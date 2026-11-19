@@ -96,7 +96,7 @@ export function initPowers(seed: number, fen: string, crowdSide: Side): BossPowe
  * then: it waits a turn). `hold` (several bosses on one side: not the turn change before his own move): the ultimate's step
  * is left out (the meter still fills; a warning and the test trigger wait), so one ultimate comes a turn change.
  */
-export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowerSettings = BOSS_POWERS, lastMove: string | null = null, hold = false): BossState {
+export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowerSettings = BOSS_POWERS, lastMove: string | null = null, hold = false, crowdMoves?: () => readonly string[]): BossState {
   const powers = bossPowers(boss);
   const p = boss.powers;
   const rules = bossRules(boss);
@@ -112,7 +112,7 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   // (An ultimate at the start of the boss's turn keeps the test trigger until then.)
   const { ultNext, ...rest } = p;
   const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && (hold || rules.ultimateOnHisTurn || rules.triggerAtHisTurn) ? { ultNext } : {}) };
-  const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext, lastMove, rageSpeed: rageSpeedOf(boss.id, s), s, events };
+  const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext, lastMove, rageSpeed: rageSpeedOf(boss.id, s), s, events, ...(crowdMoves ? { crowdMoves } : {}) };
   // The ultimate under way: while its effect runs, nothing gathers in the meter (it stays empty); once it's over, the
   // meter fills again from empty, and the next can come.
   if (next.ultAt !== undefined) {
@@ -132,6 +132,20 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
   else rules.passive(next, t);
   return { ...boss, powers: next };
+}
+
+/**
+ * Several bosses: this boss's ultimate can't wait for his own turn change (BossRules.ultimateNow: Chandy's last chance), asked as the
+ * crowd's turn in `fen` is set up, before any boss's step (his powers as his last turn left them), with the side's allowed moves.
+ * Never while an ultimate of his is under way.
+ */
+export function ultimateNow(boss: BossState, fen: string, crowdMoves: () => readonly string[], test = "", s: BossPowerSettings = BOSS_POWERS): boolean {
+  const powers = bossPowers(boss);
+  const p = boss.powers;
+  const rules = bossRules(boss);
+  if (!powers || !p || !rules?.ultimateNow || p.ultAt !== undefined) return false;
+  const t: TurnContext = { turn: turnOf(boss), fen, crowd: boss.crowdSide, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!p.ultNext, lastMove: null, rageSpeed: rageSpeedOf(boss.id, s), s, events: [], crowdMoves };
+  return rules.ultimateNow(p, t);
 }
 
 /** An ultimate has come and its effect still runs (or it's its own turn): no rage gathers. */

@@ -1254,10 +1254,6 @@ export function bossClockSettings(s: Pick<Settings, "bossMaxMoves">, clock: { ba
 export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined };
 
 /**
- * Boss powers (boss-powers.ts in the chess package). Turns are the crowd's moves. Every power is decided on the
- * server from the match's seed and the position, never breaks check and never leaves the crowd without a move.
- */
-/**
  * The Battle Tower (docs/decisions/2026-11-18-battle-tower-design.md). Several bosses on one side (PR 6): each boss's rage
  * meter fills at `rageScale[n - 1]` of its speed on a floor of n bosses (first guesses; the tower's sim tunes them), and the
  * bosses in `apart` are never on one floor: Hollow and Smudgy (both hide what is on a square; Eric, Nov 18), and, for now, the pairs
@@ -1272,6 +1268,10 @@ export const BATTLE_TOWER = {
   maxBosses: 3,
 } as const;
 
+/**
+ * Boss powers (boss-powers.ts in the chess package). Turns are the crowd's moves. Every power is decided on the
+ * server from the match's seed and the position, never breaks check and never leaves the crowd without a move.
+ */
 export const BOSS_POWERS = {
   /** The first passive comes as this crowd turn begins. */
   firstPassive: 2,

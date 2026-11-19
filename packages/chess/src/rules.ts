@@ -487,6 +487,42 @@ export function withoutPiece(fen: string, square: string): string {
   return parts.join(" ");
 }
 
+/**
+ * The position with its en passant square only where the engine keeps it: the one rule for a position a power edited (a
+ * piece put on or taken off between moves: Alfil's `editedFen`, Timber's drops and Gnaw, Don Dough's risen dough, the
+ * tiger's balloons). Stockfish keeps the square only while it and the square behind it (where the pawn's double step
+ * started) are empty and the pawn that made the step stands in front of it; chess.js keeps whatever it's given, and then
+ * lists a capture Stockfish doesn't (#275's S2, again in the Battle Tower's audit 1, Nov 19). chess.js writes the square
+ * only while a pawn of the side to move beside that one can take it legally. All of that, or "-".
+ */
+export function keptEnPassant(fen: string): string {
+  const parts = fen.split(" ");
+  const ep = parts[3];
+  if (!ep || ep === "-") return fen;
+  const mover = sideToMove(fen);
+  const up = mover === "w" ? 1 : -1;
+  const f = ep.charCodeAt(0) - 97;
+  const r = Number(ep[1]);
+  const pawn = `${ep[0]}${r - up}`;
+  const behind = `${ep[0]}${r + up}`;
+  const pawnOf = (sq: string, color: "w" | "b") => {
+    const p = pieceAt(fen, sq);
+    return p?.type === "p" && p.color === color;
+  };
+  const live =
+    f >= 0 &&
+    f < 8 &&
+    r === (mover === "w" ? 6 : 3) &&
+    !pieceAt(fen, ep) &&
+    !pieceAt(fen, behind) &&
+    pawnOf(pawn, mover === "w" ? "b" : "w") &&
+    // (A pawn's diagonal step onto the empty square: an en passant capture, from beside the pawn.)
+    legalMoves(fen).some((m) => m.slice(2, 4) === ep && m[0] !== m[2] && pawnOf(m.slice(0, 2), mover));
+  if (live) return fen;
+  parts[3] = "-";
+  return parts.join(" ");
+}
+
 /** The position with a piece put on a square (e.g. to show a destroyed piece one last time). */
 export function withPiece(fen: string, square: string, piece: { color: "w" | "b"; type: string }): string {
   const parts = fen.split(" ");

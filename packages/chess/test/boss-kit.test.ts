@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BOSS_ROSTER, mulberry32 } from "@chessroyale/core";
-import { MatchRunner, applyMove, boardEnd, bossShowMs, bossTurnShowMs, legalMoves, sanLineToUci, START_FEN } from "../src/index.ts";
+import { MatchRunner, applyMove, boardEnd, bossShowMs, bossTurnShowMs, keptEnPassant, landCheck, legalMoves, sanLineToUci, START_FEN } from "../src/index.ts";
 import { KIT_OPENING, KNOWN_STEPS, PROMOTION_OPT_OUT, StockfishMoves, epKept, fakeEngine, kitBattles, kitBosses, kitSettings, newPromotions, positionProblems, quickSearches, runBattle, unknownSteps } from "./boss-kit-lib.ts";
 
 /**
@@ -97,6 +97,28 @@ describe("the boss kit: its checks catch the past bugs' own positions", () => {
     // (Cleared, as the fix does: nothing wrong.)
     const cleared = kept.replace(" d6 ", " - ");
     expect(positionProblems(cleared, await sf.moves(cleared))).toEqual([]);
+  });
+
+  it("audit 1's finding 1: every position the one en passant rule makes is one Stockfish lists the same moves for", async () => {
+    // (keptEnPassant's own cases: rules.test.ts; and the audit's balloon, every shape on every empty square of the audit's position.)
+    const cases = [
+      "4k3/8/8/4Pp2/8/8/8/4K3 w - f6 0 2",
+      "4k3/5n2/8/4Pp2/8/8/8/4K3 w - f6 0 2",
+      "4k3/8/5n2/4Pp2/8/8/8/4K3 w - f6 0 2",
+      "4k3/8/8/5p2/8/8/8/4K3 w - f6 0 2",
+      "4k3/8/8/K3Pp1r/8/8/8/8 w - f6 0 2",
+      "4k3/8/8/8/3Pp3/8/8/4K3 b - d3 0 1",
+      "4k3/8/8/8/3Pp3/8/3N4/4K3 b - d3 0 1",
+    ].map(keptEnPassant);
+    const audit = "2rq1b2/pP1kp3/2p5/4Pp1P/1P3Q2/3b1P1N/2b4P/R1B1KBrR w KQ f6 0 25";
+    for (const shape of ["p", "n", "b", "r", "q"] as const)
+      for (const f of "abcdefgh") for (let r = 1; r <= 8; r++) cases.push(landCheck(audit, shape, `${f}${r}`, []) ?? "");
+    let checked = 0;
+    for (const fen of cases.filter(Boolean)) {
+      expect(positionProblems(fen, await sf.moves(fen)), fen).toEqual([]);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(20);
   });
 
   it("#273: a hop onto your second rank hands him a queen before you move (1.e3 e5 2.a3 e4 3.a4, then e4 over e3 to e2)", () => {

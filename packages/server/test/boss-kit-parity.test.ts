@@ -22,6 +22,7 @@ import {
   waterAnswer,
   hoopsAnswer,
   creaseAnswer,
+  dashExtraMoveFrom,
   applyMove,
   dodgeTimeline,
   slamFrom,
@@ -77,11 +78,14 @@ async function hostScore(engine: EngineLike, s: Settings, job: Extract<Msg, { t:
   return { boardId: job.boardId, bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter, botPicks: {}, botThinkMs: {}, botPowerUps: [], replies, mates };
 }
 
-/** The app's host (net.ts): its answer to a boss request, on the stand-in engine. */
-async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "bossRequest" }>): Promise<Extract<Parameters<LobbyCore["message"]>[1], { t: "bossMove" }>> {
+/**
+ * The app's host (net.ts): its answer to a boss request, on the stand-in engine. `focus`: the boss of the last view it was sent (net.ts's
+ * `this.boss`): his extra move is picked as his (Dash's after a failed Scramble Rush, else Hollow's; audit 1, finding 5).
+ */
+async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "bossRequest" }>, focus: string | undefined): Promise<Extract<Parameters<LobbyCore["message"]>[1], { t: "bossMove" }>> {
   const engines = [engine];
   const reply = (move: string, extra: { drag?: string; showdown?: string } = {}) => ({ t: "bossMove" as const, key: m.key, move, ...extra });
-  if (m.extra) return reply((await extraMoveFrom(engine, m.fen)) ?? "");
+  if (m.extra) return reply((await (focus === "dash" ? dashExtraMoveFrom : extraMoveFrom)(engine, m.fen)) ?? "");
   if (m.bounce) return reply((await bounceFrom(engines, m.fen, m.bounce))?.fen ?? "");
   if (m.fuse) return reply((await fuseFrom(engines, m.fen, m.fuse, undefined, m.land?.length ? slamAhead(m.land).after : null))?.fen ?? "");
   if (m.slam) return reply((await slamFrom(engines, m.fen, m.slam))?.fen ?? "");
@@ -129,12 +133,14 @@ async function online(bossId: string, test: string, patch: Partial<Settings> = {
   const engine = fakeEngine();
   const trace: Trace = { turns: [], events: new Set(), result: null };
   const picked = new Set<string>();
+  let focus: string | undefined;
   for (let i = 0; i < 4000 && trace.result === null; i++) {
     const msgs = inbox.get("p1") ?? [];
     inbox.set("p1", []);
     inbox.set("p2", []);
     let acted = false;
     for (const m of msgs) {
+      if ((m.t === "boss" || m.t === "round") && m.boss?.id) focus = m.boss.id;
       if (m.t === "boss") for (const e of m.boss.powers?.events ?? []) trace.events.add(eventKey(e));
       // (Chandy's Dodge: both vote the safe square (the lobby's own state: the view hides it) once the round's vote is open.)
       const dodge = m.t === "boss" ? m.dodge : undefined;
@@ -150,7 +156,7 @@ async function online(bossId: string, test: string, patch: Partial<Settings> = {
         acted = true;
       }
       if (m.t === "bossRequest") {
-        core.message("p1", await hostBoss(engine, runner.settings, m));
+        core.message("p1", await hostBoss(engine, runner.settings, m, focus));
         acted = true;
       }
       if (m.t === "round" && m.board && m.boss && !picked.has(m.key)) {
@@ -286,21 +292,29 @@ describe("the boss kit: solo and online agree", () => {
   }, 60_000);
 });
 
+/** A trace's events before the move cap's last crowd turn (`cap`): a moment on it is read by the solo trace but never sent online. */
+const beforeCap = (events: ReadonlySet<string>, cap: number) => new Set([...events].filter((e) => !(((JSON.parse(e) as { turn?: number }).turn ?? 0) >= cap)));
+
+/** More sides by hand (the default list stays as it is): `KIT_PARITY_SIDES=moo+dash,alfil+tiger npx vitest run packages/server/test/boss-kit-parity.test.ts`. */
+const EXTRA_SIDES = (process.env.KIT_PARITY_SIDES ?? "").split(",").filter(Boolean).map((x) => x.split("+"));
+
 /**
  * Several bosses on one side (Battle Tower PR 6): the same battle solo and online, through the lobby's path for the boss to move.
  * Every tower boss in at least one pair, and two threes; the first boss's ultimate by its test switch. Two limits of this harness,
  * not of the side (each shows with one boss too): Timber's scraps run on the server's clock online and on none in the solo copy,
- * so he goes first, with his ultimate's switch, as in his one-boss check; and a moment after the move cap's last crowd move is
- * read by the solo trace but never sent online, so the cap is 16 (alfil + zebra's dough rose on move 14).
+ * so he goes first, with his ultimate's switch, as in his one-boss check; and a moment on the move cap's last crowd turn is read by
+ * the solo trace but never sent online, so that turn's events are left out of the comparison (beforeCap; audit 1, finding 5).
  */
 describe("the boss kit over several bosses: solo and online agree", () => {
   const ids = kitBosses().map((d) => d.id).filter((id) => id !== "recluse");
   const half = Math.ceil(ids.length / 2);
+  const CAP = 16;
   // (Each boss once: the first half each with one from the second, then two threes; never a pair BATTLE_TOWER.apart keeps apart.)
   const sides = [
     ...ids.slice(0, half).map((id, i) => [id, ids[(half + i) % ids.length]!]),
     [ids[1]!, ids[5]!, ids[9]!],
     [ids[12]!, ids[2]!, ids[16 % ids.length]!],
+    ...EXTRA_SIDES,
   ]
     .filter((xs) => new Set(xs).size === xs.length && !BATTLE_TOWER.apart.some(([a, b]) => xs.includes(a) && xs.includes(b)))
     .map((xs) => (xs.includes("timber") ? ["timber", ...xs.filter((x) => x !== "timber")] : xs));
@@ -308,7 +322,7 @@ describe("the boss kit over several bosses: solo and online agree", () => {
     it(`${bosses.join(" + ")}: the same positions, power events and result solo and online`, async () => {
       // (The first boss's ultimate by its test switch: it comes at his own turn change.)
       const test = kitBosses().find((d) => d.id === bosses[0])!.powers!.ultimate;
-      const { trace: net, start } = await online(bosses[0]!, test, { bossIds: bosses, bossNoStrikes: true, bossMaxMoves: 16 });
+      const { trace: net, start } = await online(bosses[0]!, test, { bossIds: bosses, bossNoStrikes: true, bossMaxMoves: CAP });
       expect(start.state.bosses?.map((o) => o.id)).toEqual(bosses);
       const local = await solo(start);
       expect(net.turns.length).toBeGreaterThan(4);
@@ -316,7 +330,8 @@ describe("the boss kit over several bosses: solo and online agree", () => {
       const firstDiff = net.turns.findIndex((t, i) => t !== local.turns[i]);
       expect(firstDiff === -1 ? null : { turn: firstDiff + 1, online: net.turns[firstDiff], solo: local.turns[firstDiff] ?? "none" }).toBeNull();
       expect(local.turns.length).toBe(net.turns.length);
-      expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
+      const [netEvents, localEvents] = [beforeCap(net.events, CAP), beforeCap(local.events, CAP)];
+      expect({ onlyOnline: [...netEvents].filter((e) => !localEvents.has(e)), onlySolo: [...localEvents].filter((e) => !netEvents.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
       expect(local.result).toBe(net.result);
     }, 60_000);
   }

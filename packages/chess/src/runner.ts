@@ -102,6 +102,7 @@ import {
   sideBossAllowed,
   sideBossStopped,
   sideCrowdAllowed,
+  ultimateNow,
   sideEvaluation,
   sideIcedSquares,
   sideMustScore,
@@ -318,8 +319,14 @@ export class MatchRunner {
       /** A 50 v 50's parties (each the entrant ids of one): each plays the match on one team (core's assignTeams). */
       together?: readonly (readonly string[])[];
     },
+    /** restore's own: the match as its snapshot left it (restore puts in the rest), nothing of a new match set up. */
+    restoring?: Pick<RunnerSnapshot, "state">,
   ) {
     this.top = new TopMovesCache(opts.settings.botCandidateMoves);
+    if (restoring) {
+      this.state = restoring.state;
+      return;
+    }
     const plan = stagePlan(opts.settings);
     const boardCount = plan[0]?.boards ?? 1;
     const plies = openingPlies(opts.settings);
@@ -504,7 +511,7 @@ export class MatchRunner {
 
   /** The battle was Hollow's by his last bulb (Boss alone): for the result screen (the results' `blackout`). */
   get bossBlackout(): boolean {
-    return this.sideBosses().some((b) => blackedOut(b)) || blackedOut(this.state.boss);
+    return this.sideBosses().some((b) => blackedOut(b));
   }
 
   /** Hollow's dark: each player's wrong attempts into the dark this round. */
@@ -1306,34 +1313,16 @@ export class MatchRunner {
   ): MatchRunner {
     // (A Freestyle board's opening isn't in the library either.)
     const byId = new Map([...opts.library, FREESTYLE_OPENING].map((o) => [o.id, o]));
-    const runner = Object.create(MatchRunner.prototype) as MatchRunner;
+    // (Built as every runner is, so each field the class starts a runner with is there at its start value, then the match from the
+    // snapshot. Built with Object.create and a list kept by hand, a restored runner lacked the bosses' store (Big Boy's Big Bounce
+    // crashed online: every event of a lobby restores), then four more fields, whose turnOf the Battle Tower's audit 1 found.)
+    const runner = new MatchRunner({ ...opts, entrants: [] }, snapshot);
     Object.assign(runner, {
-      opts: { ...opts, entrants: [] },
-      top: new TopMovesCache(opts.settings.botCandidateMoves),
-      state: snapshot.state,
       boards: new Map(snapshot.boards.map((b) => [b.id, { ...b, opening: byId.get(b.opening)! }])),
       groups: new Map(snapshot.groups),
       usedFamilies: new Set(snapshot.usedFamilies),
       retiredThisRound: snapshot.retired,
       botThink: new Map(snapshot.botThink ?? []),
-      botPowerUps: new Set(),
-      // (Not made from the snapshot, but fields every runner has: Object.create skips the class's own initializers. A
-      // restored runner without the bosses' store crashed Big Boy's Big Bounce online: every event of a lobby restores.)
-      kingCallers: new Set(),
-      kingStrikers: new Set(),
-      strikeBots: null,
-      planned: new Map(),
-      planning: null,
-      forceLastStand: false,
-      showdownScout: null,
-      bossTimedOut: false,
-      humanBrain: null,
-      brainNote: null,
-      landingCheck: null,
-      raceCheck: null,
-      bossLast: null,
-      bossMemo: new Map(),
-      bossViewMemo: null,
     });
     // The boss battle's board isn't in the opening library.
     for (const [id, b] of runner.boards) if (!b.opening) runner.boards.set(id, { ...b, opening: BOSS_OPENING });
@@ -2053,6 +2042,7 @@ export class MatchRunner {
       now: () => runner.clockNow(),
       random: () => runner.opts.rng(),
       library: runner.opts.library,
+      rageRates: () => runner.rageRates(),
     };
   }
 
@@ -2471,7 +2461,9 @@ export class MatchRunner {
    * Several bosses: who comes into focus now, from the battle as it stands. The bosses to move: one whose move comes out of turn
    * (BossRules.outOfTurn: Wrangler's reply to the showdown's duel, Folio's move again after Revision), else the boss after the one
    * who moved last. The crowd to move: the boss after the one who moved (his turn change), or Hollow himself while his second
-   * move is due (Lights out failed: his turn again before the next boss's). The order goes on from the boss after whoever moved.
+   * move is due (Lights out failed: his turn again before the next boss's), or the boss whose ultimate couldn't wait and came as
+   * this crowd turn began (BossRules.ultimateNow: Chandy's Dodge, read from him as at his own turn change). The order goes on
+   * from the boss after whoever moved.
    */
   private focusNow(): number {
     const n = this.state.bosses!.length;
@@ -2483,7 +2475,10 @@ export class MatchRunner {
       const k = this.sideBosses().findIndex((b) => !!b.powers && !!bossRules(b)?.outOfTurn?.(b, board));
       return k < 0 ? next : (f + k) % n;
     }
-    return this.asBoss(moved, () => hollowBattle.extraMoveDue(this.battle)) ? moved : next;
+    if (this.asBoss(moved, () => hollowBattle.extraMoveDue(this.battle))) return moved;
+    const f = this.state.focus ?? 0;
+    const k = this.sideBosses().findIndex((b) => !!b.powers && !!bossRules(b)?.ultimateNow && b.powers.ultAt === b.powers.turn);
+    return k < 0 ? next : (f + k) % n;
   }
 
   /** Several bosses: the boss focusNow names comes into focus. */
@@ -2509,7 +2504,9 @@ export class MatchRunner {
    * meter on every crowd turn, his meter at BATTLE_TOWER.rageScale of its speed. His ultimate's step only at his own turn change:
    * the one after his own move for an ultimate his move prepares (`triggerAtHisTurn`: Wrangler's line-up, Folio's crease), the
    * one before it for every other (in focus); and one ultimate a turn change, that first one first (its line-up is ready), the
-   * other waiting, its warning kept. The move just played is passed only to the boss who played it.
+   * other waiting, its warning kept. The move just played is passed only to the boss who played it. An ultimate that can't wait
+   * (BossRules.ultimateNow: Chandy's last chance, asked with the side's allowed moves) runs its step first at any turn change, the
+   * others' waiting but a prepared one (its line-up is already on the board), and its boss holds the crowd's turn (focusNow).
    */
   private prepareSide() {
     const board = this.boards.get(this.state.boards[0]!)!;
@@ -2525,20 +2522,60 @@ export class MatchRunner {
     const moved = this.state.moved ?? n - 1;
     const ids = this.state.bosses!.map((o, i) => (i === f ? this.state.boss!.id : o.id));
     const afterHis = (i: number) => !!bossRules({ id: ids[i] })?.triggerAtHisTurn;
+    const cantWait = (i: number) => !!bossRules({ id: ids[i] })?.ultimateNow;
     // (The boss whose turn change it is: the next in the order, even while Hollow's second move holds the focus on him.)
     const nextUp = (moved + 1) % n;
+    const mine = (i: number) => (afterHis(i) ? i === moved : i === nextUp);
     const order = [moved, ...Array.from({ length: n }, (_, k) => (f + k) % n).filter((i) => i !== moved)];
+    // (The crowd's allowed moves this turn on the side, as every boss's steps leave them, a can't-wait ultimate's own held: worked
+    // out on a copy, once, and only when asked (Chandy's last chance asks them when you have a mate in one).)
+    const start = this.state;
+    let limits: readonly string[] | null = null;
+    const crowdMoves = () => (limits ??= this.sideLimits(start, () => this.sideSteps(board, s, order, (i, came) => cantWait(i) || !mine(i) || came, undefined, false)));
+    const first = order.find((i) => this.asBoss(i, () => ultimateNow(this.state.boss!, board.fen, crowdMoves, this.settings.bossPowerTest, s)));
+    if (first === undefined) return this.sideSteps(board, s, order, (i, came) => !mine(i) || came, crowdMoves);
+    // (His first, then the rest waiting, but the ultimate the boss who just moved prepared: its line-up is on the board already.)
+    const prepared = (i: number) => afterHis(i) && i === moved;
+    this.sideSteps(board, s, [first, ...order.filter((i) => i !== first)], (i, came) => i !== first && (!mine(i) || (came && !prepared(i))), crowdMoves);
+    this.refocus();
+  }
+
+  /**
+   * Several bosses: every boss's steps for the crowd's turn (prepareTurn), in `order`, each one's ultimate step held where `held`
+   * says so (`came`: an ultimate came at this turn change already); `began`: each boss's own match effect once a turn (turnBegun).
+   */
+  private sideSteps(board: BoardState, s: BossPowerSettings, order: readonly number[], held: (i: number, came: boolean) => boolean, crowdMoves?: () => readonly string[], began = true) {
+    const n = this.state.bosses!.length;
+    const moved = this.state.moved ?? n - 1;
     let came = false;
     for (const i of order) {
       this.asBoss(i, () => {
         const b = this.state.boss!;
         if (!b.powers) return;
-        const mine = afterHis(i) ? i === moved : i === nextUp;
-        const next = prepareTurn(b, board.fen, this.settings.bossPowerTest, s, i === moved ? board.lastMove : null, !mine || came);
+        const next = prepareTurn(b, board.fen, this.settings.bossPowerTest, s, i === moved ? board.lastMove : null, held(i, came), crowdMoves);
         if (next.powers?.ultAt !== undefined && b.powers.ultAt === undefined) came = true;
         this.state = { ...this.state, boss: next };
-        if (next.powers?.turn !== b.powers.turn) bossRules(next)?.turnBegun?.(this.battle);
+        if (began && next.powers?.turn !== b.powers.turn) bossRules(next)?.turnBegun?.(this.battle);
       });
+    }
+  }
+
+  /**
+   * Several bosses: the crowd's allowed moves on the side (every limit, the lift) after `steps` run on a copy of the match's state
+   * `start`; the match's state (and whose turn it is) as it was after.
+   */
+  private sideLimits(start: MatchState, steps: () => void): string[] {
+    const keep = this.state;
+    const outer = this.turnOf;
+    this.state = structuredClone(start);
+    this.turnOf = null;
+    try {
+      steps();
+      const fen = this.boards.get(this.state.boards[0]!)!.fen;
+      return sideCrowdAllowed(this.sideBosses(), fen) ?? legalMoves(fen);
+    } finally {
+      this.state = keep;
+      this.turnOf = outer;
     }
   }
 

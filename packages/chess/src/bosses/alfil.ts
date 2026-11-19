@@ -24,7 +24,7 @@
  * (characters/alfil.ts, components/Alfil.tsx), timed by ALFIL_BEATS.
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type SlamLanding, type SlamPiece } from "@chessroyale/core";
-import { applyMove, gameEnd, legalMoves, mateInOne, sideToMove } from "../rules.ts";
+import { applyMove, gameEnd, keptEnPassant, legalMoves, mateInOne, sideToMove } from "../rules.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { passTurn } from "./hollow.ts";
 import type { BossAhead, EngineLike } from "../runner.ts";
@@ -75,26 +75,16 @@ export const hisTurn = (boss: Pick<BossState, "crowdMoves" | "startPly"> & { pow
 /**
  * A position with pieces taken off or put on between moves (`g`, the side to move as in `fen`): castling rights only
  * while their king and rook stand (these powers never move either, but it costs nothing), the en passant square only
- * while it and the square behind it are empty (a piece landed on either: Stockfish drops the square then, chess.js
- * doesn't, and the two must agree on the moves), the pawn that made its double step is there and one of the side to
- * move's pawns can take it, and the fifty-move count from zero (as after a capture).
+ * where the engine keeps it (keptEnPassant: it and the square behind it empty, the pawn that made its double step
+ * there, and a capture there legal), and the fifty-move count from zero (as after a capture).
  */
 export function editedFen(fen: string, g: Grid): string {
   const parts = fen.split(" ");
   parts[0] = placementOf(g);
   const corner: Record<string, [string, string, string, string]> = { K: ["e1", "K", "h1", "R"], Q: ["e1", "K", "a1", "R"], k: ["e8", "k", "h8", "r"], q: ["e8", "k", "a8", "r"] };
   parts[2] = [...(parts[2] ?? "-")].filter((c) => corner[c] && g.get(corner[c]![0]) === corner[c]![1] && g.get(corner[c]![2]) === corner[c]![3]).join("") || "-";
-  const ep = parts[3] ?? "-";
-  if (ep !== "-") {
-    const mover: Side = sideToMove(fen);
-    const pawn = square(file(ep), mover === "w" ? 5 : 4);
-    // (Behind it: the square the pawn's double step started from.)
-    const behind = square(file(ep), mover === "w" ? 7 : 2);
-    const takers = [file(ep) - 1, file(ep) + 1].filter((f) => f >= 0 && f < 8).map((f) => square(f, mover === "w" ? 5 : 4));
-    if (g.has(ep) || g.has(behind) || g.get(pawn) !== letter(other(mover), "p") || !takers.some((sq) => g.get(sq) === letter(mover, "p"))) parts[3] = "-";
-  }
   if (parts[4]) parts[4] = "0";
-  return parts.join(" ");
+  return keptEnPassant(parts.join(" "));
 }
 
 /** The side to move has a legal move (the position is one a game can go on from). */

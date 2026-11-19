@@ -14,7 +14,7 @@
  * - **The drop:** at the end of his turn (after his move and any Gnaw), one finished piece, the first finished that he can
  *   have (never a position the engine refuses: a ninth pawn, more pieces than promotions could make), is dropped onto an empty
  *   square of his half (his own two back ranks first), the first of a seeded order the guards allow (the circus tiger's landing guards, `landCheck`: never
- *   the en passant square, a pawn never on a first or last rank, never a square you attack, never a check either way, never
+ *   the en passant square or the square behind it, a pawn never on a first or last rank, never a square you attack, never a check either way, never
  *   a mate in one for either side, never you without a move), and never one that would put him more than workshopLeadMax
  *   pawns ahead of you on material (he rebuilds what he lost; the sim's call). At most one a turn; none allowed: it waits on
  *   the bench.
@@ -27,7 +27,7 @@
  * - The usual warning as a crowd turn begins; on his turn after it, after his move (he keeps his turn, as Babur's hoops): one of
  *   your pawns, at random (seeded), is eaten, and makes gnawScraps scraps for his workshop. Guards: never one whose going
  *   leaves your king attacked by more than before (a new check), never you without a move, never a position the engine
- *   refuses; the en passant square kept only while a capture there is still legal. You have pawns but none qualifies: it
+ *   refuses; the en passant square kept only where the engine keeps it (keptEnPassant). You have pawns but none qualifies: it
  *   waits for his next turn (the meter stays full). You have none: it comes and eats nothing (the screens say so).
  * - The admins' trigger: after his next move, without the warning.
  *
@@ -36,9 +36,9 @@
  */
 import { BOSS_POWERS, WORKSHOP_PIECES, type BossPowerSettings, type BossPowerState, type PowerEvent, type WorkshopPiece, type WorkshopState } from "@chessroyale/core";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
-import { kingAttackers, legalMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
+import { keptEnPassant, kingAttackers, legalMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
 import { stockfishRefuses } from "../uci.ts";
-import { VALUE, crowdHalf, from, materialOf, meterFull, other, powerRoll, testSwitch, ticksAt, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { VALUE, crowdHalf, materialOf, meterFull, other, powerRoll, testSwitch, ticksAt, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { BALLOON_TEST_MOVES, landCheck, landRefused } from "./tiger.ts";
 
 // ---------------- His moments ----------------
@@ -150,17 +150,6 @@ export function dropSquare(fen: string, piece: WorkshopPiece, wseed: number, dro
   return null;
 }
 
-/** The position with the en passant square kept only while a capture there is still legal (as the engine keeps it). */
-export function tidyEnPassant(fen: string): string {
-  const parts = fen.split(" ");
-  const ep = parts[3];
-  if (!ep || ep === "-") return fen;
-  const takes = legalMoves(fen).some((m) => to(m) === ep && pieceAt(fen, from(m))?.type === "p" && m[0] !== m[2]);
-  if (takes) return fen;
-  parts[3] = "-";
-  return parts.join(" ");
-}
-
 /**
  * The Gnaw's pawn (`fen`: the crowd to move, after his move): the crowd's pawns in a seeded order (the battle's seed and his
  * gnaw's number), the first whose going the guards allow: no new attack on the crowd's king, a move left for the crowd,
@@ -174,7 +163,7 @@ export function gnawPick(fen: string, seed: number, gnaw: number): { square: str
   const before = kingAttackers(fen, crowd).length;
   const order = pawns.map((sq) => ({ sq, k: powerRoll(seed, "gnaw", gnaw, sq) })).sort((a, b) => a.k - b.k);
   for (const { sq } of order) {
-    const after = tidyEnPassant(withoutPiece(fen, sq));
+    const after = keptEnPassant(withoutPiece(fen, sq));
     if (stockfishRefuses(after)) continue;
     if (kingAttackers(after, crowd).length > before) continue;
     if (!legalMoves(after).length) continue;

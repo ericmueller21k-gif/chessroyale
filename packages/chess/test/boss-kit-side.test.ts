@@ -119,6 +119,27 @@ describe("the boss kit over several bosses: every pair", () => {
   }
 });
 
+/**
+ * The battles audit 1 broke on (Nov 19; docs/decisions/2026-11-19-battle-tower-audit-1.md), as it played them: trigger from turn 2,
+ * strikes on 4, 11 and 19. clown + tiger: a balloon on the square behind the en passant square (finding 1); smudgy + clown and tiger +
+ * bigboy + sawyer: the kit's invariant 9 taking a guard that binds the whole side for one boss's own forced move (finding 4).
+ */
+const AUDIT_SEEDS: readonly { bosses: string[]; seed: number; maxMoves: number; finding: number }[] = [
+  { bosses: ["clown", "tiger"], seed: 56479, maxMoves: 40, finding: 1 },
+  { bosses: ["smudgy", "clown"], seed: 30210, maxMoves: 40, finding: 4 },
+  { bosses: ["tiger", "bigboy", "sawyer"], seed: 7972, maxMoves: 45, finding: 4 },
+];
+
+describe("the boss kit over several bosses: audit 1's seeds", () => {
+  for (const a of AUDIT_SEEDS) {
+    it(`${a.bosses.join(" + ")}, seed ${a.seed} (finding ${a.finding}): the invariants after every step`, async () => {
+      const run = await runBattle({ boss: a.bosses[0]!, bosses: a.bosses, seed: a.seed, side: "w", test: "", triggerFrom: 2, strikes: [4, 11, 19], maxMoves: a.maxMoves, opening: KIT_OPENING }, sf);
+      expect(run.failures.slice(0, 3).join("\n\n")).toBe("");
+      expect(run.played.boss ?? 0).toBeGreaterThan(10);
+    }, 120_000);
+  }
+});
+
 describe("the boss kit over several bosses: a sample of threes", () => {
   for (const three of kitThrees(THREES)) {
     it(`${three.join(" + ")}: the invariants after every step`, async () => {

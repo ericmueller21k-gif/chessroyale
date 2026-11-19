@@ -150,5 +150,17 @@ describe("MatchRunner", () => {
     expect(report.boards).toHaveLength(8);
     expect(restored.stageComplete()).toBe(true);
   });
+
+  it("a restored runner has every field a new one starts with, at its start value (turnOf null: the Battle Tower's audit 1, finding 6)", () => {
+    const settings: Settings = { ...DEFAULT_SETTINGS, roundsPerStage: 2, firstStageRounds: 2 };
+    const runner = new MatchRunner({ settings, rng: mulberry32(3), engines: [fake], library, entrants: Array.from({ length: 32 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: 3 })) });
+    const restored = MatchRunner.restore(JSON.parse(JSON.stringify(runner.snapshot())), { settings, rng: mulberry32(4), engines: [fake], library });
+    expect(Object.keys(restored).sort()).toEqual(Object.keys(runner).sort());
+    const own = (r: MatchRunner) => r as unknown as Record<string, unknown>;
+    expect(own(restored)["turnOf"]).toBeNull();
+    // (Every field but the match's own (its state, boards and the rest a snapshot carries) as a new runner has it.)
+    const fromSnapshot = new Set(["opts", "state", "boards", "groups", "usedFamilies", "retiredThisRound", "botThink", "top"]);
+    for (const k of Object.keys(runner).filter((k) => !fromSnapshot.has(k))) expect(own(restored)[k], k).toEqual(own(runner)[k]);
+  });
 });
 

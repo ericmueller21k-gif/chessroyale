@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BATTLE_TOWER, BOSS_POWERS, mulberry32 } from "@chessroyale/core";
 import type { BossState, Settings } from "@chessroyale/core";
-import { MatchRunner, bossRules, crowdAllowed, legalMoves, pieceAt, rageOf, sideRates } from "../src/index.ts";
+import { MatchRunner, bossRules, crowdAllowed, legalMoves, pieceAt, rageOf, rageSpeedOf, rageTick, sideRates } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings, runBattle, sideTracked, type KitBattle } from "./boss-kit-lib.ts";
 
 /**
@@ -149,6 +149,32 @@ describe("several bosses: the turn order and the merged layer", () => {
   });
 });
 
+describe("several bosses: Folio's Crease line asked at the floor's rates (audit 1, finding 3)", () => {
+  /** Folio to move after your first move, his meter set to `full` times full at the one-boss speed as your next turn begins. */
+  async function folioAt(order: readonly string[], full: number) {
+    const r = runner(order);
+    r.deal();
+    await r.score(new Map([["h0", { move: "e2e4", thinkMs: 1000 }]]));
+    expect(r.bossToMove() && r.boss!.id).toBe("folio");
+    const p = r.boss!.powers!;
+    // (creaseDue's own sum: the meter gathered, plus this crowd move's tick, times his speed.)
+    const charge = (full * BOSS_POWERS.rageFull) / rageSpeedOf("folio") - rageTick(p.judged);
+    r.state.boss = { ...r.boss!, powers: { ...p, charge, lost: 0, rageUsed: 0 } };
+    return r;
+  }
+
+  it("a meter full at the one-boss speed but not at the floor's (75% with two, 60% with three): no line search", async () => {
+    // (Alone: full, the line is wanted. The one-boss case is unchanged.)
+    expect((await folioAt(["folio"], 1.2)).creaseAsk()).not.toBeNull();
+    expect((await folioAt(["folio", "gingerbread"], 1.2)).creaseAsk()).toBeNull();
+    expect((await folioAt(["folio", "gingerbread", "moo"], 1.5)).creaseAsk()).toBeNull();
+    // (Full at the floor's own rates: wanted, as his step will warn.)
+    expect((await folioAt(["folio", "gingerbread"], 1.2 / 0.75)).creaseAsk()).not.toBeNull();
+    expect((await folioAt(["folio", "gingerbread", "moo"], 1.2 / 0.6)).creaseAsk()).not.toBeNull();
+    expect(BATTLE_TOWER.rageScale.slice(1, 3)).toEqual([0.75, 0.6]);
+  });
+});
+
 describe("several bosses: each boss's own turn, and every move reaching every boss (the review of PR #808)", () => {
   it("Smudgy's forced moves are his own: the boss to move before him is never held to one, and his Camouflage isn't worn down by the others' turns", async () => {
     const held: string[] = [];
@@ -228,6 +254,95 @@ describe("several bosses: each boss's own turn, and every move reaching every bo
       expect(crossed).toEqual([]);
     }, 60_000);
   }
+});
+
+describe("several bosses: an ultimate that can't wait (Chandy's last chance; audit 1, finding 2)", () => {
+  /** Scholar's mate against him, the bosses' moves played as given (seed 5): Qxf7# open as the crowd's turn 4 begins. */
+  async function scholars(order: readonly string[], each?: (r: MatchRunner, k: number) => void) {
+    const r = runner(order);
+    const crowd = ["e2e4", "f1c4", "d1h5"];
+    const boss = ["e7e5", "b8c6", "g8f6"];
+    for (let k = 0; k < 3; k++) {
+      r.deal();
+      await r.score(new Map([["h0", { move: crowd[k]!, thinkMs: 1000 }]]));
+      expect(r.boards.get(0)!.history.at(-1), `the crowd's move ${k + 1}`).toBe(crowd[k]);
+      each?.(r, k);
+      r.applyBossMove(boss[k]!);
+    }
+    return { r, chandy: sideBoss(r, "chandy") };
+  }
+
+  // (Every order the audit tried: alone, Chandy first or second of two, each place of three.)
+  for (const order of [["chandy"], ["timber", "chandy"], ["zebra", "chandy"], ["chandy", "timber"], ["chandy", "zebra"], ["chandy", "timber", "zebra"], ["timber", "zebra", "chandy"], ["timber", "chandy", "zebra"]]) {
+    it(`${order.join(" + ")}: a mate in one open as your turn begins brings his Dodge at once, whoever moved last`, async () => {
+      const { r, chandy } = await scholars(order);
+      expect(legalMoves(r.boards.get(0)!.fen)).toContain("h5f7");
+      expect(chandy.powers!.events.map((e) => e.kind)).toEqual(expect.arrayContaining(["warn", "dodge"]));
+      expect(chandy.powers!.ultAt).toBe(4);
+      // (One ultimate a turn change: his, the others' waiting.)
+      for (const b of r.sideBosses()) if (b.id !== "chandy") expect(b.powers?.events.map((e) => e.kind) ?? [], b.id).not.toContain("warn");
+      // (He holds your turn: his Dodge plays on it round by round, read from him; then your move, and the order goes on after
+      // whoever moved last.)
+      expect(r.boss!.id).toBe("chandy");
+      let rounds = 0;
+      while (r.dodgeDue()) {
+        const d = r.boss!.powers!.chandy!.dodge!;
+        r.finishDodgeRound({ h0: d.rounds[d.results.length]!.safe });
+        rounds++;
+      }
+      expect(rounds).toBe(BOSS_POWERS.chandy.dodgeRounds);
+      r.deal();
+      await r.score(new Map([["h0", { move: "a2a3", thinkMs: 1000 }]]));
+      expect(r.boards.get(0)!.history.at(-1)).toBe("a2a3");
+      expect(r.bossToMove()).toBe(true);
+      expect(r.boss!.id).toBe(order[3 % order.length]);
+    });
+  }
+
+  it("an ultimate prepared by the move just played still comes with it (Wrangler's line-up is on the board), the others waiting", async () => {
+    // (Chandy's hook and ultimate stood in for: his ultimate can't wait exactly at the turn change Wrangler's line-up was made for.)
+    const rules = bossRules({ id: "chandy" })!;
+    const { ultimateNow, ultimate } = rules;
+    let runner: MatchRunner | null = null;
+    let now = false;
+    const lineUp = (turn: number) => !!runner?.sideBosses().some((b) => b.id === "pig" && b.powers?.showdown?.turn === turn && b.powers.ultAt === undefined);
+    rules.ultimateNow = (_p, t) => (now = lineUp(t.turn));
+    rules.ultimate = (next, t) => {
+      if (!now) return false;
+      next.ultAt = t.turn;
+      t.events.push({ kind: "dodge", turn: t.turn });
+      return true;
+    };
+    const both: string[][] = [];
+    try {
+      await runBattle(battle(["pig", "gingerbread", "chandy"], "showdown", 99, 24), null, (r, _fen, who) => {
+        runner = r;
+        if (who !== "crowd") return;
+        const kinds = r.sideBosses().map((b) => (b.powers?.events ?? []).filter((e) => e.turn === b.powers!.turn).map((e) => e.kind));
+        if (kinds.some((k) => k.includes("dodge"))) both.push(r.sideBosses().map((b, i) => `${b.id}: ${kinds[i]!.join(" ")}`));
+      });
+    } finally {
+      rules.ultimateNow = ultimateNow;
+      rules.ultimate = ultimate;
+    }
+    expect(both.length).toBe(1);
+    expect(both[0]!.find((x) => x.startsWith("pig:"))).toMatch(/showdown/);
+    expect(both[0]!.find((x) => x.startsWith("gingerbread:"))).not.toMatch(/warn|blizzard/);
+  }, 60_000);
+
+  it("a mate another boss's limit stops isn't open: no Dodge (Ginger's freeze holding your queen; the side's allowed moves asked)", async () => {
+    for (const order of [["gingerbread", "chandy"], ["chandy", "gingerbread"]]) {
+      const { r, chandy } = await scholars(order, (r, k) => {
+        // (No freeze of his own until then; then his freeze on your queen through turn 4.)
+        const i = r.state.bosses!.findIndex((o) => o.id === "gingerbread");
+        const own = r.state.focus === i ? r.state.boss! : r.state.bosses![i]!;
+        own.powers = { ...own.powers!, nextPassive: 9, ...(k === 2 ? { frozen: { square: "h5", piece: "q", until: 4 } } : {}) };
+      });
+      expect(r.crowdAllowed(), order.join(" + ")).not.toContain("h5f7");
+      expect(chandy.powers!.events.map((e) => e.kind), order.join(" + ")).not.toContain("dodge");
+      expect(chandy.powers!.ultAt, order.join(" + ")).toBeUndefined();
+    }
+  });
 });
 
 describe("several bosses: the design's out-of-turn rules", () => {

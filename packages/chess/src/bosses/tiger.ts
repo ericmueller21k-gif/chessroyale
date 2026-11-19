@@ -21,7 +21,8 @@
  * - **Where it lands, by the engine** (landFrom, the host's engines; the server checks the square with landCheck): the
  *   least valuable safe square, his gain (his evaluation after it, the crowd to move, against before it) in the shape's
  *   band (balloonBands, in the engine's units) nearest its low end; none in the band: the nearest. Hard guards
- *   (landCheck): an empty square, never one the crowd attacks, never inside a hoop, never a check either way, never a mate
+ *   (landCheck): an empty square, never the en passant square or the one behind it, never one the crowd attacks, never
+ *   inside a hoop, never a check either way, never a mate
  *   in one for either side, never the crowd without a move (the walls counted), never a position the engine refuses. A
  *   dud goes through every step a real balloon does until the last: a shape he can't have (a ninth pawn, more pieces than
  *   promotions could make) pops (`nine`) either way; no square the rules allow (or no answer) and either stays ready on
@@ -48,7 +49,7 @@
  *   one); none, or no answer: no cast this turn (the meter stays full), again after his next move.
  */
 import { BOSS_POWERS, type Balloon, type BalloonResult, type BalloonShape, type BalloonState, type BossPowerSettings, type BossPowerState, type HoopsState, type PowerEvent, type Settings } from "@chessroyale/core";
-import { applyMove, attackedSquares, kingAttacked, kingAttackers, legalMoves, matingMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
+import { applyMove, attackedSquares, keptEnPassant, kingAttacked, kingAttackers, legalMoves, matingMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { stockfishRefuses } from "../uci.ts";
@@ -367,26 +368,17 @@ export function landRefused(fen: string, shape: BalloonShape, his: Side): "nine"
   return promoted > 8 - n("p") ? "nine" : null;
 }
 
-/** The position with his piece put on a square, the en passant square kept only while a capture there is still legal. */
-function placed(fen: string, sq: string, shape: BalloonShape, his: Side): string {
-  const after = withPiece(fen, sq, { color: his, type: shape });
-  const parts = after.split(" ");
-  const ep = parts[3];
-  if (!ep || ep === "-") return after;
-  const takes = legalMoves(after).some((m) => to(m) === ep && pieceAt(after, from(m))?.type === "p" && m[0] !== m[2]);
-  if (takes) return after;
-  parts[3] = "-";
-  return parts.join(" ");
-}
-
 /**
  * His balloon of `shape` on `square`, if the rules allow it there (`fen`: the crowd to move, before it; `blocks`: the
- * hoops standing): an empty square on the board, not the en passant square, not inside a hoop, a pawn never on a first or
- * last rank, and the position after passing every guard (hoopsGuard). The position after, or null.
+ * hoops standing): an empty square on the board, not the en passant square nor the square behind it (where the pawn's
+ * double step started: a piece on either takes your capture there away, keptEnPassant), not inside a hoop, a pawn never on
+ * a first or last rank, and the position after passing every guard (hoopsGuard). The position after, or null.
  */
 export function landCheck(fen: string, shape: BalloonShape, square: string, blocks: readonly string[]): string | null {
   try {
-    if (!isSquare(square) || pieceAt(fen, square) || fen.split(" ")[3] === square) return null;
+    if (!isSquare(square) || pieceAt(fen, square)) return null;
+    const ep = fen.split(" ")[3] ?? "-";
+    if (ep !== "-" && square[0] === ep[0] && (square[1] === ep[1] || square[1] === (ep[1] === "6" ? "7" : "2"))) return null;
     if (blocks.some((c) => inHoop(c, square))) return null;
     if (shape === "p" && (square[1] === "1" || square[1] === "8")) return null;
     const crowd = sideToMove(fen);
@@ -394,7 +386,7 @@ export function landCheck(fen: string, shape: BalloonShape, square: string, bloc
     if (landRefused(fen, shape, his)) return null;
     // (Never where the crowd can take it at once: a square it attacks.)
     if (attackedSquares(fen, crowd).has(square)) return null;
-    const after = placed(fen, square, shape, his);
+    const after = keptEnPassant(withPiece(fen, square, { color: his, type: shape }));
     return hoopsGuard(after, blocks) ? after : null;
   } catch {
     return null;

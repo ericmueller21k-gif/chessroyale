@@ -52,7 +52,8 @@
  * **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16): his rage meter (his own: dodgeMeter) is dimmed until the
  * fifth upgrade, then fills over chandy.dodgeAfterMoves of your moves (nothing else fills or drains it); full, the usual warning, then
  * as your next turn begins Dodge (the crowd's turn waits for it: dodgeDue). **Last chance:** as your turn begins, if he hasn't used
- * it and you have a move that mates him (mateOpen), Dodge comes now, its warning with it, whatever his rifle or meter; the board
+ * it and you have a move that mates him (mateOpen), Dodge comes now, its warning with it, whatever his rifle or meter (on a shared
+ * floor too, whichever boss moved last, the others' ultimates waiting: ultimateNow; the side's limits asked); the board
  * comes back after it and you may still play the mate. On a blank board, your king in the middle of the 3 x 3 round e4 (White) or e5
  * (Black): first the warning volley (Eric, Nov 16): the clones fire once on lines that miss your king (dodgeVolley), no vote, then
  * "Dodge the next one!". Then three rounds: four clones, two on rank lines and two on file lines, leave exactly one square safe
@@ -815,11 +816,16 @@ export function dodgeMeter(p: Pick<BossPowerState, "chandy" | "ultAt" | "warnAt"
  * The last chance (Eric, Nov 16: "if we can calculate that it's a guaranteed mate in one ... he still fires his ult anyway"): the
  * crowd, to move in `t.fen`, has a move that mates him, among its allowed moves as this turn's limits stand (his held pieces and
  * stops in `next` for crowd turn `t.turn`; limits that would leave no move lift, as the dispatcher's do). Every legal move tried
- * (chess.js: matingMoves).
+ * (chess.js: matingMoves). Several bosses: among the moves the side allows (`t.crowdMoves`: every boss's limits; a mate another
+ * boss's freeze stops isn't open).
  */
-export function mateOpen(next: Pick<BossPowerState, "chandy">, t: Pick<TurnContext, "fen" | "turn">): boolean {
+export function mateOpen(next: Pick<BossPowerState, "chandy">, t: Pick<TurnContext, "fen" | "turn" | "crowdMoves">): boolean {
   const mates = matingMoves(t.fen);
   if (!mates.length) return false;
+  if (t.crowdMoves) {
+    const allowed = t.crowdMoves();
+    return mates.some((m) => allowed.includes(m));
+  }
   const c = next.chandy;
   const f = stopFieldsOf({ chandy: c, turn: t.turn });
   const marks = chandyMarks(f, on(c?.dizzy, t.turn)?.squares ?? []);
@@ -882,6 +888,8 @@ export const CHANDY: BossRules = {
       locks: c.locks.filter((l) => !lockEnds(t.fen, t.crowd, c, l, t.s.chandy)),
     };
   },
+  // Several bosses: the last chance can't wait for his own turn change (a mate open as your turn begins: Dodge now, whoever moved).
+  ultimateNow: (p, t) => (p.ults ?? 0) < dodgeMax(t.s) && mateOpen(p, t),
   // Dodge: his meter full (dodgeMeter) or the test switch, the warning as this turn begins, Dodge as the next does; the admins'
   // trigger, straight to it; the last chance (mateOpen), now, its warning with it. Once a battle.
   ultimate(next, t) {
