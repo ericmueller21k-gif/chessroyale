@@ -83,6 +83,19 @@ function dodgeOpening(dodge: string[]) {
   expect(head.filter((p) => ["cd-p-scope", "cd-p-volley", "cd-p-vote"].includes(p))).toEqual(["cd-p-scope", "cd-p-volley", "cd-p-vote"]);
 }
 
+/**
+ * Waits, in round `k`'s vote, until its clones' last teleport is 150 ms past, by the vote's own countdown (the HUD's "VOTE: TAP A
+ * SQUARE 1.2 s"). (Nov 19: a fixed wait from when the test saw the vote, which expect's polling can notice up to a second late, left
+ * round 3's tap racing the vote's close.)
+ */
+async function afterTeleports(page: Page, k: number) {
+  const left = (S.dodgeVoteMs - S.dodgeTeleports[k]!.at(-1)! - 150) / 1000;
+  await page.waitForFunction((max) => {
+    const m = /VOTE: TAP A SQUARE ([\d.]+) s/.exec(document.querySelector(".cd-say")?.textContent ?? "");
+    return !!m && Number(m[1]) <= max;
+  }, left, { timeout: 10_000 });
+}
+
 async function battle(page: Page, power: string) {
   await asAdmin(page);
   await page.goto(`/?debug&pace=quick&laststand=0&brain=stockfish&boss=chandy&power=${power}&mode=raid`);
@@ -278,7 +291,7 @@ test.describe("Chandy", () => {
     await expect(page.locator(".cd-result.cd-warned")).toHaveText("DODGE THE NEXT ONE!", { timeout: 10_000 });
     // Round 1: wait for the vote, tap the square safe once its teleport is done (the state knows it solo), see it counted.
     await expect(page.locator(".cd-root.cd-p-vote")).toBeVisible({ timeout: 10_000 });
-    await page.waitForTimeout(S.dodgeTeleports[0]!.at(-1)! + 150);
+    await afterTeleports(page, 0);
     const safe1 = d.rounds[0].safe as string;
     await page.getByRole("button", { name: new RegExp(`^Vote ${safe1}`) }).click();
     await expect(page.locator(".cd-pick.cd-mine .cd-count")).toHaveText("1");
@@ -286,7 +299,7 @@ test.describe("Chandy", () => {
     // Round 2: a square that isn't safe: a hit, your king cracked, and play goes on.
     const wrong = (safe: string) => ["d3", "e3", "f3", "d4", "e4", "f4", "d5", "e5", "f5"].find((sq) => sq !== safe)!;
     await expect(page.locator(".cd-root.cd-p-vote")).toBeVisible({ timeout: 10_000 });
-    await page.waitForTimeout(S.dodgeTeleports[1]!.at(-1)! + 150);
+    await afterTeleports(page, 1);
     await page.getByRole("button", { name: new RegExp(`^Vote ${wrong(d.rounds[1].safe)}`) }).click();
     await expect(page.locator(".cd-result")).toHaveText("HIT! KING CRACKED", { timeout: 10_000 });
     await expect(page.locator(".cd-king.cd-cracked")).toHaveCount(1);
@@ -294,7 +307,7 @@ test.describe("Chandy", () => {
     await expect(page.locator(".cd-root.cd-p-vote")).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(".cd-king.cd-cracked")).toHaveCount(1);
     expect(await phase(page)).toBe("boss");
-    await page.waitForTimeout(S.dodgeTeleports[2]!.at(-1)! + 150);
+    await afterTeleports(page, 2);
     await page.getByRole("button", { name: new RegExp(`^Vote ${wrong(d.rounds[2].safe)}`) }).click();
     await expect(page.locator(".cd-result")).toHaveText("HIT! YOU LOSE", { timeout: 10_000 });
     await expect(page.locator(".cd-root.cd-p-kill")).toBeVisible();
