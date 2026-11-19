@@ -11,13 +11,13 @@
  *   its four blocked squares; the beam's cover over a rank and a file (the squares hidden); the shields' bubbles; rapid fire's hits
  *   and dizzy stars; the queen lock's aim (the crosshair on your queen, or your best rook if your queen is gone, and the line down its
  *   file from his side), and its shot at the start of his
- *   next turn (the round down the file, the piece in its way shattered).
+ *   next turn (one round flying down the file, the piece in its way on the board until the round reaches it, then shattered).
  * - **His bar:** the rifle's pips (n of 5) and the move meter, greyed until his first upgrade (nothing hidden, nothing shifts); his
  *   rage meter dimmed until the fifth ("Rage: unlocks at 5 upgrades").
  * - **Dodge** (as your turn begins): ChandyDodge over the board, built from the shared state and the battle's clock (dodgeView): the
  *   scope-in, the warning volley, three rounds of vote and beams; the first hit cracks your king, the second is the kill.
  */
-import { CHANDY_FIRE_AT, CHANDY_FX, dodgeTimeline, linesAfter, type ChandyView } from "@chessroyale/chess";
+import { CHANDY_FIRE_AT, CHANDY_FX, dodgeTimeline, linesAfter, pieceAt, withPiece, type ChandyView } from "@chessroyale/chess";
 import { BOSS_POWERS, type ChandyMove, type DodgeLine } from "@chessroyale/core";
 import type { BossView, DodgeRun } from "../game.ts";
 import { BoardEffects, onEachFrame, prewarm, prewarmAnims, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
@@ -48,8 +48,13 @@ export const FIRE_AT = CHANDY_FIRE_AT;
 const POINT_AT = 120;
 /** The rounds of rapid fire, this far apart (ms). */
 const RAPID_STAGGER = 150;
-/** The queen lock's round, a square this long (ms). */
-const ROUND_STEP = 60;
+/** The queen lock's round, a square this long (ms; settings: chandy.shotStepMs). */
+const ROUND_STEP = BOSS_POWERS.chandy.shotStepMs;
+/**
+ * When the queen lock's round reaches the piece it hits (ms into its moment; `squares`: its path from his edge, that square last): its
+ * head at the middle of that square, half a square after it enters it. The piece stays on the board until then (chandyFen).
+ */
+export const shotHitAt = (squares: number): number => FIRE_AT + (squares - 0.5) * ROUND_STEP;
 
 const find = (moments: readonly Moment[], kind: Moment["kind"]) => moments.find((m) => m.kind === kind) ?? null;
 
@@ -120,18 +125,33 @@ export function chandyItems(boss: BossView, moments: readonly Moment[], now: num
       lineToQueen(c.aim, boss.crowdSide).forEach((sq, i) => out.push(m ? { square: sq, name: "chandyQueenAim", anim: "on", then: "aim", since: at(m, FIRE_AT), quiet: i > 0 } : { square: sq, name: "chandyQueenAim", anim: "aim", since: 0, quiet: true }));
     }
   }
-  // Its shot (at the start of his turn): the round down the file, the piece in its way shattered.
+  // Its shot (at the start of his turn): one round down the file from his edge, a square every ROUND_STEP (each square plays its slice
+  // of it), stopping on the piece in its way as it reaches the piece's middle, which shatters then (the board shows it until: chandyFen).
   const shot = find(moments, "queenShot");
   if (shot?.squares?.length) {
     const trail = shot.squares;
+    const hits = !shot.fizzled?.length && !!shot.square;
     trail.forEach((sq, i) => {
       const when = at(shot, FIRE_AT + i * ROUND_STEP);
-      if (now >= when) out.push({ square: sq, name: "chandyRound", anim: "fly", then: "trail", since: when, quiet: i > 0 });
+      if (now >= when) out.push({ square: sq, name: "chandyRound", anim: hits && i === trail.length - 1 ? "hit" : "pass", since: when, quiet: i > 0 });
     });
-    const hitAt = at(shot, FIRE_AT + trail.length * ROUND_STEP);
-    if (!shot.fizzled?.length && shot.square && now >= hitAt) out.push({ square: shot.square, name: "chandyShatter", anim: "shatter", since: hitAt });
+    const hitAt = at(shot, shotHitAt(trail.length));
+    if (hits && now >= hitAt) out.push({ square: shot.square!, name: "chandyShatter", anim: "shatter", since: hitAt });
   }
   return out;
+}
+
+/**
+ * The position the board shows while the queen lock's shot plays (Eric, Nov 20: "it makes your piece disappear before the beam actually
+ * hits it"): the game's board loses the piece as his turn begins (chandyBattle.afterCrowdMove), so the piece the round hits is put back
+ * on its square until the round reaches it (shotHitAt), then goes as it shatters. Otherwise `fen` as it is.
+ */
+export function chandyFen(boss: Pick<BossView, "id" | "crowdSide">, moments: readonly Moment[], now: number, fen: string): string {
+  if (boss.id !== "chandy") return fen;
+  const shot = find(moments, "queenShot");
+  if (!shot?.square || !shot.shape || shot.fizzled?.length || !shot.squares?.length) return fen;
+  if (now >= shot.at + shotHitAt(shot.squares.length) || pieceAt(fen, shot.square)) return fen;
+  return withPiece(fen, shot.square, { color: boss.crowdSide, type: shot.shape as "p" | "n" | "b" | "r" | "q" });
 }
 
 /** His layer over the board: everything over the pieces (the beam hides them, the crosshairs and bubbles sit on them). */
