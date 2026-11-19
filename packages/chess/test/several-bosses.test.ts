@@ -13,6 +13,14 @@ import { KIT_OPENING, fakeEngine, kitSettings, runBattle, sideTracked, type KitB
 const runner = (bosses: readonly string[], test = "", seed = 5, patch: Partial<Settings> = {}) =>
   new MatchRunner({ settings: kitSettings({ boss: bosses[0]!, bosses, test, maxMoves: 30 }, patch), rng: mulberry32(seed), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
 
+/** The paths where two plain values differ. */
+const diffKeys = (a: unknown, b: unknown, at = ""): string[] => {
+  if (JSON.stringify(a) === JSON.stringify(b)) return [];
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return [at || "(root)"];
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].flatMap((k) => diffKeys((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${at}.${k}`));
+};
+
 /** The boss with this id on the side, in full. */
 const sideBoss = (r: MatchRunner, id: string): BossState => r.sideBosses().find((b) => b.id === id)!;
 
@@ -87,6 +95,26 @@ describe("several bosses: the Battle Tower's screens (PR 10)", () => {
     expect(side.bosses.every((b) => !("board" in b) && !("side" in b) && typeof b.powers?.rage === "number")).toBe(true);
     expect(runner(["gingerbread"]).bossView()!.side).toBeUndefined();
   });
+
+  it("a floor's game survives a trip through JSON (the solo restore keeps it on the device): restored at any crowd turn, the same match, the same view", async () => {
+    let checked = 0;
+    const problems: string[] = [];
+    await runBattle(battle(["gingerbread", "clown", "moo"], "", 4, 20), null, (r, _fen, who) => {
+      if (who !== "crowd") return;
+      const snap = r.snapshot();
+      const back = MatchRunner.restore(JSON.parse(JSON.stringify(snap)), { settings: r.settings, rng: mulberry32(1), engines: [fakeEngine()], library: [KIT_OPENING] });
+      if (JSON.stringify(back.snapshot()) !== JSON.stringify(snap)) problems.push(`snapshot at move ${r.boss!.crowdMoves}`);
+      // (Not the boss's last move as the dock names it: the runner's own, not the match's; after a reload the dock says "Your move.")
+      const plain = (v: unknown) => JSON.parse(JSON.stringify(v, (k, x) => (k === "lastMove" ? undefined : x)));
+      const was = plain(r.bossView());
+      const now = plain(back.bossView());
+      if (JSON.stringify(now) !== JSON.stringify(was)) problems.push(`view at move ${r.boss!.crowdMoves}: ${diffKeys(was, now).join(", ")}`);
+      if (JSON.stringify(back.crowdAllowed()) !== JSON.stringify(r.crowdAllowed())) problems.push(`allowed at move ${r.boss!.crowdMoves}`);
+      checked++;
+    });
+    expect(problems).toEqual([]);
+    expect(checked).toBeGreaterThan(8);
+  }, 60_000);
 
   it("no Last Stand on a tower floor, the test switch's included (Eric, Nov 19: \"no save in tower\")", () => {
     const stand = (patch: Partial<Settings>) => {
