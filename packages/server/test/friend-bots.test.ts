@@ -133,7 +133,7 @@ describe("friend bots: the route", () => {
     const guest = await createGuest(sql, T0, "Guest");
     const player = await signedIn(sql, "player@example.com");
     const admin = await signedIn(sql, "boss@example.com");
-    for (const headers of [{}, { cookie: `hc_session=${guest.token}` }, { cookie: player.cookie }, { "x-e2e-sql": E2E_KEY }])
+    for (const headers of [{}, { cookie: `hc_session=${guest.token}` }, { cookie: player.cookie }, { "x-e2e-sql": E2E_KEY }] as Record<string, string>[])
       for (const method of ["GET", "POST", "DELETE"]) expect((await call(method, { ...headers, ...ORIGIN })).status).toBe(404);
     // (An admin's change from another site.)
     expect((await call("POST", { cookie: admin.cookie, origin: "https://evil.test" })).status).toBe(404);
