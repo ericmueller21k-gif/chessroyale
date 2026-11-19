@@ -44,8 +44,11 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 - **Each crowd turn:** every boss's `prepareTurn` (passive, meter at `BATTLE_TOWER.rageScale`); each one's ultimate step only at his
   own turn change (after his move for a `triggerAtHisTurn` ultimate, before it for the rest), one ultimate a turn change.
 - **The side's rules:** the dispatcher's `sideCrowdAllowed` (every boss's marks merged, every `crowdFilter`, one lift, the barred
-  move), `sideBossAllowed` (every mark binding the bosses, every boss's `bossStops` but `ownStops`), the judge, fair play, the Last
-  Stand, `afterCrowdMove` for every boss, and the moments queue (the view's `events`: every boss's, the one in focus first).
+  move), `sideBossAllowed` (every mark binding the bosses, his own `bossStops`, the others' `sideStops`), the judge, fair play, the
+  Last Stand, and the moments queue (the view's `events`: every boss's, the one in focus first).
+- **Every move reaches every boss:** after the crowd's move every boss's `afterCrowdMove` (from the boss who moved last: Folio's
+  Revision may cross the move out, and then the others never see it), each with its judged numbers; after a boss's move (and his
+  extra move) every other boss's `followMove`. A hook's `bossToMove()` is true only for the boss whose turn it is (`hisTurn`).
 - Calls made: [2026-11-18-several-bosses.md](../decisions/2026-11-18-several-bosses.md).
 
 ## The audit

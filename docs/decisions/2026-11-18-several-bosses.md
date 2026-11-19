@@ -54,3 +54,42 @@ pair once (CI's seed) and, by hand, three seeds each (456 battles), plus 12 thre
 **Harness notes (not the side's):** the parity harness's solo copy has no clock, so Timber's scraps differ from online without his
 ultimate's switch (true with one boss too; he goes first, with it); and a moment after the move cap's last crowd move is read by the
 solo trace but never sent online (the side parity's cap is 16).
+
+## The review's fixes (Nov 19)
+
+The independent review of PR #808 (findings 1-4 and a note), fixed at their causes:
+- **A hook's turn is his own.** After the crowd's move every boss's `afterCrowdMove` runs, and a hook keyed on "the bosses are to
+  move" (`Battle.bossToMove`) now means "*this* boss is to move" (`Battle.hisTurn`: the boss to move next, worked out by `focusNow`
+  before any hook runs). One boss: always him, so nothing changes. Per boss (the design: these run as alone, on his own turn):
+  - **Ginger's Super Freeze:** at the start of his own turn; a full meter waits through the others' turns (his blizzard check is his own).
+  - **Babur's balloons:** a new balloon goes on his nozzle as his own turn begins; it ripens on the clock through the others' turns and
+    lands at the end of his turn once ready.
+  - **Chandy's queen shot:** at the start of his own next turn after the aim ("his next turn"); the aim follows the queen through every
+    move, so the crowd has the round of moves before it (each boss keeps his own turns), and a queen another boss takes ends the aim.
+  - Moo's Full Moon and Don Dough's Gold Plate come at the start of their own turns (finding 4), and Smudgy's forced move is worked out
+    only at his own turn (finding 1).
+- **Smudgy's forced moves bind only him** (`BossRules.sideStops`, replacing `ownStops`: the part of a boss's stops that binds the side;
+  his disguise does, his forced moves and Sawyer's first move don't).
+- **Every move reaches every boss's trackers.** The crowd's moves reach every boss's `afterCrowdMove`, his own his `afterBossMove`, and
+  now another boss's move (and his extra move) every other boss's `followMove`: Smudgy's hidden rook, Sawyer's halves, Alfil's Tusks
+  pawns and elephants, Don Dough's gold, Chandy's locks and aim, Boingo's splats. One boss: never called, so his paths are as before.
+  - **Smudgy's rook:** another boss may step it as a pawn would (the shared disguise already allowed it), and the unmask checks (a move
+    that isn't a pawn's, a discovered check, the crowd left no move on both boards) run on any boss's move. Why not "another boss may
+    not move it": a discovered check or a stuck crowd can come from any boss's move anyway, so the checks must run on every move;
+    forbidding it would add a rule and still need them.
+  - **Marks on the crowd's pieces, checked:** a capture by another boss now reaches Chandy's locks and aim and Boingo's splats. A board
+    change by another boss's power (Alfil's Slam lifting a locked piece, Jefferson's fire burning one, Big Boy's bounce) is not a
+    move: Chandy's locks drop at the next move (`locksAfter` keeps a lock only where a piece stands); Ginger's freeze, Folio's fold
+    and Moo's stun hold only the crowd's pieces (a mark on a square left empty binds nothing) and wear off. Left as they are.
+- **Folio's Revision first.** After the crowd's move the hooks run from the boss who made the side's last move, then in turn order; each
+  boss takes the judge's numbers (`judged`) as his own hook runs. A reply Revision crosses out reaches no other boss's hook or numbers.
+- **Hollow's second move:** the ultimate step at a turn change goes to the next boss in the order (`moved + 1`), not the focus. Also
+  found: solo's extra move (`playExtraMove`) never moved the focus on (only the host's `applyExtraMove` did); both now end in
+  `extraMoveOver` (the focus, the others' `followMove`).
+- **Found, not fixed (a timing call, for the director):** Alfil's Slam lands only after his own move or fusion (`landDue`): on a side its
+  pieces stay up until his next turn, up to a round of the side's turns past `slamTurns`. It touches the Smudgy + Alfil break above
+  (Eric's call pending), so it waits for that call.
+- **The checks:** the kit's invariants 8 (every piece of the side a boss tracks stands on a square holding a piece of the side) and 9
+  (no boss is held to another's own forced move); `several-bosses.test.ts`: Sawyer's first move checked for what it binds, one ultimate
+  a turn change checked per step and per boss (with Moo and Don Dough), Hollow's second move, Smudgy's forced moves and hidden rook,
+  Revision with three partners. Each failed before its fix.
