@@ -30,7 +30,8 @@
  *  8. Several bosses on one side: every piece of the side a boss tracks stands where he tracks it (sideTracked), and none is let
  *     go (the runner's followBoard) after a step that moved no piece but by a move, or by a return to an earlier position
  *     (Revision): the trackers follow every move, so a let-go there is a tracker that missed a move or followed a crossed-out one.
- *  9. Several bosses on one side: the boss to move is never held to another boss's own forced move.
+ *  9. Several bosses on one side: the boss to move is never held to another boss's own forced move (his own part only: not a
+ *     stop that binds the whole side, `sideStops`, nor any of a boss with no `sideStops`).
  */
 import { vi } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type BossDef, type BossState, type Settings } from "@chessroyale/core";
@@ -436,8 +437,9 @@ export class Checker {
   /**
    * Invariants 8 and 9 (several bosses on one side; the review of PR #808). 8: every square a boss tracks a piece of the side on
    * (sideTracked) holds a piece of the bosses' side: another boss's move reaches his trackers too. 9: the boss to move is never held
-   * to another boss's own forced move (Smudgy's Camouflage step): when another boss's own stops (bossStops) leave a single move,
-   * the side's allowed moves are that move alone only when the boss to move's own rules alone say so too.
+   * to another boss's own forced move (Smudgy's Camouflage step): when another boss's own stops (bossStops) leave a single move
+   * that his part binding the whole side (sideStops) doesn't, the side's allowed moves are that move alone only when the boss to
+   * move's own rules alone say so too. A boss with no sideStops binds the side with all of his (Babur's hoops): never checked.
    */
   private side(r: MatchRunner, step: string) {
     const board = this.board(r);
@@ -465,9 +467,16 @@ export class Checker {
     const legal = legalMoves(fen);
     this.count("no other boss's forced move");
     for (const other of side.slice(1)) {
-      const stop = bossRules(other)?.bossStops?.(other);
+      // (Only the other boss's own part: a boss with no sideStops binds the whole side with every stop of his (Babur's hoops), and
+      // a guard of his that binds the side (Smudgy's disguise) may leave the boss to move one move by design. Audit 1, finding 4.)
+      const rules = bossRules(other);
+      if (!rules?.sideStops) continue;
+      const stop = rules.bossStops?.(other);
       const forced = stop ? legal.filter((m) => !stop(m, fen)) : [];
       if (forced.length !== 1 || forced[0] !== allowed[0]) continue;
+      const guard = rules.sideStops(other);
+      const guarded = guard ? legal.filter((m) => !guard(m, fen)) : legal;
+      if (guarded.length === 1 && guarded[0] === allowed[0]) continue;
       const own = bossAllowed(side[0]!, fen) ?? legal;
       if (own.length > 1) this.fail(`${side[0]!.id} to move is held to ${other.id}'s own forced move ${allowed[0]}`, r, step);
     }
