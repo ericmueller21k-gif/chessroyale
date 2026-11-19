@@ -463,10 +463,11 @@ export function folioView(p: BossPowerState): FolioView {
 export const folioBattle = {
   /**
    * The Crease's line is wanted with its move now: as the crowd's next turn begins the warning would come (the meter full
-   * by then, worked out as prepareTurn will: this crowd move's rage and its material lost so far; or the test switch), or
-   * the admins' trigger is pulled. Not while one is warned, holds or the meter is held.
+   * by then, worked out as prepareTurn will: this crowd move's rage and its material lost so far, at the floor's rates (several
+   * bosses: Battle.rageRates, as his step reads them; audit 1, finding 3); or the test switch), or the admins' trigger is
+   * pulled. Not while one is warned, holds or the meter is held.
    */
-  creaseDue(b: Battle, s: BossPowerSettings = BOSS_POWERS): boolean {
+  creaseDue(b: Battle, s: BossPowerSettings = b.rageRates?.() ?? BOSS_POWERS): boolean {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || boss.id !== "folio" || boss.result || p.ultAt !== undefined) return false;
