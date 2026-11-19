@@ -1,6 +1,7 @@
 import { BATTLE_TOWER, bossDef, floorBossCount, floorStrength, type Settings } from "@chessroyale/core";
 import type { RunnerSnapshot } from "@chessroyale/chess";
 import type { MoveRecord } from "./game.ts";
+import { accountReady } from "./boss-tokens.ts";
 
 /**
  * The Battle Tower's solo climb on this device (PR 10; docs/areas/battle-tower.md): the server's routes (`/api/tower`, PR 9: the run
@@ -66,6 +67,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** One ask; asked once more after a moment when it fails on the way or on the server (a refusal, a 4xx, isn't asked again). */
 async function ask<T>(path: string, body?: object): Promise<Answer<T>> {
+  // (Your account first: a guest's is made as the app opens, and the tower opened straight from its address asked before it was.)
+  await accountReady();
   const init: RequestInit = body ? { method: "POST", body: JSON.stringify(body), credentials: "same-origin", headers: { "content-type": "application/json" } } : { credentials: "same-origin" };
   for (let tries = 0; ; tries++) {
     let status = 0;
