@@ -987,7 +987,8 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   (and `chandyBattle`: the meter, the queen lock's shot, Dodge's rounds), server `server/src/bosses/chandy.ts` (Dodge's timer and
   votes: `dodgeVote`, `dodgeVotes`), screens `components/Chandy.tsx` (board layer, bar's pips and meter, the upgrade window,
   Dodge's view and dock); his art is made ahead in slices at the battle's start (`prewarmChandy`: a 3.9 s stall on a slowed phone
-  once swallowed a vote).
+  once swallowed a vote). Each of his moves' frames is still built in one go, so `paintRifle` only visits the pixels and shapes its
+  rifle's box covers (Nov 20: its full loop made a 2.5 s stall at a last-chance Dodge's start that swallowed the volley on CI).
   His sounds are his own (Nov 18, `characters/chandy-sounds.ts`: pulse-style hunter tech, synthesized; `CHANDY_SOUNDS` maps his
   cues, `CHANDY_CUES` says what each is; his intro's three are his swamp's), tested in `chandy.test.ts`. His scope's lock, unlock
   and Dodge's alarm are low and heavy (a throbbing hum, 150 to 260 Hz, a growl under the lock), not beeps (Eric: "a bird chirping").
