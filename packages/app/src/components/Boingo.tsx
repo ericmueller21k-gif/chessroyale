@@ -114,7 +114,7 @@ export function pieLine(boss: Pick<BossView, "powers" | "board">, m: Pick<Moment
   const word = PIECE_WORD[piece.type];
   if (pieFroze(boss, m)) return `Splat! Your ${word} is frozen`;
   const n = boss.powers?.splats?.find((x) => x.square === m.square)?.n ?? 0;
-  return n > 0 && n === toFreeze - 1 ? `Splat on your ${word}: one more freezes it` : `Splat on your ${word}`;
+  return n > 0 && n === toFreeze - 1 ? `Splat! One more freezes your ${word}` : `Splat on your ${word}`;
 }
 
 function pieMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {

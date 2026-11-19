@@ -388,11 +388,11 @@ describe("Eric, Nov 20: Boingo's pie says when the next splat freezes (a freeze 
   const fen = "4k3/8/8/8/3PP3/8/8/4K3 w - - 0 1";
   const view = (splats: { square: string; piece: string; n: number }[], frozen: { square: string; until: number } | null = null) => ({ board: { fen }, powers: { turn: 4, splats, frozen } }) as unknown as BossView;
   it("the first splat warns that one more freezes the piece; the second says it's frozen; a piece with no mark left just splatted", () => {
-    expect(pieLine(view([{ square: "e4", piece: "p", n: 1 }]), { square: "e4" }, 2)).toBe("Splat on your pawn: one more freezes it");
+    expect(pieLine(view([{ square: "e4", piece: "p", n: 1 }]), { square: "e4" }, 2)).toBe("Splat! One more freezes your pawn");
     expect(pieLine(view([], { square: "e4", until: 4 }), { square: "e4" }, 2)).toBe("Splat! Your pawn is frozen");
     // (Three splats to a freeze: the first says nothing of it yet, the second warns.)
     expect(pieLine(view([{ square: "e4", piece: "p", n: 1 }]), { square: "e4" }, 3)).toBe("Splat on your pawn");
-    expect(pieLine(view([{ square: "e4", piece: "p", n: 2 }]), { square: "e4" }, 3)).toBe("Splat on your pawn: one more freezes it");
+    expect(pieLine(view([{ square: "e4", piece: "p", n: 2 }]), { square: "e4" }, 3)).toBe("Splat! One more freezes your pawn");
     // (One splat freezes: nothing to warn of.)
     expect(pieLine(view([]), { square: "d4" }, 1)).toBe("Splat on your pawn");
     expect(pieLine(view([]), { square: "a1" }, 2)).toBeUndefined();
