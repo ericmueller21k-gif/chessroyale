@@ -1,3 +1,4 @@
+- Nov 19 ~22:40 UTC: 0a2fd8a LIVE (CF build fine this time; the 70df93d failure was one-off): tower flow + audit-2 fixes live. #821 flakes MERGED (27838e4), main watcher armed. Tower music helper running (bdre4436h). NEXT tower: PR 12 party (FULL, xhigh), PR 14 sim; small follow-up: Hollow wrong tries kept on reload.
 - Nov 19 ~22:25 UTC: music helper (Eric other window) says the tower music is approved ("this is the one"): stills/trailer-v2 tower-music/. Wiring helper (brief tower-music.md, Opus medium).
 - Nov 19 ~22:20 UTC: flakes -> #821 (789bacd; funhouse = test tapped queen on an underpromotion, fixed; claw not reproduced, failure now reports the panel), CI bxb6719od. Main/deploy watcher b02gky6aj (0a2fd8a).
 - Nov 19 ~21:55 UTC: #820 audit-2 fixes MERGED (0a2fd8a); watching deploy (the redeploy after the failed CF build of 70df93d) + main run. Flake helper (claw, funhouse) running.
