@@ -1,7 +1,8 @@
 import { useMemo, useState } from "preact/hooks";
 import { BATTLE_TOWER, floorBossCount } from "@chessroyale/core";
 import { artOf, bossKit } from "../characters/kits.ts";
-import { SpriteAnim } from "../components/BossEffect.tsx";
+import { SpriteAnim, frameImage } from "../components/BossEffect.tsx";
+import type { Character } from "../characters/sprite.ts";
 import { BossBarExtra, RageMeter } from "../components/BossPowers.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
@@ -60,24 +61,57 @@ export function TowerStrip({ match, computer = false }: { match: GameView; compu
 /** The figure box's height in a phone's part (px): the bar's 99 less its name, level and meters lines. */
 const PART_FIGURE_H = 46;
 
-/** One scale for every figure on the bar: the largest at which each one fits its part whole (`w` the part's width less its padding). */
+/** A figure's drawn part in its idle's first frame (sprite px): its canvas has room around it for his moves and props. */
+const drawn = new Map<string, { top: number; bottom: number; left: number; right: number }>();
+function drawnBox(name: string, art: Character, idle: string): { top: number; bottom: number; left: number; right: number } {
+  let b = drawn.get(name);
+  if (b) return b;
+  b = { top: 0, bottom: art.h, left: 0, right: art.w };
+  const frame = art.anims[idle]?.frames[0];
+  if (frame && typeof ImageData !== "undefined") {
+    const d = frameImage(art, frame).data;
+    let top = art.h, bottom = -1, left = art.w, right = -1;
+    for (let y = 0; y < art.h; y++)
+      for (let x = 0; x < art.w; x++)
+        if (d[(y * art.w + x) * 4 + 3]) {
+          top = Math.min(top, y);
+          bottom = Math.max(bottom, y);
+          left = Math.min(left, x);
+          right = Math.max(right, x);
+        }
+    if (bottom >= 0) b = { top, bottom: bottom + 1, left, right: right + 1 };
+  }
+  drawn.set(name, b);
+  return b;
+}
+
+/** One scale for every figure: the largest at which each one's drawn part fits its box (`w` × `h` px) whole. */
 function sharedScale(names: readonly string[], w: number, h: number): number {
-  let s = 2;
+  let s = 3;
   for (const n of names) {
     const kit = bossKit(n);
     if (!kit) continue;
-    const art = artOf(kit);
-    s = Math.min(s, w / art.w, h / art.h);
+    const b = drawnBox(n, artOf(kit), kit.anims.idle ?? "idle");
+    s = Math.min(s, w / (b.right - b.left), h / (b.bottom - b.top));
   }
   return Math.max(0.25, s);
 }
 
-/** A boss's figure in his idle, at `scale` screen px a sprite px; a still portrait for a boss with no figure (or an id this app doesn't know). */
+/**
+ * A boss's figure in his idle, at `scale` screen px a sprite px, cut to his drawn part (his canvas's room around him left out); a still
+ * portrait for a boss with no figure (or an id this app doesn't know).
+ */
 function Figure({ boss, scale, since, still }: { boss: BossView; scale: number; since: number; still: boolean }) {
   const kit = bossKit(boss.name);
   if (!kit) return <BossFace boss={boss} class="tw-part-portrait" label="" live />;
   const art = artOf(kit);
-  return <SpriteAnim ch={art} anim={kit.anims.idle ?? "idle"} since={since} still={still} class="tw-fig" style={{ width: `${art.w * scale}px`, height: `${art.h * scale}px` }} />;
+  const idle = kit.anims.idle ?? "idle";
+  const b = drawnBox(boss.name, art, idle);
+  return (
+    <span class="tw-fig-box" style={{ width: `${(b.right - b.left) * scale}px`, height: `${(b.bottom - b.top) * scale}px` }}>
+      <SpriteAnim ch={art} anim={idle} since={since} still={still} class="tw-fig" style={{ width: `${art.w * scale}px`, height: `${art.h * scale}px`, left: `${-b.left * scale}px`, top: `${-b.top * scale}px` }} />
+    </span>
+  );
 }
 
 /** The split bar: one part a boss, in turn order (left to right), the boss to move lit; his words over the bar. */
@@ -97,6 +131,8 @@ export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
         return (
           <span class={`tw-part${on ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id}>
             {on && <span class="tw-tag">TO MOVE</span>}
+            {/* (His words from his own part of the bar: the boss to move's, whose turn and powers come next.) */}
+            {on && !computer && <VoiceBubble voice={bossVoice} class="bc-bubble tw-bubble" balanced />}
             <span class="tw-part-face" aria-hidden="true">
               {computer ? <BossFace boss={b} label="" live /> : <Figure boss={b} scale={scale} since={since} still={still} />}
             </span>
@@ -112,7 +148,6 @@ export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
           </span>
         );
       })}
-      {!computer && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble tw-bubble" balanced />}
     </div>
   );
 }
@@ -126,12 +161,13 @@ export function TowerSide({ boss }: { boss: BossView }) {
   const side = sideOf(boss)!;
   const still = useMedia("(prefers-reduced-motion: reduce)");
   const [since] = useState(() => Date.now());
-  const scale = useMemo(() => Math.min(2, sharedScale(side.bosses.map((b) => b.name), 120, 150)), [side.bosses.map((b) => b.name).join(",")]);
+  const scale = useMemo(() => sharedScale(side.bosses.map((b) => b.name), 150, 170), [side.bosses.map((b) => b.name).join(",")]);
   const n = side.bosses.length;
   return (
-    <div class="boss-side tw-side" aria-hidden="true">
+    <div class="boss-side tw-side">
       {side.bosses.map((b, i) => (
         <span class={`tw-side-fig${i === side.toMove ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id} style={{ bottom: `${((n - 1 - i) * 100) / n}%`, height: `${100 / n}%` }}>
+          {i === side.toMove && <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" />}
           <Figure boss={b} scale={scale} since={since} still={still} />
         </span>
       ))}

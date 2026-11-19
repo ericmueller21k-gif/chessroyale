@@ -285,8 +285,8 @@
 .tw-part-face {
   display: grid;
   place-items: end center;
-  height: 44px;
-  width: 44px;
+  height: 46px;
+  max-width: 100%;
 }
 .tw-part-face canvas,
 .tw-part-face img {
@@ -309,6 +309,10 @@
   gap: 6px;
   max-width: 100%;
   font-size: 11px;
+  white-space: nowrap;
+}
+.tw-part-meters .boss-level {
+  flex: none;
 }
 .tw-part-meters .rage-meter {
   min-width: 0;
@@ -363,7 +367,7 @@
   align-items: baseline;
   gap: 12px;
 }
-.tw-side {
+.boss-side.tw-side {
   align-self: stretch;
 }
 .tw-side-fig {
@@ -391,10 +395,28 @@
 }
 .tw-bubble {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 6px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  z-index: 2;
 }
 .tw-bar {
   position: relative;
+}
+.tw-fig-box {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+.tw-fig-box .tw-fig {
+  position: absolute;
+  max-width: none;
+}
+.tw-side-bubble {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  width: max-content;
+  max-width: 220px;
+  margin-bottom: 6px;
 }
