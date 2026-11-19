@@ -492,3 +492,20 @@ all the song, and that's kind of the idea."
   tone, few overtones), cellos, a clarinet; each set to sit where the brass sat. Five clips of the same 22 seconds
   (0:57 to 1:19) went to him. The brass stays the default until he picks.
 
+## The battle tower from a plan (Nov 19, song_an.py): sent, no verdict yet
+
+"Heres instructions for a new one, please make it 2.5 min roughly, keep the sound more muted overall, it's the
+background battle tower music". His own plan again ("Moody 90s Acid-Jazz & Neo-Noir Hip-Hop Rock": 96 beats a minute,
+56% swing, F sharp minor, a gritty FM guitar, a drawbar organ, wah-pluck and electric-piano stabs, a funk bass, a
+choir pad; 32 bars: an intro, a guitar-and-organ tune, a jazz bridge, a climax of traded phrases), built as written.
+- "Looped twice" is 2:40, his "2.5 min roughly": the 32 bars twice, the second time the same notes with a little
+  more on them from the plan's own parts (the organ an octave over the tune, the electric piano over the bridge's
+  lead, the organ calling in the trade).
+- "More muted overall": a dark guitar cabinet, no bright drawbars, a dusty kit, the mix cut at 6 kHz, the leads
+  about a dB under a boss theme's. Measured against Chandy's: 4 dB less from 2 to 4 kHz, 6 less from 4 to 8, 8 less
+  above.
+- Written here: the tune, the bridge's lead, the traded phrases, the bass's pocket and walk, the stabs, the kit.
+- Measured: -16.0 LUFS, peak -1.1 dBFS, 160.00 s; its sections within 2.6 dB of each other.
+- The tower now has four candidates: song_al.py (one minute, a build), song_am.py (two minutes, his shape; its
+  tune's instrument still to be picked from five), this, and song_ak.py shelved for a defeat. None handed over.
+
