@@ -30,8 +30,10 @@ export function exitFor(m: GameView): MatchExit | null {
 }
 
 /** The confirm's line: what happens if you go now. */
-export function exitNote(m: Pick<GameView, "serverPaced" | "seatToBot" | "boss" | "totalPlayers" | "standings" | "simul">, kind: ExitKind): string {
+export function exitNote(m: Pick<GameView, "serverPaced" | "seatToBot" | "boss" | "totalPlayers" | "standings" | "simul" | "tower">, kind: ExitKind): string {
   const online = !!m.serverPaced;
+  // (A Battle Tower floor: free before your 2nd move, core's leaveFloor; a loss after, which ends the run.)
+  if (m.tower) return kind === "leave" ? "Leaving is free before your 2nd move: back to the tower, and this floor waits for you." : "Your run ends here: leaving now counts as a loss.";
   // (The Hidden Boss's phase 2: resigning is your board's; leaving once it's decided ends the battle. Online (Nov 13) a bot plays
   // your board on, from the phase change on.)
   if (online && m.simul && kind === "resign") return "You'll leave this match and it counts as a loss. A bot plays your board on.";

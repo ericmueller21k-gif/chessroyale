@@ -2,7 +2,7 @@
 
 Lane: the director (the rules: `god-king`; the floor art: `characters`; saving: the director, full lane). **Built so far: the
 board layer (PR 1); every boss on it (PRs 2-5); several bosses in the match runner (PR 6: a runner option, `settings.bossIds`); the
-climb's rules (PR 8: core `tower.ts`, a floor's start from the deal); saving (PR 9: server `tower.ts`, the routes; no screens yet).**
+climb's rules (PR 8: core `tower.ts`, a floor's start from the deal); saving (PR 9: server `tower.ts`, the routes); the solo screens (PR 10).**
 The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
 
 ## What it will be
@@ -106,6 +106,14 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 - A solo best is the device's word (as Boss alone's): it stays off any leaderboard and out of anything that pays.
 - Calls made: [2026-11-19-tower-saving.md](../decisions/2026-11-19-tower-saving.md).
 
+## The solo screens (built, PR 10)
+
+- **`/tower`** (`screens/Tower.tsx`; only the town's clerk opens it, Back to `/town`): the run's card, bests, Solo | Party (greyed), the
+  stage, CONTINUE FLOOR n / START A RUN, "Start a new run" (confirm). **A floor:** `enterTowerFloor()` (app `tower.ts`, the only way in) →
+  Boss alone's battle at the server's settings, no Last Stand; `TowerBar.tsx` (the strip, the split bar, the stacked figures, `NetBoss.side`); `TowerResult.tsx`.
+- **The restore:** the floor kept on the device at every step (`brc.tower.solo`: the runner's snapshot, your moves) and rejoined from `/tower`;
+  a result or leave kept until the server takes it. Calls: [2026-11-19-tower-solo-screens.md](../decisions/2026-11-19-tower-solo-screens.md).
+
 ### For PR 10 (the app)
 
 - A 409 on finish means "read the run again", never an error: it carries `run` and `best`. A retry of the result whose answer was
@@ -136,7 +144,7 @@ take from `startSide`) fixed in PR 8 (above).
 | The climb | built: core `tower.ts`, `BATTLE_TOWER` in `packages/core/src/settings.ts`; the runner's `towerStrength` (`settings.towerFloor`) |
 | Saving | built: `packages/server/src/tower.ts` (`tower_runs`, `tower_best`, the routes' logic and `towerResponse`), routed from `api.ts`; `account-data.ts` (store `tower`); the sign-in merge in `accounts.ts` (`towerMoves`) |
 | The party | Boss Battle's party (`PartyCore`, kind "tower", max 4), the lobby on the draw rule "party" |
-| The screens | the tower's screen, the tower's room (the challenge room's walking and seating), the boss bar for 2-3 bosses; the home card in `screens/Home.tsx` |
+| The screens | built (solo): `screens/Tower.tsx`, `TowerBar.tsx`, `TowerResult.tsx`, app `tower.ts`; to come: the tower's room (PR 11b); no home card (Eric, Nov 19: the town's clerk only) |
 
 ## Tests (planned)
 
@@ -149,4 +157,4 @@ side of finding 7 in `several-bosses.test.ts`; server `tower.test.ts` (the index
 only for the floor started, the same result sent again, a win too soon, a free leave against a counted one, a floor whose bosses rest
 since it began, a deal that doesn't parse, the best and its cap, the merge, the download and deleting) and
 `account-data.test.ts` (Ann's climb in every store's world); `e2e/account-delete.spec.ts` (a climb on the local D1: its `e2e/areas.json`
-entry, "The Battle Tower's saving"); `e2e/battle-tower.spec.ts` (PR 10).
+entry, "The Battle Tower's saving"); `e2e/battle-tower.spec.ts` (a run, floor 2's bar, a reload rejoining, a counted and a free leave, no Last Stand); app `tower.test.ts` (the restore's pure parts).

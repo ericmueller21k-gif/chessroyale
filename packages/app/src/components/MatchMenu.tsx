@@ -66,7 +66,7 @@ const rowLabel = (e: MatchExit) => e.row ?? (e.kind === "resign" ? "Resign" : "L
  * A confirm: what happens, Cancel and the go button, centered over the blurred match. Focus starts on Cancel: Enter or a
  * stray tap never goes through by itself.
  */
-function Confirm({ heading, note, icon, go, onCancel, onGo }: { heading: string; note: string; icon?: ComponentChildren; go: string; onCancel: () => void; onGo: () => void }) {
+export function Confirm({ heading, note, icon, go, onCancel, onGo }: { heading: string; note: string; icon?: ComponentChildren; go: string; onCancel: () => void; onGo: () => void }) {
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => cancel.current?.focus(), []);
   return (

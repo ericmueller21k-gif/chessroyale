@@ -1,3 +1,4 @@
+import { SideFigures } from "./TowerBar.tsx";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { applyMove, fenAtPly, legalMoves, sideToMove } from "@chessroyale/chess";
@@ -16,7 +17,7 @@ import { LOCKED_PHONE, UnderBoard, useMedia } from "../components/QuickChat.tsx"
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
-import { BossFace, BossSide } from "../components/BossCharacter.tsx";
+import { BossFace } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts, OneVOneBanner } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
@@ -293,7 +294,7 @@ export function PlayScreen({
         </div>
         )}
         <div class="board-row">
-          {match.boss && <BossSide match={match} />}
+          {match.boss && <SideFigures match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
           <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => (setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }), goldClink(match.boss, board.fen, m)) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants} gold={history.browsing ? undefined : zebraGold(match.boss)} decor={history.browsing ? undefined : boingoDecor(match.boss)}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}

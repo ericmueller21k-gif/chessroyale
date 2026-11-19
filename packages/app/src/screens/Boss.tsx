@@ -37,8 +37,9 @@ import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
 import { DodgeLayer, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
+import { SideFigures, moverOf } from "./TowerBar.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
-import { BossCharacter, BossFace, BossSide, BossTag, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
+import { BossCharacter, BossFace, BossTag, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, VoiceBubble, bossVoice } from "../speech.tsx";
@@ -90,6 +91,15 @@ function burnStart(key: string): number {
     if (burnStarts.size > 50) burnStarts.delete(burnStarts.keys().next().value!);
   }
   return t;
+}
+
+/** The dock's "Ginger plays e5": the boss who moved (on a Battle Tower floor of several, the one who did: TowerBar.tsx moverOf), with his portrait. */
+function PlaysLine({ boss, san }: { boss: BossView; san: string }) {
+  return (
+    <>
+      <BossTag boss={boss} /> plays <strong>{san}</strong>
+    </>
+  );
 }
 
 /**
@@ -435,7 +445,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // board, the chat) only as the match changes and five times a second, as on your move's screen (useStillKey).
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
-  const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
+  const bossSide = useMemo(() => <SideFigures match={match} />, [match, still]);
   // (Smudgy's reveal under the paint: the newest move isn't named yet, in the dock or the move list.)
   const hush = !!smudgy?.hush;
   const under = useMemo(() => besideBoard(match, layout, <UnderBoard match={match} />, hush), [match, still, layout.strip, layout.computer, hush]);
@@ -508,7 +518,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : boss.lastMove ? (
                 <>
                   {/* (His reveal isn't named until the paint drips: "Boss plays …", smudgyFen's `hush`.) */}
-                  <BossTag boss={boss} /> plays <strong>{smudgy?.hush ? "…" : boss.lastMove.san}</strong>
+                  <PlaysLine boss={moverOf(boss)} san={smudgy?.hush ? "…" : boss.lastMove.san} />
                 </>
               ) : noMove ? (
                 <>

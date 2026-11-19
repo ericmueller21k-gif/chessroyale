@@ -1121,8 +1121,9 @@ export class MatchRunner {
   ): LastStandRound | undefined {
     const b = this.state.boss;
     // (Never when only one move was open: his re-pick has to leave the crowd another, a power's limits included. Never
-    // against a boss his help doesn't work against: the Hidden Boss.)
-    if (!b || b.lastStand || b.barred || bossRules(b)?.blocksKing || ((this.several() ? sideCrowdAllowed(this.sideBosses(), fen) : crowdAllowed(b, fen)) ?? legalMoves(fen)).length < 2) return undefined;
+    // against a boss his help doesn't work against: the Hidden Boss. Never on a Battle Tower floor, the test switch's included: Eric,
+    // Nov 19, "no save in tower".)
+    if (!b || this.settings.towerFloor || b.lastStand || b.barred || bossRules(b)?.blocksKing || ((this.several() ? sideCrowdAllowed(this.sideBosses(), fen) : crowdAllowed(b, fen)) ?? legalMoves(fen)).length < 2) return undefined;
     const mine = scored.find((m) => m.move === played);
     const loss = mine?.loss ?? 0;
     const charges = b.kingCharges ?? 0;
@@ -2186,6 +2187,19 @@ export class MatchRunner {
   private bossViewMemo: { key: string; same: unknown[]; view: NetBoss } | null = null;
 
   private buildBossView(b: BossState, justKilled: string | null): NetBoss {
+    const view = this.oneBossView(b, justKilled);
+    const own = this.state.bosses;
+    if (!this.several() || !own) return view;
+    // (Several bosses: each one's own bar, in the order dealt; the side's shared fields from the boss in focus.)
+    const f = this.state.focus ?? 0;
+    const bosses = own.map((o, i) => {
+      const { board: _board, ...one } = i === f ? view : this.oneBossView(withOwn(b, o), justKilled);
+      return one;
+    });
+    return { ...view, side: { bosses, toMove: f, moved: this.state.moved ?? own.length - 1 } };
+  }
+
+  private oneBossView(b: BossState, justKilled: string | null): NetBoss {
     const def = chooseBoss(0, b.id, null, undefined, true, true);
     const info = { name: def.name, icon: def.icon, threat: bossThreat(b.elo) };
     // (His bar's level: the battle's own, and what his strength now makes of it; "???" for the Hidden Boss.)
