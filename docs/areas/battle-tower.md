@@ -115,6 +115,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   usual result (`TowerResult.tsx`: one button, Back to the tower) → the floor room on your mark: won, the elevator open (Up to floor N+1);
   out, shut. Bests on the lobby's board. Between floors leave by the way down or Back. A match's address is `/tower`: a reload rejoins it
   (`brc.tower.solo`, the restore). A start carries this device's id (`brc.tower.device`, kept in `fight`): a lost start answer is still its own. Calls: [2026-11-19-tower-solo-screens.md](../decisions/2026-11-19-tower-solo-screens.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md).
+- **Its music (Nov 19):** the tower's own theme (`tower-loop`, themes.json's `tower`) plays in the lobby, the floor room and a floor's battle, in place of the bosses' own (`shops.ts` its home's theme; App.tsx `musicBattle` → music.ts `towerBattle`; Town.tsx `towerBack` restarts it back in the room). [2026-11-19-tower-music.md](../decisions/2026-11-19-tower-music.md).
 - **The restore (audit 2):** kept as each round begins **and** as each step of the bosses' turn has played (solo.ts `nextRoundIn`), so a reload
   rejoins after his reply; **the clock** (the director's call): the time used on your turn is kept with the game as the page is hidden
   or closed (`KeptGame.turnMs`) and given back as used on a rejoin, and while the page is hidden your turn's clock stands still (no time

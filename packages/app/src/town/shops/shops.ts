@@ -141,9 +141,10 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   chandy: { home: "chandy", boss: "Chandy", crate: null, says: ["Crates come in on the next boat. Gators don't rush.", "Watch your step. Some of these logs bite.", "Chandy? He's out there. You won't see him till he wants you to."], kid: "swampkeeper", at: [9.5, 2.3], tall: 40, keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: [], roof: "sky", chatTone: "day" },
   // The Battle Tower's lobby (Nov 19): its clerk, a penguin bellhop (nobody's kid), behind the counter at the back left, drawn at his art's
   // size (57 px: his face and bow tie clear the 30 px counter). His tag and card say "Clerk"; his card starts or continues your climb
-  // (town/TowerDesk.tsx, the only way in: Eric, Nov 19). No crate, no theme of its own (the town's plays on). A bright lobby under a white
+  // (town/TowerDesk.tsx, the only way in: Eric, Nov 19). No crate. Its theme: the tower's own (`tower`, its home's: Nov 19), as in its floor
+  // room and a floor's battle. A bright lobby under a white
   // ceiling: the day tone.
-  tower: { home: "tower", boss: "Battle Tower", name: "Clerk", crate: null, kid: "towerclerk", at: [2.5, 2.4], tall: 57, keeper: [{ c: 2, r: 2 }, { c: 3, r: 2 }], prizes: [], roof: "store", chatTone: "day", music: null },
+  tower: { home: "tower", boss: "Battle Tower", name: "Clerk", crate: null, kid: "towerclerk", at: [2.5, 2.4], tall: 57, keeper: [{ c: 2, r: 2 }, { c: 3, r: 2 }], prizes: [], roof: "store", chatTone: "day" },
   zebra: { home: "zebra", boss: "Don Dough", crate: null, says: ZEBRA_BACK_LINES, kid: "zebrakeeper", at: [12.5, 7.3], tall: 73, flip: true, keeper: [{ c: 12, r: 7 }, { c: 13, r: 7 }], prizes: [], roof: "bakery", chatTone: "day" },
 };
 
@@ -231,9 +232,10 @@ export const canChallengeInside = (id: HomeId): boolean => id !== "recluse" && B
 /**
  * The Battle Tower's floor room (PR 11b, Nov 19), up the lobby's elevator: the same room every floor (its number on its walls), nobody's
  * shop (`hideKid`; `kid` only names a sheet the loader wants). Its doors: the elevator (`top`, up to the next floor once one's won) and the
- * way down to the lobby (`front`). Loaded by floor: ShopRoom.tsx loadTowerFloor.
+ * way down to the lobby (`front`). Loaded by floor: ShopRoom.tsx loadTowerFloor. Its theme: the tower's (its home's, Nov 19), carried on
+ * from the lobby with no restart.
  */
-export const TOWER_FLOOR: ShopDef = { home: "tower", part: "top", boss: "Battle Tower", name: "Battle Tower", crate: null, kid: "towerclerk", hideKid: true, at: [0, 0], keeper: [], prizes: [], roof: "store", chatTone: "day", music: null };
+export const TOWER_FLOOR: ShopDef = { home: "tower", part: "top", boss: "Battle Tower", name: "Battle Tower", crate: null, kid: "towerclerk", hideKid: true, at: [0, 0], keeper: [], prizes: [], roof: "store", chatTone: "day" };
 
 export const roomDef = (id: HomeId, part: RoomPart = "front"): ShopDef | null =>
   (id === "recluse" && part !== "back" ? RECLUSE_ROOMS[part] : id === "tower" && part === "top" ? TOWER_FLOOR : part === "back" ? BACK_ROOMS[id] : part === "front" ? SHOPS[id] : null) ?? null;

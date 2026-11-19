@@ -590,6 +590,8 @@ export function TownScreen({
   const towerBack = async (b: TowerBack) => {
     doorBusy.current = true;
     opening.current = { home: "tower", challenge: false };
+    // (The tower's theme, as at its door: loading now, playing as its room shows, Nov 19.)
+    roomMusicLoad(homeTheme("tower"));
     const end = await b.play.settle();
     if (end.best) towerBest.current = end.best;
     const lobby = !!end.error || (end.outcome === "left" && end.status === "open");
@@ -606,6 +608,7 @@ export function TownScreen({
     ctl.current?.pause();
     setShopOut(SHOP_FEEL.startZoom === 1);
     setInside({ ...got, intro: null, fx, n: 1, ...(lobby ? { arrived: "top" as const } : { at: FLOOR_YOU.sq }) });
+    roomMusic(roomTheme(got.room.def));
   };
   /**
    * A challenge started inside (Don Dough's, once his Challenge's beat and walk-out have played in his back room, you through its door;

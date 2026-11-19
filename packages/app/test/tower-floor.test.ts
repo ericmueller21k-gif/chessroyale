@@ -80,3 +80,19 @@ describe("the tower's floor room", () => {
     expect(upWords("fight", 4).on).toBe(false);
   });
 });
+
+/** Its music (Eric, Nov 19: "it's the background battle tower music"): the tower's own theme in its lobby, its floor room and a floor's battle. */
+describe("the tower's theme", () => {
+  it("plays in the lobby, the floor room and a floor's battle (`tower`, in themes.json), in place of the bosses' own", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { TOWER_FLOOR, homeTheme, roomDef, roomTheme } = await import("../src/town/shops/shops.ts");
+    const { TOWER_THEME, musicPlan, towerBattle } = await import("../src/music.ts");
+    const themes = JSON.parse(readFileSync(new URL("../public/music/themes.json", import.meta.url), "utf8"));
+    expect(TOWER_THEME).toBe("tower");
+    expect([roomTheme(roomDef("tower")!), roomTheme(TOWER_FLOOR), homeTheme("tower")]).toEqual(["tower", "tower", "tower"]);
+    const b = towerBattle("m", true);
+    expect(b.theme ?? b.boss).toBe("tower");
+    // (A loop with no intro, as Chandy's: from `pad`, 160 s long.)
+    expect(musicPlan(themes, "tower", 0)).toMatchObject({ intro: null, loop: { name: "tower-loop", offset: 0.5, loopStart: 0.5, loopEnd: 160.5 } });
+  });
+});

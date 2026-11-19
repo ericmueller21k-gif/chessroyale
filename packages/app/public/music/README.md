@@ -35,3 +35,9 @@ boards split at the transformation's start + `recluse-phase3`'s `introSeconds`: 
 files only. Their numbers are `themes.json`'s `town` entry (`loop`, `loopSeconds`, each solo's `id`, `file`, `seconds`; `pad` as every
 theme's), copied from the handoff's `town.json`. How often and in what order the solos play: `TOWN_MUSIC` in settings.ts. A rebuilt piece:
 replace its file and its numbers; no code change (`src/music.ts`, `townMusic`).
+
+## The Battle Tower's theme (Nov 19)
+
+`tower-loop`: one seamless loop, no intro (as Chandy's), from `tower-music/` on branch `stills/trailer-v2` (song `song_an.py`), re-encoded
+from its 192 kbps handoff to 128 kbps as above (same length, lined up at 0, `pad` and `pad + loopSeconds`). Keyed `tower` (the tower's home
+id): its lobby, its floor room and every floor's battle play it, never the bosses' own (docs/decisions/2026-11-19-tower-music.md).
