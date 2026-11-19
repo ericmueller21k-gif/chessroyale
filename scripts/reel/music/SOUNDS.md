@@ -492,7 +492,7 @@ all the song, and that's kind of the idea."
   tone, few overtones), cellos, a clarinet; each set to sit where the brass sat. Five clips of the same 22 seconds
   (0:57 to 1:19) went to him. The brass stays the default until he picks.
 
-## The battle tower from a plan (Nov 19, song_an.py): rebuilt after bar 8; v2 sent, no verdict yet
+## The battle tower from a plan (Nov 19, song_an.py): APPROVED, handed over
 
 "Heres instructions for a new one, please make it 2.5 min roughly, keep the sound more muted overall, it's the
 background battle tower music". His own plan again ("Moody 90s Acid-Jazz & Neo-Noir Hip-Hop Rock": 96 beats a minute,
@@ -528,4 +528,10 @@ choir pad; 32 bars: an intro, a guitar-and-organ tune, a jazz bridge, a climax o
     take their place;
   - "muted" is a register and a filter on every pitched voice (measured now: from 0:20, 6 to 11 dB less between
     500 Hz and 2 kHz than v1), not a cut on the whole mix.
+- Eric, Nov 19, on v2: "this is the one, nice work". It is the battle tower's music.
+- Handed over: `tower-music/` on stills/trailer-v2 (commit 572e009a): `tower-loop` as stereo 192 kbps MP3 and OGG,
+  160.0 s, -16.1 LUFS, peak -1.3 dBFS, one loop with no intro (handoff.py's id `tower`, a guess until the tower has
+  one in the code). The loop point checked on the built MP3. The director has the commit.
+- The other tower tries are not used: song_al.py, song_am.py (its tune's instrument was never picked), and
+  song_ak.py, shelved for a defeat.
 
