@@ -32,9 +32,12 @@ import { maiaProcess } from "../src/maia-process.ts";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const out = root + "reports/tower-sim/";
 const LAST_FLOOR = Number(process.env.TOWER_LAST ?? 50);
-/** A try at other numbers (Eric, Nov 20: "make it just go up like 10 per round"): the Maia floors' step (BATTLE_TOWER.maiaStep). */
-const BASE_STEP = BATTLE_TOWER.maiaStep;
-const STEP = process.env.TOWER_STEP ? Number(process.env.TOWER_STEP) : BASE_STEP;
+/**
+ * A try at another climb (Eric, Nov 20: "give it a couple tests"): the Maia floors' steps as JSON rows, [[from floor, + a floor], …]
+ * (BATTLE_TOWER.maiaSteps' shape), and a short name for the files. Unset: the settings' own.
+ */
+const STEPS = process.env.TOWER_STEPS ? (JSON.parse(process.env.TOWER_STEPS) as [number, number][]) : null;
+const CURVE = process.env.TOWER_CURVE ?? (STEPS ? "try" : "");
 /**
  * Lives (Eric, Nov 20: "add 2 lives, but it doesn't make you replay. You just win the floor"): a floor lost or drawn costs one and the
  * climb goes on; the run ends at a loss with none left. 0: the rule today (out at the first). The first loss is in the rows either way.
@@ -57,10 +60,10 @@ interface FloorRow {
   fen?: string;
 }
 
-// (The runner reads a floor's strength from BATTLE_TOWER itself, so the try sets it there, in this process only.)
-(BATTLE_TOWER as { maiaStep: number }).maiaStep = STEP;
+// (The runner reads a floor's strength from BATTLE_TOWER itself, so a try sets it there, in this process only.)
+if (STEPS) (BATTLE_TOWER as { maiaSteps: readonly (readonly [number, number])[] }).maiaSteps = STEPS;
 const rules = BATTLE_TOWER;
-const tag = `${CLIMBER}${STEP !== BASE_STEP ? `-step${STEP}` : ""}${LIVES ? `-lives${LIVES}` : ""}`;
+const tag = `${CLIMBER}${CURVE ? `-${CURVE}` : ""}${LIVES ? `-lives${LIVES}` : ""}`;
 
 async function climb(rating: number, runs: number, seed: number) {
   mkdirSync(out, { recursive: true });

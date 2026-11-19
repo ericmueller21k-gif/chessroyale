@@ -41,41 +41,50 @@ describe("the tower: floors and strength", () => {
     expect([97, 96, 98, 99].map((f) => floorBossCount(f))).toEqual([1, 3, 2, 2]);
   });
 
-  it("the design's table, row by row (floor, bosses, brain, rating)", () => {
+  it("the design's table, row by row (floor, bosses, brain, rating): Eric's gentler climb of Nov 20", () => {
     const row = (f: number) => {
       const n = floorBossCount(f);
       const s = floorStrength(f, n);
       return [f, n, s.full ? "full" : s.brain, s.rating];
     };
-    expect([1, 2, 3, 4, 5, 10, 15, 18, 20, 50, 51, 60, 79, 80, 99].map(row)).toEqual([
-      [1, 1, "maia", 800],
-      [2, 2, "maia", 700],
-      [3, 2, "maia", 800],
-      [4, 3, "maia", 900],
-      [5, 1, "maia", 1200],
-      [10, 2, "maia", 1500],
-      [15, 2, "maia", 2000],
-      [18, 2, "maia", 2300],
-      [20, 3, "maia", 2500],
-      [50, 2, "maia", 2500],
-      [51, 2, "stockfish", 2500],
-      [60, 3, "stockfish", 2725],
-      [79, 2, "stockfish", ENGINE_MAX_ELO],
-      [80, 3, "full", ENGINE_MAX_ELO],
+    expect([1, 2, 3, 4, 5, 6, 10, 11, 20, 25, 30, 31, 40, 50, 51, 60, 97, 98, 99].map(row)).toEqual([
+      [1, 1, "maia", 700],
+      [2, 2, "maia", 620],
+      [3, 2, "maia", 640],
+      [4, 3, "maia", 660],
+      [5, 1, "maia", 780],
+      [6, 2, "maia", 710],
+      [10, 2, "maia", 830],
+      [11, 2, "maia", 870],
+      [20, 3, "maia", 1230],
+      [25, 1, "maia", 1530],
+      [30, 2, "maia", 1630],
+      [31, 2, "maia", 1634],
+      [40, 3, "maia", 1670],
+      [50, 2, "maia", 1710],
+      [51, 2, "stockfish", 1750],
+      [60, 3, "stockfish", 2029],
+      [97, 1, "stockfish", ENGINE_MAX_ELO],
+      [98, 2, "stockfish", ENGINE_MAX_ELO],
       [99, 2, "full", ENGINE_MAX_ELO],
     ]);
   });
 
-  it("every floor: Maia +100 a floor to 2500 and held there to floor 50, a lone boss +200 within it; Stockfish from 51, +25 a floor, held at its ceiling on 79; its best from 80", () => {
+  it("every floor: Maia +20 a floor to 5, +30 to 10, +40 to 30, +4 to 50 (held in Eric's 1500 to 1700 band from about 25), a lone boss +100; Stockfish from 51 at 1750, +31 a floor, its ceiling on 98, its best on 99", () => {
+    const step = (g: number) => (g >= 31 ? 4 : g >= 11 ? 40 : g >= 6 ? 30 : g >= 2 ? 20 : 0);
+    let maia = 600;
     for (let f = 1; f <= 99; f++) {
       const n = floorBossCount(f);
       const s = floorStrength(f, n);
       if (f <= 50) {
-        expect(s).toEqual({ brain: "maia", rating: Math.min(2500, 600 + 100 * (f - 1) + (n === 1 ? 200 : 0)), full: false });
-        // (A lone boss plays more, never less, than the same floor with company.)
+        maia += step(f);
+        expect(s).toEqual({ brain: "maia", rating: maia + (n === 1 ? 100 : 0), full: false });
+        // (A lone boss plays more, never less, than the same floor with company; the climb never goes down with company alike.)
         expect(floorStrength(f, 1).rating).toBeGreaterThanOrEqual(floorStrength(f, 2).rating);
-      } else if (f < 80) {
-        expect(s).toEqual({ brain: "stockfish", rating: Math.min(ENGINE_MAX_ELO, 2500 + 25 * (f - 51) + (n === 1 ? 200 : 0)), full: false });
+        if (f > 1) expect(floorStrength(f, 2).rating).toBeGreaterThan(floorStrength(f - 1, 2).rating);
+      } else if (f < 99) {
+        expect(s).toEqual({ brain: "stockfish", rating: Math.min(ENGINE_MAX_ELO, 1750 + 31 * (f - 51) + (n === 1 ? 100 : 0)), full: false });
+        expect(s.rating).toBeGreaterThan(floorStrength(50, 2).rating);
       } else {
         expect(s).toEqual({ brain: "stockfish", rating: ENGINE_MAX_ELO, full: true });
       }

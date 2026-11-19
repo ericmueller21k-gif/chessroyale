@@ -13,7 +13,8 @@ export interface TowerRules {
   floors: number;
   pattern: readonly number[];
   maiaStart: number;
-  maiaStep: number;
+  /** [from this floor, + this a floor] rows, in floor order (BATTLE_TOWER.maiaSteps). */
+  maiaSteps: readonly (readonly [number, number])[];
   soloBonus: number;
   stockfishFrom: number;
   stockfishStart: number;
@@ -38,14 +39,21 @@ export interface FloorStrength {
   full: boolean;
 }
 
+/** Maia's rating on floor `floor` before any solo bonus or cap: maiaStart, plus each later floor's step (its maiaSteps row's). */
+export function maiaFloorRating(floor: number, s: Pick<TowerRules, "maiaStart" | "maiaSteps"> = BATTLE_TOWER): number {
+  let r = s.maiaStart;
+  for (let g = 2; g <= floor; g++) r += s.maiaSteps.reduce((step, [from, add]) => (g >= from ? add : step), 0);
+  return r;
+}
+
 /**
- * Floor `floor`'s strength with `bosses` on it: before stockfishFrom, Maia at maiaStart + maiaStep a floor, held at Maia's top
- * (2500, from floor 20); from stockfishFrom, Stockfish at stockfishStart + stockfishStep a floor, held at ENGINE_MAX_ELO on the
- * floor that reaches it (79), its best from the floor after (80). A lone boss plays soloBonus more, within the same caps.
+ * Floor `floor`'s strength with `bosses` on it: before stockfishFrom, Maia at maiaFloorRating (maiaStart, then maiaSteps), held at
+ * Maia's top (2500); from stockfishFrom, Stockfish at stockfishStart + stockfishStep a floor, held at ENGINE_MAX_ELO on the
+ * floor that reaches it, its best from the floor after. A lone boss plays soloBonus more, within the same caps.
  */
 export function floorStrength(floor: number, bosses: number, s: TowerRules = BATTLE_TOWER): FloorStrength {
   const bonus = bosses === 1 ? s.soloBonus : 0;
-  if (floor < s.stockfishFrom) return { brain: "maia", rating: Math.min(maiaTopRating(), s.maiaStart + s.maiaStep * (floor - 1) + bonus), full: false };
+  if (floor < s.stockfishFrom) return { brain: "maia", rating: Math.min(maiaTopRating(), maiaFloorRating(floor, s) + bonus), full: false };
   const at = (f: number) => s.stockfishStart + s.stockfishStep * (f - s.stockfishFrom);
   const full = floor > s.stockfishFrom && at(floor - 1) >= ENGINE_MAX_ELO;
   return { brain: "stockfish", rating: full ? ENGINE_MAX_ELO : Math.min(ENGINE_MAX_ELO, at(floor) + bonus), full };

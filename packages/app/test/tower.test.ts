@@ -88,9 +88,9 @@ describe("the tower's rules on the device", () => {
     expect(floorOutcome("draw")).toBe("drawn");
   });
 
-  it("a floor's rating as the screens show it (the design's table), full strength from floor 80", () => {
-    expect([1, 2, 5, 10, 60, 79].map((f) => floorRating(f))).toEqual(["800", "700", "1200", "1500", "2725", "3190"]);
-    expect(floorRating(80)).toBe("Full strength");
+  it("a floor's rating as the screens show it (the design's table), full strength on the top floor", () => {
+    expect([1, 2, 5, 10, 60, 98].map((f) => floorRating(f))).toEqual(["700", "620", "780", "830", "2029", "3190"]);
+    expect(floorRating(99)).toBe("Full strength");
   });
 
   it("draws a boss id it doesn't know (renamed or removed) as a stand-in, never a crash", () => {
