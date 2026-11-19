@@ -14,7 +14,7 @@ import { DASH_UI } from "../src/components/Dash.tsx";
 import { ZEBRA_BEATS, ZEBRA_UI } from "../src/components/Zebra.tsx";
 import { CHANDY_UI } from "../src/components/Chandy.tsx";
 import { BIGBOY_UI } from "../src/components/BigBoy.tsx";
-import { BOINGO_UI, FUNHOUSE, PIE, SPIN, funhouseFlipAt } from "../src/components/Boingo.tsx";
+import { BOINGO_UI, FUNHOUSE, PIE, SPIN, funhouseFlipAt, pieLine } from "../src/components/Boingo.tsx";
 import { BLIZZARD, FREEZE, GINGER_UI, THAW } from "../src/components/Ginger.tsx";
 import { CANDLE, GREX_UI, SPARK } from "../src/components/Grex.tsx";
 import { DARK, HOLLOW_UI } from "../src/components/Hollow.tsx";
@@ -381,5 +381,20 @@ describe("Eric, Nov 5: a power's banner shows your pawn, never the God King", ()
     expect(parts).toMatch(/nameWide > room/);
     expect(css).toMatch(/\.fight-banner\.power-cut \.fb-band \{\s*\/\*[^*]*\*\/\s*height: 44%;/);
     expect(css).toMatch(/\.fight-banner\.power-cut \.kc-label \{\s*color: #fecaca;\s*white-space: nowrap;/);
+  });
+});
+
+describe("Eric, Nov 20: Boingo's pie says when the next splat freezes (a freeze on a tower floor came as a surprise)", () => {
+  const fen = "4k3/8/8/8/3PP3/8/8/4K3 w - - 0 1";
+  const view = (splats: { square: string; piece: string; n: number }[], frozen: { square: string; until: number } | null = null) => ({ board: { fen }, powers: { turn: 4, splats, frozen } }) as unknown as BossView;
+  it("the first splat warns that one more freezes the piece; the second says it's frozen; a piece with no mark left just splatted", () => {
+    expect(pieLine(view([{ square: "e4", piece: "p", n: 1 }]), { square: "e4" }, 2)).toBe("Splat on your pawn: one more freezes it");
+    expect(pieLine(view([], { square: "e4", until: 4 }), { square: "e4" }, 2)).toBe("Splat! Your pawn is frozen");
+    // (Three splats to a freeze: the first says nothing of it yet, the second warns.)
+    expect(pieLine(view([{ square: "e4", piece: "p", n: 1 }]), { square: "e4" }, 3)).toBe("Splat on your pawn");
+    expect(pieLine(view([{ square: "e4", piece: "p", n: 2 }]), { square: "e4" }, 3)).toBe("Splat on your pawn: one more freezes it");
+    // (One splat freezes: nothing to warn of.)
+    expect(pieLine(view([]), { square: "d4" }, 1)).toBe("Splat on your pawn");
+    expect(pieLine(view([]), { square: "a1" }, 2)).toBeUndefined();
   });
 });

@@ -4,6 +4,7 @@ import { EFFECTS, cueAt } from "../characters/power-art.ts";
 import { BossFace } from "./BossCharacter.tsx";
 import { BossEffect, BossMoment, SpriteAnim } from "./BossEffect.tsx";
 import { funhouseAngle, pieceAt, type BoardAngle } from "@chessroyale/chess";
+import { BOSS_POWERS } from "@chessroyale/core";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { PieceDecor } from "../board/types.ts";
 import type { BossView } from "../game.ts";
@@ -103,13 +104,24 @@ function FaceSplash({ square, orientation, since }: { square: string; orientatio
   );
 }
 
+/**
+ * The pie's banner line, naming the piece hit (Eric, Nov 20: a freeze on a piece's second splat came as a surprise, the first
+ * having said nothing of it): frozen; one splat short of a freeze, said so; else just the splat. Undefined: no piece there.
+ */
+export function pieLine(boss: Pick<BossView, "powers" | "board">, m: Pick<Moment, "square">, toFreeze: number = BOSS_POWERS.pieSplatsToFreeze): string | undefined {
+  const piece = m.square ? pieceAt(boss.board.fen, m.square) : null;
+  if (!piece) return undefined;
+  const word = PIECE_WORD[piece.type];
+  if (pieFroze(boss, m)) return `Splat! Your ${word} is frozen`;
+  const n = boss.powers?.splats?.find((x) => x.square === m.square)?.n ?? 0;
+  return n > 0 && n === toFreeze - 1 ? `Splat on your ${word}: one more freezes it` : `Splat on your ${word}`;
+}
+
 function pieMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {
   const sq = moment.square;
-  const piece = sq ? pieceAt(boss.board.fen, sq) : null;
-  const word = piece ? PIECE_WORD[piece.type] : null;
   return (
     <div class="power-moment pm-pie">
-      {banner("PIE!", word ? (pieFroze(boss, moment) ? `Splat! Your ${word} is frozen` : `Splat on your ${word}`) : undefined, "", PIE.flyAt)}
+      {banner("PIE!", pieLine(boss, moment), "", PIE.flyAt)}
       {cast("throw", PIE.flyAt)}
       {sq && t >= PIE.flyAt && t < PIE.hitAt && <Flight name="pieFly" square={sq} orientation={orientation} since={moment.at + PIE.flyAt} ms={PIE.hitAt - PIE.flyAt} />}
       {sq && t >= PIE.hitAt && t < PIE.hitAt + 260 && <FaceSplash square={sq} orientation={orientation} since={moment.at + PIE.hitAt} />}
