@@ -492,7 +492,7 @@ all the song, and that's kind of the idea."
   tone, few overtones), cellos, a clarinet; each set to sit where the brass sat. Five clips of the same 22 seconds
   (0:57 to 1:19) went to him. The brass stays the default until he picks.
 
-## The battle tower from a plan (Nov 19, song_an.py): sent, no verdict yet
+## The battle tower from a plan (Nov 19, song_an.py): rebuilt after bar 8; v2 sent, no verdict yet
 
 "Heres instructions for a new one, please make it 2.5 min roughly, keep the sound more muted overall, it's the
 background battle tower music". His own plan again ("Moody 90s Acid-Jazz & Neo-Noir Hip-Hop Rock": 96 beats a minute,
@@ -508,4 +508,24 @@ choir pad; 32 bars: an intro, a guitar-and-organ tune, a jazz bridge, a climax o
 - Measured: -16.0 LUFS, peak -1.1 dBFS, 160.00 s; its sections within 2.6 dB of each other.
 - The tower now has four candidates: song_al.py (one minute, a build), song_am.py (two minutes, his shape; its
   tune's instrument still to be picked from five), this, and song_ak.py shelved for a defeat. None handed over.
+- His answer was a second plan (the other assistant's reading of the upload, passed on by him): the first 20 seconds
+  are right ("a slick, moody boom-bap drum pocket with a punchy funk bassline and dark off-beat chord stabs"), and
+  from 0:20 it falls apart: the leads "thin, high-register monophonic synth leads" ("a plastic kazoo, a cheesy Casio
+  keyboard demo, and a squeaky whistle"), rhythms that "fight the groove", a bridge "bright, plodding, overly sweet".
+  Its rules, built as written in v2:
+  - bars 1-8 frozen (the code that makes them is untouched; measured against v1, the first 18 s differ only by the
+    hall's own randomness, 24 dB under the music);
+  - after bar 8 nothing above F#4, everything pitched low-passed at 2.0 to 2.6 kHz, no single-line synth leads;
+  - three instruments: a gritty low guitar (riffs with a slide into the top note, power chords), dark chords of
+    three or four notes on an electric-piano-and-organ (never single notes), a muted guitar's accents;
+  - A keeps the intro's kit and pocket under a two-bar low riff with beats 3 and 4 empty; B stays dark (a rimshot,
+    a walking bass, held chords, three-note fills, a two-beat stop with a guitar slide and a flam); C is power
+    chords on 1 and the "and" of 2 with a riff and a thick chord by turns, and a tight fill into bar 1.
+- Lessons, and they are the same one from three sides:
+  - a tune in octave 5 on a thin single voice over a dark beat reads as a toy. On a dark groove the "lead" is a low
+    riff with air in it, and chords, not a singing line;
+  - the groove is the song: when its first eight bars are the best of it, what follows should add to them, not
+    take their place;
+  - "muted" is a register and a filter on every pitched voice (measured now: from 0:20, 6 to 11 dB less between
+    500 Hz and 2 kHz than v1), not a cut on the whole mix.
 
