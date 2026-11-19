@@ -167,8 +167,11 @@ export function TowerSide({ boss }: { boss: BossView }) {
     <div class="boss-side tw-side">
       {side.bosses.map((b, i) => (
         <span class={`tw-side-fig${i === side.toMove ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id} style={{ bottom: `${((n - 1 - i) * 100) / n}%`, height: `${100 / n}%` }}>
-          <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" mine={(k) => speakerOf(side, k) === i} />
-          <Figure boss={b} scale={scale} since={since} still={still} />
+          {/* (His words over his own head, whoever is to move: the figure's drawn box, not his third of the board's height.) */}
+          <span class="tw-side-body">
+            <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" mine={(k) => speakerOf(side, k) === i} />
+            <Figure boss={b} scale={scale} since={since} still={still} />
+          </span>
         </span>
       ))}
     </div>

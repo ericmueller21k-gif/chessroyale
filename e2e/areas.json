@@ -24,6 +24,7 @@
       "e2e/helpers.ts",
       "packages/app/src/net.ts",
       "packages/app/src/solo.ts",
+      "packages/app/src/boss-side.ts",
       "packages/app/src/main.tsx",
       "packages/app/src/board/OwnBoard.tsx",
       "packages/app/src/account.ts",

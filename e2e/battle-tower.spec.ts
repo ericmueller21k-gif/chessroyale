@@ -109,22 +109,34 @@ test("no Last Stand on a floor (?laststand=1 forces one elsewhere); leaving befo
 
 test("a shared floor (audit 2, finding 1): every boss drawn from his own part: Sawyer's cut on Ginger's turn, its banner and words Sawyer's, the move list naming each boss", async ({ page }, info) => {
   test.setTimeout(5 * 60_000);
-  // (Every power banner as it's put on the page: who it names.)
+  // (Every power banner as it's put on the page: who it names; and every boss's words: by whose part or figure they show.)
   await page.addInitScript(() => {
     const w = window as any;
     w.__banners = [];
+    w.__words = [];
     new MutationObserver(() => {
       for (const b of document.querySelectorAll(".power-cut[aria-label]")) {
         const l = b.getAttribute("aria-label")!;
         if (!w.__banners.includes(l)) w.__banners.push(l);
+      }
+      for (const b of document.querySelectorAll(".tw-bar .bc-bubble[aria-label], .tw-side .bc-bubble[aria-label]")) {
+        const l = `${b.closest("[data-boss]")?.getAttribute("data-boss")}|${b.getAttribute("aria-label")}`;
+        if (!w.__words.includes(l)) w.__words.push(l);
       }
     }).observe(document, { childList: true, subtree: true });
   });
   await page.goto("/tower?debug&pace=quick&power=cuts");
   await towerScreen(page);
   // A run on floor 2, Ginger then Sawyer (the deal set in the local database: a floor of two from the server's own deal is random).
-  expect((await page.request.post("/api/tower/run", { data: {} })).ok()).toBe(true);
-  const user = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  // (From the page, as the app asks: its own session.)
+  await expect.poll(async () => (await page.context().cookies()).some((c) => c.name === "hc_session"), { timeout: 20_000 }).toBe(true);
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  const user = made.user;
   await localSql(page, "UPDATE tower_runs SET floor = 2, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["gingerbread", "sawyer"]], deck: [], decks: 1 }), user);
   await page.reload();
   await towerScreen(page);
@@ -151,6 +163,11 @@ test("a shared floor (audit 2, finding 1): every boss drawn from his own part: S
   const banners: string[] = await page.evaluate(() => (window as any).__banners);
   expect(banners.some((l) => l.startsWith("Sawyer: SAW CUT!"))).toBe(true);
   expect(banners.filter((l) => l.includes("SAW CUT") && !l.startsWith("Sawyer"))).toEqual([]);
+  // His power's words by his own part of the bar (a computer's: over his own figure), never hers (characters/sawyer.ts, `power`).
+  const his = ["Mind the gap.", "Keep off the cut!", "Snip snip.", "Clean cut."];
+  const words: string[] = await page.evaluate(() => (window as any).__words);
+  expect(words.filter((l) => his.includes(l.split("|")[1]!)).length).toBeGreaterThan(0);
+  expect(words.filter((l) => his.includes(l.split("|")[1]!) && l.split("|")[0] !== "sawyer")).toEqual([]);
   // The move list: each of the side's moves by the boss who made it, in turn (Ginger, Sawyer, Ginger…).
   const said = await page.locator(".mv-row.mv-boss").evaluateAll((rows) => rows.map((r) => r.getAttribute("aria-label")!.replace(/^\S+ /, "").split(":")[0]));
   expect(said.length).toBeGreaterThan(1);

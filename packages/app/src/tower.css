@@ -390,7 +390,12 @@
   justify-content: flex-end;
   transition: transform 0.3s ease;
 }
-.tw-side-fig:not(.tw-to-move) > :not(.tw-side-bubble) {
+.tw-side-body {
+  position: relative;
+  display: block;
+}
+.tw-side-fig:not(.tw-to-move) .tw-fig-box,
+.tw-side-fig:not(.tw-to-move) .tw-part-portrait {
   opacity: 0.5;
   filter: grayscale(0.7);
 }
