@@ -234,7 +234,13 @@ test.describe("a deploy landed, the service worker in charge", () => {
     const next = version.endsWith("f") ? "brc-eeeeeeeeeeee" : "brc-ffffffffffff";
     const url = `/api/e2e/sw.js?key=${process.env.E2E_SQL_KEY ?? ""}&version=${next}`;
     expect((await page.request.get(url)).headers()["content-type"], "the next worker is on the server").toContain("javascript");
-    await page.evaluate((u) => void navigator.serviceWorker.register(u, { scope: "/" }), url);
+    // (Awaited, and the next worker's states kept as they change: a register refused, or a worker gone redundant, says so below.)
+    await page.evaluate(async (u) => {
+      const reg = await navigator.serviceWorker.register(u, { scope: "/" });
+      const sw = reg.installing ?? reg.waiting ?? reg.active;
+      const states = ((window as any).__nextStates = [sw?.state]);
+      sw?.addEventListener("statechange", () => states.push(sw.state));
+    }, url);
     const refused: string[] = [];
     page.on("response", (r) => r.status() === 404 && refused.push(new URL(r.url()).pathname));
     // The new worker takes over and keeps the old version's files: this tab runs it.
@@ -243,7 +249,18 @@ test.describe("a deploy landed, the service worker in charge", () => {
         const sw = navigator.serviceWorker.controller;
         return { next: !!sw?.scriptURL.includes("/api/e2e/sw.js") && sw.state === "activated", caches: await caches.keys() };
       });
-    await expect.poll(now, { timeout: 60_000 }).toEqual({ next: true, caches: expect.arrayContaining([version, next]) });
+    await expect
+      .poll(now, { timeout: 60_000 })
+      .toEqual({ next: true, caches: expect.arrayContaining([version, next]) })
+      .catch(async (e: Error) => {
+        // (Nov 19: twice on CI the next worker never took over, never locally. Which stage it stopped at, for the next one.)
+        const at = await page.evaluate(async () => {
+          const reg = await navigator.serviceWorker.getRegistration();
+          const w = (s: ServiceWorker | null | undefined) => (s ? `${new URL(s.scriptURL).pathname}:${s.state}` : "none");
+          return `the next worker's states ${JSON.stringify((window as any).__nextStates)}; now installing ${w(reg?.installing)}, waiting ${w(reg?.waiting)}, active ${w(reg?.active)}, in charge ${w(navigator.serviceWorker.controller)}`;
+        });
+        throw new Error(`${e.message}\n${at}`);
+      });
     // Babur's challenge: his room's code and his intro's art, chunks of the tab's version, from its version's cache.
     const card = await tapInTown(page, "boss", "tiger", page.getByRole("dialog", { name: "Babur", exact: true }));
     await card.getByRole("button", { name: "Challenge alone" }).click();
