@@ -9,4 +9,5 @@ piece ... it also looks like a pretty boring shot right now ... a particle shot 
 - **Why it looked like dotted lines:** the round's `fly` loop never ended, so each square kept its own flickering bolt. Now one round
   (a hot head and a tapering streak) moves down the file a quarter square at a time, shedding sparks that cool and fade; `hit` stops it
   at the piece's middle, where the existing shatter takes over. `shotStepMs` (65 ms a square, was 60) in settings.ts.
-- **Later (not built):** the hit piece should shatter with the same effect as the God King's king shattering (Dodge's `DODGE_KING`).
+- **Later (not built):** Eric: "take that same thing that we use for the king shattering and make the piece shatter". The only king
+  shatter in the game is Dodge's kill (`DODGE_KING` in effects/chandy.ts, played by ChandyDodge.tsx; the brief called it the God King's).
