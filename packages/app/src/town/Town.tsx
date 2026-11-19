@@ -766,6 +766,12 @@ export function TownScreen({
       </>
     );
   };
+  // (Tests) The tower's floor room now: its floor, mode and bosses, and how far into its walk-in (ms).
+  if (testSwitchesAllowed())
+    (window as unknown as { __towerFloor?: () => unknown }).__towerFloor = () => {
+      const s = floorS.current;
+      return s && insideNow.current?.room.def.home === "tower" && insideNow.current.room.def.part === "top" ? { floor: s.floor, mode: s.mode, bosses: s.bosses, t: s.t0 === null ? null : performance.now() - s.t0, go: s.times?.go ?? null } : null;
+    };
   /** Leave a floor under way from the lobby's question: free (its bosses rest), or counted (under way elsewhere, nothing kept here). */
   const towerLeave = async (start: FloorStart, free: boolean) => {
     setTowerAsk(null);
