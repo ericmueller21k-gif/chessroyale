@@ -124,6 +124,24 @@ describe("the tower: the pool and the deal", () => {
     }
   });
 
+  it("audit 2, finding 7: a kill switch flipped mid-run never leaves a boss twice in the deck (a new deck leaves out the bosses still waiting)", () => {
+    const problems: string[] = [];
+    for (let seed = 1; seed <= 400; seed++) {
+      // (Half the runs: a kill switch flips at random as each floor is won, a seeded draw, on 1 to 3 of the pool's bosses.)
+      let r = (seed * 2654435761) >>> 0;
+      const rnd = () => ((r = (Math.imul(r ^ (r >>> 15), 0x2c1b3c6d) + 0x6d2b79f5) >>> 0) / 2 ** 32);
+      const flips = seed % 2 === 0;
+      let pool = fullPool;
+      let run = newRun(seed * 397, pool);
+      while (run.status === "open") {
+        if (flips && rnd() < 0.3) pool = fullPool.filter(() => rnd() > 0.15).slice(0, fullPool.length);
+        run = finishFloor(run, "won", pool.length >= 6 ? pool : fullPool);
+        if (new Set(run.deck).size < run.deck.length) problems.push(`${seed}, floor ${run.floors.length}: ${run.deck.join(" ")}`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
   it("a pool the kill switches leave too small for the rules: never thrown, never an apart pair, at least one boss a floor", () => {
     for (const pool of [["gingerbread", "clown"], ["hollow", "smudgy"], ["gingerbread"], ["hollow", "smudgy", "alfil", "grex"]]) {
       const run = climb(5, pool);

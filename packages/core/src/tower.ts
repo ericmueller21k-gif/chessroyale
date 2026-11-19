@@ -133,7 +133,8 @@ function freshDeck(seed: number, n: number, pool: readonly string[], floor: numb
 
 /**
  * Floor `floor`'s bosses from the run's deck (a resting boss leaves it), the floor before's (`before`) never again: the deck's, in
- * order, then a new deck's once it runs out, so a run meets every boss in the pool once before any comes twice. A pool the kill
+ * order, then a new deck's once it runs out (less the bosses still waiting in the old one), so a run meets every boss in the pool once
+ * before any comes twice. A pool the kill
  * switches left too small for that: the floor before's bosses may come again, never an apart pair; still too small, fewer bosses.
  */
 function deal(run: Pick<TowerRun, "seed" | "deck" | "decks">, floor: number, before: readonly string[], pool: readonly string[], s: TowerRules): Pick<TowerRun, "deck" | "decks"> & { bosses: string[] } {
@@ -142,7 +143,8 @@ function deal(run: Pick<TowerRun, "seed" | "deck" | "decks">, floor: number, bef
   let deck = take(run.deck.filter((b) => pool.includes(b)), k, bosses, before, s);
   let decks = run.decks;
   if (bosses.length < k && deck.length < pool.length) {
-    const fresh = freshDeck(run.seed, decks++, pool, floor, bosses, before, s);
+    // (Less the bosses still waiting in the old deck: a kill switch flipped mid-run can leave some, and they'd come twice. Audit 2, finding 7.)
+    const fresh = freshDeck(run.seed, decks++, pool.filter((b) => !deck.includes(b)), floor, bosses, before, s);
     deck = [...deck, ...take(fresh, k, bosses, before, s)];
   }
   if (bosses.length < k) deck = take(deck, k, bosses, [], s);
