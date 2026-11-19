@@ -113,6 +113,12 @@ export interface Settings {
    * Unset or one: one boss, as ever.
    */
   bossIds?: readonly string[];
+  /**
+   * A Battle Tower floor (core tower.ts; set only by its start path, `startFloor`, from the run's deal): every boss on it plays
+   * the floor's strength (`floorStrength`: Maia at the floor's rating, Stockfish from BATTLE_TOWER.stockfishFrom, its best from
+   * the floor after its ceiling), with no roster offset and no difficulty, a party at the same ratings. Unset: not the tower.
+   */
+  towerFloor?: number;
   bossAvoid: string;
   /**
    * Bosses resting (kill switches: pauses.ts), by id: never met, at random or picked (a picked one is replaced by a
@@ -1263,6 +1269,24 @@ export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined }
  * docs/decisions/2026-11-19-tower-apart-pairs.md.
  */
 export const BATTLE_TOWER = {
+  /** The climb (core tower.ts; the design's section 3): 99 floors, each one game; only a win climbs. */
+  floors: 99,
+  /** How many bosses a floor has, looping: floor f has pattern[(f - 1) % pattern.length] (Eric: "1 boss then 2, maybe 2 again, then 3"). */
+  pattern: [1, 2, 2, 3] as readonly number[],
+  /** Floors before stockfishFrom: Maia at maiaStart + maiaStep a floor after the first (Eric: "100 increase per starting at 600"), held at Maia's top (2500). */
+  maiaStart: 600,
+  maiaStep: 100,
+  /** A one-boss floor plays this much stronger, within the same caps (Eric: "solo bosses get a little bit extra strength"; +200 is the director's guess). */
+  soloBonus: 200,
+  /**
+   * From this floor Stockfish (Eric: "at 50 wins ... we swap to stock fish and continue up"): its UCI_Elo stockfishStart, +stockfishStep a
+   * floor (the director's guess), held at its ceiling (ENGINE_MAX_ELO, 3190: floor 79); from the floor after that, its best every move.
+   */
+  stockfishFrom: 51,
+  stockfishStart: 2500,
+  stockfishStep: 25,
+  /** Leaving a floor under way is free before your leaveFreeBefore-th move (the floor fought again later, the same bosses), else a loss. */
+  leaveFreeBefore: 2,
   rageScale: [1, 0.75, 0.6] as readonly number[],
   apart: [["hollow", "smudgy"], ["smudgy", "alfil"], ["alfil", "grex"], ["dash", "smudgy"]] as readonly (readonly [string, string])[],
   maxBosses: 3,

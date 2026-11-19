@@ -35,7 +35,6 @@ import {
   type GroupResult,
   type BossState,
   type BossOwn,
-  BATTLE_TOWER,
   BOSS_OWN_FIELDS,
   BOSS_ROSTER,
   type MatchState,
@@ -84,7 +83,7 @@ import { freestyleStart } from "./chess960.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
 import { START_FEN, applyMove, baseAt, fenAtPly, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan, type GameEnd } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
-import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, levelForMaia, type BossBrain, type BossBrainPlan, type BossForm } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, floorStrength, levelForMaia, sideRefusal, type BossBrain, type BossBrainPlan, type BossForm, type FloorStrength } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
@@ -439,7 +438,8 @@ export class MatchRunner {
         ...this.firstForm(def.id),
         powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(setUp ?? {}) },
         tier: this.settings.bossFixedElo || raidBossElo([]),
-        elo: bossStrength(this.settings.bossFixedElo || raidBossElo([]), def, this.settings.bossDifficulty),
+        // (A tower floor: the floor's strength, no offset or difficulty.)
+        elo: this.towerStrength()?.rating ?? bossStrength(this.settings.bossFixedElo || raidBossElo([]), def, this.settings.bossDifficulty),
         crowdSide,
         startPly: this.boards.get(id)!.history.length,
         crowdMoves: 0,
@@ -1362,7 +1362,7 @@ export class MatchRunner {
     if (this.state.boss?.staggerNext) return "stagger";
     // (The stumble's draw comes first, as ever: a best reply moves nothing else the match's random source draws.)
     const stumbles = this.bossStumbles();
-    if (this.bossBestReply()) return "best";
+    if (this.bossBestReply() || this.towerStrength()?.full) return "best";
     return stumbles ? "stumble" : "elo";
   }
 
@@ -1485,11 +1485,15 @@ export class MatchRunner {
 
   /**
    * How the boss plays this battle (bossBrainFor): an admin's pick (`picked`, "" for the boss's own), and whether Maia
-   * may play here at all; a crowd's margin when more than one picks the crowd's moves (not Boss alone).
+   * may play here at all; a crowd's margin when more than one picks the crowd's moves (not Boss alone). A tower floor: the
+   * floor's (floorStrength), alone or a party alike: Maia at its rating, as Boss alone's; Stockfish (at the floor's UCI_Elo, the
+   * boss's elo) from BATTLE_TOWER.stockfishFrom.
    */
   bossBrainPlan(picked: BossBrain | "", maia: boolean): BossBrainPlan | null {
     const b = this.state.boss;
     if (!b) return null;
+    const floor = this.towerStrength();
+    if (floor) return floor.brain === "maia" ? bossBrainFor(b.id ?? "", b.elo, picked, maia, { alone: floor.rating }) : { brain: "stockfish", rating: null, stockfishShare: 0 };
     return bossBrainFor(b.id ?? "", b.elo, picked, maia, { crowd: this.alive().length > 1, alone: this.settings.bossAloneMaia || undefined });
   }
 
@@ -2584,40 +2588,48 @@ export class MatchRunner {
     return this.several() ? sideRates(BOSS_POWERS, this.state.bosses!.map((o) => o.id)) : BOSS_POWERS;
   }
 
+  /** A Battle Tower floor's strength (settings.towerFloor; core floorStrength), with as many bosses as it deals; null off the tower. */
+  private towerStrength(): FloorStrength | null {
+    const f = this.settings.towerFloor;
+    return f ? floorStrength(f, Math.max(1, this.settings.bossIds?.length ?? 1)) : null;
+  }
+
   /**
    * Several bosses on one side (settings.bossIds, the Battle Tower): every one dealt, in the order given, from the starting
    * position. The crowd keeps the side the usual pick gave it (White; Black only by the raid's test switch), but a boss who
    * always plays Black (Hollow) claims the dark side first. Each boss has his own seed (one draw each from the match's random
    * source), strength and powers, and does what he does before move 1 (Big Boy's snack), in the order dealt; the battle's own
-   * fields (the crowd's moves, the God King) are shared. The first boss dealt makes the side's first move. Never two bosses
-   * BATTLE_TOWER.apart keeps apart.
+   * fields (the crowd's moves, the God King) are shared. The first boss dealt makes the side's first move. A tower floor
+   * (settings.towerFloor): every boss at the floor's strength, no offset or difficulty.
+   *
+   * Never a side core's sideRefusal refuses (an unknown boss, one twice, more than BATTLE_TOWER.maxBosses, a pair
+   * BATTLE_TOWER.apart keeps apart): thrown, for the test switch and tests. A room never gets here with one: the tower's only
+   * way in is core's startFloor, which deals again by the same rule (and the kill switches) instead.
    */
   private startSide() {
     const ids = [...this.settings.bossIds!];
-    const defs = ids.map((id) => BOSS_ROSTER.find((d) => d.id === id && d.powers));
-    const unknown = ids.filter((_, i) => !defs[i]);
-    if (unknown.length) throw new Error(`several bosses: no boss with powers named ${unknown.join(", ")}`);
-    if (ids.length > BATTLE_TOWER.maxBosses || new Set(ids).size < ids.length) throw new Error(`several bosses: 2 to ${BATTLE_TOWER.maxBosses} different bosses, not ${ids.join(", ")}`);
-    const apart = BATTLE_TOWER.apart.find(([a, b]) => ids.includes(a) && ids.includes(b));
-    if (apart) throw new Error(`several bosses: ${apart[0]} and ${apart[1]} never share a floor (BATTLE_TOWER.apart)`);
+    const refused = sideRefusal(ids);
+    if (refused) throw new Error(`several bosses: ${refused}`);
+    const defs = ids.map((id) => BOSS_ROSTER.find((d) => d.id === id)!);
     const id = this.state.boards[0]!;
     const board = this.boards.get(id)!;
     const n = this.alive().length;
     this.bossLast = null;
     const seeds = defs.map(() => Math.floor(this.opts.rng() * 2 ** 32));
     let crowdSide = sideToMove(board.fen);
-    const claimer = crowdSide === "b" ? defs.findIndex((d) => bossRules(d!)?.opening?.crowdWhite) : -1;
+    const claimer = crowdSide === "b" ? defs.findIndex((d) => bossRules(d)?.opening?.crowdWhite) : -1;
     if (claimer >= 0) crowdSide = "w";
     this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
-    const setUps = defs.map((d, i) => bossRules(d!)?.opening?.setUp?.(this.battle, { boardId: id, seed: seeds[i]!, crowdSide, generation: board.generation }) ?? null);
+    const setUps = defs.map((d, i) => bossRules(d)?.opening?.setUp?.(this.battle, { boardId: id, seed: seeds[i]!, crowdSide, generation: board.generation }) ?? null);
     const fen = this.boards.get(id)!.fen;
     const tier = this.settings.bossFixedElo || raidBossElo([]);
+    const floor = this.towerStrength();
     const own: BossOwn[] = defs.map((d, i) => ({
-      id: d!.id,
-      ...this.firstForm(d!.id),
+      id: d.id,
+      ...this.firstForm(d.id),
       powers: { ...initPowers(seeds[i]!, fen, crowdSide), ...(i === claimer ? { claimed: true } : {}), ...(setUps[i] ?? {}) },
       tier,
-      elo: bossStrength(tier, d!, this.settings.bossDifficulty),
+      elo: floor?.rating ?? bossStrength(tier, d, this.settings.bossDifficulty),
     }));
     this.state = {
       ...this.state,

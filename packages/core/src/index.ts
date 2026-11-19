@@ -8,6 +8,7 @@ export * from "./ranked.ts";
 export * from "./ranked-leaves.ts";
 export * from "./boss.ts";
 export * from "./boss-tokens.ts";
+export * from "./tower.ts";
 export { RATING_CURVE } from "./rating-curve.ts";
 export * from "./shop.ts";
 export * from "./chat.ts";
