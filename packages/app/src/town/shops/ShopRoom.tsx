@@ -116,8 +116,11 @@ export interface RoomArt {
    * A claw machine (Boingo's Funhouse, Nov 6): its square and the square in front where you play it. Standing there, a tap on the
    * machine calls `openClawMachine()` (claw/index.ts, loaded only then); from anywhere else the tap walks you up to it.
    */
-  /** Words written on a piece's face, crisp at the screen's pixels (Boingo's price sign): its face's box in the piece's pixels, its lines. */
-  sign?: { readonly piece: string; readonly face: { readonly x: number; readonly y: number; readonly w: number; readonly h: number }; readonly lines: readonly string[] };
+  /**
+   * Words written on a piece's face, crisp at the screen's pixels (Boingo's price sign): its face's box in the piece's pixels, its lines,
+   * and their ink (none: Boingo's purple; the Battle Tower's "Best floors" board: its slate).
+   */
+  sign?: { readonly piece: string; readonly face: { readonly x: number; readonly y: number; readonly w: number; readonly h: number }; readonly lines: readonly string[]; readonly ink?: string };
   claw?: { readonly at: { readonly col: number; readonly row: number; readonly w: number; readonly d: number }; readonly spot: Sq };
   /**
    * Its people (Rolling Dough's, Nov 11: the door guards, Don Dough and his crew), drawn from their art: each one's character and the
@@ -235,6 +238,21 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
   // hidden under the water: its marks are the art's, never drawn.)
   chandy: (light) =>
     chunk(import("./chandy-art.ts")).then((m) => ({ n: m.SHOP_CHANDY_N, layout: m.SHOP_CHANDY_LAYOUT, ...m.chandyLit(light), crateAt: m.SHOP_CHANDY_CRATE_AT, marks: m.SHOP_CHANDY_MARKS, outside: "#3d3220", wade: m.SHOP_CHANDY_WADE })),
+  // (The Battle Tower's lobby, Nov 19: a 10 x 10 box room seen whole, its side walls one surface each (its scene, shops/tower-scene.ts,
+  // the room's `fx`: Town.tsx); the empty "Best floors" board's head written by the game.)
+  tower: () =>
+    chunk(import("./tower-art.ts")).then((m) => ({
+      n: m.SHOP_TOWER_N,
+      layout: m.SHOP_TOWER_LAYOUT,
+      pieces: m.SHOP_TOWER_PIECES,
+      crateAt: [0, 0] as const,
+      lights: m.SHOP_TOWER_LIGHTS,
+      pools: m.SHOP_TOWER_POOLS,
+      outside: "#d9dcdf",
+      fixCam: m.SHOP_TOWER_CAM,
+      seeThru: ["entrance", "hem"],
+      sign: { piece: "board-best", face: m.SHOP_TOWER_BOARD_HEAD, lines: ["BEST FLOORS"], ink: "#20232a" },
+    })),
   "recluse-top": (light) =>
     chunk(import("./recluse-art.ts")).then((m) => ({
       n: m.SHOP_RECLUSE_N,
@@ -603,6 +621,11 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
                 </button>
                 {!canChallenge && <div class="town-soon">Coming soon</div>}
               </>
+            ) : def.talkTo ? (
+              // (The Battle Tower's clerk, Nov 19: Talk opens the tower's screen.)
+              <a class="town-btn primary town-look" href={def.talkTo}>
+                Talk
+              </a>
             ) : (
               <button type="button" class="town-btn primary" onClick={() => (def.crate ? eng.current?.show("crate") : eng.current?.talk())}>
                 Talk
@@ -2534,7 +2557,7 @@ function startRoom(
     g.font = `800 ${size}px system-ui, sans-serif`;
     g.textAlign = "center";
     g.textBaseline = "middle";
-    g.fillStyle = "#4b2161";
+    g.fillStyle = sg.ink ?? "#4b2161";
     for (let i = 0; i < n; i++) {
       const t = sg.lines[i]!;
       const tw = g.measureText(t).width;
@@ -2609,7 +2632,7 @@ function startRoom(
     Object.assign(kidBox, { x0, y0, x1: x0 + sheet.w * s, y1: y0 + sheet.h * s, on: true, hx: pt.x, hy: fy - (sheet.foot[1] - sheet.top.idle) * s - 2, px: (sheet.foot[1] - sheet.top.idle) * s });
     // (A cave: the counter is round the bend, out of sight from the mouth, so the tag goes with him behind the rock nearer the camera,
     // drawn now, not over everything.)
-    if (cave && !challenge) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
+    if (cave && !challenge) drawTag(def.name ?? "Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
   };
   /**
    * You on your ride (town/rides.ts' frames, as the town's drawRider draws them): its idle standing, its move a cycle a step,
@@ -4182,7 +4205,8 @@ function startRoom(
     if (dk) drawDarkPass(now);
     fx?.over?.(fxd, now);
     rc?.mark(RP.lights);
-    if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
+    // (The keeper's tag: "Shopkeeper", or its own name: the Battle Tower's "Clerk".)
+    if (kidBox.on && !ci && !cave) drawTag(def.name ?? "Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     // (Hollow's intro: your tag fades as the drain starts, so the dark isn't broken by a bright label.)
     const tagA = darkNow?.tag ?? 1;
     if (youHead.on && tagA > 0) {

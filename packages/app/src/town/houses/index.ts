@@ -22,6 +22,7 @@ import { HOUSE_TIMBER, HOUSE_TIMBER_SIGN, HOUSE_TIMBER_LIGHTS, HOUSE_TIMBER_POOL
 import { HOUSE_BLITZ, HOUSE_BLITZ_SIGN, HOUSE_BLITZ_LIGHTS, HOUSE_BLITZ_POOLS } from "./blitz.ts";
 import { HOUSE_ZEBRA, HOUSE_ZEBRA_SIGN, HOUSE_ZEBRA_LIGHTS } from "./zebra.ts";
 import { HOUSE_CHANDY, HOUSE_CHANDY_SIGN, HOUSE_CHANDY_LIGHTS } from "./chandy.ts";
+import { HOUSE_TOWER, HOUSE_TOWER_SIGN, HOUSE_TOWER_LIGHTS, HOUSE_TOWER_POOLS } from "./tower.ts";
 import { HOUSE_RECLUSE, HOUSE_RECLUSE_SIGN, HOUSE_RECLUSE_LIGHTS, HOUSE_RECLUSE_POOLS } from "./recluse.ts";
 
 export interface HouseArt {
@@ -60,6 +61,8 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   recluse: { ch: HOUSE_RECLUSE, sign: HOUSE_RECLUSE_SIGN, lights: HOUSE_RECLUSE_LIGHTS, pools: HOUSE_RECLUSE_POOLS },
   // (Chandy's Swamp, Nov 16; in an admin's town only while he's in the game for admins first.)
   chandy: { ch: HOUSE_CHANDY, sign: HOUSE_CHANDY_SIGN, lights: HOUSE_CHANDY_LIGHTS, pools: [] },
+  // (The Battle Tower, Nov 19: the game writes its name on the board over its glass door.)
+  tower: { ch: HOUSE_TOWER, sign: HOUSE_TOWER_SIGN, lights: HOUSE_TOWER_LIGHTS, pools: HOUSE_TOWER_POOLS },
 };
 
 /**

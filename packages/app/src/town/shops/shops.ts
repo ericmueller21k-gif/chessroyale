@@ -41,14 +41,19 @@ export interface ShopDef {
   locked?: readonly string[];
   /** A tap on a talk piece walks you to the `talkAt` square nearest it (room.ts Room.talkNear). */
   talkNear?: true;
-  /** The talk card's name ("Don Dough"); none: "Shopkeeper". */
+  /** The talk card's name ("Don Dough"), and the name tag over a drawn keeper (the Battle Tower's "Clerk"); none: "Shopkeeper". */
   name?: string;
+  /**
+   * Talk opens this page of the app (the Battle Tower's clerk, Nov 19: "/tower", the tower's screen) in place of a crate or a line: a link,
+   * so the page loads as any address does.
+   */
+  talkTo?: string;
   /** No Shopkeeper sidekick drawn (the back room: Don Dough is one of its people, shops/zebra-scene.ts). */
   hideKid?: true;
   /** Where you stand to talk (room.ts Room.talkAt: Don Dough's, the foot of his table); none: within talking range of `keeper`. */
   talkAt?: readonly Sq[];
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper" | "zebrakeeper" | "swampkeeper";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper" | "zebrakeeper" | "swampkeeper" | "towerclerk";
   at: readonly [number, number];
   /**
    * Drawn at the art's own size, this many of the room's pixels (37 a square) from its feet to the top of its idle, rather than the
@@ -139,6 +144,10 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // the middle of the stand on stilts at the back, drawn at his art's size (40 px). He has no name: "Shopkeeper". No roof but the
   // town's sky (`sky`); a swamp under the open sky: the day tone. His crate isn't sold yet (core has no Boss Crate of Chandy's: the item-builder's), so Talk has him say a line, as Rolling Dough's.
   chandy: { home: "chandy", boss: "Chandy", crate: null, says: ["Crates come in on the next boat. Gators don't rush.", "Watch your step. Some of these logs bite.", "Chandy? He's out there. You won't see him till he wants you to."], kid: "swampkeeper", at: [9.5, 2.3], tall: 40, keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: [], roof: "sky", chatTone: "day" },
+  // The Battle Tower's lobby (Nov 19): its clerk, a penguin bellhop (nobody's kid), behind the counter at the back left, drawn at his art's
+  // size (57 px: his face and bow tie clear the 30 px counter). His tag and card say "Clerk"; Talk opens the tower's screen (/tower, the
+  // only way in: Eric, Nov 19). No crate, no theme of its own (the town's plays on). A bright lobby under a white ceiling: the day tone.
+  tower: { home: "tower", boss: "Battle Tower", name: "Clerk", crate: null, talkTo: "/tower", kid: "towerclerk", at: [2.5, 2.4], tall: 57, keeper: [{ c: 2, r: 2 }, { c: 3, r: 2 }], prizes: [], roof: "store", chatTone: "day", music: null },
   zebra: { home: "zebra", boss: "Don Dough", crate: null, says: ZEBRA_BACK_LINES, kid: "zebrakeeper", at: [12.5, 7.3], tall: 73, flip: true, keeper: [{ c: 12, r: 7 }, { c: 13, r: 7 }], prizes: [], roof: "bakery", chatTone: "day" },
 };
 

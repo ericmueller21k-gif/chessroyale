@@ -9,7 +9,7 @@
  * counter (the clerk, a penguin, is the game's own sprite: not drawn here) before a key rack; the elevator (the way up to the floors);
  * the blank "Best floors" board (the game writes on it); glass doors open on the bright street (the way out). Nothing else.
  */
-import type { Character, Frame, Part } from "../../characters/sprite.ts";
+import { renderFrame, type Character, type Frame, type Part } from "../../characters/sprite.ts";
 import type { ShopPlace } from "./room.ts";
 import { grain, groundShadow, signBoard, signFace, type LightPool, type LightSpot, type Pt } from "../houses/kit.ts";
 
@@ -599,6 +599,28 @@ const ENF = ENH - 1;
   rect(doors, 54, 54, 1, 10, "h");
   def("entrance", [2, 1], ENW, ENH, [37, ENF], [[groundShadow(37, ENF - 1, 36, 3), cropBit(day, false)!, cropBit(f)!, cropBit(doors)!]]);
 }
+
+// ==== (The game's, Nov 19) A 2-wide piece stands at its exact middle (foot 37), a 1-wide one half a pixel east of its square's (foot 18
+// of 37), so a 2-wide piece ends half a pixel short of the square piece east of it: a see-through seam at some widths (the art's note).
+// The elevator and the way out get one more column, a copy of their last as drawn (outline and all), so they meet what's east of them.
+function widen(name: string): void {
+  const p = PIECES[name]!;
+  const key = new Map(Object.entries(PALETTE).map(([k, hex]) => [(hex.length === 7 ? hex + "ff" : hex).toLowerCase(), k]));
+  const ch = toChar(p);
+  p.frames = p.frames.map((bits, f) => {
+    const { w, data } = renderFrame(ch, ch.anims.idle!.frames[f]!);
+    const col = Array.from({ length: p.h }, (_, y) => {
+      const o = (y * w + p.w - 1) * 4;
+      if (data[o + 3] === 0) return ".";
+      const hex = "#" + [0, 1, 2, 3].map((i) => data[o + i]!.toString(16).padStart(2, "0")).join("");
+      return key.get(hex) ?? ".";
+    });
+    return [...bits, { part: { grid: col, outline: false }, at: [p.w, 0] }];
+  });
+  p.w += 1;
+}
+widen("elevator");
+widen("entrance");
 
 // ==== The lights: the sconce, the elevator's call button and dial (soft), the day through the doors.
 

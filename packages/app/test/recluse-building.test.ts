@@ -40,11 +40,12 @@ describe("the Walk-up in the town (Nov 13)", () => {
     expect(ALL_HOMES.filter((h) => !adminFirst(h)).map((h) => h.id)).toContain("recluse");
   });
 
-  it("is the last home, with nobody out front: the town's figures stay one per home, each at its home's index", () => {
-    expect(ALL_HOMES.at(-1)!.id).toBe("recluse");
+  it("is last but the Battle Tower (Nov 19), both with nobody out front: the town's figures stay one per home, each at its home's index", () => {
+    expect(ALL_HOMES.slice(-2).map((h) => h.id)).toEqual(["recluse", "tower"]);
     expect(hasFigure({ id: "recluse" })).toBe(false);
+    expect(hasFigure({ id: "tower" })).toBe(false);
     const t = createTown();
-    expect(t.bosses).toHaveLength(HOMES.length - 1);
+    expect(t.bosses).toHaveLength(HOMES.length - 2);
     t.bosses.forEach((b, i) => expect(b.home, b.home.id).toBe(HOMES[i]));
   });
 
