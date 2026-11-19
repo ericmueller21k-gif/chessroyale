@@ -3866,6 +3866,24 @@ export const FRIENDS = {
 } as const;
 
 /**
+ * Friend bots (Eric, Nov 20: "some bots on my friends list that like have random activity showing ... as real as we can get"): test
+ * accounts an admin adds to their own friends list from /admin/ops, whose presence is worked out from the time and each bot's id
+ * (server/src/friend-bot-schedule.ts): no timers, no writes. docs/decisions/2026-11-20-friend-bots.md.
+ */
+export const FRIEND_BOTS = {
+  /** Bots one "Add friend bots" makes for the admin who asked (again: the missing ones only). */
+  count: 8,
+  /** A bot's sessions a day, on average: each bot's own number, somewhere in this range. */
+  perDay: [2, 6] as readonly [number, number],
+  /** A session lasts this many minutes (short ones more often). */
+  sessionMinutes: [10, 60] as readonly [number, number],
+  /** Each bot's local time: hours from UTC, one of these (US time zones: their evenings are busiest). */
+  utcOffsets: [-5, -6, -7, -8] as readonly number[],
+  /** How likely a session starts in each local hour, 0 to 23 (relative: evenings most, nights least). */
+  hourWeights: [0.35, 0.15, 0.08, 0.05, 0.04, 0.05, 0.12, 0.3, 0.4, 0.45, 0.5, 0.55, 0.65, 0.6, 0.55, 0.6, 0.75, 0.9, 1.3, 1.7, 1.9, 1.8, 1.4, 0.8] as readonly number[],
+} as const;
+
+/**
  * The age gate (Eric, Oct 16, 2026: "13 younger is guest only. If they lie then so be it, we did our part.";
  * docs/decisions/2026-10-16-age-gate-and-real-money.md): before any sign-in, a neutral question asks for the birth
  * month and year. Old enough: sign in. Younger: guest play only, under the default name and icon, and this device can't
