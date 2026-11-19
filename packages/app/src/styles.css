@@ -4943,14 +4943,13 @@ button.history-label {
 }
 /* Moo & Moon's Full Moon (Eric, Nov 20: "make it like a little like pop more ... that same kind of aura around it while it's active"):
    the gold level glows and breathes like his aura for as long as he plays at full strength. Reduced motion: the glow, no breathing. */
-.boss-level.lv-up.lv-aura {
+/* (On its text, not the badge: the badge's own animation stays its one pop, which a badge drawn anew mustn't replay: boss-bar.spec.) */
+.boss-level.lv-up.lv-aura .lv-text {
   text-shadow:
     0 0 4px rgba(255, 212, 102, 0.95),
     0 0 10px rgba(255, 170, 40, 0.75),
     0 0 18px rgba(255, 140, 20, 0.45);
-  animation:
-    lv-pop 560ms ease-out,
-    lv-aura 1.6s ease-in-out 560ms infinite;
+  animation: lv-aura 1.6s ease-in-out infinite;
 }
 @keyframes lv-aura {
   0%,
@@ -4968,7 +4967,7 @@ button.history-label {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .boss-level.lv-up.lv-aura {
+  .boss-level.lv-up.lv-aura .lv-text {
     animation: none;
   }
 }
