@@ -242,14 +242,15 @@ export function useVoice(voice: Voice): { line: Spoken | null; now: number } {
  * A voice's line in its box (SpeechBox), keeping itself current (useVoice): the figure it stands by isn't drawn again
  * for it. `hidden`: not shown just now (it's still looked at, so its lines keep their time and their turns).
  */
-export function VoiceBubble({ voice, class: cls, hidden = false, balanced = false }: { voice: Voice; class: string; hidden?: boolean; balanced?: boolean }) {
+export function VoiceBubble({ voice, class: cls, hidden = false, balanced = false, mine }: { voice: Voice; class: string; hidden?: boolean; balanced?: boolean; mine?: (key: string) => boolean }) {
   const { line, now } = useVoice(voice);
   // A test hook (test switches only): `sayBoss(text)` says any line in the boss's voice at once, so the boss-bar check
   // (e2e/boss-bar-same.spec.ts) can put every line of every boss into its bubble and measure it.
   useEffect(() => {
     if (voice === bossVoice && testSwitchesAllowed()) (globalThis as { sayBoss?: (text: string) => boolean }).sayBoss = (text) => voice.replace(text, `test:${Date.now()}:${text}`);
   }, [voice]);
-  if (!line || hidden) return null;
+  // (`mine`: of several speakers sharing the voice, only the lines this box's speaker says: a Battle Tower floor's bosses, TowerBar.)
+  if (!line || hidden || (mine && !mine(line.key))) return null;
   // (A paced line in a boss bar (`balanced`: two rows, too few for a whole line of two sentences): a sentence at a time, each its
   // own page, typed in turn (pacedPage). Elsewhere the whole line, its sentences typed in turn.)
   const page = line.paced && balanced ? pacedPage(line.paced, now - line.at) : null;

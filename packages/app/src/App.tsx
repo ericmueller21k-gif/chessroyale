@@ -59,7 +59,7 @@ import { noteWhere } from "./problems.ts";
 import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
-import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
+import { noteFloorGame, noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
 import { kingSay, type KingCue } from "./godKing.ts";
 import { game } from "./lazy-game.ts";
@@ -1420,8 +1420,8 @@ export function App() {
     m.tower = new FloorPlay(e.kept, e.best);
     // (Kept at once: a reload before its first step still knows this device holds the floor.)
     m.tower.begin();
-    // (XP: every floor is a counted solo game, timed by the server: xp.ts.)
-    noteSoloGame(m);
+    // (XP: every floor is a counted solo game, timed by the server; a rejoin goes on with the floor's own: xp.ts noteFloorGame.)
+    noteFloorGame(m, e.game ? e.kept : null, (id) => m.tower?.noteXp(id));
     towerReturn.current = true;
     setTowerBack(null);
     history.replaceState(null, "", `/tower${location.search}`);

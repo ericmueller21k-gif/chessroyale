@@ -202,6 +202,11 @@ export interface MatchState {
   /** Several bosses: who made the side's last move (an index into `bosses`; the last of them before any). */
   moved?: number;
   /**
+   * Several bosses: who made each of the side's moves, by the board's ply (an index into `bosses`), noted as each boss's turn ends (the
+   * plies since, the crowd's among them: read for the side's plies only). For the move list's faces (audit 2, finding 1).
+   */
+  movers?: number[];
+  /**
    * Knockouts cuts left over because players tied with the last one through (they all went through): owed by the cuts
    * still to come, spread evenly over them, in each pool (a team in Crowd 50 v 50, else "all"). See cutPlan.
    */

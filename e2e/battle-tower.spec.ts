@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import { legalMoves } from "@chessroyale/chess";
-import { test, submitMove, tapInTown } from "./helpers.ts";
+import { test, submitMove, tapInTown, localSql } from "./helpers.ts";
 
 /**
  * The Battle Tower (PR 10's battle; PR 11b's flow, Eric, Nov 19: "you walk into the battle tower, you talk to the clerk, you start a
@@ -174,4 +174,70 @@ test("no Last Stand on a floor; a free leave before your 2nd move goes down to t
   await expect(page.getByRole("alertdialog")).toContainText("Start over from floor 1?");
   await page.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click();
   await expect(desk.getByRole("button", { name: "Continue: floor 1" })).toBeVisible();
+});
+
+test("a shared floor (audit 2, finding 1): every boss drawn from his own part: Sawyer's cut on Ginger's turn, its banner and words Sawyer's, the move list naming each boss", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  // (Every power banner as it's put on the page: who it names; and every boss's words: by whose part or figure they show.)
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__banners = [];
+    w.__words = [];
+    new MutationObserver(() => {
+      for (const b of document.querySelectorAll(".power-cut[aria-label]")) {
+        const l = b.getAttribute("aria-label")!;
+        if (!w.__banners.includes(l)) w.__banners.push(l);
+      }
+      for (const b of document.querySelectorAll(".tw-bar .bc-bubble[aria-label], .tw-side .bc-bubble[aria-label]")) {
+        const l = `${b.closest("[data-boss]")?.getAttribute("data-boss")}|${b.getAttribute("aria-label")}`;
+        if (!w.__words.includes(l)) w.__words.push(l);
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await intoTower(page, "&power=cuts");
+  // A run on floor 2, Ginger then Sawyer (the deal set in the local database: a floor of two from the server's own deal is random).
+  // (From the page, as the app asks: its own session.)
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 2, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["gingerbread", "sawyer"]], deck: [], decks: 1 }), made.user);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
+  await floorThenMatch(page, 2, 2);
+  // Your moves until Sawyer's cut stands on Ginger's turn (she's to move: the view's top level is hers, his cut only in his part).
+  const turn = () =>
+    page.evaluate(() => {
+      const b = (window as any).match?.boss;
+      const side = b?.side;
+      return { play: (window as any).match?.phase?.kind === "play", toMove: side?.bosses[side.toMove]?.id ?? null, cut: side?.bosses.find((x: any) => x.id === "sawyer")?.powers?.cut ?? null, topCut: b?.powers?.cut ?? null };
+    });
+  let at = await turn();
+  for (let i = 0; i < 10 && !(at.play && at.toMove === "gingerbread" && at.cut); i++) {
+    await playAMove(page);
+    await expect.poll(async () => (at = await turn()).play, { timeout: 90_000 }).toBe(true);
+  }
+  expect(at.toMove).toBe("gingerbread");
+  expect(at.topCut).toBeNull();
+  // His cut drawn on her turn, once.
+  const cut = `${at.cut.a}-${at.cut.b}`;
+  await expect(page.locator(".sw-cut")).toHaveCount(1);
+  await expect(page.locator(".sw-cut")).toHaveAttribute("data-cut", cut);
+  // The banner of his cut named him, never her.
+  const banners: string[] = await page.evaluate(() => (window as any).__banners);
+  expect(banners.some((l) => l.startsWith("Sawyer: SAW CUT!"))).toBe(true);
+  expect(banners.filter((l) => l.includes("SAW CUT") && !l.startsWith("Sawyer"))).toEqual([]);
+  // His power's words by his own part of the bar (a computer's: over his own figure), never hers (characters/sawyer.ts, `power`).
+  const his = ["Mind the gap.", "Keep off the cut!", "Snip snip.", "Clean cut."];
+  const words: string[] = await page.evaluate(() => (window as any).__words);
+  expect(words.filter((l) => his.includes(l.split("|")[1]!)).length).toBeGreaterThan(0);
+  expect(words.filter((l) => his.includes(l.split("|")[1]!) && l.split("|")[0] !== "sawyer")).toEqual([]);
+  // The move list: each of the side's moves by the boss who made it, in turn (Ginger, Sawyer, Ginger…).
+  const said = await page.locator(".mv-row.mv-boss").evaluateAll((rows) => rows.map((r) => r.getAttribute("aria-label")!.replace(/^\S+ /, "").split(":")[0]));
+  expect(said.length).toBeGreaterThan(1);
+  said.forEach((name, i) => expect(name, `the side's move ${i + 1}`).toBe(i % 2 ? "Sawyer" : "Ginger"));
+  // (The still for Eric: his cut on her turn.)
+  await still(page, "shared-floor");
 });

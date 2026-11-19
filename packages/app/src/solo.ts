@@ -273,6 +273,8 @@ export class SoloMatch implements GameView {
 
   private halt() {
     this.stopped = true;
+    this.awayWatch?.();
+    this.awayWatch = null;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.clearStall();
@@ -314,10 +316,70 @@ export class SoloMatch implements GameView {
   /** A Battle Tower floor: its run (the strip, the result's buttons) and the floor kept on this device after every step. */
   tower: FloorPlay | null = null;
 
-  /** The floor's game kept on the device as it stands now (at every step: nextRound), so a reload rejoins it here. */
+  /**
+   * The floor's game kept on the device as it stands now, so a reload rejoins it here: as each round begins (nextRound) and as each
+   * step of the bosses' turn has played (nextRoundIn: his move, each power's step), so a reload rejoins after his reply, never before
+   * it to draw another (audit 2, finding 2). With it, the time you've used on this turn (turnUsedMs).
+   */
   private keepFloor() {
     if (!this.tower || this.stopped || !this.runner?.boss || this.runner.boss.result) return;
-    this.tower.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone });
+    this.watchAway();
+    const turnMs = this.turnUsedMs();
+    this.tower.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}) });
+  }
+
+  /** The step just played shows for `ms`, then the next round: the floor kept first, so a reload rejoins after the step (keepFloor). */
+  private nextRoundIn(ms: number) {
+    this.keepFloor();
+    this.timer = setTimeout(() => this.nextRound(), ms);
+  }
+
+  /**
+   * A tower floor's clock while you're away (the director's call on audit 2's finding 2): no time passes. The time you've used on this
+   * turn is kept with the game as the page is hidden or closed, and given back as used on a rejoin (`resumeTurnMs`); while the page is
+   * hidden your turn's clock stands still (`awayAt`), as a locked phone left overnight would otherwise come back lost on time.
+   */
+  private resumeTurnMs = 0;
+  private awayAt = 0;
+  private awayWatch: (() => void) | null = null;
+  /** The time you've used on this turn of yours (ms): its clock's, less its pauses; 0 when it isn't your turn. */
+  private turnUsedMs(now = Date.now()): number {
+    if (this.phase.kind !== "play") return this.resumeTurnMs;
+    return Math.max(0, (this.awayAt || now) - this.playStartedAt - this.frozenMs(this.awayAt || now));
+  }
+  private watchAway() {
+    if (this.awayWatch || typeof document === "undefined") return;
+    const changed = () => (document.visibilityState === "hidden" ? this.goneAway() : this.cameBack());
+    const gone = () => this.goneAway();
+    document.addEventListener("visibilitychange", changed);
+    globalThis.addEventListener?.("pagehide", gone);
+    this.awayWatch = () => {
+      document.removeEventListener("visibilitychange", changed);
+      globalThis.removeEventListener?.("pagehide", gone);
+    };
+  }
+  /** The page hidden (or closed) on your turn: its clock stops, and the time used so far is kept with the floor. */
+  private goneAway() {
+    if (!this.tower || this.stopped || this.phase.kind !== "play" || this.awayAt) return;
+    this.awayAt = Date.now();
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.cancelStall();
+    this.tower.keepTurn(this.turnUsedMs());
+  }
+  /** Back on the page: your turn's clock goes on from where it stood (its start and deadline moved on by the time away). */
+  private cameBack() {
+    const phase = this.phase;
+    if (!this.awayAt) return;
+    const now = Date.now();
+    const away = now - this.awayAt;
+    this.awayAt = 0;
+    if (this.stopped || phase.kind !== "play") return;
+    this.playStartedAt += away;
+    const deadline = phase.deadline + away;
+    this.timer = setTimeout(() => this.submit(null), deadline - now + this.settings.lateGraceMs);
+    this.set({ ...phase, startsAt: phase.startsAt + away, deadline });
+    this.armStall();
   }
 
   /**
@@ -334,6 +396,8 @@ export class SoloMatch implements GameView {
       clock: gardenClock,
     });
     this.moves = [...game.moves];
+    // (The time you'd used on your turn as you went: given back as used, nothing for the time away: keepFloor.)
+    this.resumeTurnMs = game.turnMs ?? 0;
     this.begun = this.runner.boss ? this.runner.boss.crowdMoves > 0 || game.intro : false;
     this.bossIntroDone = game.intro;
     if (game.intro) this.startBrain(() => this.nextRound());
@@ -756,7 +820,7 @@ export class SoloMatch implements GameView {
   private blackoutTurn() {
     if (this.timer) clearTimeout(this.timer);
     this.emit();
-    this.timer = setTimeout(() => this.nextRound(), BLACKOUT.ms);
+    this.nextRoundIn(BLACKOUT.ms);
   }
 
   // ---------------- Hollow's Lights out ----------------
@@ -852,7 +916,7 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /** Dodge on (your turn waits for it): its key, when it began, the round on and your vote in it. */
@@ -1102,7 +1166,7 @@ export class SoloMatch implements GameView {
     const showMs = bossTurnShowMs(view, this.alone);
     const until = Date.now() + showMs;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1119,7 +1183,7 @@ export class SoloMatch implements GameView {
     if (!played) return this.nextRound();
     const showMs = powerMomentMs([{ kind: this.runner.boss?.id === "dash" ? "rushExtra" : "extra" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1131,7 +1195,7 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const showMs = powerMomentMs([{ kind: "funhouse" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1149,7 +1213,7 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const showMs = powerMomentMs([{ kind: "bounce" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1170,7 +1234,7 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : done && done !== "fuse" ? powerMomentMs([{ kind: done }]) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1186,7 +1250,7 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const showMs = done ? powerMomentMs([{ kind: "hop" }]) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1204,7 +1268,7 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1221,7 +1285,7 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1239,7 +1303,7 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
-    this.timer = setTimeout(() => this.nextRound(), showMs);
+    this.nextRoundIn(showMs);
   }
 
   /**
@@ -1262,7 +1326,7 @@ export class SoloMatch implements GameView {
       const victim = this.runner.bossKill();
       const until = Date.now() + BOSS_KILL_MS;
       this.set({ kind: "boss", boss: this.bossSnapshot(victim), until });
-      this.timer = setTimeout(() => this.nextRound(), BOSS_KILL_MS);
+      this.nextRoundIn(BOSS_KILL_MS);
       return;
     }
     this.nextRound();
@@ -1542,17 +1606,22 @@ export class SoloMatch implements GameView {
     this.progress.start(this.runner.botThinkTimes(), intro);
     this.startLive(Date.now() + intro, this.runner.botThinkTimes());
     const board = this.runner.boardOf(HUMAN)!;
-    this.playStartedAt = Date.now() + intro;
+    // (A tower floor rejoined on your turn: the time you'd used on it, as used: keepFloor.)
+    const used = this.resumeTurnMs;
+    this.resumeTurnMs = 0;
+    this.playStartedAt = Date.now() + intro - used;
     this.hint = null;
     const allowed = this.runner.allowedMsFor(HUMAN);
     this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
-    this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
+    this.timer = setTimeout(() => this.submit(null), intro + allowed - used + this.settings.lateGraceMs);
     // (Dash's clock tap or stall skit, each once a battle: his beats on this move's clock, if one comes on this move.)
     const plan = this.runner.stallPlan(HUMAN);
     if (plan) {
       this.stall = { plan, timer: null };
       this.armStall();
     }
+    // (A tower floor's turn that begins while you're away (his reply came with the page hidden): its clock waits for you.)
+    if (this.tower && typeof document !== "undefined" && document.visibilityState === "hidden") this.goneAway();
   }
 
   /**

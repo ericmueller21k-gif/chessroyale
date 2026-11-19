@@ -23,6 +23,15 @@ describe("the floor kept on the device", () => {
     expect(readKept(JSON.stringify(done))).toEqual(plain);
   });
 
+  it("keeps the floor's XP game and the time used on your turn (audit 2, findings 6 and 2); a bad one is dropped, the floor kept", () => {
+    const more: KeptFloor = { ...kept, xp: "abc123", game: { ...kept.game!, turnMs: 20_000 } };
+    expect(readKept(JSON.stringify(more))).toEqual(more);
+    const bad = readKept(JSON.stringify({ ...more, xp: 7, game: { ...more.game, turnMs: "soon" } }));
+    expect(bad?.xp).toBeUndefined();
+    expect(bad?.game?.turnMs).toBeUndefined();
+    expect(bad?.game?.moves).toEqual([]);
+  });
+
   it("refuses what isn't a kept floor: nothing, damaged, another version, a bad result; a damaged game is dropped, the floor kept", () => {
     for (const t of [null, "", "{", "null", "[]", JSON.stringify({ ...kept, v: 2 }), JSON.stringify({ ...kept, fight: 7 }), JSON.stringify({ ...kept, bosses: [1] }), JSON.stringify({ ...kept, done: "maybe" }), JSON.stringify({ ...kept, settings: null })]) {
       expect(readKept(t), String(t)).toBeNull();

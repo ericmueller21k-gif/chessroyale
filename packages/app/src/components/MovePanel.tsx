@@ -6,6 +6,7 @@ import { popOffHolding } from "@chessroyale/chess";
 import { crossedOut } from "./Folio.tsx";
 import { battleStartPly, moverOf, rowNumber, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type Mover, type PieceType, type PlyCache, type PlyRow } from "../move-list.ts";
 import { camoHidden, seenFen } from "../camo.ts";
+import { plyMoverOf, sideOf } from "../boss-side.ts";
 import { pawnLook } from "../looks.ts";
 import { BossFace, bossPortraitUrl, useLiveFace } from "./BossCharacter.tsx";
 import { godKingPortraitUrl } from "./GodKing.tsx";
@@ -39,6 +40,8 @@ interface Shown {
   captured: PieceType | null;
   ms: number | null;
   picks: { n: number; of: number } | null;
+  /** A floor of several bosses: the boss who made this move of the side's (his own part of the view: audit 2, finding 1). */
+  by?: BossView;
 }
 
 const caches = new WeakMap<object, PlyCache>();
@@ -79,7 +82,7 @@ function shownRows(match: GameView, boss: BossView): { rows: Shown[]; opening: n
       if (captured === "r") captured = pieceOn(seen, row.to)?.type ?? captured;
     }
     const mover = moverOf(row, boss.crowdSide, start, boss.kingMoves ?? []);
-    rows.push({ row, mover, piece, captured, ms: turnMs(book, row.ply), picks: mover === "crowd" || mover === "king" ? (book.picks.get(row.ply) ?? null) : null });
+    rows.push({ row, mover, piece, captured, ms: turnMs(book, row.ply), picks: mover === "crowd" || mover === "king" ? (book.picks.get(row.ply) ?? null) : null, ...(mover === "boss" && sideOf(boss) ? { by: plyMoverOf(boss, row.ply) } : {}) });
   }
   // (Dash's pop-off, while he thinks for the move he's about to play: that move isn't on the board yet, so not in the list.)
   if (match.phase.kind === "boss" && match.phase.thinking && popOffHolding(boss) && rows.at(-1)?.mover === "boss") rows.pop();
@@ -94,26 +97,29 @@ const Pc = ({ color, type }: { color: "w" | "b"; type: PieceType }) => (
 );
 
 /** Who moved: a small picture. */
-function Who({ mover, boss, alone, face }: { mover: Mover; boss: BossView; alone: boolean; face: LiveFace }) {
+function Who({ mover, boss: inView, by, alone, face: live }: { mover: Mover; boss: BossView; by?: BossView; alone: boolean; face: LiveFace }) {
   if (mover === "boss") {
+    // (A floor of several: the face of the boss who made the move, by his own part of the view; his live face only if he's in view.)
+    const boss = by ?? inView;
+    const face = boss.id === inView.id ? live : null;
     // (His face as the bar draws it now, where his look changes in the battle (the Hidden Boss's suit): the list matches the bar.)
     const url = face?.url ?? bossPortraitUrl(boss.name);
     return <span class="mv-who">{url ? <img src={url} alt="" data-face={face?.id} /> : <BossFace boss={boss} label="" />}</span>;
   }
   if (mover === "king") {
-    const url = godKingPortraitUrl(boss.crowdSide);
+    const url = godKingPortraitUrl(inView.crowdSide);
     return <span class="mv-who">{url ? <img src={url} alt="" /> : "👑"}</span>;
   }
   if (mover === "crowd" && alone) {
     return (
       <span class="mv-who mv-you">
-        <Avatar look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={boss.crowdSide} />
+        <Avatar look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={inView.crowdSide} />
       </span>
     );
   }
   return (
     <span class="mv-who">
-      <Pc color={boss.crowdSide} type="p" />
+      <Pc color={inView.crowdSide} type="p" />
     </span>
   );
 }
@@ -131,6 +137,7 @@ const sameRow = (a: RowProps, b: RowProps) =>
   a.s.ms === b.s.ms &&
   a.s.picks?.n === b.s.picks?.n &&
   a.s.picks?.of === b.s.picks?.of &&
+  a.s.by?.name === b.s.by?.name &&
   a.hush === b.hush &&
   a.struck === b.struck &&
   a.alone === b.alone &&
@@ -141,13 +148,13 @@ const sameRow = (a: RowProps, b: RowProps) =>
 const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck, face }: RowProps) {
   const { row } = s;
   const other = row.color === "w" ? "b" : "w";
-  const who = s.mover === "crowd" && alone ? "You" : WHO_WORD[s.mover];
+  const who = s.by ? s.by.name : s.mover === "crowd" && alone ? "You" : WHO_WORD[s.mover];
   const words = hush
     ? `${rowNumber(row)} ${who}`
     : `${rowNumber(row)} ${who}: ${row.castle ?? `${PIECE[s.piece]} to ${row.to}`}${s.captured ? `, takes ${PIECE[s.captured]}` : ""}${s.ms !== null ? `, ${timeShown(s.ms)}` : ""}${struck ? ", crossed out" : ""}`;
   return (
     <li class={`mv-row mv-${s.mover}${struck ? " mv-struck" : ""}`} aria-label={words}>
-      <Who mover={s.mover} boss={boss} alone={alone} face={face} />
+      <Who mover={s.mover} boss={boss} by={s.by} alone={alone} face={face} />
       <span class="mv-no">{rowNumber(row)}</span>
       {hush ? (
         <span class="mv-sq">…</span>

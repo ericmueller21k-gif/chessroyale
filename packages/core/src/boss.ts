@@ -1790,6 +1790,8 @@ export interface PowerEvent {
   /** Chandy's upgrade: the rifle's stage now (1-5), and the move it unlocked (none after all five are). */
   stage?: number;
   unlock?: ChandyMove;
+  /** Several bosses (the view's moments queue only, never kept): the boss who cast it, by id (audit 2, finding 1). */
+  boss?: string;
 }
 
 /** The settings behind the God King's Last Stand. */
