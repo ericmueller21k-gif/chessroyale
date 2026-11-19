@@ -172,7 +172,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   solo_battles: "user_id id started_at",
   solo_games: "user_id id started_at test_minutes",
   tower_best: "user_id kind floor at",
-  tower_runs: "id user_id kind seed floor met members fight status started_at updated_at",
+  tower_runs: "id user_id kind seed floor met members fight last status started_at updated_at",
   users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online dnd pawn_color age_ok_at chat_on test",
   wallets: "user_id coins crates crate_keys xp boss_picks",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",

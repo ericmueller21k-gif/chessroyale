@@ -1,4 +1,4 @@
-import { BATTLE_TOWER, finishFloor, floorSettings, leaveFloor, newRun, pausedLine, startFloor, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
+import { BATTLE_TOWER, finishFloor, floorSettings, leaveFloor, newRun, pausedLine, sideRefusal, startFloor, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
@@ -18,10 +18,12 @@ import type { Sql, Stmt } from "./accounts.ts";
  *   - `tower_runs`: one row a climb. `floor`: the floor to fight (1-99; for a run that ended, the floor it ended on, 99 for the top);
  *     `met`: core's TowerRun deal (JSON: `floors` dealt so far, each one's bosses in turn order, the last the floor to fight; the
  *     `deck` still to deal; how many `decks` were shuffled from `seed`); `fight`: the floor under way, `{ id, startedAt }`, null
- *     between floors; `status`: 'open' | 'top' (floor 99 won) | 'out' (lost, drawn or left) | 'abandoned' (replaced by a new run,
- *     or the lower of two open runs a sign-in brought together). One open run an account and kind: the unique index. A run that
- *     ended stays until the account starts its next run of that kind (so each account keeps at most a few rows).
- *   - `tower_best`: the best floor won, an account and kind (1-99; 99 is the top); it only rises.
+ *     between floors; `last`: the last result taken, `{ id, outcome, floor, status }` (its floor's id, the floor and the run's
+ *     status after), so a retry whose answer was lost is answered again; `status`: 'open' | 'top' (floor 99 won) | 'out' (lost,
+ *     drawn or left) | 'abandoned' (the lower of two open runs a sign-in brought together). One open run an account and kind: the
+ *     unique index. A run that ended stays until the account starts its next run of that kind, which deletes an open one it
+ *     replaces too (so each account keeps at most a few rows).
+ *   - `tower_best`: the best floor won, an account and kind (1-99; 99 is the top, BATTLE_TOWER.floors its cap); it only rises.
  * (Only types come from accounts.ts: it imports this file's schema while it loads.)
  */
 export const TOWER_SCHEMA = [
@@ -34,6 +36,7 @@ export const TOWER_SCHEMA = [
     met TEXT NOT NULL,
     members TEXT,
     fight TEXT,
+    last TEXT,
     status TEXT NOT NULL,
     started_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
@@ -63,6 +66,7 @@ interface RunRow {
   met: string;
   members: string | null;
   fight: string | null;
+  last: string | null;
   status: RunStatus;
   started_at: number;
   updated_at: number;
@@ -115,7 +119,7 @@ const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 const randomHex = (bytes: number) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
 /** A floor's id: 18 hex characters (as a solo battle's). */
 const FIGHT_ID = /^[0-9a-f]{18}$/;
-const RUN_COLUMNS = "id, user_id, kind, seed, floor, met, members, fight, status, started_at, updated_at";
+const RUN_COLUMNS = "id, user_id, kind, seed, floor, met, members, fight, last, status, started_at, updated_at";
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 const parsed = (text: string | null): Record<string, unknown> | null => {
@@ -161,20 +165,37 @@ function viewOf(row: RunRow, pool: readonly string[]): TowerRunView {
 const openRow = (sql: Sql, userId: string, kind: TowerKind) => sql.first<RunRow>(`SELECT ${RUN_COLUMNS} FROM tower_runs WHERE user_id = ? AND kind = ? AND status = 'open'`, userId, kind);
 
 /**
- * The account's solo best, worked out again from its solo runs (each run's floors won: its floor less one, or 99 for the top), and
- * only ever raised. Run after a floor's result and before a run's rows go, so a best the result's own write didn't reach (the
- * Worker stopped between the two) is set right on the next one. (A party's best is each member's, from their own floors: its match
- * room's, PR 12.)
+ * The account's solo best, worked out again from its solo runs (each run's floors won: its floor less one, or 99 for the top; never
+ * above BATTLE_TOWER.floors, should a run be saved above it), and only ever raised. Run after a floor's result (and its retry) and
+ * before a run's rows go, so a best the result's own write didn't reach (the Worker stopped between the two) is set right on the
+ * next one. (A party's best is each member's, from their own floors: its match room's, PR 12.)
  */
 const soloBest = (userId: string): Stmt =>
   stmt(
     `INSERT INTO tower_best (user_id, kind, floor, at)
      SELECT user_id, kind, won, updated_at FROM (
-       SELECT user_id, kind, CASE WHEN status = 'top' THEN floor ELSE floor - 1 END AS won, updated_at FROM tower_runs WHERE user_id = ? AND kind = 'solo'
+       SELECT user_id, kind, MIN(CASE WHEN status = 'top' THEN floor ELSE floor - 1 END, ?) AS won, updated_at FROM tower_runs WHERE user_id = ? AND kind = 'solo'
      ) WHERE won > 0
      ON CONFLICT (user_id, kind) DO UPDATE SET floor = excluded.floor, at = excluded.at WHERE excluded.floor > tower_best.floor`,
+    BATTLE_TOWER.floors,
     userId,
   );
+const runStmt = (sql: Sql, s: Stmt) => sql.run(s.sql, ...s.params);
+
+/** The open solo run's view and the solo best: what an answer that refuses a result carries, for the app to read the run again. */
+async function soloNow(sql: Sql, userId: string, pool: readonly string[]): Promise<{ run: TowerRunView | null; best: number }> {
+  const state = await towerState(sql, userId, pool);
+  return { run: state.runs.solo, best: state.best.solo };
+}
+
+/** A run whose deal (`met`) doesn't parse (only this file writes it): no floor to play, so the app offers a new run (`confirm`). */
+const BROKEN: TowerAnswer = { status: 409, body: { message: TOWER_LINES.noRun, confirm: true } };
+
+/**
+ * Whether the floor under way's bosses no longer pass the tower's pool now (sideRefusal: a kill switch on since it began, a boss gone
+ * from the roster, a pair `apart` keeps apart since): our pause, not the player's leave, so leaving it is free (stopTower).
+ */
+const floorResting = (run: TowerRun, pool: readonly string[]) => sideRefusal(run.floors[run.floors.length - 1] ?? [], pool) !== null;
 
 /** GET /api/tower: your open runs (between floors, the next floor's bosses as dealt now) and your bests. */
 export async function towerState(sql: Sql, userId: string, pool: readonly string[]): Promise<TowerState> {
@@ -192,9 +213,9 @@ export async function towerState(sql: Sql, userId: string, pool: readonly string
 
 /**
  * POST /api/tower/run: a new solo run from the server's seed, floor 1 dealt from the pool now. An open run is replaced only with
- * `confirm` (it's abandoned, in the same batch): without, the answer is 409 with that run, for the app to ask. The account's runs
- * of this kind that ended go as the new one begins (its best stays). The unique index keeps it to one open run even when two
- * starts race: the one that loses is answered as if it had asked without `confirm`.
+ * `confirm` (it's deleted, in the same batch, once its floors count to the best): without, the answer is 409 with that run, for
+ * the app to ask. The account's runs of this kind that ended go as the new one begins (its best stays). The unique index keeps it
+ * to one open run even when two starts race: the one that loses is answered as if it had asked without `confirm`.
  */
 export async function newTowerRun(sql: Sql, userId: string, now: number, opts: { confirm: boolean; pool: readonly string[]; seed?: number }): Promise<TowerAnswer> {
   const run = newRun(opts.seed ?? crypto.getRandomValues(new Uint32Array(1))[0]!, opts.pool);
@@ -202,10 +223,9 @@ export async function newTowerRun(sql: Sql, userId: string, now: number, opts: {
   const id = randomHex(12);
   const statements = [
     soloBest(userId),
-    stmt("DELETE FROM tower_runs WHERE user_id = ? AND kind = 'solo' AND status <> 'open'", userId),
-    ...(opts.confirm ? [stmt("UPDATE tower_runs SET status = 'abandoned', fight = NULL, updated_at = ? WHERE user_id = ? AND kind = 'solo' AND status = 'open'", now, userId)] : []),
+    stmt(`DELETE FROM tower_runs WHERE user_id = ? AND kind = 'solo'${opts.confirm ? "" : " AND status <> 'open'"}`, userId),
     stmt(
-      `INSERT INTO tower_runs (${RUN_COLUMNS}) VALUES (?, ?, 'solo', ?, 1, ?, NULL, NULL, 'open', ?, ?)`,
+      `INSERT INTO tower_runs (${RUN_COLUMNS}) VALUES (?, ?, 'solo', ?, 1, ?, NULL, NULL, NULL, 'open', ?, ?)`,
       id,
       userId,
       run.seed,
@@ -238,13 +258,15 @@ export async function newTowerRun(sql: Sql, userId: string, now: number, opts: {
  * POST /api/tower/floor/start: the open solo run's floor begins. Its bosses from the run's deal (startFloor: dealt again if the pool
  * no longer allows them, and saved so), its start noted by the server's clock (`fight`). A floor already under way is answered as
  * it is (`under`: a retry, or a reload rejoining it), never begun again: the same id, the same start; that, even while solo rests
- * (`paused`, which refuses only a new floor). Answers the floor's settings for the match runner.
+ * (`paused`, which refuses only a new floor); `resting` when its bosses no longer pass the pool (floorResting: leaving it is free).
+ * Answers the floor's settings for the match runner.
  */
 export async function startTowerFloor(sql: Sql, userId: string, now: number, opts: { pool: readonly string[]; paused?: boolean }): Promise<TowerAnswer> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const row = await openRow(sql, userId, "solo");
     if (!row) return { status: 404, body: { message: TOWER_LINES.noRun } };
     const run = runOf(row);
+    if (!run.floors.length) return BROKEN;
     const under = fightOf(row.fight);
     if (under) return { status: 200, body: floorAnswer(row, run, under, opts.pool, true) };
     if (opts.paused) return SOLO_RESTING;
@@ -268,7 +290,8 @@ export async function startTowerFloor(sql: Sql, userId: string, now: number, opt
 
 function floorAnswer(row: RunRow, run: TowerRun, fight: Fight, pool: readonly string[], under: boolean): Record<string, unknown> {
   const settings: Partial<Settings> = floorSettings(run);
-  return { fight, floor: run.floors.length, bosses: [...(run.floors[run.floors.length - 1] ?? [])], settings, ...(under ? { under: true } : {}), run: viewOf(row, pool) };
+  const marks = under ? { under: true, ...(floorResting(run, pool) ? { resting: true } : {}) } : {};
+  return { fight, floor: run.floors.length, bosses: [...(run.floors[run.floors.length - 1] ?? [])], settings, ...marks, run: viewOf(row, pool) };
 }
 
 /** A floor's end, as the device reports it. */
@@ -277,42 +300,59 @@ const isOutcome = (v: unknown): v is FloorOutcome => v === "won" || v === "lost"
 
 /**
  * POST /api/tower/floor/finish {fight, outcome}: the solo floor under way ends. Only the floor the server started (`fight`, its id),
- * once: the run's floor, deal and status change and its `fight` clears in one statement that applies only while that floor is still
- * under way, so a replayed or second result (two tabs) finds none and is refused (409). Won: the next floor dealt (finishFloor, the
- * pool now), or the top on floor 99; refused while sooner than `minWinMs` after the start (the floor stays under way). Lost or drawn:
- * the run is out. The best is worked out again after (soloBest).
+ * once: the run's floor, deal and status change, its `fight` clears and `last` notes the result, in one statement that applies only
+ * while that floor is still under way. So a second result (two tabs) finds none: the same result as the last one taken (a retry
+ * whose answer was lost) is answered again, any other refused (409); either way with the run and best as they are now. Won: the
+ * next floor dealt (finishFloor, the pool now), or the top on floor 99; refused while sooner than `minWinMs` after the start (the
+ * floor stays under way). Lost or drawn: the run is out. The best is worked out again after (soloBest).
  */
 export async function finishTowerFloor(sql: Sql, userId: string, now: number, body: { fight?: unknown; outcome?: unknown }, opts: { pool: readonly string[]; minWinMs: number }): Promise<TowerAnswer> {
   if (typeof body.fight !== "string" || !FIGHT_ID.test(body.fight) || !isOutcome(body.outcome)) return { status: 400, body: { message: TOWER_LINES.bad } };
+  const outcome = body.outcome;
   const row = await openRow(sql, userId, "solo");
   const fight = row ? fightOf(row.fight) : null;
-  if (!row || !fight || fight.id !== body.fight) return { status: 409, body: { message: TOWER_LINES.notUnderWay } };
-  if (body.outcome === "won" && now - fight.startedAt < opts.minWinMs) return { status: 409, body: { message: TOWER_LINES.tooSoon, fight } };
+  if (!row || !fight || fight.id !== body.fight) return resultAgain(sql, userId, body.fight, outcome, opts.pool);
   const before = runOf(row);
-  const after = finishFloor(before, body.outcome, opts.pool);
+  if (!before.floors.length) return BROKEN;
+  if (outcome === "won" && now - fight.startedAt < opts.minWinMs) return { status: 409, body: { message: TOWER_LINES.tooSoon, fight, ...(await soloNow(sql, userId, opts.pool)) } };
+  const after = finishFloor(before, outcome, opts.pool);
+  const floor = before.floors.length;
   const applied = await sql.first(
-    "UPDATE tower_runs SET floor = ?, met = ?, status = ?, fight = NULL, updated_at = ? WHERE id = ? AND status = 'open' AND fight = ? RETURNING id",
+    "UPDATE tower_runs SET floor = ?, met = ?, status = ?, fight = NULL, last = ?, updated_at = ? WHERE id = ? AND status = 'open' AND fight = ? RETURNING id",
     after.floors.length,
     metOf(after),
     after.status,
+    JSON.stringify({ id: body.fight, outcome, floor, status: after.status }),
     now,
     row.id,
     row.fight,
   );
-  if (!applied) return { status: 409, body: { message: TOWER_LINES.notUnderWay } };
-  const best = soloBest(userId);
-  await sql.run(best.sql, ...best.params);
-  const open = after.status === "open" ? viewOf({ ...row, floor: after.floors.length, met: metOf(after), fight: null, updated_at: now }, opts.pool) : null;
-  const bestNow = (await sql.first<{ floor: number }>("SELECT floor FROM tower_best WHERE user_id = ? AND kind = 'solo'", userId))?.floor ?? 0;
-  return { status: 200, body: { outcome: body.outcome, floor: before.floors.length, status: after.status, run: open, best: bestNow } };
+  if (!applied) return resultAgain(sql, userId, body.fight, outcome, opts.pool);
+  await runStmt(sql, soloBest(userId));
+  return { status: 200, body: { outcome, floor, status: after.status, ...(await soloNow(sql, userId, opts.pool)) } };
+}
+
+/**
+ * A result for a floor not under way. The same one as the last result taken (`last`: the same id and outcome; a retry whose answer
+ * was lost, or the same result from two tabs) is answered as it was, changing nothing but the best, worked out again in case its
+ * own write was missed; any other is refused (409). Both with the run and best as they are now: a 409 means "read the run again".
+ */
+async function resultAgain(sql: Sql, userId: string, id: string, outcome: FloorOutcome, pool: readonly string[]): Promise<TowerAnswer> {
+  const lasts = await sql.all<{ last: string }>("SELECT last FROM tower_runs WHERE user_id = ? AND kind = 'solo' AND last IS NOT NULL", userId);
+  const taken = lasts.map((r) => parsed(r.last)).find((l) => l?.id === id && l.outcome === outcome);
+  if (!taken) return { status: 409, body: { message: TOWER_LINES.notUnderWay, ...(await soloNow(sql, userId, pool)) } };
+  await runStmt(sql, soloBest(userId));
+  return { status: 200, body: { outcome, floor: taken.floor, status: taken.status, ...(await soloNow(sql, userId, pool)) } };
 }
 
 /**
  * POST /api/tower/stop {fight?, moves?}: Stop here. Between floors there's nothing to do: the run is saved as it is (`stopped`
  * "between"). Mid-floor, only for the floor under way (`fight`, its id: never a floor started since), by core's leaveFloor: before
  * your 2nd move (`moves`, your moves on it, the device's word; none said, a counted leave) it's free, the same floor and bosses
- * later ("free"); after, a loss and the run is out ("lost"). Once, as a result is: the run changes only while that floor is still under
- * way, so a repeat finds nothing under way and answers "between", changing nothing; a floor started since is refused (409).
+ * later ("free"); after, a loss and the run is out ("lost"). Free at any move when the floor's bosses no longer pass the pool
+ * (floorResting: our pause, not your leave; its next start deals it again). Once, as a result is: the run changes only while that
+ * floor is still under way, so a repeat finds nothing under way and answers "between", changing nothing; a floor started since is
+ * refused (409).
  */
 export async function stopTower(sql: Sql, userId: string, now: number, body: { fight?: unknown; moves?: unknown }, opts: { pool: readonly string[] }): Promise<TowerAnswer> {
   const row = await openRow(sql, userId, "solo");
@@ -322,7 +362,7 @@ export async function stopTower(sql: Sql, userId: string, now: number, body: { f
   if (body.fight !== fight.id) return { status: 409, body: { message: TOWER_LINES.notUnderWay, fight, run: viewOf(row, opts.pool) } };
   const moves = typeof body.moves === "number" && Number.isInteger(body.moves) && body.moves >= 0 ? body.moves : Number.POSITIVE_INFINITY;
   const before = runOf(row);
-  const after = leaveFloor(before, moves);
+  const after = leaveFloor(before, floorResting(before, opts.pool) ? 0 : moves);
   const applied = await sql.first(
     "UPDATE tower_runs SET floor = ?, met = ?, status = ?, fight = NULL, updated_at = ? WHERE id = ? AND status = 'open' AND fight = ? RETURNING id",
     after.floors.length,
@@ -359,8 +399,10 @@ const POSTS = new Set(["/api/tower/run", "/api/tower/floor/start", "/api/tower/f
  * limits and ban gate before it, index.ts). Null: not one of them.
  *   GET /api/tower → TowerState
  *   POST /api/tower/run {kind?: "solo", confirm?: true} → {run} | 409 {message, confirm, run}
- *   POST /api/tower/floor/start → {fight, floor, bosses, settings, under?, run} | 404 | 503 (the bosses resting)
- *   POST /api/tower/floor/finish {fight, outcome: "won" | "lost" | "drawn"} → {outcome, floor, status, run, best} | 409
+ *   POST /api/tower/floor/start → {fight, floor, bosses, settings, under?, resting?, run} | 404 | 409 {message, confirm} (a run that
+ *     can't be played: start a new one) | 503 (the bosses resting)
+ *   POST /api/tower/floor/finish {fight, outcome: "won" | "lost" | "drawn"} → {outcome, floor, status, run, best} (the same answer for
+ *     the last result taken, sent again) | 409 {message, run, best, fight?} (read the run again) | 409 {message, confirm}
  *   POST /api/tower/stop {fight?, moves?} → {stopped: "between" | "free" | "lost", run, …} | 409
  */
 export async function towerResponse(request: Request, sql: Sql, userId: string, env: TowerEnv, now: number): Promise<Response | null> {
@@ -410,6 +452,12 @@ export const towerMoves = (from: string, to: string, now: number): Stmt[] => [
   stmt("UPDATE tower_runs SET user_id = ? WHERE user_id = ?", to, from),
 ];
 
+/** The last result taken, for the download: its outcome and floor (not the floor's id, the game's own). */
+function lastResult(text: string | null) {
+  const l = parsed(text);
+  return l ? { outcome: l.outcome, floor: l.floor } : null;
+}
+
 /** The account's part of "Download my data": its climbs (each one's floors met, never the seed or the deck still to deal) and bests. */
 export async function towerDownload(sql: Sql, userId: string): Promise<{ runs: unknown[]; best: unknown[] }> {
   const rows = await sql.all<RunRow>(`SELECT ${RUN_COLUMNS} FROM tower_runs WHERE user_id = ? ORDER BY started_at, id`, userId);
@@ -419,6 +467,7 @@ export async function towerDownload(sql: Sql, userId: string): Promise<{ runs: u
       floor: r.floor,
       status: r.status,
       floors: runOf(r).floors,
+      last_result: lastResult(r.last),
       fight_at: fightOf(r.fight)?.startedAt ?? null,
       started_at: r.started_at,
       updated_at: r.updated_at,

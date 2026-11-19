@@ -74,7 +74,7 @@ describe("a new run", () => {
     expect(await towerState(sql, ann.id, POOL)).toEqual({ runs: { solo: run, party: null }, best: { solo: 0, party: 0 } });
   });
 
-  it("replaces an open run only with confirm: without, 409 and that run, nothing written; with, the old one abandoned in the same batch", async () => {
+  it("replaces an open run only with confirm: without, 409 and that run, nothing written; with, the old one deleted in the same batch, its floors counted first", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     await climb(sql, ann.id, 2);
@@ -82,19 +82,11 @@ describe("a new run", () => {
     expect(asked.status).toBe(409);
     expect(asked.body).toMatchObject({ confirm: true, message: "You have a run on floor 3. Starting a new one ends it.", run: { floor: 3 } });
     expect((await rows(sql, ann.id)).map((r) => [r.floor, r.status])).toEqual([[3, "open"]]);
+    // (Its 2nd win's best never written, the Worker stopped: the replacing batch counts its floors before it goes.)
+    await sql.run("UPDATE tower_best SET floor = 1 WHERE user_id = ?", ann.id);
     const replaced = await newTowerRun(sql, ann.id, T0 + 101 * SEC, { confirm: true, pool: POOL, seed: 7 });
     expect(replaced.status).toBe(200);
-    expect((await rows(sql, ann.id)).map((r) => [r.floor, r.status])).toEqual([
-      [3, "abandoned"],
-      [1, "open"],
-    ]);
-    // The best stays; the next new run clears the runs that ended (the abandoned one), never the open one it replaces.
-    expect(await best(sql, ann.id)).toBe(2);
-    await newTowerRun(sql, ann.id, T0 + 102 * SEC, { confirm: true, pool: POOL, seed: 8 });
-    expect((await rows(sql, ann.id)).map((r) => [r.floor, r.status])).toEqual([
-      [1, "abandoned"],
-      [1, "open"],
-    ]);
+    expect((await rows(sql, ann.id)).map((r) => [r.floor, r.status])).toEqual([[1, "open"]]);
     expect(await best(sql, ann.id)).toBe(2);
   });
 
@@ -149,6 +141,39 @@ describe("a floor's start", () => {
     expect((await towerState(sql, ann.id, POOL)).runs.solo!.bosses).toEqual(shown);
   });
 
+  it("a boss resting since the floor began: a reload's start says so (resting), and leaving it is free at any move, the floor dealt again at its next start", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await newTowerRun(sql, ann.id, T0, { confirm: false, pool: POOL, seed: SEED });
+    const s = body<{ fight: { id: string }; bosses: string[] }>(await startTowerFloor(sql, ann.id, T0 + SEC, { pool: POOL }));
+    expect(s).not.toHaveProperty("resting");
+    // (Its bosses' kill switches on since it began.)
+    const off = towerPool(s.bosses);
+    expect(body(await startTowerFloor(sql, ann.id, T0 + 2 * SEC, { pool: POOL }))).not.toHaveProperty("resting");
+    expect(body(await startTowerFloor(sql, ann.id, T0 + 2 * SEC, { pool: off }))).toMatchObject({ fight: s.fight, under: true, resting: true, bosses: s.bosses });
+    // Our pause, not your leave: free after any number of moves (none said counts too), the same floor.
+    const stop = await stopTower(sql, ann.id, T0 + 3 * SEC, { fight: s.fight.id }, { pool: off });
+    expect(stop).toMatchObject({ status: 200, body: { stopped: "free", floor: 1, status: "open", run: { floor: 1, fight: null } } });
+    const again = body<{ floor: number; bosses: string[] }>(await startTowerFloor(sql, ann.id, T0 + 4 * SEC, { pool: off }));
+    expect(again.floor).toBe(1);
+    expect(again.bosses.filter((b) => s.bosses.includes(b))).toEqual([]);
+  });
+
+  it("a run whose deal doesn't parse (only this file writes it): its start and a result answer 409 with confirm (start a new run), which replaces it", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await newTowerRun(sql, ann.id, T0, { confirm: false, pool: POOL, seed: SEED });
+    const fight = body<{ fight: { id: string } }>(await startTowerFloor(sql, ann.id, T0 + SEC, { pool: POOL })).fight.id;
+    await sql.run("UPDATE tower_runs SET met = 'not json' WHERE user_id = ?", ann.id);
+    const broken = { status: 409, body: { message: "No run to continue. Start a new one.", confirm: true } };
+    expect(await startTowerFloor(sql, ann.id, T0 + 2 * SEC, { pool: POOL })).toEqual(broken);
+    expect(await finishTowerFloor(sql, ann.id, T0 + 60 * SEC, { fight, outcome: "won" }, { pool: POOL, minWinMs: MIN_WIN })).toEqual(broken);
+    await sql.run("UPDATE tower_runs SET fight = NULL WHERE user_id = ?", ann.id);
+    expect(await startTowerFloor(sql, ann.id, T0 + 61 * SEC, { pool: POOL })).toEqual(broken);
+    expect((await newTowerRun(sql, ann.id, T0 + 62 * SEC, { confirm: true, pool: POOL, seed: SEED })).status).toBe(200);
+    expect((await startTowerFloor(sql, ann.id, T0 + 63 * SEC, { pool: POOL })).status).toBe(200);
+  });
+
   it("every boss resting: 503 and the run as it was", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
@@ -166,7 +191,7 @@ describe("a floor's result: only for the floor started, once", () => {
   };
   const finish = (sql: Sql, user: User, fight: unknown, outcome: unknown, now: number) => finishTowerFloor(sql, user.id, now, { fight, outcome }, { pool: POOL, minWinMs: MIN_WIN });
 
-  it("won: the next floor dealt by core and saved, the best 1; a replay of it is refused and changes nothing", async () => {
+  it("won: the next floor dealt by core and saved, the best 1; the same result again (its answer lost) is answered again, changing nothing; another is refused with the run and best", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     const fight = await started(sql, ann);
@@ -176,9 +201,20 @@ describe("a floor's result: only for the floor started, once", () => {
     expect(won.body).toMatchObject({ outcome: "won", floor: 1, status: "open", best: 1, run: { floor: 2, bosses: next.floors[1], beaten: [next.floors[0]], fight: null } });
     expect(runOf({ ...(await rows(sql, ann.id))[0]!, seed: SEED, status: "open" })).toEqual(next);
     const after = await rows(sql, ann.id);
-    for (const outcome of ["won", "lost"]) expect(await finish(sql, ann, fight, outcome, T0 + 70 * SEC)).toEqual({ status: 409, body: { message: "That floor isn't under way." } });
+    expect(await finish(sql, ann, fight, "won", T0 + 70 * SEC)).toEqual(won);
+    const lost = await finish(sql, ann, fight, "lost", T0 + 70 * SEC);
+    expect(lost).toEqual({ status: 409, body: { message: "That floor isn't under way.", run: won.body.run, best: 1 } });
     expect(await rows(sql, ann.id)).toEqual(after);
-    expect(await best(sql, ann.id)).toBe(1);
+    // (The result taken, its best never written, the Worker stopped: the retry is answered, its best set right.)
+    await sql.run("DELETE FROM tower_best WHERE user_id = ?", ann.id);
+    expect(await finish(sql, ann, fight, "won", T0 + 80 * SEC)).toEqual(won);
+    // Answered as the run is now: the next floor under way, or the run ended (and the best as it is).
+    const second = body<{ fight: { id: string } }>(await startTowerFloor(sql, ann.id, T0 + 90 * SEC, { pool: POOL })).fight;
+    expect((await finish(sql, ann, fight, "won", T0 + 91 * SEC)).body).toMatchObject({ outcome: "won", floor: 1, status: "open", run: { floor: 2, fight: second }, best: 1 });
+    await finish(sql, ann, second.id, "lost", T0 + 92 * SEC);
+    expect(await finish(sql, ann, second.id, "lost", T0 + 93 * SEC)).toEqual({ status: 200, body: { outcome: "lost", floor: 2, status: "out", run: null, best: 1 } });
+    // (Only the last result is kept: one before it, or another outcome, is refused.)
+    for (const [f, o] of [[fight, "won"], [second.id, "won"]]) expect(await finish(sql, ann, f, o, T0 + 94 * SEC)).toEqual({ status: 409, body: { message: "That floor isn't under way.", run: null, best: 1 } });
   });
 
   it("refused: a floor never started (or another's id), no run, a bad outcome or id; the floor stays under way", async () => {
@@ -199,7 +235,7 @@ describe("a floor's result: only for the floor started, once", () => {
     const ann = await signedIn(sql, "ann@example.com");
     const fight = await started(sql, ann);
     const soon = await finish(sql, ann, fight, "won", T0 + SEC + MIN_WIN - 1);
-    expect(soon).toMatchObject({ status: 409, body: { message: "That floor only just began.", fight: { id: fight } } });
+    expect(soon).toMatchObject({ status: 409, body: { message: "That floor only just began.", fight: { id: fight }, run: { floor: 1, fight: { id: fight } }, best: 0 } });
     expect((await rows(sql, ann.id))[0]).toMatchObject({ floor: 1, status: "open", fight: expect.stringContaining(fight) });
     expect((await finish(sql, ann, fight, "won", T0 + SEC + MIN_WIN)).status).toBe(200);
   });
@@ -245,18 +281,26 @@ describe("a floor's result: only for the floor started, once", () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     const t = await climb(sql, ann.id, 4);
-    const t2 = await climb(sql, ann.id, 2, t + 1, 99);
-    expect(await best(sql, ann.id)).toBe(4);
-    // (The Worker stopped between a result and its best: the next result works it out again from the runs, the abandoned one's too.)
-    await sql.run("UPDATE tower_best SET floor = 1 WHERE user_id = ?", ann.id);
-    const fight = body<{ fight: { id: string } }>(await startTowerFloor(sql, ann.id, t2 + 1, { pool: POOL })).fight.id;
-    await finish(sql, ann, fight, "lost", t2 + 2);
+    // (The Worker stopped between a result and its best: the next result works it out again from the runs.)
+    await sql.run("UPDATE tower_best SET floor = 3 WHERE user_id = ?", ann.id);
+    const fight = body<{ fight: { id: string } }>(await startTowerFloor(sql, ann.id, t + 1, { pool: POOL })).fight.id;
+    await finish(sql, ann, fight, "lost", t + 2);
     expect(await best(sql, ann.id)).toBe(4);
     // (And a new run, before the runs that ended go.)
-    await sql.run("UPDATE tower_best SET floor = 1 WHERE user_id = ?", ann.id);
-    await newTowerRun(sql, ann.id, t2 + 3, { confirm: false, pool: POOL, seed: 5 });
+    await sql.run("UPDATE tower_best SET floor = 3 WHERE user_id = ?", ann.id);
+    await climb(sql, ann.id, 2, t + 3, 99);
     expect(await best(sql, ann.id)).toBe(4);
-    expect((await rows(sql, ann.id)).map((r) => r.status)).toEqual(["open"]);
+    expect((await rows(sql, ann.id)).map((r) => [r.floor, r.status])).toEqual([[3, "open"]]);
+  });
+
+  it("the best is at most BATTLE_TOWER.floors, should a run be saved above it (the setting is only ever raised)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    for (const [id, status] of [["a", "top"], ["b", "out"]]) {
+      await sql.run("INSERT INTO tower_runs (id, user_id, kind, seed, floor, met, status, started_at, updated_at) VALUES (?, ?, 'solo', 1, ?, '{}', ?, ?, ?)", id, ann.id, BATTLE_TOWER.floors + 20, status, T0, T0);
+    }
+    await newTowerRun(sql, ann.id, T0 + SEC, { confirm: false, pool: POOL, seed: SEED });
+    expect(await best(sql, ann.id)).toBe(BATTLE_TOWER.floors);
   });
 });
 
@@ -385,7 +429,7 @@ describe("download my data and deleting the account", () => {
     const d = (await accountDownload(sql, ann, t + 2)) as { tower: { runs: Record<string, unknown>[]; best: unknown[] } };
     const floors = runOf({ ...(await sql.first<{ met: string }>("SELECT met FROM tower_runs WHERE user_id = ?", ann.id))!, seed: SEED, status: "open" }).floors;
     expect(d.tower).toEqual({
-      runs: [{ kind: "solo", floor: 3, status: "open", floors, fight_at: new Date(t + 1).toISOString(), started_at: new Date(T0).toISOString(), updated_at: new Date(t + 1).toISOString() }],
+      runs: [{ kind: "solo", floor: 3, status: "open", floors, last_result: { outcome: "won", floor: 2 }, fight_at: new Date(t + 1).toISOString(), started_at: new Date(T0).toISOString(), updated_at: new Date(t + 1).toISOString() }],
       best: [{ kind: "solo", floor: 2, at: expect.any(String) }],
     });
     expect(JSON.stringify(d.tower)).not.toMatch(/seed|deck/);
@@ -418,7 +462,8 @@ describe("the API", () => {
     // (Test switches on: no minimum for a win.)
     const won = await call(d1, cookie, "/api/tower/floor/finish", { fight, outcome: "won" }, env);
     expect(won).toMatchObject({ status: 200, body: { status: "open", best: 1, run: { floor: 2 } } });
-    expect((await call(d1, cookie, "/api/tower/floor/finish", { fight, outcome: "won" }, env)).status).toBe(409);
+    expect(await call(d1, cookie, "/api/tower/floor/finish", { fight, outcome: "won" }, env)).toEqual(won);
+    expect(await call(d1, cookie, "/api/tower/floor/finish", { fight, outcome: "lost" }, env)).toMatchObject({ status: 409, body: { run: { floor: 2 }, best: 1 } });
     expect((await call(d1, cookie, "/api/tower/stop", {}, env)).body).toMatchObject({ stopped: "between", run: { floor: 2 } });
     const next = ((await call(d1, cookie, "/api/tower/floor/start", {}, env)).body.fight as { id: string }).id;
     expect((await call(d1, cookie, "/api/tower/stop", { fight: next, moves: 1 }, env)).body).toMatchObject({ stopped: "free", run: { floor: 2 } });
