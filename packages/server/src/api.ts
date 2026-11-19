@@ -22,7 +22,7 @@ import { hiddenRoomResponse } from "./hidden-room-api.ts";
 import { enterOnly } from "./town-chat.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { XP, AGE_GATE, HIDDEN_ROOM, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
+import { XP, AGE_GATE, HIDDEN_ROOM, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, soloQuestMode, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -795,7 +795,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // one already ended) earns no XP at all; a win needs XP.soloWinMinMinutes of the server's time and is capped (XP.soloWinsPerDay
   // a day), and the time too (XP.soloMinutesPerDay a day). Review M1 and M2, Nov 9. Answers {ok, xp}.
   if (path === "/api/results" && request.method === "POST") {
-    const b = (await request.json().catch(() => null)) as (Partial<MatchResult> & { game?: unknown; won?: unknown; resigned?: unknown; left?: unknown; test?: unknown }) | null;
+    const b = (await request.json().catch(() => null)) as (Partial<MatchResult> & { game?: unknown; won?: unknown; resigned?: unknown; left?: unknown; test?: unknown; tower?: unknown }) | null;
     if (!b || typeof b.placement !== "number" || typeof b.players !== "number") return json({ message: "Bad result" }, 400);
     const timed = await endSoloGame(sql, current.id, b.game, now);
     // (An app from before XP sends no moves: NULL, as for every result from before.)
@@ -819,13 +819,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
           signedInOnly: signInRequired(env),
           now,
           paused: isPaused(env, "rewards", now),
-          // (A solo Boss Battle moves the boss quests too, Nov 10: the device names the mode, as it does its moves and its win.)
-          quest: b.mode === "boss" ? "soloBoss" : "solo",
+          // (A solo Boss Battle moves the boss quests too, Nov 10: the device names the mode, as it does its moves and its win. A Battle
+          // Tower floor never does, Nov 20: `tower`, the device's word too.)
+          quest: soloQuestMode(b.mode, b.tower),
         }).catch((e: unknown) => {
           console.log(`xp for a solo game: ${String(e)}`);
           return null;
         });
-    const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, ...result } = b;
+    const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, tower: _tower, ...result } = b;
     // (`playMs`: the server's time, as XP counted it (a test server's ?xpgame minutes included); none for a game it never timed. The
     // Welcome Crate counts a solo game only with WELCOME_GIFT.soloMinSeconds of it and XP.minMoves moves: Nov 10.)
     await recordResult(sql, current.id, { ...result, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic", playMs: timed ? ms : null, moves, xp } as MatchResult, now);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QUESTS, dailiesToDeal, hasRewards, pickQuests, questCountdown, questCounts, questDef, readRewards, rewardLines, type QuestGame } from "../src/index.ts";
+import { QUESTS, dailiesToDeal, hasRewards, pickQuests, questCountdown, questCounts, questDef, readRewards, rewardLines, soloQuestMode, type QuestGame } from "../src/index.ts";
 
 /** Quests' rules (core's quests.ts; QUESTS in settings.ts; the server's part: packages/server/test/quests.test.ts). */
 describe("quests' rules", () => {
@@ -21,6 +21,16 @@ describe("quests' rules", () => {
     expect(all.filter((c) => questCounts(c as never, g(false, min)))).toEqual(["any", "boss"]);
     expect(all.filter((c) => questCounts(c as never, g(true, min - 1)))).toEqual([]);
     expect(all.filter((c) => questCounts(c as never, g(false, min - 1)))).toEqual([]);
+  });
+
+  it("a Battle Tower floor moves no boss quest (Eric, Nov 20): a solo game's mode as the device names it", () => {
+    expect(soloQuestMode("boss", undefined)).toBe("soloBoss");
+    expect(soloQuestMode("boss", true)).toBe("solo");
+    expect(soloQuestMode("classic", undefined)).toBe("solo");
+    expect(soloQuestMode("crowd", true)).toBe("solo");
+    // (A floor won still finishes games: "any" only.)
+    const floor: QuestGame = { mode: soloQuestMode("boss", true), won: true, ms: QUESTS.soloMinMinutes * 60_000 };
+    expect(["any", "win", "boss", "bossWin", "squads", "crowd"].filter((c) => questCounts(c as never, floor))).toEqual(["any"]);
   });
 
   it("the pool: only modes always playable (no auto chess, no ranked, no one boss); every quest pays XP; the weekly a crate and a key", () => {

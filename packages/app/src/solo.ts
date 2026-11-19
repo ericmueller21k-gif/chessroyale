@@ -796,6 +796,9 @@ export class SoloMatch implements GameView {
     if (out.forced) return void this.darkForcedTurn();
     if (out.blackout) return this.blackoutTurn();
     if (out.out) return void this.score(null);
+    // (A tower floor: the wrong try kept as it happens, so a reload mid-turn has the same bulbs out (Nov 20). The dark's move and the
+    // blackout are kept by the step after them: a rejoin can't play a dark's move still due.)
+    this.keepFloor();
     this.emit();
   }
 

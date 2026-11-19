@@ -636,6 +636,8 @@ export async function recordSoloResult(r: {
   /** Removed for idling (the server answers "No XP: you left the match."). */
   left?: boolean;
   test?: boolean;
+  /** A Battle Tower floor: XP and the profile as any boss battle, never the boss quests (Eric, Nov 20; core soloQuestMode). */
+  tower?: boolean;
 }): Promise<XpGrant | null> {
   if (!state.profile) return null;
   try {
