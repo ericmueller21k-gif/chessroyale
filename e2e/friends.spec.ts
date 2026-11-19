@@ -213,6 +213,9 @@ test("friend bots (Eric, Nov 20): an admin's Add puts bots on their own friends 
   const bots = (url: string, method: string) => page.request.fetch(url, { method, headers: { "x-e2e-sql": process.env.E2E_SQL_KEY ?? "" } });
   const added = (await (await bots("/api/admin/friend-bots", "POST")).json()) as { bots: { name: string; online: boolean; doing?: Activity }[] };
   expect(added.bots).toHaveLength(FRIEND_BOTS.count);
+  // (The app loaded its list with the account, before they were added: an admin's page reloads, as the ops page's button leaves it.)
+  await page.reload();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await openFriends(page);
   await expect(page.locator(".fr-list .fr-row")).toHaveCount(FRIEND_BOTS.count);
   for (const b of added.bots) {
