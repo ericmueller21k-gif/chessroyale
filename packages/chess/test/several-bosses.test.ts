@@ -116,6 +116,33 @@ describe("several bosses: the Battle Tower's screens (PR 10)", () => {
     expect(checked).toBeGreaterThan(8);
   }, 60_000);
 
+  it("audit 2, finding 1: every moment in the queue names the boss who cast it, and the view says who made each of the side's moves", async () => {
+    const problems: string[] = [];
+    const made = new Map<number, string>();
+    let named = 0;
+    await runBattle(battle(["gingerbread", "clown", "sawyer"], "", 3, 24), null, (r, _fen, who) => {
+      const board = r.boards.get(r.state.boards[0]!)!;
+      // (The boss about to move makes the side's next ply.)
+      if (who === "boss") made.set(board.history.length, r.boss!.id!);
+      if (who !== "crowd") return;
+      const view = r.bossView()!;
+      const side = view.side!;
+      for (const [ply, id] of made) if (ply < board.history.length && side.bosses[side.movers![ply]!]?.id !== id) problems.push(`ply ${ply}: ${id}, the view says ${side.bosses[side.movers![ply]!]?.id}`);
+      // (Each moment is one of its own boss's, as his own part of the view has it.)
+      for (const e of view.powers!.events) {
+        const { boss, ...plain } = e;
+        const own = r.sideBosses().find((b) => b.id === boss);
+        if (!own || !own.powers!.events.some((x) => JSON.stringify(x) === JSON.stringify(plain))) problems.push(`move ${view.crowdMoves}: ${e.kind} named ${boss}`);
+        named++;
+      }
+    });
+    expect(problems).toEqual([]);
+    expect(made.size).toBeGreaterThan(12);
+    expect(named).toBeGreaterThan(3);
+    // (One boss: no side, his events as ever.)
+    expect(runner(["gingerbread"]).bossView()!.powers!.events.every((e) => !("boss" in e))).toBe(true);
+  }, 60_000);
+
   it("no Last Stand on a tower floor, the test switch's included (Eric, Nov 19: \"no save in tower\")", () => {
     const stand = (patch: Partial<Settings>) => {
       const r = runner(["gingerbread", "clown"], "", 5, patch);
