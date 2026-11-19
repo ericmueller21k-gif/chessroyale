@@ -1,4 +1,4 @@
-import { BATTLE_TOWER, bossDef, floorBossCount, floorStrength, type Settings } from "@chessroyale/core";
+import { BATTLE_TOWER, MUSIC, bossDef, floorBossCount, floorStrength, type Settings } from "@chessroyale/core";
 import type { RunnerSnapshot } from "@chessroyale/chess";
 import type { MoveRecord } from "./game.ts";
 import { accountReady } from "./boss-tokens.ts";
@@ -143,9 +143,43 @@ export interface KeptFloor {
   moves?: number;
   /** The floor's XP game on the server (xp.ts noteSoloGame), so a rejoin goes on with it rather than starting another (audit 2, finding 6). */
   xp?: string;
+  /** The theme its battle plays (pickFloorTheme), picked as it first plays and kept, so a reload plays the same (Nov 19). */
+  music?: string;
 }
 
 const KEY = "brc.tower.solo";
+/** The themes of the last floors' battles on this device, oldest first (MUSIC.towerRecent of them). */
+const MUSIC_KEY = "brc.tower.music";
+
+/**
+ * A floor's battle's theme (Eric, Nov 19: "It picks a random track between all the bosses, and then it just sticks with it the whole
+ * time ... it doesn't reuse the same one for, 5 or 6 rounds. If the same boss shows up again, it would pick the other one"): one of its
+ * bosses' themes (`has`: themes.json lists it), at random among those not in `recent` (oldest first); all of them in it: the least
+ * recently played. None with a theme: null (no music).
+ */
+export function pickFloorTheme(bosses: readonly string[], recent: readonly string[], has: (id: string) => boolean, rand = Math.random): string | null {
+  const ok = bosses.filter(has);
+  if (!ok.length) return null;
+  const fresh = ok.filter((b) => !recent.includes(b));
+  if (fresh.length) return fresh[Math.min(fresh.length - 1, Math.floor(rand() * fresh.length))]!;
+  return ok.reduce((a, b) => (recent.lastIndexOf(b) < recent.lastIndexOf(a) ? b : a));
+}
+/** The themes the last floors' battles played here, oldest first. */
+export function recentFloorThemes(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(MUSIC_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(-MUSIC.towerRecent) : [];
+  } catch {
+    return [];
+  }
+}
+function noteFloorTheme(theme: string): void {
+  try {
+    localStorage.setItem(MUSIC_KEY, JSON.stringify([...recentFloorThemes().filter((t) => t !== theme), theme].slice(-MUSIC.towerRecent)));
+  } catch {
+    // (No storage: the next floor may repeat it.)
+  }
+}
 const DEVICE_KEY = "brc.tower.device";
 let device: string | null = null;
 /**
@@ -187,7 +221,7 @@ export function readKept(text: string | null): KeptFloor | null {
   if (k.done !== undefined && !["won", "lost", "drawn", "left"].includes(k.done)) return null;
   const g = k.game;
   const game = g && typeof g === "object" && g.snapshot && typeof g.snapshot === "object" && (g.snapshot as Partial<RunnerSnapshot>).state && Array.isArray((g.snapshot as Partial<RunnerSnapshot>).boards) && Array.isArray(g.moves) ? { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}) } : undefined;
-  return { v: 1, fight: k.fight, floor: k.floor!, bosses: k.bosses, settings: k.settings, beaten: k.beaten, ...(game ? { game } : {}), ...(k.done ? { done: k.done } : {}), ...(Number.isInteger(k.moves) ? { moves: k.moves } : {}), ...(typeof k.xp === "string" ? { xp: k.xp } : {}) };
+  return { v: 1, fight: k.fight, floor: k.floor!, bosses: k.bosses, settings: k.settings, beaten: k.beaten, ...(game ? { game } : {}), ...(k.done ? { done: k.done } : {}), ...(Number.isInteger(k.moves) ? { moves: k.moves } : {}), ...(typeof k.xp === "string" ? { xp: k.xp } : {}), ...(typeof k.music === "string" ? { music: k.music } : {}) };
 }
 
 export function loadKept(): KeptFloor | null {
@@ -331,6 +365,20 @@ export class FloorPlay {
     const game = this.kept.game;
     if (this.kept.done || !game) return;
     this.keep({ ...game, turnMs: Math.max(0, Math.round(ms)) });
+  }
+  /**
+   * The theme this floor's battle plays (KeptFloor.music): picked once, as it first asks (`has`: null while themes.json isn't read yet:
+   * none yet), then the same for the whole match whoever is to move, and after a reload.
+   */
+  music(has: ((id: string) => boolean) | null): string | null {
+    if (this.kept.music) return this.kept.music;
+    if (!has || this.kept.done) return null;
+    const pick = pickFloorTheme(this.kept.bosses, recentFloorThemes(), has);
+    if (!pick) return null;
+    this.kept = { ...this.kept, music: pick };
+    saveKept(this.kept);
+    noteFloorTheme(pick);
+    return pick;
   }
   /** The floor's XP game on the server, kept for a rejoin (KeptFloor.xp). */
   noteXp(id: string): void {

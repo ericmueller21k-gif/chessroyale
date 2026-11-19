@@ -40,4 +40,4 @@ replace its file and its numbers; no code change (`src/music.ts`, `townMusic`).
 
 `tower-loop`: one seamless loop, no intro (as Chandy's), from `tower-music/` on branch `stills/trailer-v2` (song `song_an.py`), re-encoded
 from its 192 kbps handoff to 128 kbps as above (same length, lined up at 0, `pad` and `pad + loopSeconds`). Keyed `tower` (the tower's home
-id): its lobby, its floor room and every floor's battle play it, never the bosses' own (docs/decisions/2026-11-19-tower-music.md).
+id): its lobby and its floor room play it; a floor's battle plays one of its bosses' own themes (docs/decisions/2026-11-19-tower-music.md).

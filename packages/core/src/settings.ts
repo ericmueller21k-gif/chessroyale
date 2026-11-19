@@ -4945,7 +4945,11 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  *   one at the place the old one is heard at, once the new one's clock runs (waiting at most `handoffWaitMs`), and the old one fades
  *   out over `handoffMs` from there.
  */
-export const MUSIC = { volume: 0.4, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townPreloadAfterMs: 2000, handoffMs: 300, handoffWaitMs: 1000 } as const;
+/**
+ * Music's timings and level. `towerRecent`: a Battle Tower floor's battle plays one of its bosses' themes, avoiding the themes of this
+ * many floors before it on this device (Eric, Nov 19: "it doesn't reuse the same one for, 5 or 6 rounds"; app tower.ts pickFloorTheme).
+ */
+export const MUSIC = { towerRecent: 5, volume: 0.4, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townPreloadAfterMs: 2000, handoffMs: 300, handoffWaitMs: 1000 } as const;
 
 /**
  * Chess Town's own music (Eric, Nov 14-15: "a song where people literally are like, I want to turn this song on while I'm in the chess

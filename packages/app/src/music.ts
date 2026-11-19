@@ -438,13 +438,18 @@ export interface MusicBattle {
   next?: string;
 }
 const themeOf = (b: MusicBattle) => b.theme ?? b.boss;
-/** The Battle Tower's theme (themes.json's `tower`, Nov 19): its lobby's and floor room's (shops.ts, its home's) and its floors' battles'. */
-export const TOWER_THEME = "tower";
 /**
- * A Battle Tower floor's battle (Eric, Nov 19: "it's the background battle tower music"): the tower's place theme in place of the
- * bosses' own, whichever the floor meets (its `boss` is the tower's, so a floor's next boss carries it on with no restart).
+ * Which themes themes.json lists, for a Battle Tower floor's pick (tower.ts FloorPlay.music); null while it isn't read yet (then
+ * fetched, if music is wanted: the battle asks again as it renders).
  */
-export const towerBattle = (key: unknown, live: boolean): MusicBattle => ({ key, boss: TOWER_THEME, live });
+export function themeKnown(): ((id: string) => boolean) | null {
+  const t = themesNow;
+  if (!t) {
+    if (wanted()) void loadThemes();
+    return null;
+  }
+  return (id) => !!t.themes[id];
+}
 let battle: MusicBattle | null = null;
 let playing: (Playing & { key: unknown; boss: string; theme: string }) | null = null;
 /** What a switch left playing until its fade is done (stopped at once by the result, Music off or the page hiding). */

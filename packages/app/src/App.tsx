@@ -54,7 +54,7 @@ import { confirmLeaveSearch, keepInQueue, saveAwayLobby, savedAwayLobby, searchF
 import { chosenBotLevel } from "./components/BotLevelBox.tsx";
 import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
-import { bossMusic, recluseMusic, towerBattle, type MusicBattle } from "./music.ts";
+import { bossMusic, recluseMusic, themeKnown, type MusicBattle } from "./music.ts";
 import { noteWhere } from "./problems.ts";
 import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
@@ -2602,8 +2602,11 @@ function musicBattle(match: AnyMatch | null): MusicBattle | null {
     return r && { key: match, boss: boss.id, live, ...r, ...(ahead ? { ahead: [RECLUSE_MUSIC.beaten, RECLUSE_MUSIC.transform] } : {}) };
   }
   if (boss.result) return null;
-  // (A Battle Tower floor: the tower's theme, not its bosses' own, Nov 19.)
-  if (match.tower) return towerBattle(match, live);
+  // (A Battle Tower floor: one of its bosses' themes, picked as it starts and kept for the whole match, whoever is to move; Nov 19.)
+  if (match.tower) {
+    const theme = match.tower.music(themeKnown());
+    return theme ? { key: match, boss: theme, live } : null;
+  }
   return { key: match, boss: boss.id, live };
 }
 
