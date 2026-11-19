@@ -416,6 +416,14 @@ The design is `docs/ideas/live-ops.md`. Push alerts to Discord when real players
 the problem and fixes it through the normal lanes, telling Eric. A bot plays the live site every 2 hours. Releases go out
 gradually. False alarms are avoided by design (rates against normal, two checks in a row, retry, confirm first). Build order there.
 
+## A town that fills up like a real one (Eric, Nov 20, 2026: queued, not started)
+
+Eric: "eventually ... when I join a town, it just starts loading in, you know, like 25 bots over the course of like 5 minutes." Today the
+town opens with its 20 bots (10 out at once, one swapped each minute: docs/areas/town-square.md). The idea: as you join, about 25 arrive
+over about 5 minutes, walking in from the edges and homes, so the town feels like real people turning up. Alongside it (being built
+now): bots on Eric's own friends list with lifelike activity (online, in the town, in a Boss Battle, climbing the tower), so he can see
+what the game looks like with friends playing. Both are admins-first while we test what feels real.
+
 ## Riders in regular crates (Eric, Nov 9, 2026: next after the shop page)
 
 A few rides that have nothing to do with the bosses, put in the regular crates (HunChess, Gift, Beta) to make them worth buying,
