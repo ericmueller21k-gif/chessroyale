@@ -1,0 +1,4 @@
+# Battle Tower: Hollow's wrong tries kept; floors out of the boss quests (Nov 20, 2026)
+
+- **Hollow's wrong tries** (audit 2's "not fixed" note): a wrong try into the dark keeps the floor at once (solo.ts `darkTry` → `keepFloor`), so a reload mid-turn has the same bulbs out. Call made: the try that brings the dark's move (3rd, 7th bulb) isn't kept on its own: a rejoin can't play a dark's move still due, and the step after it (the move scored, his reply) keeps it seconds later. The blackout was already kept (`nextRoundIn`).
+- **Eric, Nov 20 ("Sure", to the director's proposal):** a tower floor counts for XP and the profile as now, never the boss quests (floor 1 plays at 800). The device sends `tower: true` with the floor's result; the server's quests read core `soloQuestMode`: a floor is a plain solo game ("finish games" only). The device's word, as its mode already is.
