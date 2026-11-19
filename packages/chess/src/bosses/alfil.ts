@@ -576,6 +576,8 @@ export const ALFIL: BossRules = {
   afterBossMove(b, move) {
     alfilBattle.afterHisMove(b, move);
   },
+  // (Several bosses: another boss's move, his Tusks pawns and elephants follow it too.)
+  followMove: (b, move) => alfilBattle.follow(b, move),
   view: (p) => ({
     tusks: p.tusks ? { ...p.tusks, pawns: [...p.tusks.pawns] } : null,
     fusion: p.fusion ?? null,

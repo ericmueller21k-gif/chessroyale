@@ -938,6 +938,12 @@ export const CHANDY: BossRules = {
   afterBossMove(b, move) {
     chandyBattle.afterHisMove(b, move);
   },
+  // (Several bosses: another boss's move, his locks and the queen lock's aim follow it too; one it took is gone.)
+  followMove(b, move, fenBefore) {
+    const c = b.state.boss?.powers?.chandy;
+    if (!c || (!c.locks.length && !c.aim)) return;
+    setChandy(b, () => followLocks(c, fenBefore, move));
+  },
   opening: {
     setUp(b) {
       const test = b.settings.bossPowerTest;
@@ -1044,6 +1050,20 @@ export function chandyView(p: BossPowerState, s: ChandySettings = BOSS_POWERS.ch
 
 // ---------------- His part in the match runner ----------------
 
+/**
+ * His locks and the queen lock's aim after a move (`before`: the position before it): each follows its piece; one taken is gone; a
+ * locked pawn that promotes to a queen is unlocked at once (never the queen, L1); the aim stays only on a queen.
+ */
+function followLocks(chandy: ChandyState, before: string, move: string): ChandyState {
+  const c: ChandyState = { ...chandy };
+  c.locks = locksAfter(before, move, c.locks).filter((l) => l.piece !== "q");
+  if (c.aim) {
+    const followed = locksAfter(before, move, [{ square: c.aim.square, piece: "q", at: 0 }])[0];
+    c.aim = followed?.piece === "q" ? { ...c.aim, square: followed.square } : null;
+  }
+  return c;
+}
+
 export const chandyBattle = {
   /**
    * After the crowd's move (him to move): his locks and the queen lock's aim follow their pieces; the queen lock fires if it was
@@ -1057,20 +1077,13 @@ export const chandyBattle = {
     const s = BOSS_POWERS.chandy;
     const crowd = boss.crowdSide;
     const before = move ? fenBeforeLast(boardOf(b)) : null;
-    let c: ChandyState = { ...p.chandy };
-    if (move && before) {
-      // (A locked pawn that promotes to a queen is unlocked at once: never the queen, L1.)
-      c.locks = locksAfter(before, move, c.locks).filter((l) => l.piece !== "q");
-      if (c.aim) {
-        const followed = locksAfter(before, move, [{ square: c.aim.square, piece: "q", at: 0 }])[0];
-        c.aim = followed?.piece === "q" ? { ...c.aim, square: followed.square } : null;
-      }
-    }
+    let c: ChandyState = move && before ? followLocks(p.chandy, before, move) : { ...p.chandy };
     const fen = boardOf(b).fen;
     if (sideToMove(fen) === crowd || !legalMoves(fen).length) return setChandy(b, () => c);
     const events: PowerEvent[] = [];
-    // The queen lock fires at the start of his turn after its aim (Q5); then he plays his move.
-    if (c.aim && c.aim.turn <= boss.crowdMoves) {
+    // The queen lock fires at the start of his turn after its aim (Q5); then he plays his move. (Several bosses on one side: his own
+    // next turn, as alone: hisTurn.)
+    if (c.aim && c.aim.turn <= boss.crowdMoves && (b.hisTurn?.() ?? true)) {
       const shot = queenShot(fen, c.aim.square, crowd);
       c.shot = { at: boss.crowdMoves, square: shot.square, piece: shot.piece };
       events.push({ kind: "queenShot", turn: p.turn, square: shot.square ?? c.aim.square, squares: shot.trail, ...(shot.square ? { shape: shot.piece as "p" | "n" | "b" | "r" | "q" } : { fizzled: [c.aim.square] }) });

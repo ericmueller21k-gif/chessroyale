@@ -353,6 +353,13 @@ export const ZEBRA: BossRules = {
   afterBossMove(b, move) {
     zebraBattle.afterHisMove(b, move);
   },
+  // (Several bosses: another boss's move, his gold pieces follow it too.)
+  followMove(b, move, fenBefore) {
+    const z = b.state.boss?.powers?.zebra;
+    if (!z?.gold.length) return;
+    const gold = goldAfter(fenBefore, move, z.gold);
+    if (gold.join() !== z.gold.join()) setZebra(b, { ...z, gold });
+  },
   view: (p) => ({ zebra: zebraView(p) }),
 };
 

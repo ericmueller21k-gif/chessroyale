@@ -439,8 +439,8 @@ export function sideCrowdAllowed(side: readonly BossState[], fen: string): strin
 
 /**
  * What stops the move of the boss to move (`side[0]`, him to move in `fen`): every mark on the board that binds the bosses,
- * whoever put it there, and every boss's other stops (Smudgy's disguise, the hoops: the whole side's guards), but a stop that
- * binds only his own moves (`ownStops`: Sawyer's first move) only from the boss himself.
+ * whoever put it there, his own stops (bossStops), and of every other boss's the part that binds the whole side (sideStops:
+ * Smudgy's disguise, the hoops), never one that binds only that boss's own moves (Sawyer's first move, Smudgy's forced moves).
  */
 function sideBossLimit(side: readonly BossState[], fen: string): ((move: string) => boolean) | null {
   if (side.length < 2) return bossLimit(side[0], fen);
@@ -449,7 +449,7 @@ function sideBossLimit(side: readonly BossState[], fen: string): ((move: string)
   const layer = marks.some(bindsBosses) ? mergeLayers(side[0]!.crowdSide, marks) : null;
   const stops = live.flatMap((b) => {
     const rules = bossRules(b)!;
-    const stop = b === side[0] || !rules.ownStops ? rules.bossStops?.(b) : null;
+    const stop = b !== side[0] && rules.sideStops ? rules.sideStops(b) : rules.bossStops?.(b);
     return stop ? [stop] : [];
   });
   if (!layer && !stops.length) return null;

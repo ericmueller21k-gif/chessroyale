@@ -497,6 +497,14 @@ function camoTurn(c: Camouflage, fen: string, seed: number, boss: Side, at: numb
   return { ...c, due: null, missed, ...(missed >= s.camoTries ? { off: true as const } : {}) };
 }
 
+/** The disguise: while his rook hides, until it may strike, only its pawn-shaped moves (any boss's on his side), or null. */
+function disguiseStop(boss: BossState): ((move: string, fen: string) => boolean) | null {
+  const sq = boss.powers?.camo?.square;
+  if (!sq || strikeOpen(boss)) return null;
+  const his = other(boss.crowdSide);
+  return (m, fen) => from(m) === sq && !keepsDisguise(applyMove(fen, m), sq, to(m), !!pieceAt(fen, to(m)), his);
+}
+
 /** Smudgy: Camouflage (two forced moves, then his rook hides as a pawn until it strikes) and Repaint (his whole turn). */
 export const SMUDGY: BossRules = {
   id: "smudgy",
@@ -551,11 +559,10 @@ export const SMUDGY: BossRules = {
       const due = c.due;
       return (m) => m !== due;
     }
-    const sq = c.square;
-    if (!sq || strikeOpen(boss)) return null;
-    const his = other(boss.crowdSide);
-    return (m, fen) => from(m) === sq && !keepsDisguise(applyMove(fen, m), sq, to(m), !!pieceAt(fen, to(m)), his);
+    return disguiseStop(boss);
   },
+  // (Several bosses on one side: his forced moves are his own; the disguise binds every boss's moves.)
+  sideStops: (boss) => disguiseStop(boss),
   stopReason(boss, fen, move) {
     const sq = boss.powers?.camo?.square;
     if (!sq) return null;
@@ -599,6 +606,8 @@ export const SMUDGY: BossRules = {
   afterBossMove(b, move) {
     smudgyBattle.afterHisMove(b, move);
   },
+  // (Several bosses: another boss's move, his hidden rook stepped as a pawn or a check it discovers: followRook.)
+  followMove: (b, move) => smudgyBattle.followRook(b, move),
   opening: {
     fromStart: true,
     setUp(b, at) {
@@ -689,6 +698,20 @@ export const smudgyBattle = {
       setPowers(b, (p) => ({ ...p, camo: { ...c, side, step, due: null, swap: { at: boss.crowdMoves, rook, pawn: pick.pawn }, square: pick.pawn } }));
       return;
     }
+    smudgyBattle.followRook(b, move);
+  },
+
+  /**
+   * His hidden rook after a move of his side's (his own; on a side of several bosses, another boss's too): the rook's move (a
+   * pawn's keeps it hidden; any other reveals it), or a check by it, discovered, or no move left the crowd could make on both
+   * boards (each reveals it).
+   */
+  followRook(b: Battle, move: string): void {
+    const boss = b.state.boss;
+    const c = boss?.powers?.camo;
+    if (!boss || boss.id !== "smudgy" || !c) return;
+    const his = other(boss.crowdSide);
+    const fen = boardOf(b).fen;
     const sq = c.square;
     if (!sq) return;
     if (from(move) === sq) {

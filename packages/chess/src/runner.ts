@@ -82,7 +82,7 @@ import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./prot
 import { BOSS_OPENING, FREESTYLE_OPENING, boardEnd, boardStatus, freestyleBoard, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { freestyleStart } from "./chess960.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { START_FEN, applyMove, baseAt, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan, type GameEnd } from "./rules.ts";
+import { START_FEN, applyMove, baseAt, fenAtPly, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan, type GameEnd } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, levelForMaia, type BossBrain, type BossBrainPlan, type BossForm } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
@@ -1266,9 +1266,9 @@ export class MatchRunner {
       // Boss battle: the judged eval feeds the ultimate's meter, and the boss's own after-move effect (G-REX's fire
       // burns what was left on its tiles; Folio's Revision reads the judge's numbers).
       if (this.state.boss?.powers) {
-        this.state = { ...this.state, boss: { ...this.state.boss, powers: { ...this.state.boss.powers, judged: moverExpected } } };
-        // (Several bosses: every boss's meter reads the judged eval.)
-        if (this.several()) this.updateSide((b) => (b.powers ? { ...b, powers: { ...b.powers, judged: moverExpected } } : b));
+        // (Several bosses: every boss's meter reads the judged eval, set as his own hook runs: afterCrowdMove, so a move Revision
+        // crosses out never reaches the others' numbers.)
+        if (!this.several()) this.state = { ...this.state, boss: { ...this.state.boss, powers: { ...this.state.boss.powers, judged: moverExpected } } };
         this.afterCrowdMove(r.result.playedMove, { best: Math.max(moverExpected, r.scored[0]?.expected ?? moverExpected), played: moverExpected, ...(r.king ? { king: true } : {}), ...(r.flag ? { flag: true } : {}) });
         if (this.several() ? this.sideBosses().some((b) => bossRules(b)?.crossedOut?.(b)) : bossRules(this.state.boss)?.crossedOut?.(this.state.boss!)) crossed.add(r.boardId);
       }
@@ -1537,6 +1537,8 @@ export class MatchRunner {
     const through = side ? (sideBossStopped(side, board.fen, m) ? sideStopReason(side, board.fen, m) : null) : bossStopped(boss, board.fen, m) ? stopReason(boss, board.fen, m) : null;
     this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}), ...(through ? { through } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
+    // (Several bosses: the move reaches every other boss's trackers first, on the board as it landed: followOthers.)
+    this.followOthers(m, board.fen);
     // (The boss's own after-move effect: Sawyer's split pawn after his first move; Wrangler's pull, drag or showdown.)
     if (this.state.boss?.powers) bossRules(this.state.boss)?.afterBossMove?.(this.battle, m, { ...extras, ...(shown !== m ? { special: shown } : {}) });
     this.bossTurnOver();
@@ -1554,8 +1556,27 @@ export class MatchRunner {
       bossRules(b)?.afterCrowdMove?.(this.battle, move, judged);
       return;
     }
-    // (Several bosses: every boss's own effect, the one in focus first; then the boss to move comes into focus.)
-    this.forEachBoss(() => bossRules(this.state.boss)?.afterCrowdMove?.(this.battle, move, judged));
+    // (Several bosses: every boss's own effect, each with the judge's numbers (`judged`) as his own hook runs, from the boss who made
+    // the side's last move, then in turn order: his move came first, and Folio's Revision may cross it out with the crowd's reply;
+    // then the others never see the reply, nor take its numbers. Each hook's "the bosses are to move" means "he is to move next"
+    // (turnOf, worked out before any hook runs: focusNow). Then the boss to move comes into focus.)
+    const n = this.state.bosses!.length;
+    const moved = this.state.moved ?? n - 1;
+    const outer = this.turnOf;
+    this.turnOf = this.bossToMove() ? this.focusNow() : null;
+    try {
+      for (let k = 0; k < n; k++) {
+        const crossed = this.asBoss((moved + k) % n, () => {
+          const me = this.state.boss!;
+          if (judged && me.powers) this.state = { ...this.state, boss: { ...me, powers: { ...me.powers, judged: judged.played } } };
+          bossRules(this.state.boss)?.afterCrowdMove?.(this.battle, move, judged);
+          return !!bossRules(this.state.boss)?.crossedOut?.(this.state.boss!);
+        });
+        if (crossed) break;
+      }
+    } finally {
+      this.turnOf = outer;
+    }
     this.refocus();
   }
 
@@ -1608,15 +1629,27 @@ export class MatchRunner {
 
   /** His extra move: a quiet one that gains him only a little (extraMoveFrom), from this device's engine. */
   async playExtraMove(engine: EngineLike = this.opts.engines[0]!): Promise<string | null> {
-    return dashBattle.extraMoveDue(this.battle) ? dashBattle.playExtraMove(this.battle, engine) : hollowBattle.playExtraMove(this.battle, engine);
+    const played = await (dashBattle.extraMoveDue(this.battle) ? dashBattle.playExtraMove(this.battle, engine) : hollowBattle.playExtraMove(this.battle, engine));
+    this.extraMoveOver(played);
+    return played;
   }
 
   /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove, dashBattle's). Returns it, or null. */
   applyExtraMove(move: string | null): string | null {
     const played = dashBattle.extraMoveDue(this.battle) ? dashBattle.applyExtraMove(this.battle, move) : hollowBattle.applyExtraMove(this.battle, move);
-    // (Several bosses: Hollow's second move came, his turn again before the next boss's; the order goes on after it.)
-    if (this.several()) this.refocus();
+    this.extraMoveOver(played);
     return played;
+  }
+
+  /**
+   * Several bosses: his extra move is over (played, or skipped: null), on solo's path and the host's alike: the move reaches every
+   * other boss's trackers, and the order goes on after him (Hollow's second move came, his turn again before the next boss's).
+   */
+  private extraMoveOver(played: string | null) {
+    if (!this.several()) return;
+    const board = this.boards.get(this.state.boards[0]!)!;
+    if (played) this.followOthers(played, fenAtPly(board.history, board.history.length - 1, board.bases));
+    this.refocus();
   }
 
   /**
@@ -1989,7 +2022,9 @@ export class MatchRunner {
       engines: runner.opts.engines,
       alive: () => runner.alive(),
       finalGameOver: () => runner.finalGameOver(),
-      bossToMove: () => runner.bossToMove(),
+      // (Several bosses: only for the boss whose turn it is: hisTurn.)
+      bossToMove: () => runner.bossToMove() && runner.hisTurn(),
+      hisTurn: () => runner.hisTurn(),
       crowdAllowed: (boardId) => runner.crowdAllowed(boardId),
       boardOf: (playerId) => runner.boardOf(playerId),
       afterCrowdMove: (move) => runner.afterCrowdMove(move),
@@ -2323,14 +2358,47 @@ export class MatchRunner {
     const f = this.state.focus ?? 0;
     if (!this.several() || i < 0 || i === f) return fn();
     const saved = this.state;
+    // (Whose turn it is doesn't move with the focus: the boss in focus till now, unless it was already set: hisTurn.)
+    const outer = this.turnOf;
+    this.turnOf = outer ?? f;
     this.setFocus(i);
     const mid = this.state;
     try {
       return fn();
     } finally {
+      this.turnOf = outer;
       if (this.state === mid) this.state = saved;
       else this.setFocus(f);
     }
+  }
+
+  /**
+   * Several bosses: whose turn it is, while another boss is in focus for a moment (asBoss) or while the hooks after the crowd's
+   * move run (the boss to move next, worked out before them). Null: the boss in focus. Never kept in the match's state.
+   */
+  private turnOf: number | null = null;
+
+  /**
+   * The boss in focus is the one whose turn it is (several bosses: the boss to move, or whose turn change it is; turnOf), so a boss's
+   * hook keyed on "the bosses are to move" (Battle.bossToMove) answers for him alone: Smudgy's forced move, Ginger's Super Freeze,
+   * Babur's balloon, Moo's Full Moon, Don Dough's Gold Plate, Chandy's queen shot. One boss: always.
+   */
+  hisTurn(): boolean {
+    if (!this.several()) return true;
+    const f = this.state.focus ?? 0;
+    return (this.turnOf ?? f) === f;
+  }
+
+  /** Several bosses: a move the boss in focus just played (`fenBefore`: the position before it) reaches every other boss's trackers (BossRules.followMove). */
+  private followOthers(move: string, fenBefore: string) {
+    if (!this.several()) return;
+    const n = this.state.bosses!.length;
+    const f = this.state.focus ?? 0;
+    for (let k = 1; k < n; k++)
+      this.asBoss((f + k) % n, () => {
+        const me = this.state.boss!;
+        if (me.powers) bossRules(me)?.followMove?.(this.battle, move, fenBefore);
+      });
   }
 
   /** `fn` for every boss on the side, each in focus in turn, the one in focus first; one boss: once. */
@@ -2412,13 +2480,15 @@ export class MatchRunner {
     const moved = this.state.moved ?? n - 1;
     const ids = this.state.bosses!.map((o, i) => (i === f ? this.state.boss!.id : o.id));
     const afterHis = (i: number) => !!bossRules({ id: ids[i] })?.triggerAtHisTurn;
+    // (The boss whose turn change it is: the next in the order, even while Hollow's second move holds the focus on him.)
+    const nextUp = (moved + 1) % n;
     const order = [moved, ...Array.from({ length: n }, (_, k) => (f + k) % n).filter((i) => i !== moved)];
     let came = false;
     for (const i of order) {
       this.asBoss(i, () => {
         const b = this.state.boss!;
         if (!b.powers) return;
-        const mine = afterHis(i) ? i === moved : i === f;
+        const mine = afterHis(i) ? i === moved : i === nextUp;
         const next = prepareTurn(b, board.fen, this.settings.bossPowerTest, s, i === moved ? board.lastMove : null, !mine || came);
         if (next.powers?.ultAt !== undefined && b.powers.ultAt === undefined) came = true;
         this.state = { ...this.state, boss: next };

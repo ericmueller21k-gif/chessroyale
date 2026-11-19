@@ -298,7 +298,7 @@ export const SAWYER: BossRules = {
   },
   // His own moves: his first is a pawn move (no pawn move: any, as the dispatcher lifts it); the cuts stop him too (layer).
   // (His first move is his own: on a side of several bosses it binds only his.)
-  ownStops: true,
+  sideStops: () => null,
   bossStops(boss) {
     const p = boss.powers;
     return p && firstMoveDue(p) ? (m, fen) => pieceAt(fen, from(m))?.type !== "p" : null;
@@ -345,6 +345,8 @@ export const SAWYER: BossRules = {
   afterCrowdMove(b, move) {
     if (move) sawyerBattle.track(b, move);
   },
+  // (Several bosses: another boss's move, his halves follow it too.)
+  followMove: (b, move) => sawyerBattle.track(b, move),
   // From the game so far; his cuts start a turn later than the others' passives (the split has turn 2 to itself).
   opening: {
     setUp(b, at) {
