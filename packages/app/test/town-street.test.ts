@@ -262,3 +262,19 @@ describe("Rolling Dough stands clear of the other homes (Eric, Nov 11: \"make su
     for (const h of homes) if (h !== zebra) expect(gap(zebra, h), h.id).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe("the Battle Tower (Nov 19): Chess Town's skyscraper on Colosseum Row", () => {
+  it("stands on its lot (columns 45-48, the art's), nobody out front, its door square on the sidewalk, the walk past it open (its lamps gone)", () => {
+    const lot = lotOf("tower");
+    expect([lot.c0, lot.r0, lot.w, lot.d, lot.street]).toEqual([45, 40, 4, 4, "colosseum-row"]);
+    const home = HOMES.find((h) => h.id === "tower")!;
+    expect(home.name).toBe("Battle Tower");
+    expect(hasTownBoss(home)).toBe(false);
+    expect(createTown().bosses.some((b) => b.home.id === "tower")).toBe(false);
+    // (Its lot isn't walked on; the sidewalk in front of it, its door square too, is, from the start.)
+    const d = stepsFrom(START);
+    for (let c = 45; c <= 48; c++) expect(walkable(c, 40), at(c, 40)).toBe(false);
+    for (let c = 43; c <= 50; c++) expect(d[39 * N + c]! >= 0 && walkable(c, 39), at(c, 39)).toBe(true);
+    expect(home.door).toEqual({ c: 47, r: 39 });
+  });
+});
