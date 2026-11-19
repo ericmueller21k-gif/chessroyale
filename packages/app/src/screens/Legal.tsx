@@ -227,7 +227,7 @@ function Privacy() {
         what={
           <p>
             Your climbs: the floor each is on (or ended on), the bosses dealt for each floor so far, whether it's going, finished,
-            lost or set aside (when signing in brought two climbs together, the lower one), your last floor's result, when it began
+            lost or set aside (when signing in brought two climbs together, the lower one), the last floor result your device sent, when it began
             and last changed, and when a floor you're playing began (our server times it). Your best floor.
           </p>
         }
