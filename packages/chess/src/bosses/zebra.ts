@@ -43,11 +43,10 @@
 import { BOSS_POWERS, DOUGH_PIECES, type BossPowerSettings, type BossPowerState, type DoughLump, type DoughMark, type DoughPiece, type PowerEvent, type ZebraState } from "@chessroyale/core";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { openingNameFor } from "../openings.ts";
-import { fenAtPly, legalMoves, moveNumber, pieceAt, positionOver, sideToMove, withPiece } from "../rules.ts";
+import { fenAtPly, keptEnPassant, legalMoves, moveNumber, pieceAt, positionOver, sideToMove, withPiece } from "../rules.ts";
 import { VALUE, from, materialOf, meterFull, other, powerRoll, testSwitch, to, turnOf, unleashed, type Battle, type BossRules, type Side, type StopFields } from "./base.ts";
 import { marksStop, type LayerMarks, type PieceMark, type SquareMark } from "../board-layer.ts";
 import { BALLOON_TEST_MOVES, hoopsGuard, landRefused } from "./tiger.ts";
-import { tidyEnPassant } from "./timber.ts";
 
 // ---------------- His moments ----------------
 
@@ -171,7 +170,7 @@ export function doughSquare(fen: string, piece: DoughPiece, seed: number, n: num
 
 /**
  * His piece risen on a lump's square, if the guards allow it (`fen`: whoever is to move): the square empty, no pawn on a first or
- * last rank, a piece he can have (landRefused), the en passant square kept only while a capture there is legal, and the
+ * last rank, a piece he can have (landRefused), the en passant square kept only where the engine keeps it (keptEnPassant), and the
  * position after one the engine plays with neither king in check, a move for the side to move and no mate in one for either
  * side (hoopsGuard, with no walls). The position after, or null: it waits.
  */
@@ -180,7 +179,7 @@ export function riseCheck(fen: string, piece: DoughPiece, square: string, his: S
     if (pieceAt(fen, square)) return null;
     if (piece === "p" && (square[1] === "1" || square[1] === "8")) return null;
     if (landRefused(fen, piece, his)) return null;
-    const after = tidyEnPassant(withPiece(fen, square, { color: his, type: piece }));
+    const after = keptEnPassant(withPiece(fen, square, { color: his, type: piece }));
     return hoopsGuard(after, []) ? after : null;
   } catch {
     return null;

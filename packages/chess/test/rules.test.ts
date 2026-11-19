@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "@chessroyale/core";
-import { applyMove, blunderCost, fenAfter, gameEnd, legalMoves, pickOpenings, sanLineToUci, sideToMove, START_FEN, toSan, type Opening } from "../src/index.ts";
+import { applyMove, blunderCost, fenAfter, gameEnd, keptEnPassant, legalMoves, pickOpenings, sanLineToUci, sideToMove, START_FEN, toSan, type Opening } from "../src/index.ts";
 
 describe("rules", () => {
   it("lists legal moves in UCI and applies them", () => {
@@ -21,6 +21,37 @@ describe("rules", () => {
     expect(legalMoves(fen)).toContain("a7a8q");
     expect(legalMoves(fen)).toContain("a7a8n");
     expect(fenAfter(["a7a8n"], fen).startsWith("N7")).toBe(true);
+  });
+});
+
+describe("the en passant square the engine keeps (keptEnPassant; the Battle Tower's audit 1, finding 1)", () => {
+  // (Black's f7-f5 past White's e5 pawn: en passant on f6.)
+  const live = "4k3/8/8/4Pp2/8/8/8/4K3 w - f6 0 2";
+  const ep = (fen: string) => keptEnPassant(fen).split(" ")[3];
+
+  it("kept while it and the square behind it are empty, the pawn there and a capture legal", () => {
+    expect(keptEnPassant(live)).toBe(live);
+    expect(legalMoves(live)).toContain("e5f6");
+    // (Black to move: White's d2-d4 past Black's e4 pawn.)
+    expect(ep("4k3/8/8/8/3Pp3/8/8/4K3 b - d3 0 1")).toBe("d3");
+    expect(keptEnPassant(START_FEN)).toBe(START_FEN);
+  });
+
+  it("dropped for a piece on the square behind it: chess.js would still list the capture, Stockfish doesn't (the audit's case)", () => {
+    const behind = "4k3/5n2/8/4Pp2/8/8/8/4K3 w - f6 0 2";
+    expect(legalMoves(behind)).toContain("e5f6");
+    expect(keptEnPassant(behind)).toBe(behind.replace(" f6 ", " - "));
+    expect(legalMoves(keptEnPassant(behind))).not.toContain("e5f6");
+    expect(ep("4k3/8/8/8/3Pp3/8/3N4/4K3 b - d3 0 1")).toBe("-");
+  });
+
+  it("dropped for a piece on it, the pawn gone, no pawn beside it, a capture that isn't legal, or the wrong rank", () => {
+    expect(ep("4k3/8/5n2/4Pp2/8/8/8/4K3 w - f6 0 2")).toBe("-");
+    expect(ep("4k3/8/8/4P3/8/8/8/4K3 w - f6 0 2")).toBe("-");
+    expect(ep("4k3/8/8/5p2/8/8/8/4K3 w - f6 0 2")).toBe("-");
+    // (exf6 would open the fifth rank to Black's rook on h5: White's king on a5 in check.)
+    expect(ep("4k3/8/8/K3Pp1r/8/8/8/8 w - f6 0 2")).toBe("-");
+    expect(ep("4k3/8/8/4Pp2/8/8/8/4K3 w - f3 0 2")).toBe("-");
   });
 });
 

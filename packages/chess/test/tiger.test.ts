@@ -544,6 +544,24 @@ describe("Balloons: where they land (the bands and the guards)", () => {
     expect(landCheck("x", "n", "z9", [])).toBeNull();
   });
 
+  it("landCheck: never the square behind the en passant square either (it would take your capture there away; audit 1, finding 1)", () => {
+    // (The audit's position, clown + tiger seed 56479: Black's f7-f5 past your e5 pawn, en passant on f6. A balloon on f7 left
+    // f6 in the position, where chess.js lists e5f6 and Stockfish doesn't.)
+    const fen = "2rq1b2/pP1kp3/2p5/4Pp1P/1P3Q2/3b1P1N/2b4P/R1B1KBrR w KQ f6 0 25";
+    expect(legalMoves(fen)).toContain("e5f6");
+    for (const shape of ["p", "n", "b", "r", "q"] as const) {
+      expect(landCheck(fen, shape, "f7", []), shape).toBeNull();
+      expect(landCheck(fen, shape, "f6", []), shape).toBeNull();
+    }
+    // (Anywhere else it lands, your capture stays.)
+    const elsewhere = ["a6", "b5", "d6", "e6", "g6", "h6", "g7", "h7", "g8", "h8"].map((sq) => landCheck(fen, "n", sq, [])).filter((f): f is string => !!f);
+    expect(elsewhere.length).toBeGreaterThan(0);
+    for (const after of elsewhere) {
+      expect(after.split(" ")[3]).toBe("f6");
+      expect(legalMoves(after)).toContain("e5f6");
+    }
+  });
+
   it("never a check (the crowd's king attacked), never a mate in one for either side, never the crowd without a move", () => {
     // A knight on f3 checks White's king on g1.
     expect(landCheck(QUIET, "n", "f3", [])).toBeNull();

@@ -204,6 +204,17 @@ describe("Rising Dough: what and where", () => {
     expect(stockfishRefuses(after)).toBeNull();
     expect(kingAttacked(after, "w") || kingAttacked(after, "b")).toBe(false);
   });
+
+  it("risen on the square behind the en passant square: the square goes, as the engine drops it (audit 1, finding 1)", () => {
+    // (Black's f7-f5 past your e5 pawn, en passant on f6; a knight of his rises on f7, where the pawn started.)
+    const fen = "4k3/8/8/4Pp2/8/8/8/4K3 w - f6 0 2";
+    const after = riseCheck(fen, "n", "f7", "b")!;
+    expect(pieceAt(after, "f7")).toEqual({ color: "b", type: "n" });
+    expect(after.split(" ")[3]).toBe("-");
+    expect(legalMoves(after)).not.toContain("e5f6");
+    // (Anywhere else, your capture stays.)
+    expect(riseCheck(fen, "n", "b6", "b")!.split(" ")[3]).toBe("f6");
+  });
 });
 
 describe("Rising Dough in a battle", () => {
