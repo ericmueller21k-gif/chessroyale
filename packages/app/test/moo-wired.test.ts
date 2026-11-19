@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { BOSS_ROSTER, MOO_CINEMATIC, bossBannerMs, isPlayable, menuBosses, playableBosses, type PowerEvent } from "@chessroyale/core";
 import { KING_ATTACKERS, MOO_BEATS, MOO_FX, POWER_FX, START_FEN, bossThinkMs, fullMoonLeadMs, fullMoonMs } from "@chessroyale/chess";
-import { cineBeats, closeFrame, closeOpacity, cineFigure, fieldOpacity } from "../src/components/MooCinematic.tsx";
+import { cineBeats, closeFrame, closeOpacity, cineFigure, fieldOpacity, litOpacity, moonAt, moonLightBeats, moonLightOn } from "../src/components/MooCinematic.tsx";
+import { lightNow } from "../src/components/recluse-light.ts";
 import { momentsOf, powerLine } from "../src/components/BossPowers.tsx";
 import { FADE_MS, MOO_UI, beamPhase, fallAtOf, fullMoonMoment, heldMarks, moonPixels, moonStep, noteMooMoments, scorchItems, waxLevel } from "../src/components/Moo.tsx";
 import { ragePct, type Moment } from "../src/components/PowerParts.tsx";
@@ -235,13 +236,15 @@ describe("his moments are timed by his animations", () => {
 });
 
 describe("the Full Moon's cinematic", () => {
-  it("adds its beats up to the Full Moon's length, which his thinking waits for (fullMoonMs), at about 11 s (Eric, Nov 19: 4 s longer)", () => {
+  it("adds its beats up to the Full Moon's length, which his thinking waits for (fullMoonMs), at about 13.4 s (Eric, Nov 19: 4 s longer; Nov 20: the moon coming down)", () => {
     const c = MOO_CINEMATIC;
     expect(B.fullMoon.transformAt).toBe(c.hopMs + c.fadeInMs + c.fieldMs + c.closeMs);
     expect(B.fullMoon.total).toBe(B.fullMoon.transformAt + B.fullMoon.transformMs + c.afterMs + c.fadeOutMs + c.hopBackMs);
     expect(fullMoonMs(view([{ kind: "fullMoon", turn: 5 }]))).toBe(B.fullMoon.total + c.tailPadMs);
-    expect(B.fullMoon.total).toBeGreaterThanOrEqual(10500);
-    expect(B.fullMoon.total).toBeLessThanOrEqual(12000);
+    // (Eric, Nov 20: the field "four seconds ... or 5 seconds"; the brief: the whole about 13 to 14 s at most.)
+    expect(c.fieldMs).toBeGreaterThanOrEqual(4000);
+    expect(B.fullMoon.total).toBeGreaterThanOrEqual(12500);
+    expect(B.fullMoon.total).toBeLessThanOrEqual(14000);
     const b = cineBeats();
     expect([b.landed, b.close, b.closeEnd, b.transform, b.fadeOut, b.hopBack, b.end]).toEqual([...[b.landed, b.close, b.closeEnd, b.transform, b.fadeOut, b.hopBack, b.end]].sort((x, y) => x - y));
     expect(b.closeEnd).toBe(b.transform);
@@ -267,6 +270,47 @@ describe("the Full Moon's cinematic", () => {
     expect([0, b.landed, b.transform, b.transform + B.fullMoon.transformMs, b.hopBack].map((t) => cineFigure(t).anim)).toEqual(["move", "idle", "fullMoon", "powerIdle", "p_move"]);
     // (The Moon's line as he lands back in his spot.)
     expect(MOO_UI.moments.fullMoon.lineAt).toBe(b.hopBack + 300);
+  });
+
+  it("brings the moon down from the top of the sky over the field's own, then bursts it into the Hidden Boss's light: the glow, the rays, the white-out whole at the cut, dying back in the close-up as the eyes whiten (Eric, Nov 20)", () => {
+    const b = cineBeats();
+    const c = MOO_CINEMATIC;
+    // The moon: up with the field, gone at the cut (the field's own back after the close-up), coming down and nearer all the way, and
+    // always over the field's moon (57 art pixels across its middle), which stays put under it.
+    expect(moonAt(b.landed - 1)).toBeNull();
+    expect(moonAt(b.close)).toBeNull();
+    expect(moonAt(b.landed + c.fadeInMs)!.opacity).toBe(1);
+    const steps = Array.from({ length: 41 }, (_, i) => moonAt(b.landed + ((b.close - 1 - b.landed) * i) / 40)!);
+    for (let i = 1; i < steps.length; i++) {
+      expect(steps[i]!.y).toBeGreaterThan(steps[i - 1]!.y);
+      expect(steps[i]!.scale).toBeGreaterThan(steps[i - 1]!.scale);
+    }
+    for (const m of steps) expect(Math.abs(m.y)).toBeLessThanOrEqual(57 * (m.scale - 1) + 0.5);
+    // (It starts partly over the top of the sky, about its whole width: the field is 200 art pixels wide.)
+    expect(80.5 + c.moonFrom.y - 56.5 * c.moonFrom.scale).toBeLessThan(0);
+    expect(116 * c.moonFrom.scale).toBeGreaterThanOrEqual(180);
+    // The light: the glow, then the rays, then the white, whole at the cut; whole a moment into the close-up, gone by the eyes' last step.
+    const T = moonLightBeats();
+    expect([T.riseAt, T.radiateAt, T.whiteAt, T.whiteFull, T.downAt, T.revealAt]).toEqual([...[T.riseAt, T.radiateAt, T.whiteAt, T.whiteFull, T.downAt, T.revealAt]].sort((x, y) => x - y));
+    expect(T.riseAt).toBeGreaterThan(b.landed + c.fadeInMs + 2000);
+    expect(T.whiteFull).toBe(b.close);
+    expect(T.revealAt).toBeLessThanOrEqual(b.close + c.whitenAt + 4 * c.eyeStepMs);
+    expect(moonLightOn(T.riseAt - 1)).toBe(false);
+    expect(moonLightOn(T.whiteFull)).toBe(true);
+    expect(moonLightOn(T.revealAt)).toBe(false);
+    const at = (t: number) => lightNow(t, T);
+    expect(at(T.riseAt - 1).grow).toBe(0);
+    expect(at(T.radiateAt + 200).radiate).toBeGreaterThan(0);
+    expect(at(b.close - 1).white).toBeGreaterThan(0.95);
+    expect(at(b.close + c.lightHoldMs - 1).down).toBe(1);
+    expect(at(T.revealAt).down).toBe(0);
+    // (None of the Hidden Boss's other parts: the pages, the burst's rays, the slam.)
+    for (let t = b.landed; t < b.closeEnd; t += 50) expect([at(t).pages, at(t).rays, at(t).slam]).toEqual([0, 0, 0]);
+    // The wash on the two of them: from the cut, easing to its rest as their eyes whiten, gone with the cut back.
+    expect(litOpacity(b.close - 1)).toBe(0);
+    expect(litOpacity(b.close + c.cutMs)).toBeCloseTo(c.lit.from, 1);
+    expect(litOpacity(b.close + c.whitenAt + 4 * c.eyeStepMs)).toBeCloseTo(c.lit.to, 5);
+    expect(litOpacity(b.closeEnd)).toBe(0);
   });
 });
 

@@ -178,8 +178,9 @@ async function run(stage) {
       if (s.kind === "boss" && s.thinking && has(s, "fullMoon") && !startAt) {
         startAt = s.now;
         log("the Full Moon comes");
-        // (The cinematic, Nov 17: the hop, the field fading in, the close-up and its eyes, the transformation, the fade, the hop back.)
-        stills.push(...[0, 200, 400, 720, 1000, 1500, 2100, 2700, 3300, 3700, 4200, 4600, 5000, 5500, 5900, 6200, 6500, 6900, 7300].map((ms) => ({ label: `full-${String(ms).padStart(4, "0")}`, t: s.now + ms })));
+        // (The cinematic, Nov 17: the hop, the field fading in, the moon coming down and bursting into light (Nov 20), the close-up out
+        // of the light and its eyes, the transformation, the fade, the hop back.)
+        stills.push(...[0, 400, 720, 1220, 2200, 3200, 4200, 4800, 5300, 5700, 6000, 6300, 6800, 7400, 8200, 9200, 10200, 10800, 11400, 12000, 12600, 13000, 13400].map((ms) => ({ label: `full-${String(ms).padStart(4, "0")}`, t: s.now + ms })));
         const n = await waitUntil((x) => x.kind === "boss" && !x.thinking, 30_000);
         log(`his move, the flurry: ${JSON.stringify(n.boss.powers.stunned)}`);
         flurryAt = n.now;
