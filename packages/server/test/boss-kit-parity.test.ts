@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   allowedSearch,
@@ -296,13 +296,13 @@ describe("the boss kit: solo and online agree", () => {
 describe("the boss kit over several bosses: solo and online agree", () => {
   const ids = kitBosses().map((d) => d.id).filter((id) => id !== "recluse");
   const half = Math.ceil(ids.length / 2);
-  // (Each boss once: the first half each with one from the second, then two threes; never Hollow with Smudgy.)
+  // (Each boss once: the first half each with one from the second, then two threes; never a pair BATTLE_TOWER.apart keeps apart.)
   const sides = [
     ...ids.slice(0, half).map((id, i) => [id, ids[(half + i) % ids.length]!]),
     [ids[1]!, ids[5]!, ids[9]!],
     [ids[12]!, ids[2]!, ids[16 % ids.length]!],
   ]
-    .filter((xs) => new Set(xs).size === xs.length && !(xs.includes("hollow") && xs.includes("smudgy")))
+    .filter((xs) => new Set(xs).size === xs.length && !BATTLE_TOWER.apart.some(([a, b]) => xs.includes(a) && xs.includes(b)))
     .map((xs) => (xs.includes("timber") ? ["timber", ...xs.filter((x) => x !== "timber")] : xs));
   for (const bosses of sides) {
     it(`${bosses.join(" + ")}: the same positions, power events and result solo and online`, async () => {

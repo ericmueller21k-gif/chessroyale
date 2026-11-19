@@ -11,7 +11,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   one game from the starting position against 1, 2 or 3 bosses at once on one board (the pattern 1, 2, 2, 3 looping), taking turns
   to move, each with its own powers and meter, stronger every floor: Maia from 600, +100 a floor, to 2500 (a lone boss +200);
   from floor 51 Stockfish from 2500, +25 a floor, to full strength.
-- Every boss's moves are in, a few with a one-line rule; Hollow and Smudgy never share a floor; the Hidden Boss isn't in the tower.
+- Every boss's moves are in, a few with a one-line rule; Hollow and Smudgy never share a floor, and for now neither do Smudgy + Alfil, Alfil + Jefferson and Dash + Smudgy (Nov 19); the Hidden Boss isn't in the tower.
 - You play White (random sides later). One loss (or a draw, or leaving) ends the run. Every floor is one snug room in HunChess's colors (the town's
   challenge room as the model: `town/shops/challenge.ts`), its number big on both side walls; you walk in to the board and the
   floor's bosses come out of the top door. Between floors you may stop: the run is saved on the server (guests too) and resumes
@@ -35,7 +35,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 ## Several bosses in the runner (built, PR 6)
 
 - **The side:** `settings.bossIds` (2-3 ids, the order they take turns) starts a raid with them all, from the starting position; never
-  two `BATTLE_TOWER.apart` keeps apart (Hollow and Smudgy). `MatchState.bosses` holds each one's own part (`BossOwn`: id, strength,
+  two `BATTLE_TOWER.apart` keeps apart (Hollow and Smudgy; Smudgy + Alfil, Alfil + Jefferson, Dash + Smudgy for now: `docs/decisions/2026-11-19-tower-apart-pairs.md`). `MatchState.bosses` holds each one's own part (`BossOwn`: id, strength,
   powers); `state.boss` is always the boss in focus in full, with the battle's shared fields, so every boss's code runs as alone.
   `state.moved`: who made the side's last move.
 - **The focus:** the bosses to move: the boss whose move comes out of turn (`BossRules.outOfTurn`: Wrangler's duel reply, Folio's

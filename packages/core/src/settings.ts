@@ -1260,11 +1260,15 @@ export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined }
 /**
  * The Battle Tower (docs/decisions/2026-11-18-battle-tower-design.md). Several bosses on one side (PR 6): each boss's rage
  * meter fills at `rageScale[n - 1]` of its speed on a floor of n bosses (first guesses; the tower's sim tunes them), and the
- * bosses in `apart` are never on one floor (Hollow and Smudgy: both hide what is on a square; Eric, Nov 18).
+ * bosses in `apart` are never on one floor: Hollow and Smudgy (both hide what is on a square; Eric, Nov 18), and, for now, the pairs
+ * the kit found colliding (Eric, Nov 19: "if two boss things collide badly just for now make note of which combination to not use"):
+ * Smudgy and Alfil (Repaint while the Slam holds pieces up), Alfil and Jefferson (the Slam lifts a piece blocking a boss pawn's
+ * promotion), Dash and Smudgy (Dash's extra move ignores the side's stops and can slide the hidden rook).
+ * docs/decisions/2026-11-19-tower-apart-pairs.md.
  */
 export const BATTLE_TOWER = {
   rageScale: [1, 0.75, 0.6] as readonly number[],
-  apart: [["hollow", "smudgy"]] as readonly (readonly [string, string])[],
+  apart: [["hollow", "smudgy"], ["smudgy", "alfil"], ["alfil", "grex"], ["dash", "smudgy"]] as readonly (readonly [string, string])[],
   maxBosses: 3,
 } as const;
 

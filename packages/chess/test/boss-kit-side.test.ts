@@ -22,14 +22,7 @@ const PAIR_SEEDS = Number(process.env.KIT_PAIR_SEEDS ?? 1);
  * break (it.fails): once the rule is built, or the pair joins BATTLE_TOWER.apart, the check goes red until its entry here goes.
  */
 export const PAIR_BREAKS: Readonly<Record<string, { seeds: readonly number[]; rule: string }>> = {
-  "smudgy + alfil": {
-    seeds: [1, 2, 3],
-    rule: "Smudgy | Repaint | IN, WITH A RULE: never while another boss's power holds pieces off the board (Alfil's Slam): it waits, its warning kept (his pawn painted the crowd's while its pawns were in the air: 9 crowd pawns as they land)",
-  },
-  "alfil + grex": {
-    seeds: [2],
-    rule: "Alfil | Mammoth Slam | IN, WITH A RULE: never lifts a crowd piece that stands in a boss pawn's way to promoting (the side's next move would promote it: a pawn on c2 queened as the c1 bishop went up)",
-  },
+  // (None now: the kit's two, Smudgy + Alfil and Alfil + Jefferson, joined BATTLE_TOWER.apart on Nov 19.)
 };
 
 /** The tower's bosses: every one with powers but the Hidden Boss. */
