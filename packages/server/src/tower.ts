@@ -111,6 +111,7 @@ export const TOWER_LINES = {
   resting: "The tower's bosses are resting for a bit. Back soon.",
   notUnderWay: "That floor isn't under way.",
   tooSoon: "That floor only just began.",
+  notFree: "That boss is back: leaving now counts as a loss.",
   partyLater: "Party runs aren't open yet.",
   bad: "Bad request",
 } as const;
@@ -352,9 +353,10 @@ async function resultAgain(sql: Sql, userId: string, id: string, outcome: FloorO
  * later ("free"); after, a loss and the run is out ("lost"). Free at any move when the floor's bosses no longer pass the pool
  * (floorResting: our pause, not your leave; its next start deals it again). Once, as a result is: the run changes only while that
  * floor is still under way, so a repeat finds nothing under way and answers "between", changing nothing; a floor started since is
- * refused (409).
+ * refused (409). `free: true` (the app offered a free leave): a leave that would count now (the boss back since the app was told
+ * `resting`) is refused (409, the run as it is), never taken as a loss, so the app can ask again on the real terms (the delta review).
  */
-export async function stopTower(sql: Sql, userId: string, now: number, body: { fight?: unknown; moves?: unknown }, opts: { pool: readonly string[] }): Promise<TowerAnswer> {
+export async function stopTower(sql: Sql, userId: string, now: number, body: { fight?: unknown; moves?: unknown; free?: unknown }, opts: { pool: readonly string[] }): Promise<TowerAnswer> {
   const row = await openRow(sql, userId, "solo");
   const fight = row ? fightOf(row.fight) : null;
   // (Nothing under way: a stop between floors, or a repeat of one that already ended its floor: nothing to do, the run as it is.)
@@ -362,7 +364,10 @@ export async function stopTower(sql: Sql, userId: string, now: number, body: { f
   if (body.fight !== fight.id) return { status: 409, body: { message: TOWER_LINES.notUnderWay, fight, run: viewOf(row, opts.pool) } };
   const moves = typeof body.moves === "number" && Number.isInteger(body.moves) && body.moves >= 0 ? body.moves : Number.POSITIVE_INFINITY;
   const before = runOf(row);
+  // (A deal that doesn't parse: as start and finish answer it, never a floor 0 written over the run's.)
+  if (!before.floors.length) return BROKEN;
   const after = leaveFloor(before, floorResting(before, opts.pool) ? 0 : moves);
+  if (body.free === true && after.status !== "open") return { status: 409, body: { message: TOWER_LINES.notFree, fight, run: viewOf(row, opts.pool) } };
   const applied = await sql.first(
     "UPDATE tower_runs SET floor = ?, met = ?, status = ?, fight = NULL, updated_at = ? WHERE id = ? AND status = 'open' AND fight = ? RETURNING id",
     after.floors.length,
@@ -412,7 +417,7 @@ export async function towerResponse(request: Request, sql: Sql, userId: string, 
   const answer = (a: TowerAnswer) => json(a.body, a.status);
   if (path === "/api/tower") return request.method === "GET" ? json(await towerState(sql, userId, pool)) : null;
   if (request.method !== "POST") return null;
-  const b = ((await request.json().catch(() => null)) ?? {}) as { kind?: unknown; confirm?: unknown; fight?: unknown; outcome?: unknown; moves?: unknown };
+  const b = ((await request.json().catch(() => null)) ?? {}) as { kind?: unknown; confirm?: unknown; fight?: unknown; outcome?: unknown; moves?: unknown; free?: unknown };
   if (b.kind !== undefined && b.kind !== "solo") return json({ message: b.kind === "party" ? TOWER_LINES.partyLater : TOWER_LINES.bad }, 400);
   if (path === "/api/tower/run") return answer(env.soloPaused ? SOLO_RESTING : await newTowerRun(sql, userId, now, { confirm: b.confirm === true, pool }));
   if (path === "/api/tower/floor/start") return answer(await startTowerFloor(sql, userId, now, { pool, paused: env.soloPaused }));

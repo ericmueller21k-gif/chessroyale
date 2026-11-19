@@ -159,6 +159,19 @@ describe("a floor's start", () => {
     expect(again.bosses.filter((b) => s.bosses.includes(b))).toEqual([]);
   });
 
+  it("a free leave the app offered (free: true) that would count now (the boss back since): refused, the floor still under way (the delta review)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await newTowerRun(sql, ann.id, T0, { confirm: false, pool: POOL, seed: SEED });
+    const s = body<{ fight: { id: string } }>(await startTowerFloor(sql, ann.id, T0 + SEC, { pool: POOL }));
+    const before = await rows(sql, ann.id);
+    const stop = await stopTower(sql, ann.id, T0 + 2 * SEC, { fight: s.fight.id, moves: 14, free: true }, { pool: POOL });
+    expect(stop).toMatchObject({ status: 409, body: { message: "That boss is back: leaving now counts as a loss.", fight: s.fight, run: { floor: 1 } } });
+    expect(await rows(sql, ann.id)).toEqual(before);
+    // (Still free while it is: before your 2nd move.)
+    expect(await stopTower(sql, ann.id, T0 + 3 * SEC, { fight: s.fight.id, moves: 1, free: true }, { pool: POOL })).toMatchObject({ status: 200, body: { stopped: "free" } });
+  });
+
   it("a run whose deal doesn't parse (only this file writes it): its start and a result answer 409 with confirm (start a new run), which replaces it", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
@@ -168,6 +181,10 @@ describe("a floor's start", () => {
     const broken = { status: 409, body: { message: "No run to continue. Start a new one.", confirm: true } };
     expect(await startTowerFloor(sql, ann.id, T0 + 2 * SEC, { pool: POOL })).toEqual(broken);
     expect(await finishTowerFloor(sql, ann.id, T0 + 60 * SEC, { fight, outcome: "won" }, { pool: POOL, minWinMs: MIN_WIN })).toEqual(broken);
+    // (A stop too: never a floor 0 written over the run's; the delta review.)
+    const kept = await rows(sql, ann.id);
+    expect(await stopTower(sql, ann.id, T0 + 60 * SEC, { fight, moves: 12 }, { pool: POOL })).toEqual(broken);
+    expect(await rows(sql, ann.id)).toEqual(kept);
     await sql.run("UPDATE tower_runs SET fight = NULL WHERE user_id = ?", ann.id);
     expect(await startTowerFloor(sql, ann.id, T0 + 61 * SEC, { pool: POOL })).toEqual(broken);
     expect((await newTowerRun(sql, ann.id, T0 + 62 * SEC, { confirm: true, pool: POOL, seed: SEED })).status).toBe(200);

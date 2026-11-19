@@ -110,6 +110,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 
 - A 409 on finish means "read the run again", never an error: it carries `run` and `best`. A retry of the result whose answer was
   lost gets that answer again.
+- "Leave (free)", offered from a `resting: true` answer, sends `stop` with `free: true`: if the boss is back by then (a 409 "That
+  boss is back: leaving now counts as a loss."), ask again on the real terms; nothing was written (the delta review).
 - A 409 with `confirm: true` from a start or finish: the run can't be played; offer a new run.
 - `under` with `resting: true`: offer "Leave (free)" (the stop is free at any move); its bosses may be ones the app doesn't have.
 - Two confirmed new runs at once both answer 200 and one is deleted: show the run each answer carries (every route acts on the open
