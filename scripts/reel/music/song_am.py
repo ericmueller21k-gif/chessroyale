@@ -15,10 +15,15 @@ How his shape is met (the tempos are his "a little bit more upbeat": 96, then 10
     strings; then a harp's 8ths.
   - 0:30, twelve bars: the tune. A horn alone with its first half; the horns and the violins with it again, short
     strings under them; trumpets for its second half, a roll, and the tempo climbing to 108.
-  - 1:00, twenty bars at 108: the whole tune on trumpets and horns over a driving kit; four lighter bars that are the
-    flute's (in C major, the brightest it gets); the tune once more, the flute singing over it.
-  - 1:43, four bars slowing down: it dies out. The horn has the tune's first bar, the flute its second, and then
-    only held strings and the low drum, and a timpani roll rising.
+  - 1:00, twenty bars at 108, climbing all the way: the whole tune on trumpets and horns over a driving kit; four
+    bars more of climb (the tune's leap from a step higher each bar; the low drums come in); the tune once more, the
+    biggest, the violins soaring over it. (The first render had a flute here: four lighter bars of its own at 1:17
+    and a line over the last tune. Eric: "get rid of the flute ... instead of transitioning at 117 into the flute,
+    just keep ... ramp it up a bit more until it dies out at 143 ... or like make it start to burn out there ... keep
+    going a little bit more with where it was already going and just get rid of the flutes." There is no flute in
+    it now.)
+  - 1:43, four bars slowing down: it burns out. The horn has the tune's first two bars, and then only held strings
+    and the low drum, and a timpani roll rising.
   - 1:53, three bars at 108: the finale: the band's fanfare on F, on G, and a held A major (the tune's key turned
     major). Its ring falls on bar 1's drum.
   - A minor: Am, F, C, G under the tune. It leaps up a fifth and steps down, twice; then leaps and climbs.
@@ -27,8 +32,8 @@ How his shape is met (the tempos are his "a little bit more upbeat": 96, then 10
   bars  1-12   0:00  the calm start, in layers: a drum and a snare; plucked and held strings; a harp
   bars 13-24   0:30  the tune arrives and grows: a horn; horns and violins; trumpets, the roll, the tempo rising
   bars 25-32   1:00  the tune, whole, the full band
-  bars 33-36   1:14  the flute's four bars, lighter
-  bars 37-44   1:23  the tune again, the flute over it
+  bars 33-36   1:17  four bars more of climb (C, G, F, E)
+  bars 37-44   1:26  the tune again, the biggest, the violins over it
   bars 45-48   1:43  it dies out, slowing
   bars 49-51   1:53  the finale: F, G, A major; and bar 1
 """
@@ -55,7 +60,7 @@ FORT = {
     "E": ("E2", "B3 G#4 E4 G#4", "G#3 B3 E4 G#4", "G#3 E4 G#4 B4"), "Dm": ("D2", "D4 A4 F4 A4", "A3 D4 F4 A4", "A3 F4 A4 D5"),
     "A": ("A1", "C#4 A4 E4 A4", "A3 C#4 E4 A4", "A3 E4 A4 C#5"),
 }
-CHORDS = ("Am Am F G  Am Am F G  Am Am F G   Am F C G  Am F C G  Am F G E   Am F C G Am F G Am   C G Am F   Am F C G Am F G Am   "
+CHORDS = ("Am Am F G  Am Am F G  Am Am F G   Am F C G  Am F C G  Am F G E   Am F C G Am F G Am   C G F E   Am F C G Am F G Am   "
           "Am F Dm E   F G A").split()
 assert len(CHORDS) == BARS, len(CHORDS)
 ACCENT = (0, 3, 6)  # the full band's accent, in 8ths of the bar: three, three, two
@@ -66,13 +71,13 @@ ACCENT = (0, 3, 6)  # the full band's accent, in 8ths of the bar: three, three, 
 TUNE_A = "A4:1 E5:1.5 D5:.5 C5:1 | D5:1 C5:1 A4:2 | G4:1 E5:1.5 D5:.5 C5:1 | D5:1.5 E5:.5 D5:2"
 TUNE_B = "A4:1 E5:1.5 G5:.5 A5:1 | G5:1 F5:1 C5:2 | D5:1 G5:1.5 F5:.5 D5:1 | "
 TUNE_HOME, TUNE_UP = TUNE_B + "E5:1 C5:1 A4:2", TUNE_B + "E5:2 G#5:1 B5:1"
-# The flute's four bars (C, G, Am, F): the tune's leap turned into a skip up each chord, climbing out.
-FLUTE_TURN = "E5:.5 G5:.5 C6:1.5 B5:.5 G5:1 | D5:.5 G5:.5 B5:1.5 A5:.5 G5:1 | C5:.5 E5:.5 A5:1.5 G5:.5 E5:1 | F5:.5 A5:.5 C6:1 D6:1 E6:1"
-# The flute over the tune's last time: long notes over its moving ones.
-FLUTE_OVER = "E6:3 D6:.5 C6:.5 | A5:1 C6:1 F6:1.5 E6:.5 | E6:3 D6:.5 C6:.5 | B5:1 D6:1 E6:1 D6:1 | E6:2 C6:1 E6:1 | F6:2 E6:1 C6:1 | B5:1 D6:1 E6:1 D6:1 | C6:2 A5:2"
+# Four bars more of climb (C, G, F, E): the tune's leap from a step higher each bar, then up the E chord.
+RAMP = "C5:1 G5:1.5 F5:.5 E5:1 | D5:1 A5:1.5 G5:.5 F5:1 | F5:1 C6:1.5 A5:.5 G5:1 | E5:1 G#5:1 B5:2"
+# The violins over the tune's last time: long notes over its moving ones.
+OVER = "E6:3 D6:.5 C6:.5 | A5:1 C6:1 F6:1.5 E6:.5 | E6:3 D6:.5 C6:.5 | B5:1 D6:1 E6:1 D6:1 | E6:2 C6:1 E6:1 | F6:2 E6:1 C6:1 | B5:1 D6:1 E6:1 D6:1 | C6:2 A5:2"
 # The finale's fanfare (F, G), and the last chord's notes.
 FANFARE = "C5:.75 C5:.25 F5:1 A5:2 | D5:.75 D5:.25 G5:1 B5:2"
-for _line, _beats in ((TUNE_A, 16), (TUNE_HOME, 16), (TUNE_UP, 16), (FLUTE_TURN, 16), (FLUTE_OVER, 32), (FANFARE, 8)):
+for _line, _beats in ((TUNE_A, 16), (TUNE_HOME, 16), (TUNE_UP, 16), (RAMP, 16), (OVER, 32), (FANFARE, 8)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
@@ -239,7 +244,7 @@ def render(window=None) -> np.ndarray:
             at(b, d)
             put("held", b, x.strings(m + shift, d * 0.97, 0.03 * vol, attack=0.06, release=0.15), 0.3)
 
-    # ---- the winds ----
+    # ---- the brass ----
     def horn(m, d, vol, bite=0.02, vib=0.0, edge=1.0, players=((-7, 0.5), (0, 0.0), (6, -0.4))):
         """A brass note: FM (a fed-back pair and a 1:2 pair), three players a hair apart starting together; brightest
         at its front; `bite`: how fast it speaks."""
@@ -260,12 +265,6 @@ def render(window=None) -> np.ndarray:
         for b, d, m in notes(start, text):
             at(b, d)
             put(bus, b, horn(m + shift, max(0.1, d - 0.12), 0.2 * vol, bite, vib=0.005 if d >= 2 else 0.0, edge=edge), pan)
-
-    def flute(start, text, vol=1.0, shift=0, pan=0.25):
-        """The flute, with no breath in it (SOUNDS.md): a soft start, a vibrato on a note of a beat or more."""
-        for b, d, m in notes(start, text):
-            at(b, d)
-            put("flute", b, x.tone(m + shift, d * 0.95, list(x.FLUTE), 0.09 * vol, vib=0.005 if d >= 1 else 0.0, vib_hz=5.2, attack=0.03, release=0.06), pan)
 
     # ---- the sections ----
     def calm(first):
@@ -305,35 +304,39 @@ def render(window=None) -> np.ndarray:
         rolls(bar0(first + 11), 4, 0.05, 0.16), rolls(bar0(first + 11), 4, 0.05, 0.16, "E2")
 
     def full(first, last):
-        """Eight bars of the tune on trumpets, the horns an octave under, over the full band. The first time the
-        flute joins an octave over the tune's second half; the `last`, it sings over the whole of it and the low
-        drums are in."""
+        """Eight bars of the tune on trumpets, the horns an octave under, over the full band; the violins with the
+        tune an octave over. The `last` time everything is a little harder, the low drums are in, and the violins
+        leave the tune for a line of their own over it."""
+        up = 1.15 if last else 1.0
         for j in range(8):
             bar = first + j
-            chop(bar, 1.1), spic(bar, 1.05), held(bar, 0.023)
-            drive(bar, 1.05, drums=last, fill="ssss" if j == 3 else "ssssssss" if j == 7 and not last else "")
+            chop(bar, 1.1 * up), spic(bar, 1.05 * up), held(bar, 0.023 * up)
+            drive(bar, 1.05 * up, drums=last, fill="ssss" if j == 3 else "ssssssss" if j == 7 and not last else "")
             if CHORDS[bar - 1] != CHORDS[bar - 2]:
-                timp(bar0(bar), chord(bar)[0].replace("1", "2"), 0.22)
+                timp(bar0(bar), chord(bar)[0].replace("1", "2"), 0.22 * up)
         crash(bar0(first), 0.06), crash(bar0(first + 4), 0.04)
-        brass(bar0(first), TUNE_A + " | " + TUNE_HOME, 1.08, 0, 0.1, "trumpets", 1.05), brass(bar0(first), TUNE_A + " | " + TUNE_HOME, 0.68, -12, -0.2)
+        brass(bar0(first), TUNE_A + " | " + TUNE_HOME, 1.08 * up, 0, 0.1, "trumpets", 1.05), brass(bar0(first), TUNE_A + " | " + TUNE_HOME, 0.68 * up, -12, -0.2)
         if last:
-            flute(bar0(first), FLUTE_OVER, 0.9)
+            violins(bar0(first), OVER, 1.0, 0)
         else:
-            flute(bar0(first + 4), TUNE_HOME, 0.8, 12)
+            violins(bar0(first), TUNE_A + " | " + TUNE_HOME, 0.6)
 
-    def light(first):
-        """Four bars, the flute's: the drum and snare of the start, the harp, plucked low strings, held strings, hats."""
+    def ramp(first):
+        """Four bars more of climb between the tune's two times (C, G, F, E): its leap on trumpets, horns and violins
+        from a step higher each bar; the low drums come in; a roll through the last bar."""
         for j in range(4):
             bar = first + j
-            tap(bar, 1.1, drag=j % 2 == 1), ground(bar, 1.1), harp(bar, 1.15), held(bar, 0.02), spic(bar, 0.6, eighths=True)
-            for i in range(8):
-                hat(bar0(bar) + i / 2, 0.016 if i % 2 == 0 else 0.011)
-        flute(bar0(first), FLUTE_TURN, 1.2)
-        rolls(bar0(first + 3) + 2, 2, 0.06, 0.2)
+            up = 1.0 + 0.03 * j
+            chop(bar, 1.1 * up), spic(bar, 1.05 * up), held(bar, 0.023 * up)
+            drive(bar, 1.05 * up, drums=True, fill="ssssssss" if j == 3 else "")
+            timp(bar0(bar), chord(bar)[0], 0.22 * up)
+        crash(bar0(first), 0.05)
+        brass(bar0(first), RAMP, 0.95, 0, 0.1, "trumpets", 1.05), brass(bar0(first), RAMP, 0.68, -12, -0.2), violins(bar0(first), RAMP, 0.7)
+        rolls(bar0(first + 3), 4, 0.06, 0.2, "E2")
 
     def fade(first):
-        """Four bars, slowing (the RIDE): the horn with the tune's first bar, the flute with its second; then held
-        strings and the drum; then the timpani's roll and the snare's, rising into the finale."""
+        """Four bars, slowing (the RIDE): the horn with the tune's first two bars; then held strings and the drum;
+        then the timpani's roll and the snare's, rising into the finale."""
         for j, (drum, strings) in enumerate(((0.8, 0.02), (0.6, 0.017), (0.45, 0.014), (0.3, 0.013))):
             bar = first + j
             tap(bar, drum, drag=False), held(bar, strings)
@@ -341,8 +344,7 @@ def render(window=None) -> np.ndarray:
                 ground(bar, 0.9 - 0.2 * j)
             if j < 2:
                 harp(bar, 0.8 - 0.3 * j)
-        brass(bar0(first), "A4:1 E5:1.5 D5:.5 C5:1", 0.5, pan=-0.15, edge=0.75, bite=0.05)
-        flute(bar0(first + 1), "D6:1 C6:1 A5:2", 0.8)
+        brass(bar0(first), "A4:1 E5:1.5 D5:.5 C5:1 | D5:1 C5:1 A4:2", 0.5, pan=-0.15, edge=0.75, bite=0.05)
         rolls(bar0(first + 3), 4, 0.03, 0.26, "E2"), rolls(bar0(first + 3) + 2, 2, 0.05, 0.22)
 
     def finale(first):
@@ -353,25 +355,24 @@ def render(window=None) -> np.ndarray:
             chop(bar, 1.15), spic(bar, 1.1), held(bar, 0.026)
             drive(bar, 1.1, drums=True, fill="ssssssss" if j == 1 else "")
             timp(bar0(bar), chord(bar)[0], 0.3), crash(bar0(bar), 0.07 if j == 0 else 0.05)
-        brass(bar0(first), FANFARE, 1.0, 0, 0.1, "trumpets", 1.1), brass(bar0(first), FANFARE, 0.65, -12, -0.2), flute(bar0(first), FANFARE, 0.8, 12)
+        brass(bar0(first), FANFARE, 1.0, 0, 0.1, "trumpets", 1.1), brass(bar0(first), FANFARE, 0.65, -12, -0.2), violins(bar0(first), FANFARE, 0.9)
         b = bar0(first + 2)
         at(b, 3.4)
         for name, bus, vol, pan in (("E5", "trumpets", 0.15, 0.2), ("A5", "trumpets", 0.17, 0.0), ("C#6", "trumpets", 0.13, -0.2), ("A3", "horns", 0.13, -0.3), ("E4", "horns", 0.13, 0.3),
                                     ("A4", "horns", 0.13, -0.1), ("C#5", "horns", 0.12, 0.1)):
             put(bus, b, horn(n(name), 3.3, vol, 0.012, vib=0.004, edge=1.05), pan)
-        for name in ("A3", "C#4", "E4", "A4", "C#5", "E5", "A5"):
+        for name in ("A3", "C#4", "E4", "A4", "C#5", "E5", "A5", "E6"):
             put("held", b, x.strings(n(name), 3.4, 0.022, attack=0.03, release=0.4), 0.6 * np.sin(n(name)))
-        put("flute", b, x.tone(n("E6"), 3.3, list(x.FLUTE), 0.08, vib=0.005, vib_hz=5.2, attack=0.03, release=0.2), 0.25)
         low = n("A1")
         put("low", b, bow(low, 2.2, 0.9, 0.09) + bow(low + 12, 2.2, 0.8, 0.065), -0.2)
         kick(b, 0.55), low_drum(b, 0.34), snare(b, 0.27), crash(b, 0.09), timp(b, "A2", 0.34, 1.2)
         rolls(b + 0.5, 2.75, 0.2, 0.08, "A2")
 
     calm(1), rise(13)
-    full(25, last=False), light(33), full(37, last=True)
+    full(25, last=False), ramp(33), full(37, last=True)
     fade(45), finale(49)
 
-    # A hall for the winds, the strings, the harp and the timpani; a little of it for the snare and the low drums.
+    # A hall for the brass, the strings, the harp and the timpani; a little of it for the snare and the low drums.
     def room(name, secs=1.8, wet=0.2):
         bus = x.buses[name]
         size = bus.shape[1]
@@ -383,10 +384,10 @@ def render(window=None) -> np.ndarray:
         f = np.fft.rfftfreq(size, 1 / sr)
         x.buses[name] = bus + wet * np.fft.irfft(np.fft.rfft(bus, axis=1) * np.fft.rfft(ir, axis=1) / (1 + (f / 4000) ** 2) * (f > 150), n=size, axis=1)
 
-    for name, secs, wet in (("horns", 2.2, 0.3), ("trumpets", 2.2, 0.28), ("flute", 2.2, 0.3), ("short", 1.6, 0.22), ("low", 1.4, 0.14), ("held", 2.4, 0.35), ("harp", 2.0, 0.3),
+    for name, secs, wet in (("horns", 2.2, 0.3), ("trumpets", 2.2, 0.28), ("short", 1.6, 0.22), ("low", 1.4, 0.14), ("held", 2.4, 0.35), ("harp", 2.0, 0.3),
                             ("timp", 2.2, 0.25), ("snare", 1.6, 0.16), ("drums", 1.8, 0.22)):
         room(name, secs, wet)
-    levels = {"horns": 2.0, "trumpets": 2.2, "flute": 1.0, "short": 4.2, "low": 2.2, "held": 2.1, "harp": 1.4, "timp": 0.4, "kick": 0.8, "snare": 1.5, "drums": 0.8,
+    levels = {"horns": 2.0, "trumpets": 2.2, "short": 4.2, "low": 2.2, "held": 2.1, "harp": 1.4, "timp": 0.4, "kick": 0.8, "snare": 1.5, "drums": 0.8,
               "hats": 7.2, "crash": 2.0}
     return x.play(x.mixdown(levels, lowpass=9000, room=0.04))
 

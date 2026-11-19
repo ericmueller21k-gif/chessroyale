@@ -477,4 +477,12 @@ all the song, and that's kind of the idea."
   the full band, -25 in the dying-out, -15.5 for the finale. The first render's opening was 10 dB under the band and
   nearly all under 120 Hz; the opening drums are louder now and have more of the stick in them.
 - Not handed over. Song AL (the one-minute build) stays as it was.
+- His note on it: "get rid of the flute ... instead of transitioning at 117 into the flute, just keep ... ramp it up
+  a bit more until it dies out at 143 ... or like make it start to burn out there ... keep going a little bit more
+  with where it was already going and just get rid of the flutes." So v2: no flute anywhere. Where its four lighter
+  bars were (1:17) there are four bars more of climb (C, G, F, E: the tune's leap from a step higher each bar, the
+  low drums coming in), and over the last tune the violins have the long line the flute had. The horn alone has the
+  dying-out. Measured arc from 1:00: -17.8, -16.7, -16.2, then -25 dying out, -16.3 for the finale.
+- A lesson: a lighter section in the middle of a build reads as the build stopping. If he asks for a build, each
+  part is at least as full as the one before until the place he says it ends.
 
