@@ -2405,15 +2405,19 @@ export const MOO_CINEMATIC = {
   hopMs: 720,
   /** The field fades in over the board and everything above it (a CSS fade). */
   fadeInMs: 500,
-  /** The field holds, him standing in it, before the cut to the close-up. */
-  fieldMs: 700,
-  /** The close-up of the two of them looking up at the moon, the cuts to it and back included. */
-  closeMs: 2200,
+  /** The field holds, him standing in it, before the cut to the close-up (Eric, Nov 19: "about 2 more seconds": 700 → 2700). */
+  fieldMs: 2700,
+  /** The close-up of the two of them looking up at the moon, the cuts to it and back included (Eric, Nov 19: 2 s longer: 2200 → 4200). */
+  closeMs: 4200,
   /** The cut to the close-up and back: a quick crossfade, each way, inside `closeMs`. */
   cutMs: 160,
-  /** Into the close-up, their eyes start turning white (`eyeStepMs` a step, four steps), then hold white and glowing. */
-  whitenAt: 900,
-  eyeStepMs: 220,
+  /**
+   * Into the close-up, their eyes start turning white (`eyeStepMs` a step, four steps), then hold white and glowing. Eric, Nov 19: "it
+   * should start with their eyes being like normal and then fade ... turning into the glowing ... right now it's just very quick":
+   * normal for 1.2 s (was 0.9), then 4 steps of 0.55 s (was 0.22), glowing from 3.4 s to the cut back.
+   */
+  whitenAt: 1200,
+  eyeStepMs: 550,
   /** (His transformation in the field: his `fullMoon` animation's own length, MOO_BEATS.fullMoon.transformMs.) */
   /** After the transformation, he stands powered up in the field a moment. */
   afterMs: 400,
