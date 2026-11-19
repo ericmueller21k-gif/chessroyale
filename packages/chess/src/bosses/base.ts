@@ -365,6 +365,12 @@ export interface BossRules {
   /** What else stops the boss's own moves now (Sawyer's first move, a pawn's; the hoops), or null: nothing does. */
   bossStops?(boss: BossState): ((move: string, fen: string) => boolean) | null;
   /**
+   * Several bosses on one side: what of its `bossStops` binds the other bosses' moves too (the side's guards: Smudgy's disguise),
+   * or null: none (Sawyer's first move, a pawn's, and Smudgy's forced moves bind only his own). Left out: all of its `bossStops`
+   * (the hoops, Big Boy's toys). sideBossAllowed.
+   */
+  sideStops?(boss: BossState): ((move: string, fen: string) => boolean) | null;
+  /**
    * Which of its powers stops `move` now, either side (for the screens' words: a refused move of yours, the boss's only
    * move through it), or null. It reads only fields the screens' view carries too (`StopFields`), so the app asks it.
    */
@@ -422,6 +428,21 @@ export interface BossRules {
    */
   afterBossMove?(b: Battle, move: string, extras?: BossMoveExtras): void;
   /**
+   * Several bosses on one side: another boss's move was just played (`fenBefore`: the position before it). What of his follows
+   * pieces on the board follows it, as it follows the crowd's moves (afterCrowdMove) and his own (afterBossMove), so every move
+   * on the board reaches every boss's trackers: Smudgy's hidden rook (and its unmasking), Sawyer's split halves, Alfil's Tusks
+   * pawns and elephants, Don Dough's gold, Chandy's locks and aim, Boingo's splats. The leapfrog hop (a pawn's, before Hopper's
+   * move) reaches them as a move too. One boss: never called.
+   */
+  followMove?(b: Battle, move: string, fenBefore: string): void;
+  /**
+   * Several bosses on one side: the board may have changed outside a move (another boss's power: Wrangler's line-up or pull,
+   * Smudgy's swap or Repaint, Alfil's fusion, Revision): a piece of the side he tracks that no longer stands where he tracks it is
+   * let go, as a capture lets it go (Smudgy's hidden rook, Sawyer's halves, Alfil's Tusks pawns and elephants, Don Dough's gold).
+   * Run after every boss's turn and every crowd move. One boss: never called.
+   */
+  followBoard?(b: Battle): void;
+  /**
    * A boss move its rules play as something else (Wrangler's long pull, written as its three squares: the double step,
    * then the pawn goes on in afterBossMove), with the move as the screens name it. Null: an ordinary move.
    */
@@ -438,6 +459,17 @@ export interface BossRules {
    * play it alike. The King's strike still staggers it.
    */
   bestReply?(boss: BossState, board: BoardState): boolean;
+  /**
+   * Several bosses on one side: his move now (`board`: the bosses to move) comes out of turn, before the boss whose turn it is
+   * (Wrangler's reply to the showdown's duel; Folio's move again after Revision crossed out its own); the order then goes on
+   * from the boss after him. Left out: never.
+   */
+  outOfTurn?(boss: BossState, board: BoardState): boolean;
+  /**
+   * Several bosses on one side: his move just played reached another boss's trackers (that boss's followMove changed what he
+   * follows). Folio: Revision never crosses that move out (rewinding the board would leave the other's trackers a move ahead).
+   */
+  followedBy?(b: Battle): void;
   /**
    * What the boss's turn must work out besides its move, with the engine (Wrangler's long pull, drag and showdown), in
    * the position before its move: the server asks the host's device for it with the move; solo works it out. Null:
@@ -603,7 +635,17 @@ export interface Battle {
   readonly engines: readonly EngineLike[];
   alive(): PlayerState[];
   finalGameOver(): boolean;
+  /**
+   * The boss (`state.boss`) is to move. Several bosses on one side: only the boss whose turn it is (hisTurn): a hook's "the
+   * bosses are to move" means "he is to move".
+   */
   bossToMove(): boolean;
+  /**
+   * Several bosses on one side: the boss in `state.boss` is the one whose turn it is: the bosses to move, him to move next (worked
+   * out before the hooks after the crowd's move run); the crowd to move, the boss whose turn change it is. One boss (or left out):
+   * always.
+   */
+  hisTurn?(): boolean;
   crowdAllowed(boardId?: number): string[] | null;
   boardOf(playerId: string): BoardState | null;
   /** What happens after any crowd move (G-REX's fire). */

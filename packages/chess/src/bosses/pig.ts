@@ -1093,6 +1093,13 @@ export function showdownLive(fen: string, sq: { crowd: readonly string[]; boss: 
  * showdownEngineMoves in all (Eric, Oct 13: on his brain, Maia at 600, he once took another piece instead of taking
  * back, and the crowd won his queen for free). Then his brain again.
  */
+/** His reply to the showdown's duel is due (the duel just played): engineMoveDue's first move only, not the ones after it. */
+export function duelReplyDue(boss: Pick<BossState, "powers" | "crowdMoves" | "crowdSide">, board: Pick<BoardState, "history" | "fen">): boolean {
+  const sd = boss.powers?.showdown;
+  if (!sd || (sd.ply !== undefined && board.history.length - sd.ply !== 1)) return false;
+  return engineMoveDue(boss, board);
+}
+
 export function engineMoveDue(boss: Pick<BossState, "powers" | "crowdMoves" | "crowdSide">, board: Pick<BoardState, "history" | "fen">, s: Pick<BossPowerSettings, "showdownEngineMoves"> = BOSS_POWERS): boolean {
   const sd = boss.powers?.showdown;
   if (!sd) return false;
@@ -1160,6 +1167,8 @@ export const PIG: BossRules = {
   },
   // His reply to the showdown's duel, and his next moves while its tactics are live: the engine's, as the search scored it.
   bestReply: (boss, board) => engineMoveDue(boss, board),
+  // (Several bosses on one side: his reply to the duel is the side's very next move, out of turn.)
+  outOfTurn: (boss, board) => duelReplyDue(boss, board),
   // After his move: his first one, the long pull (or nothing: an ordinary first move); later, the showdown's line-up
   // (his meter full, or the test trigger's, outside the band if the host found none inside), the trigger's stand-in drag,
   // or the lasso drag, each checked against the rules here and put on the board as a base.

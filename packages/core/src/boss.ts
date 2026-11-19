@@ -1217,7 +1217,8 @@ export interface FolioState {
   folded: { square: string; piece: string; at: number; until: number } | null;
   next: { turn: number; line: string; loss: number | null } | null;
   warned: { line: string; loss: number | null } | null;
-  last: { move: string; fen: string; ply: number; at: number; before: number | null; staggered: boolean } | null;
+  /** Its last move, for Revision. `shared`: several bosses on one side, another boss's trackers followed it (never crossed out). */
+  last: { move: string; fen: string; ply: number; at: number; before: number | null; staggered: boolean; shared?: true } | null;
   revision: { at: number; moves: [string, string]; sans: [string, string]; fen: string; ply: number; cost: number | null; drop: number | null; move?: string; san?: string } | null;
   revisions: number;
   drafts: number;

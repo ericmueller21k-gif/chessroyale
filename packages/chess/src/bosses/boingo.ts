@@ -268,6 +268,8 @@ export const BOINGO: BossRules = {
   // The marks follow every move, his and the crowd's (the funhouse's move for the crowd too).
   afterCrowdMove: (b, move) => trackSplats(b, move),
   afterBossMove: (b, move) => trackSplats(b, move),
+  // (Several bosses: another boss's move, the splats follow it too.)
+  followMove: (b, move) => trackSplats(b, move),
   view: (p) => ({ splats: (p.splats ?? []).map((m) => ({ ...m })) }),
 };
 
