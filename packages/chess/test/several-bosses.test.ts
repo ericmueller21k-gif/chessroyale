@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BATTLE_TOWER, BOSS_POWERS, mulberry32 } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_BRAIN, BOSS_POWERS, mulberry32, newRun, startFloor, towerPool } from "@chessroyale/core";
 import type { BossState, Settings } from "@chessroyale/core";
 import { MatchRunner, bossRules, crowdAllowed, legalMoves, pieceAt, rageOf, rageSpeedOf, rageTick, sideRates } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings, runBattle, sideTracked, type KitBattle } from "./boss-kit-lib.ts";
@@ -40,6 +40,32 @@ describe("several bosses: the deal", () => {
     expect(() => runner(["gingerbread", "nobody"])).toThrow(/no boss/);
     expect(() => runner(["gingerbread", "gingerbread"])).toThrow(/different bosses/);
     expect(() => runner(["gingerbread", "clown", "moo", "bigboy"])).toThrow(/different bosses/);
+  });
+
+  it("a tower floor (core startFloor; audit 1, finding 7): its bosses from the run's deal, every one at the floor's strength with no roster offset, a party's too; Stockfish from floor 51, its best from 80", () => {
+    // (Floor 1 from a run's deal: one boss, through the one-boss start, at 600 + 200.)
+    const pool = towerPool();
+    const first = startFloor(newRun(42, pool), pool)!;
+    const lone = runner(first.settings.bossIds!, "", 5, first.settings);
+    expect(lone.sideBosses().map((b) => b.id)).toEqual(first.run.floors[0]);
+    expect(lone.boss!.elo).toBe(800);
+    expect(lone.bossBrainPlan("", true)).toEqual({ brain: BOSS_BRAIN.brain, rating: 800, stockfishShare: 0 });
+    // (Folio +150 and Ginger -100 on the roster: off the tower, two strengths; on floor 10, both the floor's 1500, alone or a party.)
+    expect(runner(["folio", "gingerbread"]).state.bosses!.map((o) => o.elo)).toEqual([2150, 1900]);
+    for (const people of [1, 2]) {
+      const entrants = Array.from({ length: people }, (_, i) => ({ id: `h${i}`, name: `H${i}`, isBot: false }));
+      const r = new MatchRunner({ settings: kitSettings({ boss: "folio", bosses: ["folio", "gingerbread"], test: "", maxMoves: 30 }, { towerFloor: 10 }), rng: mulberry32(5), engines: [fakeEngine()], library: [KIT_OPENING], entrants, raidSide: "w" });
+      expect(r.state.bosses!.map((o) => o.elo)).toEqual([1500, 1500]);
+      expect(r.bossBrainPlan("", true)).toEqual({ brain: BOSS_BRAIN.brain, rating: 1500, stockfishShare: 0 });
+    }
+    // (Floor 60: Stockfish at 2725, each; floor 80: its best every move.)
+    const sf = runner(["gingerbread", "clown", "moo"], "", 5, { towerFloor: 60 });
+    expect(sf.state.bosses!.map((o) => o.elo)).toEqual([2725, 2725, 2725]);
+    expect(sf.bossBrainPlan("", true)).toEqual({ brain: "stockfish", rating: null, stockfishShare: 0 });
+    expect(sf.bossMoveKind()).toBe("elo");
+    const top = runner(["gingerbread", "clown", "moo"], "", 5, { towerFloor: 80 });
+    expect(top.state.bosses!.map((o) => o.elo)).toEqual([3190, 3190, 3190]);
+    expect(top.bossMoveKind()).toBe("best");
   });
 
   it("one boss in bossIds is one boss, as ever (no side)", () => {
