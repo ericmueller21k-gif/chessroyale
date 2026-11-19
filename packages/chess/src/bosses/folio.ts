@@ -407,6 +407,10 @@ export const FOLIO: BossRules = {
   },
   // (Several bosses on one side: Revision's move is its own again, out of turn: only its own move is ever crossed out.)
   outOfTurn: (boss) => crossedOut(boss),
+  // (Several bosses on one side: a move of its that another boss's trackers followed is never crossed out, as if the trigger missed.)
+  followedBy(b) {
+    setFolio(b, (f) => (f.last ? { folio: { ...f, last: { ...f.last, shared: true } } } : {}));
+  },
   afterCrowdMove(b, move, judged) {
     folioBattle.afterCrowdMove(b, move, judged ?? null);
   },
@@ -530,7 +534,7 @@ export const folioBattle = {
     const last = f.last;
     const test = b.settings.bossPowerTest === "revision";
     if (!last || f.revisions >= Math.max(0, Math.round(s.revisionMax)) || boss.crowdMoves < s.revisionFrom) return false;
-    if (boss.result || boss.crowdMoves >= b.settings.bossMaxMoves || last.at !== boss.crowdMoves - 1 || last.staggered || judged?.king) return false;
+    if (boss.result || boss.crowdMoves >= b.settings.bossMaxMoves || last.at !== boss.crowdMoves - 1 || last.staggered || last.shared || judged?.king) return false;
     const board = boardOf(b);
     const ply = board.history.length;
     if (last.ply + 2 !== ply || board.history[last.ply] !== last.move || boardEnd(board) !== null) return false;

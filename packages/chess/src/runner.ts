@@ -109,6 +109,7 @@ import {
   sidePowerTurn,
   sideRanked,
   sideRates,
+  sideMoveName,
   sideStopReason,
   rageOf,
   ragePaused,
@@ -1535,7 +1536,10 @@ export class MatchRunner {
     // (A power stops it: it stopped every move he had, so the limit lifted for the turn. The screens say which power.)
     const side = this.several() ? this.sideBosses() : null;
     const through = side ? (sideBossStopped(side, board.fen, m) ? sideStopReason(side, board.fen, m) : null) : bossStopped(boss, board.fen, m) ? stopReason(boss, board.fen, m) : null;
-    this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}), ...(through ? { through } : {}) };
+    // (Its name: as his rules name it, else as another boss on the side masks it (Smudgy's hidden rook stepped as a pawn: "d6",
+    // not "Rd6"), else as it is.)
+    const named = special && m === special.play ? special.san : side ? sideMoveName(side.slice(1), board.fen, m) : null;
+    this.bossLast = { move: shown, san: named ?? toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}), ...(through ? { through } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
     // (The boss's own after-move effect: Sawyer's split pawn after his first move; Wrangler's pull, drag or showdown.)
     if (this.state.boss?.powers) bossRules(this.state.boss)?.afterBossMove?.(this.battle, m, { ...extras, ...(shown !== m ? { special: shown } : {}) });
@@ -1650,7 +1654,13 @@ export class MatchRunner {
   private extraMoveOver(played: string | null) {
     if (!this.several()) return;
     const board = this.boards.get(this.state.boards[0]!)!;
-    if (played) this.followOthers(played, fenAtPly(board.history, board.history.length - 1, board.bases));
+    if (played) {
+      const before = fenAtPly(board.history, board.history.length - 1, board.bases);
+      // (Named as another boss on the side masks it, as a move of the side's is: applyBossMove.)
+      const named = sideMoveName(this.sideBosses().slice(1), before, played);
+      if (named && this.bossLast) this.bossLast = { ...this.bossLast, san: named };
+      this.followOthers(played, before);
+    }
     this.refocus();
   }
 
@@ -2411,16 +2421,28 @@ export class MatchRunner {
     });
   }
 
-  /** Several bosses: a move the boss in focus just played (`fenBefore`: the position before it) reaches every other boss's trackers (BossRules.followMove). */
+  /**
+   * Several bosses: a move the boss in focus just played (`fenBefore`: the position before it) reaches every other boss's trackers
+   * (BossRules.followMove); when it changed what one follows, the mover is told (BossRules.followedBy: Folio's Revision then never
+   * crosses it out).
+   */
   private followOthers(move: string, fenBefore: string) {
     if (!this.several()) return;
     const n = this.state.bosses!.length;
     const f = this.state.focus ?? 0;
+    const told = bossRules(this.state.boss)?.followedBy;
+    // (What a boss follows, as text: his powers, an empty list the same as none, as a tracker may write either.)
+    const follows = (b: BossState) => (told ? JSON.stringify(b.powers, (_k, v: unknown) => (Array.isArray(v) && !v.length ? undefined : v)) : "");
+    let reached = false;
     for (let k = 1; k < n; k++)
       this.asBoss((f + k) % n, () => {
         const me = this.state.boss!;
-        if (me.powers) bossRules(me)?.followMove?.(this.battle, move, fenBefore);
+        if (!me.powers) return;
+        const was = follows(me);
+        bossRules(me)?.followMove?.(this.battle, move, fenBefore);
+        if (follows(this.state.boss!) !== was) reached = true;
       });
+    if (reached && this.state.boss?.powers) told?.(this.battle);
   }
 
   /** `fn` for every boss on the side, each in focus in turn, the one in focus first; one boss: once. */

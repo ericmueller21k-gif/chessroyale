@@ -478,6 +478,18 @@ export function sideStopReason(side: readonly BossState[], fen: string, move: st
   return null;
 }
 
+/**
+ * The name another boss on the side gives the move about to be played (`fen`: before it), when his rules play that very move
+ * under another name (specialMove: Smudgy's, while his rook hides, so no move of the side's names it), or null: as it is.
+ */
+export function sideMoveName(side: readonly BossState[], fen: string, move: string): string | null {
+  for (const b of side) {
+    const s = b.powers ? bossRules(b)?.specialMove?.(b, fen, move) : null;
+    if (s && s.play === move) return s.san;
+  }
+  return null;
+}
+
 /** A power of any boss on the side touches this crowd turn (powerTurn): its picks aren't fair-play signals. */
 export const sidePowerTurn = (side: readonly BossState[], fen?: string): boolean => side.some((b) => powerTurn(b, fen));
 

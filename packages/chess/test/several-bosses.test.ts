@@ -178,6 +178,22 @@ describe("several bosses: each boss's own turn, and every move reaching every bo
     expect(r.bossView()?.lastMove?.san).toBe("d6");
   });
 
+  it("another boss's extra move that steps Smudgy's hidden rook as a pawn would is named as a pawn's too (Dash's, a failed Scramble Rush)", async () => {
+    const r = runner(["dash", "smudgy"], "rush", 1, { bossPaintTest: 1 });
+    r.deal();
+    await r.score(new Map([["h0", { move: "a2a3", thinkMs: 1000 }]]));
+    r.applyBossMove("b7b5");
+    r.deal();
+    await r.score(new Map([["h0", { move: "a3a4", thinkMs: 1000 }]]));
+    r.applyBossMove("d7d6");
+    expect(r.rushDue()).toBe(true);
+    r.finishRush({});
+    expect(r.extraMoveDue()).toBe(true);
+    expect(r.applyExtraMove("d6d5")).toBe("d6d5");
+    expect(sideBoss(r, "smudgy").powers?.camo?.square).toBe("d5");
+    expect(r.bossView()?.lastMove?.san).toBe("d5");
+  });
+
   for (const partner of ["zebra", "sawyer", "gingerbread"]) {
     it(`Folio's Revision (with ${partner}): the crowd move it crosses out reaches no other boss (his hooks, his judged numbers)`, async () => {
       // (The others' powers as the crowd's turn was dealt, and as the bosses' turn begins after a Revision: the same.)

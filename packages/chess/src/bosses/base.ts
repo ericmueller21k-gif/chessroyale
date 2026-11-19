@@ -466,6 +466,11 @@ export interface BossRules {
    */
   outOfTurn?(boss: BossState, board: BoardState): boolean;
   /**
+   * Several bosses on one side: his move just played reached another boss's trackers (that boss's followMove changed what he
+   * follows). Folio: Revision never crosses that move out (rewinding the board would leave the other's trackers a move ahead).
+   */
+  followedBy?(b: Battle): void;
+  /**
    * What the boss's turn must work out besides its move, with the engine (Wrangler's long pull, drag and showdown), in
    * the position before its move: the server asks the host's device for it with the move; solo works it out. Null:
    * nothing.
