@@ -70,6 +70,19 @@ async function watch(page: Page) {
 }
 const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[] });
 
+/**
+ * Dodge's opening as a frame sampler can promise it (Nov 19: a long CI frame skipped the 600 ms slide): the phases sampled
+ * up to the first vote are in the timeline's order, and the long ones (the scope-in, the volley, the vote) are each seen.
+ * Every phase and its exact order are the unit test's (chandy-wired.test.ts, "Dodge on screen": the timeline).
+ */
+function dodgeOpening(dodge: string[]) {
+  const order = ["cd-p-scope", "cd-p-slide", "cd-p-volley", "cd-p-open", "cd-p-vote"];
+  const head = dodge.slice(0, dodge.indexOf("cd-p-vote") + 1);
+  const at = head.map((p) => order.indexOf(p));
+  expect(at.every((k, i) => k > (at[i - 1] ?? -1)), `Dodge's phases in the timeline's order: ${head.join(", ")}`).toBe(true);
+  expect(head.filter((p) => ["cd-p-scope", "cd-p-volley", "cd-p-vote"].includes(p))).toEqual(["cd-p-scope", "cd-p-volley", "cd-p-vote"]);
+}
+
 async function battle(page: Page, power: string) {
   await asAdmin(page);
   await page.goto(`/?debug&pace=quick&laststand=0&brain=stockfish&boss=chandy&power=${power}&mode=raid`);
@@ -287,7 +300,7 @@ test.describe("Chandy", () => {
     await expect(page.locator(".cd-root.cd-p-kill")).toBeVisible();
     await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
     const s = await seen(page);
-    expect(s.dodge.slice(0, 5)).toEqual(["cd-p-scope", "cd-p-slide", "cd-p-volley", "cd-p-open", "cd-p-vote"]);
+    dodgeOpening(s.dodge);
     expect(s.dodge).toContain("cd-p-kill");
     expect(s.kinds).toContain("dodgeWin");
     expect(s.words).toEqual(expect.arrayContaining(["TELEPORT!", "DODGE THE NEXT ONE!", "HIT! KING CRACKED", "HIT! YOU LOSE"]));
@@ -321,7 +334,7 @@ test.describe("Chandy", () => {
     await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("results");
     const s = await seen(page);
     expect(s.kinds).toEqual(expect.arrayContaining(["warn", "dodge"]));
-    expect(s.dodge.slice(0, 5)).toEqual(["cd-p-scope", "cd-p-slide", "cd-p-volley", "cd-p-open", "cd-p-vote"]);
+    dodgeOpening(s.dodge);
     expect(await page.evaluate(() => (window as any).match.boss.result)).toBe("crowd");
     expect(errors).toEqual([]);
   });

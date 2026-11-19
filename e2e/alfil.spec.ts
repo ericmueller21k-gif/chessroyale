@@ -292,6 +292,9 @@ test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN S
   let tookAt = -1;
   let took = 0;
   let slew = 0;
+  // (The Slams' banners when the trigger went in: his meter can bring a Slam of its own before he takes your queen, Nov 19
+  // (the trades' material fills it), so the loop waits for the one after the trigger, not the first.)
+  let slamsAtTrigger: number | null = null;
   // (Until the Slam has landed, however many moves that takes: a time cap, not a move cap, so the test checks the banners
   // and not whether he took your queen soon enough. Nov 5: 14 moves ran out before it on CI.)
   const cap = Date.now() + 7 * 60_000;
@@ -300,14 +303,17 @@ test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN S
     await expect.poll(async () => (await phase(page)) === "play" || (await page.evaluate(() => !!(window as any).match.boss?.result)), { timeout: 90_000 }).toBe(true);
     if (await page.evaluate(() => !!(window as any).match.boss?.result)) break;
     await yourMove(page);
-    // (His turn is over: the Slam came and his move after it.)
-    if ((await count("MAMMOTH SLAM!")) > 0) break;
+    // (His turn is over: the triggered Slam came and his move after it.)
+    if (slamsAtTrigger !== null && (await count("MAMMOTH SLAM!")) > slamsAtTrigger) break;
     const s = await state();
     // His last move took your queen (counted once for that move): the Slam comes at the start of his next turn.
     if (s.captured === "q" && s.ply !== tookAt) {
       tookAt = s.ply;
       took++;
-      await page.evaluate(() => (window as any).match.triggerUltimate());
+      if (slamsAtTrigger === null) {
+        slamsAtTrigger = await count("MAMMOTH SLAM!");
+        await page.evaluate(() => (window as any).match.triggerUltimate());
+      }
     }
     const legal = new Chess(s.fen).moves({ verbose: true }).filter((m) => !m.promotion && (!s.allowed || s.allowed.includes(m.from + m.to)));
     const takeQueen = legal.find((m) => m.captured === "q");
@@ -323,7 +329,7 @@ test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN S
   const order = await page.evaluate(() => (window as any).__banners as string[]);
   console.log(`alfil slam after queens: his takes of yours ${took}, yours of his ${slew}; banners in order: ${order.join(" | ")}`);
   expect(took, "he took your queen (the test's setup)").toBeGreaterThan(0);
-  expect(await count("MAMMOTH SLAM!"), "the Slam landed within the time cap: its own banner, once").toBe(1);
+  expect(await count("MAMMOTH SLAM!"), "the triggered Slam landed within the time cap: its own banner, once").toBe((slamsAtTrigger ?? 0) + 1);
   expect(await count("QUEEN DOWN!"), "his take of your queen: its banner, once").toBe(took);
   expect(await count("QUEEN SLAIN!"), "your take of his queen: its banner, once").toBe(slew);
   expect(errors).toEqual([]);
