@@ -48,8 +48,10 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   Last Stand, and the moments queue (the view's `events`: every boss's, the one in focus first).
 - **Every move reaches every boss:** after the crowd's move every boss's `afterCrowdMove` (from the boss who moved last: Folio's
   Revision may cross the move out, and then the others never see it), each with its judged numbers; after a boss's move (his extra
-  move, the leapfrog hop) every other boss's `followMove`; after every boss's turn and crowd move every boss's `followBoard` (a tracked
-  piece another boss's power moved is let go). A hook's `bossToMove()` is true only for the boss whose turn it is (`hisTurn`).
+  move, the leapfrog hop) every other boss's `followMove`, and the mover's `followedBy` when one changed (Folio's Revision never crosses
+  that move out); after every boss's turn and crowd move every boss's `followBoard` (a tracked piece another boss's power moved is let
+  go). A move of the side is named as any boss on it masks it (`sideMoveName`: Smudgy's hidden rook stepped as a pawn, "d6"). A
+  hook's `bossToMove()` is true only for the boss whose turn it is (`hisTurn`).
 - Calls made: [2026-11-18-several-bosses.md](../decisions/2026-11-18-several-bosses.md).
 
 ## The audit

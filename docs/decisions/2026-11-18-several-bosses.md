@@ -100,3 +100,20 @@ The independent review of PR #808 (findings 1-4 and a note), fixed at their caus
   (no boss is held to another's own forced move); `several-bosses.test.ts`: Sawyer's first move checked for what it binds, one ultimate
   a turn change checked per step and per boss (with Moo and Don Dough), Hollow's second move, Smudgy's forced moves and hidden rook,
   Revision with three partners. Each failed before its fix.
+
+## The delta review's fixes (Nov 19)
+
+- **Revision and the others' trackers (the director's call, the review's option a):** on a side, Revision never crosses out a move of
+  Folio's that changed what another boss follows (`followOthers` tells the mover: `BossRules.followedBy`; Folio marks `last.shared`,
+  and `revise` declines it as if the trigger missed). Why: rewinding the board left the others' trackers a move ahead, and
+  `followBoard` let go of pieces still standing (Sawyer's half, the hidden rook, both Tusks pawns). Simpler than rewinding each
+  tracker; Revision still came in all 40 battles of each Folio pair swept (Sawyer, Don Dough, Alfil, Smudgy, Chandy, Boingo). So
+  Revision is no longer among the powers whose board change lets a tracked piece go.
+- **A move's name on a side:** taken from any boss on the side whose `specialMove` plays that very move under another name
+  (`sideMoveName`), for a boss's move and an extra move alike: another boss stepping Smudgy's hidden rook is "d6", never "Rd6".
+- **The kit's invariant 8, its other half:** a let-go (`followBoard`) after a step that moved no piece but by a move, or by a return
+  to an earlier position (Revision's base), fails: it caught all seven of the review's Revision repros and a reverted `followOthers`
+  (25 let-goes), where the square check caught none.
+- **Found, not fixed:** an extra move (Hollow's, Dash's) is picked from `extraMoveCandidates`, which ignores the side's stops (Smudgy's
+  disguise: Dash's extra move may slide the hidden rook, which `followRook` then reveals). The filter would reach six call sites and
+  the online host's pick (`net.ts`), which has no view of the side's stops: not a few lines. Hollow never meets Smudgy (`apart`).
