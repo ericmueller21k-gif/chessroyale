@@ -82,7 +82,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 
 - **Server `tower.ts`**: a climb is stored on the server, a guest's too, so it's stopped after any floor and continued on any device.
   `tower_runs` (one row a climb: `seed` the server's, `floor` the floor to fight, `met` core's deal (`floors` dealt, `deck`, `decks`),
-  `fight` the floor under way `{ id, startedAt }` or null, `last` the last result taken `{ id, outcome, floor, status }`, `status`
+  `fight` the floor under way `{ id, startedAt, device? }` (device: the starting device's id, answered back) or null, `last` the last result taken `{ id, outcome, floor, status }`, `status`
   open, top, out or abandoned (only the sign-in merge sets that); `kind` and `members` for the party, which nothing writes yet:
   PR 12) and `tower_best` (the highest floor won, an account and kind, at most `BATTLE_TOWER.floors`; it only rises, worked out
   again from the runs after every result). One open run an account and kind (`tower_runs_open`, a unique index). A run that ended
@@ -109,12 +109,12 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 
 ## The solo flow (built, PR 10's battle; PR 11b's flow, Eric, Nov 19)
 
-- **No tower screen** (PR 10's `/tower` page removed): the clerk's card (`town/TowerDesk.tsx`: Start, or Continue: floor N with a small
+- **No tower screen** (PR 10's `/tower` page out of the flow, its code kept unused at Eric's word): the clerk's card (`town/TowerDesk.tsx`: Start, or Continue: floor N with a small
   Start over that asks) → you walk into the elevator → the floor room (`shops/tower-floor*.ts`: N on its walls, you to your mark, its bosses out
   of the elevator one by one, the pieces up, the zoom) → `enterTowerFloor()` → Boss alone's battle (no Last Stand; `TowerBar.tsx`) → the
   usual result (`TowerResult.tsx`: one button, Back to the tower) → the floor room on your mark: won, the elevator open (Up to floor N+1);
   out, shut. Bests on the lobby's board. Between floors leave by the way down or Back. A match's address is `/tower`: a reload rejoins it
-  (`brc.tower.solo`, the restore). Calls: [2026-11-19-tower-solo-screens.md](../decisions/2026-11-19-tower-solo-screens.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md).
+  (`brc.tower.solo`, the restore). A start carries this device's id (`brc.tower.device`, kept in `fight`): a lost start answer is still its own. Calls: [2026-11-19-tower-solo-screens.md](../decisions/2026-11-19-tower-solo-screens.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md).
 
 ### For PR 10 (the app)
 

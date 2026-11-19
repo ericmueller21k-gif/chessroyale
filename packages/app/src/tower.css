@@ -11,6 +11,189 @@
   margin: 4px 0 0;
 }
 
+/* ---- The tower's screen (screens/Tower.tsx): kept unused at Eric's word, Nov 19 (PR 11b) ---- */
+.tw-page {
+  height: var(--app-h);
+}
+.tw-card {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 3px solid var(--fd-line);
+  border-radius: 18px;
+  background: var(--fd-panel);
+}
+.tw-card.tw-saved {
+  border-color: var(--fd-gold);
+}
+.tw-art {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 96px;
+  border-radius: 10px;
+  background: var(--fd-seat);
+}
+.tw-sky {
+  width: 48px;
+  height: 80px;
+  fill: var(--fd-sub);
+}
+.tw-sky .tw-win {
+  fill: var(--fd-gold);
+}
+.tw-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tw-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--fd-sub);
+}
+.tw-floor {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--fd-text);
+}
+.tw-floor small {
+  font-family: Archivo, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fd-sub);
+}
+.tw-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 14px;
+  color: var(--fd-sub);
+  white-space: nowrap;
+}
+.tw-line b {
+  color: var(--fd-text);
+}
+.tw-bests {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.tw-best {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+}
+.tw-best small {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--fd-sub);
+}
+.tw-best b {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--fd-text);
+}
+.tw-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  width: min(300px, 100%);
+  margin: 0 auto;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--fd-seat);
+}
+.tw-switch button {
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--fd-text);
+}
+.tw-switch button small {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--fd-sub);
+}
+.tw-switch button.on {
+  background: var(--fd-panel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+/* (Party: greyed, never hidden, until party runs open: PR 12.) */
+.tw-switch button:disabled {
+  opacity: 0.45;
+}
+.tw-stage .bs-inv-btn:disabled {
+  opacity: 0.45;
+}
+/* (2 or 3 bosses: each its own platform, a share of the boss side, one size for all.) */
+.tw-spots {
+  display: flex;
+  justify-content: center;
+  width: var(--bs-sw);
+}
+.tw-spots .tw-spot {
+  flex: none;
+}
+.tw-n2 .tw-spot {
+  width: calc(var(--bs-sw) / 2);
+}
+.tw-n3 .tw-spot {
+  width: calc(var(--bs-sw) / 3);
+}
+.tw-names {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tw-rating {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--fd-gold-text);
+}
+.bs-start.tw-start {
+  width: 300px;
+  font-size: 18px;
+  white-space: nowrap;
+}
+.tw-start:disabled,
+.tw-new:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.tw-new {
+  display: block;
+  margin: 14px auto 0;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  font-size: 16px;
+  text-decoration: underline;
+  color: var(--fd-sub);
+  cursor: pointer;
+}
+
 /* ---- The bosses beaten, small portraits (the strip's) ---- */
 .tw-beaten {
   display: inline-flex;

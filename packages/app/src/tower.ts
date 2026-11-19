@@ -13,10 +13,11 @@ import { accountReady } from "./boss-tokens.ts";
 
 // ---------------- The server's answers (server/src/tower.ts) ----------------
 
-/** The floor under way: its id (sent back with the result) and when it began, by the server's clock. */
+/** The floor under way: its id (sent back with the result), when it began, by the server's clock, and the id of the device that started it. */
 export interface Fight {
   id: string;
   startedAt: number;
+  device?: string;
 }
 
 /** A run, as the server shows it. */
@@ -94,7 +95,7 @@ async function ask<T>(path: string, body?: object): Promise<Answer<T>> {
 export const towerApi = {
   state: () => ask<TowerState>("/api/tower"),
   newRun: (confirm: boolean) => ask<{ run: TowerRun }>("/api/tower/run", confirm ? { confirm: true } : {}),
-  start: () => ask<FloorStart>("/api/tower/floor/start", {}),
+  start: () => ask<FloorStart>("/api/tower/floor/start", { device: deviceId() }),
   finish: (fight: string, outcome: FloorOutcome) => ask<{ outcome: FloorOutcome; floor: number; status: string; run: TowerRun | null; best: number }>("/api/tower/floor/finish", { fight, outcome }),
   stop: (fight: string, moves: number | undefined, free = false) => ask<{ stopped: "between" | "free" | "lost"; floor?: number; status?: string; run: TowerRun | null }>("/api/tower/stop", { fight, ...(moves !== undefined ? { moves } : {}), ...(free ? { free: true } : {}) }),
 };
@@ -138,6 +139,31 @@ export interface KeptFloor {
 }
 
 const KEY = "brc.tower.solo";
+const DEVICE_KEY = "brc.tower.device";
+let device: string | null = null;
+/**
+ * This device's id for its floors' starts (audit 2, finding 3): random, kept on the device, sent with every start; the server keeps it in
+ * the fight and answers it back, so a retry whose first answer was lost knows the floor is this device's own (floorPlan). No storage: one
+ * for as long as the page is open.
+ */
+export function deviceId(): string {
+  if (device) return device;
+  try {
+    const had = localStorage.getItem(DEVICE_KEY);
+    if (had && /^[0-9a-f]{20}$/.test(had)) return (device = had);
+  } catch {
+    // (No storage: a new one for this page.)
+  }
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  device = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  try {
+    localStorage.setItem(DEVICE_KEY, device);
+  } catch {
+    // (No storage.)
+  }
+  return device;
+}
 
 /** A kept floor read back, or null when there's none or it isn't one (another version, a damaged entry). */
 export function readKept(text: string | null): KeptFloor | null {
@@ -186,14 +212,17 @@ export function clearKept(): void {
 /**
  * What a floor's start answer means for this device: `fresh`, a floor to play from its start (begun now, or begun here with no move
  * kept yet); `rejoin`, the floor under way kept here, played on from where it was; `resting`, its bosses rest (leaving is free, the
- * only choice); `elsewhere`, under way with nothing kept here (another device, or storage cleared): ask before the counted stop.
+ * only choice); `elsewhere`, under way with nothing kept here (another device, or storage cleared): ask before the counted stop. Under
+ * way, started by this device (`device`: the fight carries its id) with nothing kept for it yet: its start's answer was lost (audit 2,
+ * finding 3), so it's this device's own, from its start.
  */
-export function floorPlan(start: Pick<FloorStart, "fight" | "under" | "resting">, kept: KeptFloor | null): "fresh" | "rejoin" | "resting" | "elsewhere" {
+export function floorPlan(start: Pick<FloorStart, "fight" | "under" | "resting">, kept: KeptFloor | null, device?: string): "fresh" | "rejoin" | "resting" | "elsewhere" {
   if (start.resting) return "resting";
   const mine = kept?.fight === start.fight.id && !kept.done;
   if (!start.under) return "fresh";
   if (mine && kept!.game) return "rejoin";
-  return mine ? "fresh" : "elsewhere";
+  if (mine) return "fresh";
+  return !!device && start.fight.device === device && kept?.fight !== start.fight.id ? "fresh" : "elsewhere";
 }
 
 /** Leaving the floor under way after `crowdMoves` of your moves is free (core's leaveFloor): before your 2nd move. */
@@ -231,6 +260,8 @@ export async function settleKept(k: KeptFloor): Promise<TowerEnd> {
     return { ...base, status: a.ok && a.body.stopped === "free" ? "open" : run && run.floor === k.floor ? "open" : "out", run, best };
   }
   const a = await towerApi.finish(k.fight, done);
+  // (A 409 carrying the fight: the floor still under way (a win too soon): the result stays kept, sent again later; audit 2, finding 5.)
+  if (!a.ok && a.status === 409 && a.body.fight) return { ...base, status: "open", run: a.body.run ?? null, best: a.body.best ?? 0, error: a.body.message ?? TOWER_WORDS.offline };
   if (a.ok) {
     clearKept();
     return { ...base, status: a.body.status === "top" ? "top" : a.body.status === "open" ? "open" : "out", run: a.body.run, best: a.body.best };
@@ -320,7 +351,7 @@ export async function askFloor(best: number): Promise<FloorAsk> {
   if (!a.ok) return a.status === 409 && a.body.confirm ? { kind: "broken" } : { kind: "error", message: a.body.message ?? TOWER_WORDS.offline };
   const start = a.body;
   const kept = loadKept();
-  const plan = floorPlan(start, kept);
+  const plan = floorPlan(start, kept, deviceId());
   if (plan === "resting" || plan === "elsewhere") return { kind: plan, start };
   if (plan === "rejoin") return { kind: "entry", entry: { start, kept: kept!, game: kept!.game!, best } };
   return { kind: "entry", entry: { start, kept: { v: 1, fight: start.fight.id, floor: start.floor, bosses: start.bosses, settings: start.settings, beaten: start.run.beaten }, game: null, best } };

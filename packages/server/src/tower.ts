@@ -72,11 +72,17 @@ interface RunRow {
   updated_at: number;
 }
 
-/** The floor under way: its id (the device sends it back with the result) and when it began, by the server's clock. */
+/**
+ * The floor under way: its id (the device sends it back with the result), when it began, by the server's clock, and (audit 2, finding 3)
+ * the id the starting device sent with the start: answered back, so a retry whose first answer was lost knows the floor is its own.
+ */
 export interface Fight {
   id: string;
   startedAt: number;
+  device?: string;
 }
+/** A device's id for its starts: what the app makes (tower.ts deviceId). */
+const DEVICE_ID = /^[0-9a-f]{16,32}$/;
 
 /** A run as the app sees it. */
 export interface TowerRunView {
@@ -151,7 +157,7 @@ const metOf = (run: TowerRun) => JSON.stringify({ floors: run.floors, deck: run.
 /** A row's floor under way, or null. */
 export function fightOf(text: string | null): Fight | null {
   const f = parsed(text);
-  return f && typeof f.id === "string" && typeof f.startedAt === "number" ? { id: f.id, startedAt: f.startedAt } : null;
+  return f && typeof f.id === "string" && typeof f.startedAt === "number" ? { id: f.id, startedAt: f.startedAt, ...(typeof f.device === "string" ? { device: f.device } : {}) } : null;
 }
 
 /** The app's view of an open run. Between floors, the floor's bosses are the ones its start would deal now (startFloor, `pool`). */
@@ -262,7 +268,8 @@ export async function newTowerRun(sql: Sql, userId: string, now: number, opts: {
  * (`paused`, which refuses only a new floor); `resting` when its bosses no longer pass the pool (floorResting: leaving it is free).
  * Answers the floor's settings for the match runner.
  */
-export async function startTowerFloor(sql: Sql, userId: string, now: number, opts: { pool: readonly string[]; paused?: boolean }): Promise<TowerAnswer> {
+export async function startTowerFloor(sql: Sql, userId: string, now: number, opts: { pool: readonly string[]; paused?: boolean; device?: unknown }): Promise<TowerAnswer> {
+  const device = typeof opts.device === "string" && DEVICE_ID.test(opts.device) ? opts.device : undefined;
   for (let attempt = 0; attempt < 3; attempt++) {
     const row = await openRow(sql, userId, "solo");
     if (!row) return { status: 404, body: { message: TOWER_LINES.noRun } };
@@ -274,7 +281,7 @@ export async function startTowerFloor(sql: Sql, userId: string, now: number, opt
     const started = startFloor(run, opts.pool);
     const floor = run.floors.length;
     if (!started || !started.run.floors[floor - 1]?.length) return { status: 503, body: { message: TOWER_LINES.resting } };
-    const fight: Fight = { id: randomHex(9), startedAt: now };
+    const fight: Fight = { id: randomHex(9), startedAt: now, ...(device ? { device } : {}) };
     // (Only over the run as it was read: a result or another start in between, and this one reads it again.)
     const done = await sql.first(
       "UPDATE tower_runs SET met = ?, fight = ?, updated_at = ? WHERE id = ? AND status = 'open' AND fight IS NULL AND met = ? RETURNING id",
@@ -404,7 +411,7 @@ const POSTS = new Set(["/api/tower/run", "/api/tower/floor/start", "/api/tower/f
  * limits and ban gate before it, index.ts). Null: not one of them.
  *   GET /api/tower → TowerState
  *   POST /api/tower/run {kind?: "solo", confirm?: true} → {run} | 409 {message, confirm, run}
- *   POST /api/tower/floor/start → {fight, floor, bosses, settings, under?, resting?, run} | 404 | 409 {message, confirm} (a run that
+ *   POST /api/tower/floor/start {device?} → {fight (with the starting device's id), floor, bosses, settings, under?, resting?, run} | 404 | 409 {message, confirm} (a run that
  *     can't be played: start a new one) | 503 (the bosses resting)
  *   POST /api/tower/floor/finish {fight, outcome: "won" | "lost" | "drawn"} → {outcome, floor, status, run, best} (the same answer for
  *     the last result taken, sent again) | 409 {message, run, best, fight?} (read the run again) | 409 {message, confirm}
@@ -417,10 +424,10 @@ export async function towerResponse(request: Request, sql: Sql, userId: string, 
   const answer = (a: TowerAnswer) => json(a.body, a.status);
   if (path === "/api/tower") return request.method === "GET" ? json(await towerState(sql, userId, pool)) : null;
   if (request.method !== "POST") return null;
-  const b = ((await request.json().catch(() => null)) ?? {}) as { kind?: unknown; confirm?: unknown; fight?: unknown; outcome?: unknown; moves?: unknown; free?: unknown };
+  const b = ((await request.json().catch(() => null)) ?? {}) as { kind?: unknown; confirm?: unknown; fight?: unknown; outcome?: unknown; moves?: unknown; free?: unknown; device?: unknown };
   if (b.kind !== undefined && b.kind !== "solo") return json({ message: b.kind === "party" ? TOWER_LINES.partyLater : TOWER_LINES.bad }, 400);
   if (path === "/api/tower/run") return answer(env.soloPaused ? SOLO_RESTING : await newTowerRun(sql, userId, now, { confirm: b.confirm === true, pool }));
-  if (path === "/api/tower/floor/start") return answer(await startTowerFloor(sql, userId, now, { pool, paused: env.soloPaused }));
+  if (path === "/api/tower/floor/start") return answer(await startTowerFloor(sql, userId, now, { pool, paused: env.soloPaused, device: b.device }));
   if (path === "/api/tower/floor/finish") return answer(await finishTowerFloor(sql, userId, now, b, { pool, minWinMs: env.testSwitches ? 0 : BATTLE_TOWER.soloWinMinSeconds * 1000 }));
   return answer(await stopTower(sql, userId, now, b, { pool }));
 }
