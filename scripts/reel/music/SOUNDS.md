@@ -485,4 +485,10 @@ all the song, and that's kind of the idea."
   dying-out. Measured arc from 1:00: -17.8, -16.7, -16.2, then -25 dying out, -16.3 for the finale.
 - A lesson: a lighter section in the middle of a build reads as the build stopping. If he asks for a build, each
   part is at least as full as the one before until the place he says it ends.
+- On the trumpet (Nov 19): "I need some other options from this trumpet ... I almost think just a piano, a xylophone.
+  Try like a lower. Like a few instruments that aren't as bright sounding as the trumpet. So no ocarina or any of that
+  ... a little deeper but doesn't sound so like buzzy either." The FM brass is the buzz. `render(lead=...)` now puts
+  every line of the tune on one of: a piano, a marimba (the lower xylophone; long notes rolled), a soft horn (a round
+  tone, few overtones), cellos, a clarinet; each set to sit where the brass sat. Five clips of the same 22 seconds
+  (0:57 to 1:19) went to him. The brass stays the default until he picks.
 

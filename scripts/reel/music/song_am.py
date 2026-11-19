@@ -27,7 +27,7 @@ How his shape is met (the tempos are his "a little bit more upbeat": 96, then 10
   - 1:53, three bars at 108: the finale: the band's fanfare on F, on G, and a held A major (the tune's key turned
     major). Its ring falls on bar 1's drum.
   - A minor: Am, F, C, G under the tune. It leaps up a fifth and steps down, twice; then leaps and climbs.
-  python3 song_am.py <out.wav>
+  python3 song_am.py <out.wav> [the tune's instrument: brass, piano, marimba, horn, cello or clarinet]
 
   bars  1-12   0:00  the calm start, in layers: a drum and a snare; plucked and held strings; a harp
   bars 13-24   0:30  the tune arrives and grows: a horn; horns and violins; trumpets, the roll, the tempo rising
@@ -81,8 +81,16 @@ for _line, _beats in ((TUNE_A, 16), (TUNE_HOME, 16), (TUNE_UP, 16), (RAMP, 16), 
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(window=None) -> np.ndarray:
-    """The loop as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage."""
+# The tune's instrument, and how loud each is played to sit where the brass sat (measured over bars 25-32). Eric, Nov
+# 19, on the trumpet: "I need some other options ... a few instruments that aren't as bright sounding as the trumpet.
+# So no ocarina or any of that ... a little deeper but doesn't sound so like buzzy either": the others are for him to
+# choose from.
+LEADS = {"brass": 1.0, "piano": 1.0, "marimba": 0.76, "horn": 0.52, "cello": 0.69, "clarinet": 0.31}
+
+
+def render(window=None, lead="brass") -> np.ndarray:
+    """The loop as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage.
+    `lead`: the tune's instrument (LEADS)."""
     x = Ride(RIDE, BEATS, None, os=2, seed=349, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -261,10 +269,56 @@ def render(window=None) -> np.ndarray:
             w += 0.6 * np.sin(ph + 2.0 * depth * fed(ph)) + 0.4 * np.sin(ph + 1.1 * depth * np.sin(2 * ph))
         return w / len(players) * amp * vol
 
+    struck = {}
+
+    def hammer(kind, m):
+        """A struck note for the tune: the piano's (three strings a hair apart, overtones to 9 kHz that die sooner the
+        higher they are) or the marimba's (a wooden bar: its note, the one two octaves over, a faint one above that).
+        Its loudest point 1; kept once made."""
+        if (kind, m) not in struck:
+            k = int(1.6 * sr)
+            t = np.arange(k) / sr
+            f0 = x.hz(m)
+            if kind == "piano":
+                h = np.arange(1, min(24, max(2, int(9000 / f0))) + 1)
+                w = np.zeros(k)
+                for off in (-1.5, 0.3, 1.6):
+                    ph = np.outer(h * np.sqrt(1 + 0.0004 * h * h), tau * f0 * 2 ** (off / 1200) * t) + h[:, None]
+                    w += ((1 / h**1.25)[:, None] * np.sin(ph) * np.exp(-np.outer(1 + 0.35 * h, t) / (0.9 * (262 / f0) ** 0.35))).sum(axis=0)
+                w = w * np.minimum(1, t / 0.002) + 0.2 * hiss(k, 9000, 0.5) * np.exp(-t / 0.004)
+            else:
+                die = 0.5 * (262 / f0) ** 0.4
+                ph = tau * f0 * t
+                w = np.sin(ph) * np.exp(-t / die) + 0.3 * np.sin(4 * ph) * np.exp(-t / (die / 4)) + 0.1 * np.sin(10 * ph) * np.exp(-t / (die / 12))
+                w = w * np.minimum(1, t / 0.0015) + 0.12 * hiss(k, 4000, 0.3) * np.exp(-t / 0.005)
+            struck[(kind, m)] = w / np.abs(w).max() * tail(k, 0.15)
+        return struck[(kind, m)]
+
     def brass(start, text, vol=1.0, shift=0, pan=0.0, bus="horns", edge=0.9, bite=0.02):
+        """A line of the tune, on the instrument chosen for it (`lead`; the brass unless Eric picks another)."""
+        gain = 0.2 * vol * LEADS[lead]
         for b, d, m in notes(start, text):
+            m += shift
             at(b, d)
-            put(bus, b, horn(m + shift, max(0.1, d - 0.12), 0.2 * vol, bite, vib=0.005 if d >= 2 else 0.0, edge=edge), pan)
+            long = max(0.1, d - 0.12)
+            if lead == "brass":
+                w = horn(m, long, gain, bite, vib=0.005 if d >= 2 else 0.0, edge=edge)
+            elif lead == "piano":
+                # (Let go a little after the next note begins.)
+                w = hammer("piano", m)[: min(int(1.6 * sr), x.k(d + 0.4))] * gain
+                w = w * np.minimum(1, (len(w) - np.arange(len(w))) / (0.08 * sr))
+            elif lead == "marimba":
+                # (A long note is rolled: softer strokes after the first, about nine a second.)
+                w = hammer("marimba", m) * gain
+                for i in range(1, int(d / 0.2) if d >= 1.5 else 0):
+                    put(bus, b + 0.2 * i, w * 0.55, pan)
+            elif lead == "horn":
+                w = x.tone(m, long, [1, 0.5, 0.22, 0.1, 0.05, 0.02], gain, detune=(-4, 4), vib=0.004 if d >= 2 else 0.0, vib_hz=5.2, attack=0.045, release=0.09)
+            elif lead == "cello":
+                w = x.tone(m, long, [a / (i + 1) ** 0.6 for i, a in enumerate(x.BOWED)], gain, detune=(-6, 0, 5), vib=0.005 if d >= 1 else 0.0, vib_hz=5.4, attack=0.07, release=0.12)
+            else:
+                w = x.tone(m, long, list(x.REED), gain, vib=0.003 if d >= 2 else 0.0, vib_hz=5.0, attack=0.03, release=0.07)
+            put(bus, b, w, pan)
 
     # ---- the sections ----
     def calm(first):
@@ -392,9 +446,9 @@ def render(window=None) -> np.ndarray:
     return x.play(x.mixdown(levels, lowpass=9000, room=0.04))
 
 
-def main(out: str) -> None:
-    write_wav(out, render())
+def main(out: str, lead: str = "brass") -> None:
+    write_wav(out, render(lead=lead))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:])
