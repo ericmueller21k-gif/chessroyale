@@ -1838,7 +1838,8 @@ export const BOSS_POWERS = {
    * 7"): fullMoonMoves of his moves at full strength (the engine's best at his move's own budget, bossNodes: never his
    * brain, a slip or the guard), the first ending with a flurry of flurryBeams moonbeams on different pieces.
    */
-  fullMoonMoves: 5,
+  // (Eric, Nov 20: "If it's only 5, it should be like 10 moves probably.")
+  fullMoonMoves: 10,
   flurryBeams: 5,
   /**
    * The hippo gardener's Seeds (his passive; Eric, Oct 20: "a second meter on a real timer... every 30 seconds it fills and

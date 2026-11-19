@@ -51,6 +51,8 @@ export type KingCue =
   | "thawed"
   | "funhouse"
   | "showdown"
+  // Moo & Moon's Full Moon (Nov 20).
+  | "fullMoon"
   | "fireTile"
   | "mateThreat"
   | "queenLost"
@@ -126,6 +128,9 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   funhouse: ["Upside down? Shake it off!", "That clown played our move! We'll fix it.", "He moved for us? Fine. We'll take it from here."],
   // Wrangler's showdown, at its "DRAW!": the crowd must take one of his three, and one is a trap.
   showdown: ["A duel we must take. Choose the right one!", "Three duels, and one's a trap. Choose well!", "We must draw. Pick the duel that wins!"],
+  // Moo & Moon's Full Moon, as its cinematic ends (Eric, Nov 20: "his strength just ... has a massive strength increase ... I can sense
+  // like his strength is nearly matching mine ... indicating that it's like clearly so players can know"): he plays his very best now.
+  fullMoon: ["His strength surges with the moon! Every move counts now.", "I sense his power nearly matching mine. Be on your guard!", "The moon made him mighty. He plays his very best now!"],
   // A mate threatened against us (as our move begins), and a queen taken, either way.
   mateThreat: ["Mate is near! Shield the king.", "It threatens mate. Look again!", "Danger at the gate. Guard the king!"],
   queenLost: ["Our queen has fallen. Fight on!", "The queen! She'll be avenged.", "They took the queen. Hold the line."],
@@ -187,6 +192,7 @@ const KIND: Record<KingCue, Kind> = {
   thawed: "critical",
   funhouse: "critical",
   showdown: "critical",
+  fullMoon: "critical",
   fireTile: "critical",
   foeIntro: "critical",
   foeBlocked: "critical",
