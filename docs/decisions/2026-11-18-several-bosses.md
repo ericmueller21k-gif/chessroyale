@@ -71,8 +71,15 @@ The independent review of PR #808 (findings 1-4 and a note), fixed at their caus
 - **Smudgy's forced moves bind only him** (`BossRules.sideStops`, replacing `ownStops`: the part of a boss's stops that binds the side;
   his disguise does, his forced moves and Sawyer's first move don't).
 - **Every move reaches every boss's trackers.** The crowd's moves reach every boss's `afterCrowdMove`, his own his `afterBossMove`, and
-  now another boss's move (and his extra move) every other boss's `followMove`: Smudgy's hidden rook, Sawyer's halves, Alfil's Tusks
-  pawns and elephants, Don Dough's gold, Chandy's locks and aim, Boingo's splats. One boss: never called, so his paths are as before.
+  now another boss's move (and his extra move, and the leapfrog hop, a pawn's from one square to another) every other boss's
+  `followMove`, after the mover's own after-move effects (the board the crowd will face): Smudgy's hidden rook, Sawyer's halves, Alfil's
+  Tusks pawns and elephants, Don Dough's gold, Chandy's locks and aim, Boingo's splats. One boss: never called, so his paths are as before.
+  - **A power that moves the side's pieces outside a move** (the new invariant 8 found it: Wrangler's showdown line-up moved a gold
+    piece, an elephant, the hidden rook): after every boss's turn and every crowd move each boss lets go of a piece of the side he
+    tracks that no longer stands where he tracks it (`followBoard`), as a capture lets it go: the gold, a half, an elephant, a Tusks
+    pawn (the fusion fails), the hidden rook (its disguise gone, with no moment where it stood). Why not follow each piece: those powers
+    (the line-up, Wrangler's pull, Smudgy's swap and Repaint, Alfil's fusion, Revision) are bases, not moves, with no from and to to
+    follow; letting go is one rule, the same as a capture, and never leaves a stale mark.
   - **Smudgy's rook:** another boss may step it as a pawn would (the shared disguise already allowed it), and the unmask checks (a move
     that isn't a pawn's, a discovered check, the crowd left no move on both boards) run on any boss's move. Why not "another boss may
     not move it": a discovered check or a stuck crowd can come from any boss's move anyway, so the checks must run on every move;
