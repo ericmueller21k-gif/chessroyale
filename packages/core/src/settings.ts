@@ -2136,6 +2136,8 @@ export const BOSS_POWERS = {
    *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter; one the pass guard refuses, with
    *   nothing else unlocked, is checked again on his next turn). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
+   * - **The queen lock's shot** (Eric, Nov 20: the piece goes when the round reaches it): the round flies down the file from his edge,
+   *   `shotStepMs` a square; the piece it hits stays on the board until the round's head reaches its square's middle, then shatters.
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
@@ -2165,6 +2167,7 @@ export const BOSS_POWERS = {
     queenLockFirst: true as boolean,
     meterEvery: 6,
     fireOnUnlock: true as boolean,
+    shotStepMs: 65,
     looks: 3,
     scatterSquares: 4,
     shieldCount: 2,
