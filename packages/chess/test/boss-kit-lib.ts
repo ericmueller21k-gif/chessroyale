@@ -27,7 +27,9 @@
  *  7. A power's moments precede the result (#275's N-a): when the board's game ends on his move, the turn his rules
  *     would set up (prepareTurn) declares nothing the view leaves out; a battle the boss won with no mate, no time-out
  *     and before the move cap carries its declaring event in the last view before the result.
- *  8. Several bosses on one side: every piece of the side a boss tracks stands where he tracks it (sideTracked).
+ *  8. Several bosses on one side: every piece of the side a boss tracks stands where he tracks it (sideTracked), and none is let
+ *     go (the runner's followBoard) after a step that moved no piece but by a move, or by a return to an earlier position
+ *     (Revision): the trackers follow every move, so a let-go there is a tracker that missed a move or followed a crossed-out one.
  *  9. Several bosses on one side: the boss to move is never held to another boss's own forced move.
  */
 import { vi } from "vitest";
@@ -348,6 +350,23 @@ export class Checker {
     private sf: StockfishMoves | null,
     private settings: Settings,
   ) {}
+  /** Invariant 8's let-goes: what the runner's followBoard let go of since the last step (`follow`), and the bases the last step left. */
+  private letGo: string[] = [];
+  private lastBases: string[] = [];
+
+  /** Several bosses: records each tracked piece the runner's followBoard lets go of (invariant 8). */
+  follow(r: MatchRunner) {
+    const runner = r as unknown as { followBoard(): void };
+    const original = runner.followBoard;
+    const tracked = () => new Set(r.sideBosses().flatMap((b) => sideTracked(b).map(([what, sq]) => `${b.id}'s ${what} on ${sq}`)));
+    runner.followBoard = () => {
+      const was = tracked();
+      original.call(r);
+      const now = tracked();
+      this.letGo.push(...[...was].filter((t) => !now.has(t)));
+    };
+  }
+
   private fail(what: string, r: MatchRunner, step: string) {
     const b = r.boards.get(r.state.boards[0]!)!;
     this.failures.push(`${this.where}, after ${step}: ${what}\n  FEN ${b.fen}\n  moves ${b.history.join(" ")}\n  bases ${JSON.stringify(b.bases ?? [])}`);
@@ -421,7 +440,8 @@ export class Checker {
    * the side's allowed moves are that move alone only when the boss to move's own rules alone say so too.
    */
   private side(r: MatchRunner, step: string) {
-    const fen = this.board(r).fen;
+    const board = this.board(r);
+    const fen = board.fen;
     const side = r.sideBosses();
     this.count("tracked pieces in place");
     for (const b of side)
@@ -429,6 +449,16 @@ export class Checker {
         const pc = pieceAt(fen, sq);
         if (!pc || pc.color === b.crowdSide) this.fail(`${b.id}'s ${what} on ${sq}: ${pc ? "a piece of the crowd's" : "an empty square"} stands there`, r, step);
       }
+    // (A let-go needs a power that put a piece somewhere no move took it: a base this step that moved pieces, never one that only
+    // passed the turn, nor a return to an earlier position (Revision's base, `from`: the side's pieces stand as they stood then).)
+    this.count("no let-go without a cause");
+    const lost = this.letGo.splice(0);
+    const had = new Set(this.lastBases);
+    const bases = board.bases ?? [];
+    this.lastBases = bases.map((x) => JSON.stringify(x));
+    const placed = (f: string) => f.split(" ")[0];
+    const moved = bases.some((x) => !had.has(JSON.stringify(x)) && x.from === undefined && placed(x.fen) !== placed(fenAtPly(board.history, x.ply, bases.filter((y) => y !== x))));
+    if (lost.length && !moved) this.fail(`${lost.join(", ")}: let go after a step that moved no piece but by a move (a tracker missed a move, or followed one crossed out)`, r, step);
     if (!r.bossToMove() || r.stageComplete()) return;
     const allowed = r.bossAllowed();
     if (allowed?.length !== 1) return;
@@ -566,6 +596,7 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null, watch?:
   const r = new MatchRunner({ settings, rng: mulberry32(k.seed), engines, library: [k.opening], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: k.side });
   const where = `${k.bosses ? k.bosses.join(" + ") : k.boss} (seed ${k.seed}, crowd ${k.side === "w" ? "White" : "Black"}, ?power=${k.test || "none"}, from ${k.opening.id})`;
   const c = new Checker(where, sf, settings);
+  if (r.several()) c.follow(r);
   const run: KitRun = { result: null, steps: 0, played: {}, events: new Set(), failures: c.failures, ran: c.ran };
   const note = (s: string) => (run.played[s] = (run.played[s] ?? 0) + 1);
   const seen = () => {

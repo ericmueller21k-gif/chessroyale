@@ -173,8 +173,9 @@ describe("several bosses: each boss's own turn, and every move reaching every bo
     const camo = sideBoss(r, "smudgy").powers!.camo!;
     expect(camo.square).toBe("d6");
     expect(sideTracked(sideBoss(r, "smudgy"))).toEqual([["hidden rook", "d6"]]);
-    // (The crowd's board masks the rook where it stands now.)
+    // (The crowd's board masks the rook where it stands now, and the move's name gives it away no more than Smudgy's own would.)
     expect(r.bossView()?.powers?.camo?.square).toBe("d6");
+    expect(r.bossView()?.lastMove?.san).toBe("d6");
   });
 
   for (const partner of ["zebra", "sawyer", "gingerbread"]) {
@@ -194,6 +195,33 @@ describe("several bosses: each boss's own turn, and every move reaching every bo
       });
       expect(revisions).toBeGreaterThan(0);
       expect(changed).toEqual([]);
+    }, 60_000);
+  }
+
+  // (The delta review's repros: a move of Folio's moved a piece another boss tracks, and the crowd's reply drew a Revision.)
+  for (const [order, seed] of [[["sawyer", "folio"], 12], [["folio", "smudgy"], 5], [["folio", "smudgy"], 37], [["folio", "alfil"], 2]] as const) {
+    it(`Folio's Revision never crosses out a move of Folio's another boss's trackers followed (${order.join(" + ")}, seed ${seed}): his trackers stay true`, async () => {
+      let tracked: string[] = [];
+      let reached = 0;
+      let after = false;
+      const crossed: string[] = [];
+      const others = (r: MatchRunner) => r.sideBosses().filter((b) => b.id !== "folio");
+      const run = await runBattle({ ...battle([...order], "revision", 99, 24), seed }, null, (r, _fen, who) => {
+        const board = r.boards.get(0)!;
+        const rev = sideBoss(r, "folio").powers?.folio?.revision;
+        if (who === "crowd" && r.state.bosses![r.state.moved!]!.id === "folio") {
+          // (Folio's move just played: did it move a piece another boss tracks?)
+          after = tracked.includes(board.history.at(-1)?.slice(0, 2) ?? "");
+          if (after) reached++;
+        }
+        if (who !== "boss" || r.boss!.id !== "folio") return;
+        if (rev?.at === r.boss!.crowdMoves && !rev.move && after) crossed.push(`${rev.moves.join(" ")} at crowd move ${r.boss!.crowdMoves}`);
+        after = false;
+        tracked = others(r).flatMap((b) => sideTracked(b).map(([, sq]) => sq));
+      });
+      expect(run.failures).toEqual([]);
+      expect(reached).toBeGreaterThan(0);
+      expect(crossed).toEqual([]);
     }, 60_000);
   }
 });
