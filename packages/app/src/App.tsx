@@ -33,6 +33,8 @@ import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO, requestWaiting } from "./town/LeaveTown.tsx";
 import { setGoodbyeFrom } from "./town/goodbye.ts";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
+import { TowerScreen } from "./screens/Tower.tsx";
+import { FloorPlay, onEnterFloor, type FloorEntry } from "./tower.ts";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { showAwayNote } from "./components/AwayNote.tsx";
@@ -360,6 +362,13 @@ export function App() {
   const [showTown, setShowTown] = useState(() => location.pathname === "/town");
   /** Inside the Colosseum (/colosseum; the first look, Oct 30: docs/areas/colosseum.md): the town's Colosseum card opens it, Exit goes back to the town. */
   const [showColosseum, setShowColosseum] = useState(() => location.pathname === "/colosseum");
+  /**
+   * The Battle Tower's screen (/tower; PR 10): only Chess Town's skyscraper clerk opens it (Eric, Nov 19), Back goes to the town. A
+   * floor's battle keeps the address, so a reload comes back here and rejoins the floor kept on this device.
+   */
+  const [showTower, setShowTower] = useState(() => location.pathname === "/tower");
+  /** The match on screen is a tower floor: leaving it goes back to the tower's screen. */
+  const towerReturn = useRef(false);
   /**
    * Where the town opens you, back from a game with a town bot: its seat ("6.0.3": the table, your stool, the bot; the
    * town reads it). A reload during that game lands there too: its address carries it (`/town?at=6.0.3`).
@@ -1394,6 +1403,33 @@ export function App() {
   };
 
   /**
+   * Into a Battle Tower floor (tower.ts enterTowerFloor, the only way in): Boss alone's battle with the floor's bosses at its strength
+   * (the server's settings: `towerFloor`, `bossIds`), from its start, or rejoined where this device kept it. The address stays /tower,
+   * so a reload comes back to the tower's screen, which rejoins it.
+   */
+  const startTowerFloor = async (e: FloorEntry) => {
+    unlockAudio();
+    setLoading(true);
+    const [engines, soloCode] = await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
+    setLoading(false);
+    if (!soloCode) return setError("Couldn't load the game. Check your connection and try again.");
+    // (The floor's own strength: no difficulty, no Maia of your pick, no boss avoided or resting: the server dealt them.)
+    const settings: Settings = { ...DEFAULT_SETTINGS, ...overridesFromUrl("raid"), bossDifficulty: 0, bossAloneMaia: 0, bossHidden: false, bossUnfinished: false, bossesOff: undefined, ...e.start.settings };
+    const m = new soloCode.SoloMatch(engines, playerName(), settings, false, false);
+    m.tower = new FloorPlay(e.kept, e.best);
+    // (Kept at once: a reload before its first step still knows this device holds the floor.)
+    m.tower.begin();
+    // (XP: every floor is a counted solo game, timed by the server: xp.ts.)
+    noteSoloGame(m);
+    towerReturn.current = true;
+    setShowTower(false);
+    use(m);
+    if (e.game) m.resume(e.game);
+    else m.start();
+  };
+  useEffect(() => onEnterFloor((e) => void startTowerFloor(e)), []);
+
+  /**
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
@@ -1639,6 +1675,13 @@ export function App() {
     // Done with a match that's over: this device forgets its seat (its old link then says it has ended).
     if (match instanceof NetMatch && match.phase.kind === "results") forgetSeat(match.code);
     setMatch(null);
+    // A Battle Tower floor: back to the tower's screen (it sends the floor's result, if it's still to go).
+    if (towerReturn.current) {
+      towerReturn.current = false;
+      setShowTower(true);
+      history.replaceState(null, "", `/tower${location.search}`);
+      return;
+    }
     // A boss's battle from the town's challenge: back to the town square, where you stood as you challenged it.
     const back = townReturn.current;
     if (back) {
@@ -1657,8 +1700,9 @@ export function App() {
 
   /** Where the computer's side menu goes (front-door pages and, since Oct 29, the town square, outside a match). */
   const goHome = () => {
-    // (The town square is in the frame on a computer: every menu item leaves it; Chess Town sets it again.)
+    // (The town square is in the frame on a computer: every menu item leaves it; Chess Town sets it again. The tower's screen too.)
     setShowTown(false);
+    setShowTower(false);
     setTownSeat(null);
     setTownStand(null);
     closeProfile();
@@ -1994,6 +2038,24 @@ export function App() {
         {/* The front door's frame (Nov 8): the same side menu and right column as home, so neither moves on the way in. */}
         <FrontFrame page="autochess" nav={autoNav}>
           <AutoChessScreen onBack={autoBack} />
+        </FrontFrame>
+        {sideConfirm}
+      </>
+    );
+  }
+  if (!match && showTower) {
+    return (
+      <>
+        <FrontFrame page="tower" nav={nav}>
+          <TowerScreen
+            name={account().profile?.user.name ?? "Player"}
+            look={account().profile?.locker?.look}
+            onBack={() => {
+              setShowTower(false);
+              setShowTown(true);
+              history.replaceState(null, "", `/town${location.search}`);
+            }}
+          />
         </FrontFrame>
         {sideConfirm}
       </>

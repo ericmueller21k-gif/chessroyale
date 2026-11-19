@@ -262,6 +262,10 @@ export class FloorPlay {
   get beaten(): readonly string[][] {
     return this.kept.beaten;
   }
+  /** The floor kept as it begins (or is rejoined): a reload before its first step still knows this device holds it. */
+  begin(): void {
+    saveKept(this.kept);
+  }
   /** The game as it stands, kept (nothing once it's over). */
   keep(game: KeptGame): void {
     if (this.kept.done) return;
@@ -279,4 +283,46 @@ export class FloorPlay {
   settle(): Promise<TowerEnd> {
     return settle(this.kept);
   }
+}
+
+// ---------------- Into a floor ----------------
+
+/** A floor to go into: the server's start, the floor kept on this device (new, or the one rejoined), the game to rejoin (null: from its start). */
+export interface FloorEntry {
+  start: FloorStart;
+  kept: KeptFloor;
+  game: KeptGame | null;
+  best: number;
+}
+
+/** What asking for the floor gave: a floor to go into, a question first (`resting`, `elsewhere`, `broken`: start a new run), or why not. */
+export type FloorAsk = { kind: "entry"; entry: FloorEntry } | { kind: "resting" | "elsewhere"; start: FloorStart } | { kind: "broken" } | { kind: "error"; message: string };
+
+/** The run's floor started (or the one under way answered) and what it means here (floorPlan): the tower's screen's CONTINUE, a win's Continue. */
+export async function askFloor(best: number): Promise<FloorAsk> {
+  const a = await towerApi.start();
+  if (!a.ok) return a.status === 409 && a.body.confirm ? { kind: "broken" } : { kind: "error", message: a.body.message ?? TOWER_WORDS.offline };
+  const start = a.body;
+  const kept = loadKept();
+  const plan = floorPlan(start, kept);
+  if (plan === "resting" || plan === "elsewhere") return { kind: plan, start };
+  if (plan === "rejoin") return { kind: "entry", entry: { start, kept: kept!, game: kept!.game!, best } };
+  return { kind: "entry", entry: { start, kept: { v: 1, fight: start.fight.id, floor: start.floor, bosses: start.bosses, settings: start.settings, beaten: start.run.beaten }, game: null, best } };
+}
+
+let floorHandler: ((e: FloorEntry) => void) | null = null;
+/** The app's way into a floor's battle (App.tsx registers it). */
+export function onEnterFloor(fn: (e: FloorEntry) => void): () => void {
+  floorHandler = fn;
+  return () => {
+    if (floorHandler === fn) floorHandler = null;
+  };
+}
+
+/**
+ * Into a floor: the only way the tower's screen starts one (a new floor, the next after a win, or one rejoined). For now straight to
+ * the battle; PR 11b puts the floor room's walk-in in front of it.
+ */
+export function enterTowerFloor(e: FloorEntry): void {
+  floorHandler?.(e);
 }
