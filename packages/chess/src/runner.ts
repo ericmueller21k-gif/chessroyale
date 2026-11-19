@@ -319,8 +319,14 @@ export class MatchRunner {
       /** A 50 v 50's parties (each the entrant ids of one): each plays the match on one team (core's assignTeams). */
       together?: readonly (readonly string[])[];
     },
+    /** restore's own: the match as its snapshot left it (restore puts in the rest), nothing of a new match set up. */
+    restoring?: Pick<RunnerSnapshot, "state">,
   ) {
     this.top = new TopMovesCache(opts.settings.botCandidateMoves);
+    if (restoring) {
+      this.state = restoring.state;
+      return;
+    }
     const plan = stagePlan(opts.settings);
     const boardCount = plan[0]?.boards ?? 1;
     const plies = openingPlies(opts.settings);
@@ -505,7 +511,7 @@ export class MatchRunner {
 
   /** The battle was Hollow's by his last bulb (Boss alone): for the result screen (the results' `blackout`). */
   get bossBlackout(): boolean {
-    return this.sideBosses().some((b) => blackedOut(b)) || blackedOut(this.state.boss);
+    return this.sideBosses().some((b) => blackedOut(b));
   }
 
   /** Hollow's dark: each player's wrong attempts into the dark this round. */
@@ -1307,34 +1313,16 @@ export class MatchRunner {
   ): MatchRunner {
     // (A Freestyle board's opening isn't in the library either.)
     const byId = new Map([...opts.library, FREESTYLE_OPENING].map((o) => [o.id, o]));
-    const runner = Object.create(MatchRunner.prototype) as MatchRunner;
+    // (Built as every runner is, so each field the class starts a runner with is there at its start value, then the match from the
+    // snapshot. Built with Object.create and a list kept by hand, a restored runner lacked the bosses' store (Big Boy's Big Bounce
+    // crashed online: every event of a lobby restores), then four more fields, whose turnOf the Battle Tower's audit 1 found.)
+    const runner = new MatchRunner({ ...opts, entrants: [] }, snapshot);
     Object.assign(runner, {
-      opts: { ...opts, entrants: [] },
-      top: new TopMovesCache(opts.settings.botCandidateMoves),
-      state: snapshot.state,
       boards: new Map(snapshot.boards.map((b) => [b.id, { ...b, opening: byId.get(b.opening)! }])),
       groups: new Map(snapshot.groups),
       usedFamilies: new Set(snapshot.usedFamilies),
       retiredThisRound: snapshot.retired,
       botThink: new Map(snapshot.botThink ?? []),
-      botPowerUps: new Set(),
-      // (Not made from the snapshot, but fields every runner has: Object.create skips the class's own initializers. A
-      // restored runner without the bosses' store crashed Big Boy's Big Bounce online: every event of a lobby restores.)
-      kingCallers: new Set(),
-      kingStrikers: new Set(),
-      strikeBots: null,
-      planned: new Map(),
-      planning: null,
-      forceLastStand: false,
-      showdownScout: null,
-      bossTimedOut: false,
-      humanBrain: null,
-      brainNote: null,
-      landingCheck: null,
-      raceCheck: null,
-      bossLast: null,
-      bossMemo: new Map(),
-      bossViewMemo: null,
     });
     // The boss battle's board isn't in the opening library.
     for (const [id, b] of runner.boards) if (!b.opening) runner.boards.set(id, { ...b, opening: BOSS_OPENING });

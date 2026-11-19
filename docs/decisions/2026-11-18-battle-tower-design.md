@@ -1,6 +1,7 @@
 # The Battle Tower: the design (Nov 18, 2026)
 
-**Status: design only, nothing built; settled with Eric (Nov 18).** It replaces the Boss Assists design written earlier the same day
+**Status: settled with Eric (Nov 18); being built (the board layer, every boss on it and several bosses in the match runner, PRs
+1-6, by Nov 19: what is built is on the area page).** It replaces the Boss Assists design written earlier the same day
 (Eric dropped that mode, below). Eric answered every call; the ones he didn't object to stand as proposed ("What else you need").
 The settled calls are listed at the end.
 Area stub: [docs/areas/battle-tower.md](../areas/battle-tower.md).
