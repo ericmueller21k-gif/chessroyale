@@ -57,7 +57,7 @@ jobs:
           BODY: ${{ github.event.pull_request.body }}
         run: |
           n=$(printf '%s\n' "$BODY" | wc -l)
-          if [ "$n" -gt 60 ]; then echo "::warning::The PR body is $n lines. Keep it to what changed, what players see and the changed checks (old -> new); detail goes in the decision note or the area page."; fi
+          if [ "$n" -gt 60 ]; then echo "::warning::The PR body is $n lines. Keep it to what changed, what players see and the changed checks (old -> new); detail goes on the area page."; fi
       - uses: actions/setup-node@v7
         with:
           node-version: 22

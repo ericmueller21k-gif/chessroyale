@@ -8,7 +8,6 @@ import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool, warmEngine } from "./engine.ts";
 import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
-import { DashTap } from "./components/DashStall.tsx";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
@@ -85,6 +84,8 @@ const SpectateScreen = game.screen("SpectateScreen");
 const StageBreakScreen = game.screen("StageBreakScreen");
 const SquadsQueue = game.screen("SquadsQueue");
 const SquadsScreen = game.screen("SquadsScreen");
+// (A piece inside the match screen, so nothing shows until the chunk is here; in a match it always is.)
+const DashTap = game.screen("DashTap", null);
 const DuelFront = game.screen("DuelFront");
 /** Solo play (solo.ts: the match runner, chess.js's whole game, the boss rules): loaded as play is near, or as it starts. */
 const solo = lazyGroup(() => import("./solo.ts"));
