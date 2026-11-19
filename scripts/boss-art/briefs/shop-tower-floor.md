@@ -107,6 +107,12 @@ out of; the floor tiles tile with no seams; nothing else is in the room.
 
 Call done with notes: your choices, each piece's size, the wall picture's size, where the number sits, and the exports.
 
-## How to write it
-Write a short skeleton first (palette, floor tiles, the circle, the back wall, the layout and the room still) and render it; then
-add the pieces a few at a time with `edit_drawing`, rendering as you go. Keep each turn's writing under about 600 lines.
+## How to write it (a first try ran out of room writing the whole file in one turn: don't)
+- **Start from the lobby's file**, `scripts/boss-art/out/house-shop-tower/house-shop-tower.ts` (finished): read it once and copy
+  what you can (its palette, its helpers, the floor tiles, the back wall, the elevator, the hem, the entrance, the side wall's
+  picture, the room still's builder), so the two rooms match and you write less.
+- Your **first `write_drawing` is a skeleton of at most about 300 lines**: the palette, the helpers, the floor tiles, the back
+  wall, the layout and the room still. Render it.
+- Then add the rest **a piece at a time with `edit_drawing`** (the circle; the elevator; the side walls and the digits; the
+  front; the table palettes and `table-mock`; the review views), each edit at most about 250 lines, rendering as you go.
+- Never write more than about 300 lines in one turn.
