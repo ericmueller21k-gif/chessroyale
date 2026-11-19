@@ -76,6 +76,31 @@ describe("several bosses: the deal", () => {
   });
 });
 
+describe("several bosses: the Battle Tower's screens (PR 10)", () => {
+  it("the view carries every boss on the side for the split bar: each his own name, level and meter, the one to move, who moved last; none with one boss", () => {
+    const r = runner(["gingerbread", "clown", "moo"]);
+    const side = r.bossView()!.side!;
+    expect(side.bosses.map((b) => b.id)).toEqual(["gingerbread", "clown", "moo"]);
+    expect(side.bosses.map((b) => b.name)).toEqual(["Ginger", "Boingo the Clown", "Moo & Moon"]);
+    expect(side.toMove).toBe(0);
+    expect(side.moved).toBe(2);
+    expect(side.bosses.every((b) => !("board" in b) && !("side" in b) && typeof b.powers?.rage === "number")).toBe(true);
+    expect(runner(["gingerbread"]).bossView()!.side).toBeUndefined();
+  });
+
+  it("no Last Stand on a tower floor, the test switch's included (Eric, Nov 19: \"no save in tower\")", () => {
+    const stand = (patch: Partial<Settings>) => {
+      const r = runner(["gingerbread", "clown"], "", 5, patch);
+      r.forceLastStand = true;
+      const fen = r.boards.get(0)!.fen;
+      const scored = [{ move: "e2e4", expected: 0.6, loss: 0 }, { move: "g2g4", expected: 0.2, loss: 0.4 }];
+      return (r as unknown as { lastStandFor: (...a: unknown[]) => unknown }).lastStandFor(fen, "g2g4", 0.6, scored, { replies: {} });
+    };
+    expect(stand({})).toBeDefined();
+    expect(stand({ towerFloor: 2 })).toBeUndefined();
+  });
+});
+
 describe("several bosses: the turn order and the merged layer", () => {
   it("they move in the order dealt, each his own turn; the crowd's moves are limited by every boss's marks at once", async () => {
     const movers: string[] = [];
