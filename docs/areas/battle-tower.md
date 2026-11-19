@@ -92,7 +92,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   `/floor/finish {fight, outcome}` (only the floor started, once: one statement that applies only while it's under way; won:
   `finishFloor` deals the next floor, refused sooner than `BATTLE_TOWER.soloWinMinSeconds` unless TEST_SWITCHES; lost or drawn: out);
   `/stop {fight?, moves?}` (between floors nothing to do; mid-floor `leaveFloor`: free before your 2nd move, else a loss; no
-  `moves` counts). Solo resting (PAUSE_SOLO) refuses a run and a start; the bosses resting are never dealt. A solo result is the
+  `moves` counts). Solo resting (PAUSE_SOLO) refuses a new run or floor (one under way still answers, finishes, stops); the bosses resting are never dealt. A solo result is the
   device's word (as Boss alone's).
 - **The sign-in merge** (`towerMoves`, in the sign-in's batch): the guest's runs and bests join the account; two open runs of a
   kind: the higher floor stays (the account's on a tie), the other is abandoned; bests: the higher. **Download** (store `tower`:

@@ -425,16 +425,20 @@ describe("the API", () => {
     expect((await call(d1, cookie, "/api/tower")).body).toMatchObject({ runs: { solo: { floor: 2, fight: null } }, best: { solo: 1 } });
   });
 
-  it("without test switches a win at once is too soon; solo resting refuses a new run or floor, never a result; a party run, later; no session, 401", async () => {
+  it("without test switches a win at once is too soon; solo resting refuses a new run or floor, never one under way; a party run, later; no session, 401", async () => {
     const { sql, d1 } = await world();
     const ann = await signedIn(sql, "ann@example.com", Date.now());
     const cookie = await cookieOf(sql, ann.id);
     await call(d1, cookie, "/api/tower/run", {});
     const fight = ((await call(d1, cookie, "/api/tower/floor/start", {})).body.fight as { id: string }).id;
     expect(await call(d1, cookie, "/api/tower/floor/finish", { fight, outcome: "won" })).toMatchObject({ status: 409, body: { message: "That floor only just began." } });
+    // (Solo resting: the floor under way still answers its start (a reload rejoining it) and its result; no new run or floor.)
     const resting = { PAUSE_SOLO: "1" };
-    for (const path of ["/api/tower/run", "/api/tower/floor/start"]) expect(await call(d1, cookie, path, { confirm: true }, resting)).toMatchObject({ status: 503, body: { paused: "solo" } });
+    expect(await call(d1, cookie, "/api/tower/floor/start", {}, resting)).toMatchObject({ status: 200, body: { under: true, fight: { id: fight } } });
     expect(await call(d1, cookie, "/api/tower/floor/finish", { fight, outcome: "lost" }, resting)).toMatchObject({ status: 200, body: { status: "out" } });
+    expect(await call(d1, cookie, "/api/tower/run", { confirm: true }, resting)).toEqual({ status: 503, body: { message: "Solo and Boss alone are resting for a bit. Back soon.", paused: "solo" } });
+    await call(d1, cookie, "/api/tower/run", {});
+    expect(await call(d1, cookie, "/api/tower/floor/start", {}, resting)).toMatchObject({ status: 503, body: { paused: "solo" } });
     expect(await call(d1, cookie, "/api/tower/run", { kind: "party" })).toEqual({ status: 400, body: { message: "Party runs aren't open yet." } });
     expect((await call(d1, null, "/api/tower")).status).toBe(401);
     expect((await call(d1, cookie, "/api/tower/nope", {})).status).toBe(404);

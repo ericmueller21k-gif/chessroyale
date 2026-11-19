@@ -782,11 +782,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   // The Battle Tower (Nov 19; tower.ts): GET /api/tower, POST /api/tower/run, /floor/start, /floor/finish, /stop. A guest's run is
-  // saved as an account's. Solo resting (PAUSE_SOLO): no new run or floor; one under way still finishes or stops. The bosses resting
-  // are never dealt.
+  // saved as an account's. Solo resting (PAUSE_SOLO): no new run or floor; one under way still answers, finishes or stops. The bosses
+  // resting are never dealt.
   if (path === "/api/tower" || path.startsWith("/api/tower/")) {
-    if ((path === "/api/tower/run" || path === "/api/tower/floor/start") && request.method === "POST" && isPaused(env, "solo", now)) return pausedResponse("solo");
-    const tower = await towerResponse(request, sql, current.id, { off: pausedBosses(env, now), testSwitches: (env as AdminEnv).TEST_SWITCHES === "1" }, now);
+    const tower = await towerResponse(request, sql, current.id, { off: pausedBosses(env, now), soloPaused: isPaused(env, "solo", now), testSwitches: (env as AdminEnv).TEST_SWITCHES === "1" }, now);
     if (tower) return tower;
   }
 

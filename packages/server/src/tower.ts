@@ -1,4 +1,4 @@
-import { BATTLE_TOWER, finishFloor, floorSettings, leaveFloor, newRun, startFloor, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
+import { BATTLE_TOWER, finishFloor, floorSettings, leaveFloor, newRun, pausedLine, startFloor, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
@@ -237,16 +237,17 @@ export async function newTowerRun(sql: Sql, userId: string, now: number, opts: {
 /**
  * POST /api/tower/floor/start: the open solo run's floor begins. Its bosses from the run's deal (startFloor: dealt again if the pool
  * no longer allows them, and saved so), its start noted by the server's clock (`fight`). A floor already under way is answered as
- * it is (`under`: a retry, or a reload rejoining it), never begun again: the same id, the same start. Answers the floor's settings
- * for the match runner.
+ * it is (`under`: a retry, or a reload rejoining it), never begun again: the same id, the same start; that, even while solo rests
+ * (`paused`, which refuses only a new floor). Answers the floor's settings for the match runner.
  */
-export async function startTowerFloor(sql: Sql, userId: string, now: number, opts: { pool: readonly string[] }): Promise<TowerAnswer> {
+export async function startTowerFloor(sql: Sql, userId: string, now: number, opts: { pool: readonly string[]; paused?: boolean }): Promise<TowerAnswer> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const row = await openRow(sql, userId, "solo");
     if (!row) return { status: 404, body: { message: TOWER_LINES.noRun } };
     const run = runOf(row);
     const under = fightOf(row.fight);
     if (under) return { status: 200, body: floorAnswer(row, run, under, opts.pool, true) };
+    if (opts.paused) return SOLO_RESTING;
     const started = startFloor(run, opts.pool);
     const floor = run.floors.length;
     if (!started || !started.run.floors[floor - 1]?.length) return { status: 503, body: { message: TOWER_LINES.resting } };
@@ -337,10 +338,15 @@ export async function stopTower(sql: Sql, userId: string, now: number, body: { f
   return { status: 200, body: { stopped: free ? "free" : "lost", floor: before.floors.length, status: after.status, run: open } };
 }
 
-/** What the routes need from the Worker: the bosses resting, and whether test switches are on here. */
+/** Solo resting (PAUSE_SOLO): kill-switches.ts's pausedResponse, as an answer. */
+const SOLO_RESTING: TowerAnswer = { status: 503, body: { message: pausedLine("solo"), paused: "solo" } };
+
+/** What the routes need from the Worker: the kill switches, and whether test switches are on here. */
 export interface TowerEnv {
   /** The bosses resting (kill switches): never dealt. */
   off: readonly string[];
+  /** Solo resting (PAUSE_SOLO): no new run or floor; a floor under way still answers, finishes and stops (a match running finishes). */
+  soloPaused: boolean;
   /** TEST_SWITCHES is "1" here (local, e2e, staging): a win isn't held to BATTLE_TOWER.soloWinMinSeconds. */
   testSwitches: boolean;
 }
@@ -350,7 +356,7 @@ const POSTS = new Set(["/api/tower/run", "/api/tower/floor/start", "/api/tower/f
 
 /**
  * The tower's routes, for the account behind the request (api.ts, after its session: a guest's cookie as anyone's; the API's rate
- * limits and ban gate before it, index.ts; solo resting, PAUSE_SOLO, refuses a new run or floor there). Null: not one of them.
+ * limits and ban gate before it, index.ts). Null: not one of them.
  *   GET /api/tower → TowerState
  *   POST /api/tower/run {kind?: "solo", confirm?: true} → {run} | 409 {message, confirm, run}
  *   POST /api/tower/floor/start → {fight, floor, bosses, settings, under?, run} | 404 | 503 (the bosses resting)
@@ -366,8 +372,8 @@ export async function towerResponse(request: Request, sql: Sql, userId: string, 
   if (request.method !== "POST") return null;
   const b = ((await request.json().catch(() => null)) ?? {}) as { kind?: unknown; confirm?: unknown; fight?: unknown; outcome?: unknown; moves?: unknown };
   if (b.kind !== undefined && b.kind !== "solo") return json({ message: b.kind === "party" ? TOWER_LINES.partyLater : TOWER_LINES.bad }, 400);
-  if (path === "/api/tower/run") return answer(await newTowerRun(sql, userId, now, { confirm: b.confirm === true, pool }));
-  if (path === "/api/tower/floor/start") return answer(await startTowerFloor(sql, userId, now, { pool }));
+  if (path === "/api/tower/run") return answer(env.soloPaused ? SOLO_RESTING : await newTowerRun(sql, userId, now, { confirm: b.confirm === true, pool }));
+  if (path === "/api/tower/floor/start") return answer(await startTowerFloor(sql, userId, now, { pool, paused: env.soloPaused }));
   if (path === "/api/tower/floor/finish") return answer(await finishTowerFloor(sql, userId, now, b, { pool, minWinMs: env.testSwitches ? 0 : BATTLE_TOWER.soloWinMinSeconds * 1000 }));
   return answer(await stopTower(sql, userId, now, b, { pool }));
 }
