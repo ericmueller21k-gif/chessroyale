@@ -23257,6 +23257,28 @@ body.mo-on .mm-scrim {
 .mo-close {
   z-index: 3;
 }
+/* The moon coming down (Nov 20): the field's own, lifted, over the field and under him. */
+.mo-bigmoon {
+  position: absolute;
+  z-index: 1;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+/* The moon's light on the two of them in the close-up: a wash from its side, lighting what's lit and keeping the dark lines (overlay). */
+.mo-lit {
+  position: absolute;
+  z-index: 3;
+  mix-blend-mode: overlay;
+  background: radial-gradient(circle at var(--mo-lx) var(--mo-ly), #fffbe8 0%, rgba(255, 238, 190, 0.8) 35%, rgba(255, 226, 160, 0) 85%);
+}
+/* The Hidden Boss's light for the moon (recluse-light.ts): the glow, the rays over the whole screen, the white-out; over everything. */
+.mo-cine .mo-light {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+}
 .mo-cine .mo-cine-fig {
   position: absolute;
   z-index: 2;
