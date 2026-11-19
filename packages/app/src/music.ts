@@ -438,6 +438,18 @@ export interface MusicBattle {
   next?: string;
 }
 const themeOf = (b: MusicBattle) => b.theme ?? b.boss;
+/**
+ * Which themes themes.json lists, for a Battle Tower floor's pick (tower.ts FloorPlay.music); null while it isn't read yet (then
+ * fetched, if music is wanted: the battle asks again as it renders).
+ */
+export function themeKnown(): ((id: string) => boolean) | null {
+  const t = themesNow;
+  if (!t) {
+    if (wanted()) void loadThemes();
+    return null;
+  }
+  return (id) => !!t.themes[id];
+}
 let battle: MusicBattle | null = null;
 let playing: (Playing & { key: unknown; boss: string; theme: string }) | null = null;
 /** What a switch left playing until its fade is done (stopped at once by the result, Music off or the page hiding). */

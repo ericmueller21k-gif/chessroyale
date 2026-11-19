@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FLOOR_DOOR, FLOOR_TABLE, FLOOR_YOU, TOWER_FLOOR_FEEL, bossAt, bossMarks, floorTimes, piecesAt, upWords, type BossNow } from "../src/town/shops/tower-floor.ts";
 import { SHOP_TOWER_FLOOR_LAYOUT, SHOP_TOWER_FLOOR_N, towerFloorPieces } from "../src/town/shops/tower-floor-art.ts";
 import { makeRoom, passArrive, isFloor, walkable, findPath } from "../src/town/shops/room.ts";
@@ -78,5 +78,50 @@ describe("the tower's floor room", () => {
     expect(upWords("out", 4).on).toBe(false);
     expect(upWords("out", 4).note).toContain("run is over");
     expect(upWords("fight", 4).on).toBe(false);
+  });
+});
+
+/**
+ * Its music (Eric, Nov 19): the tower's own theme in its lobby and floor room ("just for when you're idling in the tower"); a floor's
+ * battle plays one of its bosses' themes, picked once and kept, avoiding the last floors' ("it doesn't reuse the same one for, 5 or 6 rounds").
+ */
+describe("the tower's music", () => {
+  it("the lobby and the floor room play `tower` (in themes.json, a loop from `pad`, 160 s)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { TOWER_FLOOR, homeTheme, roomDef, roomTheme } = await import("../src/town/shops/shops.ts");
+    const { musicPlan } = await import("../src/music.ts");
+    const themes = JSON.parse(readFileSync(new URL("../public/music/themes.json", import.meta.url), "utf8"));
+    expect([roomTheme(roomDef("tower")!), roomTheme(TOWER_FLOOR), homeTheme("tower")]).toEqual(["tower", "tower", "tower"]);
+    expect(musicPlan(themes, "tower", 0)).toMatchObject({ intro: null, loop: { name: "tower-loop", offset: 0.5, loopStart: 0.5, loopEnd: 160.5 } });
+  });
+
+  it("a floor's battle: one of its bosses' themes, kept (a reload too), avoiding the last floors', else the least recent", async () => {
+    const { FloorPlay, pickFloorTheme, readKept, recentFloorThemes } = await import("../src/tower.ts");
+    const has = (id: string) => id !== "nomusic";
+    // (Not a recent one; none fresh: the least recently played; no boss with a theme: none.)
+    expect(pickFloorTheme(["grex", "zebra", "moo"], ["grex", "zebra"], has, () => 0)).toBe("moo");
+    expect(pickFloorTheme(["grex", "zebra"], ["zebra", "pig", "grex"], has, () => 0.99)).toBe("zebra");
+    expect(pickFloorTheme(["nomusic", "grex"], [], has, () => 0)).toBe("grex");
+    expect(pickFloorTheme(["nomusic"], [], has)).toBeNull();
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) });
+    try {
+      const play = new FloorPlay({ v: 1, fight: "f1", floor: 3, bosses: ["grex", "zebra"], settings: {}, beaten: [] }, 0);
+      expect(play.music(null)).toBeNull(); // (themes.json not read yet: no pick yet)
+      const pick = play.music(has)!;
+      expect(["grex", "zebra"]).toContain(pick);
+      // (The same for the whole match, whatever is asked after, and after a reload.)
+      expect(play.music(() => false)).toBe(pick);
+      expect(new FloorPlay(readKept(store.get("brc.tower.solo")!)!, 0).music(has)).toBe(pick);
+      expect(recentFloorThemes()).toEqual([pick]);
+      // (The next floor with the same bosses plays the other.)
+      const next = new FloorPlay({ v: 1, fight: "f2", floor: 4, bosses: ["grex", "zebra"], settings: {}, beaten: [] }, 0);
+      expect(next.music(has)).toBe(pick === "grex" ? "zebra" : "grex");
+      // (Only the last MUSIC.towerRecent are remembered.)
+      for (const [i, b] of ["a", "b", "c", "d", "e", "f"].entries()) new FloorPlay({ v: 1, fight: `g${i}`, floor: 5, bosses: [b], settings: {}, beaten: [] }, 0).music(has);
+      expect(recentFloorThemes()).toEqual(["b", "c", "d", "e", "f"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
