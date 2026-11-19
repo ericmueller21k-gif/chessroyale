@@ -1838,7 +1838,8 @@ export const BOSS_POWERS = {
    * 7"): fullMoonMoves of his moves at full strength (the engine's best at his move's own budget, bossNodes: never his
    * brain, a slip or the guard), the first ending with a flurry of flurryBeams moonbeams on different pieces.
    */
-  fullMoonMoves: 5,
+  // (Eric, Nov 20: "If it's only 5, it should be like 10 moves probably.")
+  fullMoonMoves: 10,
   flurryBeams: 5,
   /**
    * The hippo gardener's Seeds (his passive; Eric, Oct 20: "a second meter on a real timer... every 30 seconds it fills and
@@ -2405,8 +2406,37 @@ export const MOO_CINEMATIC = {
   hopMs: 720,
   /** The field fades in over the board and everything above it (a CSS fade). */
   fadeInMs: 500,
-  /** The field holds, him standing in it, before the cut to the close-up (Eric, Nov 19: "about 2 more seconds": 700 → 2700). */
-  fieldMs: 2700,
+  /**
+   * The field holds, him standing in it, before the cut to the close-up (Eric, Nov 19: "about 2 more seconds": 700 → 2700; Nov 20,
+   * the moon coming down and bursting into light: "four seconds for that first part, or 5 seconds": 2700 → 5000).
+   */
+  fieldMs: 5000,
+  /**
+   * The moon coming down (Eric, Nov 20: "this big moon ... it takes up basically the full width of the sky, and then it starts like
+   * coming downward ... almost like a meteor ... it doesn't move ... too quick, but ... you can clearly see it"): the field's own moon,
+   * lifted as a sprite (characters/moo-moon.png), from the field fading in to the cut, `scale` times the field's and `y` art pixels
+   * below the field's moon, from `moonFrom` to `moonTo`, gathering pace (its progress to the power `moonPow`). It always covers the
+   * field's moon, which stays put under it (|y| ≤ 57 × (scale − 1): the field's moon is 57 art pixels across its middle).
+   */
+  moonFrom: { scale: 1.65, y: -37 },
+  moonTo: { scale: 1.95, y: 42 },
+  moonPow: 1.4,
+  /**
+   * Then the Hidden Boss's light (components/recluse-light.ts, Eric: "the same way the light looks there, because it looks perfect"):
+   * the moon starts glowing `glowMs` before the cut, its rays radiate over the whole screen from `radiateMs` before it, the white
+   * covers the whole screen from `whiteMs` before it, whole at the cut.
+   */
+  glowMs: 2600,
+  radiateMs: 1500,
+  whiteMs: 700,
+  /**
+   * The close-up comes in out of that light: whole white for `lightHoldMs`, then the light dies back into the moon's side (above
+   * them, to the left) by `lightMs` into the close-up, its rays still falling on them. A wash of it on the two of them (`lit`, its
+   * strength) eases from `from` to `to` as their eyes turn white (by `whitenAt` + 4 × `eyeStepMs`) and holds.
+   */
+  lightHoldMs: 120,
+  lightMs: 3000,
+  lit: { from: 1, to: 0.45 },
   /** The close-up of the two of them looking up at the moon, the cuts to it and back included (Eric, Nov 19: 2 s longer: 2200 → 4200). */
   closeMs: 4200,
   /** The cut to the close-up and back: a quick crossfade, each way, inside `closeMs`. */
@@ -5021,6 +5051,13 @@ export const AREA_BANNER = { inMs: 400, holdMs: 1800, outMs: 600 } as const;
 
 /** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
 export type HapticPattern = number | readonly number[];
+
+/**
+ * The installed app's first window on a computer (Eric, Nov 20: it opened narrow, in the phone layout). Chrome opens an installed app
+ * small; on its first launch the app opens itself at this size (smaller on a smaller screen) and centers. Only once: a window the player
+ * resizes afterward keeps their size (the browser remembers it). The desktop layout with chat starts at 1100 px wide (styles.css).
+ */
+export const APP_WINDOW = { width: 1600, height: 900 } as const;
 
 /**
  * Haptics (Eric, Nov 9: "when you tap [a piece] … it should vibrate. And then when we drop it on a square … vibrate";

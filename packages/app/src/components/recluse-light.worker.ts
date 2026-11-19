@@ -1,6 +1,7 @@
 /**
  * The light of the Hidden Boss's transformation, drawn off the main thread (Nov 14 review, B1): RecluseTransform hands its two
- * canvases here once (`init`, with the phase change's beats), then a frame each animation frame; only the latest is drawn.
+ * canvases here once (`init`, with the phase change's beats), then a frame each animation frame; only the latest is drawn. Moo &
+ * Moon's Full Moon (MooCinematic.tsx) hands its one, the front, with its own beats.
  */
 import { drawLight, type LightBeats, type LightFrame } from "./recluse-light.ts";
 
@@ -16,7 +17,7 @@ const draw = () => {
   next = null;
 };
 
-self.onmessage = (e: MessageEvent<{ init: { back: OffscreenCanvas; front: OffscreenCanvas; beats: LightBeats } } | { frame: LightFrame }>) => {
+self.onmessage = (e: MessageEvent<{ init: { back: OffscreenCanvas | null; front: OffscreenCanvas; beats: LightBeats } } | { frame: LightFrame }>) => {
   const m = e.data;
   if ("init" in m) {
     ({ back, front, beats } = m.init);

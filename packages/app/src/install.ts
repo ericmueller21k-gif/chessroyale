@@ -1,5 +1,7 @@
 /** Install ("Add to Home Screen") support and service worker registration. */
 
+import { APP_WINDOW } from "@chessroyale/core";
+
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -97,5 +99,38 @@ export function dismissInstall(): void {
     localStorage.setItem(DISMISS_KEY, "1");
   } catch {
     // Not important.
+  }
+}
+
+const SIZED_KEY = "brc.app-window-sized";
+
+type SizableWindow = Pick<Window, "matchMedia" | "outerWidth" | "resizeTo" | "moveTo"> & {
+  screen: Pick<Screen, "availWidth" | "availHeight"> & { availLeft?: number; availTop?: number };
+  navigator: Navigator & { standalone?: boolean };
+};
+
+/**
+ * The installed app on a computer, on its first launch: open at a computer's size (APP_WINDOW), centered, not the narrow window Chrome
+ * opens an installed app in (which takes the phone layout). Once: the flag is set first, so a window the player resizes keeps their size.
+ * Phones and tablets (no fine pointer), a tab, or a browser that refuses to resize: nothing happens.
+ */
+export function sizeAppWindow(win: SizableWindow = window, store: Pick<Storage, "getItem" | "setItem"> = localStorage): void {
+  const standalone = win.matchMedia("(display-mode: standalone)").matches || win.navigator.standalone === true;
+  if (!standalone || !win.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  try {
+    if (store.getItem(SIZED_KEY)) return;
+    store.setItem(SIZED_KEY, "1");
+  } catch {
+    return;
+  }
+  const s = win.screen;
+  const w = Math.min(APP_WINDOW.width, s.availWidth);
+  const h = Math.min(APP_WINDOW.height, s.availHeight);
+  if (win.outerWidth >= w) return;
+  try {
+    win.resizeTo(w, h);
+    win.moveTo((s.availLeft ?? 0) + Math.round((s.availWidth - w) / 2), (s.availTop ?? 0) + Math.round((s.availHeight - h) / 2));
+  } catch {
+    // Refused: the window stays as the browser opened it.
   }
 }

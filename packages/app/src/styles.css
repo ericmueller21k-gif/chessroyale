@@ -4941,6 +4941,36 @@ button.history-label {
   color: #ffd466;
   animation: lv-pop 560ms ease-out;
 }
+/* Moo & Moon's Full Moon (Eric, Nov 20: "make it like a little like pop more ... that same kind of aura around it while it's active"):
+   the gold level glows and breathes like his aura for as long as he plays at full strength. Reduced motion: the glow, no breathing. */
+/* (On its text, not the badge: the badge's own animation stays its one pop, which a badge drawn anew mustn't replay: boss-bar.spec.) */
+.boss-level.lv-up.lv-aura .lv-text {
+  text-shadow:
+    0 0 4px rgba(255, 212, 102, 0.95),
+    0 0 10px rgba(255, 170, 40, 0.75),
+    0 0 18px rgba(255, 140, 20, 0.45);
+  animation: lv-aura 1.6s ease-in-out infinite;
+}
+@keyframes lv-aura {
+  0%,
+  100% {
+    text-shadow:
+      0 0 4px rgba(255, 212, 102, 0.95),
+      0 0 10px rgba(255, 170, 40, 0.75),
+      0 0 18px rgba(255, 140, 20, 0.45);
+  }
+  50% {
+    text-shadow:
+      0 0 6px rgba(255, 230, 140, 1),
+      0 0 16px rgba(255, 180, 50, 0.9),
+      0 0 28px rgba(255, 150, 30, 0.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boss-level.lv-up.lv-aura .lv-text {
+    animation: none;
+  }
+}
 .boss-level.lv-down {
   color: #ff6b6b;
   animation: lv-flash 480ms steps(1, end);
@@ -23256,6 +23286,28 @@ body.mo-on .mm-scrim {
 }
 .mo-close {
   z-index: 3;
+}
+/* The moon coming down (Nov 20): the field's own, lifted, over the field and under him. */
+.mo-bigmoon {
+  position: absolute;
+  z-index: 1;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+/* The moon's light on the two of them in the close-up: a wash from its side, lighting what's lit and keeping the dark lines (overlay). */
+.mo-lit {
+  position: absolute;
+  z-index: 3;
+  mix-blend-mode: overlay;
+  background: radial-gradient(circle at var(--mo-lx) var(--mo-ly), #fffbe8 0%, rgba(255, 238, 190, 0.8) 35%, rgba(255, 226, 160, 0) 85%);
+}
+/* The Hidden Boss's light for the moon (recluse-light.ts): the glow, the rays over the whole screen, the white-out; over everything. */
+.mo-cine .mo-light {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
 }
 .mo-cine .mo-cine-fig {
   position: absolute;

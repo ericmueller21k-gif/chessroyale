@@ -479,6 +479,7 @@
         "packages/app/src/components/Moo.tsx",
         "packages/app/src/components/MooCinematic.tsx",
         "packages/app/src/characters/moo-cinematic.png",
+        "packages/app/src/characters/moo-moon.png",
         "packages/app/src/speech-icons.ts"
       ],
       "specs": ["e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts", "e2e/moo.spec.ts"]

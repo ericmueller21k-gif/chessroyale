@@ -85,6 +85,12 @@ export function questCounts(counts: QuestCounts, g: QuestGame): boolean {
   }
 }
 
+/**
+ * A solo game's mode for the quests, from what the device names (its result's `mode` and `tower`): a solo Boss Battle "soloBoss", a
+ * Battle Tower floor plain "solo" (Eric, Nov 20: a floor counts for XP and the profile, never the boss quests; floor 1 plays at 800).
+ */
+export const soloQuestMode = (mode: unknown, tower: unknown): QuestGame["mode"] => (mode === "boss" && tower !== true ? "soloBoss" : "solo");
+
 const DAY = 86_400_000;
 
 /** The quest week holding `t` began: the Monday (QUESTS.weekStartDay) at XP.dayStartUtcHour UTC. */

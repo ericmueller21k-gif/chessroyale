@@ -263,10 +263,13 @@ export interface LightFrame {
   eyes: readonly { x: number; y: number }[];
   back: boolean;
   front: boolean;
+  /** Without the book's shaft (Moo & Moon's Full Moon: the moon's glow, its rays and the white-out alone; MooCinematic.tsx). */
+  noShaft?: boolean;
 }
 /** Draws a frame on the two canvases (each only while it has something to draw; its CSS size is the main thread's). */
 export function drawLight(f: LightFrame, T: LightBeats, back: HTMLCanvasElement | OffscreenCanvas | null, front: HTMLCanvasElement | OffscreenCanvas | null) {
   const s = lightNow(f.t, T);
+  if (f.noShaft) s.shaft = 0;
   for (const [c, which] of [
     [back, "b"],
     [front, "f"],
