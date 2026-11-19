@@ -29,7 +29,7 @@ test("Settings: download my data, then delete the account (asked first); it's go
     localStorage.setItem("brc.theme", "dark");
   });
   // A Battle Tower climb (the server's tower.ts, on this D1): floor 1 won, floor 2 under way. One open run only (a second start asks
-  // first); a result taken once.
+  // first); a result taken once (sent again, the same answer; another refused with the run).
   const tower = await page.evaluate(async () => {
     const post = (path: string, body: unknown) =>
       fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: (await r.json()) as Record<string, any> })); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -38,10 +38,18 @@ test("Settings: download my data, then delete the account (asked first); it's go
     const fight = (await post("/api/tower/floor/start", {})).body.fight.id as string;
     const won = await post("/api/tower/floor/finish", { fight, outcome: "won" });
     const replay = await post("/api/tower/floor/finish", { fight, outcome: "won" });
+    const other = await post("/api/tower/floor/finish", { fight, outcome: "lost" });
     const next = await post("/api/tower/floor/start", {});
-    return { made: made.status, again: [again.status, again.body.confirm], won: [won.status, won.body.best], replay: replay.status, next: next.body.floor };
+    return {
+      made: made.status,
+      again: [again.status, again.body.confirm],
+      won: [won.status, won.body.best],
+      replay: [replay.status, replay.body.floor, replay.body.best],
+      other: [other.status, other.body.run.floor],
+      next: next.body.floor,
+    };
   });
-  expect(tower).toEqual({ made: 200, again: [409, true], won: [200, 1], replay: 409, next: 2 });
+  expect(tower).toEqual({ made: 200, again: [409, true], won: [200, 1], replay: [200, 1, 1], other: [409, 2], next: 2 });
   const cookie = (await page.context().cookies()).find((c) => c.name === "hc_session")!;
 
   // Download my data: a JSON file of everything kept about the account.

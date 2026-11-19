@@ -1269,7 +1269,10 @@ export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined }
  * docs/decisions/2026-11-19-tower-apart-pairs.md.
  */
 export const BATTLE_TOWER = {
-  /** The climb (core tower.ts; the design's section 3): 99 floors, each one game; only a win climbs. */
+  /**
+   * The climb (core tower.ts; the design's section 3): 99 floors, each one game; only a win climbs. Only ever raised: a run saved
+   * above it would end there as the top (core finishFloor), its best held at it (server tower.ts, soloBest).
+   */
   floors: 99,
   /** How many bosses a floor has, looping: floor f has pattern[(f - 1) % pattern.length] (Eric: "1 boss then 2, maybe 2 again, then 3"). */
   pattern: [1, 2, 2, 3] as readonly number[],
