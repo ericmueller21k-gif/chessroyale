@@ -32,7 +32,6 @@ import { prewarmFolio } from "./Folio.tsx";
 import { prewarmRecluse } from "./Recluse.tsx";
 import { coated } from "../characters/recluse.ts";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
-import { TowerSide } from "../screens/TowerBar.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
 import { seenFen } from "../camo.ts";
@@ -616,12 +615,6 @@ export function bossPortraitUrl(name: string): string | null {
  * board (by its bottom-right). Goes first in a screen's `.board-row`; on a phone it's hidden (the boss bar has him).
  */
 export function BossSide({ match }: { match: GameView }) {
-  // (A Battle Tower floor of several: the figures stacked beside the board, the one to move stepped forward: TowerBar.tsx.)
-  if (match.boss?.side && match.boss.side.bosses.length > 1) return <TowerSide boss={match.boss} />;
-  return <OneBossSide match={match} />;
-}
-
-function OneBossSide({ match }: { match: GameView }) {
   const el = useRef<HTMLDivElement>(null);
   const name = match.boss?.name;
   // Its size and the God King's by the room beside the board (characters/side-size.ts): measured as it's first drawn and as the window

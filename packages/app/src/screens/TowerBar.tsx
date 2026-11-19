@@ -4,7 +4,7 @@ import { artOf, bossKit } from "../characters/kits.ts";
 import { SpriteAnim, frameImage } from "../components/BossEffect.tsx";
 import type { Character } from "../characters/sprite.ts";
 import { BossBarExtra, RageMeter } from "../components/BossPowers.tsx";
-import { BossFace } from "../components/BossCharacter.tsx";
+import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
 import { BossLevel } from "./Boss.tsx";
@@ -173,4 +173,9 @@ export function TowerSide({ boss }: { boss: BossView }) {
       ))}
     </div>
   );
+}
+
+/** The figures beside the board (a computer's): the floor's several stacked (TowerSide), else the boss's own (BossSide). */
+export function SideFigures({ match }: { match: GameView }) {
+  return match.boss && sideOf(match.boss) ? <TowerSide boss={match.boss} /> : <BossSide match={match} />;
 }
