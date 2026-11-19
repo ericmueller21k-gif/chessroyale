@@ -6,8 +6,9 @@ import { accountReady } from "./boss-tokens.ts";
 /**
  * The Battle Tower's solo climb on this device (PR 10; docs/areas/battle-tower.md): the server's routes (`/api/tower`, PR 9: the run
  * and the floor under way are the server's), the floor's game kept on the device after every step (so a reload rejoins it where it
- * was), and the rules the screens follow: which floor to play, when leaving is free, what a result sends. The screens: the tower's
- * own (screens/Tower.tsx, route /tower) and the battle (a Boss alone battle with the floor's bosses: solo.ts).
+ * was), and the rules the screens follow: which floor to play, when leaving is free, what a result sends. No screen of its own (PR 11b,
+ * Eric, Nov 19): Chess Town's skyscraper is the tower (its clerk, elevator and floor room: town/Town.tsx, town/TowerDesk.tsx), and the
+ * battle a Boss alone battle with the floor's bosses (solo.ts).
  */
 
 // ---------------- The server's answers (server/src/tower.ts) ----------------
@@ -60,7 +61,7 @@ export const TOWER_WORDS = {
   elsewhere: "This floor is under way on another device. Leaving it here counts as a loss and ends your run.",
   resting: "This floor's bosses are resting for a bit. Leaving it now is free: the same floor waits for you.",
   broken: "This run can't be played. Start a new one.",
-  replace: (floor: number) => `Your run on floor ${floor} ends. Start a new run from floor 1?`,
+  replace: (floor: number) => `Your run on floor ${floor} ends, and a new one starts on floor 1.`,
 } as const;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -208,7 +209,7 @@ export interface TowerEnd {
   status: "open" | "top" | "out";
   run: TowerRun | null;
   best: number;
-  /** Couldn't be sent (no connection, or refused): the result is still kept here, sent again from the tower's screen. */
+  /** Couldn't be sent (no connection, or refused): the result is still kept here, sent again by the clerk's card. */
   error?: string;
 }
 
@@ -313,7 +314,7 @@ export interface FloorEntry {
 /** What asking for the floor gave: a floor to go into, a question first (`resting`, `elsewhere`, `broken`: start a new run), or why not. */
 export type FloorAsk = { kind: "entry"; entry: FloorEntry } | { kind: "resting" | "elsewhere"; start: FloorStart } | { kind: "broken" } | { kind: "error"; message: string };
 
-/** The run's floor started (or the one under way answered) and what it means here (floorPlan): the tower's screen's CONTINUE, a win's Continue. */
+/** The run's floor started (or the one under way answered) and what it means here (floorPlan): as the floor room's board comes up. */
 export async function askFloor(best: number): Promise<FloorAsk> {
   const a = await towerApi.start();
   if (!a.ok) return a.status === 409 && a.body.confirm ? { kind: "broken" } : { kind: "error", message: a.body.message ?? TOWER_WORDS.offline };
@@ -334,10 +335,7 @@ export function onEnterFloor(fn: (e: FloorEntry) => void): () => void {
   };
 }
 
-/**
- * Into a floor: the only way the tower's screen starts one (a new floor, the next after a win, or one rejoined). For now straight to
- * the battle; PR 11b puts the floor room's walk-in in front of it.
- */
+/** Into a floor's battle: the only way one starts (the floor room's walk-in done, town/Town.tsx; or one rejoined after a reload, App.tsx). */
 export function enterTowerFloor(e: FloorEntry): void {
   floorHandler?.(e);
 }

@@ -120,7 +120,7 @@ export interface RoomArt {
    * Words written on a piece's face, crisp at the screen's pixels (Boingo's price sign): its face's box in the piece's pixels, its lines,
    * and their ink (none: Boingo's purple; the Battle Tower's "Best floors" board: its slate).
    */
-  sign?: { readonly piece: string; readonly face: { readonly x: number; readonly y: number; readonly w: number; readonly h: number }; readonly lines: readonly string[]; readonly ink?: string };
+  sign?: { readonly piece: string; readonly face: { readonly x: number; readonly y: number; readonly w: number; readonly h: number }; readonly lines: readonly string[]; readonly ink?: string; readonly body?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly ink: string } };
   claw?: { readonly at: { readonly col: number; readonly row: number; readonly w: number; readonly d: number }; readonly spot: Sq };
   /**
    * Its people (Rolling Dough's, Nov 11: the door guards, Don Dough and his crew), drawn from their art: each one's character and the
@@ -251,7 +251,8 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
       outside: "#d9dcdf",
       fixCam: m.SHOP_TOWER_CAM,
       seeThru: ["entrance", "hem"],
-      sign: { piece: "board-best", face: m.SHOP_TOWER_BOARD_HEAD, lines: ["BEST FLOORS"], ink: "#20232a" },
+      // (Its body: your best, written by the lobby's scene, PR 11b: tower-scene.ts.)
+      sign: { piece: "board-best", face: m.SHOP_TOWER_BOARD_HEAD, lines: ["BEST FLOORS"], ink: "#20232a", body: { ...m.SHOP_TOWER_BOARD_BODY, ink: "#f4b740" } },
     })),
   "recluse-top": (light) =>
     chunk(import("./recluse-art.ts")).then((m) => ({
@@ -404,6 +405,30 @@ export function loadRoom(home: HomeId, part: RoomPart = "front"): Promise<Loaded
   const light = LIT_ROOMS.has(key) ? roomLight(skyNow()) : "day";
   return loadRoomWith(LIT_ROOMS.has(key) ? `${key}@${light}` : key, roomDef(home, part)!, () => ART[key]!(light));
 }
+/**
+ * The Battle Tower's floor room for floor `floor` (PR 11b, Nov 19): the same room every floor, its back wall's panels showing the floor's
+ * number (tower-floor-art.ts towerFloorPieces; its side walls' are the scene's). Kept for the last floor loaded only: the next floor's
+ * replaces it.
+ */
+let towerFloorKey: string | null = null;
+export function loadTowerFloor(floor: number): Promise<LoadedRoom> {
+  const key = `tower-top-${floor}`;
+  if (towerFloorKey && towerFloorKey !== key) loading.delete(towerFloorKey);
+  towerFloorKey = key;
+  return loadRoomWith(key, roomDef("tower", "top")!, () =>
+    chunk(import("./tower-floor-art.ts")).then((m) => ({
+      n: m.SHOP_TOWER_FLOOR_N,
+      layout: m.SHOP_TOWER_FLOOR_LAYOUT,
+      pieces: m.towerFloorPieces(floor),
+      crateAt: [0, 0] as const,
+      lights: m.SHOP_TOWER_FLOOR_LIGHTS,
+      pools: m.SHOP_TOWER_FLOOR_POOLS,
+      outside: "#d9dcdf",
+      fixCam: m.SHOP_TOWER_FLOOR_CAM,
+      seeThru: ["entrance", "hem"],
+    })),
+  );
+}
 /** The rooms whose light follows the town's time of day as they load (sky.ts `roomLight`): the walk-up's three (Nov 14), Chandy's Swamp (Nov 16). */
 const LIT_ROOMS: ReadonlySet<string> = new Set(["recluse", "recluse-landing", "recluse-top", "chandy"]);
 /**
@@ -484,6 +509,11 @@ export interface ShopCtl {
   close?: () => void;
   /** The claw machine's controls are open (the away rule's clock holds: afk.ts). */
   busy?: () => boolean;
+  /**
+   * Walks you to square `sq` (a path round what's in the way) and, once there, eases you `off` squares on (a mark's middle between two
+   * squares) over `settleMs`; your steps `stepMs` each. The number of steps, or -1: no way there (the Battle Tower's floor walk-in).
+   */
+  walkTo?: (sq: Sq, off?: { c: number; r: number }, stepMs?: number) => number;
 }
 
 /**
@@ -498,6 +528,12 @@ export interface RoomFx {
   figures?: (now: number) => readonly { readonly z: number; readonly draw: (d: FxDraw, now: number) => void }[];
   /** Drawn over the whole room (its lights and effects), before the tags and cards. */
   over?: (d: FxDraw, now: number) => void;
+  /** A piece drawn as another of the room's pieces now (the Battle Tower's floor room: its elevator open), or null: as laid out. */
+  swap?: (name: string) => string | null;
+  /** Taps and the arrow keys don't walk you now (the Battle Tower's floor: its walk-in walks you, tower-floor.ts). */
+  hold?: () => boolean;
+  /** The lines written on the room's sign's body now (the Battle Tower's "Best floors" board: your best), under its head's. */
+  signBody?: () => readonly string[] | null;
 }
 /** What a scene draws with: the room's canvas (CSS pixels), its camera and focus this frame, and the box's size. */
 export interface FxDraw {
@@ -521,7 +557,7 @@ export interface RoomIntro {
   onDone: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, fx = null, challengeCard = null }: { /** The boss's card's own challenge (the Hidden Boss's room, Nov 13: its count, Challenge and Cancel), in place of Challenge alone. */ challengeCard?: ComponentChildren; /** The room's own scene (RoomFx), or none. */ fx?: RoomFx | null; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it; the room you left, when a room has more than one such door: the walk-up's landing). */ arrived?: boolean | RoomPart; /** Through a door to another of the home's rooms (Rolling Dough's, the walk-up's stairs): the room it leads to. */ onPass?: (to: RoomPart) => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, fx = null, challengeCard = null, talkCard = null, passCard, at = null }: { /** The boss's card's own challenge (the Hidden Boss's room, Nov 13: its count, Challenge and Cancel), in place of Challenge alone. */ challengeCard?: ComponentChildren; /** The keeper's card's own buttons in place of Talk (the Battle Tower's clerk, Nov 19: Start, or Continue and Start over). */ talkCard?: ComponentChildren; /** A door's card's own buttons, by the room it leads to, in place of its one button (the Battle Tower's elevator and way down); null: as usual. */ passCard?: (to: RoomPart) => ComponentChildren | null; /** You start on this square (the Battle Tower's floor, back from its match: on your mark), not at a door. */ at?: Sq | null; /** The room's own scene (RoomFx), or none. */ fx?: RoomFx | null; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it; the room you left, when a room has more than one such door: the walk-up's landing). */ arrived?: boolean | RoomPart; /** Through a door to another of the home's rooms (Rolling Dough's, the walk-up's stairs): the room it leads to. */ onPass?: (to: RoomPart) => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -535,7 +571,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
-    }, intro, zzz, arrived, () => onChallenge?.(), onReady, fx));
+    }, intro, zzz, arrived, () => onChallenge?.(), onReady, fx, at));
     ctl.current = r;
 
     return () => {
@@ -582,7 +618,8 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     return () => removeEventListener("keydown", key, true);
   }, [gotOpen, opening]);
   const held = bossHoldings(def.home);
-  const label = card === "talk" ? (def.name ?? "Shopkeeper") : card === "crate" ? (def.crate ?? undefined) : card === "door" ? "Door" : card === "pass" ? (def.home === "recluse" ? "Stairs" : "Door") : undefined;
+  const passTo = card === "pass" ? (eng.current?.passTo() ?? null) : null;
+  const label = card === "talk" ? (def.name ?? "Shopkeeper") : card === "crate" ? (def.crate ?? undefined) : card === "door" ? "Door" : card === "pass" ? (def.home === "recluse" ? "Stairs" : def.home === "tower" ? (passTo === "top" ? "Elevator" : "Way down") : "Door") : undefined;
   // (Don Dough's card, Nov 11: his Challenge alone. It plays his beat, the walk-out, then the challenge: Eric, "when you hit challenge,
   // it just goes through the talk animation no matter what". The Hidden Boss's on his top floor, Nov 13: the room's own challenge, from
   // the town (`challengeCard`: HiddenRoom.tsx), the count, Challenge and Cancel.)
@@ -594,7 +631,6 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     cardWas.current = card;
   }
   // (The door's card at the stairs (the walk-up's): up or down, by the floors; Rolling Dough's: in to the back room, or out front.)
-  const passTo = card === "pass" ? (eng.current?.passTo() ?? null) : null;
   const passWord = passTo === null ? "" : def.home === "recluse" ? (FLOOR_OF[passTo] > FLOOR_OF[def.part ?? "front"] ? "Go up" : "Go down") : back ? "Go out front" : "Go in";
   return (
     <div class="town-shop" ref={box}>
@@ -621,11 +657,9 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
                 </button>
                 {!canChallenge && <div class="town-soon">Coming soon</div>}
               </>
-            ) : def.talkTo ? (
-              // (The Battle Tower's clerk, Nov 19: Talk opens the tower's screen.)
-              <a class="town-btn primary town-look" href={def.talkTo}>
-                Talk
-              </a>
+            ) : talkCard ? (
+              // (The Battle Tower's clerk, Nov 19: the climb's own buttons: town/TowerDesk.tsx.)
+              talkCard
             ) : (
               <button type="button" class="town-btn primary" onClick={() => (def.crate ? eng.current?.show("crate") : eng.current?.talk())}>
                 Talk
@@ -638,11 +672,12 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
             Go out
           </button>
         )}
-        {card === "pass" && (
-          <button type="button" class="town-btn primary" onClick={() => passTo && onPass?.(passTo)}>
-            {passWord}
-          </button>
-        )}
+        {card === "pass" &&
+          ((passTo && passCard?.(passTo)) ?? (
+            <button type="button" class="town-btn primary" onClick={() => passTo && onPass?.(passTo)}>
+              {passWord}
+            </button>
+          ))}
         {card === "crate" && def.crate && (
           <>
             <h2>{def.crate}</h2>
@@ -794,11 +829,15 @@ function startRoom(
   onWarm: () => void = () => {},
   /** The room's own scene (RoomFx), or none. */
   fx: RoomFx | null = null,
+  /** You start on this square, not at a door (the Battle Tower's floor, back from its match). */
+  startAt: Sq | null = null,
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
   const SQ = f.housePxPerSquare;
   const { def, art, frames } = loaded;
+  /** The room's scene (`fx`, by another name: drawing code below names a foot's x `fx`). */
+  const roomFx = fx;
   // (Ginger's igloo: its catwalk and staircases, a second walking level: levels.ts.)
   const lv = art.levels ? makeLevels(art.levels, art.n ?? 20) : null;
   const room: Room = makeRoom(art.layout, def.keeper, art.n ?? 20, art.floor, def.talk, lv, def.talkAt ?? null, !!def.talkNear);
@@ -811,7 +850,7 @@ function startRoom(
   const g = cv.getContext("2d")!;
   // (Through the door from the home's other room: just inside it, facing away from it, into the room.)
   const arrive = arrived ? passArrive(room, typeof arrived === "string" ? arrived : undefined) : null;
-  const you = new Walker(arrive ?? room.start, f.youStepMs, true, f.walkEase);
+  const you = new Walker(startAt ?? arrive ?? room.start, f.youStepMs, true, f.walkEase);
   // (A room's rows run toward the camera, the town's away: up the screen is a row less. The walker's views and the arrow keys
   // follow it: Walker.rowsUp. Facing the counter, north: up the screen, its back.)
   you.rowsUp = -1;
@@ -899,8 +938,18 @@ function startRoom(
     const at = standAt(a, marks, m);
     return { c: at.c - m.mark.c, r: at.r - m.mark.r };
   };
-  const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) + (castOff("you")?.c ?? back() * (marks.youClear.c - marks.you.c)) : 0);
-  const youOy = (now: number) => (marks ? settle(youAt, marks.you.r - marks.youSq.r, now) + (castOff("you")?.r ?? back() * (marks.youClear.r - marks.you.r)) : 0);
+  /** A walk the room's caller asked for (`walkTo`: the Battle Tower's floor): the half square on once there, from when you got there. */
+  const nudge = { c: 0, r: 0, at: -1, on: false };
+  const nudged = (now: number, k: "c" | "r") => {
+    if (!nudge.on) return 0;
+    if (nudge.at < 0) {
+      if (you.moving()) return 0;
+      nudge.at = now;
+    }
+    return settle(nudge.at, nudge[k], now);
+  };
+  const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) + (castOff("you")?.c ?? back() * (marks.youClear.c - marks.you.c)) : nudged(now, "c"));
+  const youOy = (now: number) => (marks ? settle(youAt, marks.you.r - marks.youSq.r, now) + (castOff("you")?.r ?? back() * (marks.youClear.r - marks.you.r)) : nudged(now, "r"));
   const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) + (castOff("boss")?.c ?? back() * (marks.bossClear.c - marks.boss.c)) : 0);
   const bossOy = (now: number) => (marks ? settle(bossAt, marks.boss.r - marks.bossSq.r, now) + (castOff("boss")?.r ?? back() * (marks.bossClear.r - marks.boss.r)) : 0);
   /** How high the hop back lifts you (or the boss) now, in squares. */
@@ -2509,7 +2558,8 @@ function startRoom(
     if (pt.depth <= S.nearGone) return;
     // (Hollow's intro: a lantern going out, bulbs gone dark, the tree draining: its own frame, and its lit pixels for over the dark.)
     // (Ginger's intro: the stockroom door open while the board carriers come out.)
-    const img = darkPiece(u, now) ?? frameAt(iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name, now + (u.t0 ?? 0));
+    // (The Battle Tower's floor: its elevator open, the scene's `swap`.)
+    const img = darkPiece(u, now) ?? frameAt(roomFx?.swap?.(u.name) ?? (iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name), now + (u.t0 ?? 0));
     const ch = frames[u.name]!.ch;
     const s = pt.k / SQ;
     const fx = u.flip ? ch.w - 1 - ch.foot[0] : ch.foot[0];
@@ -2564,6 +2614,22 @@ function startRoom(
       const k = Math.min(1, (fw * 0.92) / Math.max(1, tw));
       g.save();
       g.translate(fx + fw / 2, fy + lineH * (i + 0.5));
+      g.scale(k, 1);
+      g.fillText(t, 0, 0);
+      g.restore();
+    }
+    // (Its body's lines, the scene's: the Battle Tower's bests, one to a ruled row of the board's 7 px.)
+    const body = sg.body;
+    const more = body ? roomFx?.signBody?.() : null;
+    if (!body || !more?.length) return;
+    const rowH = 7 * s;
+    g.font = `800 ${Math.max(4, rowH * 0.78)}px system-ui, sans-serif`;
+    g.fillStyle = body.ink;
+    for (let i = 0; i < more.length && (i + 1) * rowH <= body.h * s + 0.5; i++) {
+      const t = more[i]!;
+      const k = Math.min(1, (body.w * s * 0.92) / Math.max(1, g.measureText(t).width));
+      g.save();
+      g.translate(x + (body.x + body.w / 2) * s, y + body.y * s + rowH * (i + 0.5));
       g.scale(k, 1);
       g.fillText(t, 0, 0);
       g.restore();
@@ -4304,7 +4370,7 @@ function startRoom(
   let alive = true;
   /** Held arrow keys walk you (the town's rule: a key set off closes the room's card and clears a tap's walk; the walk runs on). */
   const keysWalk = () => {
-    if (ci || walkOut) return;
+    if (ci || walkOut || fx?.hold?.()) return;
     if (!anyHeld()) {
       keysOn = false;
       return;
@@ -4486,7 +4552,7 @@ function startRoom(
     return { x: e.clientX - rc.left, y: e.clientY - rc.top };
   };
   const onDown = (e: PointerEvent) => {
-    if (ci || walkOut) return; // (A challenge plays out on its own: no walking, no looking around. Don Dough's walk-out too.)
+    if (ci || walkOut || fx?.hold?.()) return; // (A challenge plays out on its own: no walking, no looking around. Don Dough's walk-out too; the tower's floor walk-in.)
     cv.setPointerCapture?.(e.pointerId);
     P(camX, camY - 0.5, pq[0]);
     P(camX, camY + 0.5, pq[1]);
@@ -4883,6 +4949,17 @@ function startRoom(
     },
     /** Closes the card (its OK: the walk-up's flats' doors). */
     close,
+    walkTo: (sq: Sq, off?: { c: number; r: number }, stepMs?: number) => {
+      const path = findPath(room, you.here(), sq);
+      if (!path) return -1;
+      if (stepMs) you.stepMs = stepMs;
+      Object.assign(nudge, { c: off?.c ?? 0, r: off?.r ?? 0, at: -1, on: !!off });
+      // (Started on its square already (reduced motion, or back from the match): the half square on at once.)
+      if (!path.length && off) nudge.at = 0;
+      close();
+      you.go(path);
+      return path.length;
+    },
     youAt: () => {
       you.pose(performance.now(), pose);
       return { c: pose.x, r: pose.y };

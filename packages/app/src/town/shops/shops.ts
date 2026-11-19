@@ -43,11 +43,6 @@ export interface ShopDef {
   talkNear?: true;
   /** The talk card's name ("Don Dough"), and the name tag over a drawn keeper (the Battle Tower's "Clerk"); none: "Shopkeeper". */
   name?: string;
-  /**
-   * Talk opens this page of the app (the Battle Tower's clerk, Nov 19: "/tower", the tower's screen) in place of a crate or a line: a link,
-   * so the page loads as any address does.
-   */
-  talkTo?: string;
   /** No Shopkeeper sidekick drawn (the back room: Don Dough is one of its people, shops/zebra-scene.ts). */
   hideKid?: true;
   /** Where you stand to talk (room.ts Room.talkAt: Don Dough's, the foot of his table); none: within talking range of `keeper`. */
@@ -145,9 +140,10 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // town's sky (`sky`); a swamp under the open sky: the day tone. His crate isn't sold yet (core has no Boss Crate of Chandy's: the item-builder's), so Talk has him say a line, as Rolling Dough's.
   chandy: { home: "chandy", boss: "Chandy", crate: null, says: ["Crates come in on the next boat. Gators don't rush.", "Watch your step. Some of these logs bite.", "Chandy? He's out there. You won't see him till he wants you to."], kid: "swampkeeper", at: [9.5, 2.3], tall: 40, keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: [], roof: "sky", chatTone: "day" },
   // The Battle Tower's lobby (Nov 19): its clerk, a penguin bellhop (nobody's kid), behind the counter at the back left, drawn at his art's
-  // size (57 px: his face and bow tie clear the 30 px counter). His tag and card say "Clerk"; Talk opens the tower's screen (/tower, the
-  // only way in: Eric, Nov 19). No crate, no theme of its own (the town's plays on). A bright lobby under a white ceiling: the day tone.
-  tower: { home: "tower", boss: "Battle Tower", name: "Clerk", crate: null, talkTo: "/tower", kid: "towerclerk", at: [2.5, 2.4], tall: 57, keeper: [{ c: 2, r: 2 }, { c: 3, r: 2 }], prizes: [], roof: "store", chatTone: "day", music: null },
+  // size (57 px: his face and bow tie clear the 30 px counter). His tag and card say "Clerk"; his card starts or continues your climb
+  // (town/TowerDesk.tsx, the only way in: Eric, Nov 19). No crate, no theme of its own (the town's plays on). A bright lobby under a white
+  // ceiling: the day tone.
+  tower: { home: "tower", boss: "Battle Tower", name: "Clerk", crate: null, kid: "towerclerk", at: [2.5, 2.4], tall: 57, keeper: [{ c: 2, r: 2 }, { c: 3, r: 2 }], prizes: [], roof: "store", chatTone: "day", music: null },
   zebra: { home: "zebra", boss: "Don Dough", crate: null, says: ZEBRA_BACK_LINES, kid: "zebrakeeper", at: [12.5, 7.3], tall: 73, flip: true, keeper: [{ c: 12, r: 7 }, { c: 13, r: 7 }], prizes: [], roof: "bakery", chatTone: "day" },
 };
 
@@ -232,8 +228,15 @@ export const RECLUSE_ROOMS: Readonly<Record<"front" | "landing" | "top", ShopDef
  */
 export const canChallengeInside = (id: HomeId): boolean => id !== "recluse" && BOSS_ROSTER.some((b) => b.id === id && adminPlayable(b));
 /** A home's room: its front (the shop, from the town), its back room, or a floor of the walk-up. */
+/**
+ * The Battle Tower's floor room (PR 11b, Nov 19), up the lobby's elevator: the same room every floor (its number on its walls), nobody's
+ * shop (`hideKid`; `kid` only names a sheet the loader wants). Its doors: the elevator (`top`, up to the next floor once one's won) and the
+ * way down to the lobby (`front`). Loaded by floor: ShopRoom.tsx loadTowerFloor.
+ */
+export const TOWER_FLOOR: ShopDef = { home: "tower", part: "top", boss: "Battle Tower", name: "Battle Tower", crate: null, kid: "towerclerk", hideKid: true, at: [0, 0], keeper: [], prizes: [], roof: "store", chatTone: "day", music: null };
+
 export const roomDef = (id: HomeId, part: RoomPart = "front"): ShopDef | null =>
-  (id === "recluse" && part !== "back" ? RECLUSE_ROOMS[part] : part === "back" ? BACK_ROOMS[id] : part === "front" ? SHOPS[id] : null) ?? null;
+  (id === "recluse" && part !== "back" ? RECLUSE_ROOMS[part] : id === "tower" && part === "top" ? TOWER_FLOOR : part === "back" ? BACK_ROOMS[id] : part === "front" ? SHOPS[id] : null) ?? null;
 
 /** The theme a room plays as it shows (themes.json): its own (`music`), or its home's; null: none. */
 export const roomTheme = (def: ShopDef): string | null => (def.music === undefined ? def.home : def.music);

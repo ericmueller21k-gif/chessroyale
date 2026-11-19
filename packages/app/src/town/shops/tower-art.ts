@@ -674,8 +674,8 @@ const FLOOR_COUNT = LAYOUT.length;
 at("wall-none", 0, 0, true);
 if (PIECES["backdrop"]) at("backdrop", 1, 0, true);
 else for (let c = 1; c <= 3; c++) at(c === 2 ? "wall-pilaster" : "wall", c, 0, true);
-// (PR 11: solid and decorative; its door to the floors comes with the floor room, PR 11b.)
-if (PIECES["elevator"]) at("elevator", 4, 0, true);
+// (PR 11b, Nov 19: the elevator is the door up to the floor room, `top`: the town opens it only with a run to play, tower-flow.ts.)
+if (PIECES["elevator"]) at("elevator", 4, 0, false, { door: "top" });
 else for (let c = 4; c <= 5; c++) at("wall", c, 0, true);
 at("wall-sconce", 6, 0, true);
 if (PIECES["board-best"]) at("board-best", 7, 0, true);
