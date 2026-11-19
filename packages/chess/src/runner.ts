@@ -1577,6 +1577,7 @@ export class MatchRunner {
     } finally {
       this.turnOf = outer;
     }
+    this.followBoard();
     this.refocus();
   }
 
@@ -1831,12 +1832,20 @@ export class MatchRunner {
 
   /** The hop, from this device's engines (hopFrom: the one best for him); null: none was due. */
   async playHop(engines: readonly EngineLike[] = this.opts.engines): Promise<LeapfrogHop | null> {
-    return hopperBattle.play(this.battle, engines);
+    const before = this.boards.get(this.state.boards[0]!)!.fen;
+    return this.hopped(await hopperBattle.play(this.battle, engines), before);
   }
 
   /** The hop (from the host's engine online: one of the candidates, else the first; hopperBattle.apply); null: none was due. */
   applyHop(pick: string | null): LeapfrogHop | null {
-    return hopperBattle.apply(this.battle, pick);
+    const before = this.boards.get(this.state.boards[0]!)!.fen;
+    return this.hopped(hopperBattle.apply(this.battle, pick), before);
+  }
+
+  /** Several bosses: the hop moved a pawn of the side's (`fenBefore`: the position before it): it reaches every other boss's trackers as a move. */
+  private hopped(hop: LeapfrogHop | null, fenBefore: string): LeapfrogHop | null {
+    if (hop) this.followOthers(`${hop.from}${hop.to}`, fenBefore);
+    return hop;
   }
 
   /**
@@ -2389,6 +2398,18 @@ export class MatchRunner {
     return (this.turnOf ?? f) === f;
   }
 
+  /**
+   * Several bosses: the board may have changed outside a move (a boss's power, his turn or the crowd's move just over): every boss
+   * lets go of a piece of the side he tracks that no longer stands where he tracks it (BossRules.followBoard).
+   */
+  private followBoard() {
+    if (!this.several()) return;
+    this.forEachBoss(() => {
+      const me = this.state.boss!;
+      if (me.powers) bossRules(me)?.followBoard?.(this.battle);
+    });
+  }
+
   /** Several bosses: a move the boss in focus just played (`fenBefore`: the position before it) reaches every other boss's trackers (BossRules.followMove). */
   private followOthers(move: string, fenBefore: string) {
     if (!this.several()) return;
@@ -2453,6 +2474,7 @@ export class MatchRunner {
    */
   private bossTurnOver() {
     if (this.several()) {
+      this.followBoard();
       this.state = { ...this.state, moved: this.state.focus ?? 0 };
       this.refocus();
     }

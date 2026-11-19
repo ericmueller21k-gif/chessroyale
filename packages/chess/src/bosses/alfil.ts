@@ -576,8 +576,17 @@ export const ALFIL: BossRules = {
   afterBossMove(b, move) {
     alfilBattle.afterHisMove(b, move);
   },
-  // (Several bosses: another boss's move, his Tusks pawns and elephants follow it too.)
+  // (Several bosses: another boss's move, his Tusks pawns and elephants follow it too; one another boss's power moved or changed
+  // is let go, a Tusks pawn as if taken: no move, so only what still stands is kept.)
   followMove: (b, move) => alfilBattle.follow(b, move),
+  followBoard(b) {
+    const p = b.state.boss!.powers!;
+    const fen = boardOf(b).fen;
+    const his = other(b.state.boss!.crowdSide);
+    const g = gridOf(fen);
+    const lost = (squares: readonly string[], type: "p" | "b") => squares.some((sq) => g.get(sq) !== letter(his, type));
+    if (lost(p.tusks?.pawns ?? [], "p") || lost(p.elephants ?? [], "b")) alfilBattle.follow(b, "");
+  },
   view: (p) => ({
     tusks: p.tusks ? { ...p.tusks, pawns: [...p.tusks.pawns] } : null,
     fusion: p.fusion ?? null,

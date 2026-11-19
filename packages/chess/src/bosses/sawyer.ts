@@ -345,8 +345,17 @@ export const SAWYER: BossRules = {
   afterCrowdMove(b, move) {
     if (move) sawyerBattle.track(b, move);
   },
-  // (Several bosses: another boss's move, his halves follow it too.)
+  // (Several bosses: another boss's move, his halves follow it too; a half another boss's power moved or changed is let go.)
   followMove: (b, move) => sawyerBattle.track(b, move),
+  followBoard(b) {
+    const boss = b.state.boss!;
+    const p = boss.powers!;
+    if (!p.split?.halves.length) return;
+    const fen = b.boards.get(b.state.boards[0]!)!.fen;
+    const mine = other(boss.crowdSide);
+    const halves = p.split.halves.filter((h) => pieceAt(fen, h.square)?.type === "p" && pieceAt(fen, h.square)?.color === mine);
+    if (halves.length < p.split.halves.length) b.state = { ...b.state, boss: { ...boss, powers: { ...p, split: { ...p.split, halves } } } };
+  },
   // From the game so far; his cuts start a turn later than the others' passives (the split has turn 2 to itself).
   opening: {
     setUp(b, at) {

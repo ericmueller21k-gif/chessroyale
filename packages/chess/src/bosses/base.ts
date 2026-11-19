@@ -431,9 +431,17 @@ export interface BossRules {
    * Several bosses on one side: another boss's move was just played (`fenBefore`: the position before it). What of his follows
    * pieces on the board follows it, as it follows the crowd's moves (afterCrowdMove) and his own (afterBossMove), so every move
    * on the board reaches every boss's trackers: Smudgy's hidden rook (and its unmasking), Sawyer's split halves, Alfil's Tusks
-   * pawns and elephants, Don Dough's gold, Chandy's locks and aim, Boingo's splats. One boss: never called.
+   * pawns and elephants, Don Dough's gold, Chandy's locks and aim, Boingo's splats. The leapfrog hop (a pawn's, before Hopper's
+   * move) reaches them as a move too. One boss: never called.
    */
   followMove?(b: Battle, move: string, fenBefore: string): void;
+  /**
+   * Several bosses on one side: the board may have changed outside a move (another boss's power: Wrangler's line-up or pull,
+   * Smudgy's swap or Repaint, Alfil's fusion, Revision): a piece of the side he tracks that no longer stands where he tracks it is
+   * let go, as a capture lets it go (Smudgy's hidden rook, Sawyer's halves, Alfil's Tusks pawns and elephants, Don Dough's gold).
+   * Run after every boss's turn and every crowd move. One boss: never called.
+   */
+  followBoard?(b: Battle): void;
   /**
    * A boss move its rules play as something else (Wrangler's long pull, written as its three squares: the double step,
    * then the pawn goes on in afterBossMove), with the move as the screens name it. Null: an ordinary move.

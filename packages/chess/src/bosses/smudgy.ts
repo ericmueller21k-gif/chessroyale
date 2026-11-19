@@ -606,8 +606,18 @@ export const SMUDGY: BossRules = {
   afterBossMove(b, move) {
     smudgyBattle.afterHisMove(b, move);
   },
-  // (Several bosses: another boss's move, his hidden rook stepped as a pawn or a check it discovers: followRook.)
+  // (Several bosses: another boss's move, his hidden rook stepped as a pawn or a check it discovers: followRook. His rook moved or
+  // changed by another boss's power: its disguise is gone, with no moment where it stood, as when the crowd takes it.)
   followMove: (b, move) => smudgyBattle.followRook(b, move),
+  followBoard(b) {
+    const boss = b.state.boss!;
+    const c = boss.powers?.camo;
+    const sq = c?.square;
+    if (!c || !sq) return;
+    const rook = pieceAt(boardOf(b).fen, sq);
+    if (rook?.type === "r" && rook.color !== boss.crowdSide) return;
+    setPowers(b, (p) => ({ ...p, camo: { ...c, square: null, reveal: { at: boss.crowdMoves, square: sq, how: "taken" } } }));
+  },
   opening: {
     fromStart: true,
     setUp(b, at) {
