@@ -235,13 +235,13 @@ describe("his moments are timed by his animations", () => {
 });
 
 describe("the Full Moon's cinematic", () => {
-  it("adds its beats up to the Full Moon's length, which his thinking waits for (fullMoonMs), at about 7 s", () => {
+  it("adds its beats up to the Full Moon's length, which his thinking waits for (fullMoonMs), at about 11 s (Eric, Nov 19: 4 s longer)", () => {
     const c = MOO_CINEMATIC;
     expect(B.fullMoon.transformAt).toBe(c.hopMs + c.fadeInMs + c.fieldMs + c.closeMs);
     expect(B.fullMoon.total).toBe(B.fullMoon.transformAt + B.fullMoon.transformMs + c.afterMs + c.fadeOutMs + c.hopBackMs);
     expect(fullMoonMs(view([{ kind: "fullMoon", turn: 5 }]))).toBe(B.fullMoon.total + c.tailPadMs);
-    expect(B.fullMoon.total).toBeGreaterThanOrEqual(6500);
-    expect(B.fullMoon.total).toBeLessThanOrEqual(8000);
+    expect(B.fullMoon.total).toBeGreaterThanOrEqual(10500);
+    expect(B.fullMoon.total).toBeLessThanOrEqual(12000);
     const b = cineBeats();
     expect([b.landed, b.close, b.closeEnd, b.transform, b.fadeOut, b.hopBack, b.end]).toEqual([...[b.landed, b.close, b.closeEnd, b.transform, b.fadeOut, b.hopBack, b.end]].sort((x, y) => x - y));
     expect(b.closeEnd).toBe(b.transform);
