@@ -11,6 +11,7 @@ import { BossLevel } from "./Boss.tsx";
 import { Beaten } from "./Tower.tsx";
 import { floorRating } from "../tower.ts";
 import type { BossView, GameView } from "../game.ts";
+import { sideOf } from "../boss-side.ts";
 
 /**
  * A Battle Tower floor's battle (PR 10, the approved mockups 1 to 6 on stills/battle-tower): the run's strip in place of the title
@@ -19,17 +20,16 @@ import type { BossView, GameView } from "../game.ts";
  * stepped forward. One boss: today's bar and figure. Every part keeps its size and place for the whole floor.
  */
 
-/** Each boss on a floor of several, as a bar draws him (his own view, with the battle's board); null with one boss. */
-export function sideOf(boss: BossView): { bosses: BossView[]; toMove: number; moved: number } | null {
-  const side = boss.side;
-  if (!side || side.bosses.length < 2) return null;
-  return { bosses: side.bosses.map((b) => ({ ...b, board: boss.board }) as BossView), toMove: side.toMove, moved: side.moved };
-}
+// (Each boss on a floor of several, from his own part of the view: boss-side.ts.)
+export { moverOf, sideOf } from "../boss-side.ts";
 
-/** The boss who made the side's last move (the dock's "Ginger plays e5"): the one who moved on a floor of several, else the boss. */
-export function moverOf(boss: BossView): BossView {
-  const s = sideOf(boss);
-  return s ? (s.bosses[s.moved] ?? boss) : boss;
+/**
+ * Who says the line keyed `key` on a floor of several: the boss whose id starts it (a moment's line is keyed by the boss who cast it,
+ * BossPowers.tsx useMomentSpeech), else the boss to move. His bubble shows it, by his own part of the bar (audit 2, finding 1).
+ */
+export function speakerOf(side: { bosses: readonly { id?: string }[]; toMove: number }, key: string): number {
+  const i = side.bosses.findIndex((b) => !!b.id && key.startsWith(`${b.id}:`));
+  return i < 0 ? side.toMove : i;
 }
 
 /** The run's strip: "Battle Tower · Floor 4 of 99", the bosses beaten (the last 6, or 9 on a computer; the rest counted), the next floor's rating, the moves left. */
@@ -131,8 +131,8 @@ export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
         return (
           <span class={`tw-part${on ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id}>
             {on && <span class="tw-tag">TO MOVE</span>}
-            {/* (His words from his own part of the bar: the boss to move's, whose turn and powers come next.) */}
-            {on && !computer && <VoiceBubble voice={bossVoice} class="bc-bubble tw-bubble" balanced />}
+            {/* (His words from his own part of the bar: the boss who says them, the one who cast a moment, else the boss to move.) */}
+            {!computer && <VoiceBubble voice={bossVoice} class="bc-bubble tw-bubble" balanced mine={(k) => speakerOf(side, k) === i} />}
             <span class="tw-part-face" aria-hidden="true">
               {computer ? <BossFace boss={b} label="" live /> : <Figure boss={b} scale={scale} since={since} still={still} />}
             </span>
@@ -167,7 +167,7 @@ export function TowerSide({ boss }: { boss: BossView }) {
     <div class="boss-side tw-side">
       {side.bosses.map((b, i) => (
         <span class={`tw-side-fig${i === side.toMove ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id} style={{ bottom: `${((n - 1 - i) * 100) / n}%`, height: `${100 / n}%` }}>
-          {i === side.toMove && <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" />}
+          <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" mine={(k) => speakerOf(side, k) === i} />
           <Figure boss={b} scale={scale} since={since} still={still} />
         </span>
       ))}

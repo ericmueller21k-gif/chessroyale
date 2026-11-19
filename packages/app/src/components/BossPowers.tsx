@@ -28,6 +28,7 @@ import { CHANDY_UI } from "./Chandy.tsx";
 import { Cast, PowerBanner, kitLine, momentKey, rageWarn, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
+import { partOf } from "../boss-side.ts";
 
 /**
  * Boss powers on screen: what every player sees, from the battle's shared state (NetBoss.powers), so online everyone
@@ -113,7 +114,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   return list.map((e) => {
     // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
     const lead = bannerLeadMs(e.kind);
-    const m: Moment = { kind: e.kind, key: momentKey(boss.id, e), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.height ? { height: e.height } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}), ...(e.stage !== undefined ? { stage: e.stage } : {}), ...(e.unlock ? { unlock: e.unlock } : {}) };
+    const m: Moment = { kind: e.kind, key: momentKey(e.boss ?? boss.id, e), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.height ? { height: e.height } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}), ...(e.stage !== undefined ? { stage: e.stage } : {}), ...(e.unlock ? { unlock: e.unlock } : {}), ...(e.boss ? { boss: e.boss } : {}) };
     t += lead + m.ms;
     return m;
   });
@@ -220,9 +221,16 @@ export function useMomentSpeech(boss: BossView, moments: readonly Moment[], now:
     // (Each moment's line once: the voice ignores a moment said again.)
     // (Its time runs from when this device says it, as a boss's animations do: a busy frame never eats into it.)
     // (A long line comes in parts that each fit the bar's two rows, "\n" between them (Don Dough's): said one after another.)
-    for (const m of due) (powerLine(bossKit(boss.name), m) ?? "").split("\n").forEach((part, i) => bossVoice.say(part, `${boss.id}:${boss.startMove}:${m.key}${i ? `:${i}` : ""}`, momentPriority(m)));
+    // (A floor of several: in the words of the boss who cast it, keyed by his id, so his own bubble says it: TowerBar speakerOf.)
+    for (const m of due) {
+      const by = partOf(boss, m.boss);
+      (powerLine(bossKit(by.name), m) ?? "").split("\n").forEach((part, i) => bossVoice.say(part, `${by.id}:${boss.startMove}:${m.key}${i ? `:${i}` : ""}`, momentPriority(m)));
+    }
   }, [last]);
 }
+
+/** The boss who cast a moment: his own part of the view on a floor of several (its banner's face, his figure), else the boss. */
+export const casterOf = (boss: BossView, m: Pick<Moment, "boss"> | null | undefined): BossView => partOf(boss, m?.boss);
 
 /** The boss's animation for a power's moment, from its kit (e.g. freezeCast, pieThrow, check, blizzard, funhouse). */
 const kitAnim = (kit: BossKit | null, kind: PowerEventKind) => {
@@ -237,8 +245,10 @@ const kitAnim = (kit: BossKit | null, kind: PowerEventKind) => {
  * view, from its boss's file). The ice and the pie themselves are the board layer's (PowerBoard), timed to land with
  * the effect.
  */
-export function PowerMoment({ boss, moment, now: wall, orientation, side }: { boss: BossView; moment: Moment | null; now: number; orientation: "white" | "black"; side: "w" | "b" }) {
+export function PowerMoment({ boss: inView, moment, now: wall, orientation, side }: { boss: BossView; moment: Moment | null; now: number; orientation: "white" | "black"; side: "w" | "b" }) {
   if (!moment) return null;
+  // (A floor of several: the boss who cast it, his banner, his figure casting and his own powers: audit 2, finding 1.)
+  const boss = casterOf(inView, moment);
   // (Its banner's hold, `lead`, before its own clock: the moment drawn as at its start, its banner up.)
   const now = Math.max(wall, moment.at);
   const t = now - moment.at;
