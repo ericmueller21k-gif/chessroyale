@@ -114,7 +114,7 @@ describe("Moo & Moon on the roster", () => {
     expect(def).toMatchObject({ name: "Moo & Moon", icon: "🐄", kit: "Moo", powers: { passive: "moonbeam", ultimate: "fullmoon" } });
     expect(isPlayable(def)).toBe(true);
     expect(bossRules(def)?.opening).toBeUndefined();
-    expect(BOSS_POWERS).toMatchObject({ moonbeamEvery: 3, fullMoonMoves: 5, flurryBeams: 5 });
+    expect(BOSS_POWERS).toMatchObject({ moonbeamEvery: 3, fullMoonMoves: 10, flurryBeams: 5 });
     expect(BOSS_POWERS.rageSpeed.moo).toBeGreaterThan(0);
   });
 
