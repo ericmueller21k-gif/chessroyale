@@ -351,3 +351,50 @@
 .tw-result .btn:disabled {
   opacity: 0.5;
 }
+
+/* ---- A computer's strip row, and the figures stacked beside the board ---- */
+.tw-strip-line {
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+}
+.tw-strip-wide {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 12px;
+}
+.tw-side {
+  align-self: stretch;
+}
+.tw-side-fig {
+  position: absolute;
+  right: 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  opacity: 0.5;
+  filter: grayscale(0.7);
+  transition: transform 0.3s ease;
+}
+.tw-side-fig.tw-to-move {
+  opacity: 1;
+  filter: none;
+  transform: translateX(18px);
+}
+.tw-fig {
+  display: block;
+  image-rendering: pixelated;
+}
+.tw-part-portrait {
+  width: 40px;
+  height: 40px;
+}
+.tw-bubble {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+}
+.tw-bar {
+  position: relative;
+}

@@ -10,6 +10,7 @@ import { BoardsStrip } from "../components/TinyBoard.tsx";
 import { bossAlone, cutCountdown, isCrowd, shortCountdown, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
 import { BossBar } from "./Boss.tsx";
+import { TowerBar, TowerStrip, sideOf } from "./TowerBar.tsx";
 
 /**
  * Your total time left (the bank), ticking down while you think. Each move
@@ -89,7 +90,13 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   if (boss && mouse)
     return (
       <>
-        <BossBar boss={boss} match={match} move={match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />
+        {sideOf(boss) ? <TowerBar boss={boss} match={match} /> : <BossBar boss={boss} match={match} move={match.tower ? undefined : match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />}
+        {/* (A Battle Tower floor: the run's strip, a row under the bar, as wide as the board.) */}
+        {match.tower && (
+          <div class="tw-strip-line">
+            <TowerStrip match={match} computer />
+          </div>
+        )}
         <BossTools match={match} crowd={crowd} />
       </>
     );
@@ -100,6 +107,9 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
           <span class="hud-stage">
             {match.final ? (
               "FINAL"
+            ) : boss && match.tower ? (
+              // (A Battle Tower floor: the run's strip in place of "BOSS · move 1".)
+              <TowerStrip match={match} />
             ) : boss ? (
               <>
                 BOSS<span class="muted"> · {match.bossNote != null ? "phase 2" : `move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`}</span>
@@ -177,7 +187,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
         {/* The gear: its list has Sound, Animations, Resign and Report a bug (a crowd match, Crowd or a raid, adds the Motion trail row). */}
         <MatchMenu exit={exitFor(match)} crowd={crowd} />
       </div>
-      {boss ? <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
+      {boss ? sideOf(boss) ? <TowerBar boss={boss} match={match} /> : <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
     </>
   );
