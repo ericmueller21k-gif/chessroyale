@@ -1,4 +1,5 @@
 import { expect, type Browser, type Page } from "@playwright/test";
+import { ACTIVITY_LINES, FRIEND_BOTS, type Activity } from "@chessroyale/core";
 import { named, pickMode, test } from "./helpers.ts";
 
 /**
@@ -203,6 +204,31 @@ test("the friends page (Eric, Nov 11): home's Friends opens a page, not a pop-up
   // Private lobby: Play with friends' sheet (make a lobby or join by its code).
   await lobby.click();
   await expect(page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Get friend code" })).toBeVisible();
+});
+
+test("friend bots (Eric, Nov 20): an admin's Add puts bots on their own friends list, each online doing something or last online a while ago, as its schedule says; Remove takes them off", async ({ browser }) => {
+  // (The e2e's key with this page's session stands for an admin's: friend-bots.ts.)
+  const me = await player(browser, `Bot Pal ${isComputer() ? "C" : "P"}${String(Date.now() % 10_000).padStart(4, "0")}`);
+  const page = me.page;
+  const bots = (url: string, method: string) => page.request.fetch(url, { method, headers: { "x-e2e-sql": process.env.E2E_SQL_KEY ?? "" } });
+  const added = (await (await bots("/api/admin/friend-bots", "POST")).json()) as { bots: { name: string; online: boolean; doing?: Activity }[] };
+  expect(added.bots).toHaveLength(FRIEND_BOTS.count);
+  await openFriends(page);
+  await expect(page.locator(".fr-list .fr-row")).toHaveCount(FRIEND_BOTS.count);
+  for (const b of added.bots) {
+    // (Its line is a real friend's: what it's doing while online, else "Last online …"; a session may begin or end meanwhile.)
+    const status = page.locator(".fr-row", { hasText: b.name }).locator(".fr-status");
+    await expect(status).toHaveText(new RegExp(`^(${Object.values(ACTIVITY_LINES).join("|")}|Online|Last online .+)$`));
+  }
+  const online = added.bots.filter((b) => b.online).length;
+  await expect(page.locator("#fp-online")).toHaveText(new RegExp(`^ONLINE · (${online}|${Math.max(0, online - 1)}|${online + 1})$`));
+  await shot(page, "friend-bots");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await shot(page, "friend-bots-dark");
+  expect(((await (await bots("/api/admin/friend-bots", "DELETE")).json()) as { removed: number }).removed).toBe(FRIEND_BOTS.count);
+  await page.reload();
+  await expect(page.locator("#fp-offline")).toHaveText("OFFLINE · 0");
+  await expect(page.locator(".fr-list .fr-row")).toHaveCount(0);
 });
 
 /** Two players made friends through the API (a request and its answer), each on their own page. */
