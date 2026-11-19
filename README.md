@@ -1,0 +1,1 @@
+Chandy's rook lock, 428x746 (Eric's baseline): no queen of yours, so the queen lock aims at a rook. rook-lock-banner.png: the banner ("He fires at your rook next. Block its file!"); rook-lock-aim.png: the crosshair on the h1 rook and the aim down the h-file.
