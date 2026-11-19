@@ -1537,10 +1537,11 @@ export class MatchRunner {
     const through = side ? (sideBossStopped(side, board.fen, m) ? sideStopReason(side, board.fen, m) : null) : bossStopped(boss, board.fen, m) ? stopReason(boss, board.fen, m) : null;
     this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}), ...(through ? { through } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
-    // (Several bosses: the move reaches every other boss's trackers first, on the board as it landed: followOthers.)
-    this.followOthers(m, board.fen);
     // (The boss's own after-move effect: Sawyer's split pawn after his first move; Wrangler's pull, drag or showdown.)
     if (this.state.boss?.powers) bossRules(this.state.boss)?.afterBossMove?.(this.battle, m, { ...extras, ...(shown !== m ? { special: shown } : {}) });
+    // (Several bosses: then the move reaches every other boss's trackers, on the board the crowd will face (a check his rook
+    // discovers counts after the mover's own effects): followOthers.)
+    this.followOthers(m, board.fen);
     this.bossTurnOver();
     return m;
   }
