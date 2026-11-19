@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BATTLE_TOWER } from "@chessroyale/core";
-import { floorOutcome, floorPlan, floorRating, leaveIsFree, readKept, towerBoss, type KeptFloor } from "../src/tower.ts";
+import { floorOutcome, floorPlan, floorRating, leaveIsFree, loadKept, readKept, saveKept, settleKept, towerBoss, type KeptFloor } from "../src/tower.ts";
+
+// (The server's answers, faked: your account is ready at once.)
+vi.mock("../src/boss-tokens.ts", () => ({ accountReady: async () => true }));
 
 /**
  * The Battle Tower's solo restore and rules on this device (PR 10; docs/areas/battle-tower.md): the floor kept on the device read
@@ -56,6 +59,17 @@ describe("what a floor's start means here", () => {
     expect(floorPlan({ fight, under: true }, { ...kept, done: "won" })).toBe("elsewhere");
   });
 
+  it("under way, started by this device with nothing kept for it (its start's answer lost): its own, from its start (audit 2, finding 3)", () => {
+    const dev = "0123456789abcdef0123";
+    const ours = { ...fight, device: dev };
+    expect(floorPlan({ fight: ours, under: true }, null, dev)).toBe("fresh");
+    expect(floorPlan({ fight: ours, under: true }, { ...kept, fight: "ffffffffffffffffff" }, dev)).toBe("fresh");
+    // (Another device's, or one with no id: still asked first. Its result kept here: not played again.)
+    expect(floorPlan({ fight: ours, under: true }, null, "ffffffffffffffffffff")).toBe("elsewhere");
+    expect(floorPlan({ fight, under: true }, null, dev)).toBe("elsewhere");
+    expect(floorPlan({ fight: ours, under: true }, { ...kept, done: "won" }, dev)).toBe("elsewhere");
+  });
+
   it("its bosses resting: only the free leave, whatever is kept", () => {
     expect(floorPlan({ fight, under: true, resting: true }, kept)).toBe("resting");
     expect(floorPlan({ fight, under: true, resting: true }, null)).toBe("resting");
@@ -82,5 +96,28 @@ describe("the tower's rules on the device", () => {
   it("draws a boss id it doesn't know (renamed or removed) as a stand-in, never a crash", () => {
     expect(towerBoss("gingerbread")).toMatchObject({ name: "Ginger", known: true });
     expect(towerBoss("no-such-boss")).toEqual({ id: "no-such-boss", name: "A boss", icon: "?", known: false });
+  });
+});
+
+describe("sending a kept result", () => {
+  const store = new Map<string, string>();
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    store.clear();
+  });
+  const answer = (status: number, body: object) => vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }));
+
+  it("a 409 carrying the fight (the floor still under way: a win too soon) keeps the result to send again; a 409 without is read as the run now, and forgets it (audit 2, finding 5)", async () => {
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) });
+    const won: KeptFloor = { ...kept, game: undefined, done: "won", moves: 4 };
+    saveKept(won);
+    vi.stubGlobal("fetch", answer(409, { message: "Too soon.", fight, run: null, best: 0 }));
+    const end = await settleKept(won);
+    expect(end.error).toBe("Too soon.");
+    expect(loadKept()?.done).toBe("won");
+    vi.stubGlobal("fetch", answer(409, { message: "Read it again.", run: null, best: 1 }));
+    const again = await settleKept(won);
+    expect(again.error).toBeUndefined();
+    expect(loadKept()).toBeNull();
   });
 });

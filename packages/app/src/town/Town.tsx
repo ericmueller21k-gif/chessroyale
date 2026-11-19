@@ -81,6 +81,11 @@ import { FdButton } from "../components/FrontDoor.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO, setRequestWaiting } from "./LeaveTown.tsx";
 import { HiddenRoomClient, type RoomOutcome } from "./hidden-net.ts";
 import { HiddenCard, HiddenCount, RoomNote } from "./HiddenRoom.tsx";
+import { TowerDesk } from "./TowerDesk.tsx";
+import { Confirm } from "../components/MatchMenu.tsx";
+import { TOWER_WORDS, askFloor, enterTowerFloor, towerApi, type FloorPlay, type FloorStart } from "../tower.ts";
+import type { FloorScript } from "./shops/tower-floor-scene.ts";
+import { FLOOR_YOU, TOWER_FLOOR_FEEL, floorTimes, upWords } from "./shops/tower-floor.ts";
 import type { LivePawn, RecluseScene } from "./shops/recluse-scene.ts";
 import { tooYoung } from "../account.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
@@ -154,6 +159,13 @@ const bossIn = (id: string): boolean => BOSS_ROSTER.some((b) => b.id === id && a
  */
 const bossReady = (id: string): boolean => bossIn(id) || testParams().has("introPreview");
 
+/** A Battle Tower floor's match just ended (its result, sent once: tower.ts FloorPlay.settle): back into the tower. */
+export interface TowerBack {
+  play: FloorPlay;
+}
+/** Reduced motion asked for: no walking in the tower's floor room (the design's §4). */
+const stillNow = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export function TownScreen({
   onBack,
   askLeave,
@@ -167,7 +179,10 @@ export function TownScreen({
   framed = false,
   onAway,
   onSignIn,
+  tower = null,
 }: {
+  /** Back from a Battle Tower floor's match (PR 11b): the town opens straight in the tower, in the floor room or (a free leave) the lobby. */
+  tower?: TowerBack | null;
   onBack: () => void;
   /** Leaving the town for another screen (the back button, a guest's chat sign-up): the app's "Leave Chess Town?" first (LeaveTown.tsx). */
   askLeave: (dest: string, go: () => void) => void;
@@ -202,7 +217,7 @@ export function TownScreen({
   // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
   // (Rolling Dough, Nov 11: a home with two rooms; `arrived` you came through the door between them, `n` the room's mount, a new one each
   // time through it.)
-  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null; arrived?: boolean | RoomPart; n?: number; fx?: RoomFx | null } | null>(null);
+  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null; arrived?: boolean | RoomPart; n?: number; fx?: RoomFx | null; at?: { c: number; r: number } } | null>(null);
   const insideNow = useRef(inside);
   insideNow.current = inside;
   /** The shop you're in (its home's id), for the away rule's beats; null in the town square. */
@@ -261,6 +276,18 @@ export function TownScreen({
   const byDoor = useRef(false);
   const [banner, setBanner] = useState<(AreaBannerText & { n: number }) | null>(null);
   const bannerN = useRef(0);
+  // ---- The Battle Tower (PR 11b, Eric, Nov 19): the clerk's card, the elevator, the floor room (its script: shops/tower-floor.ts).
+  /** The floor room's script (the scene draws it, the town walks you), or null: not in it. */
+  const floorS = useRef<FloorScript | null>(null);
+  /** Your best floor (solo) as last read: the lobby's board. */
+  const towerBest = useRef<number | null>(null);
+  /** A floor's start answered with a question (its bosses resting, under way elsewhere, a run that can't be played). */
+  const [towerAsk, setTowerAsk] = useState<{ kind: "resting" | "elsewhere"; start: FloorStart } | { kind: "broken" } | null>(null);
+  const towerTimers = useRef<number[]>([]);
+  const clearTowerTimers = () => {
+    towerTimers.current.forEach((t) => clearTimeout(t));
+    towerTimers.current = [];
+  };
   // ---- The Hidden Boss's room challenge (Eric, Nov 12 and 13; hidden-net.ts, HiddenRoom.tsx; the server's: server/src/hidden-room.ts).
   /** The room's client (made as you first climb to his room), and his room's scene (the child, the others, the summoning). */
   const hidden = useRef<HiddenRoomClient | null>(null);
@@ -316,7 +343,9 @@ export function TownScreen({
    */
   const roomFxOf = (id: HomeId, part: RoomPart): Promise<RoomFx | null> | null =>
     id === "tower"
-      ? chunk(import("./shops/tower-scene.ts")).then((m) => m.TOWER_LOBBY_FX)
+      ? part === "top"
+        ? chunk(import("./shops/tower-floor-scene.ts")).then((m) => m.towerFloorFx(floorS.current!))
+        : chunk(import("./shops/tower-scene.ts")).then((m) => m.towerLobbyFx(() => towerBest.current))
       : id !== "recluse"
       ? null
       : part === "top"
@@ -452,11 +481,25 @@ export function TownScreen({
         return;
       }
     }
-    byDoor.current = true;
+    // (The Battle Tower: up the elevator only with a run to play, to its floor (its number, its bosses: the server's); out of the floor
+    // room, its walk-in stops.)
+    const tower = at.room.def.home === "tower";
+    if (tower && from === "top") clearTowerTimers();
+    if (tower && to === "top") {
+      const s = await towerUp(from);
+      passNext.current = null;
+      if (!s) {
+        shopCtl.current?.close?.();
+        doorBusy.current = false;
+        return;
+      }
+      floorS.current = s;
+    } else if (tower) floorS.current = null;
+    byDoor.current = !tower;
     opening.current = { home: at.room.def.home, challenge: false };
     doorPhase(RF.goIn);
     // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
-    const load = chunk(import("./shops/ShopRoom.tsx")).then((m) => m.loadRoom(at.room.def.home, to));
+    const load = chunk(import("./shops/ShopRoom.tsx")).then((m) => (tower && to === "top" ? m.loadTowerFloor(floorS.current!.floor) : m.loadRoom(at.room.def.home, to)));
     const scene = roomFxOf(at.room.def.home, to);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
@@ -469,7 +512,100 @@ export function TownScreen({
       return;
     }
     setShopOut(F.startZoom === 1);
-    setInside({ room, View: at.View, intro: null, arrived: from, n: (at.n ?? 0) + 1, fx });
+    // (A tower floor: you come in at its way in, from below, whichever way you came up; reduced motion, on your mark already.)
+    const up = tower && to === "top";
+    setInside({ room, View: at.View, intro: null, arrived: up ? "front" : from, n: (at.n ?? 0) + 1, fx, at: up && stillNow() ? FLOOR_YOU.sq : undefined });
+  };
+  /**
+   * Up the tower's elevator (from the lobby, or the floor room once its floor is won): the run as the server has it now, its floor and
+   * that floor's bosses; null (and a note why) when there's none to play.
+   */
+  const towerUp = async (from: RoomPart): Promise<FloorScript | null> => {
+    if (from === "top" && floorS.current?.mode !== "won") return null;
+    const a = await towerApi.state();
+    if (!a.ok) {
+      setNote(a.body.message ?? TOWER_WORDS.offline);
+      return null;
+    }
+    towerBest.current = a.body.best.solo;
+    const run = a.body.runs.solo;
+    if (!run) {
+      setNote("Talk to the clerk to start a climb.");
+      return null;
+    }
+    return { floor: run.floor, mode: "fight", bosses: run.bosses, times: null, t0: null, board: null };
+  };
+  /** The clerk's Start or Continue: you walk into the elevator, and up. */
+  const towerGo = () => {
+    shopCtl.current?.close?.();
+    const steps = shopCtl.current?.walkTo?.({ c: 4, r: 1 }) ?? -1;
+    towerTimers.current.push(window.setTimeout(() => void goThrough("top"), Math.max(0, steps) * TOWN_FEEL.youStepMs + 150));
+  };
+  /**
+   * The floor room has shown: a floor to fight, its walk-in (you to your mark, its bosses out of the elevator one after another, the
+   * pieces up on the board), then into the board and the match; back from one, you stand on your mark.
+   */
+  const floorShown = () => {
+    const s = floorS.current;
+    const n = insideNow.current?.n;
+    if (!s) return;
+    clearTowerTimers();
+    s.t0 = performance.now();
+    const off = { c: FLOOR_YOU.at.c - FLOOR_YOU.sq.c, r: FLOOR_YOU.at.r - FLOOR_YOU.sq.r };
+    if (s.mode !== "fight") return void shopCtl.current?.walkTo?.(FLOOR_YOU.sq, off);
+    const still = stillNow();
+    s.times = floorTimes(s.bosses.length, 1, still);
+    const at = (ms: number, fn: () => void) => towerTimers.current.push(window.setTimeout(() => insideNow.current?.n === n && floorS.current === s && fn(), ms));
+    at(s.times.youGo, () => shopCtl.current?.walkTo?.(FLOOR_YOU.sq, off, TOWER_FLOOR_FEEL.stepMs));
+    at(s.times.go, () => void floorGo(s, still));
+  };
+  /**
+   * Everyone's on their marks and the pieces are up: the floor starts on the server (or the one under way answers) as the room zooms
+   * into the board and goes black; then its match (the app's: tower.ts enterTowerFloor). A question first, or no answer: down to the
+   * lobby, where it's asked.
+   */
+  const floorGo = async (s: FloorScript, still: boolean) => {
+    if (doorBusy.current) return;
+    doorBusy.current = true;
+    const F = TOWER_FLOOR_FEEL;
+    const ask = askFloor(towerBest.current ?? 0);
+    const cv = box.current?.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas") ?? null;
+    if (cv && s.board && !still) {
+      cv.style.transformOrigin = `${s.board.x.toFixed(1)}px ${s.board.y.toFixed(1)}px`;
+      cv.style.transition = `transform ${F.zoomMs}ms ease-in`;
+      cv.style.transform = `scale(${F.zoom})`;
+    }
+    fadeTo(1, SHOP_FEEL.fadeMs, still ? 0 : F.zoomMs - SHOP_FEEL.fadeMs);
+    await later(still ? SHOP_FEEL.fadeMs : F.zoomMs);
+    const a = await ask;
+    if (a.kind === "entry" && !gone.current) return enterTowerFloor(a.entry);
+    if (cv) cv.style.transition = cv.style.transform = cv.style.transformOrigin = "";
+    doorBusy.current = false;
+    s.mode = "out";
+    await goThrough("front");
+    if (a.kind === "error") setNote(a.message);
+    else if (a.kind !== "entry") setTowerAsk(a);
+  };
+  /** Back from a floor's match: its result sent (once), then into the floor room on your mark (won: the elevator open), or the lobby. */
+  const towerBack = async (b: TowerBack) => {
+    doorBusy.current = true;
+    opening.current = { home: "tower", challenge: false };
+    const end = await b.play.settle();
+    if (end.best) towerBest.current = end.best;
+    const lobby = !!end.error || (end.outcome === "left" && end.status === "open");
+    floorS.current = lobby ? null : { floor: b.play.floor, mode: end.outcome === "won" && end.status === "open" ? "won" : "out", bosses: [], times: null, t0: null, board: null };
+    const room = chunk(import("./shops/ShopRoom.tsx")).then(async (m) => ({ room: await (lobby ? m.loadRoom("tower") : m.loadTowerFloor(b.play.floor)), View: m.ShopRoom }));
+    const got = await room.catch(() => null);
+    const fx = await (roomFxOf("tower", lobby ? "front" : "top") ?? Promise.resolve(null)).catch(() => null);
+    if (!got || !box.current) {
+      fadeTo(0, SHOP_FEEL.fadeMs);
+      doorBusy.current = false;
+      return;
+    }
+    if (end.error) setNote(end.error);
+    ctl.current?.pause();
+    setShopOut(SHOP_FEEL.startZoom === 1);
+    setInside({ ...got, intro: null, fx, n: 1, ...(lobby ? { arrived: "top" as const } : { at: FLOOR_YOU.sq }) });
   };
   /**
    * A challenge started inside (Don Dough's, once his Challenge's beat and walk-out have played in his back room, you through its door;
@@ -512,6 +648,7 @@ export function TownScreen({
   /** The room drew its first frame: the black lifts. */
   const shopReady = () => {
     const at = insideNow.current;
+    if (at?.room.def.home === "tower" && at.room.def.part === "top") floorShown();
     if (byDoor.current && at) {
       byDoor.current = false;
       roomMusic(roomTheme(at.room.def));
@@ -538,6 +675,8 @@ export function TownScreen({
     }
     outNext.current = false;
     passNext.current = null;
+    clearTowerTimers();
+    floorS.current = null;
     // (A challenge can be called off, with the back button, until its transition starts: the battle is coming from then on.)
     if (flow.current !== "town" && flow.current !== "walkIn" && flow.current !== "intro") return;
     doorBusy.current = true;
@@ -602,6 +741,43 @@ export function TownScreen({
   };
   /** In the walk-up's top floor, his room: the room's client asks the server while you're there (its count, its people, your start). */
   const inTop = inside?.room.def.home === "recluse" && inside.room.def.part === "top";
+  /** In the Battle Tower's floor room. */
+  const inTowerFloor = inside?.room.def.home === "tower" && inside.room.def.part === "top";
+  /**
+   * The tower's doors' cards: the lobby's elevator, Go up; the floor room's, up to the next floor once this one's won (shut otherwise:
+   * greyed, why under it); its way in, down to the lobby.
+   */
+  const towerPass = (to: RoomPart) => {
+    if (!inTowerFloor) return to === "top" ? <button type="button" class="town-btn primary" onClick={() => void goThrough("top")}>Go up</button> : null;
+    if (to === "front")
+      return (
+        <button type="button" class="town-btn primary" onClick={() => void goThrough("front")}>
+          Down to the lobby
+        </button>
+      );
+    const s = floorS.current;
+    const w = upWords(s?.mode ?? "out", s?.floor ?? 1);
+    return (
+      <>
+        <button type="button" class="town-btn primary" disabled={!w.on} onClick={() => void goThrough("top")}>
+          {w.word}
+        </button>
+        {w.note && <p class="town-card-text">{w.note}</p>}
+      </>
+    );
+  };
+  // (Tests) The tower's floor room now: its floor, mode and bosses, and how far into its walk-in (ms).
+  if (testSwitchesAllowed())
+    (window as unknown as { __towerFloor?: () => unknown }).__towerFloor = () => {
+      const s = floorS.current;
+      return s && insideNow.current?.room.def.home === "tower" && insideNow.current.room.def.part === "top" ? { floor: s.floor, mode: s.mode, bosses: s.bosses, t: s.t0 === null ? null : performance.now() - s.t0, go: s.times?.go ?? null } : null;
+    };
+  /** Leave a floor under way from the lobby's question: free (its bosses rest), or counted (under way elsewhere, nothing kept here). */
+  const towerLeave = async (start: FloorStart, free: boolean) => {
+    setTowerAsk(null);
+    const a = await towerApi.stop(start.fight.id, free ? 0 : undefined, free);
+    if (!a.ok && a.body.message) setNote(a.body.message);
+  };
   useEffect(() => {
     if (!inTop) return;
     const c = hiddenClient();
@@ -657,6 +833,7 @@ export function TownScreen({
         setGated(true);
       });
     };
+    if (tower) fadeTo(1, 0);
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
@@ -665,8 +842,10 @@ export function TownScreen({
         loaded = true;
         startGuest();
         // (Back after that reload: the room or challenge your tap was opening opens, as the tap would, once the town is drawn.)
-        const i = back?.open ? HOMES.findIndex((h) => h.id === back.open!.home) : -1;
+        const i = back?.open && !tower ? HOMES.findIndex((h) => h.id === back.open!.home) : -1;
         if (i >= 0) requestAnimationFrame(() => (back!.open!.challenge ? fight(i) : ctl.current?.goIn(i)));
+        // (Back from a tower floor's match: straight into the tower, the street never showing.)
+        if (tower) requestAnimationFrame(() => void towerBack(tower));
         return setLoading(false);
       }
       if (step) setLoadStep(step);
@@ -754,7 +933,8 @@ export function TownScreen({
       ) : (
         <header class="town-bar">
           {/* (Inside a shop, back takes you out to the town square.) */}
-          <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => askIfWaiting(() => void goOut()) : () => askLeave(TOWN_BACK_TO, onBack)}>
+          {/* (The tower's floor room: back is down to the lobby.) */}
+          <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => askIfWaiting(() => void (inTowerFloor ? goThrough("front") : goOut())) : () => askLeave(TOWN_BACK_TO, onBack)}>
             ‹
           </button>
           {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2. On a computer's narrow header, on up to two smaller lines.) */}
@@ -787,7 +967,10 @@ export function TownScreen({
             ctl={shopCtl}
             intro={inside.intro}
             zzz={() => !!ctl.current?.town.you.zzz}
-            arrived={!!inside.arrived}
+            arrived={inside.room.def.home === "tower" ? (inside.arrived ?? false) : !!inside.arrived}
+            at={inside.at ?? null}
+            talkCard={inside.room.def.home === "tower" && !inside.room.def.part ? <TowerDesk onGo={towerGo} onBest={(b) => void (towerBest.current = b)} /> : null}
+            passCard={inside.room.def.home === "tower" ? towerPass : undefined}
             onPass={(to) => askIfWaiting(() => void goThrough(to))}
             fx={inside.fx ?? null}
             challengeCard={inTop ? <HiddenCard client={hiddenClient()} /> : null}
@@ -801,6 +984,17 @@ export function TownScreen({
         {inTop && <HiddenCount client={hiddenClient()} />}
         {frozen && <div class="hb-freeze" aria-hidden="true" />}
         {note && <RoomNote text={note} onOk={() => setNote(null)} />}
+        {towerAsk && (
+          <div class="mm-scrim" onClick={() => setTowerAsk(null)}>
+            {towerAsk.kind === "elsewhere" ? (
+              <Confirm heading="Floor under way" note={TOWER_WORDS.elsewhere} go="Leave it" onCancel={() => setTowerAsk(null)} onGo={() => void towerLeave(towerAsk.start, false)} />
+            ) : towerAsk.kind === "resting" ? (
+              <Confirm heading="Bosses resting" note={TOWER_WORDS.resting} go="Leave (free)" onCancel={() => setTowerAsk(null)} onGo={() => void towerLeave(towerAsk.start, true)} />
+            ) : (
+              <Confirm heading="Run can't be played" note={TOWER_WORDS.broken} go="New run" onCancel={() => setTowerAsk(null)} onGo={() => (setTowerAsk(null), void towerApi.newRun(true))} />
+            )}
+          </div>
+        )}
         {asking && (
           <LeaveTownConfirm
             dest=""

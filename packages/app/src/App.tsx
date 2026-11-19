@@ -8,7 +8,6 @@ import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool, warmEngine } from "./engine.ts";
 import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
-import { DashTap } from "./components/DashStall.tsx";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
@@ -33,8 +32,8 @@ import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO, requestWaiting } from "./town/LeaveTown.tsx";
 import { setGoodbyeFrom } from "./town/goodbye.ts";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
-import { TowerScreen } from "./screens/Tower.tsx";
-import { FloorPlay, onEnterFloor, type FloorEntry } from "./tower.ts";
+import { FloorPlay, askFloor, loadKept, onEnterFloor, type FloorEntry } from "./tower.ts";
+import type { TowerBack } from "./town/Town.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { showAwayNote } from "./components/AwayNote.tsx";
@@ -85,6 +84,8 @@ const SpectateScreen = game.screen("SpectateScreen");
 const StageBreakScreen = game.screen("StageBreakScreen");
 const SquadsQueue = game.screen("SquadsQueue");
 const SquadsScreen = game.screen("SquadsScreen");
+// (A piece inside the match screen, so nothing shows until the chunk is here; in a match it always is.)
+const DashTap = game.screen("DashTap", null);
 const DuelFront = game.screen("DuelFront");
 /** Solo play (solo.ts: the match runner, chess.js's whole game, the boss rules): loaded as play is near, or as it starts. */
 const solo = lazyGroup(() => import("./solo.ts"));
@@ -359,16 +360,16 @@ export function App() {
    */
   const [showAutoChess, setShowAutoChess] = useState(() => location.pathname === "/autochess");
   /** The town square (/town; hidden, nothing links to it yet: slice 1 of Boss raid's town square, docs/areas/town-square.md). */
-  const [showTown, setShowTown] = useState(() => location.pathname === "/town");
+  // (Also /tower: the address of a Battle Tower floor's match; a reload there rejoins the floor kept on this device, else the town.)
+  const [showTown, setShowTown] = useState(() => location.pathname === "/town" || location.pathname === "/tower");
   /** Inside the Colosseum (/colosseum; the first look, Oct 30: docs/areas/colosseum.md): the town's Colosseum card opens it, Exit goes back to the town. */
   const [showColosseum, setShowColosseum] = useState(() => location.pathname === "/colosseum");
   /**
-   * The Battle Tower's screen (/tower; PR 10): only Chess Town's skyscraper clerk opens it (Eric, Nov 19), Back goes to the town. A
-   * floor's battle keeps the address, so a reload comes back here and rejoins the floor kept on this device.
+   * The Battle Tower (PR 11b, Eric, Nov 19): no screen of its own; Chess Town's skyscraper is the tower (its clerk, its elevator, its
+   * floor room: town/Town.tsx). The match on screen is a tower floor: leaving it goes back into the town's tower (`towerBack`).
    */
-  const [showTower, setShowTower] = useState(() => location.pathname === "/tower");
-  /** The match on screen is a tower floor: leaving it goes back to the tower's screen. */
   const towerReturn = useRef(false);
+  const [towerBack, setTowerBack] = useState<TowerBack | null>(null);
   /**
    * Where the town opens you, back from a game with a town bot: its seat ("6.0.3": the table, your stool, the bot; the
    * town reads it). A reload during that game lands there too: its address carries it (`/town?at=6.0.3`).
@@ -1404,8 +1405,8 @@ export function App() {
 
   /**
    * Into a Battle Tower floor (tower.ts enterTowerFloor, the only way in): Boss alone's battle with the floor's bosses at its strength
-   * (the server's settings: `towerFloor`, `bossIds`), from its start, or rejoined where this device kept it. The address stays /tower,
-   * so a reload comes back to the tower's screen, which rejoins it.
+   * (the server's settings: `towerFloor`, `bossIds`), from its start, or rejoined where this device kept it. Its address is /tower, so
+   * a reload rejoins it (`rejoinTower`).
    */
   const startTowerFloor = async (e: FloorEntry) => {
     unlockAudio();
@@ -1422,12 +1423,24 @@ export function App() {
     // (XP: every floor is a counted solo game, timed by the server; a rejoin goes on with the floor's own: xp.ts noteFloorGame.)
     noteFloorGame(m, e.game ? e.kept : null, (id) => m.tower?.noteXp(id));
     towerReturn.current = true;
-    setShowTower(false);
+    setTowerBack(null);
+    history.replaceState(null, "", `/tower${location.search}`);
     use(m);
     if (e.game) m.resume(e.game);
     else m.start();
   };
   useEffect(() => onEnterFloor((e) => void startTowerFloor(e)), []);
+  /**
+   * Opened at /tower (a reload during a floor's match, the app reopened): the floor kept on this device is rejoined where it was (PR 10's
+   * restore); none (or one this device can't play on): the town, whose tower's clerk says Continue.
+   */
+  useEffect(() => {
+    if (location.pathname !== "/tower") return;
+    history.replaceState(null, "", `/town${location.search}`);
+    const kept = loadKept();
+    if (!kept || kept.done || !kept.game) return;
+    void askFloor(0).then((a) => a.kind === "entry" && a.entry.game && void startTowerFloor(a.entry));
+  }, []);
 
   /**
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
@@ -1675,11 +1688,16 @@ export function App() {
     // Done with a match that's over: this device forgets its seat (its old link then says it has ended).
     if (match instanceof NetMatch && match.phase.kind === "results") forgetSeat(match.code);
     setMatch(null);
-    // A Battle Tower floor: back to the tower's screen (it sends the floor's result, if it's still to go).
+    // A Battle Tower floor: back into the town's tower (the floor room, or the lobby after a free leave), its result sent there.
+    const play = match instanceof NetMatch ? null : (match?.tower ?? null);
+    setTowerBack(null);
     if (towerReturn.current) {
       towerReturn.current = false;
-      setShowTower(true);
-      history.replaceState(null, "", `/tower${location.search}`);
+      if (play) setTowerBack({ play });
+      setTownSeat(null);
+      setTownStand(null);
+      setShowTown(true);
+      history.replaceState(null, "", `/town${location.search}`);
       return;
     }
     // A boss's battle from the town's challenge: back to the town square, where you stood as you challenged it.
@@ -1700,9 +1718,9 @@ export function App() {
 
   /** Where the computer's side menu goes (front-door pages and, since Oct 29, the town square, outside a match). */
   const goHome = () => {
-    // (The town square is in the frame on a computer: every menu item leaves it; Chess Town sets it again. The tower's screen too.)
+    // (The town square is in the frame on a computer: every menu item leaves it; Chess Town sets it again.)
     setShowTown(false);
-    setShowTower(false);
+    setTowerBack(null);
     setTownSeat(null);
     setTownStand(null);
     closeProfile();
@@ -2043,24 +2061,6 @@ export function App() {
       </>
     );
   }
-  if (!match && showTower) {
-    return (
-      <>
-        <FrontFrame page="tower" nav={nav}>
-          <TowerScreen
-            name={account().profile?.user.name ?? "Player"}
-            look={account().profile?.locker?.look}
-            onBack={() => {
-              setShowTower(false);
-              setShowTown(true);
-              history.replaceState(null, "", `/town${location.search}`);
-            }}
-          />
-        </FrontFrame>
-        {sideConfirm}
-      </>
-    );
-  }
   if (!match && showColosseum) {
     // (Its own Stockfish, started and ended with it: the pool isn't warmed here.)
     return (
@@ -2089,6 +2089,7 @@ export function App() {
           askLeave={askLeave}
           seat={townSeat}
           stand={townStand}
+          tower={towerBack}
           onBossChallenge={challengeFromTown}
           onHiddenFight={hiddenFight}
           onPlayBot={playTownBot}

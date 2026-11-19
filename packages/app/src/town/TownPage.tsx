@@ -15,6 +15,7 @@ export type { Stand };
  * sidekick's face). (Plain data:
  * the main bundle never loads the town's code.)
  */
+import type { TowerBack } from "./Town.tsx";
 export interface BotGameAsk {
   seat: string;
   name: string;
@@ -42,6 +43,8 @@ type Props = {
   seat: string | null;
   /** Back from a boss's challenge: where you stood as you challenged it. */
   stand: Stand | null;
+  /** Back from a Battle Tower floor's match (PR 11b): the town opens in the tower (Town.tsx TowerBack). */
+  tower: TowerBack | null;
 };
 type Screen = FunctionComponent<Props & { framed: boolean }>;
 

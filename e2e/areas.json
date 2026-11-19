@@ -164,9 +164,9 @@
       "paths": ["packages/server/src/tower.ts"],
       "specs": ["e2e/account-delete.spec.ts", "e2e/battle-tower.spec.ts"]
     },
-    "The Battle Tower's solo screens (Nov 19, PR 10): the tower's screen at /tower, a floor's battle (the split bar, the run's strip, the stacked figures), its result, the floor kept on the device and rejoined": {
-      "paths": ["packages/app/src/tower.ts", "packages/app/src/tower.css", "packages/app/src/screens/Tower.tsx", "packages/app/src/screens/TowerBar.tsx", "packages/app/src/screens/TowerResult.tsx"],
-      "specs": ["e2e/battle-tower.spec.ts"]
+    "The Battle Tower's solo play (Nov 19, PR 10; PR 11b: no screen in the flow, Tower.tsx kept unused): a floor's battle (the split bar, the run's strip, the stacked figures), its result, the floor kept on the device and rejoined; the town's tower (its clerk's card, the elevator, the floor room's walk-in)": {
+      "paths": ["packages/app/src/tower.ts", "packages/app/src/tower.css", "packages/app/src/screens/Tower.tsx", "packages/app/src/screens/TowerBar.tsx", "packages/app/src/screens/TowerResult.tsx", "packages/app/src/town/TowerDesk.tsx", "packages/app/src/town/shops/tower-*.ts", "packages/app/src/town/houses/tower.ts"],
+      "specs": ["e2e/battle-tower.spec.ts", "e2e/town-street.spec.ts"]
     },
     "Quests (Nov 9, XP phase 3): dealt, counted and paid by the server, the overlay on home and its entry in the top bar, a quest's line in the result's toast": {
       "paths": ["packages/server/src/quests.ts", "packages/app/src/quests.ts", "packages/app/src/components/QuestsOverlay.tsx"],

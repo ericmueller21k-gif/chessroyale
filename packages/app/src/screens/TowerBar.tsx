@@ -8,10 +8,12 @@ import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
 import { BossLevel } from "./Boss.tsx";
-import { Beaten } from "./Tower.tsx";
-import { floorRating } from "../tower.ts";
+import { BossPortrait } from "../components/BossPortrait.tsx";
+import { portraitName } from "../characters/portraits.ts";
+import { floorRating, towerBoss } from "../tower.ts";
 import type { BossView, GameView } from "../game.ts";
 import { sideOf } from "../boss-side.ts";
+import "../tower.css";
 
 /**
  * A Battle Tower floor's battle (PR 10, the approved mockups 1 to 6 on stills/battle-tower): the run's strip in place of the title
@@ -22,6 +24,25 @@ import { sideOf } from "../boss-side.ts";
 
 // (Each boss on a floor of several, from his own part of the view: boss-side.ts.)
 export { moverOf, sideOf } from "../boss-side.ts";
+
+/** Portraits of the bosses beaten, the last `max` (the rest counted: "+3"), never cut off. (Moved here from the tower's screen, PR 11b.) */
+export function Beaten({ ids, max }: { ids: readonly string[]; max: number }) {
+  const shown = ids.slice(-max);
+  const more = ids.length - shown.length;
+  return (
+    <span class="tw-beaten">
+      {more > 0 && <span class="tw-more">+{more}</span>}
+      {shown.map((id, i) => {
+        const b = towerBoss(id);
+        return (
+          <span class="tw-face" key={`${i}-${id}`} title={b.name}>
+            {b.known && portraitName(b) ? <BossPortrait boss={b} /> : <span class="tw-unknown" aria-label={b.name}>?</span>}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 /**
  * Who says the line keyed `key` on a floor of several: the boss whose id starts it (a moment's line is keyed by the boss who cast it,

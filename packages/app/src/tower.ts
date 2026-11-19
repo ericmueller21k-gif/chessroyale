@@ -6,16 +6,18 @@ import { accountReady } from "./boss-tokens.ts";
 /**
  * The Battle Tower's solo climb on this device (PR 10; docs/areas/battle-tower.md): the server's routes (`/api/tower`, PR 9: the run
  * and the floor under way are the server's), the floor's game kept on the device after every step (so a reload rejoins it where it
- * was), and the rules the screens follow: which floor to play, when leaving is free, what a result sends. The screens: the tower's
- * own (screens/Tower.tsx, route /tower) and the battle (a Boss alone battle with the floor's bosses: solo.ts).
+ * was), and the rules the screens follow: which floor to play, when leaving is free, what a result sends. No screen of its own (PR 11b,
+ * Eric, Nov 19): Chess Town's skyscraper is the tower (its clerk, elevator and floor room: town/Town.tsx, town/TowerDesk.tsx), and the
+ * battle a Boss alone battle with the floor's bosses (solo.ts).
  */
 
 // ---------------- The server's answers (server/src/tower.ts) ----------------
 
-/** The floor under way: its id (sent back with the result) and when it began, by the server's clock. */
+/** The floor under way: its id (sent back with the result), when it began, by the server's clock, and the id of the device that started it. */
 export interface Fight {
   id: string;
   startedAt: number;
+  device?: string;
 }
 
 /** A run, as the server shows it. */
@@ -60,7 +62,7 @@ export const TOWER_WORDS = {
   elsewhere: "This floor is under way on another device. Leaving it here counts as a loss and ends your run.",
   resting: "This floor's bosses are resting for a bit. Leaving it now is free: the same floor waits for you.",
   broken: "This run can't be played. Start a new one.",
-  replace: (floor: number) => `Your run on floor ${floor} ends. Start a new run from floor 1?`,
+  replace: (floor: number) => `Your run on floor ${floor} ends, and a new one starts on floor 1.`,
 } as const;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -93,7 +95,7 @@ async function ask<T>(path: string, body?: object): Promise<Answer<T>> {
 export const towerApi = {
   state: () => ask<TowerState>("/api/tower"),
   newRun: (confirm: boolean) => ask<{ run: TowerRun }>("/api/tower/run", confirm ? { confirm: true } : {}),
-  start: () => ask<FloorStart>("/api/tower/floor/start", {}),
+  start: () => ask<FloorStart>("/api/tower/floor/start", { device: deviceId() }),
   finish: (fight: string, outcome: FloorOutcome) => ask<{ outcome: FloorOutcome; floor: number; status: string; run: TowerRun | null; best: number }>("/api/tower/floor/finish", { fight, outcome }),
   stop: (fight: string, moves: number | undefined, free = false) => ask<{ stopped: "between" | "free" | "lost"; floor?: number; status?: string; run: TowerRun | null }>("/api/tower/stop", { fight, ...(moves !== undefined ? { moves } : {}), ...(free ? { free: true } : {}) }),
 };
@@ -144,6 +146,31 @@ export interface KeptFloor {
 }
 
 const KEY = "brc.tower.solo";
+const DEVICE_KEY = "brc.tower.device";
+let device: string | null = null;
+/**
+ * This device's id for its floors' starts (audit 2, finding 3): random, kept on the device, sent with every start; the server keeps it in
+ * the fight and answers it back, so a retry whose first answer was lost knows the floor is this device's own (floorPlan). No storage: one
+ * for as long as the page is open.
+ */
+export function deviceId(): string {
+  if (device) return device;
+  try {
+    const had = localStorage.getItem(DEVICE_KEY);
+    if (had && /^[0-9a-f]{20}$/.test(had)) return (device = had);
+  } catch {
+    // (No storage: a new one for this page.)
+  }
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  device = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  try {
+    localStorage.setItem(DEVICE_KEY, device);
+  } catch {
+    // (No storage.)
+  }
+  return device;
+}
 
 /** A kept floor read back, or null when there's none or it isn't one (another version, a damaged entry). */
 export function readKept(text: string | null): KeptFloor | null {
@@ -192,14 +219,17 @@ export function clearKept(): void {
 /**
  * What a floor's start answer means for this device: `fresh`, a floor to play from its start (begun now, or begun here with no move
  * kept yet); `rejoin`, the floor under way kept here, played on from where it was; `resting`, its bosses rest (leaving is free, the
- * only choice); `elsewhere`, under way with nothing kept here (another device, or storage cleared): ask before the counted stop.
+ * only choice); `elsewhere`, under way with nothing kept here (another device, or storage cleared): ask before the counted stop. Under
+ * way, started by this device (`device`: the fight carries its id) with nothing kept for it yet: its start's answer was lost (audit 2,
+ * finding 3), so it's this device's own, from its start.
  */
-export function floorPlan(start: Pick<FloorStart, "fight" | "under" | "resting">, kept: KeptFloor | null): "fresh" | "rejoin" | "resting" | "elsewhere" {
+export function floorPlan(start: Pick<FloorStart, "fight" | "under" | "resting">, kept: KeptFloor | null, device?: string): "fresh" | "rejoin" | "resting" | "elsewhere" {
   if (start.resting) return "resting";
   const mine = kept?.fight === start.fight.id && !kept.done;
   if (!start.under) return "fresh";
   if (mine && kept!.game) return "rejoin";
-  return mine ? "fresh" : "elsewhere";
+  if (mine) return "fresh";
+  return !!device && start.fight.device === device && kept?.fight !== start.fight.id ? "fresh" : "elsewhere";
 }
 
 /** Leaving the floor under way after `crowdMoves` of your moves is free (core's leaveFloor): before your 2nd move. */
@@ -215,7 +245,7 @@ export interface TowerEnd {
   status: "open" | "top" | "out";
   run: TowerRun | null;
   best: number;
-  /** Couldn't be sent (no connection, or refused): the result is still kept here, sent again from the tower's screen. */
+  /** Couldn't be sent (no connection, or refused): the result is still kept here, sent again by the clerk's card. */
   error?: string;
 }
 
@@ -237,6 +267,8 @@ export async function settleKept(k: KeptFloor): Promise<TowerEnd> {
     return { ...base, status: a.ok && a.body.stopped === "free" ? "open" : run && run.floor === k.floor ? "open" : "out", run, best };
   }
   const a = await towerApi.finish(k.fight, done);
+  // (A 409 carrying the fight: the floor still under way (a win too soon): the result stays kept, sent again later; audit 2, finding 5.)
+  if (!a.ok && a.status === 409 && a.body.fight) return { ...base, status: "open", run: a.body.run ?? null, best: a.body.best ?? 0, error: a.body.message ?? TOWER_WORDS.offline };
   if (a.ok) {
     clearKept();
     return { ...base, status: a.body.status === "top" ? "top" : a.body.status === "open" ? "open" : "out", run: a.body.run, best: a.body.best };
@@ -332,13 +364,13 @@ export interface FloorEntry {
 /** What asking for the floor gave: a floor to go into, a question first (`resting`, `elsewhere`, `broken`: start a new run), or why not. */
 export type FloorAsk = { kind: "entry"; entry: FloorEntry } | { kind: "resting" | "elsewhere"; start: FloorStart } | { kind: "broken" } | { kind: "error"; message: string };
 
-/** The run's floor started (or the one under way answered) and what it means here (floorPlan): the tower's screen's CONTINUE, a win's Continue. */
+/** The run's floor started (or the one under way answered) and what it means here (floorPlan): as the floor room's board comes up. */
 export async function askFloor(best: number): Promise<FloorAsk> {
   const a = await towerApi.start();
   if (!a.ok) return a.status === 409 && a.body.confirm ? { kind: "broken" } : { kind: "error", message: a.body.message ?? TOWER_WORDS.offline };
   const start = a.body;
   const kept = loadKept();
-  const plan = floorPlan(start, kept);
+  const plan = floorPlan(start, kept, deviceId());
   if (plan === "resting" || plan === "elsewhere") return { kind: plan, start };
   if (plan === "rejoin") return { kind: "entry", entry: { start, kept: kept!, game: kept!.game!, best } };
   return { kind: "entry", entry: { start, kept: { v: 1, fight: start.fight.id, floor: start.floor, bosses: start.bosses, settings: start.settings, beaten: start.run.beaten }, game: null, best } };
@@ -353,10 +385,7 @@ export function onEnterFloor(fn: (e: FloorEntry) => void): () => void {
   };
 }
 
-/**
- * Into a floor: the only way the tower's screen starts one (a new floor, the next after a win, or one rejoined). For now straight to
- * the battle; PR 11b puts the floor room's walk-in in front of it.
- */
+/** Into a floor's battle: the only way one starts (the floor room's walk-in done, town/Town.tsx; or one rejoined after a reload, App.tsx). */
 export function enterTowerFloor(e: FloorEntry): void {
   floorHandler?.(e);
 }

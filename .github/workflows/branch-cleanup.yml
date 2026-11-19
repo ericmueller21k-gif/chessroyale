@@ -3,6 +3,8 @@
 # gets a dry run, listing what it would delete (the session can't start a workflow by hand). Merged means: the branch's
 # tip is in main's history, or is exactly the head a merged pull request merged. Never touched: main, claude/director-notes,
 # stills/*, any branch with an open pull request, and any branch whose tip is under 2 days old (a helper's fresh branch).
+# Also (Eric, Nov 19: "Yes, it can delete those"): review/* and audit/* branches, which never merge (a review's or an audit's report,
+# read by the director at the time), once their tip is over 3 days old.
 name: branch-cleanup
 on:
   schedule:
@@ -37,6 +39,7 @@ jobs:
             --jq '.[] | select(.merged_at) | "\(.head.ref) \(.head.sha)"' > merged-heads.txt
           gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].head.ref' > open-heads.txt
           cutoff=$(( $(date +%s) - 2*24*3600 ))
+          old=$(( $(date +%s) - 3*24*3600 ))
           : > delete.txt
           for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | sed 's#^origin/##'); do
             case "$ref" in HEAD|origin|main|claude/director-notes|stills/*) continue;; esac
@@ -45,6 +48,8 @@ jobs:
             [ "$(git log -1 --format=%ct "$tip")" -gt "$cutoff" ] && continue
             if git merge-base --is-ancestor "$tip" origin/main || grep -qxF "$ref $tip" merged-heads.txt; then
               echo "$tip $ref" >> delete.txt
+            else
+              case "$ref" in review/*|audit/*) if [ "$(git log -1 --format=%ct "$tip")" -le "$old" ]; then echo "$tip $ref" >> delete.txt; fi;; esac
             fi
           done
           echo "Merged branches: $(wc -l < delete.txt) of $(git for-each-ref refs/remotes/origin | wc -l)"

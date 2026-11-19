@@ -1,0 +1,130 @@
+/**
+ * The Battle Tower's floor room as a flow (PR 11b, Eric, Nov 19: "you walk into the battle tower, you talk to the clerk, you start a
+ * match. After the round ends, it's like a victory or defeat screen ... And then it takes you back. And then you stand there and wait
+ * in the room. And then the next, you go up whatever the elevator, you go to the next floor and then you continue on."). Pure: where
+ * everyone stands, and when, as the floor's bosses come out of the elevator one after another and walk to their marks; the scene
+ * (tower-scene.ts) draws it and the town (Town.tsx) walks you. Tested in packages/app/test/tower-floor.test.ts.
+ */
+import { CHALLENGE_FEEL } from "./challenge.ts";
+
+/** Squares (a square's middle on its whole number): the room is 10 x 10, its battle circle's middle between columns and rows 4 and 5. */
+export interface At {
+  readonly c: number;
+  readonly r: number;
+}
+
+export const TOWER_FLOOR_FEEL = {
+  /** Just inside the way in this long (the room's fade-in, then a beat) before you walk to your mark (the challenge's). */
+  insideMs: CHALLENGE_FEEL.insideMs,
+  /** A square's walk, yours and the bosses' (the challenge's slow walk). */
+  stepMs: CHALLENGE_FEEL.walkStepMs,
+  /** The last half square onto your mark's middle (the challenge's). */
+  settleMs: CHALLENGE_FEEL.settleMs,
+  /** The first boss steps out of the elevator this long after you start walking; each next one this much later. */
+  firstMs: 300,
+  gapMs: 800,
+  /** A boss shows in the elevator's doorway over this long (ms) as he steps out. */
+  showMs: 250,
+  /** The doors open this long before the first boss steps out, and close this long after the last one is clear of them. */
+  doorsMs: 300,
+  /** Everyone on their marks: this long, then the pieces come up on the board over `boardMs`, then held `holdMs` before the match. */
+  beatMs: 400,
+  boardMs: 450,
+  holdMs: 600,
+  /** Into the board (the town's own zoom on a door, on the room's canvas), then black, then the match. */
+  zoomMs: 650,
+  zoom: 2.4,
+} as const;
+
+/** The table: on the battle circle's middle. */
+export const FLOOR_TABLE: At = { c: 4.5, r: 4.5 };
+/** Your mark (south of the table, facing it, as a challenge's "facing" layout): the square you walk to, and the half square on. */
+export const FLOOR_YOU = { sq: { c: 4, r: 7 }, at: { c: 4.5, r: 7 } } as const;
+/** Where a boss shows: in the elevator's doorway (the back wall's columns 4-5), just out of its doors. */
+export const FLOOR_DOOR: At = { c: 4.5, r: 0.7 };
+
+/** The bosses' marks on the far side of the table, in their turn order (1, 2 or 3, spread across it). */
+export function bossMarks(n: number): At[] {
+  if (n <= 1) return [{ c: 4.5, r: 2.0 }];
+  if (n === 2)
+    return [
+      { c: 3.3, r: 2.2 },
+      { c: 5.7, r: 2.2 },
+    ];
+  return [
+    { c: 2.6, r: 2.6 },
+    { c: 4.5, r: 2.0 },
+    { c: 6.4, r: 2.6 },
+  ];
+}
+
+/** When each part of a floor's walk-in happens (ms from the room's first frame), for `n` bosses. Reduced motion: everyone on their marks. */
+export interface FloorTimes {
+  /** You start walking to your mark (and you're on it, settled). */
+  youGo: number;
+  youOn: number;
+  /** Each boss steps out, and is on his mark. */
+  bossGo: number[];
+  bossOn: number[];
+  /** The elevator's doors open and close round the bosses' coming out (open: `doorsOpen` <= t < `doorsShut`). */
+  doorsOpen: number;
+  doorsShut: number;
+  /** The pieces start coming up on the board; the match starts (the zoom into the board). */
+  board: number;
+  go: number;
+}
+
+const dist = (a: At, b: At) => Math.hypot(a.c - b.c, a.r - b.r);
+
+/** The floor's walk-in times: `youSteps`, the squares you walk from the way in to your mark. */
+export function floorTimes(n: number, youSteps: number, still: boolean, F = TOWER_FLOOR_FEEL): FloorTimes {
+  const marks = bossMarks(n);
+  if (still) {
+    // (Reduced motion: nobody walks; everyone stands on their marks as the room shows, and the pieces come up.)
+    const board = F.insideMs;
+    return { youGo: 0, youOn: 0, bossGo: marks.map(() => 0), bossOn: marks.map(() => 0), doorsOpen: 0, doorsShut: 0, board, go: board + F.boardMs + F.holdMs };
+  }
+  const youGo = F.insideMs;
+  const youOn = youGo + youSteps * F.stepMs + F.settleMs;
+  const bossGo = marks.map((_, i) => youGo + F.firstMs + i * F.gapMs);
+  const bossOn = marks.map((m, i) => bossGo[i]! + dist(FLOOR_DOOR, m) * F.stepMs);
+  const doorsOpen = bossGo[0]! - F.doorsMs;
+  // (Clear of the doors: a square out.)
+  const doorsShut = bossGo[bossGo.length - 1]! + F.stepMs + F.doorsMs;
+  const board = Math.max(youOn, ...bossOn) + F.beatMs;
+  return { youGo, youOn, bossGo, bossOn, doorsOpen, doorsShut, board, go: board + F.boardMs + F.holdMs };
+}
+
+/** A boss now: where he stands (squares), how much of him shows (0-1: stepping out of the doorway), whether he's walking. */
+export interface BossNow {
+  c: number;
+  r: number;
+  a: number;
+  walking: boolean;
+}
+
+/** Boss `i` of `n` at `t` ms (the floor's times): in the doorway, walking straight to his mark, then on it. Before he steps out: unseen. */
+export function bossAt(i: number, n: number, t: number, times: FloorTimes, out: BossNow, F = TOWER_FLOOR_FEEL): BossNow {
+  const m = bossMarks(n)[i]!;
+  const go = times.bossGo[i]!;
+  const on = times.bossOn[i]!;
+  if (on <= go || t >= on) return Object.assign(out, { c: m.c, r: m.r, a: 1, walking: false });
+  if (t < go) return Object.assign(out, { c: FLOOR_DOOR.c, r: FLOOR_DOOR.r, a: 0, walking: false });
+  const u = (t - go) / (on - go);
+  return Object.assign(out, { c: FLOOR_DOOR.c + (m.c - FLOOR_DOOR.c) * u, r: FLOOR_DOOR.r + (m.r - FLOOR_DOOR.r) * u, a: Math.min(1, (t - go) / F.showMs), walking: true });
+}
+
+/** How far the pieces have come up on the board at `t` (0-1). */
+export const piecesAt = (t: number, times: FloorTimes, F = TOWER_FLOOR_FEEL): number => Math.max(0, Math.min(1, (t - times.board) / F.boardMs));
+
+/**
+ * The floor room's state (the town's): `fight`, the floor's bosses walking in to a match; `won`, back after a win, the elevator open to
+ * the next floor; `out`, back after the run ended (a loss, a draw, a counted leave, or the top), the elevator shut: down to the lobby.
+ */
+export type FloorMode = "fight" | "won" | "out";
+
+/** The elevator's card in the floor room: up to the next floor once a floor's won; shut otherwise (greyed, nothing hidden). */
+export function upWords(mode: FloorMode, floor: number): { word: string; on: boolean; note: string | null } {
+  if (mode === "won") return { word: `Up to floor ${floor + 1}`, on: true, note: null };
+  return { word: "Up", on: false, note: mode === "out" ? "Your run is over. Talk to the clerk downstairs to start a new one." : "Win this floor first." };
+}
