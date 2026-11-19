@@ -1,4 +1,4 @@
-# Battle Tower audit 2: the fixes (Nov 19). Opus, xhigh. Targeted lane (one PR)
+# Battle Tower audit 2: the fixes (Nov 19). Opus, high. Targeted lane (one PR)
 
 The audit: `git fetch origin audit/battle-tower-2 && git show origin/audit/battle-tower-2:docs/decisions/2026-11-19-battle-tower-audit-2.md`.
 Read it in full, then CLAUDE.md, `.claude/LESSONS.md`, `docs/rules/eric.md`. Branch `claude/tower-audit-2-fixes` from main; first merge
@@ -16,6 +16,6 @@ yours** (they go to that flow). Yours, each fixed at its cause with a test that 
   rejoin; no time passes while you're away (a floor left overnight isn't lost on time).
 - **Finding 6:** no new XP game on a rejoin. **Finding 7:** a new deck leaves out the bosses still waiting in the old one.
 - **Nits:** the area page and the audit brief's "next to Auto chess" lines (Eric: the town's clerk only).
-Effort xhigh (the runner's view for every screen, the restore). One still per platform of a shared floor for Eric (Sawyer's cut on
+Effort high (screens with logic and the restore; high, not xhigh, so it can run beside the flow helper: be thorough). One still per platform of a shared floor for Eric (Sawyer's cut on
 Ginger's turn). Done: `.pr-body.md` (lane, player-visible, changed checks old → new; under 40 lines) and `.done`; push and end. No PRs,
 no CI waits.
