@@ -1,7 +1,17 @@
-/* The Battle Tower (PR 10): its screen (screens/Tower.tsx, the approved mockups 7 and 8), the run's strip over the battle and the split
-   boss bar (screens/TowerBar.tsx, mockups 1 to 6), the result's buttons. Colors from the front door's tokens (light and dark). */
+/* The Battle Tower (PR 10): the run's strip over the battle and the split boss bar (screens/TowerBar.tsx, mockups 1 to 6), the result's
+   buttons; (PR 11b) the clerk's card. Colors from the front door's tokens (light and dark). */
 
-/* ---- The tower's screen ---- */
+/* ---- The clerk's card in the town's tower (town/TowerDesk.tsx, PR 11b): "Start over", small under Start or Continue ---- */
+.town-btn.tw-over {
+  min-height: 36px;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+.tw-desk-note {
+  margin: 4px 0 0;
+}
+
+/* ---- The tower's screen (screens/Tower.tsx): kept unused at Eric's word, Nov 19 (PR 11b) ---- */
 .tw-page {
   height: var(--app-h);
 }
@@ -70,43 +80,6 @@
 }
 .tw-line b {
   color: var(--fd-text);
-}
-.tw-beaten {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-.tw-more {
-  font-weight: 800;
-  color: var(--fd-text);
-  margin-right: 2px;
-}
-.tw-face {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 22px;
-  height: 22px;
-  overflow: hidden;
-}
-.tw-strip .tw-face {
-  width: 18px;
-  height: 18px;
-}
-.tw-face > *,
-.tw-face .boss-portrait {
-  width: 100%;
-  height: 100%;
-}
-.tw-face canvas,
-.tw-face img {
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
-}
-.tw-unknown {
-  font-weight: 800;
-  color: var(--fd-dim);
 }
 .tw-bests {
   display: grid;
@@ -219,6 +192,45 @@
   text-decoration: underline;
   color: var(--fd-sub);
   cursor: pointer;
+}
+
+/* ---- The bosses beaten, small portraits (the strip's) ---- */
+.tw-beaten {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.tw-more {
+  font-weight: 800;
+  color: var(--fd-text);
+  margin-right: 2px;
+}
+.tw-face {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  overflow: hidden;
+}
+.tw-strip .tw-face {
+  width: 18px;
+  height: 18px;
+}
+.tw-face > *,
+.tw-face .boss-portrait {
+  width: 100%;
+  height: 100%;
+}
+.tw-face canvas,
+.tw-face img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.tw-unknown {
+  font-weight: 800;
+  color: var(--fd-dim);
 }
 
 /* ---- The run's strip over the battle (in place of "BOSS · move 1"; a computer's: a row above the bar) ---- */

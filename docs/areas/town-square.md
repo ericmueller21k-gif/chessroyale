@@ -892,8 +892,9 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 ## The Battle Tower (Nov 19; everyone's town)
 
 - **Front** (`houses/tower.ts`, 144 x 592): Colosseum Row 45-48, its sign "BATTLE TOWER"; nobody out front (`hasFigure`); box: slate glass sides, no roof. Card: Go in.
-- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"); Talk is a link to `/tower` (`ShopDef.talkTo`); the elevator solid (its door is PR 11b's); "BEST FLOORS" written on the empty board (`RoomArt.sign.ink`).
-- e2e `town-street.spec.ts` ("the Battle Tower"). [2026-11-19-tower-building.md](../decisions/2026-11-19-tower-building.md)
+- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls and your best on the "BEST FLOORS" board, `RoomFx.signBody`): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"), his card `town/TowerDesk.tsx` (ShopRoom `talkCard`); the elevator, a door up (`top`).
+- **Floor room** (PR 11b: `shops/tower-floor-art.ts`, `tower-floor.ts` the flow, `tower-floor-scene.ts`; `loadTowerFloor(n)`): N on its walls; its walk-in held (`RoomFx.hold`, `ShopCtl.walkTo`), the elevator open (`RoomFx.swap`); back from a match on your mark (ShopRoom `at`); the way down to the lobby. battle-tower.md.
+- e2e `town-street.spec.ts` ("the Battle Tower"), `battle-tower.spec.ts`. [2026-11-19-tower-building.md](../decisions/2026-11-19-tower-building.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md)
 
 ## Chandy's Swamp (Nov 16; an admin's town only, as Chandy is admins first)
 

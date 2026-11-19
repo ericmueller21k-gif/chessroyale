@@ -11,6 +11,9 @@ import { TOWER_WORDS, askFloor, floorRating, towerBoss, enterTowerFloor, loadKep
 import "../tower.css";
 
 /**
+ * KEPT UNUSED (Eric, Nov 19, PR 11b: "keep whatever you already did for that screen for now ... maybe we can find some use for it later.
+ * But yeah, that's not [the way] it's going."): nothing opens it, no route renders it; the tower is the town's (town/Town.tsx).
+ *
  * The Battle Tower's screen (route /tower; PR 10, the approved mockup 7 and 8 on stills/battle-tower): opened only by Chess Town's
  * skyscraper clerk (Eric, Nov 19: never from home or a menu), Back goes to the town. Built on Boss Battle's screen: your run's card
  * (its floor, the bosses beaten, the floor's bosses and rating), your bests, Solo | Party (Party greyed: coming soon), the stage (you
@@ -21,24 +24,9 @@ import "../tower.css";
 /** A boss on the stage (BossStage.tsx, in the match's chunk); nothing until it's here (the spot keeps its size). */
 const StageFigure = game.screen("BossStageFigure", null);
 
-/** Portraits of the bosses beaten, the last `max` (the rest counted: "+3"), never cut off. */
-export function Beaten({ ids, max }: { ids: readonly string[]; max: number }) {
-  const shown = ids.slice(-max);
-  const more = ids.length - shown.length;
-  return (
-    <span class="tw-beaten">
-      {more > 0 && <span class="tw-more">+{more}</span>}
-      {shown.map((id, i) => {
-        const b = towerBoss(id);
-        return (
-          <span class="tw-face" key={`${i}-${id}`} title={b.name}>
-            {b.known && portraitName(b) ? <BossPortrait boss={b} /> : <span class="tw-unknown" aria-label={b.name}>?</span>}
-          </span>
-        );
-      })}
-    </span>
-  );
-}
+/** Portraits of the bosses beaten (TowerBar.tsx's, where the strip uses them since PR 11b). */
+export { Beaten } from "./TowerBar.tsx";
+import { Beaten } from "./TowerBar.tsx";
 
 /** The skyscraper on the run's card (the art runner draws the real one): a plain tower of windows. */
 const Skyscraper = () => (

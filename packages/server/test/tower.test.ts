@@ -124,6 +124,20 @@ describe("a floor's start", () => {
     expect(again).toMatchObject({ fight: s.fight, under: true, floor: 1, settings: core.settings });
   });
 
+  it("keeps the starting device's id in the fight and answers it back, the retry's `under` too (audit 2, finding 3); a bad id is dropped", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await newTowerRun(sql, ann.id, T0, { confirm: false, pool: POOL, seed: SEED });
+    const dev = "0123456789abcdef0123";
+    const s = body<{ fight: { id: string; device?: string } }>(await startTowerFloor(sql, ann.id, T0 + SEC, { pool: POOL, device: dev }));
+    expect(s.fight.device).toBe(dev);
+    const again = body<{ fight: { device?: string }; under?: boolean }>(await startTowerFloor(sql, ann.id, T0 + 2 * SEC, { pool: POOL, device: "ffffffffffffffff" }));
+    expect(again).toMatchObject({ under: true, fight: { id: s.fight.id, device: dev } });
+    const bob = await signedIn(sql, "bob@example.com");
+    await newTowerRun(sql, bob.id, T0, { confirm: false, pool: POOL, seed: SEED });
+    expect(body<{ fight: object }>(await startTowerFloor(sql, bob.id, T0 + SEC, { pool: POOL, device: "<not hex>" })).fight).not.toHaveProperty("device");
+  });
+
   it("a boss resting since the deal is dealt again, and saved so (the floor's bosses then stay, whatever rests after its start)", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
