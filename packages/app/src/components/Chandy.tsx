@@ -9,7 +9,8 @@
  *   it unlocked (ChandyUpgrade), front and center over the board.
  * - **His meter's moves** (each with its banner, your pawn on it, and his shot from the board's corner): scatter shot's burst and
  *   its four blocked squares; the beam's cover over a rank and a file (the squares hidden); the shields' bubbles; rapid fire's hits
- *   and dizzy stars; the queen lock's aim (her crosshair and the line down her file from his side), and its shot at the start of his
+ *   and dizzy stars; the queen lock's aim (the crosshair on your queen, or your best rook if your queen is gone, and the line down its
+ *   file from his side), and its shot at the start of his
  *   next turn (the round down the file, the piece in its way shattered).
  * - **His bar:** the rifle's pips (n of 5) and the move meter, greyed until his first upgrade (nothing hidden, nothing shifts); his
  *   rage meter dimmed until the fifth ("Rage: unlocks at 5 upgrades").
@@ -36,7 +37,7 @@ export const CHANDY_WORDS = {
   beam: (square?: string) => (square ? `Rank ${square[1]} and the ${square[0]}-file held.` : "A rank and a file held."),
   shields: "Two of his pieces shielded.",
   rapid: "Three of your pieces dizzy.",
-  aim: "He fires at her next. Block her file!",
+  aim: (shape?: string) => (shape === "r" ? "He fires at your rook next. Block its file!" : "He fires at your queen next. Block her file!"),
   shot: (piece: string | null | undefined, stopped: boolean) => (stopped ? "Queen lock: the shot was stopped." : piece === "q" ? "Queen lock: your queen fell." : `Queen lock: your ${PIECES[piece ?? "p"] ?? "piece"} took it.`),
 } as const;
 const PIECES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
@@ -111,7 +112,7 @@ export function chandyItems(boss: BossView, moments: readonly Moment[], now: num
       out.push(m ? { square: sq, name: "chandyDizzy", anim: "hit", then: "dizzy", since: when } : { square: sq, name: "chandyDizzy", anim: "dizzy", since: 0, quiet: true });
     });
   }
-  // The queen lock's aim: her crosshair and the line down her file from his side, through your turn.
+  // The queen lock's aim: the crosshair on its target (your queen, or a rook: Nov 19) and the line down its file from his side, through your turn.
   if (c.aim) {
     const m = find(moments, "queenAim");
     if (!m || now >= at(m, FIRE_AT)) {
@@ -186,7 +187,7 @@ const MOMENTS: Record<"lockOn" | "upgrade" | "scatterShot" | "beam" | "shields" 
   beam: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("BEAM!", (m) => CHANDY_WORDS.beam(m.square)) },
   shields: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("SHIELDS!", () => CHANDY_WORDS.shields) },
   rapidFire: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("RAPID FIRE!", () => CHANDY_WORDS.rapid) },
-  queenAim: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("QUEEN LOCK!", () => CHANDY_WORDS.aim) },
+  queenAim: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("QUEEN LOCK!", (m) => CHANDY_WORDS.aim(m.shape)) },
   lockOn: { order: 2, kit: "powerHit", view: lockMoment },
   // (At the start of his turn: the dock says what the shot did.)
   queenShot: { order: 0, kit: "power", dock: (m) => CHANDY_WORDS.shot(m.shape, !!m.fizzled?.length), view: shotMoment },

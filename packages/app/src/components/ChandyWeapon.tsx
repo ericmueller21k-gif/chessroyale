@@ -40,7 +40,7 @@ const MOVE_WHAT: Record<ChandyMove, string> = {
   beam: "A rank and a file held",
   shields: `${S.shieldCount} of his pieces shielded`,
   rapidfire: `${S.rapidCount} of yours can't move`,
-  queenlock: "He fires down her file",
+  queenlock: "Fires at your queen, or best rook",
 };
 
 /** What the screen shows, from his view (pure). */

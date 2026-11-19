@@ -203,8 +203,12 @@ describe("the locks (L1-L6)", () => {
       if (taken && taken.color === r.boss!.crowdSide) caught++;
       expect(marks).toEqual(taken && taken.color === r.boss!.crowdSide ? [sq] : []);
       // (His first unlock: the queen lock when it could come then, your queen on the board with a save (Eric, Nov 18; the review of
-      // #797); else the usual random one. Here your queen is deep in his camp with nothing to put in front of her: random.)
-      if (caught === 1 && marks.length) expect([cOf(r).unlocked[0] === "queenlock", queenLockAim(fenOf(r), r.boss!.crowdSide, 0, 0) !== null]).toEqual([false, false]);
+      // #797), or with none it can aim at your best rook with one (Nov 19); else the usual random one. Here your queen is deep in his
+      // camp with nothing to put in front of her, so it aims at a rook of yours.)
+      if (caught === 1 && marks.length) {
+        const aim = queenLockAim(fenOf(r), r.boss!.crowdSide, 0, 0);
+        expect([cOf(r).unlocked[0], aim && pieceAt(fenOf(r), aim)?.type]).toEqual(["queenlock", "r"]);
+      }
       // (Upgrades 1 and 2 come with the captures; the hunt only once both have taught it.)
       expect([cOf(r).upgrades, cOf(r).marked ?? 0, cOf(r).taught]).toEqual([caught, caught, caught >= S.teachCaptures ? true : undefined]);
     }
@@ -585,6 +589,35 @@ describe("the queen lock", () => {
     expect(queenLockAim("4k3/8/8/8/8/8/8/4K3 w - - 0 1", "w", 1, 0)).toBeNull();
     // (Black's queen lock from White's edge: your queen on d8 behind a pawn on d7.)
     expect(queenLockAim("3qk3/3p4/8/8/8/8/8/4K3 b - - 0 1", "b", 1, 0)).toBe("d8");
+  });
+
+  it("with no queen of yours it can aim at, it aims at your best rook (Eric, Nov 19): the most gettable (lockRank), ties by the seed; never a rook with no save", () => {
+    // (No queen: the a1 rook behind its pawn; the h1 rook has nothing to put in front of it.)
+    expect(queenLockAim("4k3/8/8/8/8/8/P7/R3K2R w - - 0 1", "w", 1, 0)).toBe("a1");
+    // (Both rooks behind a pawn; his bishop on f3 hits the undefended h1 rook: h1, whatever the seed.)
+    for (let seed = 0; seed < 10; seed++) expect(queenLockAim("4k3/8/8/8/8/5b2/P6P/R3K2R w - - 0 1", "w", seed, 0)).toBe("h1");
+    // (Both alike: the seed picks.)
+    expect(new Set(Array.from({ length: 20 }, (_, seed) => queenLockAim("4k3/8/8/8/8/8/P6P/R3K2R w - - 0 1", "w", seed, 0)))).toEqual(new Set(["a1", "h1"]));
+    // (A queen it can aim at comes first; a queen with no save gives way to the rook.)
+    expect(queenLockAim("4k3/8/8/8/8/8/P2P4/R2QK3 w - - 0 1", "w", 1, 0)).toBe("d1");
+    expect(queenLockAim("4k3/8/8/8/3Q4/8/P7/R3K3 w - - 0 1", "w", 1, 0)).toBe("a1");
+    // (Black's rook lock from White's edge.)
+    expect(queenLockAim("r3k3/p7/8/8/8/8/8/4K3 b - - 0 1", "b", 1, 0)).toBe("a8");
+  });
+
+  it("aims at the rook, follows it, and the shot lands: your queen gone (Eric, Nov 19)", async () => {
+    const r = battle(8);
+    await crowdMove(r);
+    // (Black to move, his meter full with the queen lock: no queen of yours; your rook on d1 behind your d2 pawn.)
+    onPosition(r, "4k3/pppp4/8/8/8/8/3PP3/3R2K1 b - - 0 1", "w", { upgrades: 1, unlocked: ["queenlock"], due: "queenlock", meter: S.meterEvery });
+    expect(r.queenLockDue()).toBe(true);
+    expect(r.applyQueenLock(null)).toBe("d1");
+    expect(r.boss!.powers!.events.find((e) => e.kind === "queenAim")).toMatchObject({ square: "d1", shape: "r" });
+    // (Your free move: the rook slides behind the e2 pawn; the aim follows it, and the shot at the start of his turn shatters e2.)
+    await crowdMove(r, () => "d1e1");
+    expect(cOf(r).shot).toMatchObject({ square: "e2", piece: "p" });
+    expect(pieceAt(fenOf(r), "e2")).toBeNull();
+    expect(pieceAt(fenOf(r), "e1")).toMatchObject({ type: "r", color: "w" });
   });
 
   it("fires down her file: the first of your pieces from his edge shatters; your king stops it; nothing in the way, she falls; his own pieces don't stop it", () => {

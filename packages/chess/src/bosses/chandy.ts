@@ -20,7 +20,8 @@
  *   within chandy.chaseMargin (his own pick if it does). Only on his ordinary moves (not the King's strike, a slip or a power's
  *   engine-best reply). Online the host steers with the request's `lock` (steerPick), the same function as here.
  * - **Upgrades:** only taking a locked piece upgrades the rifle (to chandy.upgradesMax); each unlocks one of his five moves at
- *   random, the queen lock first while it could come right then (you have a queen it can aim at: queenLockAim; chandy.queenLockFirst;
+ *   random, the queen lock first while it could come right then (you have a queen, or with none it can aim at a rook, it can aim at:
+ *   queenLockAim, Nov 19; chandy.queenLockFirst;
  *   Eric, Nov 18: "make that upgrade happen earlier"; unlockPick) (the rifle's parts come in a fixed order: the art's), shown in the
  *   upgrade window as your turn begins (`upgrade`, 2 s, the clock held). After the fifth: no window.
  * - **A new unlock fires at once** (chandy.fireOnUnlock; Eric, Nov 16): on his turn after its upgrade window, whatever his meter
@@ -41,9 +42,10 @@
  *   pieces can't take them on your turn (Don Dough's gold rule, every piece, one turn).
  * - **Rapid fire** (`rapidFire`): three of your pieces with a move, at random, never the king: held for your turn (Moo's stun).
  * - **Queen lock** (`queenAim`, then `queenShot`): only when you have a queen and a move that leaves a pawn, knight or bishop
- *   between her and his edge on her file (queenLockAim). He spends his turn aiming; your move is free; at the start of his next
- *   turn he fires straight down the file she stands on then: the first of your pieces from his edge shatters (her, if none is in
- *   the way); your king in the way stops it; his own pieces don't. A shot that would leave your king attacked with him to move, or
+ *   between her and his edge on her file (queenLockAim); with no queen it can aim at, your best rook with such a move (Eric, Nov 19:
+ *   "yes on chandy good idea"; lockRank's most gettable, ties by the seed). He spends his turn aiming; your move is free; at the
+ *   start of his next turn he fires straight down the file the target stands on then: the first of your pieces from his edge
+ *   shatters (the target, if none is in the way); your king in the way stops it; his own pieces don't. A shot that would leave your king attacked with him to move, or
  *   hand him a promotion for his next move, fizzles.
  * A power never leaves you without a legal move: the dispatcher lifts the turn's limits if it would.
  *
@@ -387,8 +389,8 @@ export function meterOrder(c: Pick<ChandyState, "unlocked" | "fresh" | "used" | 
 export const meterPick = (c: Pick<ChandyState, "unlocked" | "fresh" | "used" | "last" | "fired">, seed: number, skip: readonly ChandyMove[] = []): ChandyMove | null => meterOrder(c, seed, skip)[0] ?? null;
 
 /**
- * The move an upgrade unlocks: the queen lock while it's still locked and it could come right then (`queen`: you have a queen it can
- * aim at, afterHisMove; chandy.queenLockFirst: Eric, Nov 18, "make that upgrade happen earlier": in his game the queens were gone
+ * The move an upgrade unlocks: the queen lock while it's still locked and it could come right then (`queen`: you have a queen, or
+ * with none a rook (Nov 19), it can aim at, afterHisMove; chandy.queenLockFirst: Eric, Nov 18, "make that upgrade happen earlier": in his game the queens were gone
  * before it came), else random among those still locked
  * (from the seed and the upgrade's number); none once all five are.
  */
@@ -540,49 +542,56 @@ function fromHisEdge(square: string, crowd: Side): string[] {
   return out;
 }
 
-/** The first of the crowd's pieces down the file from his edge to the queen's square (her included), or null. */
+/** The first of the crowd's pieces down the file from his edge to the target's square (the queen lock's queen or rook, it included), or null. */
 export function shotTarget(fen: string, queen: string, crowd: Side): string | null {
   for (const sq of fromHisEdge(queen, crowd)) if (pieceAt(fen, sq)?.color === crowd) return sq;
   return null;
 }
 
-/** A pawn, knight or bishop of the crowd's is the first of its pieces from his edge down the queen's file, before her. */
+/** A pawn, knight or bishop of the crowd's is the first of its pieces from his edge down the target's file, before it. */
 const shielded = (fen: string, queen: string, crowd: Side): boolean => {
   const first = shotTarget(fen, queen, crowd);
   return !!first && first !== queen && ["p", "n", "b"].includes(pieceAt(fen, first)!.type);
 };
 
 /**
- * The queen the queen lock aims at (`passed`: his turn spent, the crowd to move), or null: it can't come now. The crowd's queen (a
+ * The piece the queen lock aims at (`passed`: his turn spent, the crowd to move), or null: it can't come now. The crowd's queen (a
  * promoted one counts; several: the one with the most saves, ties by the seed) with a move that leaves a pawn, knight or bishop
- * between her and his edge on her file (one is there already, she steps behind one, or one steps in front of her). Never with the
- * crowd in check; null `passed` (he's in check: no pass) never.
+ * between her and his edge on her file (one is there already, she steps behind one, or one steps in front of her). With no queen it
+ * can aim at, the crowd's best rook with such a save (Eric, Nov 19: "yes on chandy good idea", the queen lock a dead upgrade once the
+ * queens came off): the one lockRank rates most gettable, ties by the seed (docs/decisions/2026-11-19-chandy-rook-lock.md). Never
+ * with the crowd in check; null `passed` (he's in check: no pass) never.
  */
 export function queenLockAim(passed: string | null, crowd: Side, seed: number, n: number): string | null {
   if (!passed || sideToMove(passed) !== crowd || kingAttacked(passed, crowd)) return null;
-  const queens = piecesOf(passed, crowd)
-    .filter((p) => p.type === "q")
-    .map((p) => p.square);
-  if (!queens.length) return null;
   const legal = legalMoves(passed);
-  const saves = (q: string) =>
+  const saves = (sq: string, type: "q" | "r") =>
     legal.filter((m) => {
       try {
         const after = applyMove(passed, m);
-        const qNow = from(m) === q ? to(m) : q;
-        return pieceAt(after, qNow)?.type === "q" && shielded(after, qNow, crowd);
+        const now = from(m) === sq ? to(m) : sq;
+        return pieceAt(after, now)?.type === type && shielded(after, now, crowd);
       } catch {
         return false;
       }
     }).length;
-  const ranked = seeded(queens, seed, (x) => x, "queen-aim", n)
-    .map((q) => ({ q, n: saves(q) }))
+  const of = (type: "q" | "r") => piecesOf(passed, crowd).filter((p) => p.type === type).map((p) => p.square);
+  const queen = seeded(of("q"), seed, (x) => x, "queen-aim", n)
+    .map((q) => ({ q, n: saves(q, "q") }))
     .filter((x) => x.n > 0)
-    .sort((a, b) => b.n - a.n);
-  return ranked[0]?.q ?? null;
+    .sort((a, b) => b.n - a.n)[0]?.q;
+  if (queen) return queen;
+  const board = boardFor(passed);
+  const hits = attackedSquares(passed, other(crowd));
+  return (
+    seeded(of("r"), seed, (x) => x, "rook-aim", n)
+      .filter((r) => saves(r, "r") > 0)
+      .map((r) => ({ r, rank: lockRank(passed, r, crowd, board, hits) }))
+      .sort((a, b) => b.rank - a.rank)[0]?.r ?? null
+  );
 }
 
-/** The queen lock may come now (`fen`: him to move): a queen to aim at with a cheap save (queenLockAim), and a turn he can pass. */
+/** The queen lock may come now (`fen`: him to move): a queen (or, with none it can aim at, a rook) with a cheap save (queenLockAim), and a turn he can pass. */
 export const queenLockOk = (fen: string, crowd: Side, seed: number, n: number): boolean => queenLockAim(passTurn(fen), crowd, seed, n) !== null;
 
 /**
@@ -899,7 +908,11 @@ export const CHANDY: BossRules = {
     const c = next.chandy;
     if (!c) return;
     if (c.upgrade && c.upgrade.turn === t.turn) t.events.push({ kind: "upgrade", turn: t.turn, stage: c.upgrade.stage, ...(c.upgrade.unlock ? { unlock: c.upgrade.unlock } : {}) });
-    if (c.aim && c.aim.turn === t.turn) t.events.push({ kind: "queenAim", turn: t.turn, square: c.aim.square });
+    if (c.aim && c.aim.turn === t.turn) {
+      // (Its target, a queen or a rook (Nov 19), for the screens' words.)
+      const shape = pieceAt(t.fen, c.aim.square)?.type;
+      t.events.push({ kind: "queenAim", turn: t.turn, square: c.aim.square, ...(shape === "r" || shape === "q" ? { shape } : {}) });
+    }
   },
   passive(next, t) {
     let c = next.chandy;
@@ -1052,14 +1065,16 @@ export function chandyView(p: BossPowerState, s: ChandySettings = BOSS_POWERS.ch
 
 /**
  * His locks and the queen lock's aim after a move (`before`: the position before it): each follows its piece; one taken is gone; a
- * locked pawn that promotes to a queen is unlocked at once (never the queen, L1); the aim stays only on a queen.
+ * locked pawn that promotes to a queen is unlocked at once (never the queen, L1); the aim stays only on the queen or rook it was on.
  */
 function followLocks(chandy: ChandyState, before: string, move: string): ChandyState {
   const c: ChandyState = { ...chandy };
   c.locks = locksAfter(before, move, c.locks).filter((l) => l.piece !== "q");
   if (c.aim) {
-    const followed = locksAfter(before, move, [{ square: c.aim.square, piece: "q", at: 0 }])[0];
-    c.aim = followed?.piece === "q" ? { ...c.aim, square: followed.square } : null;
+    // (The aim follows its piece, a queen or a rook (Nov 19), while it stays that piece: taken, or not there, it's gone.)
+    const was = pieceAt(before, c.aim.square)?.type;
+    const followed = was === "q" || was === "r" ? locksAfter(before, move, [{ square: c.aim.square, piece: was, at: 0 }])[0] : undefined;
+    c.aim = followed && followed.piece === was ? { ...c.aim, square: followed.square } : null;
   }
   return c;
 }
@@ -1154,7 +1169,7 @@ export const chandyBattle = {
       const hit = first || (taken ? c.locks.some((l) => l.square === taken) : false);
       c.locks = locksAfter(before, move, c.locks);
       if (hit && c.upgrades < s.upgradesMax) {
-        // (The queen lock first only when it could come now: a queen of yours with a save, the test queenLockOk makes after his
+        // (The queen lock first only when it could come now: a queen of yours (or, with none, a rook: Nov 19) with a save, the test queenLockOk makes after his
         // pass, on the board after this move, you to move. The review of #797: with a queen it can't aim at, the slot sat dead.)
         const queen = s.queenLockFirst && queenLockAim(boardOf(b).fen, boss.crowdSide, p.seed, c.used) !== null;
         const unlock = unlockPick(c.unlocked, p.seed, c.upgrades, queen);
@@ -1197,7 +1212,7 @@ export const chandyBattle = {
   },
 
   /**
-   * The queen lock is due: the start of his turn, his meter's pick, with a queen to aim at and a cheap save (queenLockOk), not after
+   * The queen lock is due: the start of his turn, his meter's pick, with a queen (or a rook) to aim at and a cheap save (queenLockOk), not after
    * the pass guard had it wait this turn. It's his whole turn: no move of his follows it.
    */
   queenLockDue(b: Battle): boolean {
@@ -1218,7 +1233,7 @@ export const chandyBattle = {
   /**
    * The queen lock's aim (his whole turn): `answer` PASS_WAIT (the host's pass guard): no aim, the meter's pick another unlocked move
    * (none: the queen lock stays due, checked again on his next turn), and he plays his move; anything else aims: the turn passes to
-   * the crowd (a base), the aim on her square, the meter spent, and the crowd's turn set up as after his move (its moment, the aim's). Returns her square; null: none was due, or it waits.
+   * the crowd (a base), the aim on its target's square (her, or a rook), the meter spent, and the crowd's turn set up as after his move (its moment, the aim's). Returns the target's square; null: none was due, or it waits.
    */
   applyQueenLock(b: Battle, answer: string | null = null): string | null {
     if (!chandyBattle.queenLockDue(b)) return null;

@@ -2096,7 +2096,8 @@ export const BOSS_POWERS = {
    *   `lockLines` moves, one taking a locked piece within `takeMargin` pawns of his best is played; else one attacking a locked piece
    *   (or adding an attacker) within `chaseMargin`.
    * - **The rifle:** each locked piece he takes is an upgrade (`upgradesMax`), each unlocking one of his five moves at random (the
-   *   queen lock first while it could come right then, a queen of yours it can aim at: `queenLockFirst`, Eric, Nov 18); the upgrade window holds everything `upgradeMs` (Eric: 2 s).
+   *   queen lock first while it could come right then, a queen of yours it can aim at, or with none your best rook (Nov 19):
+   *   `queenLockFirst`, Eric, Nov 18); the upgrade window holds everything `upgradeMs` (Eric: 2 s).
    * - **The move meter:** from the first upgrade, full every `meterEvery` of your moves; it fires an unlocked move: a new unlock first,
    *   never the one he fired last while another can come, then the least fired, ties at random (Eric, Nov 18; chandy.ts meterOrder). `fireOnUnlock` (Eric, Nov 16; false turns it off): a new unlock fires on his turn after its upgrade window whatever the
    *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter; one the pass guard refuses, with
