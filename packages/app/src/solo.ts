@@ -25,6 +25,7 @@ import { MaiaGate, type GateEnd } from "./maia-gate.ts";
 import { testParams, timingOnDevice } from "./test-switches.ts";
 import { gardenClock, setGardenSource } from "./garden-clock.ts";
 import { chunk } from "./stale.ts";
+import { type FloorPlay, type KeptGame, floorOutcome, leaveIsFree } from "./tower.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -296,12 +297,47 @@ export class SoloMatch implements GameView {
     }
     // (Nor while a beaten boss falls: the battle is over, its result on its way.)
     if (this.stopped || k === "results" || k === "loading" || (k === "boss" && this.phase.kind === "boss" && this.phase.fall)) return null;
+    // (A tower floor: free before your 2nd move, core's leaveFloor; a loss after.)
+    if (this.tower && this.runner?.boss) return leaveIsFree(this.runner.boss.crowdMoves) ? "leave" : "resign";
     if (!this.begun) return "leave";
     return this.you.alive ? "resign" : "leave";
   }
 
   get exitHome(): boolean {
+    // (A tower floor: leaving before your 2nd move is free, and goes back to the tower: no result.)
+    if (this.tower && this.runner?.boss) return leaveIsFree(this.runner.boss.crowdMoves);
     return !this.begun;
+  }
+
+  // ---------------- The Battle Tower (tower.ts) ----------------
+
+  /** A Battle Tower floor: its run (the strip, the result's buttons) and the floor kept on this device after every step. */
+  tower: FloorPlay | null = null;
+
+  /** The floor's game kept on the device as it stands now (at every step: nextRound), so a reload rejoins it here. */
+  private keepFloor() {
+    if (!this.tower || this.stopped || !this.runner?.boss || this.runner.boss.result) return;
+    this.tower.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone });
+  }
+
+  /**
+   * A tower floor rejoined after a reload (or a reopened app): the match as it was kept at its last step, played on from there (the
+   * boss's brain loaded again; his entrance not played again once it has). The position is the same, so a reload can't dodge a loss.
+   */
+  resume(game: KeptGame) {
+    warmEngineServer();
+    this.runner = MatchRunner.restore(game.snapshot, {
+      settings: this.baseSettings,
+      rng: this.rng,
+      engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
+      library: openings(),
+      clock: gardenClock,
+    });
+    this.moves = [...game.moves];
+    this.begun = this.runner.boss ? this.runner.boss.crowdMoves > 0 || game.intro : false;
+    this.bossIntroDone = game.intro;
+    if (game.intro) this.startBrain(() => this.nextRound());
+    else this.nextRound();
   }
 
   /**
@@ -318,6 +354,8 @@ export class SoloMatch implements GameView {
       return this.finishPhase2();
     }
     const home = this.exitHome;
+    // (A tower floor: the leave to send, kept here until the server takes it; it decides free or a loss, by your moves.)
+    if (this.tower && this.runner?.boss) this.tower.done("left", this.runner.boss.crowdMoves);
     const alive = this.you.alive;
     const alone = this.alone;
     const boss = !!this.runner.boss;
@@ -1427,6 +1465,7 @@ export class SoloMatch implements GameView {
   }
 
   private nextRound() {
+    this.keepFloor();
     if (this.runner.isOver()) return this.finish();
     // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
     if (this.runner.endGameIfOver()) return this.finish();
@@ -1874,6 +1913,8 @@ export class SoloMatch implements GameView {
   }
 
   private finish() {
+    // (A tower floor: its result, kept until the server takes it.)
+    if (this.tower) this.tower.done(floorOutcome(this.runner.boss?.result ?? "boss"), this.runner.boss?.crowdMoves ?? 0);
     this.lobbyChat.botsSay({ kind: "end" }, this.runner.state.players.filter((p) => p.isBot).map((p) => p.id));
     this.freeBrain();
     this.runner.showdownScout?.reset();

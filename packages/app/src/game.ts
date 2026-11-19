@@ -1,3 +1,4 @@
+import type { FloorPlay } from "./tower.ts";
 import { toSan, type BoardRound, type Base, type BoardSlot, type Capture, type LivePick, type NetBoss, type NetFinal, type NetLightsOut, type NetStanding, type NetVote, type Phase2Seat } from "@chessroyale/chess";
 import { brilliance, type MaterialSlip } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
@@ -470,6 +471,8 @@ export interface GameView {
   readonly exit: ExitKind | null;
   /** Leaving goes straight home, with no results screen (before move 1; online, once you're out). */
   readonly exitHome: boolean;
+  /** A Battle Tower floor (solo: solo.ts): its run, for the strip and the result's buttons. */
+  readonly tower?: FloorPlay | null;
   /** Online: a bot takes the seat you leave (the lobby fills seats with bots); else the match goes on without it. */
   readonly seatToBot?: boolean;
   /**
