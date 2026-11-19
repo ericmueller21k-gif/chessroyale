@@ -224,8 +224,8 @@ export const SHOP_TOWER_FLOOR_WALL_H = WALL_H;
 
 // ==== The battle circle (columns 2-7, rows 2-7; its middle the corner at x 5, y 5): a slate disc in a bold gold ring studded at the
 // eight points, a sunburst of quiet slate wedges, a fine gold inner ring, the middle line west to east, and in the middle (2 x 2 squares,
-// where the table stands) a gold sunburst medallion with a crown. Floor tiles `circle-<n>`, a tile reused (turned or mirrored) where a
-// copy matches.
+// where the table stands) a gold sunburst medallion with a crown. Floor tiles `circle-<n>`, a tile reused (as is or half-turned, never
+// mirrored: the game ignores `flip` on floor tiles) where a copy matches.
 
 const CC = 5 * T;
 const R_OUT = 111;
@@ -307,9 +307,9 @@ const CIRCLE_SQ = new Map<string, { name: string; rot?: 0 | 1 | 2 | 3; flip?: bo
       // (The middle's north-west tile is kept its own: the circle's light pool hangs on it.)
       if (!(col === 4 && row === 4))
         for (const k of kept) {
-          for (const flip of [false, true])
-            // (Only half turns: a quarter turn's sense differs between drawers, a half turn's doesn't.)
-            for (let rot = 0; rot < 4 && !hit; rot += 2) if (laid(k.grid, flip, rot).join("\n") === key) hit = { name: k.name, ...(rot ? { rot: rot as 1 | 2 | 3 } : {}), ...(flip ? { flip } : {}) };
+          // (Only unturned or half-turned, never mirrored: the game lays floor tiles with `rot` alone and ignores `flip` on them; a
+          // quarter turn's sense differs between drawers, a half turn's doesn't.)
+          for (let rot = 0; rot < 4 && !hit; rot += 2) if (laid(k.grid, false, rot).join("\n") === key) hit = { name: k.name, ...(rot ? { rot: rot as 1 | 2 | 3 } : {}) };
           if (hit) break;
         }
       if (!hit) {
@@ -518,6 +518,64 @@ export function towerFloorWallGrid(west: boolean, run: number, floor: number): {
   return { grid: c.map((r) => r.join("")), palette: PALETTE };
 }
 
+// ==== The back wall's number panels (2 squares each, columns 1-2 and 7-8 either side of the elevator): the floor's number again, smaller,
+// where a phone reads it (the side walls are seen edge on there). The back wall's frieze, plaster, rail and dado, and in the plaster a
+// slate panel in a gold frame (64 x 64) with the floor's number in the side walls' numerals, 46 px tall.
+
+const NPW = 2 * T;
+const NP = { x0: 5, x1: 68, y0: 16, y1: 79 } as const;
+const NP_CX = 36.5;
+const NP_DW = 23;
+const NP_DH = 46;
+const NP_GAP = 3;
+/** The digits 0-9 small (the side walls' numerals scaled to NP_DW x NP_DH): "#" the numeral, "." clear. */
+const NP_DIGITS: readonly (readonly string[])[] = DIGIT_SHAPES.map((sh) =>
+  Array.from({ length: NP_DH }, (_, y) => Array.from({ length: NP_DW }, (_, x) => (sh.some((s) => s(((x + 0.5) * DG_W) / NP_DW, ((y + 0.5) * DG_H) / NP_DH)) ? "#" : ".")).join("")),
+);
+/** The number panel's picture for a floor: the back wall with the gold-framed slate panel and the number. */
+function numberPanelCv(floor: number): Cv {
+  const c = cv(NPW, WALL_H);
+  fill(c, (x, y) => wallKey(mod(x, T), y));
+  const { x0, x1, y0, y1 } = NP;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const e = Math.min(x - x0, y - y0, x1 - x, y1 - y);
+      let k: string;
+      if (e === 0) k = "k";
+      else if (e < 4) {
+        const lit = (y - y0 === e && x1 - x > e) || (x - x0 === e && y1 - y > e);
+        k = lit ? ["", "Y", "G", "g"][e]! : ["", "h", "g", "g"][e]!;
+      } else if (e === 4) k = "k";
+      else k = x - x0 === 5 || y - y0 === 5 ? "1" : "2";
+      put(c, x, y, k);
+    }
+  for (const [x, y] of [[x0 + 2, y0 + 2], [x1 - 2, y0 + 2], [x0 + 2, y1 - 2], [x1 - 2, y1 - 2]] as const) put(c, x, y, "W");
+  crest(c, NP_CX, y0 - 1, [10, 5]);
+  // A soft shadow under the frame on the plaster.
+  for (let x = x0 + 2; x <= x1 + 1; x++) put(c, x, y1 + 1, "p");
+  for (let y = y0 + 2; y <= y1 + 1; y++) put(c, x1 + 1, y, "p");
+  const ds = String(Math.max(1, Math.min(99, Math.round(floor)))).split("").map(Number);
+  const SH = 2;
+  const total = ds.length * NP_DW + (ds.length - 1) * NP_GAP;
+  const left = Math.round(NP_CX - (total + SH) / 2 + 0.5);
+  const top = Math.round((y0 + 5 + y1 - 5) / 2 - (NP_DH + SH) / 2 + 0.5);
+  const ink = new Set<string>();
+  ds.forEach((d, i) => NP_DIGITS[d]!.forEach((r, y) => [...r].forEach((ch, x) => ch === "#" && ink.add(`${left + i * (NP_DW + NP_GAP) + x},${top + y}`))));
+  const has = (x: number, y: number) => ink.has(`${x},${y}`);
+  const shade = (x: number, y: number) => !has(x, y) && [1, 2].some((s) => s <= SH && has(x - s, y - s));
+  for (let y = top - 2; y < top + NP_DH + SH + 2; y++)
+    for (let x = left - 2; x < left + total + SH + 2; x++) {
+      if (has(x, y)) {
+        const tl = !has(x - 1, y) || !has(x, y - 1) || !has(x - 1, y - 1);
+        const br = !has(x + 1, y) || !has(x, y + 1);
+        put(c, x, y, tl ? "Y" : br ? "g" : "G");
+      } else if (shade(x, y)) put(c, x, y, "h");
+      else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => has(x + dx!, y + dy!) || shade(x + dx!, y + dy!))) put(c, x, y, "k");
+    }
+  return c;
+}
+def("number-panel", [2, 1], NPW, WALL_H, [37, WALL_H - 1], [[whole(numberPanelCv(4))]]);
+
 // ==== The front: the hem (the front wall's low top, seen from inside) and the way in: an open doorway in a gold frame onto the lit
 // landing (the elevator hall: warm cream plaster, a gold rail, a slate floor with a cream runner leading in).
 
@@ -718,9 +776,12 @@ for (let row = 0; row < N; row++)
   }
 const FLOOR_COUNT = LAYOUT.length;
 
-// -- The back wall (row 0): the corners blank; plain wall and pilasters either side of the elevator (4-5).
+// -- The back wall (row 0): the corners blank; the number panels (1-2, 7-8, upright, the same number) and plain wall either side of the
+// elevator (4-5).
 at("wall-none", 0, 0, true);
-for (const c of [1, 2, 3, 6, 7, 8]) at(c === 2 || c === 7 ? "wall-pilaster" : "wall", c, 0, true);
+at("number-panel", 1, 0, true);
+at("number-panel", 7, 0, true);
+for (const c of [3, 6]) at("wall", c, 0, true);
 if (PIECES["elevator"]) at("elevator", 4, 0, false, { door: "top" });
 else for (const c of [4, 5]) at("wall", c, 0, true);
 at("wall-none", N - 1, 0, true);
@@ -739,6 +800,21 @@ at("entrance", 4, N - 1, false, { exit: true });
 export const SHOP_TOWER_FLOOR_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOOR_COUNT), ...LAYOUT.slice(FLOOR_COUNT).sort((a, b) => a.row - b.row || a.col - b.col)];
 /** Every piece by its name, each its own Character `shop-tower-floor-<name>`. */
 export const SHOP_TOWER_FLOOR_PIECES: Readonly<Record<string, Character>> = Object.fromEntries(Object.values(PIECES).map((p) => [p.name, toChar(p)]));
+const PIECES_BY_FLOOR = new Map<number, Readonly<Record<string, Character>>>([[4, SHOP_TOWER_FLOOR_PIECES]]);
+/**
+ * The pieces for a floor (1 to 99): SHOP_TOWER_FLOOR_PIECES with its `number-panel` showing that floor's number (made once per floor
+ * and kept). Floor 4's are SHOP_TOWER_FLOOR_PIECES itself; another floor's panel has the id `shop-tower-floor-number-panel-<floor>`.
+ */
+export function towerFloorPieces(floor: number): Readonly<Record<string, Character>> {
+  const f = Math.max(1, Math.min(99, Math.round(floor)));
+  let got = PIECES_BY_FLOOR.get(f);
+  if (!got) {
+    const ch = toChar({ ...PIECES["number-panel"]!, frames: [[whole(numberPanelCv(f))]] });
+    got = { ...SHOP_TOWER_FLOOR_PIECES, "number-panel": { ...ch, id: `${ch.id}-${f}` } };
+    PIECES_BY_FLOOR.set(f, got);
+  }
+  return got;
+}
 /** The camera's fixed look (square coordinates, a square's middle on its whole number): the room seen whole. */
 export const SHOP_TOWER_FLOOR_CAM = { x: 4.5, y: 4.2 } as const;
 
@@ -824,8 +900,8 @@ const floorKey = (gx: number, gy: number): string => {
   const p = floorAt.get(`${Math.floor(gx / T)},${Math.floor(gy / T)}`);
   if (!p) return ".";
   const g = PIECES[p.name]!.frames[0]![0]!.part.grid;
+  // (The game's way: `rot` quarter turns clockwise about the tile's middle; `flip` ignored on floor tiles.)
   let [x, y] = [gx % T, gy % T];
-  if (p.flip) x = T - 1 - x;
   for (let q = 0; q < (p.rot ?? 0); q++) [x, y] = [y, T - 1 - x];
   return g[y]![x]!;
 };
@@ -856,6 +932,14 @@ for (const floor of [4, 57, 88]) {
   roomParts[`walls-${floor}-w`] = { grid: wg, outline: false };
   roomParts[`walls-${floor}-e`] = { grid: eg, outline: false };
   anims[`review-walls-${floor}`] = { loop: true, frames: [{ ms: 1000, layers: [{ part: `walls-${floor}-w`, x: 0, y: 0 }, { part: `walls-${floor}-e`, x: wg[0]!.length + 12, y: 0 }] }] };
+}
+
+/** The back wall's number panel alone at 3x, for floors 4 and 57 (and 88). */
+for (const floor of [4, 57, 88]) {
+  const c = numberPanelCv(floor);
+  const z = 3;
+  roomParts[`panel-${floor}`] = { grid: Array.from({ length: WALL_H * z }, (_, y) => Array.from({ length: NPW * z }, (_, x) => c[Math.floor(y / z)]![Math.floor(x / z)]!).join("")), outline: false };
+  anims[`review-panel-${floor}`] = { loop: true, frames: [{ ms: 1000, layers: [{ part: `panel-${floor}`, x: 4, y: 4 }] }] };
 }
 
 {
