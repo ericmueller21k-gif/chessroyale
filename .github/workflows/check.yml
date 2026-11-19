@@ -66,9 +66,15 @@ jobs:
       - name: Unit tests (all but packages/chess, which `chess` runs)
         run: npx vitest run --exclude "packages/chess/test/**"
 
+  # (Two halves since Nov 19: the tower's kit and layer tests doubled this job, which then set check's time; the sweep's N2,
+  # Eric's OK. Every test still runs on every PR, half on each runner.)
   chess:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -76,10 +82,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # (The typecheck runs here, the shorter job, so it's off the unit job's critical path: the Nov 9 audit, F7.)
-      - run: npm run typecheck
-      - name: packages/chess's tests
-        run: npx vitest run packages/chess/test
+      # (The typecheck runs here, on the first half only, so it's off the unit job's critical path: the Nov 9 audit, F7.)
+      - if: ${{ matrix.shard == 1 }}
+        run: npm run typecheck
+      - name: packages/chess's tests (half ${{ matrix.shard }} of 2)
+        run: npx vitest run packages/chess/test --shard=${{ matrix.shard }}/2
 
   # (The name every reader and rule knows: green only when both jobs are.)
   check:
