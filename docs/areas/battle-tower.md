@@ -2,7 +2,7 @@
 
 Lane: the director (the rules: `god-king`; the floor art: `characters`; saving: the director, full lane). **Built so far: the
 board layer (PR 1); every boss on it (PRs 2-5); several bosses in the match runner (PR 6: a runner option, `settings.bossIds`); the
-climb's rules (PR 8: core `tower.ts`, a floor's start from the deal; no screens or saving yet).**
+climb's rules (PR 8: core `tower.ts`, a floor's start from the deal); saving (PR 9: server `tower.ts`, the routes; no screens yet).**
 The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
 
 ## What it will be
@@ -77,6 +77,29 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   core's `sideRefusal` refuses still throws in `startSide` (test switch, tests); a room never gets there (finding 7).
 - Calls made: [2026-11-19-tower-climb-rules.md](../decisions/2026-11-19-tower-climb-rules.md).
 
+## Saving (built, PR 9)
+
+- **Server `tower.ts`**: a climb is stored on the server, a guest's too, so it's stopped after any floor and continued on any device.
+  `tower_runs` (one row a climb: `seed` the server's, `floor` the floor to fight, `met` core's deal (`floors` dealt, `deck`, `decks`),
+  `fight` the floor under way `{ id, startedAt }` or null, `status` open, top, out or abandoned; `kind` and `members` for the party,
+  which nothing writes yet: PR 12) and `tower_best` (the highest floor won, an account and kind; it only rises, worked out again
+  from the runs after every result). One open run an account and kind (`tower_runs_open`, a unique index). A run that ended stays
+  until the next new run of its kind.
+- **Routes** (`api.ts` → `towerResponse`, behind the session (a guest's cookie as anyone's), the API's rate limits and the ban gate):
+  `GET /api/tower` (open runs, between floors the floor's bosses as its start will deal them now; bests);
+  `POST /api/tower/run` (`newRun` from the server's seed; replaces an open run only with `confirm`, else 409 with it);
+  `/floor/start` (`startFloor`, the start noted by the server's clock; one under way answers itself, `under`);
+  `/floor/finish {fight, outcome}` (only the floor started, once: one statement that applies only while it's under way; won:
+  `finishFloor` deals the next floor, refused sooner than `BATTLE_TOWER.soloWinMinSeconds` unless TEST_SWITCHES; lost or drawn: out);
+  `/stop {fight?, moves?}` (between floors nothing to do; mid-floor `leaveFloor`: free before your 2nd move, else a loss; no
+  `moves` counts). Solo resting (PAUSE_SOLO) refuses a run and a start; the bosses resting are never dealt. A solo result is the
+  device's word (as Boss alone's).
+- **The sign-in merge** (`towerMoves`, in the sign-in's batch): the guest's runs and bests join the account; two open runs of a
+  kind: the higher floor stays (the account's on a tie), the other is abandoned; bests: the higher. **Download** (store `tower`:
+  each climb's floors met, never the seed or deck; bests) and **deleting** (every row): `account-data.ts`; the privacy policy's
+  "The Battle Tower".
+- Calls made: [2026-11-19-tower-saving.md](../decisions/2026-11-19-tower-saving.md).
+
 ## The audit
 
 An independent auditor (Fable, high) checks the build three times (after PRs 6, 10 and 12): its brief is
@@ -91,7 +114,7 @@ take from `startSide`) fixed in PR 8 (above).
 | The board layer | `packages/chess/src/board-layer.ts` (built; exported through `boss-powers.ts`); the dispatcher reads it (`limitCrowd`, `bossAllowed`, `bossStopped`, `boardAltered`) through each boss's `layer` hook: held pieces from PR 2, shields (Don Dough's gold, Chandy's shields) from PR 5, square marks (pies, toy blocks, plants, Chandy's beam and scatter, Don Dough's dough) from PR 3 |
 | Several bosses on one board | built: `MatchState.bosses`, `focus`, `moved` (`packages/core/src/match.ts`); the runner's side section (`sideBosses`, `startSide`, `prepareSide`, `focusNow`); the dispatcher's `side*` functions (`boss-powers.ts`); `BATTLE_TOWER.rageScale` and `apart` (`settings.ts`) |
 | The climb | built: core `tower.ts`, `BATTLE_TOWER` in `packages/core/src/settings.ts`; the runner's `towerStrength` (`settings.towerFloor`) |
-| Saving | `packages/server/src/tower.ts` (`tower_runs`, `tower_best`), `account-data.ts`, the sign-in merge |
+| Saving | built: `packages/server/src/tower.ts` (`tower_runs`, `tower_best`, the routes' logic and `towerResponse`), routed from `api.ts`; `account-data.ts` (store `tower`); the sign-in merge in `accounts.ts` (`towerMoves`) |
 | The party | Boss Battle's party (`PartyCore`, kind "tower", max 4), the lobby on the draw rule "party" |
 | The screens | the tower's screen, the tower's room (the challenge room's walking and seating), the boss bar for 2-3 bosses; the home card in `screens/Home.tsx` |
 
@@ -102,5 +125,7 @@ take from `startSide`) fixed in PR 8 (above).
 moved onto the layer; `boss-kit-side.test.ts` runs the kit over every pair and a sample of threes (and audit 1's seeds), `several-bosses.test.ts` the side's
 rules (Chandy's last chance in every order, Folio's crease line at the floor's rates), and `boss-kit-parity.test.ts` solo against online
 for every boss in a pair and two threes (more by hand: `KIT_PARITY_SIDES`); core `tower.test.ts` (the design's table, the deal over 300 seeds and two pools, the run's steps, finding 7's start) and the runner's
-side of finding 7 in `several-bosses.test.ts`; `e2e/battle-tower.spec.ts` (its
-`e2e/areas.json` entry).
+side of finding 7 in `several-bosses.test.ts`; server `tower.test.ts` (the index, every route's happy path and refusals, a result once and
+only for the floor started, a win too soon, a free leave against a counted one, the best, the merge, the download and deleting) and
+`account-data.test.ts` (Ann's climb in every store's world); `e2e/account-delete.spec.ts` (a climb on the local D1: its `e2e/areas.json`
+entry, "The Battle Tower's saving"); `e2e/battle-tower.spec.ts` (PR 10).

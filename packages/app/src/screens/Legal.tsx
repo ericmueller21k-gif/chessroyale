@@ -223,6 +223,18 @@ function Privacy() {
         kept="your XP, crates and boss crates to pick until you open or pick them, or the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in; a daily quest until the day after it's finished (one not finished waits), the weekly until the week ends, each with the games that moved it."
       />
       <Item
+        title="The Battle Tower"
+        what={
+          <p>
+            Your climbs: the floor each is on (or ended on), the bosses dealt for each floor so far, whether it's going, finished,
+            lost or replaced by a new one, when it began and last changed, and when a floor you're playing began (our server times it).
+            Your best floor.
+          </p>
+        }
+        why="so you can stop after any floor and carry on later, on any device, a floor's result counts once, and your best floor is yours."
+        kept="a climb until you start your next one, or the account is deleted; your best floor until the account is deleted."
+      />
+      <Item
         title="The engine server"
         what={<p>How many times today your account asked our engine server for a deeper look at a solo game's moves, or to wake it.</p>}
         why={`so no one can use up the server's day for everyone: at most ${ENGINE_SERVER.perAccountDaily} a day, then your device checks on its own.`}
@@ -460,7 +472,7 @@ function Privacy() {
         <li>
           <strong>Deleted:</strong> your account (name, icon, email or Google id, when you joined and were last seen), every
           sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates, crate keys and
-          shop items, your boss tokens and their records, your quick-chat picks, your 1 v 1 rank, reports you made and reports about you, moderators' decisions about your chat, fair
+          shop items, your boss tokens and their records, your Battle Tower climbs and best floors, your quick-chat picks, your 1 v 1 rank, reports you made and reports about you, moderators' decisions about your chat, fair
           play's records about you, your friends, requests, blocks and invites (from the other players' lists too), your lines
           in the global chat and any of your town square messages still there, the bug reports you sent, and your account id on
           error records.

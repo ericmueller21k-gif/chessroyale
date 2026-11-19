@@ -39,7 +39,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
     (`youngGuest` in the app).
   - "Delete account" keeps the flag.
 - **Signing in keeps what you played as a guest.** A new identity attaches to your current account; one that already
-  belongs to an account switches you to it, moves your guest results, items, coins, crates, crate keys and boss tokens over and deletes the
+  belongs to an account switches you to it, moves your guest results, items, coins, crates, crate keys, boss tokens and Battle Tower
+  climbs and bests over (of two open climbs of a kind the higher floor stays, the account's on a tie: `towerMoves`, tower.ts) and deletes the
   empty guest. That whole merge is one batch (one transaction): two sign-ins at once move the coins once, a buy in
   another tab lands wholly before it or wholly after, and a failure moves nothing (`sign-in-races.test.ts`;
   [docs/decisions/2026-10-16-sign-in-races.md](../decisions/2026-10-16-sign-in-races.md)). The guest's reports (made
@@ -191,6 +192,7 @@ Who's online, who's in a match and what they're doing (`?doing=`) stay in the li
 | Download my data and deleting an account: every store's part (`ACCOUNT_STORES`), the routes `/api/me/data` and `/api/me/delete` | `packages/server/src/account-data.ts`, `api.ts`; the live hub's part `live-hub.ts` (`accountData`, `forgetAccount`) |
 | App side: Settings → ACCOUNT's download link and delete confirmation | `packages/app/src/components/AccountData.tsx`, `account.ts` (`deleteMyAccount`) |
 | Fair play's tables (made with the rest of the schema) | `packages/server/src/fairplay-schema.ts` |
+| The Battle Tower's climbs and bests (`tower_runs`, `tower_best`), `/api/tower*`, its part of the merge, the download and deleting | `packages/server/src/tower.ts`, routed from `api.ts`; [battle-tower.md](battle-tower.md) |
 | Friends: requests, blocks, invites, settings, caps (D1); the API (`/api/friends`, its kill switch) | `packages/server/src/friends.ts`, `friends-api.ts`; shared types `packages/core/src/friends.ts` |
 | App side: the friends list, actions, the invite toast, who's blocked | `packages/app/src/friends.ts`; screens on [hub.md](hub.md) |
 
@@ -208,6 +210,7 @@ offered, how long each answer lasts).
   the weekly, the pause, merge, download and delete, the API); `e2e/quests.spec.ts`.
 - XP: `packages/core/test/xp.test.ts` (the rules, the fill), `packages/server/test/xp.test.ts` (granted once, races, the caps, each "No
   XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); `e2e/xp.spec.ts`.
+- The Battle Tower: `packages/server/test/tower.test.ts` (the routes, a floor's result once, the merge, the download and deleting).
 - Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `ban-sign-in.test.ts` (each sign-in refused
   for a banned account and ban evasion, no session; [fairplay.md](fairplay.md)); `age-gate.test.ts` (Sign up behind the
   answer; Sign in with no question into an account that answered; asked first, with nothing written, for an unknown email or
