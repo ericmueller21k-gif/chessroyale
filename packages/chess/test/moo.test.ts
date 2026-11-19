@@ -114,7 +114,7 @@ describe("Moo & Moon on the roster", () => {
     expect(def).toMatchObject({ name: "Moo & Moon", icon: "🐄", kit: "Moo", powers: { passive: "moonbeam", ultimate: "fullmoon" } });
     expect(isPlayable(def)).toBe(true);
     expect(bossRules(def)?.opening).toBeUndefined();
-    expect(BOSS_POWERS).toMatchObject({ moonbeamEvery: 3, fullMoonMoves: 5, flurryBeams: 5 });
+    expect(BOSS_POWERS).toMatchObject({ moonbeamEvery: 3, fullMoonMoves: 10, flurryBeams: 5 });
     expect(BOSS_POWERS.rageSpeed.moo).toBeGreaterThan(0);
   });
 
@@ -128,7 +128,7 @@ describe("Moo & Moon on the roster", () => {
     expect(f.total).toBeGreaterThanOrEqual(f.beamAt + (BOSS_POWERS.flurryBeams - 1) * f.stagger + f.fallMs + f.hitMs);
     // (The Full Moon is its cinematic, Nov 17: MOO_CINEMATIC's beats and his transformation's 1340 ms.)
     expect(MOO_BEATS.fullMoon.transformMs).toBe(1340);
-    expect(MOO_FX).toEqual({ moonbeam: 1040, flurry: 1430, fullMoon: 11080, dazed: 1250 });
+    expect(MOO_FX).toEqual({ moonbeam: 1040, flurry: 1430, fullMoon: 13380, dazed: 1250 });
   });
 });
 

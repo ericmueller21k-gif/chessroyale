@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { hapticOnce } from "../haptics.ts";
-import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
+import { KING_ATTACK, MOO_BEATS, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, casterOf, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown, yourTopple } from "../components/BigBoy.tsx";
@@ -188,7 +188,7 @@ export function BossLevel({ boss }: { boss: BossView }) {
   const since = levelSince(`${boss.name}:${boss.startMove}`, mark);
   return (
     // (Its own element for each direction, and each new level up: a lift or a slash plays as it begins, then stays as a color.)
-    <span key={mark} class={`boss-level${dir ? ` lv-${dir}` : ""}`} data-level={lv ?? "unknown"} style={dir ? { animationDelay: `${since - Date.now()}ms` } : undefined}>
+    <span key={mark} class={`boss-level${dir ? ` lv-${dir}` : ""}${dir === "up" && boss.powers?.fullMoon ? " lv-aura" : ""}`} data-level={lv ?? "unknown"} style={dir ? { animationDelay: `${since - Date.now()}ms` } : undefined}>
       <span class="lv-text" aria-hidden="true">
         LVL {lv ?? "???"}
       </span>
@@ -389,6 +389,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   useEffect(() => {
     if (showdownLine) kingSay("showdown", `showdown-${showdown!.key}`);
   }, [showdownLine]);
+  // Moo & Moon's Full Moon: the God King's word as its cinematic ends (Nov 20), so players know he plays his best now.
+  const fullMoon = moments.find((m) => m.kind === "fullMoon");
+  const fullMoonLine = !!fullMoon && now >= fullMoon.at + MOO_BEATS.fullMoon.total;
+  useEffect(() => {
+    if (fullMoonLine) kingSay("fullMoon", `fullMoon-${fullMoon!.key}`);
+  }, [fullMoonLine]);
   // The board: the crowd's view (in Boingo's funhouse turned upside down, then a quarter turn either way, then back:
   // each step turns it as its moment reaches its spin).
   const view = intro ? angleView(0, boss.crowdSide) : angleView(fun.angle, boss.crowdSide);
