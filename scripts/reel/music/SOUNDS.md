@@ -445,7 +445,7 @@ written here.
   pulls the same way, and together they made a dirge. A place players stand in before a fight wants forward motion
   whatever its mood. Kept as it is, for a defeat screen if he wants one.
 
-## The battle tower, second go (Nov 18, song_al.py): sent, no verdict yet
+## The battle tower, second go (Nov 18, song_al.py): redone as the third
 
 "Think more like fight scene build up game style ... discard the original dark vision." Still one minute, still a
 loop, still the tower's background. Written here.
@@ -459,4 +459,22 @@ loop, still the tower's background. Written here.
 - Measured: -16.0 LUFS, peak -1.0 dBFS, 60.00 s. It climbs 4.4 dB from its first eight bars to its last (the first
   render climbed 7, and its opening was nearly all under 250 Hz: the violas' pulse was added for small speakers).
 - Not handed over.
+
+## The battle tower, third go (Nov 19, song_am.py): sent, no verdict yet
+
+"Let's make it 2 minutes long, and I think we need to redo it again." The shape is his, said aloud: 30 seconds of slow
+build from "a simple ... drum and like a snare", layering; at 30 seconds "a cool ... original score" that keeps
+"coming up more and more" for another 30; then about 45 seconds of it, "a little bit more upbeat ... increase the
+BPM", "a little flute kind of in there"; then it "starts to die out"; then "a small, like 5 to 7 second ... grand
+finale"; and it "loops ... nicely back into the calming start". "They're not going to probably sit there and listen to
+all the song, and that's kind of the idea."
+- Two minutes exactly, 51 bars. A minor; 96 beats a minute, 108 from the full band on.
+- 0:00 a low drum and a soft snare; 0:10 plucked low strings and held strings; 0:20 a harp. 0:30 the tune on one
+  horn; 0:40 horns and violins; 0:50 trumpets, a roll, the tempo rising. 1:00 the tune whole, the full band; 1:17
+  the flute's four lighter bars (C major); 1:26 the tune again, the flute over it. 1:43 it dies out, slowing. 1:53
+  the finale: a fanfare on F, on G, and a held A major, whose ring falls on bar 1's drum.
+- Measured: -16.0 LUFS, peak -1.0 dBFS, 120.00 s, the seam clean. Its arc: -23 (the drum alone), -21 by 0:30, -17 at
+  the full band, -25 in the dying-out, -15.5 for the finale. The first render's opening was 10 dB under the band and
+  nearly all under 120 Hz; the opening drums are louder now and have more of the stick in them.
+- Not handed over. Song AL (the one-minute build) stays as it was.
 
