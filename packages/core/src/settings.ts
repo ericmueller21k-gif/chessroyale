@@ -5053,6 +5053,13 @@ export const AREA_BANNER = { inMs: 400, holdMs: 1800, outMs: 600 } as const;
 export type HapticPattern = number | readonly number[];
 
 /**
+ * The installed app's first window on a computer (Eric, Nov 20: it opened narrow, in the phone layout). Chrome opens an installed app
+ * small; on its first launch the app opens itself at this size (smaller on a smaller screen) and centers. Only once: a window the player
+ * resizes afterward keeps their size (the browser remembers it). The desktop layout with chat starts at 1100 px wide (styles.css).
+ */
+export const APP_WINDOW = { width: 1600, height: 900 } as const;
+
+/**
  * Haptics (Eric, Nov 9: "when you tap [a piece] … it should vibrate. And then when we drop it on a square … vibrate";
  * docs/decisions/2026-11-09-haptics.md; `packages/app/src/haptics.ts`). Each kind's pattern, in ms; Settings → Sound,
  * "Vibration" switches them all off on the device. On an iPhone each pulse is one system tick (no lengths), at most

@@ -10,7 +10,7 @@ import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
 import { SearchBar } from "./components/SearchBar.tsx";
 import { startStatus } from "./status.ts";
 import { hapticsDebug } from "./haptics.ts";
-import { setUpInstall } from "./install.ts";
+import { setUpInstall, sizeAppWindow } from "./install.ts";
 import { watchErrors } from "./problems.ts";
 import { watchStaleChunks } from "./stale.ts";
 import { prepareAudio, wakeAudio } from "./sound.ts";
@@ -48,6 +48,8 @@ watchErrors();
 // A chunk of an older version gone after a deploy (opening the town square): the page loads again (stale.ts).
 watchStaleChunks();
 setUpInstall();
+// The installed app on a computer opens once at a computer size, not Chrome's narrow default (install.ts).
+sizeAppWindow();
 // A phone is upright (Eric, Nov 11): where the browser allows a lock (an installed app, or full screen) it is locked to portrait. Elsewhere
 // index.html's panel covers a phone held sideways. Refused or unsupported (a computer): nothing happens.
 try {
