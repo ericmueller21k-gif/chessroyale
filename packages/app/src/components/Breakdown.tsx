@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
-import { toSan } from "@chessroyale/chess";
+import { START_FEN, applyMove, toSan } from "@chessroyale/chess";
 import { Board } from "./Board.tsx";
 import { Chevrons } from "./HistoryNav.tsx";
 import type { MoveRecord, SimulBoardView } from "../game.ts";
@@ -24,6 +24,7 @@ export function Breakdown({
   dp = 1,
   inline = false,
   solo = false,
+  estRating,
 }: {
   moves: readonly MoveRecord[];
   you?: number;
@@ -42,6 +43,8 @@ export function Breakdown({
   inline?: boolean;
   /** Inline, in a solo boss battle: no "Everyone's average loss" and no "found" count (you play alone). */
   solo?: boolean;
+  /** Inline: the engine's estimate of your rating this game, in a small centered line under the stepper (Eric, Nov 20). */
+  estRating?: number | null;
 }) {
   const played = moves.filter((m) => m.bestMove);
   const costly = [...played].filter((m) => m.roundScore < 0).sort((a, b) => a.roundScore - b.roundScore).slice(0, 3);
@@ -49,7 +52,7 @@ export function Breakdown({
   // (On the result page the first move's board is open when nothing cost you: the review shows with no tap.)
   const [open, setOpen] = useState<MoveRecord | null>(costly[0] ?? null);
   const short = you !== undefined && line !== undefined ? line - you : null;
-  if (inline) return <InlineReview moves={moves} dp={dp} solo={solo} />;
+  if (inline) return <InlineReview moves={moves} dp={dp} solo={solo} estRating={estRating} />;
   return (
     <div class="breakdown" role="dialog" aria-label="Your game, move by move">
       <div class="breakdown-head">
@@ -156,7 +159,7 @@ function MoveRow({ m, open, onOpen, dp }: { m: MoveRecord; open: boolean; onOpen
  * The result page's review (a boss battle): one board, stepped with ◀ ▶ (and the ← → keys on a computer). The stepper row, the
  * board and the text under it keep their places from move to move: stepping only changes the board, the arrows and the words.
  */
-function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: number; solo: boolean }) {
+function InlineReview({ moves, dp, solo, estRating }: { moves: readonly MoveRecord[]; dp: number; solo: boolean; estRating?: number | null }) {
   const played = moves.filter((m) => m.bestMove);
   const brilliant = played.filter((m) => m.brilliant);
   const last = played.length - 1;
@@ -196,6 +199,7 @@ function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: n
           <Chevrons />
         </button>
       </div>
+      {estRating !== undefined && <p class="bm-est">Est. rating {estRating ?? "—"}</p>}
       <div class="bm-board-wrap">
         <Board
           fen={m.fen}
@@ -221,6 +225,49 @@ function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: n
 }
 
 /** The arrow keys step a review (0 to `last`), but not while typing in a field. */
+/**
+ * A 1 v 1's move-by-move under its end screen (Eric, Nov 20: "its own result page like the boss/tower end screen, with the
+ * move-by-move below"): the game's board, stepped with ◀ ▶ (and ← → on a computer), from the last position. No engine's words: a 1 v 1
+ * isn't judged. Its stepper row and board keep their places from move to move, as InlineReview's.
+ */
+export function GameSteps({ moves, orientation }: { moves: readonly string[]; orientation: "white" | "black" }) {
+  const fens = useMemo(() => {
+    const out = [START_FEN];
+    for (const m of moves) out.push(applyMove(out[out.length - 1]!, m));
+    return out;
+  }, [moves]);
+  const last = moves.length - 1;
+  const [at, setAt] = useState(last);
+  const step = (d: number) => setAt((p) => Math.min(last, Math.max(0, p + d)));
+  useStepKeys(last, setAt);
+  if (last < 0) return null;
+  const before = fens[at]!;
+  return (
+    <div class="breakdown inline" data-testid="game-steps">
+      <div class="breakdown-head">
+        <h2>The game, move by move</h2>
+      </div>
+      <div class="history-nav bm-step">
+        <button type="button" class="nav-btn" aria-label="Previous move" disabled={at === 0} onClick={() => step(-1)}>
+          <Chevrons back />
+        </button>
+        <div class="nav-middle bm-step-mid">
+          <span class="bm-step-text">
+            Move {at + 1} of {moves.length} · {moveNo(before)}
+            {before.split(" ")[1] === "w" ? "." : "…"} {toSan(before, moves[at]!)}
+          </span>
+        </div>
+        <button type="button" class="nav-btn" aria-label="Next move" disabled={at === last} onClick={() => step(1)}>
+          <Chevrons />
+        </button>
+      </div>
+      <div class="bm-board-wrap">
+        <Board fen={fens[at + 1]!} orientation={orientation} lastMove={moves[at]} small animate={false} />
+      </div>
+    </div>
+  );
+}
+
 function useStepKeys(last: number, setAt: (f: (p: number) => number) => void) {
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {

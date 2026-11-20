@@ -5,13 +5,15 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 [god-king.md](god-king.md).
 
 ## How it works today
-- **The result screen** (Nov 9; [2026-11-09-boss-result-v2.md](../decisions/2026-11-09-boss-result-v2.md)): no God King. One row
-  (`components/ResultDuo.tsx`): the boss on the left (his bow, his line), your pawn on the right facing him, and under it your name,
-  "+N XP", "Level N", the bar filling from your old XP to the new and its parts ("Win +50", never the minutes: `xpShownParts`), or
-  why there was none (`XpResult compact`; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)). A loss: his `kingAttack` plays
+- **The result screen** (the end screen since Nov 20; [2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md); `components/EndScreen.tsx`): "Victory!" / "Defeat" / "A draw" in the
+  God King's pixel type and the match's line under it ("Ginger defeated!", "Ginger wins"; a tower floor's: "Floor 3 cleared!", "Floor 4
+  lost · 1 life left"); then XP EARNED counting up and lobbing into the XP bar, the middle, the bar, the quests the game moved, and the
+  review with "Est. rating" under its move line. The middle: a Battle Tower floor's bosses 1-2-1 (`EndDuo`: the first in front, the
+  others behind; their defeat on a win, their victory, gloating, on a loss) and your pawn; any other boss battle's `ResultDuo` (Nov 9;
+  [2026-11-09-boss-result-v2.md](../decisions/2026-11-09-boss-result-v2.md)): no God King, the boss on the left (his bow, his line),
+  your pawn on the right facing him (your XP is in the bar under the row now). A loss: his `kingAttack` plays
   where he stands (landing to laugh, 1.9 s) and your pawn jolts at each lash; a win: his defeat; a draw: both stand. Your pawn's art is
-  centered over the XP column (Nov 11: it was 20 px right; `.rd-you .you-pawn-bob` has no margin override; the row gap is 36 px, 20
-  under 360; the padding 30, 12 under 360). 16 px between his figure and your pawn at rest (12 under 360; Smudgy's worst is 17.6 px at 360 to 430 px); his blow lands on your pawn but never passes it. At 320 px the 12 px and the XP column don't both fit yet: docs/decisions/2026-11-11-result-pawn-center.md. Tests: `e2e/boss-result.spec.ts`,
+  centered in its column (Nov 11). 16 px between his figure and your pawn at rest (12 under 360; Smudgy's worst is 17.6 px at 360 to 430 px); his blow lands on your pawn but never passes it. A level reached during the bar's fill: your pawn hops. Tests: `e2e/boss-result.spec.ts`,
   `e2e/formats.spec.ts` (after a Last Stand); frames: `node scripts/frames-boss-result.mjs <dir> <boss> <win|loss|draw|resign> [width]`.
   XP's rules and storage: [accounts.md](accounts.md), "XP and levels".
 

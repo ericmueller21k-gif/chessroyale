@@ -9,16 +9,17 @@ import { LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection, useMedia } from "../components/QuickChat.tsx";
 import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
-import { BossTag, hasCharacter } from "../components/BossCharacter.tsx";
 import { ResultDuo } from "../components/ResultDuo.tsx";
 import { FlagIcon, MOUSE_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
-import { XpResult, useGameXp } from "../components/XpResult.tsx";
+import { useGameXp } from "../components/XpResult.tsx";
+import { EndHeadline, EndDuo, EndRewards, type EndTone } from "../components/EndScreen.tsx";
+import { partsOf } from "../boss-side.ts";
 import { NO_RESULT_LINE } from "./Recluse2.tsx";
 import { CrowdPodium } from "../components/Podium.tsx";
 import { phase2Headline } from "../recluse-phase2.ts";
-import { TowerPartyResult, TowerResult } from "./TowerResult.tsx";
+import { TowerResult, useTowerEnd } from "./TowerResult.tsx";
 
 /** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
 export const UNVOUCHED_LINE = "Only one device checked this match: it pays as a solo game.";
@@ -36,7 +37,6 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
   const elim = elimination.current;
   const best = [...played].sort((a, b) => b.roundScore - a.roundScore)[0];
   const worst = [...played].sort((a, b) => a.roundScore - b.roundScore)[0];
-  const avgMs = match.scoringMs.length ? match.scoringMs.reduce((a, b) => a + b, 0) / match.scoringMs.length : 0;
   const standings = match.standings();
   const team = myTeam(match);
   const gameWinner = match.phase.kind === "results" ? match.phase.gameWinner : undefined;
@@ -78,8 +78,86 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
     const w = standings.find((s) => s.placement === 1);
     return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
   })();
+  // (A Battle Tower floor: its line in the headline, its button under the rewards.)
+  const tower = useTowerEnd(match);
+  const boss = bossResult && match.boss ? match.boss : null;
+  // The end screen's headline (Eric, Nov 20): "Victory!" / "Defeat" and the match's line under it.
+  const tone: EndTone = tower
+    ? tower.tone
+    : resigned
+      ? "loss"
+      : bossResult
+        ? bossResult === "crowd" ? "win" : bossResult === "boss" ? "loss" : "draw"
+        : team
+          ? gameWinner === team ? "win" : gameWinner ? "loss" : "draw"
+          : placement === 1 ? "win" : "draw";
+  // (A tower floor resigned is a floor lost: "Defeat", its line says so; Eric, Nov 20.)
+  const title = afk
+    ? "Removed for being away"
+    : resigned && !tower
+      ? "You resigned"
+      : bossResult || team
+        ? tone === "win" ? "Victory!" : tone === "loss" ? "Defeat" : "A draw"
+        : `${placement}${ordinal(placement)} of ${match.totalPlayers}`;
+  const name = boss ? bossInText(boss.name, true) : "";
+  const headLine = tower
+    ? tower.line
+    : boss
+      ? noResult
+        ? "No result"
+        : simul
+          ? `${simul.won} of ${simul.of} boards won`
+          : bossResult === "crowd"
+            ? `${name} defeated!`
+            : bossResult === "boss"
+              ? `${name} wins`
+              : `A draw with ${bossInText(boss.name)}`
+      : bossResult
+        ? ""
+        : left
+        ? ""
+        : team
+          ? `${placement}${ordinal(placement)} of ${match.totalPlayers}`
+          : placement === 1
+            ? "You won the match!"
+            : "";
+  // (A boss battle's line under the bosses: only what the headline doesn't say (Eric, Nov 20: no "You beat X"): a crowd's result, his
+  // win's way (on time, the carrots, the bulbs), the Hidden Boss's boards, no result.)
+  const bossWords = !boss
+    ? null
+    : noResult
+      ? `${NO_RESULT_LINE} ${noResult === "board" ? "Nothing counts for or against you." : "Your place stands."}`
+      : simul
+        ? simul.won === simul.of
+          ? `You beat ${bossInText(boss.name)} on all ${simul.of} boards!`
+          : `${bossInText(boss.name, true)} won. You won ${simul.won} of ${simul.of} boards: all ${simul.of} must be won.`
+        : bossResult === "boss" && (onTime || byCarrots || byBlackout)
+          ? `${bossInText(boss.name, true)} won${onTime ? " on time" : byCarrots ? " with their fifth carrot" : ": the last of your ten bulbs went out"}.`
+          : !alone
+            ? bossResult === "crowd"
+              ? `The crowd beat ${bossInText(boss.name)}!`
+              : bossResult === "boss"
+                ? `${bossInText(boss.name, true)} won.`
+                : `A draw with ${bossInText(boss.name)}.`
+            : null;
+  // (The middle of the rewards: a tower floor's bosses 1-2-1 and your pawn; another boss battle's boss and your pawn (ResultDuo); the
+  // 50 v 50's podium; Classic's trophy.)
+  const middle = (hopAt: number) =>
+    boss ? (
+      match.tower || match.towerParty ? (
+        <EndDuo names={partsOf(boss).map((b) => b.name)} result={tone} hopAt={hopAt} side={boss.crowdSide} />
+      ) : (
+        <ResultDuo match={match} result={bossResult!} hopAt={hopAt} />
+      )
+    ) : podium ? (
+      <CrowdPodium match={match} titles={podium} gameWinner={gameWinner} />
+    ) : (
+      <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
+        {resigned ? <FlagIcon size={56} /> : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
+      </div>
+    );
   return (
-    <div class={`screen results mm-screen${bossResult ? " boss-results" : ""}`}>
+    <div class={`screen results mm-screen${bossResult ? " boss-results" : ""} es-screen`}>
       {/* (The top part: a box of its own only on a computer, where a boss battle's review sits beside it.) */}
       <div class="results-top">
         {!(bossResult && sidebar) && (
@@ -87,34 +165,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             <MatchMenu exit={exitFor(match)} />
           </div>
         )}
-        {/* (The 50 v 50 rework, C3: the podium in place of the trophy and the title; the rest of the page as before.) */}
-        {podium && <CrowdPodium match={match} titles={podium} gameWinner={gameWinner} />}
-        {/* (A boss battle has no trophy and no skull above its title: Eric, Nov 7.) */}
-        {!bossResult && !podium && (
-          <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
-            {resigned ? <FlagIcon size={56} /> : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
-          </div>
-        )}
-        {/* (A boss battle's title: the God King's pixel type, Eric, Nov 7.) */}
-        {!podium && <h1 class={bossResult ? "boss-title" : undefined}>
-          {afk ? (
-            "Removed for being away"
-          ) : resigned ? (
-            "You resigned"
-          ) : alone ? (
-            bossResult === "crowd" ? "Victory!" : bossResult === "boss" ? "Defeated" : "A draw"
-          ) : p2Head ? (
-            p2Head
-          ) : (
-            <>
-              {placement}
-              {ordinal(placement)} of {match.totalPlayers}
-            </>
-          )}
-        </h1>}
-        {podium ? null : left ? (
-          // (Your place when you left; the match went on without you, or, solo, stopped there. Boss alone: the boss's line
-          // below says who won.)
+        <EndHeadline title={title} line={headLine} tone={tone} />
+        {left ? (
+          // (Your place when you left; the match went on without you, or, solo, stopped there.)
           !alone && (
             <p class="muted left-line">
               {resigned
@@ -124,51 +177,30 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
                 : "You left before the end. Your place stands."}
             </p>
           )
-        ) : !alone && (
-          <p class="muted">
-            {p2Head ? (
-              // (Your place, under the boards' verdict: it's still what your result is written with.)
-              placement === 1 ? (
-                `You were the best in the crowd: 1st of ${match.totalPlayers}.`
+        ) : (
+          !alone &&
+          !podium && (
+            <p class="muted es-sub">
+              {p2Head || bossResult ? (
+                placement === 1 ? (
+                  `You were the best in the crowd: 1st of ${match.totalPlayers}.`
+                ) : (
+                  <>
+                    {placement}
+                    {ordinal(placement)} of {match.totalPlayers} in the crowd. {topName} was the best.
+                  </>
+                )
+              ) : placement === 1 ? (
+                "You won the match!"
               ) : (
-                <>
-                  {placement}
-                  {ordinal(placement)} of {match.totalPlayers} in the crowd. {topName} was the best.
-                </>
-              )
-            ) : bossResult ? (
-              placement === 1 ? (
-                "You were the best in the crowd."
-              ) : (
-                <>{topName} was the best in the crowd.</>
-              )
-            ) : placement === 1 ? (
-              "You won the match!"
-            ) : (
-              <>{topName} won the match.</>
-            )}
-          </p>
+                <>{topName} won the match.</>
+              )}
+            </p>
+          )
         )}
-        {/* The boss on the left (his bow, or his attack on you if he won), your pawn on the right with your XP under it; no God
-            King (Eric, Nov 9: ResultDuo). */}
-        {bossResult && match.boss && <ResultDuo match={match} result={bossResult} xp={xp} />}
-        {bossResult && match.boss && (
-          <p class={`team-result ${noResult ? "" : bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
-            {hasCharacter(match) ? null : <><BossTag boss={match.boss} /> </>}
-            {noResult
-              ? `${NO_RESULT_LINE} ${noResult === "board" ? "Nothing counts for or against you." : "Your place stands."}`
-              : simul
-              ? // (The Hidden Boss's phase 2: every board must be won.)
-                simul.won === simul.of
-                ? `You beat ${bossInText(match.boss.name)} on all ${simul.of} boards!`
-                : `${bossInText(match.boss.name, true)} won. You won ${simul.won} of ${simul.of} boards: all ${simul.of} must be won.`
-              : bossResult === "crowd"
-              ? `${alone ? "You" : "The crowd"} beat ${bossInText(match.boss.name)}!`
-              : bossResult === "boss"
-                ? `${bossInText(match.boss.name, true)} won${onTime ? " on time" : byCarrots ? " with their fifth carrot" : byBlackout ? ": the last of your ten bulbs went out" : ""}.`
-                : `A draw with ${bossInText(match.boss.name)}.`}
-          </p>
-        )}
+        {/* The rewards (Eric, Nov 20): XP EARNED counting up and lobbing into its bar, the screen's middle, the bar, the quests. */}
+        <EndRewards xp={xp} middle={middle} />
+        {bossWords && <p class={`team-result ${noResult ? "" : bossResult === "crowd" ? "good" : bossResult === "boss" ? "bad" : ""}`}>{bossWords}</p>}
         {/* What he saved you from: the blunder, the boss's reply, the best move, your chances (tap to open). */}
         {bossResult && match.boss?.lastStand?.fen && <LastStandCard stand={match.boss.lastStand} side={match.boss.crowdSide} />}
         {/* You resigned: a loss on your record (a boss battle says nothing of the record: its counts just move, Eric, Nov 7). */}
@@ -195,26 +227,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
                 : "Unranked: solo games don't count for ranking."}
           </p>
         )}
-        {/* XP (Nov 9): the bar filling from your old XP to the new, on every result screen (a boss battle's: under your pawn). */}
-        {!(bossResult && match.boss) && <XpResult xp={xp} />}
         {/* Online: quick chat, for the GGs. */}
         <ChatSection match={match} />
-        {me && (
-          <div class="stat-tiles">
-            <div class="stat-tile">
-              <span class="stat-value">{me.rating ?? "—"}</span>
-              <span class="stat-label">Engine rating (est.)</span>
-            </div>
-            <div class="stat-tile">
-              <span class="stat-value">{(me.avgThinkMs / 1000).toFixed(1)} s</span>
-              <span class="stat-label">Average time per move</span>
-            </div>
-            <div class="stat-tile">
-              <span class="stat-value">{me.powerUpsUsed}</span>
-              <span class="stat-label">Power-ups used</span>
-            </div>
-          </div>
-        )}
         {/* (Boss alone: you'd be the whole list.) */}
         {scariest.length > 0 && !alone && (
           <div class="scariest">
@@ -278,9 +292,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             {review && <Breakdown moves={match.moves} you={elim?.you} line={elim?.line} placement={elim ? placement : null} lastCut={elim?.lastCut} onClose={() => setReview(false)} dp={scoreDp(match.settings)} />}
           </>
         )}
-        {avgMs > 0 && <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>}
         {/* (A Battle Tower floor: its own buttons, Continue or the run's end.) */}
-        {match.tower ? <TowerResult match={match} onBack={onHome} /> : match.towerParty ? <TowerPartyResult match={match} onBack={onHome} /> : <div class="actions">
+        {tower ? <TowerResult end={tower} onBack={onHome} /> : <div class="actions">
           {/* (Its words on one line: "Back to town" after a boss challenged in the town.) */}
           <button type="button" class="btn btn-secondary" style={{ whiteSpace: "nowrap" }} onClick={onHome}>
             {homeText}
@@ -294,7 +307,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
       {/* A boss battle's review: every move, on the page (the first costly move's board open), no tap needed (Eric's brief). */}
       {bossResult && (simulBoard || played.some((m) => m.bestMove)) && (
         <div class="results-review">
-          {simulBoard ? <BoardReview board={simulBoard} /> : <Breakdown inline moves={match.moves} dp={scoreDp(match.settings)} solo={!match.serverPaced} />}
+          {simulBoard ? <BoardReview board={simulBoard} /> : <Breakdown inline moves={match.moves} dp={scoreDp(match.settings)} solo={!match.serverPaced} estRating={me?.rating ?? null} />}
         </div>
       )}
       {/* A boss battle that dropped you a token: its box, over the screen (Eric, Nov 2). */}

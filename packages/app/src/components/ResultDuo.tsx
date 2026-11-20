@@ -1,6 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
 import { KING_ATTACK } from "@chessroyale/chess";
-import type { XpGrant } from "@chessroyale/core";
 import type { GameView } from "../game.ts";
 import { bossKit } from "../characters/kits.ts";
 import { turned } from "../characters/sprite-kit.ts";
@@ -8,13 +7,13 @@ import { pawnLook } from "../looks.ts";
 import { BossCharacter } from "./BossCharacter.tsx";
 import { YourPawn } from "./BossDock.tsx";
 import { SpriteAnim } from "./BossEffect.tsx";
-import { XpResult } from "./XpResult.tsx";
 
 /**
  * A boss battle's result (Eric, Nov 9: "get rid of the king in the victory and defeat screen entirely … it always shows our pawn
  * piece and the boss. And then if we lost, it shows him … attack animation on us"; docs/decisions/2026-11-09-boss-result-v2.md):
- * one row, the boss on the left (his bow, his line in his bubble) and your pawn on the right, facing him, your name, XP and level
- * under it (XpResult, compact). Victory, defeat or a draw, alone or in a raid, after a Last Stand too; no God King.
+ * one row, the boss on the left (his bow, his line in his bubble) and your pawn on the right, facing him. Victory, defeat or a draw,
+ * alone or in a raid, after a Last Stand too; no God King. On the end screen (Nov 20) it's the middle of the rewards: the XP number
+ * above it, the XP bar under it, and your pawn hops as a level is reached (`hopAt`).
  *
  * A loss: the boss plays his attack on a king (his kit's `kingAttack`, the one the board plays at his mate: KingAttack.tsx) where he
  * stands, from his landing to his laugh (KING_ATTACK.landAt to leaveAt: he's already here, so no drop-in and no leap off), his
@@ -27,7 +26,7 @@ const ATTACK_DELAY_MS = 250;
 /** How long it plays here: from his landing to his laugh's end. */
 export const RESULT_ATTACK_MS = KING_ATTACK.leaveAt - KING_ATTACK.landAt;
 
-export function ResultDuo({ match, result, xp }: { match: GameView; result: "crowd" | "boss" | "draw"; xp: XpGrant | null | undefined }) {
+export function ResultDuo({ match, result, hopAt = 0 }: { match: GameView; result: "crowd" | "boss" | "draw"; hopAt?: number }) {
   const boss = match.boss!;
   const kit = bossKit(boss.name);
   const ka = result === "boss" ? kit?.kingAttack : undefined;
@@ -67,9 +66,8 @@ export function ResultDuo({ match, result, xp }: { match: GameView; result: "cro
       </div>
       <div class="rd-you">
         <div class={`rd-pawn${ka && stage !== "done" ? " rd-hit" : ""}`} style={ka && stage !== "done" ? { animationDelay: `${Math.round(lashIn)}ms` } : undefined}>
-          <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={boss.crowdSide} hopAt={0} />
+          <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={boss.crowdSide} hopAt={hopAt} />
         </div>
-        <XpResult xp={xp} compact />
       </div>
     </div>
   );

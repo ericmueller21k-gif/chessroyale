@@ -17,9 +17,11 @@ Bullet on the left and the longest on the right since Eric's Oct 16; nobody voti
 move.
 
 ## How it works today
-- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the knocked-out card and the results (`screens/Squads.tsx`, `SquadsXp`; a win is your squad 1st; a test lobby: "No XP: test game.") shows `XpResult`, a fixed 78 px box: the
-  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("Win +50": never the minutes, Eric, Nov 9), or why there was none. Its rules
-  and storage: [accounts.md](accounts.md), "XP and levels".
+- **The end screen** (Nov 20; [2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md); replaces the XP box of Nov 9): the knocked-out card and the results (`screens/Squads.tsx`, `SquadsXp`; a test lobby: "No XP: test game.") shows `EndRewards` (`components/EndScreen.tsx`): XP EARNED
+  counting from 0 (`END_SCREEN` in settings.ts), lobbing into the XP bar (`XP.perLevel` a bar), which fills from your old XP to the new
+  (a level: it flashes, "Level 3!", on from 0), then the quests the game moved sliding to their counts; what made it under the number
+  ("Win +50": never the minutes) or why there was none in its place. Every box at its size from the first frame; a tap anywhere but a
+  button skips to the end; reduced motion: the end at once. The toast after it shows only crates and keys (`RewardBox endScreen`). The results' middle: your squad (its tag and members); the headline "Victory!" (champions) or your place. The card's run plays once: the results show its end. Its rules and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
   less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column: 848 px at

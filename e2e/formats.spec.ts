@@ -127,9 +127,10 @@ test("boss raid (solo): you against a boss from the starting position (Eric, Oct
   const end = await page.evaluate(() => (window as any).match.runner.state.boss);
   expect(end.kingStrikes).toEqual([1]);
   expect(["crowd", "boss", "draw"]).toContain(end.result);
-  await expect(page.locator(".team-result")).toBeVisible();
+  // (The end screen, Nov 20: the result in the headline's line, "Ginger defeated!", "Ginger wins", "A draw with Ginger".)
+  await expect(page.getByTestId("es-line")).toHaveText(/ defeated!$| wins$|^A draw with /);
   // Alone, the headline is the result against the boss, never "1st of 1 · You won the match!" after a loss.
-  await expect(page.locator(".results h1")).toHaveText({ crowd: "Victory!", boss: "Defeated", draw: "A draw" }[end.result as "crowd" | "boss" | "draw"]);
+  await expect(page.locator(".results h1")).toHaveText({ crowd: "Victory!", boss: "Defeat", draw: "A draw" }[end.result as "crowd" | "boss" | "draw"]);
 });
 
 test("boss raid alone flows like a chess site: your move is played, the boss replies, your turn (no reveal, no ring, no countdown)", async ({ page }) => {
@@ -277,7 +278,6 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
           };
           put("boss", ".results-duo .boss-char");
           put("pawn", ".results-duo .rd-you .you-pawn");
-          put("xp", ".results-duo .rd-you .xp-box");
           if (boss) put("bossBubble", ".results-duo .boss-char .bc-bubble");
           const cv = document.querySelector<HTMLCanvasElement>(".rd-attack canvas") ?? document.querySelector<HTMLCanvasElement>(".results-duo .boss-char-sprite");
           const right = cv ? paintedRight(cv) : null;
@@ -311,7 +311,8 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   const pawn0 = samples.find((x) => x.rects.pawn)!.rects.pawn!;
   expect((boss0.x + boss0.r) / 2 < (pawn0.x + pawn0.r) / 2, "the boss on the left of your pawn").toBe(true);
   // Eric, Nov 11 (your pawn sat right of the column under it): at rest (his attack's knock is over), your pawn's art box is centered
-  // over your XP box within 2 px, on the phone (390) and the computer (1440: its project's window is 1280, so it's set wider here).
+  // in its column within 2 px (the XP under it until the end screen, Nov 20, moved it to the bar under the row), on the phone (390)
+  // and the computer (1440: its project's window is 1280, so it's set wider here).
   await page.waitForFunction(() => !["wait", "on"].includes(document.querySelector(".results-duo")?.getAttribute("data-attack") ?? "done"));
   const vp = page.viewportSize()!;
   if (testInfo.project.name === "desktop") await page.setViewportSize({ width: 1440, height: 900 });
@@ -320,10 +321,10 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
       const b = document.querySelector(sel)!.getBoundingClientRect();
       return (b.left + b.right) / 2;
     };
-    return { pawn: cx(".results-duo .rd-you .you-pawn-bob"), xp: cx(".results-duo .rd-you .xp-box.xp-compact") };
+    return { pawn: cx(".results-duo .rd-you .you-pawn-bob"), xp: cx(".results-duo .rd-you") };
   });
   await page.setViewportSize(vp);
-  expect(Math.abs(centers.pawn - centers.xp), "your pawn's art centered over your XP (2 px)").toBeLessThanOrEqual(2);
+  expect(Math.abs(centers.pawn - centers.xp), "your pawn's art centered in its column (2 px)").toBeLessThanOrEqual(2);
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
   await expect(card).toContainText(/Move \d+: \S+\?\? · /);
   await card.click();

@@ -1,4 +1,5 @@
-import { XpResult } from "../components/XpResult.tsx";
+import { EndHeadline, EndRewards } from "../components/EndScreen.tsx";
+import { GameSteps } from "../components/Breakdown.tsx";
 import { XP_NONE_LINES } from "@chessroyale/core";
 import type { ComponentChildren, VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -387,6 +388,9 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
       {snap.phase === "overlay" && clockLine && <DuelOverlay text={`Timer: ${clockLine}`} />}
     </Board>
   );
+  // (A ranked game that was played (not aborted): its own end page, as the boss battles' (Eric, Nov 20), its move-by-move below.)
+  if (over && snap.end && !snap.town && !snap.bot && snap.end.result !== "aborted")
+    return <DuelEndPage session={session} snap={snap} people={people} computer={computer} onHome={onHome} onAgain={onAgain} />;
   return (
     <div class={`screen game duel-screen${over ? " over" : ""}`}>
       <div class="hud-row">
@@ -435,7 +439,58 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
   );
 }
 
-/** The result card: who won and why, your rank's change, your coins, and what's next. */
+/**
+ * A ranked game's end page (Eric, Nov 20: "its own result page like the boss/tower end screen, with the move-by-move below", not a card
+ * over the board): "Victory!" / "Defeat" / "A draw" and why, then RP EARNED (or RP LOST) counting up and lobbing into the division's bar,
+ * then XP EARNED and its bar, the quests, your coins, Play again and Home; the game's moves under it (GameSteps).
+ */
+function DuelEndPage({ session, snap, people, computer, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; people: ChatPeople; computer: boolean; onHome: () => void; onAgain: () => void }) {
+  const end = snap.end!;
+  const you = snap.you;
+  const title = resultTitle(end, you);
+  const tone = title === "You won" ? "win" : title === "You lost" ? "loss" : "draw";
+  const o = snap.outcome;
+  const coins = o?.coins ?? 0;
+  // (The rank's change: coming until the outcome; none for an unranked game or one fair play holds: your rank as it stands.)
+  const change = o ? (o.unranked ? null : o.change) : undefined;
+  const now = o?.unranked ? null : ranked1v1Rank();
+  return (
+    <div class="screen results mm-screen boss-results es-screen dv-end">
+      <div class="results-top">
+        <div class="mm-corner">
+          <MatchMenu exit={null} />
+        </div>
+        <EndHeadline title={tone === "win" ? "Victory!" : tone === "loss" ? "Defeat" : "A draw"} line={resultReason(end, you, snap.players[other(you)].name, snap.left, o)} tone={tone} plain />
+        <EndRewards
+          xp={o ? (o.xp ?? null) : undefined}
+          none={o?.unranked ? XP_NONE_LINES.test : undefined}
+          rp={{ change: change === undefined ? undefined : change && { ...change, before: yourRankShown(change.before), after: yourRankShown(change.after) }, now: o?.unranked ? null : now }}
+        />
+        <p class="es-coins muted" data-testid="es-coins">
+          {o?.unranked ? "Unranked game" : coins > 0 ? `+${coins} coins` : " "}
+        </p>
+        <div class="dv-result-actions">
+          <button type="button" class="btn btn-primary" onClick={onAgain}>
+            Play again
+          </button>
+          <button type="button" class="btn btn-secondary" onClick={onHome}>
+            Home
+          </button>
+        </div>
+        {session.chat && session.chat.enabled && (
+          <div class="lchat dv-chat">
+            <ChatPanel people={people} chat={session.chat} variant={computer ? "side" : "full"} />
+          </div>
+        )}
+      </div>
+      <div class="results-review">
+        <GameSteps moves={snap.moves} orientation={you === "w" ? "white" : "black"} />
+      </div>
+    </div>
+  );
+}
+
+/** The result card (an aborted game, a bot's or the town's): who won and why, your rank's change, your coins, and what's next. */
 function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () => void; onAgain: () => void }) {
   const end = snap.end!;
   const you = snap.you;
@@ -459,9 +514,8 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
           </span>
         </span>
       )}
-      {/* XP (Nov 9): the box on every result screen; it comes with the outcome (an aborted game earns none). A game against a bot,
-          here or in the town, records nothing yet, so it has no box. */}
-      {!snap.town && !snap.bot && <XpResult xp={snap.outcome ? (snap.outcome.xp ?? null) : undefined} none={snap.outcome?.unranked ? XP_NONE_LINES.test : undefined} />}
+      {/* (No XP box: an aborted game earns none, and a game against a bot, here or in the town, records nothing. A played ranked game's
+          XP is on its end page.) */}
       <div class="dv-result-actions">
         {/* A town bot's game: back to the town, at the table, the bot across. */}
         {snap.town ? (

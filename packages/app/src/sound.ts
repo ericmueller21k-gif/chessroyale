@@ -1218,7 +1218,11 @@ export type SoundName =
   | "clawThud"
   // Quest progress on home (Nov 10; questSound below).
   | "questTick"
-  | "questDone";
+  | "questDone"
+  // The end screen's rewards (mockup, Nov 20; xpPing below): a count's ping, the number landing in its bar, the bar's last ding.
+  | "xpPing"
+  | "xpLand"
+  | "xpDing";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => pieceSample("move", t),
@@ -1279,6 +1283,21 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   popSoft: (t) => bubblePop(t, 0.45),
   // (Placeholders until Eric's pack: a small bell note per count, and the auto chess level-up's arpeggio and chord. QUEST_SOUND_FILES.)
   questTick: (t) => (QUEST_SOUND_FILES.tick ? fileSample(QUEST_SOUND_FILES.tick, t) : strike(t, 1568, [[1, 1, 0.09], [2, 0.3, 0.05]], 0.1)),
+  // (The ping climbs a pentatonic scale as the count goes (xpPing's `k`, 0 to 1): rapid, musical, never a siren. The count-up's are an
+  // octave down and softer than the bar's.)
+  xpPing: (t) => {
+    const scale = [1046.5, 1174.7, 1318.5, 1568, 1760, 2093];
+    const f = scale[Math.min(scale.length - 1, Math.floor(pingK * scale.length))]! * (pingLow ? 0.5 : 1);
+    strike(t, f, [[1, 1, 0.07], [2.76, 0.18, 0.03], [5.4, 0.06, 0.015]], pingLow ? 0.05 : 0.065, { glide: 0.01 });
+  },
+  xpLand: (t) => {
+    strike(t, 523.25, [[1, 1, 0.12], [2, 0.4, 0.06]], 0.09, { glide: 0.25 });
+    tap(t, 900, 0.08);
+  },
+  xpDing: (t) => {
+    strike(t, 1568, [[1, 1, 0.5], [2.76, 0.25, 0.2], [5.4, 0.08, 0.08]], 0.08);
+    strike(t + 0.07, 2093, [[1, 1, 0.7], [2.76, 0.2, 0.25]], 0.07);
+  },
   questDone: (t) => (QUEST_SOUND_FILES.done ? fileSample(QUEST_SOUND_FILES.done, t) : autochess("level")(t)),
   sell: autochess("sell"),
   acReroll: autochess("reroll"),
@@ -2078,6 +2097,15 @@ export function playOnTap(name: SoundName) {
  */
 export type QuestSound = "tick" | "done";
 const QUEST_SOUND_FILES: Record<QuestSound, string | null> = { tick: null, done: null };
+/** The next xpPing's place in its count (0 to 1: the pitch) and whether it's the count-up's (low). */
+let pingK = 0;
+let pingLow = false;
+export function xpPing(k: number, low = false) {
+  pingK = Math.max(0, Math.min(0.999, k));
+  pingLow = low;
+  play("xpPing");
+}
+
 export const questSound = (s: QuestSound) => play(s === "tick" ? "questTick" : "questDone");
 /** Made ahead (the done sound's placeholder, in the sound worker), as the overlay opens to show progress. */
 export const warmQuestSounds = () => warmSounds(["questDone"]);

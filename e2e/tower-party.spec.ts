@@ -134,7 +134,10 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
 
   // Both pick Qxf7 (the party rule: every connected member picks): the boss is mated, floor 1 won.
   for (const p of [ann.page, bo.page]) await submitMove(p, "h5f7");
-  for (const p of [ann.page, bo.page]) await expect(p.locator('[data-tower-result="won"][data-tower-party]')).toContainText("Floor 1 cleared!", { timeout: 120_000 });
+  for (const p of [ann.page, bo.page]) {
+    await expect(p.locator('[data-tower-result="won"][data-tower-party]')).toBeVisible({ timeout: 120_000 });
+    await expect(p.getByTestId("es-line")).toHaveText("Floor 1 cleared!");
+  }
 
   // The room wrote every copy: the same run, both on floor 2, nothing under way.
   await expect

@@ -7,9 +7,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 - **Its queue while you browse** (Nov 10; [matchmaking.md](matchmaking.md), "Stepping out of a lobby"; home's rows: [hub.md](hub.md)): the 50 v 50
   lobby's Exit with "Keep me in the queue" keeps your seat as you look around ("Searching · 50 v 50", "Solo queue · 37 of 100"); the lobby
   filling takes you in. Home's Start with bots ("Play bots?", Yes) leaves the queue for you and 99 bots at once, at your last Bot level.
-- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the result screen (`screens/Results.tsx`; online, asked for by the lobby's code) shows `XpResult`, a fixed 78 px box (its top row: the gain, your name, your level): the
-  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("Win +50": never the minutes, Eric, Nov 9), or why there was none. Its rules
-  and storage: [accounts.md](accounts.md), "XP and levels".
+- **The end screen** (Nov 20; [2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md); replaces the XP box of Nov 9): the result screen (`screens/Results.tsx`; online, asked for by the lobby's code) shows `EndRewards` (`components/EndScreen.tsx`): XP EARNED
+  counting from 0 (`END_SCREEN` in settings.ts), lobbing into the XP bar (`XP.perLevel` a bar), which fills from your old XP to the new
+  (a level: it flashes, "Level 3!", on from 0), then the quests the game moved sliding to their counts; what made it under the number
+  ("Win +50": never the minutes) or why there was none in its place. Every box at its size from the first frame; a tap anywhere but a
+  button skips to the end; reduced motion: the end at once. The toast after it shows only crates and keys (`RewardBox endScreen`). The 50 v 50's middle is its podium; Classic's, its trophy. The headline: "Victory!" / "Defeat" / "A draw" by your team, your place in its line. Its rules and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
   less 170 px (the title line, the line over the board, the row under it), never wider than its column: 904 px at 1920 × 1080

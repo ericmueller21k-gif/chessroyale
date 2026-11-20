@@ -135,7 +135,7 @@ test("a guest where sign-in is set up: the Quests entry is there, greyed, \"Sign
   await expect(entry(page)).toBeDisabled();
 });
 
-test("a game that finishes quests: \"Quests +1,800\" in its XP box, \"Quest done: …\" in its toast, and Done! in the overlay after", async ({ page }, testInfo) => {
+test("a game that finishes quests: \"Quests +1,800\" under its XP, both rows done on the end screen, the crate's \"Quest done: …\" in its toast, and Done! in the overlay after", async ({ page }, testInfo) => {
   test.setTimeout(4 * 60_000);
   // Warm Up at 2 of 3 and the weekly at 9 of 10: a won Boss alone game counted as 12 minutes (?xpgame=12) finishes both.
   await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xpgame=12&quests=warm-up:2,squad-up,regular:9");
@@ -145,12 +145,19 @@ test("a game that finishes quests: \"Quests +1,800\" in its XP box, \"Quest done
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
   await submitMove(page, "h5f7");
   await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
-  const box = page.getByTestId("xp-box");
-  await expect(box).toHaveClass(/xp-done/, { timeout: 20_000 });
-  await expect(box.locator(".xp-parts")).toHaveText("Win +50 · Quests +1,800");
+  await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
+  await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win +50 · Quests +1,800");
+  // The end screen's quest rows (Nov 20): both slid to done, each with its check and its XP.
+  const rows = page.getByTestId("es-q");
+  await expect(rows.locator(".es-q-text strong")).toHaveText(["Warm Up", "Regular"]);
+  await expect(rows.locator(".es-q-count")).toHaveText(["3/3 ✓", "10/10 ✓"]);
+  await expect(rows.locator(".es-q-reward")).toHaveText(["+300 XP", "+1,500 XP"]);
+  await expect(rows.nth(0)).toHaveClass(/es-q-done/);
+  await expect(rows.nth(1)).toHaveClass(/es-q-done/);
+  // The toast: only what the rows don't show, the weekly's crate and key (its XP is in its row; Warm Up paid only XP).
   const toast = page.getByTestId("reward-box");
-  await expect(toast).toContainText("Quest done: Warm Up +300 XP");
-  await expect(toast).toContainText("Quest done: Regular +1,500 XP · +1 Winter Crate · +1 crate key");
+  await expect(toast).toContainText("Quest done: Regular · +1 Winter Crate · +1 crate key");
+  await expect(toast).not.toContainText("Warm Up");
   if (SHOTS) {
     await page.waitForTimeout(200);
     await page.screenshot({ path: `${SHOTS}/quests-toast-${testInfo.project.name}.png` });
@@ -184,7 +191,7 @@ test.describe("quest progress back on home (Nov 10)", () => {
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
     await submitMove(page, "h5f7");
     await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
-    await expect(page.getByTestId("xp-box")).toHaveClass(/xp-done/, { timeout: 20_000 });
+    await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
     // (Every count each row shows, the first time it shows it, watched from before home: the slide is about a second a row.)
     await page.evaluate(() => {
       const seen: { name: string; count: string; at: number }[] = [];
@@ -223,7 +230,7 @@ test.describe("quest progress back on home (Nov 10)", () => {
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
     await submitMove(page, "h5f7");
     await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
-    await expect(page.getByTestId("xp-box")).toHaveClass(/xp-done/, { timeout: 20_000 });
+    await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
     const came = page.waitForResponse((r) => r.url().endsWith("/api/quests"));
     await page.getByRole("button", { name: "Home", exact: true }).click();
     await came;

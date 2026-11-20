@@ -108,7 +108,7 @@ test("Hollow's mate: he lashes your king, it topples into the dark, then the res
   const heard = await page.evaluate(() => ((window as any).__soundLog as string[]).map((n) => n.split(":")[0]));
   expect(heard.filter((n) => n === "hollowLash").length).toBeGreaterThanOrEqual(LASHES - 1);
   // The result: Hollow won.
-  await expect(page.getByText(/Hollow won/)).toBeVisible();
+  await expect(page.getByText(/Hollow wins/)).toBeVisible();
 });
 
 test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls and you pick again", async ({ page }) => {

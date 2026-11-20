@@ -78,7 +78,7 @@ export function CrowdPodium({ match, titles, gameWinner }: { match: GameView; ti
   return (
     <div class="podium">
       <p class="pod-mode muted">{modeLine(s)}</p>
-      <h1 class="pod-head">{endWords(gameWinner, fen, s)}</h1>
+      <h2 class="pod-head">{endWords(gameWinner, fen, s)}</h2>
       <p class="pod-sub muted">
         {lastMove ? `Move ${lastMove}` : ""}
         {lastMove && oneVOne && lastMove >= oneVOne ? ` · 1 v 1 from move ${oneVOne}` : ""}

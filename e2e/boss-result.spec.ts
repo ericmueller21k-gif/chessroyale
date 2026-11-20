@@ -84,15 +84,14 @@ async function resultOf(page: Page, project: string, name: string) {
   expect(box.x, "starting over him").toBeLessThanOrEqual(boss.x + boss.width / 2);
   expect(box.x + box.width, "reaching past his middle").toBeGreaterThan(boss.x + boss.width / 2);
   expect(box.y + box.height, "above him").toBeLessThanOrEqual(boss.y);
-  // Eric, Nov 9: no God King on a boss result; one row, the boss on the left and your pawn on the right, your name and XP (the
-  // compact box) under your pawn, and only one XP box on the screen.
+  // Eric, Nov 9: no God King on a boss result; one row, the boss on the left and your pawn on the right. The end screen (Nov 20):
+  // your XP bar (your name on it) under that row, and only one on the screen.
   await expect(results.locator(".god-king, .gk-epilogue")).toHaveCount(0);
   const duo = results.locator(".results-duo");
   const pawn = (await duo.locator(".rd-you .you-pawn").boundingBox())!;
   expect(boss.x + boss.width / 2 < pawn.x + pawn.width / 2, "the boss on the left of your pawn").toBe(true);
-  await expect(results.getByTestId("xp-box")).toHaveCount(1);
-  const xp = duo.locator(".rd-you").getByTestId("xp-box");
-  await expect(xp).toHaveClass(/xp-compact/);
+  await expect(results.getByTestId("es-track-xp")).toHaveCount(1);
+  const xp = results.getByTestId("es-track-xp");
   expect((await xp.boundingBox())!.y, "your XP under your pawn").toBeGreaterThanOrEqual(pawn.y + pawn.height - 1);
   for (const r of [pawn, (await xp.boundingBox())!]) {
     expect(r.x, "left gutter").toBeGreaterThanOrEqual(16);
@@ -105,13 +104,13 @@ async function resultOf(page: Page, project: string, name: string) {
 
 test("a boss battle's victory and defeat screens: the title in the pixel type, no trophy or skull, no record text, the boss's line", async ({ page }, testInfo) => {
   test.setTimeout(3 * 60_000);
-  // A boss beats you at once (?mate=1): Defeated, and the boss's victory line. Hollow, named: START's random pick can be
+  // A boss beats you at once (?mate=1): Defeat, and the boss's victory line. Hollow, named: START's random pick can be
   // Wrangler or Sawyer, whose first move is a power's (the long pull; a pawn move for the split), not the mate, so the
   // battle went on and the result never came (main's red, Nov 9: 2026-11-09-boss-result-red.md).
   await watchDuo(page);
   await page.goto("/?debug&pace=quick&mate=1&boss=hollow");
   await bossAloneFromHome(page);
-  await expect(page.locator(".results h1")).toHaveText("Defeated", { timeout: 120_000 });
+  await expect(page.locator(".results h1")).toHaveText("Defeat", { timeout: 120_000 });
   // His attack on your pawn (Eric, Nov 9): it plays (its frames advance, his usual figure hidden), your pawn jolts back, then his
   // usual figure again. At rest (before and after) his painted figure is at least 16 px from your pawn (Eric's rule: nothing touches);
   // his attack's blow lands on your pawn (pies, ink, the lasso fly to it, as to a king) but never passes it (2026-11-09-boss-result-v2.md).

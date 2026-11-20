@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import { squadsVotes, type NetSquadsLobby } from "@chessroyale/chess/squads";
@@ -18,7 +19,8 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { SIDE_PANEL } from "../components/SquadsParts.tsx";
 import { FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 import { ReplayButton } from "../components/MoveReplay.tsx";
-import { XpResult, useGameXp } from "../components/XpResult.tsx";
+import { useGameXp } from "../components/XpResult.tsx";
+import { EndHeadline, EndRewards } from "../components/EndScreen.tsx";
 import { XP_NONE_LINES } from "@chessroyale/core";
 
 /**
@@ -227,10 +229,11 @@ function OutCard({ client, actions, onSpectate }: { client: SquadsClient; action
  * Your XP from this lobby (Nov 9), once your squad's place is decided: the same box as every result screen, asked for by the lobby's
  * code (its room writes it with your result). A test lobby records nothing: "No XP: test game."
  */
-function SquadsXp({ client }: { client: SquadsClient }) {
+function SquadsXp({ client, middle }: { client: SquadsClient; middle?: () => ComponentChildren }) {
   const test = !!client.lobby?.test;
   const xp = useGameXp(client.placed ?? client, { code: test ? null : client.code });
-  return <XpResult xp={xp} none={test ? XP_NONE_LINES.test : undefined} />;
+  // (The end screen's rewards (Nov 20): the same grant on the knocked-out card and then the results plays once: the second shows its end.)
+  return <EndRewards xp={xp} none={test ? XP_NONE_LINES.test : undefined} middle={middle} />;
 }
 
 /** Your squad's finished Pairs match's same-move tokens, every use and the judge's verdict (the post-match breakdown). */
@@ -295,18 +298,34 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
   const order = standingsOrder(lobby);
   const won = placed?.placement === 1;
   return (
-    <div class="screen results sq-results">
-      <div class="trophy" aria-hidden="true">
-        {won ? "🏆" : placed?.placement === 2 ? "🥈" : "♟️"}
-      </div>
-      <h1>{placed ? (won ? "Champions!" : `${placementText(placed.placement)} of 8 squads`) : "The bracket is decided"}</h1>
+    <div class="screen results sq-results es-screen">
+      {/* (The end screen's headline, Nov 20: "Victory!" for the champions; your squad's place otherwise.) */}
+      <EndHeadline
+        title={placed ? (won ? "Victory!" : `${placementText(placed.placement)} of 8`) : "Decided"}
+        line={placed ? (won ? "Champions!" : `${squadName(placed.squadId)} · ${placementText(placed.placement)}`) : "The bracket is decided"}
+        tone={won ? "win" : placed ? "loss" : "draw"}
+      />
       {placed && (
         <p class="muted">
           {won ? `${squadName(placed.squadId)} won the Squads final.` : `${squadName(placed.squadId)} placed ${placementText(placed.placement)}.`}{" "}
           {placed.coins || placed.crates ? `+${placed.coins} coins${placed.crates ? ` and ${placed.crates} crate` : ""}.` : lobby.test ? "Test lobby: no rewards." : placed.why ? NO_REWARD[placed.why] : ""}
         </p>
       )}
-      {placed && <SquadsXp client={client} />}
+      {/* (The rewards' middle: your squad, its tag and its members.) */}
+      {placed && (
+        <SquadsXp
+          client={client}
+          middle={() => {
+            const sq = lobby.squads.find((x) => x.id === placed.squadId);
+            return (
+              <div class="es-squad" style={{ "--sq": squadColour(placed.squadId) }}>
+                <SquadTag id={placed.squadId} you={placed.squadId === mine} />
+                <span class="sq-row-members">{sq?.seats.map((pid) => <Member key={pid} client={client} id={pid} />)}</span>
+              </div>
+            );
+          }}
+        />
+      )}
       <ol class="sq-places">
         {order.map((id) => {
           const sq = lobby.squads.find((s) => s.id === id)!;
