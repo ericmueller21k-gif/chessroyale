@@ -296,6 +296,13 @@ function trackChars(b: Battle, move: string | null): void {
   b.state = { ...b.state, boss: { ...boss!, powers: { ...p, charred } } };
 }
 
+/**
+ * The fire did something to see after the crowd's last move (a piece burnt or charred, a tile fizzled under the king): the
+ * boss's move waits for it (FIRE_BURN_MS), solo and online. (One test for both: a char once went unwaited in both copies.)
+ */
+export const fireShows = (boss: { crowdMoves: number; powers?: { burnt?: readonly BurnEvent[] } | null } | null | undefined): boolean =>
+  !!boss?.powers?.burnt?.some((b) => b.turn === boss.crowdMoves && !!(b.piece || b.fizzled || b.charred));
+
 /** How much of the crowd's material a move leaves to the fire this turn (pawn 1 ... queen 9). */
 export function fireLoss(fen: string, move: string, burn: readonly string[], crowd: Side): number {
   if (!burn.length) return 0;

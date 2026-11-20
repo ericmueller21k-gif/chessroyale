@@ -6,10 +6,11 @@ import { KING_ATTACK, bannerLeadMs, bossRules, mateMoments, powerFxMs, powerMome
 import { bossKit, liveKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
-import { BOINGO_UI, angleView } from "./Boingo.tsx";
+import { BOINGO_UI, angleView, boingoDecor } from "./Boingo.tsx";
 import { BIGBOY_UI } from "./BigBoy.tsx";
 import { GINGER_UI } from "./Ginger.tsx";
-import { GREX_UI } from "./Grex.tsx";
+import { GREX_UI, grexDecor } from "./Grex.tsx";
+import type { PieceDecor } from "../board/types.ts";
 import { HOLLOW_UI } from "./Hollow.tsx";
 import { SAWYER_UI } from "./Sawyer.tsx";
 import { PIG_UI } from "./Pig.tsx";
@@ -339,3 +340,33 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
 export const RAGE_DRAIN = { holdMs: 400, ms: 900 } as const;
 /** What each battle's meter last showed on this device, and its slide down while one runs (from `start`, page time). */
 const meterShown = new Map<string, { pct: number; drain: { from: number; start: number } | null }>();
+
+/** Several bosses' marks on the pieces at once (Boingo's splats, Jefferson's char): each one's class and drawing. */
+export function joinDecor(...all: (PieceDecor | undefined)[]): PieceDecor | undefined {
+  const on = all.filter((d): d is PieceDecor => !!d);
+  if (on.length < 2) return on[0];
+  return {
+    key: on.map((d) => d.key).join("|"),
+    of: (square, code) => {
+      const parts = on.map((d) => d.of(square, code)).filter((x) => !!x);
+      return parts.length ? { cls: parts.map((x) => x!.cls).filter(Boolean).join(" "), kids: parts.map((x) => x!.kids) } : null;
+    },
+  };
+}
+
+/**
+ * The marks a boss battle draws on the crowd's pieces (Boingo's splats, Jefferson's char), for every screen that draws its board
+ * (your move's, the boss's, the crowd's): one function, so no screen misses one (Nov 20: Jefferson's char was drawn only on the
+ * boss's screen at first, and went as your move began). `moments`, `now`: the boss's screen's (the pie's hit); `burnt`, `since`:
+ * the fire after the crowd's move, as that screen shows it (a charred piece burning keeps its look until it comes off).
+ */
+export function battleDecor(
+  boss: BossView | null | undefined,
+  moments: readonly Moment[] = [],
+  now = 0,
+  burnt: Parameters<typeof grexDecor>[1] = [],
+  since = 0,
+): PieceDecor | undefined {
+  if (!boss) return undefined;
+  return joinDecor(boingoDecor(partOf(boss, "clown"), moments, now), grexDecor(partOf(boss, "grex"), burnt, since, now));
+}

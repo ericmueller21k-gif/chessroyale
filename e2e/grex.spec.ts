@@ -61,7 +61,7 @@ async function play(page: Page, opts: { leave?: boolean; step?: boolean } = {}) 
         piece: { selector: left.map((sq) => `.pw-burns .pw-burn[data-square="${sq}"]:not(.out):not(.fizzled):not(.charred)`).join(",") },
         dock: { selector: ".boss-dock-status", text: /burnt/i },
         charred: { selector: left.map((sq) => `.pw-burns .pw-burn.charred[data-square="${sq}"]`).join(",") },
-        charLine: { selector: ".boss-dock-status", text: /Charred! One more burns (it|them)$|burnt, \w+ charred$/ },
+        charLine: { selector: ".boss-dock-status", text: /Charred! One more burns (it|them)|burnt, \w+ charred/ },
       })
     : null;
   await page.evaluate((mv) => {
@@ -239,9 +239,10 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
         await expect.poll(async () => (await r.burn!.seen()).charLine, { timeout: 15_000 }).toBe(true);
         expect((await r.burn!.seen()).charred).toBe(true);
         await expect(page.locator(`.hb-board piece.pw-charred[data-square="${sq}"]`)).toHaveCount(1, { timeout: 5_000 });
+        // (Still drawn charred on your next move's screen, its own board, if his move left it there.)
         await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
         const marks = (await powers(page))?.charred ?? [];
-        if ((await phase(page)) === "play" && marks.some((m: { square: string }) => m.square === sq)) await expect(page.locator(`.hb-board piece.pw-charred[data-square="${sq}"]`)).toHaveCount(1);
+        if ((await phase(page)) === "play" && marks.some((m: { square: string }) => m.square === sq)) await expect(page.locator(`.hb-board piece.pw-charred[data-square="${sq}"]`)).toHaveCount(1, { timeout: 5_000 });
         charredOne = true;
       }
     }
