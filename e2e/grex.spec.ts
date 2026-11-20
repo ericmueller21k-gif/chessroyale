@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { engineTop, test, watchFor, bossAloneFromHome, submitMove } from "./helpers.ts";
+import { engineTop, test, watchFor, bossAloneFromHome, openBossRaid, submitMove } from "./helpers.ts";
 import { MUSIC } from "@chessroyale/core";
 
 /**
@@ -282,6 +282,56 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   expect(laughs.length).toBeLessThanOrEqual(1);
   if (laughs.length) expect((await laugh.seen()).line).toBe(true);
   console.log(`fireballs on his half: ${onHisHalf}; his laugh on turn ${laughs[0] ?? "none"}`);
+});
+
+test("a raid's reveal draws the char marks as they were before the fire: a piece the candle chars that turn is plain until its flames (the review of Nov 20)", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  // A Solo raid (you and 49 bots: a reveal after each crowd move); ?power=candle aims his fireballs at the crowd's pieces.
+  await page.goto("/?debug&pace=quick&clock=30&bossMoves=16&boss=grex&power=candle&laststand=0");
+  await openBossRaid(page);
+  await page.getByRole("button", { name: /^Play with bots/ }).click();
+  // Every frame of every reveal: the squares drawn charred, by the crowd turn the state counts then (the move's and its fire's).
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__rev = {};
+    const tick = () => {
+      const m = w.match;
+      if (m?.phase.kind === "reveal" && m.boss) {
+        const seen = (w.__rev[m.boss.crowdMoves] ??= []);
+        for (const e of document.querySelectorAll(".hb-board piece.pw-charred")) if (!seen.includes((e as HTMLElement).dataset.square)) seen.push((e as HTMLElement).dataset.square);
+      }
+      if (m?.phase.kind !== "results") requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  type Burn = { turn: number; square: string; piece?: string; charred?: string; hits?: number };
+  let checked = 0;
+  const stopAt = Date.now() + 5 * 60_000;
+  while (Date.now() < stopAt && !checked && (await phase(page)) !== "results") {
+    const k = await phase(page);
+    if (k === "play") {
+      await page
+        .evaluate(async () => {
+          const m = (window as any).match;
+          if (m.phase.kind !== "play" || Date.now() < m.phase.startsAt) return;
+          const fen = m.phase.board.fen;
+          const [top] = await m.runner.topMovesFor(fen);
+          if (m.phase.kind === "play" && m.phase.board.fen === fen) m.submit(top.move);
+        })
+        .catch(() => undefined);
+    } else if (k === "boss") {
+      // The fire this turn: a piece charred the first time was never drawn charred on the reveal before it.
+      const s = await page.evaluate(() => ({ turn: (window as any).match.boss.crowdMoves as number, burnt: ((window as any).match.boss.powers?.burnt ?? []) as Burn[], rev: (window as any).__rev as Record<number, string[]> }));
+      const chars = s.burnt.filter((b) => b.turn === s.turn && b.charred && (b.hits ?? 1) === 1);
+      if (chars.length) {
+        expect(s.rev[s.turn], `the reveal of turn ${s.turn} was watched`).toBeTruthy();
+        for (const b of chars) expect(s.rev[s.turn], `${b.square}, charred by turn ${s.turn}'s fire, drawn charred on its reveal`).not.toContain(b.square);
+        checked++;
+      }
+    }
+    await page.waitForTimeout(150);
+  }
+  expect(checked, "a piece left on the candle's fire was charred").toBeGreaterThan(0);
 });
 
 test("on a computer the dock is under the board at every width, the board and dock on screen, the God King beside it", async ({ page }) => {
