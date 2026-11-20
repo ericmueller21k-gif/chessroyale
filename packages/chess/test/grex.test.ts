@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossDef, mulberry32, type BossPowerSettings, type BossState, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
+  GREX,
   ablaze,
   applyMove,
   blizzardNow,
   boardEnd,
   burnOnBoard,
   burnOutcome,
+  candleAim,
+  charSquares,
   chooseFireballs,
   chooseSpark,
   crowdAllowed,
@@ -18,6 +21,7 @@ import {
   fireJudged,
   fireLoss,
   fireRanked,
+  fireBurns,
   fireShadows,
   fireproofSquare,
   ownShots,
@@ -39,7 +43,9 @@ import {
   recentMoves,
   sanLineToUci,
   triggerUltimate,
+  withPiece,
   withoutPiece,
+  type Battle,
   type EngineLike,
   type Opening,
 } from "../src/index.ts";
@@ -548,6 +554,169 @@ describe("Jefferson's candle on his own half, and his fireproof laugh (Eric, Oct
     const pickOf = (seed: number) => prepareTurn({ ...start, powers: { ...powers, seed } }, RUY_FEN).powers!.fireproof!.pick;
     expect(pickOf(11)).toBe(pickOf(11));
     expect(new Set(Array.from({ length: 20 }, (_, i) => pickOf(i) % 4)).size).toBeGreaterThan(1);
+  });
+});
+
+describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov 20)", () => {
+  // (After the crowd's move h2-h3: the knight on f3 left on a tile of the candle's, ablaze on turn 4.)
+  const AFTER = applyMove(KN_FEN, "h2h3");
+  const onFire = (patch: Partial<BossState["powers"] & object> = {}, square = "f3", candle = true) =>
+    battle("grex", KN_FEN, { crowdMoves: 4, powers: { ...initPowers(7, KN_FEN, "w"), turn: 4, fire: [{ square, lit: 2, ...(candle ? { candle: true as const } : {}) }], ...patch } });
+
+  it("the first time the candle's fire reaches a piece, it's charred and stays; the second time it burns", () => {
+    const first = fireAfterMove(onFire(), AFTER, "h2h3");
+    expect(first.emptied).toEqual([]);
+    expect(first.fen).toBe(AFTER);
+    expect(first.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", charred: "n", hits: 1 }]);
+    expect(first.boss.powers!.charred).toEqual([{ square: "f3", piece: "n", n: 1 }]);
+    // (The tile burns out under it, as an empty one does.)
+    expect(first.boss.powers!.fire).toEqual([]);
+    // The second: it burns, and its mark goes with it.
+    const second = fireAfterMove(onFire({ charred: first.boss.powers!.charred }), AFTER, "h2h3");
+    expect(second.emptied).toEqual(["f3"]);
+    expect(pieceAt(second.fen, "f3")).toBeNull();
+    expect(second.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", piece: "n", hits: 2 }]);
+    expect(second.boss.powers!.charred).toEqual([]);
+    // Other marks stay as they were.
+    const both = fireAfterMove(onFire({ charred: [{ square: "f3", piece: "n", n: 1 }, { square: "g2", piece: "p", n: 1 }] }), AFTER, "h2h3");
+    expect(both.boss.powers!.charred).toEqual([{ square: "g2", piece: "p", n: 1 }]);
+  });
+
+  it("his sparkler still burns at once, and candleHitsToBurn 1 is the old candle (it burns the first time)", () => {
+    const spark = fireAfterMove(onFire({}, "f3", false), AFTER, "h2h3");
+    expect(spark.emptied).toEqual(["f3"]);
+    expect(spark.boss.powers!.charred).toBeUndefined();
+    const once = fireAfterMove(onFire(), AFTER, "h2h3", { ...BOSS_POWERS, candleHitsToBurn: 1 });
+    expect(once.emptied).toEqual(["f3"]);
+    expect(once.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", piece: "n", hits: 1 }]);
+    // (The sparkler's: no count.)
+    expect(spark.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", piece: "n" }]);
+    // Three: charred twice, then it burns.
+    const three = { ...BOSS_POWERS, candleHitsToBurn: 3 };
+    const twice = fireAfterMove(onFire({ charred: [{ square: "f3", piece: "n", n: 1 }] }), AFTER, "h2h3", three);
+    expect(twice.emptied).toEqual([]);
+    expect(twice.boss.powers!.charred).toEqual([{ square: "f3", piece: "n", n: 2 }]);
+    expect(fireAfterMove(onFire({ charred: twice.boss.powers!.charred }), AFTER, "h2h3", three).emptied).toEqual(["f3"]);
+  });
+
+  it("his own pieces are never charred or burnt, and the guards hold: never the king; a charred piece whose loss leaves a king in check stays charred", () => {
+    // (A black pawn on f7: the crowd is White.)
+    const his = fireAfterMove(onFire({}, "f7"), AFTER, "h2h3");
+    expect(his.emptied).toEqual([]);
+    expect(his.boss.powers!.burnt).toEqual([{ turn: 4, square: "f7" }]);
+    expect(his.boss.powers!.charred).toBeUndefined();
+    expect(charSquares(AFTER, [{ square: "f7", lit: 2, candle: true }], [], "w")).toEqual([]);
+    // The king: the tile fizzles, no mark.
+    const king = fireAfterMove(onFire({}, "g1"), AFTER, "h2h3");
+    expect(king.boss.powers!.burnt).toEqual([{ turn: 4, square: "g1", fizzled: true }]);
+    expect(king.boss.powers!.charred).toBeUndefined();
+    // The knight on f2 shields its king from the bishop on c5: charred the first time (a mark takes nothing off the board),
+    // and the second time it fizzles, still charred, still there.
+    const pinned = "6k1/8/8/2b5/8/8/5N2/6K1 b - - 0 1";
+    const pin = (patch: Partial<BossState["powers"] & object> = {}) => battle("grex", pinned, { crowdMoves: 4, powers: { ...initPowers(7, pinned, "w"), turn: 4, fire: [{ square: "f2", lit: 2, candle: true }], ...patch } });
+    const once = fireAfterMove(pin(), pinned, null);
+    expect(once.boss.powers!.charred).toEqual([{ square: "f2", piece: "n", n: 1 }]);
+    const again = fireAfterMove(pin({ charred: once.boss.powers!.charred }), pinned, null);
+    expect(again.emptied).toEqual([]);
+    expect(again.boss.powers!.burnt).toEqual([{ turn: 4, square: "f2", fizzled: true }]);
+    expect(again.boss.powers!.charred).toEqual([{ square: "f2", piece: "n", n: 1 }]);
+  });
+
+  it("the judge counts only what really burns: a piece the candle only chars isn't lost, a charred one is", () => {
+    // Turn 4 begins (3 crowd moves made) with the candle's tile under the knight ablaze.
+    const turn4 = (patch: Partial<BossState["powers"] & object> = {}, candle = true) => ({ ...onFire({ turn: 4, ...patch }, "f3", candle), crowdMoves: 3 });
+    expect(ablaze(turn4())).toEqual(["f3"]);
+    expect(fireBurns(turn4())).toEqual([]);
+    expect(fireBurns(turn4({ charred: [{ square: "f3", piece: "n", n: 1 }] }))).toEqual(["f3"]);
+    expect(fireBurns(turn4({}, false))).toEqual(["f3"]);
+    // (A mark elsewhere doesn't count; a tile not yet ablaze doesn't either.)
+    expect(fireBurns(turn4({ charred: [{ square: "g2", piece: "p", n: 1 }] }))).toEqual([]);
+    expect(fireBurns({ ...turn4({ charred: [{ square: "f3", piece: "n", n: 1 }] }), crowdMoves: 2 })).toEqual([]);
+    // Leaving the knight to be charred costs nothing; leaving the charred one costs it.
+    expect(fireLoss(KN_FEN, "h2h3", fireBurns(turn4()), "w")).toBe(0);
+    expect(fireLoss(KN_FEN, "h2h3", fireBurns(turn4({ charred: [{ square: "f3", piece: "n", n: 1 }] })), "w")).toBe(3);
+  });
+
+  it("the marks follow their pieces through every move, his and the crowd's, solo and online, and a rejoin keeps them", async () => {
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "gingerbread", lastStandFrom: 999 } as Settings;
+    const runner = new MatchRunner({ settings, rng: mulberry32(2), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
+    // Jefferson in Ginger's place, a tile of his candle's ablaze under the knight on f3.
+    const fen = runner.boards.get(0)!.fen;
+    runner.state = { ...runner.state, boss: { ...runner.state.boss!, id: "grex", powers: { ...initPowers(7, fen, "w"), turn: 1, nextPassive: 99, fire: [{ square: "f3", lit: -1, candle: true }] } } };
+    // (Only charred: the judge counts nothing lost.)
+    expect(runner.fireBurn()).toEqual([]);
+    runner.deal();
+    await runner.score(new Map([["h0", { move: "d2d3", thinkMs: 1000 }]]));
+    let board = runner.boards.get(0)!;
+    expect(pieceAt(board.fen, "f3")).toEqual({ color: "w", type: "n" });
+    expect(board.bases ?? []).toEqual([]);
+    expect(runner.bossView()!.powers!.burnt).toEqual([{ turn: 1, square: "f3", charred: "n", hits: 1 }]);
+    expect(runner.bossView()!.powers!.charred).toEqual([{ square: "f3", piece: "n", n: 1 }]);
+    // His move (this seed's doesn't touch the knight): the mark stays on it.
+    await runner.playBoss();
+    board = runner.boards.get(0)!;
+    expect(pieceAt(board.fen, "f3")).toEqual({ color: "w", type: "n" });
+    expect(runner.bossView()!.powers!.charred).toEqual([{ square: "f3", piece: "n", n: 1 }]);
+    // The crowd moves the knight: its mark goes with it.
+    const hop = legalMoves(board.fen).filter((m) => m.startsWith("f3")).sort()[0]!;
+    runner.deal();
+    await runner.score(new Map([["h0", { move: hop, thinkMs: 1000 }]]));
+    expect(runner.boards.get(0)!.lastMove).toBe(hop);
+    expect(runner.bossView()!.powers!.charred).toEqual([{ square: hop.slice(2, 4), piece: "n", n: 1 }]);
+    // A rejoin (the lobby's snapshot, solo's restore): the marks are still there.
+    const back = MatchRunner.restore(JSON.parse(JSON.stringify(runner.snapshot())), { settings, rng: mulberry32(3), engines: [fakeEngine()], library: [opening(RUY)] });
+    expect(back.bossView()!.powers!.charred).toEqual([{ square: hop.slice(2, 4), piece: "n", n: 1 }]);
+  });
+
+  it("in a match, the second hit burns the charred knight, and the judge scores saving it as the best", async () => {
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "gingerbread", lastStandFrom: 999 } as Settings;
+    const runner = new MatchRunner({ settings, rng: mulberry32(2), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
+    const fen = runner.boards.get(0)!.fen;
+    runner.state = { ...runner.state, boss: { ...runner.state.boss!, id: "grex", powers: { ...initPowers(7, fen, "w"), turn: 1, nextPassive: 99, fire: [{ square: "f3", lit: -1, candle: true }], charred: [{ square: "f3", piece: "n", n: 1 }] } } };
+    expect(runner.fireBurn()).toEqual(["f3"]);
+    runner.deal();
+    const report = await runner.score(new Map([["h0", { move: "d2d3", thinkMs: 1000 }]]));
+    expect(report.boards[0]!.bestMove.startsWith("f3")).toBe(true);
+    const board = runner.boards.get(0)!;
+    expect(pieceAt(board.fen, "f3")).toBeNull();
+    expect(board.bases).toEqual([{ ply: board.history.length, fen: board.fen }]);
+    expect(runner.bossView()!.powers!.burnt).toEqual([{ turn: 1, square: "f3", piece: "n", hits: 2 }]);
+    expect(runner.bossView()!.powers!.charred).toEqual([]);
+  });
+
+  it("a mark whose piece is gone goes as the next turn begins", () => {
+    const b = battle("grex", KN_FEN, { crowdMoves: 1, powers: { ...initPowers(7, KN_FEN, "w"), charred: [{ square: "f3", piece: "n", n: 1 }, { square: "e4", piece: "b", n: 1 }, { square: "g2", piece: "b", n: 1 }] } });
+    expect(prepareTurn(b, KN_FEN).powers!.charred).toEqual([{ square: "f3", piece: "n", n: 1 }]);
+  });
+
+  it("on a floor of several, another boss's power that moves a charred piece outside a move takes its mark at once (followBoard)", () => {
+    const marks = [{ square: "f3", piece: "n", n: 1 }, { square: "g2", piece: "p", n: 1 }];
+    const boss = battle("grex", KN_FEN, { crowdMoves: 1, powers: { ...initPowers(7, KN_FEN, "w"), charred: marks } });
+    // (Say Wrangler drags the knight from f3 to e5: no move, so no tracker follows it.)
+    const moved = withPiece(withoutPiece(KN_FEN, "f3"), "e5", { color: "w", type: "n" });
+    const b = { state: { boss, boards: [0] }, boards: new Map([[0, { fen: moved }]]) } as unknown as Battle;
+    GREX.followBoard!(b);
+    expect(b.state.boss!.powers!.charred).toEqual([{ square: "g2", piece: "p", n: 1 }]);
+    // Nothing moved: the state is left as it was.
+    const still = { state: { boss, boards: [0] }, boards: new Map([[0, { fen: KN_FEN }]]) } as unknown as Battle;
+    GREX.followBoard!(still);
+    expect(still.state.boss).toBe(boss);
+  });
+
+  it("the test switch (?power=candle) aims the crowd's share at its pieces: charred ones first, then pawns", () => {
+    const aim = candleAim(RUY_FEN, "w", [{ square: "f3", piece: "n", n: 1 }]);
+    expect(aim[0]).toEqual(["f3"]);
+    expect(aim[1]!.every((sq) => pieceAt(RUY_FEN, sq)?.type === "p" && pieceAt(RUY_FEN, sq)?.color === "w")).toBe(true);
+    expect(aim.flat()).not.toContain("g1");
+    for (let seed = 0; seed < 20; seed++) {
+      const sq = chooseFireballs(RUY_FEN, "w", seed, 6, 3, [], 1, aim);
+      expect(sq[0]).toBe("f3");
+      expect(pieceAt(RUY_FEN, sq[1]!)).toEqual({ color: "w", type: "p" });
+      // (His share isn't aimed.)
+      expect(Number(sq[2]![1])).toBeGreaterThanOrEqual(5);
+      // No aim: the squares as before.
+      expect(chooseFireballs(RUY_FEN, "w", seed, 6, 3, [], 1, [])).toEqual(chooseFireballs(RUY_FEN, "w", seed, 6, 3, [], 1));
+    }
   });
 });
 
