@@ -565,7 +565,7 @@ describe("several bosses: one primary for the powers that add pieces (BATTLE_TOW
         const run = await runBattle(k, null, (r) => {
           for (const b of r.sideBosses()) {
             expect(b.powers!.noAdd, `${b.id} on ${where}`).toBe(where === "tower" && b.id === id ? true : undefined);
-            if (addedBy(b)) added[where]!.add(b.id);
+            if (addedBy(b)) added[where]!.add(b.id!);
           }
         });
         expect(run.failures).toEqual([]);

@@ -466,7 +466,7 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   await still(page, "shared-floor-babur-wrangler");
 });
 
-test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, the first in turn order): Babur's pump stays in his part, greyed and tagged OFF, never a balloon; Puddles' seeds say no pieces grow", async ({ page }) => {
+test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, the first in turn order): Babur's pump stays in his part, greyed and tagged OFF, never a balloon; Puddles, first, keeps his", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await intoTower(page);
   const made = await page.evaluate(async () => {
@@ -487,11 +487,12 @@ test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, t
     await expect(pump).toHaveAttribute("aria-label", "Balloons: off on this floor");
     await expect(pump).toHaveAttribute("data-balloon", "");
     await expect(pump.locator(".tg-off-tag")).toHaveText("OFF");
-    expect(await pump.evaluate((el) => getComputedStyle(el).filter)).toContain("grayscale");
+    expect(await pump.locator(".tg-pump").evaluate((el) => getComputedStyle(el).filter)).toContain("grayscale");
   };
   await expect(page.locator(".tg-pump")).toHaveCount(1);
   await off();
-  await expect(page.locator('.tw-part[data-boss="gardener"] .seed-meter')).toHaveAttribute("data-no-pieces", "");
+  // (Puddles is the primary: his seed meter as ever, no "no pieces" in its label.)
+  await expect(page.locator('.tw-part[data-boss="gardener"] .seed-meter')).toHaveAttribute("aria-label", /^Seeds \d+ of \d+$/);
   const powers = () => page.evaluate(() => Object.fromEntries((window as any).match.boss.side.bosses.map((b: any) => [b.id, { noAdd: !!b.powers.noAdd, placed: b.powers.balloons?.placed ?? 0 }])));
   // (Two of your moves: Babur's turn comes and goes with nothing on his pump.)
   for (let n = 1; n <= 2; n++) {
