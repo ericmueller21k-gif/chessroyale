@@ -581,6 +581,11 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 20 ~21:40 UTC
+- #855 end screen MERGED 65dfe8e (fix: boss headline from bossResult after reload; "X wins" checks). Watcher b262f6icj: deploy + main run.
+- Sounds helper (Fable, medium) started: session_01JuCWRvUXzKxGd3XtTzaqqk, claude/end-screen-sounds. Eric's final picks in notes/briefs/end-screen-sounds.md.
+- Saw Swap helper (xhigh) still running: session_01JuCWRrXPGDqG9JetRMUcgq.
+
 ## Nov 20 ~21:00 UTC
 - #854 levels-500 MERGED dc7404e (deployed ~26 min late: CF build queue; main green).
 - #855 end screen OPEN (head c9466ab; main merged in with xp specs at 500/level; EndScreen.tsx + end-screen.css in areas.json full). CI watcher b8x90ry5q. Stills sent to Eric. Merge when green.
