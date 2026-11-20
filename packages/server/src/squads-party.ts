@@ -104,7 +104,7 @@ export interface PartyRecord {
    * does, the Durable Object's read of everyone's copies: `plan`), and its line in the town's chat while it stands (`open`: its number
    * there, null while it's being posted).
    */
-  tower?: { plan: TowerPartyPlan | null; open?: { line: number | null; at: number; by: string; room: string }; recheckAt?: number };
+  tower?: { plan: TowerPartyPlan | null; open?: { line: number | null; at: number; by: string; room: string }; recheckAt?: number; win?: true };
   /**
    * A 50 v 50 party (Nov 16): the account that made it (the first in), and its open invites (each friend's account, name, who
    * invited them and when it lapses): only those accounts get in.

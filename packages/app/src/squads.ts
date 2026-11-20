@@ -1091,7 +1091,9 @@ export async function createParty(kind: PartyKind = "squads"): Promise<{ code: s
   // (?pool=NAME: a queue of its own, a test switch; a 50 v 50 party's ?partyfill=SECONDS too.)
   const pool = kind === "squads" || kind === "crowd" ? queuePool() : null;
   const fill = kind === "crowd" ? partyFill() : null;
-  const query = new URLSearchParams([...(pool ? [["pool", pool]] : []), ...(fill ? [["fill", fill]] : [])]).toString();
+  // (A Battle Tower party's floors where Qxf7 mates, ?win=1: a test switch the server checks.)
+  const win = kind === "tower" && new URLSearchParams(location.search).get("win") === "1";
+  const query = new URLSearchParams([...(pool ? [["pool", pool]] : []), ...(fill ? [["fill", fill]] : []), ...(win ? [["win", "1"]] : [])]).toString();
   try {
     const res = await fetch(`/api/${kind}/party${query ? `?${query}` : ""}`, { method: "POST" });
     const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string; banned?: boolean };

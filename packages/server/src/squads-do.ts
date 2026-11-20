@@ -487,9 +487,11 @@ export class SquadsParty extends DurableObject<Env> {
    * "boss", boss-party.ts) has no queue: its START makes the battle. A 50 v 50 party ("crowd", Nov 16) queues into the public
    * 50 v 50 matchmaking; `owner` (its maker's account) is the only one in without an invite.
    */
-  async create(code: string, queueName: string, fillMs: number, kind?: "boss" | "crowd" | "tower", poolName?: string, owner?: string): Promise<boolean> {
+  async create(code: string, queueName: string, fillMs: number, kind?: "boss" | "crowd" | "tower", poolName?: string, owner?: string, towerWin = false): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = { ...newPartyRecord(code, Date.now(), kind, owner), queueName, fillMs, ...(poolName ? { poolName } : {}) };
+    // (A Battle Tower party's test switch: its floors open where Qxf7 mates the boss, index.ts.)
+    if (towerWin && this.record.tower) this.record.tower.win = true;
     await this.persist(this.core());
     return true;
   }
@@ -735,7 +737,7 @@ export class SquadsParty extends DurableObject<Env> {
     if (!shown || shown.key !== uids.join(",") || JSON.stringify(shown.plan) !== JSON.stringify(now)) return fail(TOWER_LINES.changed, true);
     const code = this.record.code;
     const fight = Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(16).padStart(2, "0")).join("");
-    const overrides = JSON.parse(JSON.stringify(prep.settings)) as NonNullable<Parameters<ReturnType<Env["LOBBIES"]["get"]>["create"]>[1]>;
+    const overrides = JSON.parse(JSON.stringify({ ...prep.settings, ...(this.record.tower?.win ? { bossWinTest: true } : {}) })) as NonNullable<Parameters<ReturnType<Env["LOBBIES"]["get"]>["create"]>[1]>;
     const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, overrides, undefined, undefined, partyLobby(want, code, Date.now(), { fight }))) !== false).catch(() => null);
     if (!this.record) return;
     if (!lobby) return fail("Couldn't start the floor. Try again.");
