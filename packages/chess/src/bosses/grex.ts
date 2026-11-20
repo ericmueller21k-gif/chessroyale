@@ -21,7 +21,7 @@ import {
   type PowerEvent,
 } from "@chessroyale/core";
 import { burnOnBoard } from "../boards.ts";
-import { followSplats } from "./boingo.ts";
+import { followSplats, marksStanding } from "./boingo.ts";
 import { applyMove, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "../rules.ts";
 import type { MoveScore } from "../uci.ts";
 import { VALUE, crowdHalf, from, logit, other, powerRoll, to, turnOf, warnThenUnleash, type Battle, type BossRules, type Side } from "./base.ts";
@@ -357,7 +357,7 @@ export const GREX: BossRules = {
   id: "grex",
   // (A char mark whose piece is gone: another boss's power, or a capture a tracker missed.)
   wearOff(next, t) {
-    if (next.charred?.length) next.charred = next.charred.filter((m) => pieceAt(t.fen, m.square)?.color === t.crowd && pieceAt(t.fen, m.square)?.type === m.piece);
+    if (next.charred?.length) next.charred = marksStanding(next.charred, t.fen, t.crowd);
   },
   ultimate(next, t) {
     const now = warnThenUnleash(next, t);
@@ -424,5 +424,15 @@ export const GREX: BossRules = {
   afterBossMove: (b, move) => trackChars(b, move),
   // (Several bosses: another boss's move, the marks follow it too.)
   followMove: (b, move) => trackChars(b, move),
+  // (Several bosses: another boss's power moved a charred piece outside a move (Wrangler's drag or pull, Smudgy's swap or Repaint,
+  // Revision): its mark goes at once, as a capture's (one of the same kind the same power put on its square still wears it:
+  // nothing tells them apart; bosses.md). Review, Nov 20.)
+  followBoard(b) {
+    const boss = b.state.boss!;
+    const p = boss.powers!;
+    if (!p.charred?.length) return;
+    const charred = marksStanding(p.charred, b.boards.get(b.state.boards[0]!)!.fen, boss.crowdSide);
+    if (charred.length < p.charred.length) b.state = { ...b.state, boss: { ...boss, powers: { ...p, charred } } };
+  },
   view: (p) => ({ charred: (p.charred ?? []).map((m) => ({ ...m })) }),
 };

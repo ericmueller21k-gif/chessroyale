@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import { BOSS_BANNER, BOSS_POWERS, bossBannerMs, type PowerEventKind } from "@chessroyale/core";
-import { KING_ATTACK, bannerLeadMs, bossRules, followSplats, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
+import { KING_ATTACK, bannerLeadMs, bossRules, followSplats, mateMoments, powerFxMs, powerMomentMs, unfollowSplats } from "@chessroyale/chess";
 import { bossKit, liveKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
@@ -358,24 +358,47 @@ export function joinDecor(...all: (PieceDecor | undefined)[]): PieceDecor | unde
  * The marks a boss battle draws on the crowd's pieces (Boingo's splats, Jefferson's char), for every screen that draws its board
  * (your move's, the boss's, the crowd's): one function, so no screen misses one (Nov 20: Jefferson's char was drawn only on the
  * boss's screen at first, and went as your move began). `moments`, `now`: the boss's screen's (the pie's hit); `burnt`, `since`:
- * the fire after the crowd's move, as that screen shows it (a charred piece burning keeps its look until it comes off). `pending`:
- * your move already on the board while it's scored (the position after it), the marks following it as the rules will.
+ * the fire after the crowd's move, as that screen shows it (a charred piece burning keeps its look until it comes off, one just
+ * charred takes it as its flames die). `pending`: your move already on the board while it's scored (the position after it), the
+ * marks following it as the rules will. `reveal`: the crowd's reveal, which shows the move about to be played (`played`: on the
+ * board now) while the state already counts it and the fire after it: the marks as they stood before the fire (the review of
+ * Nov 20: the char showed seconds before its flames), and before the move until it's played (backBeforeFire, unfollowSplats).
  */
 export function battleDecor(
   boss: BossView | null | undefined,
-  moments: readonly Moment[] = [],
-  now = 0,
-  burnt: Parameters<typeof grexDecor>[1] = [],
-  since = 0,
-  pending: { move: string; fen: string } | null = null,
+  o: {
+    moments?: readonly Moment[];
+    now?: number;
+    burnt?: Parameters<typeof grexDecor>[1];
+    since?: number;
+    pending?: { move: string; fen: string } | null;
+    reveal?: { move: string; fenBefore: string; played: boolean } | null;
+  } = {},
 ): PieceDecor | undefined {
   if (!boss) return undefined;
+  const { moments = [], now = 0, burnt = [], since = 0, pending = null, reveal = null } = o;
   const part = (id: string): BossView => {
-    const b = partOf(boss, id);
+    let b = partOf(boss, id);
+    if (reveal) b = backBeforeFire(b);
     const p = b.powers;
-    if (!pending || !p || (!p.splats?.length && !p.charred?.length)) return b;
+    if (!p || (!p.splats?.length && !p.charred?.length)) return b;
+    if (reveal && !reveal.played) return { ...b, powers: { ...p, splats: p.splats && unfollowSplats(p.splats, reveal.move, reveal.fenBefore), charred: p.charred && unfollowSplats(p.charred, reveal.move, reveal.fenBefore) } };
+    if (!pending) return b;
     const follow = <M extends { square: string; piece: string; n: number }>(m: M[] | undefined) => (m?.length ? followSplats(m, pending.move, pending.fen, b.crowdSide) : m);
     return { ...b, powers: { ...p, splats: follow(p.splats), charred: follow(p.charred) } };
   };
   return joinDecor(boingoDecor(part("clown"), moments, now), grexDecor(part("grex"), burnt, since, now));
+}
+
+/**
+ * Jefferson's char marks as they stood after the crowd's last move, before its fire (the state's are after it): a mark the fire
+ * added or added to is one less (gone at none), and a charred piece the fire burnt has its mark back.
+ */
+export function backBeforeFire(b: BossView): BossView {
+  const p = b.powers;
+  const fired = (p?.burnt ?? []).filter((e) => e.turn === b.crowdMoves && (e.charred || (e.piece && (e.hits ?? 0) > 1)));
+  if (!p || !fired.length) return b;
+  const charred = (p.charred ?? []).flatMap((m) => (!fired.some((e) => e.charred && e.square === m.square) ? [m] : m.n > 1 ? [{ ...m, n: m.n - 1 }] : []));
+  for (const e of fired) if (e.piece) charred.push({ square: e.square, piece: e.piece, n: e.hits! - 1 });
+  return { ...b, powers: { ...p, charred } };
 }

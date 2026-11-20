@@ -620,7 +620,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           evaluate={(f) => match.evaluate(f)}
           override={plunge}
         />
-        <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} decor={battleDecor(match.boss)} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined} premove={{ key: seatKey(match, board.id, team ?? sideToMove(fen)), side: team ?? sideToMove(fen), watch: true }}>
+        <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} decor={/* (The marks before the fire, and before the move until it's played; a Last Stand's undone move: as the state has them.) */ battleDecor(match.boss, { reveal: stand ? null : { move: mine.result.playedMove, fenBefore: fen, played } })} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined} premove={{ key: seatKey(match, board.id, team ?? sideToMove(fen)), side: team ?? sideToMove(fen), watch: true }}>
           {match.boss?.powers && <PowerBoard boss={match.boss} orientation={orientation} fen={onBoard.fen} />}
           {!played && (
             <CrowdGhosts

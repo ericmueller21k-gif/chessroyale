@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, bossDef, mulberry32, type BossPowerSettings, type BossState, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
+  GREX,
   ablaze,
   applyMove,
   blizzardNow,
@@ -42,7 +43,9 @@ import {
   recentMoves,
   sanLineToUci,
   triggerUltimate,
+  withPiece,
   withoutPiece,
+  type Battle,
   type EngineLike,
   type Opening,
 } from "../src/index.ts";
@@ -684,6 +687,20 @@ describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov
   it("a mark whose piece is gone goes as the next turn begins", () => {
     const b = battle("grex", KN_FEN, { crowdMoves: 1, powers: { ...initPowers(7, KN_FEN, "w"), charred: [{ square: "f3", piece: "n", n: 1 }, { square: "e4", piece: "b", n: 1 }, { square: "g2", piece: "b", n: 1 }] } });
     expect(prepareTurn(b, KN_FEN).powers!.charred).toEqual([{ square: "f3", piece: "n", n: 1 }]);
+  });
+
+  it("on a floor of several, another boss's power that moves a charred piece outside a move takes its mark at once (followBoard)", () => {
+    const marks = [{ square: "f3", piece: "n", n: 1 }, { square: "g2", piece: "p", n: 1 }];
+    const boss = battle("grex", KN_FEN, { crowdMoves: 1, powers: { ...initPowers(7, KN_FEN, "w"), charred: marks } });
+    // (Say Wrangler drags the knight from f3 to e5: no move, so no tracker follows it.)
+    const moved = withPiece(withoutPiece(KN_FEN, "f3"), "e5", { color: "w", type: "n" });
+    const b = { state: { boss, boards: [0] }, boards: new Map([[0, { fen: moved }]]) } as unknown as Battle;
+    GREX.followBoard!(b);
+    expect(b.state.boss!.powers!.charred).toEqual([{ square: "g2", piece: "p", n: 1 }]);
+    // Nothing moved: the state is left as it was.
+    const still = { state: { boss, boards: [0] }, boards: new Map([[0, { fen: KN_FEN }]]) } as unknown as Battle;
+    GREX.followBoard!(still);
+    expect(still.state.boss).toBe(boss);
   });
 
   it("the test switch (?power=candle) aims the crowd's share at its pieces: charred ones first, then pawns", () => {

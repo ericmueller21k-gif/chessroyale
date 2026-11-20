@@ -1,5 +1,5 @@
 import { BOSS_POWERS } from "@chessroyale/core";
-import { FIRE_BURN_MS } from "@chessroyale/chess";
+import { FIRE_BURN_MS, pieceAt } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { EFFECTS, animLength, cueAt, type EffectName } from "../characters/power-art.ts";
 import { CANDLE_SHOTS, candleMuzzle } from "../characters/grex.ts";
@@ -145,9 +145,11 @@ type Burnt = { square: string; piece?: string; fizzled?: boolean; charred?: stri
 /**
  * The dock's line for what the fire did after the crowd's move (one line on a phone: one or two pieces by name, more by how
  * many): pieces burnt; pieces the Roman candle only charred (Eric, Nov 20: "Charred! One more burns it", when one more does:
- * `toBurn`, candleHitsToBurn); both; or the king fireproof. Null: nothing to say (tiles that just burnt out).
+ * `toBurn`, candleHitsToBurn); both; or a tile that fizzled: under the king (fireproof), or under a piece whose loss would
+ * leave a king in check (`fen`, the board after the fire, tells them apart: the review of Nov 20). Null: nothing to say (tiles
+ * that just burnt out).
  */
-export function fireLine(burnt: readonly Burnt[], toBurn: number = BOSS_POWERS.candleHitsToBurn): string | null {
+export function fireLine(burnt: readonly Burnt[], fen?: string, toBurn: number = BOSS_POWERS.candleHitsToBurn): string | null {
   const names = (kinds: string[]) => (kinds.length > 2 ? `${kinds.length} pieces` : kinds.map((k) => PIECE_WORD[k] ?? "piece").join(" and "));
   const burning = burnt.filter((b) => b.piece).map((b) => b.piece!);
   const chars = burnt.filter((b) => b.charred);
@@ -156,20 +158,27 @@ export function fireLine(burnt: readonly Burnt[], toBurn: number = BOSS_POWERS.c
   if (burning.length && charring.length) return `${cap(names(burning))} burnt, ${charring.length > 1 ? `${charring.length}` : (PIECE_WORD[charring[0]!] ?? "piece")} charred`;
   if (burning.length) return `${cap(names(burning))} burnt!`;
   if (charring.length) return chars.every((b) => (b.hits ?? 1) + 1 >= toBurn) ? `Charred! One more burns ${charring.length > 1 ? "them" : "it"}` : `${cap(names(charring))} charred!`;
-  return burnt.some((b) => b.fizzled) ? "Your king is fireproof." : null;
+  const fizzled = burnt.filter((b) => b.fizzled);
+  if (!fizzled.length) return null;
+  // (No board to look at: the king's line, as before.)
+  const shields = fen ? fizzled.filter((b) => pieceAt(fen, b.square)?.type !== "k") : [];
+  return shields.length < fizzled.length ? "Your king is fireproof." : `Fizzled: ${shields.length > 1 ? "they shield" : "it shields"} a king`;
 }
 
 /**
  * The crowd's pieces the Roman candle's fire has charred (Eric, Nov 20), drawn as part of each piece (a board decor: the
- * `pw-charred` tone, styles.css), so it slides with it; a piece charred by this crowd move's fire, as its tile's flames
- * start to die (FireBurn). While that fire shows (`burnt`, from `since`), a charred piece burning keeps the look until it
- * comes off the board (BURN.goneAt). Undefined: none to draw.
+ * `pw-charred` tone, styles.css), so it slides with it. While this crowd move's fire shows (`burnt`, from `since`), until its
+ * flare (BURN.goneAt): a charred piece burning keeps the look until it comes off the board, and one the fire chars for the first
+ * time doesn't have it yet (it takes it as its tile's flames die: the review of Nov 20 caught it charred under fresh flames).
+ * Undefined: none to draw.
  */
 export function grexDecor(boss: Pick<BossView, "id" | "crowdSide" | "powers"> | null | undefined, burnt: readonly Burnt[] = [], since = 0, now = 0): PieceDecor | undefined {
   const p = boss?.id === "grex" ? boss.powers : null;
   if (!p) return undefined;
-  const marks = (p.charred ?? []).map((m) => `${m.square}${m.piece}`);
-  if (now < since + BURN.goneAt) for (const b of burnt) if (b.piece && (b.hits ?? 0) > 1) marks.push(`${b.square}${b.piece}`);
+  const early = now < since + BURN.goneAt;
+  const fresh = early ? burnt.filter((b) => b.charred && (b.hits ?? 1) <= 1).map((b) => b.square) : [];
+  const marks = (p.charred ?? []).filter((m) => !fresh.includes(m.square)).map((m) => `${m.square}${m.piece}`);
+  if (early) for (const b of burnt) if (b.piece && (b.hits ?? 0) > 1) marks.push(`${b.square}${b.piece}`);
   if (!marks.length) return undefined;
   const side = boss!.crowdSide;
   return {

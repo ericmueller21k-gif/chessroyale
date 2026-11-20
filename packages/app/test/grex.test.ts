@@ -430,10 +430,15 @@ describe("his Roman candle chars a piece first, then burns it (Eric, Nov 20)", (
     expect(fireLine([{ square: "e4", piece: "p", hits: 2 }, char("c3", "n")])).toBe("Pawn burnt, knight charred");
     expect(fireLine([{ square: "e4", piece: "p" }, { square: "d4", piece: "b" }, char("c3", "n"), char("f3", "p")])).toBe("Pawn and bishop burnt, 2 charred");
     expect(fireLine([{ square: "g1", fizzled: true }])).toBe("Your king is fireproof.");
+    // (A tile that fizzled under a piece whose loss would leave a king in check, not the king: the review of Nov 20.)
+    const PIN = "4k3/4r3/8/8/8/8/4N3/4K3 w - - 0 1";
+    expect(fireLine([{ square: "e2", fizzled: true }], PIN)).toBe("Fizzled: it shields a king");
+    expect(fireLine([{ square: "e1", fizzled: true }], PIN)).toBe("Your king is fireproof.");
+    expect(fireLine([{ square: "e1", fizzled: true }, { square: "e2", fizzled: true }], PIN)).toBe("Your king is fireproof.");
     expect(fireLine([{ square: "h3" }])).toBeNull();
     // (Three hits to burn: the first char doesn't say one more burns it yet.)
-    expect(fireLine([char("e4", "p")], 3)).toBe("Pawn charred!");
-    expect(fireLine([char("e4", "p", 2)], 3)).toBe("Charred! One more burns it");
+    expect(fireLine([char("e4", "p")], undefined, 3)).toBe("Pawn charred!");
+    expect(fireLine([char("e4", "p", 2)], undefined, 3)).toBe("Charred! One more burns it");
   });
 
   it("draws the charred look on the crowd's charred pieces (its side and kind on the square), and on a charred piece burning until it comes off", () => {
@@ -450,6 +455,13 @@ describe("his Roman candle chars a piece first, then burns it (Eric, Nov 20)", (
     expect(grexDecor(view([]), burning, 1000, 1000 + BURN.goneAt - 1)!.of("c3", "wn")).toEqual({ cls: "pw-charred", kids: null });
     expect(grexDecor(view([]), burning, 1000, 1000 + BURN.goneAt)).toBeUndefined();
     expect(grexDecor(view([]), [{ square: "c3", piece: "n" }], 1000, 1000)).toBeUndefined();
+    // A piece this fire chars for the first time: plain under the fresh flames, charred from the flare on (the review of Nov 20);
+    // one reached before (three hits to burn) keeps its look throughout.
+    const fresh = [{ square: "e4", charred: "p", hits: 1 }];
+    expect(grexDecor(view([{ square: "e4", piece: "p", n: 1 }]), fresh, 1000, 1000)).toBeUndefined();
+    expect(grexDecor(view([{ square: "e4", piece: "p", n: 1 }]), fresh, 1000, 1000 + BURN.goneAt - 1)).toBeUndefined();
+    expect(grexDecor(view([{ square: "e4", piece: "p", n: 1 }]), fresh, 1000, 1000 + BURN.goneAt)!.of("e4", "wp")).toEqual({ cls: "pw-charred", kids: null });
+    expect(grexDecor(view([{ square: "e4", piece: "p", n: 2 }]), [{ square: "e4", charred: "p", hits: 2 }], 1000, 1000)!.of("e4", "wp")).toEqual({ cls: "pw-charred", kids: null });
   });
 
   it("on every screen, one decor; while your move is scored (already on the board), the marks follow it as the rules will", () => {
@@ -457,10 +469,31 @@ describe("his Roman candle chars a piece first, then burns it (Eric, Nov 20)", (
     const AFTER = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
     const boss = { id: "grex", crowdSide: "w", board: { fen: START }, powers: { charred: [{ square: "e2", piece: "p", n: 1 }] } } as unknown as BossView;
     expect(battleDecor(boss)!.of("e2", "wp")).toEqual({ cls: "pw-charred", kids: null });
-    const pending = battleDecor(boss, [], 0, [], 0, { move: "e2e4", fen: AFTER })!;
+    const pending = battleDecor(boss, { pending: { move: "e2e4", fen: AFTER } })!;
     expect(pending.of("e4", "wp")).toEqual({ cls: "pw-charred", kids: null });
     expect(pending.of("e2", "wp")).toBeNull();
     expect(battleDecor(null)).toBeUndefined();
+  });
+
+  it("the crowd's reveal draws the marks as they were before the fire, and before the move until it's played (the review of Nov 20)", () => {
+    const CHAR = { cls: "pw-charred", kids: null };
+    const START = "rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR w KQkq - 0 1";
+    const at = (charred: object[], burnt: object[]) => ({ id: "grex", crowdSide: "w", crowdMoves: 5, board: { fen: START }, powers: { charred, burnt } }) as unknown as BossView;
+    const reveal = (move: string, played: boolean) => ({ reveal: { move, fenBefore: START, played } });
+    // (a) A pawn the fire chars this turn: plain all through the reveal (its char comes with the boss's screen's flames).
+    const charredNow = at([{ square: "e4", piece: "p", n: 1 }], [{ turn: 5, square: "e4", charred: "p", hits: 1 }]);
+    expect(battleDecor(charredNow, reveal("e2e4", false))).toBeUndefined();
+    expect(battleDecor(charredNow, reveal("e2e4", true))).toBeUndefined();
+    expect(battleDecor(charredNow)!.of("e4", "wp")).toEqual(CHAR);
+    // (b) A charred knight its second hit burns: charred as it stands, and as it lands, not plain.
+    const burnsNow = at([], [{ turn: 5, square: "d5", piece: "n", hits: 2 }]);
+    expect(battleDecor(burnsNow, reveal("c3d5", true))!.of("d5", "wn")).toEqual(CHAR);
+    expect(battleDecor(burnsNow, reveal("c3d5", false))!.of("c3", "wn")).toEqual(CHAR);
+    // (c) A charred knight that moves (no fire): on its square until the move is played, then where it lands.
+    const moved = at([{ square: "d5", piece: "n", n: 1 }], [{ turn: 4, square: "h3", charred: "p", hits: 1 }]);
+    expect(battleDecor(moved, reveal("c3d5", false))!.of("c3", "wn")).toEqual(CHAR);
+    expect(battleDecor(moved, reveal("c3d5", false))!.of("d5", "wn")).toBeNull();
+    expect(battleDecor(moved, reveal("c3d5", true))!.of("d5", "wn")).toEqual(CHAR);
   });
 });
 
