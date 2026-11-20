@@ -35,6 +35,7 @@
 .tw-desk-lives {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   min-height: 20px;
   margin: 2px 0 0;
@@ -73,6 +74,11 @@
 .town-card:has(.tw-desk) {
   width: 272px;
   max-width: min(272px, calc(100vw - 24px));
+}
+/* (Eric, Nov 20: "the whole box itself should be centered": a keeper's panel stands in the middle of the room, ShopRoom.tsx `cardMid`,
+   with no tail; and every label and line in it centered, as the card's title is. docs/decisions/2026-11-20-ui-centered.md.) */
+.town-card.town-mid::after {
+  display: none;
 }
 .tw-desk-ways {
   display: grid;
@@ -114,7 +120,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  text-align: left;
+  text-align: center;
   color: var(--card-gold, #d9bb8c);
 }
 /* (Its rows 3 px apart, the last one with nothing under it: three fit exactly, with no scroll (the delta review of #835, finding 5); its
@@ -124,7 +130,8 @@
   margin: 0;
   padding: 0;
   overflow-y: auto;
-  scrollbar-gutter: stable;
+  /* (Both edges: its words stay in the box's middle on a computer that draws a scrollbar.) */
+  scrollbar-gutter: stable both-edges;
   overscroll-behavior: contain;
   list-style: none;
   border-radius: 8px;
@@ -180,8 +187,14 @@
   opacity: 0.4;
   cursor: default;
 }
+/* (Its one line, "Reading…" or "No open parties right now.", in the middle of the box, not hung at its top: Eric, Nov 20.) */
 .tw-open-none {
-  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 0 8px;
   font-size: 12px;
   opacity: 0.7;
 }
@@ -214,16 +227,17 @@
   padding: 0;
   list-style: none;
 }
+/* (Its dot, name and mark centered in the seat, as the card's other lines: Eric, Nov 20.) */
 .tw-seat {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   min-height: 28px;
   padding: 2px 6px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.08);
   font-size: 12px;
-  text-align: left;
 }
 .tw-seat.free {
   opacity: 0.5;
@@ -243,7 +257,7 @@
   border: 1.5px dashed rgba(255, 255, 255, 0.6);
 }
 .tw-seat-name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -274,7 +288,12 @@
 /* Three lines, always, whatever it says (the plan, a refusal, the solo climb's note), so nothing under it moves: a fixed height, never a
    least one (the delta review of #835, finding 3), and words written to fit it (tower-plan.ts; e2e/tower-party.spec.ts measures the
    longest). */
+/* (Its words in the middle of their three lines, so one or two lines leave no gap under them: Eric, Nov 20; `safe`: words too long for
+   the box would start at its top, so a test's overflow measure still sees them.) */
 .tw-desk .tw-plan {
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
   height: calc(3 * 1.3em);
   margin: 2px 0 0;
   font-size: 12px;

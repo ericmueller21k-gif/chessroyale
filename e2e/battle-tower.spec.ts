@@ -111,6 +111,38 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   // (The climb's lives on the card, Nov 20: both, and the clerk's line.)
   await heartsAre(clerk.locator(".tw-desk-lives .tw-hearts"), 2);
   await expect(clerk).toContainText("Two lives: the third loss ends it.");
+  // (Eric, Nov 20: "the whole box itself should be centered", and every label and line in it: the card in the middle of the room within
+  // 2 px, its labels' text centered, and what each line shows (the lives row's hearts and words, the open parties' one line) in its
+  // middle within 2 px. docs/decisions/2026-11-20-ui-centered.md.)
+  await expect(clerk.locator(".tw-open-none")).not.toHaveText(/Reading/, { timeout: 20_000 });
+  const mid = await page.evaluate(() => {
+    const card = document.querySelector('[role="dialog"][aria-label="Clerk"]') as HTMLElement;
+    const box = (e: Element | Range) => e.getBoundingClientRect();
+    const cx = (r: DOMRect) => r.left + r.width / 2;
+    const cy = (r: DOMRect) => r.top + r.height / 2;
+    const words = (e: Element) => {
+      const r = document.createRange();
+      r.selectNodeContents(e);
+      return box(r);
+    };
+    const room = box(document.querySelector(".town-shop")!);
+    const c = box(card);
+    const lives = card.querySelector(".tw-desk-lives")!;
+    const kids = [...lives.children].map(box);
+    const none = card.querySelector(".tw-open-none")!;
+    return {
+      card: [cx(c) - cx(room), cy(c) - cy(room)],
+      align: [".tw-open-head", "h2", ".tw-plan", ".tw-open-none"].map((s) => [s, getComputedStyle(card.querySelector(s)!).textAlign]),
+      lives: (kids[0]!.left + kids.at(-1)!.right) / 2 - cx(c),
+      none: [cx(words(none)) - cx(box(none)), cy(words(none)) - cy(box(none))],
+      plan: cy(words(card.querySelector(".tw-plan")!)) - cy(box(card.querySelector(".tw-plan")!)),
+    };
+  });
+  for (const d of mid.card) expect(Math.abs(d), "the card in the middle of the room").toBeLessThanOrEqual(2);
+  for (const [s, a] of mid.align) expect(a, s!).toBe("center");
+  expect(Math.abs(mid.lives), "the lives row centered").toBeLessThanOrEqual(2);
+  for (const d of mid.none) expect(Math.abs(d), "the open parties' line in its box's middle").toBeLessThanOrEqual(2);
+  expect(Math.abs(mid.plan), "the plan line's words in its three lines' middle").toBeLessThanOrEqual(2);
   await still(page, "clerk-start");
   await clerk.getByRole("button", { name: "Start", exact: true }).click();
   // Into the elevator, the floor room: floor 1, one boss; the match.
