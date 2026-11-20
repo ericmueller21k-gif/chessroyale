@@ -286,7 +286,9 @@ describe("a floor's result: only for the floor started, once", () => {
       // Floor 4 lost: floor 5 dealt as after a win (the run's deal), one life left, the best still 3.
       const one = await play(outcome);
       const run = (await rows(sql, ann.id))[0]!;
-      expect(one).toMatchObject({ status: 200, body: { outcome, floor: 4, status: "open", lives: 1, lost: [4], run: { floor: 5, lives: 1, lost: [4], beaten: { length: 4 } }, best: 3 } });
+      expect(one).toMatchObject({ status: 200, body: { outcome, floor: 4, status: "open", lives: 1, lost: [4], run: { floor: 5, lives: 1, lost: [4], beaten: { length: 3 } }, best: 3 } });
+      // (The bosses beaten: floors 1 to 3's, never floor 4's.)
+      expect((one.body.run as TowerRunView).beaten).toEqual(runOf({ ...(await rows(sql, ann.id))[0]!, seed: SEED, status: "open" }).floors.slice(0, 3));
       expect(runOf({ ...run, seed: SEED, status: "open" }).floors).toHaveLength(5);
       expect(JSON.parse(run.met)).toMatchObject({ lost: [4], won: 3 });
       expect(await best(sql, ann.id)).toBe(3);

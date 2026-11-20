@@ -1105,7 +1105,7 @@ export function TownScreen({
         {towerAsk && (
           <div class="mm-scrim" onClick={() => setTowerAsk(null)}>
             {towerAsk.kind === "elsewhere" ? (
-              <Confirm heading="Floor under way" note={TOWER_WORDS.elsewhere} go="Leave it" onCancel={() => setTowerAsk(null)} onGo={() => void towerLeave(towerAsk.start, false)} />
+              <Confirm heading="Floor under way" note={TOWER_WORDS.elsewhere(livesOf(towerAsk.start.run.lives))} go="Leave it" onCancel={() => setTowerAsk(null)} onGo={() => void towerLeave(towerAsk.start, false)} />
             ) : towerAsk.kind === "resting" ? (
               <Confirm heading="Bosses resting" note={TOWER_WORDS.resting} go="Leave (free)" onCancel={() => setTowerAsk(null)} onGo={() => void towerLeave(towerAsk.start, true)} />
             ) : (

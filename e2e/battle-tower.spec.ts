@@ -8,8 +8,9 @@ import { test, submitMove, tapInTown, localSql } from "./helpers.ts";
  * match. After the round ends, it's like a victory or defeat screen ... And then it takes you back. And then you stand there and wait in
  * the room. And then the next, you go up whatever the elevator, you go to the next floor and then you continue on."): Chess Town's
  * skyscraper, its clerk (Start), the elevator, the floor room (its number, its bosses walking out), the match (?win=1: Qxf7 mates), the
- * usual result, back in the room with the elevator open, up to floor 2 and its two bosses, a reload mid-floor rejoining, a loss ending
- * the run; a free leave before your 2nd move, and Continue after a reload; no Last Stand on a floor. `STILLS=<dir>` writes the stills.
+ * usual result, back in the room with the elevator open, up to floor 2 and its two bosses, a reload mid-floor rejoining; a loss costing a
+ * life and the climb going on (Nov 20: a heart greyed in the room and the strip), the third loss ending the run with its floors lost listed;
+ * a free leave before your 2nd move, and Continue after a reload; no Last Stand on a floor. `STILLS=<dir>` writes the stills.
  */
 
 const STILLS = process.env.STILLS;
@@ -67,6 +68,25 @@ async function tapRoom(page: Page, kind: "keeper" | "pass", name: string, part?:
   return card;
 }
 
+/** Your 2nd move on the floor, then Resign (a loss as the tower counts it, the confirm saying `note`). */
+async function loseFloor(page: Page, note: string) {
+  for (const n of [1, 2]) {
+    await playAMove(page);
+    await expect.poll(async () => (await phase(page)) === "play" && (await moves(page)) === n, { timeout: 90_000 }).toBe(true);
+  }
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("button", { name: "Resign" }).click();
+  await expect(page.getByRole("alertdialog")).toContainText(note);
+  await page.getByRole("alertdialog").getByRole("button", { name: "Resign" }).click();
+}
+
+/** The run's lives as the floor room's corner and the clerk's card show them (Nov 20): `left` hearts, the rest greyed. */
+async function heartsAre(at: ReturnType<Page["locator"]>, left: number) {
+  await expect(at).toHaveAttribute("data-lives", String(left), { timeout: 20_000 });
+  await expect(at.locator(".tw-heart")).toHaveCount(2);
+  await expect(at.locator(".tw-heart.spent")).toHaveCount(2 - left);
+}
+
 /** The floor room of floor `n`, its bosses out and walking in, then its match. */
 async function floorThenMatch(page: Page, n: number, bosses: number) {
   await expect.poll(async () => (await floorNow(page))?.floor ?? null, { timeout: 30_000 }).toBe(n);
@@ -80,17 +100,21 @@ async function floorThenMatch(page: Page, n: number, bosses: number) {
   await expect(page.locator(".tw-strip").first()).toContainText(`Floor ${n} of 99`);
 }
 
-test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floor 2, a reload rejoins, a loss ends the run", async ({ page }) => {
-  test.setTimeout(6 * 60_000);
+test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floor 2, a reload rejoins; a loss costs a life and the climb goes on, the third ends the run", async ({ page }) => {
+  test.setTimeout(8 * 60_000);
   await intoTower(page, "&win=1");
   // The clerk: Start (no run), "Start over" greyed under it.
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await expect(clerk.getByRole("button", { name: "Start", exact: true })).toBeEnabled({ timeout: 20_000 });
   await expect(clerk.getByRole("button", { name: "Start over" })).toBeDisabled();
+  // (The climb's lives on the card, Nov 20: both, and the clerk's line.)
+  await heartsAre(clerk.locator(".tw-desk-lives .tw-hearts"), 2);
+  await expect(clerk).toContainText("Two lives: the third loss ends it.");
   await still(page, "clerk-start");
   await clerk.getByRole("button", { name: "Start", exact: true }).click();
   // Into the elevator, the floor room: floor 1, one boss; the match.
   await floorThenMatch(page, 1, 1);
+  await heartsAre(page.locator(".tw-strip .tw-hearts").first(), 2);
   await submitMove(page, "h5f7");
   // The usual result screen, the floor and the run in its line; one button back.
   const won = page.locator('[data-tower-result="won"]');
@@ -115,16 +139,46 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await page.reload();
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
   expect(await fen(page)).toBe(before);
-  // A second move: leaving now counts as a loss (the confirm says so), and the run ends.
+  // A second move: leaving now counts as a loss and costs a life (the confirm says so). The floor counts, the climb goes on (Nov 20).
   await playAMove(page);
   await expect.poll(async () => (await phase(page)) === "play" && (await moves(page)) === 2, { timeout: 90_000 }).toBe(true);
   await page.getByRole("button", { name: "Match options" }).click();
   await page.getByRole("button", { name: "Resign" }).click();
-  await expect(page.getByRole("alertdialog")).toContainText("counts as a loss");
+  await expect(page.getByRole("alertdialog")).toContainText("counts as a loss: it costs a life (1 life left after).");
   await page.getByRole("alertdialog").getByRole("button", { name: "Resign" }).click();
+  const lost = page.locator('[data-tower-result="lost"]');
+  await expect(lost).toContainText("You lost floor 2. It still counts: 1 life left.", { timeout: 30_000 });
+  await expect(lost).toContainText("Next: floor 3", { timeout: 20_000 });
+  await expect(lost.getByRole("button", { name: "Back to the tower" })).toBeEnabled({ timeout: 20_000 });
+  await lost.scrollIntoViewIfNeeded();
+  await still(page, "result-lost");
+  await lost.getByRole("button", { name: "Back to the tower" }).click();
+  // Back in the floor room on your mark, a heart greyed, the elevator open: up to floor 3, its strip's heart greyed too.
+  await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
+  await heartsAre(page.locator(".tw-room-lives .tw-hearts"), 1);
+  await page.waitForTimeout(800);
+  await still(page, "room-life-spent");
+  const on = await tapRoom(page, "pass", "Elevator", "top");
+  await on.getByRole("button", { name: "Up to floor 3" }).click();
+  await floorThenMatch(page, 3, 2);
+  await heartsAre(page.locator(".tw-strip .tw-hearts").first(), 1);
+  await still(page, "strip-life-spent");
+  // Floor 3 lost too: no life left, still climbing; floor 4's loss (the third) ends the run, its floors lost listed.
+  await loseFloor(page, "counts as a loss: it costs a life (no lives left after).");
+  await expect(page.locator('[data-tower-result="lost"]')).toContainText("You lost floor 3. It still counts: no lives left.", { timeout: 30_000 });
+  await page.locator('[data-tower-result="lost"]').getByRole("button", { name: "Back to the tower" }).click();
+  await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
+  await heartsAre(page.locator(".tw-room-lives .tw-hearts"), 0);
+  const last = await tapRoom(page, "pass", "Elevator", "top");
+  await last.getByRole("button", { name: "Up to floor 4" }).click();
+  await floorThenMatch(page, 4, 3);
+  await loseFloor(page, "Your run ends here: leaving now counts as a loss.");
   const out = page.locator('[data-tower-result="out"]');
-  await expect(out).toContainText("Your run ended on floor 2.", { timeout: 30_000 });
-  await expect(out).toContainText("Best solo: floor 1", { timeout: 20_000 });
+  await expect(out).toContainText("Your run ended on floor 4.", { timeout: 30_000 });
+  await expect(out).toContainText("Lost floors 2, 3 and 4. Best solo: floor 1", { timeout: 20_000 });
+  await expect(out.getByRole("button", { name: "Back to the tower" })).toBeEnabled({ timeout: 20_000 });
+  await out.scrollIntoViewIfNeeded();
+  await still(page, "result-out-recap");
   await out.getByRole("button", { name: "Back to the tower" }).click();
   // The run's over: the elevator shut (its Up greyed), down to the lobby, where the clerk offers Start again.
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("out");

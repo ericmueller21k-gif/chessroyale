@@ -30,7 +30,7 @@ export interface TowerRun {
   floor: number;
   /** Its bosses in turn order (between floors: as its start would deal them now). */
   bosses: string[];
-  /** The floors climbed so far (won, or lost with a life spent), each one's bosses, floor 1 first. */
+  /** The floors won so far, each one's bosses, floor 1 first (a floor lost with a life spent isn't one: Nov 20). */
   beaten: string[][];
   fight: Fight | null;
   startedAt: number;
@@ -81,7 +81,8 @@ export type Answer<T> = { ok: true; body: T } | { ok: false; status: number; bod
 /** What the screens say when the server can't be reached. */
 export const TOWER_WORDS = {
   offline: "Couldn't reach the tower. Check your connection and try again.",
-  elsewhere: "This floor is under way on another device. Leaving it here counts as a loss and ends your run.",
+  /** (A counted leave: a life spent, or with none left (`lives`, the run's going in) the run's end: Nov 20.) */
+  elsewhere: (lives: number) => `This floor is under way on another device. Leaving it here counts as a loss${lives > 0 ? ": it costs a life." : " and ends your run."}`,
   resting: "This floor's bosses are resting for a bit. Leaving it now is free: the same floor waits for you.",
   broken: "This run can't be played. Start a new one.",
   replace: (floor: number) => `Your run on floor ${floor} ends, and a new one starts on floor 1.`,

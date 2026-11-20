@@ -133,7 +133,7 @@ export interface TowerRunView {
   floor: number;
   /** Its bosses in the order they take turns: the floor under way's, or as its start would deal them now (the kill switches). */
   bosses: string[];
-  /** The floors climbed so far (won, or lost with a life spent: Nov 20), each one's bosses, floor 1 first. */
+  /** The floors won so far, each one's bosses, floor 1 first (a floor lost with a life spent isn't one: Nov 20). */
   beaten: string[][];
   /** The floor under way, or null between floors. */
   fight: Fight | null;
@@ -233,7 +233,7 @@ function viewOf(row: RunRow, pool: readonly string[], names?: ReadonlyMap<string
     kind: row.kind,
     floor,
     bosses: [...(shown.floors[floor - 1] ?? [])],
-    beaten: shown.floors.slice(0, Math.max(0, floor - 1)).map((f) => [...f]),
+    beaten: shown.floors.slice(0, Math.max(0, floor - 1)).flatMap((f, i) => (shown.lost.includes(i + 1) ? [] : [[...f]])),
     fight,
     startedAt: row.started_at,
     lives: livesLeft(shown),

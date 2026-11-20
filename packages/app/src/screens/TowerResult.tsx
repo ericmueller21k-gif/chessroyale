@@ -35,7 +35,8 @@ export function TowerResult({ match, onBack }: { match: GameView; onBack: () => 
   const left = p.kind === "results" && !!p.left;
   const won = !left && p.kind === "results" && !!p.bossResult && floorOutcome(p.bossResult) === "won";
   const floor = play.floor;
-  const outcome = left ? "left" : p.kind === "results" && p.bossResult ? floorOutcome(p.bossResult) : "lost";
+  // (Resigning after your 2nd move is a loss as the tower counts it: "You lost floor 8.")
+  const outcome = p.kind === "results" && p.bossResult && !left ? floorOutcome(p.bossResult) : "lost";
   // (The run after this floor: the server's word once it has taken the result; until then (or if it couldn't be sent), as the lives
   // going in say.)
   const said = end && !end.error ? end : null;
