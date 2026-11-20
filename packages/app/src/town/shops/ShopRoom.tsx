@@ -4409,8 +4409,14 @@ function startRoom(
     shut = `${h.c},${h.r}`;
     setCard(null);
   };
+  /**
+   * No cards now: a challenge (you're here to fight), and Don Dough's from his Challenge on (his beat, the walk-out). Every way a card
+   * opens asks this: the ones that show as you arrive, and a tap on a door's picture (Nov 20: it skipped this, and a tap on the floor
+   * behind the back door mid-beat opened its card and stopped your walk).
+   */
+  const noCards = () => !!ci || !!backScene?.talking();
   const stepCards = () => {
-    if (ci || backScene?.talking()) return; // (A challenge: no cards; you're here to fight. Don Dough's from his Challenge on.)
+    if (noCards()) return;
     const h = you.here();
     const key = `${h.c},${h.r}`;
     if (shut && shut !== key) shut = "";
@@ -4621,10 +4627,11 @@ function startRoom(
   const keyAt = (x: number, y: number): string => (onSlot(x, y) ? "claw-slot" : guardAt(x, y) ? `zebra-${guardAt(x, y)}` : onKid(x, y) ? pressKey(room, true, null) : doorTap(x, y) >= 0 ? `door-pic-${doorTap(x, y)}` : pressKey(room, false, squareAt(x, y)));
   /**
    * The door whose card a tap at (x, y) opens at once (its picture, from anywhere: Nov 20), or -1. Not the Shopkeeper over it, and not the
-   * floor just inside a door: that still walks you there, its card showing as you arrive (as before).
+   * floor just inside a door: that still walks you there, its card showing as you arrive (as before). None while there are no cards
+   * (`noCards`): the tap walks you to the floor under it, as before Nov 20.
    */
   const doorTap = (x: number, y: number): number => {
-    if (onKid(x, y)) return -1;
+    if (noCards() || onKid(x, y)) return -1;
     const i = doorAt(x, y);
     if (i < 0) return -1;
     const sq = squareAt(x, y);
