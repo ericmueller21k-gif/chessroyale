@@ -358,7 +358,10 @@ decay, the last-20 window, the delayed queue's waits, the 8-mark lock, the quick
   searching, the opponent's pawn, name and rank on the right when found, your pawn's element kept and nothing on the
   stage moved, held for `versusMs`, then the board; the stage whole at 320, 360 and 390 px (1280 on a computer) with
   the longest names and ranks, searching with "Few players online" and in the versus moment (held there by the test's
-  own copy of the game's messages), no scroll either way, nothing animating under reduced motion).
+  own copy of the game's messages), no scroll either way, nothing animating under reduced motion). Its `meet()` waits
+  for each page's game to be on the board (the vote on, not over), never for the 2.5 s versus moment. A failure's report
+  keeps each player's `window.duel.snapshot()` and the app's breadcrumbs (`window.__crumbs`, with `?debug`), so a lost
+  move shows which side lost it ([2026-11-20-duel-flake-diagnostics.md](../decisions/2026-11-20-duel-flake-diagnostics.md)).
 - e2e: `e2e/ranked-1v1-browse.spec.ts` (phones and computers: Home from the search, still asking, the bar on home and
   in the shop over nothing, back to the stage with the same wait, Cancel from the bar; found in the shop: the sound and
   the buzz, straight to the stage, the versus moment whole, then the board; 1 v 1's PLAY back to the stage, another
