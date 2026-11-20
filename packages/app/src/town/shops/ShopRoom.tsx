@@ -4770,11 +4770,13 @@ function startRoom(
       const i = doorUps.findIndex((d) => d.to === sq);
       if (i < 0 || !upBox(doorUps[i]!.u, doorBx)) return null;
       const { x0, y0, x1, y1 } = doorBx;
-      for (const fy of [0.35, 0.5, 0.2, 0.65])
-        for (const fx of [0.5, 0.35, 0.65]) {
+      const rc = cv.getBoundingClientRect();
+      // (Not under the chat box, a card or the buttons over the room.)
+      for (const fy of [0.35, 0.5, 0.2, 0.65, 0.8, 0.1])
+        for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) {
           const x = x0 + (x1 - x0) * fx;
           const y = y0 + (y1 - y0) * fy;
-          if (x > 0 && x < W && y > 0 && y < H && doorTap(x, y) === i) return { x, y };
+          if (x > 0 && x < W && y > 0 && y < H && doorTap(x, y) === i && document.elementFromPoint(rc.left + x, rc.top + y) === cv) return { x, y };
         }
       return null;
     }
