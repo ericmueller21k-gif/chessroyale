@@ -115,7 +115,7 @@ import {
   ragePaused,
   strikeRage,
   bossPowers,
-  ablaze,
+  fireBurns,
   bossRules,
   fireShadows,
   fireStage,
@@ -519,10 +519,13 @@ export class MatchRunner {
     return this.asBoss(this.bossIndex("hollow"), () => hollowBattle.darkTries(this.battle));
   }
 
-  /** Boss battle, G-REX's fire: the tiles ablaze this crowd turn (a crowd piece left on one burns after the move). */
+  /**
+   * Boss battle, G-REX's fire: the tiles ablaze this crowd turn where a crowd piece left after the move burns (a piece his
+   * Roman candle only chars isn't counted: fireBurns).
+   */
   fireBurn(): string[] {
-    if (this.several()) return [...new Set(this.sideBosses().flatMap((b) => ablaze(b)))];
-    return this.state.boss ? ablaze(this.state.boss) : [];
+    if (this.several()) return [...new Set(this.sideBosses().flatMap((b) => fireBurns(b)))];
+    return this.state.boss ? fireBurns(this.state.boss) : [];
   }
 
   /** Boss battle: the moves the crowd may play this turn (a power's limits, the Last Stand's barred move); null: any. */

@@ -33,6 +33,9 @@ export function crumb(event: string) {
   if (trail.length > OPS.client.breadcrumbs) trail.shift();
 }
 
+/** The breadcrumbs kept now, oldest first (`?debug` puts this on `window` for the e2e's failure reports). */
+export const breadcrumbs = (): string[] => [...trail];
+
 /** Where the app is now (App calls it after each render); a new screen is a breadcrumb. */
 export function noteWhere(w: Where) {
   if (w.screen !== where.screen) crumb(w.screen);

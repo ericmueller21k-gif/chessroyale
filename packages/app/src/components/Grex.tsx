@@ -1,5 +1,5 @@
 import { BOSS_POWERS } from "@chessroyale/core";
-import { FIRE_BURN_MS } from "@chessroyale/chess";
+import { FIRE_BURN_MS, pieceAt } from "@chessroyale/chess";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { EFFECTS, animLength, cueAt, type EffectName } from "../characters/power-art.ts";
 import { CANDLE_SHOTS, candleMuzzle } from "../characters/grex.ts";
@@ -7,15 +7,17 @@ import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
 import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
-import { Cast, Flight, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { Cast, Flight, PIECE_WORD, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 import { CRITICAL } from "../speech.tsx";
+import type { PieceDecor } from "../board/types.ts";
 
 /**
  * G-REX's fire on screen (the characters' sprites): the tiles in their stages on one canvas, each with a small
  * countdown (the crowd moves left before it burns: 3, 2, 1, and 0 as it burns), the sparkler, the Roman candle and its
  * fireballs (moments), the fireballs' shadows growing on the squares they'll hit (one canvas under the pieces), a piece
- * burning after the crowd's move (FireBurn), and the row of the candle's shots still up in his boss card (CandlePips,
- * the bar's prop slot: candleRow). His rules: packages/chess/src/bosses/grex.ts.
+ * burning after the crowd's move (FireBurn), a piece the candle's fire charred (grexDecor, Eric, Nov 20), and the row of the
+ * candle's shots still up in his boss card (CandlePips, the bar's prop slot: candleRow). His rules:
+ * packages/chess/src/bosses/grex.ts.
  */
 
 /**
@@ -114,10 +116,11 @@ export function shadowItems(boss: Pick<BossView, "powers">, moments: readonly Mo
 
 /**
  * After the crowd's move: a piece left on a tile ablaze burns up (`pieceBurn`, its kind's charred shape, over the
- * tile's burnOut), a tile under the king fizzles out (he's fireproof), and an empty one just burns out. One canvas over
- * the board, for BURN.ms from `since`.
+ * tile's burnOut), a tile under the king fizzles out (he's fireproof), and an empty one just burns out, as does one of the
+ * candle's under a piece it only chars (the piece's charred look comes with its flames: grexDecor). One canvas over the
+ * board, for BURN.ms from `since`.
  */
-export function FireBurn({ burnt, since, now, orientation }: { burnt: readonly { square: string; piece?: string; fizzled?: boolean }[]; since: number; now: number; orientation: "white" | "black" }) {
+export function FireBurn({ burnt, since, now, orientation }: { burnt: readonly Burnt[]; since: number; now: number; orientation: "white" | "black" }) {
   if (!burnt.length || now < since || now >= since + BURN.ms) return null;
   const items: BoardItem[] = burnt.flatMap((b): BoardItem[] =>
     b.fizzled
@@ -128,13 +131,60 @@ export function FireBurn({ burnt, since, now, orientation }: { burnt: readonly {
     <div class="power-board pw-burns" aria-hidden="true">
       <BoardEffects items={items} orientation={orientation} class="pw-fire-board" />
       {burnt.map((b) => (
-        <span key={`burn-${b.square}`} class={`pw-burn${b.fizzled ? " fizzled" : b.piece ? "" : " out"}`} style={onSquare(b.square, orientation)} data-square={b.square}>
+        <span key={`burn-${b.square}`} class={`pw-burn${b.fizzled ? " fizzled" : b.piece ? "" : b.charred ? " charred" : " out"}`} style={onSquare(b.square, orientation)} data-square={b.square}>
           {/* (The countdown reaches 0 as it burns.) */}
           <b class="pw-count">0</b>
         </span>
       ))}
     </div>
   );
+}
+
+type Burnt = { square: string; piece?: string; fizzled?: boolean; charred?: string; hits?: number };
+
+/**
+ * The dock's line for what the fire did after the crowd's move (one line on a phone: one or two pieces by name, more by how
+ * many): pieces burnt; pieces the Roman candle only charred (Eric, Nov 20: "Charred! One more burns it", when one more does:
+ * `toBurn`, candleHitsToBurn); both; or a tile that fizzled: under the king (fireproof), or under a piece whose loss would
+ * leave a king in check (`fen`, the board after the fire, tells them apart: the review of Nov 20). Null: nothing to say (tiles
+ * that just burnt out).
+ */
+export function fireLine(burnt: readonly Burnt[], fen?: string, toBurn: number = BOSS_POWERS.candleHitsToBurn): string | null {
+  const names = (kinds: string[]) => (kinds.length > 2 ? `${kinds.length} pieces` : kinds.map((k) => PIECE_WORD[k] ?? "piece").join(" and "));
+  const burning = burnt.filter((b) => b.piece).map((b) => b.piece!);
+  const chars = burnt.filter((b) => b.charred);
+  const charring = chars.map((b) => b.charred!);
+  const cap = (x: string) => `${x.charAt(0).toUpperCase()}${x.slice(1)}`;
+  if (burning.length && charring.length) return `${cap(names(burning))} burnt, ${charring.length > 1 ? `${charring.length}` : (PIECE_WORD[charring[0]!] ?? "piece")} charred`;
+  if (burning.length) return `${cap(names(burning))} burnt!`;
+  if (charring.length) return chars.every((b) => (b.hits ?? 1) + 1 >= toBurn) ? `Charred! One more burns ${charring.length > 1 ? "them" : "it"}` : `${cap(names(charring))} charred!`;
+  const fizzled = burnt.filter((b) => b.fizzled);
+  if (!fizzled.length) return null;
+  // (No board to look at: the king's line, as before.)
+  const shields = fen ? fizzled.filter((b) => pieceAt(fen, b.square)?.type !== "k") : [];
+  return shields.length < fizzled.length ? "Your king is fireproof." : `Fizzled: ${shields.length > 1 ? "they shield" : "it shields"} a king`;
+}
+
+/**
+ * The crowd's pieces the Roman candle's fire has charred (Eric, Nov 20), drawn as part of each piece (a board decor: the
+ * `pw-charred` tone, styles.css), so it slides with it. While this crowd move's fire shows (`burnt`, from `since`), until its
+ * flare (BURN.goneAt): a charred piece burning keeps the look until it comes off the board, and one the fire chars for the first
+ * time doesn't have it yet (it takes it as its tile's flames die: the review of Nov 20 caught it charred under fresh flames).
+ * Undefined: none to draw.
+ */
+export function grexDecor(boss: Pick<BossView, "id" | "crowdSide" | "powers"> | null | undefined, burnt: readonly Burnt[] = [], since = 0, now = 0): PieceDecor | undefined {
+  const p = boss?.id === "grex" ? boss.powers : null;
+  if (!p) return undefined;
+  const early = now < since + BURN.goneAt;
+  const fresh = early ? burnt.filter((b) => b.charred && (b.hits ?? 1) <= 1).map((b) => b.square) : [];
+  const marks = (p.charred ?? []).filter((m) => !fresh.includes(m.square)).map((m) => `${m.square}${m.piece}`);
+  if (early) for (const b of burnt) if (b.piece && (b.hits ?? 0) > 1) marks.push(`${b.square}${b.piece}`);
+  if (!marks.length) return undefined;
+  const side = boss!.crowdSide;
+  return {
+    key: `char:${marks.join(",")}`,
+    of: (square, code) => (code[0] === side && marks.some((m) => m.slice(0, 2) === square && m[2] === code[1]) ? { cls: "pw-charred", kids: null } : null),
+  };
 }
 
 /**

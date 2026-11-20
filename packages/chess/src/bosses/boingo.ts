@@ -133,6 +133,25 @@ export function followSplats(marks: readonly SplatMark[], move: string, fen: str
   });
 }
 
+/**
+ * The marks as they stood before a move (`fenBefore`: the position before it), from the marks after it (followSplats undone):
+ * the mark on the move's square back on the square it left (a promotion: the pawn again), castling's rook's back on its corner.
+ * For a screen that shows a move about to be played while the state already counts it (the crowd's reveal). A piece the move
+ * took isn't the crowd's (its own move never takes its own), so nothing comes back.
+ */
+export function unfollowSplats<M extends SplatMark>(marks: readonly M[], move: string, fenBefore: string): M[] {
+  const f = from(move);
+  const t = to(move);
+  const pc = pieceAt(fenBefore, f);
+  if (!pc) return [...marks];
+  const castle = pc.type === "k" && f[1] === t[1] && Math.abs(f.charCodeAt(0) - t.charCodeAt(0)) === 2 ? (t[0] === "g" ? [`h${t[1]}`, `f${t[1]}`] : [`a${t[1]}`, `d${t[1]}`]) : null;
+  return marks.map((m) => (m.square === t ? { ...m, square: f, piece: pc.type } : castle && m.square === castle[1] ? { ...m, square: castle[0]! } : m));
+}
+
+/** The marks whose piece still stands on its square (the crowd's, the marked kind): a mark whose piece is gone goes, as a capture's. */
+export const marksStanding = <M extends SplatMark>(marks: readonly M[], fen: string, crowd: Side): M[] =>
+  marks.filter((m) => pieceAt(fen, m.square)?.color === crowd && pieceAt(fen, m.square)?.type === m.piece);
+
 /** The pied squares now (none: an empty list). */
 export const piedSquares = (boss: Pick<BossState, "powers"> | null | undefined): string[] => (boss?.powers?.pies ?? []).map((p) => p.square);
 
@@ -214,7 +233,7 @@ export const BOINGO: BossRules = {
       const piece = pieceAt(t.fen, next.frozen.square);
       if (next.frozen.until < t.turn || piece?.color !== t.crowd || piece.type !== next.frozen.piece) next.frozen = null;
     }
-    if (next.splats?.length) next.splats = next.splats.filter((m) => pieceAt(t.fen, m.square)?.color === t.crowd && pieceAt(t.fen, m.square)?.type === m.piece);
+    if (next.splats?.length) next.splats = marksStanding(next.splats, t.fen, t.crowd);
   },
   ultimate(next, t) {
     const now = warnThenUnleash(next, t);
@@ -270,6 +289,14 @@ export const BOINGO: BossRules = {
   afterBossMove: (b, move) => trackSplats(b, move),
   // (Several bosses: another boss's move, the splats follow it too.)
   followMove: (b, move) => trackSplats(b, move),
+  // (Several bosses: another boss's power moved a piece outside a move: its splat goes with it, as a capture's.)
+  followBoard(b) {
+    const boss = b.state.boss!;
+    const p = boss.powers!;
+    if (!p.splats?.length) return;
+    const splats = marksStanding(p.splats, b.boards.get(b.state.boards[0]!)!.fen, boss.crowdSide);
+    if (splats.length < p.splats.length) b.state = { ...b.state, boss: { ...boss, powers: { ...p, splats } } };
+  },
   view: (p) => ({ splats: (p.splats ?? []).map((m) => ({ ...m })) }),
 };
 
