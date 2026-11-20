@@ -130,8 +130,13 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
     const lives = card.querySelector(".tw-desk-lives")!;
     const kids = [...lives.children].map(box);
     const none = card.querySelector(".tw-open-none")!;
+    // (Where it reaches over the walking keys' column (a phone), in the middle of the room above them (8 px from its top at the least),
+    // the keys staying in view: ShopRoom.tsx `cardFloor`.)
+    const keys = box(document.querySelector(".town-box > .town-controls")!);
+    const floor = keys.left < c.right + 8 ? keys.top - 8 : room.bottom;
     return {
-      card: [cx(c) - cx(room), cy(c) - cy(room)],
+      card: [cx(c) - cx(room), c.top - Math.max(room.top + 8, (room.top + floor - c.height) / 2)],
+      clear: keys.left < c.right ? keys.top - c.bottom : 99,
       align: [".tw-open-head", "h2", ".tw-plan", ".tw-open-none"].map((s) => [s, getComputedStyle(card.querySelector(s)!).textAlign]),
       lives: (kids[0]!.left + kids.at(-1)!.right) / 2 - cx(c),
       none: [cx(words(none)) - cx(box(none)), cy(words(none)) - cy(box(none))],
@@ -139,6 +144,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
     };
   });
   for (const d of mid.card) expect(Math.abs(d), "the card in the middle of the room").toBeLessThanOrEqual(2);
+  expect(mid.clear, "the walking keys clear of the card").toBeGreaterThanOrEqual(0);
   for (const [s, a] of mid.align) expect(a, s!).toBe("center");
   expect(Math.abs(mid.lives), "the lives row centered").toBeLessThanOrEqual(2);
   for (const d of mid.none) expect(Math.abs(d), "the open parties' line in its box's middle").toBeLessThanOrEqual(2);

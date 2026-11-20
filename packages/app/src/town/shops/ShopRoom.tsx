@@ -4382,6 +4382,8 @@ function startRoom(
   let cardA = NaN;
   /** The open card stands in the middle of the room (the crate's, a keeper's panel: `.town-mid`), read as it's measured. */
   let cardMid = false;
+  /** How far down the room a card in the middle may reach (the walking keys' top on a phone; else the room's height). */
+  let cardFloor = 0;
   /**
    * The door whose card is open from a tap on its picture (Nov 20, Eric: "tap on the door, like no matter where you're standing, and then
    * hit go in, and then it would just run you to the door"): its place in `doorUps`, or -1 (a card opened as you arrived, or none).
@@ -4453,11 +4455,19 @@ function startRoom(
       cardW = cardEl.offsetWidth;
       cardH = cardEl.offsetHeight;
       cardMid = card === "crate" || cardEl.classList.contains("town-mid");
+      // (A card in the middle that reaches over the walking keys' column (a phone) stands in the middle of the room above them, so they
+      // stay in view and tappable: read once as it opens.)
+      cardFloor = H;
+      const keys = cardMid ? box.parentElement?.querySelector(":scope > .town-controls")?.getBoundingClientRect() : undefined;
+      if (keys && keys.width) {
+        const at = box.getBoundingClientRect();
+        if (keys.left - at.left < (W + cardW) / 2 + 8) cardFloor = keys.top - at.top - 8;
+      }
     }
     // The crate's card and a keeper's panel (the Battle Tower's clerk: Eric, Nov 20, "the whole box itself should be centered") stand in
     // the middle of the box, with no tail; the others over the Shopkeeper's head or yours, their tails pointing there.
     let ax = W / 2;
-    let ay = H / 2 + cardH / 2 + 14;
+    let ay = cardFloor / 2 + cardH / 2 + 14;
     if (!cardMid) {
       if (card === "talk" && kidBox.on) ((ax = kidBox.hx), (ay = kidBox.hy - 16));
       // (A door's card opened from its picture: over the door, its tail pointing at it.)
