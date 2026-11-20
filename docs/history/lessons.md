@@ -1149,3 +1149,21 @@ card used the small speech-bubble placement made for one-button cards. No rule s
 **The fix:** one rule (the card centered; its titles, labels and short lines centered; true lists may stay left), the clerk's card in
 the middle of the room above a phone's walking keys, its empty line and plan line centered in their boxes; the rule is in
 `.claude/LESSONS.md`, and `e2e/battle-tower.spec.ts` measures the card's place and its lines. docs/decisions/2026-11-20-ui-centered.md.
+
+
+## A mate the test walked into, and a figure measured before it came (Nov 20, 2026)
+
+**What happened:** main's full run on f25c38a went red on two tests that passed only on their retry. `recluse.spec.ts`'s child-form
+test waited 120 s for its move and found the result screen: Defeat, "The Hidden Boss wins", after 5 of your moves, before the test
+ever pressed Win this form. `boss-select.spec.ts`'s new speech-tail test threw `Cannot read properties of null` on its first tap.
+
+**Why:** the Recluse test's move picker pushed the a-pawn (a3, a4, a5, a6…), never defending, against a real engine: the child's
+`…Qxf2#` lines are open by move 4, and a mate ended the match. Each spec had its own picker, and each had missed a case before (a frozen
+piece, Oct 15; no quiet move left, boss-bar, the same day). The tail test measured the stage's boss figure, which comes with the match's
+chunk (lazy-game.ts), loaded as the screen opens: on a busy runner the first tap beat it. The other stage checks already waited for it.
+The new end screen (#855) played no part.
+
+**The fix:** one picker for every spec that just needs a move (`pickMove` in `e2e/helpers.ts`: allowed, quiet, preferred, and never a
+move that lets the other side mate at once), used by recluse, boss-bar and boss-dock; the tail test waits for the figure's paint, as the
+stage's other checks do (reproduced with the chunk delayed 2.5 s: the same TypeError before, a pass after).
+docs/decisions/2026-11-20-flaky-pick-move.md.

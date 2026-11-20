@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS, RECLUSE_ONLINE, RECLUSE_PHASE2 } from "@chessroyale/core";
-import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, pickMove, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
 import { RECLUSE_PALETTE } from "../packages/app/src/characters/recluse.ts";
 import { pacedLine } from "../packages/app/src/paced-line.ts";
@@ -71,12 +71,11 @@ async function play(page: Page, move: string) {
   }
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }
-/** A quiet legal move once it's your move (the battle goes on). */
+/** A quiet legal move once it's your move (the battle goes on: never one that lets him mate at once, pickMove). */
 async function quietMove(page: Page): Promise<string> {
   await yourMove(page);
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
-  const moves = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion);
-  return (moves.find((m) => m.piece === "p" && !"de".includes(m.from[0]!)) ?? moves[0]!).lan;
+  return pickMove(fen, { prefer: (m) => m.piece === "p" && !"de".includes(m.from[0]!) });
 }
 
 /**

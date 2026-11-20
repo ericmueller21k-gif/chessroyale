@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { Chess, type Move } from "chess.js";
 
 /** The local server's state folder (playwright.config.ts: a fresh temp folder each run, unless E2E_KEEP_STATE=1). */
 export const E2E_STATE = resolve(process.env.E2E_STATE_DIR || ".wrangler/state");
@@ -143,6 +144,35 @@ export const BOARD_SEL = {
   fileCoord: ".hb-files .hb-coord",
   rankCoord: ".hb-ranks .hb-coord",
 } as const;
+
+/**
+ * Your move for a test that only needs the game to go on: a legal one the game takes (`allowed`: a boss power's list, as `lan`; null is
+ * every move), quiet when it can be (no capture, no promotion), `prefer`'s first, and never one that lets the other side mate at once
+ * while another move doesn't. Each spec once picked its own, and each missed a case: a frozen piece (Oct 15), no quiet move left (boss-bar,
+ * Nov 20), and a mate: recluse's a3, a4, a5, a6 against the Hidden Boss's child let in Qxf2#, and the match ended before the test's
+ * Win this form (Nov 20). One picker for every spec that just needs a move.
+ */
+export function pickMove(fen: string, { allowed = null, prefer }: { allowed?: readonly string[] | null; prefer?: (m: Move) => boolean } = {}): string {
+  const c = new Chess(fen);
+  const legal = c.moves({ verbose: true }).filter((m) => !allowed || allowed.includes(m.lan));
+  if (!legal.length) throw new Error(`pickMove: no move the game takes in ${fen}`);
+  const quiet = (m: Move) => !m.captured && !m.promotion;
+  const rank = (m: Move) => (quiet(m) ? (prefer?.(m) ? 0 : 1) : 2);
+  // (A stable order: chess.js's own within each rank.)
+  const order = legal.map((m, i) => ({ m, i })).sort((a, b) => rank(a.m) - rank(b.m) || a.i - b.i).map((x) => x.m);
+  const letsMate = (m: Move) => {
+    c.move({ from: m.from, to: m.to, promotion: m.promotion });
+    const mate = c.moves({ verbose: true }).some((r) => {
+      c.move({ from: r.from, to: r.to, promotion: r.promotion });
+      const over = c.isCheckmate();
+      c.undo();
+      return over;
+    });
+    c.undo();
+    return mate;
+  };
+  return (order.find((m) => !letsMate(m)) ?? order[0]!).lan;
+}
 
 /**
  * Plays `move` in the page's match while it's your turn (on `fen`, if given; nothing to play: nothing happens). Work a

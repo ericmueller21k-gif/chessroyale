@@ -354,6 +354,11 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A wait that has another way through (a glide) gives up as soon as it can tell, counted in frames, not after a fixed time.
   - A town load costs 5 to 9 s on software WebGL: a spec opens the town once it needs it, signed in first.
 
+- **A mate the test walked into** (Nov 20, [story](../docs/history/lessons.md#a-mate-the-test-walked-into-and-a-figure-measured-before-it-came-nov-20-2026)):
+  - A spec that just needs a move plays `pickMove` (`e2e/helpers.ts`): a move the game takes, quiet, never one that lets the boss mate at
+    once. Never a picker of its own: blind pawn pushes against a real engine lose by move 5 now and then, and the match ends early.
+  - A check on the boss select's stage figure waits for its paint (`figureDrawn`): it comes with the match's chunk, and a first tap can beat it.
+
 ## Eric's rules hold
 
 - **A boss's sounds are its own** (Nov 18, [story](../docs/history/lessons.md#chandy-played-other-bosses-sounds-nov-18-2026)):
