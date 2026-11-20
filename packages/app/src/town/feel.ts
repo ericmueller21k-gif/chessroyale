@@ -738,6 +738,13 @@ export const SHOP_FEEL = {
    */
   talkRange: 3,
   /**
+   * A door's picture inside a room (the way out, a door to another room, the Battle Tower's elevator) as a finger finds it (Eric, Nov 20:
+   * "you should be able to tap on the door, like no matter where you're standing, and then hit go in"): its box as drawn, grown this many
+   * pixels each way, and to `doorMinPx` across and high at least.
+   */
+  doorPad: 10,
+  doorMinPx: 44,
+  /**
    * An upright piece nearer the camera than this many squares (its depth: the front wall as you stand at the door, a prop
    * between the camera and you) fades out, gone by `nearGone`: up close it would fill the screen. (Close puts you about 3.5 deep.)
    */

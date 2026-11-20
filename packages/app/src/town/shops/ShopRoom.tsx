@@ -47,7 +47,7 @@ import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { STORE_PANELS, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, passAt, type RoomPart, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, opaqueNear, atDoor, doorGoal, doorOf, type DoorTo, onDoorPic, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, passAt, type RoomPart, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, gotLine, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CrateOpening } from "../../screens/Crates.tsx";
 import type { BossCrateDef } from "@chessroyale/core";
@@ -516,6 +516,11 @@ export interface ShopCtl {
   walkTo?: (sq: Sq, off?: { c: number; r: number }, stepMs?: number) => number;
   /** Walks you into talking range of the Shopkeeper, as a tap on it (its card opens as you stop); there already, its card opens again. */
   toKeeper?: () => void;
+  /**
+   * A door card's button (Nov 20): `act` now at the door, or, its card opened from the door's picture across the room, a run to the door
+   * first (the card closes), then `act` there. The Battle Tower's own door buttons (Town.tsx towerPass) go through it too.
+   */
+  go?: (act: () => void) => void;
 }
 
 /**
@@ -564,14 +569,17 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
   const [card, setCard] = useState<ShopCard | null>(null);
+  /** The room the open door card leads to (a door to another room's), or null. */
+  const [passTo, setPassTo] = useState<RoomPart | null>(null);
   const [msg, setMsg] = useState("");
   const eng = useRef<ReturnType<typeof startRoom> | null>(null);
   const cardWas = useRef<ShopCard | null>(null);
   const lockedN = useRef(0);
   const { def } = room;
   useLayoutEffect(() => {
-    const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
+    const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c, to) => {
       setCard(c);
+      setPassTo(to);
       setMsg("");
     }, intro, zzz, arrived, () => onChallenge?.(), onReady, fx, at, atKeeper));
     ctl.current = r;
@@ -620,7 +628,6 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     return () => removeEventListener("keydown", key, true);
   }, [gotOpen, opening]);
   const held = bossHoldings(def.home);
-  const passTo = card === "pass" ? (eng.current?.passTo() ?? null) : null;
   const label = card === "talk" ? (def.name ?? "Shopkeeper") : card === "crate" ? (def.crate ?? undefined) : card === "door" ? "Door" : card === "pass" ? (def.home === "recluse" ? "Stairs" : def.home === "tower" ? (passTo === "top" ? "Elevator" : "Way down") : "Door") : undefined;
   // (Don Dough's card, Nov 11: his Challenge alone. It plays his beat, the walk-out, then the challenge: Eric, "when you hit challenge,
   // it just goes through the talk animation no matter what". The Hidden Boss's on his top floor, Nov 13: the room's own challenge, from
@@ -670,13 +677,13 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
           </>
         )}
         {card === "door" && (
-          <button type="button" class="town-btn primary" onClick={onOut}>
+          <button type="button" class="town-btn primary" onClick={() => (eng.current ? eng.current.go(onOut) : onOut())}>
             Go out
           </button>
         )}
         {card === "pass" &&
           ((passTo && passCard?.(passTo)) ?? (
-            <button type="button" class="town-btn primary" onClick={() => passTo && onPass?.(passTo)}>
+            <button type="button" class="town-btn primary" onClick={() => passTo && eng.current?.go(() => onPass?.(passTo))}>
               {passWord}
             </button>
           ))}
@@ -821,7 +828,7 @@ function startRoom(
   youRider: () => Rider | null,
   youName: () => string,
   onZoom: (out: boolean) => void,
-  onCard: (c: ShopCard | null) => void,
+  onCard: (c: ShopCard | null, to: RoomPart | null) => void,
   challenge: RoomIntro | null = null,
   zzz: () => boolean = () => false,
   arrived: boolean | RoomPart = false,
@@ -1067,16 +1074,20 @@ function startRoom(
   const ups: Up[] = [];
   const flats: ShopPlace[] = [];
   const counter = art.layout.find((p) => p.name === "counter");
+  /** The doors' pictures (Nov 20: a tap on one from anywhere in the room opens its card): each door's upright, and where it leads. */
+  const doorUps: { u: Up; to: DoorTo }[] = [];
   for (const p of art.layout) {
     if (isFloor(p.name)) continue;
     const w = p.w ?? 1;
     const d = p.d ?? 1;
     const ch = art.pieces[p.name]!;
+    const to = doorOf(p);
     if (d > 1 && !art.upright?.includes(p.name)) {
       // The plan lies flat on its w x d squares; the strip above its north row (its plants' tops) stands up there.
       flats.push(p);
       const rise = ch.h - d * SQ;
       if (rise > 0) ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row - d + 0.5, z: p.row - d + 0.5, ox: 0, oy: ch.foot[1] - rise + 1, flip: false, cut: rise });
+      if (rise > 0 && to) doorUps.push({ u: ups[ups.length - 1]!, to });
       continue;
     }
     if (p.name === "crate" && counter) {
@@ -1088,6 +1099,7 @@ function startRoom(
     // (Jefferson's board on its crates stands with its foot `standDy` south of its row's middle, on the marks' line.)
     const dr = p.name === "board-stand" && art.standDy ? art.standDy / SQ : 0;
     ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row + dr, z: p.row + dr, ox: 0, oy: 0, flip: !!p.flip, cut: 0, t0: p.t0 });
+    if (to) doorUps.push({ u: ups[ups.length - 1]!, to });
   }
   ups.sort((a, b) => a.z - b.z);
   ups.forEach((u, i) => (u.i = i));
@@ -2650,6 +2662,57 @@ function startRoom(
     const x = pt.x + (u.ox - (u.flip ? fr.ch.w - 1 - fr.ch.foot[0] : fr.ch.foot[0])) * s;
     const y = pt.y + (u.oy - fr.ch.foot[1]) * s;
     return x > W || x + img.width * s < 0 || y > H ? Infinity : y;
+  };
+  /** An upright piece's box on screen this frame, as drawUp places it, into `out`; false when it isn't drawn (off screen, faded out). */
+  const upBox = (u: Up, out: { x0: number; y0: number; x1: number; y1: number }): boolean => {
+    const y = upTop(u);
+    if (y === Infinity) return false;
+    const fr = frames[u.name]!;
+    const img = fr.frames[0]!;
+    const s = pt.k / SQ;
+    out.x0 = pt.x + (u.ox - (u.flip ? fr.ch.w - 1 - fr.ch.foot[0] : fr.ch.foot[0])) * s;
+    out.x1 = out.x0 + img.width * s;
+    out.y0 = y;
+    out.y1 = y + (u.cut || img.height) * s;
+    return out.y1 > 0;
+  };
+  const doorBx = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  /** Each door picture's pixels (read once, at the first tap that needs them), or null: unreadable (its whole box counts). */
+  const doorPx = new Map<string, Uint8ClampedArray | null>();
+  /**
+   * (x, y) is near a drawn pixel of door `u`'s picture (box `b` as drawn this frame), not on the floor through a gap in its box: within
+   * `SHOP_FEEL.doorPad` of one. A picture smaller than a finger: anywhere in its finger-sized box.
+   */
+  const onDoorPx = (u: Up, b: typeof doorBx, x: number, y: number): boolean => {
+    if (b.x1 - b.x0 < SHOP_FEEL.doorMinPx || b.y1 - b.y0 < SHOP_FEEL.doorMinPx) return true;
+    const img = frames[u.name]!.frames[0]!;
+    let a = doorPx.get(u.name);
+    if (a === undefined) {
+      try {
+        a = img.getContext("2d")?.getImageData(0, 0, img.width, img.height).data ?? null;
+      } catch {
+        a = null;
+      }
+      doorPx.set(u.name, a);
+    }
+    if (!a) return true;
+    const s = (b.x1 - b.x0) / img.width;
+    const px = Math.floor((x - b.x0) / s);
+    return opaqueNear(a, img.width, u.cut || img.height, u.flip ? img.width - 1 - px : px, Math.floor((y - b.y0) / s), Math.max(1, Math.ceil(SHOP_FEEL.doorPad / s)));
+  };
+  /**
+   * The door whose picture (x, y) is on (Nov 20; its box grown to a finger's size: room.ts onDoorPic), the nearest's middle of two, as
+   * drawn this frame: its place in `doorUps`, or -1.
+   */
+  const doorAt = (x: number, y: number): number => {
+    let out = -1;
+    let bd = Infinity;
+    for (let i = 0; i < doorUps.length; i++) {
+      if (!upBox(doorUps[i]!.u, doorBx) || !onDoorPic(doorBx, x, y) || !onDoorPx(doorUps[i]!.u, doorBx, x, y)) continue;
+      const d = Math.hypot(x - (doorBx.x0 + doorBx.x1) / 2, y - (doorBx.y0 + doorBx.y1) / 2);
+      if (d < bd) ((bd = d), (out = i));
+    }
+    return out;
   };
   /**
    * A store's ceiling light panels (room.ts STORE_PANELS), on the backdrop behind the room, cut at the highest top of any upright piece
@@ -4317,11 +4380,33 @@ function startRoom(
   let cardX = NaN;
   let cardY = NaN;
   let cardA = NaN;
-  const setCard = (c: ShopCard | null) => {
-    if (c === card) return;
+  /**
+   * The door whose card is open from a tap on its picture (Nov 20, Eric: "tap on the door, like no matter where you're standing, and then
+   * hit go in, and then it would just run you to the door"): its place in `doorUps`, or -1 (a card opened as you arrived, or none).
+   */
+  let aimI = -1;
+  /** The door the card's button sent you running to, and what it does once you're there (its Go out, Go up, Go in…); null: none. */
+  let going: { to: DoorTo; act: () => void } | null = null;
+  /** The room the open door card leads to (a door to another room's), or null. */
+  let cardTo: RoomPart | null = null;
+  const setCard = (c: ShopCard | null, a = -1) => {
+    const h = you.here();
+    const to = c !== "pass" ? null : a >= 0 ? (doorUps[a]!.to as RoomPart) : (passAt(room, h.c, h.r)?.to ?? null);
+    if (c === card && a === aimI && to === cardTo) return;
     card = c;
+    aimI = a;
+    cardTo = to;
     cardW = cardH = cardX = cardY = cardA = NaN;
-    onCard(c);
+    onCard(c, to);
+  };
+  /** A tap on door `i`'s picture: its card opens at once, wherever you are (a walk under way stops at the end of its step). */
+  const aimDoor = (i: number) => {
+    going = null;
+    if (you.moving()) you.halt();
+    dest.on = false;
+    waitFor = null;
+    shut = "";
+    setCard(doorUps[i]!.to === "out" ? "door" : "pass", i);
   };
   const close = () => {
     if (!card) return;
@@ -4335,8 +4420,18 @@ function startRoom(
     const key = `${h.c},${h.r}`;
     if (shut && shut !== key) shut = "";
     if (you.moving()) {
-      if (card === "talk" || card === "door" || card === "pass") setCard(null);
+      // (A door's card opened from its picture stays while the step you were on ends.)
+      if (aimI < 0 && (card === "talk" || card === "door" || card === "pass")) setCard(null);
       return;
+    }
+    // (Run to a door by its card's button: there, its action; stopped short of it (tapped elsewhere, someone in the way), nothing.)
+    if (going && !waitFor) {
+      const g = going;
+      going = null;
+      if (atDoor(room, h.c, h.r, g.to)) {
+        shut = key;
+        return g.act();
+      }
     }
     if (card || shut === key) return;
     if (onDoor(room, h.c, h.r)) setCard("door");
@@ -4354,6 +4449,8 @@ function startRoom(
     let ax = W / 2;
     let ay = H / 2 + cardH / 2 + 14;
     if (card === "talk" && kidBox.on) ((ax = kidBox.hx), (ay = kidBox.hy - 16));
+    // (A door's card opened from its picture: over the door, its tail pointing at it.)
+    else if (aimI >= 0 && upBox(doorUps[aimI]!.u, doorBx)) ((ax = Math.max(0, Math.min(W, (doorBx.x0 + doorBx.x1) / 2))), (ay = Math.max(0, Math.min(H, doorBx.y0 + 6))));
     else if (card !== "crate" && youHead.on) ((ax = youHead.x), (ay = youHead.y - 16));
     const left = Math.max(8, Math.min(W - cardW - 8, ax - cardW / 2));
     const top = Math.max(8, Math.min(H - cardH - 8, ay - cardH - 14));
@@ -4385,6 +4482,8 @@ function startRoom(
       dest.on = false;
       waitFor = null;
       follow = true;
+      going = null;
+      if (aimI >= 0) close();
       if (you.moving()) you.go([]);
     }
     keys.start();
@@ -4524,7 +4623,18 @@ function startRoom(
     return null;
   };
   /** What a press or its release at (x, y) is on (tap.ts `pressKey`): the same at both walks you, as in the town. */
-  const keyAt = (x: number, y: number): string => (onSlot(x, y) ? "claw-slot" : guardAt(x, y) ? `zebra-${guardAt(x, y)}` : onKid(x, y) ? pressKey(room, true, null) : pressKey(room, false, squareAt(x, y)));
+  const keyAt = (x: number, y: number): string => (onSlot(x, y) ? "claw-slot" : guardAt(x, y) ? `zebra-${guardAt(x, y)}` : onKid(x, y) ? pressKey(room, true, null) : doorTap(x, y) >= 0 ? `door-pic-${doorTap(x, y)}` : pressKey(room, false, squareAt(x, y)));
+  /**
+   * The door whose card a tap at (x, y) opens at once (its picture, from anywhere: Nov 20), or -1. Not the Shopkeeper over it, and not the
+   * floor just inside a door: that still walks you there, its card showing as you arrive (as before).
+   */
+  const doorTap = (x: number, y: number): number => {
+    if (onKid(x, y)) return -1;
+    const i = doorAt(x, y);
+    if (i < 0) return -1;
+    const sq = squareAt(x, y);
+    return sq && (onDoor(room, sq.c, sq.r) || onPass(room, sq.c, sq.r)) ? -1 : i;
+  };
   /** What a tap at (x, y) means: the Shopkeeper (its picture), the way out (its picture), or the square under it. */
   const plan = (x: number, y: number) => {
     const here = you.here();
@@ -4563,7 +4673,12 @@ function startRoom(
     P(camX, camY + 0.5, pq[1]);
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: camX, cy: camY, k: Math.max(8, pq[1]!.y - pq[0]!.y) };
     closing = !!card;
-    if (closing) return press.down(e.clientX, e.clientY, "");
+    // (A card open: a tap closes it; one on a door's picture opens that door's card instead, Nov 20.)
+    if (closing) {
+      const xy = local(e);
+      const di = doorTap(xy.x, xy.y);
+      return press.down(e.clientX, e.clientY, di >= 0 ? `door-pic-${di}` : "");
+    }
     // (What's under the finger now, as you see it: the camera may glide on before the release (it trails your walk), and a release
     // on anything else lets go without walking, as in the town.)
     const xy = local(e);
@@ -4584,12 +4699,16 @@ function startRoom(
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
+    const xy = local(e);
     if (closing) {
-      if (press.up("") !== "drag") close();
+      const di = doorTap(xy.x, xy.y);
+      const r = press.up(di >= 0 ? `door-pic-${di}` : "");
+      if (r === "walk" && di >= 0) aimDoor(di);
+      else if (r !== "drag") close();
       return;
     }
-    const xy = local(e);
     if (press.up(keyAt(xy.x, xy.y)) !== "walk") return;
+    going = null;
     // (Rolling Dough's front room: a tapped guard tells you he's in the back. You stay where you are.)
     const gd = guardAt(xy.x, xy.y);
     if (gd) {
@@ -4600,24 +4719,30 @@ function startRoom(
       openClawMachine();
       return;
     }
+    // (A door's picture, from anywhere in the room: its card at once; its button runs you there. Nov 20.)
+    const di = doorTap(xy.x, xy.y);
+    if (di >= 0) return aimDoor(di);
     const p = plan(xy.x, xy.y);
-    if (!p?.dest) return;
-    // (Round Jefferson's machines where they are now; round Ginger's elves, or wait where you are while they're in the way.)
-    const path = EA ? wayRoundElves(you.here(), p.dest) : findWay(you.here(), p.dest);
+    if (p?.dest) setOff(p.dest);
+  };
+  /** Sets you off to `to`: round Jefferson's machines where they are now; round Ginger's elves, or wait where you are while they're in the way. False: no way. */
+  const setOff = (to: Sq): boolean => {
+    const path = EA ? wayRoundElves(you.here(), to) : findWay(you.here(), to);
     waitFor = null;
     if (!path) {
-      if (!EA || !findPath(room, you.here(), p.dest)) return;
+      if (!EA || !findPath(room, you.here(), to)) return false;
       if (you.moving()) you.halt();
-      waitFor = { c: p.dest.c, r: p.dest.r };
-      Object.assign(dest, { c: p.dest.c, r: p.dest.r, on: true });
+      waitFor = { c: to.c, r: to.r };
+      Object.assign(dest, { c: to.c, r: to.r, on: true });
       shut = "";
       follow = true;
-      return;
+      return true;
     }
     you.go(path);
-    Object.assign(dest, { c: p.dest.c, r: p.dest.r, on: path.length > 0 });
+    Object.assign(dest, { c: to.c, r: to.r, on: path.length > 0 });
     shut = "";
     follow = true;
+    return true;
   };
   const onCancel = () => {
     drag = null;
@@ -4643,8 +4768,23 @@ function startRoom(
   cv.dataset.room = def.home;
   // (Rolling Dough: which of its rooms.)
   if (def.part) cv.dataset.part = def.part;
-  const hookAt = (kind: "keeper" | "door" | "pass" | "square" | "slot" | "guard-a" | "guard-b", sq?: readonly [number, number] | RoomPart) => {
+  const hookAt = (kind: "keeper" | "door" | "pass" | "pic" | "square" | "slot" | "guard-a" | "guard-b", sq?: readonly [number, number] | DoorTo) => {
     if (!testSwitchesAllowed()) return null;
+    // (A door's picture (Nov 20; `sq`: where it leads, "out" the way out): a point on it, high on its picture, that a tap finds, or null.)
+    if (kind === "pic") {
+      const i = doorUps.findIndex((d) => d.to === sq);
+      if (i < 0 || !upBox(doorUps[i]!.u, doorBx)) return null;
+      const { x0, y0, x1, y1 } = doorBx;
+      const rc = cv.getBoundingClientRect();
+      // (Not under the chat box, a card or the buttons over the room.)
+      for (const fy of [0.35, 0.5, 0.2, 0.65, 0.8, 0.1])
+        for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+          const x = x0 + (x1 - x0) * fx;
+          const y = y0 + (y1 - y0) * fy;
+          if (x > 0 && x < W && y > 0 && y < H && doorTap(x, y) === i && document.elementFromPoint(rc.left + x, rc.top + y) === cv) return { x, y };
+        }
+      return null;
+    }
     // (Rolling Dough's front room: the middle of the part of a guard's tap box (`guardAt`, head to feet) that's on screen this frame.
     // On a computer, with the camera at rest on you in the middle of the room, his feet are below the room's bottom edge: his middle was
     // off screen and this said null while a finger could still tap his head and chest; Nov 12.)
@@ -4947,10 +5087,19 @@ function startRoom(
     recenter: () => {
       follow = true;
     },
-    /** The room the door you stand at leads to (its card's), or null: you aren't at one. */
-    passTo: (): RoomPart | null => {
+    /** The room the open door card leads to, or null. */
+    passTo: (): RoomPart | null => cardTo,
+    /**
+     * A door card's button (Go out, Go up, Go in…; Nov 20): at its door already, `act` now; its card opened from the door's picture across
+     * the room, the card closes and you run to the door, then `act`.
+     */
+    go: (act: () => void) => {
       const h = you.here();
-      return passAt(room, h.c, h.r)?.to ?? null;
+      const to = aimI >= 0 ? doorUps[aimI]!.to : null;
+      if (to === null || atDoor(room, h.c, h.r, to)) return act();
+      const d = doorGoal(room, h, to);
+      close();
+      if (d && setOff(d)) going = { to, act };
     },
     /** Closes the card (its OK: the walk-up's flats' doors). */
     close,
@@ -4970,6 +5119,8 @@ function startRoom(
       return { c: pose.x, r: pose.y };
     },
     toKeeper: () => {
+      // (A walk of its own, as a tap: a door card's run under way is called off.)
+      going = null;
       const h = you.here();
       if (!you.moving() && inTalkRange(room, h.c, h.r)) {
         shut = "";
