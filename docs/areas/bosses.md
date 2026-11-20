@@ -218,16 +218,19 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   rating (`childRatingNow`) and strength (`bossEloNow`) to the host and its checker alike; `NetMatch` resets his beats, words, banners
   and its 🏆 as the form goes. Tests: `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, server
   `recluse-online.test.ts` ("his child form online"), `e2e/recluse.spec.ts` ("his child form first"; "his words stand above his head at every age", a computer, with the test switches' `bossFigure(loop)` hook), `e2e/hidden-boss-room.spec.ts`.
-- **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13; his child form too: for Eric's timing test of his music and phase
-  change): a 🏆 after the 🐟 (a computer: in the title line). Pressed, your next move beats his adult form by the end a mate takes
-  (the runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"; his fall, phase change and music follow as for
-  real), or in phase 2 wins every board still on (`phase2WinAll`) and the result plays. Greyed once pressed. Gated by
-  `winFormAllowed` (`boss-brain.ts`). **Online, in his fight from his room** (Nov 13, Eric's test kit): the same 🏆 for an admin in the
-  party (`NetMatch.winForm`, the message `winForm`): the server checks the admin and the battle (`LobbyCore.winFormTrigger`: his room's
-  fight only, `PartyLobby.room`) and the team's next move beats his adult form (the runner's `bossForceWin`, kept in the lobby's record
-  as `winForm`); in the four boards (Nov 13) the team's next move (a person's or a bot's, any board) wins every board still on
-  (`recluse2.winNext`; pressed in his fall or phase change, it waits for the boards); the battle is a test game (no XP). Tests: `engine-move.test.ts`, `chess/test/recluse*.test.ts`,
-  `server/test/hidden-room.test.ts`, `e2e/recluse.spec.ts` ("Win this form"), `e2e/hidden-boss-room.spec.ts`.
+- **Win this match** (admins only, every boss battle since Nov 20, Eric: "end the current match as like a victory, so I can test going up
+  each floor": [2026-11-20-admin-win-match.md](../decisions/2026-11-20-admin-win-match.md)): a 🏆 after the 🐟 and ⚡ (a phone: beside the
+  God King, a party's in the title line; a computer: in the title line), in Boss alone, solo raids, online raids and parties, and Battle
+  Tower floors (solo and party). Pressed, your next move (the team's) beats the boss, or the floor's bosses, by the end a mate takes (the
+  runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"): the result, a tower floor's write and the elevator up
+  follow as for real. Greyed once pressed and when nothing is left to win. Gated by `winFormAllowed` (`boss-brain.ts`); online
+  `NetMatch.winForm`, the message `winForm`, the server checking the admin (`LobbyCore.winFormTrigger`, kept in the lobby's record as
+  `winForm`); online the battle is a test game (no XP), as the ⚡ makes it. **The Hidden Boss keeps "Win this form"** (Nov 13; his child
+  form too: Eric's timing test of his music and phase change): your next move beats his form (his fall, phase change and music follow as
+  for real), or in phase 2 wins every board still on (`phase2WinAll`; online `recluse2.winNext`, pressed in his fall or phase change it
+  waits for the boards) and the result plays. Tests: `engine-move.test.ts`, `chess/test/recluse*.test.ts`,
+  `server/test/hidden-room.test.ts`, `server/test/tower-party.test.ts` ("Win this match"), `e2e/recluse.spec.ts` ("Win this form"),
+  `e2e/hidden-boss-room.spec.ts`, `e2e/battle-tower.spec.ts` ("an admin's 🏆").
 - **The ground rules of every power** (the server decides, the same everywhere):
   - Every power comes from the battle's seed (drawn once, as it starts) and the position, so the server, the solo game
     and every screen work out the same thing (`powerRoll`).

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import { legalMoves } from "@chessroyale/chess";
-import { test, submitMove, tapInTown, localSql } from "./helpers.ts";
+import { test, asAdmin, submitMove, tapInTown, localSql } from "./helpers.ts";
 
 /**
  * The Battle Tower (PR 10's battle; PR 11b's flow, Eric, Nov 19: "you walk into the battle tower, you talk to the clerk, you start a
@@ -136,6 +136,35 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(room(page)).not.toHaveAttribute("data-part", "top", { timeout: 20_000 });
   const again = await tapRoom(page, "keeper", "Clerk");
   await expect(again.getByRole("button", { name: "Start", exact: true })).toBeEnabled({ timeout: 20_000 });
+});
+
+test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, the next move wins floor 1, then up to floor 2", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  await asAdmin(page);
+  await intoTower(page);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: /^(Start|Continue)/ }).first().click();
+  await floorThenMatch(page, 1, 1);
+  const win = page.getByRole("button", { name: "Win this match (testing)" });
+  await expect(win).toBeEnabled();
+  // (Beside the ⚡: a phone's by the God King, a computer's in the title line.)
+  await expect(page.locator(".ult-test")).toBeVisible();
+  // (The still once the God King's opening line has gone: on a phone it stands over the icons for a moment.)
+  if (STILLS) await expect(page.locator(".gk-bubble:visible")).toHaveCount(0, { timeout: 30_000 });
+  await still(page, "win-match");
+  await win.click();
+  await expect(page.getByRole("button", { name: "Your next move wins this match (testing)" })).toBeDisabled();
+  await playAMove(page);
+  const won = page.locator('[data-tower-result="won"]');
+  await expect(won).toContainText("Floor 1 cleared!", { timeout: 120_000 });
+  expect(await moves(page)).toBe(1);
+  await won.getByRole("button", { name: "Back to the tower" }).click();
+  await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
+  const lift = await tapRoom(page, "pass", "Elevator", "top");
+  await lift.getByRole("button", { name: "Up to floor 2" }).click();
+  await floorThenMatch(page, 2, 2);
+  // (A new floor: the 🏆 ready again.)
+  await expect(page.getByRole("button", { name: "Win this match (testing)" })).toBeEnabled();
 });
 
 test("the elevator tapped from across the lobby (Eric, Nov 20): its card at once, where you stand; Go up runs you to it and up", async ({ page }) => {
