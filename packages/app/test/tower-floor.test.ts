@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FLOOR_DOOR, FLOOR_TABLE, FLOOR_YOU, TOWER_FLOOR_FEEL, bossAt, bossMarks, floorTimes, piecesAt, upWords, type BossNow } from "../src/town/shops/tower-floor.ts";
+import { FLOOR_DOOR, FLOOR_IN, FLOOR_TABLE, FLOOR_YOU, MATE_MARKS, TOWER_FLOOR_FEEL, bossAt, bossMarks, floorTimes, mateAt, piecesAt, upWords, type BossNow } from "../src/town/shops/tower-floor.ts";
 import { SHOP_TOWER_FLOOR_LAYOUT, SHOP_TOWER_FLOOR_N, towerFloorPieces } from "../src/town/shops/tower-floor-art.ts";
 import { makeRoom, passArrive, isFloor, walkable, findPath } from "../src/town/shops/room.ts";
 
@@ -60,6 +60,29 @@ describe("the tower's floor room", () => {
     expect([b.c, b.r, b.a, b.walking]).toEqual([bossMarks(3)[0]!.c, bossMarks(3)[0]!.r, 1, false]);
     expect(piecesAt(t.board - 1, t)).toBe(0);
     expect(piecesAt(t.board + TOWER_FLOOR_FEEL.boardMs, t)).toBe(1);
+  });
+
+  it("a party (Nov 20): the others walk in after you, one a step apart, to their marks beside yours, walkable and clear of each other; the board waits for them", () => {
+    const n = 2;
+    const solo = floorTimes(n, 1, false);
+    const t = floorTimes(n, 1, false, TOWER_FLOOR_FEEL, 3);
+    expect(t.mateGo).toHaveLength(3);
+    expect(t.mateGo[0]).toBeGreaterThan(t.youGo);
+    expect(t.mateGo[1]! - t.mateGo[0]!).toBe(TOWER_FLOOR_FEEL.stepMs);
+    expect(t.board).toBeGreaterThanOrEqual(Math.max(...t.mateOn) + TOWER_FLOOR_FEEL.beatMs);
+    expect(t.board).toBeGreaterThanOrEqual(solo.board);
+    const out: BossNow = { c: 0, r: 0, a: 0, walking: false };
+    for (const [i, m] of MATE_MARKS.entries()) {
+      expect(walkable(room, Math.floor(m.c), Math.floor(m.r))).toBe(true);
+      expect(Math.hypot(m.c - FLOOR_YOU.at.c, m.r - FLOOR_YOU.at.r)).toBeGreaterThan(0.9);
+      expect(mateAt(i, t, t.mateGo[i]! - 1, out)).toMatchObject({ c: FLOOR_IN.c, r: FLOOR_IN.r, a: 0 });
+      expect(mateAt(i, t, (t.mateGo[i]! + t.mateOn[i]!) / 2, out).walking).toBe(true);
+      expect(mateAt(i, t, t.mateOn[i]!, out)).toMatchObject({ c: m.c, r: m.r, a: 1, walking: false });
+      // (Back from a match, or reduced motion: on their marks.)
+      expect(mateAt(i, null, 0, out)).toMatchObject({ c: m.c, r: m.r, a: 1 });
+    }
+    // (Solo: none.)
+    expect(solo.mateGo).toEqual([]);
   });
 
   it("with reduced motion, nobody walks: everyone on their marks from the start, the pieces come up, then the match", () => {

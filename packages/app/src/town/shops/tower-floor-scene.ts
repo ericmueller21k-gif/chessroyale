@@ -138,6 +138,8 @@ export function towerFloorFx(s: FloorScript): RoomFx {
     },
   });
   const bosses = [0, 1, 2].map(bossFig);
+  /** Each party member's pawn picture, made the first time it's drawn (nothing made a frame). */
+  const mateImgs: (HTMLCanvasElement | undefined)[] = [];
   /** Party member `i`'s pawn this frame (Nov 20): the plain pawn in their seat's color, walking in after you to their mark. */
   const mateFig = (i: number) => ({
     z: 0,
@@ -146,7 +148,7 @@ export function towerFloorFx(s: FloorScript): RoomFx {
       if (!m) return;
       const b = mateAt(i, s.mode === "fight" ? (s.times ?? null) : null, t(now), now1);
       if (b.a <= 0 || !at(d, b.c, b.r)) return;
-      const img = pawnImage("light", PARTY_COLORS[m.seat] ?? PARTY_COLORS[0]);
+      const img = (mateImgs[i] ??= pawnImage("light", PARTY_COLORS[m.seat] ?? PARTY_COLORS[0]));
       const h = TOWN_FEEL.youSquares * pt.k;
       const hop = b.walking ? Math.abs(Math.sin((now / TOWN_FEEL.youStepMs) * Math.PI)) * 0.06 * pt.k : 0;
       const g = d.g;
