@@ -85,7 +85,13 @@ import {
   type NetBoss,
 } from "@chessroyale/chess";
 import { seatName } from "./text-filter.ts";
-import type { PartyFloorEnd } from "./tower.ts";
+
+/**
+ * A Battle Tower party floor's end for one member's copy, as its match room counted it (server tower.ts partyFloorWrite): the party's
+ * result, or their leave after `moves` of the party's moves. (Here, not in tower.ts: that one's types reach accounts.ts, which the sim's
+ * scripts that read this file don't load.)
+ */
+export type PartyFloorEnd = { uid: string; outcome: "won" | "lost" | "drawn" } | { uid: string; outcome: "left"; moves: number };
 import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeCandidate, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
 
 /**

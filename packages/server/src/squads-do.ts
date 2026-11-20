@@ -722,6 +722,8 @@ export class SquadsParty extends DurableObject<Env> {
       if (reread) await this.towerUpkeep();
     };
     if (!this.env.DB) return fail(TOWER_LINES.noRun);
+    // (Online boss battles resting, a kill switch: no party floor begins; its copies stay as they are.)
+    if (isPaused(this.env, "raid")) return fail(pausedLine("raid"));
     const sql = d1Sql(this.env.DB);
     const uids = [...want.members].sort((a, b) => a.seat - b.seat).flatMap((m) => (m.userId ? [m.userId] : []));
     const read = await (async () => {

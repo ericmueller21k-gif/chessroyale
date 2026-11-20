@@ -1,5 +1,6 @@
 import { BATTLE_TOWER, TOWER_PARTY, finishFloor, floorSettings, leaveFloor, newRun, pausedLine, sideRefusal, startFloor, towerPartySettings, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
+import type { PartyFloorEnd } from "./lobby.ts";
 
 /**
  * The Battle Tower's saving (docs/decisions/2026-11-18-battle-tower-design.md, section 5; docs/areas/battle-tower.md, "Saving"): a
@@ -742,8 +743,8 @@ export async function commitPartyFloor(sql: Sql, prep: PartyFloorPrep, fight: Fi
   return (await sql.first<{ fight: string | null }>("SELECT fight FROM tower_runs WHERE id = ?", first!.id))?.fight === fightText;
 }
 
-/** A party floor's end for one member's copy, as its match room counted it: the party's result, or their leave after `moves` of the party's moves. */
-export type PartyFloorEnd = { uid: string; outcome: FloorOutcome } | { uid: string; outcome: "left"; moves: number };
+/** A party floor's end for one member's copy, as its match room counted it (lobby.ts's type). */
+export type { PartyFloorEnd };
 
 /** A best floor, only ever raised (`floor`: floors won; 99 the top). */
 const bestStmt = (userId: string, kind: TowerKind, floor: number, now: number): Stmt =>

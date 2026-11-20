@@ -1206,7 +1206,8 @@ export class PartyClient {
             this.placedAt = p.at;
             this.onPlaced(p.lobby, p.pass, 0);
           }
-        } else if (msg.party.state === "placed" && p && String(p.at) !== stored(`${partyKey(this.code, this.kind)}.placed`)) {
+        } else if (msg.party.state === "placed" && p && (this.kind !== "tower" || !!p.pass) && String(p.at) !== stored(`${partyKey(this.code, this.kind)}.placed`)) {
+          // (A Battle Tower party's floor begun before you joined: no pass of yours in it, so not yours: you stay in the party.)
           store(`${partyKey(this.code, this.kind)}.placed`, String(p.at));
           this.close();
           this.onPlaced(p.lobby, p.pass, this.me?.seat ?? 0);

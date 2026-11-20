@@ -88,6 +88,8 @@ export async function joinTowerParty(code: string): Promise<boolean> {
   const p: PartyClient = new PartyClient(
     up,
     (lobby, pass, seat) => {
+      // (A floor begun before you were in the party: no pass of yours, not your floor.)
+      if (!pass) return;
       const f = { code: up, lobby, pass, seat };
       // (The party as its START placed it: its others walk in with you, and stand there after (its socket closes until the floor's over).)
       floorMates = matesOf(p);
