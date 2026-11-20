@@ -68,11 +68,11 @@ moves: a smoke run at 3000 won 12 of 12 floors). Each floor now records how it e
 
 **What it says**
 - **The bosses' rating hardly matters down here.** A 1500 climber loses about 1 floor in 4 to bosses at 620 to 780. Almost every
-  lost floor ended in the climber being **mated** (36 of 49); the rest were draws (stalemates, repetitions). It's the powers, plus a
+  lost floor ended in the climber being **mated** (36 of 60); the rest were draws (stalemates, repetitions). It's the powers, plus a
   bot that doesn't know them, that end climbs, not the bosses' chess.
 - **Lives matter more than the curve.** With 2 lives the 1500 climber's runs end on floors 9 to 15; at the first loss they'd have
   ended by about floor 4.
-- **`maia-best` isn't a better player:** without sampling Maia repeats itself and draws (5 repetitions, 2 stalemates in 15 lost
+- **`maia-best` isn't a better player:** without sampling Maia repeats itself and draws (5 repetitions or 50-move draws, 2 stalemates in 15 lost
   floors). Neither bot is a stand-in for a person who learns the powers; Eric's own climbs are the real measure.
 - **Hardest bosses** (floors lost/met, all four tries): Jefferson (grex) 44%, Tiger 38%, the Hollow 33%, Big Boy 32%, Folio 32%.
   **Easiest:** Smudgy 14%, Hopper 20%.
