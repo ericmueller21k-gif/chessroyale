@@ -1,4 +1,5 @@
 # Tower: one "primary" boss for overlapping powers (Nov 20). Opus, xhigh (boss rules), alone. Boss lane + quick review
 **Eric, Nov 20:** "maybe we need a rule where one boss acts as the primary when it comes to certain moves IE hippo and Babur both shouldn't be 'growing' pieces."
+- **Eric's refinement, Nov 20:** "We just wanna make a rule for this specific one, for any move that's an 'add pieces' move, but it's not their ult. Only one is active during the battle tower, so solo battle tower bosses it's fine." So: only the "adds pieces" kind, only non-ultimate powers, only on shared tower floors.
 - On a shared floor, powers of the same kind (e.g. adding pieces to the board: Babur's balloons, Puddles' (the hippo gardener) growing pieces; find the others) are used by one boss only: the floor's primary (the first in its turn order). The others' same-kind power is off for that floor (shown greyed per Eric's nothing-hidden rule). A data table of power kinds in settings.ts; the runner applies it; solo and online agree; the boss kit over pairs/threes stays green.
 - Decision note with the kinds table; Eric's words.
