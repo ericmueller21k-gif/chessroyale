@@ -457,3 +457,43 @@ test("rides for an admin (Oct 31; admins own one of every item): the Ride tab ha
     expect.objectContaining({ ride: "riding-chirp", color: "red", ready: true }),
   );
 });
+
+test.describe("your account not loading (Nov 20)", () => {
+  // (No service worker: page.route sees every request the page makes.)
+  test.use({ serviceWorkers: "block" });
+  test("Profile never sits on \"Loading…\": the server failing, it says so, and Try again loads it; signed out of the site's gate (a 302 to its login), \"Sign in again\" there and in one notice over the app", async ({ page }) => {
+    // The server failing your profile (twice: the load's own second try too).
+    let failing = true;
+    await page.route("**/api/me*", (route) => (failing ? route.fulfill({ status: 503, json: { message: "down" } }) : route.fallback()));
+    await page.goto("/profile");
+    const card = page.locator(".fd-card");
+    await expect(card.getByText("HunChess couldn't load your account just now. Please try again.")).toBeVisible({ timeout: 5_000 });
+    await expect(card.getByText("Loading…")).toHaveCount(0);
+    // (Not the gate: no notice, no "Sign in again".)
+    await expect(page.locator(".site-gate")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Sign in again" })).toHaveCount(0);
+    failing = false;
+    await card.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible({ timeout: 10_000 });
+
+    // Signed out of the site's gate: every /api/* request answered with a redirect to its login, on another origin.
+    await page.unroute("**/api/me*");
+    await page.route("**/api/**", (route) =>
+      route.fulfill({ status: 302, headers: { location: "https://hunchess-test.cloudflareaccess.com/cdn-cgi/access/login/hunchess.com" } }),
+    );
+    await page.reload();
+    await expect(card.getByText("You've been signed out of the site, so your account, friends and chat can't load.")).toBeVisible({ timeout: 5_000 });
+    await expect(card.getByText("Loading…")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Sign in again" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Try again" })).toBeVisible();
+    // The same, once, over the whole app (it stays on any screen): its own "Sign in again".
+    const notice = page.locator(".site-gate");
+    await expect(notice).toHaveCount(1);
+    await expect(notice.getByRole("button", { name: "Sign in again" })).toBeVisible();
+    // "Sign in again" loads the page again from the network (where the gate shows its login).
+    const reloaded = page.waitForEvent("load");
+    await notice.getByRole("button", { name: "Sign in again" }).click();
+    await reloaded;
+    await expect(notice).toHaveCount(1, { timeout: 5_000 });
+  });
+});

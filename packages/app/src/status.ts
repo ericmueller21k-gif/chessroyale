@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { bossesOff, type Pausable } from "@chessroyale/core";
+import { gateAnswered, noteSiteReached, noteSiteSignedOut } from "./site-gate.ts";
 
 /**
  * The kill switches that are off and the maintenance banner (GET /api/status: kill-switches.ts on the server; the parts
@@ -22,7 +23,10 @@ export const pausedBosses = () => bossesOff(state.paused);
 
 export async function refreshStatus(): Promise<void> {
   try {
-    const res = await fetch("/api/status", { credentials: "same-origin" });
+    // (Asked every minute: also how an open page learns it was signed out of the site's gate, site-gate.ts, and that it's back in.)
+    const res = await fetch("/api/status", { credentials: "same-origin", redirect: "manual" });
+    if (gateAnswered(res)) return noteSiteSignedOut();
+    noteSiteReached();
     if (!res.ok) return;
     const body = (await res.json()) as Partial<ServerStatus>;
     const next = { paused: Array.isArray(body.paused) ? body.paused.filter((p) => typeof p === "string") : [], banner: typeof body.banner === "string" && body.banner ? body.banner : null };

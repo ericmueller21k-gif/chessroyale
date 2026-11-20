@@ -10,7 +10,8 @@ import { QuickChatPicks } from "../components/ChatPicks.tsx";
 import { FriendsBadge } from "../components/Friends.tsx";
 import { Recent, Wearing } from "../components/ProfileParts.tsx";
 import { friendsBadge, useFriends } from "../friends.ts";
-import { account, fetchProfile, onAccountChange, tooYoung, updateProfile, youngGuest, type PublicProfile } from "../account.ts";
+import { account, failureOf, fetchProfile, onAccountChange, tooYoung, updateProfile, youngGuest, type AccountFailure, type PublicProfile } from "../account.ts";
+import { AccountTrouble } from "../components/AccountTrouble.tsx";
 import { openProfile, type ProfileTarget } from "../profile-nav.ts";
 import { nth } from "../public-profile.ts";
 import { PublicProfileScreen } from "./PublicProfile.tsx";
@@ -290,12 +291,14 @@ function OwnProfileScreen({
 }) {
   const [, rerender] = useState(0);
   useEffect(() => onAccountChange(() => rerender((n) => n + 1)), []);
-  const { config, profile: me } = account();
+  const { config, profile: me, failed } = account();
   const own = !!target.you || (!!me && target.uid === me.user.id);
   const friends = useFriends();
   const uid = own ? me?.user.id : target.uid;
   const [p, setP] = useState<PublicProfile | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // (Why your profile's page didn't load, with Try again: `tries` asks again.)
+  const [error, setError] = useState<AccountFailure | null>(null);
+  const [tries, setTries] = useState(0);
   // (Home's icon opens your own profile's Edit sheet on the icon picker.)
   const [sheet, setSheet] = useState<null | "edit">(() => (own && target.section === "icon" ? "edit" : null));
   // Your own reloads when your account changes (a new name, something new to wear).
@@ -306,11 +309,11 @@ function OwnProfileScreen({
     setError(null);
     fetchProfile(uid)
       .then((x) => live && setP(x))
-      .catch((e: Error) => live && setError(e.message));
+      .catch((e: unknown) => live && setError(failureOf(e)));
     return () => {
       live = false;
     };
-  }, [uid, version]);
+  }, [uid, version, tries]);
 
   const head = (
     <header class="fd-page-head">
@@ -353,6 +356,10 @@ function OwnProfileScreen({
   }
 
   if (!p) {
+    // Your account didn't load (Nov 20: "Loading…" for good): why, with Try again; or your profile's page didn't. A server with no
+    // accounts at all (local dev) says so.
+    const trouble = own && !me ? failed : error;
+    const noAccounts = own && !me && !failed && config && !config.accounts;
     return (
       <div class="fd-page fd-profile">
         {head}
@@ -360,7 +367,21 @@ function OwnProfileScreen({
         <div class="fd-card">
           <DressedPawn size="profile" shadow ride look={own ? me?.locker?.look : undefined} own={own} />
           <div class="fd-card-name">{own ? (me?.user.name ?? target.name) : target.name}</div>
-          <p class="fd-sub">{error ?? "Loading…"}</p>
+          {trouble ? (
+            <AccountTrouble
+              failed={trouble}
+              onRetry={
+                own && !me
+                  ? undefined
+                  : async () => {
+                      setError(null);
+                      setTries((n) => n + 1);
+                    }
+              }
+            />
+          ) : (
+            <p class="fd-sub">{noAccounts ? "Profiles aren't available here." : "Loading…"}</p>
+          )}
         </div>
       </div>
     );
