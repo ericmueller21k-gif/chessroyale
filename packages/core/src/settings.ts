@@ -4412,9 +4412,9 @@ export const END_SCREEN = {
    * then a chord (C6 E6 G6 C7) at `chordAtMs`. One sound for the end screen's level-up, auto chess's and a finished quest.
    * `gain` trims the whole sound (the run and chord keep their balance) so its peak, the chord's four notes struck together, stays
    * under half a move's, as every synthesized sound's does, and its loudness under the chime's it replaced (measured Nov 20: at
-   * 1 the peak was 0.62, a move's 0.57; at 0.42 about 0.26, the reveal's three dings 0.29). Louder or softer: this one number.
+   * 1 the peak was 0.62, a move's 0.57; at 0.4 about 0.25, the reveal's three dings 0.29). Louder or softer: this one number.
    */
-  levelUp: { run: [783.99, 1046.5, 1318.51, 1567.98], stepMs: 60, runLevel: 0.8, chord: [1046.5, 1318.51, 1567.98, 2093], chordAtMs: 300, chordLevel: 0.75, gain: 0.42 },
+  levelUp: { run: [783.99, 1046.5, 1318.51, 1567.98], stepMs: 60, runLevel: 0.8, chord: [1046.5, 1318.51, 1567.98, 2093], chordAtMs: 300, chordLevel: 0.75, gain: 0.4 },
   /** The end of the fill: one soft pan note (G6), quieter than the level-up (was a bright two-note bell: "goofy"). */
   ding: { hz: 1567.98, level: 0.35 },
   /** Each moved quest's slide, and the gap before the next. */
