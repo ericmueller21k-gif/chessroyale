@@ -49,3 +49,30 @@ boss (lost/met): Tiger 8/18, Big Boy 6/14, Jefferson (grex) 8/20, Hollow 8/23, F
   60-move cap as a loss. That's Eric's call (the one-loss rule is his). The sim can test any of these in one run.
 - **Caveat:** the climber doesn't know the powers. A player who answers Tiger's hoops, Folio's creases or Jefferson's slams will
   do better. One playtest climb by Eric would show how far apart the bot and a person are.
+
+## Nov 20: Eric's gentler climb (curve A) and a steeper one (B), with 2 lives
+
+Eric: "wouldn't these 700-800 ELO bots just be making terrible mistakes?" and "go up like 20 points for the first 5 levels, and then
+go up like 30 points, and then like maybe 40 points ... around the 30 mark ... keep it clamped in like the 15 to 1700 range".
+Curve A (now the settings: +20 to floor 5, +30 to 10, +40 to 30, +4 to 50; a lone boss +100) and B (+25, +35, +45, then +10 to 30,
++4 after), 5 runs each to floor 40, with Eric's 2 lives (a lost floor still climbs; out at the third). New climber options:
+`CLIMBER=maia` (sampled, as before), `maia-best` (Maia's likeliest move, no sampling), `stockfish` (full strength among the allowed
+moves: a smoke run at 3000 won 12 of 12 floors). Each floor now records how it ended.
+
+| Climber | Floors won: median (min to max) | Fell on (the third loss) | Won 1 / 2 / 3 bosses |
+| --- | --- | --- | --- |
+| maia 1000, curve A | 4 (2 to 6) | 5 to 9 | 4/11, 12/17, 4/7 |
+| maia 1500, curve A | 8 (6 to 12) | 9 to 15 | 15/17, 19/29, 9/12 |
+| maia 1500, curve B | 8 (3 to 16) | 6 to 19 | 12/17, 25/32, 10/13 |
+| maia-best 1500, curve A | 4 (3 to 10) | 6 to 13 | 6/12, 17/21, 3/8 |
+
+**What it says**
+- **The bosses' rating hardly matters down here.** A 1500 climber loses about 1 floor in 4 to bosses at 620 to 780. Almost every
+  lost floor ended in the climber being **mated** (36 of 49); the rest were draws (stalemates, repetitions). It's the powers, plus a
+  bot that doesn't know them, that end climbs, not the bosses' chess.
+- **Lives matter more than the curve.** With 2 lives the 1500 climber's runs end on floors 9 to 15; at the first loss they'd have
+  ended by about floor 4.
+- **`maia-best` isn't a better player:** without sampling Maia repeats itself and draws (5 repetitions, 2 stalemates in 15 lost
+  floors). Neither bot is a stand-in for a person who learns the powers; Eric's own climbs are the real measure.
+- **Hardest bosses** (floors lost/met, all four tries): Jefferson (grex) 44%, Tiger 38%, the Hollow 33%, Big Boy 32%, Folio 32%.
+  **Easiest:** Smudgy 14%, Hopper 20%.
