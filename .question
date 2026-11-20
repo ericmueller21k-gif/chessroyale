@@ -1,0 +1,64 @@
+# moo.spec.ts:453 [phone] flake (main 72291bb): cause not found
+
+Short version: this wasn't a slow start or a slow heading. The phone page **stopped answering for 3.7 minutes** right after the tap on
+home's Boss Battle card, on the test's third page load in the same tab. Nothing #847 or #848 changed runs on that path, and I couldn't
+reproduce it in 18 local runs of the spec, 15 of them inside CI-like shard runs. I made no fix: any change I could make now would hide
+the flake, not fix it. The director decides the next step (options at the end).
+
+## What the CI record shows (shard 8's e2e-report, the failed try's steps)
+
+- The test's time ran out (240 s, `Test timeout of 240000ms exceeded`). The heading check is just the step that was running when it did.
+- Sizes 320 and 360 passed normally (about 9 s each: goto, Boss Battle, START, battle, checks).
+- At 390 (the third `page.goto` in the same page): the goto took 0.1 s and the tap on the Boss Battle card 0.2 s. Then
+  `expect(heading "Boss Battle").toBeVisible()`, a **5 s** expect, ran for **226.7 s**, from 15:08:32.68 until the test timed out at
+  15:12:14.33. Its call log stops at "waiting for getByRole(...)", so it never found the heading or reported anything back.
+- Why a 5 s expect can run for minutes: in Playwright 1.56, `Frame.expect` makes its first ("one-shot") check with `noAbort`
+  (`node_modules/playwright-core/lib/server/frames.js`, `_expectInternal(..., true)`), so nothing cuts it off at its timeout. It can only
+  hang like that if the page's main thread, or its script context, never answers. So the page itself was stuck (a renderer hang), not
+  slow.
+- Closing the context afterwards took 5.0 s, and the failed try saved **no trace** (its attachments are empty), which also fits a stuck
+  page. The trace in the artifact is the retry's, which passed in 29.9 s.
+- The other worker (desktop boss-side) passed test after test at its usual pace through those minutes, and the local server logged no
+  errors then. So the machine and the server were fine: only that one phone page (or its browser) was stuck.
+
+## What it isn't
+
+- **Not a slower start.** Builds before and after (1d0c789 vs 72291bb): the entry chunk is 1,351.93 kB vs 1,351.92 kB, the other
+  entry chunks are the same, and `index.html` is the same 8.94 kB with the same preloads (three fonts, nothing else).
+  `moo-field-layers.png` (27.3 kB) is its own asset, loaded by URL from `MooCinematic.tsx`, a module in the match's code. It's
+  decoded only by `prewarmCinematic()`, which `prewarmMoo()` calls when his battle starts. Nothing on the home or Boss Battle path
+  touches it. game-screens shrank 4.4 kB.
+- **Not on the path that hung.** The tap opens `BossSelect` plus `prewarmBoss` (`BossStage.tsx`: sprite slices of 4 ms each) and
+  `warmSounds`. Neither #847 (Boingo) nor #848 (MooCinematic, moo-horizon, settings, CSS) changed any of it.
+- **Not back/forward cache.** A probe spec (since deleted) showed `pagehide persisted=false` on every goto, and the JS heap stays
+  under about 65 MB across 5 loads with battles.
+- **Nothing in the app that blocks on purpose:** no synchronous XHR, `Atomics.wait` or `importScripts` in `packages/app/src`, and no
+  reload on `controllerchange`. Tapping the card changes app state only; there's no navigation.
+
+## Repeat counts (local, this container, 4 CPUs)
+
+- `moo.spec.ts:453 --project phone --repeat-each 10 --workers 2` (full Chromium 1243): 10/10 passed, 28 to 35 s each.
+- Shard-like runs, `moo.spec.ts` + `boss-side.spec.ts`, both projects, 2 workers, `--retries 0`:
+  - `--repeat-each 2` (Chromium 1243): 114/114 passed.
+  - `--repeat-each 3` (headless shell 1243, like CI's): 171/171 passed.
+- That's 15 runs of the phone test in total (plus 5 on desktop), each run after the same Moo tests on the same worker as in CI.
+- CI runs headless shell **1194** (Playwright 1.56.1's own browser). This container only has 1243, and I was told not to install
+  browsers, so I couldn't run CI's exact browser.
+
+## Also on main today, a different flake
+
+The run before (5225eef, #847's merge) was red too: `[phone] hopper.spec.ts:236`, a 60 s poll for "results" that saw "play" (shard
+12), passing on its retry. That's a different test and a different failure, not this one.
+
+## Options for the director
+
+1. **Watch for it again (my pick).** Treat it as a one-off renderer hang in CI's Chromium. Re-run main once; if `moo.spec:453` (or any
+   test) shows the same pattern (a short expect running for minutes, no trace), open a dedicated investigation then. The missing
+   trace is the real gap: a stuck page can't save one.
+2. If it comes back: in `e2e/helpers.ts`, record a CDP-level snapshot (`Runtime.evaluate` with a short timeout, the browser's process
+   list) when a step overruns. That's a diagnostic, not a fix, so it needs the director's (and maybe Eric's) OK under the "fix the
+   cause, not add a checker" rule.
+3. Not recommended without a cause: giving each size in the test its own fresh page instead of three `page.goto`s in one tab. It
+   might dodge the hang, but it would hide it rather than fix it.
+
+Nothing pushed but this file. Branch `claude/fix-moo-flake` = origin/main + this note.
