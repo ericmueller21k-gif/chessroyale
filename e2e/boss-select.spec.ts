@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { adminFirstBosses, playableBosses } from "@chessroyale/core";
 import { asAdmin, named, openBossRaid, openSoloBoss, test } from "./helpers.ts";
+import { SAY_AT, SAY_AT_DEFAULT } from "../packages/app/src/characters/boss-select.ts";
 
 /**
  * The Boss raid screen as an old-school character select (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md):
@@ -865,5 +866,31 @@ test("Chandy stands as tall as the others on the stage, sized by his body, not h
     // (His body is about 0.9 of the others', his slung rifle's tip at the stage's room: before, about 0.7 with the rifle, his body 0.63.)
     expect(chandy, `${w}: Chandy's painted height (rifle and all) against Sawyer's`).toBeGreaterThanOrEqual(sawyer * 0.95);
     expect(await sideways(page), `${w}: no sideways scroll`).toBe(0);
+  }
+});
+
+// The speech tail points at the picked boss's mouth (Eric, Nov 20: "pointing at the head or near the mouth"): its tip's x within 24 px of
+// the mouth's x (SAY_AT, as a fraction of the boss's art box), on a computer and a phone alike. The bubble stays put; only its tail moves.
+test("the speech tail points at the picked boss's mouth: its tip within 24 px of the mouth, for Ginger and Hollow (Eric, Nov 20)", async ({ page }) => {
+  await named(page, "Selector");
+  await page.goto("/?mode=raid");
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
+  for (const [name, id] of [["Ginger", "gingerbread"], ["Hollow", "hollow"]] as const) {
+    await tile(page, name).click();
+    await expect(page.locator(".bs-name")).toHaveText(name);
+    await expect(bubble(page)).toBeVisible();
+    const at = SAY_AT[id] ?? SAY_AT_DEFAULT;
+    const { tipX, mouthX } = await page.evaluate(
+      ({ x }) => {
+        const sprite = document.querySelector(".bs-spot:not(.bs-mine) .bs-sprite")!.getBoundingClientRect();
+        const bub = document.querySelector(".bs-say .bs-bubble") as HTMLElement;
+        const b = bub.getBoundingClientRect();
+        // (The tail is the bubble's ::after, 12 px square with its borders: its middle sits 7.5 px in from its `right`.)
+        const right = parseFloat(getComputedStyle(bub, "::after").right);
+        return { tipX: b.right - right - 7.5, mouthX: sprite.left + x * sprite.width };
+      },
+      { x: at.x },
+    );
+    expect(Math.abs(tipX - mouthX)).toBeLessThanOrEqual(24);
   }
 });

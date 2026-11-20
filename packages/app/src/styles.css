@@ -11273,8 +11273,15 @@ button.fd-logo {
 .bs-say .bs-bubble {
   bottom: calc(16px + var(--bs-rise));
   left: auto;
-  right: 0;
+  /* (--say-nudge: a narrow bubble moves left only as far as its tail needs to reach the mouth; BossSelect sets it.) */
+  right: var(--say-nudge, 0px);
   max-width: min(100%, 260px);
+}
+/* Its tail (Eric, Nov 20: "that little pointy part... pointing at the head or near the mouth"): BossSelect's placeSayTail sets where along
+   the bottom edge it sits (--say-tail, from the right edge; clamped inside the corners by the script) and how far it leans (--say-tilt). */
+.bs-say .bs-bubble::after {
+  right: calc(var(--say-tail, 26px) - 7px);
+  transform: rotate(calc(45deg + var(--say-tilt, 0deg)));
 }
 .bs-vs {
   align-self: start;
