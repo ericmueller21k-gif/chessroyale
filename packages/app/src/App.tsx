@@ -1886,7 +1886,7 @@ export function App() {
       if (!match && crowdParty?.memberId && !crowdParty.done && crowdParty.party?.state !== "queueing") return { kind: "crowdparty", code: crowdParty.code };
       // (A Battle Tower party, from its clerk's Invite friends: Nov 20.)
       const tp = towerParty();
-      if (!match && tp?.memberId) return { kind: "tower", code: tp.code };
+      if (!match && tp) return { kind: "tower", code: tp.code };
       return party ? { kind: "squads", code: party.code } : null;
     },
     canCreate: () => !match && !squads,

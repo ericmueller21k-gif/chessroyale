@@ -5,7 +5,7 @@ import { Confirm } from "../components/MatchMenu.tsx";
 import { InviteSheet } from "../components/Friends.tsx";
 import { PARTY_COLORS } from "../board/logic.ts";
 import { TOWER_WORDS, loadKept, settle, towerApi, type RunKind, type TowerState } from "../tower.ts";
-import { leaveTowerParty, makeTowerParty, onTowerParty, planWords, towerParty } from "../tower-party.ts";
+import { leaveTowerParty, makeTowerParty, onTowerParty, openTowerParty, planWords, towerParty } from "../tower-party.ts";
 import { chatTestRoom } from "./chat-net.ts";
 import "../tower.css";
 
@@ -71,7 +71,7 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
     if (await party()) setInviting(true);
   };
   const open = async () => {
-    if (await party()) towerParty()?.open(chatTestRoom() ?? undefined);
+    if (await party()) openTowerParty(chatTestRoom() ?? undefined);
   };
   const run = st?.runs.solo ?? null;
   const copy = st?.runs.party ?? null;

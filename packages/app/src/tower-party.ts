@@ -24,7 +24,24 @@ let floorHandler: ((f: PartyFloor) => void) | null = null;
 /** A floor placed before anything was listening (the town still loading): handed over once something is. */
 let floorWaiting: PartyFloor | null = null;
 
-const emit = () => listeners.forEach((l) => l());
+/** An Open party asked for before the party's welcome came (its room; null: the town's own): sent once it's in. */
+let openWanted: string | null | undefined;
+const emit = () => {
+  const p = towerParty();
+  if (openWanted !== undefined && p?.memberId && p.party) {
+    p.open(openWanted ?? undefined);
+    openWanted = undefined;
+  }
+  listeners.forEach((l) => l());
+};
+
+/** The leader's Open party (its line in the town's chat `room`), sent as soon as this device is in the party. */
+export function openTowerParty(room?: string) {
+  const p = towerParty();
+  if (!p) return;
+  if (p.memberId && p.party) p.open(room);
+  else openWanted = room ?? null;
+}
 
 /** The party this page is in now (null: none, or it's closed). */
 export function towerParty(): PartyClient | null {
@@ -52,6 +69,7 @@ export function onPartyFloor(fn: (f: PartyFloor) => void): () => void {
 
 function use(p: PartyClient | null) {
   unsub?.();
+  openWanted = undefined;
   if (client && client !== p && !client.done) client.close();
   client = p;
   unsub = p ? p.subscribe(emit) : null;

@@ -284,8 +284,8 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
         return;
       }
       if (!e.isPrimary || !seeable()) return;
-      // The typing line, the "↓ new" marker and a line's menu are their own: a press there isn't the box's.
-      if (target.closest(".tc-form, .tc-new, .tc-menu")) return;
+      // The typing line, the "↓ new" marker, a line's menu and a party line's Join are their own: a press there isn't the box's.
+      if (target.closest(".tc-form, .tc-new, .tc-menu, .tc-join")) return;
       log.poke(); // (reading: the wait before the fade starts over)
       // (A mouse's up may come off the box: it's captured. A finger is captured by its own touch, and the browser's scroll of the stream isn't touched.)
       if (e.pointerType === "mouse") el.setPointerCapture?.(e.pointerId);

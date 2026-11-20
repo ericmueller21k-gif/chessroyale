@@ -331,7 +331,7 @@ export class ChatLog {
       name,
       text,
       kind,
-      ...(who ? { uid: who.uid, n: who.n, ...(who.color !== undefined ? { color: who.color } : {}) } : {}),
+      ...(who ? { uid: who.uid, n: who.n, ...(who.color !== undefined ? { color: who.color } : {}), ...(who.party ? { party: who.party } : {}) } : {}),
       ...(l.mine ? { private: true as const } : {}),
     });
     // At most `keepLines`: the oldest go first.
