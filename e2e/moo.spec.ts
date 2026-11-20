@@ -100,13 +100,8 @@ async function record(page: Page) {
           if (!m) return null;
           const z = (e: HTMLElement) => Number(getComputedStyle(e).zIndex);
           const url = (e: HTMLElement | null) => e?.style.backgroundImage.match(/url\("?([^")]+)/)?.[1] ?? "";
-          // (A picture the page already holds is complete at once.)
-          const arrived = (u: string) => {
-            if (!u) return false;
-            const im = new Image();
-            im.src = u;
-            return im.complete && im.naturalWidth > 0;
-          };
+          // (Its fetch done: the page's resource timing, kept whole by `keepTimings`.)
+          const arrived = (u: string) => !!u && performance.getEntriesByName(new URL(u, location.href).href).some((e) => (e as PerformanceResourceTiming).responseEnd > 0);
           return {
             top: m.getBoundingClientRect().top,
             frontOver: !!f && f.parentElement === m.parentElement && z(f) > z(m) && Number(f.style.opacity) >= Number(m.style.opacity),
@@ -160,6 +155,8 @@ type Rec = {
   say: string | null;
   moon: string | null;
 };
+/** Every resource's timing kept (the browser keeps 250 by default): the recorder asks whether a picture's fetch is done. */
+const keepTimings = (page: Page) => page.addInitScript(() => performance.setResourceTimingBufferSize(100_000));
 const recorded = (page: Page) => page.evaluate(() => (window as any).__rec as Rec[]);
 
 test("Moo & Moon: a moonbeam falls on one of your pieces and burns a crescent into its square; it can't move for your turn, then it's free", { tag: "@phone-only" }, async ({ page }) => {
@@ -277,6 +274,7 @@ test("Moo & Moon: the Full Moon warns, its cinematic plays (the field, the close
   test.setTimeout(300_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  await keepTimings(page);
   await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=moo&power=fullmoon");
   await bossAloneFromHome(page);
   await yourMove(page);
@@ -396,6 +394,7 @@ test("Moo & Moon's Full Moon on a cold load: the moon never shows before the lan
     await held;
     await route.continue();
   });
+  await keepTimings(page);
   await page.goto("/?debug&nolanding&clock=60&laststand=0&boss=moo&power=fullmoon");
   await bossAloneFromHome(page);
   await record(page);
