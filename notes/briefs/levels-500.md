@@ -1,0 +1,7 @@
+# Levels: 500 XP a level, rewards every other level (Nov 20). Opus, xhigh (wallets/rewards), alone. FULL lane (money/wallets): full-e2e label + independent review + delta re-review
+**Eric, Nov 20** (on the end-screen mockup: a +150 game only moved the 1,000 XP bar 15%): "Maybe smaller levels and adjust the prizes less? Like double the levels needed? What do you think". Director's call (told Eric): double the levels, same rewards per XP.
+- `XP.perLevel` 1000 -> 500. A typical game (+150) moves the bar 30%.
+- Level rewards (crate + key) every **2nd** level instead of every level: new setting e.g. `XP.levelRewardEvery: 2` used by core `levelReward(level)` (0 crates/keys on the others). Boss crate pick: every 20th level (`bossCrateEvery` 10 -> 20), so the boss picks per XP stay the same.
+- Ledger safety: the op key is `level:<level>:<account>`. Renumbering makes existing accounts' level jump (2,700 XP: level 3 -> 6) and pays the newly "reached" levels at their next counted game (capped by XP.levelsPerGame). Pre-launch (Eric and testers only): acceptable, but decide and document whether to skip paying levels at or below each account's old-numbered paid level (e.g. a one-off mapping) — prefer the simplest correct option; never double-pay.
+- Everywhere the numbers show: FAQ (levels, level-up rewards), Crates tab, home ring, profile, XpResult, quests text. Level-up moment still on every level; the reward toast only on reward levels.
+- Tests: core xp tests, server rewards tests (`packages/server/test/*reward*`), the XP e2e. Decision note with Eric's words.
