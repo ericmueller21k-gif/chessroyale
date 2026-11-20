@@ -796,8 +796,17 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   `night` (white words on a dark tint), Puddles' light greenhouse `day` (dark words on a light tint), whatever the time outside.
 - **The way out**: standing on one of the two squares just inside the door, a card says **"Go out"**. The door is behind you as you look
   north: walk back toward it, or drag the view back to it and tap it.
+- **A door tapped from anywhere (Nov 20, Eric: "tap on the door, like no matter where you're standing, and then hit go in, and then it
+  would just run you to the door").** In every room a tap on a door's picture (the way out, any door to another room: the tower's elevator
+  and way down, Rolling Dough's back door, the walk-up's stairs) opens its card at once, over the door (`aimDoor`; a walk under way stops at
+  the end of its step); its button runs you to the nearest square just inside it (`ShopCtl.go`, room.ts `doorGoal`), then does its action
+  (Town.tsx's tower buttons through `atDoor`). The picture counts where it's drawn plus `SHOP_FEEL.doorPad` (10 px; a picture under
+  `doorMinPx`, 44, its whole finger-sized box: `onDoorPic`, `opaqueNear`), never the Shopkeeper over it or the floor just inside a door (that
+  still walks you there, the card showing as you arrive). A tap elsewhere or an arrow key on the way cancels the run. Tests:
+  `packages/app/test/room-door-tap.test.ts`; `e2e/battle-tower.spec.ts`, "the elevator tapped from across the lobby".
+  [2026-11-20-room-doors.md](../decisions/2026-11-20-room-doors.md).
 - **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
-  `__shopAt("keeper" | "door" | "square", [c, r])`, `__shopCam()`, `__shopBench(n)`, `__shopRide()` (your ride inside).
+  `__shopAt("keeper" | "door" | "square", [c, r])` (and `"pic"` with where a door leads, `"out"` the way out: a point on its picture), `__shopCam()`, `__shopBench(n)`, `__shopRide()` (your ride inside).
 
 ## The Walk-up, the Hidden Boss's building (Nov 13)
 
@@ -892,7 +901,7 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 ## The Battle Tower (Nov 19; everyone's town)
 
 - **Front** (`houses/tower.ts`, 144 x 592): Colosseum Row 45-48, its sign "BATTLE TOWER"; nobody out front (`hasFigure`); box: slate glass sides, no roof. Card: Go in.
-- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls and your best on the "BEST FLOORS" board, `RoomFx.signBody`): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"), his card `town/TowerDesk.tsx` (ShopRoom `talkCard`); the elevator, a door up (`top`).
+- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls and your best on the "BEST FLOORS" board, `RoomFx.signBody`): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"), his card `town/TowerDesk.tsx` (ShopRoom `talkCard`); the elevator, a door up (`top`); its picture tapped from anywhere opens its card, Go up runs you to it ("A door tapped from anywhere", above).
 - **Floor room** (PR 11b: `shops/tower-floor-art.ts`, `tower-floor.ts` the flow, `tower-floor-scene.ts`; `loadTowerFloor(n)`): N on its walls; its walk-in held (`RoomFx.hold`, `ShopCtl.walkTo`), the elevator open (`RoomFx.swap`); back from a match on your mark (ShopRoom `at`); the way down to the lobby. battle-tower.md.
 - e2e `town-street.spec.ts` ("the Battle Tower"), `battle-tower.spec.ts`. [2026-11-19-tower-building.md](../decisions/2026-11-19-tower-building.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md)
 

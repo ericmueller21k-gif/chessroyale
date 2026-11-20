@@ -413,3 +413,35 @@ export function tapTarget(room: Room, from: Sq, c: number, r: number): RoomTap {
   if (walkable(room, c, r)) return { kind: "square", dest: { c, r } };
   return { kind: "square", dest: best(room, from, (x, y) => Math.max(Math.abs(x - c), Math.abs(y - r))) };
 }
+
+/**
+ * A room's door as its card names it (Nov 20): the way out ("out"), or a door to another of the home's rooms (the room it leads to:
+ * Rolling Dough's back door, the walk-up's stairs, the Battle Tower's elevator and way down).
+ */
+export type DoorTo = "out" | RoomPart;
+/** The door a piece of the room's layout is, or null: not a door. */
+export const doorOf = (p: ShopPlace): DoorTo | null => (isFloor(p.name) ? null : p.exit ? "out" : (p.door ?? null));
+/** (c, r) is a square just inside that door, where its card shows as you arrive and where its Go does its action. */
+export const atDoor = (room: Room, c: number, r: number, to: DoorTo): boolean => (to === "out" ? onDoor(room, c, r) : room.passes.some((p) => p.to === to && has(p.inside, c, r)));
+/** Where a door's Go runs you from `from`: the square just inside it you reach soonest (where you stand, if you're there); null: no way. */
+export const doorGoal = (room: Room, from: Sq, to: DoorTo): Sq | null => best(room, from, (c, r) => (atDoor(room, c, r, to) ? 0 : null));
+/**
+ * A finger at (x, y) is on a door's picture whose box on screen is `b` (Eric, Nov 20: a tap on the door from anywhere in the room opens its
+ * card): the box grown `pad` pixels each way, and to `min` across and high at least (centered on it).
+ */
+export function onDoorPic(b: { x0: number; y0: number; x1: number; y1: number }, x: number, y: number, pad: number = SHOP_FEEL.doorPad, min: number = SHOP_FEEL.doorMinPx): boolean {
+  const cx = (b.x0 + b.x1) / 2;
+  const cy = (b.y0 + b.y1) / 2;
+  const hw = Math.max((b.x1 - b.x0) / 2 + pad, min / 2);
+  const hh = Math.max((b.y1 - b.y0) / 2 + pad, min / 2);
+  return Math.abs(x - cx) <= hw && Math.abs(y - cy) <= hh;
+}
+/**
+ * A drawn pixel of a picture within `r` of its pixel (ix, iy) (`a`: its RGBA, `w` wide, its top `h` rows drawn): what you see there is the
+ * door, not the floor through a gap in its picture's box (Nov 20).
+ */
+export function opaqueNear(a: Uint8ClampedArray, w: number, h: number, ix: number, iy: number, r: number): boolean {
+  for (let y = Math.max(0, iy - r); y <= Math.min(h - 1, iy + r); y++)
+    for (let x = Math.max(0, ix - r); x <= Math.min(w - 1, ix + r); x++) if (a[(y * w + x) * 4 + 3]! > 0) return true;
+  return false;
+}
