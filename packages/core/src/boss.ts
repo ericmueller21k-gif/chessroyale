@@ -1586,6 +1586,8 @@ export interface FireTile {
 /**
  * After a crowd move: a piece the fire destroyed (`piece` its kind), a tile that fizzled under the king, a piece the Roman
  * candle's fire charred and left standing (`charred` its kind: Eric, Nov 20), or a tile that just burnt out (none of them).
+ * `hits`: a piece the candle's fire charred or burnt, the times it has reached it, this one included (missing for the
+ * sparkler's).
  */
 export interface BurnEvent {
   turn: number;
@@ -1593,6 +1595,7 @@ export interface BurnEvent {
   piece?: string;
   fizzled?: boolean;
   charred?: string;
+  hits?: number;
 }
 
 /**

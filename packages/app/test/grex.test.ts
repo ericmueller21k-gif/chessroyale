@@ -6,6 +6,7 @@ import { pickLine, type Beat } from "../src/characters/boss-beats.ts";
 import { CRACKLE_EVERY, GREX_SOUNDS, WHISTLES, WHISTLE_SPREAD, grexSound, whistlePick } from "../src/characters/grex-sounds.ts";
 import { CANDLE_LEN, CANDLE_SHOTS, CANDLE_SWEEP, candleMuzzle } from "../src/characters/grex.ts";
 import { CANDLE, candleShotTimes, fireCountdown, shadowItems, type Moment } from "../src/components/BossPowers.tsx";
+import { BURN, fireLine, grexDecor } from "../src/components/Grex.tsx";
 import type { BossView } from "../src/game.ts";
 import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { EFFECTS, POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
@@ -416,5 +417,37 @@ describe("Jefferson laughs it off (Oct 11): his pieces don't burn", () => {
     for (let pick = 0; pick < 12; pick++) expect(fireproofLine(pick)).toBe(FIREPROOF_LINES[pick % FIREPROOF_LINES.length]);
     // It's the moment's line, said into his voice like any moment's.
     expect(powerLine(grex, { kind: "fireproof", key: "grex:fireproof:9", pick: 6 })).toBe(fireproofLine(6));
+  });
+});
+
+describe("his Roman candle chars a piece first, then burns it (Eric, Nov 20)", () => {
+  it("the dock's line: charred and one more burns it (them, for several); burnt; both; the king fireproof", () => {
+    const char = (square: string, charred: string, hits = 1) => ({ square, charred, hits });
+    expect(fireLine([char("e4", "p")])).toBe("Charred! One more burns it");
+    expect(fireLine([char("e4", "p"), char("c3", "n")])).toBe("Charred! One more burns them");
+    expect(fireLine([{ square: "e4", piece: "p", hits: 2 }])).toBe("Pawn burnt!");
+    expect(fireLine([{ square: "e4", piece: "p", hits: 2 }, char("c3", "n")])).toBe("Pawn burnt, knight charred");
+    expect(fireLine([{ square: "e4", piece: "p" }, { square: "d4", piece: "b" }, char("c3", "n"), char("f3", "p")])).toBe("Pawn and bishop burnt, 2 charred");
+    expect(fireLine([{ square: "g1", fizzled: true }])).toBe("Your king is fireproof.");
+    expect(fireLine([{ square: "h3" }])).toBeNull();
+    // (Three hits to burn: the first char doesn't say one more burns it yet.)
+    expect(fireLine([char("e4", "p")], 3)).toBe("Pawn charred!");
+    expect(fireLine([char("e4", "p", 2)], 3)).toBe("Charred! One more burns it");
+  });
+
+  it("draws the charred look on the crowd's charred pieces (its side and kind on the square), and on a charred piece burning until it comes off", () => {
+    const view = (charred: { square: string; piece: string; n: number }[]) => ({ id: "grex", crowdSide: "w", powers: { charred } }) as unknown as BossView;
+    const d = grexDecor(view([{ square: "e4", piece: "p", n: 1 }]))!;
+    expect(d.of("e4", "wp")).toEqual({ cls: "pw-charred", kids: null });
+    expect(d.of("e4", "bp")).toBeNull();
+    expect(d.of("e4", "wn")).toBeNull();
+    expect(d.of("d4", "wp")).toBeNull();
+    expect(grexDecor(view([]))).toBeUndefined();
+    expect(grexDecor({ ...view([{ square: "e4", piece: "p", n: 1 }]), id: "clown" } as BossView)).toBeUndefined();
+    // Its second hit: the mark's gone from the view; the piece keeps the look until it comes off the board, not a sparkler's.
+    const burning = [{ square: "c3", piece: "n", hits: 2 }];
+    expect(grexDecor(view([]), burning, 1000, 1000 + BURN.goneAt - 1)!.of("c3", "wn")).toEqual({ cls: "pw-charred", kids: null });
+    expect(grexDecor(view([]), burning, 1000, 1000 + BURN.goneAt)).toBeUndefined();
+    expect(grexDecor(view([]), [{ square: "c3", piece: "n" }], 1000, 1000)).toBeUndefined();
   });
 });

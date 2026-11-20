@@ -261,8 +261,13 @@ export function fireAfterMove(
   const result = burnOutcome(fen, due.map((t) => t.square).filter((sq) => !chars.includes(sq)), boss.crowdSide);
   const fire = p.fire.filter((t) => !due.includes(t));
   // (A tile with nothing of the crowd's on it just burns out; one the candle chars a piece on burns out under it.)
+  const hits = (sq: string) => (marks.find((m) => m.square === sq)?.n ?? 0) + 1;
   const burnt: BurnEvent[] = due
-    .map((t) => (chars.includes(t.square) ? { turn, square: t.square, charred: pieceAt(fen, t.square)!.type } : { turn, square: t.square, ...result.burnt.find((b) => b.square === t.square) }))
+    .map((t): BurnEvent => {
+      if (chars.includes(t.square)) return { turn, square: t.square, charred: pieceAt(fen, t.square)!.type, hits: hits(t.square) };
+      const b = result.burnt.find((x) => x.square === t.square);
+      return { turn, square: t.square, ...b, ...(t.candle && b?.piece ? { hits: hits(t.square) } : {}) };
+    })
     .sort((a, b) => (a.square < b.square ? -1 : 1));
   const emptied = result.burnt.filter((b) => b.piece).map((b) => b.square);
   // The marks: one more on each piece charred, none on a piece burnt.

@@ -15484,6 +15484,12 @@ img.qicon {
   background: #fdeedb;
   box-shadow: inset 0 -1px 0 #dfbb9c;
 }
+/* Jefferson's charred piece (Nov 20; Eric: "it just becomes charred, and then if it does it twice, then it disintegrates"): his
+   Roman candle's fire reached it once. A tone on the piece itself (a board decor, so it slides with it): toned down to soot,
+   and an ember glow round its edge, so a dark piece shows it too. */
+.hb piece.pw-charred {
+  filter: sepia(0.75) brightness(0.55) contrast(1.15) drop-shadow(0 0 1.5px rgba(255, 96, 16, 0.95));
+}
 
 /* The blizzard's sweep covers the whole board (clipped to it). */
 .pw-clip {

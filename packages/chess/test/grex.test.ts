@@ -564,7 +564,7 @@ describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov
     const first = fireAfterMove(onFire(), AFTER, "h2h3");
     expect(first.emptied).toEqual([]);
     expect(first.fen).toBe(AFTER);
-    expect(first.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", charred: "n" }]);
+    expect(first.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", charred: "n", hits: 1 }]);
     expect(first.boss.powers!.charred).toEqual([{ square: "f3", piece: "n", n: 1 }]);
     // (The tile burns out under it, as an empty one does.)
     expect(first.boss.powers!.fire).toEqual([]);
@@ -572,7 +572,7 @@ describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov
     const second = fireAfterMove(onFire({ charred: first.boss.powers!.charred }), AFTER, "h2h3");
     expect(second.emptied).toEqual(["f3"]);
     expect(pieceAt(second.fen, "f3")).toBeNull();
-    expect(second.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", piece: "n" }]);
+    expect(second.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", piece: "n", hits: 2 }]);
     expect(second.boss.powers!.charred).toEqual([]);
     // Other marks stay as they were.
     const both = fireAfterMove(onFire({ charred: [{ square: "f3", piece: "n", n: 1 }, { square: "g2", piece: "p", n: 1 }] }), AFTER, "h2h3");
@@ -585,7 +585,9 @@ describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov
     expect(spark.boss.powers!.charred).toBeUndefined();
     const once = fireAfterMove(onFire(), AFTER, "h2h3", { ...BOSS_POWERS, candleHitsToBurn: 1 });
     expect(once.emptied).toEqual(["f3"]);
-    expect(once.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", piece: "n" }]);
+    expect(once.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", piece: "n", hits: 1 }]);
+    // (The sparkler's: no count.)
+    expect(spark.boss.powers!.burnt).toEqual([{ turn: 4, square: "f3", piece: "n" }]);
     // Three: charred twice, then it burns.
     const three = { ...BOSS_POWERS, candleHitsToBurn: 3 };
     const twice = fireAfterMove(onFire({ charred: [{ square: "f3", piece: "n", n: 1 }] }), AFTER, "h2h3", three);
@@ -645,7 +647,7 @@ describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov
     let board = runner.boards.get(0)!;
     expect(pieceAt(board.fen, "f3")).toEqual({ color: "w", type: "n" });
     expect(board.bases ?? []).toEqual([]);
-    expect(runner.bossView()!.powers!.burnt).toEqual([{ turn: 1, square: "f3", charred: "n" }]);
+    expect(runner.bossView()!.powers!.burnt).toEqual([{ turn: 1, square: "f3", charred: "n", hits: 1 }]);
     expect(runner.bossView()!.powers!.charred).toEqual([{ square: "f3", piece: "n", n: 1 }]);
     // His move (this seed's doesn't touch the knight): the mark stays on it.
     await runner.playBoss();
@@ -675,7 +677,7 @@ describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov
     const board = runner.boards.get(0)!;
     expect(pieceAt(board.fen, "f3")).toBeNull();
     expect(board.bases).toEqual([{ ply: board.history.length, fen: board.fen }]);
-    expect(runner.bossView()!.powers!.burnt).toEqual([{ turn: 1, square: "f3", piece: "n" }]);
+    expect(runner.bossView()!.powers!.burnt).toEqual([{ turn: 1, square: "f3", piece: "n", hits: 2 }]);
     expect(runner.bossView()!.powers!.charred).toEqual([]);
   });
 
