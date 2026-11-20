@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_DIFFICULTY, hiddenBosses, menuBosses, type BossDef, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
 import { isAdmin } from "../boss-brain.ts";
 import { DressedPawn } from "./FrontDoor.tsx";
-import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, STAGE_RISE, TILE_GAP, TILE_RATIO, TILES_PER_ROW } from "../characters/boss-select.ts";
+import { rowSizes, SAY_AT, SAY_AT_DEFAULT, SELECT_SOUND, SELECT_TINT, selectLine, STAGE_RISE, TILE_GAP, TILE_RATIO, TILES_PER_ROW } from "../characters/boss-select.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { playOnTap, warmSounds } from "../sound.ts";
 import { NORMAL, Voice, VoiceBubble } from "../speech.tsx";
@@ -193,6 +193,43 @@ export function BossSelect({
     if (next) onDifficulty(next.id);
   };
   const rise = roomy && (twoRows || rowSizes(bosses.length + hidden.length + 1, TILES_PER_ROW).length <= 3);
+  // The bubble's tail: moved along its bottom edge to the picked boss's mouth (SAY_AT), angled when the mouth is past its edge.
+  // Only its custom properties change, so nothing moves; re-measured when the boss drops in, the line changes or the stage resizes.
+  const sayStage = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const stage = sayStage.current;
+    if (!stage) return;
+    const place = () => {
+      const say = stage.querySelector<HTMLElement>(".bs-say");
+      const bub = stage.querySelector<HTMLElement>(".bs-say .bs-bubble");
+      const spr = stage.querySelector<HTMLElement>(".bs-spot:not(.bs-mine) .bs-sprite");
+      if (!say || !bub || !spr || !spr.getClientRects().length) return;
+      const at = SAY_AT[value] ?? SAY_AT_DEFAULT;
+      const r = spr.getBoundingClientRect();
+      const mouthX = r.left + at.x * r.width;
+      // (The bubble is pinned to the band's right edge, so the mouth's distance from that edge is all the tail needs.)
+      const from0 = say.getBoundingClientRect().right - mouthX;
+      const w = bub.offsetWidth;
+      const pad = 20;
+      // (A narrow bubble and a mouth past its left edge: the bubble nudges left, only as far as the tail needs, never past the stage's edge.)
+      const nudge = Math.max(0, Math.min(from0 - (w - pad), say.clientWidth - w));
+      const from = from0 - nudge;
+      const inside = Math.min(Math.max(from, pad), Math.max(pad, w - pad));
+      const over = from - inside;
+      // (Past the edge: the tail stays at the edge and leans toward the mouth, up to 35 degrees.)
+      const tilt = over ? Math.max(-35, Math.min(35, (Math.atan2(over, 40) * 180) / Math.PI)) : 0;
+      say.style.setProperty("--say-nudge", `${nudge.toFixed(1)}px`);
+      say.style.setProperty("--say-tail", `${inside}px`);
+      say.style.setProperty("--say-tilt", `${tilt.toFixed(1)}deg`);
+    };
+    place();
+    const obs = [new ResizeObserver(place), new MutationObserver(place)];
+    obs[0]!.observe(stage);
+    const bub = stage.querySelector(".bs-say .bs-bubble");
+    if (bub) obs[0]!.observe(bub);
+    obs[1]!.observe(stage, { childList: true, subtree: true });
+    return () => obs.forEach((o) => o.disconnect());
+  }, [value, drop.n]);
   const tile = (id: string, label: string, body: preact.ComponentChildren, cls = "", tint?: string) => (
     <button type="button" role="radio" key={id || "random"} aria-checked={value === id} aria-label={label} class={`bs-tile${cls}${value === id ? " on" : ""}`} data-boss={hiddenIds.has(id) ? "hidden" : id || "random"} onClick={() => tap(id)}>
       <span class={`bs-tile-in${tint ? " bs-tinted" : ""}`} style={tint ? { "--bs-tint": tint } : undefined}>
@@ -218,7 +255,7 @@ export function BossSelect({
           </div>
         ))}
       </div>
-      <section class={`bs-stage${dark ? " bs-dark" : ""}`} aria-label="Your stage" style={{ "--bs-rise-cqi": rise ? STAGE_RISE : 0 }}>
+      <section ref={sayStage} class={`bs-stage${dark ? " bs-dark" : ""}`} aria-label="Your stage" style={{ "--bs-rise-cqi": rise ? STAGE_RISE : 0 }}>
         <div class="bs-say">
           <VoiceBubble voice={selectVoice} class="bc-bubble bs-bubble" />
         </div>

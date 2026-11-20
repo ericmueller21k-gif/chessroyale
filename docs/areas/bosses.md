@@ -112,6 +112,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   under 1236 px wide, and the phone, are unchanged. Admins get the speech band on a computer too (no fourth row there), so their bosses
   clear their bubbles. Guard: `e2e/boss-select.spec.ts` ("on a computer the pawn and the picked boss stand bigger"). Decision:
   [2026-11-12-select-desktop-big.md](../decisions/2026-11-12-select-desktop-big.md).
+  **The speech tail** (Eric, Nov 20: "pointing at the head or near the mouth"): the bubble stays where it is and only its tail moves along the bottom edge to the picked boss's mouth (`SAY_AT` in `characters/boss-select.ts`, a fraction of his art box; `BossSelect`'s placeSayTail sets `--say-tail`, `--say-tilt`, `--say-nudge`: a narrow bubble nudges left only as far as the tail needs, never off the stage, and a mouth past the edge tilts the tail). Guard: `e2e/boss-select.spec.ts` ("the speech tail points at the picked boss's mouth"). Decision: [2026-11-20-say-at-mouth.md](../decisions/2026-11-20-say-at-mouth.md).
 - **The roster is a template** (`BOSS_ROSTER` in `packages/core/src/boss.ts`): each boss has an id, a name, an icon,
   a character kit (its art, moments, lines and sounds, by name), an Elo `offset` (nastier powers play a little weaker
   underneath) and its powers: a **passive** and an **ultimate**. Only a **playable** boss (`isPlayable`: a complete
