@@ -7,7 +7,10 @@
   font-size: 13px;
   padding: 6px 12px;
 }
-.tw-desk-note {
+/* (Its own lines beat the town card's text style (`.town-card-text`, town.css) by their selector, never by which stylesheet loads last:
+   tower.css loads before or after town.css depending on what opened first, and since #839 (the town drawing the run's hearts) always
+   before, which turned the plan line's 12 px / 1.3 into 13 px / 1.35, its three lines taller than their box. The review of #839.) */
+.tw-desk .tw-desk-note {
   margin: 4px 0 0;
 }
 
@@ -271,7 +274,7 @@
 /* Three lines, always, whatever it says (the plan, a refusal, the solo climb's note), so nothing under it moves: a fixed height, never a
    least one (the delta review of #835, finding 3), and words written to fit it (tower-plan.ts; e2e/tower-party.spec.ts measures the
    longest). */
-.tw-plan {
+.tw-desk .tw-plan {
   height: calc(3 * 1.3em);
   margin: 2px 0 0;
   font-size: 12px;
