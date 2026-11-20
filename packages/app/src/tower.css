@@ -511,10 +511,6 @@
   height: 22px;
   overflow: hidden;
 }
-.tw-strip .tw-face {
-  width: 18px;
-  height: 18px;
-}
 .tw-face > *,
 .tw-face .boss-portrait {
   width: 100%;
@@ -531,20 +527,23 @@
   color: var(--fd-dim);
 }
 
-/* ---- The run's strip over the battle (in place of "BOSS · move 1"; a computer's: a row above the bar) ---- */
+/* ---- The run's strip (Eric, Nov 20): "Battle Tower · Floor 4" and the hearts, one centered line in place of "BOSS · move 1" ---- */
 .tw-strip {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-/* The top line and the run's hearts after it, never cut (the line's words are, with "…", first). */
-.tw-strip-head {
-  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
   min-width: 0;
 }
+/* (A phone's top stage takes the room the strip needs, and leaves the gear's 44 px at its right out of the middle, so the strip centers
+   over the board.) */
+.hud-stage:has(> .tw-strip) {
+  flex: 1;
+  min-width: 0;
+  padding-left: 44px;
+}
+/* The title's words are cut first, with "…", the hearts never. */
 .tw-strip-top {
   min-width: 0;
   font-weight: 800;
@@ -556,20 +555,6 @@
 .tw-strip-top span {
   font-weight: 600;
   color: var(--fd-sub, var(--muted));
-}
-.tw-strip-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-.tw-strip-row b {
-  font-weight: 800;
-}
-.tw-left {
-  font-weight: 800;
-  color: #dc2626;
 }
 
 /* ---- The split boss bar (2 or 3 bosses): today's box, split in equal parts ---- */
@@ -687,15 +672,16 @@
 }
 
 /* ---- A computer's strip row, and the figures stacked beside the board ---- */
+/* (A fixed-height line in the gap between the boss bar and the board's turn bar: the screen's 8 px row gap above it taken back, so it
+   fills the gap exactly (60 to 96 px on a 1280 × 800 computer), its strip centered in it: the same buffer above and below, always.) */
 .tw-strip-line {
   display: flex;
   align-items: center;
-  padding: 2px 4px;
-}
-.tw-strip-wide {
-  flex-direction: row;
-  align-items: baseline;
-  gap: 12px;
+  justify-content: center;
+  box-sizing: border-box;
+  margin-top: -8px;
+  height: 36px;
+  padding: 0 4px;
 }
 .boss-side.tw-side {
   align-self: stretch;

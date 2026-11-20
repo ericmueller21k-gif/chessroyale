@@ -130,7 +130,7 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   await expect.poll(async () => { const f = await floorNow(ann.page); return !!f && f.t !== null && f.go !== null && f.t > f.go - 900; }, { timeout: 15_000 }).toBe(true);
   await still(ann.page, "party-walk-in");
   for (const p of [ann.page, bo.page]) await expect.poll(() => phase(p), { timeout: 120_000 }).toBe("play");
-  await expect(ann.page.locator(".tw-strip").first()).toContainText("Floor 1 of 99");
+  await expect(ann.page.locator(".tw-strip").first()).toContainText("Floor 1");
 
   // Both pick Qxf7 (the party rule: every connected member picks): the boss is mated, floor 1 won.
   for (const p of [ann.page, bo.page]) await submitMove(p, "h5f7");
@@ -161,7 +161,7 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   await alone.click();
   await expect.poll(async () => (await floorNow(bo.page))?.floor ?? null, { timeout: 60_000 }).toBe(2);
   await expect.poll(() => phase(bo.page), { timeout: 120_000 }).toBe("play");
-  await expect(bo.page.locator(".tw-strip").first()).toContainText("Floor 2 of 99");
+  await expect(bo.page.locator(".tw-strip").first()).toContainText("Floor 2");
   const mine = (await copies(bo.page, [bo.id]))[0]!;
   expect(JSON.parse(mine.members).alone).toBe(true);
   expect(JSON.parse(mine.fight!).lobby).toBeUndefined();

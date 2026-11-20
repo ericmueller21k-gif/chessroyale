@@ -1,5 +1,4 @@
 import { useMemo, useState } from "preact/hooks";
-import { BATTLE_TOWER, floorBossCount } from "@chessroyale/core";
 import { artOf, bossKit } from "../characters/kits.ts";
 import { SpriteAnim, frameImage } from "../components/BossEffect.tsx";
 import type { Character } from "../characters/sprite.ts";
@@ -10,7 +9,7 @@ import { VoiceBubble, bossVoice } from "../speech.tsx";
 import { BossLevel } from "./Boss.tsx";
 import { BossPortrait } from "../components/BossPortrait.tsx";
 import { portraitName } from "../characters/portraits.ts";
-import { floorRating, livesOf, towerBoss } from "../tower.ts";
+import { livesOf, towerBoss } from "../tower.ts";
 import { TowerHearts } from "../components/TowerHearts.tsx";
 import type { BossView, GameView } from "../game.ts";
 import { sideOf } from "../boss-side.ts";
@@ -55,34 +54,20 @@ export function speakerOf(side: { bosses: readonly { id?: string }[]; toMove: nu
 }
 
 /**
- * The run's strip: "Battle Tower · Floor 4 of 99" and the run's lives (Nov 20: two hearts, a spent one greyed), the bosses beaten (the last
- * 6, or 9 on a computer; the rest counted), the next floor's rating, the moves left.
+ * The run's strip (Eric, Nov 20): "Battle Tower · Floor 4" and the run's lives (two hearts, a spent one greyed), centered. No floor count
+ * (nobody is to know how many floors there are), no next floor and no moves left (the boss card says those). The beaten bosses stay on
+ * the tower's own card.
  */
-export function TowerStrip({ match, computer = false }: { match: GameView; computer?: boolean }) {
+export function TowerStrip({ match }: { match: GameView }) {
   // (A solo floor's run, or a party floor's: Nov 20.)
   const play = match.tower ?? match.towerParty;
-  const boss = match.boss;
   if (!play) return null;
-  const left = boss ? Math.max(0, boss.maxMoves - boss.crowdMoves) : null;
-  const next = play.floor + 1;
   return (
-    <span class={`tw-strip${computer ? " tw-strip-wide" : ""}`} data-tower-floor={play.floor}>
-      <span class="tw-strip-head">
-        <span class="tw-strip-top">
-          Battle Tower<span> · Floor {play.floor} of {BATTLE_TOWER.floors}</span>
-        </span>
-        <TowerHearts lives={livesOf(play.lives)} />
+    <span class="tw-strip" data-tower-floor={play.floor}>
+      <span class="tw-strip-top">
+        Battle Tower<span> · Floor {play.floor}</span>
       </span>
-      <span class="tw-strip-row">
-        {computer && boss && <span>Move {Math.min(boss.crowdMoves + 1, boss.maxMoves)} ·</span>}
-        {play.beaten.length > 0 && <Beaten ids={play.beaten.flat()} max={computer ? 9 : 6} />}
-        {next <= BATTLE_TOWER.floors && (
-          <span>
-            Next floor <b>{floorRating(next, floorBossCount(next))}</b>
-          </span>
-        )}
-        {left !== null && <span class="tw-left">{`${left} ${left === 1 ? "move" : "moves"} left`}</span>}
-      </span>
+      <TowerHearts lives={livesOf(play.lives)} />
     </span>
   );
 }

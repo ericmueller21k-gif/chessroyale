@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BATTLE_TOWER, floorBossCount, type ItemLook } from "@chessroyale/core";
+import { floorBossCount, type ItemLook } from "@chessroyale/core";
 import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { BossPortrait } from "../components/BossPortrait.tsx";
 import { Confirm } from "../components/MatchMenu.tsx";
@@ -128,7 +128,7 @@ export function TowerScreen({ name, look, onBack }: { name: string; look?: ItemL
           <span class="tw-label">{run ? "Your solo run · saved" : "Your solo run"}</span>
           {run ? (
             <span class="tw-floor">
-              Floor {floor} <small>of {BATTLE_TOWER.floors}</small>
+              Floor {floor}
             </span>
           ) : (
             <span class="tw-floor">No run yet</span>
