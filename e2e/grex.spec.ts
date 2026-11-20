@@ -61,7 +61,7 @@ async function play(page: Page, opts: { leave?: boolean; step?: boolean } = {}) 
         piece: { selector: left.map((sq) => `.pw-burns .pw-burn[data-square="${sq}"]:not(.out):not(.fizzled):not(.charred)`).join(",") },
         dock: { selector: ".boss-dock-status", text: /burnt/i },
         charred: { selector: left.map((sq) => `.pw-burns .pw-burn.charred[data-square="${sq}"]`).join(",") },
-        charLine: { selector: ".boss-dock-status", text: /^Charred! One more burns (it|them)$/ },
+        charLine: { selector: ".boss-dock-status", text: /Charred! One more burns (it|them)$|burnt, \w+ charred$/ },
       })
     : null;
   await page.evaluate((mv) => {
