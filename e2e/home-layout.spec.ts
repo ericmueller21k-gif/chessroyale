@@ -13,6 +13,7 @@ const run = Date.now().toString(36).slice(-5);
 const shown = (p: Page) => p.evaluate(() => document.documentElement.getAttribute("data-theme"));
 const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const bg = (p: Page, sel: string) => p.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+const statusBar = (p: Page) => p.locator('meta[name="theme-color"]').getAttribute("content");
 const LIGHT_GROUND = "rgb(244, 242, 238)";
 const DARK_GROUND = "rgb(20, 22, 27)";
 
@@ -51,6 +52,9 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).__themes)).toEqual(["light"]);
   expect(await bg(page, ".fd-root")).toBe(LIGHT_GROUND);
+  // The installed app's status bar is solid, in the page's ground (Nov 20: iOS frosted home's top bar under a translucent one).
+  expect(await statusBar(page)).toBe("#f4f2ee");
+  await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveCount(0);
 
   // Every front-door page honors it, and the game's colors too.
   for (const path of ["/settings", "/profile", "/shop"]) {
@@ -76,6 +80,7 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   await expect(page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
   expect(await shown(page)).toBe("dark");
   expect(await page.evaluate(() => (window as any).__themes)).toEqual(["dark"]);
+  expect(await statusBar(page)).toBe("#14161b");
   // Back home: dark.
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();

@@ -16,7 +16,12 @@ function device({ stored, light = false, noStorage = false }: { stored?: string 
       : { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, String(v)), removeItem: (k: string) => void m.delete(k) },
   );
   const attrs = new Map<string, string>();
-  vi.stubGlobal("document", { documentElement: { getAttribute: (k: string) => attrs.get(k) ?? null, setAttribute: (k: string, v: string) => void attrs.set(k, v) } });
+  const bar = { content: "" };
+  const meta = { setAttribute: (k: string, v: string) => void (k === "content" && (bar.content = v)) };
+  vi.stubGlobal("document", {
+    documentElement: { getAttribute: (k: string) => attrs.get(k) ?? null, setAttribute: (k: string, v: string) => void attrs.set(k, v) },
+    querySelector: (sel: string) => (sel === 'meta[name="theme-color"]' ? meta : null),
+  });
   const media = { light, listeners: new Set<() => void>() };
   vi.stubGlobal("matchMedia", (q: string) => ({
     get matches() {
@@ -27,6 +32,8 @@ function device({ stored, light = false, noStorage = false }: { stored?: string 
   return {
     storage: m,
     shown: () => attrs.get("data-theme") ?? null,
+    /** The status bar's color (`<meta name="theme-color">`). */
+    bar: () => bar.content,
     /** The device switches between light and dark. */
     flip(toLight: boolean) {
       media.light = toLight;
@@ -122,9 +129,10 @@ describe("light or dark", () => {
       new Function(script!)();
       const expected = resolveTheme(c.noStorage ? "system" : (parseThemePref(c.stored) as ThemePref), c.light);
       expect(d.shown(), JSON.stringify(c)).toBe(expected);
-      // And theme.ts agrees once it's running.
+      // And theme.ts agrees once it's running, the status bar's color too.
       const t = await theme();
       expect(t.currentTheme(), JSON.stringify(c)).toBe(expected);
+      expect(d.bar(), JSON.stringify(c)).toBe(t.THEME_COLOR[expected]);
     }
     // No media queries at all: dark, the base.
     device();
@@ -135,5 +143,24 @@ describe("light or dark", () => {
     vi.stubGlobal("document", { documentElement: { setAttribute: (k: string, v: string) => (attrs[k] = v) } });
     new Function(script!)();
     expect(attrs["data-theme"]).toBe("dark");
+  });
+
+  it("the Home Screen app's status bar is solid, in the page's ground: no black-translucent, theme-color follows the theme (Nov 20)", async () => {
+    // iOS 26 frosts the band under a black-translucent status bar, our top bar with it (Eric's iPhone, Nov 20).
+    const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    expect(html).not.toMatch(/<meta[^>]+apple-mobile-web-app-status-bar-style/);
+    const d = device({ light: true });
+    const t = await theme();
+    // The colors are the front door's ground, --fd-bg, in each theme.
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    expect(css).toContain(`:root {\n  --fd-bg: ${t.THEME_COLOR.dark};`);
+    expect(css).toContain(`:root[data-theme="light"] {\n  --fd-bg: ${t.THEME_COLOR.light};`);
+    // It follows the device and a pick.
+    t.watchTheme();
+    expect(d.bar()).toBe(t.THEME_COLOR.light);
+    d.flip(false);
+    expect(d.bar()).toBe(t.THEME_COLOR.dark);
+    t.setThemePref("light");
+    expect(d.bar()).toBe(t.THEME_COLOR.light);
   });
 });

@@ -52,10 +52,21 @@ export const currentTheme = (): Theme => resolveTheme(themePref(), deviceLight()
 
 const listeners = new Set<() => void>();
 
-/** Puts the theme on the page (`<html data-theme>`), and tells whoever is showing the pick (Settings). */
+/**
+ * The status bar's color in each theme: the front door's ground (`--fd-bg`), set as `<meta name="theme-color">` (Nov 20,
+ * docs/decisions/2026-11-20-ios-standalone-top.md: the Home Screen app's status bar is solid, in this color, above the page).
+ */
+export const THEME_COLOR: Record<Theme, string> = { light: "#f4f2ee", dark: "#14161b" };
+
+/** Puts the theme on the page (`<html data-theme>`, the status bar's color), and tells whoever is showing the pick (Settings). */
 export function applyTheme() {
   const t = currentTheme();
   if (document.documentElement.getAttribute("data-theme") !== t) document.documentElement.setAttribute("data-theme", t);
+  try {
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLOR[t]);
+  } catch {
+    // (No document to color: nothing to do.)
+  }
   listeners.forEach((l) => l());
 }
 
