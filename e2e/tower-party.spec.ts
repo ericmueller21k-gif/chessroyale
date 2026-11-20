@@ -13,7 +13,7 @@ import { test, named, submitMove, tapInTown, localSql } from "./helpers.ts";
 const STILLS = process.env.STILLS;
 const NEWS = { timeout: 25_000 };
 const phase = (page: Page) => page.evaluate(() => (window as any).match?.phase?.kind ?? null);
-type Floor = { floor: number; mode: string; bosses: string[]; t: number | null } | null;
+type Floor = { floor: number; mode: string; bosses: string[]; t: number | null; go: number | null; mates: number } | null;
 const floorNow = (page: Page): Promise<Floor> => page.evaluate(() => (window as any).__towerFloor?.() ?? null);
 const room = (page: Page) => page.locator("canvas.town-shop-canvas");
 
@@ -119,8 +119,10 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   await expect(start).toBeEnabled({ timeout: 20_000 });
   await start.click();
   for (const p of [ann.page, bo.page]) await expect.poll(async () => (await floorNow(p))?.floor ?? null, { timeout: 60_000 }).toBe(1);
-  // (Mid-walk: Bo's pawn in his seat's color coming in after Ann's.)
-  await expect.poll(async () => (await floorNow(ann.page))?.t ?? 0, { timeout: 10_000 }).toBeGreaterThan(1600);
+  // (Each sees the other's pawn walk in: one mate in the floor room.)
+  for (const p of [ann.page, bo.page]) expect((await floorNow(p))!.mates).toBe(1);
+  // (Everyone on their marks, the pieces coming up: Bo's pawn in his seat's color beside Ann's.)
+  await expect.poll(async () => { const f = await floorNow(ann.page); return !!f && f.t !== null && f.go !== null && f.t > f.go - 900; }, { timeout: 15_000 }).toBe(true);
   await still(ann.page, "party-walk-in");
   for (const p of [ann.page, bo.page]) await expect.poll(() => phase(p), { timeout: 120_000 }).toBe("play");
   await expect(ann.page.locator(".tw-strip").first()).toContainText("Floor 1 of 99");

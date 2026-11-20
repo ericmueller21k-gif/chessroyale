@@ -89,6 +89,8 @@ export async function joinTowerParty(code: string): Promise<boolean> {
     up,
     (lobby, pass, seat) => {
       const f = { code: up, lobby, pass, seat };
+      // (The party as its START placed it: its others walk in with you, and stand there after (its socket closes until the floor's over).)
+      floorMates = matesOf(p);
       if (floorHandler) floorHandler(f);
       else floorWaiting = f;
       emit();
@@ -155,8 +157,17 @@ export function enterPartyFloor(e: PartyFloorEntry): void {
   enterHandler?.(e);
 }
 
-/** The others in your party, in seat order: their seats (their colors in the floor room). */
+/** The others in a party (bots aside), in seat order: their seats (their colors in the floor room). */
+const matesOf = (p: PartyClient | null): { seat: number }[] =>
+  (p?.party?.members ?? [])
+    .filter((m) => m.id !== p?.memberId && !m.bot)
+    .map((m) => ({ seat: m.seat ?? 0 }))
+    .sort((a, b) => a.seat - b.seat);
+/** The others as the party's last floor began (its socket closed while it's played, and is opened again after). */
+let floorMates: { seat: number }[] = [];
+
+/** The others in your party, in seat order: as the party is now, or as its floor began while you're away from it (on the floor). */
 export function partyMates(): { seat: number }[] {
-  const p = towerParty();
-  return (p?.party?.members ?? []).filter((m) => m.id !== p?.memberId).map((m) => ({ seat: m.seat ?? 0 })).sort((a, b) => a.seat - b.seat);
+  const live = towerParty();
+  return live?.party ? matesOf(live) : floorMates;
 }
