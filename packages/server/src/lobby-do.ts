@@ -477,6 +477,17 @@ export class Lobby extends DurableObject<Env> {
     return !!this.record && this.record.party?.tower?.fight === fight;
   }
 
+  /**
+   * Whether party `code`'s battle from its START `start` is over here (a Battle Tower party asks while its floor still shows under way: the
+   * delta review of #835, finding 2): this room has closed (it never started, nobody having come), it's another battle's room now, or its
+   * battle has reached its results (the call that tells the party may have failed).
+   */
+  async partyBattleDone(code: string, start: number): Promise<boolean> {
+    if (!this.record || (await this.closeIfDue())) return true;
+    const pl = this.record.party;
+    return !pl || pl.partyCode !== code || pl.startId !== start || this.record.phase === "results";
+  }
+
   /** Whether the lobby is open, and where its match is (null: no such lobby, or it has closed). */
   /** Whether it's open and where it's at; `matchmade` (PLAY's queue, not a code's lobby) and `mode` for friends' invites. */
   /** `parties` (the e2e's test hook, where the test switches are on): each 50 v 50 party's group here, by its members' accounts. */

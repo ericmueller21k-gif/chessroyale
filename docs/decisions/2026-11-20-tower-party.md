@@ -103,3 +103,25 @@ others joined it): every member keeps a copy. The rest of §5 stands.
 
 No new table or column: `tower_runs.members` (PR 9's, unused until now) holds a copy's JSON. The download names how many climbed a
 copy, never who. The privacy policy's "The Battle Tower" says a party copy names the others.
+
+## The town's party line and the clerk's list (Eric, Nov 20, on the review round)
+
+**Eric:** "Yeah, just keep the join button. ... wouldn't it make more sense to just say like go to the battle tower or something? Because
+like you could have multiple. It's like you should be able to click on the clerk and see the parties and like which ones you could join or
+something. I think that makes more sense."
+
+18. **The line's press is its own, and says "Go to the tower"** (Eric's exception to his typing rule, written into the rule's text in
+    `docs/rules/eric.md`; its guard test unchanged): a tap on it never opens typing, anywhere else on the box still does. On the street it
+    is the tower's own Go in (you walk to its door and go in), landing by the clerk with his card open (`atKeeper`); in the tower's lobby
+    it walks you to the clerk (`ShopCtl.toKeeper`). **Mine:** inside another building or up in the tower it's greyed (out first): the
+    rooms' own ways out (the Hidden Boss's "Cancel your game request?", a floor's walk-in) stay the only ones, and a greyed button is
+    never a dropped tap. One label, so the pill never changes size.
+19. **The clerk's card lists the open parties** (the director's calls): under the three ways (the third now reads "Open your own
+    party"), a box of one size, three rows tall and scrolling inside, each party's leader, "2/4" and Join; "No open parties right now."
+    when none. Listed: a party whose line stands in the town and that can take someone new: room in it, no floor under way, and not a
+    run's own members climbing on (a newcomer would only end their climb). Such a party isn't opened to the town at all (`closed`: Open
+    your own party greyed, and a standing line lapses when its plan turns to climbing on). Sourced from what exists: the live hub's party
+    lines (their codes) and each party's own state (`towerListing`), through `GET /api/tower/parties`, read as the card opens and every
+    `TOWER_PARTY.listPollMs` (4 s) while it shows, `TOWER_PARTY.listMax` (12) at most. Join from the list is the line's old Join: seated
+    once the party welcomes you, its words on the card's line otherwise; the party's own checks stay (accounts only, full refused).
+    Your own party shows "Joined"; the others' Join is greyed while you're in a party.

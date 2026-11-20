@@ -734,7 +734,9 @@ export class SquadsParty extends DurableObject<Env> {
     })().catch(() => null);
     if (!read) return { kind: "wait", message: TOWER_PARTY_LINES.reading, recheck: true };
     if (read.ok) return planOf(read.prep);
-    return { kind: "wait", message: this.refusalLine(read), recheck: true };
+    // (A deleted member's seat holds the plan until they're kicked or leave, and both read it again: no recheck meanwhile (the delta
+    // review of #835, finding 9). Everything else that refuses passes on its own: asked again in a moment.)
+    return "gone" in read ? { kind: "wait", message: this.refusalLine(read) } : { kind: "wait", message: this.refusalLine(read), recheck: true };
   }
 
   /** Why a party floor can't begin, in words (preparePartyFloor's refusal). */
@@ -815,6 +817,19 @@ export class SquadsParty extends DurableObject<Env> {
         core.towerRecheck(null);
         core.towerReread();
         await this.persist(core);
+      }
+      // (Its floor still showing under way: its room asked whether it's over, should the room's own word never have come.)
+      const check = core.takeFloorCheck();
+      if (check) {
+        await this.persist(core);
+        const done = await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(check.lobby))
+          .partyBattleDone(this.record.code, check.start)
+          .catch(() => false);
+        if (done && this.record) {
+          const after = this.core();
+          after.battleOver(check.start);
+          await this.persist(after);
+        }
       }
       return this.towerUpkeep();
     }

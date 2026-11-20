@@ -1,8 +1,5 @@
-import type { NetTowerPlan } from "@chessroyale/chess/squads";
-import { PartyClient, createParty, currentParty, forgetParty, partyStatus, possessive } from "./squads.ts";
+import { PartyClient, createParty, currentParty, forgetParty, partyStatus } from "./squads.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BATTLE_TOWER } from "@chessroyale/core";
-import { livesLeftWords } from "./tower.ts";
 
 /**
  * The Battle Tower's party on this device (Nov 20; docs/decisions/2026-11-20-tower-party.md): the clerk's Invite friends and Open party
@@ -149,17 +146,21 @@ export interface OpenParty {
 
 /**
  * The Battle Tower parties a newcomer can join now (GET /api/tower/parties: those open to the town, each able to take someone new),
- * newest first, in the town chat's `room` (a test's own); null: the server couldn't be asked.
+ * newest first, in the town chat's `room` (a test's own); `message`, why you can't join any (a guest where signing in is set up: the delta
+ * review of #835, finding 1), else null; null: the server couldn't be asked.
  */
-export async function openTowerParties(room?: string): Promise<OpenParty[] | null> {
+export async function openTowerParties(room?: string): Promise<{ parties: OpenParty[]; message: string | null } | null> {
   try {
     const res = await fetch(`/api/tower/parties${room ? `?townroom=${encodeURIComponent(room)}` : ""}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
-    const body = (await res.json()) as { parties?: unknown };
+    const body = (await res.json()) as { parties?: unknown; message?: unknown };
     if (!Array.isArray(body.parties)) return null;
-    return body.parties.filter(
-      (p): p is OpenParty => !!p && typeof p.code === "string" && /^[A-Z2-9]{5}$/.test(p.code) && typeof p.leader === "string" && typeof p.members === "number" && typeof p.max === "number",
-    );
+    return {
+      parties: body.parties.filter(
+        (p): p is OpenParty => !!p && typeof p.code === "string" && /^[A-Z2-9]{5}$/.test(p.code) && typeof p.leader === "string" && typeof p.members === "number" && typeof p.max === "number",
+      ),
+      message: typeof body.message === "string" ? body.message : null,
+    };
   } catch {
     return null;
   }
@@ -189,43 +190,8 @@ export function leaveTowerParty() {
   use(null);
 }
 
-/** What READY or START asks first (your own climb ends, or goes back floors), or null. */
-export interface PlanAsk {
-  heading: string;
-  note: string;
-}
-
-/**
- * The plan's words for this device (`me`: your member id): what START does (`line`), the up button's words in the floor room (`up`), and
- * what READY or START asks first (`ask`): when it ends your own party climb, or takes it back floors you played alone (the director's
- * call on the review of #835, finding 10: "Ann's climb goes back from floor 30", asked first as for an end).
- */
-export function planWords(plan: NetTowerPlan | undefined, me: string | null, nameOf: (id: string) => string): { line: string; up: string; ask: PlanAsk | null; ok: boolean } {
-  if (!plan) return { line: "", up: "START", ask: null, ok: false };
-  if (plan.kind === "wait") return { line: plan.message, up: "START", ask: null, ok: false };
-  if (plan.kind === "continue") {
-    const back = [...(plan.back ?? [])].sort((a, b) => Number(b.id === me) - Number(a.id === me));
-    const goes = back.map((b, i) => `${b.id === me ? (i ? "yours" : "Your") : possessive(nameOf(b.id))}${i ? "" : " climb goes back"} from floor ${b.floor}`);
-    const mine = back.find((b) => b.id === me)?.floor;
-    // (Its lives once one is spent, Nov 20: "Your climb together goes on: floor 9, 1 life left.")
-    const lives = plan.lives !== undefined && plan.lives < BATTLE_TOWER.lives ? `, ${livesLeftWords(plan.lives)}` : "";
-    return {
-      line: `Your climb together goes on: floor ${plan.floor}${lives}.${goes.length ? ` ${goes.join(", ")}.` : ""}`,
-      up: `Up to floor ${plan.floor}`,
-      ask: mine === undefined ? null : { heading: `Back to floor ${plan.floor}?`, note: `Your climb goes back from floor ${mine} to floor ${plan.floor}, where your party left off. Your best floors stay.` },
-      ok: true,
-    };
-  }
-  const mine = plan.ends.find((e) => e.id === me)?.floor ?? null;
-  const others = plan.ends.filter((e) => e.id !== me).map((e) => `${nameOf(e.id)}'s on floor ${e.floor}`);
-  const ending = [...(mine !== null ? [`yours on floor ${mine}`] : []), ...others];
-  return {
-    line: `A new climb from floor 1.${ending.length ? ` It ends ${ending.join(" and ")}.` : ""}`,
-    up: "New climb: floor 1",
-    ask: mine === null ? null : { heading: "Start a new climb?", note: `Your party climb on floor ${mine} ends, and this party starts on floor 1.` },
-    ok: true,
-  };
-}
+// (The plan's words: a pure module of their own, which the e2e measures in the clerk's card.)
+export { planWaiting, planWords, type PlanAsk } from "./tower-plan.ts";
 
 /** A party floor to go into: its room, your pass and seat, the floor, its bosses, the floors beaten and the lives going in (the run's strip). */
 export interface PartyFloorEntry extends PartyFloor {
