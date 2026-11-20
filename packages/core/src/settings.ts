@@ -119,6 +119,12 @@ export interface Settings {
    * the floor after its ceiling), with no roster offset and no difficulty, a party at the same ratings. Unset: not the tower.
    */
   towerFloor?: number;
+  /**
+   * The draw rule "party"'s tie (partyMove): with no majority, another tied move within this many centipawns of the engine's best
+   * may be played instead, one of them at random. Unset: BOSS_PARTY.closeCp (30). The Battle Tower's party sets 0 (TOWER_PARTY):
+   * Eric's "followed by best engine move if draws", always the best.
+   */
+  partyCloseCp?: number;
   bossAvoid: string;
   /**
    * Bosses resting (kill switches: pauses.ts), by id: never met, at random or picked (a picked one is replaced by a
@@ -1184,6 +1190,16 @@ export const BOSS_CLOCK = { bankSeconds: 600, incrementSeconds: 10 } as const;
 export const BOSS_PARTY = { max: 3, closeCp: 30, afkKickSec: 60, joinWaitSec: 30 } as const;
 
 /**
+ * The Battle Tower's party (Eric, Nov 18 and 20; docs/decisions/2026-11-20-tower-party.md): Boss Battle's party (its seats, READY and
+ * START, Kick and Promote, the party rule) for up to `max` climbers, the tie always the engine's best (`closeCp` 0: Eric's "followed
+ * by best engine move if draws"). A party's floor won at one of `crateFloors` pays a crate, once an account (the design's section 3:
+ * a party's floor is the server's word, a solo floor the device's). `openLineMinutes`: the clerk's "Open party" line in the town's
+ * chat lasts at most this long (the town's lines last TOWN_CHAT.lineMs), and lapses sooner when the party fills, starts or its leader
+ * leaves.
+ */
+export const TOWER_PARTY = { max: 4, closeCp: 0, crateFloors: [25, 50, 75, 99] as readonly number[] } as const;
+
+/**
  * The Hidden Boss's room challenge (Eric, Nov 12 and 13; docs/decisions/2026-11-13-hidden-boss-challenge.md): in the top-floor room
  * of his walk-up in the town, each player's Challenge counts toward one request per town instance ("1 of 4"…); at `players` the
  * summoning plays and they fight him together (one team on the party rule: hiddenRoomSettings).
@@ -1225,6 +1241,15 @@ export function bossPartySettings(difficulty: string): Partial<Settings> {
  * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His forms in turn (RECLUSE_FORMS): the child
  * first, then his adult form, then his phase change and the four boards online (Nov 13: RECLUSE_ONLINE), as in the Crowd's final. The server's alone: a player can't ask for it.
  */
+/**
+ * A Battle Tower party's floor (docs/decisions/2026-11-20-tower-party.md): Boss Battle's party battle (the party rule, the team's one
+ * clock, any member's God King call) for up to TOWER_PARTY.max, every tie to the engine's best (`partyCloseCp` 0), the bosses at the
+ * floor's strength (`floor`: core tower.ts floorSettings, the run's deal; no difficulty, no Maia of a pick, as a solo floor).
+ */
+export function towerPartySettings(floor: Partial<Settings>): Partial<Settings> {
+  return { ...bossPartySettings("normal"), lobbySize: TOWER_PARTY.max, groupSize: TOWER_PARTY.max, partyCloseCp: TOWER_PARTY.closeCp, bossDifficulty: 0, bossAloneMaia: 0, bossHidden: false, bossUnfinished: false, ...floor };
+}
+
 export function hiddenRoomSettings(): Partial<Settings> {
   return { ...bossPartySettings("normal"), lobbySize: HIDDEN_ROOM.players, groupSize: HIDDEN_ROOM.players, bossId: HIDDEN_ROOM.boss, bossHidden: true, recluseChild: recluseChildFirst() };
 }
