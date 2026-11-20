@@ -618,6 +618,12 @@ export interface BossPowerState {
    */
   noUlt?: boolean;
   /**
+   * This battle his power that adds pieces is off (a Battle Tower floor of several, BATTLE_TOWER.addsPieces: another boss there is the
+   * primary, Nov 20): Babur's balloons never go on his pump, Timber's workshop and Don Dough's dough never drop, Sawyer's pawn never
+   * splits, and Puddles' Watering grows no pieces (their seeds come up as nothing).
+   */
+  noAdd?: boolean;
+  /**
    * G-REX's fire tiles, each with the crowd turn it landed (stage 1 that turn, ablaze fireStages - 1 turns later;
    * after the crowd's move on that turn, a crowd piece still on it burns, the king never).
    */

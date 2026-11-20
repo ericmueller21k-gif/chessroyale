@@ -775,3 +775,32 @@
     height: 72px;
   }
 }
+
+/* ---- Babur's balloons off on this floor (noAdd: a floor of several whose primary is another boss, BATTLE_TOWER.addsPieces; Eric, Nov 20):
+   his pump stays in its place, empty, greyed and dimmed, an OFF tag over its foot, never dimmed (its label says why). Positioned: nothing
+   moves. ---- */
+.tw-part > .tg-pump-slot.tg-off > .tg-pump,
+.tw-side-body > .tg-pump-slot.tg-off > .tg-pump {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+.tg-pump-slot > .tg-off-tag {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  font: 700 9px/12px system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+@media (min-width: 900px) and (pointer: fine) {
+  .tw-side-body > .tg-pump-slot > .tg-off-tag {
+    font-size: 11px;
+    line-height: 14px;
+  }
+}

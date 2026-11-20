@@ -66,8 +66,11 @@ export const SPLIT_TEST_MOVES: Readonly<Record<Side, readonly string[]>> = {
   b: ["e2e4", "d7d5", "b1c3", "d5e4", "c3e4"],
 };
 
-/** Sawyer's first move is still to come: it must be a pawn move. */
-export const firstMoveDue = (p: Pick<BossPowerState, "split"> | null | undefined): boolean => !!p && !p.split;
+/**
+ * Sawyer's first move is still to come: it must be a pawn move. Never while his split is off this battle (noAdd: a tower floor of
+ * several whose primary is another boss, BATTLE_TOWER.addsPieces): then nothing splits, and his first move is any.
+ */
+export const firstMoveDue = (p: Pick<BossPowerState, "split" | "noAdd"> | null | undefined): boolean => !!p && !p.split && !p.noAdd;
 
 /**
  * There's room on the board for another pawn of `side`'s: fewer than 8 of them, fewer than 32 pieces in all, and no

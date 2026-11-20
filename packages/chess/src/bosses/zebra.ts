@@ -579,7 +579,8 @@ export const zebraBattle = {
     let drop: DoughMark | null = null;
     const fen = boardOf(b).fen;
     const over = sideToMove(fen) !== boss.crowdSide || !legalMoves(fen).length;
-    if (!over && dropDue(z, at, s)) {
+    // (Off this battle (noAdd: a tower floor of several whose primary is another boss, BATTLE_TOWER.addsPieces): no lump drops.)
+    if (!over && !p.noAdd && dropDue(z, at, s)) {
       const his = other(boss.crowdSide);
       const n = z.drops;
       // (The test switch: his first lump a pawn's.)

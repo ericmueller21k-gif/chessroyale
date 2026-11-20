@@ -1361,6 +1361,18 @@ export const BATTLE_TOWER = {
    * elsewhere needs its own gate too (tower.test.ts runs every boss listed). docs/decisions/2026-11-20-tower-fixes.md.
    */
   noUltimate: ["pig"] as readonly string[],
+  /**
+   * Bosses whose power adds pieces to the board, not their ultimate: on a tower floor of several, only the first of them in the floor's
+   * turn order (the primary) keeps it; the others' is off all floor (the runner marks their powers `noAdd` as the floor starts, so solo
+   * and the party's room agree, and a restored battle keeps it). One of them on a floor, a lone floor, and every other mode: unchanged.
+   * Eric, Nov 20: "maybe we need a rule where one boss acts as the primary when it comes to certain moves IE hippo and Babur both
+   * shouldn't be 'growing' pieces", then "for any move that's an 'add pieces' move, but it's not their ult. Only one is active during
+   * the battle tower, so solo battle tower bosses it's fine." Babur's balloons (`tiger`), Timber's workshop drops, Don Dough's rising
+   * dough (`zebra`), Sawyer's split pawn; Puddles (`gardener`) grows his pieces at his Watering, his ultimate, so off the primary the
+   * Watering still comes but every seed that would grow a piece comes up as nothing (the director's call: Eric named the hippo).
+   * Each boss's own code reads `noAdd`. docs/decisions/2026-11-20-tower-primary-boss.md.
+   */
+  addsPieces: ["tiger", "gardener", "timber", "zebra", "sawyer"] as readonly string[],
   apart: [["hollow", "smudgy"], ["smudgy", "alfil"], ["alfil", "grex"], ["dash", "smudgy"]] as readonly (readonly [string, string])[],
   maxBosses: 3,
 } as const;

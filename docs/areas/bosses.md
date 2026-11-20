@@ -1091,7 +1091,12 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 **Several bosses on one side** (the Battle Tower, PR 6; [decision](../decisions/2026-11-18-several-bosses.md)): `state.boss` is the
 boss in focus in full, so every hook above still sees only its own boss; the runner reads the whole side (`sideBosses`) through the
 dispatcher's `side*` functions (one boss: today's functions, unchanged). A hook's `b.bossToMove()` means "this boss is to move"
-(`Battle.hisTurn`): a power that comes "at the start of his turn" comes at his own turn only.
+(`Battle.hisTurn`): a power that comes "at the start of his turn" comes at his own turn only. **One primary for the powers that add
+pieces** (Eric, Nov 20; [decision](../decisions/2026-11-20-tower-primary-boss.md)): on a tower floor of several, of the bosses in
+`BATTLE_TOWER.addsPieces` (Babur, Puddles, Timber, Don Dough, Sawyer) only the first in turn order keeps it; the others' powers carry
+`noAdd` from the start, and each one's own code reads it (Babur's pump stays empty, `tiger.ts`; Timber's workshop closed, `timber.ts`;
+no dough drops, `zebra.ts`; no split, `sawyer.ts` `firstMoveDue`; Puddles' Watering rolls no pieces, `gardener.ts` `grows`). A boss
+added to the list needs his own gate and a reading in `several-bosses.test.ts` (`addedBy`).
 
 A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` words where no banner says what it means, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece (its passive's bar, the row under the rage meter: Hollow's bulbs, Puddles' Seeds), `ultBar` (beside the rage meter: Moo's moon), `barProp` (its prop in the boss bar's free room at the right, under the status: none yet) and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
 

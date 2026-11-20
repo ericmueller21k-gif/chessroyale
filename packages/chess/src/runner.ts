@@ -2277,6 +2277,7 @@ export class MatchRunner {
               stepped: p.stepped ?? null,
               ultNext: !!p.ultNext,
               ...(p.noUlt ? { noUlt: true } : {}),
+              ...(p.noAdd ? { noAdd: true } : {}),
               ...(bossRules(b)?.view?.(p) ?? {}),
             },
           }
@@ -2621,6 +2622,16 @@ export class MatchRunner {
     return this.settings.towerFloor && BATTLE_TOWER.noUltimate.includes(id) ? { noUlt: true } : {};
   }
 
+  /**
+   * A Battle Tower floor of several (settings.towerFloor, startSide): of its bosses whose power adds pieces (BATTLE_TOWER.addsPieces),
+   * only the first in the floor's turn order (`ids`, the order dealt) keeps it; the others' is off all floor (noAdd; Eric, Nov 20: "Only
+   * one is active during the battle tower"). Set as the floor starts, the same solo and online; one such boss, or off the tower: nothing.
+   */
+  private towerNoAdd(ids: readonly string[], id: string): { noAdd?: true } {
+    if (!this.settings.towerFloor || !BATTLE_TOWER.addsPieces.includes(id)) return {};
+    return ids.find((x) => BATTLE_TOWER.addsPieces.includes(x)) === id ? {} : { noAdd: true };
+  }
+
   /** A Battle Tower floor's strength (settings.towerFloor; core floorStrength), with as many bosses as it deals; null off the tower. */
   private towerStrength(): FloorStrength | null {
     const f = this.settings.towerFloor;
@@ -2660,7 +2671,7 @@ export class MatchRunner {
     const own: BossOwn[] = defs.map((d, i) => ({
       id: d.id,
       ...this.firstForm(d.id),
-      powers: { ...initPowers(seeds[i]!, fen, crowdSide), ...(i === claimer ? { claimed: true } : {}), ...(setUps[i] ?? {}), ...this.towerNoUlt(d.id) },
+      powers: { ...initPowers(seeds[i]!, fen, crowdSide), ...(i === claimer ? { claimed: true } : {}), ...(setUps[i] ?? {}), ...this.towerNoUlt(d.id), ...this.towerNoAdd(ids, d.id) },
       tier,
       elo: floor?.rating ?? bossStrength(tier, d, this.settings.bossDifficulty),
     }));
