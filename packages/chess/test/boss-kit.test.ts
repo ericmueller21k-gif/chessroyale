@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BOSS_ROSTER, mulberry32 } from "@chessroyale/core";
 import { MatchRunner, applyMove, boardEnd, bossShowMs, bossTurnShowMs, keptEnPassant, landCheck, legalMoves, sanLineToUci, START_FEN } from "../src/index.ts";
-import { KIT_OPENING, KNOWN_STEPS, PROMOTION_OPT_OUT, StockfishMoves, epKept, fakeEngine, kitBattles, kitBosses, kitSettings, newPromotions, positionProblems, quickSearches, runBattle, unknownSteps } from "./boss-kit-lib.ts";
+import { KIT_FIRST_MOVE, KIT_OPENING, KNOWN_STEPS, PROMOTION_OPT_OUT, StockfishMoves, epKept, fakeEngine, kitBattles, kitBosses, kitSettings, newPromotions, positionProblems, quickSearches, runBattle, unknownSteps } from "./boss-kit-lib.ts";
 
 /**
  * The shared boss test kit (Oct 18; docs/decisions/2026-10-18-boss-test-kit.md): every boss in BOSS_ROSTER, hidden
@@ -139,6 +139,9 @@ describe("the boss kit: every boss, every step", () => {
       for (const battle of kitBattles(def, MAX_MOVES, EXTRA)) {
         const run = await runBattle(battle, sf);
         failures.push(...run.failures);
+        // (A switch whose power waits on the crowd's first move: its battle shows it.)
+        const first = KIT_FIRST_MOVE[battle.test];
+        if (first) expect(run.events.has(first.kind), `${def.id}, ?power=${battle.test}: no ${first.kind}`).toBe(true);
         steps += run.steps;
         for (const e of run.events) kinds.add(e);
         for (const p of Object.keys(run.played)) kinds.add(`step:${p}`);

@@ -641,6 +641,8 @@ const boardSaw: Anim = lazyAnim(() => ({
 export const SAWYER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
   entrance: ["Measure twice, cut once.", "Hard hat zone!", "Let's get sawing."],
   split: ["Two for one!", "Half off!", "Double trouble!"],
+  // (The Saw Swap, Nov 20: Eric's line, and three more in his voice.)
+  sawSwap: ["Let me saw my way out of this.", "Pardon the renovation!", "Measure twice, swap once.", "Swap shop's open!"],
   move: ["Snip.", "Clean cut.", "On the level."],
   capture: ["Timber!", "Sawed it.", "That's lumber now."],
   check: ["Cut off!", "Nowhere to run.", "Corner cut!"],

@@ -1687,6 +1687,14 @@ export const BOSS_POWERS = {
   boardSawFrom: 10,
   boardSawTurns: 5,
   /**
+   * Sawyer's Saw Swap (his third power, once a battle; Eric, Nov 20: "one time a game when's in check, he saws the board in half
+   * (only triggers if king is on his upper half, so he slices down the whole middle, then his upper half down the center, and swaps
+   * the two 4x4 sides to remove his king from check, then he plays a turn"; "just have it trigger anytime whenever it legally is safe
+   * to"). On a Battle Tower floor (lone or shared) only with this on (Eric: "Let's have this off by default for now in battle
+   * tower"). docs/decisions/2026-11-20-sawyer-saw-swap.md.
+   */
+  sawSwapInTower: false,
+  /**
    * Wrangler's long pull (his first move): a center pawn's double step, lassoed one square further (three squares in one
    * move: e2-e5 or d2-d5 as White; d7-d4 or e7-e4 as Black after the crowd's first move). The engine picks the d- or
    * e-pawn (the position after each, and after his best ordinary move, searched at pullNodes); a pull losing more than

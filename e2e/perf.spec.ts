@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
+import { SAW_SWAP_TEST_CHECK } from "@chessroyale/chess";
 import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
 
@@ -583,6 +584,27 @@ test("Moo & Moon's Full Moon cinematic on a slow phone: the hop, the field, the 
   await expect(page.locator(".mo-cine")).toHaveCount(0, { timeout: 30_000 });
   const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
   console.log(`Moo's Full Moon cinematic (slowed phone): ${f(s)}`);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+});
+
+test("Sawyer's Saw Swap on a slow phone: the grooves across the middle and down his half, his half's two blocks sliding past each other and the board closing stay within budget, the first time they show (Nov 20)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  await page.addInitScript(instrument);
+  // (?power=sawswap: the crowd's check, Bb5+, brings it as it lands.)
+  await page.goto("/?debug&nolanding&clock=60&boss=sawyer&power=sawswap&laststand=0");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await bossAloneFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  await page.evaluate((uci) => (window as any).match.submit(uci), SAW_SWAP_TEST_CHECK.w);
+  // The moment, from its banner to your turn (his move after it).
+  await page.locator(".fight-banner.power-cut", { hasText: "SAW SWAP!" }).waitFor({ timeout: 30_000 });
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`Sawyer's Saw Swap (slowed phone): ${f(s)}`);
   expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
 });

@@ -5,7 +5,7 @@ import { BOINGO_FX } from "./bosses/boingo.ts";
 import { FIRE_BURN_MS, GREX_FX } from "./bosses/grex.ts";
 import { CLAIM_MS, HOLLOW_FX, HOLLOW_FX_EXTRA } from "./bosses/hollow.ts";
 import { BIGBOY_FX, SNACK_MS } from "./bosses/bigboy.ts";
-import { SAWYER_FX } from "./bosses/sawyer.ts";
+import { SAW_SWAP, SAWYER_FX } from "./bosses/sawyer.ts";
 import { PIG_FX } from "./bosses/pig.ts";
 import { RECLUSE_FX } from "./bosses/recluse.ts";
 import { ALFIL_FX } from "./bosses/alfil.ts";
@@ -111,6 +111,8 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   split: [[0, 1300]],
   cut: [[0, 1500]],
   boardsaw: [[0, 1500]],
+  // (Sawyer's SAW SWAP!, Nov 20: off the board as his saw comes down.)
+  sawSwap: [[0, SAW_SWAP.bannerMs]],
   pull: [[0, 1300]],
   drag: [[0, 1300]],
   showdown: [
@@ -362,6 +364,23 @@ export const gingerTurnMs = (boss: QueenSlainView): number =>
  */
 export const folioTurnMs = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
   powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "fold" | "revision" } => e.kind === "fold" || e.kind === "revision"));
+
+/** Sawyer's Saw Swap came at the start of his turn (as the crowd's check landed: its `sawSwap` among this turn's events). */
+const sawSwapNow = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): boolean => !!boss?.powers?.events?.some((e) => e.kind === "sawSwap");
+
+/**
+ * How long after his thinking screen comes his Saw Swap's moment starts: when the crowd's check that brought it also took his queen,
+ * after QUEEN SLAIN! and its beat (as Ginger's Super Freeze: superFreezeLeadMs), else at once.
+ */
+export const sawSwapLeadMs = (boss: QueenSlainView): number => (sawSwapNow(boss) && queenSlain(boss) ? bossBannerMs() + 500 : 0);
+
+/**
+ * Sawyer's Saw Swap at the start of his turn (Nov 20): it plays while he thinks, so his thinking lasts at least as long (the ms; 0:
+ * none): QUEEN SLAIN! first if his queen just fell (sawSwapLeadMs), the moment (its banner's hold included) and a margin after it
+ * (MOO_CINEMATIC.tailPadMs, as Ginger's Super Freeze: a late frame or a slow connection never cuts its end before his move shows). The
+ * same in solo and on the server.
+ */
+export const sawyerTurnMs = (boss: QueenSlainView): number => (sawSwapNow(boss) ? sawSwapLeadMs(boss) + powerFxMs({ kind: "sawSwap" }) + MOO_CINEMATIC.tailPadMs : 0);
 
 /**
  * Alfil's Slam: its pieces came down early after the crowd's move just played (he had a mate in one only while they

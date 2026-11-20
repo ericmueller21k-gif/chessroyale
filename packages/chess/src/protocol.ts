@@ -420,6 +420,8 @@ export interface NetBossPowers {
   split?: SplitPawn | null;
   cut?: SawCut | null;
   boardSaw?: { at: number; until: number } | null;
+  /** Sawyer's Saw Swap once it has come (once a battle): the crowd turn its check landed on, his king's square before and after. */
+  sawSwap?: { at: number; king: [string, string] } | null;
   /**
    * Wrangler (missing for other bosses): his long pull once his first move is played (null: an ordinary first move), his
    * last lasso drag (the piece, its squares, the crowd turn it set up; `ult`: the drag that stood in for the test

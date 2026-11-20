@@ -2,7 +2,7 @@
  * Sawyer's effects: a saw cut along one edge of a square (its half on each of the two squares: a groove, then taped
  * over as it heals), the crack as his pawn splits, and the board saw's gap down the middle of the board. See ../effects.ts.
  */
-import { BOARD_SAW } from "@chessroyale/chess";
+import { BOARD_SAW, SAW_SWAP } from "@chessroyale/chess";
 import { toGrid } from "../paint.ts";
 import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Speck } from "../sprite.ts";
 import { SQUARE } from "./common.ts";
@@ -254,7 +254,9 @@ export const gapRunStep = (runMs: number) => Math.round(runMs / (GAP_STEPS + 1))
 /**
  * The board saw's gap, a strip GAP_W wide and the board's height: `run` (a groove opening from the bottom to the top in
  * GAP_STEPS + 1 steps over BOARD_SAW.runMs), `part` (the halves parting: wider and wider, a `split` cue), `gap` (loop:
- * the board in two), `close` (the halves coming back together, a `rejoin` cue, ends empty).
+ * the board in two), `close` (the halves coming back together, a `rejoin` cue, ends empty). The Saw Swap's grooves are the same
+ * strip, faster (Nov 20): `swapRun`, the whole run over SAW_SWAP.crossMs (turned a quarter: across the middle, left to right), and
+ * `swapDown`, its top half's run over SAW_SWAP.downMs (from the middle to his edge); both hold their last frame.
  */
 export const BOARD_GAP: Character = {
   id: "boardGap",
@@ -270,6 +272,8 @@ export const BOARD_GAP: Character = {
     part: lazyAnim(() => ({ loop: false, frames: [cutFrame("part7", 160, "split"), cutFrame("part10", 90), cutFrame(`part${GAP_W}`, 100)] })),
     gap: lazyAnim(() => ({ loop: true, frames: [cutFrame(`part${GAP_W}`, 1000)] })),
     close: lazyAnim(() => ({ loop: false, frames: [cutFrame("close10", 110, "rejoin"), cutFrame("close6", 110), cutFrame("close2", 140), cutFrame("empty", 30)] })),
+    swapRun: lazyAnim(() => ({ loop: false, frames: Array.from({ length: GAP_STEPS + 1 }, (_, k) => cutFrame(`run${k}`, gapRunStep(SAW_SWAP.crossMs))) })),
+    swapDown: lazyAnim(() => ({ loop: false, frames: Array.from({ length: GAP_STEPS / 2 + 1 }, (_, k) => cutFrame(`run${GAP_STEPS / 2 + k}`, Math.round(SAW_SWAP.downMs / (GAP_STEPS / 2 + 1)))) })),
   },
 };
 

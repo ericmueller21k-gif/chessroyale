@@ -442,6 +442,8 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     ultimate: { anim: "boardSaw", hit: "bigsaw", onBoard: true, effects: ["boardGap"] },
     more: {
       split: { anim: "sawDown", hit: "cut", onBoard: true, effects: ["sawCrack"] },
+      // (The Saw Swap, Nov 20: his saw at the board's corner as the grooves run, the board saw's gap turned and halved.)
+      sawSwap: { anim: "sawDown", hit: "cut", effects: ["boardGap"] },
       leap: { anim: "leap", hit: "hop", onBoard: true },
     },
   },
