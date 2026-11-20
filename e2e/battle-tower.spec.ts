@@ -465,3 +465,43 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   expect(await inside()).toBe(true);
   await still(page, "shared-floor-babur-wrangler");
 });
+
+test("a shared floor of Puddles and Babur (Eric, Nov 20): every part's name, level and seed meter inside its own part, phone and computer", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  await intoTower(page);
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 2, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["gardener", "tiger"]], deck: [], decks: 1 }), made.user);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
+  await floorThenMatch(page, 2, 2);
+  const bar = page.locator(".tw-bar");
+  await expect(bar.locator('.tw-part[data-boss="gardener"] .seed-meter')).toBeVisible();
+  // Every part's words and meters (its text and what's in it) inside the part's yellow outline, within 1 px: a row never spills across it.
+  const spill = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>(".tw-bar .tw-part")].flatMap((part) => {
+        const a = part.getBoundingClientRect();
+        // (The box inside the 3 px outline: its border is part's own, clientLeft/clientWidth.)
+        const left = a.left + part.clientLeft;
+        const right = left + part.clientWidth;
+        return [...part.querySelectorAll<HTMLElement>(".tw-part-text, .tw-part-text *")]
+          .filter((c) => {
+            const b = c.getBoundingClientRect();
+            return b.width > 0 && (b.left < left - 1 || b.right > right + 1);
+          })
+          .map((c) => `${part.dataset.boss}: ${c.className || c.tagName}`);
+      }),
+    );
+  expect(await spill()).toEqual([]);
+  if (STILLS) {
+    mkdirSync(STILLS, { recursive: true });
+    // (The still without his words over the bar: the bubble is his own, and it hides the row while he speaks.)
+    await expect(bar.locator(".tw-bubble")).toHaveCount(0, { timeout: 30_000 });
+    await bar.screenshot({ path: `${STILLS}/tower-part-fit-${test.info().project.name}.png` });
+  }
+});
