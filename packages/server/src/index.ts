@@ -18,6 +18,7 @@ import { BAN_COOKIE, BAN_HEADER, UNMARK, banAnswer, banGate } from "./ban-gate.t
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { handleTestAccounts } from "./test-accounts.ts";
+import { handleFriendBots } from "./friend-bots.ts";
 import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
 import { deepCheckRun, recountDeep } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
@@ -214,6 +215,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Test accounts (admins, a script through Access, the e2e's key: test-accounts.ts): made, listed and deleted.
     const tests = await handleTestAccounts(request, env);
     if (tests) return tests;
+    // Friend bots on an admin's own friends list (admins, the e2e's key with a session: friend-bots.ts).
+    const bots = await handleFriendBots(request, env);
+    if (bots) return bots;
     // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
     const review = await handleAdmin(request, env, caseMailer(env), waitUntil, containerSearch(env));
     if (review) return review;

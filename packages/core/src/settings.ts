@@ -2154,6 +2154,8 @@ export const BOSS_POWERS = {
    *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter; one the pass guard refuses, with
    *   nothing else unlocked, is checked again on his next turn). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
+   * - **The queen lock's shot** (Eric, Nov 20: the piece goes when the round reaches it): the round flies down the file from his edge,
+   *   `shotStepMs` a square; the piece it hits stays on the board until the round's head reaches its square's middle, then shatters.
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
@@ -2183,6 +2185,7 @@ export const BOSS_POWERS = {
     queenLockFirst: true as boolean,
     meterEvery: 6,
     fireOnUnlock: true as boolean,
+    shotStepMs: 65,
     looks: 3,
     scatterSquares: 4,
     shieldCount: 2,
@@ -3880,6 +3883,24 @@ export const FRIENDS = {
   searchDebounceMs: 250,
   /** …and shows at most this many players (names starting with what was typed, any case). */
   searchMax: 6,
+} as const;
+
+/**
+ * Friend bots (Eric, Nov 20: "some bots on my friends list that like have random activity showing ... as real as we can get"): test
+ * accounts an admin adds to their own friends list from /admin/ops, whose presence is worked out from the time and each bot's id
+ * (server/src/friend-bot-schedule.ts): no timers, no writes. docs/decisions/2026-11-20-friend-bots.md.
+ */
+export const FRIEND_BOTS = {
+  /** Bots one "Add friend bots" makes for the admin who asked (again: the missing ones only). */
+  count: 8,
+  /** A bot's sessions a day, on average: each bot's own number, somewhere in this range. */
+  perDay: [2, 6] as readonly [number, number],
+  /** A session lasts this many minutes (short ones more often). */
+  sessionMinutes: [10, 60] as readonly [number, number],
+  /** Each bot's local time: hours from UTC, one of these (US time zones: their evenings are busiest). */
+  utcOffsets: [-5, -6, -7, -8] as readonly number[],
+  /** How likely a session starts in each local hour, 0 to 23 (relative: evenings most, nights least). */
+  hourWeights: [0.35, 0.15, 0.08, 0.05, 0.04, 0.05, 0.12, 0.3, 0.4, 0.45, 0.5, 0.55, 0.65, 0.6, 0.55, 0.6, 0.75, 0.9, 1.3, 1.7, 1.9, 1.8, 1.4, 0.8] as readonly number[],
 } as const;
 
 /**

@@ -301,6 +301,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     you have a friend who shows when they're online, who's online in it refreshes every `FRIENDS.refreshMs`
     (`/api/friends/online`: the cached session, one D1 read, one hub call). Who's online and in a match come from the
     live hub (the app says "in a match" with its live line, `?busy=1`).
+  - **Friend bots** (Eric, Nov 20, [decision](../decisions/2026-11-20-friend-bots.md)): `/admin/ops`'s Friend bots card (`POST`/`DELETE
+    /api/admin/friend-bots`, `server/src/friend-bots.ts`; admins, or the e2e's key with a session) adds `FRIEND_BOTS.count` test accounts
+    (`fbot-` ids) to the asking admin's own list, or removes them. Their online, busy, `doing` and "Last online" come from
+    `friend-bot-schedule.ts` (the time and the bot's id: a seeded schedule, nothing written, no live hub) in `presenceRows`, `friendsState`
+    and `publicProfile`. Tests: `packages/server/test/friend-bots.test.ts`; `e2e/friends.spec.ts`, "friend bots".
   - **The toast waits** for a front-door page: an invite that arrives during a match or in the queue shows when you're
     back (if it's still open), and its `FRIENDS.toastMs` start only once it's on screen.
 - **Light and dark:** follows the device until you pick (Settings); same layout and accents in both.
