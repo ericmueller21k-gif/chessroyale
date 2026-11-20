@@ -581,6 +581,12 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 20 ~18:30 UTC
+- #850 (moonrise load order) merged 7b1ec32, deployed, main full run green.
+- End-screen mockup DONE (branch claude/end-screen-mockup, stills/end-screen-mockup); sent to Eric with 5 questions (bar span 1,000; ranked card over board; "RP LOST 14"; tap to skip; no-boss modes). WAIT for his answers, then a build helper (high) from `.mockup` on that branch. Don't merge the mockup code.
+- Tower fixes helper (session_01JuCWRvE3735JrqeoJYjAAt) pushed .done at 6cac568a BEFORE Eric's Wrangler refinement; still running on it (off only on SHARED floors; once a game in all modes then grey; showdownMax 2 -> 1). Watcher bbl2aaxip waits for a newer head with .done. Then prep-pr, PR, CI, merge.
+- Then the primary-boss rule (notes/briefs/tower-primary-boss.md, xhigh alone).
+
 ## Live on main (5fd736a, Nov 3 00:20 UTC)
 Nov 1 work plus Nov 2: #456 auto chess reveal, #457 brush ink, #458 shops r1 (Babur, Puddles; buy = Coming soon), #459 Timber
 sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise moves 1-10, #461 boss picker 2 rows on computer, #462 boss tokens + keys + boss crate buying, #463 Colosseum GBA pieces, #464 bot spread, #465 batch B, #466 boss challenge (Alfil custom; Babur, Puddles default), #467 Big Boy home + intro, Timber king attack, #468 challenge pacing (~12 s) + hop clear of stools + e2e sign-in race fix, #469 Last Stand from move 6, #470 boss result screen (two columns, review inline).
