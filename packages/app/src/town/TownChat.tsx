@@ -143,11 +143,16 @@ export function TownChat({ tone: room, onSignIn, onGoTower }: { /** Inside a sho
     log.drop((l) => l.uid !== undefined);
     if (hear === "none") return;
     return openTownFeed({
-      // (The server's own lines, no name, no menu, no account behind them: a boss challenged from the town and how it went, in its
-      // blue; "Ann has entered the town.", in a quiet gray: Nov 12.)
+      // (The server's own lines, no name, no menu: a boss challenged from the town and how it went, in its blue; "Ann has entered the
+      // town.", in a quiet gray: Nov 12. A Battle Tower party's line keeps its leader's account (`from`): muting or blocking them takes it
+      // out with their own lines (the delta review of #835, finding 8); the others have no one behind them.)
       line: (l) =>
         l.sys
-          ? log.say("", l.text, l.sys === "enter" ? "arrival" : "server", Date.now(), { uid: "", n: l.n, ...(l.sys === "party" && typeof l.party === "string" && /^[A-Z2-9]{5}$/.test(l.party) ? { party: l.party } : {}) })
+          ? log.say("", l.text, l.sys === "enter" ? "arrival" : "server", Date.now(), {
+              uid: l.sys === "party" ? l.from : "",
+              n: l.n,
+              ...(l.sys === "party" && typeof l.party === "string" && /^[A-Z2-9]{5}$/.test(l.party) ? { party: l.party } : {}),
+            })
           : log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n, color: l.color }),
       drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
       paused: () => redraw((n) => n + 1),

@@ -5,7 +5,7 @@ import { Confirm } from "../components/MatchMenu.tsx";
 import { InviteSheet } from "../components/Friends.tsx";
 import { PARTY_COLORS } from "../board/logic.ts";
 import { TOWER_WORDS, loadKept, settle, towerApi, type RunKind, type TowerState } from "../tower.ts";
-import { joinTowerPartyAnswer, leaveTowerParty, makeTowerParty, onTowerParty, openTowerParties, openTowerParty, planWords, towerParty, type OpenParty } from "../tower-party.ts";
+import { joinTowerPartyAnswer, leaveTowerParty, makeTowerParty, onTowerParty, openTowerParties, openTowerParty, planWaiting, planWords, towerParty, type OpenParty } from "../tower-party.ts";
 import { chatTestRoom } from "./chat-net.ts";
 import "../tower.css";
 
@@ -34,13 +34,21 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
   const [ask, setAsk] = useState<{ kind: "over"; floor: number } | { kind: "ready" | "start"; heading: string; note: string } | { kind: "kick"; id: string; name: string } | null>(null);
   const [inviting, setInviting] = useState(false);
   const [, redraw] = useState(0);
-  /** The parties open to newcomers (null: not read yet), read as the card opens and every TOWER_PARTY.listPollMs while it shows. */
-  const [opens, setOpens] = useState<OpenParty[] | null>(null);
+  /**
+   * The parties open to newcomers (null: not read yet), read as the card opens and every TOWER_PARTY.listPollMs while it shows; `message`,
+   * why you can't join one (a guest where signing in is set up), shown in the list's box, and then it isn't read again while the card shows.
+   */
+  const [opens, setOpens] = useState<{ parties: OpenParty[]; message: string | null } | null>(null);
   useEffect(() => {
     let live = true;
-    const read = () => void openTowerParties(chatTestRoom() ?? undefined).then((l) => live && l && setOpens(l));
-    read();
+    const read = () =>
+      void openTowerParties(chatTestRoom() ?? undefined).then((l) => {
+        if (!live || !l) return;
+        setOpens(l);
+        if (l.message) clearInterval(t);
+      });
     const t = setInterval(read, TOWER_PARTY.listPollMs);
+    read();
     return () => {
       live = false;
       clearInterval(t);
@@ -116,8 +124,7 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
   const me = p?.me ?? null;
   const leading = !!p?.isLeader;
   const full = (view?.members.length ?? 0) >= TOWER_PARTY.max;
-  const nameOf = (id: string) => view?.members.find((m) => m.id === id)?.name ?? "A member";
-  const plan = planWords(view?.tower?.plan, p?.memberId ?? null, nameOf);
+  const plan = planWords(view?.tower?.plan, p?.memberId ?? null);
   const waiting = view ? view.members.filter((m) => m.id !== view.leaderId && m.connected && !m.ready) : [];
   // (Your party copy under way with your party: its floor is the room's; played alone: the clerk's Continue picks it up.)
   const copyBusy = !!copy?.fight?.lobby;
@@ -143,7 +150,7 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
           ? `Your party climb is on floor ${copy.floor}.`
           : "A climb of 99 floors. One loss ends it."
     : "Reading your climb…";
-  const status = p ? (p.error ?? note ?? (plan.ok && leading && waiting.length ? `${plan.line} Waiting for ${waiting.map((w) => w.name).join(", ")}.` : plan.line || "Joining…")) : (note ?? soloNote);
+  const status = p ? (p.error ?? note ?? (plan.ok && leading && waiting.length ? planWaiting(plan.line, waiting.length) : plan.line || "Joining…")) : (note ?? soloNote);
   return (
     <div class="tw-desk">
       <div class="tw-desk-ways" role="group" aria-label="How to climb">
@@ -163,10 +170,10 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
         <ul class="tw-open-list">
           {opens === null ? (
             <li class="tw-open-none">Reading the open parties…</li>
-          ) : !opens.length ? (
-            <li class="tw-open-none">No open parties right now.</li>
+          ) : !opens.parties.length ? (
+            <li class="tw-open-none">{opens.message ?? "No open parties right now."}</li>
           ) : (
-            opens.map((o) => (
+            opens.parties.map((o) => (
               <li key={o.code} class="tw-open-row">
                 <span class="tw-open-name">{o.leader}</span>
                 <span class="tw-open-n">
@@ -269,8 +276,7 @@ export function TowerPartyUp() {
   const view = p?.party ?? null;
   const leading = !!p?.isLeader;
   const me = p?.me ?? null;
-  const nameOf = (id: string) => view?.members.find((m) => m.id === id)?.name ?? "A member";
-  const plan = planWords(view?.tower?.plan, p?.memberId ?? null, nameOf);
+  const plan = planWords(view?.tower?.plan, p?.memberId ?? null);
   const waiting = view ? view.members.filter((m) => m.id !== view.leaderId && m.connected && !m.ready) : [];
   const go = (confirmed = false) => {
     if (!p) return;

@@ -59,11 +59,14 @@
   text-align: left;
   color: var(--card-gold, #d9bb8c);
 }
+/* (Its rows 3 px apart, the last one with nothing under it: three fit exactly, with no scroll (the delta review of #835, finding 5); its
+   scrollbar's room kept always, so the rows never narrow as one comes and goes on a computer that draws one.) */
 .tw-open-list {
   height: calc(3 * 32px + 2 * 3px);
   margin: 0;
   padding: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
   list-style: none;
   border-radius: 8px;
@@ -78,6 +81,9 @@
   padding: 0 4px 0 8px;
   font-size: 12px;
   text-align: left;
+}
+.tw-open-row:last-child {
+  margin-bottom: 0;
 }
 .tw-open-name {
   flex: 1 1 auto;
@@ -207,9 +213,11 @@
   opacity: 0.35;
   cursor: default;
 }
-/* Room for three lines whatever it says (the plan, a refusal, the solo climb's note), so nothing under it moves. */
+/* Three lines, always, whatever it says (the plan, a refusal, the solo climb's note), so nothing under it moves: a fixed height, never a
+   least one (the delta review of #835, finding 3), and words written to fit it (tower-plan.ts; e2e/tower-party.spec.ts measures the
+   longest). */
 .tw-plan {
-  min-height: calc(3 * 1.3em);
+  height: calc(3 * 1.3em);
   margin: 2px 0 0;
   font-size: 12px;
   line-height: 1.3;

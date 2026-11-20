@@ -252,7 +252,12 @@ export function TownScreen({
   awayOut.current = () => (onAway ?? onBack)();
   /** A boss's challenge (shops/challenge.ts), where it is: "town" when there's none. */
   const flow = useRef<ChallengeFlow>("town");
-  const step = (e: ChallengeEvent) => (flow.current = nextFlow(flow.current, e));
+  /** Whether no challenge is under way (`flow` is "town"), as drawn: the town chat's "Go to the tower" shows greyed meanwhile (finding 6). */
+  const [noChallenge, setNoChallenge] = useState(true);
+  const step = (e: ChallengeEvent) => {
+    flow.current = nextFlow(flow.current, e);
+    setNoChallenge(flow.current === "town");
+  };
   const [shopOut, setShopOut] = useState(false);
   const shopCtl = useRef<ShopCtl | null>(null);
   const fade = useRef<HTMLDivElement>(null);
@@ -373,8 +378,9 @@ export function TownScreen({
   /**
    * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
    * A boss's challenge (`challenge`) goes in the same way, the boss beside you, with its intro's art loading too; the room plays it.
+   * `clerk`: this walk in was the town chat's "Go to the tower" (you land by its clerk, his card open).
    */
-  const goIn = async (id: HomeId, x: number, y: number, challenge = false) => {
+  const goIn = async (id: HomeId, x: number, y: number, challenge = false, clerk = false) => {
     if (doorBusy.current) return;
     doorBusy.current = true;
     opening.current = { home: id, challenge };
@@ -425,17 +431,15 @@ export function TownScreen({
     setShopOut(F.startZoom === 1);
     if (fight) step("inside");
     // (The town chat's "Go to the tower": in by the clerk, its card open on the open parties.)
-    const atKeeper = id === "tower" && toClerk.current;
-    toClerk.current = false;
+    const atKeeper = id === "tower" && clerk;
     setInside({ ...got, fx, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null, ...(atKeeper ? { atKeeper } : {}) });
   };
-  /** The town chat's "Go to the tower" was pressed: the next way into the tower lands by its clerk. */
-  const toClerk = useRef(false);
   /**
    * A Battle Tower party's line's "Go to the tower" (Eric, Nov 20: "wouldn't it make more sense to just say like go to the battle tower
    * ... you should be able to click on the clerk and see the parties"): on the street, the tower's own Go in (you walk to its door and
    * go in), landing by the clerk with his card open on the open parties; in the tower's lobby, you walk to the clerk. Elsewhere (in
-   * another building, up in the tower) it's greyed (`canGoTower`): out first.
+   * another building, up in the tower, or while a boss's challenge plays on the street) it's greyed: out first. The clerk rides with that
+   * walk: a walk elsewhere calls it off, so a later way in by the door is the door's (the delta review of #835, finding 6).
    */
   const goTower = () => {
     const at = insideNow.current;
@@ -445,8 +449,7 @@ export function TownScreen({
     }
     const i = HOMES.findIndex((h) => h.id === "tower");
     if (i < 0 || flow.current !== "town") return;
-    toClerk.current = true;
-    ctl.current?.goIn(i);
+    ctl.current?.goIn(i, true);
   };
   /**
    * The intro is done: the boss's transition sweeps in (outside the town's tree: it stays as the town closes), the battle starts
@@ -932,7 +935,7 @@ export function TownScreen({
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand ?? back?.stand ?? null, () => step("cancel"), (share, step) => {
+    }, (id, x, y, challenge, clerk) => void goIn(id, x, y, challenge, clerk), stand ?? back?.stand ?? null, () => step("cancel"), (share, step) => {
       if (share === null) {
         loaded = true;
         startGuest();
@@ -1108,7 +1111,7 @@ export function TownScreen({
         )}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
-          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} onGoTower={!inside || (inside.room.def.home === "tower" && !inside.room.def.part) ? goTower : undefined} />
+          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} onGoTower={(!inside && noChallenge) || (inside?.room.def.home === "tower" && !inside.room.def.part) ? goTower : undefined} />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
           <div class={card?.kind === "person" ? "town-card town-person" : card?.kind === "home" && !card.confirm && home && shopOf(home.id) ? "town-card town-door" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
@@ -1466,7 +1469,8 @@ function startTown(
   onCard: (c: Card | null) => void,
   seat: Seat | null,
   onPlay: (seat: Seat, face: string | null) => void,
-  onGoIn: (id: HomeId, x: number, y: number, challenge: boolean) => void,
+  /** At a home's door after its "Go in" (`clerk`: the town chat's "Go to the tower" sent you: you land by the tower's clerk). */
+  onGoIn: (id: HomeId, x: number, y: number, challenge: boolean, clerk: boolean) => void,
   /** Back from a boss's challenge: where you stood (you start there). */
   stand: Stand | null = null,
   /** A boss's challenge called off on the way to its door (a tap elsewhere walked you away). */
@@ -1773,6 +1777,8 @@ function startTown(
   let away = false;
   /** A home's "Go in" sent you to its door (its index in HOMES; -1: none): you go in once you stand there. */
   let goingIn = -1;
+  /** That walk is the town chat's "Go to the tower" (set with `goingIn`, so a walk elsewhere calls it off with it). */
+  let goingClerk = false;
   /**
    * A boss's challenge (shops/challenge.ts): the boss walking to its door with you (its index in the bosses; -1: none), and where you
    * stood as you challenged it (the battle's "Back to town" brings you back there).
@@ -1986,7 +1992,8 @@ function startTown(
       goingIn = -1;
       const at = { x: r.W / 2, y: r.H / 2 };
       r.squareAt(h.entry.c, h.entry.r, at);
-      onGoIn(h.id, at.x, at.y, challenging >= 0);
+      onGoIn(h.id, at.x, at.y, challenging >= 0, goingClerk);
+      goingClerk = false;
     }
     stepClose(dt);
     updateCamera(dt, now);
@@ -2863,8 +2870,8 @@ function startTown(
     confirm: () => card && setCard({ ...card, confirm: true }),
     /** A stand-in's Talk (Rolling Dough's guard out front): his card says the boss is inside, a line at random, never the same twice running. */
     talk: () => card?.kind === "boss" && setCard({ ...card, line: pickLine(ZEBRA_OUTSIDE_LINES, card.line ?? null) }),
-    /** A home's "Go in" (a shop's: shops/shops.ts): you walk to the square in front of its door, and go in once there. */
-    goIn: (i: number) => {
+    /** A home's "Go in" (a shop's: shops/shops.ts): you walk to the square in front of its door, and go in once there (`clerk`: "Go to the tower"). */
+    goIn: (i: number, clerk = false) => {
       const h = HOMES[i]!;
       setCard(null);
       leaveClose();
@@ -2873,6 +2880,7 @@ function startTown(
       const to = spotNear(town, town.you.walker, h.door, false);
         if (!to || !walkWalker(town.you.walker, to)) return;
       goingIn = i;
+      goingClerk = clerk;
       follow = true;
       glide = null;
     },
@@ -2899,6 +2907,7 @@ function startTown(
       const beside = spotNear(town, boss.walker, to, true);
       if (beside) walkWalker(boss.walker, beside);
       goingIn = i;
+      goingClerk = false;
       follow = true;
       glide = null;
       return true;
