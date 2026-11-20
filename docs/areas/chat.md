@@ -36,8 +36,9 @@ Lane: `social`.
   server also says "Ann has entered the town." when a player comes in (once per visit, a quick reconnect skipped, a burst as one
   line; a device marked too young reads these lines alone), and the box's foot shows a faint "Tap here to type" / "Click here to
   type" while you aren't typing (`docs/decisions/2026-11-12-town-chat-hints.md`). Since Nov 20 a Battle Tower party open to the town
-  posts "Ann is looking for 3 more to climb the Battle Tower" (`sys` "party", its code in `party`), with a **Join** after its words (a
-  press there is the button's, never the box's); the party's Durable Object takes it out again when the party fills, starts or its
+  posts "Ann is looking for 3 more to climb the Battle Tower" (`sys` "party", its code in `party`), with **Go to the tower** after its
+  words (Eric, Nov 20: a press there is the button's, never the box's, his exception to the typing rule; it takes you to the tower's
+  clerk, whose card lists the open parties; greyed inside another building); the party's Durable Object takes it out again when the party fills, starts or its
   leader leaves, and only that party's own line (`removeParty`: a restart starts the numbers again). Since the review of #835: one line
   an account (a newer replaces the older), a new one at most every `TOWER_PARTY.openGapMs` (a minute); the leader passes the town chat's
   checks first (not banned, no moderator's chat ban, the chat not paused: `townPartyPoster`) and the line carries their account's name;

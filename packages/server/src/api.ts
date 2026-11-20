@@ -212,8 +212,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/quests" &&
     !path.startsWith("/api/quests/") &&
     path !== "/api/tower" &&
-    // (A Battle Tower party's own routes, /api/tower/party…, are the Worker's: index.ts.)
-    (!path.startsWith("/api/tower/") || path.startsWith("/api/tower/party"))
+    // (A Battle Tower party's own routes, /api/tower/party… and the open parties' /api/tower/parties, are the Worker's: index.ts.)
+    (!path.startsWith("/api/tower/") || path.startsWith("/api/tower/party") || path === "/api/tower/parties")
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
