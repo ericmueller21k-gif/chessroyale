@@ -40,7 +40,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   - "Delete account" keeps the flag.
 - **Signing in keeps what you played as a guest.** A new identity attaches to your current account; one that already
   belongs to an account switches you to it, moves your guest results, items, coins, crates, crate keys, boss tokens and Battle Tower
-  climbs and bests over (of two open climbs of a kind the higher floor stays, the account's on a tie: `towerMoves`, tower.ts) and deletes the
+  climbs and bests over (of two open climbs of a kind the higher floor stays, the account's on a tie; a party copy naming the guest names
+  the account instead: `towerMoves`, tower.ts) and deletes the
   empty guest. That whole merge is one batch (one transaction): two sign-ins at once move the coins once, a buy in
   another tab lands wholly before it or wholly after, and a failure moves nothing (`sign-in-races.test.ts`;
   [docs/decisions/2026-10-16-sign-in-races.md](../decisions/2026-10-16-sign-in-races.md)). The guest's reports (made
@@ -170,7 +171,7 @@ policy's "Friends" entry (`screens/Legal.tsx`) says the same in plain words.
 | `friends` (user_id, friend_id, since) | A friendship, one row per side | Until either removes it, blocks, or deletes their account |
 | `friend_requests` (from_id, to_id, at) | A request waiting for an answer | Until answered or taken back; unanswered, `FRIENDS.requestDays` (30) |
 | `blocks` (user_id, blocked_id, at) | Who you've blocked | Until you unblock (or either account is deleted) |
-| `invites` (from_id, to_id, kind, code, at, expires_at) | An open invite: the lobby's mode, "squads" or "crowdparty", and its code | `FRIENDS.inviteMinutes` (10), then pruned within 10 minutes; one per pair |
+| `invites` (from_id, to_id, kind, code, at, expires_at) | An open invite: the lobby's mode, "squads", "crowdparty" or "tower" (a Battle Tower party, Nov 20), and its code | `FRIENDS.inviteMinutes` (10), then pruned within 10 minutes; one per pair |
 | `friend_limits` (user_id, kind, window_start, n) | Requests sent today, invites sent this hour (the caps) | A day |
 | `users.allow_invites` | Who may invite you: NULL everyone, "friends", "none" | With the account |
 | `users.hide_online` | 1: online and last seen hidden from everyone | With the account |

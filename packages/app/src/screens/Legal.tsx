@@ -228,11 +228,12 @@ function Privacy() {
           <p>
             Your climbs: the floor each is on (or ended on), the bosses dealt for each floor so far, whether it's going, finished,
             lost or set aside (when signing in brought two climbs together, the lower one), the last floor result your device sent, when it began
-            and last changed, and when a floor you're playing began (our server times it). Your best floor.
+            and last changed, and when a floor you're playing began (our server times it). Your best floor. A party's climb: your own copy
+            of it, which names the players who climbed it with you (their accounts), and theirs name you.
           </p>
         }
-        why="so you can stop after any floor and carry on later, on any device, a floor's result counts once (sent again, it gets the same answer), and your best floor is yours."
-        kept="a climb, whether it's going, ended or set aside, until you start your next one, or the account is deleted; your best floor until the account is deleted."
+        why="so you can stop after any floor and carry on later, on any device, a floor's result counts once (sent again, it gets the same answer), your best floor is yours, and the players you climbed with can climb on together with you later."
+        kept="a climb, whether it's going, ended or set aside, until you start your next one, or the account is deleted; your best floor until the account is deleted. Deleting your account takes your name off the other players' copies of a party's climb."
       />
       <Item
         title="The engine server"

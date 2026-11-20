@@ -35,7 +35,10 @@ Lane: `social`.
   and signed-in players' typed messages, below): its look in [town-square.md](town-square.md), "The chat log". Since Nov 12 the
   server also says "Ann has entered the town." when a player comes in (once per visit, a quick reconnect skipped, a burst as one
   line; a device marked too young reads these lines alone), and the box's foot shows a faint "Tap here to type" / "Click here to
-  type" while you aren't typing (`docs/decisions/2026-11-12-town-chat-hints.md`).
+  type" while you aren't typing (`docs/decisions/2026-11-12-town-chat-hints.md`). Since Nov 20 a Battle Tower party open to the town
+  posts "Ann is looking for 3 more to climb the Battle Tower" (`sys` "party", its code in `party`), with a **Join** after its words (a
+  press there is the button's, never the box's); the party's Durable Object takes it out again when the party fills, starts or its
+  leader leaves ([battle-tower.md](battle-tower.md), "The party").
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`
   phrases and `maxEmoji` emoji (the defaults until they choose). Bots use the whole list.
 - **Packs.** Free packs everyone has; more are sold in the shop (`QUICK_CHAT.packPrices`; `core/shop.ts` lists them
