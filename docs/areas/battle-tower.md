@@ -10,8 +10,9 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 
 - A climb of up to 99 floors (a skyscraper), alone or as a party of up to 4, opened from the town's clerk only (Eric, Nov 19: no home card). Each floor is
   one game from the starting position against 1, 2 or 3 bosses at once on one board (the pattern 1, 2, 2, 3 looping), taking turns
-  to move, each with its own powers and meter, stronger every floor: Maia from 600, +100 a floor, to 2500 (a lone boss +200);
-  from floor 51 Stockfish from 2500, +25 a floor, to full strength.
+  to move, each with its own powers and meter, stronger every floor: Maia from 600, +20 a floor to floor 5, +30 to 10, +40 to 30,
+  then +4 a floor (held about 1630 to 1710 to floor 50; a lone boss +100); from floor 51 Stockfish from 1750, +31 a floor, its best
+  on floor 99 (Eric, Nov 20).
 - Every boss's moves are in, a few with a one-line rule; Hollow and Smudgy never share a floor, and for now neither do Smudgy + Alfil, Alfil + Jefferson and Dash + Smudgy (Nov 19); the Hidden Boss isn't in the tower.
 - You play White (random sides later). One loss (or a draw, or leaving) ends the run. Every floor is one snug room in HunChess's colors (the town's
   challenge room as the model: `town/shops/challenge.ts`), its number big on both side walls; you walk in to the board and the
@@ -64,9 +65,9 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 ## The climb (built, PR 8)
 
 - **Core `tower.ts`**, plain data and pure functions for the server to save (PR 9): `floorBossCount` (`BATTLE_TOWER.pattern` looping),
-  `floorStrength(floor, bosses)` (Maia `maiaStart` + `maiaStep` a floor, held at Maia's top; a lone boss `soloBonus` more, within
-  the caps; Stockfish from `stockfishFrom` at `stockfishStart` + `stockfishStep`, held at `ENGINE_MAX_ELO` on floor 79, its best from
-  80), `towerPool(off)` (every playable boss: never the hidden one or one in the game for admins first; minus the kill switches).
+  `floorStrength(floor, bosses)` (Maia `maiaStart`, then each floor its `maiaSteps` row's step, `maiaFloorRating`, held at Maia's top; a lone boss `soloBonus` more, within
+  the caps; Stockfish from `stockfishFrom` at `stockfishStart` + `stockfishStep`, held at `ENGINE_MAX_ELO` on floor 98, its best on
+  99), `towerPool(off)` (every playable boss: never the hidden one or one in the game for admins first; minus the kill switches).
 - **A run** (`TowerRun`: `seed`, `floors` dealt so far, the last the floor to fight, `deck`, `decks`, `status` open, top or out):
   `newRun(seed, pool)`, `startFloor(run, pool)` (the only way into a floor: its bosses from the deal, dealt again if the pool no longer
   allows them; its runner settings), `finishFloor(run, "won" | "lost" | "drawn", pool)` (a win deals the next floor; floor 99 won:
