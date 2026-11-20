@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, asAdmin, engineTop, submitMove, test, bossAloneFromHome, openBossRaid } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, engineTop, pickMove, submitMove, test, bossAloneFromHome, openBossRaid } from "./helpers.ts";
 
 /**
  * The boss battle's dock under the board, on every screen (Eric, Oct 15, after his Hidden Boss playtest):
@@ -30,12 +30,9 @@ async function quietMove(page: Page) {
     const m = (window as any).match;
     return { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null };
   });
-  const all = new Chess(fen).moves({ verbose: true }).filter((m) => !allowed || allowed.includes(m.lan));
-  // (A quiet one when there is one; in check, every answer can be a capture (PR #300's CI: Ginger had taken the queen
-  // with check), and then any allowed move.)
-  const quiet = all.filter((m) => !m.captured && !m.promotion);
-  const moves = quiet.length ? quiet : all;
-  await submitMove(page, (moves.find((m) => m.piece === "p") ?? moves[0]!).lan, fen);
+  // (pickMove: a quiet one when there is one, a pawn's first; in check, every answer can be a capture (PR #300's CI: Ginger had taken
+  // the queen with check), and then any allowed move; never one that lets the boss mate at once.)
+  await submitMove(page, pickMove(fen, { allowed, prefer: (m) => m.piece === "p" }), fen);
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }
 

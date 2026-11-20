@@ -879,6 +879,9 @@ test("the speech tail points at the picked boss's mouth: its tip within 24 px of
     await tile(page, name).click();
     await expect(page.locator(".bs-name")).toHaveText(name);
     await expect(bubble(page)).toBeVisible();
+    // (The figure comes with the match's screens, loaded as this screen opens (lazy-game.ts): the first tap can beat it, and the tail is
+    // placed as it lands. CI main Nov 20: measured before it, the figure was null. Wait for its paint, as the other stage checks do.)
+    await expect.poll(() => figureDrawn(page), { timeout: 15_000, message: `${name}'s figure drawn` }).toBe(true);
     const at = SAY_AT[id] ?? SAY_AT_DEFAULT;
     const { tipX, mouthX } = await page.evaluate(
       ({ x }) => {

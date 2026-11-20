@@ -1,8 +1,7 @@
 import { expect, type Page } from "@playwright/test";
-import { Chess } from "chess.js";
 import { BOSS_ROSTER, isPlayable } from "@chessroyale/core";
 import { BOSS_KITS } from "../packages/app/src/characters/kits.ts";
-import { bossAloneFromHome, submitMove, test } from "./helpers.ts";
+import { bossAloneFromHome, pickMove, submitMove, test } from "./helpers.ts";
 
 /**
  * The boss bar above the board, for every playable boss (docs/decisions/2026-10-23-boss-bar.md; Eric, Oct 23):
@@ -199,13 +198,9 @@ async function quietMove(page: Page) {
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
   const s = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
-  // (Every legal move, a quiet one preferred: a position with none (only captures or promotions left, e.g. out of a check) plays
-  // whatever the boss's powers allow. CI main Nov 20: no quiet move left, the pick was undefined.)
-  const all = new Chess(s.fen).moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), knight: m.piece === "n", quiet: !m.captured && !m.promotion }));
-  const ok = all.filter((m) => !s.allowed || s.allowed.includes(m.uci));
-  const pick = ok.find((m) => m.quiet && m.knight) ?? ok.find((m) => m.quiet) ?? ok[0] ?? all[0];
-  expect(pick, "a legal move to play").toBeTruthy();
-  await submitMove(page, pick!.uci, s.fen);
+  // (pickMove: a move the boss's powers allow, a quiet knight's first, any legal one when none is quiet (CI main Nov 20: no quiet move
+  // left), never one that lets him mate at once.)
+  await submitMove(page, pickMove(s.fen, { allowed: s.allowed, prefer: (m) => m.piece === "n" }), s.fen);
 }
 
 test("his level follows his strength: lifted in Moo's Full Moon (gold, an arrow), back to his own after it", async ({ page }) => {
