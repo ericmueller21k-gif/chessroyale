@@ -234,7 +234,7 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
   const box = page.getByTestId("es-track-xp");
   await expect(rewards(page)).toHaveAttribute("data-es", "done", { timeout: 120_000 });
   await expect(box.getByTestId("es-who-xp")).toHaveText("WWWWWWWWWWWWWWWW");
-  expect(await box.locator(".es-who").evaluate((e) => e.scrollWidth > e.clientWidth), "the long name is cut short").toBe(true);
+  expect(await box.getByTestId("es-who-xp").evaluate((e) => e.scrollWidth > e.clientWidth), "the long name is cut short").toBe(true);
   await topRowFits(box, false);
   await expect(box.locator(".es-gain")).toHaveText("+300 XP");
   await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win (paid once today) +0");
@@ -248,7 +248,8 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
 test("a tap anywhere but a button skips the whole sequence to its end (Eric, Nov 20): the final numbers at once, and it stays there", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await sampleXp(page);
-  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12");
+  // (Quests no solo boss game can finish, as the level-up test's.)
+  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12&quests=squad-up,fifty-fifty,regular");
   await xpIs(page, 990);
   await bossAloneFromHome(page);
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");

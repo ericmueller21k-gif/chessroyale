@@ -35,7 +35,8 @@ async function wonGame(page: Page, xp: number, moves: number | null = null) {
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
   await submitMove(page, "h5f7");
   await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
-  await expect(page.getByTestId("xp-box")).toHaveClass(/xp-done/, { timeout: 20_000 });
+  // (The end screen's sequence to its end, Nov 20: the toast comes after it.)
+  await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
 }
 
 /** The locker as the server has it. */
@@ -55,9 +56,8 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
   test.setTimeout(9 * 60_000);
   await oneXpDay(5);
   await wonGame(page, 0, 20);
-  const box = page.getByTestId("xp-box");
-  await expect(box.locator(".xp-parts")).toHaveText("Win +50 · Daily reward +200");
-  await expect(box.locator(".xp-gain")).toHaveText("+370 XP");
+  await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win +50 · Daily reward +200");
+  await expect(page.getByTestId("es-track-xp").locator(".es-gain")).toHaveText("+370 XP");
   const toast = page.getByTestId("reward-box");
   await expect(toast).toContainText("Daily reward");
   await expect(toast).toContainText("Daily reward: +1 Winter Crate");
@@ -69,7 +69,7 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
   await expect(toast).toHaveCount(0, { timeout: 10_000 });
   // The next game today: its own XP, no daily reward.
   await wonGame(page, 370, 20);
-  await expect(page.getByTestId("xp-box").locator(".xp-parts")).toHaveText("Win +50");
+  await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win +50");
   await expect(page.getByTestId("reward-box")).toHaveCount(0);
   expect((await locker(page)).seriesCrates).toEqual({ "winter-1": 1 });
 });

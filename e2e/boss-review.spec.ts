@@ -41,17 +41,17 @@ async function playAndResign(page: Page, boss: string, moves: number) {
   await expect(page.locator(".results h1")).toHaveText("You resigned");
 }
 
-test("a boss's picture never covers the title: the flag, the title, the picture, then the result line (Ginger, Jefferson, Big Boy)", async ({ page }) => {
+test("a boss's picture never covers the title: the title and its line, the picture, then the XP bar (Ginger, Jefferson, Big Boy)", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   for (const boss of ["gingerbread", "grex", "bigboy"]) {
     await playAndResign(page, boss, 0);
     const [title, picture, result] = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
-      return [r(".results h1"), r(".results .boss-char-sprite"), r(".results .team-result")];
+      return [r(".results .es-head"), r(".results .boss-char-sprite"), r(".results .es-track-xp")];
     });
-    // Nothing intersects: the picture starts under the title, and the result line under the picture.
+    // Nothing intersects: the picture starts under the headline (the end screen, Nov 20: its line too), and the XP bar under it.
     expect(picture.top, `${boss}: the picture under the title`).toBeGreaterThanOrEqual(title.bottom);
-    expect(result.top, `${boss}: the result line under the picture`).toBeGreaterThanOrEqual(picture.bottom - 1);
+    expect(result.top, `${boss}: the XP bar under the picture`).toBeGreaterThanOrEqual(picture.bottom - 1);
     await page.getByRole("button", { name: "Home", exact: true }).click();
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   }
