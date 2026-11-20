@@ -219,7 +219,7 @@ export function drawMove(
 ): string {
   const among = (xs: readonly string[]) => xs[Math.floor(rng() * xs.length)]!;
   const distinct = [...new Set(moves)];
-  if (rule === "party") return partyMove(moves, losses, rng, expected);
+  if (rule === "party") return partyMove(moves, losses, rng, expected, settings.partyCloseCp ?? BOSS_PARTY.closeCp);
   if (rule === "popular" && settings.crowdPick) {
     // (The 50 v 50 rework: one draw over its mode's odds, in their order.)
     const odds = Object.entries(crowdPickOdds(settings.crowdPick, moves, losses, CROWD_PICK, majorityOf(settings)));

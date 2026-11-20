@@ -48,7 +48,8 @@ export interface QuestsAnswer {
  * word, as its moves and its win are), and a win whose XP was paid.
  */
 export interface QuestGame {
-  mode: "classic" | "crowd" | "boss" | "squads" | "duel" | "solo" | "soloBoss";
+  /** ("tower": a Battle Tower party's floor, the room's word: any and win quests, never the boss quests: Eric, Nov 20.) */
+  mode: "classic" | "crowd" | "boss" | "squads" | "duel" | "solo" | "soloBoss" | "tower";
   /** Won, and its win XP paid (the server checks the ledger: a friends' lobby's win pays once a day per opponent). */
   won: boolean;
   /** Your time in it by the server's clock, ms (a solo game needs QUESTS.soloMinMinutes of it). */

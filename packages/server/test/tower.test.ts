@@ -501,7 +501,7 @@ describe("the API", () => {
     expect((await call(d1, cookie, "/api/tower")).body).toMatchObject({ runs: { solo: { floor: 2, fight: null } }, best: { solo: 1 } });
   });
 
-  it("without test switches a win at once is too soon; solo resting refuses a new run or floor, never one under way; a party run, later; no session, 401", async () => {
+  it("without test switches a win at once is too soon; solo resting refuses a new run or floor, never one under way; a party run only from its START; no session, 401", async () => {
     const { sql, d1 } = await world();
     const ann = await signedIn(sql, "ann@example.com", Date.now());
     const cookie = await cookieOf(sql, ann.id);
@@ -515,7 +515,8 @@ describe("the API", () => {
     expect(await call(d1, cookie, "/api/tower/run", { confirm: true }, resting)).toEqual({ status: 503, body: { message: "Solo and Boss alone are resting for a bit. Back soon.", paused: "solo" } });
     await call(d1, cookie, "/api/tower/run", {});
     expect(await call(d1, cookie, "/api/tower/floor/start", {}, resting)).toMatchObject({ status: 503, body: { paused: "solo" } });
-    expect(await call(d1, cookie, "/api/tower/run", { kind: "party" })).toEqual({ status: 400, body: { message: "Party runs aren't open yet." } });
+    // (Nov 20: a party's climb begins at its party's START, never here: tower-party.test.ts.)
+    expect(await call(d1, cookie, "/api/tower/run", { kind: "party" })).toEqual({ status: 400, body: { message: "A party's climb starts from its START at the clerk." } });
     expect((await call(d1, null, "/api/tower")).status).toBe(401);
     expect((await call(d1, cookie, "/api/tower/nope", {})).status).toBe(404);
   });

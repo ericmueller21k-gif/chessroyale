@@ -10,10 +10,10 @@ export const isInviteSetting = (v: unknown): v is InviteSetting => (INVITE_SETTI
 
 /**
  * What an invite is for: a private lobby in one of the modes (its link is /lobby/CODE), a Squads party
- * (/squads/party/CODE), or a 50 v 50 party ("crowdparty", Nov 16: no link, its invite is the only way in). Joining is
- * joining the lobby or the party.
+ * (/squads/party/CODE), a 50 v 50 party ("crowdparty", Nov 16: no link, its invite is the only way in), or a Battle Tower party
+ * ("tower", Nov 20: its way in is the town's tower, the clerk's card). Joining is joining the lobby or the party.
  */
-export const INVITE_KINDS = ["crowd", "raid", "classic", "squads", "crowdparty"] as const;
+export const INVITE_KINDS = ["crowd", "raid", "classic", "squads", "crowdparty", "tower"] as const;
 export type InviteKind = (typeof INVITE_KINDS)[number];
 export const isInviteKind = (v: unknown): v is InviteKind => (INVITE_KINDS as readonly unknown[]).includes(v);
 
@@ -24,6 +24,7 @@ export const isGameCode = (v: unknown): v is string => typeof v === "string" && 
 export function inviteWhat(kind: InviteKind): string {
   if (kind === "squads") return "their Squads party";
   if (kind === "crowdparty") return "their 50 v 50 party";
+  if (kind === "tower") return "climb the Battle Tower";
   if (kind === "raid") return "a Boss Battle";
   if (kind === "classic") return "a Classic lobby";
   return "a Crowd lobby";

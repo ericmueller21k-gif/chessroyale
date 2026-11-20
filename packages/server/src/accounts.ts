@@ -49,7 +49,7 @@ import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
 import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
 import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
-import { TOWER_SCHEMA, towerMoves } from "./tower.ts";
+import { TOWER_SCHEMA, holdsPartyCopy, towerMoves } from "./tower.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { botPresence, isFriendBot } from "./friend-bot-schedule.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
@@ -726,7 +726,8 @@ async function signIn(
         // (Quests, Nov 9: the guest's go; the account keeps its own. What they paid is in the balances moved above.)
         ...questDeletes(current.id),
         // (The Battle Tower, Nov 19: the guest's climbs and bests; of two open runs of a kind, the higher floor's stays open.)
-        ...towerMoves(current.id, owner.id, now),
+        // (Its party copies' others name the account in its place: only read through when the guest holds a party copy.)
+        ...towerMoves(current.id, owner.id, now, { party: await holdsPartyCopy(sql, current.id) }),
         // (The guest's calls to the engine server today: the account's own count stands.)
         stmt("DELETE FROM engine_calls WHERE user_id = ?", current.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),

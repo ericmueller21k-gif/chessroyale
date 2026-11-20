@@ -17,7 +17,11 @@ import type { FxDraw, RoomFx } from "./ShopRoom.tsx";
 import { sideWalls } from "./side-walls.ts";
 import { SHOP_TOWER_FLOOR_N, SHOP_TOWER_FLOOR_STOOL_PALETTE, SHOP_TOWER_FLOOR_TABLE_PALETTE, SHOP_TOWER_FLOOR_WALL_H, towerFloorWallGrid } from "./tower-floor-art.ts";
 import { BOSS_ZEBRA } from "./zebra-don.ts";
-import { FLOOR_TABLE, bossAt, piecesAt, type BossNow, type FloorMode, type FloorTimes } from "./tower-floor.ts";
+import { FLOOR_TABLE, bossAt, mateAt, piecesAt, type BossNow, type FloorMode, type FloorTimes } from "./tower-floor.ts";
+import { PAWN_FOOT, pawnImage } from "../render.ts";
+import { PARTY_COLORS } from "../../board/logic.ts";
+import type { RunKind } from "../../tower.ts";
+import type { PartyFloorEntry } from "../../tower-party.ts";
 
 const SQ = 37;
 
@@ -31,6 +35,12 @@ export interface FloorScript {
   t0: number | null;
   /** Where the table's board is on screen now (the room's box), for the zoom into it; null until drawn. */
   board: { x: number; y: number } | null;
+  /** Which of your runs this floor is (your solo run, or your party copy played alone; Nov 20). */
+  kind?: RunKind;
+  /** A party's floor (Nov 20): its match room to join after the walk-in. */
+  party?: PartyFloorEntry;
+  /** The others in your party, in seat order (their pawns in their seat colors walk in after you, to their marks beside yours). */
+  mates?: readonly { seat: number }[];
 }
 
 /** A boss's town figure (his own; Don Dough's, met in his back room, his intro's), or null: a boss this app doesn't draw (drawn safely: not at all). */
@@ -128,6 +138,31 @@ export function towerFloorFx(s: FloorScript): RoomFx {
     },
   });
   const bosses = [0, 1, 2].map(bossFig);
+  /** Each party member's pawn picture, made the first time it's drawn (nothing made a frame). */
+  const mateImgs: (HTMLCanvasElement | undefined)[] = [];
+  /** Party member `i`'s pawn this frame (Nov 20): the plain pawn in their seat's color, walking in after you to their mark. */
+  const mateFig = (i: number) => ({
+    z: 0,
+    draw: (d: FxDraw, now: number) => {
+      const m = s.mates?.[i];
+      if (!m) return;
+      const b = mateAt(i, s.mode === "fight" ? (s.times ?? null) : null, t(now), now1);
+      if (b.a <= 0 || !at(d, b.c, b.r)) return;
+      const img = (mateImgs[i] ??= pawnImage("light", PARTY_COLORS[m.seat] ?? PARTY_COLORS[0]));
+      const h = TOWN_FEEL.youSquares * pt.k;
+      const hop = b.walking ? Math.abs(Math.sin((now / TOWN_FEEL.youStepMs) * Math.PI)) * 0.06 * pt.k : 0;
+      const g = d.g;
+      g.save();
+      g.fillStyle = "rgba(14,16,20,0.28)";
+      g.beginPath();
+      g.ellipse(pt.x, pt.y, h * 0.22, pt.k * 0.1, 0, 0, Math.PI * 2);
+      g.fill();
+      g.imageSmoothingEnabled = true;
+      g.drawImage(img, pt.x - h / 2, pt.y - h * PAWN_FOOT - hop, h, h);
+      g.restore();
+    },
+  });
+  const mates = [0, 1, 2].map(mateFig);
   const list: { z: number; draw: (d: FxDraw, now: number) => void }[] = [];
   return {
     figures: (now) => {
@@ -139,6 +174,10 @@ export function towerFloorFx(s: FloorScript): RoomFx {
           bosses[i]!.z = b.r;
           list.push(bosses[i]!);
         }
+      for (let i = 0; i < (s.mates?.length ?? 0) && i < 3; i++) {
+        mates[i]!.z = mateAt(i, s.mode === "fight" ? (s.times ?? null) : null, t(now), now1).r;
+        list.push(mates[i]!);
+      }
       return list;
     },
     // (The elevator's doors: open while the bosses come out, and after a win (the way up); shut otherwise.)
