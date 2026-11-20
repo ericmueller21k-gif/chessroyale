@@ -98,6 +98,8 @@
     "packages/app/src/net.ts",
     "packages/app/src/engine.ts",
     "packages/app/src/account.ts",
+    "packages/app/src/site-gate.ts",
+    "packages/app/src/components/SiteGateNotice.tsx",
     "packages/app/src/prefs.ts",
     "packages/app/src/hooks.ts",
     "packages/app/src/test-switches.ts",
@@ -767,6 +769,7 @@
       "paths": [
         "packages/app/src/screens/Profile.tsx",
         "packages/app/src/screens/PlayerProfile.tsx",
+        "packages/app/src/components/AccountTrouble.tsx",
         "packages/app/src/item-details.ts",
         "packages/app/src/screens/PublicProfile.tsx",
         "packages/app/src/profile-nav.ts",
