@@ -24,13 +24,17 @@ import { isPaused, pausedBosses } from "./kill-switches.ts";
 import { TOWER_LINES, commitPartyFloor, preparePartyFloor, type LobbyGone, type PartyFloorPrep, type PartyRefusal } from "./tower.ts";
 import { partyOpenText } from "./town-chat.ts";
 import { chatRoomOf, townPartyPoster } from "./town-chat-api.ts";
-import { towerPool } from "@chessroyale/core";
+import { livesLeft, towerPool } from "@chessroyale/core";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
 
-/** A Battle Tower party's plan as the party keeps it (TowerPartyPlan), from a floor ready to begin (tower.ts preparePartyFloor). */
-const planOf = (prep: PartyFloorPrep): TowerPartyPlan["plan"] => (prep.plan.kind === "continue" ? { kind: "continue", floor: prep.floor, back: prep.plan.back } : prep.plan);
+/**
+ * A Battle Tower party's plan as the party keeps it (TowerPartyPlan), from a floor ready to begin (tower.ts preparePartyFloor); climbing on
+ * together, its lives left (Nov 20: the fewest any copy holds there), so a change of them changes the plan (everyone readies again).
+ */
+const planOf = (prep: PartyFloorPrep): TowerPartyPlan["plan"] =>
+  prep.plan.kind === "continue" ? { kind: "continue", floor: prep.floor, back: prep.plan.back, lives: livesLeft(prep.run) } : prep.plan;
 
 /** What a socket carries: who it is once they've said hello, and what the request said about them. */
 interface Attached {

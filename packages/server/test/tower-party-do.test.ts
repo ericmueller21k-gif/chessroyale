@@ -143,6 +143,23 @@ describe("a Battle Tower party's START (SquadsParty.makeTowerFloor; the review o
     for (const u of [ann.id, bo.id]) expect(JSON.parse((await copy(W.sql, u))!.fight!).lobby).toBe(W.made[0]);
   });
 
+  it("climbing on together, the plan carries the climb's lives left (Nov 20); a floor lost since, one fewer", async () => {
+    const W = await world();
+    const [ann, bo] = [await signedIn(W.sql, "ann@example.com", Date.now()), await signedIn(W.sql, "bo@example.com", Date.now())];
+    await climbedOnce(W.sql, [ann.id, bo.id], Date.now());
+    const a = await W.join(ann.id, "Ann");
+    const b = await W.join(bo.id, "Bo");
+    expect(b.party()!.party.tower!.plan).toMatchObject({ kind: "continue", floor: 2, lives: 2 });
+    await W.send(b, { t: "ready", on: true });
+    await W.send(a, { t: "start" });
+    // (Floor 2 lost by the party: a life spent, both copies on floor 3; the plan read again shows it.)
+    const fight = JSON.parse((await copy(W.sql, ann.id))!.fight!).id as string;
+    for (const uid of [ann.id, bo.id]) await partyFloorWrite(W.sql, Date.now() + 60_000, fight, { uid, outcome: "lost" }, { pool: POOL });
+    const read = await preparePartyFloor(W.sql, [ann.id, bo.id], Date.now(), { pool: POOL });
+    expect(read.ok && read.prep.plan.kind === "continue" && read.prep.floor).toBe(3);
+    expect(read.ok && read.prep.run.lost).toEqual([2]);
+  });
+
   it("a plan changed between READY and START: refused before any room is made, nobody placed, the new plan shown and everyone un-readied", async () => {
     const W = await world();
     const [ann, bo, cy] = [await signedIn(W.sql, "ann@example.com", Date.now()), await signedIn(W.sql, "bo@example.com", Date.now()), await signedIn(W.sql, "cy@example.com", Date.now())];

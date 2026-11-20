@@ -85,16 +85,58 @@ describe("one run, a copy each", () => {
     expect(st.best.party).toBe(1);
   });
 
-  it("a loss or a draw ends every copy; a member who left: free before the party's 2nd move, else a loss; one who never came: free", async () => {
+  it("a loss or a draw costs a life and the copy climbs on (Nov 20); a member who left: free before the party's 2nd move, else a loss (a life); one who never came: free", async () => {
     const sql = await world();
     const [ann, bo, cy] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com"), await signedIn(sql, "cy@example.com")];
     const { fight } = await begin(sql, [ann.id, bo.id, cy.id], T0);
     await partyFloorWrite(sql, T0 + 1, fight.id, { uid: cy.id, outcome: "left", moves: 1 }, { pool: POOL });
     expect(await copyOf(sql, cy.id)).toMatchObject({ floor: 1, status: "open", fight: null });
     await partyFloorWrite(sql, T0 + 2, fight.id, { uid: bo.id, outcome: "left", moves: BATTLE_TOWER.leaveFreeBefore }, { pool: POOL });
-    expect((await sql.first<{ status: string }>("SELECT status FROM tower_runs WHERE user_id = ? AND kind = 'party'", bo.id))!.status).toBe("out");
+    expect(await copyOf(sql, bo.id)).toMatchObject({ floor: 2, status: "open", fight: null });
     await partyFloorWrite(sql, T0 + 3, fight.id, { uid: ann.id, outcome: "drawn" }, { pool: POOL });
-    expect((await sql.first<{ status: string }>("SELECT status FROM tower_runs WHERE user_id = ? AND kind = 'party'", ann.id))!.status).toBe("out");
+    expect(await copyOf(sql, ann.id)).toMatchObject({ floor: 2, status: "open", fight: null });
+    // (The draw and the counted leave: the same floor lost, the same deal on both copies; neither is a party best.)
+    expect((await copyOf(sql, ann.id))!.met).toBe((await copyOf(sql, bo.id))!.met);
+    expect(JSON.parse((await copyOf(sql, ann.id))!.met)).toMatchObject({ lost: [1], won: 0 });
+    expect((await towerState(sql, ann.id, POOL)).runs.party).toMatchObject({ floor: 2, lives: 1, lost: [1] });
+    expect(await best(sql, ann.id, "party")).toBe(0);
+  });
+
+  it("lives (Nov 20): one count for the party, every copy alike; climbing on together again, the fewest any copy holds (in any seat order), in the plan; the third loss ends every copy", async () => {
+    const sql = await world();
+    const [ann, bo] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com")];
+    const uids = [ann.id, bo.id];
+    let now = T0;
+    // Floor 1 won, floor 2 lost: both copies on floor 3, one life left, alike.
+    let f = await begin(sql, uids, (now += 1000));
+    await end(sql, f.fight, uids, "won", (now += 1000));
+    f = await begin(sql, uids, (now += 1000));
+    expect(f.prep.plan).toMatchObject({ kind: "continue", floor: 2 });
+    await end(sql, f.fight, uids, "lost", (now += 1000));
+    for (const uid of uids) expect((await towerState(sql, uid, POOL)).runs.party).toMatchObject({ floor: 3, lives: 1, lost: [2], fight: null });
+    expect((await copyOf(sql, ann.id))!.met).toBe((await copyOf(sql, bo.id))!.met);
+    // Floor 3: the party plays on with one life; Bo leaves after the party's 2nd move (a loss: his last life), Ann's party wins it.
+    f = await begin(sql, uids, (now += 1000));
+    expect(f.prep.run.lost).toEqual([2]);
+    await partyFloorWrite(sql, (now += 1000), f.fight.id, { uid: bo.id, outcome: "left", moves: 5 }, { pool: POOL });
+    await partyFloorWrite(sql, now, f.fight.id, { uid: ann.id, outcome: "won" }, { pool: POOL });
+    expect((await towerState(sql, ann.id, POOL)).runs.party).toMatchObject({ floor: 4, lives: 1, lost: [2] });
+    expect((await towerState(sql, bo.id, POOL)).runs.party).toMatchObject({ floor: 4, lives: 0, lost: [2, 3] });
+    expect([await best(sql, ann.id, "party"), await best(sql, bo.id, "party")]).toEqual([3, 1]);
+    // Together again on floor 4: the fewest lives (Bo's: nobody is given back a life they spent), whoever sits first.
+    for (const order of [uids, [bo.id, ann.id]]) {
+      const read = await preparePartyFloor(sql, order, now, { pool: POOL });
+      expect(read.ok && read.prep.plan.kind === "continue" && read.prep.floor).toBe(4);
+      expect(read.ok && read.prep.run.lost).toEqual([2, 3]);
+    }
+    f = await begin(sql, uids, (now += 1000));
+    for (const uid of uids) expect((await towerState(sql, uid, POOL)).runs.party).toMatchObject({ floor: 4, lives: 0, lost: [2, 3], fight: { id: f.fight.id } });
+    // Floor 4 lost: the third loss, every copy out on it.
+    await end(sql, f.fight, uids, "lost", (now += 1000));
+    for (const uid of uids) {
+      const row = (await sql.first<{ status: string; floor: number; met: string; last: string }>("SELECT status, floor, met, last FROM tower_runs WHERE user_id = ? AND kind = 'party'", uid))!;
+      expect([row.status, row.floor, JSON.parse(row.met).lost, JSON.parse(row.last).lost]).toEqual(["out", 4, [2, 3, 4], [2, 3, 4]]);
+    }
   });
 
   it("a party floor's result is the room's: a device can't finish it or leave it, alone or not", async () => {
@@ -500,12 +542,13 @@ describe("the party, after the review of #835", () => {
     expect(P.core.takeLapsedOpen()).toBeNull();
   });
 
-  it("10: a plan that takes the leader's copy back floors needs their confirm; the view names who goes back, by member", () => {
+  it("10: a plan that takes the leader's copy back floors needs their confirm; the view names who goes back, by member, and the lives left", () => {
     const P = party();
     const lead = P.join("ua", "Ann");
     const bo = P.join("ub", "Bo");
-    P.core.setTowerPlan({ key: "ua,ub", plan: { kind: "continue", floor: 5, back: [{ uid: "ua", floor: 30 }] } });
-    expect(P.core.view(bo).tower!.plan).toEqual({ kind: "continue", floor: 5, back: [{ id: lead, floor: 30 }] });
+    P.core.setTowerPlan({ key: "ua,ub", plan: { kind: "continue", floor: 5, back: [{ uid: "ua", floor: 30 }], lives: 1 } });
+    // (With the climb's lives left: Nov 20.)
+    expect(P.core.view(bo).tower!.plan).toEqual({ kind: "continue", floor: 5, back: [{ id: lead, floor: 30 }], lives: 1 });
     P.core.message(bo, { t: "ready", on: true });
     P.core.message(lead, { t: "start" });
     expect(P.core.takeStart()).toBeNull();
