@@ -1,3 +1,4 @@
+- Nov 20 ~14:35 UTC: pie-freeze look -> #847 (0e83f5e) CI bisxh2nbb; moonrise -> #848 (9bd68b8, moon now the field moon size: call, told Eric) CI b9h4bdder. GIFs sent. No helpers running.
 - Nov 20 ~14:15 UTC: ERIC Moo: moon must RISE from behind the hill (half hidden -> up, same timing), always behind the terrain; light from the new spot; close-up unchanged -> helper session_01JuCWRt26x7iueoa3zk7nRb (high, claude/moo-moonrise), watcher brx6gvk4k. Running Opus: pie-freeze look + moonrise (2 high).
 - Nov 20 ~14:10 UTC: ERIC: Boingo freeze should be its own animation, not the ice cube -> characters helper session_01JuCWRsLTyPPNAZdJt4Lz5T (high, claude/boingo-pie-freeze-look; buried in pie: cream mound + cherry, drips, slides off at thaw; code-built from his palette, no art spend), watcher bkfykvh9b.
 - Nov 20 ~12:55 UTC: main 1d0c789 full run GREEN (no failures, no flakes); deployed. All of today merged. Queue empty; no helpers. Open: Maia-fallback alert offer to ERIC.
