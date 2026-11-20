@@ -128,6 +128,9 @@ export function rollSeed(seed: number, watering: number, i: number, s: Pick<Boss
   return "q";
 }
 
+/** The outcome grows a piece for him (a pawn, knight, bishop, rook or the queen). */
+export const grows = (k: WaterKind): boolean => k !== "nothing" && k !== "plant" && k !== "killer";
+
 // ---------------- Watering: placing what came up ----------------
 
 /** What a placed outcome is: a plain plant, a killer plant, or a piece grown for him. */
@@ -601,7 +604,10 @@ export const gardenerBattle = {
     if (g.roll?.at === boss.crowdMoves) return g.roll;
     const clock = b.now();
     const seeds = seedsAt(g, clock).count;
-    const kinds = Array.from({ length: seeds }, (_, i) => rollSeed(boss.powers!.seed, g.waterings, i));
+    // (His pieces off this battle (noAdd: a tower floor of several whose primary is another boss, BATTLE_TOWER.addsPieces): a seed that
+    // would grow one comes up as nothing; plain and killer plants as ever.)
+    const off = !!boss.powers!.noAdd;
+    const kinds = Array.from({ length: seeds }, (_, i) => rollSeed(boss.powers!.seed, g.waterings, i)).map((k) => (off && grows(k) ? "nothing" : k));
     const roll = { at: boss.crowdMoves, clock, seeds, kinds };
     setGarden(b, (x) => ({ ...x, roll }));
     return roll;

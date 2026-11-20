@@ -295,9 +295,11 @@ export const timberBattle = {
     if (sideToMove(fen) !== boss.crowdSide || !legalMoves(fen).length) return null;
     const at = boss.crowdMoves;
     const his = other(boss.crowdSide);
-    const now = workshopAt(w0, b.now(), s);
+    // (Off this battle (noAdd): his clock works in nothing either, so the workshop never fills with pieces that never drop.)
+    const now = p.noAdd ? w0 : workshopAt(w0, b.now(), s);
     const w: WorkshopState = { ...w0, prog: now.prog, done: now.done, n: now.n, since: now.since };
-    const open = !workshopClosed(w, s);
+    // (Off this battle (noAdd: a tower floor of several whose primary is another boss, BATTLE_TOWER.addsPieces): closed from the start.)
+    const open = !p.noAdd && !workshopClosed(w, s);
     let next: BossPowerState = p;
     let gnaw: WorkshopState["gnaw"] = null;
     let bonus = 0;

@@ -320,6 +320,9 @@ function useWake(times: readonly (number | null)[]): void {
  * The pump in the boss bar's free room, and what's new in his turn's events (each played once on this device): his trip or place, his
  * reactions. Drawn from the view's `balloon` on the battle's clock; redrawn only when something is due (a stage, the put, a release).
  */
+/** His pump's words when his balloons are off this battle (a tower floor of several whose primary is another boss). */
+export const PUMP_OFF = "Balloons: off on this floor";
+
 export function TigerPump({ boss, moments }: { boss: BossView; moments: () => Moment[] }) {
   const now = Date.now();
   const rec = noteTiger(boss, now, moments());
@@ -376,9 +379,28 @@ export function TigerPump({ boss, moments }: { boss: BossView; moments: () => Mo
   const sized = place.at === "side" || place.at === "tall" ? { "--tg-s": place.scale.toFixed(4) } : undefined;
   const sprite = <SpriteAnim ch={TIGER_PUMP} anim={show.anim} since={show.since} then={show.then} look={show.look} sounds={show.quiet ? {} : PUMP_SOUNDS} id={`pump:${rec?.key ?? ""}`} class="tg-pump" />;
   const side = place.at === "side" && drawn ? place.side : null;
+  // (His balloons off this battle: a tower floor of several whose primary is another boss (noAdd, BATTLE_TOWER.addsPieces; Eric, Nov 20).
+  // The pump stays where it is, empty and greyed, tagged OFF and saying why: nothing hidden.)
+  const off = !!boss.powers?.noAdd;
   return (
-    <span ref={slot} class={`tg-pump-slot${place.at === "side" ? " tg-side" : place.at === "tall" ? " tg-tall" : ""}`} style={place.at === "tall" ? sized : undefined} data-anim={show.anim} data-balloon={b ? `${b.shape}${b.color}` : ""} data-place={place.at}>
+    <span
+      ref={slot}
+      class={`tg-pump-slot${place.at === "side" ? " tg-side" : place.at === "tall" ? " tg-tall" : ""}${off ? " tg-off" : ""}`}
+      style={place.at === "tall" ? sized : undefined}
+      data-anim={show.anim}
+      data-balloon={b ? `${b.shape}${b.color}` : ""}
+      data-place={place.at}
+      data-off={off ? "" : undefined}
+      role={off ? "img" : undefined}
+      aria-label={off ? PUMP_OFF : undefined}
+      title={off ? PUMP_OFF : undefined}
+    >
       {place.at !== "side" && sprite}
+      {off && (
+        <span class="tg-off-tag" aria-hidden="true">
+          OFF
+        </span>
+      )}
       {side &&
         createPortal(
           <span class="tg-side-pump" style={{ ...sized, left: `${place.x.toFixed(1)}px` }}>
