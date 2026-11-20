@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, towerPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -32,7 +32,8 @@ import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO, requestWaiting } from "./town/LeaveTown.tsx";
 import { setGoodbyeFrom } from "./town/goodbye.ts";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
-import { FloorPlay, askFloor, loadKept, onEnterFloor, type FloorEntry } from "./tower.ts";
+import { FloorPlay, askFloor, forgetPartyFloor, keepPartyFloor, loadKept, onEnterFloor, partyFloorOf, type FloorEntry } from "./tower.ts";
+import { joinTowerParty, onEnterPartyFloor, towerParty, type PartyFloorEntry } from "./tower-party.ts";
 import type { TowerBack } from "./town/Town.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
@@ -1432,6 +1433,17 @@ export function App() {
   };
   useEffect(() => onEnterFloor((e) => void startTowerFloor(e)), []);
   /**
+   * Into a Battle Tower party's floor (Nov 20; tower-party.ts enterPartyFloor, the floor room's walk-in done): its match room, joined
+   * with your pass and seat as a Boss Battle party's battle, the floor's settings (towerPartySettings: its bosses, its strength, the
+   * party rule with ties to the engine's best). Kept on this device by its room's code, so a reload there is still the tower's floor.
+   */
+  const startPartyFloor = (e: PartyFloorEntry) => {
+    keepPartyFloor({ lobby: e.lobby, floor: e.floor, bosses: e.bosses, beaten: e.beaten });
+    setTowerBack(null);
+    joinLobby(e.lobby, { party: { pass: e.pass, seat: e.seat, boss: "", difficulty: "normal" } });
+  };
+  useEffect(() => onEnterPartyFloor((e) => startPartyFloor(e)), []);
+  /**
    * Opened at /tower (a reload during a floor's match, the app reopened): the floor kept on this device is rejoined where it was (PR 10's
    * restore); none (or one this device can't play on): the town, whose tower's clerk says Continue.
    */
@@ -1440,7 +1452,7 @@ export function App() {
     history.replaceState(null, "", `/town${location.search}`);
     const kept = loadKept();
     if (!kept || kept.done || !kept.game) return;
-    void askFloor(0).then((a) => a.kind === "entry" && a.entry.game && void startTowerFloor(a.entry));
+    void askFloor(0, kept.kind ?? "solo").then((a) => a.kind === "entry" && a.entry.game && void startTowerFloor(a.entry));
   }, []);
 
   /**
@@ -1460,7 +1472,15 @@ export function App() {
     unlockAudio();
     setError(null);
     const m = new NetMatch(code.toUpperCase(), playerName(), enginePool, queue ? false : practiceOn());
-    m.settings = opts.party?.hidden
+    // (A Battle Tower party's floor, this room's (tower-party.ts keepPartyFloor): its strip, and the way back into the tower after it.)
+    const floor = partyFloorOf(code);
+    if (floor) {
+      m.towerParty = { floor: floor.floor, bosses: floor.bosses, beaten: floor.beaten };
+      towerReturn.current = true;
+    }
+    m.settings = floor
+      ? { ...DEFAULT_SETTINGS, ...towerPartySettings({ towerFloor: floor.floor, bossId: floor.bosses[0] ?? "", bossIds: floor.bosses, bossAvoid: "" }) }
+      : opts.party?.hidden
       ? { ...DEFAULT_SETTINGS, ...hiddenRoomSettings() }
       : opts.party
       ? { ...DEFAULT_SETTINGS, ...bossPartySettings(opts.party.difficulty), ...(opts.party.boss ? { bossId: opts.party.boss } : {}) }
@@ -1691,10 +1711,14 @@ export function App() {
     setMatch(null);
     // A Battle Tower floor: back into the town's tower (the floor room, or the lobby after a free leave), its result sent there.
     const play = match instanceof NetMatch ? null : (match?.tower ?? null);
+    // (A party floor's: back into the tower's floor room with your party, Nov 20.)
+    const partyFloor = match instanceof NetMatch ? match.towerParty : null;
+    if (partyFloor) forgetPartyFloor();
     setTowerBack(null);
     if (towerReturn.current) {
       towerReturn.current = false;
       if (play) setTowerBack({ play });
+      else if (partyFloor) setTowerBack({ party: partyFloor });
       setTownSeat(null);
       setTownStand(null);
       setShowTown(true);
@@ -1860,6 +1884,9 @@ export function App() {
         return { kind: match.settings.raid ? "raid" : match.settings.mode === "crowd" ? "crowd" : "classic", code: match.code };
       // (50 v 50's party, on its screen and not searching: its "+" seats invite into it.)
       if (!match && crowdParty?.memberId && !crowdParty.done && crowdParty.party?.state !== "queueing") return { kind: "crowdparty", code: crowdParty.code };
+      // (A Battle Tower party, from its clerk's Invite friends: Nov 20.)
+      const tp = towerParty();
+      if (!match && tp?.memberId) return { kind: "tower", code: tp.code };
       return party ? { kind: "squads", code: party.code } : null;
     },
     canCreate: () => !match && !squads,
@@ -1895,11 +1922,28 @@ export function App() {
         taken();
         joinNow(kind, code);
       };
+      // (A Battle Tower party's: into it, and into the tower's lobby, to its clerk; in the town already, you stay where you are.)
+      if (kind === "tower") {
+        taken();
+        return void joinTowerFromInvite(code, inTown);
+      }
       if (inTown) askLeave("their game", go);
       else go();
     },
   });
+  /** A friend's Battle Tower party (their invite, Nov 20): into it, then the town's tower lobby, its clerk the party's card. */
+  function joinTowerFromInvite(code: string, inTown: boolean) {
+    void joinTowerParty(code).then((ok) => {
+      if (!ok) return setSquadsNote("That party has closed.");
+      if (inTown) return;
+      goHome();
+      setTowerBack({ lobby: true });
+      setShowTown(true);
+      history.replaceState(null, "", `/town${location.search}`);
+    });
+  }
   function joinNow(kind: InviteKind, code: string) {
+    if (kind === "tower") return joinTowerFromInvite(code, false);
     goHome();
     if (kind === "squads") return void joinParty(code);
     if (kind === "crowdparty") return void joinCrowdParty(code);

@@ -58,6 +58,17 @@ export function bossMarks(n: number): At[] {
   ];
 }
 
+/**
+ * A party's others' marks (Nov 20: "everyone's pawn walks in in seat order"): beside yours on your side of the table, in the order they
+ * walk in (seat order), and where they come in (the way in, below).
+ */
+export const MATE_MARKS: readonly At[] = [
+  { c: 3.0, r: 7.35 },
+  { c: 6.0, r: 7.35 },
+  { c: 4.5, r: 8.3 },
+];
+export const FLOOR_IN: At = { c: 4.5, r: 9.4 };
+
 /** When each part of a floor's walk-in happens (ms from the room's first frame), for `n` bosses. Reduced motion: everyone on their marks. */
 export interface FloorTimes {
   /** You start walking to your mark (and you're on it, settled). */
@@ -72,17 +83,21 @@ export interface FloorTimes {
   /** The pieces start coming up on the board; the match starts (the zoom into the board). */
   board: number;
   go: number;
+  /** A party's others (Nov 20): each starts walking in after you, one after another, and is on their mark. */
+  mateGo: number[];
+  mateOn: number[];
 }
 
 const dist = (a: At, b: At) => Math.hypot(a.c - b.c, a.r - b.r);
 
 /** The floor's walk-in times: `youSteps`, the squares you walk from the way in to your mark. */
-export function floorTimes(n: number, youSteps: number, still: boolean, F = TOWER_FLOOR_FEEL): FloorTimes {
+export function floorTimes(n: number, youSteps: number, still: boolean, F = TOWER_FLOOR_FEEL, mates = 0): FloorTimes {
   const marks = bossMarks(n);
+  const them = MATE_MARKS.slice(0, Math.max(0, Math.min(mates, MATE_MARKS.length)));
   if (still) {
     // (Reduced motion: nobody walks; everyone stands on their marks as the room shows, and the pieces come up.)
     const board = F.insideMs;
-    return { youGo: 0, youOn: 0, bossGo: marks.map(() => 0), bossOn: marks.map(() => 0), doorsOpen: 0, doorsShut: 0, board, go: board + F.boardMs + F.holdMs };
+    return { youGo: 0, youOn: 0, bossGo: marks.map(() => 0), bossOn: marks.map(() => 0), doorsOpen: 0, doorsShut: 0, board, go: board + F.boardMs + F.holdMs, mateGo: them.map(() => 0), mateOn: them.map(() => 0) };
   }
   const youGo = F.insideMs;
   const youOn = youGo + youSteps * F.stepMs + F.settleMs;
@@ -91,8 +106,25 @@ export function floorTimes(n: number, youSteps: number, still: boolean, F = TOWE
   const doorsOpen = bossGo[0]! - F.doorsMs;
   // (Clear of the doors: a square out.)
   const doorsShut = bossGo[bossGo.length - 1]! + F.stepMs + F.doorsMs;
-  const board = Math.max(youOn, ...bossOn) + F.beatMs;
-  return { youGo, youOn, bossGo, bossOn, doorsOpen, doorsShut, board, go: board + F.boardMs + F.holdMs };
+  // (Your party in after you, in seat order, one a step apart: Nov 20.)
+  const mateGo = them.map((_, i) => youGo + (i + 1) * F.stepMs);
+  const mateOn = them.map((m, i) => mateGo[i]! + dist(FLOOR_IN, m) * F.stepMs);
+  const board = Math.max(youOn, ...bossOn, ...mateOn) + F.beatMs;
+  return { youGo, youOn, bossGo, bossOn, doorsOpen, doorsShut, board, go: board + F.boardMs + F.holdMs, mateGo, mateOn };
+}
+
+/**
+ * Party member `i` (of the others, in seat order) at `t` ms: below the way in until they set off, walking straight to their mark, then on
+ * it. `times` null (back from a match, or reduced motion): on their mark.
+ */
+export function mateAt(i: number, times: FloorTimes | null, t: number, out: BossNow): BossNow {
+  const m = MATE_MARKS[i] ?? MATE_MARKS[0]!;
+  const go = times?.mateGo[i];
+  const on = times?.mateOn[i];
+  if (go === undefined || on === undefined || on <= go || t >= on) return Object.assign(out, { c: m.c, r: m.r, a: 1, walking: false });
+  if (t < go) return Object.assign(out, { c: FLOOR_IN.c, r: FLOOR_IN.r, a: 0, walking: false });
+  const u = (t - go) / (on - go);
+  return Object.assign(out, { c: FLOOR_IN.c + (m.c - FLOOR_IN.c) * u, r: FLOOR_IN.r + (m.r - FLOOR_IN.r) * u, a: 1, walking: true });
 }
 
 /** A boss now: where he stands (squares), how much of him shows (0-1: stepping out of the doorway), whether he's walking. */

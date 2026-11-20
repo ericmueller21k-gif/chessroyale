@@ -93,6 +93,8 @@ export interface ChatWho {
   uid: string;
   n: number;
   color?: number;
+  /** A Battle Tower party's open line (Nov 20): its code, for the line's Join. */
+  party?: string;
 }
 
 export interface ChatLine extends Partial<ChatWho> {

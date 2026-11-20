@@ -230,7 +230,7 @@ export const PAWN_HEAD = 9 / 45;
  * And its base's foot (the path's bottom at y 39.5, and half its outline): this point stands on the square's middle, so
  * the base sits on the square. (Slices 1 to 4 stood it at 0.96, about a tenth of a square lower: it seemed to float.)
  */
-const PAWN_FOOT = (39.5 + 0.75) / 45;
+export const PAWN_FOOT = (39.5 + 0.75) / 45;
 
 /** Your own pawn's picture: the plain pawn, or your dressed pawn (`pad`: the margin round the pawn's box for its items). */
 export interface YouArt {

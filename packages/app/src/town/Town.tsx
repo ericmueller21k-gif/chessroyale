@@ -83,7 +83,9 @@ import { HiddenRoomClient, type RoomOutcome } from "./hidden-net.ts";
 import { HiddenCard, HiddenCount, RoomNote } from "./HiddenRoom.tsx";
 import { TowerDesk } from "./TowerDesk.tsx";
 import { Confirm } from "../components/MatchMenu.tsx";
-import { TOWER_WORDS, askFloor, enterTowerFloor, towerApi, type FloorPlay, type FloorStart } from "../tower.ts";
+import { TOWER_WORDS, askFloor, enterTowerFloor, towerApi, type FloorPlay, type FloorStart, type RunKind, type TowerStripInfo } from "../tower.ts";
+import { enterPartyFloor, onPartyFloor, partyMates, rejoinTowerParty, towerParty, type PartyFloor } from "../tower-party.ts";
+import { TowerPartyUp } from "./TowerDesk.tsx";
 import type { FloorScript } from "./shops/tower-floor-scene.ts";
 import { FLOOR_YOU, TOWER_FLOOR_FEEL, floorTimes, upWords } from "./shops/tower-floor.ts";
 import type { LivePawn, RecluseScene } from "./shops/recluse-scene.ts";
@@ -159,10 +161,11 @@ const bossIn = (id: string): boolean => BOSS_ROSTER.some((b) => b.id === id && a
  */
 const bossReady = (id: string): boolean => bossIn(id) || testParams().has("introPreview");
 
-/** A Battle Tower floor's match just ended (its result, sent once: tower.ts FloorPlay.settle): back into the tower. */
-export interface TowerBack {
-  play: FloorPlay;
-}
+/**
+ * Back into the tower: a floor's match just ended (its result, sent once: tower.ts FloorPlay.settle), a party floor's (its result the
+ * room's: Nov 20), or a friend's party joined from their invite (`lobby`: the tower's lobby, to its clerk).
+ */
+export type TowerBack = { play: FloorPlay } | { party: TowerStripInfo } | { lobby: true };
 /** Reduced motion asked for: no walking in the tower's floor room (the design's §4). */
 const stillNow = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -284,6 +287,10 @@ export function TownScreen({
   /** A floor's start answered with a question (its bosses resting, under way elsewhere, a run that can't be played). */
   const [towerAsk, setTowerAsk] = useState<{ kind: "resting" | "elsewhere"; start: FloorStart } | { kind: "broken" } | null>(null);
   const towerTimers = useRef<number[]>([]);
+  /** Which run the clerk's Continue went up with: your solo run, or your party copy played alone (Nov 20). */
+  const towerKind = useRef<RunKind>("solo");
+  /** Your party's START placed its floor (tower-party.ts): up the elevator to it, everyone walking in. */
+  const partyNext = useRef<PartyFloor | null>(null);
   const clearTowerTimers = () => {
     towerTimers.current.forEach((t) => clearTimeout(t));
     towerTimers.current = [];
@@ -521,22 +528,34 @@ export function TownScreen({
    * that floor's bosses; null (and a note why) when there's none to play.
    */
   const towerUp = async (from: RoomPart): Promise<FloorScript | null> => {
-    if (from === "top" && floorS.current?.mode !== "won") return null;
+    const pf = partyNext.current;
+    if (from === "top" && floorS.current?.mode !== "won" && !pf) return null;
     const a = await towerApi.state();
     if (!a.ok) {
       setNote(a.body.message ?? TOWER_WORDS.offline);
       return null;
     }
     towerBest.current = a.body.best.solo;
-    const run = a.body.runs.solo;
+    // (A party floor: your copy's floor under way in its room, everyone's pawn walking in, in seat order.)
+    if (pf) {
+      const copy = a.body.runs.party;
+      partyNext.current = null;
+      if (!copy || copy.fight?.lobby !== pf.lobby) {
+        setNote(TOWER_WORDS.offline);
+        return null;
+      }
+      return { floor: copy.floor, mode: "fight", bosses: copy.bosses, times: null, t0: null, board: null, party: { ...pf, floor: copy.floor, bosses: copy.bosses, beaten: copy.beaten }, mates: partyMates() };
+    }
+    const run = a.body.runs[towerKind.current];
     if (!run) {
-      setNote("Talk to the clerk to start a climb.");
+      setNote(towerKind.current === "party" ? "No party climb to go on with." : "Talk to the clerk to start a climb.");
       return null;
     }
-    return { floor: run.floor, mode: "fight", bosses: run.bosses, times: null, t0: null, board: null };
+    return { floor: run.floor, mode: "fight", bosses: run.bosses, times: null, t0: null, board: null, kind: towerKind.current };
   };
-  /** The clerk's Start or Continue: you walk into the elevator, and up. */
-  const towerGo = () => {
+  /** The clerk's Start or Continue (`kind`: your solo run, or your party copy played alone): you walk into the elevator, and up. */
+  const towerGo = (kind: RunKind = "solo") => {
+    towerKind.current = kind;
     shopCtl.current?.close?.();
     const steps = shopCtl.current?.walkTo?.({ c: 4, r: 1 }) ?? -1;
     towerTimers.current.push(window.setTimeout(() => void goThrough("top"), Math.max(0, steps) * TOWN_FEEL.youStepMs + 150));
@@ -554,7 +573,7 @@ export function TownScreen({
     const off = { c: FLOOR_YOU.at.c - FLOOR_YOU.sq.c, r: FLOOR_YOU.at.r - FLOOR_YOU.sq.r };
     if (s.mode !== "fight") return void shopCtl.current?.walkTo?.(FLOOR_YOU.sq, off);
     const still = stillNow();
-    s.times = floorTimes(s.bosses.length, 1, still);
+    s.times = floorTimes(s.bosses.length, 1, still, undefined, s.mates?.length ?? 0);
     const at = (ms: number, fn: () => void) => towerTimers.current.push(window.setTimeout(() => insideNow.current?.n === n && floorS.current === s && fn(), ms));
     at(s.times.youGo, () => shopCtl.current?.walkTo?.(FLOOR_YOU.sq, off, TOWER_FLOOR_FEEL.stepMs));
     at(s.times.go, () => void floorGo(s, still));
@@ -568,7 +587,7 @@ export function TownScreen({
     if (doorBusy.current) return;
     doorBusy.current = true;
     const F = TOWER_FLOOR_FEEL;
-    const ask = askFloor(towerBest.current ?? 0);
+    const ask = s.party ? null : askFloor(towerBest.current ?? 0, s.kind ?? "solo");
     const cv = box.current?.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas") ?? null;
     if (cv && s.board && !still) {
       cv.style.transformOrigin = `${s.board.x.toFixed(1)}px ${s.board.y.toFixed(1)}px`;
@@ -577,7 +596,12 @@ export function TownScreen({
     }
     fadeTo(1, SHOP_FEEL.fadeMs, still ? 0 : F.zoomMs - SHOP_FEEL.fadeMs);
     await later(still ? SHOP_FEEL.fadeMs : F.zoomMs);
-    const a = await ask;
+    // (A party floor: its match room, joined with your pass and seat.)
+    if (s.party) {
+      if (!gone.current) enterPartyFloor(s.party);
+      return;
+    }
+    const a = await ask!;
     if (a.kind === "entry" && !gone.current) return enterTowerFloor(a.entry);
     if (cv) cv.style.transition = cv.style.transform = cv.style.transformOrigin = "";
     doorBusy.current = false;
@@ -592,11 +616,10 @@ export function TownScreen({
     opening.current = { home: "tower", challenge: false };
     // (The tower's theme, as at its door: loading now, playing as its room shows, Nov 19.)
     roomMusicLoad(homeTheme("tower"));
-    const end = await b.play.settle();
-    if (end.best) towerBest.current = end.best;
-    const lobby = !!end.error || (end.outcome === "left" && end.status === "open");
-    floorS.current = lobby ? null : { floor: b.play.floor, mode: end.outcome === "won" && end.status === "open" ? "won" : "out", bosses: [], times: null, t0: null, board: null };
-    const room = chunk(import("./shops/ShopRoom.tsx")).then(async (m) => ({ room: await (lobby ? m.loadRoom("tower") : m.loadTowerFloor(b.play.floor)), View: m.ShopRoom }));
+    const back = "play" in b ? await towerBackSolo(b.play) : "party" in b ? await towerBackParty(b.party) : { lobby: true, error: null, floor: 1, mode: "out" as const };
+    const { lobby, floor } = back;
+    floorS.current = lobby ? null : { floor, mode: back.mode, bosses: [], times: null, t0: null, board: null, ...("party" in b ? { mates: partyMates() } : {}) };
+    const room = chunk(import("./shops/ShopRoom.tsx")).then(async (m) => ({ room: await (lobby ? m.loadRoom("tower") : m.loadTowerFloor(floor)), View: m.ShopRoom }));
     const got = await room.catch(() => null);
     const fx = await (roomFxOf("tower", lobby ? "front" : "top") ?? Promise.resolve(null)).catch(() => null);
     if (!got || !box.current) {
@@ -604,12 +627,57 @@ export function TownScreen({
       doorBusy.current = false;
       return;
     }
-    if (end.error) setNote(end.error);
+    if (back.error) setNote(back.error);
     ctl.current?.pause();
     setShopOut(SHOP_FEEL.startZoom === 1);
     setInside({ ...got, intro: null, fx, n: 1, ...(lobby ? { arrived: "top" as const } : { at: FLOOR_YOU.sq }) });
     roomMusic(roomTheme(got.room.def));
   };
+  /** A solo floor's (or a party copy's played alone) result sent: into the floor room (won: the elevator open), or the lobby. */
+  const towerBackSolo = async (play: FloorPlay): Promise<{ lobby: boolean; error: string | null; floor: number; mode: "won" | "out" }> => {
+    const end = await play.settle();
+    if (end.best) towerBest.current = end.best;
+    const lobby = !!end.error || (end.outcome === "left" && end.status === "open");
+    return { lobby, error: end.error ?? null, floor: play.floor, mode: end.outcome === "won" && end.status === "open" ? "won" : "out" };
+  };
+  /**
+   * A party floor's match over (its room writes every copy: Nov 20): your copy read until it's written (a few seconds at most), then the
+   * floor room on your mark, won (your party's START is the way up) or out; back in your party, whose plan is read again.
+   */
+  const towerBackParty = async (f: TowerStripInfo): Promise<{ lobby: boolean; error: string | null; floor: number; mode: "won" | "out" }> => {
+    void rejoinTowerParty();
+    for (let tries = 0; tries < 12; tries++) {
+      const a = await towerApi.state();
+      if (a.ok) {
+        towerBest.current = a.body.best.solo;
+        const copy = a.body.runs.party;
+        if (!copy?.fight?.lobby) return { lobby: false, error: null, floor: f.floor, mode: copy && copy.floor > f.floor ? "won" : "out" };
+      }
+      await later(1000);
+    }
+    return { lobby: true, error: TOWER_WORDS.offline, floor: f.floor, mode: "out" };
+  };
+  // (Your party's START placed its floor: up to it, from the tower's lobby or its floor room; anywhere else, straight into its match.)
+  useEffect(
+    () =>
+      onPartyFloor((f) => {
+        const at = insideNow.current;
+        if (at?.room.def.home === "tower" && flow.current === "town") {
+          partyNext.current = f;
+          if (at.room.def.part === "top") return void goThrough("top");
+          shopCtl.current?.close?.();
+          const steps = shopCtl.current?.walkTo?.({ c: 4, r: 1 }) ?? -1;
+          towerTimers.current.push(window.setTimeout(() => void goThrough("top"), Math.max(0, steps) * TOWN_FEEL.youStepMs + 150));
+          return;
+        }
+        void towerApi.state().then((a) => {
+          const copy = a.ok ? a.body.runs.party : null;
+          if (copy && copy.fight?.lobby === f.lobby) enterPartyFloor({ ...f, floor: copy.floor, bosses: copy.bosses, beaten: copy.beaten });
+          else setNote(TOWER_WORDS.offline);
+        });
+      }),
+    [],
+  );
   /**
    * A challenge started inside (Don Dough's, once his Challenge's beat and walk-out have played in his back room, you through its door;
    * Nov 11): his intro and the front room load, the back room fades to black and the front room fades in in challenge mode (Eric: "The
@@ -759,6 +827,8 @@ export function TownScreen({
         </button>
       );
     const s = floorS.current;
+    // (In a party: its START is the way up, the leader's once everyone's READY: Nov 20.)
+    if (towerParty() && s?.mode === "won") return <TowerPartyUp floor={s.floor} />;
     const w = upWords(s?.mode ?? "out", s?.floor ?? 1);
     return (
       <>
@@ -778,7 +848,7 @@ export function TownScreen({
   /** Leave a floor under way from the lobby's question: free (its bosses rest), or counted (under way elsewhere, nothing kept here). */
   const towerLeave = async (start: FloorStart, free: boolean) => {
     setTowerAsk(null);
-    const a = await towerApi.stop(start.fight.id, free ? 0 : undefined, free);
+    const a = await towerApi.stop(start.fight.id, free ? 0 : undefined, free, towerKind.current);
     if (!a.ok && a.body.message) setNote(a.body.message);
   };
   useEffect(() => {

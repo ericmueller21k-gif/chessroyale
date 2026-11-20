@@ -56,6 +56,27 @@ import { NAME_COLORS, nameColorIndex } from "./names.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { useChatBackground, useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
+import { joinTowerParty, towerParty } from "../tower-party.ts";
+
+/** A party line's Join (Nov 20): into that Battle Tower party (greyed once you're in it or another); the clerk in the tower is its card. */
+function PartyJoin({ code }: { code: string }) {
+  const [state, setState] = useState<"idle" | "busy" | "in" | "gone">(() => (towerParty()?.code === code ? "in" : "idle"));
+  const busy = state !== "idle" || !!towerParty();
+  return (
+    <button
+      type="button"
+      class="tc-join"
+      disabled={busy}
+      onClick={(e) => {
+        e.stopPropagation();
+        setState("busy");
+        void joinTowerParty(code).then((ok) => setState(ok ? "in" : "gone"));
+      }}
+    >
+      {state === "in" ? "Joined: see the clerk" : state === "gone" ? "Closed" : "Join"}
+    </button>
+  );
+}
 
 /** What of the town's lines this device reads now (TownChat's `hear`). */
 const hearing = (): "all" | "enter" | "none" => (mayReadTownChat() ? "all" : mayHearTown() ? "enter" : "none");
@@ -126,7 +147,7 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
       // blue; "Ann has entered the town.", in a quiet gray: Nov 12.)
       line: (l) =>
         l.sys
-          ? log.say("", l.text, l.sys === "enter" ? "arrival" : "server", Date.now(), { uid: "", n: l.n })
+          ? log.say("", l.text, l.sys === "enter" ? "arrival" : "server", Date.now(), { uid: "", n: l.n, ...(l.sys === "party" && typeof l.party === "string" && /^[A-Z2-9]{5}$/.test(l.party) ? { party: l.party } : {}) })
           : log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n, color: l.color }),
       drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
       paused: () => redraw((n) => n + 1),
@@ -415,6 +436,8 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
               {l.name && ": "}
               {/* (A player's line: our pixel emoji drawn for their `:name:` codes, as in every chat; Nov 7.) */}
               {l.kind === "player" ? <ChatText text={l.text} /> : l.text}
+              {/* (A Battle Tower party open to the town: Join takes you into it, its clerk's card your party's: Nov 20.) */}
+              {l.party && <PartyJoin code={l.party} />}
             </div>
           );
         })}

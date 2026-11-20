@@ -11,6 +11,108 @@
   margin: 4px 0 0;
 }
 
+/* ---- The clerk's three ways to climb (Nov 20: Solo, Invite friends, Open party) and the panel under them, one size whatever it holds ---- */
+.town-card:has(.tw-desk) {
+  width: 272px;
+  max-width: min(272px, calc(100vw - 24px));
+}
+.tw-desk-ways {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.tw-way {
+  min-height: 44px;
+  padding: 4px 6px;
+  border: 1.5px solid var(--card-gold, #d9bb8c);
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.15;
+  cursor: pointer;
+}
+.tw-way.on {
+  background: var(--card-gold, #d9bb8c);
+  color: #20212a;
+}
+.tw-way:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tw-way.on:disabled {
+  opacity: 1;
+}
+.tw-desk-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 176px;
+  justify-content: flex-start;
+}
+.tw-desk-row {
+  display: flex;
+  gap: 6px;
+}
+.tw-desk-row > .town-btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.tw-seats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-seat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  text-align: left;
+}
+.tw-seat.free {
+  opacity: 0.5;
+}
+.tw-seat.away .tw-seat-name {
+  opacity: 0.6;
+}
+.tw-seat-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pt-c);
+}
+.tw-seat.free .tw-seat-dot {
+  background: transparent;
+  border: 1.5px dashed rgba(255, 255, 255, 0.6);
+}
+.tw-seat-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-seat-mark {
+  flex: none;
+  color: var(--card-gold, #d9bb8c);
+}
+.tw-plan {
+  min-height: 2.6em;
+  font-size: 12px;
+}
+
 /* ---- The tower's screen (screens/Tower.tsx): kept unused at Eric's word, Nov 19 (PR 11b) ---- */
 .tw-page {
   height: var(--app-h);
