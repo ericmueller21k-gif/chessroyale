@@ -231,6 +231,7 @@ export function askAgeAgain(why: string = ASK_AGE_LINE) {
 /** Loads the sign-in options and your profile (making a guest account the first time). */
 export async function loadAccount(name?: string): Promise<void> {
   lastName = name;
+  retryOnReturn();
   let config: NonNullable<AccountState["config"]> | null = null;
   // Your profile is asked for beside the options, not after them (Nov 10: home waits on it, and each request is a round trip). The
   // server plays a device it knows is too young under the default name, whatever name this one sends.
@@ -262,9 +263,14 @@ let lastName: string | undefined;
 export function retryAccount(): Promise<void> {
   return loadAccount(lastName);
 }
-// (Back online after failing offline, or let in by the site's gate again, from another tab, say: the account loads by itself.)
-if (typeof addEventListener === "function") addEventListener("online", () => void (state.failed === "offline" && retryAccount()));
-onSiteGate(() => void (!siteSignedOut() && state.failed === "gate" && retryAccount()));
+let watching = false;
+/** (Back online after failing offline, or let in by the site's gate again, from another tab, say: the account loads by itself.) */
+function retryOnReturn() {
+  if (watching) return;
+  watching = true;
+  if (typeof addEventListener === "function") addEventListener("online", () => void (state.failed === "offline" && retryAccount()));
+  onSiteGate(() => void (!siteSignedOut() && state.failed === "gate" && retryAccount()));
+}
 
 async function sendAgeAnswer(ok: boolean): Promise<AgeAnswer> {
   const { age } = await api<{ age: AgeAnswer }>("/api/auth/age", { method: "POST", body: JSON.stringify({ oldEnough: ok }) });
