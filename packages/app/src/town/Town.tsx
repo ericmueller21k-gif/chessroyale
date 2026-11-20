@@ -858,11 +858,13 @@ export function TownScreen({
    * The tower's doors' cards: the lobby's elevator, Go up; the floor room's, up to the next floor once this one's won (shut otherwise:
    * greyed, why under it); its way in, down to the lobby.
    */
+  /** A door card's button: run to its door first when its card was opened from across the room (the room's `go`, Nov 20), then `act`. */
+  const atDoor = (act: () => void) => () => (shopCtl.current?.go ? shopCtl.current.go(act) : act());
   const towerPass = (to: RoomPart) => {
-    if (!inTowerFloor) return to === "top" ? <button type="button" class="town-btn primary" onClick={() => void goThrough("top")}>Go up</button> : null;
+    if (!inTowerFloor) return to === "top" ? <button type="button" class="town-btn primary" onClick={atDoor(() => void goThrough("top"))}>Go up</button> : null;
     if (to === "front")
       return (
-        <button type="button" class="town-btn primary" onClick={() => void goThrough("front")}>
+        <button type="button" class="town-btn primary" onClick={atDoor(() => void goThrough("front"))}>
           Down to the lobby
         </button>
       );
@@ -872,7 +874,7 @@ export function TownScreen({
     const w = upWords(s?.mode ?? "out", s?.floor ?? 1);
     return (
       <>
-        <button type="button" class="town-btn primary" disabled={!w.on} onClick={() => void goThrough("top")}>
+        <button type="button" class="town-btn primary" disabled={!w.on} onClick={atDoor(() => void goThrough("top"))}>
           {w.word}
         </button>
         {w.note && <p class="town-card-text">{w.note}</p>}
