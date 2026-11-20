@@ -6,9 +6,11 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
 (`packages/core/src/settings.ts`).
 
 ## How it works today
-- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the result card (`screens/Duel.tsx`; its XP on the `outcome` message, `DuelOutcome.xp`; a bot or town game has none) shows `XpResult`, a fixed 78 px box (its top row: the gain, your name, your level): the
-  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("Win +50": never the minutes, Eric, Nov 9), or why there was none. Its rules
-  and storage: [accounts.md](accounts.md), "XP and levels".
+- **The end screen** (Nov 20; [2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md); replaces the XP box of Nov 9): a played ranked game's own end page (`screens/Duel.tsx`, `DuelEndPage`; its XP on the `outcome` message, `DuelOutcome.xp`) shows `EndRewards` (`components/EndScreen.tsx`): XP EARNED
+  counting from 0 (`END_SCREEN` in settings.ts), lobbing into the XP bar (`XP.perLevel` a bar), which fills from your old XP to the new
+  (a level: it flashes, "Level 3!", on from 0), then the quests the game moved sliding to their counts; what made it under the number
+  ("Win +50": never the minutes) or why there was none in its place. Every box at its size from the first frame; a tap anywhere but a
+  button skips to the end; reduced motion: the end at once. The toast after it shows only crates and keys (`RewardBox endScreen`). RP first: "RP EARNED" (or "RP LOST 14", counting in red, the bar draining) along the ladder, `RANKED_1V1.pointsPerDivision` a bar, a division crossed: the bar flashes, the new division's name and emblem; placements, the placing game and the top tiers show the rank still ("Placement 2/5"). Then XP. "Victory!" / "Defeat" / "A draw" and why, your coins, Play again and Home, and the game's moves under it (`GameSteps`, from the last). An aborted game, a bot's and the town's keep the card under the board (no XP). Its rules and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
   less 170 px (the title, the two players' strips), never wider than its column: 904 px at 1920 × 1080, 624 at 1280 × 800

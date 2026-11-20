@@ -196,13 +196,13 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
     await tapMove(p, m);
     await expect.poll(() => p.evaluate(() => (window as unknown as { duel?: { snapshot(): { moves: string[] } } }).duel?.snapshot().moves.length ?? -1).catch(() => -1)).toBe(ply);
   }
-  await expect(black.locator(".dv-result-title")).toHaveText("You won");
-  await expect(black.locator(".dv-result-why")).toHaveText("Checkmate.");
-  await expect(white.locator(".dv-result-title")).toHaveText("You lost");
+  await expect(black.getByTestId("es-title")).toHaveText("Victory!");
+  await expect(black.getByTestId("es-line")).toHaveText("Checkmate.");
+  await expect(white.getByTestId("es-title")).toHaveText("Defeat");
   // The ranks moved: one placement game each (the server's record).
-  for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
-  // XP (Nov 9): the result card's XP box, from the outcome: 2 moves each is too few for anyone.
-  for (const p of [white, black]) await expect(p.getByTestId("xp-box").locator(".xp-why")).toHaveText("No XP: the game ended before move 10.");
+  for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  // XP (Nov 9): the end page's XP (Nov 20: a ranked game's own page), from the outcome: 2 moves each is too few for anyone.
+  for (const p of [white, black]) await expect(p.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: the game ended before move 10.");
   expect(await record(black)).toMatchObject({ games: 1, wins: 1, losses: 0, rank: { label: "Placement 1/5" } });
   expect(await record(white)).toMatchObject({ games: 1, wins: 0, losses: 1 });
 });
@@ -222,10 +222,10 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
   await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
   // Before your 3rd move it's a leave (L1); in placements there are no rank points to take, so it goes on the record.
   await resign(white, "Resign", "It counts as a loss, and resigning this early goes on your record.");
-  await expect(black.locator(".dv-result-title")).toHaveText("You won");
-  await expect(black.locator(".dv-result-why")).toHaveText(/ resigned\.$/);
-  await expect(white.locator(".dv-result-why")).toHaveText("You resigned.");
-  for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  await expect(black.getByTestId("es-title")).toHaveText("Victory!");
+  await expect(black.getByTestId("es-line")).toHaveText(/ resigned\.$/);
+  await expect(white.getByTestId("es-line")).toHaveText("You resigned.");
+  for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
   expect(await leavesOf(white)).toMatchObject({ marks: 1 });
   expect(await leavesOf(black)).toMatchObject({ marks: 0 });
 
@@ -238,11 +238,10 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
   await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
   await tapMove(black, "d7d5");
   // White doesn't move: 6 s later the flag falls (Black has more than a lone king: a loss, not a draw).
-  await expect(white.locator(".dv-result-title")).toHaveText("You lost", { timeout: 20_000 });
-  await expect(white.locator(".dv-result-why")).toHaveText("You ran out of time.");
-  await expect(black.locator(".dv-result-why")).toHaveText(/ ran out of time\.$/);
-  await expect(white.locator(".dv-clock.low").first()).toBeVisible();
-  for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 2/5", { timeout: 15_000 });
+  await expect(white.getByTestId("es-title")).toHaveText("Defeat", { timeout: 20_000 });
+  await expect(white.getByTestId("es-line")).toHaveText("You ran out of time.");
+  await expect(black.getByTestId("es-line")).toHaveText(/ ran out of time\.$/);
+  for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 2/5", { timeout: 15_000 });
 });
 
 test("every change is drawn, even in the same millisecond as the last draw (the clock held still from the last move): the result, then the rank", { tag: "@phone-only" }, async ({ browser }) => {
@@ -261,9 +260,9 @@ test("every change is drawn, even in the same millisecond as the last draw (the 
   await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
   for (const p of [white, black]) await p.clock.setFixedTime(await p.evaluate(() => Date.now()));
   await resign(white);
-  await expect(black.locator(".dv-result-title")).toHaveText("You won");
-  await expect(white.locator(".dv-result-why")).toHaveText("You resigned.");
-  for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  await expect(black.getByTestId("es-title")).toHaveText("Victory!");
+  await expect(white.getByTestId("es-line")).toHaveText("You resigned.");
+  for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
 });
 
 test("a first move that never comes: the game is aborted, a dodge for the one who didn't move (L1), nothing for the other", { tag: "@phone-only" }, async ({ browser }) => {
@@ -322,9 +321,9 @@ test("a reload mid-game comes back to the same game, its clocks running; a decli
   await expect(white.locator(".dv-draw")).toContainText(`${nameOf(black)} offers a draw`);
   await white.locator(".dv-draw").getByRole("button", { name: "Accept" }).click();
   for (const p of [white, black]) {
-    await expect(p.locator(".dv-result-title")).toHaveText("Draw");
-    await expect(p.locator(".dv-result-why")).toHaveText("Draw agreed.");
-    await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
+    await expect(p.getByTestId("es-title")).toHaveText("A draw");
+    await expect(p.getByTestId("es-line")).toHaveText("Draw agreed.");
+    await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
   }
   expect(await record(white)).toMatchObject({ games: 1, draws: 1 });
 });

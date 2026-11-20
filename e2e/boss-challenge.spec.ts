@@ -240,7 +240,7 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   // He mates you (?mate=1): the result screen, its leaving "Back to town" (not Home).
   const back = page.getByRole("button", { name: "Back to town" });
   await expect(back).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByText(/Alfil won/)).toBeVisible();
+  await expect(page.getByText(/Alfil wins/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Home", exact: true })).toHaveCount(0);
   // (A token's box, if one dropped: OK it.)
   const box = page.getByRole("dialog", { name: /^You got an? .+ token!$/ });

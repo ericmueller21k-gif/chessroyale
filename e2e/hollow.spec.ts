@@ -273,7 +273,7 @@ test("Hollow's bulbs (Boss alone): a 2 x 2 block of the dark drawn, then the 10t
   if (STILLS) await still(page, "bulbs-blackout");
   expect(await soundsHeard(page)).toContain("hollowBlackout");
   await expect.poll(() => phase(page), { timeout: 15_000 }).toBe("results");
-  await expect(page.locator(".results h1")).toHaveText("Defeated");
+  await expect(page.locator(".results h1")).toHaveText("Defeat");
   await expect(page.locator(".team-result.bad")).toContainText("won: the last of your ten bulbs went out.");
   expect(await page.evaluate(() => (window as any).match.phase.blackout)).toBe(true);
   if (STILLS) await still(page, "bulbs-result");

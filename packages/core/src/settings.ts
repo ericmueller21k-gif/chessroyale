@@ -4363,6 +4363,50 @@ export const XP = {
 } as const;
 
 /**
+ * The end screen (Eric, Nov 20; docs/decisions/2026-11-20-end-screen.md; the app's components/EndScreen.tsx): every match's result
+ * shows "XP EARNED" (and on ranked 1 v 1, "RP EARNED" first) counting up from 0, the number lobbing into its bar, the bar filling from
+ * where you were (a level or a division reached: the bar flashes full and goes on from 0), then the quests the match moved sliding to
+ * their new counts. A tap anywhere but a button skips to the end. Reduced motion: the end at once, one ding. Times in ms; sizes in px.
+ * The bar's span is XP.perLevel (RANKED_1V1.pointsPerDivision for RP), never a number of its own.
+ */
+export const END_SCREEN = {
+  /** After the screen (and the game's XP) shows, before the first count: a beat to take in the headline. */
+  startMs: 450,
+  /** The count-up from 0 to the total (Eric: "should only be like 1.5 sec to reach total"), on an ease-out curve. */
+  countMs: 1500,
+  /** The number holds at its total before it lobs. */
+  holdMs: 280,
+  /** The lob into the bar's slot. */
+  lobMs: 620,
+  /** How far the lob's arc rises above its two ends. */
+  lobLift: 18,
+  /** The number's size when it lands in the slot (a share of its size). */
+  lobEndScale: 0.38,
+  /** The bar's fill: between these, by how much of a level it gains. */
+  fillMs: { min: 1300, max: 2200 },
+  /** The shortest fill of one stretch (between two levels). */
+  stretchMinMs: 120,
+  /** A level (a division) reached: the pause at full while "Level 3!" pops. */
+  levelMs: 650,
+  /** Between the RP's bar and the XP's count (ranked), and before the quests. */
+  gapMs: 300,
+  /** The pings at most this often (a 150 XP count would otherwise ask for 90 a second). */
+  pingGapMs: 42,
+  /** Each moved quest's slide, and the gap before the next. */
+  questMs: 650,
+  questGapMs: 250,
+  /** The most quest rows the box shows (its height is this many rows, always). */
+  questRows: 2,
+  /** How long the end screen waits for the quests' answer before it goes on without them. */
+  questWaitMs: 4000,
+  /** The bosses' row (1-2-1): the one in front fits this box, the two behind this one (px). */
+  frontBoss: { w: 130, h: 98 },
+  backBoss: { w: 80, h: 66 },
+  /** The largest a boss is drawn there (screen px a sprite px). */
+  bossMaxScale: 2,
+} as const;
+
+/**
  * Quests (Eric, Nov 9; XP phase 3; the approved design's sections 3 and 5, notes/briefs/design-xp-quests.md;
  * docs/decisions/2026-11-09-quests-*.md; core's quests.ts has the rules, server/quests.ts deals them and pays them):
  *   - **Dailies:** `dailyPerDay` new ones each XP day (it starts at XP.dayStartUtcHour, 08:00 UTC), dealt the first time your quests

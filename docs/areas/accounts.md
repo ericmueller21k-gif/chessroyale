@@ -76,7 +76,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   once per level (`lvl:<n>:<ledger id>`), every paying level owed at the next counted game (at most 20 a game). The ledger's older
   `level:<n>` ops are levels of 1,000: counted as today's by reward, the nth crate and key and the nth pick (`paidLevels`), so none is
   paid again ([2026-11-20-levels-500.md](../decisions/2026-11-20-levels-500.md)). Both go through the ledger in the game's XP grant; what a game paid is kept on its result
-  (`results.xp_rewards`) and shown in a toast at the top once the bar fills (`components/RewardBox.tsx`). `PAUSE_REWARDS` grants
+  (`results.xp_rewards`) and shown in a toast at the top once the end screen's sequence ends (`components/RewardBox.tsx`; on the end screen only the crates and keys: the bar shows the level and the rows the quests, Nov 20). `PAUSE_REWARDS` grants
   nothing ("Rewards are paused for a moment."). Merge adds the crates and picks; deleting closes them; the download has them. A level
   a merged guest was paid counts as paid for the account (`owedLevels` reads the merge's ledger legs; Nov 10: it was paid again).
 - **Quests** (Nov 9, phase 3; `server/quests.ts`, the rules in core's `quests.ts`, the numbers and pool `QUESTS` in settings.ts; decisions

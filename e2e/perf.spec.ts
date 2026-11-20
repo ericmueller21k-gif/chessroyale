@@ -471,7 +471,7 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change, four boards i
   }
 });
 
-test("the XP box on a slow phone: the result screen's frames while the bar fills, a level-up included (Nov 9)", { tag: "@perf" }, async ({ page }) => {
+test("the end screen on a slow phone: its frames through the count, the lob and the bar's fill, a level-up included (Nov 9; Nov 20)", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(3 * 60_000);
   await page.addInitScript(instrument);
@@ -485,11 +485,12 @@ test("the XP box on a slow phone: the result screen's frames while the bar fills
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   await page.evaluate(() => (window as any).match.submit("h5f7"));
-  await page.locator(".xp-box").waitFor({ timeout: 60_000 });
+  // (The end screen, Nov 20: from its first frame through XP EARNED's count, its lob and the bar's fill, to its end.)
+  await page.getByTestId("es-rewards").waitFor({ timeout: 60_000 });
   await page.evaluate(() => ((window as any).__perf.frames = []));
-  await expect(page.locator(".xp-box")).toHaveClass(/xp-done/, { timeout: 30_000 });
+  await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
   const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
-  console.log(`the XP box filling (slowed phone): ${f(s)}`);
+  console.log(`the end screen's count, lob and fill (slowed phone): ${f(s)}`);
   expect(s.n, "frames while it filled").toBeGreaterThan(20);
   expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);

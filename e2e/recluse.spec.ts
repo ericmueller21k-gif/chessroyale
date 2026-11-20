@@ -1067,7 +1067,7 @@ test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defea
   await resignHere(page, /Your board is lost\. The other boards play on, but all four must be won\./);
   await expect.poll(async () => (await simulNow(page))?.boards[0].result?.how ?? null, { timeout: 10_000 }).toBe("resign");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
-  await expect(page.locator(".results h1")).toHaveText("Defeated");
+  await expect(page.locator(".results h1")).toHaveText("Defeat");
   await expect(page.locator(".team-result")).toContainText("The Hidden Boss won. You won 3 of 4 boards: all 4 must be won.");
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /laugh2|idle2/, { timeout: 10_000 });
   expect(errors).toEqual([]);
