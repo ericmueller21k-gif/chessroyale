@@ -184,6 +184,8 @@ function useTrackRefs(): TrackRefs {
   return { box: useRef(null), gain: useRef(null), who: useRef(null), level: useRef(null), fill: useRef(null), pop: useRef(null), now: useRef(null), emblem: useRef(null) };
 }
 
+/** An amount counted so far as XP, for its ping's pitch (xpPingHz): XP as it is; RP by its bar's share (a full bar as a level). */
+const asXp = (plan: { per: number }, counted: number) => (Math.abs(counted) * XP.perLevel) / plan.per;
 const within = (at: number, per: number) => ((at % per) + per) % per;
 
 /**
@@ -334,9 +336,9 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
     const frames: number[] = [];
     let anim: Animation | null = null;
     let stopped = false;
-    const sound = (name: "xpPing" | "xpLand" | "xpDing" | "acLevel" | "questTick" | "questDone", k?: number, low?: boolean) => {
+    const sound = (name: "xpPing" | "xpLand" | "xpDing" | "acLevel" | "questTick" | "questDone", xp?: number, count?: boolean) => {
       if (stopped) return;
-      if (name === "xpPing") xpPing(k ?? 0, low);
+      if (name === "xpPing") xpPing(xp ?? 0, count);
       else if (name === "questTick" || name === "questDone") questSound(name === "questTick" ? "tick" : "done");
       else play(name);
     };
@@ -438,7 +440,7 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
         const now = performance.now();
         if (v !== 0 && now - lastPing >= FX.pingGapMs) {
           lastPing = now;
-          sound("xpPing", Math.abs(v / plan.earned), true);
+          sound("xpPing", asXp(plan, v), true);
         }
       });
     };
@@ -503,7 +505,7 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
           const now = performance.now();
           if (now - lastPing >= FX.pingGapMs) {
             lastPing = now;
-            sound("xpPing", w / plan.per);
+            sound("xpPing", asXp(plan, shown - plan.before));
           }
         });
         if (stopped || stop === to) break;

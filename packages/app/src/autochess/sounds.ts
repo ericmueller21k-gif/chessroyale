@@ -8,7 +8,6 @@
  * - hold (an offer dragged to the bench): a soft pop, a little bubble;
  * - sell: a coin cascade, six clinks tumbling down in pitch and loudness (nothing like buying's thunk);
  * - xp (Buy XP): a small rising chime, three bell notes up;
- * - level (a level-up): a bigger chime, a rising arpeggio that ends in a ringing chord;
  * - lock (Lock in): a latch, a click and a clack;
  * - reveal (one of their pieces shown): a short high ping, a scoop up to a bell note;
  * - cash (a pawn cashing in at the far end of the fight): a short double clink, two coins, the second higher;
@@ -17,11 +16,12 @@
  * - star3 (its third star): a bigger one, about a second: a longer shimmer up into a swelling major chord with a bright bell-like hit and a sparkle of small
  *   high bells falling away.
  *
- * (The play names in sound.ts: acReroll, acPlace, acHold, sell, acXp, acLevel, acLock, acReveal, acCash, acStar2, acStar3.)
+ * (The play names in sound.ts: acReroll, acPlace, acHold, sell, acXp, acLock, acReveal, acCash, acStar2, acStar3. A level-up, acLevel,
+ * is the app's shared steel pan one since Nov 20: sound.ts's levelUp.)
  */
 import { bandpass, lowpass, noise, osc, render, sine, soft, soundCache, type Voice } from "../characters/synth.ts";
 
-export type AutochessSound = "reroll" | "place" | "hold" | "sell" | "xp" | "level" | "lock" | "reveal" | "cash" | "star2" | "star3";
+export type AutochessSound = "reroll" | "place" | "hold" | "sell" | "xp" | "lock" | "reveal" | "cash" | "star2" | "star3";
 
 /** An exponential decay with a quick attack (a struck thing): 0 before `at`, then rising over `attack` s and falling with time constant `tau`. */
 const strike = (t: number, at: number, tau: number, attack = 0.002) => (t < at ? 0 : Math.min(1, (t - at) / attack) * Math.exp(-(t - at) / tau));
@@ -108,17 +108,6 @@ const SOUNDS: Record<AutochessSound, (rate: number) => Float32Array> = {
     const notes = [1046.5, 1318.5, 1568].map((f) => bell(rate, f, [[1, 1, 0.09], [2, 0.3, 0.05]]));
     return render(rate, 0.5, (t) => notes.reduce((sum, n, i) => sum + n(t, i * 0.075, 0.2), 0));
   },
-  // A rising arpeggio (C5, E5, G5, C6) that ends in a ringing C major chord, with a soft shimmer: bigger and longer than the XP chime.
-  level: (rate) => {
-    const arp = [523.25, 659.25, 783.99, 1046.5].map((f) => bell(rate, f, [[1, 1, 0.16], [2.01, 0.35, 0.1], [3, 0.12, 0.06]]));
-    const chord = [1046.5, 1318.5, 1568, 2093].map((f) => bell(rate, f, [[1, 1, 0.34], [2.76, 0.18, 0.12]]));
-    return render(rate, 1.15, (t) => {
-      let v = 0;
-      arp.forEach((n, i) => (v += n(t, i * 0.09, 0.2)));
-      chord.forEach((n) => (v += n(t, 0.4, 0.12)));
-      return soft(v, 0.3);
-    });
-  },
   // A latch: a sharp click (a bright burst and a tick), then a lower clack a moment later.
   lock: (rate) => {
     const bright = bandpass(rate, () => 3000, 4, noise(8));
@@ -183,7 +172,7 @@ const SOUNDS: Record<AutochessSound, (rate: number) => Float32Array> = {
 };
 
 /** Trims each so it sits a little under a move's loudness (peak well under the move's; mean a few dB under it). */
-const LEVEL: Record<AutochessSound, number> = { reroll: 0.55, place: 0.38, hold: 0.8, sell: 0.9, xp: 0.85, level: 0.68, lock: 0.8, reveal: 0.85, cash: 0.62, star2: 0.42, star3: 0.46 };
+const LEVEL: Record<AutochessSound, number> = { reroll: 0.55, place: 0.38, hold: 0.8, sell: 0.9, xp: 0.85, lock: 0.8, reveal: 0.85, cash: 0.62, star2: 0.42, star3: 0.46 };
 
 const cache = soundCache("autochess");
 /** The samples for one of these sounds at a sample rate (made once, then reused). */

@@ -74,6 +74,7 @@ async function xpIs(page: Page, xp: number) {
 test("a counted game with a level-up: the bar fills from the old XP to the new, never a jump, to the end and on from empty; nothing moves; home's level", async ({ page }, testInfo) => {
   test.setTimeout(3 * 60_000);
   await sampleXp(page);
+  await page.addInitScript(() => ((window as any).__soundLog = []));
   // 490 XP (Level 1, 98% of the way: levels of 500 since Nov 20), then a won Boss alone game counted as 12 minutes: 120 + 50 = 170,
   // to 660 (Level 2, 32%).
   await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=490&xpgame=12&quests=squad-up,fifty-fifty,regular"); // (quests no solo boss game can finish: a dealt "Win a Boss Battle" adds its own XP since Nov 10)
@@ -130,6 +131,20 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   }
   expect(wraps, "one level-up").toBe(1);
   expect(all.some((s) => s.pop === "Level 2!"), '"Level 2!" pops').toBe(true);
+  // Its sounds (Eric, Nov 20: the steel pan level-up; a soft pan note at the fill's end): pings through the count and the fill, one
+  // level-up, one last note; the level-up quieter than a move, the last note quieter than the level-up.
+  const heard = ((await page.evaluate(() => (window as any).__soundLog)) as string[]).map((l) => l.split(":")[0]!);
+  expect(heard.filter((n) => n === "xpPing").length, "pings").toBeGreaterThan(10);
+  expect(heard.filter((n) => n === "acLevel").length, "one level-up").toBe(1);
+  expect(heard.filter((n) => n === "xpDing").length, "one last note").toBe(1);
+  expect(heard.indexOf("acLevel"), "the level-up before the last note").toBeLessThan(heard.indexOf("xpDing"));
+  const loud = (n: string) => page.evaluate((n) => (window as any).__measureSound(n, 1.5), n) as Promise<{ peak: number; rms: number }>;
+  const [move, levelUp, ding] = [await loud("move"), await loud("acLevel"), await loud("xpDing")];
+  expect(move.peak).toBeGreaterThan(0.05);
+  expect(levelUp.peak, "the level-up's peak under half a move's (as every synthesized sound)").toBeLessThan(move.peak / 2);
+  expect(levelUp.rms, "the level-up's loudness under a move's").toBeLessThan(move.rms);
+  expect(ding.peak, "the last note under the level-up").toBeLessThan(levelUp.peak);
+  expect(ding.peak).toBeGreaterThan(0.01);
   // The fill took over a second, over many frames (never one step).
   const fill = all.slice(first);
   const end = fill.findIndex((s) => Math.abs(s.share - 0.32) < 0.001);
