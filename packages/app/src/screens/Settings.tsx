@@ -239,6 +239,8 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
         <span class="fd-head-spacer" />
       </header>
 
+      <InstallCard />
+
       <section class="fd-section">
         <h2 class="fd-label">THEME</h2>
         <ThemeChoice />
@@ -378,7 +380,6 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
         </button>
       </section>
 
-      <InstallCard />
 
       {config?.accounts && u && (
         <section class="fd-section">
