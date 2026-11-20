@@ -1,9 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS, SAWYER_LOOKS } from "@chessroyale/core";
-import { chooseCut } from "@chessroyale/chess";
+import { SAW_SWAP_TEST_CHECK, SAW_SWAP_TEST_MOVES, applyMove, chooseCut, fenAfter, fenAtPly, sawSwapFen } from "@chessroyale/chess";
 import { BOARD_SEL, engineTop, test, watchFor, bossAloneFromHome } from "./helpers.ts";
-import { REFUSED, REFUSED_MS, REFUSED_OTHER, THROUGH } from "../packages/app/src/refused.ts";
+import { REFUSED, REFUSED_MS, REFUSED_OTHER, SAW_SWAP_LINE, THROUGH } from "../packages/app/src/refused.ts";
 
 /**
  * Sawyer, the raccoon with a saw, played alone on a phone and a computer with real taps: his first move a pawn's and
@@ -11,7 +11,8 @@ import { REFUSED, REFUSED_MS, REFUSED_OTHER, THROUGH } from "../packages/app/src
  * two small whole pawns that land and grow to a pawn's size, or with SAWYER_LOOKS.split "halves" the two halves come
  * apart and stay drawn as halves), your move's knock first, the board saw (?power=boardsaw: BOARD SAW!, he saws up the middle, the board jolts and splits
  * with a gap; no moves or move dots across it), a saw cut (SAW CUT!, the groove on its edge, no move across it), the
- * cut taped over and healing away and the halves rejoining (the admins' trigger), his sounds through the mute switch.
+ * cut taped over and healing away and the halves rejoining (the admins' trigger), his sounds through the mute switch; and his Saw Swap
+ * (?power=sawswap: your check on his king on his half, SAW SWAP!, the grooves, the blocks sliding past each other, then his move).
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
@@ -521,6 +522,53 @@ test("Sawyer: the board saw from the admins' trigger, a cut taped over and heali
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
   const allowed = (await powers(page)).allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to);
   expect(allowed.some(crossesMiddle)).toBe(new Chess(fen).moves({ verbose: true }).some((m) => crossesMiddle(m.from + m.to)));
+  expect(errors).toEqual([]);
+});
+
+test("Sawyer's Saw Swap (?power=sawswap, Eric, Nov 20): your check on his king on his half; he saws the board, swaps its two blocks out of check, then moves", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
+  await page.goto("/?debug&clock=60&boss=sawyer&power=sawswap&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  // (The switch's position, the crowd to move: Bb5+ checks his king on e8, and the swap takes it to a8.)
+  const start = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+  expect(start.split(" ")[0]).toBe(fenAfter([...SAW_SWAP_TEST_MOVES.w]).split(" ")[0]);
+  const swapped = sawSwapFen(applyMove(start, SAW_SWAP_TEST_CHECK.w), "b")!;
+  const swap = await watchFor(page, {
+    banner: { selector: ".fight-banner", text: /SAW SWAP!/ },
+    cross: { selector: ".sw-gap.sw-cross" },
+    down: { selector: ".sw-gap.sw-down" },
+    slide: { selector: '.pm-sawswap[data-swap="slide"] .sw-slab.sw-lifted' },
+    line: { selector: ".bc-bubble", text: /Let me saw my way out of this\.|Pardon the renovation!|Measure twice, swap once\.|Swap shop's open!/ },
+  });
+  await play(page, SAW_SWAP_TEST_CHECK.w);
+  await yourMove(page);
+  expect(await swap.seen()).toEqual({ banner: true, cross: true, down: true, slide: true, line: true });
+  expect((await powers(page)).sawSwap).toEqual({ at: 1, king: ["e8", "a8"] });
+  // He moved after it, from the swapped position (a base at the check's ply: the history keeps every move).
+  const board = await page.evaluate(() => {
+    const b = (window as any).match.boss.board;
+    return { history: b.history as string[], bases: b.bases, fen: b.fen as string };
+  });
+  expect(board.history.at(-2)).toBe(SAW_SWAP_TEST_CHECK.w);
+  expect(fenAtPly(board.history, board.history.length - 1, board.bases)).toBe(swapped);
+  // Every piece on screen where the game has it: his king on a8, the bishop that checked carried to f5 with its block.
+  const drawn = await page.evaluate(() =>
+    Object.fromEntries([...document.querySelectorAll(".hb-board > piece")].filter((e) => !e.classList.contains("fading")).map((e) => [(e as HTMLElement).dataset.square, e.className])),
+  );
+  const game = new Chess(board.fen);
+  const want: Record<string, string> = {};
+  for (const row of game.board()) for (const pc of row) if (pc) want[pc.square] = `${pc.color === "w" ? "white" : "black"} ${{ p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" }[pc.type]}`;
+  expect(Object.keys(drawn).sort()).toEqual(Object.keys(want).sort());
+  for (const [sq, name] of Object.entries(want)) for (const c of name.split(" ")) expect(drawn[sq], sq).toContain(c);
+  expect(want.a8).toBe("black king");
+  expect(want.f5).toBe("white bishop");
+  // The dock says so through your turn; nothing of the moment is left on the board.
+  await expect(page.getByText(SAW_SWAP_LINE)).toBeVisible();
+  await expect(page.locator(".sw-slab, .sw-hole, .sw-gap")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

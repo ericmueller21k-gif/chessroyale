@@ -348,6 +348,13 @@ export const SAW_SWAP_TEST_CHECK: Readonly<Record<Side, string>> = { w: "f1b5", 
 /** The Saw Swap has come this battle (once a battle). */
 export const sawSwapped = (boss: Pick<BossState, "powers"> | null | undefined): boolean => !!boss?.powers?.sawSwap;
 
+/**
+ * His Saw Swap came as the crowd's move just played landed: while he thinks after it (its moment, about 5 s), the move he's about to
+ * play isn't on the board yet, so the move list holds it back (as Dash's pop-off: popOffHolding). The screens' view and the state alike.
+ */
+export const sawSwapHolding = (boss: { id?: string; crowdMoves?: number; powers?: { sawSwap?: { at: number } | null } | null } | null | undefined): boolean =>
+  boss?.id === "sawyer" && !!boss.powers?.sawSwap && boss.powers.sawSwap.at === boss.crowdMoves;
+
 /** Sawyer: the split pawn after his first move, a saw cut every few turns, and the board saw. */
 export const SAWYER: BossRules = {
   id: "sawyer",
