@@ -535,3 +535,18 @@ choir pad; 32 bars: an intro, a guitar-and-organ tune, a jazz bridge, a climax o
 - The other tower tries are not used: song_al.py, song_am.py (its tune's instrument was never picked), and
   song_ak.py, shelved for a defeat.
 
+
+## The God King's new voice (Nov 20): four shouts from Eric's pack, an octave down; sent, no verdict yet
+
+Eric uploaded a sound pack he made for the God King (8 s: four short shouts and a long cry): "This is the sound pack
+I ... made for the God King. We're replacing the sound, but the last one I don't want, which is ... the longer one ...
+the cry. But for the other ones, can you ... chop them up so they're their own? But then also we need to make the
+voice like an octave deeper than what it is now ... he's supposed to have a deeper voice than this."
+- His audio, cut and pitched: nothing here is synthesized. The pack itself stays in the scratch folder until he says
+  how it was made (the game's `public/sounds/god-king/CREDITS.md` lists every sound's source).
+- Cut where each shout rises out of silence and dies away (0.33 to 0.37 s each); the cry (4.0 to 7.5 s) left out.
+- An octave down two ways: the same length (a pitch shift; 0.30 to 0.37 s), which is what went to him as four
+  files; and slowed like a tape (twice as long, 0.64 to 0.75 s, no shifting artifacts), as one sheet to compare.
+  Measured on both: the strongest low partial and the spectrum's centre each halve.
+- Set to the level of the game's present voice cuts (peak -5.5 dBFS; `hyuah`, `last-grunt1`, `last-grunt2`), mono,
+  44.1 kHz MP3 as those are. Which shout goes to which moment is his or the director's to say.
