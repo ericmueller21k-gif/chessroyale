@@ -222,6 +222,15 @@ describe("the tower: the run's steps", () => {
     expect(floorsWonBest(run)).toBe(0);
     // (Other numbers, as a test or the sim passes them: 0 lives, out at the first loss, as before Nov 20.)
     expect(finishFloor(won, "lost", pool, { ...BATTLE_TOWER, lives: 0 })).toEqual({ ...won, status: "out", lost: [2] });
+    // (The setting lowered below a run's floors lost (two lost, lives now 1): a win still climbs, never ends it; the next loss does. The
+    // review of #839, finding 4.)
+    const lower = { ...BATTLE_TOWER, lives: 1 };
+    const spent = finishFloor(finishFloor(won, "lost", pool), "lost", pool);
+    const on = finishFloor(spent, "won", pool, lower);
+    expect(on).toMatchObject({ status: "open", lost: [2, 3] });
+    expect(on.floors.length).toBe(spent.floors.length + 1);
+    expect(livesLeft(on, lower)).toBe(0);
+    expect(finishFloor(on, "lost", pool, lower)).toMatchObject({ status: "out", lost: [2, 3, 5] });
   });
 
   it("a run with no floor lost (as every run saved before lives reads: server tower.ts runOf): all its lives; its best its floor less one, or 99 at the top", () => {

@@ -221,7 +221,7 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
         {/* (Your solo climb, greyed while you're in a party: Leave party first. Its lives and floors lost always on their line (Nov 20).) */}
         <p class="tw-desk-lives" data-tower-lives={run ? livesOf(run.lives) : BATTLE_TOWER.lives}>
           <TowerHearts lives={run ? livesOf(run.lives) : BATTLE_TOWER.lives} />
-          <span>{!run ? "Two lives a climb" : lostWords(run.lost ?? []) || "No floors lost"}</span>
+          <span>{!run ? TOWER_WORDS.livesAClimb : lostWords(run.lost ?? []) || "No floors lost"}</span>
         </p>
         {run ? (
           <button type="button" class="town-btn primary tw-solo-go" disabled={busy || !!p} onClick={() => onGo("solo")}>

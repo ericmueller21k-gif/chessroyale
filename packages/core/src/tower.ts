@@ -226,7 +226,9 @@ export function finishFloor(run: TowerRun, outcome: "won" | "lost" | "drawn", po
   if (run.status !== "open") return run;
   const floor = run.floors.length;
   const lost = outcome === "won" ? run.lost : [...run.lost, floor];
-  if (lost.length > s.lives) return { ...run, lost, status: "out" };
+  // (Only a floor not won ends a run: a win never does, even with more floors lost than `lives` now allows (the setting lowered since
+  // they were spent: the review of #839, finding 4).)
+  if (outcome !== "won" && lost.length > s.lives) return { ...run, lost, status: "out" };
   if (floor >= s.floors) return { ...run, lost, status: "top" };
   const { bosses, deck, decks } = deal(run, floor + 1, run.floors[floor - 1]!, pool, s);
   return { ...run, floors: [...run.floors, bosses], deck, decks, lost };

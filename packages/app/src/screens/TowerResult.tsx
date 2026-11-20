@@ -16,7 +16,8 @@ const nextLine = (n: number) => `Next: floor ${n} · ${floorBossCount(n)} ${floo
  * and one button, "Back to the tower" (greyed while the result's pictures play and the server answers), into the floor room: won, the
  * elevator open to the next floor. Lost, drawn or left (counted) with a life to spend (Eric, Nov 20: "it just takes you on to the next
  * match, and it just counts"): "You lost floor 8. It still counts: 1 life left.", the elevator open too; with none, the run over, its
- * floors lost listed (the recap). Until the server answers, the run's lives going in say which (the server's word then stands).
+ * floors lost listed (the recap). Until the server answers, the run's lives going in say which (the server's word then stands). A leave
+ * the server made free: "You left floor 8. It waits for you.", back to the lobby.
  */
 export function TowerResult({ match, onBack }: { match: GameView; onBack: () => void }) {
   const play = match.tower!;
@@ -33,19 +34,24 @@ export function TowerResult({ match, onBack }: { match: GameView; onBack: () => 
   }, [play]);
   const p = match.phase;
   const left = p.kind === "results" && !!p.left;
-  const won = !left && p.kind === "results" && !!p.bossResult && floorOutcome(p.bossResult) === "won";
   const floor = play.floor;
-  // (Resigning after your 2nd move is a loss as the tower counts it: "You lost floor 8.")
-  const outcome = p.kind === "results" && p.bossResult && !left ? floorOutcome(p.bossResult) : "lost";
-  // (The run after this floor: the server's word once it has taken the result; until then (or if it couldn't be sent), as the lives
-  // going in say.)
+  // (The run after this floor, and the floor's result: the server's word once it has taken the result (a floor counted lost on another
+  // device while this one won it stays lost: the review of #839, finding 2); until then (or if it couldn't be sent), the match's, and
+  // as the lives going in say. Resigning after your 2nd move is a loss as the tower counts it: "You lost floor 8.")
   const said = end && !end.error ? end : null;
+  const played = p.kind === "results" && p.bossResult && !left ? floorOutcome(p.bossResult) : "lost";
+  const outcome = said && said.outcome !== "left" ? said.outcome : played;
+  const won = !left && outcome === "won";
+  // (A leave the server made free (the floor's bosses rested since it began: the review of #839, finding 6): nothing spent, the same
+  // floor waits; Town takes you to the lobby.)
+  const free = left && !!said?.free;
   const lives = said ? said.lives : won ? play.lives : Math.max(0, play.lives - 1);
   const on = won || play.lives > 0;
   const status = said ? said.status : on && floor >= BATTLE_TOWER.floors ? "top" : on ? "open" : "out";
   const n = floor + 1;
-  const line =
-    status === "top"
+  const line = free
+    ? `You left floor ${floor}. It waits for you.`
+    : status === "top"
       ? won
         ? `Floor ${BATTLE_TOWER.floors} cleared: the top of the tower!`
         : `${notWon(outcome, floor)} It still counts: the top of the tower!`
@@ -55,9 +61,9 @@ export function TowerResult({ match, onBack }: { match: GameView; onBack: () => 
           : spentLine(outcome, floor, lives)
         : `Your run ended on floor ${floor}.`;
   const best = end ? `Best solo: ${end.best ? `floor ${end.best}` : "none yet"}` : "";
-  const sub = !end ? "Saving your run…" : (end.error ?? (status === "open" ? nextLine(n) : [lostWords(end.lost), best].filter(Boolean).join(". ")));
+  const sub = !end ? "Saving your run…" : (end.error ?? (status === "open" ? nextLine(free ? floor : n) : [lostWords(end.lost), best].filter(Boolean).join(". ")));
   return (
-    <div class="tw-result" data-tower-result={status === "open" ? (won ? "won" : "lost") : status}>
+    <div class="tw-result" data-tower-result={free ? "free" : status === "open" ? (won ? "won" : "lost") : status}>
       <p class="tw-result-line">{line}</p>
       <p class="tw-result-sub">{sub}</p>
       <div class="actions">

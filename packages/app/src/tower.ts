@@ -78,6 +78,20 @@ export type FloorOutcome = "won" | "lost" | "drawn";
 /** An answer: the body, or the refusal's status and body (a 409 carries `run` and `best` to read again, or `confirm`). */
 export type Answer<T> = { ok: true; body: T } | { ok: false; status: number; body: { message?: string; confirm?: boolean; run?: TowerRun | null; best?: number; fight?: Fight } };
 
+/** A run's lives in words, from the setting (the review of #839, finding 5: never a number written into the words): "two lives", "one life", "no lives"; 11 and up in digits. */
+export function livesWords(n: number): string {
+  const words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+  return `${words[n] ?? String(n)} ${n === 1 ? "life" : "lives"}`;
+}
+/** "first", "second", "third", …; 11 and up in digits ("11th", "22nd"). */
+export function ordinal(n: number): string {
+  const words = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+  if (words[n - 1]) return words[n - 1]!;
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  return `${n}${teen ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th")}`;
+}
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 /** What the screens say when the server can't be reached. */
 export const TOWER_WORDS = {
   offline: "Couldn't reach the tower. Check your connection and try again.",
@@ -86,8 +100,10 @@ export const TOWER_WORDS = {
   resting: "This floor's bosses are resting for a bit. Leaving it now is free: the same floor waits for you.",
   broken: "This run can't be played. Start a new one.",
   replace: (floor: number) => `Your run on floor ${floor} ends, and a new one starts on floor 1.`,
-  /** The clerk's line with no climb under way (Nov 20: lives). */
-  climb: `A climb of ${BATTLE_TOWER.floors} floors. Two lives: the third loss ends it.`,
+  /** The clerk's line with no climb under way (Nov 20: lives): "A climb of 99 floors. Two lives: the third loss ends it." */
+  climb: `A climb of ${BATTLE_TOWER.floors} floors. ${capital(livesWords(BATTLE_TOWER.lives))}: the ${ordinal(BATTLE_TOWER.lives + 1)} loss ends it.`,
+  /** The clerk's card's lives line with no solo climb: "Two lives a climb". */
+  livesAClimb: `${capital(livesWords(BATTLE_TOWER.lives))} a climb`,
 } as const;
 
 /** The lives a run has as the screens show them: none known (a floor or answer from before lives), all of them; never fewer than 0 or more than all. */
@@ -98,9 +114,15 @@ export const livesLeftWords = (n: number): string => (n <= 0 ? "no lives left" :
 
 /** The run's recap of its floors lost (Eric, Nov 20: "in your recap, it would show like that you lost ... floor 8"): "Lost floor 8", "Lost floors 8 and 11", "Lost floors 3, 8 and 11"; none, "". */
 export function lostWords(lost: readonly number[]): string {
-  if (!lost.length) return "";
-  if (lost.length === 1) return `Lost floor ${lost[0]}`;
-  return `Lost floors ${lost.slice(0, -1).join(", ")} and ${lost[lost.length - 1]}`;
+  // (A floor lost again, "Lost floor 2 twice": a party gone back to a floor one of its members lost with it in the room keeps that life
+  // spent, and can lose the floor again (the review of #839, finding 1).)
+  const floors = [...new Set(lost)].map((f) => {
+    const n = lost.filter((x) => x === f).length;
+    return n === 1 ? `${f}` : `${f} ${n === 2 ? "twice" : `${n} times`}`;
+  });
+  if (!floors.length) return "";
+  if (floors.length === 1) return `Lost floor ${floors[0]}`;
+  return `Lost floors ${floors.slice(0, -1).join(", ")} and ${floors[floors.length - 1]}`;
 }
 
 /** A floor not won, in words: "You lost floor 8." (`who`: "Your party lost floor 8."), "Floor 8 was a draw.", "You left floor 8.". */
@@ -384,7 +406,10 @@ export async function settleKept(k: KeptFloor): Promise<TowerEnd> {
     // (The stop's own word on the run, else (refused: the floor ended elsewhere) the run now: open, or over.)
     const said = a.ok ? a.body.status : undefined;
     const status = said === "open" || said === "top" || said === "out" ? said : run ? "open" : "out";
-    const free = a.ok && a.body.stopped === "free";
+    // (Free: the stop's own word; or "between", a stop sent again after its first answer was lost (ask's retry, or the clerk's re-send
+    // after a reload), with the run still on this floor: a counted leave always moves the floor on or ends the run (the review of #839,
+    // finding 3).)
+    const free = a.ok && (a.body.stopped === "free" || (a.body.stopped === "between" && run?.floor === k.floor));
     return { ...base, status, run, best, ...lives(status, run, a.ok ? a.body : undefined), ...(free ? { free } : {}) };
   }
   const a = await towerApi.finish(k.fight, done, k.kind);
@@ -398,7 +423,10 @@ export async function settleKept(k: KeptFloor): Promise<TowerEnd> {
   if (a.status === 409 && !a.body.confirm && "run" in a.body) {
     clearKept();
     const run = a.body.run ?? null;
-    return { ...base, status: run ? "open" : "out", run, best: a.body.best ?? 0, ...lives(run ? "open" : "out", run) };
+    // (The floor counted lost on another device while this one played it out (that device's counted leave): the server's loss stands,
+    // never this device's win (the review of #839, finding 2).)
+    const outcome = done === "won" && run?.lost?.includes(k.floor) ? "lost" : done;
+    return { ...base, outcome, status: run ? "open" : "out", run, best: a.body.best ?? 0, ...lives(run ? "open" : "out", run) };
   }
   if (a.status === 409 && a.body.confirm) clearKept();
   return { ...base, status: "out", run: null, best: 0, ...lives("out", null), error: a.body.message ?? TOWER_WORDS.offline };

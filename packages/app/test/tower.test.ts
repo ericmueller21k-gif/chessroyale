@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BATTLE_TOWER } from "@chessroyale/core";
-import { FloorPlay, floorOutcome, floorPlan, floorRating, leaveIsFree, livesOf, lostWords, loadKept, readKept, saveKept, settleKept, spentLine, towerBoss, type KeptFloor } from "../src/tower.ts";
+import { FloorPlay, TOWER_WORDS, floorOutcome, floorPlan, floorRating, leaveIsFree, livesOf, livesWords, lostWords, loadKept, ordinal, readKept, saveKept, settleKept, spentLine, towerBoss, type KeptFloor } from "../src/tower.ts";
 
 // (The server's answers, faked: your account is ready at once.)
 vi.mock("../src/boss-tokens.ts", () => ({ accountReady: async () => true }));
@@ -111,6 +111,16 @@ describe("the tower's rules on the device", () => {
     expect(spentLine("lost", 4, 1, "Your party")).toBe("Your party lost floor 4. It still counts: 1 life left.");
     expect([[], [8], [8, 11], [3, 8, 11]].map(lostWords)).toEqual(["", "Lost floor 8", "Lost floors 8 and 11", "Lost floors 3, 8 and 11"]);
     expect([undefined, -1, 0, 1, 2, 5].map(livesOf)).toEqual([2, 0, 0, 1, 2, 2]);
+    // (A floor lost again: a party gone back to a floor one of its members lost with it, the review of #839, finding 1.)
+    expect([[2, 2], [2, 5, 2], [3, 3, 3]].map(lostWords)).toEqual(["Lost floor 2 twice", "Lost floors 2 twice and 5", "Lost floor 3 3 times"]);
+  });
+
+  it("the clerk's words follow the lives setting, never a number written in (the review of #839, finding 5)", () => {
+    // (Today's setting, 2: built from livesWords and ordinal, so another number changes the words with it.)
+    expect(BATTLE_TOWER.lives).toBe(2);
+    expect([TOWER_WORDS.climb, TOWER_WORDS.livesAClimb]).toEqual([`A climb of ${BATTLE_TOWER.floors} floors. Two lives: the third loss ends it.`, "Two lives a climb"]);
+    expect([0, 1, 2, 3, 10, 12].map(livesWords)).toEqual(["no lives", "one life", "two lives", "three lives", "ten lives", "12 lives"]);
+    expect([1, 2, 3, 4, 10, 11, 12, 13, 21, 22, 23, 101].map(ordinal)).toEqual(["first", "second", "third", "fourth", "tenth", "11th", "12th", "13th", "21st", "22nd", "23rd", "101st"]);
   });
 
   it("draws a boss id it doesn't know (renamed or removed) as a stand-in, never a crash", () => {
@@ -160,6 +170,31 @@ describe("sending a kept result", () => {
     const end = await settleKept(left);
     expect(end).toMatchObject({ outcome: "left", status: "open", lives: 1, lost: [2], run });
     expect(end.free).toBeUndefined();
+  });
+
+  it("a free leave whose stop answer was lost: the stop sent again answers \"between\", the run still on the floor, and it's free (the lobby); a counted one moved the floor on (the review of #839, finding 3)", async () => {
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) });
+    const left: KeptFloor = { ...kept, game: undefined, done: "left", moves: 1 };
+    const on2 = { id: "r", kind: "solo", floor: 2, bosses: ["gingerbread", "moo"], beaten: [["clown"]], fight: null, startedAt: 1, lives: 2, lost: [] };
+    const on3 = { ...on2, floor: 3, bosses: ["moo"], lives: 1, lost: [2] };
+    for (const [run, free] of [[on2, true], [on3, undefined]] as const) {
+      const replies = [{ stopped: "between", run }, { runs: { solo: run, party: null }, best: { solo: 1, party: 0 } }];
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(replies.shift()), { status: 200 })));
+      const end = await settleKept(left);
+      expect(end).toMatchObject({ outcome: "left", status: "open", run, lives: run.lives, lost: run.lost });
+      expect(end.free).toBe(free);
+    }
+  });
+
+  it("a win sent after the floor was counted lost on another device (its counted leave): the server's loss stands, never \"cleared\" (the review of #839, finding 2)", async () => {
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) });
+    const won: KeptFloor = { ...kept, game: undefined, done: "won", moves: 12 };
+    const run = { id: "r", kind: "solo", floor: 3, bosses: ["moo"], beaten: [["clown"]], fight: null, startedAt: 1, lives: 1, lost: [2] };
+    vi.stubGlobal("fetch", answer(409, { message: "That floor isn't under way.", run, best: 1 }));
+    expect(await settleKept(won)).toMatchObject({ outcome: "lost", status: "open", run, lives: 1, lost: [2] });
+    // (Its floor not on the run's lost list: this device's own result, as before.)
+    vi.stubGlobal("fetch", answer(409, { message: "That floor isn't under way.", run: { ...run, lost: [1], floor: 3 }, best: 2 }));
+    expect(await settleKept(won)).toMatchObject({ outcome: "won", status: "open" });
   });
 });
 
