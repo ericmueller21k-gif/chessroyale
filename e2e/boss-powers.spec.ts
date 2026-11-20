@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS, type SplatMark } from "@chessroyale/core";
-import { applyMove, behindSquares, choosePieThrow, followSplats } from "@chessroyale/chess";
+import { applyMove, behindSquares, choosePieThrow, followSplats, pieceAt } from "@chessroyale/chess";
 import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, submitMove, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /**
@@ -395,8 +395,8 @@ test("Boingo's pie (?power=pie): in your piece's face, two pies on the squares d
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Boingo the Clown");
   // Each beat, watched from before it can come: his throw's flight, the pie in the piece's face, its two pieces flying
-  // to the squares behind, the pies there, a freeze's ice.
-  const beats = await watchFor(page, { flight: { selector: ".pw-flight.pieFly:not(.bit)" }, face: { selector: ".pw-pie-face" }, split: { selector: ".pw-flight.pieFly.bit" }, pie: { selector: ".power-board .pw-pie[data-square]" }, ice: { selector: ".power-board .pw-ice" } });
+  // to the squares behind, the pies there, a freeze's cream (his own look, never Ginger's ice: Eric, Nov 20).
+  const beats = await watchFor(page, { flight: { selector: ".pw-flight.pieFly:not(.bit)" }, face: { selector: ".pw-pie-face" }, split: { selector: ".pw-flight.pieFly.bit" }, pie: { selector: ".power-board .pw-pie[data-square]" }, cream: { selector: ".power-board .pw-pie-freeze" }, ice: { selector: ".power-board .pw-ice" } });
   // Your moves: quiet ones that leave a piece he can hit (1. e4, then Nc3 to guard it, then the edge pawns), never the
   // splatted piece nor onto the squares behind it.
   const plan = ["e2e4", "b1c3", "a2a3", "h2h3", "a3a4", "h3h4", "d2d4", "g2g3", "b2b3"];
@@ -404,6 +404,7 @@ test("Boingo's pie (?power=pie): in your piece's face, two pies on the squares d
   let froze = 0;
   let due = 0;
   let last: { turn: number; fen: string; move: string; marks: SplatMark[] } | null = null;
+  let slide: { square: string; watch: Awaited<ReturnType<typeof watchFor>> } | null = null;
   for (let i = 0; i < 8 && froze === 0; i++) {
     await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
     await page.waitForTimeout(300);
@@ -434,14 +435,17 @@ test("Boingo's pie (?power=pie): in your piece's face, two pies on the squares d
       const pied = await piesOffSquares(page);
       expect(pied.worst, JSON.stringify(pied.off)).toBeLessThanOrEqual(1);
       if (p.frozen?.square === ev.square) {
-        // The second splat: frozen this turn (Ginger's ice), its mark gone, none of its moves allowed.
+        // The second splat: frozen this turn (buried in his pie's cream, not Ginger's ice), its mark gone, none of its moves allowed.
         froze++;
         expect(p.frozen.until).toBe(p.turn);
         expect(p.iced).toEqual([ev.square]);
         expect((p.splats ?? []).some((m: SplatMark) => m.square === ev.square)).toBe(false);
         expect((p.allowed ?? []).some((m: string) => m.startsWith(ev.square))).toBe(false);
-        await expect(page.locator(`.board-area .power-board .pw-ice[data-square="${ev.square}"]`)).toBeVisible();
+        await expect(page.locator(`.board-area .power-board .pw-pie-freeze[data-square="${ev.square}"] [data-fx="pie-freeze"]`)).toBeVisible();
+        await expect(page.locator(".power-board .pw-ice")).toHaveCount(0);
         await expect(page.locator(`.board-area .hb piece[data-square="${ev.square}"] .pw-splat-mark`)).toHaveCount(0);
+        // (As the freeze wears off, next turn, the cream slides off it.)
+        slide = { square: ev.square, watch: await watchFor(page, { sliding: { selector: `.power-board .pw-pie-freeze.sliding[data-square="${ev.square}"]` } }) };
       } else {
         // The first: a splat mark on the piece, drawn with it.
         expect(p.splats).toEqual(expect.arrayContaining([expect.objectContaining({ square: ev.square, n: 1 })]));
@@ -458,12 +462,20 @@ test("Boingo's pie (?power=pie): in your piece's face, two pies on the squares d
     await submitMove(page, move, s.fen);
     await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
   }
+  // The freeze wears off as your next turn begins: the cream slides off the piece (if his move didn't take it), and it's clean.
+  if (slide) {
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+    const after = await page.evaluate(() => ({ frozen: (window as any).match.boss.powers.frozen, fen: (window as any).match.phase.board.fen as string }));
+    expect(after.frozen).toBeNull();
+    if (pieceAt(after.fen, slide.square)?.color === "w") expect((await slide.watch.seen()).sliding).toBe(true);
+    await expect(page.locator(".power-board .pw-pie-freeze:not(.sliding)")).toHaveCount(0);
+  }
   if (process.env.PIE_DEBUG) console.log("pie", JSON.stringify({ thrown, froze, due }));
   expect(thrown).toBeGreaterThan(0);
   // (A freeze whenever the rule called for one: the splatted piece still standing on a target the turn after.)
   expect(froze).toBe(due > 0 ? 1 : froze);
   const seen = await beats.seen();
-  expect(seen).toMatchObject({ flight: true, face: true, split: true, pie: true, ...(froze ? { ice: true } : {}) });
+  expect(seen).toMatchObject({ flight: true, face: true, split: true, pie: true, ice: false, ...(froze ? { cream: true } : {}) });
   expect(BOSS_POWERS.pieTurns).toBe(1);
 });
 

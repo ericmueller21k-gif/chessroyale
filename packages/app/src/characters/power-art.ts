@@ -207,6 +207,8 @@
  *   blizzardSweep  board   sweep (one-shot, about 1.3 s, ends empty). Cloud and snow cross left to right.
  *   pieSplat       square  splat, pied (loop), fade (ends empty). On an empty square.
  *   pieFly         square  fly (loop). A pie tumbling; move it from the boss to the square.
+ *   pieFreeze      square  heap, buried (loop), slide (ends empty): a piece his pie froze (its second splat), buried to
+ *                           its waist in whipped cream with a cherry on top; as the freeze wears off it slides away.
  *   fireTile       square  ignite, stage1 (loop), spread2, stage2 (loop), spread3, stage3 (loop), burnOut (ends
  *                          empty); or fizzle (ends empty) when the king stands on it at the end. The stages read
  *                          on their own (a singe at the borders; more burn, flames up the sides; ablaze), with no
@@ -396,7 +398,7 @@ export interface BossPowerMoments {
 
 export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
   "Boingo the Clown": {
-    power: { anim: "pieThrow", hit: "throw", effects: ["pieFly", "pieSplat"] },
+    power: { anim: "pieThrow", hit: "throw", effects: ["pieFly", "pieSplat", "pieFreeze"] },
     ultimateWarn: { anim: "check" },
     ultimate: { anim: "funhouse", hit: "flip", onBoard: true },
   },
@@ -549,6 +551,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   superIce: { ch: EFFECT_SPRITES.superIce, covers: "strip", start: "grow", loop: "hold", end: "settle", sounds: { burst: "gingerBurst", crackle: "gingerCrackle" } },
   pieSplat: { ch: EFFECT_SPRITES.pieSplat, covers: "square", start: "splat", loop: "pied", end: "fade", sounds: { splat: "clownSplat" } },
   pieFly: { ch: EFFECT_SPRITES.pieFly, covers: "square", loop: "fly", sounds: {} },
+  pieFreeze: { ch: EFFECT_SPRITES.pieFreeze, covers: "square", start: "heap", loop: "buried", end: "slide", sounds: { slide: "clownSlideDown" } },
   fireTile: {
     ch: EFFECT_SPRITES.fireTile,
     covers: "square",

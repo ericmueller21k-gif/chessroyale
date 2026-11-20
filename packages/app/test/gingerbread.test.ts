@@ -7,7 +7,10 @@ import { bossKit } from "../src/characters/kits.ts";
 import { EFFECT_NAMES, EFFECTS, POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 import { spriteFrameAt } from "../src/components/BossEffect.tsx";
-import { BLIZZARD, MELT_MS, THAW, thawLine } from "../src/components/Ginger.tsx";
+import { BLIZZARD, GINGER_UI, MELT_MS, THAW, thawLine } from "../src/components/Ginger.tsx";
+import { BOINGO_UI } from "../src/components/Boingo.tsx";
+import type { BossView } from "../src/game.ts";
+import type { VNode } from "preact";
 import { GINGER_FX } from "@chessroyale/chess";
 
 const ginger = bossKit("Ginger")!;
@@ -212,5 +215,35 @@ describe("playing an effect (BossEffect)", () => {
     expect(spriteFrameAt(ice, "thaw", undefined, since + 60_000, since)).toMatchObject({ anim: "thaw", frame: thaw.frames.length - 1 });
     // Two devices that started it a moment apart show the same frame of the loop at the same time.
     expect(spriteFrameAt(ice, "freeze", "frozen", 5_000_123, since).frame).toBe(spriteFrameAt(ice, "freeze", "frozen", 5_000_123, since + 40).frame);
+  });
+});
+
+describe("Boingo's freeze: the piece buried in his pie, not Ginger's ice (Eric, Nov 20: \"its own animation, not an ice cube\")", () => {
+  // One white pawn on e4, frozen through crowd turn 3 (white is the crowd).
+  const fen = "4k3/8/8/8/4P3/8/8/4K3 w - - 0 1";
+  const layer = (ui: typeof BOINGO_UI | typeof GINGER_UI, id: string, frozen: { square: string; until: number } | null, turn: number, now: number) => {
+    const p = { frozen, iced: frozen ? [frozen.square] : [], turn, pies: [], events: [], thaw: [] } as unknown as NonNullable<BossView["powers"]>;
+    const boss = { id, startMove: 7, crowdSide: "w", powers: p, board: { fen } } as unknown as BossView;
+    const out = ui.board!({ boss, p, board: fen, orientation: "white", turn: 0, moments: [], now, appearAt: () => 0 } as Parameters<NonNullable<typeof ui.board>>[0]);
+    // Each square's overlay: its class and the effect sprite it plays (and which animation).
+    return (out.over as unknown[]).flat().filter((v): v is VNode<{ class: string; "data-square": string; children: VNode<{ ch: Character; anim: string }> }> => !!v && typeof v === "object").map((v) => ({ cls: v.props.class, square: v.props["data-square"], fx: v.props.children.props.ch.id, anim: v.props.children.props.anim }));
+  };
+
+  it("draws a piece his pie froze buried in cream (heaping up, then the loop), never the ice; Ginger's freeze keeps its ice", () => {
+    expect(layer(BOINGO_UI, "clown", { square: "e4", until: 3 }, 3, 1000)).toEqual([{ cls: "pw-pie-freeze", square: "e4", fx: "pie-freeze", anim: "heap" }]);
+    expect(EFFECTS.pieFreeze.loop).toBe("buried");
+    expect(layer(GINGER_UI, "gingerbread", { square: "e4", until: 3 }, 3, 1000)).toEqual([{ cls: "pw-ice", square: "e4", fx: "ice-overlay", anim: "freeze" }]);
+  });
+
+  it("slides the cream off as the freeze wears off (once, from when it was first seen gone), then leaves the piece clean", () => {
+    layer(BOINGO_UI, "clown", { square: "e4", until: 3 }, 3, 1000);
+    const slide = animLength(EFFECTS.pieFreeze.ch.anims.slide!);
+    expect(layer(BOINGO_UI, "clown", null, 4, 5000)).toEqual([{ cls: "pw-pie-freeze sliding", square: "e4", fx: "pie-freeze", anim: "slide" }]);
+    expect(layer(BOINGO_UI, "clown", null, 4, 5000 + slide - 1)).toHaveLength(1);
+    expect(layer(BOINGO_UI, "clown", null, 4, 5000 + slide)).toEqual([]);
+    // Its sound, the slide whistle down, on its first frame; its last frame empty.
+    expect(cueAt(EFFECTS.pieFreeze.ch.anims.slide!, "slide")).toBe(0);
+    expect(EFFECTS.pieFreeze.sounds.slide).toBe("clownSlideDown");
+    expect(EFFECTS.pieFreeze.ch.anims.slide!.frames.at(-1)!.layers).toEqual([]);
   });
 });
