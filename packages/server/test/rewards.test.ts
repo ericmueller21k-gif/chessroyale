@@ -6,7 +6,7 @@ import { handleAccountApi } from "../src/api.ts";
 import { openBossCrate } from "../src/boss-tokens.ts";
 import { applyOp, leg, ledgerAccount, ledgerMismatches } from "../src/ledger.ts";
 import { lockerState, openCrate } from "../src/locker.ts";
-import { NO_PICK, pickBossCrate } from "../src/rewards.ts";
+import { NO_PICK, levelOwed, paidLevels, pickBossCrate } from "../src/rewards.ts";
 import { gameXpOf, grantXp, setTestXp, xpOf, type XpGame } from "../src/xp.ts";
 import { memoryDb, stockCrates } from "./memory-db.ts";
 
@@ -15,7 +15,8 @@ vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, serverRech
 
 /**
  * XP phase 2 (Eric, Nov 9: "go with phase two"; server/rewards.ts, xp.ts; docs/decisions/2026-11-09-xp-phase2-*.md): the daily
- * reward once an XP day, each level's crates and key once (several at once too), every 10th level's boss crate picked once, a series
+ * reward once an XP day, every 2nd level's crates and key once (several at once too; levels of 500 since Nov 20, and the levels of
+ * 1,000 paid before never paid again), every 20th level's boss crate picked once, a series
  * crate's open taking a key (refused without), the kill switch PAUSE_REWARDS, the old crates' turn into Winter Crates, and the new
  * rows through a guest's merge, the download and deleting the account.
  */
@@ -46,17 +47,17 @@ describe("the daily reward: XP.dailyBonus XP and XP.dailyCrates Winter Crates fo
     ]);
     expect(first?.rewards).toEqual({ crate: "winter-1", daily: XP.dailyCrates, crates: 0, keys: 0, bossPicks: 0, levels: [] });
     expect(first).toMatchObject({ before: 120, after: 120 + 120 + XP.dailyBonus });
-    // The next game today: its own XP only.
+    // The next game today: its own XP only, no daily reward (its 560 XP reach level 2: that level's crate and key, Nov 20's levels).
     const second = await grantXp(sql, ann.id, game("lobby:CCCCC:1", 20, { now: T0 + 60 * MIN }));
-    expect([second?.parts, second?.rewards]).toEqual([[{ label: "12 min", xp: 120 }], undefined]);
+    expect([second?.parts, second?.rewards]).toEqual([[{ label: "12 min", xp: 120 }], { crate: "winter-1", daily: 0, crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: 0, levels: [2] }]);
     // A replay of the paying game: the same parts and rewards, nothing more.
     const again = await grantXp(sql, ann.id, game("lobby:BBBBB:1"));
     expect([again?.parts, again?.rewards]).toEqual([first?.parts, first?.rewards]);
-    expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 1 }, keys: 0, picks: 0 });
+    expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 1 + XP.levelCrates }, keys: XP.levelKeys, picks: 0 });
     // The next XP day (08:00 UTC): again.
     const tomorrow = await grantXp(sql, ann.id, game("lobby:DDDDD:1", 20, { now: xpDayStart(T0) + DAY }));
     expect(tomorrow?.parts.at(-1)).toEqual({ label: "Daily reward", xp: XP.dailyBonus });
-    expect((await holdings(sql, ann.id)).crates).toEqual({ "winter-1": 2 });
+    expect((await holdings(sql, ann.id)).crates).toEqual({ "winter-1": 2 + XP.levelCrates });
     expect(await xpOf(sql, ann.id)).toBe(120 * 4 + 2 * XP.dailyBonus);
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
   });
@@ -67,7 +68,8 @@ describe("the daily reward: XP.dailyBonus XP and XP.dailyCrates Winter Crates fo
     const both = await Promise.all(["lobby:AAAAA:1", "squads:BBBBB:1", "duel:CCCCC"].map((k) => grantXp(sql, ann.id, game(k))));
     expect(both.filter((g) => g?.parts.some((p) => p.label === "Daily reward")).length).toBe(1);
     expect(both.filter((g) => g?.rewards?.daily).length).toBe(1);
-    expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 1 }, keys: 0, picks: 0 });
+    // (Their 560 XP reach level 2: its crate and key, once.)
+    expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 1 + XP.levelCrates }, keys: XP.levelKeys, picks: 0 });
     expect(await xpOf(sql, ann.id)).toBe(3 * 120 + XP.dailyBonus);
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
   });
@@ -95,27 +97,34 @@ describe("the daily reward: XP.dailyBonus XP and XP.dailyCrates Winter Crates fo
   });
 });
 
-describe("level rewards: XP.levelCrates Winter Crates and XP.levelKeys keys a level; every 10th also a boss crate to pick", () => {
-  it("a level-up pays its level once; a replay answers the same; the next game in the same level pays nothing", async () => {
+describe("level rewards: XP.levelCrates Winter Crates and XP.levelKeys keys every 2nd level; every 20th also a boss crate to pick", () => {
+  it("a level-up pays its level once; a replay answers the same; the next game in the same level pays nothing; an odd level pays nothing", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     // (The levels below 2 were never reached: nothing owed.)
-    await setTestXp(sql, ann.id, 950, T0);
+    await setTestXp(sql, ann.id, 450, T0);
     const up = await grantXp(sql, ann.id, game("lobby:AAAAA:1", 14));
     expect(up).toMatchObject({ levelBefore: 1, levelAfter: 2, rewards: { crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: 0, levels: [2], daily: 0 } });
     expect((await grantXp(sql, ann.id, game("lobby:AAAAA:1", 14)))?.rewards).toEqual(up?.rewards);
     expect((await grantXp(sql, ann.id, game("lobby:BBBBB:1", 14)))?.rewards).toBeUndefined();
     expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": XP.levelCrates }, keys: XP.levelKeys, picks: 0 });
+    // (Level 3: the level-up, no rewards (Nov 20: every 2nd level pays). Level 4: its crate and key.)
+    await setTestXp(sql, ann.id, 950, T0);
+    const three = await grantXp(sql, ann.id, game("lobby:CCCCC:1", 14));
+    expect([three?.levelBefore, three?.levelAfter, three?.rewards]).toEqual([2, 3, undefined]);
+    await setTestXp(sql, ann.id, 1_450, T0);
+    expect(await grantXp(sql, ann.id, game("lobby:DDDDD:1", 14))).toMatchObject({ levelBefore: 3, levelAfter: 4, rewards: { crates: XP.levelCrates, keys: XP.levelKeys, levels: [4] } });
+    expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 2 * XP.levelCrates }, keys: 2 * XP.levelKeys, picks: 0 });
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
   });
 
-  it("several levels at once (a test switch's jump, or levels from before): each paid once, the 10th's boss crate pick too", async () => {
+  it("several levels at once (a test switch's jump, or levels from before): each paid once, the 20th's boss crate pick too", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     await setTestXp(sql, ann.id, 9_850, T0);
     const g = await grantXp(sql, ann.id, game("lobby:AAAAA:1", 14));
-    expect(g?.rewards).toEqual({ crate: "winter-1", daily: 0, crates: 9 * XP.levelCrates, keys: 9 * XP.levelKeys, bossPicks: 1, levels: [2, 3, 4, 5, 6, 7, 8, 9, 10] });
-    expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 9 * XP.levelCrates }, keys: 9 * XP.levelKeys, picks: 1 });
+    expect(g?.rewards).toEqual({ crate: "winter-1", daily: 0, crates: 10 * XP.levelCrates, keys: 10 * XP.levelKeys, bossPicks: 1, levels: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20] });
+    expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 10 * XP.levelCrates }, keys: 10 * XP.levelKeys, picks: 1 });
     // Down and up again (the test switch): never paid twice.
     await setTestXp(sql, ann.id, 0, T0);
     await setTestXp(sql, ann.id, 9_850, T0);
@@ -133,7 +142,8 @@ describe("level rewards: XP.levelCrates Winter Crates and XP.levelKeys keys a le
     expect(new Set(paid).size).toBe(paid.length);
     const next = await grantXp(sql, ann.id, game("lobby:CCCCC:1", 14));
     const all = [...paid, ...(next?.rewards?.levels ?? [])].sort((a, b) => a - b);
-    expect(all).toEqual(Array.from({ length: 40 }, (_, i) => i + 2));
+    // (40,120 XP: level 81. Every 2nd level from 2 to 80, the 20th, 40th, 60th and 80th with a pick: the same as levels of 1,000.)
+    expect(all).toEqual(Array.from({ length: 40 }, (_, i) => 2 * (i + 1)));
     expect(both.every((g) => (g?.rewards?.levels.length ?? 0) <= XP.levelsPerGame)).toBe(true);
     expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 40 * XP.levelCrates }, keys: 40 * XP.levelKeys, picks: 4 });
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
@@ -142,9 +152,9 @@ describe("level rewards: XP.levelCrates Winter Crates and XP.levelKeys keys a le
   it("the daily reward's XP can be the level-up's: both in one game's rewards", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
-    await setTestXp(sql, ann.id, 850, T0);
+    await setTestXp(sql, ann.id, 350, T0);
     const g = await grantXp(sql, ann.id, game("lobby:AAAAA:1"));
-    expect(g).toMatchObject({ before: 850, after: 850 + 120 + XP.dailyBonus, levelAfter: 2 });
+    expect(g).toMatchObject({ before: 350, after: 350 + 120 + XP.dailyBonus, levelAfter: 2 });
     expect(g?.rewards).toEqual({ crate: "winter-1", daily: XP.dailyCrates, crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: 0, levels: [2] });
   });
 });
@@ -230,9 +240,9 @@ describe("PAUSE_REWARDS (Nov 9): nothing granted while it's on; owed levels and 
   it("a paused game: \"paused\", no XP, no crate, no key; after it, the next game pays the day's reward and the levels", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
-    await setTestXp(sql, ann.id, 990, T0);
+    await setTestXp(sql, ann.id, 490, T0);
     const paused = await grantXp(sql, ann.id, game("lobby:AAAAA:1", 20, { paused: true }));
-    expect(paused).toEqual({ before: 990, after: 990, levelBefore: 1, levelAfter: 1, parts: [], none: "paused" });
+    expect(paused).toEqual({ before: 490, after: 490, levelBefore: 1, levelAfter: 1, parts: [], none: "paused" });
     expect(await holdings(sql, ann.id)).toEqual({ crates: {}, keys: 0, picks: 0 });
     const on = await grantXp(sql, ann.id, game("lobby:BBBBB:1"));
     expect(on?.rewards).toEqual({ crate: "winter-1", daily: XP.dailyCrates, crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: 0, levels: [2] });
@@ -258,24 +268,118 @@ describe("level rewards through a guest's merge (the outside review of Nov 10)",
     const { sql } = await world();
     const owner = await signedIn(sql, "owner@example.com");
     const guest = (await createGuest(sql, T0, "Guest")).user;
-    // (A guest earns where sign-in isn't set up: the local and e2e servers.) The guest reaches level 3: levels 2 and 3 paid to it.
+    // (A guest earns where sign-in isn't set up: the local and e2e servers.) The guest reaches level 5: levels 2 and 4 paid to it.
     await setTestXp(sql, guest.id, 2_000, T0);
-    expect((await grantXp(sql, guest.id, { ...game("lobby:AAAAA:1"), signedInOnly: false }))?.rewards?.levels).toEqual([2, 3]);
+    expect((await grantXp(sql, guest.id, { ...game("lobby:AAAAA:1"), signedInOnly: false }))?.rewards?.levels).toEqual([2, 4]);
     // The account reaches level 2: level 2 paid to it.
-    await setTestXp(sql, owner.id, 1_500, T0);
+    await setTestXp(sql, owner.id, 600, T0);
     expect((await grantXp(sql, owner.id, game("lobby:BBBBB:1")))?.rewards?.levels).toEqual([2]);
     const before = await holdings(sql, guest.id);
     const mine = await holdings(sql, owner.id);
     await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 1);
-    // Together: 1,820 + 2,320 XP, level 5. Its next game pays levels 4 and 5 only (before: 3, 4 and 5; level 3 the guest's again).
-    expect(await xpOf(sql, owner.id)).toBe(4_140);
+    // Together: 920 + 2,320 XP, level 7. Its next game pays level 6 only (before Nov 10: 4 and 6; level 4 the guest's again).
+    expect(await xpOf(sql, owner.id)).toBe(3_240);
     const next = await grantXp(sql, owner.id, game("lobby:CCCCC:1", 20, { now: T0 + 60 * MIN }));
-    expect(next?.rewards?.levels).toEqual([4, 5]);
+    expect(next?.rewards?.levels).toEqual([6]);
     const after = await holdings(sql, owner.id);
-    expect(after.keys).toBe(mine.keys + before.keys + 2 * XP.levelKeys);
-    expect(after.crates["winter-1"]).toBe((mine.crates["winter-1"] ?? 0) + (before.crates["winter-1"] ?? 0) + 2 * XP.levelCrates);
+    expect(after.keys).toBe(mine.keys + before.keys + XP.levelKeys);
+    expect(after.crates["winter-1"]).toBe((mine.crates["winter-1"] ?? 0) + (before.crates["winter-1"] ?? 0) + XP.levelCrates);
     // Nothing more at the game after.
     expect((await grantXp(sql, owner.id, game("lobby:DDDDD:1", 20, { now: T0 + 90 * MIN })))?.rewards?.levels ?? []).toEqual([]);
+    expect(await ledgerMismatches(sql, owner.id)).toEqual([]);
+  });
+});
+
+describe("levels of 500 (Nov 20): what the levels of 1,000 paid is never paid again (docs/decisions/2026-11-20-levels-500.md)", () => {
+  /** An old level's op (levels of 1,000 XP, Nov 9 to Nov 20) as the ledger has it: a crate and a key, every 10th also a boss pick. */
+  const oldLevels = async (sql: Sql, userId: string, levels: number[]) => {
+    const me = (await ledgerAccount(sql, userId))!;
+    for (const l of levels) {
+      const legs = [leg.seriesCrates(userId, "winter-1", 1, "lobby:OLDGM:1"), leg.keys(userId, 1, "lobby:OLDGM:1"), ...(l % 10 === 0 ? [leg.bossPicks(userId, 1, "lobby:OLDGM:1")] : [])];
+      expect(await applyOp(sql, me, { id: `level:${l}:${me.account}`, reason: "level", now: T0, legs })).toBe("applied");
+    }
+  };
+  /** Every game's levels paid, and the holdings after, for games of +120 XP from each of these XPs (the test switch, then a game). */
+  const climb = async (sql: Sql, userId: string, from: number[]) => {
+    const paid: number[][] = [];
+    for (const [i, xp] of from.entries()) {
+      await setTestXp(sql, userId, xp, T0);
+      paid.push((await grantXp(sql, userId, game(`lobby:CL${String(i).padStart(3, "0")}:1`, 14)))?.rewards?.levels ?? []);
+    }
+    return { paid, holdings: await holdings(sql, userId) };
+  };
+
+  it("the mapping: old level k is today's (k-1)th crate and key (level 2(k-1)); old 10's pick is today's 20th's; a lvl: op is its level", () => {
+    const paid = paidLevels([
+      { op_id: "level:2:x", pick: 0 },
+      { op_id: "level:3:x", pick: 0 },
+      { op_id: "level:10:x", pick: 1 },
+      { op_id: "lvl:22:x", pick: 0 },
+      { op_id: "nonsense", pick: 0 },
+    ]);
+    expect([[...paid.rewards], [...paid.picks], [...paid.done]]).toEqual([[2, 4, 18], [20], [22]]);
+    // (Level 20: its crate and key still owed (old 10's crate was today's 18th level's), its pick paid; 22 done; 3 never pays.)
+    expect([20, 22, 3, 6].map((l) => levelOwed(l, paid))).toEqual([
+      { crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: 0 },
+      { crates: 0, keys: 0, bossPicks: 0 },
+      { crates: 0, keys: 0, bossPicks: 0 },
+      { crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: 0 },
+    ]);
+  });
+
+  it("a fresh account is paid on levels 2, 4, 6, … (the 20th's pick too), each once, nothing on the others", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    // (Up to 10,120 XP, 250 at a time: level 21.)
+    const { paid, holdings: h } = await climb(sql, ann.id, Array.from({ length: 41 }, (_, i) => i * 250));
+    expect(paid.flat()).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    expect(h).toEqual({ crates: { "winter-1": 10 * XP.levelCrates }, keys: 10 * XP.levelKeys, picks: 1 });
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
+
+  it("2,700 XP, paid levels 2 and 3 of 1,000 (now level 6): its next games pay level 6, then 8; never 2 or 4 again", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await oldLevels(sql, ann.id, [2, 3]);
+    const { paid, holdings: h } = await climb(sql, ann.id, [2_700, 2_820, 3_450]);
+    expect(paid).toEqual([[6], [], [8]]);
+    // (4 crates and keys at 3,570 XP: as a fresh account's, levels 2, 4, 6 and 8.)
+    expect(h).toEqual({ crates: { "winter-1": 4 }, keys: 4, picks: 0 });
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
+
+  it("old level 10 paid with its boss pick (9,200 XP, now level 19): level 20 pays its crate and key but no second pick; 40 pays a pick", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await oldLevels(sql, ann.id, [2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(await holdings(sql, ann.id)).toEqual({ crates: { "winter-1": 9 }, keys: 9, picks: 1 });
+    const { paid, holdings: h } = await climb(sql, ann.id, [9_200, 9_450, 19_450]);
+    expect(paid).toEqual([[], [20], [22, 24, 26, 28, 30, 32, 34, 36, 38, 40]]);
+    // (Level 40: 20 crates and keys and 2 picks, as a fresh account's.)
+    expect(h).toEqual({ crates: { "winter-1": 20 }, keys: 20, picks: 2 });
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
+
+  it("old levels past its XP now (the test switch down): nothing owed and no error; up again, only what's past them", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await oldLevels(sql, ann.id, [2, 3, 4, 5]);
+    const { paid, holdings: h } = await climb(sql, ann.id, [1_000, 4_600]);
+    // (Old 2 to 5 are today's 2, 4, 6 and 8: at level 10 (4,720 XP), only 10.)
+    expect(paid).toEqual([[], [10]]);
+    expect(h).toEqual({ crates: { "winter-1": 5 }, keys: 5, picks: 0 });
+  });
+
+  it("a guest's old levels, merged in, count as paid for the account", async () => {
+    const { sql } = await world();
+    const owner = await signedIn(sql, "owner@example.com");
+    const guest = (await createGuest(sql, T0, "Guest")).user;
+    await oldLevels(sql, guest.id, [2, 3]);
+    await setTestXp(sql, guest.id, 2_000, T0);
+    await setTestXp(sql, owner.id, 600, T0);
+    await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 1);
+    // (2,600 + 120 XP: level 6; the guest's old 2 and 3 are today's 2 and 4.)
+    expect((await grantXp(sql, owner.id, game("lobby:AAAAA:1", 14)))?.rewards?.levels).toEqual([6]);
     expect(await ledgerMismatches(sql, owner.id)).toEqual([]);
   });
 });

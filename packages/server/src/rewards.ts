@@ -10,11 +10,12 @@ import { applyOp, cond, keyFor, leg, ledgerAccount, opKeys, opStatements, type L
  *   - **The daily reward** (op `daily:<XP day's start>:<ledger id>`, reason "daily"): your first counted game of the XP day with
  *     XP.dailyMinMoves of your own moves: XP.dailyBonus XP and XP.dailyCrates crates of XP.rewardCrate. One op a day: a second game,
  *     a retry or two rooms at once pay it once. Its legs' source is the game that paid it, so that game's result answers it.
- *   - **Level rewards** (op `level:<level>:<ledger id>`, reason "level"): each level reached, XP.levelCrates crates and XP.levelKeys
- *     keys, every XP.bossCrateEvery-th also a boss crate to pick (the wallet's `boss_picks`). Paid at a counted game for every level
- *     up to your level now that isn't paid yet (at most XP.levelsPerGame a game), so a level reached before phase 2, through a guest's
- *     merge or a test switch, or while rewards were paused, is paid at the next counted game; never twice (one op per level), and never
- *     a level a guest merged into the account was paid already (Nov 10).
+ *   - **Level rewards** (op `lvl:<level>:<ledger id>`, reason "level"): every XP.levelRewardEvery-th level reached, XP.levelCrates
+ *     crates and XP.levelKeys keys, every XP.bossCrateEvery-th also a boss crate to pick (the wallet's `boss_picks`). Paid at a counted
+ *     game for every paying level up to your level now that isn't paid yet (at most XP.levelsPerGame a game), so a level reached
+ *     before phase 2, through a guest's merge or a test switch, or while rewards were paused, is paid at the next counted game; never
+ *     twice (one op per level), never a level a guest merged into the account was paid already (Nov 10), and never one the levels of
+ *     1,000 XP paid already (Nov 20: `level:<old level>:<ledger id>` ops, mapped onto today's levels by paidLevels).
  *   - **The boss crate pick** (op `pick:<ledger id>:<request>`): one pick spent, the chosen live boss's crate into your boss crates
  *     (unopened, opened as any boss crate: no tokens, no key).
  *   - **Old crates** (the wallet's `crates`, Squads' placements' before Nov 9): turned into crates of XP.rewardCrate as the locker is
@@ -25,8 +26,17 @@ const newId = (bytes = 9) => [...crypto.getRandomValues(new Uint8Array(bytes))].
 
 /** The daily reward's op key: one a day per account. */
 export const dailyOpId = (day: number, account: string) => `daily:${day}:${account}`;
-/** A level's reward op key: one per level per account. */
-export const levelOpId = (level: number, account: string) => `level:${level}:${account}`;
+/**
+ * A level's reward op key: one per level per account. `lvl:` since levels became 500 XP (Nov 20): the ledger's `level:<n>` ops are
+ * levels of 1,000 XP (OLD_LEVELS), a different numbering, read by paidLevels.
+ */
+export const levelOpId = (level: number, account: string) => `lvl:${level}:${account}`;
+
+/**
+ * The numbering of the `level:<n>` ops (Nov 9 to Nov 20): 1,000 XP a level, each level from 2 a crate (two until Nov 18) and a key,
+ * every 10th also a boss crate pick. Fixed: they're history.
+ */
+const OLD_LEVELS = { prefix: "level", bossCrateEvery: 10 } as const;
 
 /** The daily reward's op (its legs' source: the game paying it). */
 export function dailyOp(me: LedgerAccount, day: number, game: string, now: number): Op {
@@ -41,9 +51,11 @@ export function dailyOp(me: LedgerAccount, day: number, game: string, now: numbe
   };
 }
 
-/** One level's reward op (its legs' source: the game paying it). Null: nothing to give at that level (the settings say none). */
-export function levelOp(me: LedgerAccount, level: number, game: string, now: number): Op | null {
-  const r = levelReward(level);
+/**
+ * One level's reward op (its legs' source: the game paying it): what it owes (`r`: owedLevels'; the settings' whole reward by
+ * default). Null: nothing to give at that level.
+ */
+export function levelOp(me: LedgerAccount, level: number, game: string, now: number, r: { crates: number; keys: number; bossPicks: number } = levelReward(level)): Op | null {
   const legs = [
     ...(r.crates ? [leg.seriesCrates(me.user, XP.rewardCrate, r.crates, game)] : []),
     ...(r.keys ? [leg.keys(me.user, r.keys, game)] : []),
@@ -55,26 +67,67 @@ export function levelOp(me: LedgerAccount, level: number, game: string, now: num
 /**
  * The level rewards an account has had, in SQL (`?1`: its ledger id): its own level ops, and those of every guest that signed in to it
  * (its merge's legs name the guest's ledger id: `merge:<ledger id>:…`, ledger.ts mergeMoves). The guest's XP joins the account, so
- * the levels that XP reached were paid already: the outside review of Nov 10 (a merge had them paid again).
+ * the levels that XP reached were paid already: the outside review of Nov 10 (a merge had them paid again). One row an op: whether it
+ * paid a boss crate pick.
  */
-const PAID_LEVELS = `SELECT op_id FROM ledger WHERE reason = 'level' AND leg = 0 AND account IN (
-  SELECT ?1 UNION SELECT substr(op_id, 7, instr(substr(op_id, 7), ':') - 1) FROM ledger WHERE account = ?1 AND reason = 'merge')`;
+const PAID_LEVELS = `SELECT op_id, MAX(asset_kind = 'boss_pick') AS pick FROM ledger WHERE reason = 'level' AND account IN (
+  SELECT ?1 UNION SELECT substr(op_id, 7, instr(substr(op_id, 7), ':') - 1) FROM ledger WHERE account = ?1 AND reason = 'merge')
+  GROUP BY op_id`;
+
+/** What's paid of today's levels: `done`, levels whose op is in (all of it paid); `rewards`, `picks`: their crates and key, their pick. */
+export interface PaidLevels {
+  done: Set<number>;
+  rewards: Set<number>;
+  picks: Set<number>;
+}
 
 /**
- * The levels owed: every level from 2 to `level` whose reward isn't paid yet (by this account, or a guest merged into it: PAID_LEVELS),
- * lowest first, at most XP.levelsPerGame. One read.
+ * Today's levels paid, from the level ops in the ledger (Nov 20; docs/decisions/2026-11-20-levels-500.md). A `lvl:<n>` op is level n,
+ * all of it. An old `level:<k>` op (levels of 1,000 XP) paid the (k-1)th crate and key, and on every 10th old level the (k/10)th boss
+ * crate pick: they count as today's (k-1)th crate and key (level (k-1) × XP.levelRewardEvery: old 2, 3, 4 are today's 2, 4, 6) and
+ * today's (k/10)th pick (old 10 is today's 20). The nth reward is the nth reward: an account is never paid more crates, keys or picks
+ * than one that earned the same XP in today's levels from the start, and never misses one.
  */
-export async function owedLevels(sql: Sql, me: LedgerAccount, level: number): Promise<number[]> {
+export function paidLevels(rows: readonly { op_id: string; pick: number | boolean | null }[]): PaidLevels {
+  const paid: PaidLevels = { done: new Set(), rewards: new Set(), picks: new Set() };
+  for (const r of rows) {
+    const [prefix, n] = r.op_id.split(":");
+    const level = Number(n);
+    if (!Number.isInteger(level) || level < 2) continue;
+    if (prefix === OLD_LEVELS.prefix) {
+      paid.rewards.add((level - 1) * XP.levelRewardEvery);
+      if (r.pick) paid.picks.add((level / OLD_LEVELS.bossCrateEvery) * XP.bossCrateEvery);
+    } else paid.done.add(level);
+  }
+  return paid;
+}
+
+/** What a level still owes, given what's paid (paidLevels): its crates and keys, its pick, or nothing. */
+export function levelOwed(level: number, paid: PaidLevels): { crates: number; keys: number; bossPicks: number } {
+  const r = levelReward(level);
+  if (paid.done.has(level)) return { crates: 0, keys: 0, bossPicks: 0 };
+  const rewards = !paid.rewards.has(level);
+  return { crates: rewards ? r.crates : 0, keys: rewards ? r.keys : 0, bossPicks: paid.picks.has(level) ? 0 : r.bossPicks };
+}
+
+/**
+ * The levels owed: every level from 2 to `level` that pays something not paid yet (by this account, or a guest merged into it, in
+ * today's levels or the old ones: PAID_LEVELS, paidLevels), with what it owes, lowest first, at most XP.levelsPerGame. One read.
+ */
+export async function owedLevels(sql: Sql, me: LedgerAccount, level: number): Promise<{ level: number; crates: number; keys: number; bossPicks: number }[]> {
   if (level < 2) return [];
-  const paid = new Set((await sql.all<{ op_id: string }>(PAID_LEVELS, me.account)).map((r) => Number(r.op_id.split(":")[1])));
-  return Array.from({ length: level - 1 }, (_, i) => i + 2)
-    .filter((l) => !paid.has(l))
-    .slice(0, XP.levelsPerGame);
+  const paid = paidLevels(await sql.all<{ op_id: string; pick: number }>(PAID_LEVELS, me.account));
+  const owed: { level: number; crates: number; keys: number; bossPicks: number }[] = [];
+  for (let l = 2; l <= level && owed.length < XP.levelsPerGame; l++) {
+    const o = levelOwed(l, paid);
+    if (o.crates || o.keys || o.bossPicks) owed.push({ level: l, ...o });
+  }
+  return owed;
 }
 
 /** Pays every level owed at your XP now (one batch, each level once: a race or a retry pays nothing more). */
 export async function payLevels(sql: Sql, me: LedgerAccount, xpNow: number, game: string, now: number): Promise<void> {
-  const ops = (await owedLevels(sql, me, levelOf(xpNow))).map((l) => levelOp(me, l, game, now)).filter((op): op is Op => !!op);
+  const ops = (await owedLevels(sql, me, levelOf(xpNow))).map((o) => levelOp(me, o.level, game, now, o)).filter((op): op is Op => !!op);
   if (ops.length) await sql.batch(ops.flatMap((op) => opStatements(me, op, newId())));
 }
 

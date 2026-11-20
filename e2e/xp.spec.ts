@@ -74,9 +74,10 @@ async function xpIs(page: Page, xp: number) {
 test("a counted game with a level-up: the bar fills from the old XP to the new, never a jump, to the end and on from empty; nothing moves; home's level", async ({ page }, testInfo) => {
   test.setTimeout(3 * 60_000);
   await sampleXp(page);
-  // 990 XP (Level 1, 99% of the way), then a won Boss alone game counted as 12 minutes: 120 + 50 = 170, to 1,160 (Level 2, 16%).
-  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12&quests=squad-up,fifty-fifty,regular"); // (quests no solo boss game can finish: a dealt "Win a Boss Battle" adds its own XP since Nov 10)
-  await xpIs(page, 990);
+  // 490 XP (Level 1, 98% of the way: levels of 500 since Nov 20), then a won Boss alone game counted as 12 minutes: 120 + 50 = 170,
+  // to 660 (Level 2, 32%).
+  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=490&xpgame=12&quests=squad-up,fifty-fifty,regular"); // (quests no solo boss game can finish: a dealt "Win a Boss Battle" adds its own XP since Nov 10)
+  await xpIs(page, 490);
   await bossAloneFromHome(page);
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
   await submitMove(page, "h5f7");
@@ -106,11 +107,11 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   await topRowFits(box, true);
   const all = await samples(page);
   expect(all.some((x) => x.wait && x.done), "never done while its XP is still coming").toBe(false);
-  // While its XP is coming, and through the count and the lob: the bar at the old XP, 990 of Level 1's 1,000, standing still.
+  // While its XP is coming, and through the count and the lob: the bar at the old XP, 490 of Level 1's 500, standing still.
   const first = all.findIndex((s) => s.share !== all[0]!.share);
   expect(first, "the bar moves").toBeGreaterThan(0);
-  for (const s of all.slice(0, first)) expect(s.share, "the old XP, standing still").toBeCloseTo(0.99, 2);
-  expect(all.at(-1)!.share, "ends at the new: 160 of Level 2's 1,000").toBeCloseTo(0.16, 2);
+  for (const s of all.slice(0, first)) expect(s.share, "the old XP, standing still").toBeCloseTo(0.98, 2);
+  expect(all.at(-1)!.share, "ends at the new: 160 of Level 2's 500").toBeCloseTo(0.32, 2);
   // The count first: "+0" up to "+170", never down, over many frames, before the bar moves.
   const nums = all.slice(0, first).map((s) => Number((s.num ?? "0").replace(/[^\d]/g, "")));
   for (let i = 1; i < nums.length; i++) expect(nums[i]!).toBeGreaterThanOrEqual(nums[i - 1]!);
@@ -131,7 +132,7 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   expect(all.some((s) => s.pop === "Level 2!"), '"Level 2!" pops').toBe(true);
   // The fill took over a second, over many frames (never one step).
   const fill = all.slice(first);
-  const end = fill.findIndex((s) => Math.abs(s.share - 0.16) < 0.001);
+  const end = fill.findIndex((s) => Math.abs(s.share - 0.32) < 0.001);
   expect(end).toBeGreaterThan(20);
   expect(fill[end]!.t - fill[0]!.t).toBeGreaterThan(1000);
   // Nothing shifts: the number's box, the bar, the quests, the title and the buttons keep their places (to one another: a still may
@@ -140,14 +141,14 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   for (const x of all) expect(shape(x), "every part in its place and size").toEqual(shape(all[0]!));
   expect(all[0]!.box[3], "the bar's fixed height").toBe(BOX_H);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/xp-counted-${testInfo.project.name}.png` });
-  // Home: the real level and its ring (Level 2, 16% of the way round).
+  // Home: the real level and its ring (Level 2, 32% of the way round).
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(page.locator(".fd-level")).toHaveText("LVL 2");
   const filled = await page.evaluate(() => {
     const fill = document.querySelector(".fd-level-ring .fill") as SVGPathElement;
     return parseFloat(getComputedStyle(fill).strokeDasharray.split(/[ ,]+/)[0]!) / fill.getTotalLength();
   });
-  expect(filled).toBeCloseTo(0.16, 2);
+  expect(filled).toBeCloseTo(0.32, 2);
 });
 
 test('"No XP: test game." in the same box, the same size: a test switch on (?mate)', async ({ page }, testInfo) => {
@@ -163,9 +164,9 @@ test('"No XP: test game." in the same box, the same size: a test switch on (?mat
   await expect(page.locator(".es-quests-none")).toHaveText("No quests moved this game.");
   await expect(rewards(page)).toHaveAttribute("data-es", "done");
   expect((await box.boundingBox())!.height).toBe(BOX_H);
-  // (The bar stands at your XP: 250 of 1,000.)
+  // (The bar stands at your XP: 250 of 500.)
   const share = await box.locator(".es-fill").evaluate((e) => new DOMMatrixReadOnly(getComputedStyle(e).transform).a);
-  expect(share).toBeCloseTo(0.25, 2);
+  expect(share).toBeCloseTo(0.5, 2);
   if (SHOTS) {
     await box.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/xp-none-${testInfo.project.name}.png` });
@@ -196,7 +197,7 @@ test("each other \"No XP\" line, in the same box and size (the server's answer f
     await page.unrouteAll();
     await page.route(/\/api\/results$/, async (route) => {
       const res = await route.fetch();
-      await route.fulfill({ response: res, json: { ok: true, xp: { before: 4_500, after: 4_500, levelBefore: 5, levelAfter: 5, parts: [], none } } });
+      await route.fulfill({ response: res, json: { ok: true, xp: { before: 4_500, after: 4_500, levelBefore: 10, levelAfter: 10, parts: [], none } } });
     });
     await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
     await bossAloneFromHome(page);
@@ -204,7 +205,7 @@ test("each other \"No XP\" line, in the same box and size (the server's answer f
     const box = page.getByTestId("es-track-xp");
     const why = page.locator(".es-earned-xp .es-earned-why");
     await expect(why).toHaveText(line, { timeout: 20_000 });
-    await expect(box.locator(".es-level")).toHaveText("Level 5");
+    await expect(box.locator(".es-level")).toHaveText("Level 10");
     const b = (await box.boundingBox())!;
     expect(b.height, none).toBe(BOX_H);
     // (Whole on its line: not cut, inside the window.)
@@ -222,7 +223,7 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
     const res = await route.fetch();
     await route.fulfill({
       response: res,
-      json: { ok: true, xp: { before: 99_950, after: 100_250, levelBefore: 100, levelAfter: 101, parts: [{ label: "30 min", xp: 300 }, { label: "Win (paid once today)", xp: 0 }] } },
+      json: { ok: true, xp: { before: 99_950, after: 100_250, levelBefore: 200, levelAfter: 201, parts: [{ label: "30 min", xp: 300 }, { label: "Win (paid once today)", xp: 0 }] } },
     });
   });
   await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
@@ -238,7 +239,7 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
   await topRowFits(box, false);
   await expect(box.locator(".es-gain")).toHaveText("+300 XP");
   await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win (paid once today) +0");
-  await expect(box.locator(".es-level")).toHaveText("Level 101");
+  await expect(box.locator(".es-level")).toHaveText("Level 201");
   for (const sel of [".es-track-top", ".es-earned-xp .es-parts"]) expect(await page.locator(sel).evaluate((e) => e.scrollWidth <= e.clientWidth), `${sel} fits at 320 px`).toBe(true);
   const b = (await box.boundingBox())!;
   expect(b.x).toBeGreaterThanOrEqual(0);
@@ -249,8 +250,8 @@ test("a tap anywhere but a button skips the whole sequence to its end (Eric, Nov
   test.setTimeout(3 * 60_000);
   await sampleXp(page);
   // (Quests no solo boss game can finish, as the level-up test's.)
-  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12&quests=squad-up,fifty-fifty,regular");
-  await xpIs(page, 990);
+  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=490&xpgame=12&quests=squad-up,fifty-fifty,regular");
+  await xpIs(page, 490);
   await bossAloneFromHome(page);
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
   await submitMove(page, "h5f7");
@@ -268,7 +269,7 @@ test("a tap anywhere but a button skips the whole sequence to its end (Eric, Nov
   // (From the tap on, the bar stands at the end: no fill plays after it.)
   await page.waitForTimeout(2_500);
   const after = (await samples(page)).filter((s) => s.t > at + 300);
-  for (const s of after) expect(s.share, "at its end, still").toBeCloseTo(0.16, 3);
+  for (const s of after) expect(s.share, "at its end, still").toBeCloseTo(0.32, 3);
   expect(after.length).toBeGreaterThan(10);
   // The buttons still work: Play again's neighbor, Home.
   await page.getByRole("button", { name: "Home", exact: true }).click();

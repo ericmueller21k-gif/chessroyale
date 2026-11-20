@@ -17,8 +17,8 @@ import { dailyOp, gameRewards, payLevels } from "./rewards.ts";
  *     an XP day (the leg's source says which: `vs:<their ledger ids>` or `solo`).
  *   - A solo game's time leg has source `solo`: capped at XP.soloMinutesPerDay minutes an XP day, its guard in the same statement.
  * Both go in one batch, with phase 2's daily reward (rewards.ts: `daily:<XP day>:<ledger id>`, once a day, for a game of
- * XP.dailyMinMoves of your own moves); then the level rewards owed at the XP it reached (rewards.ts payLevels: `level:<n>:<ledger id>`,
- * once per level). Nothing at all while rewards are paused (PAUSE_REWARDS: `paused`). What the screen shows is answered (`XpGrant`) and kept on the game's result row (results.xp_before,
+ * XP.dailyMinMoves of your own moves); then the level rewards owed at the XP it reached (rewards.ts payLevels: `lvl:<n>:<ledger id>`,
+ * once per level; every 2nd level pays since Nov 20). Nothing at all while rewards are paused (PAUSE_REWARDS: `paused`). What the screen shows is answered (`XpGrant`) and kept on the game's result row (results.xp_before,
  * xp_parts, xp_none: `xpColumns`), so an online result screen can ask for it (GET /api/xp?game=CODE).
  * (Only types come from accounts.ts: it imports this file's helpers while it loads.)
  */

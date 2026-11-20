@@ -5,6 +5,8 @@ import {
   CRATES,
   FISCHER,
   XP,
+  everyLevel,
+  levelOf,
   ITEM_COLORS,
   GOD_KING_SHOP,
   PAWN_COLORS,
@@ -356,7 +358,7 @@ function TokenStock({ tokens, admin }: { tokens: Record<string, number>; admin: 
 }
 
 /**
- * A level's boss crate to choose (Nov 9: every 10th level), always there (shown, not hidden): greyed with none to choose, "Choose your
+ * A level's boss crate to choose (Nov 9: every XP.bossCrateEvery-th level, 20th since Nov 20), always there (shown, not hidden): greyed with none to choose, "Choose your
  * boss crate" when one waits. Its page lists the live bosses' crates.
  */
 function BossPickRow({ picks, onOpen }: { picks: number; onOpen: () => void }) {
@@ -427,7 +429,7 @@ function BossPickPage({ onBack }: { onBack: () => void }) {
   );
 }
 /** Your level now (the profile's XP). */
-const levelNow = () => 1 + Math.floor(Math.max(0, account().profile?.xp ?? 0) / XP.perLevel);
+const levelNow = () => levelOf(account().profile?.xp ?? 0);
 
 /** Admins only: test grants to yourself (crate keys, any boss's tokens), for trying the boss crates (the server checks it's you). */
 function AdminGrants() {
@@ -515,7 +517,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
             {!held
               ? "You have none. Leveling up and the daily reward give you crates."
               : !keys
-                ? `You have ${held}. You need a crate key to open one: each level gives you one.`
+                ? `You have ${held}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
                 : `You have ${held}, and ${keys} ${keys === 1 ? "key" : "keys"}.`}
           </span>
         )}

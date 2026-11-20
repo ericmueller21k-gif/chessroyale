@@ -22,6 +22,7 @@ import {
   BOSS_CRATE_PRICE,
   BOSS_TOKENS,
   XP,
+  everyLevel,
   QUESTS,
   BOSS_PARTY,
   HIDDEN_ROOM,
@@ -1131,7 +1132,7 @@ function crates(src: FaqSources): FaqSection {
     body: `
 **Everything here is cosmetic.** Nothing you own changes how a match is played or scored. Items dress your pawn (head, face, skin and weapon) on the vote board, the cut screen and your profile.
 
-**Crates and keys.** Each crate in the Crates tab opens with **one crate key**: you need the crate and a key. You earn crates from [leveling up and the daily reward](#xp) (${n(src.xp.levelCrates, "crate")} and ${n(src.xp.levelKeys, "key")} each level, and a crate for the day's first game), and from Squads placements. Crates come often; keys are scarcer, so you'll usually have a few crates waiting. A crate with a padlock is one you can't open yet: you have none, or no key. Crates and keys are never sold for now.
+**Crates and keys.** Each crate in the Crates tab opens with **one crate key**: you need the crate and a key. You earn crates from [leveling up and the daily reward](#xp) (${n(src.xp.levelCrates, "crate")} and ${n(src.xp.levelKeys, "key")} ${everyLevel(src.xp.levelRewardEvery)}, and a crate for the day's first game), and from Squads placements. Crates come often; keys are scarcer, so you'll usually have a few crates waiting. A crate with a padlock is one you can't open yet: you have none, or no key. Crates and keys are never sold for now.
 
 Every item from a crate rolls three things, each on its own:
 
@@ -1193,7 +1194,7 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 
 **The daily reward:** your first game of the day that counts and has at least ${X.dailyMinMoves} of your own moves gives you **+${X.dailyBonus} XP** ("Daily reward +${X.dailyBonus}") and **${n(X.dailyCrates, "crate")}**, once a day. In a game on your device it must also last a little while (our server times it). The day starts at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC.
 
-**Level-up rewards:** every level you reach gives you **${n(X.levelCrates, "crate")} and ${n(X.levelKeys, "crate key")}**, and every ${nth(X.bossCrateEvery)} level (${X.bossCrateEvery}, ${2 * X.bossCrateEvery}, ${3 * X.bossCrateEvery}, …) also **a boss crate you choose**: pick whose in the Crates tab ("Choose your boss crate"). It opens like any boss crate you hold, with nothing more to pay. Each level pays once, at the end of the game that reached it (a level reached some other way is paid at your next game that counts). The crates are from the newest series.
+**Level-up rewards:** ${everyLevel(X.levelRewardEvery)} you reach${X.levelRewardEvery > 1 ? ` (${X.levelRewardEvery}, ${2 * X.levelRewardEvery}, ${3 * X.levelRewardEvery}, …)` : ""} gives you **${n(X.levelCrates, "crate")} and ${n(X.levelKeys, "crate key")}**, and every ${nth(X.bossCrateEvery)} level (${X.bossCrateEvery}, ${2 * X.bossCrateEvery}, ${3 * X.bossCrateEvery}, …) also **a boss crate you choose**: pick whose in the Crates tab ("Choose your boss crate"). It opens like any boss crate you hold, with nothing more to pay. Each level pays once, at the end of the game that reached it (a level reached some other way is paid at your next game that counts). The crates are from the newest series.
 
 **Quests:** you get **${n(Q.dailyPerDay, "daily quest")}** each day and **${n(1, "weekly quest")}** each week, in the Quests window (it opens by itself the first time you come to the home screen each day when you're signed in, and from the **Quests** button any time). Each shows what to do ("${Q.daily[0]?.goal ?? ""}", "${Q.weekly[0]?.goal ?? ""}"), how far you are and what it pays.
 - **Rewards:** ${dailyPays}; the weekly quest ${weeklyPays}. They're paid the moment a game finishes the quest, and its XP joins that game's XP ("Quest +${Q.daily[0]?.xp ?? 0}"); the result says which quest ("Quest done: …").
@@ -1201,7 +1202,7 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 - **New dailies** come each day at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC; the weekly resets on Mondays at the same time. **Unfinished dailies stay**, up to ${Q.maxDailies} waiting, so missing a day doesn't waste them. A new weekly replaces the old one, finished or not.
 - **One free reroll a day for each daily:** the arrows on a daily you haven't finished swap it for another quest (only that one). The new quest's arrows come back the next day.
 
-After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level-up, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
+After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level that pays, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
 `,
   };
 }

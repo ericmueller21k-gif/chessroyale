@@ -479,7 +479,7 @@ describe("the FAQ's numbers come from the settings", () => {
 
   it("XP and levels (Nov 9), from the settings: a level's XP, a game's, the move minimum, each \"No XP\" reason, the caps", () => {
     const t = section("xp");
-    expect(t).toContain("Each level takes 1,000 XP, the same for every level, with no top level. You start at Level 1.");
+    expect(t).toContain("Each level takes 500 XP, the same for every level, with no top level. You start at Level 1.");
     expect(t).toContain("more for a longer game, plus 50 XP for a win. A game earns at most 350 XP.");
     expect(t).toContain("(1,200 XP a day before win bonuses)");
     expect(t).toContain("A game counts from your 10th move.");
@@ -498,6 +498,16 @@ describe("the FAQ's numbers come from the settings", () => {
     }
     expect(moved).toContain("from your 8th move");
     expect(moved).toContain("3 wins a day");
+  });
+
+  it("level-up rewards (Nov 20: every other level, a boss crate every 20th), from the settings, in the XP and the crates sections", () => {
+    expect(section("xp")).toContain("Level-up rewards: every other level you reach (2, 4, 6, …) gives you 1 crate and 1 crate key, and every 20th level (20, 40, 60, …) also a boss crate you choose");
+    expect(section("crates")).toContain("(1 crate and 1 key every other level, and a crate for the day's first game)");
+    const moved = { ...FAQ_DEFAULTS, xp: { ...FAQ_DEFAULTS.xp, levelRewardEvery: 3, bossCrateEvery: 30, levelKeys: 2 } };
+    expect(section("xp", moved)).toContain("every 3rd level you reach (3, 6, 9, …) gives you 1 crate and 2 crate keys, and every 30th level (30, 60, 90, …)");
+    expect(section("crates", moved)).toContain("(1 crate and 2 keys every 3rd level,");
+    const each = section("xp", { ...FAQ_DEFAULTS, xp: { ...FAQ_DEFAULTS.xp, levelRewardEvery: 1 } });
+    expect(each).toContain("Level-up rewards: every level you reach gives you");
   });
 
   it("quests (Nov 9, phase 3), from the settings: how many, the rewards, the carry-over, the reroll, the reset", () => {
