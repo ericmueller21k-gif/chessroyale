@@ -134,7 +134,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     with friends' news for anyone in it, which their next `/api/live` passes on as `inbox`; a friends list is one hub
     call (`presenceOf`). No new D1 writes per request. One new request: while a friends list is on screen, for a
     player with a friend who shows when they're online, `/api/friends/online` once a minute (cached session, one D1
-    read, one hub call).
+    read, one hub call). The Battle Tower clerk's list of open parties (`/api/tower/parties`, polled every 4 s while the
+    card shows) is made once per Worker instance every `TOWER_PARTY.listCacheMs` (3 s) from that instance's copy of the town's
+    room (no hub call while the town's readers keep it fresh) and at most 24 party Durable Objects, and is only for whoever
+    could join one (an account; signed in where signing in is set up). The delta review of #835, finding 1: it had asked the
+    hub and 12 parties for every reader, guests included.
   - **Quests at a game's end** (Nov 9, phase 3; review of #575, m5): each player's XP grant adds 3 to 5 D1 queries (the `quest_days`
     read, the quests twice on a new day, the day's deal batch, the paid quests), in turn in the room's `writeResults` loop: about 300
     to 500 more for a 100-player Crowd game. Plus one `quest_games` row write per player per counted game (the replay claim; cleared after a day). Fine for now; if it shows, read `quest_days` and the quests in one query, and skip the claim when no unfinished quest counts the game.

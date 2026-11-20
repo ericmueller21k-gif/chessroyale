@@ -152,25 +152,36 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   each friend's Invite: the invite kind "tower", "invited you to climb the Battle Tower", whose Accept joins the party and opens the
   town's tower), **Open party** (makes the party; the leader's line in the town's chat, "Ann is looking for 3 more to climb the Battle
   Tower", with **Go to the tower**: `TownChat.tsx` `PartyGo`, Town.tsx `goTower`: on the street the tower's own Go in, landing by the
-  clerk with his card open; in the lobby, a walk to the clerk; greyed elsewhere). Under the three ways (the third, **Open your own party**),
-  the **open parties** (Eric, Nov 20): a box of one size, three rows tall, scrolling inside, each party's leader, "2/4" and Join (seated on
-  the party's welcome, its words otherwise; `GET /api/tower/parties`: the hub's standing party lines, each party's `towerListing`: room in
-  it, no floor under way, not a run's own members climbing on), "No open parties right now." when none. The panel under them is one layout whatever you're doing (the review of #835, finding 11): the
+  clerk with his card open, the clerk riding with that walk (a walk elsewhere calls it off); in the lobby, a walk to the clerk; greyed
+  elsewhere, and on the street while a boss's challenge plays). Under the three ways (the third, **Open your own party**),
+  the **open parties** (Eric, Nov 20): a box of one size, three rows tall (exactly: no scroll for three), scrolling inside, each party's
+  leader, "2/4" and Join (seated on the party's welcome, its words otherwise; `GET /api/tower/parties`: the party lines standing in the
+  Worker instance's copy of the town's room, each party's `towerListing`: room in it, no floor under way, not a run's own members climbing
+  on; made once an instance every `TOWER_PARTY.listCacheMs` and shared by its readers, `townOpenParties`; read every
+  `TOWER_PARTY.listPollMs` while the card shows), "No open parties right now." when none. Only for whoever could join: a guest where
+  signing in is set up gets none and "Sign in to climb with a party." (and the card stops asking); none on a device the age gate marked too
+  young or while the town's chat is paused, as the town shows no party lines then (the delta review of #835, findings 1 and 4). The panel under them is one layout whatever you're doing (the review of #835, finding 11): the
   party's 4 seats (seat colors, ★ the leader, ✓ ready, each other member's Kick, the leader's, asked first and greyed during a floor),
-  the line (the plan, or your solo climb's note), READY or START (asked first when the plan ends your own party climb or takes it back
+  the line (the plan, or your solo climb's note; three lines high, fixed, its words written to fit: your own climb named with its floor, the
+  others counted, the leader's "2 not ready yet."; `tower-plan.ts`), READY or START (asked first when the plan ends your own party climb or takes it back
   floors) and Leave party, then the solo climb (Continue or Start, Start over, Alone). The party's half is greyed outside a party, the
   solo half inside one. Open your own party greyed but for its leader, full, open, during a floor, or a run's own members climbing on
   (`tower.closed`: such a party isn't opened to newcomers).
 - **The party** (`squads-party.ts` kind "tower", `squads-do.ts`; routes `POST /api/tower/party`, `/api/tower/party/CODE[/ws]`): Boss
   Battle's party for `TOWER_PARTY.max` (4), one seat an account, accounts only, no bots, two or more to START. Its plan (`NetParty.tower`:
-  "Your climb together goes on: floor N. Ann's climb goes back from floor 30", or "A new climb from floor 1. It ends …") is the Durable
+  "Your climb together goes on: floor N. Yours goes back from floor 30, and 1 more.", or "A new climb from floor 1. It ends 2 party
+  climbs.") is the Durable
   Object's read of everyone's copies (`preparePartyFloor`), read again when its people change or a floor ends (3 s later while a member's
   last floor is still being written); a change of plan un-readies everyone; START reads it again and must find the plan they readied for;
-  a seat whose account has been deleted holds it ("… Kick them to climb on"). Kick is refused from START until the room says the floor is
-  over (`towerFloorOn`; the view's `tower.floor`). The open line lapses when the party fills, starts, its leader leaves or its plan turns to
+  a seat whose account has been deleted holds it ("… Kick them to climb on"; not read again until a kick or a leave). Kick is refused from
+  START until the room says the floor is over (`towerFloorOn`; the view's `tower.floor`); should its word never come (a room nobody
+  reached, or its call lost), the party asks the room every `TOWER_PARTY.floorCheckMs` (`takeFloorCheck`, the room's `partyBattleDone`)
+  and ends the floor itself once the room has closed or reached its results. The open line lapses when the party fills, starts, its leader leaves or its plan turns to
   a run's own members climbing on, and
   `TOWN_CHAT.lineMs` after it went up (`takeLapsedOpen`, the alarm; the live hub's `townRemoveParty`, only its own line); one an account,
-  a new one at most every `TOWER_PARTY.openGapMs`, the leader passing the town chat's checks first (`townPartyPoster`).
+  a new one at most every `TOWER_PARTY.openGapMs`, the leader passing the town chat's checks first (`townPartyPoster`); the line carries
+  the leader's account (`from`), so muting or blocking them hides it. A party closed to the town (a run's own members climbing on) still
+  seats anyone with its code (a friend's invite comes in the same way); a newcomer only turns the plan into a new climb, asked first.
 - **One run, a copy each** (server `tower.ts`): a `tower_runs` row of kind 'party' for every member, the same seed and deal, `members`
   `{run, uids, alone?, party?, partyMet?}`. START: the floor's match room made (`towerPartySettings`: the party rule, ties to the engine's best, the floor's
   strength), then the floor begun on every copy in one batch (`commitPartyFloor`: a new run replaces only copies whose holders agreed; a

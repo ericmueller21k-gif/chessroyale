@@ -43,6 +43,8 @@ Lane: `social`.
   an account (a newer replaces the older), a new one at most every `TOWER_PARTY.openGapMs` (a minute); the leader passes the town chat's
   checks first (not banned, no moderator's chat ban, the chat not paused: `townPartyPoster`) and the line carries their account's name;
   a deleted account's or a name reset's party line goes with their other lines ([battle-tower.md](battle-tower.md), "The party").
+  Since the delta review of #835 the party line carries its leader's account (`from`; still no name to tap): muting or blocking the leader
+  hides it, and the leader's profile reports them. "Go to the tower" is greyed on the street while a boss's challenge plays.
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`
   phrases and `maxEmoji` emoji (the defaults until they choose). Bots use the whole list.
 - **Packs.** Free packs everyone has; more are sold in the shop (`QUICK_CHAT.packPrices`; `core/shop.ts` lists them
