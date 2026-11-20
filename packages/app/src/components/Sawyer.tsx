@@ -1,11 +1,13 @@
 import { useLayoutEffect, useRef } from "preact/hooks";
-import { BOARD_SAW, SAW_CUT, SPLIT, withoutPiece } from "@chessroyale/chess";
-import { BOSS_POWERS, SAWYER_LOOKS, type SawCut, type SplitPawn } from "@chessroyale/core";
+import { BOARD_SAW, SAW_CUT, SAW_SWAP, SPLIT, bannerLeadMs, hisRanks, pieceAt, powerFxMs, sawSwapLeadMs, swapPlacement, swapSquare, withoutPiece } from "@chessroyale/chess";
+import { BOSS_POWERS, MOO_CINEMATIC, SAWYER_LOOKS, type SawCut, type SplitPawn } from "@chessroyale/core";
 import { CUT, LEAP, SAWYER } from "../characters/sawyer.ts";
 import { bossKit } from "../characters/kits.ts";
+import { rejoinedAt } from "../characters/moo-state.ts";
 import { EFFECTS, animLength } from "../characters/power-art.ts";
 import type { CutSide } from "../characters/effects.ts";
 import type { BossView } from "../game.ts";
+import { onResetBeats } from "./boss-figure.ts";
 import { BoardEffects, BossEffect, BossMoment, SpriteAnim, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { hash, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
@@ -18,7 +20,10 @@ import { BOARD_SQUARES, boardPieces } from "../board/dom.ts";
  * they go), his saw cuts
  * (a groove along one edge of a square, sawn as his saw comes down at the board's corner, taped over turn by turn as it
  * heals) and his board saw (he leaps onto the board, revs, saws his way up between the d and e files, and the board
- * splits with a gap for its turns, then rejoins). All from the shared state (`powers.split`, `cut`, `boardSaw`) and
+ * splits with a gap for its turns, then rejoins), and his Saw Swap (while he thinks, as your check lands: a groove across the
+ * middle, then down his half, and its two 4 x 4 blocks slide past each other to trade places, before his move; the board saw's
+ * gap turned and halved, the blocks drawn with the board's own squares and pieces). All from the shared state (`powers.split`,
+ * `cut`, `boardSaw`, this turn's `sawSwap` event) and
  * the moment's start, so everyone online sees the same thing. Everything sits in eighths of the board's own size.
  * His rules: packages/chess/src/bosses/sawyer.ts.
  */
@@ -469,6 +474,161 @@ function boardSawMoment({ boss, moment, t, banner }: MomentProps) {
   );
 }
 
+// ---------------- The Saw Swap ----------------
+
+const hisSide = (boss: Pick<BossView, "crowdSide">): "w" | "b" => (boss.crowdSide === "w" ? "b" : "w");
+
+/** When this device first saw each Saw Swap (a screen drawn again carries on: it doesn't start over). A new battle forgets them. */
+const swapSeen = new Map<string, number>();
+onResetBeats(() => swapSeen.clear());
+
+/**
+ * His Saw Swap, the moment of his thinking screen (it comes as your check lands, at the start of his turn; his move waits for it:
+ * sawyerTurnMs), from when this device first saw it (after QUEEN SLAIN! if your check took his queen), with its banner's hold. None for
+ * another boss, or once its turn has gone. First seen just as this device rejoined: skipped, the board simply swapped (Ginger's
+ * Super Freeze's rule, MOO_CINEMATIC.rejoinMs: his move would cut it off).
+ */
+export function sawyerMoments(boss: BossView, now = Date.now()): Moment[] {
+  const p = boss.powers;
+  if (boss.id !== "sawyer" || !p) return [];
+  const e = p.events.find((x) => x.kind === "sawSwap" && x.turn === p.turn);
+  if (!e) return [];
+  const key = `${boss.id}:sawSwap:${e.turn}`;
+  const seenKey = `${boss.startMove}:${key}`;
+  if (!swapSeen.has(seenKey) && now - rejoinedAt() < MOO_CINEMATIC.rejoinMs) swapSeen.set(seenKey, -Infinity);
+  let first = swapSeen.get(seenKey);
+  if (first === undefined) {
+    swapSeen.set(seenKey, (first = now));
+    if (swapSeen.size > 20) swapSeen.delete(swapSeen.keys().next().value!);
+  }
+  if (first === -Infinity) return [];
+  const lead = bannerLeadMs("sawSwap");
+  const at = first + sawSwapLeadMs(boss) + lead;
+  return [{ kind: "sawSwap", key, at, ms: powerFxMs({ kind: "sawSwap" }) - lead, lead, ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: [...e.squares] } : {}) }];
+}
+
+/** The position with every piece on his half taken off (the moment draws them on their blocks while they slide). */
+const withoutHalf = (fen: string, his: "w" | "b"): string => {
+  const [lo, hi] = hisRanks(his);
+  const parts = fen.split(" ");
+  parts[0] = parts[0]!
+    .split("/")
+    .map((row, i) => (8 - i >= lo && 8 - i <= hi ? "8" : row))
+    .join("/");
+  return parts.join(" ");
+};
+
+/**
+ * The board while the Saw Swap plays (the game's board is already swapped: a base at this ply). Until its blocks come loose
+ * (`liftAt`): the position before it (the same swap undoes it), your check as the last move. From then until they land: that
+ * position without his half's pieces (the moment draws them on their blocks), and no last move (nothing new has moved: no knock).
+ * From their landing: null, the board as it is. `evalFen`: the position before it until they land, for the eval bar.
+ */
+export function sawSwapBoard(boss: BossView, moments: readonly Moment[], now: number): { fen: string; evalFen: string; lastMove: string | null } | null {
+  const m = moments.find((x) => x.kind === "sawSwap");
+  if (!m || now >= m.at + SAW_SWAP.landAt) return null;
+  const his = hisSide(boss);
+  const before = swapPlacement(boss.board.fen, his);
+  const loose = now >= m.at + SAW_SWAP.liftAt;
+  return { fen: loose ? withoutHalf(before, his) : before, evalFen: before, lastMove: loose ? null : (boss.board.history.at(-1) ?? null) };
+}
+
+/** The board doesn't animate its own changes while his half's blocks are off it (they leave it as they lift, and come back as they land). */
+export const swapStill = (moments: readonly Moment[], now: number): boolean => {
+  const m = moments.find((x) => x.kind === "sawSwap");
+  return !!m && now >= m.at + SAW_SWAP.liftAt - 80 && now < m.at + SAW_SWAP.landAt + 300;
+};
+
+/** One of his half's two 4 x 4 blocks on screen: its squares, its top-left square's column and row, and whether his king is on it. */
+type SwapBlock = { squares: string[]; col: number; row: number; king: boolean };
+
+/** His half's two blocks on screen (files a-d, then e-h), from the side the board is seen. */
+export function swapBlocks(boss: Pick<BossView, "crowdSide" | "powers">, o: Orientation): [SwapBlock, SwapBlock] {
+  const his = hisSide(boss);
+  const [lo, hi] = hisRanks(his);
+  const king = boss.powers?.sawSwap?.king[0] ?? null;
+  const block = (f0: number): SwapBlock => {
+    const squares: string[] = [];
+    for (let f = f0; f < f0 + 4; f++) for (let r = lo; r <= hi; r++) squares.push(`${"abcdefgh"[f]}${r}`);
+    const cells = squares.map((sq) => onScreen(sq, o));
+    return { squares, col: Math.min(...cells.map((c) => c.col)), row: Math.min(...cells.map((c) => c.row)), king: !!king && squares.includes(king) };
+  };
+  return [block(0), block(4)];
+}
+
+/**
+ * The Saw Swap's grooves now (ms into its moment `t`): across the middle (the board saw's gap turned a quarter) from `cutAt`, then
+ * down his half (its top half's run) from `downAt`; both part as the blocks come loose (a crack: the `split` cue), and close as the
+ * board closes (the `rejoin` cue). Only the groove across the middle plays their sounds. Null: not (or no longer) on the board.
+ */
+export function swapGrooves(t: number, at: number): { cross: { anim: string; then?: string; since: number } | null; down: { anim: string; then?: string; since: number } | null } {
+  const B = SAW_SWAP;
+  const parted = (from: number, run: string) =>
+    t < from ? null : t < B.liftAt ? { anim: run, since: at + from } : t < B.closeAt ? { anim: "part", then: "gap", since: at + B.liftAt } : t < B.closeAt + CLOSE_MS() ? { anim: "close", since: at + B.closeAt } : null;
+  return { cross: parted(B.cutAt, "swapRun"), down: parted(B.downAt, "swapDown") };
+}
+
+const ROLE = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" } as const;
+
+/**
+ * The Saw Swap on the board: the banner, his saw at the board's corner as the grooves run (the board's own layer: swapGrooves), then
+ * from `liftAt` his half's two blocks (its squares and the pieces on them, drawn as the board draws them, over a dark pit) slide past
+ * each other, the one with his king lifted over the other, and land on each other's place (`landAt`), where the board takes over
+ * (drawn `overlap` more, so no frame has neither).
+ */
+function sawSwapMoment({ boss, t, orientation, banner, cast }: MomentProps) {
+  const his = hisSide(boss);
+  const before = swapPlacement(boss.board.fen, his);
+  const blocks = swapBlocks(boss, orientation);
+  const B = SAW_SWAP;
+  const on = t >= B.liftAt && t < B.landAt + B.overlap;
+  const u = ease(clamp01((t - B.liftAt) / B.slideMs));
+  const bump = Math.sin(Math.PI * u);
+  const r2 = (n: number) => Math.round(n * 1000) / 1000;
+  return (
+    <div class="power-moment pm-sawswap" data-swap={t < B.liftAt ? "saw" : t < B.landAt ? "slide" : "landed"}>
+      {banner("SAW SWAP!", "He swaps his half out of check", "saw", B.bannerMs)}
+      {cast("cut", B.cutAt)}
+      {on && (
+        <div class="hb-pieces sw-layer" aria-hidden="true">
+          {t < B.landAt && <span class="sw-hole" style={{ top: `${blocks[0].row * 12.5}%` }} />}
+          {blocks.map((b, i) => {
+            const to = blocks[1 - i]!;
+            // (A square is a quarter of the block: its move across, in % of its own width.)
+            const dx = r2((to.col - b.col) * 25 * u);
+            return (
+              <span
+                key={`block-${i}`}
+                class={`sw-slab${b.king ? " sw-lifted" : ""}`}
+                style={{
+                  left: `${b.col * 12.5}%`,
+                  top: `${b.row * 12.5}%`,
+                  translate: `${dx}% 0`,
+                  ...(b.king ? { scale: String(r2(1 + 0.06 * bump)) } : bump > 0 ? { filter: `brightness(${r2(1 - 0.3 * bump)})` } : {}),
+                }}
+                data-block={i ? "e-h" : "a-d"}
+              >
+                {b.squares.map((sq) => {
+                  const pc = pieceAt(before, sq);
+                  if (!pc) return null;
+                  const c = onScreen(sq, orientation);
+                  return <piece key={sq} class={`${PIECE_COLOUR[pc.color]} ${ROLE[pc.type]}`} style={{ left: `${(c.col - b.col) * 25}%`, top: `${(c.row - b.row) * 25}%` }} data-square={swapSquare(sq, his)} />;
+                })}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The Saw Swap's line (his kit's `sawSwap` lines, picked by the moment: the same for everyone). */
+const swapLine = (kit: ReturnType<typeof bossKit>, m: Pick<Moment, "key">): string | null => {
+  const lines = kit?.lines.sawSwap;
+  return lines?.length ? lines[hash(m.key) % lines.length]! : null;
+};
+
 // ---------------- Drawn ahead ----------------
 
 const warmed = new Set<string>();
@@ -505,12 +665,18 @@ export const SAWYER_UI = {
     split: { order: 0, kit: "power", line: splitLine, view: splitMoment },
     cut: { order: 0, kit: "power", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + SAW_CUT.cutAt : undefined), view: cutMoment },
     boardsaw: { order: 2, kit: "ultimate", view: boardSawMoment },
+    // (While he thinks, as your check lands: sawyerMoments. His line as his saw comes down.)
+    sawSwap: { order: 0, kit: "power", line: swapLine, lineAt: SAW_SWAP.cutAt, view: sawSwapMoment },
   },
   // Under the pieces: the cut's groove and tape, the gap down the middle. Over them: his split pawns drawn as halves or
   // small (once they've landed; as ordinary pawns with the morph's "grow"), and markers for tests and readers.
   board: ({ boss, p, orientation, now, appearAt, moments }) => {
     const cuts = cutItems(boss, orientation, now, appearAt);
     const gap = gapState(boss, moments, now);
+    // (The Saw Swap's grooves, while it plays: across the middle, then down his half, which is the top of the board as you see it.)
+    const swap = moments.find((m) => m.kind === "sawSwap");
+    const grooves = swap ? swapGrooves(now - swap.at, swap.at) : null;
+    const low = swapBlocks(boss, orientation)[0].row >= 4;
     const splitting = moments.find((m) => m.kind === "split");
     const halvesOn = !splitting || now >= splitting.at + splitSettledAt();
     const look = pairLook();
@@ -522,6 +688,16 @@ export const SAWYER_UI = {
           {gap && (
             <span class="sw-gap" data-state={gap.anim}>
               <SpriteAnim ch={EFFECTS.boardGap.ch} anim={gap.anim} then={gap.then} since={gap.since} sounds={EFFECTS.boardGap.sounds} id="gap" />
+            </span>
+          )}
+          {grooves?.cross && (
+            <span class="sw-gap sw-cross" data-state={grooves.cross.anim}>
+              <SpriteAnim ch={EFFECTS.boardGap.ch} anim={grooves.cross.anim} then={grooves.cross.then} since={grooves.cross.since} sounds={EFFECTS.boardGap.sounds} id="swap-cross" />
+            </span>
+          )}
+          {grooves?.down && (
+            <span class={`sw-gap sw-down${low ? " sw-low" : ""}`} data-state={grooves.down.anim}>
+              <SpriteAnim ch={EFFECTS.boardGap.ch} anim={grooves.down.anim} then={grooves.down.then} since={grooves.down.since} id="swap-down" />
             </span>
           )}
         </>

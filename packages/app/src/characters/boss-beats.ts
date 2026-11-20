@@ -54,6 +54,8 @@ export type Beat =
   | "toppleHis"
   // Sawyer's split pawn after his first move (that pawn sawn in two).
   | "split"
+  // Sawyer's Saw Swap (Nov 20): his line as its moment begins, while he thinks (its animation is his `power`, the saw coming down).
+  | "sawSwap"
   // Wrangler's long pull (his first move), the drag standing in for the test trigger's showdown, and his meter full
   // (Eric, Oct 13: "I've got you in my sights.", then his ready loop until he fires).
   | "pull"

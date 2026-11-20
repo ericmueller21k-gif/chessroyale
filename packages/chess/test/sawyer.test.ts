@@ -741,8 +741,6 @@ describe("Sawyer's Saw Swap (Eric, Nov 20: once a battle, in check with his king
       const view = r.bossView()!;
       expect(view.powers!.sawSwap).toEqual({ at: 1, king });
       expect(sawyerTurnMs(view)).toBe(SAW_SWAP.total + bannerWaitMs("sawSwap") + MOO_CINEMATIC.tailPadMs);
-      // The rage meter and his other powers untouched.
-      expect(rageOf(r.boss).value).toBe(rageOf({ ...r.boss!, powers: { ...r.boss!.powers!, sawSwap: undefined } }).value);
       // His move comes from the new position (his first, a pawn's), and the game goes on from it.
       const move = await r.playBoss();
       expect(legalMoves(want)).toContain(move);
@@ -788,7 +786,15 @@ describe("Sawyer's Saw Swap (Eric, Nov 20: once a battle, in check with his king
     r.state = { ...r.state, boss: { ...r.boss!, crowdMoves: r.settings.bossMaxMoves } };
     expect(sawyerBattle.sawSwap(b)).toBe(false);
     r.state = { ...r.state, boss: { ...r.boss!, crowdMoves: 1 } };
+    const before = r.boss!.powers!;
     expect(sawyerBattle.sawSwap(b)).toBe(true);
+    // (The rage meter and his other powers untouched: only the Saw Swap's own record and the turn's events change.)
+    const { sawSwap, events, ...rest } = r.boss!.powers!;
+    const { sawSwap: none, events: was, ...kept } = before;
+    expect(none).toBeUndefined();
+    expect(sawSwap).toEqual({ at: 1, king: ["e8", "a8"] });
+    expect(events).toEqual([...was, { kind: "sawSwap", turn: before.turn, square: "a8", squares: ["e8", "a8"] }]);
+    expect(rest).toEqual(kept);
   });
 
   it("never on a Battle Tower floor with sawSwapInTower off (Eric: off by default there), and does with it on", async () => {

@@ -17138,6 +17138,53 @@ img.qicon {
   pointer-events: none;
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.55));
 }
+/* The Saw Swap's grooves (Nov 20): the same strip, turned a quarter to run across the middle (centered on the board, so it turns about
+   the board's middle), and halved to run down his half: only its top half shows (his half is the top of the board as you see it; the
+   strip turned upside down when it's the bottom). */
+.board-wrap > .sw-gap.sw-cross {
+  rotate: 90deg;
+}
+.board-wrap > .sw-gap.sw-down {
+  clip-path: inset(0 0 50% 0);
+}
+.board-wrap > .sw-gap.sw-down.sw-low {
+  scale: 1 -1;
+}
+/* The Saw Swap's blocks while they slide (over the pieces, in .sw-layer): the dark pit his half leaves, and each block a piece of the
+   board, its squares in the board's own colors (its 4 x 4 is the top-left quarter of the board's light-square mask: every quarter of the
+   board starts on a light square) with the pieces on them, each a quarter of it. The one with his king lifted over the other. */
+.sw-layer > .sw-hole {
+  left: 0;
+  width: 100%;
+  height: 50%;
+  z-index: 2;
+  background: #120b08;
+  box-shadow: inset 0 0 2cqw rgba(0, 0, 0, 0.85);
+}
+.sw-layer > .sw-slab {
+  width: 50%;
+  height: 50%;
+  z-index: 3;
+  background-color: var(--sq-dark);
+  box-shadow: 0 0 0 0.3cqw rgba(56, 36, 26, 0.9);
+}
+.sw-layer > .sw-slab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--sq-light);
+  -webkit-mask: var(--sq-light-mask) 0 0 / 200% 200% no-repeat;
+  mask: var(--sq-light-mask) 0 0 / 200% 200% no-repeat;
+}
+.sw-layer > .sw-slab.sw-lifted {
+  z-index: 4;
+  filter: drop-shadow(0 1.2cqw 0.6cqw rgba(0, 0, 0, 0.5));
+}
+.sw-layer .sw-slab piece {
+  width: 25%;
+  height: 25%;
+  z-index: 1;
+}
 /* While his cut or gap is on the board, the square highlights (the last move, the selection, check) go under it (Eric, Nov 20:
    "the black horse green color on the tile should be behind the 'cut'"): back to the squares' own layer, under his z-index 1,
    the pieces (2) still over everything. The move dots stay over (taps, other bosses' under-layers: review of #784). */

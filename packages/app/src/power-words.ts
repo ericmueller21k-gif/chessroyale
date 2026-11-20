@@ -20,6 +20,7 @@ export const POWER_WORDS: Record<PowerId, string> = {
   bounce: "Big Bounce",
   cuts: "splits a pawn, Saw Cuts",
   boardsaw: "Board Saw",
+  sawswap: "Saw Swap",
   drag: "lassos your pieces",
   showdown: "Showdown",
   nohelp: "no God King help",
