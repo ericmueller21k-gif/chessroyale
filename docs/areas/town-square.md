@@ -802,9 +802,12 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   the end of its step); its button runs you to the nearest square just inside it (`ShopCtl.go`, room.ts `doorGoal`), then does its action
   (Town.tsx's tower buttons through `atDoor`). The picture counts where it's drawn plus `SHOP_FEEL.doorPad` (10 px; a picture under
   `doorMinPx`, 44, its whole finger-sized box: `onDoorPic`, `opaqueNear`), never the Shopkeeper over it or the floor just inside a door (that
-  still walks you there, the card showing as you arrive). A tap elsewhere or an arrow key on the way cancels the run. Tests:
-  `packages/app/test/room-door-tap.test.ts`; `e2e/battle-tower.spec.ts`, "the elevator tapped from across the lobby".
-  [2026-11-20-room-doors.md](../decisions/2026-11-20-room-doors.md).
+  still walks you there, the card showing as you arrive). A tap elsewhere or an arrow key on the way cancels the run. Not while there
+  are no cards (`noCards`: a challenge, Don Dough's from his Challenge on): one rule for every way a card opens, so a tap on a door's
+  picture then walks you to the floor under it, as before (the back door stands in the back room's near wall, over the floor behind it).
+  Tests: `packages/app/test/room-door-tap.test.ts`; `e2e/battle-tower.spec.ts`, "the elevator tapped from across the lobby";
+  `e2e/zebra-home.spec.ts`, Don's beat (the walk to 4,8 by the back door).
+  [2026-11-20-room-doors.md](../decisions/2026-11-20-room-doors.md), [2026-11-20-no-door-cards-in-a-beat.md](../decisions/2026-11-20-no-door-cards-in-a-beat.md).
 - **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
   `__shopAt("keeper" | "door" | "square", [c, r])` (and `"pic"` with where a door leads, `"out"` the way out: a point on its picture), `__shopCam()`, `__shopBench(n)`, `__shopRide()` (your ride inside).
 
