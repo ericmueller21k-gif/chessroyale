@@ -157,12 +157,12 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await heartsAre(page.locator(".tw-strip .tw-hearts").first(), 2);
   await submitMove(page, "h5f7");
   // The end screen (Nov 20): "Victory!", the floor in its line, the floor's boss facing your pawn, the rewards to their end (a skip
-  // tap on the headline: 4 moves earn no XP), the next floor's line and one button back.
+  // tap on the headline: a test floor earns no XP), the next floor's line and one button back.
   const won = page.locator('[data-tower-result="won"]');
   await expect(page.getByTestId("es-line")).toHaveText("Floor 1 cleared!", { timeout: 120_000 });
   await expect(page.getByTestId("es-title")).toHaveText("Victory!");
   await expect(page.getByTestId("es-lineup").locator(".es-fig, .es-portrait")).toHaveCount(1);
-  await expect(page.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: the game ended before move 10.", { timeout: 20_000 });
+  await expect(page.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: test game.", { timeout: 20_000 });
   await page.getByTestId("es-title").click();
   await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 10_000 });
   await expect(page.locator(".es-quests-none")).toHaveText("No quests moved this game.");
