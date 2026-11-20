@@ -581,6 +581,12 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 20 ~19:15 UTC
+- #852 primary boss: review clean (2 nits fixed in b341f73: Timber clock frozen when off; FAQ line). CI watcher bqhfcsnfm -> merge when green.
+- Part-fit (Haiku, session_01JuCWRv5xBiLwy9YVjc8hCW, claude/tower-part-fit): Puddles' name/meters spill out of his split-bar part. Watcher ba11qr36r.
+- Levels-500 (xhigh, FULL lane, session_01JuCWRsVmJzAVdxepUxbxwg, claude/levels-500): brief notes/briefs/levels-500.md. Then: full-e2e label + independent review + delta re-review.
+- Then end-screen build (notes/briefs/end-screen-build.md; Eric approved animations; big XP number normal font; ranked own page; RP LOST; tap skips).
+
 ## Nov 20 ~18:45 UTC
 - #851 tower fixes MERGED b8494e0 (Sawyer cut layering; Wrangler once a game everywhere, none on shared tower floors; Babur pump on shared floors). Review nits left: Sawyer tints under other bosses' layers on shared floors; admin ult button can stick; <600px-tall desktop no pump. Watcher bewm3i210 = deploy + main full run.
 - Primary-boss helper started: session_01JuCWRuqs6cBwVcmaQeXNQd, branch claude/tower-primary-boss (xhigh, alone). Watcher for .done running. Then prep-pr, PR, CI, quick review, merge.
