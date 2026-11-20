@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
-import { toSan } from "@chessroyale/chess";
+import { START_FEN, applyMove, toSan } from "@chessroyale/chess";
 import { Board } from "./Board.tsx";
 import { Chevrons } from "./HistoryNav.tsx";
 import type { MoveRecord, SimulBoardView } from "../game.ts";
@@ -225,6 +225,49 @@ function InlineReview({ moves, dp, solo, estRating }: { moves: readonly MoveReco
 }
 
 /** The arrow keys step a review (0 to `last`), but not while typing in a field. */
+/**
+ * A 1 v 1's move-by-move under its end screen (Eric, Nov 20: "its own result page like the boss/tower end screen, with the
+ * move-by-move below"): the game's board, stepped with ◀ ▶ (and ← → on a computer), from the last position. No engine's words: a 1 v 1
+ * isn't judged. Its stepper row and board keep their places from move to move, as InlineReview's.
+ */
+export function GameSteps({ moves, orientation }: { moves: readonly string[]; orientation: "white" | "black" }) {
+  const fens = useMemo(() => {
+    const out = [START_FEN];
+    for (const m of moves) out.push(applyMove(out[out.length - 1]!, m));
+    return out;
+  }, [moves]);
+  const last = moves.length - 1;
+  const [at, setAt] = useState(last);
+  const step = (d: number) => setAt((p) => Math.min(last, Math.max(0, p + d)));
+  useStepKeys(last, setAt);
+  if (last < 0) return null;
+  const before = fens[at]!;
+  return (
+    <div class="breakdown inline" data-testid="game-steps">
+      <div class="breakdown-head">
+        <h2>The game, move by move</h2>
+      </div>
+      <div class="history-nav bm-step">
+        <button type="button" class="nav-btn" aria-label="Previous move" disabled={at === 0} onClick={() => step(-1)}>
+          <Chevrons back />
+        </button>
+        <div class="nav-middle bm-step-mid">
+          <span class="bm-step-text">
+            Move {at + 1} of {moves.length} · {moveNo(before)}
+            {before.split(" ")[1] === "w" ? "." : "…"} {toSan(before, moves[at]!)}
+          </span>
+        </div>
+        <button type="button" class="nav-btn" aria-label="Next move" disabled={at === last} onClick={() => step(1)}>
+          <Chevrons />
+        </button>
+      </div>
+      <div class="bm-board-wrap">
+        <Board fen={fens[at + 1]!} orientation={orientation} lastMove={moves[at]} small animate={false} />
+      </div>
+    </div>
+  );
+}
+
 function useStepKeys(last: number, setAt: (f: (p: number) => number) => void) {
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -51,7 +51,9 @@ export type EndTone = "win" | "loss" | "draw";
 export function EndHeadline({ title, line, tone, plain = false }: { title: ComponentChildren; line: string; tone: EndTone; plain?: boolean }) {
   return (
     <div class={`es-head es-${tone}${plain ? " es-plain" : ""}`}>
-      <h1 class="boss-title es-title">{title}</h1>
+      <h1 class={`boss-title es-title${typeof title === "string" && title.length > 12 ? " es-title-long" : ""}`} data-testid="es-title">
+        {title}
+      </h1>
       {/* (One line, always there: an empty one keeps its height.) */}
       <p class={`es-line${line.length > 22 ? " es-line-long" : ""}`} data-testid="es-line">
         {line || " "}
@@ -192,7 +194,7 @@ function Track({ plan, refs, emblem }: { plan: TrackPlan; refs: TrackRefs; emble
   const w = plan.still ? plan.before : within(plan.before, plan.per);
   const lvl = plan.label(plan.before);
   return (
-    <div class={`es-track es-track-${plan.kind}`} ref={refs.box} data-testid={`es-track-${plan.kind}`}>
+    <div class={`es-track es-track-${plan.kind}${plan.earned < 0 ? " es-down" : ""}`} ref={refs.box} data-testid={`es-track-${plan.kind}`}>
       <div class="es-track-top">
         <span class="es-gain" ref={refs.gain} />
         <span class="es-who">

@@ -1,5 +1,15 @@
-/* ---- MOCKUP (Nov 20): the end screen for every match (components/EndScreen.tsx; notes in `.mockup`). Every box has its size from
-   the first frame; the sequence only sets transforms, opacity and texts. ---- */
+/* ---- The end screen of every match (Eric, Nov 20; components/EndScreen.tsx; docs/decisions/2026-11-20-end-screen.md). Every box has
+   its size from the first frame; the sequence only sets transforms, opacity and texts. Centered, cards and all. ---- */
+.es-screen {
+  text-align: center;
+}
+.es-rewards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
 
 /* The headline: the title in the God King's pixel type, the match's line under it in the same type. */
 .es-head {
@@ -28,6 +38,10 @@
   color: #ffe1e1;
   text-shadow: 3px 3px 0 #9c2f2f;
 }
+.results .es-title.es-title-long,
+.es-title.es-title-long {
+  font-size: 15px;
+}
 .es-line {
   margin: 0;
   height: 22px;
@@ -35,6 +49,9 @@
   font-size: 12px;
   line-height: 22px;
   white-space: nowrap;
+}
+.es-line.es-line-long {
+  font-size: 10px;
 }
 .es-win .es-line {
   color: var(--good);
@@ -65,13 +82,31 @@
 
 /* "XP EARNED" and its number: a fixed box; the number counts here, then lobs into its bar. */
 .es-earned {
-  height: 62px;
+  height: 78px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   text-align: center;
+}
+/* Why there's none ("No XP: test game."), in the number's place, the same height. */
+.es-earned-why {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+}
+/* What made it ("Win +50 · Daily reward +200"): one small line, always there. */
+.es-parts {
+  height: 15px;
+  font-size: 12px;
+  line-height: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
 }
 .es-earned-label {
   font-family: "Press Start 2P", ui-monospace, monospace;
@@ -84,13 +119,16 @@
   color: #a8741a;
   text-shadow: none;
 }
+/* (The number in the normal UI font, Eric, Nov 20: "we don't need to make the big xp number so pixelated I think normal is fine".) */
 .es-earned-num {
   display: inline-block;
-  font-family: "Press Start 2P", ui-monospace, monospace;
-  font-size: 28px;
-  line-height: 30px;
+  font-family: inherit;
+  font-weight: 900;
+  font-size: 36px;
+  line-height: 38px;
+  letter-spacing: -0.5px;
   color: var(--good);
-  text-shadow: 3px 3px 0 color-mix(in srgb, var(--good) 30%, #000 35%);
+  text-shadow: 0 2px 0 color-mix(in srgb, var(--good) 30%, #000 35%);
   font-variant-numeric: tabular-nums;
   opacity: 0.3;
   transform-origin: center;
@@ -100,7 +138,10 @@
 }
 .es-earned-rp .es-earned-num {
   color: var(--accent);
-  text-shadow: 3px 3px 0 color-mix(in srgb, var(--accent) 35%, #000 40%);
+  text-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 35%, #000 40%);
+}
+.es-earned-rp.es-down .es-earned-label {
+  color: var(--bad);
 }
 .es-earned-rp.es-down .es-earned-num {
   color: var(--bad);
@@ -253,13 +294,17 @@
 }
 .es-gain {
   justify-self: start;
-  font-family: "Press Start 2P", ui-monospace, monospace;
-  font-size: 11px;
+  font-size: 14px;
+  font-weight: 900;
   color: var(--good);
   opacity: 0;
 }
 .es-track-rp .es-gain {
   color: var(--accent);
+}
+.es-track-rp.es-down .es-gain,
+:root[data-theme="light"] .es-track-rp.es-down .es-gain {
+  color: var(--bad);
 }
 :root[data-theme="light"] .es-track-rp .es-gain {
   color: #a8741a;
@@ -561,27 +606,6 @@
   color: var(--muted);
 }
 
-/* (Ranked 1 v 1: the result card over the board, the board dimmed behind.) */
-.es-card {
-  box-sizing: border-box;
-  width: min(380px, calc(100vw - 20px));
-  padding: 10px 14px 14px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--bg);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.es-card .es-why {
-  margin: -4px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  text-align: center;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .es-win .es-line,
   .es-gain.on,
@@ -600,21 +624,36 @@
     opacity: 1;
   }
 }
-.es-ranked {
-  position: relative;
-  align-items: center;
+/* A boss without a character's art: his portrait in the front's place. */
+.es-portrait {
+  width: 72px;
+  height: 72px;
 }
-.es-ranked-board {
-  width: min(100%, 520px);
-  margin: 40px auto 0;
-  opacity: 0.35;
-  filter: saturate(0.6);
+/* (A boss battle's ResultDuo as the rewards' middle: nothing under your pawn now, so he stands on its base line.) */
+.es-screen .rd-boss {
+  margin-bottom: 12px;
 }
-.es-ranked-over {
-  position: absolute;
-  inset: 0;
+/* Squads' middle: your squad's tag and members, in a row. */
+.es-squad {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 64px;
   justify-content: center;
-  align-items: flex-start;
-  padding-top: calc(env(safe-area-inset-top) + 12px);
+}
+/* Ranked 1 v 1's coins line, under the quests: one line, always there. */
+.es-coins {
+  margin: 0;
+  height: 18px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dv-end .dv-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.dv-end .dv-chat {
+  width: min(380px, 100%);
 }

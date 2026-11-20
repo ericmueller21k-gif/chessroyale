@@ -1,43 +1,57 @@
 import { useEffect, useState } from "preact/hooks";
 import { BATTLE_TOWER, floorBossCount } from "@chessroyale/core";
-import { RESULT_ATTACK_MS } from "../components/ResultDuo.tsx";
-import { floorOutcome, floorRating, livesOf, lostWords, notWon, spentLine, type TowerEnd } from "../tower.ts";
+import { floorOutcome, floorRating, livesLeftWords, livesOf, lostWords, type FloorOutcome, type TowerEnd } from "../tower.ts";
 import type { GameView } from "../game.ts";
-
-/** The result's button stays greyed while its pictures play (ResultDuo: a beat, then the boss's attack or bow). */
-const HOLD_MS = 250 + RESULT_ATTACK_MS;
 
 /** The next floor's line: "Next: floor 9 · 2 bosses · rating 1270". */
 const nextLine = (n: number) => `Next: floor ${n} · ${floorBossCount(n)} ${floorBossCount(n) === 1 ? "boss" : "bosses"} · rating ${floorRating(n)}`;
 
+/** A floor not won, short, for the end screen's headline line (Eric, Nov 20): "Floor 4 lost · 1 life left". */
+const shortNotWon = (outcome: FloorOutcome | "left", floor: number, lives: number) =>
+  `Floor ${floor} ${outcome === "drawn" ? "drawn" : outcome === "left" ? "left" : "lost"} · ${livesLeftWords(lives)}`;
+
+/** A tower floor's end, as its end screen shows it: the headline's line and tone, the line under it, the result's state. */
+export interface TowerEndView {
+  /** The headline's line: "Floor 3 cleared!", "Floor 4 lost · 1 life left" (never the tower's floor count). */
+  line: string;
+  tone: "win" | "loss" | "draw";
+  /** Under it, by the button: "Next: floor 4 · 3 bosses · rating 660", the recap, or "Saving your run…". */
+  sub: string;
+  /** The result's state, for its box's `data-tower-result`. */
+  state: string;
+  party: boolean;
+  /** The button waits for the server's word (a solo floor's). */
+  waiting: boolean;
+}
+
 /**
  * A tower floor's result (PR 10; PR 11b, Eric, Nov 19: "After the round ends, it's like a victory or defeat screen, like it normally is.
- * And then it takes you back."): the game's own result screen, the floor and the run in its line, its result sent to the server (once),
- * and one button, "Back to the tower" (greyed while the result's pictures play and the server answers), into the floor room: won, the
- * elevator open to the next floor. Lost, drawn or left (counted) with a life to spend (Eric, Nov 20: "it just takes you on to the next
- * match, and it just counts"): "You lost floor 8. It still counts: 1 life left.", the elevator open too; with none, the run over, its
- * floors lost listed (the recap). Until the server answers, the run's lives going in say which (the server's word then stands). A leave
- * the server made free: "You left floor 8. It waits for you.", back to the lobby.
+ * And then it takes you back."; the end screen, Nov 20: its line in the headline): the floor and the run, its result sent to the server
+ * (once), and one button, "Back to the tower" (greyed until the server answers), into the floor room: won, the elevator open to the next
+ * floor. Lost, drawn or left (counted) with a life to spend (Eric, Nov 20: "it just takes you on to the next match, and it just
+ * counts"): "Floor 8 lost · 1 life left", the elevator open too; with none, the run over, its floors lost listed (the recap). Until the
+ * server answers, the run's lives going in say which (the server's word then stands). A leave the server made free: "Floor 8 left · it
+ * waits", back to the lobby. Null for a match that isn't a tower floor.
  */
-export function TowerResult({ match, onBack }: { match: GameView; onBack: () => void }) {
-  const play = match.tower!;
+export function useTowerEnd(match: GameView): TowerEndView | null {
+  const play = match.tower;
   const [end, setEnd] = useState<TowerEnd | null>(null);
-  const [held, setHeld] = useState(true);
   useEffect(() => {
+    if (!play) return;
     let on = true;
     void play.settle().then((e) => on && setEnd(e));
-    const t = setTimeout(() => setHeld(false), HOLD_MS);
     return () => {
       on = false;
-      clearTimeout(t);
     };
   }, [play]);
   const p = match.phase;
   const left = p.kind === "results" && !!p.left;
+  if (match.towerParty && !play) return partyEnd(match, left);
+  if (!play) return null;
   const floor = play.floor;
   // (The run after this floor, and the floor's result: the server's word once it has taken the result (a floor counted lost on another
   // device while this one won it stays lost: the review of #839, finding 2); until then (or if it couldn't be sent), the match's, and
-  // as the lives going in say. Resigning after your 2nd move is a loss as the tower counts it: "You lost floor 8.")
+  // as the lives going in say. Resigning after your 2nd move is a loss as the tower counts it.)
   const said = end && !end.error ? end : null;
   const played = p.kind === "results" && p.bossResult && !left ? floorOutcome(p.bossResult) : "lost";
   const outcome = said && said.outcome !== "left" ? said.outcome : played;
@@ -50,44 +64,35 @@ export function TowerResult({ match, onBack }: { match: GameView; onBack: () => 
   const status = said ? said.status : on && floor >= BATTLE_TOWER.floors ? "top" : on ? "open" : "out";
   const n = floor + 1;
   const line = free
-    ? `You left floor ${floor}. It waits for you.`
+    ? `Floor ${floor} left · it waits`
     : status === "top"
       ? won
-        ? "You reached the top of the tower!"
-        : `${notWon(outcome, floor)} It still counts: the top of the tower!`
+        ? "Top of the tower!"
+        : `Floor ${floor} ${outcome === "drawn" ? "drawn" : "lost"} · the top!`
       : status === "open"
         ? won
           ? `Floor ${floor} cleared!`
-          : spentLine(outcome, floor, lives)
-        : `Your run ended on floor ${floor}.`;
+          : shortNotWon(outcome, floor, lives)
+        : `Run over on floor ${floor}`;
   const best = end ? `Best solo: ${end.best ? `floor ${end.best}` : "none yet"}` : "";
   const sub = !end ? "Saving your run…" : (end.error ?? (status === "open" ? nextLine(free ? floor : n) : [lostWords(end.lost), best].filter(Boolean).join(". ")));
-  return (
-    <div class="tw-result" data-tower-result={free ? "free" : status === "open" ? (won ? "won" : "lost") : status}>
-      <p class="tw-result-line">{line}</p>
-      <p class="tw-result-sub">{sub}</p>
-      <div class="actions">
-        <button type="button" class="btn btn-primary" style={{ whiteSpace: "nowrap" }} disabled={!end || held} onClick={onBack}>
-          Back to the tower
-        </button>
-      </div>
-    </div>
-  );
+  return {
+    line,
+    tone: won ? "win" : outcome === "drawn" && !left ? "draw" : "loss",
+    sub,
+    state: free ? "free" : status === "open" ? (won ? "won" : "lost") : status,
+    party: false,
+    waiting: !end,
+  };
 }
 
 /**
- * A party floor's result (Nov 20; docs/decisions/2026-11-20-tower-party.md): the game's own result screen, the floor in its line (the
- * party's win, its loss or draw, or your leave), and one button, "Back to the tower": into the floor room with your party (its room
- * has written every member's copy: town/Town.tsx reads yours there).
+ * A party floor's end (Nov 20; docs/decisions/2026-11-20-tower-party.md): the floor in its line (the party's win, its loss or draw, or
+ * your leave), and one button, "Back to the tower": into the floor room with your party (its room has written every member's copy:
+ * town/Town.tsx reads yours there).
  */
-export function TowerPartyResult({ match, onBack }: { match: GameView; onBack: () => void }) {
-  const [held, setHeld] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setHeld(false), HOLD_MS);
-    return () => clearTimeout(t);
-  }, []);
+function partyEnd(match: GameView, left: boolean): TowerEndView {
   const p = match.phase;
-  const left = p.kind === "results" && !!p.left;
   const outcome = p.kind === "results" && p.bossResult ? floorOutcome(p.bossResult) : "lost";
   const won = !left && outcome === "won";
   const floor = match.towerParty!.floor;
@@ -96,23 +101,33 @@ export function TowerPartyResult({ match, onBack }: { match: GameView; onBack: (
   const going = livesOf(match.towerParty!.lives);
   const lives = won ? going : going - 1;
   const top = floor >= BATTLE_TOWER.floors && lives >= 0;
-  const n = floor + 1;
   const line = left
-    ? `You left floor ${floor}.`
+    ? `You left floor ${floor}`
     : top && won
-      ? "You reached the top of the tower!"
+      ? "Top of the tower!"
       : won
         ? `Floor ${floor} cleared!`
         : lives >= 0
-          ? spentLine(outcome, floor, lives, "Your party")
-          : `Your party's climb ended on floor ${floor}.`;
-  const sub = !left && !top && lives >= 0 ? nextLine(n) : "Every member's climb is saved with the party's result.";
+          ? shortNotWon(outcome, floor, lives)
+          : `Climb over on floor ${floor}`;
+  const sub = !left && !top && lives >= 0 ? nextLine(floor + 1) : "Every member's climb is saved with the party's result.";
+  return {
+    line,
+    tone: won ? "win" : outcome === "drawn" && !left ? "draw" : "loss",
+    sub,
+    state: left ? "out" : top ? "top" : won ? "won" : lives >= 0 ? "lost" : "out",
+    party: true,
+    waiting: false,
+  };
+}
+
+/** The floor's line under the rewards and its one button (live as soon as the server has the result: Eric, "buttons work at all times"). */
+export function TowerResult({ end, onBack }: { end: TowerEndView; onBack: () => void }) {
   return (
-    <div class="tw-result" data-tower-result={left ? "out" : top ? "top" : won ? "won" : lives >= 0 ? "lost" : "out"} data-tower-party="">
-      <p class="tw-result-line">{line}</p>
-      <p class="tw-result-sub">{sub}</p>
+    <div class="tw-result" data-tower-result={end.state} data-tower-party={end.party ? "" : undefined}>
+      <p class="tw-result-sub">{end.sub}</p>
       <div class="actions">
-        <button type="button" class="btn btn-primary" style={{ whiteSpace: "nowrap" }} disabled={held} onClick={onBack}>
+        <button type="button" class="btn btn-primary" style={{ whiteSpace: "nowrap" }} disabled={end.waiting} onClick={onBack}>
           Back to the tower
         </button>
       </div>
