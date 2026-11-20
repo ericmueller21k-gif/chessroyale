@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { BATTLE_TOWER, DEFAULT_SETTINGS, TOWER_PARTY, TOWN_CHAT, finishFloor, floorSettings, mulberry32, newRun, towerPartySettings, towerPool, type Settings } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
+import { legalMoves, type BoardScore, type MatchRunner, type ServerMessage } from "@chessroyale/chess";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { commitPartyFloor, finishTowerFloor, holdsPartyCopy, membersOf, partyFloorWrite, partyPlan, preparePartyFloor, startTowerFloor, stopTower, towerMoves, towerState, type Fight, type PartyFloorPrep } from "../src/tower.ts";
@@ -668,5 +669,71 @@ describe("the floor's match room: each copy's end (LobbyCore.takeTowerEnds)", ()
       { uid: "u2", outcome: "left", moves: 0 },
     ]);
     expect(core.takeTowerEnds()).toEqual([]);
+  });
+});
+
+describe("the admin's 🏆 \"Win this match\" on a party floor (Nov 20; docs/decisions/2026-11-20-admin-win-match.md)", () => {
+  it("a non-admin's win message is refused; the admin's: the party's next move wins the floor, every copy's end a win", () => {
+    let now = 1_000_000;
+    const inbox = new Map<string, ServerMessage[]>();
+    const run = newRun(5, POOL);
+    const overrides = JSON.parse(JSON.stringify(towerPartySettings(floorSettings(run))));
+    const start = { id: 1, members: [0, 1].map((i) => ({ id: `m${i}`, seat: i, pass: `pass${i}`, userId: `u${i}` })), bots: 0, leaderSeat: 0, boss: "", difficulty: "normal" as const };
+    const core = new LobbyCore(
+      newLobbyRecord("FLOOR", now, overrides, partyLobby(start, "TOWER", now, { fight: "f1" })),
+      { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), msg as ServerMessage]) },
+      library,
+      mulberry32(3),
+      { ...DEFAULT_SETTINGS, ...overrides, boardIntroSeconds: 0 } as Settings,
+    );
+    const runner = () => (core as unknown as { runner: MatchRunner }).runner;
+    const advance = (ms: number) => {
+      const to = now + ms;
+      while (core.nextAlarm !== null && core.nextAlarm <= to) {
+        now = Math.max(now, core.nextAlarm);
+        core.alarm();
+      }
+      now = to;
+    };
+    // (The host's device scores each turn: every move even, its bosses' replies the first legal move.)
+    const hostScores = () => {
+      const req = [...(inbox.get("p1") ?? [])].reverse().find((m) => m.t === "scoreRequest") as Extract<ServerMessage, { t: "scoreRequest" }> | undefined;
+      if (!req) return;
+      const boards: BoardScore[] = req.jobs.map((j) => {
+        const legal = legalMoves(j.fen);
+        return { boardId: j.boardId, bestMove: legal[0]!, bestExpected: 0.4, expectedAfter: Object.fromEntries(legal.map((m) => [m, 0.4])), botPicks: {}, botThinkMs: {} };
+      });
+      core.message("p1", { t: "scores", key: req.key, boards });
+      inbox.set("p1", (inbox.get("p1") ?? []).filter((m) => m.t !== "scoreRequest"));
+    };
+    for (const seat of [0, 1]) expect(core.connect(undefined, `M${seat}`, "phone", false, 1500, undefined, `u${seat}`, null, null, false, { pass: `pass${seat}`, seat }).ok).toBe(true);
+    advance(60_000);
+    advance(60_000);
+    expect(runner().boss).toBeTruthy();
+    // (A player's press, as the Durable Object passes it (not an admin): refused; the message itself never arms it.)
+    core.message("p2", { t: "winForm" });
+    expect(core.winFormTrigger("p2", false)).toBe(false);
+    expect(runner().bossForceWin).toBe(false);
+    expect(core.record.winForm).toBeUndefined();
+    // (The admin's seat.)
+    expect(core.winFormTrigger("p1", true)).toBe(true);
+    expect(core.record).toMatchObject({ winForm: true, overrides: { tested: true } });
+    for (let i = 0; i < 40 && core.record.phase !== "results"; i++) {
+      const key = core.record.round?.key;
+      const fen = runner().boards.get(runner().state.boards[0]!)!.fen;
+      if (key && runner().boss && !runner().boss!.result) {
+        const move = legalMoves(fen)[0]!;
+        core.message("p1", { t: "pick", key, move });
+        core.message("p2", { t: "pick", key, move });
+      }
+      hostScores();
+      advance(2000);
+    }
+    expect(runner().boss!.result).toBe("crowd");
+    expect(runner().boss!.crowdMoves).toBe(1);
+    expect(core.takeTowerEnds()).toEqual([
+      { uid: "u0", outcome: "won" },
+      { uid: "u1", outcome: "won" },
+    ]);
   });
 });
