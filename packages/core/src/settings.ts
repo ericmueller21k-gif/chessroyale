@@ -1481,6 +1481,13 @@ export const BOSS_POWERS = {
    */
   candleAhead: 3,
   /**
+   * How many times the Roman candle's fire must reach one of the crowd's pieces to burn it (Eric, Nov 20: "if a piece ... is
+   * there when the tile starts burning, ... it just becomes charred, and then if it does it twice, then it disintegrates").
+   * Each time short of it, the piece is charred instead (it stays, marked for the rest of the match). 1: it burns the first
+   * time, as before. His sparkler's fire still burns at once. docs/decisions/2026-11-20-grex-char.md.
+   */
+  candleHitsToBurn: 2,
+  /**
    * Hollow's dark: after his first move he covers the square of the piece he moved, then another on every darkEvery-th
    * of his moves (his 4th, 7th, 10th…), a random occupied square from the seed (his or the crowd's, never a king's, never
    * one already dark). Each lasts darkTurns crowd turns: it belongs to the square, not the piece.

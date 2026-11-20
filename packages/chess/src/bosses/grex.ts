@@ -3,8 +3,11 @@
  * fire: it burns in stages, one a crowd turn, and a crowd piece left on it after the crowd's move on the last stage
  * burns (never the king, nor a piece whose loss would leave a king in check: the tile fizzles). His ultimate, the Roman
  * candle, rains fireballs in waves, each wave's squares shown as growing shadows a few turns ahead; each lands as a fresh
- * tile, some on his own half (his pieces never burn: the first time one sits on the candle's fire, he laughs it off). The judge counts a piece left to burn as already gone, so saving it is never a mistake. Numbers:
- * BOSS_POWERS.fire*, candle*. His art and moments are the app's (characters/grex.ts, the fire in characters/effects/).
+ * tile, some on his own half (his pieces never burn: the first time one sits on the candle's fire, he laughs it off). The
+ * candle's fire chars a crowd piece the first time it reaches it (it stays, charred for the rest of the match) and burns it
+ * the second (Eric, Nov 20: candleHitsToBurn; docs/decisions/2026-11-20-grex-char.md); the sparkler's burns at once. The
+ * judge counts a piece left to burn as already gone, so saving it is never a mistake. Numbers: BOSS_POWERS.fire*, candle*.
+ * His art and moments are the app's (characters/grex.ts, the fire in characters/effects/).
  */
 import {
   BOSS_POWERS,
@@ -13,13 +16,15 @@ import {
   type BossState,
   type BurnEvent,
   type CandleWave,
+  type CharMark,
   type FireTile,
   type PowerEvent,
 } from "@chessroyale/core";
 import { burnOnBoard } from "../boards.ts";
+import { followSplats } from "./boingo.ts";
 import { applyMove, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "../rules.ts";
 import type { MoveScore } from "../uci.ts";
-import { VALUE, crowdHalf, from, logit, other, powerRoll, to, turnOf, warnThenUnleash, type BossRules, type Side } from "./base.ts";
+import { VALUE, crowdHalf, from, logit, other, powerRoll, to, turnOf, warnThenUnleash, type Battle, type BossRules, type Side } from "./base.ts";
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
 export const GREX_FX = { spark: 2300, candle: 7100, fireball: 1700, fireproof: 2200 } as const;
@@ -48,27 +53,41 @@ export function chooseSpark(fen: string, crowd: Side, seed: number, turn: number
  * A wave of the Roman candle's fireballs: `n` squares, `own` of them on his own half (Eric, Oct 11: his pieces never
  * burn, so those are mostly wasted) and the rest on the crowd's; never the crowd king's square, never one already on
  * fire, spread out (none next to another tile if it can be helped). The same everywhere, from the seed. The crowd's
- * come first (as they always did: with `own` 0, the same squares as before).
+ * come first (as they always did: with `own` 0, the same squares as before). `aim` (the test switch, ?power=candle): on
+ * the crowd's half, squares from its first list that can be hit come first, then its next (candleAim), spread or not.
  */
-export function chooseFireballs(fen: string, crowd: Side, seed: number, turn: number, n: number, fire: readonly FireTile[] = [], own: number = 0): string[] {
+export function chooseFireballs(fen: string, crowd: Side, seed: number, turn: number, n: number, fire: readonly FireTile[] = [], own: number = 0, aim: readonly (readonly string[])[] = []): string[] {
   const king = kingSquare(fen, crowd);
   const taken = fire.map((t) => t.square);
   const out: string[] = [];
   const mine = Math.max(0, Math.min(n, own));
-  const pick = (half: string[], count: number, key: string) => {
+  const pick = (half: string[], count: number, key: string, tiers: readonly (readonly string[])[] = []) => {
     for (let i = 0; i < count; i++) {
       const free = half.filter((sq) => sq !== king && !taken.includes(sq) && !out.includes(sq));
       if (!free.length) break;
       // (Away from every tile if it can be; else at least from this wave's.)
       const spread = free.filter((sq) => [...taken, ...out].every((t) => apart(sq, t) >= 2));
       const inWave = free.filter((sq) => out.every((t) => apart(sq, t) >= 2));
-      const pool = spread.length ? spread : inWave.length ? inWave : free;
+      const aimed = tiers.map((tier) => free.filter((sq) => tier.includes(sq))).find((x) => x.length);
+      const pool = aimed ?? (spread.length ? spread : inWave.length ? inWave : free);
       out.push(pool[Math.floor(powerRoll(seed, key, turn, i) * pool.length)]!);
     }
   };
-  pick(crowdHalf(crowd), n - mine, "fireball");
+  pick(crowdHalf(crowd), n - mine, "fireball", aim);
   pick(crowdHalf(other(crowd)), mine, "fireball-own");
   return out;
+}
+
+/**
+ * The test switch's aim (?power=candle): the crowd's charred pieces first (so the second hit, the burn, comes soon), then
+ * its pawns, then its other pieces (never the king), so a test sees the candle char a piece and then burn it.
+ */
+export function candleAim(fen: string, crowd: Side, marks: readonly CharMark[]): string[][] {
+  const mine = crowdHalf(crowd)
+    .concat(crowdHalf(other(crowd)))
+    .filter((sq) => pieceAt(fen, sq)?.color === crowd && pieceAt(fen, sq)?.type !== "k");
+  const charred = mine.filter((sq) => marks.some((m) => m.square === sq));
+  return [charred, mine.filter((sq) => !charred.includes(sq) && pieceAt(fen, sq)!.type === "p"), mine.filter((sq) => !charred.includes(sq))];
 }
 
 /** How many of a wave's fireballs fall on his own half (candleOwnShare of them, rounded). */
@@ -81,15 +100,16 @@ export const candleLands = (at: number, i: number, s: Pick<BossPowerSettings, "c
  * The Roman candle's barrage as a crowd turn begins: the waves due land, each fireball a stage-1 fire tile (one on the
  * crowd king's square fizzles: never on his square), then the waves whose time has come are picked, candleAhead turns
  * before they land: spread out (chooseFireballs), never on the king's square or one that will be burning or hit before
- * then. Returns the candle and the fire tiles after it, and the turn's fireball event if a wave landed. Pure: the same
- * everywhere, from the seed.
+ * then (`test`, the test switch: aimed at the crowd's pieces, candleAim). Returns the candle and the fire tiles after it,
+ * and the turn's fireball event if a wave landed. Pure: the same everywhere, from the seed.
  */
 export function candleTurn(
-  p: Pick<BossPowerState, "candle" | "fire" | "seed">,
+  p: Pick<BossPowerState, "candle" | "fire" | "seed" | "charred">,
   fen: string,
   crowd: Side,
   turn: number,
   s: Pick<BossPowerSettings, "candleWaves" | "candleDelay" | "candleAhead" | "fireStages" | "candleOwnShare"> = BOSS_POWERS,
+  test = false,
 ): { candle: BossPowerState["candle"]; fire: FireTile[] | undefined; event: PowerEvent | null } {
   const c = p.candle;
   if (!c) return { candle: c, fire: p.fire, event: null };
@@ -121,7 +141,7 @@ export function candleTurn(
       ...(fire ?? []).filter((t) => t.lit + s.fireStages - 1 >= lands),
       ...waves.flatMap((w) => w.squares.map((square) => ({ square, lit: w.lands }))),
     ];
-    waves = [...waves, { lands, shots, squares: chooseFireballs(fen, crowd, p.seed, lands, shots, taken, ownShots(shots, s)) }];
+    waves = [...waves, { lands, shots, squares: chooseFireballs(fen, crowd, p.seed, lands, shots, taken, ownShots(shots, s), test ? candleAim(fen, crowd, p.charred ?? []) : []) }];
     unpicked -= shots;
     nextWave++;
   }
@@ -145,12 +165,49 @@ export function fireShadows(p: Pick<BossPowerState, "candle" | "turn"> | null | 
 /** A fire tile's stage on a crowd turn: 1 (a singe) as it lands, up to fireStages (ablaze). */
 export const fireStage = (t: FireTile, turn: number) => turn - t.lit + 1;
 
-/** The tiles ablaze this crowd turn: a crowd piece left on one after the crowd's move burns. */
+/** The tiles ablaze this crowd turn: a crowd piece left on one after the crowd's move burns, or (the candle's) chars. */
 export function ablaze(boss: BossState | null | undefined, s: Pick<BossPowerSettings, "fireStages"> = BOSS_POWERS): string[] {
   const fire = boss?.powers?.fire;
   if (!boss || !fire?.length) return [];
   const turn = turnOf(boss);
   return fire.filter((t) => fireStage(t, turn) >= s.fireStages).map((t) => t.square).sort();
+}
+
+/** The char marks now (none: an empty list). */
+export const charMarks = (boss: Pick<BossState, "powers"> | null | undefined): CharMark[] => boss?.powers?.charred ?? [];
+
+/** The candle's fire burns a piece it has already reached this many times (candleHitsToBurn - 1); short of it, it chars it. */
+const burnsAt = (s: Pick<BossPowerSettings, "candleHitsToBurn">) => Math.max(1, Math.round(s.candleHitsToBurn)) - 1;
+
+/**
+ * The tiles ablaze this crowd turn where a crowd piece left after the move is destroyed (the judge's and the bots' `burn`):
+ * every one of his sparkler's, and those of his Roman candle's with a charred crowd piece on it now (one not yet charred
+ * is only charred: it stays). A charred piece that steps onto an empty tile of the candle's ablaze burns too, but isn't
+ * counted here (the judge is lenient there: docs/decisions/2026-11-20-grex-char.md).
+ */
+export function fireBurns(boss: BossState | null | undefined, s: Pick<BossPowerSettings, "fireStages" | "candleHitsToBurn"> = BOSS_POWERS): string[] {
+  const fire = boss?.powers?.fire;
+  if (!boss || !fire?.length) return [];
+  const turn = turnOf(boss);
+  const marks = charMarks(boss);
+  const at = burnsAt(s);
+  return fire.filter((t) => fireStage(t, turn) >= s.fireStages && (!t.candle || (marks.find((m) => m.square === t.square)?.n ?? 0) >= at)).map((t) => t.square).sort();
+}
+
+/**
+ * The candle's tiles in `due` that char the piece on them rather than burn it (after the crowd's move, `fen`): a crowd piece
+ * not the king, reached fewer than candleHitsToBurn - 1 times before (`marks`, already moved with the move).
+ */
+export function charSquares(fen: string, due: readonly FireTile[], marks: readonly CharMark[], crowd: Side, s: Pick<BossPowerSettings, "candleHitsToBurn"> = BOSS_POWERS): string[] {
+  const at = burnsAt(s);
+  return due
+    .filter((t) => {
+      if (!t.candle) return false;
+      const pc = pieceAt(fen, t.square);
+      return pc?.color === crowd && pc.type !== "k" && (marks.find((m) => m.square === t.square)?.n ?? 0) < at;
+    })
+    .map((t) => t.square)
+    .sort();
 }
 
 /**
@@ -182,29 +239,56 @@ export function burnOutcome(fen: string, burn: readonly string[], crowd: Side): 
 }
 
 /**
- * After the crowd's move (the boss state already counting it): the tiles that were ablaze burn out, destroying what
- * burnOutcome says; the God King's warning the first time a crowd piece steps onto a burning tile. Returns the new
- * state, the position after the fire, and the squares emptied.
+ * After the crowd's move (the boss state already counting it, its char marks already moved with it): the tiles that were
+ * ablaze burn out, destroying what burnOutcome says, but a crowd piece the candle's fire reaches for the first time
+ * (candleHitsToBurn) is only charred (it stays, marked); the God King's warning the first time a crowd piece steps onto a
+ * burning tile. Returns the new state, the position after the fire, and the squares emptied.
  */
-export function fireAfterMove(boss: BossState, fen: string, move: string | null, s: Pick<BossPowerSettings, "fireStages"> = BOSS_POWERS): { boss: BossState; fen: string; emptied: string[] } {
+export function fireAfterMove(
+  boss: BossState,
+  fen: string,
+  move: string | null,
+  s: Pick<BossPowerSettings, "fireStages" | "candleHitsToBurn"> = BOSS_POWERS,
+): { boss: BossState; fen: string; emptied: string[] } {
   const p = boss.powers;
   if (!p?.fire?.length) return { boss, fen, emptied: [] };
   const turn = boss.crowdMoves;
   const due = p.fire.filter((t) => fireStage(t, turn) >= s.fireStages);
   // (Stepping onto a tile that isn't ablaze yet: there's still time to leave.)
   const stepped = p.stepped ?? (move && p.fire.some((t) => t.square === to(move) && fireStage(t, turn) < s.fireStages) ? turn : undefined);
-  const result = burnOutcome(fen, due.map((t) => t.square), boss.crowdSide);
+  const marks = p.charred ?? [];
+  const chars = charSquares(fen, due, marks, boss.crowdSide, s);
+  const result = burnOutcome(fen, due.map((t) => t.square).filter((sq) => !chars.includes(sq)), boss.crowdSide);
   const fire = p.fire.filter((t) => !due.includes(t));
-  // (A tile with nothing of the crowd's on it just burns out.)
-  const burnt: BurnEvent[] = due.map((t) => ({ turn, square: t.square, ...result.burnt.find((b) => b.square === t.square) })).sort((a, b) => (a.square < b.square ? -1 : 1));
+  // (A tile with nothing of the crowd's on it just burns out; one the candle chars a piece on burns out under it.)
+  const burnt: BurnEvent[] = due
+    .map((t) => (chars.includes(t.square) ? { turn, square: t.square, charred: pieceAt(fen, t.square)!.type } : { turn, square: t.square, ...result.burnt.find((b) => b.square === t.square) }))
+    .sort((a, b) => (a.square < b.square ? -1 : 1));
+  const emptied = result.burnt.filter((b) => b.piece).map((b) => b.square);
+  // The marks: one more on each piece charred, none on a piece burnt.
+  const charred = [
+    ...marks.filter((m) => !chars.includes(m.square) && !emptied.includes(m.square)),
+    ...chars.map((square) => ({ square, piece: pieceAt(fen, square)!.type, n: (marks.find((m) => m.square === square)?.n ?? 0) + 1 })),
+  ].sort((a, b) => (a.square < b.square ? -1 : 1));
   const powers: BossPowerState = {
     ...p,
     fire,
     burnt,
     ...(stepped !== undefined ? { stepped } : {}),
     ...(due.length && !fire.length ? { fireOut: turn } : {}),
+    ...(charred.length || p.charred ? { charred } : {}),
   };
-  return { boss: { ...boss, powers }, fen: result.fen, emptied: result.burnt.filter((b) => b.piece).map((b) => b.square) };
+  return { boss: { ...boss, powers }, fen: result.fen, emptied };
+}
+
+/** The char marks follow a move just played on the battle's board (the crowd's or his): Boingo's splats' machinery (followSplats). */
+function trackChars(b: Battle, move: string | null): void {
+  const boss = b.state.boss;
+  const p = boss?.powers;
+  if (!move || !p?.charred?.length) return;
+  const charred = followSplats(p.charred, move, b.boards.get(b.state.boards[0]!)!.fen, boss!.crowdSide);
+  if (charred.length === p.charred.length && charred.every((m, i) => m.square === p.charred![i]!.square && m.piece === p.charred![i]!.piece)) return;
+  b.state = { ...b.state, boss: { ...boss!, powers: { ...p, charred } } };
 }
 
 /** How much of the crowd's material a move leaves to the fire this turn (pawn 1 ... queen 9). */
@@ -259,6 +343,10 @@ export function fireEscapes(fen: string, burn: readonly string[]): string[] {
 /** G-REX: a burning tile from his sparkler, and a barrage of fireballs from his Roman candle. */
 export const GREX: BossRules = {
   id: "grex",
+  // (A char mark whose piece is gone: another boss's power, or a capture a tracker missed.)
+  wearOff(next, t) {
+    if (next.charred?.length) next.charred = next.charred.filter((m) => pieceAt(t.fen, m.square)?.color === t.crowd && pieceAt(t.fen, m.square)?.type === m.piece);
+  },
   ultimate(next, t) {
     const now = warnThenUnleash(next, t);
     if (now) {
@@ -273,7 +361,7 @@ export const GREX: BossRules = {
   // tile; each wave's squares picked candleAhead turns before it lands (their shadows growing meanwhile).
   everyTurn(next, t) {
     if (!next.candle) return;
-    const barrage = candleTurn(next, t.fen, t.crowd, t.turn, t.s);
+    const barrage = candleTurn(next, t.fen, t.crowd, t.turn, t.s, t.test === "candle");
     next.candle = barrage.candle;
     if (barrage.fire) next.fire = barrage.fire;
     if (barrage.event) t.events.push(barrage.event);
@@ -300,14 +388,17 @@ export const GREX: BossRules = {
   powerTurn: (boss) => !!boss.powers!.fire?.length,
   // The Roman candle's shadows on the board, where its fireballs are coming down (the God King's Last Stand sits out).
   altersBoard: (boss) => fireShadows(boss.powers).length > 0,
-  // The judge: a piece left on a tile ablaze counts as gone, and the moves that save it are always scored.
+  // The judge: a piece left to burn on a tile ablaze counts as gone (one the candle only chars doesn't), and the moves that
+  // save it are always scored.
   judge: {
-    mustScore: (boss, fen) => fireEscapes(fen, ablaze(boss)),
-    rank: (boss, top, fen) => fireRanked(top, fen, ablaze(boss), boss.crowdSide),
-    evaluation: (boss, evaluation, fen) => fireJudged(evaluation, fen, ablaze(boss), boss.crowdSide),
+    mustScore: (boss, fen) => fireEscapes(fen, fireBurns(boss)),
+    rank: (boss, top, fen) => fireRanked(top, fen, fireBurns(boss), boss.crowdSide),
+    evaluation: (boss, evaluation, fen) => fireJudged(evaluation, fen, fireBurns(boss), boss.crowdSide),
   },
-  // After the crowd's move: what was left on a tile ablaze burns (the board's position changes).
+  // After the crowd's move: the char marks follow it; then what was left on a tile ablaze burns, or the candle chars it (the
+  // board's position changes).
   afterCrowdMove(b, move) {
+    trackChars(b, move);
     const boss = b.state.boss;
     if (!boss?.powers?.fire?.length) return;
     const id = b.state.boards[0]!;
@@ -317,4 +408,9 @@ export const GREX: BossRules = {
     b.boards.set(id, board);
     b.state = { ...b.state, boss: out.boss };
   },
+  // The char marks follow every move, his and the crowd's.
+  afterBossMove: (b, move) => trackChars(b, move),
+  // (Several bosses: another boss's move, the marks follow it too.)
+  followMove: (b, move) => trackChars(b, move),
+  view: (p) => ({ charred: (p.charred ?? []).map((m) => ({ ...m })) }),
 };

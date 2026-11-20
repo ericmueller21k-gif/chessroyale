@@ -542,6 +542,12 @@ export interface SplatMark {
   piece: string;
   n: number;
 }
+/**
+ * A char mark of Jefferson's Roman candle on one of the crowd's pieces (Eric, Nov 20): the same shape as a splat mark (it follows
+ * its piece through every move): its square, its kind and how many times the candle's fire has reached it; at
+ * BOSS_POWERS.candleHitsToBurn the fire burns it.
+ */
+export type CharMark = SplatMark;
 
 export interface BossPowerState {
   /** Every choice a power makes comes from this and the position (the same on the server and in every replay). */
@@ -622,6 +628,13 @@ export interface BossPowerState {
   candle?: { at: number; left: number; next?: number; waves?: CandleWave[] } | null;
   /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
   stepped?: number;
+  /**
+   * Jefferson's charred pieces (Eric, Nov 20; docs/decisions/2026-11-20-grex-char.md): the crowd's pieces his Roman candle's
+   * fire has reached and left standing, by square (each follows its piece through every move, for the rest of the match;
+   * gone once it's taken or burns), its kind and the times it was reached; the candle's fire burns one reached
+   * candleHitsToBurn - 1 times already.
+   */
+  charred?: CharMark[];
   /**
    * Jefferson's laugh (once a match): the crowd turn one of his own pieces first sat on fire from his Roman candle, and
    * the line he says, picked from the seed (`pick`, 0-4095: the app takes it modulo its lines).
@@ -1570,12 +1583,16 @@ export interface FireTile {
   candle?: true;
 }
 
-/** After a crowd move: a piece the fire destroyed (`piece` its kind), a tile that fizzled under the king, or one that just burnt out (neither). */
+/**
+ * After a crowd move: a piece the fire destroyed (`piece` its kind), a tile that fizzled under the king, a piece the Roman
+ * candle's fire charred and left standing (`charred` its kind: Eric, Nov 20), or a tile that just burnt out (none of them).
+ */
 export interface BurnEvent {
   turn: number;
   square: string;
   piece?: string;
   fizzled?: boolean;
+  charred?: string;
 }
 
 /**
