@@ -261,6 +261,12 @@ export class LiveHub extends DurableObject<Env> {
     return { n: r.line.n };
   }
 
+  /** The Battle Tower parties open to the town now, newest first (their lines' codes: the clerk's list of open parties, Nov 20). */
+  async townParties(room = TOWN_CHAT_ROOM): Promise<string[]> {
+    countCall("hub.townParties");
+    return this.townIn(room).partyCodes(Date.now());
+  }
+
   /** A party's line taken out by its party (town-chat.ts `removeParty`: only that party's own line). Whether it was. */
   async townRemoveParty(n: number, code: string, room = TOWN_CHAT_ROOM): Promise<boolean> {
     return this.townIn(room).removeParty(n, code, Date.now());

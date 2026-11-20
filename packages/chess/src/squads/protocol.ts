@@ -504,10 +504,11 @@ export interface NetParty {
    * A Battle Tower party (Nov 20, docs/decisions/2026-11-20-tower-party.md): "tower" (`kind`), seats and READY as a Boss Battle party's.
    * `plan`: what the leader's START does now, from everyone's copies (the server's: their climb on together from a floor, or a new
    * one from floor 1, naming each member whose own party climb it ends, or why it can't yet); `open`: its line stands in the town's
-   * chat ("Open party"); `floor`: a floor of the party's is under way (its START to the room's end: Kick greyed then). Any change of plan
+   * chat ("Open party"); `floor`: a floor of the party's is under way (its START to the room's end: Kick greyed then); `closed`: its
+   * people are a run's own members climbing on, so it isn't opened to the town (nobody new is looked for). Any change of plan
    * un-readies everyone.
    */
-  tower?: { plan: NetTowerPlan; open: boolean; floor?: true };
+  tower?: { plan: NetTowerPlan; open: boolean; floor?: true; closed?: true };
   /** A 50 v 50 party whose last search stopped because everyone was away (CROWD_PARTY.awayStopMs); gone at the next Find match. */
   stopped?: "away";
 }

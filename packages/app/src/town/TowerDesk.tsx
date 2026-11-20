@@ -5,7 +5,7 @@ import { Confirm } from "../components/MatchMenu.tsx";
 import { InviteSheet } from "../components/Friends.tsx";
 import { PARTY_COLORS } from "../board/logic.ts";
 import { TOWER_WORDS, loadKept, settle, towerApi, type RunKind, type TowerState } from "../tower.ts";
-import { leaveTowerParty, makeTowerParty, onTowerParty, openTowerParty, planWords, towerParty } from "../tower-party.ts";
+import { joinTowerPartyAnswer, leaveTowerParty, makeTowerParty, onTowerParty, openTowerParties, openTowerParty, planWords, towerParty, type OpenParty } from "../tower-party.ts";
 import { chatTestRoom } from "./chat-net.ts";
 import "../tower.css";
 
@@ -16,7 +16,11 @@ import "../tower.css";
  * - **Solo** (today's): Start, or "Continue: floor N", and a small "Start over" that asks first; beside it, "Alone: floor N", your party
  *   climb played on by yourself (from then on solo: Eric, "you can continue on your own, but it's just solo from that point forward").
  * - **Invite friends**: a party (made the first time) and your friends list to invite from.
- * - **Open party**: a party, and its line in the town's chat ("Ann is looking for 3 more to climb the Battle Tower", with Join).
+ * - **Open your own party**: a party, and its line in the town's chat ("Ann is looking for 3 more to climb the Battle Tower", with "Go to the
+ *   tower", which brings a player here, by the clerk).
+ * Under them, the parties open to newcomers now (Eric, Nov 20: "you should be able to click on the clerk and see the parties and like which
+ * ones you could join"): each one's leader, how many are in it ("2/4") and Join; a box of one size whatever it holds (it scrolls inside),
+ * "No open parties right now." when there are none.
  * The panel under them holds the same things, in the same places, whatever you're doing (Eric's "nothing hidden": the review of #835,
  * finding 11): the party's four seats (each other member's Kick: the leader's, greyed during a floor), the line saying what START does
  * (`plan`) or how your climb stands, READY or START and Leave party, then your solo climb (Continue or Start, Start over, Alone). What
@@ -30,6 +34,18 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
   const [ask, setAsk] = useState<{ kind: "over"; floor: number } | { kind: "ready" | "start"; heading: string; note: string } | { kind: "kick"; id: string; name: string } | null>(null);
   const [inviting, setInviting] = useState(false);
   const [, redraw] = useState(0);
+  /** The parties open to newcomers (null: not read yet), read as the card opens and every TOWER_PARTY.listPollMs while it shows. */
+  const [opens, setOpens] = useState<OpenParty[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    const read = () => void openTowerParties(chatTestRoom() ?? undefined).then((l) => live && l && setOpens(l));
+    read();
+    const t = setInterval(read, TOWER_PARTY.listPollMs);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, []);
   const alive = useRef(true);
   useEffect(() => () => void (alive.current = false), []);
   useEffect(() => onTowerParty(() => redraw((n) => n + 1)), []);
@@ -83,6 +99,16 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
     fresh();
     if (await party()) openTowerParty(chatTestRoom() ?? undefined);
   };
+  /** Join from the list: seated once the party welcomes you; turned away, its words on the line. */
+  const joinOpen = async (code: string) => {
+    setBusy(true);
+    setNote(null);
+    const words = await joinTowerPartyAnswer(code);
+    if (!alive.current) return;
+    setBusy(false);
+    setNote(words);
+    void openTowerParties(chatTestRoom() ?? undefined).then((l) => alive.current && l && setOpens(l));
+  };
   const run = st?.runs.solo ?? null;
   const copy = st?.runs.party ?? null;
   const p = towerParty();
@@ -127,9 +153,35 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
         <button type="button" class="tw-way" disabled={busy || (!!p && full)} onClick={() => void invite()}>
           Invite friends
         </button>
-        <button type="button" class={`tw-way${view?.tower?.open ? " on" : ""}`} aria-pressed={!!view?.tower?.open} disabled={busy || (!!p && (!leading || full || !!view?.tower?.open))} onClick={() => void open()}>
-          Open party
+        <button type="button" class={`tw-way${view?.tower?.open ? " on" : ""}`} aria-pressed={!!view?.tower?.open} disabled={busy || (!!p && (!leading || full || !!view?.tower?.open || !!view?.tower?.closed || floorOn))} onClick={() => void open()}>
+          Open your own party
         </button>
+      </div>
+      {/* (The parties open to newcomers: one box whatever it holds, scrolling inside; your own shows "Joined", the others' Join greyed while you're in a party.) */}
+      <div class="tw-open" role="group" aria-label="Open parties">
+        <p class="tw-open-head">Open parties</p>
+        <ul class="tw-open-list">
+          {opens === null ? (
+            <li class="tw-open-none">Reading the open parties…</li>
+          ) : !opens.length ? (
+            <li class="tw-open-none">No open parties right now.</li>
+          ) : (
+            opens.map((o) => (
+              <li key={o.code} class="tw-open-row">
+                <span class="tw-open-name">{o.leader}</span>
+                <span class="tw-open-n">
+                  {o.members}/{o.max}
+                </span>
+                <button type="button" class="tw-open-join" aria-label={p?.code === o.code ? `Joined ${o.leader}'s party` : `Join ${o.leader}'s party`} disabled={busy || !!p || o.members >= o.max} onClick={() => void joinOpen(o.code)}>
+                  <span class="tw-open-size" aria-hidden="true">
+                    Joined
+                  </span>
+                  <span>{p?.code === o.code ? "Joined" : "Join"}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
       </div>
       <div class={`tw-desk-panel${p ? " in-party" : " solo"}`}>
         <ul class="tw-seats" aria-label="Your party">

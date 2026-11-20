@@ -514,6 +514,54 @@ describe("the party, after the review of #835", () => {
   });
 });
 
+describe("the clerk's list of open parties (Eric, Nov 20: \"click on the clerk and see the parties and like which ones you could join\")", () => {
+  function party() {
+    let now = T0;
+    const core = new PartyCore(newPartyRecord("TOWER", now, "tower"), { now: () => now, send: () => undefined, random: () => "r" });
+    const join = (uid: string, name: string) => (core.connect(undefined, { name, device: "phone", v: SQUADS_PROTOCOL, userId: uid }) as { memberId: string }).memberId;
+    return { core, join, tick: (ms: number) => (now += ms) };
+  }
+
+  it("listed only while its line stands and it can take someone new: not before it's up, not full, not a run's own members climbing on", () => {
+    const P = party();
+    const lead = P.join("ua", "Ann");
+    expect(P.core.towerListing()).toBeNull();
+    P.core.message(lead, { t: "open" });
+    expect(P.core.towerListing()).toBeNull();
+    P.core.openPosted(3);
+    expect(P.core.towerListing()).toEqual({ leader: "Ann", members: 1, max: TOWER_PARTY.max });
+    P.join("ub", "Bo");
+    expect(P.core.towerListing()).toEqual({ leader: "Ann", members: 2, max: TOWER_PARTY.max });
+    // (Ann and Bo turn out to be a run's own members: their climb on together. Nobody new is looked for: the line lapses, the party is
+    // closed to the town and Open party refused.)
+    P.core.setTowerPlan({ key: "ua,ub", plan: { kind: "continue", floor: 4, back: [] } });
+    expect(P.core.towerListing()).toBeNull();
+    expect(P.core.takeLapsedOpen()).toEqual({ line: 3, room: "town" });
+    expect(P.core.view(lead).tower).toMatchObject({ open: false, closed: true });
+    P.core.message(lead, { t: "open" });
+    expect(P.core.takeOpen()).toBeNull();
+    // (A new climb's plan again: open to newcomers.)
+    P.core.setTowerPlan({ key: "ua,ub", plan: { kind: "new", ends: [] } });
+    P.core.message(lead, { t: "open" });
+    expect(P.core.takeOpen()).toMatchObject({ uid: "ua", free: 2 });
+    P.core.openPosted(4);
+    P.join("uc", "Cy");
+    P.join("ud", "Di");
+    expect(P.core.towerListing()).toBeNull();
+  });
+
+  it("the town's open parties, newest first, only while their lines stand", () => {
+    const t = new TownChat();
+    t.partyOpen("ua", "Ann is looking for 3 more", "AAAAA", T0);
+    t.partyOpen("ub", "Bo is looking for 3 more", "BBBBB", T0 + 1000);
+    t.post({ id: "uz", name: "Zed" }, "hello", T0 + 1500);
+    expect(t.partyCodes(T0 + 2000)).toEqual(["BBBBB", "AAAAA"]);
+    t.removeParty(1, "AAAAA", T0 + 3000);
+    expect(t.partyCodes(T0 + 3000)).toEqual(["BBBBB"]);
+    expect(t.partyCodes(T0 + 1000 + TOWN_CHAT.lineMs)).toEqual([]);
+  });
+});
+
 describe("the town's party line (town-chat.ts, the review of #835, findings 2 and 4)", () => {
   it("one line an account (a newer replaces the older), a new one at most every TOWER_PARTY.openGapMs; a party takes out only its own line", () => {
     const t = new TownChat();

@@ -46,6 +46,81 @@
 .tw-way.on:disabled {
   opacity: 1;
 }
+/* The parties open to newcomers (Eric, Nov 20): a box of one size, three rows tall, scrolling inside when there are more. */
+.tw-open {
+  margin-bottom: 6px;
+}
+.tw-open-head {
+  margin: 0 0 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--card-gold, #d9bb8c);
+}
+.tw-open-list {
+  height: calc(3 * 32px + 2 * 3px);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.tw-open-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin-bottom: 3px;
+  padding: 0 4px 0 8px;
+  font-size: 12px;
+  text-align: left;
+}
+.tw-open-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-open-n {
+  flex: none;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+/* Its box the size of its widest label (both laid in one cell, the other unseen): "Join" to "Joined" never moves the row. */
+.tw-open-join {
+  flex: none;
+  display: inline-grid;
+  justify-items: center;
+  min-height: 26px;
+  padding: 2px 10px;
+  border: 1px solid var(--card-gold, #d9bb8c);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: 700 12px Archivo, sans-serif;
+  cursor: pointer;
+}
+.tw-open-join > span {
+  grid-area: 1 / 1;
+}
+.tw-open-join > .tw-open-size {
+  visibility: hidden;
+}
+.tw-open-join:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tw-open-none {
+  padding: 8px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 /* One layout in both states (the review of #835, finding 11): the party's half (seats, the line, READY or START, Leave party), then the
    solo half; the half that doesn't apply greyed, nothing swapped. */
 .tw-desk-panel {

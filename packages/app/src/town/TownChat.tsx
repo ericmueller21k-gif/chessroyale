@@ -56,40 +56,24 @@ import { NAME_COLORS, nameColorIndex } from "./names.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { useChatBackground, useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
-import { joinTowerPartyAnswer, towerParty } from "../tower-party.ts";
-
-/** The Join pill's words (each laid in its box, so the widest sets its size and a change never widens it). */
-const JOIN_WORDS = { idle: "Join", busy: "Join", in: "Joined", gone: "Closed" } as const;
-
 /**
- * A party line's Join (Nov 20): into that Battle Tower party (greyed once you're in it or another); the clerk in the tower is its card.
- * "Joined" only once the party has welcomed you; turned away, its words go in your chat as a line only you see (`say`), and Join is
- * live again (the review of #835, finding 11).
+ * A party line's "Go to the tower" (Eric, Nov 20: "wouldn't it make more sense to just say like go to the battle tower ... you should be
+ * able to click on the clerk and see the parties and like which ones you could join"): into the Battle Tower's lobby by its clerk, his
+ * card open on the open parties (Town.tsx goTower). Greyed where it can't take you (inside another building: out first). Its press is its
+ * own, never the box's (Eric's exception to the typing rule, Nov 20); one label, so its pill never changes size.
  */
-function PartyJoin({ code, say }: { code: string; say: (words: string) => void }) {
-  const [state, setState] = useState<"idle" | "busy" | "in" | "gone">(() => (towerParty()?.code === code && towerParty()?.memberId ? "in" : "idle"));
-  const busy = state !== "idle" || !!towerParty();
+function PartyGo({ go }: { go?: () => void }) {
   return (
     <button
       type="button"
       class="tc-join"
-      disabled={busy}
+      disabled={!go}
       onClick={(e) => {
         e.stopPropagation();
-        setState("busy");
-        void joinTowerPartyAnswer(code).then((words) => {
-          if (words === null) say("You're in the party: the clerk in the Battle Tower is its card.");
-          else say(words);
-          setState(words === null ? "in" : words === "That party has closed." ? "gone" : "idle");
-        });
+        go?.();
       }}
     >
-      {(["Joined", "Closed"] as const).map((w) => (
-        <span key={w} class="tc-join-size" aria-hidden="true">
-          {w}
-        </span>
-      ))}
-      <span>{JOIN_WORDS[state]}</span>
+      Go to the tower
     </button>
   );
 }
@@ -97,7 +81,7 @@ function PartyJoin({ code, say }: { code: string; say: (words: string) => void }
 /** What of the town's lines this device reads now (TownChat's `hear`). */
 const hearing = (): "all" | "enter" | "none" => (mayReadTownChat() ? "all" : mayHearTown() ? "enter" : "none");
 
-export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room's tone (shops.ts' `chatTone`), whatever the sky outside. */ tone?: SkyTone; /** A guest's tap on their greyed typing line: the app's sign-in. */ onSignIn?: () => void } = {}) {
+export function TownChat({ tone: room, onSignIn, onGoTower }: { /** Inside a shop: its room's tone (shops.ts' `chatTone`), whatever the sky outside. */ tone?: SkyTone; /** A guest's tap on their greyed typing line: the app's sign-in. */ onSignIn?: () => void; /** A party line's "Go to the tower" (none: greyed here). */ onGoTower?: () => void } = {}) {
   const wrap = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -453,7 +437,7 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
               {/* (A player's line: our pixel emoji drawn for their `:name:` codes, as in every chat; Nov 7.) */}
               {l.kind === "player" ? <ChatText text={l.text} /> : l.text}
               {/* (A Battle Tower party open to the town: Join takes you into it, its clerk's card your party's: Nov 20.) */}
-              {l.party && <PartyJoin code={l.party} say={(w) => log.whisper(w)} />}
+              {l.party && <PartyGo go={onGoTower} />}
             </div>
           );
         })}

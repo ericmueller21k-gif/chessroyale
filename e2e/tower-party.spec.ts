@@ -5,7 +5,7 @@ import { test, named, submitMove, tapInTown, localSql } from "./helpers.ts";
 /**
  * The Battle Tower's party (Nov 20; docs/decisions/2026-11-20-tower-party.md; Eric: "there should be a solo mode, and then there have an
  * invite friends, or another option, which is like basically like open party ... the invite friends one should just give a pop-up for
- * your friends list"): the clerk's three ways (Solo, Invite friends, Open party), the friends pop-up's Invite, the friend's Accept into
+ * your friends list"): the clerk's three ways (Solo, Invite friends, Open your own party), the friends pop-up's Invite, the friend's Accept into
  * the tower, READY and START, both pawns walking in, floor 1 won together (?win=1: Qxf7 mates), every copy on floor 2, and one of them
  * going on alone ("you can continue on your own, but it's just solo from that point forward"). `STILLS=<dir>` writes the stills.
  */
@@ -79,13 +79,13 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   const bo = await player(browser, "Bo Tower");
   await befriend(ann, bo);
 
-  // Ann at the clerk: Solo (hers now), Invite friends, Open party, always there; her solo climb's Start under them.
+  // Ann at the clerk: Solo (hers now), Invite friends, Open your own party, always there; her solo climb's Start under them.
   await intoTower(ann.page, "&win=1");
   const clerk = await tapRoom(ann.page, "keeper", "Clerk");
   const ways = clerk.getByRole("group", { name: "How to climb" });
   await expect(ways.getByRole("button", { name: "Solo" })).toHaveAttribute("aria-pressed", "true");
   await expect(ways.getByRole("button", { name: "Invite friends" })).toBeEnabled({ timeout: 20_000 });
-  await expect(ways.getByRole("button", { name: "Open party" })).toBeEnabled();
+  await expect(ways.getByRole("button", { name: "Open your own party" })).toBeEnabled();
   await expect(clerk.getByRole("button", { name: "Start", exact: true })).toBeEnabled();
   await expect(clerk.getByRole("button", { name: "Alone" })).toBeDisabled();
 
@@ -166,7 +166,7 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   expect((await copies(ann.page, [ann.id]))[0]).toMatchObject({ floor: 2, fight: null });
 });
 
-test("the clerk's card: its three ways always there; Open party's line in the town's chat, whose Join brings a player in; the friends pop-up", async ({ browser }) => {
+test("the clerk's card: its three ways and the open parties always there; Open your own party's line in the town's chat, whose Go to the tower brings a player to the clerk, who joins from the list; the friends pop-up", async ({ browser }) => {
   test.setTimeout(4 * 60_000);
   const ann = await player(browser, "Ann Open");
   const bo = await player(browser, "Bo Open");
@@ -175,27 +175,33 @@ test("the clerk's card: its three ways always there; Open party's line in the to
   await intoTower(ann.page, `&townroom=${chat}`);
   const clerk = await tapRoom(ann.page, "keeper", "Clerk");
   const ways = clerk.getByRole("group", { name: "How to climb" });
-  for (const name of ["Solo", "Invite friends", "Open party"]) await expect(ways.getByRole("button", { name })).toBeVisible();
-  await expect(ways.getByRole("button", { name: "Open party" })).toBeEnabled({ timeout: 20_000 });
+  for (const name of ["Solo", "Invite friends", "Open your own party"]) await expect(ways.getByRole("button", { name })).toBeVisible();
+  await expect(ways.getByRole("button", { name: "Open your own party" })).toBeEnabled({ timeout: 20_000 });
+  // (The open parties: none yet, said so in its box (Eric, Nov 20).)
+  const opens = (card: typeof clerk) => card.getByRole("group", { name: "Open parties" });
+  await expect(opens(clerk)).toContainText("No open parties right now.", { timeout: 20_000 });
   await still(ann.page, "clerk-three-ways");
-  // Open party: a party, and its line in the town's chat with Join (greyed for Ann: she's in it).
-  await ways.getByRole("button", { name: "Open party" }).click();
-  await expect(ways.getByRole("button", { name: "Open party" })).toHaveAttribute("aria-pressed", "true", { timeout: 20_000 });
+  // Open your own party: a party, and its line in the town's chat with "Go to the tower"; on the list, hers, "Joined" (greyed).
+  await ways.getByRole("button", { name: "Open your own party" }).click();
+  await expect(ways.getByRole("button", { name: "Open your own party" })).toHaveAttribute("aria-pressed", "true", { timeout: 20_000 });
   const line = (p: Page) => p.locator(".tc-line", { hasText: "Ann Open is looking for 3 more to climb the Battle Tower" });
   await expect(line(ann.page)).toBeVisible({ timeout: 30_000 });
-  await expect(line(ann.page).getByRole("button", { name: "Join" })).toBeDisabled();
-  // Bo in the town (the same chat): his Join brings him into Ann's party.
+  await expect(opens(clerk).getByRole("button", { name: "Joined Ann Open's party" })).toBeDisabled({ timeout: 20_000 });
+  // Bo on the street (the same chat): the line's "Go to the tower" (its press never opens typing: Eric's exception, Nov 20) walks him
+  // into the tower, by the clerk, his card open on the open parties; he joins Ann's from the list.
   await bo.page.goto(`/town?debug&pace=quick&sky=day&townroom=${chat}`);
   await expect(bo.page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  const join = line(bo.page).getByRole("button", { name: "Join" });
-  const wide = (await join.boundingBox())!.width;
-  await join.click();
-  // (Joined once the party has welcomed him, its pill no wider; and the press never opened typing: Eric's typing rule, the review of
-  // #835, 12e.)
-  const joined = line(bo.page).getByRole("button", { name: "Joined" });
-  await expect(joined).toBeDisabled({ timeout: 20_000 });
-  expect((await joined.boundingBox())!.width).toBeCloseTo(wide, 0);
+  await line(bo.page).getByRole("button", { name: "Go to the tower" }).click();
   await expect(bo.page.locator(".tc-form")).toHaveAttribute("data-open", "0");
+  await expect(room(bo.page)).toHaveAttribute("data-room", "tower", { timeout: 60_000 });
+  const boClerk = bo.page.getByRole("dialog", { name: "Clerk", exact: true });
+  await expect(boClerk).toBeVisible({ timeout: 30_000 });
+  const row = opens(boClerk).locator(".tw-open-row", { hasText: "Ann Open" });
+  await expect(row).toContainText("1/4", { timeout: 20_000 });
+  await row.getByRole("button", { name: "Join Ann Open's party" }).click();
+  await expect(boClerk.locator(".tw-seat:not(.free)")).toHaveCount(2, { timeout: 20_000 });
+  await expect(row.getByRole("button", { name: "Joined Ann Open's party" })).toBeDisabled({ timeout: 20_000 });
+  await still(bo.page, "clerk-open-parties");
   await expect(clerk.locator(".tw-seat:not(.free)")).toHaveCount(2, { timeout: 20_000 });
   await expect(clerk.locator(".tw-plan")).toContainText("A new climb from floor 1", { timeout: 20_000 });
   // The friends pop-up (its slide-in done).

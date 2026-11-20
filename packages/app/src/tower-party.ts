@@ -137,6 +137,32 @@ export async function joinTowerPartyAnswer(code: string, waitMs = 20_000): Promi
   });
 }
 
+/** A party open to newcomers, as the clerk's list shows it (Eric, Nov 20): its code, its leader's name, how many are in it, of how many. */
+export interface OpenParty {
+  code: string;
+  leader: string;
+  members: number;
+  max: number;
+}
+
+/**
+ * The Battle Tower parties a newcomer can join now (GET /api/tower/parties: those open to the town, each able to take someone new),
+ * newest first, in the town chat's `room` (a test's own); null: the server couldn't be asked.
+ */
+export async function openTowerParties(room?: string): Promise<OpenParty[] | null> {
+  try {
+    const res = await fetch(`/api/tower/parties${room ? `?townroom=${encodeURIComponent(room)}` : ""}`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { parties?: unknown };
+    if (!Array.isArray(body.parties)) return null;
+    return body.parties.filter(
+      (p): p is OpenParty => !!p && typeof p.code === "string" && /^[A-Z2-9]{5}$/.test(p.code) && typeof p.leader === "string" && typeof p.members === "number" && typeof p.max === "number",
+    );
+  } catch {
+    return null;
+  }
+}
+
 /** A new party (the clerk's Invite friends or Open party), you its leader. Its error's words, or null once you're in. */
 export async function makeTowerParty(): Promise<string | null> {
   if (towerParty()) return null;

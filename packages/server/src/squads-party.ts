@@ -219,7 +219,7 @@ export class PartyCore {
       max: this.max,
       ...(boss && this.r.boss ? { boss: { ...this.r.boss } } : {}),
       ...(crowd ? { kind: "crowd" as const, invited: this.openInvites().map(({ uid, name, expiresAt }) => ({ uid, name, expiresAt })) } : {}),
-      ...(tower ? { kind: "tower" as const, tower: { plan: this.towerPlanView(), open: !!this.r.tower?.open, ...(this.towerFloorOn ? { floor: true as const } : {}) } } : {}),
+      ...(tower ? { kind: "tower" as const, tower: { plan: this.towerPlanView(), open: !!this.r.tower?.open, ...(this.towerFloorOn ? { floor: true as const } : {}), ...(this.towerContinues ? { closed: true as const } : {}) } } : {}),
       state: this.r.state,
       ...(placed ? { placed } : {}),
       ...(this.r.state === "queueing" && this.r.busy ? { busy: { ...this.r.busy } } : {}),
@@ -623,9 +623,28 @@ export class PartyCore {
    * while the party is full or its battle is being made.
    */
   private openParty(id: string, room: string) {
-    if (this.r.kind !== "tower" || id !== this.leaderNow() || this.r.tower?.open || this.towerFloorOn || this.r.members.length >= this.max) return;
+    if (this.r.kind !== "tower" || id !== this.leaderNow() || this.r.tower?.open || this.towerFloorOn || this.towerContinues || this.r.members.length >= this.max) return;
     this.r.tower = { ...(this.r.tower ?? { plan: null }), open: { line: null, at: this.io.now(), by: id, room } };
     this.broadcast();
+  }
+
+  /**
+   * This party as the clerk's list of open parties shows it (Eric, Nov 20: "you should be able to click on the clerk and see the parties
+   * and like which ones you could join"): its leader's name and how many are in it, while its line stands in the town and it can take
+   * someone new (room in it, no floor under way, and not a run's own members climbing on: a newcomer would only end their climb); else
+   * null.
+   */
+  towerListing(): { leader: string; members: number; max: number } | null {
+    const o = this.r.tower?.open;
+    if (this.r.kind !== "tower" || !o || o.line === null || this.r.members.length >= this.max || this.towerFloorOn || this.towerContinues) return null;
+    const lead = this.r.members.find((m) => m.id === this.leaderNow());
+    return lead ? { leader: lead.name, members: this.r.members.length, max: this.max } : null;
+  }
+
+  /** The party's plan is its people's run on together (a run's own members): nobody new is looked for then. */
+  private get towerContinues(): boolean {
+    const p = this.r.tower?.plan;
+    return !!p && p.key === this.towerKey() && p.plan.kind === "continue";
   }
 
   /** The open line to post (asked for, not posted yet): its leader's account and name, the seats still free and the town's chat room. */
@@ -672,7 +691,7 @@ export class PartyCore {
   takeLapsedOpen(): { line: number; room: string } | null {
     const o = this.r.tower?.open;
     if (!o || o.line === null) return null;
-    const lapsed = this.r.members.length >= this.max || this.towerFloorOn || this.leaderNow() !== o.by || this.io.now() >= (this.openLapsesAt ?? Infinity);
+    const lapsed = this.r.members.length >= this.max || this.towerFloorOn || this.towerContinues || this.leaderNow() !== o.by || this.io.now() >= (this.openLapsesAt ?? Infinity);
     if (!lapsed) return null;
     delete this.r.tower!.open;
     this.broadcast();

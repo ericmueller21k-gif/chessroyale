@@ -650,6 +650,12 @@ export class SquadsParty extends DurableObject<Env> {
     await this.towerUpkeep();
   }
 
+  /** A Battle Tower party as the clerk's list of open parties shows it, or null: it isn't open to newcomers (PartyCore.towerListing). */
+  async towerListing(): Promise<{ leader: string; members: number; max: number } | null> {
+    if (!this.record || this.record.kind !== "tower" || (await this.closeIfDue())) return null;
+    return this.core().towerListing();
+  }
+
   /** A party floor's match room, asked whether it still holds the floor (tower.ts settleStale). */
   private lobbyGone: LobbyGone = async (f) => (f.lobby ? !(await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(f.lobby)).holdsTowerFloor(f.id)) : null);
 

@@ -348,6 +348,12 @@ export class TownChat {
     return { ok: true, line };
   }
 
+  /** The Battle Tower parties open to the town now (their lines held), newest first: their codes (the clerk's list, Nov 20). */
+  partyCodes(now: number): string[] {
+    this.sweep(now);
+    return this.held.flatMap((l) => (l.sys === "party" && l.party ? [l.party] : [])).reverse();
+  }
+
   /**
    * A party's own line taken out by its party (it lapsed): only while line `n` is that party's (`code`), never a line that took its number
    * since (the room's numbers start again after a restart, and every deploy restarts it: the review of #835, finding 4). Whether it was.

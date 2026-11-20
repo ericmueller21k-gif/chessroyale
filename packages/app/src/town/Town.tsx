@@ -220,7 +220,7 @@ export function TownScreen({
   // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
   // (Rolling Dough, Nov 11: a home with two rooms; `arrived` you came through the door between them, `n` the room's mount, a new one each
   // time through it.)
-  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null; arrived?: boolean | RoomPart; n?: number; fx?: RoomFx | null; at?: { c: number; r: number } } | null>(null);
+  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null; arrived?: boolean | RoomPart; n?: number; fx?: RoomFx | null; at?: { c: number; r: number }; atKeeper?: boolean } | null>(null);
   const insideNow = useRef(inside);
   insideNow.current = inside;
   /** The shop you're in (its home's id), for the away rule's beats; null in the town square. */
@@ -424,7 +424,29 @@ export function TownScreen({
     // (You start inside zoomed out, the − pressed: SHOP_FEEL.startZoom, a challenge's camera too.)
     setShopOut(F.startZoom === 1);
     if (fight) step("inside");
-    setInside({ ...got, fx, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null });
+    // (The town chat's "Go to the tower": in by the clerk, its card open on the open parties.)
+    const atKeeper = id === "tower" && toClerk.current;
+    toClerk.current = false;
+    setInside({ ...got, fx, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null, ...(atKeeper ? { atKeeper } : {}) });
+  };
+  /** The town chat's "Go to the tower" was pressed: the next way into the tower lands by its clerk. */
+  const toClerk = useRef(false);
+  /**
+   * A Battle Tower party's line's "Go to the tower" (Eric, Nov 20: "wouldn't it make more sense to just say like go to the battle tower
+   * ... you should be able to click on the clerk and see the parties"): on the street, the tower's own Go in (you walk to its door and
+   * go in), landing by the clerk with his card open on the open parties; in the tower's lobby, you walk to the clerk. Elsewhere (in
+   * another building, up in the tower) it's greyed (`canGoTower`): out first.
+   */
+  const goTower = () => {
+    const at = insideNow.current;
+    if (at) {
+      if (at.room.def.home === "tower" && !at.room.def.part) shopCtl.current?.toKeeper?.();
+      return;
+    }
+    const i = HOMES.findIndex((h) => h.id === "tower");
+    if (i < 0 || flow.current !== "town") return;
+    toClerk.current = true;
+    ctl.current?.goIn(i);
   };
   /**
    * The intro is done: the boss's transition sweeps in (outside the town's tree: it stays as the town closes), the battle starts
@@ -1042,6 +1064,7 @@ export function TownScreen({
             zzz={() => !!ctl.current?.town.you.zzz}
             arrived={inside.room.def.home === "tower" ? (inside.arrived ?? false) : !!inside.arrived}
             at={inside.at ?? null}
+            atKeeper={!!inside.atKeeper}
             talkCard={inside.room.def.home === "tower" && !inside.room.def.part ? <TowerDesk onGo={towerGo} onBest={(b) => void (towerBest.current = b)} /> : null}
             passCard={inside.room.def.home === "tower" ? towerPass : undefined}
             onPass={(to) => askIfWaiting(() => void goThrough(to))}
@@ -1085,7 +1108,7 @@ export function TownScreen({
         )}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
-          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} />
+          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} onGoTower={!inside || (inside.room.def.home === "tower" && !inside.room.def.part) ? goTower : undefined} />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
           <div class={card?.kind === "person" ? "town-card town-person" : card?.kind === "home" && !card.confirm && home && shopOf(home.id) ? "town-card town-door" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>

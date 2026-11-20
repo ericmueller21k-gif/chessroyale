@@ -1,11 +1,11 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { OPS, RAID_SETTINGS, bossIdFromLink, lockedLine, modeSettings, type RankedLeaves } from "@chessroyale/core";
+import { OPS, RAID_SETTINGS, TOWER_PARTY, bossIdFromLink, lockedLine, modeSettings, type RankedLeaves } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
 import { Matchmaker } from "./matchmaker.ts";
 import { DuelGame } from "./duel-do.ts";
-import { LiveHub } from "./live-hub.ts";
+import { LiveHub, liveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
@@ -24,7 +24,7 @@ import { deepCheckRun, recountDeep } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
-import { expireTownCache } from "./town-chat-api.ts";
+import { chatRoomOf, expireTownCache } from "./town-chat-api.ts";
 import { handleFriendsApi } from "./friends-api.ts";
 import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
@@ -349,6 +349,20 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const win = url.searchParams.get("win") === "1" && env.TEST_SWITCHES === "1";
       const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "tower", undefined, undefined, win));
       return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
+    }
+    // GET /api/tower/parties[?townroom=] → { parties: [{ code, leader, members, max }] }: the Battle Tower parties a newcomer can join
+    // now (the clerk's list, Eric, Nov 20): those whose Open party line stands in the town's chat (the live hub's), each asked whether it
+    // takes someone new (room in it, no floor under way, not a run's own members climbing on). Newest first, TOWER_PARTY.listMax at most.
+    // Anyone may look; joining keeps the party's own checks (accounts only, full refused with its words).
+    if (url.pathname === "/api/tower/parties" && request.method === "GET") {
+      const codes = env.LIVE ? await liveHub(env).townParties(chatRoomOf(url.searchParams.get("townroom"), env.TEST_SWITCHES === "1")).catch(() => [] as string[]) : [];
+      const listed = await Promise.all(
+        codes.slice(0, TOWER_PARTY.listMax).map(async (code) => {
+          const l = await env.PARTIES.get(env.PARTIES.idFromName(code)).towerListing().catch(() => null);
+          return l ? { code, ...l } : null;
+        }),
+      );
+      return json({ parties: listed.filter((x) => x !== null) });
     }
     const bp = url.pathname.match(/^\/api\/(boss|crowd|tower)\/party\/([A-Z2-9]{5})(\/ws)?$/i);
     if (bp) {

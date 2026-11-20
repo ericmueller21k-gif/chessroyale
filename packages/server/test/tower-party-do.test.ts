@@ -200,6 +200,8 @@ describe("Open party's line (the review of #835, findings 2 and 3)", () => {
     expect(a.party()!.party.tower!.open).toBe(true);
     const lines = () => W.town.snapshot(Date.now()).lines.filter((l) => l.sys === "party");
     expect(lines().map((l) => [l.text, l.party])).toEqual([["Ann is looking for 3 more to climb the Battle Tower", "TOWER"]]);
+    // (And on the clerk's list of open parties: Eric, Nov 20.)
+    expect(await W.party.towerListing()).toEqual({ leader: "Ann", members: 1, max: 4 });
     // (Bo joins: 2 more now; the line stands. Ann leaves: it goes.)
     const b = await W.join(bo.id, "Bo");
     expect(lines()).toHaveLength(1);

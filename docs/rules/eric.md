@@ -110,7 +110,8 @@ removed (old → new) and says whether any of them guards a rule here.
     (method: docs/decisions/2026-10-26-town-square-slice-2.md: headless, a phone 390 × 844 and a computer 1440 × 900, 5 s
     walking, the medians of four runs taken in turn, one pass); not a CI test, CI frame rates vary too much. `e2e/town.spec.ts` checks that nothing of Maia's is fetched in the town before a game opens.
 - **Typing works wherever the chat box shows (Eric, Oct 28, from his phone; replaces "the field is in Always on only").** You chat by
-  tapping the box anywhere but a player's name; the typing line is an input with no placeholder, border or backing and shows only while
+  tapping the box anywhere but a player's name or a Battle Tower party line's button (Eric, Nov 20: the town's party line's "Go to the
+  tower" press is its own; it never opens typing); the typing line is an input with no placeholder, border or backing and shows only while
   you're typing (a strip at the box's foot, reserved so nothing moves). While the box shows and you aren't typing, that strip holds a faint
   hint, "Tap here to type" (phone) / "Click here to type" (computer), thin and gray, in line with the timestamps' "[": gone while you type
   and gone with the box (Eric, Nov 12, replacing Oct 28's "there is no 'Say something…' anywhere": "In very faint, like gray, let's put a
