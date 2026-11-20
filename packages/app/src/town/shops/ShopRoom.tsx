@@ -47,7 +47,7 @@ import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { STORE_PANELS, atDoor, doorGoal, doorOf, type DoorTo, onDoorPic, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, passAt, type RoomPart, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, opaqueNear, atDoor, doorGoal, doorOf, type DoorTo, onDoorPic, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, passAt, type RoomPart, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, gotLine, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CrateOpening } from "../../screens/Crates.tsx";
 import type { BossCrateDef } from "@chessroyale/core";
@@ -2672,6 +2672,29 @@ function startRoom(
     return out.y1 > 0;
   };
   const doorBx = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  /** Each door picture's pixels (read once, at the first tap that needs them), or null: unreadable (its whole box counts). */
+  const doorPx = new Map<string, Uint8ClampedArray | null>();
+  /**
+   * (x, y) is near a drawn pixel of door `u`'s picture (box `b` as drawn this frame), not on the floor through a gap in its box: within
+   * `SHOP_FEEL.doorPad` of one. A picture smaller than a finger: anywhere in its finger-sized box.
+   */
+  const onDoorPx = (u: Up, b: typeof doorBx, x: number, y: number): boolean => {
+    if (b.x1 - b.x0 < SHOP_FEEL.doorMinPx || b.y1 - b.y0 < SHOP_FEEL.doorMinPx) return true;
+    const img = frames[u.name]!.frames[0]!;
+    let a = doorPx.get(u.name);
+    if (a === undefined) {
+      try {
+        a = img.getContext("2d")?.getImageData(0, 0, img.width, img.height).data ?? null;
+      } catch {
+        a = null;
+      }
+      doorPx.set(u.name, a);
+    }
+    if (!a) return true;
+    const s = (b.x1 - b.x0) / img.width;
+    const px = Math.floor((x - b.x0) / s);
+    return opaqueNear(a, img.width, u.cut || img.height, u.flip ? img.width - 1 - px : px, Math.floor((y - b.y0) / s), Math.max(1, Math.ceil(SHOP_FEEL.doorPad / s)));
+  };
   /**
    * The door whose picture (x, y) is on (Nov 20; its box grown to a finger's size: room.ts onDoorPic), the nearest's middle of two, as
    * drawn this frame: its place in `doorUps`, or -1.
@@ -2680,7 +2703,7 @@ function startRoom(
     let out = -1;
     let bd = Infinity;
     for (let i = 0; i < doorUps.length; i++) {
-      if (!upBox(doorUps[i]!.u, doorBx) || !onDoorPic(doorBx, x, y)) continue;
+      if (!upBox(doorUps[i]!.u, doorBx) || !onDoorPic(doorBx, x, y) || !onDoorPx(doorUps[i]!.u, doorBx, x, y)) continue;
       const d = Math.hypot(x - (doorBx.x0 + doorBx.x1) / 2, y - (doorBx.y0 + doorBx.y1) / 2);
       if (d < bd) ((bd = d), (out = i));
     }

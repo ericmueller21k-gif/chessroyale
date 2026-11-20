@@ -436,3 +436,12 @@ export function onDoorPic(b: { x0: number; y0: number; x1: number; y1: number },
   const hh = Math.max((b.y1 - b.y0) / 2 + pad, min / 2);
   return Math.abs(x - cx) <= hw && Math.abs(y - cy) <= hh;
 }
+/**
+ * A drawn pixel of a picture within `r` of its pixel (ix, iy) (`a`: its RGBA, `w` wide, its top `h` rows drawn): what you see there is the
+ * door, not the floor through a gap in its picture's box (Nov 20).
+ */
+export function opaqueNear(a: Uint8ClampedArray, w: number, h: number, ix: number, iy: number, r: number): boolean {
+  for (let y = Math.max(0, iy - r); y <= Math.min(h - 1, iy + r); y++)
+    for (let x = Math.max(0, ix - r); x <= Math.min(w - 1, ix + r); x++) if (a[(y * w + x) * 4 + 3]! > 0) return true;
+  return false;
+}
