@@ -28,6 +28,7 @@ import {
   dodgeOver,
   popOffMs,
   folioTurnMs,
+  sawyerTurnMs,
   landsAfterHisMove,
   PASS_WAIT,
   powerMomentMs,
@@ -2359,8 +2360,8 @@ export class LobbyCore {
     const b = this.runner!.state.boss;
     const burnt = fireShows(b);
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
-    // transformation at the start of his turn, and Ginger's Super Freeze.)
-    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b);
+    // transformation at the start of his turn, Ginger's Super Freeze and Sawyer's Saw Swap.)
+    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view);
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 

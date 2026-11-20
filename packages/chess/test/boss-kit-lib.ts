@@ -37,6 +37,7 @@ import { vi } from "vitest";
 import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type BossDef, type BossState, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
+  SAW_SWAP_TEST_CHECK,
   boardEnd,
   bossAllowed,
   bossRules,
@@ -169,7 +170,14 @@ export interface KitBattle {
  * A boss's powers beyond its passive and ultimate, by their test switches (?power=): each gets a battle of its own in the kit, switched
  * on early, the trigger pulled from the middle (Ginger's Super Freeze, his second meter: Nov 18).
  */
-export const KIT_EXTRA_TESTS: Readonly<Record<string, readonly string[]>> = { gingerbread: ["superfreeze"] };
+export const KIT_EXTRA_TESTS: Readonly<Record<string, readonly string[]>> = { gingerbread: ["superfreeze"], sawyer: ["sawswap"] };
+
+/**
+ * A test switch whose power waits on one move of the crowd's (Sawyer's Saw Swap, Nov 20: the check its position is set up for): the
+ * crowd's first move in that switch's battle (`moves`, by the side the crowd plays), when it's allowed; its other moves as ever
+ * (crowdPick). Its battle must show the power's event (`kind`), or the kit no longer tests it.
+ */
+export const KIT_FIRST_MOVE: Readonly<Record<string, { moves: Readonly<Record<"w" | "b", string>>; kind: string }>> = { sawswap: { moves: SAW_SWAP_TEST_CHECK, kind: "sawSwap" } };
 
 /**
  * The battles each boss gets: his passive switched on early (crowd White); his ultimate switched on early and the
@@ -730,7 +738,8 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null, watch?:
     if (k.strikes.includes(r.boss!.crowdMoves + 1)) callStrike(r);
     // (Hollow alone, the 3rd or 7th bulb out: the dark's move is the crowd's. The driver never tries the dark, so only a
     // battle set up with it comes here.)
-    const move = r.darkForcedDue() ? await r.playDarkForced(engines[0]) : crowdPick(fen, allowed, rng);
+    const first = r.boss!.crowdMoves === 0 ? KIT_FIRST_MOVE[k.test]?.moves[k.side] : undefined;
+    const move = r.darkForcedDue() ? await r.playDarkForced(engines[0]) : first && allowed.includes(first) ? first : crowdPick(fen, allowed, rng);
     const report = await r.score(new Map([[r.alive()[0]!.id, { move, thinkMs: 1000 }]]));
     note("crowd");
     c.round(r, report, allowed, `the crowd's move ${move}`);

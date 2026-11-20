@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -96,9 +96,11 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * (the gilding at the start of his turn after it). Chandy's ?power=lockon brings his first lock from his first move (not his third);
  * ?power=dodge gives him all five upgrades at the start and warns as the second turn begins (Dodge as the third begins); and each of
  * his five moves has a switch of its own (?power=scatter, beam, shields, rapidfire, queenlock: not on his BOSS_ROSTER line): that
- * move unlocked from the start and his move meter full from the second turn (bosses/chandy.ts).
+ * move unlocked from the start and his move meter full from the second turn (bosses/chandy.ts). Sawyer's ?power=sawswap, his
+ * once-a-battle Saw Swap (not on his BOSS_ROSTER line either), starts the battle a few moves in with a check of his king on his half
+ * ready for the crowd's next move (SAW_SWAP_TEST_MOVES; it fires as that check lands).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
  * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
@@ -707,6 +709,12 @@ export interface BossPowerState {
   cut?: SawCut | null;
   /** Sawyer's board saw (his ultimate): no move may cross between the d and e files from crowd turn `at` through `until`. */
   boardSaw?: { at: number; until: number } | null;
+  /**
+   * Sawyer's Saw Swap (Eric, Nov 20; once a battle, never on a Battle Tower floor unless BOSS_POWERS.sawSwapInTower): the crowd's move
+   * that checked his king on his half landed on crowd turn `at`, and he swapped his half's two 4 x 4 blocks (files a-d and e-h of his
+   * four ranks) out of check before his move; `king`, his king's square before and after. Unset until it comes.
+   */
+  sawSwap?: { at: number; king: [string, string] } | null;
   /**
    * Wrangler's long pull (his first move): the center pawn's double step (`from` to `via`), then lassoed one square
    * further (to `to`), as crowd turn `turn` begins. Null: his first move was an ordinary one (no sound pull). Unset until
@@ -1689,6 +1697,9 @@ export type PowerEventKind =
   | "split"
   | "cut"
   | "boardsaw"
+  // Sawyer's Saw Swap (Nov 20): at the start of his turn, as the crowd's check lands (while he thinks; `squares`: his king's square
+  // before and after), his half sawn and its two 4 x 4 blocks swapped; his move follows it.
+  | "sawSwap"
   | "pull"
   | "drag"
   | "showdown"

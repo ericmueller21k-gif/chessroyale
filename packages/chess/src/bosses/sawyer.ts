@@ -8,17 +8,20 @@
  * nothing (either side) may move straight across it while it's there
  * (diagonal moves pass at the corners, knights jump it). His ultimate, the board saw: with the rage meter full, from
  * turn boardSawFrom, and one half of the board more his than the crowd's on material, the warning, then the board is
- * sawn in two between the d and e files: for a few turns no move may cross between the halves, knights included.
+ * sawn in two between the d and e files: for a few turns no move may cross between the halves, knights included. His third
+ * power, the Saw Swap (Eric, Nov 20), once a battle: at the start of his turn, in check with his king on his half, he saws the
+ * board across the middle and his half down its center, and swaps its two 4 x 4 blocks out of check; then he moves.
  *
  * Both kinds of cut block movement, never attacks (checks and pins work across them as in ordinary chess), and like
  * every power they never leave anyone without a move or block the only way out of check (the dispatcher lifts them
  * for the turn). Numbers: BOSS_POWERS.saw*, boardSaw*. His art and moments are the app's (characters/sawyer.ts,
  * components/Sawyer.tsx, the cuts in characters/effects/sawyer.ts).
  */
-import { BOSS_POWERS, type BossPowerState, type BossState, type SawCut, type SplitPawn } from "@chessroyale/core";
-import { BOSS_OPENING, newBoard } from "../boards.ts";
+import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type SawCut, type SplitPawn } from "@chessroyale/core";
+import { BOSS_OPENING, boardEnd, newBoard } from "../boards.ts";
 import { marksStop, moveEdges, type EdgeMark } from "../board-layer.ts";
-import { legalMoves, pieceAt, withPiece } from "../rules.ts";
+import { inCheck, kingAttacked, legalMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
+import { stockfishRefuses } from "../uci.ts";
 import { VALUE, crowdHalf, from, meterFull, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type TurnContext } from "./base.ts";
 
 /**
@@ -46,8 +49,22 @@ export const SAW_CUT = { cutAt: 1500, openMs: 380, ms: 2300 } as const;
  */
 export const BOARD_SAW = { jumpAt: 1400, landAt: 1900, revAt: 1950, runAt: 3150, runMs: 1700, splitAt: 4850, jolt: 280, offAt: 5050, total: 5700 } as const;
 
+/**
+ * The Saw Swap, beat by beat (ms into its moment, after its banner's hold; it plays while he thinks at the start of his turn, and his
+ * move waits for it all: sawyerTurnMs in boss-timing.ts):
+ *   0         "SAW SWAP!" (his banner, to `cutAt`).
+ *   cutAt     he saws at the board's corner (his `sawDown`, its `cut` cue): a groove runs across the middle of the board, between
+ *             his half and the crowd's, for `crossMs`;
+ *   downAt    then down the middle of his half (between the d and e files), from the middle to his edge, for `downMs`.
+ *   liftAt    the two 4 x 4 blocks of his half come loose (the grooves part, a crack); they slide past each other for `slideMs`,
+ *             the block with his king lifted over the other;
+ *   landAt    each lands on the other's place; the board draws the new position from here (the moment's blocks `overlap` more);
+ *   closeAt   the grooves close (the board saw's rejoin), done by `total`. Then his move.
+ */
+export const SAW_SWAP = { bannerMs: 1300, cutAt: 1300, crossMs: 680, downAt: 1980, downMs: 420, liftAt: 2520, slideMs: 900, landAt: 3420, overlap: 60, closeAt: 3520, total: 4000 } as const;
+
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
-export const SAWYER_FX = { split: SPLIT.total, cut: SAW_CUT.ms, boardsaw: BOARD_SAW.total } as const;
+export const SAWYER_FX = { split: SPLIT.total, cut: SAW_CUT.ms, boardsaw: BOARD_SAW.total, sawSwap: SAW_SWAP.total } as const;
 
 const file = (sq: string) => sq.charCodeAt(0) - 97;
 const rank = (sq: string) => Number(sq[1]);
@@ -251,6 +268,86 @@ export function favouredHalf(fen: string, crowd: Side): "a-d" | "e-h" | null {
 /** The board saw may be warned of now: the rage meter full, turn boardSawFrom or later, and a half of the board his. */
 export const boardSawReady = (next: BossPowerState, t: TurnContext): boolean => meterFull(next, t) && t.turn >= t.s.boardSawFrom && favouredHalf(t.fen, t.crowd) !== null;
 
+// ---------------- The Saw Swap ----------------
+
+/** His half of the board: its lowest and highest rank (1-4 when he plays White, 5-8 when he plays Black). */
+export const hisRanks = (boss: Side): readonly [number, number] => (boss === "w" ? [1, 4] : [5, 8]);
+
+/** Where the piece on `sq` goes in the Saw Swap: on his half, 4 files over (a-d to e-h and back), its rank kept; elsewhere, nowhere. */
+export function swapSquare(sq: string, boss: Side): string {
+  const [lo, hi] = hisRanks(boss);
+  const r = rank(sq);
+  return r >= lo && r <= hi ? square((file(sq) + 4) % 8, r) : sq;
+}
+
+/**
+ * The board's pieces with his half's two 4 x 4 blocks swapped (every piece in them, both colors, 4 files over, its rank kept): the
+ * FEN's placement only. The same swap undoes it (the screens draw the position before it from the one after).
+ */
+export function swapPlacement(fen: string, boss: Side): string {
+  const parts = fen.split(" ");
+  const [lo, hi] = hisRanks(boss);
+  parts[0] = parts[0]!
+    .split("/")
+    .map((row, i) => {
+      const r = 8 - i;
+      if (r < lo || r > hi) return row;
+      const cells = row.replace(/\d/g, (n) => ".".repeat(Number(n)));
+      return (cells.slice(4) + cells.slice(0, 4)).replace(/\.+/g, (d) => String(d.length));
+    })
+    .join("/");
+  return parts.join(" ");
+}
+
+/** `side`'s king's square, or null. */
+const kingOf = (fen: string, side: Side): string | null => {
+  for (let f = 0; f < 8; f++) for (let r = 1; r <= 8; r++) if (pieceAt(fen, square(f, r))?.type === "k" && pieceAt(fen, square(f, r))?.color === side) return square(f, r);
+  return null;
+};
+
+/**
+ * The Saw Swap's position, when it may come now (`fen`: him to move), else null. It comes when he's in check with his king on his
+ * half, and swapping his half's two blocks (swapPlacement) leaves a position the game can play on: him no longer in check, the
+ * crowd's king not attacked, a legal move for him, and one the engine plays (stockfishRefuses: no pawn on the first or last rank,
+ * which a swap that keeps every rank can't make anyway). His castling rights go (his king always moves, and his rooks with him: one
+ * rule for every case; the crowd's king and rooks on their own back rank never move, so the crowd's stay), the en passant square goes,
+ * and the fifty-move count starts again (as after a piece another power took off: withoutPiece). The side to move stays his.
+ */
+export function sawSwapFen(fen: string, boss: Side): string | null {
+  if (sideToMove(fen) !== boss) return null;
+  const king = kingOf(fen, boss);
+  const [lo, hi] = hisRanks(boss);
+  if (!king || rank(king) < lo || rank(king) > hi) return null;
+  try {
+    if (!inCheck(fen)) return null;
+    const parts = swapPlacement(fen, boss).split(" ");
+    const mine = (c: string) => (boss === "w" ? c >= "A" && c <= "Z" : c >= "a" && c <= "z");
+    parts[2] = [...(parts[2] ?? "-")].filter((c) => c !== "-" && !mine(c)).join("") || "-";
+    parts[3] = "-";
+    if (parts[4] !== undefined) parts[4] = "0";
+    const after = parts.join(" ");
+    if (stockfishRefuses(after) || kingAttacked(after, other(boss)) || inCheck(after) || !legalMoves(after).length) return null;
+    return after;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The test switch (?power=sawswap): the battle starts a few real moves in, the crowd to move, and the crowd's natural next move (the
+ * bishop's check, SAW_SWAP_TEST_CHECK) checks his king on his half where the swap takes him out of it: it fires as that move lands.
+ * The crowd White: 1.e4 d5 2.exd5 Qxd5 3.Nc3 Qd8 (then Bb5+); Black: 1.d4 e6 2.c4 (then ...Bb4+).
+ */
+export const SAW_SWAP_TEST_MOVES: Readonly<Record<Side, readonly string[]>> = {
+  w: ["e2e4", "d7d5", "e4d5", "d8d5", "b1c3", "d5d8"],
+  b: ["d2d4", "e7e6", "c2c4"],
+};
+/** The crowd's check in the test switch's position (SAW_SWAP_TEST_MOVES), by the side the crowd plays. */
+export const SAW_SWAP_TEST_CHECK: Readonly<Record<Side, string>> = { w: "f1b5", b: "f8b4" };
+
+/** The Saw Swap has come this battle (once a battle). */
+export const sawSwapped = (boss: Pick<BossState, "powers"> | null | undefined): boolean => !!boss?.powers?.sawSwap;
+
 /** Sawyer: the split pawn after his first move, a saw cut every few turns, and the board saw. */
 export const SAWYER: BossRules = {
   id: "sawyer",
@@ -345,8 +442,10 @@ export const SAWYER: BossRules = {
     }
     sawyerBattle.track(b, move);
   },
+  // After the crowd's move (the start of his turn): the halves follow it; then the Saw Swap, if it comes now.
   afterCrowdMove(b, move) {
     if (move) sawyerBattle.track(b, move);
+    sawyerBattle.sawSwap(b);
   },
   // (Several bosses: another boss's move, his halves follow it too; a half another boss's power moved or changed is let go.)
   followMove: (b, move) => sawyerBattle.track(b, move),
@@ -363,18 +462,54 @@ export const SAWYER: BossRules = {
   opening: {
     setUp(b, at) {
       // (The test switch: a pawn of his already gone, the crowd to move: SPLIT_TEST_MOVES.)
-      if (b.settings.bossPowerTest === "split") {
-        const moves = SPLIT_TEST_MOVES[at.crowdSide];
+      // (?power=sawswap: a few moves in, the crowd's check ready: SAW_SWAP_TEST_MOVES.)
+      const test = b.settings.bossPowerTest === "split" ? SPLIT_TEST_MOVES : b.settings.bossPowerTest === "sawswap" ? SAW_SWAP_TEST_MOVES : null;
+      if (test) {
+        const moves = test[at.crowdSide];
         b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...moves] }, moves.length, at.generation));
       }
       return { nextPassive: BOSS_POWERS.sawFirst };
     },
   },
-  view: (p) => ({ split: p.split ?? null, cut: p.cut ? { ...p.cut } : null, boardSaw: p.boardSaw ? { ...p.boardSaw } : null }),
+  view: (p) => ({ split: p.split ?? null, cut: p.cut ? { ...p.cut } : null, boardSaw: p.boardSaw ? { ...p.boardSaw } : null, sawSwap: p.sawSwap ? { at: p.sawSwap.at, king: [...p.sawSwap.king] as [string, string] } : null }),
 };
 
 /** His part in the match runner. */
 export const sawyerBattle = {
+  /**
+   * The Saw Swap, if it comes as the crowd's move just played lands (the start of his turn; Eric, Nov 20: "trigger anytime whenever it
+   * legally is safe to"): not yet this battle, not on a Battle Tower floor (lone or shared) unless `sawSwapInTower`, he's to move, the
+   * battle goes on (not at the move cap; never on a mate, a draw or the battle's end: the crowd's mate stands), and sawSwapFen says
+   * the swap may come. The board takes the new position (a base at this ply: the history keeps every move, and nothing before it can
+   * come again), its last move cleared (the crowd's move's squares mean nothing on the swapped half); his split pawn's halves on his
+   * half move with their blocks; the rage meter and his other powers are untouched (his saw cut is always in the crowd's half; the
+   * board saw's line, between the d and e files, is the line the swap saws along, so it stays as it is). Its moment (`sawSwap`, while
+   * he thinks) plays before his move, which he picks from the new position as ever. Returns whether it came.
+   */
+  sawSwap(b: Battle, s: Pick<BossPowerSettings, "sawSwapInTower"> = BOSS_POWERS): boolean {
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    if (!boss || !p || boss.id !== "sawyer" || p.sawSwap || boss.result) return false;
+    if (b.settings.towerFloor && !s.sawSwapInTower) return false;
+    if (!b.bossToMove() || boss.crowdMoves >= b.settings.bossMaxMoves) return false;
+    const id = b.state.boards[0]!;
+    const board = b.boards.get(id)!;
+    if (boardEnd(board) !== null) return false;
+    const mine = other(boss.crowdSide);
+    const fen = sawSwapFen(board.fen, mine);
+    if (!fen) return false;
+    const before = kingOf(board.fen, mine)!;
+    const king: [string, string] = [before, swapSquare(before, mine)];
+    const ply = board.history.length;
+    b.boards.set(id, { ...board, fen, lastMove: null, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }] });
+    const split = p.split?.halves.length ? { ...p.split, halves: p.split.halves.map((h) => ({ ...h, square: swapSquare(h.square, mine) })) } : p.split;
+    b.state = {
+      ...b.state,
+      boss: { ...boss, powers: { ...p, ...(split ? { split } : {}), sawSwap: { at: boss.crowdMoves, king }, events: [...p.events, { kind: "sawSwap", turn: p.turn, square: king[1], squares: [...king] }] } },
+    };
+    return true;
+  },
+
   /** The split's halves follow a move just played on the battle's board. */
   track(b: Battle, move: string): void {
     const boss = b.state.boss!;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type SawCut, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, MOO_CINEMATIC, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type SawCut, type Settings } from "@chessroyale/core";
 import {
   BOARD_SAW,
   MatchRunner,
@@ -35,6 +35,17 @@ import {
   trackHalves,
   triggerUltimate,
   withPiece,
+  SAW_SWAP,
+  SAW_SWAP_TEST_CHECK,
+  SAW_SWAP_TEST_MOVES,
+  fenAfter,
+  sawSwapFen,
+  sawyerBattle,
+  sawyerTurnMs,
+  sideToMove,
+  swapPlacement,
+  swapSquare,
+  type Battle,
   type EngineLike,
   type Opening,
 } from "../src/index.ts";
@@ -634,5 +645,207 @@ describe("Sawyer's split test switch (?power=split)", () => {
       expect(sp.square, side).toBeTruthy();
       expect(sp.waiting).toBeUndefined();
     }
+  });
+});
+
+describe("Sawyer's Saw Swap (Eric, Nov 20: once a battle, in check with his king on his half, his half's two 4 x 4 blocks swapped)", () => {
+  /** The test switch's battle (?power=sawswap), the crowd on `side`; `patch`: other settings (a tower floor). */
+  const swapRaid = (side: "w" | "b", patch: Partial<Settings> = {}) => {
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "sawyer", lastStandLoss: 999, lastStandLossFloor: 999, bossPowerTest: "sawswap", ...patch } as Settings;
+    return new MatchRunner({ settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(LINE)], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: side });
+  };
+  /** The crowd's move now (scored), the boss's reply not yet played. */
+  const crowdPlays = async (r: MatchRunner, move: string) => {
+    r.deal();
+    await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
+  };
+  const battleOf = (r: MatchRunner) => (r as unknown as { battle: Battle }).battle;
+  /** The test switch's position after the crowd's check, him to move. */
+  const checked = (side: "w" | "b") => applyMove(fenAfter([...SAW_SWAP_TEST_MOVES[side]]), SAW_SWAP_TEST_CHECK[side]);
+
+  it("the swap: his half's two 4 x 4 blocks trade places, every piece 4 files over on its own rank, both colors; the rest stays", () => {
+    // (The crowd White: Bb5+ against his king on e8; the crowd Black: ...Bb4+ against his king on e1.)
+    expect(sawSwapFen(checked("w"), "b")).toBe("kbnrrnbq/ppppppp1/8/5B2/8/2N5/PPPP1PPP/R1BQK1NR b KQ - 0 4");
+    expect(sawSwapFen(checked("b"), "w")).toBe("rnbqk1nr/pppp1ppp/4p3/8/5bPP/8/PPPPPP2/KBNRRNBQ w kq - 0 3");
+    expect(swapSquare("e8", "b")).toBe("a8");
+    expect(swapSquare("b5", "b")).toBe("f5");
+    expect(swapSquare("b4", "b")).toBe("b4");
+    expect(swapSquare("e1", "w")).toBe("a1");
+    expect(swapSquare("d4", "w")).toBe("h4");
+    expect(swapSquare("d5", "w")).toBe("d5");
+    // (The same swap undoes it, for the screens: the board before it from the one after.)
+    for (const side of ["w", "b"] as const) {
+      const boss = side === "w" ? "b" : "w";
+      expect(swapPlacement(swapPlacement(checked(side), boss), boss)).toBe(checked(side));
+    }
+  });
+
+  it("his castling rights go (the crowd's stay), en passant goes, the fifty-move count starts again, he's still to move", () => {
+    const after = sawSwapFen(checked("w"), "b")!.split(" ");
+    expect(after[1]).toBe("b");
+    expect(after[2]).toBe("KQ");
+    expect(after[3]).toBe("-");
+    expect(after[4]).toBe("0");
+    // (An en passant square in the position before: gone after.)
+    const ep = "rnbqkbnr/ppp1pppp/8/1B6/3pP3/8/PPPP1PPP/RNBQK1NR b KQkq e3 0 3";
+    expect(inCheck(ep)).toBe(true);
+    expect(sawSwapFen(ep, "b")!.split(" ").slice(2, 4)).toEqual(["KQ", "-"]);
+    const black = sawSwapFen(checked("b"), "w")!.split(" ");
+    expect(black[2]).toBe("kq");
+    expect(stockfishRefuses(sawSwapFen(checked("w"), "b")!)).toBeNull();
+    expect(stockfishRefuses(sawSwapFen(checked("b"), "w")!)).toBeNull();
+  });
+
+  it("only when it qualifies: in check, his king on his half, and the swap leaves him out of check, the crowd's king safe and a move", () => {
+    // Not in check (him to move, the same position before the crowd's check): none.
+    const quiet = applyMove(fenAfter([...SAW_SWAP_TEST_MOVES.w]), "g1f3");
+    expect(inCheck(quiet)).toBe(false);
+    expect(sawSwapFen(quiet, "b")).toBeNull();
+    // Not his move: none.
+    expect(sawSwapFen(fenAfter([...SAW_SWAP_TEST_MOVES.w]), "b")).toBeNull();
+    // His king on the crowd's half (d4, in check from the rook on d1): none.
+    expect(sawSwapFen("8/8/8/8/3k4/8/8/3RK3 b - - 0 1", "b")).toBeNull();
+    // Still in check after it (the king goes from e8 to a8, where the rook on a1 sees him): none.
+    const still = "4k3/8/8/8/8/8/8/R3R1K1 b - - 0 1";
+    expect(inCheck(still)).toBe(true);
+    expect(sawSwapFen(still, "b")).toBeNull();
+    // The crowd's king attacked after it (its king on c7 goes to g7, on his bishop's diagonal from a1): none.
+    const exposed = "4k3/2K5/8/8/8/8/8/b3R3 b - - 0 1";
+    expect(inCheck(exposed)).toBe(true);
+    expect(sawSwapFen(exposed, "b")).toBeNull();
+    // (Out of check with a move: it comes, either side.)
+    expect(sawSwapFen("4k3/8/8/8/8/8/8/4R1K1 b - - 0 1", "b")).toBe("k7/8/8/8/8/8/8/4R1K1 b - - 0 1");
+    expect(sawSwapFen("4r1k1/8/8/8/8/8/8/4K3 w - - 0 1", "w")).toBe("4r1k1/8/8/8/8/8/8/K7 w - - 0 1");
+  });
+
+  it("?power=sawswap: a few moves in, the crowd to move; its check lands and he swaps out of it before his move, either side", async () => {
+    for (const side of ["w", "b"] as const) {
+      const r = swapRaid(side);
+      const boss = side === "w" ? "b" : "w";
+      expect(r.boss!.crowdSide).toBe(side);
+      expect(r.boards.get(0)!.history).toEqual(SAW_SWAP_TEST_MOVES[side]);
+      expect(sideToMove(fenOf(r))).toBe(side);
+      await crowdPlays(r, SAW_SWAP_TEST_CHECK[side]);
+      const board = r.boards.get(0)!;
+      const want = sawSwapFen(checked(side), boss)!;
+      expect(board.fen, side).toBe(want);
+      // (A base at this ply: the history keeps every move; the last move's squares cleared.)
+      expect(board.history.at(-1)).toBe(SAW_SWAP_TEST_CHECK[side]);
+      expect(board.bases).toContainEqual({ ply: board.history.length, fen: want });
+      expect(fenAtPly(board.history, board.history.length, board.bases)).toBe(want);
+      expect(board.lastMove).toBeNull();
+      const king = side === "w" ? ["e8", "a8"] : ["e1", "a1"];
+      expect(r.boss!.powers!.sawSwap).toEqual({ at: 1, king });
+      expect(r.boss!.powers!.events).toContainEqual({ kind: "sawSwap", turn: 1, square: king[1], squares: king });
+      // (The screens: the view says so, and his thinking holds for the moment.)
+      const view = r.bossView()!;
+      expect(view.powers!.sawSwap).toEqual({ at: 1, king });
+      expect(sawyerTurnMs(view)).toBe(SAW_SWAP.total + bannerWaitMs("sawSwap") + MOO_CINEMATIC.tailPadMs);
+      // The rage meter and his other powers untouched.
+      expect(rageOf(r.boss).value).toBe(rageOf({ ...r.boss!, powers: { ...r.boss!.powers!, sawSwap: undefined } }).value);
+      // His move comes from the new position (his first, a pawn's), and the game goes on from it.
+      const move = await r.playBoss();
+      expect(legalMoves(want)).toContain(move);
+      const after = r.boards.get(0)!;
+      expect(after.history.at(-1)).toBe(move);
+      expect(fenAtPly(after.history, after.history.length - 1, after.bases)).toBe(want);
+      // (His first move, a pawn's, splits it after: Sawyer's split, as ever.)
+      expect(pieceAt(want, move.slice(0, 2))!.type).toBe("p");
+      expect(r.boss!.powers!.events.some((e) => e.kind === "sawSwap")).toBe(false);
+      expect(r.bossView()!.powers!.sawSwap).toEqual({ at: 1, king });
+      expect(sawyerTurnMs(r.bossView()!)).toBe(0);
+    }
+  });
+
+  it("once a battle: a second check that would qualify never brings another", async () => {
+    for (const side of ["w", "b"] as const) {
+      const r = swapRaid(side);
+      await crowdPlays(r, SAW_SWAP_TEST_CHECK[side]);
+      expect(r.boss!.powers!.sawSwap).toBeTruthy();
+      // (The same qualifying check again on the board, him to move: nothing.)
+      const b = battleOf(r);
+      const board = r.boards.get(0)!;
+      r.boards.set(0, { ...board, fen: checked(side) });
+      expect(sawyerBattle.sawSwap(b)).toBe(false);
+      expect(fenOf(r)).toBe(checked(side));
+    }
+  });
+
+  it("never on a mate (the crowd's mate stands), never when the battle is over or at the move cap", async () => {
+    const r = swapRaid("w");
+    const b = battleOf(r);
+    // (A mate of his king on his half: e8, the rook on e1 down the open e-file, his own rooks and pawns round him. The swap would take
+    // him out.)
+    const mate = "3rkr2/3p1p2/8/8/8/8/8/4R1K1 b - - 0 1";
+    expect(inCheck(mate)).toBe(true);
+    expect(legalMoves(mate)).toEqual([]);
+    expect(sawSwapFen(mate, "b")).not.toBeNull();
+    const board = r.boards.get(0)!;
+    r.boards.set(0, { ...board, fen: mate, history: [], bases: [{ ply: 0, fen: mate }] });
+    expect(sawyerBattle.sawSwap(b)).toBe(false);
+    // (The move cap reached: nothing.)
+    r.boards.set(0, { ...board, fen: checked("w"), history: [], bases: [{ ply: 0, fen: checked("w") }] });
+    r.state = { ...r.state, boss: { ...r.boss!, crowdMoves: r.settings.bossMaxMoves } };
+    expect(sawyerBattle.sawSwap(b)).toBe(false);
+    r.state = { ...r.state, boss: { ...r.boss!, crowdMoves: 1 } };
+    expect(sawyerBattle.sawSwap(b)).toBe(true);
+  });
+
+  it("never on a Battle Tower floor with sawSwapInTower off (Eric: off by default there), and does with it on", async () => {
+    expect(BOSS_POWERS.sawSwapInTower).toBe(false);
+    for (const side of ["w", "b"] as const) {
+      const off = swapRaid(side, { towerFloor: 3 });
+      await crowdPlays(off, SAW_SWAP_TEST_CHECK[side]);
+      expect(off.boss!.powers!.sawSwap, side).toBeUndefined();
+      expect(fenOf(off)).toBe(checked(side));
+      const was = BOSS_POWERS.sawSwapInTower;
+      Object.assign(BOSS_POWERS as unknown as Record<string, boolean>, { sawSwapInTower: true });
+      try {
+        const on = swapRaid(side, { towerFloor: 3 });
+        await crowdPlays(on, SAW_SWAP_TEST_CHECK[side]);
+        expect(on.boss!.powers!.sawSwap, side).toBeTruthy();
+        expect(fenOf(on)).toBe(sawSwapFen(checked(side), side === "w" ? "b" : "w"));
+      } finally {
+        Object.assign(BOSS_POWERS as unknown as Record<string, boolean>, { sawSwapInTower: was });
+      }
+      // (Off the tower: always.)
+      const raid = swapRaid(side);
+      await crowdPlays(raid, SAW_SWAP_TEST_CHECK[side]);
+      expect(raid.boss!.powers!.sawSwap).toBeTruthy();
+    }
+  });
+
+  it("his split pawn's halves on his half move with their blocks", () => {
+    const r = swapRaid("w");
+    const b = battleOf(r);
+    const board = r.boards.get(0)!;
+    r.boards.set(0, { ...board, fen: checked("w"), history: [], bases: [{ ply: 0, fen: checked("w") }] });
+    r.state = { ...r.state, boss: { ...r.boss!, powers: { ...r.boss!.powers!, split: { turn: 2, pawn: "a7", square: "b7", halves: [{ square: "a7", side: "a" }, { square: "b7", side: "h" }] } } } };
+    expect(sawyerBattle.sawSwap(b)).toBe(true);
+    expect(r.boss!.powers!.split!.halves).toEqual([{ square: "e7", side: "a" }, { square: "f7", side: "h" }]);
+    for (const h of r.boss!.powers!.split!.halves) expect(pieceAt(fenOf(r), h.square)).toEqual({ color: "b", type: "p" });
+  });
+
+  it("a snapshot keeps it used: restored, the board is the swapped one and it never comes again", async () => {
+    const r = swapRaid("b");
+    await crowdPlays(r, SAW_SWAP_TEST_CHECK.b);
+    const restored = MatchRunner.restore(structuredClone(r.snapshot()), { settings: r.settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(LINE)] });
+    expect(restored.boss!.powers!.sawSwap).toEqual(r.boss!.powers!.sawSwap);
+    expect(restored.boards.get(0)!.fen).toBe(fenOf(r));
+    const board = restored.boards.get(0)!;
+    restored.boards.set(0, { ...board, fen: checked("b") });
+    expect(sawyerBattle.sawSwap(battleOf(restored))).toBe(false);
+    // (And the battle plays on from the restored one as from the first: his move from the swapped position.)
+    const move = await r.playBoss();
+    restored.boards.set(0, board);
+    expect(await restored.playBoss()).toBe(move);
+  });
+
+  it("its moment's length: its beats and its banner (POWER_FX, the same solo and online)", () => {
+    expect(powerMomentMs([{ kind: "sawSwap" }])).toBe(SAW_SWAP.total + bannerWaitMs("sawSwap"));
+    expect(SAW_SWAP.downAt).toBe(SAW_SWAP.cutAt + SAW_SWAP.crossMs);
+    expect(SAW_SWAP.landAt).toBe(SAW_SWAP.liftAt + SAW_SWAP.slideMs);
+    expect(SAW_SWAP.liftAt).toBeGreaterThanOrEqual(SAW_SWAP.downAt + SAW_SWAP.downMs);
+    expect(SAW_SWAP.total).toBeGreaterThan(SAW_SWAP.closeAt);
   });
 });

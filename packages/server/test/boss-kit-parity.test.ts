@@ -26,6 +26,7 @@ import {
   applyMove,
   dodgeTimeline,
   slamFrom,
+  SAW_SWAP_TEST_CHECK,
   type BoardScore,
   type EngineLike,
   type ServerMessage,
@@ -120,7 +121,7 @@ const turnKey = (fen: string, allowed: readonly string[] | null | undefined) => 
 const eventKey = (e: object) => JSON.stringify(e, Object.keys(e).sort());
 
 /** The battle online: two people (the host, p1, answers every request), each crowd turn the same pick from both. */
-async function online(bossId: string, test: string, patch: Partial<Settings> = {}): Promise<{ trace: Trace; start: MatchRunner }> {
+async function online(bossId: string, test: string, patch: Partial<Settings> = {}, pick = pickFor): Promise<{ trace: Trace; start: MatchRunner }> {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const settings = { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...RAID_SETTINGS, lastStandFrom: 999, bossId, bossPowerTest: test, bossUnfinished: true, bossHidden: true, bossMaxMoves: MAX_MOVES, bossSeedTest: KIT_SEEDS_WAITING, bossStageTest: KIT_BALLOON_STAGE, ...patch } as Settings;
@@ -164,7 +165,7 @@ async function online(bossId: string, test: string, patch: Partial<Settings> = {
         for (const e of m.boss.powers?.events ?? []) trace.events.add(eventKey(e));
         const allowed = m.boss.powers?.allowed ?? null;
         trace.turns.push(turnKey(m.board.fen, allowed));
-        const move = pickFor(m.board.fen, allowed ?? legalMoves(m.board.fen));
+        const move = pick(m.board.fen, allowed ?? legalMoves(m.board.fen));
         for (const id of ["p1", "p2"]) core.message(id, { t: "pick", key: m.key, move });
         acted = true;
       }
@@ -179,7 +180,7 @@ async function online(bossId: string, test: string, patch: Partial<Settings> = {
 }
 
 /** The same battle as solo plays it: the lobby's runner as the battle started, its own steps, this device's engine. */
-async function solo(start: MatchRunner): Promise<Trace> {
+async function solo(start: MatchRunner, pick = pickFor): Promise<Trace> {
   const r = start;
   const engines = [fakeEngine()];
   const trace: Trace = { turns: [], events: new Set(), result: null };
@@ -241,7 +242,7 @@ async function solo(start: MatchRunner): Promise<Trace> {
     const fen = r.boards.get(r.state.boards[0]!)!.fen;
     const allowed = r.crowdAllowed();
     trace.turns.push(turnKey(fen, allowed));
-    const move = pickFor(fen, allowed ?? legalMoves(fen));
+    const move = pick(fen, allowed ?? legalMoves(fen));
     await r.score(new Map(r.alive().map((p) => [p.id, { move, thinkMs: 1000 }])));
     if (r.bossKillDue()) r.bossKill();
   }
@@ -275,6 +276,17 @@ describe("the boss kit: solo and online agree", () => {
     const { trace: net, start } = await online("gingerbread", "superfreeze");
     const local = await solo(start);
     expect([...net.events].some((e) => e.includes("superFreeze"))).toBe(true);
+    expect(local.turns).toEqual(net.turns);
+    expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
+    expect(local.result).toBe(net.result);
+  }, 60_000);
+
+  it("sawyer, ?power=sawswap: his Saw Swap (as the crowd's check lands, before his move) is the same solo and online", async () => {
+    // (The crowd plays the switch's check when it can, from the position alone: the same on both paths.)
+    const pick = (fen: string, allowed: readonly string[]) => Object.values(SAW_SWAP_TEST_CHECK).find((m) => allowed.includes(m)) ?? pickFor(fen, allowed);
+    const { trace: net, start } = await online("sawyer", "sawswap", {}, pick);
+    const local = await solo(start, pick);
+    expect([...net.events].some((e) => e.includes("sawSwap"))).toBe(true);
     expect(local.turns).toEqual(net.turns);
     expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
     expect(local.result).toBe(net.result);
