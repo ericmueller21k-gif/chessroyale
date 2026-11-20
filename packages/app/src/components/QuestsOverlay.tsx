@@ -86,7 +86,7 @@ export const QuestsBarIcon = () => (
 );
 
 /** The quest's picture, in its tile. */
-function QuestPicture({ icon }: { icon: QuestIcon }) {
+export function QuestPicture({ icon }: { icon: QuestIcon }) {
   if (icon.kind === "boss") return <BossPortrait boss={{ name: icon.boss, icon: "" }} class="qo-boss" label="" />;
   if (icon.kind === "squad")
     return (

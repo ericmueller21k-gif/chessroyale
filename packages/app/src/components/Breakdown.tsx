@@ -24,6 +24,7 @@ export function Breakdown({
   dp = 1,
   inline = false,
   solo = false,
+  estRating,
 }: {
   moves: readonly MoveRecord[];
   you?: number;
@@ -42,6 +43,8 @@ export function Breakdown({
   inline?: boolean;
   /** Inline, in a solo boss battle: no "Everyone's average loss" and no "found" count (you play alone). */
   solo?: boolean;
+  /** Inline: the engine's estimate of your rating this game, in a small centered line under the stepper (Eric, Nov 20). */
+  estRating?: number | null;
 }) {
   const played = moves.filter((m) => m.bestMove);
   const costly = [...played].filter((m) => m.roundScore < 0).sort((a, b) => a.roundScore - b.roundScore).slice(0, 3);
@@ -49,7 +52,7 @@ export function Breakdown({
   // (On the result page the first move's board is open when nothing cost you: the review shows with no tap.)
   const [open, setOpen] = useState<MoveRecord | null>(costly[0] ?? null);
   const short = you !== undefined && line !== undefined ? line - you : null;
-  if (inline) return <InlineReview moves={moves} dp={dp} solo={solo} />;
+  if (inline) return <InlineReview moves={moves} dp={dp} solo={solo} estRating={estRating} />;
   return (
     <div class="breakdown" role="dialog" aria-label="Your game, move by move">
       <div class="breakdown-head">
@@ -156,7 +159,7 @@ function MoveRow({ m, open, onOpen, dp }: { m: MoveRecord; open: boolean; onOpen
  * The result page's review (a boss battle): one board, stepped with ◀ ▶ (and the ← → keys on a computer). The stepper row, the
  * board and the text under it keep their places from move to move: stepping only changes the board, the arrows and the words.
  */
-function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: number; solo: boolean }) {
+function InlineReview({ moves, dp, solo, estRating }: { moves: readonly MoveRecord[]; dp: number; solo: boolean; estRating?: number | null }) {
   const played = moves.filter((m) => m.bestMove);
   const brilliant = played.filter((m) => m.brilliant);
   const last = played.length - 1;
@@ -196,6 +199,7 @@ function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: n
           <Chevrons />
         </button>
       </div>
+      {estRating !== undefined && <p class="bm-est">Est. rating {estRating ?? "—"}</p>}
       <div class="bm-board-wrap">
         <Board
           fen={m.fen}
