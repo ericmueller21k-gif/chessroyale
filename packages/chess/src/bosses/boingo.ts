@@ -282,7 +282,7 @@ export const BOINGO: BossRules = {
   },
   stopReason: (boss, fen, m) => (marksStop({ squares: pieMarks((boss.powers?.pies ?? []).map((x) => x.square)) }, fen, m) ? "pie" : null),
   powerTurn: (boss) => piedSquares(boss).length > 0 || !!boss.powers!.frozen || boardAngle(boss) !== 0,
-  // The frozen piece shows ice (as Ginger's freeze), through the boss's turn after it too.
+  // The frozen piece is iced (held, as Ginger's freeze; on screen buried in his pie's cream), through the boss's turn after it too.
   iced: (boss) => (boss.powers!.frozen ? [boss.powers!.frozen.square] : []),
   // The marks follow every move, his and the crowd's (the funhouse's move for the crowd too).
   afterCrowdMove: (b, move) => trackSplats(b, move),

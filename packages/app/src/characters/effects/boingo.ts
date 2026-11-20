@@ -1,8 +1,8 @@
 /** Boingo's effects: the pie, flying and splatting. See ../effects.ts. */
 import { canvas, ellipse, inEllipse, roundLight, shade, toGrid, type Canvas } from "../paint.ts";
-import type { Anim, Character, Frame, Part, Speck } from "../sprite.ts";
+import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, type Pt } from "./common.ts";
-import { lazyAnim } from "../sprite.ts";
+import { lazyAnim, lazyParts } from "../sprite.ts";
 
 // ---- The pie (Boingo's passive): flying, splatting on a square, staying, fading.
 
@@ -199,4 +199,105 @@ export const PIE_FACE: Character = {
   anims: Object.fromEntries(
     Object.entries(pieHitAnims).map(([k, a]) => [k, { ...a, frames: a.frames.map((f, i) => (i === 0 ? { ...f, cue: "splat" } : f)) }]),
   ),
+};
+
+// ---- A piece his pie froze (its second splat; Eric, Nov 20: "its own animation, not an ice cube"): buried in pie.
+
+/**
+ * The heap of whipped cream a frozen piece stands in, 30 x 18, its flat bottom on the square's bottom edge: a low dome
+ * (about to the piece's waist, so its head still shows which piece it is) with a dollop each side, the right one higher
+ * (the cherry sits on it), swirls, and bits of crust in the cream. `rise`: how tall it has heaped up so far (18 whole).
+ */
+function creamHeap(rise: number): Part {
+  const cv: Canvas = canvas(30, 18);
+  const dome = inEllipse(15, 19, 14, 10.5);
+  const lumps = [inEllipse(6.5, 8, 4.6, 4.4), inEllipse(23.5, 6, 5, 4.8), inEllipse(11.5, 10, 3.4, 3), inEllipse(17.5, 9.5, 3.2, 3)];
+  // (Heaping up: the whole heap squashed down to `rise` rows, its lumps and all.)
+  const whole = (x: number, y: number) => dome(x, y) || lumps.some((l) => l(x, y));
+  const inside = (x: number, y: number) => y >= 18 - rise && whole(x, Math.floor(17 - ((17 - y) * 18) / rise));
+  shade(cv, inside, "XWw", (x, y) => 1.45 - 0.022 * x - 0.045 * y);
+  const on = (x: number, y: number, k: string) => inside(x, y) && (cv[y]![x] = k);
+  // The swirls: a curl under each dollop's top, and a fold across the dome.
+  for (const [x, y] of [[4, 9], [5, 10], [6, 10], [8, 9], [20, 7], [21, 8], [22, 8], [24, 8], [25, 7], [10, 12], [11, 13], [13, 12], [16, 11], [17, 12], [18, 11]] as const) on(x, y, "W");
+  for (const [x, y] of [[2, 16], [3, 15], [27, 14], [26, 15], [8, 16], [21, 15]] as const) on(x, y, "X");
+  // Bits of crust in the cream.
+  for (const [x, y] of [[9, 14], [18, 11], [3, 13], [25, 12], [14, 16]] as const) {
+    on(x, y, "o");
+    on(x + 1, y, "O");
+    on(x, y + 1, "O");
+  }
+  return { grid: toGrid(cv) };
+}
+
+/** The cherry on top, with its stem. */
+const cherryPart: Part = { grid: ["...O", "..O.", ".rr.", "rErr", "rrrR", ".RR."] };
+
+const { parts: FREEZE_PARTS, add: addFreezePart } = lazyParts();
+for (const rise of [5, 10, 18]) addFreezePart(`cream${rise}`, () => creamHeap(rise));
+addFreezePart("cherry", () => cherryPart);
+
+/** Where the heap and its cherry stand when settled (the heap's top-left; the cherry on the right dollop). */
+const HEAP: Pt = [1, 12];
+const CHERRY: Pt = [22, 8];
+const heap = (dx = 0, dy = 0, cherry: Pt | null = [0, 0], part = "cream18"): Layer[] => [
+  { part, x: HEAP[0] + dx, y: HEAP[1] + dy },
+  ...(cherry ? [{ part: "cherry", x: CHERRY[0] + dx + cherry[0], y: CHERRY[1] + dy + cherry[1] }] : []),
+];
+/** A drip of cream running down the heap's face from (x, y0), `t` frames on (a streak behind it), then off its bottom edge. */
+const creamDrip = (x: number, y0: number, t: number): Speck[] => {
+  const y = Math.min(29, y0 + t * 2);
+  const streak: Speck[] = Array.from({ length: y - y0 }, (_, i): Speck => [x, y0 + i, "W"]);
+  return [...streak, [x, y, "w"], [x + 1, y, "X"], [x, y + 1, "X"], ...(y0 + t * 2 > 29 ? [[x, 31, "W"] as Speck] : [])];
+};
+
+export const PIE_FREEZE: Character = {
+  id: "pie-freeze",
+  name: "A piece buried in pie",
+  w: SQUARE,
+  h: SQUARE,
+  foot: [16, 31],
+  palette: PIE_PALETTE,
+  parts: FREEZE_PARTS,
+  anims: {
+    /**
+     * The pie's cream heaps up over the piece (as the second splat lands, just after the pie in its face): a low splat at
+     * its feet with cream flying, rising round it, a bounce past its height as the cherry drops in, and it settles.
+     */
+    heap: lazyAnim(() => ({
+      loop: false,
+      frames: [
+        { ms: 70, layers: heap(0, 0, null, "cream5"), specks: spatter(0), shake: [0, 1] },
+        { ms: 70, layers: heap(0, 0, null, "cream10"), specks: spatter(1) },
+        { ms: 80, layers: heap(0, -1, [0, -6]) },
+        { ms: 90, layers: heap(0, 0, [0, -1]), shake: [0, 1] },
+        { ms: 140, layers: heap(), pal: { E: "#ffffff", r: "#ff5a5f" } },
+      ],
+    })),
+    /** Buried, while the freeze lasts: a small wobble now and then, cream dripping down its face and off its bottom edge. */
+    buried: lazyAnim(() => ({
+      loop: true,
+      frames: [
+        ...[0, 1, 2, 3, 4].map((t): Frame => ({ ms: 160, layers: heap(), specks: creamDrip(19, 21, t) })),
+        { ms: 90, layers: heap(1, 0) },
+        { ms: 90, layers: heap(-1, 0) },
+        { ms: 90, layers: heap(1, 0) },
+        { ms: 120, layers: heap(), pal: { E: "#ffffff" } },
+        ...[0, 1, 2, 3, 4].map((t): Frame => ({ ms: 160, layers: heap(), specks: creamDrip(8, 23, t) })),
+        { ms: 260, layers: heap() },
+      ],
+    })),
+    /** The freeze wears off: the cream slides down off the piece and off the square, the cherry rolling away. Ends empty. */
+    slide: lazyAnim(() => ({
+      loop: false,
+      frames: [
+        { ms: 80, cue: "slide", layers: heap(0, 1, [1, 0]) },
+        { ms: 80, layers: heap(0, 3, [3, 1]) },
+        { ms: 80, layers: heap(0, 6, [5, 4]), specks: creamDrip(8, 25, 0) },
+        { ms: 90, layers: heap(0, 10, [8, 8]), specks: creamDrip(8, 25, 1) },
+        { ms: 90, layers: heap(0, 14, null), specks: creamDrip(8, 25, 2) },
+        { ms: 90, layers: heap(0, 17, null) },
+        { ms: 60, layers: [] },
+      ],
+    })),
+  },
 };

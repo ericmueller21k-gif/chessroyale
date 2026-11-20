@@ -15298,7 +15298,7 @@ img.qicon {
 
 /* ---------------- Boss powers (BossPowers.tsx) ---------------- */
 
-/* The board layer: ice over frozen pieces, the pie on its square (the characters' effect sprites). Over the pieces,
+/* The board layer: ice over frozen pieces, the pie on its square, a piece buried in it (the characters' effect sprites). Over the pieces,
    never taking a tap. */
 .power-board {
   position: absolute;
@@ -15381,6 +15381,7 @@ img.qicon {
   }
 }
 .pw-ice,
+.pw-pie-freeze,
 .pw-frost {
   position: absolute;
   left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);

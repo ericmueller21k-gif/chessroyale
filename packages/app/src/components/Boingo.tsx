@@ -1,8 +1,10 @@
+import type { JSX } from "preact";
 import { useContext } from "preact/hooks";
 import type { BossKit } from "../characters/kits.ts";
-import { EFFECTS, cueAt } from "../characters/power-art.ts";
+import { EFFECTS, animLength, cueAt } from "../characters/power-art.ts";
 import { BossFace } from "./BossCharacter.tsx";
-import { BossEffect, BossMoment, SpriteAnim } from "./BossEffect.tsx";
+import { BossEffect, BossMoment, SpriteAnim, prewarm } from "./BossEffect.tsx";
+import { onResetBeats } from "./boss-figure.ts";
 import { funhouseAngle, pieceAt, type BoardAngle } from "@chessroyale/chess";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
@@ -13,14 +15,14 @@ import { Flight, PIECE_WORD, hash, onSquare, type BossUi, type Moment, type Mome
 /**
  * Boingo's powers on screen: the pie (Eric, Nov 12: his throw, the pie in the face of one of your pieces, two pieces of it
  * splitting off onto the two squares diagonally behind it, the pies there while they last; the piece's splat mark, a
- * small cream smear drawn with the piece; a second splat's freeze, Ginger's ice) and the funhouse (he pogos onto the
+ * small cream smear drawn with the piece; a second splat's freeze, the piece buried in his pie's cream: Eric, Nov 20) and the funhouse (he pogos onto the
  * board, it spins and flips, he speaks, he plays the crowd's move, he bounces off). His rules:
  * packages/chess/src/bosses/boingo.ts.
  */
 
 /**
  * The pie's beats (ms into its moment): the banner (gone as he throws), then his throw and the pie's flight from his side
- * (`flyAt`), the pie in the piece's face (`hitAt`: the splash, its splat mark, a second splat's ice from `iceAt`), two
+ * (`flyAt`), the pie in the piece's face (`hitAt`: the splash, its splat mark, a second splat's cream heaping up from `iceAt`), two
  * pieces of it splitting off (`splitAt`) and landing on the two squares behind (`landAt`: the splat, then the pie).
  */
 export const PIE = { flyAt: 1450, hitAt: 1800, iceAt: 1900, splitAt: 1880, landAt: 2160 } as const;
@@ -177,11 +179,51 @@ function spinMoment({ boss, banner }: MomentProps) {
   return <div class="power-moment pm-spin">{banner(to === 0 ? "BACK AGAIN!" : "SPIN!", sub, "fun", SPIN.spinAt)}</div>;
 }
 
+// ---------------- A piece his pie froze: buried in cream ----------------
+
+/** The freeze each battle last showed (by the battle's start), so the cream can slide off as it wears off. */
+const lastFrozen = new Map<string, { square: string; until: number }>();
+/** When this device first saw a freeze worn off (by battle, square and turn): its cream slides off from then. */
+const slideSeen = new Map<string, number>();
+// (A new battle forgets both.)
+onResetBeats(() => {
+  lastFrozen.clear();
+  slideSeen.clear();
+});
+/** How long the cream takes to slide off (pieFreeze's slide; it ends empty). */
+const SLIDE_MS = () => animLength(EFFECTS.pieFreeze.ch.anims.slide!);
+
+/**
+ * The freeze that wore off as this crowd turn began, sliding off its piece now: its square and when it began (this device
+ * first saw the freeze gone, as Ginger's melts). Null once it's done, when there's none, or when its piece is gone (taken).
+ */
+export function pieThaw(boss: Pick<BossView, "startMove" | "crowdSide">, p: Pick<NonNullable<BossView["powers"]>, "frozen" | "turn">, board: string, now: number): { square: string; at: number } | null {
+  const battle = `${boss.startMove}`;
+  if (p.frozen) {
+    lastFrozen.set(battle, { square: p.frozen.square, until: p.frozen.until });
+    return null;
+  }
+  const was = lastFrozen.get(battle);
+  if (!was || p.turn !== was.until + 1 || pieceAt(board, was.square)?.color !== boss.crowdSide) return null;
+  const key = `${battle}:${was.square}:${was.until}`;
+  const at = slideSeen.get(key) ?? (slideSeen.set(key, now), now);
+  if (slideSeen.size > 20) slideSeen.delete(slideSeen.keys().next().value!);
+  return now < at + SLIDE_MS() ? { square: was.square, at } : null;
+}
+
+let warmed = false;
+/** The cream's frames drawn ahead (its heap, the loop and the slide), a slice a frame, as his battle starts. */
+export function prewarmBoingo(): void {
+  if (warmed) return;
+  warmed = true;
+  prewarm("pieFreeze", Object.entries(EFFECTS.pieFreeze.ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
+}
+
 export const BOINGO_UI = {
   id: "clown",
   ultimate: { name: "the Funhouse" },
   moments: {
-    // (The pies on the two squares behind as the split pieces land; a second splat's ice on the piece just after the hit.)
+    // (The pies on the two squares behind as the split pieces land; a second splat's cream heaping up just after the hit.)
     pie: { order: 0, kit: "power", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + PIE.landAt : m.square === square ? m.at + PIE.iceAt : undefined), view: pieMoment },
     // The funhouse has a screen of its own, after the move he plays for the crowd: the board turns upside down and the
     // move lands. Then each later step turns it again as a crowd turn begins.
@@ -201,12 +243,18 @@ export const BOINGO_UI = {
       view: spinMoment,
     },
   },
-  // The pies on their squares (pieSplat: the splat, then the pie; one splat sound for the pair), and a frozen piece's ice
-  // (Ginger's: it forms, then shimmers while it lasts), in eighths of the board's own size, where the board shows them
-  // however it's turned.
+  // The pies on their squares (pieSplat: the splat, then the pie; one splat sound for the pair), and a frozen piece buried in
+  // cream (pieFreeze: it heaps up as the second splat lands, wobbles and drips while it lasts, and slides off as the freeze
+  // wears off), in eighths of the board's own size, where the board shows them however it's turned.
   board: ({ boss, p, board, orientation, now, appearAt, turn }) => {
     const pies = p.pies ?? (p.pie ? [p.pie] : []);
-    const ice = EFFECTS.iceOverlay;
+    const fx = EFFECTS.pieFreeze;
+    const thaw = pieThaw(boss, p, board, now);
+    const cream = (sq: string, anim: JSX.Element, state = "") => (
+      <span key={`cream-${sq}`} class={`pw-pie-freeze${state}`} style={onSquare(sq, orientation, turn)} data-square={sq}>
+        {anim}
+      </span>
+    );
     return {
       over: [
         ...pies.map(
@@ -219,11 +267,8 @@ export const BOINGO_UI = {
         ),
         ...p.iced
           .filter((sq) => pieceAt(board, sq)?.color === boss.crowdSide && now >= appearAt(sq))
-          .map((sq) => (
-            <span key={`ice-${sq}`} class="pw-ice" style={onSquare(sq, orientation, turn)} data-square={sq}>
-              <SpriteAnim ch={ice.ch} anim={ice.start!} then={ice.loop} since={appearAt(sq)} sounds={ice.sounds} id={sq} />
-            </span>
-          )),
+          .map((sq) => cream(sq, <SpriteAnim ch={fx.ch} anim={fx.start!} then={fx.loop} since={appearAt(sq)} sounds={fx.sounds} id={sq} />)),
+        thaw && cream(thaw.square, <SpriteAnim ch={fx.ch} anim={fx.end!} since={thaw.at} sounds={fx.sounds} id={`${thaw.square}:${thaw.at}`} />, " sliding"),
       ],
     };
   },

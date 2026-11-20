@@ -16,6 +16,7 @@ import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
 import { frameImage, prewarmAnims } from "./BossEffect.tsx";
 import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmGinger } from "./Ginger.tsx";
+import { prewarmBoingo } from "./Boingo.tsx";
 import { prewarmGrex } from "./Grex.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
@@ -296,8 +297,10 @@ function Character({ boss, stage, place, muteFall, children }: { boss: BossView;
       if (kit.ch.id === "sawyer") prewarmSawyer(kit.ch.name);
       // (Wrangler's leap and lasso too: his long pull comes a move in; then his wind-up and haul.)
       if (kit.ch.id === "pig") prewarmPig(kit.ch.name);
-      // (Ginger's ice: its crack, thin ice and thaw; Boingo's freeze, a piece his pie splatted twice, shows it too.)
-      if (kit.ch.id === "gingerbread" || kit.ch.id === "clown") prewarmGinger();
+      // (Ginger's ice: its crack, thin ice and thaw.)
+      if (kit.ch.id === "gingerbread") prewarmGinger();
+      // (Boingo's freeze, a piece his pie splatted twice: the cream heaping up, its loop and its slide.)
+      if (kit.ch.id === "clown") prewarmBoingo();
       // (Jefferson's Roman candle: him, its shots and fireballs.)
       if (kit.ch.id === "grex") prewarmGrex(kit.ch.name);
       // (Alfil's cast, fusion and Slam, and the shadows his pieces cast while they're up.)
