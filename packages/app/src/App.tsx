@@ -1438,7 +1438,7 @@ export function App() {
    * party rule with ties to the engine's best). Kept on this device by its room's code, so a reload there is still the tower's floor.
    */
   const startPartyFloor = (e: PartyFloorEntry) => {
-    keepPartyFloor({ lobby: e.lobby, floor: e.floor, bosses: e.bosses, beaten: e.beaten });
+    keepPartyFloor({ lobby: e.lobby, floor: e.floor, bosses: e.bosses, beaten: e.beaten, ...(e.lives !== undefined ? { lives: e.lives } : {}) });
     setTowerBack(null);
     joinLobby(e.lobby, { party: { pass: e.pass, seat: e.seat, boss: "", difficulty: "normal" } });
   };
@@ -1475,7 +1475,7 @@ export function App() {
     // (A Battle Tower party's floor, this room's (tower-party.ts keepPartyFloor): its strip, and the way back into the tower after it.)
     const floor = partyFloorOf(code);
     if (floor) {
-      m.towerParty = { floor: floor.floor, bosses: floor.bosses, beaten: floor.beaten };
+      m.towerParty = { floor: floor.floor, bosses: floor.bosses, beaten: floor.beaten, ...(floor.lives !== undefined ? { lives: floor.lives } : {}) };
       towerReturn.current = true;
     }
     m.settings = floor

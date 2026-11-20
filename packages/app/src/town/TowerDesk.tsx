@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
-import { TOWER_PARTY } from "@chessroyale/core";
+import { BATTLE_TOWER, TOWER_PARTY } from "@chessroyale/core";
 import { Confirm } from "../components/MatchMenu.tsx";
 import { InviteSheet } from "../components/Friends.tsx";
 import { PARTY_COLORS } from "../board/logic.ts";
-import { TOWER_WORDS, loadKept, settle, towerApi, type RunKind, type TowerState } from "../tower.ts";
+import { TOWER_WORDS, livesOf, lostWords, loadKept, settle, towerApi, type RunKind, type TowerState } from "../tower.ts";
+import { TowerHearts } from "../components/TowerHearts.tsx";
 import { joinTowerPartyAnswer, leaveTowerParty, makeTowerParty, onTowerParty, openTowerParties, openTowerParty, planWords, towerParty, type OpenParty } from "../tower-party.ts";
 import { chatTestRoom } from "./chat-net.ts";
 import "../tower.css";
@@ -23,9 +24,9 @@ import "../tower.css";
  * "No open parties right now." when there are none.
  * The panel under them holds the same things, in the same places, whatever you're doing (Eric's "nothing hidden": the review of #835,
  * finding 11): the party's four seats (each other member's Kick: the leader's, greyed during a floor), the line saying what START does
- * (`plan`) or how your climb stands, READY or START and Leave party, then your solo climb (Continue or Start, Start over, Alone). What
- * doesn't apply now shows greyed: the party's half until you're in one, the solo half while you are. `onGo`: a floor of yours is ready,
- * you walk into the elevator (Town.tsx).
+ * (`plan`) or how your climb stands, READY or START and Leave party, then your solo climb (its lives and floors lost: Nov 20; Continue or
+ * Start, Start over, Alone). What doesn't apply now shows greyed: the party's half until you're in one, the solo half while you are.
+ * `onGo`: a floor of yours is ready, you walk into the elevator (Town.tsx).
  */
 export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onBest: (best: number) => void }) {
   const [st, setSt] = useState<TowerState | null>(null);
@@ -141,7 +142,7 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
         ? "Your run is saved."
         : copy
           ? `Your party climb is on floor ${copy.floor}.`
-          : "A climb of 99 floors. One loss ends it."
+          : TOWER_WORDS.climb
     : "Reading your climb…";
   const status = p ? (p.error ?? note ?? (plan.ok && leading && waiting.length ? `${plan.line} Waiting for ${waiting.map((w) => w.name).join(", ")}.` : plan.line || "Joining…")) : (note ?? soloNote);
   return (
@@ -210,7 +211,11 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
             Leave party
           </button>
         </div>
-        {/* (Your solo climb, greyed while you're in a party: Leave party first.) */}
+        {/* (Your solo climb, greyed while you're in a party: Leave party first. Its lives and floors lost always on their line (Nov 20).) */}
+        <p class="tw-desk-lives" data-tower-lives={run ? livesOf(run.lives) : BATTLE_TOWER.lives}>
+          <TowerHearts lives={run ? livesOf(run.lives) : BATTLE_TOWER.lives} />
+          <span>{!run ? "Two lives a climb" : lostWords(run.lost ?? []) || "No floors lost"}</span>
+        </p>
         {run ? (
           <button type="button" class="town-btn primary tw-solo-go" disabled={busy || !!p} onClick={() => onGo("solo")}>
             Continue: floor {run.floor}

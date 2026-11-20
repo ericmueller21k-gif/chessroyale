@@ -10,7 +10,8 @@ import { VoiceBubble, bossVoice } from "../speech.tsx";
 import { BossLevel } from "./Boss.tsx";
 import { BossPortrait } from "../components/BossPortrait.tsx";
 import { portraitName } from "../characters/portraits.ts";
-import { floorRating, towerBoss } from "../tower.ts";
+import { floorRating, livesOf, towerBoss } from "../tower.ts";
+import { TowerHearts } from "../components/TowerHearts.tsx";
 import type { BossView, GameView } from "../game.ts";
 import { sideOf } from "../boss-side.ts";
 import "../tower.css";
@@ -53,7 +54,10 @@ export function speakerOf(side: { bosses: readonly { id?: string }[]; toMove: nu
   return i < 0 ? side.toMove : i;
 }
 
-/** The run's strip: "Battle Tower · Floor 4 of 99", the bosses beaten (the last 6, or 9 on a computer; the rest counted), the next floor's rating, the moves left. */
+/**
+ * The run's strip: "Battle Tower · Floor 4 of 99" and the run's lives (Nov 20: two hearts, a spent one greyed), the bosses beaten (the last
+ * 6, or 9 on a computer; the rest counted), the next floor's rating, the moves left.
+ */
 export function TowerStrip({ match, computer = false }: { match: GameView; computer?: boolean }) {
   // (A solo floor's run, or a party floor's: Nov 20.)
   const play = match.tower ?? match.towerParty;
@@ -63,8 +67,11 @@ export function TowerStrip({ match, computer = false }: { match: GameView; compu
   const next = play.floor + 1;
   return (
     <span class={`tw-strip${computer ? " tw-strip-wide" : ""}`} data-tower-floor={play.floor}>
-      <span class="tw-strip-top">
-        Battle Tower<span> · Floor {play.floor} of {BATTLE_TOWER.floors}</span>
+      <span class="tw-strip-head">
+        <span class="tw-strip-top">
+          Battle Tower<span> · Floor {play.floor} of {BATTLE_TOWER.floors}</span>
+        </span>
+        <TowerHearts lives={livesOf(play.lives)} />
       </span>
       <span class="tw-strip-row">
         {computer && boss && <span>Move {Math.min(boss.crowdMoves + 1, boss.maxMoves)} ·</span>}

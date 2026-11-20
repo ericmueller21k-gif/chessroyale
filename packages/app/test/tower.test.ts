@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BATTLE_TOWER } from "@chessroyale/core";
-import { floorOutcome, floorPlan, floorRating, leaveIsFree, loadKept, readKept, saveKept, settleKept, towerBoss, type KeptFloor } from "../src/tower.ts";
+import { FloorPlay, floorOutcome, floorPlan, floorRating, leaveIsFree, livesOf, lostWords, loadKept, readKept, saveKept, settleKept, spentLine, towerBoss, type KeptFloor } from "../src/tower.ts";
 
 // (The server's answers, faked: your account is ready at once.)
 vi.mock("../src/boss-tokens.ts", () => ({ accountReady: async () => true }));
@@ -30,6 +30,17 @@ describe("the floor kept on the device", () => {
     expect(bad?.xp).toBeUndefined();
     expect(bad?.game?.turnMs).toBeUndefined();
     expect(bad?.game?.moves).toEqual([]);
+  });
+
+  it("keeps the run's lives going into the floor (Nov 20); one kept before lives, or a bad one, reads as all of them", () => {
+    expect(readKept(JSON.stringify({ ...kept, lives: 1 }))?.lives).toBe(1);
+    expect(new FloorPlay({ ...kept, lives: 0 }, 0).lives).toBe(0);
+    for (const bad of [undefined, "1", 1.5, null]) {
+      const k = readKept(JSON.stringify({ ...kept, lives: bad }))!;
+      expect(k.lives).toBeUndefined();
+      expect(new FloorPlay(k, 0).lives).toBe(BATTLE_TOWER.lives);
+    }
+    expect(readKept(JSON.stringify({ ...kept, lives: 9 }))?.lives).toBe(BATTLE_TOWER.lives);
   });
 
   it("refuses what isn't a kept floor: nothing, damaged, another version, a bad result; a damaged game is dropped, the floor kept", () => {
@@ -82,7 +93,7 @@ describe("the tower's rules on the device", () => {
     expect([0, 1, 2, 3].map(leaveIsFree)).toEqual([true, true, false, false]);
   });
 
-  it("only a win climbs: a battle's result as the tower takes it", () => {
+  it("a battle's result as the tower takes it", () => {
     expect(floorOutcome("crowd")).toBe("won");
     expect(floorOutcome("boss")).toBe("lost");
     expect(floorOutcome("draw")).toBe("drawn");
@@ -91,6 +102,15 @@ describe("the tower's rules on the device", () => {
   it("a floor's rating as the screens show it (the design's table), full strength on the top floor", () => {
     expect([1, 2, 5, 10, 60, 98].map((f) => floorRating(f))).toEqual(["700", "620", "780", "830", "2029", "3190"]);
     expect(floorRating(99)).toBe("Full strength");
+  });
+
+  it("lives in words (Nov 20): the result's line after a floor not won, the recap of the floors lost, the lives as shown", () => {
+    expect(spentLine("lost", 8, 1)).toBe("You lost floor 8. It still counts: 1 life left.");
+    expect(spentLine("drawn", 8, 0)).toBe("Floor 8 was a draw. It still counts: no lives left.");
+    expect(spentLine("left", 3, 1)).toBe("You left floor 3. It still counts: 1 life left.");
+    expect(spentLine("lost", 4, 1, "Your party")).toBe("Your party lost floor 4. It still counts: 1 life left.");
+    expect([[], [8], [8, 11], [3, 8, 11]].map(lostWords)).toEqual(["", "Lost floor 8", "Lost floors 8 and 11", "Lost floors 3, 8 and 11"]);
+    expect([undefined, -1, 0, 1, 2, 5].map(livesOf)).toEqual([2, 0, 0, 1, 2, 2]);
   });
 
   it("draws a boss id it doesn't know (renamed or removed) as a stand-in, never a crash", () => {
@@ -120,6 +140,27 @@ describe("sending a kept result", () => {
     expect(again.error).toBeUndefined();
     expect(loadKept()).toBeNull();
   });
+
+  it("a floor lost with a life spent (Nov 20): the climb goes on, the lives and floors lost the server's; a counted leave too, never taken for a free one", async () => {
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) });
+    const run = { id: "r", kind: "solo", floor: 3, bosses: ["moo"], beaten: [["clown"], ["gingerbread", "moo"]], fight: null, startedAt: 1, lives: 1, lost: [2] };
+    const lost: KeptFloor = { ...kept, game: undefined, done: "lost", moves: 9, lives: 2 };
+    vi.stubGlobal("fetch", answer(200, { outcome: "lost", floor: 2, status: "open", lives: 1, lost: [2], run, best: 1 }));
+    expect(await settleKept(lost)).toEqual({ outcome: "lost", floor: 2, status: "open", run, best: 1, lives: 1, lost: [2] });
+    // (The third loss: out, none left, every floor lost listed.)
+    vi.stubGlobal("fetch", answer(200, { outcome: "lost", floor: 2, status: "out", lives: 0, lost: [1, 2, 2], run: null, best: 0 }));
+    expect(await settleKept(lost)).toMatchObject({ status: "out", lives: 0, lost: [1, 2, 2], run: null });
+    // (A counted leave with a life left: the stop says "lost" and the run goes on; the state read after it.)
+    const left: KeptFloor = { ...kept, game: undefined, done: "left", moves: 3 };
+    const replies = [
+      { stopped: "lost", floor: 2, status: "open", lives: 1, lost: [2], run },
+      { runs: { solo: run, party: null }, best: { solo: 1, party: 0 } },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(replies.shift()), { status: 200 })));
+    const end = await settleKept(left);
+    expect(end).toMatchObject({ outcome: "left", status: "open", lives: 1, lost: [2], run });
+    expect(end.free).toBeUndefined();
+  });
 });
 
 describe("the party's plan in words (tower-party.ts planWords; the review of #835, finding 10)", async () => {
@@ -133,6 +174,10 @@ describe("the party's plan in words (tower-party.ts planWords; the review of #83
     expect(mine.line).toBe("Your climb together goes on: floor 5. Your climb goes back from floor 12, Ann's from floor 30.");
     expect(mine.ask).toEqual({ heading: "Back to floor 5?", note: "Your climb goes back from floor 12 to floor 5, where your party left off. Your best floors stay." });
     expect(planWords({ kind: "continue", floor: 3, back: [] }, "a", nameOf)).toMatchObject({ line: "Your climb together goes on: floor 3.", ask: null });
+    // (Its lives once one is spent: Nov 20.)
+    expect(planWords({ kind: "continue", floor: 3, back: [], lives: 2 }, "a", nameOf).line).toBe("Your climb together goes on: floor 3.");
+    expect(planWords({ kind: "continue", floor: 9, back: [], lives: 1 }, "a", nameOf).line).toBe("Your climb together goes on: floor 9, 1 life left.");
+    expect(planWords({ kind: "continue", floor: 9, back: [], lives: 0 }, "a", nameOf).line).toBe("Your climb together goes on: floor 9, no lives left.");
   });
   it("a new climb: what it ends, asked first when it's yours; waiting: no START", () => {
     expect(planWords({ kind: "new", ends: [{ id: "a", floor: 6 }] }, "a", nameOf)).toEqual({

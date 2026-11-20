@@ -1,6 +1,8 @@
 import type { NetTowerPlan } from "@chessroyale/chess/squads";
 import { PartyClient, createParty, currentParty, forgetParty, partyStatus, possessive } from "./squads.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
+import { BATTLE_TOWER } from "@chessroyale/core";
+import { livesLeftWords } from "./tower.ts";
 
 /**
  * The Battle Tower's party on this device (Nov 20; docs/decisions/2026-11-20-tower-party.md): the clerk's Invite friends and Open party
@@ -205,8 +207,10 @@ export function planWords(plan: NetTowerPlan | undefined, me: string | null, nam
     const back = [...(plan.back ?? [])].sort((a, b) => Number(b.id === me) - Number(a.id === me));
     const goes = back.map((b, i) => `${b.id === me ? (i ? "yours" : "Your") : possessive(nameOf(b.id))}${i ? "" : " climb goes back"} from floor ${b.floor}`);
     const mine = back.find((b) => b.id === me)?.floor;
+    // (Its lives once one is spent, Nov 20: "Your climb together goes on: floor 9, 1 life left.")
+    const lives = plan.lives !== undefined && plan.lives < BATTLE_TOWER.lives ? `, ${livesLeftWords(plan.lives)}` : "";
     return {
-      line: `Your climb together goes on: floor ${plan.floor}.${goes.length ? ` ${goes.join(", ")}.` : ""}`,
+      line: `Your climb together goes on: floor ${plan.floor}${lives}.${goes.length ? ` ${goes.join(", ")}.` : ""}`,
       up: `Up to floor ${plan.floor}`,
       ask: mine === undefined ? null : { heading: `Back to floor ${plan.floor}?`, note: `Your climb goes back from floor ${mine} to floor ${plan.floor}, where your party left off. Your best floors stay.` },
       ok: true,
@@ -223,11 +227,12 @@ export function planWords(plan: NetTowerPlan | undefined, me: string | null, nam
   };
 }
 
-/** A party floor to go into: its room, your pass and seat, the floor, its bosses and the floors beaten (the run's strip). */
+/** A party floor to go into: its room, your pass and seat, the floor, its bosses, the floors beaten and the lives going in (the run's strip). */
 export interface PartyFloorEntry extends PartyFloor {
   floor: number;
   bosses: string[];
   beaten: string[][];
+  lives?: number;
 }
 
 let enterHandler: ((e: PartyFloorEntry) => void) | null = null;

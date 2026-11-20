@@ -11,6 +11,61 @@
   margin: 4px 0 0;
 }
 
+/* ---- A run's lives (Nov 20; components/TowerHearts.tsx): every heart always there, a spent one greyed ---- */
+.tw-hearts {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  vertical-align: -1px;
+}
+.tw-heart {
+  width: 15px;
+  height: 13px;
+  fill: #e11d48;
+}
+.tw-heart.spent {
+  fill: currentColor;
+  opacity: 0.3;
+}
+/* The clerk's card: your solo climb's lives and floors lost, one line whatever it says (greyed in a party, as the solo half). */
+.tw-desk-lives {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  margin: 2px 0 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tw-desk-panel.in-party .tw-desk-lives {
+  opacity: 0.5;
+}
+/* The floor room: the run's lives in its corner (the room's bottom left, as the Hidden Boss's count; taps pass through). */
+.tw-room-lives {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(20, 12, 8, 0.82);
+  border: 1px solid #c9a24a;
+  color: #f6e7c1;
+  font: 700 14px/1 Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+}
+.tw-room-lives .tw-heart {
+  width: 17px;
+  height: 15px;
+}
+
 /* ---- The clerk's three ways to climb (Nov 20: Solo, Invite friends, Open party) and the panel under them, one size whatever it holds ---- */
 .town-card:has(.tw-desk) {
   width: 272px;
@@ -443,7 +498,15 @@
   gap: 1px;
   min-width: 0;
 }
+/* The top line and the run's hearts after it, never cut (the line's words are, with "…", first). */
+.tw-strip-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .tw-strip-top {
+  min-width: 0;
   font-weight: 800;
   font-size: 17px;
   white-space: nowrap;

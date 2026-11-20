@@ -30,20 +30,27 @@ export interface TowerRun {
   floor: number;
   /** Its bosses in turn order (between floors: as its start would deal them now). */
   bosses: string[];
-  /** The floors won so far, each one's bosses, floor 1 first. */
+  /** The floors climbed so far (won, or lost with a life spent), each one's bosses, floor 1 first. */
   beaten: string[][];
   fight: Fight | null;
   startedAt: number;
+  /** The lives left (Nov 20: BATTLE_TOWER.lives a run) and the floors lost so far, in order (the run's recap). */
+  lives: number;
+  lost: number[];
   /** A party copy's (Nov 20): the others who climbed it, and whether it's played on alone. */
   mates?: { uid: string; name: string }[];
   alone?: boolean;
 }
 
-/** What the run's strip shows of a floor (the floor, its bosses, the floors beaten): a solo floor's FloorPlay, or a party floor's (Nov 20). */
+/**
+ * What the run's strip shows of a floor (the floor, its bosses, the floors beaten, the lives left going into it: Nov 20): a solo floor's
+ * FloorPlay, or a party floor's (Nov 20). No lives known (a floor kept before lives): all of them.
+ */
 export interface TowerStripInfo {
   readonly floor: number;
   readonly bosses: readonly string[];
   readonly beaten: readonly string[][];
+  readonly lives?: number;
 }
 
 /** Which of your runs: your solo run, or your party copy played on alone (Nov 20: solo from then on). */
@@ -78,7 +85,32 @@ export const TOWER_WORDS = {
   resting: "This floor's bosses are resting for a bit. Leaving it now is free: the same floor waits for you.",
   broken: "This run can't be played. Start a new one.",
   replace: (floor: number) => `Your run on floor ${floor} ends, and a new one starts on floor 1.`,
+  /** The clerk's line with no climb under way (Nov 20: lives). */
+  climb: `A climb of ${BATTLE_TOWER.floors} floors. Two lives: the third loss ends it.`,
 } as const;
+
+/** The lives a run has as the screens show them: none known (a floor or answer from before lives), all of them; never fewer than 0 or more than all. */
+export const livesOf = (n: number | undefined): number => (n === undefined || !Number.isFinite(n) ? BATTLE_TOWER.lives : Math.max(0, Math.min(BATTLE_TOWER.lives, Math.floor(n))));
+
+/** "1 life left", "2 lives left", "no lives left". */
+export const livesLeftWords = (n: number): string => (n <= 0 ? "no lives left" : `${n} ${n === 1 ? "life" : "lives"} left`);
+
+/** The run's recap of its floors lost (Eric, Nov 20: "in your recap, it would show like that you lost ... floor 8"): "Lost floor 8", "Lost floors 8 and 11", "Lost floors 3, 8 and 11"; none, "". */
+export function lostWords(lost: readonly number[]): string {
+  if (!lost.length) return "";
+  if (lost.length === 1) return `Lost floor ${lost[0]}`;
+  return `Lost floors ${lost.slice(0, -1).join(", ")} and ${lost[lost.length - 1]}`;
+}
+
+/** A floor not won, in words: "You lost floor 8." (`who`: "Your party lost floor 8."), "Floor 8 was a draw.", "You left floor 8.". */
+export const notWon = (outcome: FloorOutcome | "left", floor: number, who = "You"): string =>
+  outcome === "drawn" ? `Floor ${floor} was a draw.` : outcome === "left" ? `You left floor ${floor}.` : `${who} lost floor ${floor}.`;
+
+/**
+ * The result line after a floor not won that the climb goes on from (Eric, Nov 20: "it just takes you on to the next match, and it just
+ * counts"): "You lost floor 8. It still counts: 1 life left." (notWon's words first).
+ */
+export const spentLine = (outcome: FloorOutcome | "left", floor: number, lives: number, who = "You"): string => `${notWon(outcome, floor, who)} It still counts: ${livesLeftWords(lives)}.`;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -114,9 +146,10 @@ export const towerApi = {
   state: () => ask<TowerState>("/api/tower"),
   newRun: (confirm: boolean) => ask<{ run: TowerRun }>("/api/tower/run", confirm ? { confirm: true } : {}),
   start: (kind?: RunKind) => ask<FloorStart>("/api/tower/floor/start", { device: deviceId(), ...kindOf(kind) }),
-  finish: (fight: string, outcome: FloorOutcome, kind?: RunKind) => ask<{ outcome: FloorOutcome; floor: number; status: string; run: TowerRun | null; best: number }>("/api/tower/floor/finish", { fight, outcome, ...kindOf(kind) }),
+  finish: (fight: string, outcome: FloorOutcome, kind?: RunKind) =>
+    ask<{ outcome: FloorOutcome; floor: number; status: string; lives?: number; lost?: number[]; run: TowerRun | null; best: number }>("/api/tower/floor/finish", { fight, outcome, ...kindOf(kind) }),
   stop: (fight: string, moves: number | undefined, free = false, kind?: RunKind) =>
-    ask<{ stopped: "between" | "free" | "lost"; floor?: number; status?: string; run: TowerRun | null }>("/api/tower/stop", { fight, ...(moves !== undefined ? { moves } : {}), ...(free ? { free: true } : {}), ...kindOf(kind) }),
+    ask<{ stopped: "between" | "free" | "lost"; floor?: number; status?: string; lives?: number; lost?: number[]; run: TowerRun | null }>("/api/tower/stop", { fight, ...(moves !== undefined ? { moves } : {}), ...(free ? { free: true } : {}), ...kindOf(kind) }),
 };
 
 /** A boss as the screens draw it: his own, or a safe stand-in for an id this app doesn't know (a boss renamed or removed since). */
@@ -166,6 +199,8 @@ export interface KeptFloor {
   music?: string;
   /** Your party copy played on alone (Nov 20): its start, result and leave say so. Unset: your solo run. */
   kind?: "party";
+  /** The run's lives going into this floor (Nov 20; the strip's hearts). Unset (kept before lives): all of them. */
+  lives?: number;
 }
 
 const KEY = "brc.tower.solo";
@@ -242,7 +277,21 @@ export function readKept(text: string | null): KeptFloor | null {
   if (k.done !== undefined && !["won", "lost", "drawn", "left"].includes(k.done)) return null;
   const g = k.game;
   const game = g && typeof g === "object" && g.snapshot && typeof g.snapshot === "object" && (g.snapshot as Partial<RunnerSnapshot>).state && Array.isArray((g.snapshot as Partial<RunnerSnapshot>).boards) && Array.isArray(g.moves) ? { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}) } : undefined;
-  return { v: 1, fight: k.fight, floor: k.floor!, bosses: k.bosses, settings: k.settings, beaten: k.beaten, ...(game ? { game } : {}), ...(k.done ? { done: k.done } : {}), ...(Number.isInteger(k.moves) ? { moves: k.moves } : {}), ...(typeof k.xp === "string" ? { xp: k.xp } : {}), ...(typeof k.music === "string" ? { music: k.music } : {}), ...(k.kind === "party" ? { kind: "party" as const } : {}) };
+  return {
+    v: 1,
+    fight: k.fight,
+    floor: k.floor!,
+    bosses: k.bosses,
+    settings: k.settings,
+    beaten: k.beaten,
+    ...(game ? { game } : {}),
+    ...(k.done ? { done: k.done } : {}),
+    ...(Number.isInteger(k.moves) ? { moves: k.moves } : {}),
+    ...(typeof k.xp === "string" ? { xp: k.xp } : {}),
+    ...(typeof k.music === "string" ? { music: k.music } : {}),
+    ...(k.kind === "party" ? { kind: "party" as const } : {}),
+    ...(Number.isInteger(k.lives) ? { lives: livesOf(k.lives) } : {}),
+  };
 }
 
 export function loadKept(): KeptFloor | null {
@@ -293,13 +342,20 @@ export const leaveIsFree = (crowdMoves: number): boolean => crowdMoves < BATTLE_
 /** A battle's result as the tower takes it. */
 export const floorOutcome = (r: "crowd" | "boss" | "draw"): FloorOutcome => (r === "crowd" ? "won" : r === "boss" ? "lost" : "drawn");
 
-/** The floor's end, as the result screen shows it: the server's word on the run (`status` "open": climbing on; "top": floor 99 won; "out"). */
+/**
+ * The floor's end, as the result screen shows it: the server's word on the run (`status` "open": climbing on, after a win or a life spent;
+ * "top": floor 99 played through; "out"), the lives left after it and the run's floors lost (Nov 20).
+ */
 export interface TowerEnd {
   outcome: FloorOutcome | "left";
   floor: number;
   status: "open" | "top" | "out";
   run: TowerRun | null;
   best: number;
+  lives: number;
+  lost: number[];
+  /** A leave before your 2nd move: free, the same floor waiting (back to the lobby, no result). */
+  free?: boolean;
   /** Couldn't be sent (no connection, or refused): the result is still kept here, sent again by the clerk's card. */
   error?: string;
 }
@@ -312,29 +368,39 @@ export interface TowerEnd {
 export async function settleKept(k: KeptFloor): Promise<TowerEnd> {
   const done = k.done ?? "left";
   const base = { outcome: done, floor: k.floor };
+  // (The lives and floors lost: the server's answer's, else the run's as it is now; a run that's over has none left.)
+  const lives = (status: TowerEnd["status"], run: TowerRun | null, said?: { lives?: number; lost?: number[] }) => ({
+    lives: status === "out" ? 0 : livesOf(said?.lives ?? run?.lives),
+    lost: Array.isArray(said?.lost) ? said.lost : (run?.lost ?? []),
+  });
   if (done === "left") {
     const a = await towerApi.stop(k.fight, k.moves, false, k.kind);
-    if (!a.ok && a.status !== 409) return { ...base, status: "open", run: null, best: 0, error: a.body.message ?? TOWER_WORDS.offline };
+    if (!a.ok && a.status !== 409) return { ...base, status: "open", run: null, best: 0, ...lives("open", null), error: a.body.message ?? TOWER_WORDS.offline };
     clearKept();
     const s = await towerApi.state();
     const best = s.ok ? s.body.best.solo : 0;
     const run = s.ok ? s.body.runs[k.kind ?? "solo"] : null;
-    return { ...base, status: a.ok && a.body.stopped === "free" ? "open" : run && run.floor === k.floor ? "open" : "out", run, best };
+    // (The stop's own word on the run, else (refused: the floor ended elsewhere) the run now: open, or over.)
+    const said = a.ok ? a.body.status : undefined;
+    const status = said === "open" || said === "top" || said === "out" ? said : run ? "open" : "out";
+    const free = a.ok && a.body.stopped === "free";
+    return { ...base, status, run, best, ...lives(status, run, a.ok ? a.body : undefined), ...(free ? { free } : {}) };
   }
   const a = await towerApi.finish(k.fight, done, k.kind);
   // (A 409 carrying the fight: the floor still under way (a win too soon): the result stays kept, sent again later; audit 2, finding 5.)
-  if (!a.ok && a.status === 409 && a.body.fight) return { ...base, status: "open", run: a.body.run ?? null, best: a.body.best ?? 0, error: a.body.message ?? TOWER_WORDS.offline };
+  if (!a.ok && a.status === 409 && a.body.fight) return { ...base, status: "open", run: a.body.run ?? null, best: a.body.best ?? 0, ...lives("open", a.body.run ?? null), error: a.body.message ?? TOWER_WORDS.offline };
   if (a.ok) {
     clearKept();
-    return { ...base, status: a.body.status === "top" ? "top" : a.body.status === "open" ? "open" : "out", run: a.body.run, best: a.body.best };
+    const status = a.body.status === "top" ? "top" : a.body.status === "open" ? "open" : "out";
+    return { ...base, status, run: a.body.run, best: a.body.best, ...lives(status, a.body.run, a.body) };
   }
   if (a.status === 409 && !a.body.confirm && "run" in a.body) {
     clearKept();
     const run = a.body.run ?? null;
-    return { ...base, status: run ? "open" : "out", run, best: a.body.best ?? 0 };
+    return { ...base, status: run ? "open" : "out", run, best: a.body.best ?? 0, ...lives(run ? "open" : "out", run) };
   }
   if (a.status === 409 && a.body.confirm) clearKept();
-  return { ...base, status: "out", run: null, best: 0, error: a.body.message ?? TOWER_WORDS.offline };
+  return { ...base, status: "out", run: null, best: 0, ...lives("out", null), error: a.body.message ?? TOWER_WORDS.offline };
 }
 
 /** Results being sent, by the floor's fight id: the result screen and the tower's screen never send one twice at once. */
@@ -370,6 +436,10 @@ export class FloorPlay {
   }
   get beaten(): readonly string[][] {
     return this.kept.beaten;
+  }
+  /** The run's lives going into this floor (Nov 20). */
+  get lives(): number {
+    return livesOf(this.kept.lives);
   }
   /** The floor kept as it begins (or is rejoined): a reload before its first step still knows this device holds it. */
   begin(): void {
@@ -442,7 +512,10 @@ export async function askFloor(best: number, kind: RunKind = "solo"): Promise<Fl
   const plan = floorPlan(start, kept, deviceId());
   if (plan === "resting" || plan === "elsewhere") return { kind: plan, start };
   if (plan === "rejoin") return { kind: "entry", entry: { start, kept: kept!, game: kept!.game!, best } };
-  return { kind: "entry", entry: { start, kept: { v: 1, fight: start.fight.id, floor: start.floor, bosses: start.bosses, settings: start.settings, beaten: start.run.beaten, ...(kind === "party" ? { kind } : {}) }, game: null, best } };
+  return {
+    kind: "entry",
+    entry: { start, kept: { v: 1, fight: start.fight.id, floor: start.floor, bosses: start.bosses, settings: start.settings, beaten: start.run.beaten, lives: livesOf(start.run.lives), ...(kind === "party" ? { kind } : {}) }, game: null, best },
+  };
 }
 
 let floorHandler: ((e: FloorEntry) => void) | null = null;
@@ -481,7 +554,7 @@ export function partyFloorOf(code: string): KeptPartyFloor | null {
   try {
     const v = JSON.parse(localStorage.getItem(PARTY_KEY) ?? "null") as Partial<KeptPartyFloor> | null;
     if (!v || typeof v.lobby !== "string" || v.lobby.toUpperCase() !== code.toUpperCase() || !Number.isInteger(v.floor) || !Array.isArray(v.bosses) || !Array.isArray(v.beaten)) return null;
-    return { lobby: v.lobby, floor: v.floor!, bosses: v.bosses.filter((b): b is string => typeof b === "string"), beaten: v.beaten.filter(Array.isArray) as string[][] };
+    return { lobby: v.lobby, floor: v.floor!, bosses: v.bosses.filter((b): b is string => typeof b === "string"), beaten: v.beaten.filter(Array.isArray) as string[][], ...(Number.isInteger(v.lives) ? { lives: livesOf(v.lives) } : {}) };
   } catch {
     return null;
   }
