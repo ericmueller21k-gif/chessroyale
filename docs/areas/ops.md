@@ -18,6 +18,12 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 - **The installed app's first window** (Nov 20, [decision](../decisions/2026-11-20-app-window-size.md)): on a computer, the installed
   app opens itself once at `APP_WINDOW` (1600 x 900, smaller on a smaller screen, centered; settings.ts), not the narrow window
   Chrome opens it in (`install.ts`, `sizeAppWindow`; unit test `packages/app/test/app-window.test.ts`). After that the player's size sticks.
+- **The installed app's status bar on an iPhone** (Nov 20, [decision](../decisions/2026-11-20-ios-standalone-top.md)): no
+  `apple-mobile-web-app-status-bar-style` in `index.html` (iOS 26 frosted the band under a `black-translucent` bar, home's top
+  bar with it), so iOS draws a solid status bar and the page starts below it. Its color is `<meta name="theme-color">`, the
+  front door's ground in each theme (`THEME_COLOR` in `theme.ts`, set before the first paint by `index.html`'s script and on
+  every theme change). iOS reads the tag only when the app is added: an icon added before must be removed and added again.
+  Checks: `packages/app/test/theme.test.ts`, `e2e/home-layout.spec.ts` (the theme test).
 - **A deploy and the tabs already open** (Nov 15, [decision](../decisions/2026-11-15-stale-tab.md)): a deploy takes the old
   version's files off the server, so an open tab lives on what the service worker keeps (`packages/app/sw-template.js`). Each
   version's cache stays while a tab runs it: the new worker asks each tab for its entry script (`install.ts`, `answerWorker`) and
