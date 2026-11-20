@@ -14,6 +14,8 @@ import { plainLine } from "../packages/app/src/speech-icons.ts";
  * - The Full Moon (?power=fullmoon): the warning, the transformation while he thinks, the flurry's five beams 120 ms apart all
  *   holding together, every animation of his drawn powered up (the gold of his fur on his canvas) through his five moves,
  *   then dazed, and his colors back. The Moon says his lines.
+ * - The Full Moon on a cold load (Nov 20): the field's layers' picture held back; the moon never shows before the land: that rise draws
+ *   the field's own picture throughout.
  * - His icons in a line: drawn as pixel images in the bubble, the plain words for a screen reader, the long lines whole and in
  *   view at 320, 360, 390 and 1280 px.
  * - He hugs the moon, now and then sits on it and hugs it again, at rest and never during a moment.
@@ -90,13 +92,31 @@ async function record(page: Page) {
         cine: document.querySelector(".mo-cine")
           ? [...document.querySelectorAll<HTMLElement>(".mo-pic")].map((e) => `${e.classList.contains("mo-close") ? "close" : e.classList.contains("mo-front") ? "front" : "field"}:${e.dataset.frame}:${e.style.opacity}`)
           : null,
-        // (The rising moon: its top on screen, and whether the field's front, the hills and the grass, is drawn over it.)
+        // (The rising moon: its top on screen, whether the field's front, the hills and the grass, is drawn over it, and whether the
+        // picture they're drawn from had arrived: its fetch done, Nov 20.)
         bigMoon: (() => {
           const m = document.querySelector<HTMLElement>(".mo-bigmoon");
           const f = document.querySelector<HTMLElement>(".mo-front");
           if (!m) return null;
           const z = (e: HTMLElement) => Number(getComputedStyle(e).zIndex);
-          return { top: m.getBoundingClientRect().top, frontOver: !!f && f.parentElement === m.parentElement && z(f) > z(m) };
+          const url = (e: HTMLElement | null) => e?.style.backgroundImage.match(/url\("?([^")]+)/)?.[1] ?? "";
+          // (A picture the page already holds is complete at once.)
+          const arrived = (u: string) => {
+            if (!u) return false;
+            const im = new Image();
+            im.src = u;
+            return im.complete && im.naturalWidth > 0;
+          };
+          return {
+            top: m.getBoundingClientRect().top,
+            frontOver: !!f && f.parentElement === m.parentElement && z(f) > z(m) && Number(f.style.opacity) >= Number(m.style.opacity),
+            arrived: arrived(url(m)) && arrived(url(f)),
+          };
+        })(),
+        // (The field's picture: "layers" (the sky without its moon, under the moon and the front) or "sheet" (the field's own).)
+        fieldPic: (() => {
+          const e = document.querySelector<HTMLElement>(".mo-field");
+          return e ? (e.style.backgroundImage.includes("moo-field-layers") ? "layers" : "sheet") : null;
         })(),
         moments: [...document.querySelectorAll(".power-moment")].map((e) => e.className.replace("power-moment", "").trim()),
         // (What a tap on the board's middle would reach: the cinematic's field, while it's up, or the board.)
@@ -127,7 +147,8 @@ type Rec = {
   casterGold: number | null;
   /** The Full Moon's cinematic, while it's up: each picture showing, "field", "front" (the field's hills and grass) or "close", its frame and opacity. */
   cine: string[] | null;
-  bigMoon: { top: number; frontOver: boolean } | null;
+  bigMoon: { top: number; frontOver: boolean; arrived: boolean } | null;
+  fieldPic: "layers" | "sheet" | null;
   moments: string[];
   /** Whether a tap on the board's middle would land on the cinematic (its field takes taps while it's up). */
   tapCine: boolean | null;
@@ -318,6 +339,7 @@ test("Moo & Moon: the Full Moon warns, its cinematic plays (the field, the close
   const moons = rec.flatMap((r) => (r.bigMoon ? [r.bigMoon] : []));
   expect(moons.length, "the moon rises in the field").toBeGreaterThan(10);
   expect(moons.every((m) => m.frontOver), "the hills and the grass are over the moon").toBe(true);
+  expect(moons.every((m) => m.arrived), "the moon only once its picture, the land's too, has arrived").toBe(true);
   expect(moons.at(-1)!.top, "the moon rises").toBeLessThan(moons[0]!.top - 20);
   expect(rec.filter((r) => !r.cine && r.phase === "play").every((r) => r.tapCine === false), "the board takes them again after").toBe(true);
   const cineEnd = cine.at(-1)!.i;
@@ -358,6 +380,43 @@ test("Moo & Moon: the Full Moon warns, its cinematic plays (the field, the close
   expect(MOO_LINES.dazed!.map(plainLine).some((l) => said.has(l)), "the daze's line").toBe(true);
   // The moon on his meter went from new to full as it filled.
   expect(Math.max(...rec.map((r) => Number(r.moon ?? 0)))).toBe(8);
+  expect(errors).toEqual([]);
+});
+
+test("Moo & Moon's Full Moon on a cold load: the moon never shows before the land; layers that arrive late leave the field's own picture for the whole rise (Nov 20)", async ({ page }) => {
+  test.skip(desktop(), "one run is enough: a phone");
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (Eric, Nov 20, live: "The first few frames you can see the moon behind the land because the moon loaded first." The field's layers'
+  // picture held back until the cinematic is under way: a slow network on a fresh load.)
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route("**/moo-field-layers*.png", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto("/?debug&nolanding&clock=60&laststand=0&boss=moo&power=fullmoon");
+  await bossAloneFromHome(page);
+  await record(page);
+  // (?power=fullmoon: the warning as the 2nd turn begins, the Full Moon as your 2nd move lands.)
+  for (let i = 0; i < 2; i++) {
+    await yourMove(page);
+    const s = await state(page);
+    await submitMove(page, quiet(s.fen, s.allowed), s.fen);
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  }
+  await page.locator(".mo-cine").waitFor({ timeout: 30_000 });
+  await expect.poll(async () => (await recorded(page)).some((r) => r.fieldPic), { timeout: 10_000 }).toBe(true);
+  // (The picture arrives as the moon would be rising: too late for this one, which never switches mid-rise.)
+  release();
+  await expect(page.locator(".mo-cine")).toHaveCount(0, { timeout: 30_000 });
+  const rec = await recorded(page);
+  const field = rec.filter((r) => r.fieldPic);
+  expect(field.length, "the field shows").toBeGreaterThan(10);
+  expect(rec.every((r) => !r.bigMoon || (r.bigMoon.arrived && r.bigMoon.frontOver)), "no moon before the land").toBe(true);
+  expect(rec.some((r) => r.bigMoon), "this rise kept the field's own picture").toBe(false);
+  expect(field.every((r) => r.fieldPic === "sheet")).toBe(true);
   expect(errors).toEqual([]);
 });
 

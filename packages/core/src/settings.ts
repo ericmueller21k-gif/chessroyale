@@ -2478,8 +2478,8 @@ export const MOO_CINEMATIC = {
   /**
    * The moon rising (Eric, Nov 20: "the moon should start half hidden behind the horizon/grassy hill and then move upward into the sky
    * for a few seconds (same timing as is now), moon should never be in front of the background hill terrain"; it came down like a
-   * meteor before that day's second change): the field's own moon, lifted as a sprite (characters/moo-moon.png), behind the field's
-   * hills, barn and grass (characters/moo-field-layers.png: the sky without its moon, then the front), from the field fading in to the
+   * meteor before that day's second change): the field's own moon, lifted, behind the field's hills, barn and grass (one picture,
+   * characters/moo-field-layers.png: the sky without its moon, the front, the moon), from the field fading in to the
    * cut, `scale` times the field's and `y` art pixels below the field's moon, from `moonFrom` (its middle on the hill line, half
    * hidden) to `moonTo` (the field's own moon's place: the field after the close-up is the same picture), easing out as it rises (its
    * progress 1 − (1 − p) to the power `moonEase`).

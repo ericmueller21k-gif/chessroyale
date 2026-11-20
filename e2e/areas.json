@@ -484,7 +484,6 @@
         "packages/app/src/components/Moo.tsx",
         "packages/app/src/components/MooCinematic.tsx",
         "packages/app/src/characters/moo-cinematic.png",
-        "packages/app/src/characters/moo-moon.png",
         "packages/app/src/characters/moo-field-layers.png",
         "packages/app/src/speech-icons.ts"
       ],

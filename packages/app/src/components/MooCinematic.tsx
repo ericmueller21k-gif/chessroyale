@@ -14,8 +14,8 @@
  * 5. He hops back to his spot (his powered `move`).
  * Two pictures in one sheet (characters/moo-cinematic.png: the field's four frames, its stars twinkling, and the close-up's five,
  * normal to white eyes; drawn on claude/boss-art: scripts/boss-art/out/arena-moo-field and scripts/boss-art/moo-closeup), the field's
- * moon lifted as its own sprite (characters/moo-moon.png, scripts/lift-moo-moon.py) rising between the field's sky without it and its
- * front (characters/moo-field-layers.png, scripts/lift-moo-field.py), his own sprite over the field, and opacities:
+ * moon rising between the field's sky without it and its front, all three lifted from its pixels into one picture
+ * (characters/moo-field-layers.png, scripts/lift-moo-field.py), his own sprite over the field, and opacities:
  * no filters. The light is the Hidden Boss's (recluse-light.ts), on one canvas the size of the screen drawn in its worker, off the
  * main thread, only while it's up. Everything from the moment's start, so a screen drawn
  * later carries on (a device that first sees it as it rejoins skips it: Moo.tsx, fullMoonMoment). While the field is up it takes
@@ -26,7 +26,6 @@ import { useLayoutEffect, useRef } from "preact/hooks";
 import { MOO_CINEMATIC as C } from "@chessroyale/core";
 import { MOO_BEATS } from "@chessroyale/chess";
 import sheetUrl from "../characters/moo-cinematic.png?url";
-import moonUrl from "../characters/moo-moon.png?url";
 import layersUrl from "../characters/moo-field-layers.png?url";
 import { bossKit } from "../characters/kits.ts";
 import { BossMoment } from "./BossEffect.tsx";
@@ -42,13 +41,19 @@ const H = 260;
 const FIELD = [0, 1, 2, 3];
 const FIELD_MS = 400;
 const CLOSE = [4, 5, 6, 7, 8];
-/** The field's layers (characters/moo-field-layers.png): its sky without the moon, four frames, then its front, four frames. */
+/**
+ * The field's layers (characters/moo-field-layers.png): its sky without the moon, four frames, then its front, four frames, then the
+ * moon in its own place. One picture, so the moon can never be drawn before the land (Eric, Nov 20, on a cold load: "you can see the
+ * moon behind the land because the moon loaded first"; docs/decisions/2026-11-20-moonrise-load-order.md).
+ */
 const SKY = [0, 1, 2, 3];
 const FRONT = [4, 5, 6, 7];
+const MOON_FRAME = 8;
+const LAYER_FRAMES = 9;
 /** Where he stands in the field (art pixels): the field was drawn with this patch clear for him. */
 const SPOT: readonly [number, number] = [100, 205];
 
-/** The field's moon (art pixels): its sprite's box in the field (scripts/lift-moo-moon.py) and its middle. */
+/** The field's moon (art pixels): its box in the field (scripts/lift-moo-field.py) and its middle. */
 const MOON = { x: 42, y: 24, w: 116, h: 113, cx: 100, cy: 80.5 };
 /** The moon's side of the close-up (shares of the picture: above the two of them, to the left, where its light streaks come from). */
 const LIGHT_FROM: readonly [number, number] = [0.14, -0.06];
@@ -168,14 +173,22 @@ function spotBox(): Box | null {
   return r && r.width ? { x: r.x, y: r.y, w: r.width } : null;
 }
 
-/** The pictures fetched and decoded ahead, as his battle starts (Moo.tsx, prewarmMoo): never a blank first frame. */
+/**
+ * The pictures fetched and decoded ahead, as his battle starts (Moo.tsx, prewarmMoo): never a blank first frame. The rising moon's
+ * layers are drawn only once their picture has decoded (`layersReady`); a Full Moon that comes before then (a cold load, a slow
+ * network) draws the field's own single picture for its whole rise instead, its moon already in place behind the hills, so no frame
+ * ever shows the moon without the land over it.
+ */
 let sheet: HTMLImageElement[] | null = null;
+let layersReady = false;
 export function prewarmCinematic(): void {
   if (sheet || typeof Image === "undefined") return;
-  sheet = [sheetUrl, moonUrl, layersUrl].map((src) => {
+  sheet = [sheetUrl, layersUrl].map((src) => {
     const im = new Image();
     im.src = src;
-    im.decode?.().catch(() => undefined);
+    const ok = im.decode ? im.decode() : new Promise<void>((res, rej) => ((im.onload = () => res()), (im.onerror = rej)));
+    if (src === layersUrl) ok.then(() => (layersReady = true)).catch(() => undefined);
+    else ok.catch(() => undefined);
     return im;
   });
 }
@@ -217,6 +230,8 @@ export function MooCinematic({ at, name }: { at: number; name: string }) {
     };
   }, [lit]);
   const frame = useRef<LightFrame | null>(null);
+  // (Whether this Full Moon's field rises in layers, decided once, before its first frame: never switched mid-rise.)
+  const layers = useRef<{ at: number; on: boolean } | null>(null);
   useLayoutEffect(() => {
     const f = frame.current;
     if (!f) return;
@@ -229,6 +244,8 @@ export function MooCinematic({ at, name }: { at: number; name: string }) {
   const rect = on ? boardOnScreen()?.getBoundingClientRect() : null;
   if (!rect || !rect.width || !kit) return null;
   const b = cineBeats();
+  if (t >= b.landed && layers.current?.at !== at) layers.current = { at, on: layersReady };
+  const layered = layers.current?.at === at && layers.current.on;
   // The area: the board and everything above it.
   const computer = onComputer();
   const area = { x: computer ? rect.x : 0, y: 0, w: computer ? rect.width : innerWidth, h: rect.bottom };
@@ -267,8 +284,9 @@ export function MooCinematic({ at, name }: { at: number; name: string }) {
   // blind; review, #1 and #4. On the hops the board shows, and takes taps as ever.)
   const fieldUp = fieldOpacity(t) > 0;
   // The moon rising: the field's, lifted, its middle where the field's is (less `y`), in whole screen pixels, between the field's sky
-  // without it and its front (the hills, the barn, the grass), so it's always behind them.
-  const m = moonAt(t);
+  // without it and its front (the hills, the barn, the grass), so it's always behind them. Its layers not decoded in time: the
+  // field's own picture, its moon in its end's place.
+  const m = layered ? moonAt(t) : null;
   const ab = m && moonArtBox(m);
   const moonBox = ab && { x: Math.round(field.x + ab.x * k), y: Math.round(field.y + ab.y * k), w: Math.round(ab.w * k), h: Math.round(ab.h * k) };
   // The light: from the moon's middle in the field; from the moon's side of the close-up after the cut (under the white, unseen).
@@ -277,7 +295,7 @@ export function MooCinematic({ at, name }: { at: number; name: string }) {
     const s = lightNow(t, T);
     s.shaft = 0;
     const toClose = t >= b.close;
-    const mm = moonMiddle(t);
+    const mm = m ? { x: MOON.cx, y: MOON.cy + m.y } : moonMiddle(b.close);
     const mid = toClose
       ? { x: area.x + close.x + LIGHT_FROM[0] * close.w, y: area.y + close.y + LIGHT_FROM[1] * close.h }
       : { x: area.x + field.x + mm.x * k, y: area.y + field.y + mm.y * k };
@@ -290,11 +308,14 @@ export function MooCinematic({ at, name }: { at: number; name: string }) {
   return createPortal(
     <div class="mo-cine" data-t={Math.round(t)}>
       <div class={`mo-area${fieldUp ? " mo-block" : ""}`} style={{ left: `${area.x}px`, top: `${area.y}px`, width: `${area.w}px`, height: `${area.h}px` }}>
-        {m ? pic(SKY[fieldFrame]!, fieldOpacity(t), "mo-field", field, layersUrl, 8) : pic(FIELD[fieldFrame]!, fieldOpacity(t), "mo-field", field)}
+        {m ? pic(SKY[fieldFrame]!, fieldOpacity(t), "mo-field", field, layersUrl, LAYER_FRAMES) : pic(FIELD[fieldFrame]!, fieldOpacity(t), "mo-field", field)}
         {moonBox && m!.opacity > 0 && (
-          <div class="mo-bigmoon" style={{ left: `${moonBox.x}px`, top: `${moonBox.y}px`, width: `${moonBox.w}px`, height: `${moonBox.h}px`, opacity: String(m!.opacity), backgroundImage: `url(${moonUrl})` }} />
+          <div
+            class="mo-bigmoon"
+            style={{ left: `${moonBox.x}px`, top: `${moonBox.y}px`, width: `${moonBox.w}px`, height: `${moonBox.h}px`, opacity: String(m!.opacity), backgroundImage: `url(${layersUrl})`, backgroundSize: `${(W * LAYER_FRAMES * moonBox.w) / MOON.w}px ${(H * moonBox.h) / MOON.h}px`, backgroundPosition: `${(-(MOON_FRAME * W + MOON.x) * moonBox.w) / MOON.w}px ${(-MOON.y * moonBox.h) / MOON.h}px` }}
+          />
         )}
-        {m && pic(FRONT[fieldFrame]!, fieldOpacity(t), "mo-front", field, layersUrl, 8)}
+        {m && pic(FRONT[fieldFrame]!, fieldOpacity(t), "mo-front", field, layersUrl, LAYER_FRAMES)}
         {pic(CLOSE[closeFrame(t)]!, closeOpacity(t), "mo-close", close)}
         {litOn > 0 && (
           <div
