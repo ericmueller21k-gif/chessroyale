@@ -38,7 +38,10 @@ Lane: `social`.
   type" while you aren't typing (`docs/decisions/2026-11-12-town-chat-hints.md`). Since Nov 20 a Battle Tower party open to the town
   posts "Ann is looking for 3 more to climb the Battle Tower" (`sys` "party", its code in `party`), with a **Join** after its words (a
   press there is the button's, never the box's); the party's Durable Object takes it out again when the party fills, starts or its
-  leader leaves ([battle-tower.md](battle-tower.md), "The party").
+  leader leaves, and only that party's own line (`removeParty`: a restart starts the numbers again). Since the review of #835: one line
+  an account (a newer replaces the older), a new one at most every `TOWER_PARTY.openGapMs` (a minute); the leader passes the town chat's
+  checks first (not banned, no moderator's chat ban, the chat not paused: `townPartyPoster`) and the line carries their account's name;
+  a deleted account's or a name reset's party line goes with their other lines ([battle-tower.md](battle-tower.md), "The party").
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`
   phrases and `maxEmoji` emoji (the defaults until they choose). Bots use the whole list.
 - **Packs.** Free packs everyone has; more are sold in the shop (`QUICK_CHAT.packPrices`; `core/shop.ts` lists them

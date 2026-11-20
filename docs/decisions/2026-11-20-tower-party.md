@@ -24,7 +24,8 @@ others joined it): every member keeps a copy. The rest of §5 stands.
   the floor's settings (`towerPartySettings`: the party rule, ties always to the engine's best, `partyCloseCp` 0; the bosses at the floor's
   strength; no difficulty).
 - **One run, a copy each** (server `tower.ts`): a party's run is one seed and one deal; each member holds a `tower_runs` row of kind
-  'party', its `members` the run's key and who climbed it (`{run, uids, alone?}`). START begins the floor on every copy at once
+  'party', its `members` the run's key and who climbed it (`{run, uids, alone?, party?, partyMet?}`: `party`, the floor the copy
+  reached with its party; `partyMet`, the deal there, kept while it's played alone: the review's finding 1, below). START begins the floor on every copy at once
   (`preparePartyFloor`, `commitPartyFloor`: one batch, all or nothing); the floor's match room writes each member's end to their copy
   (`LobbyCore.takeTowerEnds` → `partyFloorWrite`, beside its results, retried as they are), never a device.
 - **Teaming up again:** the plan (`partyPlan`) reads everyone's copies: when two or more hold an open copy of one run and every one of
@@ -38,8 +39,11 @@ others joined it): every member keeps a copy. The rest of §5 stands.
 ## The calls (the director's reading of Eric's words, and mine)
 
 1. **Every member keeps a copy**, written by the room for every member who started the floor: the same seed, deal and floor.
-2. **Re-forming: the party's floor is the lowest of its members' copies** (the director's call): nobody is carried up a floor they didn't
-   win with the party. Copies above it go back to it; their party bests stay (bests only rise).
+2. **Re-forming: the party's floor is the lowest floor any of its members reached with the party** (the director's call): nobody is carried
+   up a floor they didn't win with the party. A copy's party floor (`members.party`) is set only by the party's writes (a START's commit,
+   the room's write), never by a floor played alone (the review of #835, finding 1: before, a copy's floor counted, and two accounts could
+   climb alone to 25 by script and collect the floor-25 crate and a party best of 25 in one party win). Copies above it go back to it,
+   each named in the plan and asked first (call 13); their bests stay (bests only rise).
 3. **Nobody new joins a run already climbed:** a party with anyone new starts its own run from floor 1. A run's members are fixed at its
    first START (nobody joins mid-run; the design's "joining mid-run" is dropped).
 4. **Starting a new party run asks first** whoever's open party copy it would end: a member's READY is their yes (the app asks before it),
@@ -60,9 +64,40 @@ others joined it): every member keeps a copy. The rest of §5 stands.
     stop that person climbing on with their own party; the guest's id is gone from every copy either way). Guests can only be in a
     party where signing in isn't asked for (local, tests).
 11. **Open party** is the leader's; its line lapses when the party fills, starts a floor, or its leader leaves (`takeLapsedOpen`), and
-    with the town's other lines after `TOWN_CHAT.lineMs`. Anyone with the line's Join (or a friend's invite) comes in by the party's
+    with the town's other lines after `TOWN_CHAT.lineMs`, when the button is live again (the review's finding 3: the card said "open"
+    after the town had dropped it). One line an account (a newer replaces the older), a new one at most every `TOWER_PARTY.openGapMs`
+    (a minute), the leader passing the town chat's checks first (not banned, no moderator's chat ban, the chat not paused), under their
+    account's name (finding 2: lines nobody could mute, from accounts banned from chat). Sign-in isn't asked again: the party takes only
+    accounts where signing in is set up. A party takes out only its own line (finding 4). Anyone with the line's Join (or a friend's invite) comes in by the party's
     code, as Boss Battle's link.
 12. **A tower party floor's settings** reuse `bossPartySettings` with 4 seats; the floor's strength is the run's, never a difficulty.
+
+## The review of #835 (Nov 20): the director's calls, and mine
+
+13. **Kick is greyed during a tower party's floor** (the director's call, finding 6): from START until the room says the floor is over,
+    the server refuses Kick and the seats show it greyed; live again after. A kick mid-floor is a leave (a loss after the party's 2nd
+    move), so a leader could otherwise end a member's climb; the match's own AFK kick still applies. **Mine:** the clerk's panel had no
+    Kick at all (the party's Kick was only reachable by a hand-made message), so "greyed" had nothing to grey: each other member's seat
+    now has a small Kick, the leader's to press, asked first ("Kick Bo?": they never come back in), greyed for the others and during a
+    floor. Promote stays off the clerk's card.
+14. **A continue that takes a member's copy back floors says so and asks first** (the director's call, finding 10): the plan names each
+    ("Your climb together goes on: floor 5. Ann's climb goes back from floor 30, Bo's from floor 12."), READY asks first ("Back to floor
+    5?") as it does for an end, and the leader's START needs their confirm when it's theirs. The floor room's up button says where START
+    goes, from the plan ("Up to floor 5", "New climb: floor 1"), never the floor after the room's.
+15. **The clerk's panel keeps the solo row shown greyed** (the director's call, Eric's "nothing hidden", finding 11): one layout whatever
+    you're doing, nothing swapped: the party's seats, the line, READY or START and Leave party, then the solo climb (Continue or Start,
+    Start over, Alone). **Mine:** outside a party, the party's half shows too, greyed (four open seats, START and Leave party), the line
+    holding your solo climb's note; the line keeps room for three lines and the seats are two equal halves (a long name cut with "…"), so
+    nothing moves as people come and go. The town line's Join reads "Joined"
+    only once the party has welcomed you; turned away, its words show in your chat as a line only you see, and Join is live again; the
+    pill is as wide as its widest label whatever it says.
+16. **Mine (findings 5, 7, 8, 9):** a seat whose account has been deleted holds the plan ("Bo's account has been deleted. Kick them to
+    climb on."), and a new run's copies are written only for accounts still there (the batch refused otherwise). The floor room passes
+    over a member's write that fails rather than waiting on it, and a crate floor's crate that keeps failing stops holding its floor up
+    after `MATCH_SAVE.strictMinutes` (the floor written without it, logged), as a result's rewards do. The sign-in merge names the account
+    once in a copy that named both, and reads the party copies only when the guest holds one. `?win=1` only where `TEST_SWITCHES` is on.
+17. **Mine (found fixing finding 3):** a Boss Battle party stays "placed" after its battle, so a tower party's Open party after its first
+    floor went up and was taken out at once. The line now lapses on a floor under way (START to the room's end), not on "placed".
 
 ## Stored data
 

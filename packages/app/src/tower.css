@@ -67,7 +67,8 @@
 }
 .tw-seats {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* (Two equal halves whatever the names: a long one is cut with "…", never widens its column.) */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
   margin: 0;
   padding: 0;
