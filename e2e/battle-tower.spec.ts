@@ -426,13 +426,18 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
   await floorThenMatch(page, 2, 2);
-  // Babur's pump in his own part, inside it, never resizing it (phone and computer alike).
-  const part = page.locator('.tw-part[data-boss="tiger"]');
-  const pump = part.locator("> .tg-pump-slot");
+  // Babur's pump: a phone's in his own part of the split bar, inside it; a computer's beside his figure by the board, clear of it. One.
+  const desk = test.info().project.name === "desktop";
+  const holder = page.locator(desk ? '.tw-side-fig[data-boss="tiger"]' : '.tw-part[data-boss="tiger"]');
+  const pump = holder.locator(".tg-pump-slot");
   await expect(pump).toHaveAttribute("data-place", "tower");
+  await expect(page.locator(".tg-pump")).toHaveCount(1);
   const inside = async () => {
-    const [a, b] = [(await part.boundingBox())!, (await pump.boundingBox())!];
-    return b.x >= a.x - 0.5 && b.y >= a.y - 0.5 && b.x + b.width <= a.x + a.width + 0.5 && b.y + b.height <= a.y + a.height + 0.5;
+    const b = (await pump.boundingBox())!;
+    const a = desk ? { x: 0, y: 0, ...page.viewportSize()! } : (await holder.boundingBox())!;
+    const ok = b.width > 30 && b.x >= a.x - 0.5 && b.y >= a.y - 0.5 && b.x + b.width <= a.x + a.width + 0.5 && b.y + b.height <= a.y + a.height + 0.5;
+    const board = (await page.locator(".board-wrap").first().boundingBox())!;
+    return ok && (!desk || b.x + b.width <= board.x);
   };
   expect(await inside()).toBe(true);
   // Wrangler's meter: on the bar, empty and dimmed, saying why.

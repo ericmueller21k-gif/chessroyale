@@ -145,8 +145,9 @@ export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
         return (
           <span class={`tw-part${on ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id}>
             {on && <span class="tw-tag">TO MOVE</span>}
-            {/* (His prop where it fits a part: Babur's pump, BossUi.towerProp; Eric, Nov 20: his balloons weren't to be seen.) */}
-            <BossBarExtra boss={b} until={until} part="towerProp" />
+            {/* (His prop where it fits a part, a phone's: Babur's pump, BossUi.towerProp; Eric, Nov 20: his balloons weren't to be seen. A
+                computer's stands beside his figure by the board: TowerSide. One pump on the page, never two.) */}
+            {!computer && <BossBarExtra boss={b} until={until} part="towerProp" />}
             {/* (His words from his own part of the bar: the boss who says them, the one who cast a moment, else the boss to move.) */}
             {!computer && <VoiceBubble voice={bossVoice} class="bc-bubble tw-bubble" balanced mine={(k) => speakerOf(side, k) === i} />}
             <span class="tw-part-face" aria-hidden="true">
@@ -173,8 +174,10 @@ export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
  * scale for all, each one's feet at the foot of his third of the board's height; the boss to move stepped toward the board and in full
  * color, the others dimmed (as the phone's bar).
  */
-export function TowerSide({ boss }: { boss: BossView }) {
+export function TowerSide({ boss, match }: { boss: BossView; match: GameView }) {
   const side = sideOf(boss)!;
+  const computer = useMedia("(min-width: 900px) and (pointer: fine)");
+  const until = match.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
   const still = useMedia("(prefers-reduced-motion: reduce)");
   const [since] = useState(() => Date.now());
   const scale = useMemo(() => sharedScale(side.bosses.map((b) => b.name), 150, 170), [side.bosses.map((b) => b.name).join(",")]);
@@ -187,6 +190,8 @@ export function TowerSide({ boss }: { boss: BossView }) {
           <span class="tw-side-body">
             <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" mine={(k) => speakerOf(side, k) === i} />
             <Figure boss={b} scale={scale} since={since} still={still} />
+            {/* (His prop beside him, a computer's: Babur's pump by his feet, toward the window's edge, as by a lone boss's figure.) */}
+            {computer && <BossBarExtra boss={b} until={until} part="towerProp" />}
           </span>
         </span>
       ))}
@@ -196,5 +201,5 @@ export function TowerSide({ boss }: { boss: BossView }) {
 
 /** The figures beside the board (a computer's): the floor's several stacked (TowerSide), else the boss's own (BossSide). */
 export function SideFigures({ match }: { match: GameView }) {
-  return match.boss && sideOf(match.boss) ? <TowerSide boss={match.boss} /> : <BossSide match={match} />;
+  return match.boss && sideOf(match.boss) ? <TowerSide boss={match.boss} match={match} /> : <BossSide match={match} />;
 }

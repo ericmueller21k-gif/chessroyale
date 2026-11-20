@@ -245,7 +245,10 @@ export function sidePump(fig: Box, figScale: number, baseline: number, s: number
  */
 type PumpPlace = { at: "phone" | "side" | "tall" | "bar" | "tower"; scale: number; x: number; side: HTMLElement | null };
 const PHONE: PumpPlace = { at: "phone", scale: 2, x: 0, side: null };
-/** A tower floor's split bar (his part, `.tw-part`): 1x at the part's left, phone and computer (tower.css); never beside him or a taller bar. */
+/**
+ * A tower floor of several (tower.css): a phone's in his part of the split bar (`.tw-part`), a computer's beside his figure by the board
+ * (`.tw-side-body`); never the lone boss's side place or a taller bar.
+ */
 const TOWER: PumpPlace = { at: "tower", scale: 1, x: 0, side: null };
 /** styles.css' computer. */
 const COMPUTER = "(min-width: 900px) and (min-height: 600px)";
@@ -259,7 +262,7 @@ let lastPlace: PumpPlace = PHONE;
  * class it leaves on `slot`). Synchronous: the class comes off and on again in the same task, never painted in between.
  */
 function pumpPlace(slot: HTMLElement, kit: BossKit | null): PumpPlace {
-  if (slot.closest(".tw-part")) return TOWER;
+  if (slot.closest(".tw-part, .tw-side-body")) return TOWER;
   if (!matchMedia(COMPUTER).matches) return PHONE;
   const screen = slot.closest<HTMLElement>(".screen") ?? document.body;
   const board = screen.querySelector<HTMLElement>(".hb-board");
