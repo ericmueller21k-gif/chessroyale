@@ -417,7 +417,7 @@ describe("the player search (the friends page, Eric, Nov 11)", () => {
     const env = { DB: d1 };
     // (Anna has signed in: her email is on her row, and must never leave the server.)
     await sql.run("UPDATE users SET email = 'anna@example.com' WHERE id = ?", ids[1]!);
-    await sql.run("INSERT INTO wallets (user_id, coins, xp) VALUES (?, 0, ?)", ids[2]!, 6 * 1000 + 10);
+    await sql.run("INSERT INTO wallets (user_id, coins, xp) VALUES (?, 0, ?)", ids[2]!, 6 * 500 + 10);
     const bo = users[3]!;
     const r = await search(env, bo.token, "an");
     expect(r.status).toBe(200);

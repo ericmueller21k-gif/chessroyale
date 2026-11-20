@@ -34,8 +34,8 @@ export interface XpPart {
 }
 
 /**
- * What a game paid beside its XP (Nov 9, phase 2): the daily reward's crate, and each level's crates and key (and every 10th level's
- * boss crate to pick). `crate`: which series the crates are (XP.rewardCrate when paid); `levels`: the levels whose rewards this game
+ * What a game paid beside its XP (Nov 9, phase 2): the daily reward's crate, and each paying level's crates and key (every 2nd level
+ * since Nov 20; and every XP.bossCrateEvery-th level's boss crate to pick). `crate`: which series the crates are (XP.rewardCrate when paid); `levels`: the levels whose rewards this game
  * paid (a level reached before, while rewards were paused, is paid at the next counted game).
  */
 export interface XpRewards {
@@ -63,9 +63,20 @@ export interface XpGrant {
   rewards?: XpRewards;
 }
 
-/** One level's rewards (XP.levelCrates crates, XP.levelKeys keys, and on every XP.bossCrateEvery-th a boss crate to pick). */
+/**
+ * One level's rewards: on every XP.levelRewardEvery-th level (2, 4, 6, …: since Nov 20, when levels halved) XP.levelCrates crates and
+ * XP.levelKeys keys, and on every XP.bossCrateEvery-th a boss crate to pick; nothing on the others (their level-up still pops).
+ */
 export function levelReward(level: number): { crates: number; keys: number; bossPicks: number } {
-  return { crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: level > 1 && level % XP.bossCrateEvery === 0 ? 1 : 0 };
+  const pays = level > 1 && level % XP.levelRewardEvery === 0;
+  return { crates: pays ? XP.levelCrates : 0, keys: pays ? XP.levelKeys : 0, bossPicks: level > 1 && level % XP.bossCrateEvery === 0 ? 1 : 0 };
+}
+
+/** How often something comes by level, in plain words: "every level", "every other level", "every 20th level" (the FAQ, the Crates tab). */
+export function everyLevel(n: number): string {
+  if (n <= 1) return "every level";
+  if (n === 2) return "every other level";
+  return `every ${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th")} level`;
 }
 
 /** Whether a grant's rewards hold anything. */
