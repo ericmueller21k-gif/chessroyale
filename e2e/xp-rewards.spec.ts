@@ -6,7 +6,7 @@ import { asServerAdmin, bossAloneFromHome, giveCrates, submitMove, test } from "
  * XP phase 2 (Eric, Nov 9: "go with phase two"; docs/decisions/2026-11-09-xp-phase2-*.md), phone and computer: the daily reward in
  * the result's XP box ("Daily reward +200") and its toast ("+1 Winter Crate"); a level-up's toast with its crates and key and the
  * Crates tab after it (the counts, a crate opened with the key, then refused without one, a padlock on the crate it can't open);
- * every 10th level's boss crate, chosen in the Crates tab; an admin's +100 crate keys. Each game is a won Boss alone game counted as
+ * every 20th level's boss crate (levels of 500 since Nov 20, rewards every other level), chosen in the Crates tab; an admin's +100 crate keys. Each game is a won Boss alone game counted as
  * 12 minutes (?xpgame=12) against Ginger (?win needs a boss whose powers don't get in its way); its moves are the device's word, so
  * the daily reward's 15 are said by the test (`moves`). REWARD_SHOTS=<dir> saves the stills (the level-up toast, the boss crate
  * choice, the Crates tab with keys and a locked crate).
@@ -67,8 +67,8 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
   expect((await locker(page)).seriesCrates).toEqual({ "winter-1": 1 });
   // It goes on its own.
   await expect(toast).toHaveCount(0, { timeout: 10_000 });
-  // The next game today: its own XP, no daily reward.
-  await wonGame(page, 370, 20);
+  // The next game today: its own XP, no daily reward (from 100 XP: no level-up either, at 500 a level since Nov 20).
+  await wonGame(page, 100, 20);
   await expect(page.getByTestId("xp-box").locator(".xp-parts")).toHaveText("Win +50");
   await expect(page.getByTestId("reward-box")).toHaveCount(0);
   expect((await locker(page)).seriesCrates).toEqual({ "winter-1": 1 });
@@ -76,9 +76,9 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
 
 test("a level-up: its toast (\"Level 2!\", a Winter Crate and a key, beside the daily's crate); the Crates tab shows them, opens one with the key, then the other is locked and refused", async ({ page }, testInfo) => {
   test.setTimeout(4 * 60_000);
-  // 990 XP, then +170 and the daily's +200: Level 2. (20 moves, so the daily reward's crate comes too: a level pays 1 crate since
-  // Nov 18, and the crate left after the open is the daily's.)
-  await wonGame(page, 990, 20);
+  // 490 XP, then +170 and the daily's +200: Level 2 (levels of 500 since Nov 20). (20 moves, so the daily reward's crate comes too: a
+  // level pays 1 crate since Nov 18, and the crate left after the open is the daily's.)
+  await wonGame(page, 490, 20);
   const toast = page.getByTestId("reward-box");
   await expect(toast).toContainText("Level 2!");
   await expect(toast).toContainText("+1 Winter Crate · +1 crate key");
@@ -106,7 +106,7 @@ test("a level-up: its toast (\"Level 2!\", a Winter Crate and a key, beside the 
   await expect(page.getByRole("button", { name: "▶ Open another" })).toBeDisabled();
   expect(await locker(page)).toMatchObject({ seriesCrates: { "winter-1": 1 }, keys: 0 });
   await page.getByRole("button", { name: "▶ Done" }).click();
-  await expect(page.locator(".crate-held")).toHaveText("You have 1. You need a crate key to open one: each level gives you one.");
+  await expect(page.locator(".crate-held")).toHaveText("You have 1. You need a crate key to open one: every other level gives you one.");
   await expect(page.getByRole("button", { name: /Open · uses 1 key/ })).toBeDisabled();
   await page.getByRole("button", { name: "‹ Crates" }).click();
   await expect(winter.locator(".crate-lock")).toBeVisible();
@@ -116,13 +116,13 @@ test("a level-up: its toast (\"Level 2!\", a Winter Crate and a key, beside the 
   expect(await locker(page)).toMatchObject({ seriesCrates: { "winter-1": 1 }, keys: 0 });
 });
 
-test("every 10th level: a boss crate to choose; its toast says so, the Crates tab's choice picks Babur's crate, which is then yours to open", async ({ page }, testInfo) => {
+test("every 20th level: a boss crate to choose; its toast says so, the Crates tab's choice picks Babur's crate, which is then yours to open", async ({ page }, testInfo) => {
   test.setTimeout(4 * 60_000);
-  // 8,900 XP (the levels below never paid: a test switch's jump), then +170: Level 10, every level from 2 paid at once.
-  await wonGame(page, 8_900);
+  // 9,400 XP (the levels below never paid: a test switch's jump), then +170: Level 20, every other level from 2 paid at once.
+  await wonGame(page, 9_400);
   const toast = page.getByTestId("reward-box");
-  await expect(toast).toContainText("Level 10!");
-  await expect(toast).toContainText("+9 Winter Crates · +9 crate keys");
+  await expect(toast).toContainText("Level 20!");
+  await expect(toast).toContainText("+10 Winter Crates · +10 crate keys");
   await expect(toast).toContainText("Choose your boss crate in Crates.");
   expect((await locker(page)).bossPicks).toBe(1);
   await page.goto("/shop?crates");

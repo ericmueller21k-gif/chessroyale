@@ -51,7 +51,7 @@ export interface LockerState {
   seriesCrates: Record<string, number>;
   /** Crate keys you have (a series crate takes one to open, and a boss crate bought with a key; stored since Nov 2, 2026). */
   keys: number;
-  /** Boss crates to pick (Nov 9: every 10th level's): rewards.ts pickBossCrate. */
+  /** Boss crates to pick (Nov 9: every XP.bossCrateEvery-th level's (20th since Nov 20)): rewards.ts pickBossCrate. */
   bossPicks: number;
   /** Boss tokens you have, by boss (only those you have some of): boss-tokens.ts. */
   tokens: Record<string, number>;

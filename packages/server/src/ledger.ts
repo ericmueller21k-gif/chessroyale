@@ -143,7 +143,7 @@ export const leg = {
   keys: (user: string, delta: number, source: string | null = null) => walletLeg("keys", user, delta, source),
   /** XP (Nov 9; xp.ts): a game's, or a test's. The wallet's `xp` column. */
   xp: (user: string, delta: number, source: string | null = null) => walletLeg("xp", user, delta, source),
-  /** Boss crates to pick (Nov 9: every 10th level's; the wallet's `boss_picks`): one is spent as it's picked (rewards.ts). */
+  /** Boss crates to pick (Nov 9: every XP.bossCrateEvery-th level's (20th since Nov 20); the wallet's `boss_picks`): one is spent as it's picked (rewards.ts). */
   bossPicks: (user: string, delta: number, source: string | null = null) => walletLeg("boss_pick", user, delta, source),
   /** Series crates you hold, unopened (Nov 9; `series_crates`): earned by the daily reward and levels, spent by an open. */
   seriesCrates: (user: string, crate: string, delta: number, source: string | null = null) =>

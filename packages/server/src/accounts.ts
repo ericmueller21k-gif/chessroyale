@@ -274,7 +274,7 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // XP (Nov 9, 2026; xp.ts): each account's XP, its level worked out from it (core's levelOf). Moved only through the ledger (asset
   // kind "xp"). Every row from before starts at 0.
   { table: "wallets", column: "xp", type: "INTEGER NOT NULL DEFAULT 0" },
-  // Boss crates to pick (Nov 9, 2026, XP phase 2: every 10th level's; rewards.ts): moved only through the ledger (asset kind
+  // Boss crates to pick (Nov 9, 2026, XP phase 2: every XP.bossCrateEvery-th level's (20th since Nov 20); rewards.ts): moved only through the ledger (asset kind
   // "boss_pick"). Every row from before has none.
   { table: "wallets", column: "boss_picks", type: "INTEGER NOT NULL DEFAULT 0" },
   // A game's XP (Nov 9, 2026; xp.ts): the player's time in it and their own moves (online: as the match room counted them; solo: the

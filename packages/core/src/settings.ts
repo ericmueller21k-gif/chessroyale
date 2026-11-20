@@ -4317,14 +4317,20 @@ export const BOSS_TOKENS = {
  *   - **The daily reward:** your first counted game of the XP day with at least `dailyMinMoves` of your own moves (a solo game also
  *     `dailySoloMinMinutes` of the server's own time) pays `dailyBonus` XP ("Daily reward +200") and `dailyCrates` crates of
  *     `rewardCrate` (the newest series), once an XP day.
- *   - **Level-up rewards:** each level reached pays `levelCrates` crates of `rewardCrate` and `levelKeys` crate keys; every
- *     `bossCrateEvery`th level also a boss crate the player picks among the live bosses (it waits in the Crates tab until picked).
- *     Paid once per level, at the next counted game (so levels reached while rewards were paused, or before phase 2, are paid then);
- *     at most `levelsPerGame` levels a game (the rest at the next).
+ *   - **Level-up rewards:** every `levelRewardEvery`th level reached (2, 4, 6, …) pays `levelCrates` crates of `rewardCrate` and
+ *     `levelKeys` crate keys; every `bossCrateEvery`th level also a boss crate the player picks among the live bosses (it waits in
+ *     the Crates tab until picked). Paid once per level, at the next counted game (so levels reached while rewards were paused, or
+ *     before phase 2, are paid then); at most `levelsPerGame` paying levels a game (the rest at the next).
+ *   - **Levels of 500 since Nov 20** (Eric, Nov 20, on a +150 XP game moving the 1,000 XP bar 15%: "Maybe smaller levels and adjust
+ *     the prizes less? Like double the levels needed?"; the director's call: double the levels, the same rewards per XP;
+ *     docs/decisions/2026-11-20-levels-500.md). Changing `perLevel`, `levelRewardEvery` or `bossCrateEvery` renumbers every
+ *     account's levels: server/rewards.ts maps the levels paid under the old numbers onto the new (paidLevels), so none is paid
+ *     twice; a later change needs its own mapping there.
  *   - The result screen shows what a game paid beside its XP in a toast at the top once the XP bar has filled, for `rewardToastMs`.
  */
 export const XP = {
-  perLevel: 1000,
+  /** 500 since Nov 20 (was 1,000; Eric: "Like double the levels needed?"). Renumbers levels: see the comment above. */
+  perLevel: 500,
   perMinute: 10,
   maxMinutes: 30,
   win: 50,
@@ -4344,7 +4350,13 @@ export const XP = {
   /** 1 since Nov 18 (was 2; Eric: "One crate per level seems fine"; the payments design, section 6). */
   levelCrates: 1,
   levelKeys: 1,
-  bossCrateEvery: 10,
+  /**
+   * Since Nov 20 (was every level): levels halved, so a level's crate and key come every 2nd level, the same per XP as before (the
+   * director's call on Eric's "adjust the prizes less").
+   */
+  levelRewardEvery: 2,
+  /** 20 since Nov 20 (was 10, at 1,000 XP a level): the same boss crate picks per XP. */
+  bossCrateEvery: 20,
   levelsPerGame: 20,
   rewardCrate: "winter-1",
   rewardToastMs: 6000,
