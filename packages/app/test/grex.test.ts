@@ -7,6 +7,7 @@ import { CRACKLE_EVERY, GREX_SOUNDS, WHISTLES, WHISTLE_SPREAD, grexSound, whistl
 import { CANDLE_LEN, CANDLE_SHOTS, CANDLE_SWEEP, candleMuzzle } from "../src/characters/grex.ts";
 import { CANDLE, candleShotTimes, fireCountdown, shadowItems, type Moment } from "../src/components/BossPowers.tsx";
 import { BURN, fireLine, grexDecor } from "../src/components/Grex.tsx";
+import { battleDecor } from "../src/components/BossPowers.tsx";
 import type { BossView } from "../src/game.ts";
 import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { EFFECTS, POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
@@ -450,4 +451,16 @@ describe("his Roman candle chars a piece first, then burns it (Eric, Nov 20)", (
     expect(grexDecor(view([]), burning, 1000, 1000 + BURN.goneAt)).toBeUndefined();
     expect(grexDecor(view([]), [{ square: "c3", piece: "n" }], 1000, 1000)).toBeUndefined();
   });
+
+  it("on every screen, one decor; while your move is scored (already on the board), the marks follow it as the rules will", () => {
+    const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const AFTER = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    const boss = { id: "grex", crowdSide: "w", board: { fen: START }, powers: { charred: [{ square: "e2", piece: "p", n: 1 }] } } as unknown as BossView;
+    expect(battleDecor(boss)!.of("e2", "wp")).toEqual({ cls: "pw-charred", kids: null });
+    const pending = battleDecor(boss, [], 0, [], 0, { move: "e2e4", fen: AFTER })!;
+    expect(pending.of("e4", "wp")).toEqual({ cls: "pw-charred", kids: null });
+    expect(pending.of("e2", "wp")).toBeNull();
+    expect(battleDecor(null)).toBeUndefined();
+  });
 });
+

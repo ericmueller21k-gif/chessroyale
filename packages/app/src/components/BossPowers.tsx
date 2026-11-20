@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import { BOSS_BANNER, BOSS_POWERS, bossBannerMs, type PowerEventKind } from "@chessroyale/core";
-import { KING_ATTACK, bannerLeadMs, bossRules, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
+import { KING_ATTACK, bannerLeadMs, bossRules, followSplats, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { bossKit, liveKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
@@ -358,7 +358,8 @@ export function joinDecor(...all: (PieceDecor | undefined)[]): PieceDecor | unde
  * The marks a boss battle draws on the crowd's pieces (Boingo's splats, Jefferson's char), for every screen that draws its board
  * (your move's, the boss's, the crowd's): one function, so no screen misses one (Nov 20: Jefferson's char was drawn only on the
  * boss's screen at first, and went as your move began). `moments`, `now`: the boss's screen's (the pie's hit); `burnt`, `since`:
- * the fire after the crowd's move, as that screen shows it (a charred piece burning keeps its look until it comes off).
+ * the fire after the crowd's move, as that screen shows it (a charred piece burning keeps its look until it comes off). `pending`:
+ * your move already on the board while it's scored (the position after it), the marks following it as the rules will.
  */
 export function battleDecor(
   boss: BossView | null | undefined,
@@ -366,7 +367,15 @@ export function battleDecor(
   now = 0,
   burnt: Parameters<typeof grexDecor>[1] = [],
   since = 0,
+  pending: { move: string; fen: string } | null = null,
 ): PieceDecor | undefined {
   if (!boss) return undefined;
-  return joinDecor(boingoDecor(partOf(boss, "clown"), moments, now), grexDecor(partOf(boss, "grex"), burnt, since, now));
+  const part = (id: string): BossView => {
+    const b = partOf(boss, id);
+    const p = b.powers;
+    if (!pending || !p || (!p.splats?.length && !p.charred?.length)) return b;
+    const follow = <M extends { square: string; piece: string; n: number }>(m: M[] | undefined) => (m?.length ? followSplats(m, pending.move, pending.fen, b.crowdSide) : m);
+    return { ...b, powers: { ...p, splats: follow(p.splats), charred: follow(p.charred) } };
+  };
+  return joinDecor(boingoDecor(part("clown"), moments, now), grexDecor(part("grex"), burnt, since, now));
 }

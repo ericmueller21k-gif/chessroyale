@@ -78,6 +78,20 @@ async function record(name, move, crowd) {
   const dir = `${out}/${name}`;
   mkdirSync(dir, { recursive: true });
   const lines = [`${name}: ${move}`];
+  // (Every animation frame too: which pieces are drawn charred, in which phase, so a look lost for a frame or two shows.)
+  await p.evaluate(() => {
+    const t0 = performance.now();
+    let last = "";
+    window.__samp = [];
+    window.__stop = false;
+    const f = () => {
+      const c = [...document.querySelectorAll(".hb-board piece.pw-charred")].map((e) => e.dataset.square).sort().join(",");
+      const k = `${window.match?.phase.kind}|${c}`;
+      if (k !== last) window.__samp.push(`${Math.round(performance.now() - t0)}ms ${(last = k)}`);
+      if (!window.__stop) requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
   await tapAt(move.slice(0, 2), crowd);
   await tapAt(move.slice(2, 4), crowd);
   const t0 = Date.now();
@@ -94,6 +108,8 @@ async function record(name, move, crowd) {
     }
     await p.waitForTimeout(30);
   }
+  const frames = await p.evaluate(() => ((window.__stop = true), window.__samp));
+  lines.push("every frame (phase|charred):", ...frames.map((x) => `  ${x}`));
   console.log(lines.join("\n"));
   writeFileSync(`${dir}/timeline.txt`, lines.join("\n") + "\n");
 }
