@@ -4,7 +4,7 @@ Lane: the director (the rules: `god-king`; the floor art: `characters`; saving: 
 board layer (PR 1); every boss on it (PRs 2-5); several bosses in the match runner (PR 6: a runner option, `settings.bossIds`); the
 climb's rules (PR 8: core `tower.ts`, a floor's start from the deal); saving (PR 9: server `tower.ts`, the routes); the solo battle (PR 10); the
 town's tower is the tower, no screen of its own (PR 11b); the party (PR 12: a copy each, climbing on together, alone after; the clerk's
-three ways).**
+three ways); two lives (Nov 20).**
 The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
 
 ## What it will be
@@ -15,7 +15,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   then +4 a floor (held about 1630 to 1710 to floor 50; a lone boss +100); from floor 51 Stockfish from 1750, +31 a floor, its best
   on floor 99 (Eric, Nov 20).
 - Every boss's moves are in, a few with a one-line rule; Hollow and Smudgy never share a floor, and for now neither do Smudgy + Alfil, Alfil + Jefferson and Dash + Smudgy (Nov 19); the Hidden Boss isn't in the tower.
-- You play White (random sides later). One loss (or a draw, or leaving) ends the run. Every floor is one snug room in HunChess's colors (the town's
+- You play White (random sides later). Two lives (Nov 20, below): a floor lost, drawn or left counts and costs one, the climb going on; the
+  third loss ends the run. Every floor is one snug room in HunChess's colors (the town's
   challenge room as the model: `town/shops/challenge.ts`), its number big on both side walls; you walk in to the board and the
   floor's bosses come out of the top door. Between floors you may stop: the run is saved on the server (guests too) and resumes
   on that floor; a solo floor rejoins after a reload.
@@ -71,8 +72,9 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   99), `towerPool(off)` (every playable boss: never the hidden one or one in the game for admins first; minus the kill switches).
 - **A run** (`TowerRun`: `seed`, `floors` dealt so far, the last the floor to fight, `deck`, `decks`, `status` open, top or out):
   `newRun(seed, pool)`, `startFloor(run, pool)` (the only way into a floor: its bosses from the deal, dealt again if the pool no longer
-  allows them; its runner settings), `finishFloor(run, "won" | "lost" | "drawn", pool)` (a win deals the next floor; floor 99 won:
-  top; a loss or draw: out), `leaveFloor(run, crowdMoves)` (free before your 2nd move, `leaveFreeBefore`, else a loss).
+  allows them; its runner settings), `finishFloor(run, "won" | "lost" | "drawn", pool)` (a win deals the next floor; floor 99 played
+  through: top; a loss or draw: a life, the next floor dealt as after a win, or with none left out: "Lives", below),
+  `leaveFloor(run, crowdMoves, pool)` (free before your 2nd move, `leaveFreeBefore`, else a loss).
 - **The deal:** a seeded deck of the pool, in order, a new deck when it runs out: every boss once before any twice, never the same boss
   on two floors in a row, never an `apart` pair (a deck that would leave a pair waiting at its end is shuffled again).
 - **In the runner** (`settings.towerFloor`, set by `startFloor`): every boss at the floor's strength (`elo` the floor's rating, no
@@ -90,16 +92,21 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   again from the runs after every result). One open run an account and kind (`tower_runs_open`, a unique index). A run that ended
   (or was set aside by the merge) stays until the next new run of its kind; a confirmed new run deletes the open one it replaces in
   its batch, after the best counts its floors.
+- **Lives** (Nov 20, docs/decisions/2026-11-20-tower-lives.md): `met.lost`, the floors lost (each a life), and `met.won`, the highest
+  floor won, written only once a floor is lost (a run with none lost is stored as before; one saved before lives reads as none lost);
+  the best reads `met.won` (`soloBest`: a floor lost never counts to a best). Every run view, result and stop answers `lives` and
+  `lost`; `last` keeps `lost` (a retry's answer); the download lists each climb's `lost`.
 - **Routes** (`api.ts` → `towerResponse`, behind the session (a guest's cookie as anyone's), the API's rate limits and the ban gate):
   `GET /api/tower` (open runs, between floors the floor's bosses as its start will deal them now; bests);
   `POST /api/tower/run` (`newRun` from the server's seed; replaces an open run only with `confirm`, else 409 with it);
   `/floor/start` (`startFloor`, the start noted by the server's clock; one under way answers itself, `under`, and `resting` when its
   bosses no longer pass the pool; a run whose deal doesn't parse: 409 `confirm`, start a new one);
   `/floor/finish {fight, outcome}` (only the floor started, once: one statement that applies only while it's under way; won:
-  `finishFloor` deals the next floor, refused sooner than `BATTLE_TOWER.soloWinMinSeconds` unless TEST_SWITCHES; lost or drawn: out;
+  `finishFloor` deals the next floor, refused sooner than `BATTLE_TOWER.soloWinMinSeconds` unless TEST_SWITCHES; lost or drawn: a life
+  and the next floor, or with none left out;
   the last result taken, sent again, gets the same answer; any other result for a floor not under way is a 409 with `run` and `best`);
   `/stop {fight?, moves?}` (between floors nothing to do; mid-floor `leaveFloor`: free before your 2nd move, else a loss; no
-  `moves` counts; free at any move when the floor's bosses no longer pass the pool: a kill switch since it began is our pause, not
+  `moves` counts (a life, as a loss); free at any move when the floor's bosses no longer pass the pool: a kill switch since it began is our pause, not
   your leave, and its next start deals it again). Solo resting (PAUSE_SOLO) refuses a new run or floor (one under way still answers, finishes, stops); the bosses resting are never dealt. A solo result is the
   device's word (as Boss alone's).
 - **The sign-in merge** (`towerMoves`, in the sign-in's batch): the guest's runs and bests join the account; two open runs of a
@@ -109,13 +116,36 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 - A solo best is the device's word (as Boss alone's): it stays off any leaderboard and out of anything that pays.
 - Calls made: [2026-11-19-tower-saving.md](../decisions/2026-11-19-tower-saving.md).
 
+## Lives (built, Nov 20)
+
+- **The rule** (Eric, Nov 20: "it just takes you on to the next match, and it just counts. You just advance"): `BATTLE_TOWER.lives` (2) a
+  run; a floor lost, drawn, or left after your 2nd move costs one and the climb goes on, the next floor dealt as after a win; the third
+  loss ends it. The run keeps the floors lost (`TowerRun.lost`, `livesLeft`); a best counts only floors won (`floorsWonBest`, the
+  director's call). Floor 99 lost with a life left: the climb is done (top), its best 98. The climb sim uses core's rule.
+- **The party:** one count for the party, every copy alike (the room writes one result to all); climbing on together again, the fewest
+  lives any copy holds (`preparePartyFloor`: each copy's floors lost below its own party floor, so a life spent in the party's room stays
+  spent when the plan goes back below it, as after one member's free leave; floors lost alone come back with the floors played alone:
+  the review of #839, finding 1); the plan says them once one is spent (`NetTowerPlan.lives`). A floor the party goes back to and loses
+  again reads "Lost floor 2 twice".
+- **On screen** (nothing hidden, nothing shifts): two hearts, a spent one greyed (`components/TowerHearts.tsx`), always, in the run's
+  strip, the floor room's corner (`.tw-room-lives`) and the clerk's card (the solo climb's line: hearts and "Lost floor 8"). After a lost
+  floor: "You lost floor 8. It still counts: 1 life left." and the next floor (`data-tower-result="lost"`), the room's elevator open;
+  the run's end lists the floors lost ("Lost floors 8, 11 and 12. Best solo: floor 10"). The leave's confirm says what it costs. The
+  result screen takes the server's word once it answers: a win sent after the floor was counted lost on another device reads as the
+  loss, and a leave the server made free (bosses rested since the floor began) reads "You left floor 8. It waits for you."
+  (`data-tower-result="free"`), the lobby next; a free leave whose stop answer was lost (sent again: "between", the run still on the
+  floor) is free too. The clerk's words follow the setting ("Two lives: the third loss ends it.", "Two lives a climb": `livesWords`,
+  `ordinal`). The clerk's plan line keeps its own 12 px / 1.3 by its selector (`.tw-desk .tw-plan`), never by which stylesheet loads
+  last (the review of #839: the town's hearts made tower.css load first, and the town card's 13 px / 1.35 overflowed its three lines).
+- Calls made: [2026-11-20-tower-lives.md](../decisions/2026-11-20-tower-lives.md).
+
 ## The solo flow (built, PR 10's battle; PR 11b's flow, Eric, Nov 19)
 
 - **No tower screen** (PR 10's `/tower` page out of the flow, its code kept unused at Eric's word): the clerk's card (`town/TowerDesk.tsx`: Start, or Continue: floor N with a small
   Start over that asks) → you walk into the elevator → the floor room (`shops/tower-floor*.ts`: N on its walls, you to your mark, its bosses out
   of the elevator one by one, the pieces up, the zoom) → `enterTowerFloor()` → Boss alone's battle (no Last Stand; `TowerBar.tsx`) → the
-  usual result (`TowerResult.tsx`: one button, Back to the tower) → the floor room on your mark: won, the elevator open (Up to floor N+1);
-  out, shut. Bests on the lobby's board. Between floors leave by the way down or Back. A match's address is `/tower`: a reload rejoins it
+  usual result (`TowerResult.tsx`: one button, Back to the tower) → the floor room on your mark: won (or a life spent), the elevator open
+  (Up to floor N+1); out, shut. Bests on the lobby's board. Between floors leave by the way down or Back. A match's address is `/tower`: a reload rejoins it
   (`brc.tower.solo`, the restore). A start carries this device's id (`brc.tower.device`, kept in `fight`): a lost start answer is still its own. Calls: [2026-11-19-tower-solo-screens.md](../decisions/2026-11-19-tower-solo-screens.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md).
 - **Its music (Nov 19):** the tower's own theme (`tower-loop`, themes.json's `tower`) plays in the lobby and the floor room (`shops.ts`: its home's theme; Town.tsx `towerBack` starts it back in the room). A floor's battle plays one of its bosses' themes, picked at random as it starts and kept for the whole match and a reload (tower.ts `FloorPlay.music` → `KeptFloor.music`), avoiding the themes of the last `MUSIC.towerRecent` (5) floors on the device (`brc.tower.music`), else the least recent (`pickFloorTheme`). [2026-11-19-tower-music.md](../decisions/2026-11-19-tower-music.md).
 - **The restore (audit 2):** kept as each round begins **and** as each step of the bosses' turn has played (solo.ts `nextRoundIn`), so a reload
@@ -230,15 +260,19 @@ take from `startSide`) fixed in PR 8 (above).
 (today's rule, frozen, against the layer over seeded battles: `held-layer-twin.test.ts` for the held pieces, `square-layer-twin.test.ts` for the square marks, `shield-layer-twin.test.ts` for the shields); the boss kit (`packages/chess/test/boss-kit.test.ts`) and `e2e/boss-smoke.spec.ts` guard every boss
 moved onto the layer; `boss-kit-side.test.ts` runs the kit over every pair and a sample of threes (and audit 1's seeds), `several-bosses.test.ts` the side's
 rules (Chandy's last chance in every order, Folio's crease line at the floor's rates), and `boss-kit-parity.test.ts` solo against online
-for every boss in a pair and two threes (more by hand: `KIT_PARITY_SIDES`); core `tower.test.ts` (the design's table, the deal over 300 seeds and two pools, the run's steps, finding 7's start) and the runner's
+for every boss in a pair and two threes (more by hand: `KIT_PARITY_SIDES`); core `tower.test.ts` (the design's table, the deal over 300 seeds and two pools, the run's steps and lives, finding 7's start) and the runner's
 side of finding 7 in `several-bosses.test.ts`; server `tower.test.ts` (the index, every route's happy path and refusals, a result once and
 only for the floor started, the same result sent again, a win too soon, a free leave against a counted one, a floor whose bosses rest
-since it began, a deal that doesn't parse, the best and its cap, the merge, the download and deleting) and
+since it began, a deal that doesn't parse, the best and its cap, the merge, the download and deleting; lives: a life spent and the climb
+on, the third loss out, a run saved before lives, floor 99 lost, a counted leave, lives through the merge) and
 `account-data.test.ts` (Ann's climb in every store's world); `e2e/account-delete.spec.ts` (a climb on the local D1: its `e2e/areas.json`
-entry, "The Battle Tower's saving"); `e2e/battle-tower.spec.ts` (the clerk, the elevator, floor 1 won, back in the room, up to floor 2's bar, a reload rejoining, a loss ending the run,
+entry, "The Battle Tower's saving"); `e2e/battle-tower.spec.ts` (the clerk, the elevator, floor 1 won, back in the room, up to floor 2's bar, a reload rejoining, a loss costing a
+life (a heart greyed in the room and the strip) and the climb going on, the third loss ending the run with its floors lost,
 a free leave down to the lobby, Continue after a reload, no Last Stand); the party: server `tower-party.test.ts` (copies to every member,
 climbing on together only with the run's own members, someone new a new run once each agreed, a leave, the room's ends, a crate floor,
-alone, the merge and deleting, the party's plan, START and open line; since the review of #835: floors won alone never carrying a party
+alone, the merge and deleting, the party's plan, START and open line; lives (Nov 20): a loss a life on every copy alike, a counted leave
+on the leaver's alone, the fewest lives climbing on together, the third loss out, a life spent in the room never given back by going back
+below it, lives spent alone coming back; since the review of #835: floors won alone never carrying a party
 up, a deleted account's seat, the merge naming the account once, the line's lapse, Kick during a floor, the plan's floors going back, the
 town's one line an account, the clerk's list) and `tower-party-do.test.ts` (the party's Durable Object on a fake runtime: START's plan changed since READY,
 the room made but the commit refused, the raid kill switch, the open line's checks and lapse; the room's writes, `writeTowerEnds`), app

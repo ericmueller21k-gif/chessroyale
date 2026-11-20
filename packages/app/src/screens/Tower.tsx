@@ -7,7 +7,7 @@ import { SwordsIcon } from "../town/CardIcons.tsx";
 import { game } from "../lazy-game.ts";
 import { portraitName } from "../characters/portraits.ts";
 import { useMedia } from "../components/QuickChat.tsx";
-import { TOWER_WORDS, askFloor, floorRating, towerBoss, enterTowerFloor, loadKept, settle, towerApi, type FloorStart, type TowerState } from "../tower.ts";
+import { TOWER_WORDS, askFloor, floorRating, livesOf, towerBoss, enterTowerFloor, loadKept, settle, towerApi, type FloorStart, type TowerState } from "../tower.ts";
 import "../tower.css";
 
 /**
@@ -229,7 +229,7 @@ export function TowerScreen({ name, look, onBack }: { name: string; look?: ItemL
           {ask.kind === "replace" ? (
             <Confirm heading="Start a new run?" note={TOWER_WORDS.replace(ask.floor)} go="New run" onCancel={() => setAsk(null)} onGo={() => (setAsk(null), void newRun(true))} />
           ) : ask.kind === "elsewhere" ? (
-            <Confirm heading="Floor under way" note={TOWER_WORDS.elsewhere} go="Leave it" onCancel={() => setAsk(null)} onGo={() => void leave(ask.start, false)} />
+            <Confirm heading="Floor under way" note={TOWER_WORDS.elsewhere(livesOf(ask.start.run.lives))} go="Leave it" onCancel={() => setAsk(null)} onGo={() => void leave(ask.start, false)} />
           ) : ask.kind === "resting" ? (
             <Confirm heading="Bosses resting" note={TOWER_WORDS.resting} go="Leave (free)" onCancel={() => setAsk(null)} onGo={() => void leave(ask.start, true)} />
           ) : (

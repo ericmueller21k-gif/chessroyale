@@ -2,8 +2,8 @@
  * The Battle Tower's climb sim (PR 14; docs/decisions/2026-11-18-battle-tower-design.md, section 3 and section 7's row 14):
  * a bot climber at one strength climbs from floor 1 with the real deal (core tower.ts: newRun, startFloor, finishFloor), each
  * floor a real battle through the match runner as solo plays one (the boss kit's driver, boss-kit-lib.ts runBattle, without its
- * invariants), every boss on the floor's brain and strength (Maia at the floor's rating), until a loss, a draw or floor 50 won
- * (Maia's floors; Stockfish's 51 to 99 are left for later).
+ * invariants), every boss on the floor's brain and strength (Maia at the floor's rating), until the run is out (core's lives: the
+ * third loss or draw, below) or floor 50 is played (Maia's floors; Stockfish's 51 to 99 are left for later).
  *
  * The climber: Maia-3 at the climber's rating (the human-like stand-in for a player of that rating), among the moves the bosses'
  * powers allow. It doesn't know the powers; it never calls the God King, votes Chandy's Dodge right, and has no clock (Dash's and
@@ -39,10 +39,11 @@ const LAST_FLOOR = Number(process.env.TOWER_LAST ?? 50);
 const STEPS = process.env.TOWER_STEPS ? (JSON.parse(process.env.TOWER_STEPS) as [number, number][]) : null;
 const CURVE = process.env.TOWER_CURVE ?? (STEPS ? "try" : "");
 /**
- * Lives (Eric, Nov 20: "add 2 lives, but it doesn't make you replay. You just win the floor"): a floor lost or drawn costs one and the
- * climb goes on; the run ends at a loss with none left. 0: the rule today (out at the first). The first loss is in the rows either way.
+ * Lives (Eric, Nov 20: "add 2 lives, but it doesn't make you replay. You just win the floor"): core's rule (finishFloor: a floor lost or
+ * drawn costs one and the climb goes on; the run ends at a loss with none left), BATTLE_TOWER.lives unless TOWER_LIVES tries another
+ * number (0: out at the first loss, the rule before Nov 20). The first loss is in the rows either way.
  */
-const LIVES = Number(process.env.TOWER_LIVES ?? 0);
+const LIVES = process.env.TOWER_LIVES !== undefined ? Number(process.env.TOWER_LIVES) : BATTLE_TOWER.lives;
 type Climber = "maia" | "maia-best" | "stockfish";
 const CLIMBER = (process.env.CLIMBER ?? "maia") as Climber;
 const CLIMBER_NODES = Number(process.env.TOWER_NODES ?? 200_000);
@@ -62,7 +63,7 @@ interface FloorRow {
 
 // (The runner reads a floor's strength from BATTLE_TOWER itself, so a try sets it there, in this process only.)
 if (STEPS) (BATTLE_TOWER as { maiaSteps: readonly (readonly [number, number])[] }).maiaSteps = STEPS;
-const rules = BATTLE_TOWER;
+const rules = { ...BATTLE_TOWER, lives: LIVES };
 const tag = `${CLIMBER}${CURVE ? `-${CURVE}` : ""}${LIVES ? `-lives${LIVES}` : ""}`;
 
 async function climb(rating: number, runs: number, seed: number) {
@@ -75,7 +76,6 @@ async function climb(rating: number, runs: number, seed: number) {
     const runSeed = seed * 1000 + k;
     let run = newRun(runSeed, pool, rules);
     const floors: FloorRow[] = [];
-    let lives = LIVES;
     while (run.status === "open" && run.floors.length <= LAST_FLOOR) {
       const start = startFloor(run, pool, rules)!;
       run = start.run;
@@ -85,10 +85,8 @@ async function climb(rating: number, runs: number, seed: number) {
       const bosses = [...run.floors[floor - 1]!];
       floors.push({ floor, bosses, rating: floorStrength(floor, bosses.length, rules).rating, ...row, sec: Math.round((Date.now() - t0) / 1000) });
       console.log(`${rating} run ${k} floor ${floor} ${bosses.join("+")}: ${row.result} in ${row.moves}`);
-      // (A life spent: the floor counts as climbed, the bosses' strength goes on rising.)
-      const spend = row.result !== "crowd" && lives > 0;
-      if (spend) lives--;
-      run = finishFloor(run, row.result === "crowd" || spend ? "won" : row.result === "draw" ? "drawn" : "lost", pool, rules);
+      // (Core's rule: a floor lost or drawn spends a life and the climb goes on, the bosses' strength still rising; with none, out.)
+      run = finishFloor(run, row.result === "crowd" ? "won" : row.result === "draw" ? "drawn" : "lost", pool, rules);
       if (floor === LAST_FLOOR) break;
     }
     appendFileSync(out + `${tag}-${rating}.jsonl`, JSON.stringify({ rating, climber: tag, seed: runSeed, floors }) + "\n");

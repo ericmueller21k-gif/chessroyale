@@ -41,6 +41,8 @@ export interface FloorScript {
   party?: PartyFloorEntry;
   /** The others in your party, in seat order (their pawns in their seat colors walk in after you, to their marks beside yours). */
   mates?: readonly { seat: number }[];
+  /** The run's lives (Nov 20): going into the floor, or after it (the room's corner shows them: Town.tsx). */
+  lives?: number;
 }
 
 /** A boss's town figure (his own; Don Dough's, met in his back room, his intro's), or null: a boss this app doesn't draw (drawn safely: not at all). */

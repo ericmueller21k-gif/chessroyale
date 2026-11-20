@@ -193,11 +193,12 @@ export function leaveTowerParty() {
 // (The plan's words: a pure module of their own, which the e2e measures in the clerk's card.)
 export { planWaiting, planWords, type PlanAsk } from "./tower-plan.ts";
 
-/** A party floor to go into: its room, your pass and seat, the floor, its bosses and the floors beaten (the run's strip). */
+/** A party floor to go into: its room, your pass and seat, the floor, its bosses, the floors beaten and the lives going in (the run's strip). */
 export interface PartyFloorEntry extends PartyFloor {
   floor: number;
   bosses: string[];
   beaten: string[][];
+  lives?: number;
 }
 
 let enterHandler: ((e: PartyFloorEntry) => void) | null = null;

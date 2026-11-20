@@ -1,4 +1,5 @@
 import type { NetTowerPlan } from "@chessroyale/chess/squads";
+import { BATTLE_TOWER } from "@chessroyale/core";
 
 /** What READY or START asks first (your own climb ends, or goes back floors), or null. */
 export interface PlanAsk {
@@ -26,8 +27,10 @@ export function planWords(plan: NetTowerPlan | undefined, me: string | null): { 
     const others = back.length - (mine === undefined ? 0 : 1);
     const goes =
       mine !== undefined ? ` Yours goes back from floor ${mine}${others ? `, and ${others} more` : ""}.` : others ? ` ${climbs(others)} go${others === 1 ? "es" : ""} back to it.` : "";
+    // (Its lives once one is spent, Nov 20: "Your climb together goes on: floor 9, 1 life left.")
+    const lives = plan.lives === undefined || plan.lives >= BATTLE_TOWER.lives ? "" : plan.lives <= 0 ? ", no lives left" : `, ${plan.lives} ${plan.lives === 1 ? "life" : "lives"} left`;
     return {
-      line: `Your climb together goes on: floor ${plan.floor}.${goes}`,
+      line: `Your climb together goes on: floor ${plan.floor}${lives}.${goes}`,
       up: `Up to floor ${plan.floor}`,
       ask: mine === undefined ? null : { heading: `Back to floor ${plan.floor}?`, note: `Your climb goes back from floor ${mine} to floor ${plan.floor}, where your party left off. Your best floors stay.` },
       ok: true,

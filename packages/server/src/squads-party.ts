@@ -73,7 +73,7 @@ export const TOWER_PARTY_LINES = {
  */
 export type TowerPartyPlan = {
   key: string;
-  plan: { kind: "continue"; floor: number; back?: { uid: string; floor: number }[] } | { kind: "new"; ends: { uid: string; floor: number }[] } | { kind: "wait"; message: string };
+  plan: { kind: "continue"; floor: number; back?: { uid: string; floor: number }[]; lives?: number } | { kind: "new"; ends: { uid: string; floor: number }[] } | { kind: "wait"; message: string };
 };
 
 /** A 50 v 50 party's refusals (docs/decisions/2026-11-16-crowd-party.md): it's friends only, by invite. */
@@ -617,7 +617,7 @@ export class PartyCore {
     if (p.plan.kind === "wait") return p.plan;
     const idOf = (uid: string) => this.r.members.find((m) => m.userId === uid)?.id ?? "";
     const byId = (xs: { uid: string; floor: number }[]) => xs.map((e) => ({ id: idOf(e.uid), floor: e.floor })).filter((e) => e.id);
-    return p.plan.kind === "new" ? { kind: "new", ends: byId(p.plan.ends) } : { kind: "continue", floor: p.plan.floor, back: byId(p.plan.back ?? []) };
+    return p.plan.kind === "new" ? { kind: "new", ends: byId(p.plan.ends) } : { kind: "continue", floor: p.plan.floor, back: byId(p.plan.back ?? []), ...(p.plan.lives !== undefined ? { lives: p.plan.lives } : {}) };
   }
 
   /**
