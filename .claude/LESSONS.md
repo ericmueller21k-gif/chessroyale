@@ -66,6 +66,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   masked copy of a drawing in front of a figure to hide part of it: every edge of the copy lands on the figure as a line. Draw the thing
   once, behind, and clip the figure by a shape whose edge is a line that drawing already has (a ride's `pose.hide`). When a fix moves a
   seam and Eric sees another, change the structure, not the mask. Check his own look, zoomed 4×, every frame and view.
+- **A card hung off to the left** (Nov 20, [story](../docs/history/lessons.md#a-card-hung-off-to-the-left-nov-20-2026)):
+  - One rule for every card and panel: the card stands centered, and its title, labels and short lines are centered. Long body
+    text and true lists of rows may stay left inside it. Never a left label under a centered title. `docs/decisions/2026-11-20-ui-centered.md`.
+  - A big panel (more than a line or two of buttons) stands in the middle of its screen, not over its speaker; on a phone it keeps
+    clear of the walking keys and other fixed controls. Check it at 390 × 664 with them in view.
+  - A fixed box that can hold "nothing yet" puts that line in its middle, and a fixed-height line box centers its words, so a short
+    state never looks like an empty well. Measure where the words sit, not only the box.
 - **Purity that didn't match the item** (Oct 6, [story](../docs/history/lessons.md#purity-that-didnt-match-the-item-oct-6-2026)):
   when a number on screen describes a drawing (a purity, a meter, a share), measure the drawing against the number
   over many cases, not one preview. Then add a test that does the same.
