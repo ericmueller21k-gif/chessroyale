@@ -1035,6 +1035,8 @@ export const showdownScouting = (p: Pick<BossPowerState, "sdBase" | "ults" | "ul
 export const showdownDue = (boss: BossState | null | undefined): "try" | "test" | null => {
   const p = boss?.powers;
   if (!p || boss!.result || boss!.id !== "pig" || p.ultAt !== undefined || p.noUlt) return null;
+  // At his cap, never another (a battle saved before once-a-game kept no ultAt after his last: Nov 20).
+  if ((p.ults ?? 0) >= BOSS_POWERS.showdownMax) return null;
   if (p.ultNext) return "test";
   return (showdownMeter(p, p.turn) ?? 0) >= 1 ? "try" : null;
 };
