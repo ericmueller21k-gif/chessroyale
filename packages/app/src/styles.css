@@ -23311,7 +23311,6 @@ body.mo-on .mm-scrim {
 .mo-bigmoon {
   position: absolute;
   z-index: 1;
-  background-size: 100% 100%;
   background-repeat: no-repeat;
   image-rendering: pixelated;
 }

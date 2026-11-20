@@ -4,6 +4,7 @@
 // daze); his entrance with its line and icons; his attack on a king in the God King's Last Stand (?laststand=1); and his tile on
 // the Boss raid screen. Records every painted frame (Chrome's screencast), saves a GIF of each moment and stills through them.
 //   npm run frames:moo -- <out-dir> [tile|beam|full|intro|attack|all] [phone|desktop] [light|dark] [width]
+//   MOO_LAYERS_MS=<ms>: the Full Moon field's layers' picture held back that long (a slow network on a cold load, Nov 20).
 // The page draws what a player sees; the script reads the game (window.match) only to pick moves and to say, in the log, what
 // the rules did. Read the frames before calling a moment done (.claude/LESSONS.md: watch it frame by frame).
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
@@ -37,6 +38,13 @@ function gif(dir, file) {
 async function run(stage) {
   const name = `${device}${widthArg ? widthArg : ""}-${scheme}-${stage}`;
   const p = await browser.newPage({ ...context, colorScheme: scheme });
+  if (process.env.MOO_LAYERS_MS) {
+    const ms = Number(process.env.MOO_LAYERS_MS);
+    await p.route("**/moo-field-layers*.png", async (r) => {
+      await new Promise((res) => setTimeout(res, ms));
+      await r.continue();
+    });
+  }
   const errors = [];
   p.on("pageerror", (e) => {
     errors.push(e.message);
@@ -199,6 +207,8 @@ async function run(stage) {
     }
     if (startAt) {
       clip("full-moon", startAt - 200, flurryAt + 4200);
+      // (Its start alone: the hop, the field fading in, the moon rising from behind the hill.)
+      clip("full-moon-start", startAt - 200, startAt + 3200);
       if (dazedAt) clip("dazed", dazedAt - 900, dazedAt + 3800);
     }
   } else if (stage === "attack") {

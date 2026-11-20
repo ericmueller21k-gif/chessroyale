@@ -1,10 +1,13 @@
-"""Splits Moo & Moon's field (characters/moo-cinematic.png, its four frames) into two layers, so the Full Moon's moon can rise from
-behind the hill (Eric, Nov 20: "the moon should start half hidden behind the horizon/grassy hill and then move upward into the sky
+"""Splits Moo & Moon's field (characters/moo-cinematic.png, its four frames) into three layers in one picture, so the Full Moon's moon
+can rise from behind the hill (Eric, Nov 20: "the moon should start half hidden behind the horizon/grassy hill and then move upward into the sky
 ... moon should never be in front of the background hill terrain"; docs/decisions/2026-11-20-moo-moonrise.md):
   - the sky without its moon (frames 0 to 3): the field's own sky, its moon and the moon's glow round it filled from the sky on either
     side of them in the same row (the sky's own colors, dithered as the art's), its stars kept;
   - the front (frames 4 to 7): everything from the hill line down (the hills, the barn and silo, the fence, the grass and flowers),
-    the field's own pixels, the sky above and between them see-through.
+    the field's own pixels, the sky above and between them see-through;
+  - the moon (frame 8): the field's own moon in its own place, the sky round it see-through (the four frames share it; only their
+    stars twinkle). In the same picture as the sky and the front, so the three can never arrive apart (Eric, Nov 20: on a cold load
+    "you can see the moon behind the land because the moon loaded first"; docs/decisions/2026-11-20-moonrise-load-order.md).
 Nothing drawn: every pixel is the field's own, or one of its sky's colors. Also writes the hill line per art column
 (characters/moo-horizon.ts) for the tests.
   python3 scripts/lift-moo-field.py   ->  packages/app/src/characters/moo-field-layers.png, moo-horizon.ts
@@ -22,6 +25,8 @@ GLOW = R + 30
 BANDS = [(9, 11, 36), (14, 18, 54), (21, 26, 71), (29, 35, 87), (38, 45, 103), (49, 56, 118), (61, 68, 133), (79, 83, 143), (103, 104, 157), (111, 118, 182)]
 STARS = [(184, 194, 240), (255, 255, 255)]
 SKY = set(BANDS) | set(STARS)
+# The moon's box in the field (art pixels): columns 42 to 157, rows 24 to 136 (its bottom tip touches the hills at 137).
+MX0, MY0, MX1, MY1 = 42, 24, 158, 137
 # A 2 x 2 ordered dither: which of two neighboring colors a pixel takes for a share between them.
 BAYER = [[0.125, 0.625], [0.875, 0.375]]
 
@@ -93,7 +98,17 @@ for y, (xl, xr, _, _) in raw.items():
     near = [raw[k] for k in range(y - EASE, y + EASE + 1) if k in raw]
     rows[y] = (xl, xr, sum(n[2] for n in near) / len(near), sum(n[3] for n in near) / len(near))
 
-out = Image.new("RGBA", (W * FRAMES * 2, H), (0, 0, 0, 0))
+out = Image.new("RGBA", (W * (FRAMES * 2 + 1), H), (0, 0, 0, 0))
+# The moon (frame 8): the moon's own pixels (warm, the sky's cool: red over blue) inside its disc.
+holes = 0
+for y in range(MY0, MY1):
+    for x in range(MX0, MX1):
+        r, g, b = f0.getpixel((x, y))
+        if in_disc(x, y, R) and r > b:
+            out.putpixel((FRAMES * 2 * W + x, y), (r, g, b, 255))
+        elif in_disc(x, y, R - 3):
+            holes += 1
+assert holes == 0, f"{holes} sky pixels inside the moon"
 for i, f in enumerate(frames):
     sky = f.copy()
     front = Image.new("RGBA", (W, H), (0, 0, 0, 0))

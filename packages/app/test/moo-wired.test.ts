@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { BOSS_ROSTER, MOO_CINEMATIC, bossBannerMs, isPlayable, menuBosses, playableBosses, type PowerEvent } from "@chessroyale/core";
 import { KING_ATTACKERS, MOO_BEATS, MOO_FX, POWER_FX, START_FEN, bossThinkMs, fullMoonLeadMs, fullMoonMs } from "@chessroyale/chess";
@@ -287,6 +288,9 @@ describe("the Full Moon's cinematic", () => {
       expect(steps[i]!.y).toBeLessThan(steps[i - 1]!.y);
       expect(steps[i]!.scale).toBeGreaterThanOrEqual(steps[i - 1]!.scale);
     }
+    // One picture for the sky, the front and the moon (Nov 20: on a cold load the moon's own came first, before the land): nine frames.
+    const png = readFileSync(new URL("../src/characters/moo-field-layers.png", import.meta.url));
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([9 * 200, 260]);
     // Behind the hill line (the front layer's solid rows, MOO_HORIZON): its rows there are hidden. It starts about half hidden, rises
     // until it's clear of it, and its top always stays in the sky (inside the field, never off its top).
     const hidden = (m: { scale: number; y: number }) => {
