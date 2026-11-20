@@ -768,10 +768,17 @@ export async function preparePartyFloor(sql: Sql, uids: readonly string[], now: 
       .find((x) => x !== null);
     const dealt = base ? runOf({ ...base.r, met: base.met }) : null;
     if (!base || !dealt || dealt.floors.length !== plan.floor) return { ok: false, broken: true };
-    // (One life count for the party (Nov 20): the fewest any of its copies holds on that floor, each copy's floors lost below it (a member
-    // who left a floor of it after the party's 2nd move spent one their party didn't), so nobody is given back a life they spent, as
-    // nobody is carried up a floor. Floors lost alone above it go with the floors won there.)
-    const lost = uids.map((u) => runOf(copies.get(u)!).lost.filter((f) => f < plan.floor)).reduce((most, l) => (l.length > most.length ? l : most), dealt.lost);
+    // (One life count for the party (Nov 20): the fewest any of its copies holds, each copy's floors lost below its OWN party floor (a
+    // member who left a floor of it after the party's 2nd move spent one their party didn't), so nobody is given back a life they spent,
+    // as nobody is carried up a floor. That's the floors lost with the party, in its rooms, kept even when the plan goes back below them
+    // (one member's free leave kept their copy on a floor another lost in the room: the review of #839, finding 1); the floors lost alone,
+    // all at or above the copy's party floor (a floor alone never moves `party`), go with the floors won there.)
+    const lost = uids
+      .map((u) => {
+        const c = copies.get(u)!;
+        return runOf(c).lost.filter((f) => f < partyFloorOf(c, membersOf(c.members)!));
+      })
+      .reduce((most, l) => (l.length > most.length ? l : most), dealt.lost);
     const before: TowerRun = { ...dealt, lost };
     const started = startFloor(before, opts.pool);
     if (!started || !started.run.floors[before.floors.length - 1]?.length) return { ok: false, resting: true };

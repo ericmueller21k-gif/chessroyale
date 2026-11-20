@@ -140,6 +140,64 @@ describe("one run, a copy each", () => {
     }
   });
 
+  it("a life spent in the party's room is never given back when the party goes back below it (one member's free leave kept their copy there: the review of #839, finding 1)", async () => {
+    const sql = await world();
+    const [ann, bo] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com")];
+    const uids = [ann.id, bo.id];
+    let f = await begin(sql, uids, T0);
+    await end(sql, f.fight, uids, "won", T0 + 60_000);
+    // Floor 2: Ann leaves before the party's 2nd move (free: her copy stays on floor 2); Bo plays on and his party loses it.
+    f = await begin(sql, uids, T0 + 70_000);
+    await partyFloorWrite(sql, T0 + 71_000, f.fight.id, { uid: ann.id, outcome: "left", moves: BATTLE_TOWER.leaveFreeBefore - 1 }, { pool: POOL });
+    await partyFloorWrite(sql, T0 + 130_000, f.fight.id, { uid: bo.id, outcome: "lost" }, { pool: POOL });
+    expect((await towerState(sql, ann.id, POOL)).runs.party).toMatchObject({ floor: 2, lives: 2, lost: [] });
+    expect((await towerState(sql, bo.id, POOL)).runs.party).toMatchObject({ floor: 3, lives: 1, lost: [2] });
+    // Together again: back to Ann's floor 2 (Bo's copy goes back from 3), with Bo's life still spent, whoever sits first.
+    for (const order of [uids, [bo.id, ann.id]]) {
+      const read = await preparePartyFloor(sql, order, T0 + 140_000, { pool: POOL });
+      expect(read.ok && read.prep.plan).toMatchObject({ kind: "continue", floor: 2, back: [{ uid: bo.id, floor: 3 }] });
+      expect(read.ok && read.prep.run.lost).toEqual([2]);
+    }
+    f = await begin(sql, uids, T0 + 150_000);
+    for (const uid of uids) expect((await towerState(sql, uid, POOL)).runs.party).toMatchObject({ floor: 2, lives: 1, lost: [2], fight: { id: f.fight.id } });
+    // (Floor 2 won this time: on to 3 with the one life; the party best is the floor won.)
+    await end(sql, f.fight, uids, "won", T0 + 210_000);
+    for (const uid of uids) expect((await towerState(sql, uid, POOL)).runs.party).toMatchObject({ floor: 3, lives: 1, lost: [2] });
+    expect([await best(sql, ann.id, "party"), await best(sql, bo.id, "party")]).toEqual([2, 2]);
+  });
+
+  it("a party of three: one sits a floor out (free), one leaves it after the party's 2nd move, one's party wins it; together again on the floor sat out, the counted leave's life stays spent", async () => {
+    const sql = await world();
+    const [ann, bo, cy] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com"), await signedIn(sql, "cy@example.com")];
+    const uids = [ann.id, bo.id, cy.id];
+    const f = await begin(sql, uids, T0);
+    await partyFloorWrite(sql, T0 + 1_000, f.fight.id, { uid: cy.id, outcome: "left", moves: 0 }, { pool: POOL });
+    await partyFloorWrite(sql, T0 + 30_000, f.fight.id, { uid: bo.id, outcome: "left", moves: BATTLE_TOWER.leaveFreeBefore }, { pool: POOL });
+    await partyFloorWrite(sql, T0 + 60_000, f.fight.id, { uid: ann.id, outcome: "won" }, { pool: POOL });
+    const read = await preparePartyFloor(sql, uids, T0 + 70_000, { pool: POOL });
+    expect(read.ok && read.prep.plan).toMatchObject({ kind: "continue", floor: 1 });
+    expect(read.ok && read.prep.run.lost).toEqual([1]);
+  });
+
+  it("lives spent playing a party copy on alone come back when the party climbs on together (they go with the floors played alone, which never count for the party)", async () => {
+    const sql = await world();
+    const [ann, bo] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com")];
+    const first = await begin(sql, [ann.id, bo.id], T0);
+    await end(sql, first.fight, [ann.id, bo.id], "won", T0 + 60_000);
+    // Ann alone: floor 2 lost (a life), floor 3 won.
+    let t = T0 + 70_000;
+    for (const outcome of ["lost", "won"] as const) {
+      const s = await startTowerFloor(sql, ann.id, t, { pool: POOL, kind: "party" });
+      t += BATTLE_TOWER.soloWinMinSeconds * 1000 + 1;
+      expect((await finishTowerFloor(sql, ann.id, t++, { fight: (s.body as { fight: { id: string } }).fight.id, outcome }, { pool: POOL, minWinMs: 0, kind: "party" })).status).toBe(200);
+    }
+    expect((await towerState(sql, ann.id, POOL)).runs.party).toMatchObject({ floor: 4, lives: 1, lost: [2], alone: true });
+    const again = await begin(sql, [bo.id, ann.id], t + 1);
+    expect(again.prep.plan).toMatchObject({ kind: "continue", floor: 2, back: [{ uid: ann.id, floor: 4 }] });
+    expect(again.prep.run.lost).toEqual([]);
+    expect((await towerState(sql, ann.id, POOL)).runs.party).toMatchObject({ floor: 2, lives: 2, lost: [] });
+  });
+
   it("a party floor's result is the room's: a device can't finish it or leave it, alone or not", async () => {
     const sql = await world();
     const [ann, bo] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com")];
