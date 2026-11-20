@@ -161,6 +161,8 @@ export interface KitBattle {
   opening: Opening;
   /** Several bosses on one side (the Battle Tower: settings.bossIds), `boss` the first; none: him alone. */
   bosses?: readonly string[];
+  /** Any other settings (a tower floor: `towerFloor`). */
+  patch?: Partial<Settings>;
 }
 
 /**
@@ -600,7 +602,7 @@ export interface KitRun {
  * (the board layer's twin tests read it).
  */
 export async function runBattle(k: KitBattle, sf: StockfishMoves | null, watch?: (r: MatchRunner, fen: string, who: "crowd" | "boss") => void): Promise<KitRun> {
-  const settings = kitSettings(k);
+  const settings = kitSettings(k, k.patch);
   const engines = [fakeEngine()];
   const r = new MatchRunner({ settings, rng: mulberry32(k.seed), engines, library: [k.opening], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: k.side });
   const where = `${k.bosses ? k.bosses.join(" + ") : k.boss} (seed ${k.seed}, crowd ${k.side === "w" ? "White" : "Black"}, ?power=${k.test || "none"}, from ${k.opening.id})`;

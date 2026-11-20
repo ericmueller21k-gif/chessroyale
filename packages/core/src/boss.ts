@@ -613,6 +613,11 @@ export interface BossPowerState {
   /** The test trigger (an admin): the ultimate comes as the next crowd turn begins, without the warning. */
   ultNext?: boolean;
   /**
+   * This battle has no ultimate for this boss (a Battle Tower floor, BATTLE_TOWER.noUltimate: Wrangler, Nov 20): the ultimate never
+   * comes, the test trigger refuses, and the meter shows empty and dimmed.
+   */
+  noUlt?: boolean;
+  /**
    * G-REX's fire tiles, each with the crowd turn it landed (stage 1 that turn, ablaze fireStages - 1 turns later;
    * after the crowd's move on that turn, a crowd piece still on it burns, the king never).
    */

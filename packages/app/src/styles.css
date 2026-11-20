@@ -17138,6 +17138,12 @@ img.qicon {
   pointer-events: none;
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.55));
 }
+/* While his cut or gap is on the board, the square highlights (the last move, the selection, check) go under it (Eric, Nov 20:
+   "the black horse green color on the tile should be behind the 'cut'"): back to the squares' own layer, under his z-index 1,
+   the pieces (2) still over everything. The move dots stay over (taps, other bosses' under-layers: review of #784). */
+.board-wrap:has(> .sw-gap, > .sw-cut-board) .hb square:is(.last-move, .selected, .check) {
+  z-index: 0;
+}
 
 /* ---- Wrangler: his long pull, his lasso drag and his showdown (components/Pig.tsx) ---- */
 

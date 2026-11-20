@@ -1005,21 +1005,24 @@ export async function pigTurn(engines: readonly EngineLike[], fen: string, ask: 
  * showdownMeterTurns, so the first showdown can come once both sides have made that many moves. Full while the test
  * trigger is pulled. Null once he has had showdownMax: no more this battle (the screens hide it).
  */
-export function showdownMeter(p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null {
+export function showdownMeter(p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "noUlt">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null {
+  // (No showdown this battle, a Battle Tower floor: empty, never filling.)
+  if (p.noUlt) return 0;
   if (p.ultNext) return 1;
   if ((p.ults ?? 0) >= s.showdownMax) return null;
   return Math.max(0, Math.min(1, (turn - 1 - (p.sdBase ?? 0)) / s.showdownMeterTurns));
 }
 
 /** His meter is full and he's waiting to fire (none under way): the fill (its sdBase), for his line and his ready loop; else null. */
-export const showdownReady = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt" | "turn">, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null =>
+export const showdownReady = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt" | "turn" | "noUlt">, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null =>
   p.ultAt === undefined && (showdownMeter(p, p.turn, s) ?? 0) >= 1 ? (p.sdBase ?? 0) : null;
 
 /**
  * The scout searches while crowd turn `turn` is picked (a showdown may follow before long): from showdownFrom (or once
  * his meter is full), while he has one left and none is under way.
  */
-export const showdownScouting = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax" | "showdownFrom"> = BOSS_POWERS): boolean => {
+export const showdownScouting = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt" | "noUlt">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax" | "showdownFrom"> = BOSS_POWERS): boolean => {
+  if (p.noUlt) return false;
   const m = showdownMeter(p, turn, s);
   return m !== null && p.ultAt === undefined && (turn >= s.showdownFrom || m >= 1);
 };
@@ -1030,7 +1033,7 @@ export const showdownScouting = (p: Pick<BossPowerState, "sdBase" | "ults" | "ul
  */
 export const showdownDue = (boss: BossState | null | undefined): "try" | "test" | null => {
   const p = boss?.powers;
-  if (!p || boss!.result || boss!.id !== "pig" || p.ultAt !== undefined) return null;
+  if (!p || boss!.result || boss!.id !== "pig" || p.ultAt !== undefined || p.noUlt) return null;
   if (p.ultNext) return "test";
   return (showdownMeter(p, p.turn) ?? 0) >= 1 ? "try" : null;
 };

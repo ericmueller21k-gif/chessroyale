@@ -1351,6 +1351,14 @@ export const BATTLE_TOWER = {
    */
   soloWinMinSeconds: 10,
   rageScale: [1, 0.75, 0.6] as readonly number[],
+  /**
+   * Bosses whose ultimate never comes on a tower floor (solo and party alike; the runner sets it up as the floor starts, so solo and
+   * online agree). Eric, Nov 20: "Disable wrangler ult plz in battle tower" (Wrangler's code id is `pig`). His meter stays on the bar,
+   * empty and dimmed, never filling (nothing hidden). Outside the tower nothing changes. The gates are generic (prepareTurn's ultimate
+   * step, ultimateNow, the test trigger, the meter) plus Wrangler's own showdown checks: a boss added here whose ultimate is set up
+   * elsewhere needs its own gate too (tower.test.ts runs every boss listed). docs/decisions/2026-11-20-tower-fixes.md.
+   */
+  noUltimate: ["pig"] as readonly string[],
   apart: [["hollow", "smudgy"], ["smudgy", "alfil"], ["alfil", "grex"], ["dash", "smudgy"]] as readonly (readonly [string, string])[],
   maxBosses: 3,
 } as const;

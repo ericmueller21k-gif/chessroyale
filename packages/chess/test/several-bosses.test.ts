@@ -477,6 +477,33 @@ describe("several bosses: the design's out-of-turn rules", () => {
     expect(movers[replay + 1]?.id).toBe("gingerbread");
   }, 60_000);
 
+  it("a tower floor's boss in BATTLE_TOWER.noUltimate (Wrangler, Eric, Nov 20) never casts his ultimate, his meter empty and dimmed all floor; off the tower he does", async () => {
+    expect(BATTLE_TOWER.noUltimate).toContain("pig");
+    for (const id of BATTLE_TOWER.noUltimate) {
+      // (His ultimate's test switch and the admins' trigger pulled from turn 2: still nothing, on a floor of two and a lone floor.)
+      const test = id === "pig" ? "showdown" : "ultimate";
+      for (const bosses of [[id, id === "gingerbread" ? "clown" : "gingerbread"], null]) {
+        const meters: string[] = [];
+        const k: KitBattle = { ...battle(bosses ?? [id], test, 2, 20), ...(bosses ? {} : { bosses: undefined }), patch: { towerFloor: bosses ? 2 : 1 } };
+        const run = await runBattle(k, null, (r) => {
+          const b = r.several() ? sideBoss(r, id) : r.boss!;
+          expect(b.powers!.noUlt).toBe(true);
+          expect(b.powers!.ultAt).toBeUndefined();
+          // (The view, what every screen draws: his meter at 0, held (dimmed), marked off.)
+          const v = r.bossView()!;
+          const mine = v.side ? v.side.bosses.find((x) => x.id === id)! : v;
+          meters.push(`${mine.powers!.rage}:${mine.powers!.paused}:${mine.powers!.noUlt}:${rageOf(b)}`);
+        });
+        expect(run.failures).toEqual([]);
+        expect(run.events.has(id === "pig" ? "showdown" : "warn")).toBe(false);
+        expect(new Set(meters)).toEqual(new Set(["0:true:true:0"]));
+      }
+    }
+    // (Off the tower: the same battle's showdown comes.)
+    const off = await runBattle(battle(["pig", "gingerbread"], "showdown", 2, 20), null);
+    expect(off.events.has("showdown")).toBe(true);
+  }, 120_000);
+
   it("Wrangler's reply to the showdown's duel is the side's very next move, out of turn; the order then goes on after him", async () => {
     const movers: string[] = [];
     const run = await runBattle(battle(["pig", "gingerbread"], "showdown", 99, 24), null, (r, _fen, who) => {
