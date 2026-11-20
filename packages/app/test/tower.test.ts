@@ -121,3 +121,26 @@ describe("sending a kept result", () => {
     expect(loadKept()).toBeNull();
   });
 });
+
+describe("the party's plan in words (tower-party.ts planWords; the review of #835, finding 10)", async () => {
+  const { planWords } = await import("../src/tower-party.ts");
+  const names: Record<string, string> = { a: "Ann", b: "Bo", c: "Cy" };
+  const nameOf = (id: string) => names[id] ?? "A member";
+  it("on together: who goes back from which floor, named; the up button where START goes; asked first only when it's yours", () => {
+    const plan = { kind: "continue" as const, floor: 5, back: [{ id: "a", floor: 30 }, { id: "b", floor: 12 }] };
+    expect(planWords(plan, "c", nameOf)).toEqual({ line: "Your climb together goes on: floor 5. Ann's climb goes back from floor 30, Bo's from floor 12.", up: "Up to floor 5", ask: null, ok: true });
+    const mine = planWords(plan, "b", nameOf);
+    expect(mine.line).toBe("Your climb together goes on: floor 5. Your climb goes back from floor 12, Ann's from floor 30.");
+    expect(mine.ask).toEqual({ heading: "Back to floor 5?", note: "Your climb goes back from floor 12 to floor 5, where your party left off. Your best floors stay." });
+    expect(planWords({ kind: "continue", floor: 3, back: [] }, "a", nameOf)).toMatchObject({ line: "Your climb together goes on: floor 3.", ask: null });
+  });
+  it("a new climb: what it ends, asked first when it's yours; waiting: no START", () => {
+    expect(planWords({ kind: "new", ends: [{ id: "a", floor: 6 }] }, "a", nameOf)).toEqual({
+      line: "A new climb from floor 1. It ends yours on floor 6.",
+      up: "New climb: floor 1",
+      ask: { heading: "Start a new climb?", note: "Your party climb on floor 6 ends, and this party starts on floor 1." },
+      ok: true,
+    });
+    expect(planWords({ kind: "wait", message: "Reading everyone's climbs…" }, "a", nameOf)).toMatchObject({ ok: false, up: "START", ask: null });
+  });
+});
