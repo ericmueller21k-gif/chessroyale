@@ -125,3 +125,30 @@ something. I think that makes more sense."
     `TOWER_PARTY.listPollMs` (4 s) while it shows, `TOWER_PARTY.listMax` (12) at most. Join from the list is the line's old Join: seated
     once the party welcomes you, its words on the card's line otherwise; the party's own checks stay (accounts only, full refused).
     Your own party shows "Joined"; the others' Join is greyed while you're in a party.
+
+## The delta review of #835 (Nov 20): mine
+
+20. **The clerk's list is made once per Worker instance, never per reader** (finding 1): from the instance's own copy of the town's room
+    (the one the town's chat readers keep fresh, `TOWN_CHAT.readCacheMs`: usually no hub call at all), each party asked, the whole list
+    kept `TOWER_PARTY.listCacheMs` (3 s) and shared by every reader on that instance (`townOpenParties`). The hub's per-request
+    `townParties` is gone. Codes are deduped and filtered before the cap (twice `listMax` asked, so lines whose party just filled or
+    started don't push joinable ones off). Only for whoever could join: an account, signed in where signing in is set up (the party's own
+    rule); a guest gets none and "Sign in to climb with a party.", and the card stops asking. A banned account still sees the list (a ban
+    check is D1 reads per poll); its Join is refused with the ban's words, as before.
+21. **None where the town shows no party lines** (finding 4): a device the age gate marked too young, and the town's chat paused.
+22. **A floor whose room never says it's over ends anyway** (finding 2): while it shows under way, the party asks its room every
+    `TOWER_PARTY.floorCheckMs` (a minute) whether the battle from its START is over there (the room's `partyBattleDone`: closed, another
+    room's now, or at its results), and ends the floor itself when it is. The copies already let such a floor go (`settleStale`).
+23. **The plan line keeps its three lines** (finding 3, Eric's "nothing shifts"): a fixed height, and words written to fit it: your own
+    climb named with its floor, the others counted ("Yours goes back from floor 30, and 2 more.", "It ends 3 party climbs."), the
+    leader's waiting as a count ("2 not ready yet."; the seats' ✓ show who). Each member is still asked about their own climb as they
+    READY. The e2e measures the longest words in the card's box with room for a wider font. The open parties' box: three rows fit exactly
+    (no scroll), and its scrollbar's room is kept (finding 5).
+24. **"Go to the tower" rides with its walk** (finding 6): the clerk is the walk's (`goIn(i, clerk)`), so a walk elsewhere calls it off and
+    a later way in by the door is the door's. On the street it's greyed while a boss's challenge plays.
+25. **A party closed to the town still seats anyone with its code** (finding 7): a friend's invite comes in by the same code, and the
+    run's own members come back by it too, so refusing at the door would turn them away. A stranger can only get there from a list entry
+    a few seconds old, and a newcomer only turns the plan into a new climb, which asks the run's members first (the leader can kick).
+26. **The party line carries its leader's account** (finding 8): `from` is the leader's id, so muting or blocking them hides it (the town
+    chat's own filter) and a report through the line names them; it still has no name to tap (a server line), so the leader's profile is
+    where they're reported. A deleted member's seat no longer re-reads the plan every 3 s (finding 9): only a kick or a leave changes it.

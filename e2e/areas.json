@@ -115,8 +115,7 @@
     "packages/app/src/hints.ts",
     "packages/app/src/progress.ts",
     "packages/app/src/refused.ts",
-    "public/**"
-  ],
+    "public/**", "packages/app/src/town/shops/ShopRoom.tsx", "packages/app/src/town/shops/room.ts"],
   "none": [
     "**/*.md",
     "docs/**",
@@ -170,7 +169,7 @@
       "specs": ["e2e/battle-tower.spec.ts", "e2e/town-street.spec.ts", "e2e/tower-party.spec.ts"]
     },
     "The Battle Tower's party (Nov 20, PR 12): the clerk's three ways (Solo, Invite friends, Open party), the party's seats, plan, READY and START, the town chat's party line and its Join, everyone walking into the floor room, a party floor's match and result, a copy played on alone": {
-      "paths": ["packages/app/src/tower-party.ts"],
+      "paths": ["packages/app/src/tower-party.ts", "packages/app/src/tower-plan.ts"],
       "specs": ["e2e/tower-party.spec.ts", "e2e/battle-tower.spec.ts"]
     },
     "Quests (Nov 9, XP phase 3): dealt, counted and paid by the server, the overlay on home and its entry in the top bar, a quest's line in the result's toast": {
