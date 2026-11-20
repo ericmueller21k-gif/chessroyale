@@ -2476,15 +2476,17 @@ export const MOO_CINEMATIC = {
    */
   fieldMs: 5000,
   /**
-   * The moon coming down (Eric, Nov 20: "this big moon ... it takes up basically the full width of the sky, and then it starts like
-   * coming downward ... almost like a meteor ... it doesn't move ... too quick, but ... you can clearly see it"): the field's own moon,
-   * lifted as a sprite (characters/moo-moon.png), from the field fading in to the cut, `scale` times the field's and `y` art pixels
-   * below the field's moon, from `moonFrom` to `moonTo`, gathering pace (its progress to the power `moonPow`). It always covers the
-   * field's moon, which stays put under it (|y| ≤ 57 × (scale − 1): the field's moon is 57 art pixels across its middle).
+   * The moon rising (Eric, Nov 20: "the moon should start half hidden behind the horizon/grassy hill and then move upward into the sky
+   * for a few seconds (same timing as is now), moon should never be in front of the background hill terrain"; it came down like a
+   * meteor before that day's second change): the field's own moon, lifted as a sprite (characters/moo-moon.png), behind the field's
+   * hills, barn and grass (characters/moo-field-layers.png: the sky without its moon, then the front), from the field fading in to the
+   * cut, `scale` times the field's and `y` art pixels below the field's moon, from `moonFrom` (its middle on the hill line, half
+   * hidden) to `moonTo` (the field's own moon's place: the field after the close-up is the same picture), easing out as it rises (its
+   * progress 1 − (1 − p) to the power `moonEase`).
    */
-  moonFrom: { scale: 1.65, y: -37 },
-  moonTo: { scale: 1.95, y: 42 },
-  moonPow: 1.4,
+  moonFrom: { scale: 1, y: 57 },
+  moonTo: { scale: 1, y: 0 },
+  moonEase: 1.6,
   /**
    * Then the Hidden Boss's light (components/recluse-light.ts, Eric: "the same way the light looks there, because it looks perfect"):
    * the moon starts glowing `glowMs` before the cut, its rays radiate over the whole screen from `radiateMs` before it, the white

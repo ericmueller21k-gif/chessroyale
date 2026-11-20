@@ -23294,10 +23294,13 @@ body.mo-on .mm-scrim {
 .mo-field {
   z-index: 1;
 }
+.mo-front {
+  z-index: 2;
+}
 .mo-close {
   z-index: 3;
 }
-/* The moon coming down (Nov 20): the field's own, lifted, over the field and under him. */
+/* The moon rising (Nov 20): the field's own, lifted, over the field's sky and under its front (the hills, the barn, the grass) and him. */
 .mo-bigmoon {
   position: absolute;
   z-index: 1;

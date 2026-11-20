@@ -88,8 +88,16 @@ async function record(page: Page) {
         barGold: gold(bar?.querySelector("canvas") ?? null),
         casterGold: gold(document.querySelector<HTMLCanvasElement>(".pm-caster canvas, canvas.mo-cine-fig")),
         cine: document.querySelector(".mo-cine")
-          ? [...document.querySelectorAll<HTMLElement>(".mo-pic")].map((e) => `${e.classList.contains("mo-close") ? "close" : "field"}:${e.dataset.frame}:${e.style.opacity}`)
+          ? [...document.querySelectorAll<HTMLElement>(".mo-pic")].map((e) => `${e.classList.contains("mo-close") ? "close" : e.classList.contains("mo-front") ? "front" : "field"}:${e.dataset.frame}:${e.style.opacity}`)
           : null,
+        // (The rising moon: its top on screen, and whether the field's front, the hills and the grass, is drawn over it.)
+        bigMoon: (() => {
+          const m = document.querySelector<HTMLElement>(".mo-bigmoon");
+          const f = document.querySelector<HTMLElement>(".mo-front");
+          if (!m) return null;
+          const z = (e: HTMLElement) => Number(getComputedStyle(e).zIndex);
+          return { top: m.getBoundingClientRect().top, frontOver: !!f && f.parentElement === m.parentElement && z(f) > z(m) };
+        })(),
         moments: [...document.querySelectorAll(".power-moment")].map((e) => e.className.replace("power-moment", "").trim()),
         // (What a tap on the board's middle would reach: the cinematic's field, while it's up, or the board.)
         tapCine: (() => {
@@ -117,8 +125,9 @@ type Rec = {
   anim: string | null;
   barGold: number | null;
   casterGold: number | null;
-  /** The Full Moon's cinematic, while it's up: each picture showing, "field" or "close", its frame and opacity. */
+  /** The Full Moon's cinematic, while it's up: each picture showing, "field", "front" (the field's hills and grass) or "close", its frame and opacity. */
   cine: string[] | null;
+  bigMoon: { top: number; frontOver: boolean } | null;
   moments: string[];
   /** Whether a tap on the board's middle would land on the cinematic (its field takes taps while it's up). */
   tapCine: boolean | null;
@@ -305,6 +314,11 @@ test("Moo & Moon: the Full Moon warns, its cinematic plays (the field, the close
   const fieldUp = cine.filter((c) => c.pics.some((p) => p.startsWith("field:") && p.endsWith(":1")));
   expect(fieldUp.length).toBeGreaterThan(10);
   expect(fieldUp.every((c) => rec[c.i]!.tapCine), "the field takes the taps").toBe(true);
+  // (Eric, Nov 20: the moon rises from behind the hill, never in front of it: the field's front is over it all the way up.)
+  const moons = rec.flatMap((r) => (r.bigMoon ? [r.bigMoon] : []));
+  expect(moons.length, "the moon rises in the field").toBeGreaterThan(10);
+  expect(moons.every((m) => m.frontOver), "the hills and the grass are over the moon").toBe(true);
+  expect(moons.at(-1)!.top, "the moon rises").toBeLessThan(moons[0]!.top - 20);
   expect(rec.filter((r) => !r.cine && r.phase === "play").every((r) => r.tapCine === false), "the board takes them again after").toBe(true);
   const cineEnd = cine.at(-1)!.i;
   const flurryOn = rec.findIndex((r) => r.moments.includes("pm-flurry"));
