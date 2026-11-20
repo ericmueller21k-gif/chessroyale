@@ -1357,7 +1357,7 @@ test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's 
   await bossAloneFromHome(page);
   const box = page.getByRole("dialog", { name: /^You got an? .+ token!$/ });
   await expect(box).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByText(/Hollow won/)).toBeVisible();
+  await expect(page.getByText(/Hollow wins/)).toBeVisible();
   await expect(box.locator(".token-art")).toHaveAttribute("data-drawn", "1");
   const b = (await box.boundingBox())!;
   expect(Math.abs(b.width - b.height), "a square box").toBeLessThan(2);

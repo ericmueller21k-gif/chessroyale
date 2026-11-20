@@ -86,7 +86,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
     ? tower.tone
     : resigned
       ? "loss"
-      : boss
+      : bossResult
         ? bossResult === "crowd" ? "win" : bossResult === "boss" ? "loss" : "draw"
         : team
           ? gameWinner === team ? "win" : gameWinner ? "loss" : "draw"
@@ -96,7 +96,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
     ? "Removed for being away"
     : resigned && !tower
       ? "You resigned"
-      : boss || team
+      : bossResult || team
         ? tone === "win" ? "Victory!" : tone === "loss" ? "Defeat" : "A draw"
         : `${placement}${ordinal(placement)} of ${match.totalPlayers}`;
   const name = boss ? bossInText(boss.name, true) : "";
@@ -112,7 +112,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             : bossResult === "boss"
               ? `${name} wins`
               : `A draw with ${bossInText(boss.name)}`
-      : left
+      : bossResult
+        ? ""
+        : left
         ? ""
         : team
           ? `${placement}${ordinal(placement)} of ${match.totalPlayers}`
