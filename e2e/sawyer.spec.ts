@@ -209,6 +209,17 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   expect(Math.abs(gap.x + gap.width / 2 - (board.x + board.width / 2))).toBeLessThanOrEqual(1.5);
   expect(gap.height).toBeGreaterThan(board.height - 2);
+  // (Eric, Nov 20: the square highlights go under it, "the green color on the tile should be behind the cut": the last move's tint at
+  // z-index 0, the gap at 1, the pieces at 2, in the one stacking context.)
+  const z = await page.evaluate(() => {
+    const zi = (s: string) => {
+      const e = document.querySelector(s);
+      return e ? getComputedStyle(e).zIndex : null;
+    };
+    return { last: zi(".hb square.last-move"), gap: zi(".board-wrap > .sw-gap"), piece: zi(".hb piece") };
+  });
+  expect(z).toEqual({ last: "0", gap: "1", piece: "2" });
+  if (process.env.STILLS) await page.locator(".board-wrap").first().screenshot({ path: `${process.env.STILLS}/sawyer-gap-over-highlight-${test.info().project.name}.png` });
   // Nothing crosses it: not in the allowed moves, no move dots across it. When it stops none of the crowd's legal moves
   // (his move gave check and every answer stays on its half: "Check! Shield the king." on CI, Oct 18) there are no
   // allowed moves (null: every legal move is); likewise when it would stop them all (a limit never leaves none).
@@ -223,6 +234,9 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   if (across) {
     await tap(page, across.from);
     await expect(page.locator(`${BOARD_SEL.square}.move-dest`).first()).toBeVisible();
+    // (The selection under the gap too; the move dots stay over it.)
+    expect(await page.locator(`${BOARD_SEL.square}.selected`).first().evaluate((e) => getComputedStyle(e).zIndex)).toBe("0");
+    expect(await page.locator(`${BOARD_SEL.square}.move-dest`).first().evaluate((e) => getComputedStyle(e).zIndex)).toBe("2");
     for (const sq of await dotSquares(page)) expect(file(sq) <= 3, `${across.from} → ${sq}`).toBe(file(across.from) <= 3);
     await tap(page, across.from);
   }

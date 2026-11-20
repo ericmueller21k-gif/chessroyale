@@ -166,6 +166,15 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   the bar (`speakerOf`: a line keyed by his id); `refusedLine` asks every boss on the side; the move list's faces by ply
   (`side.movers`, from `MatchState.movers`) and "Ginger is thinking…" name the boss. One boss: unchanged.
 
+- **Eric's playtest fixes (Nov 20):** Wrangler has no ultimate on a floor of several (`BATTLE_TOWER.noUltimate: ["pig"]`: the runner marks
+  his powers `noUlt` as a shared floor starts; his meter stays on the bar empty and dimmed, aria "Rage: no ultimate in the Battle Tower");
+  alone on a floor he keeps it, once, as in every mode (`showdownMax` 1, Eric: "if wrangler is solo in battle tower he fires his ult off
+  still ... make sure in all modes for him he can only ult once a game then it turns gray"). Babur's pump on a shared floor (`BossUi.towerProp`): a phone's in his part of the split bar (1.25x, at its left, never dimmed),
+  a computer's beside his figure by the board (`TowerSide`, 2x); one pump on the page. The other bosses' bar props are still not drawn on
+  a shared floor. Sawyer's cut and gap over the square highlights on every screen (bosses.md). Checks: `several-bosses.test.ts` (every
+  `noUltimate` boss on a floor of two; Wrangler's one showdown on a lone floor and off the tower) and `e2e/battle-tower.spec.ts` ("a shared floor of Babur and Wrangler").
+  [2026-11-20-tower-fixes.md](../decisions/2026-11-20-tower-fixes.md).
+
 ### For PR 10 (the app)
 
 - A 409 on finish means "read the run again", never an error: it carries `run` and `best`. A retry of the result whose answer was

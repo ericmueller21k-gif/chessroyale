@@ -722,7 +722,7 @@ describe("Wrangler's showdown in the match", () => {
     expect(r.boss!.powers!.showdown ?? null).toBeNull();
   }, 60_000);
 
-  it("full, he fires on his first turn where one qualifies: the line-up after his move, no warning; the forced duel; the meter empties and fills again", async () => {
+  it("full, he fires on his first turn where one qualifies: the line-up after his move, no warning; the forced duel; the meter empties and stays empty, greyed (once a battle, Eric, Nov 20)", async () => {
     const r = raid({ engine: duelEngine() });
     const n = BOSS_POWERS.showdownMeterTurns;
     for (let t = 1; t <= n; t++) {
@@ -747,13 +747,15 @@ describe("Wrangler's showdown in the match", () => {
     const duels = p.showdown!.pairs.map((x) => x.crowd + x.boss).sort();
     expect([...crowdAllowed(r.boss, board.fen)!].sort()).toEqual(duels);
     expect(powerTurn(r.boss)).toBe(true);
-    // Its turn: the meter's spent (the screens show it full as it comes); then it fills again from empty.
+    // Its turn: the meter's spent (the screens show it full as it comes); then, his one a battle (showdownMax 1), it stays empty and
+    // dimmed, still counted as had (ultAt kept): it never fills again.
     expect(r.bossView()!.powers!.ultAt).toBe(n + 2);
     expect(r.bossView()!.powers!.ready).toBeNull();
     await turn(r, duels[0]);
     expect(r.crowdAllowed()).toBeNull();
-    expect(r.bossView()!.powers!.ultAt).toBeNull();
-    expect(r.bossView()!.powers!.rage).toBe(1 / n);
+    expect(r.bossView()!.powers!.ultAt).toBe(n + 2);
+    expect(r.bossView()!.powers!.rage).toBe(0);
+    expect(r.bossView()!.powers!.paused).toBe(true);
     expect(r.boss!.powers!.ults).toBe(1);
   }, 60_000);
 
@@ -780,7 +782,7 @@ describe("Wrangler's showdown in the match", () => {
     expect(kinds(r)).toContain("showdown");
   }, 60_000);
 
-  it("at most showdownMax a battle: then no meter (none shown), and none is asked for", async () => {
+  it("at most showdownMax a battle (once, Eric, Nov 20): then his meter stays on the bar, empty and greyed, and none is asked for", async () => {
     const r = showdownRaid(duelEngine(), { bossMaxMoves: 60 });
     await turn(r, "e2e4");
     let fired = 0;
@@ -793,10 +795,14 @@ describe("Wrangler's showdown in the match", () => {
       }
     }
     expect(fired).toBe(BOSS_POWERS.showdownMax);
-    expect(r.bossView()!.powers!.rage).toBeNull();
+    expect(BOSS_POWERS.showdownMax).toBe(1);
     for (let t = 0; t < BOSS_POWERS.showdownMeterTurns + 2; t++) {
       expect(r.bossAsks()?.showdown).toBeUndefined();
       await turn(r);
+      // (From the turn after the duel: shown, empty, dimmed; the admins' trigger refuses.)
+      expect(r.bossView()!.powers!.rage).toBe(0);
+      expect(r.bossView()!.powers!.paused).toBe(true);
+      expect(r.triggerUltimate()).toBe(false);
     }
     expect(r.bossView()!.powers!.ready).toBeNull();
   }, 120_000);

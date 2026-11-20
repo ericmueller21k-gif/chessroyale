@@ -243,8 +243,13 @@ export function sidePump(fig: Box, figScale: number, baseline: number, s: number
  * `x` px from its left), at `scale`; `tall`, at the left of a taller bar, at `scale`; `bar`, at the bar's left at 1x (a screen without
  * the boss dock, whose board doesn't leave room for a taller bar).
  */
-type PumpPlace = { at: "phone" | "side" | "tall" | "bar"; scale: number; x: number; side: HTMLElement | null };
+type PumpPlace = { at: "phone" | "side" | "tall" | "bar" | "tower"; scale: number; x: number; side: HTMLElement | null };
 const PHONE: PumpPlace = { at: "phone", scale: 2, x: 0, side: null };
+/**
+ * A tower floor of several (tower.css): a phone's in his part of the split bar (`.tw-part`), a computer's beside his figure by the board
+ * (`.tw-side-body`); never the lone boss's side place or a taller bar.
+ */
+const TOWER: PumpPlace = { at: "tower", scale: 1, x: 0, side: null };
 /** styles.css' computer. */
 const COMPUTER = "(min-width: 900px) and (min-height: 600px)";
 /** What the pump keeps clear of beside his figure (the side menu on a computer, Nov 1: from 900 to 1099 px it stood over it). */
@@ -257,6 +262,7 @@ let lastPlace: PumpPlace = PHONE;
  * class it leaves on `slot`). Synchronous: the class comes off and on again in the same task, never painted in between.
  */
 function pumpPlace(slot: HTMLElement, kit: BossKit | null): PumpPlace {
+  if (slot.closest(".tw-part, .tw-side-body")) return TOWER;
   if (!matchMedia(COMPUTER).matches) return PHONE;
   const screen = slot.closest<HTMLElement>(".screen") ?? document.body;
   const board = screen.querySelector<HTMLElement>(".hb-board");
@@ -561,5 +567,7 @@ export const TIGER_UI = {
   ultimate: { name: "Hoops", when: "After your move" },
   moments: MOMENTS,
   barProp: ({ boss, moments }) => <TigerPump boss={boss} moments={moments} />,
+  // (A tower floor of several: the pump in his part of the split bar, 1x, phone and computer: Nov 20.)
+  towerProp: true,
   board: (p) => ({ over: <TigerLayer {...p} /> }),
 } satisfies BossUi;

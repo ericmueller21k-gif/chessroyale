@@ -83,7 +83,7 @@ import { freestyleStart } from "./chess960.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
 import { START_FEN, applyMove, baseAt, fenAtPly, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan, type GameEnd } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
-import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, floorStrength, levelForMaia, sideRefusal, type BossBrain, type BossBrainPlan, type BossForm, type FloorStrength } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, floorStrength, levelForMaia, sideRefusal, type BossBrain, type BossBrainPlan, type BossForm, type FloorStrength } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
@@ -2276,6 +2276,7 @@ export class MatchRunner {
               shadows: fireShadows(p),
               stepped: p.stepped ?? null,
               ultNext: !!p.ultNext,
+              ...(p.noUlt ? { noUlt: true } : {}),
               ...(bossRules(b)?.view?.(p) ?? {}),
             },
           }
@@ -2612,6 +2613,14 @@ export class MatchRunner {
     return this.several() ? sideRates(BOSS_POWERS, this.state.bosses!.map((o) => o.id)) : BOSS_POWERS;
   }
 
+  /**
+   * A Battle Tower floor of several (settings.towerFloor, startSide) and a boss whose ultimate is off there (BATTLE_TOWER.noUltimate:
+   * Wrangler, Eric, Nov 20): his powers say so from the start (noUlt), the same solo and online. Alone on a floor, or off the tower: nothing.
+   */
+  private towerNoUlt(id: string): { noUlt?: true } {
+    return this.settings.towerFloor && BATTLE_TOWER.noUltimate.includes(id) ? { noUlt: true } : {};
+  }
+
   /** A Battle Tower floor's strength (settings.towerFloor; core floorStrength), with as many bosses as it deals; null off the tower. */
   private towerStrength(): FloorStrength | null {
     const f = this.settings.towerFloor;
@@ -2651,7 +2660,7 @@ export class MatchRunner {
     const own: BossOwn[] = defs.map((d, i) => ({
       id: d.id,
       ...this.firstForm(d.id),
-      powers: { ...initPowers(seeds[i]!, fen, crowdSide), ...(i === claimer ? { claimed: true } : {}), ...(setUps[i] ?? {}) },
+      powers: { ...initPowers(seeds[i]!, fen, crowdSide), ...(i === claimer ? { claimed: true } : {}), ...(setUps[i] ?? {}), ...this.towerNoUlt(d.id) },
       tier,
       elo: floor?.rating ?? bossStrength(tier, d, this.settings.bossDifficulty),
     }));

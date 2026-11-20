@@ -42,7 +42,7 @@ const opening = (moves: string[]): Opening => ({ id: "o", eco: "", name: "Test",
 /** Each boss's ultimate and the moment that shows it has come. */
 const ULTIMATES = { gingerbread: "blizzard", clown: "funhouse", grex: "candle", hollow: "lightsout", bigboy: "bounce", sawyer: "boardsaw", pig: "showdown" } as const;
 
-describe("every boss's ultimate, again and again", () => {
+describe("every boss's ultimate, again and again (Wrangler's once)", () => {
   for (const [id, ult] of Object.entries(ULTIMATES)) {
     it(`${id}: its ${ult} comes again and again, never two at once, never leaving the crowd without a move`, async () => {
       // (Wrangler's showdown searches its line-ups for real, under a second a try: a shorter battle keeps the test quick.)
@@ -93,7 +93,9 @@ describe("every boss's ultimate, again and again", () => {
         await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
       }
       const p = r.boss!.powers!;
-      expect(p.ults ?? 0).toBeGreaterThanOrEqual(3);
+      // Wrangler's showdown comes once a battle (Eric, Nov 20: "in all modes for him he can only ult once a game"); the rest again and again.
+      if (id === "pig") expect(p.ults ?? 0).toBe(1);
+      else expect(p.ults ?? 0).toBeGreaterThanOrEqual(3);
       // Never two at once: a new ultimate's turn only after a turn with none under way.
       for (let k = 1; k < seen.length; k++) {
         const [a, b] = [seen[k - 1]!, seen[k]!];

@@ -152,6 +152,11 @@ export interface BossUi {
    */
   barProp?: (p: { boss: BossView; moments: () => Moment[] }) => ComponentChildren;
   /**
+   * Its barProp is drawn in a Battle Tower floor's split bar too, in his own part (TowerBar; Babur's pump, Nov 20: his balloons
+   * grow there as in his own bar). Left out: the split bar draws no prop for it.
+   */
+  towerProp?: boolean;
+  /**
    * The dock's line for its turn when that turn brought no move to show (Alfil's fusion was his move: "Alfil spent his
    * move on the fusion."); null or left out: none.
    */

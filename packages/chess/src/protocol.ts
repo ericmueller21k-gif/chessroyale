@@ -366,6 +366,8 @@ export interface NetBossPowers {
   stepped?: number | null;
   /** The test trigger: the ultimate is on its way (it comes as the next crowd turn begins). */
   ultNext?: boolean;
+  /** No ultimate this battle (a Battle Tower floor: Wrangler, BATTLE_TOWER.noUltimate): the meter shows empty and dimmed. Missing: false. */
+  noUlt?: boolean;
   /**
    * Hollow's dark (missing for other bosses): each dark square, the crowd turn it fell as and its last turn (it thins
    * then); the squares whose dark cleared as this turn began; his bulbs still lit (his moves to his next cover); whether

@@ -1351,6 +1351,16 @@ export const BATTLE_TOWER = {
    */
   soloWinMinSeconds: 10,
   rageScale: [1, 0.75, 0.6] as readonly number[],
+  /**
+   * Bosses whose ultimate never comes on a tower floor of several (2 or 3 bosses; solo and party alike; the runner sets it up as the
+   * floor starts, so solo and online agree). Eric, Nov 20: "Disable wrangler ult plz in battle tower", then "if wrangler is solo in battle
+   * tower he fires his ult off still ... just make sure in all modes for him he can only ult once a game then it turns gray": alone on a
+   * floor he keeps it (once, as everywhere: showdownMax). Wrangler's code id is `pig`. His meter stays on the bar, empty and dimmed, never
+   * filling (nothing hidden). Outside the tower nothing changes. The gates are generic (prepareTurn's ultimate
+   * step, ultimateNow, the test trigger, the meter) plus Wrangler's own showdown checks: a boss added here whose ultimate is set up
+   * elsewhere needs its own gate too (tower.test.ts runs every boss listed). docs/decisions/2026-11-20-tower-fixes.md.
+   */
+  noUltimate: ["pig"] as readonly string[],
   apart: [["hollow", "smudgy"], ["smudgy", "alfil"], ["alfil", "grex"], ["dash", "smudgy"]] as readonly (readonly [string, string])[],
   maxBosses: 3,
 } as const;
@@ -1706,7 +1716,8 @@ export const BOSS_POWERS = {
    *   showdownMeterTurns moves, and again over as many after each showdown; as it fills he says "I've got you in my
    *   sights." and swings both ropes until he fires. With it full, on the first of his turns where a qualifying line-up
    *   is found after his move, he fires (no other warning, no "Not yet..."); none found, he plays on (his lasso drags
-   *   carry on) and tries again next turn. At most showdownMax a battle.
+   *   carry on) and tries again next turn. At most showdownMax a battle: once (Eric, Nov 20: "make sure in all modes for him he can
+   *   only ult once a game then it turns gray"; was 2), his meter then on the bar, empty and dimmed, for the rest of the battle.
    * - His moves after the duel: his reply, and his next ones while the showdown's tactics are live (a line-up piece of
    *   either side still attacked), up to showdownEngineMoves, are the engine's best at full strength, never his brain's.
    * - The search: while the crowd thinks, every turn from showdownFrom (while one may still come), up to
@@ -1726,7 +1737,7 @@ export const BOSS_POWERS = {
   showdownTrap: 1.5,
   showdownFrom: 4,
   showdownMeterTurns: 5,
-  showdownMax: 2,
+  showdownMax: 1,
   showdownEngineMoves: 3,
   showdownSearchMs: 8000,
   showdownTurnMs: 3000,

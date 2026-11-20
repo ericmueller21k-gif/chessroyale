@@ -178,9 +178,10 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
  * in the free room at the right (`prop`; none yet). Through the boss's turn on its screen it draws itself every frame (the
  * strip relights as his darkness lands): the header around it draws only now and then (useStillKey).
  */
-export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView; until?: number; part?: "bar" | "ult" | "prop" }) {
+export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView; until?: number; part?: "bar" | "ult" | "prop" | "towerProp" }) {
   const ui = bossUi(boss);
-  const draw = part === "ult" ? ui?.ultBar : part === "prop" ? ui?.barProp : ui?.bar;
+  // (`towerProp`: a tower floor's split bar, his prop only where it's drawn there: BossUi.towerProp.)
+  const draw = part === "ult" ? ui?.ultBar : part === "prop" ? ui?.barProp : part === "towerProp" ? (ui?.towerProp ? ui.barProp : undefined) : ui?.bar;
   useFrameNow(!!draw && !!until);
   return draw?.({ boss, moments: () => momentsOf(boss, until) }) ?? null;
 }
@@ -296,6 +297,8 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
   // (Spent: the last ultimate a battle allows has come and the meter stays, empty and dimmed: Timber's after his second Gnaw.)
   const rules = bossRules(boss);
   const spent = paused && !!rules?.spentMeterShown && (p?.ults ?? 0) >= (rules?.ultimateMax ?? Infinity);
+  // (No ultimate this battle, a Battle Tower floor's Wrangler: empty and dimmed all battle, as a spent meter.)
+  const off = !!p?.noUlt;
   const now = !!p && p.ultAt !== null && !paused;
   const pct = ragePct(boss) ?? 0;
   // The meter only drops when an ultimate empties it: from what this device last showed, it holds a moment (the screen
@@ -324,11 +327,12 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
     <span
       class={`rage-meter${glow ? " glow" : ""}${p!.warned ? " warned" : ""}${now ? " now" : ""}${paused ? " paused" : ""}`}
       role="meter"
-      aria-label={spent ? "Rage: no more ultimates this battle" : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
+      data-ult-off={off ? "" : undefined}
+      aria-label={off ? "Rage: no ultimate in the Battle Tower" : spent ? "Rage: no more ultimates this battle" : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
-      title={spent ? "Rage: no more ultimates this battle" : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
+      title={off ? "Rage: no ultimate in the Battle Tower" : spent ? "Rage: no more ultimates this battle" : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
     >
       {/* (No width transition while it slides down: a transition would override the slide.) */}
       <i ref={bar} style={drain ? { width: `${pct}%`, transition: "none" } : { width: `${pct}%` }} />

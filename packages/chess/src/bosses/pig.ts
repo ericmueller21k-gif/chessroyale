@@ -1003,23 +1003,27 @@ export async function pigTurn(engines: readonly EngineLike[], fen: string, ask: 
 /**
  * His meter as crowd turn `turn` is picked (0-1; his own, nothing else adds to it): his moves since it last emptied, of
  * showdownMeterTurns, so the first showdown can come once both sides have made that many moves. Full while the test
- * trigger is pulled. Null once he has had showdownMax: no more this battle (the screens hide it).
+ * trigger is pulled. Empty once he has had showdownMax (once a battle, Eric, Nov 20): no more this battle, the meter kept on the bar,
+ * dimmed (spentMeterShown).
  */
-export function showdownMeter(p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null {
+export function showdownMeter(p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "noUlt">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null {
+  // (No showdown this battle, a Battle Tower floor: empty, never filling.)
+  if (p.noUlt) return 0;
   if (p.ultNext) return 1;
-  if ((p.ults ?? 0) >= s.showdownMax) return null;
+  if ((p.ults ?? 0) >= s.showdownMax) return 0;
   return Math.max(0, Math.min(1, (turn - 1 - (p.sdBase ?? 0)) / s.showdownMeterTurns));
 }
 
 /** His meter is full and he's waiting to fire (none under way): the fill (its sdBase), for his line and his ready loop; else null. */
-export const showdownReady = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt" | "turn">, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null =>
+export const showdownReady = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt" | "turn" | "noUlt">, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax"> = BOSS_POWERS): number | null =>
   p.ultAt === undefined && (showdownMeter(p, p.turn, s) ?? 0) >= 1 ? (p.sdBase ?? 0) : null;
 
 /**
  * The scout searches while crowd turn `turn` is picked (a showdown may follow before long): from showdownFrom (or once
  * his meter is full), while he has one left and none is under way.
  */
-export const showdownScouting = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax" | "showdownFrom"> = BOSS_POWERS): boolean => {
+export const showdownScouting = (p: Pick<BossPowerState, "sdBase" | "ults" | "ultNext" | "ultAt" | "noUlt">, turn: number, s: Pick<BossPowerSettings, "showdownMeterTurns" | "showdownMax" | "showdownFrom"> = BOSS_POWERS): boolean => {
+  if (p.noUlt) return false;
   const m = showdownMeter(p, turn, s);
   return m !== null && p.ultAt === undefined && (turn >= s.showdownFrom || m >= 1);
 };
@@ -1030,7 +1034,9 @@ export const showdownScouting = (p: Pick<BossPowerState, "sdBase" | "ults" | "ul
  */
 export const showdownDue = (boss: BossState | null | undefined): "try" | "test" | null => {
   const p = boss?.powers;
-  if (!p || boss!.result || boss!.id !== "pig" || p.ultAt !== undefined) return null;
+  if (!p || boss!.result || boss!.id !== "pig" || p.ultAt !== undefined || p.noUlt) return null;
+  // At his cap, never another (a battle saved before once-a-game kept no ultAt after his last: Nov 20).
+  if ((p.ults ?? 0) >= BOSS_POWERS.showdownMax) return null;
   if (p.ultNext) return "test";
   return (showdownMeter(p, p.turn) ?? 0) >= 1 ? "try" : null;
 };
@@ -1135,6 +1141,11 @@ export const PIG: BossRules = {
   },
   // His own meter, not the rage meter (nothing but his moves fills it).
   meter: (p, turn, s) => showdownMeter(p, turn, s),
+  // Once a battle in every mode (Eric, Nov 20: "he can only ult once a game then it turns gray"): after it the showdown stays counted as
+  // under way (ultAt kept), so none is asked for, the trigger refuses and his meter stays on the bar, empty and dimmed (as Chandy's).
+  ultimateMax: BOSS_POWERS.showdownMax,
+  spentMeterShown: true,
+  ultimateRunning: (p, turn, s) => (p.ults ?? 0) >= s.showdownMax || turn <= (p.ultAt ?? 0),
   // The long pull's moment, as the turn after his first move begins.
   everyTurn(next, t) {
     if (next.pull && next.pull.turn === t.turn) t.events.push({ kind: "pull", turn: t.turn, square: next.pull.to, squares: [next.pull.from, next.pull.via, next.pull.to] });
