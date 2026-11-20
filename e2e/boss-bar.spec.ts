@@ -199,9 +199,13 @@ async function quietMove(page: Page) {
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
   const s = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
-  const legal = new Chess(s.fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion).map((m) => ({ uci: m.from + m.to, knight: m.piece === "n" }));
-  const ok = legal.filter((m) => !s.allowed || s.allowed.includes(m.uci));
-  await submitMove(page, (ok.find((m) => m.knight) ?? ok[0] ?? legal[0])!.uci, s.fen);
+  // (Every legal move, a quiet one preferred: a position with none (only captures or promotions left, e.g. out of a check) plays
+  // whatever the boss's powers allow. CI main Nov 20: no quiet move left, the pick was undefined.)
+  const all = new Chess(s.fen).moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), knight: m.piece === "n", quiet: !m.captured && !m.promotion }));
+  const ok = all.filter((m) => !s.allowed || s.allowed.includes(m.uci));
+  const pick = ok.find((m) => m.quiet && m.knight) ?? ok.find((m) => m.quiet) ?? ok[0] ?? all[0];
+  expect(pick, "a legal move to play").toBeTruthy();
+  await submitMove(page, pick!.uci, s.fen);
 }
 
 test("his level follows his strength: lifted in Moo's Full Moon (gold, an arrow), back to his own after it", async ({ page }) => {
