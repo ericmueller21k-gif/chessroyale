@@ -1296,10 +1296,17 @@ export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined }
  */
 export const BATTLE_TOWER = {
   /**
-   * The climb (core tower.ts; the design's section 3): 99 floors, each one game; only a win climbs. Only ever raised: a run saved
-   * above it would end there as the top (core finishFloor), its best held at it (server tower.ts, soloBest).
+   * The climb (core tower.ts; the design's section 3): 99 floors, each one game. Only ever raised: a run saved above it would end there
+   * as the top (core finishFloor), its best held at it (server tower.ts, soloBest).
    */
   floors: 99,
+  /**
+   * A run's lives (Eric, Nov 20: "2 lives I think is still the way to go. And yeah, it just takes you on to the next match, and it just
+   * counts. You just advance."): a floor lost or drawn (or left after your 2nd move) costs one and the climb goes on, the next floor
+   * dealt as after a win; a loss with none left ends the run (core finishFloor). 2: the third loss ends it. Only floors won count to a
+   * best. docs/decisions/2026-11-20-tower-lives.md.
+   */
+  lives: 2,
   /** How many bosses a floor has, looping: floor f has pattern[(f - 1) % pattern.length] (Eric: "1 boss then 2, maybe 2 again, then 3"). */
   pattern: [1, 2, 2, 3] as readonly number[],
   /**
@@ -1331,7 +1338,7 @@ export const BATTLE_TOWER = {
   stockfishFrom: 51,
   stockfishStart: 1750,
   stockfishStep: 31,
-  /** Leaving a floor under way is free before your leaveFreeBefore-th move (the floor fought again later, the same bosses), else a loss. */
+  /** Leaving a floor under way is free before your leaveFreeBefore-th move (the floor fought again later, the same bosses), else a loss (a life). */
   leaveFreeBefore: 2,
   /**
    * A solo floor reported won sooner than this after its start, by the server's clock, is refused, the floor still under way (server

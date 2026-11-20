@@ -6,9 +6,11 @@ import {
   adminFirstBosses,
   finishFloor,
   floorBossCount,
+  floorsWonBest,
   floorStrength,
   hiddenBosses,
   leaveFloor,
+  livesLeft,
   newRun,
   playableBosses,
   sideRefusal,
@@ -19,7 +21,7 @@ import {
 
 /**
  * The Battle Tower's climb (core tower.ts; docs/decisions/2026-11-18-battle-tower-design.md, section 3): the floors' pattern and
- * strength (the design's table), the deal, the run's steps, and audit 1's finding 7 (what a floor's start takes). The runner's side
+ * strength (the design's table), the deal, the run's steps (its lives since Nov 20), and audit 1's finding 7 (what a floor's start takes). The runner's side
  * of finding 7 (every boss at the floor's strength) is in packages/chess/test/several-bosses.test.ts.
  */
 
@@ -176,36 +178,84 @@ describe("the tower: the run's steps", () => {
     expect(pool).toContain(run.floors[0]![0]);
   });
 
-  it("a win climbs: the next floor dealt as it's won; a loss or a draw ends the run; a finished run stays as it is", () => {
+  it("a win climbs: the next floor dealt as it's won, no life spent", () => {
     const run = newRun(42, pool);
+    expect(run.lost).toEqual([]);
+    expect(livesLeft(run)).toBe(BATTLE_TOWER.lives);
     const won = finishFloor(run, "won", pool);
     expect(won.status).toBe("open");
     expect(won.floors.length).toBe(2);
     expect(won.floors[0]).toEqual(run.floors[0]);
     expect(won.floors[1]!.length).toBe(2);
+    expect(won.lost).toEqual([]);
+    expect(floorsWonBest(won)).toBe(1);
+  });
+
+  it("lives (Eric, Nov 20): a loss or a draw costs one and the run climbs on, the next floor dealt as after a win; the third loss ends it; a finished run stays as it is", () => {
+    expect(BATTLE_TOWER.lives).toBe(2);
+    const won = finishFloor(newRun(42, pool), "won", pool);
     for (const outcome of ["lost", "drawn"] as const) {
-      const out = finishFloor(won, outcome, pool);
-      expect(out).toEqual({ ...won, status: "out" });
+      // (Floor 2 lost or drawn: it counts, a life spent; floor 3 dealt exactly as a win on floor 2 would deal it.)
+      const one = finishFloor(won, outcome, pool);
+      const asWin = finishFloor(won, "won", pool);
+      expect(one).toEqual({ ...asWin, lost: [2] });
+      expect(livesLeft(one)).toBe(1);
+      expect(floorsWonBest(one)).toBe(1);
+      // (Floor 3 won, floor 4 lost: the last life spent, still climbing; floor 5's loss ends the run, on floor 5.)
+      const two = finishFloor(finishFloor(one, "won", pool), outcome, pool);
+      expect(two).toMatchObject({ status: "open", lost: [2, 4] });
+      expect(two.floors.length).toBe(5);
+      expect(livesLeft(two)).toBe(0);
+      expect(floorsWonBest(two)).toBe(3);
+      const out = finishFloor(two, outcome, pool);
+      expect(out).toEqual({ ...two, status: "out", lost: [2, 4, 5] });
+      expect(livesLeft(out)).toBe(0);
+      expect(floorsWonBest(out)).toBe(3);
       expect(finishFloor(out, "won", pool)).toBe(out);
+      expect(startFloor(out, pool)).toBeNull();
     }
+    // (Losses in a row: floors 1, 2 and 3; none won, the best 0.)
+    let run = newRun(7, pool);
+    for (let i = 0; i < 3; i++) run = finishFloor(run, "lost", pool);
+    expect(run).toMatchObject({ status: "out", lost: [1, 2, 3] });
+    expect(run.floors.length).toBe(3);
+    expect(floorsWonBest(run)).toBe(0);
+    // (Other numbers, as a test or the sim passes them: 0 lives, out at the first loss, as before Nov 20.)
+    expect(finishFloor(won, "lost", pool, { ...BATTLE_TOWER, lives: 0 })).toEqual({ ...won, status: "out", lost: [2] });
   });
 
-  it("leaving: free before your 2nd move (the same floor, the same bosses), a loss after", () => {
+  it("a run with no floor lost (as every run saved before lives reads: server tower.ts runOf): all its lives; its best its floor less one, or 99 at the top", () => {
+    const won = finishFloor(newRun(42, pool), "won", pool);
+    expect(livesLeft(won)).toBe(2);
+    expect(floorsWonBest({ ...won, status: "out" })).toBe(1);
+    expect(floorsWonBest({ ...climb(42, pool, 99), status: "top" })).toBe(99);
+  });
+
+  it("leaving: free before your 2nd move (the same floor, the same bosses), a loss after: a life, the climb on", () => {
     const run = finishFloor(newRun(42, pool), "won", pool);
-    expect(leaveFloor(run, 0)).toBe(run);
-    expect(leaveFloor(run, 1)).toBe(run);
-    expect(leaveFloor(run, 2)).toEqual({ ...run, status: "out" });
-    expect(leaveFloor(run, 30).status).toBe("out");
+    expect(leaveFloor(run, 0, pool)).toBe(run);
+    expect(leaveFloor(run, 1, pool)).toBe(run);
+    expect(leaveFloor(run, 2, pool)).toEqual(finishFloor(run, "lost", pool));
+    expect(leaveFloor(run, 30, pool)).toMatchObject({ status: "open", lost: [2] });
+    // (With no life left, a counted leave ends the run.)
+    const last = { ...climb(42, pool, 3), lost: [1, 2] };
+    expect(leaveFloor(last, 2, pool)).toEqual({ ...last, status: "out", lost: [1, 2, 3] });
   });
 
-  it("floor 99 won: the run is complete (top), and stays so", () => {
+  it("floor 99 won: the run is complete (top), and stays so; floor 99 lost with a life left: the climb is done too (top), the best 98", () => {
     const at99 = climb(42, pool, 99);
     expect(at99.status).toBe("open");
     expect(at99.floors.length).toBe(99);
     const top = finishFloor(at99, "won", pool);
     expect(top).toEqual({ ...at99, status: "top" });
+    expect(floorsWonBest(top)).toBe(99);
     expect(finishFloor(top, "lost", pool)).toBe(top);
     expect(startFloor(top, pool)).toBeNull();
+    const lostTop = finishFloor(at99, "lost", pool);
+    expect(lostTop).toEqual({ ...at99, status: "top", lost: [99] });
+    expect(floorsWonBest(lostTop)).toBe(98);
+    // (No life left on floor 99: out there.)
+    expect(finishFloor({ ...at99, lost: [3, 9] }, "drawn", pool)).toMatchObject({ status: "out", lost: [3, 9, 99] });
   });
 });
 

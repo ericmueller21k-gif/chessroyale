@@ -20,6 +20,8 @@ export interface TowerRules {
   stockfishStart: number;
   stockfishStep: number;
   leaveFreeBefore: number;
+  /** A run's lives: each floor lost, drawn or left after your 2nd move costs one; a loss with none left ends the run. */
+  lives: number;
   apart: readonly (readonly [string, string])[];
   maxBosses: number;
 }
@@ -92,8 +94,29 @@ export interface TowerRun {
   floors: readonly (readonly string[])[];
   deck: readonly string[];
   decks: number;
-  /** "open": climbing; "top": floor `floors` (99) won; "out": a floor lost, drawn, or left after your 2nd move. */
+  /**
+   * "open": climbing; "top": the last floor (99) played through, won or with a life spent on it; "out": a floor lost, drawn, or left
+   * after your 2nd move with no life left.
+   */
   status: "open" | "top" | "out";
+  /**
+   * The floors lost (or drawn, or left after your 2nd move), in order (Nov 20: lives): each one cost a life, and a run that's out has
+   * the floor that ended it last. A run saved before lives has none (all its lives left). livesLeft, floorsWonBest.
+   */
+  lost: readonly number[];
+}
+
+/** The lives a run has left (none for a run that's out). */
+export const livesLeft = (run: Pick<TowerRun, "lost">, s: Pick<TowerRules, "lives"> = BATTLE_TOWER): number => Math.max(0, s.lives - run.lost.length);
+
+/**
+ * The highest floor a run has won (0: none), for a best (Nov 20, the director's call: a floor lost with a life spent counts for the
+ * run's floor, never for a best). The floors played: those under its floor to fight, or every one for a run at the top; the run that's
+ * out ended on its floor.
+ */
+export function floorsWonBest(run: Pick<TowerRun, "floors" | "lost" | "status">): number {
+  for (let f = run.status === "top" ? run.floors.length : run.floors.length - 1; f > 0; f--) if (!run.lost.includes(f)) return f;
+  return 0;
 }
 
 /**
@@ -162,7 +185,7 @@ function deal(run: Pick<TowerRun, "seed" | "deck" | "decks">, floor: number, bef
 /** A new run from `seed` (the server's draw): floor 1 dealt from the pool now (towerPool). */
 export function newRun(seed: number, pool: readonly string[], s: TowerRules = BATTLE_TOWER): TowerRun {
   const { bosses, deck, decks } = deal({ seed: seed >>> 0, deck: [], decks: 0 }, 1, [], pool, s);
-  return { seed: seed >>> 0, floors: [bosses], deck, decks, status: "open" };
+  return { seed: seed >>> 0, floors: [bosses], deck, decks, status: "open", lost: [] };
 }
 
 /**
@@ -194,22 +217,24 @@ export function floorSettings(run: Pick<TowerRun, "floors">): Partial<Settings> 
 }
 
 /**
- * A floor's end. Won: the next floor dealt from the pool now (and saved with the run: stopping and coming back meets the same
- * bosses), or the run complete ("top") on the last floor. Lost or drawn: the run is over ("out"; only a win climbs). A run that
- * isn't open stays as it is.
+ * A floor's end (Nov 20: lives, Eric: "it doesn't make you replay. You just win the floor"). Won: the next floor dealt from the pool
+ * now (and saved with the run: stopping and coming back meets the same bosses), or the run complete ("top") on the last floor. Lost or
+ * drawn: the floor goes on the run's `lost` and costs a life; with one to spend the climb goes on exactly as after a win (the next floor
+ * dealt, or the top on the last floor), with none the run is over ("out"). A run that isn't open stays as it is.
  */
 export function finishFloor(run: TowerRun, outcome: "won" | "lost" | "drawn", pool: readonly string[], s: TowerRules = BATTLE_TOWER): TowerRun {
   if (run.status !== "open") return run;
-  if (outcome !== "won") return { ...run, status: "out" };
   const floor = run.floors.length;
-  if (floor >= s.floors) return { ...run, status: "top" };
+  const lost = outcome === "won" ? run.lost : [...run.lost, floor];
+  if (lost.length > s.lives) return { ...run, lost, status: "out" };
+  if (floor >= s.floors) return { ...run, lost, status: "top" };
   const { bosses, deck, decks } = deal(run, floor + 1, run.floors[floor - 1]!, pool, s);
-  return { ...run, floors: [...run.floors, bosses], deck, decks };
+  return { ...run, floors: [...run.floors, bosses], deck, decks, lost };
 }
 
 /**
  * Leaving a floor under way after `crowdMoves` of your moves on it: free before your leaveFreeBefore-th (2nd) move (the run as it
- * was: the same floor and bosses, fought again later), else a loss.
+ * was: the same floor and bosses, fought again later), else a loss (finishFloor: a life, the next floor dealt from `pool`).
  */
-export const leaveFloor = (run: TowerRun, crowdMoves: number, s: TowerRules = BATTLE_TOWER): TowerRun =>
-  crowdMoves < s.leaveFreeBefore ? run : finishFloor(run, "lost", [], s);
+export const leaveFloor = (run: TowerRun, crowdMoves: number, pool: readonly string[], s: TowerRules = BATTLE_TOWER): TowerRun =>
+  crowdMoves < s.leaveFreeBefore ? run : finishFloor(run, "lost", pool, s);
