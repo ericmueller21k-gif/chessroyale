@@ -581,6 +581,11 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 20 ~18:45 UTC
+- #851 tower fixes MERGED b8494e0 (Sawyer cut layering; Wrangler once a game everywhere, none on shared tower floors; Babur pump on shared floors). Review nits left: Sawyer tints under other bosses' layers on shared floors; admin ult button can stick; <600px-tall desktop no pump. Watcher bewm3i210 = deploy + main full run.
+- Primary-boss helper started: session_01JuCWRuqs6cBwVcmaQeXNQd, branch claude/tower-primary-boss (xhigh, alone). Watcher for .done running. Then prep-pr, PR, CI, quick review, merge.
+- End-screen: waiting on Eric's 5 answers.
+
 ## Nov 20 ~18:30 UTC
 - #850 (moonrise load order) merged 7b1ec32, deployed, main full run green.
 - End-screen mockup DONE (branch claude/end-screen-mockup, stills/end-screen-mockup); sent to Eric with 5 questions (bar span 1,000; ranked card over board; "RP LOST 14"; tap to skip; no-boss modes). WAIT for his answers, then a build helper (high) from `.mockup` on that branch. Don't merge the mockup code.
