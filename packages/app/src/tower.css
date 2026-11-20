@@ -610,6 +610,16 @@
   object-fit: contain;
   image-rendering: pixelated;
 }
+/* (Eric, Nov 20: every part's words and meters centered, and inside its outline. The words a centered column no wider than the part; a row
+   of meters too long for it (Puddles': level, then seeds) wraps to a second centered line, so it never crosses the outline. A row that
+   fits stays on one line, as before.) */
+.tw-part-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+}
 .tw-part-name {
   font-weight: 800;
   font-size: 14px;
@@ -620,8 +630,10 @@
 }
 .tw-part-meters {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   max-width: 100%;
   font-size: 11px;
   white-space: nowrap;
@@ -642,11 +654,6 @@
   .tw-part-face {
     width: 34px;
     height: 34px;
-  }
-  .tw-part-text {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
   }
 }
 

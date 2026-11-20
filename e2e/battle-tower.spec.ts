@@ -466,7 +466,7 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   await still(page, "shared-floor-babur-wrangler");
 });
 
-test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, the first in turn order): Babur's pump stays in his part, greyed and tagged OFF, never a balloon; Puddles, first, keeps his", async ({ page }) => {
+test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, the first in turn order): Babur's pump stays in his part, greyed and tagged OFF, never a balloon; Puddles, first, keeps his; every part's words inside its outline", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await intoTower(page);
   const made = await page.evaluate(async () => {
@@ -480,6 +480,24 @@ test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, t
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
   await floorThenMatch(page, 2, 2);
+  // (Eric, Nov 20: every part's name, level and seed meter inside its own part's outline, within 1 px; Puddles' row wraps.)
+  await expect(page.locator('.tw-part[data-boss="gardener"] .seed-meter')).toBeVisible();
+  const spill = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>(".tw-bar .tw-part")].flatMap((part) => {
+        const a = part.getBoundingClientRect();
+        // (The box inside the 3 px outline: its border is part's own, clientLeft/clientWidth.)
+        const left = a.left + part.clientLeft;
+        const right = left + part.clientWidth;
+        return [...part.querySelectorAll<HTMLElement>(".tw-part-text, .tw-part-text *")]
+          .filter((c) => {
+            const b = c.getBoundingClientRect();
+            return b.width > 0 && (b.left < left - 1 || b.right > right + 1);
+          })
+          .map((c) => `${part.dataset.boss}: ${c.className || c.tagName}`);
+      }),
+    );
+  expect(await spill()).toEqual([]);
   const desk = test.info().project.name === "desktop";
   const pump = page.locator(desk ? '.tw-side-fig[data-boss="tiger"] .tg-pump-slot' : '.tw-part[data-boss="tiger"] .tg-pump-slot');
   const off = async () => {
