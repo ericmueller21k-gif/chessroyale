@@ -61,6 +61,8 @@ export const KICKED = "You were removed from the party.";
 export const TOWER_PARTY_LINES = {
   needTwo: "A party climbs with two or more. Invite a friend, or open the party to the town.",
   reading: "Reading everyone's climbs…",
+  /** A party's seat is an account's (its run copy): a guest where signing in is set up (connect; the clerk's list of open parties). */
+  signIn: "Sign in to climb with a party.",
   /** Open party again too soon (TOWER_PARTY.openGapMs: the review of #835, finding 2). */
   openWait: (ms: number) => `You can open a party to the town once a minute. Try again in ${Math.max(1, Math.ceil(ms / 1000))} s.`,
 } as const;
@@ -109,7 +111,14 @@ export interface PartyRecord {
    * does, the Durable Object's read of everyone's copies: `plan`), and its line in the town's chat while it stands (`open`: its number
    * there, null while it's being posted).
    */
-  tower?: { plan: TowerPartyPlan | null; open?: { line: number | null; at: number; by: string; room: string }; recheckAt?: number; win?: true };
+  tower?: {
+    plan: TowerPartyPlan | null;
+    open?: { line: number | null; at: number; by: string; room: string };
+    recheckAt?: number;
+    /** While its floor is under way: when the party next asks the floor's room whether it's over (TOWER_PARTY.floorCheckMs). */
+    floorCheckAt?: number;
+    win?: true;
+  };
   /**
    * A 50 v 50 party (Nov 16): the account that made it (the first in), and its open invites (each friend's account, name, who
    * invited them and when it lapses): only those accounts get in.
@@ -313,7 +322,7 @@ export class PartyCore {
     }
     if (this.r.members.length >= this.max) return { ok: false, message: "This party is full." };
     // (A Battle Tower party's seat holds its account's copy of the climb: an account, always.)
-    if (this.r.kind === "tower" && !opts.userId) return { ok: false, message: "Sign in to climb with a party." };
+    if (this.r.kind === "tower" && !opts.userId) return { ok: false, message: TOWER_PARTY_LINES.signIn };
     // A 50 v 50 party: friends only (Eric, Nov 16): its maker first, then only an account a member invited (no codes, no links).
     if (crowd) {
       if (this.r.state === "queueing") return { ok: false, message: CROWD_PARTY_LINES.searching };
@@ -522,6 +531,7 @@ export class PartyCore {
     if (this.r.placedStart !== id) return;
     delete this.r.passes;
     delete this.r.revokes;
+    if (this.r.tower) delete this.r.tower.floorCheckAt;
     // (A Battle Tower party's floor is over: everyone's copies have moved on; the plan is read again.)
     this.towerReread();
   }
@@ -735,7 +745,27 @@ export class PartyCore {
     const dropped = s.members.filter((m) => !this.r.members.some((x) => x.id === m.id)).map((m) => m.id);
     if (dropped.length) this.r.revokes = [...(this.r.revokes ?? []), ...dropped];
     for (const m of this.r.members) if (!m.bot) m.ready = false;
+    // (A Battle Tower floor: the party asks its room now and then whether it's over (takeFloorCheck), should the room's word never come.)
+    if (this.r.kind === "tower") this.r.tower = { ...(this.r.tower ?? { plan: null }), floorCheckAt: this.io.now() + TOWER_PARTY.floorCheckMs };
     this.broadcast();
+  }
+
+  /**
+   * A Battle Tower party's floor shows under way, and it's time to ask its room whether it's over (the delta review of #835, finding 2):
+   * the room tells the party when its battle reaches its results (battleOver), once; a room that never started (nobody reached it) closes
+   * without results, and a call that failed isn't made again, so the floor would show under way for good (Kick greyed, Open party refused,
+   * off the clerk's list). Which room and START to ask about, or null; the next ask is TOWER_PARTY.floorCheckMs later (a lost answer too).
+   */
+  takeFloorCheck(): { lobby: string; start: number } | null {
+    const at = this.r.tower?.floorCheckAt;
+    if (this.r.kind !== "tower" || at === undefined || at > this.io.now()) return null;
+    const lobby = this.r.placed?.lobby;
+    if (!this.r.passes || !lobby || this.r.placedStart === undefined) {
+      delete this.r.tower!.floorCheckAt;
+      return null;
+    }
+    this.r.tower!.floorCheckAt = this.io.now() + TOWER_PARTY.floorCheckMs;
+    return { lobby, start: this.r.placedStart };
   }
 
   /**
@@ -775,7 +805,7 @@ export class PartyCore {
 
   /** When to ask again (the Durable Object's alarm), or when a 50 v 50 party's away leader's hold on the lead ends. */
   get nextAlarm(): number | null {
-    const times = [this.r.state === "queueing" && this.r.queue ? this.r.queue.retryAt : null, this.leadHeldUntil(), this.r.tower?.recheckAt ?? null, this.openLapsesAt].filter((t): t is number => t !== null);
+    const times = [this.r.state === "queueing" && this.r.queue ? this.r.queue.retryAt : null, this.leadHeldUntil(), this.r.tower?.recheckAt ?? null, this.r.tower?.floorCheckAt ?? null, this.openLapsesAt].filter((t): t is number => t !== null);
     return times.length ? Math.min(...times) : null;
   }
 

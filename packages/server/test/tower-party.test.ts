@@ -5,6 +5,7 @@ import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { commitPartyFloor, finishTowerFloor, holdsPartyCopy, membersOf, partyFloorWrite, partyPlan, preparePartyFloor, startTowerFloor, stopTower, towerMoves, towerState, type Fight, type PartyFloorPrep } from "../src/tower.ts";
 import { TownChat } from "../src/town-chat.ts";
+import { forgetTownCache, partyCodesOf, townOpenParties } from "../src/town-chat-api.ts";
 import { PartyCore, TOWER_PARTY_LINES, newPartyRecord } from "../src/squads-party.ts";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 import { partyLobby } from "../src/boss-party.ts";
@@ -550,15 +551,47 @@ describe("the clerk's list of open parties (Eric, Nov 20: \"click on the clerk a
     expect(P.core.towerListing()).toBeNull();
   });
 
-  it("the town's open parties, newest first, only while their lines stand", () => {
+  it("the town's open parties, newest first, each once, only while their lines stand", () => {
     const t = new TownChat();
     t.partyOpen("ua", "Ann is looking for 3 more", "AAAAA", T0);
     t.partyOpen("ub", "Bo is looking for 3 more", "BBBBB", T0 + 1000);
     t.post({ id: "uz", name: "Zed" }, "hello", T0 + 1500);
-    expect(t.partyCodes(T0 + 2000)).toEqual(["BBBBB", "AAAAA"]);
+    // (A code held twice, a failed removal then the new leader's line: listed once, where its newest line is.)
+    t.partyOpen("uc", "Cy is looking for 2 more", "AAAAA", T0 + 1600);
+    expect(partyCodesOf(t.snapshot(T0 + 2000))).toEqual(["AAAAA", "BBBBB"]);
     t.removeParty(1, "AAAAA", T0 + 3000);
-    expect(t.partyCodes(T0 + 3000)).toEqual(["BBBBB"]);
-    expect(t.partyCodes(T0 + 1000 + TOWN_CHAT.lineMs)).toEqual([]);
+    t.removeParty(4, "AAAAA", T0 + 3000);
+    expect(partyCodesOf(t.snapshot(T0 + 3000))).toEqual(["BBBBB"]);
+    expect(partyCodesOf(t.snapshot(T0 + 1000 + TOWN_CHAT.lineMs))).toEqual([]);
+  });
+
+  it("the clerk's list is made once per Worker instance every TOWER_PARTY.listCacheMs, from its copy of the town's room, and shared by every reader (the delta review of #835, finding 1)", async () => {
+    forgetTownCache();
+    const t = new TownChat();
+    // (More lines than the list holds, the newest few from parties that can't take anyone now: they don't push the others off.)
+    const all = Array.from({ length: TOWER_PARTY.listMax + 4 }, (_, i) => `P${String.fromCharCode(65 + i)}AAA`);
+    all.forEach((code, i) => t.partyOpen(`u${i}`, `Player ${i} is looking for 3 more`, code, T0 + i));
+    const full = new Set(all.slice(-3));
+    let reads = 0;
+    const asked: string[] = [];
+    const hub = { townRead: async () => (reads++, t.snapshot(T0 + 100)) };
+    const listing = async (code: string) => (asked.push(code), full.has(code) ? null : { leader: code, members: 1, max: TOWER_PARTY.max });
+    // (Many readers at once, and again within the time: one read of the room, each party asked once.)
+    const lists = await Promise.all(Array.from({ length: 20 }, (_, i) => townOpenParties(hub, listing, T0 + 100 + i)));
+    await townOpenParties(hub, listing, T0 + 100 + TOWER_PARTY.listCacheMs);
+    expect(reads).toBe(1);
+    expect(asked).toHaveLength(all.length);
+    expect(new Set(asked).size).toBe(all.length);
+    const want = all.filter((c) => !full.has(c)).reverse().slice(0, TOWER_PARTY.listMax);
+    for (const l of lists) expect(l.map((p) => p.code)).toEqual(want);
+    // (Once the time is up, the next reader's list is made afresh: the room's copy (TOWN_CHAT.readCacheMs) read again, the parties asked again.)
+    await townOpenParties(hub, listing, T0 + 101 + TOWER_PARTY.listCacheMs + TOWN_CHAT.readCacheMs);
+    expect(reads).toBe(2);
+    expect(asked).toHaveLength(2 * all.length);
+    // (Its own room each: a test's room is never the town's list.)
+    await townOpenParties(hub, listing, T0 + 102 + TOWER_PARTY.listCacheMs + TOWN_CHAT.readCacheMs, undefined, "test:x");
+    expect(reads).toBe(3);
+    forgetTownCache();
   });
 });
 
@@ -573,6 +606,8 @@ describe("the town's party line (town-chat.ts, the review of #835, findings 2 an
     expect(b.ok).toBe(true);
     const snap = t.snapshot(T0 + TOWER_PARTY.openGapMs);
     expect(snap.lines.filter((l) => l.sys === "party").map((l) => l.party)).toEqual(["BBBBB"]);
+    // (Its leader's account behind it, never a name to tap: muting or blocking them hides it (the delta review's finding 8).)
+    expect(snap.lines.filter((l) => l.sys === "party").map((l) => [l.from, l.name])).toEqual([["ua", ""]]);
     expect(snap.gone).toContain(n);
     // (Another account's line stands beside it.)
     expect(t.partyOpen("ub", "Bo is looking for 3 more", "CCCCC", T0 + TOWER_PARTY.openGapMs).ok).toBe(true);

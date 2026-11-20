@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MATCH_SAVE, TOWN_CHAT, finishFloor, newRun, pausedLine, towerPool } from "@chessroyale/core";
+import { MATCH_SAVE, TOWER_PARTY, TOWN_CHAT, finishFloor, newRun, pausedLine, towerPool } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
+import { deleteAccount } from "../src/account-data.ts";
 import { TOWER_LINES, commitPartyFloor, partyFloorWrite, preparePartyFloor, type Fight } from "../src/tower.ts";
 import type { LobbyRecord } from "../src/lobby.ts";
 import { TownChat } from "../src/town-chat.ts";
@@ -52,7 +53,9 @@ async function world(extra: Record<string, string> = {}, shared?: { sql: Sql; d1
   const { sql, d1 } = shared ?? memoryDb();
   await ensureSchema(sql);
   const made: string[] = [];
-  const room = { onCreate: async () => undefined as unknown };
+  // (`done`: what the floor's room answers when the party asks whether its battle is over; `asked`: each ask, [room, party, START].)
+  const room = { onCreate: async () => undefined as unknown, done: false };
+  const asked: [string, string, number][] = [];
   // (The live hub's town chat, a real room: the party's line goes in and out of it.)
   const town = shared?.town ?? new TownChat();
   const hub = {
@@ -75,6 +78,7 @@ async function world(extra: Record<string, string> = {}, shared?: { sql: Sql; d1
           return true;
         },
         holdsTowerFloor: async () => true,
+        partyBattleDone: async (code: string, start: number) => (asked.push([c, code, start]), room.done),
         revokePartyMember: async () => undefined,
       }),
     },
@@ -108,7 +112,7 @@ async function world(extra: Record<string, string> = {}, shared?: { sql: Sql; d1
     await send(ws, { t: "hello", v: SQUADS_PROTOCOL, name, device: "phone" });
     return ws;
   };
-  return { sql, d1, made, room, join, send, town, party };
+  return { sql, d1, made, room, asked, join, send, town, party, store };
 }
 
 /** A party climb begun and won once by `uids` (beside the party under test): their copies open on floor 2. */
@@ -187,6 +191,52 @@ describe("a Battle Tower party's START (SquadsParty.makeTowerFloor; the review o
     expect(W.made).toEqual([]);
     expect(b.errors()).toContain(pausedLine("raid"));
     expect(await copy(W.sql, ann.id)).toBeNull();
+  });
+});
+
+describe("a floor whose room never says it's over (the delta review of #835, finding 2)", () => {
+  it("the party asks its room every TOWER_PARTY.floorCheckMs: under way there, nothing changes; closed without results, the floor ends here (Kick and Open party live again)", async () => {
+    const W = await world();
+    const [ann, bo] = [await signedIn(W.sql, "ann@example.com", Date.now()), await signedIn(W.sql, "bo@example.com", Date.now())];
+    const a = await W.join(ann.id, "Ann");
+    const b = await W.join(bo.id, "Bo");
+    await W.send(b, { t: "ready", on: true });
+    await W.send(a, { t: "start" });
+    expect(b.party()!.party.tower!.floor).toBe(true);
+    // (Before its time: nothing asked.)
+    await W.party.alarm();
+    expect(W.asked).toEqual([]);
+    // (Its room still holds the battle: asked once, still under way.)
+    vi.setSystemTime(Date.now() + TOWER_PARTY.floorCheckMs);
+    await W.party.alarm();
+    expect(W.asked).toEqual([[W.made[0], "TOWER", expect.any(Number)]]);
+    expect(b.party()!.party.tower!.floor).toBe(true);
+    // (Nobody reached it: it closed without results, and its word never came. The next ask ends the floor here.)
+    W.room.done = true;
+    vi.setSystemTime(Date.now() + TOWER_PARTY.floorCheckMs);
+    await W.party.alarm();
+    expect(W.asked).toHaveLength(2);
+    expect(b.party()!.party.tower!.floor).toBeUndefined();
+    expect((W.store.get("party") as { tower?: { floorCheckAt?: number } }).tower?.floorCheckAt).toBeUndefined();
+    // (And nothing more is asked.)
+    vi.setSystemTime(Date.now() + TOWER_PARTY.floorCheckMs);
+    await W.party.alarm();
+    expect(W.asked).toHaveLength(2);
+    // (Kick is the leader's again.)
+    await W.send(a, { t: "kick", id: a.party()!.party.members.find((m) => m.name === "Bo")!.id });
+    expect(a.party()!.party.members.map((m) => m.name)).toEqual(["Ann"]);
+  });
+
+  it("a deleted member's seat holds the plan without reading it again every few seconds (the delta review's finding 9)", async () => {
+    const W = await world();
+    const [ann, bo, cy] = [await signedIn(W.sql, "ann@example.com", Date.now()), await signedIn(W.sql, "bo@example.com", Date.now()), await signedIn(W.sql, "cy@example.com", Date.now())];
+    const a = await W.join(ann.id, "Ann");
+    await W.join(bo.id, "Bo");
+    await deleteAccount(W.sql, bo, Date.now());
+    // (Cy comes in: the plan is read again, and Bo's seat holds it.)
+    await W.join(cy.id, "Cy");
+    expect(a.party()!.party.tower!.plan).toEqual({ kind: "wait", message: TOWER_LINES.gone("Bo") });
+    expect((W.store.get("party") as { tower?: { recheckAt?: number } }).tower?.recheckAt).toBeUndefined();
   });
 });
 

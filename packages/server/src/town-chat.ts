@@ -37,9 +37,10 @@ export interface TownLine {
    */
   color?: number;
   /**
-   * A line the server says itself, not a player (`from` and `name` empty; no menu): "challenge", a boss challenged from the town and
-   * how its battle ended (`challenge`), in its own blue; "enter", a player came into the town (`arrive`: Nov 12), in a quiet gray;
-   * "party", a Battle Tower party open to the town (Nov 20: `party`, its code, for the line's Join).
+   * A line the server says itself, not a player (`name` empty, no menu; `from` empty too, but a party line's): "challenge", a boss
+   * challenged from the town and how its battle ended (`challenge`), in its own blue; "enter", a player came into the town (`arrive`:
+   * Nov 12), in a quiet gray; "party", a Battle Tower party open to the town (Nov 20: `party`, its code, for the line's "Go to the tower";
+   * `from`, its leader's account, so Mute and blocking hide it and a report of it names them: the delta review of #835, finding 8).
    */
   sys?: TownSys;
   /** A "party" line's party: its code (the app's Join goes into it). */
@@ -342,16 +343,11 @@ export class TownChat {
     const was = this.parties.get(by);
     if (was && now - was.at < gapMs) return { ok: false, retryMs: was.at + gapMs - now };
     if (was) this.remove(was.n, now);
-    const line = this.notice(text, now, "party", code);
+    // (Its leader's account behind it, `from` (the delta review of #835, finding 8): muting or blocking them hides it, as their own lines.)
+    const line = this.notice(text, now, "party", code, by);
     this.parties.delete(by);
     this.parties.set(by, { n: line.n, at: now });
     return { ok: true, line };
-  }
-
-  /** The Battle Tower parties open to the town now (their lines held), newest first: their codes (the clerk's list, Nov 20). */
-  partyCodes(now: number): string[] {
-    this.sweep(now);
-    return this.held.flatMap((l) => (l.sys === "party" && l.party ? [l.party] : [])).reverse();
   }
 
   /**
@@ -364,8 +360,8 @@ export class TownChat {
   }
 
   /** A line the server says itself (`sys`), held as players' lines are, for TOWN_CHAT.lineMs. */
-  private notice(text: string, now: number, sys: TownSys = "challenge", party?: string): TownLine {
-    const line: TownLine = { n: ++this.n, at: now, from: "", name: "", text, sys, ...(party ? { party } : {}) };
+  private notice(text: string, now: number, sys: TownSys = "challenge", party?: string, from = ""): TownLine {
+    const line: TownLine = { n: ++this.n, at: now, from, name: "", text, sys, ...(party ? { party } : {}) };
     this.held.push(line);
     if (this.held.length > this.o.holdMax) this.held.splice(0, this.held.length - this.o.holdMax);
     return line;

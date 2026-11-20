@@ -1196,9 +1196,13 @@ export const BOSS_PARTY = { max: 3, closeCp: 30, afkKickSec: 60, joinWaitSec: 30
  * a party's floor is the server's word, a solo floor the device's). The clerk's "Open party" line in the town's chat lasts as the town's
  * lines do (TOWN_CHAT.lineMs, then the button is live again), and lapses sooner when the party fills, starts or its leader leaves; one
  * line an account at a time (a newer replaces the older), and a new one at most every `openGapMs` (the review of #835, finding 2). The
- * clerk's list of open parties (Eric, Nov 20) shows at most `listMax` of them, newest first, read again every `listPollMs` while it shows.
+ * clerk's list of open parties (Eric, Nov 20) shows at most `listMax` of them, newest first, read again every `listPollMs` while it shows;
+ * each Worker instance makes the list at most once every `listCacheMs` (from its copy of the town's chat, then each party asked), and every
+ * reader on it shares that (the delta review of #835, finding 1: one list an instance, never one a reader). While a party's floor shows
+ * under way, the party asks its floor's room every `floorCheckMs` whether the floor is over, should the room's own word never come
+ * (finding 2: a room that never started, or its call lost).
  */
-export const TOWER_PARTY = { max: 4, closeCp: 0, crateFloors: [25, 50, 75, 99] as readonly number[], openGapMs: 60_000, listMax: 12, listPollMs: 4000 } as const;
+export const TOWER_PARTY = { max: 4, closeCp: 0, crateFloors: [25, 50, 75, 99] as readonly number[], openGapMs: 60_000, listMax: 12, listPollMs: 4000, listCacheMs: 3000, floorCheckMs: 60_000 } as const;
 
 /**
  * The Hidden Boss's room challenge (Eric, Nov 12 and 13; docs/decisions/2026-11-13-hidden-boss-challenge.md): in the top-floor room
