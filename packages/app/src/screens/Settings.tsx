@@ -8,6 +8,7 @@ import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { account, signOut, tooYoung } from "../account.ts";
+import { AccountTrouble } from "../components/AccountTrouble.tsx";
 import { chatOn as chatOnNow, onChatOn, setChatOn as setTypedOn } from "../chat-on.ts";
 import { useTurnChatOn } from "../components/ChatOptIn.tsx";
 import { BOARD_COLORS, boardColors, boardMarksOn, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, setSquadsJumpNext, setVibrationOn, squadsJumpNext, vibrationOn, type BoardColors } from "../prefs.ts";
@@ -209,7 +210,7 @@ function SoundReport() {
  * and terms; and for admins, testing (practice mode, the eval bar, and the shelved Auto chess demo).
  */
 export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => void; onFaq?: (section?: string) => void; onAutoChess?: () => void }) {
-  const { config, profile } = useAccount();
+  const { config, profile, failed } = useAccount();
   const [, rerender] = useState(0);
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
   useEffect(() => onMusicChange(() => rerender((n) => n + 1)), []);
@@ -238,6 +239,8 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
         <h1>Settings</h1>
         <span class="fd-head-spacer" />
       </header>
+
+      <InstallCard />
 
       <section class="fd-section">
         <h2 class="fd-label">THEME</h2>
@@ -378,8 +381,16 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
         </button>
       </section>
 
-      <InstallCard />
 
+      {/* (Your account didn't load: why, and Try again, where it shows; Nov 20.) */}
+      {!u && failed && (
+        <section class="fd-section">
+          <h2 class="fd-label">ACCOUNT</h2>
+          <div class="fd-panel">
+            <AccountTrouble failed={failed} />
+          </div>
+        </section>
+      )}
       {config?.accounts && u && (
         <section class="fd-section">
           <h2 class="fd-label">ACCOUNT</h2>

@@ -71,7 +71,8 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   const labels = async () => (await page.locator(".fd-settings .fd-label").allTextContents()).filter((l) => l !== "ACCOUNT" && l !== "FRIENDS");
   // (SQUADS, Nov 5: Quick board jump, always there, after the board's choices.)
   // (CHAT, Nov 7: the chat's opt-in, before Quick chat.)
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "SQUADS", "CHAT", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
+  // (THE APP, Nov 20, Eric: "in the settings ... somewhere near the top": installing the app, first.)
+  await expect.poll(labels).toEqual(["THE APP", "THEME", "SOUND", "BOARD", "SQUADS", "CHAT", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
   // Gone (Eric, Oct 15): practice mode and the eval bar for players, the pre-game votes' and Classic's opening moves'
   // switches, the sound lab (its choice is the Reveal sound picker).
   await expect(page.getByRole("switch", { name: /Practice mode|Eval bar|Pre-game votes/ })).toHaveCount(0);
@@ -92,7 +93,7 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   // shown, switched off and not tappable).
   await asAdmin(page);
   await page.reload();
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "SQUADS", "CHAT", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
+  await expect.poll(labels).toEqual(["THE APP", "THEME", "SOUND", "BOARD", "SQUADS", "CHAT", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
   const practice = page.getByRole("switch", { name: /Practice mode/ });
   await expect(practice).not.toBeChecked();
   await expect(page.getByRole("switch", { name: /Eval bar/ })).not.toBeChecked();

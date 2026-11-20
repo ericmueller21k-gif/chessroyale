@@ -207,8 +207,8 @@ test("the clerk's card: its three ways and the open parties always there; Open y
   await still(bo.page, "clerk-open-parties");
   await expect(clerk.locator(".tw-seat:not(.free)")).toHaveCount(2, { timeout: 20_000 });
   await expect(clerk.locator(".tw-plan")).toContainText("A new climb from floor 1", { timeout: 20_000 });
-  // (The plan line's three lines hold its longest words, the leader's in a party of four and the longest refusals, with room for a wider
-  // font, so nothing under it moves (the delta review of #835, finding 3); the open parties' box holds three rows with no scroll (finding
+  // (The plan line's three lines hold its longest words, the leader's in a party of four (with its lives, #839) and the longest refusals,
+  // with room for a wider font, so nothing under it moves (the delta review of #835, finding 3); the open parties' box holds three rows with no scroll (finding
   // 5). Measured on copies beside the real ones, in their font and width: the card's own stay as they are.)
   await expect(opens(clerk).locator(".tw-open-row").first()).toBeVisible({ timeout: 20_000 });
   const four = ["a", "b", "c", "d"].map((id) => ({ id, floor: 99 }));
@@ -216,6 +216,9 @@ test("the clerk's card: its three ways and the open parties always there; Open y
     planWaiting(planWords({ kind: "continue", floor: 98, back: four }, "a").line, 3),
     planWaiting(planWords({ kind: "new", ends: four }, "a").line, 3),
     planWaiting(planWords({ kind: "continue", floor: 98, back: four }, "e").line, 3),
+    // (With the climb's lives once one is spent (Nov 20): none left is the longest.)
+    planWaiting(planWords({ kind: "continue", floor: 98, back: four, lives: 0 }, "a").line, 3),
+    planWaiting(planWords({ kind: "continue", floor: 98, back: four, lives: 0 }, "e").line, 3),
     TOWER_PARTY_LINES.needTwo,
     TOWER_PARTY_LINES.openWait(60_000),
     `${"W".repeat(16)}'s account has been deleted. Kick them to climb on.`,

@@ -83,7 +83,8 @@ import { HiddenRoomClient, type RoomOutcome } from "./hidden-net.ts";
 import { HiddenCard, HiddenCount, RoomNote } from "./HiddenRoom.tsx";
 import { TowerDesk } from "./TowerDesk.tsx";
 import { Confirm } from "../components/MatchMenu.tsx";
-import { TOWER_WORDS, askFloor, enterTowerFloor, towerApi, type FloorPlay, type FloorStart, type RunKind, type TowerStripInfo } from "../tower.ts";
+import { TOWER_WORDS, askFloor, enterTowerFloor, livesOf, towerApi, type FloorPlay, type FloorStart, type RunKind, type TowerStripInfo } from "../tower.ts";
+import { TowerHearts } from "../components/TowerHearts.tsx";
 import { enterPartyFloor, onPartyFloor, partyMates, rejoinTowerParty, towerParty, type PartyFloor } from "../tower-party.ts";
 import { TowerPartyUp } from "./TowerDesk.tsx";
 import type { FloorScript } from "./shops/tower-floor-scene.ts";
@@ -569,14 +570,24 @@ export function TownScreen({
         setNote(TOWER_WORDS.offline);
         return null;
       }
-      return { floor: copy.floor, mode: "fight", bosses: copy.bosses, times: null, t0: null, board: null, party: { ...pf, floor: copy.floor, bosses: copy.bosses, beaten: copy.beaten }, mates: partyMates() };
+      return {
+        floor: copy.floor,
+        mode: "fight",
+        bosses: copy.bosses,
+        times: null,
+        t0: null,
+        board: null,
+        lives: copy.lives,
+        party: { ...pf, floor: copy.floor, bosses: copy.bosses, beaten: copy.beaten, lives: copy.lives },
+        mates: partyMates(),
+      };
     }
     const run = a.body.runs[towerKind.current];
     if (!run) {
       setNote(towerKind.current === "party" ? "No party climb to go on with." : "Talk to the clerk to start a climb.");
       return null;
     }
-    return { floor: run.floor, mode: "fight", bosses: run.bosses, times: null, t0: null, board: null, kind: towerKind.current };
+    return { floor: run.floor, mode: "fight", bosses: run.bosses, times: null, t0: null, board: null, kind: towerKind.current, lives: run.lives };
   };
   /** The clerk's Start or Continue (`kind`: your solo run, or your party copy played alone): you walk into the elevator, and up. */
   const towerGo = (kind: RunKind = "solo") => {
@@ -641,9 +652,9 @@ export function TownScreen({
     opening.current = { home: "tower", challenge: false };
     // (The tower's theme, as at its door: loading now, playing as its room shows, Nov 19.)
     roomMusicLoad(homeTheme("tower"));
-    const back = "play" in b ? await towerBackSolo(b.play) : "party" in b ? await towerBackParty(b.party) : { lobby: true, error: null, floor: 1, mode: "out" as const };
+    const back = "play" in b ? await towerBackSolo(b.play) : "party" in b ? await towerBackParty(b.party) : { lobby: true, error: null, floor: 1, mode: "out" as const, lives: 0 };
     const { lobby, floor } = back;
-    floorS.current = lobby ? null : { floor, mode: back.mode, bosses: [], times: null, t0: null, board: null, ...("party" in b ? { mates: partyMates() } : {}) };
+    floorS.current = lobby ? null : { floor, mode: back.mode, bosses: [], times: null, t0: null, board: null, lives: back.lives, ...("party" in b ? { mates: partyMates() } : {}) };
     const room = chunk(import("./shops/ShopRoom.tsx")).then(async (m) => ({ room: await (lobby ? m.loadRoom("tower") : m.loadTowerFloor(floor)), View: m.ShopRoom }));
     const got = await room.catch(() => null);
     const fx = await (roomFxOf("tower", lobby ? "front" : "top") ?? Promise.resolve(null)).catch(() => null);
@@ -658,29 +669,33 @@ export function TownScreen({
     setInside({ ...got, intro: null, fx, n: 1, ...(lobby ? { arrived: "top" as const } : { at: FLOOR_YOU.sq }) });
     roomMusic(roomTheme(got.room.def));
   };
-  /** A solo floor's (or a party copy's played alone) result sent: into the floor room (won: the elevator open), or the lobby. */
-  const towerBackSolo = async (play: FloorPlay): Promise<{ lobby: boolean; error: string | null; floor: number; mode: "won" | "out" }> => {
+  /**
+   * A solo floor's (or a party copy's played alone) result sent: into the floor room, the elevator open while the climb goes on (a win, or
+   * a life spent: Nov 20), shut once it's over; the lobby after a free leave.
+   */
+  const towerBackSolo = async (play: FloorPlay): Promise<{ lobby: boolean; error: string | null; floor: number; mode: "won" | "out"; lives: number }> => {
     const end = await play.settle();
     if (end.best) towerBest.current = end.best;
-    const lobby = !!end.error || (end.outcome === "left" && end.status === "open");
-    return { lobby, error: end.error ?? null, floor: play.floor, mode: end.outcome === "won" && end.status === "open" ? "won" : "out" };
+    const lobby = !!end.error || (end.outcome === "left" && !!end.free);
+    return { lobby, error: end.error ?? null, floor: play.floor, mode: end.status === "open" ? "won" : "out", lives: end.lives };
   };
   /**
    * A party floor's match over (its room writes every copy: Nov 20): your copy read until it's written (a few seconds at most), then the
    * floor room on your mark, won (your party's START is the way up) or out; back in your party, whose plan is read again.
    */
-  const towerBackParty = async (f: TowerStripInfo): Promise<{ lobby: boolean; error: string | null; floor: number; mode: "won" | "out" }> => {
+  const towerBackParty = async (f: TowerStripInfo): Promise<{ lobby: boolean; error: string | null; floor: number; mode: "won" | "out"; lives: number }> => {
     void rejoinTowerParty();
     for (let tries = 0; tries < 12; tries++) {
       const a = await towerApi.state();
       if (a.ok) {
         towerBest.current = a.body.best.solo;
         const copy = a.body.runs.party;
-        if (!copy?.fight?.lobby) return { lobby: false, error: null, floor: f.floor, mode: copy && copy.floor > f.floor ? "won" : "out" };
+        // (Your copy on past the floor: won, or a life spent (Nov 20); none open: the climb is over.)
+        if (!copy?.fight?.lobby) return { lobby: false, error: null, floor: f.floor, mode: copy && copy.floor > f.floor ? "won" : "out", lives: copy ? copy.lives : 0 };
       }
       await later(1000);
     }
-    return { lobby: true, error: TOWER_WORDS.offline, floor: f.floor, mode: "out" };
+    return { lobby: true, error: TOWER_WORDS.offline, floor: f.floor, mode: "out", lives: 0 };
   };
   // (Your party's START placed its floor: up to it, from the tower's lobby or its floor room; anywhere else, straight into its match.)
   useEffect(
@@ -697,7 +712,7 @@ export function TownScreen({
         }
         void towerApi.state().then((a) => {
           const copy = a.ok ? a.body.runs.party : null;
-          if (copy && copy.fight?.lobby === f.lobby) enterPartyFloor({ ...f, floor: copy.floor, bosses: copy.bosses, beaten: copy.beaten });
+          if (copy && copy.fight?.lobby === f.lobby) enterPartyFloor({ ...f, floor: copy.floor, bosses: copy.bosses, beaten: copy.beaten, lives: copy.lives });
           else setNote(TOWER_WORDS.offline);
         });
       }),
@@ -1083,12 +1098,19 @@ export function TownScreen({
         {inside && banner && <AreaBanner key={banner.n} text={banner} onDone={() => setBanner(null)} />}
         {/* His room's count ("Challengers 2 of 4"), for everyone in it from the start (0 of 4); the summoning's freeze over it all. */}
         {inTop && <HiddenCount client={hiddenClient()} />}
+        {/* The tower's floor room: the run's lives in its corner, always (Nov 20: two hearts, a spent one greyed). */}
+        {inTowerFloor && floorS.current && (
+          <p class="tw-room-lives" data-tower-lives={livesOf(floorS.current.lives)}>
+            <span class="hb-count-label">Lives</span>
+            <TowerHearts lives={livesOf(floorS.current.lives)} />
+          </p>
+        )}
         {frozen && <div class="hb-freeze" aria-hidden="true" />}
         {note && <RoomNote text={note} onOk={() => setNote(null)} />}
         {towerAsk && (
           <div class="mm-scrim" onClick={() => setTowerAsk(null)}>
             {towerAsk.kind === "elsewhere" ? (
-              <Confirm heading="Floor under way" note={TOWER_WORDS.elsewhere} go="Leave it" onCancel={() => setTowerAsk(null)} onGo={() => void towerLeave(towerAsk.start, false)} />
+              <Confirm heading="Floor under way" note={TOWER_WORDS.elsewhere(livesOf(towerAsk.start.run.lives))} go="Leave it" onCancel={() => setTowerAsk(null)} onGo={() => void towerLeave(towerAsk.start, false)} />
             ) : towerAsk.kind === "resting" ? (
               <Confirm heading="Bosses resting" note={TOWER_WORDS.resting} go="Leave (free)" onCancel={() => setTowerAsk(null)} onGo={() => void towerLeave(towerAsk.start, true)} />
             ) : (

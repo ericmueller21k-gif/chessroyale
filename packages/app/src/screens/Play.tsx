@@ -21,9 +21,8 @@ import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts, OneVOneBanner } from "./Crowd.tsx";
-import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
+import { DarkCost, PowerBoard, battleDecor, crowdView } from "../components/BossPowers.tsx";
 import { goldClink, zebraGold } from "../components/Zebra.tsx";
-import { boingoDecor } from "../components/Boingo.tsx";
 import { DarkForced, HOLLOW_BULB_LINES, HollowBlackout, hollowTaunt } from "../components/Hollow.tsx";
 import { bossKit } from "../characters/kits.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
@@ -302,7 +301,7 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <SideFigures match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => (setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }), goldClink(own("zebra"), board.fen, m)) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing || !match.boss ? undefined : onSide(match.boss, (b) => b.powers?.elephants)} gold={history.browsing ? undefined : zebraGold(own("zebra"))} decor={history.browsing ? undefined : boingoDecor(own("clown"))}>
+          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => (setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }), goldClink(own("zebra"), board.fen, m)) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing || !match.boss ? undefined : onSide(match.boss, (b) => b.powers?.elephants)} gold={history.browsing ? undefined : zebraGold(own("zebra"))} decor={history.browsing ? undefined : battleDecor(match.boss, { pending: moved ? { move: moved.lastMove, fen: moved.fen } : null })}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {/* (A floor of several: every boss's marks, each from his own part of the view: audit 2, finding 1.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && partsOf(match.boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} fen={fen} />)}

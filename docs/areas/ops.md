@@ -28,6 +28,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   visit before it's ready): `stale.ts` reloads it once a minute at most, back where it was (the town's square and facing, and the
   room or challenge your tap was opening). Tests: `sw-versions.test.ts`, `stale.test.ts`, town.spec's two "a deploy landed" describes
   (the e2e server's `/api/e2e/sw.js`, `e2e-sql.ts`, serves the next deploy's worker).
+- **A page the network answered is never replaced by the saved app** (Nov 20, [decision](../decisions/2026-11-20-account-load-fail.md)):
+  the worker's `navigate` branch passes on whatever the network answers (an error page, the site's gate's redirect to its login, which
+  the browser follows) and gives the saved `/` only when the fetch fails (offline). So the app's "Sign in again" is a plain reload.
+  Test: `sw-versions.test.ts`, "a page opened".
 - **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"; fast PR checks since Oct 18,
   `docs/decisions/2026-10-18-faster-pipeline.md`, a trial): `.github/workflows/e2e.yml`, on GitHub's standard runners
   (free: the repository is public).

@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TowerScatter, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, CharMark, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TowerScatter, TusksCast } from "@chessroyale/core";
 import type { Base, Capture } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -162,8 +162,9 @@ export interface ScoreJob {
   /** Boss battle, a power limits the crowd's moves: the moves allowed (the best and the bots' picks come from these). */
   allowed?: string[];
   /**
-   * Boss battle, G-REX's fire: the tiles ablaze this turn. A crowd piece left on one after the move burns: the moves
-   * that save it are scored too, and the bots count a piece left there as gone (the lobby's runner does the scoring).
+   * Boss battle, G-REX's fire: the tiles ablaze this turn where a crowd piece left after the move burns (one his Roman
+   * candle only chars isn't among them: fireBurns): the moves that save it are scored too, and the bots count a piece left
+   * there as gone (the lobby's runner does the scoring).
    */
   burn?: string[];
   /**
@@ -347,8 +348,13 @@ export interface NetBossPowers {
   allowed: string[] | null;
   /** G-REX's fire tiles (missing from older servers): each square, the crowd turn it landed, its stage (1-3) now. */
   fire?: { square: string; lit: number; stage: number }[];
-  /** What the fire did after the crowd's last move: pieces destroyed, tiles that fizzled under the king. */
+  /** What the fire did after the crowd's last move: pieces destroyed, tiles that fizzled under the king, pieces the candle charred. */
   burnt?: BurnEvent[];
+  /**
+   * Jefferson's char marks (Nov 20; missing for other bosses and from older servers): the crowd's pieces his Roman candle's
+   * fire has reached and left standing, by square, each one's kind and how many times (the next burns it).
+   */
+  charred?: CharMark[];
   /** The Roman candle: the crowd turn he fired, and the shots still to fall (the pips by the board). */
   candle?: { at: number; left: number } | null;
   /**
@@ -846,7 +852,7 @@ export type ServerMessage = { now: number } & (
         barred?: string;
         /** Boss battle, a power limits the crowd's moves: the bots pick from these. */
         allowed?: string[];
-        /** Boss battle, G-REX's fire: the tiles ablaze (the bots count a piece left there as gone). */
+        /** Boss battle, G-REX's fire: the tiles ablaze where a piece left burns (the bots count it as gone; fireBurns). */
         burn?: string[];
         /** Boss battle, Chub & Chirp's Carrot Patch: the race (the bots pick with it counted). */
         race?: CarrotRace;

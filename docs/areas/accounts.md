@@ -181,6 +181,16 @@ Nothing else is stored: no friend codes, no chat between friends. The friends pa
 index on `users.name` (`users_name`, any case: a prefix is a range, never a scan; `searchPlayers` in `friends.ts`), nothing new kept.
 Who's online, who's in a match and what they're doing (`?doing=`) stay in the live hub's memory (never written).
 
+- **When your account doesn't load** (Nov 20, [decision](../decisions/2026-11-20-account-load-fail.md); Eric's Profile sat on "Loading…"):
+  the load (`loadAccount`) knows why, as `account().failed`: `"offline"` (no answer, or none within `FRONT_DOOR.accountTimeoutMs`),
+  `"server"` (our error, after the profile's one retry), or `"gate"` (before launch, signed out of the site's Cloudflare Access: every
+  `/api/*` answered by a 302 to its login). `api()` asks with `redirect: "manual"`, so the gate's redirect reads as the gate
+  (`site-gate.ts`, `gateAnswered`; also a 401/403 naming `Cloudflare-Access`) instead of failing like offline. The app plays on without
+  an account; Profile's card and Settings' ACCOUNT say why (`AccountTrouble.tsx`) with **Try again**, and for the gate **Sign in
+  again** (a reload: the service worker passes the gate's redirect through). Signed out of the gate, one notice floats over the app
+  (`SiteGateNotice.tsx`, `.fd-notice`), also noticed by the minute's `/api/status` poll, and it goes once a request gets through
+  (the account then loads by itself; back online after an offline failure too).
+
 ## Where the code is
 
 | What | Where |
@@ -188,6 +198,7 @@ Who's online, who's in a match and what they're doing (`?doing=`) stay in the li
 | Accounts, sessions, identities, profiles, results (D1, behind a tiny SQL interface) | `packages/server/src/accounts.ts` |
 | The account API (`/api/me`, `/api/auth/*`, `/api/profile/*`, `/api/results`, …) | `packages/server/src/api.ts`, routed from `index.ts` |
 | App side: your account, signing in | `packages/app/src/account.ts`, `components/SignIn.tsx` |
+| App side: the account not loading (why, Try again), signed out of the site's gate | `account.ts` (`failed`, `retryAccount`), `site-gate.ts`, `components/AccountTrouble.tsx`, `components/SiteGateNotice.tsx` |
 | The age gate: its rule and lines (core), the answer's route and checks (`ageAnswer`, `ageRefusal`, POST `/api/auth/age`), the app's question and flag (`answerAge`, `tooYoung`) | `packages/core/src/age-gate.ts`, `packages/server/src/api.ts`, `packages/app/src/account.ts`, `components/SignIn.tsx` |
 | The privacy policy, terms and copyright page | `packages/app/src/screens/Legal.tsx` |
 | Download my data and deleting an account: every store's part (`ACCOUNT_STORES`), the routes `/api/me/data` and `/api/me/delete` | `packages/server/src/account-data.ts`, `api.ts`; the live hub's part `live-hub.ts` (`accountData`, `forgetAccount`) |
@@ -247,3 +258,7 @@ offered, how long each answer lasts).
 - The app's `api()` (`account.ts`) never takes an answer it couldn't read for one: a 2xx that isn't a JSON object fails like a server
   error (502, asked again where a server error is), so a cut-off `/api/me` never becomes a profile without its `user` (Nov 11:
   every screen reading `profile.user` threw). `account-load.test.ts`.
+- No screen waits on the account for good (Nov 20): a failed load sets `failed`, and whatever shows the account shows why with Try
+  again. `api()` keeps `redirect: "manual"` (our API never redirects a script's request). Tests: `account-load.test.ts` (each failure
+  kind, the timeout, Try again), `sw-versions.test.ts` (a page's redirect passed on, the saved app only offline), `e2e/profile.spec.ts`,
+  "your account not loading".

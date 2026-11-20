@@ -1,5 +1,6 @@
 import type { ExitKind, GameView } from "./game.ts";
 import type { MatchExit } from "./components/MatchMenu.tsx";
+import { livesLeftWords } from "./tower.ts";
 
 /**
  * Leaving the match on screen (Resign, or Leave): the app's own handler (App.tsx registers it: it knows where to go
@@ -32,8 +33,12 @@ export function exitFor(m: GameView): MatchExit | null {
 /** The confirm's line: what happens if you go now. */
 export function exitNote(m: Pick<GameView, "serverPaced" | "seatToBot" | "boss" | "totalPlayers" | "standings" | "simul" | "tower">, kind: ExitKind): string {
   const online = !!m.serverPaced;
-  // (A Battle Tower floor: free before your 2nd move, core's leaveFloor; a loss after, which ends the run.)
-  if (m.tower) return kind === "leave" ? "Leaving is free before your 2nd move: back to the tower, and this floor waits for you." : "Your run ends here: leaving now counts as a loss.";
+  // (A Battle Tower floor: free before your 2nd move, core's leaveFloor; a loss after: a life spent and the climb on, or with none left the
+  // run's end (Nov 20).)
+  if (m.tower) {
+    if (kind === "leave") return "Leaving is free before your 2nd move: back to the tower, and this floor waits for you.";
+    return m.tower.lives > 0 ? `Leaving now counts as a loss: it costs a life (${livesLeftWords(m.tower.lives - 1)} after).` : "Your run ends here: leaving now counts as a loss.";
+  }
   // (The Hidden Boss's phase 2: resigning is your board's; leaving once it's decided ends the battle. Online (Nov 13) a bot plays
   // your board on, from the phase change on.)
   if (online && m.simul && kind === "resign") return "You'll leave this match and it counts as a loss. A bot plays your board on.";

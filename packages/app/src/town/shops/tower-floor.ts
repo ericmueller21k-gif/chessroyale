@@ -150,8 +150,9 @@ export function bossAt(i: number, n: number, t: number, times: FloorTimes, out: 
 export const piecesAt = (t: number, times: FloorTimes, F = TOWER_FLOOR_FEEL): number => Math.max(0, Math.min(1, (t - times.board) / F.boardMs));
 
 /**
- * The floor room's state (the town's): `fight`, the floor's bosses walking in to a match; `won`, back after a win, the elevator open to
- * the next floor; `out`, back after the run ended (a loss, a draw, a counted leave, or the top), the elevator shut: down to the lobby.
+ * The floor room's state (the town's): `fight`, the floor's bosses walking in to a match; `won`, back after a floor the climb goes on from
+ * (a win, or a loss, draw or counted leave with a life spent: Nov 20), the elevator open to the next floor; `out`, back after the run ended
+ * (a loss with no life left, or the top), the elevator shut: down to the lobby.
  */
 export type FloorMode = "fight" | "won" | "out";
 

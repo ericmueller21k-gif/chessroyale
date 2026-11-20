@@ -260,3 +260,35 @@ export const GOODBYE_LINES: Readonly<Record<string, string>> = {
   chandy: "Good game. I'll keep you in my sights.",
   recluse: "Good game. Come back and bring a better opening.",
 };
+
+/**
+ * Where each boss's mouth is on the select stage, as fractions of its art box (the figure's canvas on the stage): x 0 = left
+ * edge … 1 = right edge, y 0 = top … 1 = bottom. The speech bubble keeps its place; its tail moves along the bubble's bottom
+ * edge to point at this point (BossSelect's placeSayTail). Eric, Nov 20: "where they need to be is pointing at the head or
+ * near the mouth." Estimates read off the stage at 1440 x 900 (docs/decisions/2026-11-20-say-at-mouth.md); a boss not listed
+ * uses SAY_AT_DEFAULT.
+ */
+export const SAY_AT: Readonly<Record<string, { x: number; y: number }>> = {
+  gingerbread: { x: 0.51, y: 0.47 },
+  clown: { x: 0.5, y: 0.2 },
+  grex: { x: 0.52, y: 0.22 },
+  hollow: { x: 0.5, y: 0.25 },
+  bigboy: { x: 0.5, y: 0.27 },
+  sawyer: { x: 0.58, y: 0.32 },
+  pig: { x: 0.45, y: 0.4 },
+  alfil: { x: 0.4, y: 0.38 },
+  hopper: { x: 0.48, y: 0.3 },
+  smudgy: { x: 0.5, y: 0.33 },
+  moo: { x: 0.5, y: 0.22 },
+  gardener: { x: 0.45, y: 0.3 },
+  tiger: { x: 0.45, y: 0.42 },
+  folio: { x: 0.5, y: 0.25 },
+  // The admins' four (BOSS_ADMIN_FIRST): Don Dough's line, Dash, Timber and Chandy (Nov 20, read off their stage at 1440 x 900).
+  zebra: { x: 0.52, y: 0.37 },
+  dash: { x: 0.36, y: 0.26 },
+  timber: { x: 0.42, y: 0.44 },
+  chandy: { x: 0.5, y: 0.47 },
+};
+
+/** A boss not in SAY_AT: a face about a third of the way down, in the middle. */
+export const SAY_AT_DEFAULT = { x: 0.5, y: 0.33 };

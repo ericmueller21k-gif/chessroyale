@@ -15,8 +15,35 @@ import { BOARD_SEL, named, test, watchFor, watchSpans } from "./helpers.ts";
 
 const isComputer = () => test.info().project.name === "desktop";
 
+/** This test's players, by name: on a failure, each one's game and breadcrumbs go into the report. */
+let players: [string, Page][] = [];
+test.beforeEach(() => {
+  players = [];
+});
+
+/**
+ * A failure's report keeps each player's `window.duel.snapshot()` (the game as that page holds it) and the app's breadcrumbs
+ * (`1v1 move e2e4`: a move the page sent), so a lost move shows which side lost it (docs/decisions/2026-11-20-duel-flake-diagnostics.md).
+ */
+test.afterEach(async ({}, info) => {
+  if (info.status === info.expectedStatus) return;
+  for (const [name, page] of players) {
+    const state = await Promise.race([
+      page
+        .evaluate(() => {
+          const w = window as unknown as { duel?: { snapshot(): unknown } | null; __crumbs?: () => string[] };
+          return { at: Date.now(), url: location.href, duel: w.duel?.snapshot() ?? null, crumbs: w.__crumbs?.() ?? null };
+        })
+        .catch((e: unknown) => ({ error: String(e) })),
+      new Promise((r) => setTimeout(() => r({ error: "no answer in 5 s" }), 5000)),
+    ]);
+    await info.attach(`duel state: ${name}`, { body: JSON.stringify(state, null, 2), contentType: "application/json" });
+  }
+});
+
 async function player(browser: Browser, name: string): Promise<Page> {
   const page = await (await browser.newContext({ ...test.info().project.use })).newPage();
+  players.push([name, page]);
   await named(page, name);
   await page.goto("/?nolanding");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
@@ -54,13 +81,33 @@ async function tapMove(page: Page, uci: string) {
   await page.mouse.click(b.x, b.y);
 }
 
-/** Both players queue in `pool` and meet: the versus moment (each other's pawn on the stage), then the vote on the board. */
+/**
+ * Each page's game is on its board (the vote, the "Timer" line or play) and not over: a state that lasts from the vote to the
+ * result. (The versus moment lasts 2.5 s and the vote 5: a test process slowed for longer missed them, the page went on, and the
+ * wait timed out on a game that was fine. The versus moment has its own test, "the stage", below.)
+ */
+async function inGame(pages: Page[], timeout = 30_000) {
+  for (const p of pages)
+    await expect
+      .poll(
+        () =>
+          p
+            .evaluate(() => {
+              const s = (window as unknown as { duel?: { snapshot(): { phase: string; end: unknown } } | null }).duel?.snapshot();
+              return s && !s.end ? s.phase : null;
+            })
+            .catch(() => null),
+        { timeout },
+      )
+      .toMatch(/^(vote|overlay|play)$/);
+}
+
+/** Both players queue in `pool` and meet: their game on the board (from the vote on). */
 async function meet(a: Page, b: Page, pool: string, extra = "") {
   await a.goto(`/1v1?nolanding&debug&pool=${pool}${extra}`);
   await expect(a.locator(".dv-search")).toContainText("Finding opponent…");
   await b.goto(`/1v1?nolanding&debug&pool=${pool}${extra}`);
-  for (const p of [a, b]) await expect(p.locator(".dv-versus .dv-st-them .dv-st-pawn")).toBeVisible({ timeout: 20_000 });
-  for (const p of [a, b]) await expect(p.locator(".dv-vote")).toBeVisible({ timeout: 10_000 });
+  await inGame([a, b]);
 }
 
 /** The two players by side, once the board is up. */
@@ -88,6 +135,7 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
   const b = await player(browser, "Bo Duel");
   const pool = poolName();
   await meet(a, b, pool);
+  for (const p of [a, b]) await expect(p.locator(".dv-vote")).toBeVisible();
 
   // Each pawn starts off the grid on its own side, on the line between its second and third ranks; the zones are
   // Bullet, Blitz, Rapid from left to right whichever side you play.
@@ -183,7 +231,7 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
 
   // Play again: both back in the queue (the same pool), a new game; this time White's clock runs out.
   for (const p of [a, b]) await p.getByRole("button", { name: "Play again" }).click();
-  for (const p of [a, b]) await expect(p.locator(".dv-vote")).toBeVisible({ timeout: 25_000 });
+  await inGame([a, b]);
   await waitForPlay(a, b);
   ({ white, black } = await bySide(a, b));
   await tapMove(white, "d2d4");

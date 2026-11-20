@@ -1300,10 +1300,17 @@ export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined }
  */
 export const BATTLE_TOWER = {
   /**
-   * The climb (core tower.ts; the design's section 3): 99 floors, each one game; only a win climbs. Only ever raised: a run saved
-   * above it would end there as the top (core finishFloor), its best held at it (server tower.ts, soloBest).
+   * The climb (core tower.ts; the design's section 3): 99 floors, each one game. Only ever raised: a run saved above it would end there
+   * as the top (core finishFloor), its best held at it (server tower.ts, soloBest).
    */
   floors: 99,
+  /**
+   * A run's lives (Eric, Nov 20: "2 lives I think is still the way to go. And yeah, it just takes you on to the next match, and it just
+   * counts. You just advance."): a floor lost or drawn (or left after your 2nd move) costs one and the climb goes on, the next floor
+   * dealt as after a win; a loss with none left ends the run (core finishFloor). 2: the third loss ends it. Only floors won count to a
+   * best. docs/decisions/2026-11-20-tower-lives.md.
+   */
+  lives: 2,
   /** How many bosses a floor has, looping: floor f has pattern[(f - 1) % pattern.length] (Eric: "1 boss then 2, maybe 2 again, then 3"). */
   pattern: [1, 2, 2, 3] as readonly number[],
   /**
@@ -1335,7 +1342,7 @@ export const BATTLE_TOWER = {
   stockfishFrom: 51,
   stockfishStart: 1750,
   stockfishStep: 31,
-  /** Leaving a floor under way is free before your leaveFreeBefore-th move (the floor fought again later, the same bosses), else a loss. */
+  /** Leaving a floor under way is free before your leaveFreeBefore-th move (the floor fought again later, the same bosses), else a loss (a life). */
   leaveFreeBefore: 2,
   /**
    * A solo floor reported won sooner than this after its start, by the server's clock, is refused, the floor still under way (server
@@ -1510,6 +1517,13 @@ export const BOSS_POWERS = {
    * that grows each turn: small, bigger, bigger again, then the fireball drops onto it.
    */
   candleAhead: 3,
+  /**
+   * How many times the Roman candle's fire must reach one of the crowd's pieces to burn it (Eric, Nov 20: "if a piece ... is
+   * there when the tile starts burning, ... it just becomes charred, and then if it does it twice, then it disintegrates").
+   * Each time short of it, the piece is charred instead (it stays, marked for the rest of the match). 1: it burns the first
+   * time, as before. His sparkler's fire still burns at once. docs/decisions/2026-11-20-grex-char.md.
+   */
+  candleHitsToBurn: 2,
   /**
    * Hollow's dark: after his first move he covers the square of the piece he moved, then another on every darkEvery-th
    * of his moves (his 4th, 7th, 10th…), a random occupied square from the seed (his or the crowd's, never a king's, never
@@ -3023,6 +3037,11 @@ export const FRONT_DOOR = {
    * ever going, and the town's and the home page's chats, which ride on it, stopped until a reload (Nov 11).
    */
   liveTimeoutMs: 10_000,
+  /**
+   * Your account's load (the sign-in options and /api/me, each try): a request with no answer by now is given up, and the profile says
+   * it couldn't reach us, with Try again (Nov 20: a load that never ended left Profile on "Loading…" for good).
+   */
+  accountTimeoutMs: 20_000,
   /** A running match counts while its lobby has reported within this long (it reports at least once a minute). */
   matchStaleMs: 3 * 60_000,
   /** The queue: after the fill time, bots pop into the empty seats for this long before the match begins. */

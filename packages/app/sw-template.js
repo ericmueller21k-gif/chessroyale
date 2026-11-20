@@ -138,6 +138,10 @@ self.addEventListener("fetch", (event) => {
 
   // Every page (including /lobby/CODE invite links) is the single-page app. Fetch it fresh so an
   // update shows up on the next open; fall back to the cached copy only when offline.
+  // Whatever the network answers is passed on as it is: an error page, and the site's gate's redirect to its login (before launch,
+  // Cloudflare Access; a page's request keeps its redirects for the browser to follow, so it comes here as an "opaqueredirect"), which
+  // the browser then follows. The cached app is only for no answer at all (the fetch failing: offline), never in place of an answer
+  // (Nov 20: the app shell running behind an expired gate, every /api/* call failing, and no way to the gate's login; site-gate.ts).
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(() =>

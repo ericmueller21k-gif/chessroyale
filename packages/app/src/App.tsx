@@ -56,7 +56,7 @@ import { chosenBotLevel } from "./components/BotLevelBox.tsx";
 import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
 import { bossMusic, recluseMusic, themeKnown, type MusicBattle } from "./music.ts";
-import { noteWhere } from "./problems.ts";
+import { breadcrumbs, noteWhere } from "./problems.ts";
 import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
@@ -1081,8 +1081,9 @@ export function App() {
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
   const debug = debugSwitch();
-  // (__kingSay: a God King line on cue, for the layout checks; the roll always lands.)
-  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, __kingSay: (cue: KingCue, key: string) => kingSay(cue, key, Date.now(), () => 0), ...(match ? { match } : {}) });
+  // (__kingSay: a God King line on cue, for the layout checks; the roll always lands. __crumbs: the app's breadcrumbs, which a 1 v 1
+  // spec's failure report keeps.)
+  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __crumbs: breadcrumbs, __measureSound: measureSound, __kingSay: (cue: KingCue, key: string) => kingSay(cue, key, Date.now(), () => 0), ...(match ? { match } : {}) });
 
   // ---------------- Squads ----------------
 
@@ -1438,7 +1439,7 @@ export function App() {
    * party rule with ties to the engine's best). Kept on this device by its room's code, so a reload there is still the tower's floor.
    */
   const startPartyFloor = (e: PartyFloorEntry) => {
-    keepPartyFloor({ lobby: e.lobby, floor: e.floor, bosses: e.bosses, beaten: e.beaten });
+    keepPartyFloor({ lobby: e.lobby, floor: e.floor, bosses: e.bosses, beaten: e.beaten, ...(e.lives !== undefined ? { lives: e.lives } : {}) });
     setTowerBack(null);
     joinLobby(e.lobby, { party: { pass: e.pass, seat: e.seat, boss: "", difficulty: "normal" } });
   };
@@ -1475,7 +1476,7 @@ export function App() {
     // (A Battle Tower party's floor, this room's (tower-party.ts keepPartyFloor): its strip, and the way back into the tower after it.)
     const floor = partyFloorOf(code);
     if (floor) {
-      m.towerParty = { floor: floor.floor, bosses: floor.bosses, beaten: floor.beaten };
+      m.towerParty = { floor: floor.floor, bosses: floor.bosses, beaten: floor.beaten, ...(floor.lives !== undefined ? { lives: floor.lives } : {}) };
       towerReturn.current = true;
     }
     m.settings = floor

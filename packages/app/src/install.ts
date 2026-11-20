@@ -84,23 +84,6 @@ export function isIos(): boolean {
   return /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
 }
 
-const DISMISS_KEY = "brc.install-dismissed";
-
-export function installDismissed(): boolean {
-  try {
-    return localStorage.getItem(DISMISS_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function dismissInstall(): void {
-  try {
-    localStorage.setItem(DISMISS_KEY, "1");
-  } catch {
-    // Not important.
-  }
-}
 
 const SIZED_KEY = "brc.app-window-sized";
 

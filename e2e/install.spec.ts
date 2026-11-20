@@ -20,3 +20,14 @@ test("installable: manifest, icons and a service worker that precaches the engin
   expect(hashes[wasm]).toMatch(/^[0-9a-f]{12}$/);
   await expect.poll(() => page.evaluate(async (f) => (await caches.match(f))?.headers.get("x-brc-hash") ?? null, wasm), { timeout: 30_000 }).toBe(hashes[wasm]);
 });
+
+test("Settings' first section is THE APP (Eric, Nov 20: 'in the settings ... somewhere near the top'): always shown; a browser with no install offer greys Install app and says how", async ({ page }, info) => {
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.locator(".fd-settings .fd-label").first()).toHaveText("THE APP");
+  const install = page.locator(".install-card").getByRole("button", { name: "Install app" });
+  await expect(install).toBeVisible();
+  // (Playwright's browser never offers an install: the button greyed, the line says how: the phone project is an iPhone.)
+  await expect(install).toBeDisabled();
+  await expect(page.locator(".install-card .install-text")).toContainText(info.project.name === "phone" ? "Add to Home Screen" : "Chrome or Edge");
+});

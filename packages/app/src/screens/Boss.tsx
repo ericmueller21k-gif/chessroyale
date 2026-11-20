@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { hapticOnce } from "../haptics.ts";
 import { KING_ATTACK, MOO_BEATS, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, casterOf, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, battleDecor, casterOf, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown, yourTopple } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
@@ -14,7 +14,7 @@ import { popOffMoments } from "../components/Dash.tsx";
 import { folioMoments, revisionFen } from "../components/Folio.tsx";
 import { gingerMoments } from "../components/Ginger.tsx";
 import { gardenerFen } from "../components/Gardener.tsx";
-import { boingoDecor } from "../components/Boingo.tsx";
+import { fireLine } from "../components/Grex.tsx";
 import { timberFen } from "../components/Timber.tsx";
 import { ZEBRA_BEATS, zebraFen, zebraGold, zebraTurnMoments } from "../components/Zebra.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
@@ -79,7 +79,6 @@ function OpeningRoulette({ name }: { name: string }) {
   return <span class={`opening-roulette${spinning ? " spinning" : " landed"}`}>{spinning ? ROULETTE[i % ROULETTE.length] : name}</span>;
 }
 
-const PIECE_NAME: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen" };
 
 /** When each burn after a crowd move started on this device (a screen drawn again carries on, it doesn't restart). */
 const burnStarts = new Map<string, number>();
@@ -448,10 +447,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const rushLines = rush ? rushDock(boss, rush, now) : dodge ? dodgeDock(boss, dodge, now) : null;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (own("bigboy").powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
-  // (One or two pieces by name; more, how many: the dock's line stays one line.)
-  const burnNames = burning.length > 2 ? `${burning.length} pieces` : burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
-  const fizzled = burnt.some((b) => b.fizzled);
-  const burnLine = burnt.length && now < burnAt + BURN.ms ? (burning.length ? `${burnNames.charAt(0).toUpperCase()}${burnNames.slice(1)} burnt!` : fizzled ? "Your king is fireproof." : null) : null;
+  // (Burnt, charred by the Roman candle, or the king fireproof: one line, fireLine.)
+  const burnLine = burnt.length && now < burnAt + BURN.ms ? fireLine(burnt, boss.board.fen) : null;
   // G-REX slams the Roman candle down on the board: it jolts.
   const slam = moment?.kind === "candle" && now >= moment.at + CANDLE.slamAt && now < moment.at + CANDLE.slamAt + CANDLE.slamMs;
   // The screen draws every frame for its effects; the parts that don't move with them (the header, the boss by the
@@ -580,7 +577,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : onSide(boss, (b) => b.powers?.elephants)} gold={intro ? undefined : zebraGold(own("zebra"), moments, now)} decor={gardener?.decor ?? (intro ? undefined : boingoDecor(own("clown"), moments, now))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : onSide(boss, (b) => b.powers?.elephants)} gold={intro ? undefined : zebraGold(own("zebra"), moments, now)} decor={gardener?.decor ?? (intro ? undefined : battleDecor(boss, { moments, now, burnt, since: burnAt }))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
             {/* (A floor of several: every boss's marks, each from his own part of the view with his own moments: audit 2, finding 1.) */}
             {!intro && partsOf(boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} moments={sideOf(boss) ? moments.filter((m) => !m.boss || m.boss === b.id) : moments} now={now} fen={boardFen} />)}
             {rush && <RushLayer boss={boss} view={rush} now={now} orientation={orientation} onPlace={(from, to) => match.rushPlace(from, to)} />}

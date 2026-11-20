@@ -776,6 +776,10 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   Drizzle for Puddles, behind the middle of the low counter), its idle playing, a blue "Shopkeeper" tag. Standing still within
   `talkRange` (3) squares of it, its card shows (**"Shopkeeper"**, **Talk**); a tap on it or the counter walks you in front of it, the
   counter between you. A card you close stays closed until you move on.
+- **A panel stands in the middle of the room** (Nov 20, Eric: "the whole box itself should be centered"): the crate's card and a
+  keeper's panel (the Battle Tower's clerk: `.town-mid`, ShopRoom.tsx `cardMid`) stand centered in the room with no tail; on a phone,
+  where one reaches over the walking keys' column, in the middle of the room above them (`cardFloor`). The small cards stay over their
+  speaker. Every card's labels and short lines centered: [2026-11-20-ui-centered.md](../decisions/2026-11-20-ui-centered.md).
 - **The crate's card** (Talk): in the middle of the room, **"Babur's Boss Crate"** / **"Puddles' Boss Crate"**, the crate's picture, its
   prizes (the boss's ride first, always: Balloon Pup; Puddles's Mower; then **"+ 24 Beta Crate items, Common to Epic"**), the price line
   (**"3 Babur tokens, or 1 Babur token + 1 crate key"**, `BOSS_CRATE_PRICE` in core's settings), what you have (**"You have 2 Babur tokens

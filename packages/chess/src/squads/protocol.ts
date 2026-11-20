@@ -515,9 +515,10 @@ export interface NetParty {
 
 /**
  * A Battle Tower party's plan (NetParty.tower): `ends` names members (their ids) whose open party climb (on `floor`) a new run ends;
- * `back`, members whose copy, played on alone, goes back from `floor` to the party's (each asked first, as for `ends`).
+ * `back`, members whose copy, played on alone, goes back from `floor` to the party's (each asked first, as for `ends`); `lives`, the
+ * climb's lives left climbing on together (Nov 20).
  */
-export type NetTowerPlan = { kind: "continue"; floor: number; back: { id: string; floor: number }[] } | { kind: "new"; ends: { id: string; floor: number }[] } | { kind: "wait"; message: string };
+export type NetTowerPlan = { kind: "continue"; floor: number; back: { id: string; floor: number }[]; lives?: number } | { kind: "new"; ends: { id: string; floor: number }[] } | { kind: "wait"; message: string };
 
 export type PartyClientMessage =
   | { t: "hello"; v: number; token?: string; name?: string; device?: "phone" | "computer"; look?: unknown }

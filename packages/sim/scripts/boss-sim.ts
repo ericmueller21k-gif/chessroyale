@@ -409,8 +409,24 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // only these are power turns (powerTurn, Eric's (b)); the rest count.)
       const bigboy = { topples: [] as { at: number; by: "crowd" | "piece" | "self"; height: number; blocks: number }[], tallest: 0, toyTurns: 0, limitedTurns: 0 };
       const toppleSeen = new Set<string>();
+      // (Jefferson: what his fire did to the crowd's pieces: the sparkler's burns; the Roman candle's chars (Eric, Nov 20: a piece
+      // its fire reaches is charred the first time) and its burns, and of those the material in pawns.)
+      const grex = { sparkBurnt: 0, charred: 0, candleBurnt: 0, fizzled: 0, lost: 0 };
+      const burnSeen = new Set<string>();
       const look = () => {
         const p = runner.boss?.powers;
+        if (bossId === "grex" && p)
+          for (const e of p.burnt ?? []) {
+            const key = `${e.turn}:${e.square}`;
+            if (burnSeen.has(key) || !(e.piece || e.charred || e.fizzled)) continue;
+            burnSeen.add(key);
+            if (e.charred) grex.charred++;
+            else if (e.fizzled) grex.fizzled++;
+            else {
+              grex[e.hits ? "candleBurnt" : "sparkBurnt"]++;
+              grex.lost += ({ p: 1, n: 3, b: 3, r: 5, q: 9 } as Record<string, number>)[e.piece!] ?? 0;
+            }
+          }
         if (bossId === "bigboy" && p) {
           bigboy.tallest = Math.max(bigboy.tallest, p.tower?.height ?? 0);
           const sc = p.scatter;
@@ -873,7 +889,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           }
         : null;
       if (zs) for (const g of zs.gilds) ults.push({ kind: "goldPlate", turn: g.at });
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "bigboy" ? { bigboy } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "bigboy" ? { bigboy } : {}), ...(bossId === "grex" ? { grex: { ...grex, hitsToBurn: BOSS_POWERS.candleHitsToBurn } } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }
