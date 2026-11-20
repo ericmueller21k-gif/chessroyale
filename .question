@@ -1,0 +1,62 @@
+# ranked-1v1.spec.ts:241 flake: cause not found (question for the director)
+
+## What the failed first try shows
+Main run 44670475092, shard 2, 03:54:31Z (first try, no trace: CI records one on the retry only). It failed at line 249, before
+the reload, not at the reload the title names:
+
+    tapMove(white, "e2e4")
+    expect(black .dv-status).toContainText("Your first move")   // 10 s
+    received: "Bo Draw's first move: 20 s" … "10 s"
+
+Black's page (Ann; the error-context snapshot) counted its own first-move timer down from 20 s and never saw White's e2e4. Clocks
+3:00 / 3:00, Blitz 3+2, so the game was in play. "20 s" at the start of the wait means play had begun under a second earlier: White
+tapped about 50-100 ms after its status showed "Your first move" (the retry, which passed, tapped 57 ms after it). The trace and
+the HTML report have nothing more about the first try: no console errors, and the retry's console has only font-preload warnings.
+The shard log has no server error or dev-proxy drop near 03:54:44. The only "recovered on attempt 2 after a dropped connection"
+was at 03:55:04.5, from the town spec running beside it.
+
+## Reproduction: none of the CI symptom in about 330 runs
+| Run | Load | Result |
+| --- | --- | --- |
+| `:241 --repeat-each 10 --workers 3` | none | 10/10 |
+| `--repeat-each 20/60/70/70/70`, `--workers 4` | 3 (or 2) CPU-burning processes on 4 cores | 287/290; the 3 failures were other steps (below) |
+| `ranked-1v1.spec.ts` + `town.spec.ts`, `--repeat-each 4 --workers 2` (as the CI shard) | none | 152/152 |
+| The test's opening alone, both pages CPU-throttled 6× and 20× (CDP) from the vote on | | 24/24 |
+
+The 3 failures were all under heavy local load, at a different step, and are not this flake: `meet()` waits for the versus
+moment's opponent pawn (`.dv-versus .dv-st-them .dv-st-pawn`), which shows for only `versusMs` (2.5 s). A test process starved for
+longer misses it, the page goes on to the board (seen in the error context: "Blitz 3+2" over the board), and the wait times out
+after 20 s. This is a real test weakness, a wait on a short-lived state, but CI hasn't shown it. Not changed here.
+
+## What I ruled out (code read, and experiments where noted)
+- **Server** (`duel-room.ts`, `rules.ts`, `duel-do.ts`): a move is refused only for phase/turn/illegal/step, and the client sees
+  "play" only from the server's own broadcast. Every DO handler builds its core from the same in-memory record object, so an
+  await that interleaves (hello's D1 reads) can't act on a stale copy. Debug logs on every receive, send, accept, close, alarm and
+  storage write (about 290 runs) showed nothing odd.
+- **Dev proxy dropping its link to the Worker:** I cut the proxy↔Worker TCP links mid-game with gdb (`shutdown(fd)`), from the
+  proxy side and then from the Worker side. Both pages' sockets closed, reconnected within 0.5 s, and the next move arrived
+  (`welcome` re-sends a move still unanswered). So a dropped link isn't silent, at least when it closes cleanly.
+- **Client** (`duel.ts` `NetDuel.move`/`onMessage`, `screens/Duel.tsx`, `board/OwnBoard.tsx`, `board/logic.ts` press logic,
+  `haptics.ts`): once the board is interactive, a tap-tap always reaches `session.move`, and `move()` can't return early at the
+  first move. `crumb()` can't throw. The status and the board's `interactive` change in the same render. The iPhone haptic switch
+  is a 1 px, `pointer-events: none` element at 0,0. The client never sends `sync`.
+
+## What's left (unproven)
+1. White's taps never reached the board's handlers, or `move()` refused them (unknown client state).
+2. The move was sent but lost on a socket that stayed open without a close (a drop that isn't clean: an RST or a stall rather
+   than the FIN I could make).
+3. The server sent `move` to Black and Black's page didn't apply it.
+
+The first try leaves no record of White's page or of either socket's frames, so none of these can be told apart.
+
+## The question
+I can't fix this at its cause without knowing which of the three it was, and I won't raise the timeout or add a retry. Options:
+- (a) Have the duel specs keep, on a failure, both pages' `window.duel.snapshot()` and the app's breadcrumbs (`problems.ts`
+  `crumb`: "1v1 move e2e4" shows whether `move()` sent it). The next time it flakes, that says which side lost the move. This
+  adds diagnostics, not a check. It's your call against "fix the cause, not add a checker".
+- (b) Leave it until it recurs (about 1 in 330 or rarer here).
+- (c) Separately, the `meet()` wait on the 2.5 s versus moment above: wait for the board (or `snapshot().phase`) instead, if
+  you want it fixed before it shows on CI.
+
+Nothing else is changed on this branch. Local setup note: this container's Playwright wanted `chromium_headless_shell-1194`;
+I linked it to the pre-installed 1243 build (outside the repo).
