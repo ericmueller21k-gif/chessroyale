@@ -345,9 +345,6 @@ export const SAW_SWAP_TEST_MOVES: Readonly<Record<Side, readonly string[]>> = {
 /** The crowd's check in the test switch's position (SAW_SWAP_TEST_MOVES), by the side the crowd plays. */
 export const SAW_SWAP_TEST_CHECK: Readonly<Record<Side, string>> = { w: "f1b5", b: "f8b4" };
 
-/** The Saw Swap has come this battle (once a battle). */
-export const sawSwapped = (boss: Pick<BossState, "powers"> | null | undefined): boolean => !!boss?.powers?.sawSwap;
-
 /**
  * His Saw Swap came as the crowd's move just played landed: while he thinks after it (its moment, about 5 s), the move he's about to
  * play isn't on the board yet, so the move list holds it back (as Dash's pop-off: popOffHolding). The screens' view and the state alike.

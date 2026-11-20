@@ -90,8 +90,11 @@ export function refusedLine(boss: BossLike, fen: string, move: string): string {
   return why ? REFUSED[why] : REFUSED_OTHER;
 }
 
-/** Sawyer's Saw Swap came at the start of his last turn (Nov 20): the dock's words through your turn after it. */
-export const SAW_SWAP_LINE = "He swapped his half out of check.";
+/**
+ * Sawyer's Saw Swap came at the start of his last turn (Nov 20): the dock's words through your turn after it (its banner named it). Short
+ * enough to be whole in the dock at 320 px (142 of its 159 px, measured; e2e/sawyer.spec.ts checks it).
+ */
+export const SAW_SWAP_LINE = "Swapped out of check.";
 
 /** The dock's words for Sawyer's Saw Swap through your turn after it (it came as your check landed, before his move), or null. */
 export const swapLine = (boss: { crowdMoves?: number; powers?: { sawSwap?: { at: number } | null } | null } | null | undefined): string | null =>

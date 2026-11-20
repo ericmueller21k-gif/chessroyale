@@ -566,8 +566,12 @@ test("Sawyer's Saw Swap (?power=sawswap, Eric, Nov 20): your check on his king o
   for (const [sq, name] of Object.entries(want)) for (const c of name.split(" ")) expect(drawn[sq], sq).toContain(c);
   expect(want.a8).toBe("black king");
   expect(want.f5).toBe("white bishop");
-  // The dock says so through your turn; nothing of the moment is left on the board.
+  // The dock says so through your turn, whole on a narrow phone (320 px: no "…"); nothing of the moment is left on the board.
   await expect(page.getByText(SAW_SWAP_LINE)).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 664 });
+  const note = page.locator(".boss-dock .through-note");
+  await expect(note).toHaveText(SAW_SWAP_LINE);
+  await expect.poll(() => note.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
   await expect(page.locator(".sw-slab, .sw-hole, .sw-gap")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
