@@ -491,9 +491,11 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
         const edge = dir > 0 ? (level + 1) * plan.per : level * plan.per;
         const stop = dir > 0 ? Math.min(to, edge) : Math.max(to, edge);
         const a = start;
+        // (Where in this stretch's level: its full end shown full, never as the next level's 0, either way.)
+        const base = level * plan.per;
         await run(Math.max(FX.stretchMinMs, (ms * Math.abs(stop - a)) / gain), (k) => {
           const shown = Math.round(a + (stop - a) * smooth(k));
-          const w = shown === edge && dir > 0 ? plan.per : within(shown, plan.per);
+          const w = Math.max(0, Math.min(plan.per, shown - base));
           if (refs.fill.current) refs.fill.current.style.transform = `scaleX(${w / plan.per})`;
           if (shown === lastShown) return;
           lastShown = shown;

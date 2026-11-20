@@ -127,11 +127,99 @@ test("the versus screen shows both ranks' emblems; the result of a division up s
   await b.getByRole("button", { name: "Match options" }).click();
   await b.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /Resign/ }).click();
   await b.getByRole("button", { name: /^Resign/ }).last().click();
-  // The result: the new division's emblem beside "Gold 2 · 10 RP (+20)".
-  await expect(a.locator(".dv-result-rank")).toHaveText("Gold 2 · 10 RP (+20)", { timeout: 20_000 });
-  await expectEmblem(a, ".dv-result", "gold-d2", 48);
-  // Bo's own result card keeps the emblem's room too (his outcome as the server has it: a placement game here).
-  await expect(b.locator(".dv-result-line .re-box")).toHaveCount(1);
+  // The result (the end page, Nov 20): RP EARNED counts to +20 and lobs into the division's bar, which fills from 70 of 80 to the end,
+  // "Gold 2!", the new division's emblem, and on to 10.
+  await expectRp(a, { label: "RP EARNED", num: "+20", gain: "+20 RP", who: "Gold 2", now: "10 RP", emblem: "gold-d2", from: 70 / 80, to: 10 / 80, wraps: 1 });
+  // Bo's own page keeps the emblem's room too (his outcome as the server has it: a placement game here).
+  await expect(b.locator(".es-track-rp .re-box")).toHaveCount(1);
+});
+
+/**
+ * Every frame of the RP bar from the result on (its fill's scaleX, its division), then its end: the label, the number, the landed gain,
+ * the division and where in it, the emblem; the fill never jumps (only a division's wrap: full to empty going up, empty to full down).
+ */
+async function expectRp(page: Page, want: { label: string; num: string; gain: string; who: string; now: string; emblem: string; from: number; to: number; wraps: number }) {
+  await page.evaluate(() => {
+    const w = window as unknown as { __rp: { share: number; who: string }[] };
+    w.__rp = [];
+    const frame = () => {
+      const fill = document.querySelector(".es-track-rp .es-fill") as HTMLElement | null;
+      if (fill && document.querySelector("[data-es]")?.getAttribute("data-es") !== "wait") {
+        const t = getComputedStyle(fill).transform;
+        w.__rp.push({ share: new DOMMatrixReadOnly(t === "none" ? undefined : t).a, who: document.querySelector(".es-track-rp [data-testid=es-who-rp]")?.textContent ?? "" });
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+  await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
+  await expect(page.locator(".es-earned-rp .es-earned-label")).toHaveText(want.label);
+  await expect(page.locator(".es-earned-rp .es-earned-num")).toHaveText(want.num);
+  const track = page.getByTestId("es-track-rp");
+  await expect(track.locator(".es-gain")).toHaveText(want.gain);
+  await expect(track.getByTestId("es-who-rp")).toHaveText(want.who);
+  await expect(track.getByTestId("es-now-rp")).toHaveText(want.now);
+  await expect(track.locator(".re-box")).toHaveAttribute("data-emblem", want.emblem);
+  const s = await page.evaluate(() => (window as unknown as { __rp: { share: number; who: string }[] }).__rp);
+  expect(s[0]!.share, "from where you were").toBeCloseTo(want.from, 2);
+  expect(s.at(-1)!.share, "to where you are").toBeCloseTo(want.to, 2);
+  let wraps = 0;
+  for (let i = 1; i < s.length; i++) {
+    const d = s[i]!.share - s[i - 1]!.share;
+    if (Math.abs(d) > 0.5) wraps++;
+    else expect(Math.abs(d), "no jump between frames").toBeLessThan(0.08);
+  }
+  expect(wraps, "a division crossed").toBe(want.wraps);
+}
+
+test("a ranked game lost (Eric, Nov 20): \"RP LOST 14\" counting in red, the bar draining through the division, Gold 3 to Gold 4", { tag: "@phone-only" }, async ({ browser }) => {
+  test.setTimeout(3 * 60_000);
+  const pool = `rd${Math.random().toString(36).slice(2, 9)}`;
+  const GOLD3_9 = at(2, 3, 9);
+  const GOLD4_75 = at(2, 4, 75);
+  const a = await player(browser, "Ann Down", GOLD3_9);
+  const b = await player(browser, "Bo Down", GOLD3_9);
+  // Ann's game's outcome: a loss from Gold 3 · 9 RP to Gold 4 · 75 RP (−14).
+  await a.routeWebSocket(/\/api\/1v1\/game\/[A-Z2-9]{5}\/ws/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((m) => server.send(m));
+    server.onMessage((m) => {
+      const msg = JSON.parse(String(m));
+      if (msg.t === "outcome" && msg.outcome) msg.outcome.change = { before: GOLD3_9, after: GOLD4_75, points: -14, placed: false };
+      ws.send(JSON.stringify(msg));
+    });
+  });
+  await a.goto(`/1v1?nolanding&pool=${pool}`);
+  await expect(a.locator(".dv-search")).toContainText("Finding opponent…");
+  await b.goto(`/1v1?nolanding&pool=${pool}`);
+  for (const p of [a, b]) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 30_000 });
+  const sideOf = async (p: Page) => (await p.locator(".dv-strip.dv-you").getAttribute("data-side")) as "w" | "b";
+  const tap = async (p: Page, uci: string) => {
+    const box = (await p.locator(".board-area .board-wrap").first().boundingBox())!;
+    const w = (await sideOf(p)) === "w";
+    for (const sq of [uci.slice(0, 2), uci.slice(2, 4)]) {
+      const f = sq.charCodeAt(0) - 97;
+      const r = Number(sq[1]) - 1;
+      await p.mouse.click(box.x + (((w ? f : 7 - f) + 0.5) * box.width) / 8, box.y + (((w ? 7 - r : r) + 0.5) * box.height) / 8);
+    }
+  };
+  const [white, black] = (await sideOf(a)) === "w" ? [a, b] : [b, a];
+  await tap(white, "e2e4");
+  await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
+  await tap(black, "e7e5");
+  await expect(white.locator(".dv-status")).toContainText("Your move", { timeout: 10_000 });
+  // Ann resigns: her own page, "Defeat", and its move-by-move under it (the two moves, from the last).
+  await a.getByRole("button", { name: "Match options" }).click();
+  await a.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /Resign/ }).click();
+  await a.getByRole("button", { name: /^Resign/ }).last().click();
+  await expect(a.getByTestId("es-title")).toHaveText("Defeat", { timeout: 20_000 });
+  await expect(a.getByTestId("es-line")).toHaveText("You resigned.");
+  await expect(a.getByTestId("game-steps").locator(".bm-step-text")).toHaveText("Move 2 of 2 · 1… e5");
+  await expectRp(a, { label: "RP LOST", num: "14", gain: "−14 RP", who: "Gold 4", now: "75 RP", emblem: "gold-d4", from: 9 / 80, to: 75 / 80, wraps: 1 });
+  // (Red: the count and the gain.)
+  const red = await a.locator(".es-earned-rp .es-earned-num").evaluate((e) => getComputedStyle(e).color);
+  expect(red).toBe(await a.locator(".es-track-rp .es-gain").evaluate((e) => getComputedStyle(e).color));
+  await expect(a.locator(".es-earned-rp")).toHaveClass(/es-down/);
 });
 
 test("home's ranked row and the profile show your rank's emblem; the row's panel keeps its size, its words one line each at 320 px", async ({ browser }) => {
