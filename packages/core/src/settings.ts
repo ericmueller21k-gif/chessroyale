@@ -1301,18 +1301,35 @@ export const BATTLE_TOWER = {
   floors: 99,
   /** How many bosses a floor has, looping: floor f has pattern[(f - 1) % pattern.length] (Eric: "1 boss then 2, maybe 2 again, then 3"). */
   pattern: [1, 2, 2, 3] as readonly number[],
-  /** Floors before stockfishFrom: Maia at maiaStart + maiaStep a floor after the first (Eric: "100 increase per starting at 600"), held at Maia's top (2500). */
+  /**
+   * Floors before stockfishFrom: Maia at maiaStart, then each floor adds the step of the last `maiaSteps` row whose floor it has reached
+   * (held at Maia's top, 2500). Eric, Nov 20 (the climb sim: +100 a floor ended every run by floor 8): "for the first 10 levels, it
+   * should probably just climb like 20 per ... go up like 20 points for the first 5 levels, and then go up like 30 points, and then like
+   * maybe 40 points ... players feel pretty comfortable getting, you know, 10 levels in ... Getting to 20 levels should be doable ...
+   * around the 30 mark ... keep it clamped in like the 15 to 1700 range for a bit." Two-boss floors: 600, 680 (floor 5), 830 (10),
+   * 1630 (30), 1710 (50); a lone boss soloBonus more. The sims' tries: reports/tower-sim.md.
+   */
   maiaStart: 600,
-  maiaStep: 100,
-  /** A one-boss floor plays this much stronger, within the same caps (Eric: "solo bosses get a little bit extra strength"; +200 is the director's guess). */
-  soloBonus: 200,
+  maiaSteps: [
+    [2, 20],
+    [6, 30],
+    [11, 40],
+    [31, 4],
+  ] as readonly (readonly [number, number])[],
+  /**
+   * A one-boss floor plays this much stronger, within the same caps (Eric: "solo bosses get a little bit extra strength"). The director's
+   * guess: +200 with +100 a floor; +100 since the gentler climb of Nov 20 (+200 made floor 1 stronger than floors 2 to 8, and the
+   * lone floors of the 30s and 40s 1900, well over Eric's "15 to 1700").
+   */
+  soloBonus: 100,
   /**
    * From this floor Stockfish (Eric: "at 50 wins ... we swap to stock fish and continue up"): its UCI_Elo stockfishStart, +stockfishStep a
-   * floor (the director's guess), held at its ceiling (ENGINE_MAX_ELO, 3190: floor 79); from the floor after that, its best every move.
+   * floor, held at its ceiling (ENGINE_MAX_ELO, 3190); from the floor after that, its best every move. Nov 20 (the director's call, with
+   * the gentler Maia climb): from about where Maia's floors end (1750, not a jump to 2500), +31 a floor: its ceiling on floor 98, and the top floor (99) its best.
    */
   stockfishFrom: 51,
-  stockfishStart: 2500,
-  stockfishStep: 25,
+  stockfishStart: 1750,
+  stockfishStep: 31,
   /** Leaving a floor under way is free before your leaveFreeBefore-th move (the floor fought again later, the same bosses), else a loss. */
   leaveFreeBefore: 2,
   /**
@@ -2162,6 +2179,8 @@ export const BOSS_POWERS = {
    *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter; one the pass guard refuses, with
    *   nothing else unlocked, is checked again on his next turn). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
+   * - **The queen lock's shot** (Eric, Nov 20: the piece goes when the round reaches it): the round flies down the file from his edge,
+   *   `shotStepMs` a square; the piece it hits stays on the board until the round's head reaches its square's middle, then shatters.
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
@@ -2191,6 +2210,7 @@ export const BOSS_POWERS = {
     queenLockFirst: true as boolean,
     meterEvery: 6,
     fireOnUnlock: true as boolean,
+    shotStepMs: 65,
     looks: 3,
     scatterSquares: 4,
     shieldCount: 2,

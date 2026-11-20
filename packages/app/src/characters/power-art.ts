@@ -654,7 +654,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   chandyShield: { ch: EFFECT_SPRITES.chandyShield, covers: "square", start: "up", loop: "held", end: "pop", sounds: CHANDY_SOUNDS },
   chandyDizzy: { ch: EFFECT_SPRITES.chandyDizzy, covers: "square", start: "hit", loop: "dizzy", end: "clear", sounds: CHANDY_SOUNDS },
   chandyQueenAim: { ch: EFFECT_SPRITES.chandyQueenAim, covers: "square", start: "on", loop: "aim", end: "fade", sounds: CHANDY_SOUNDS },
-  chandyRound: { ch: EFFECT_SPRITES.chandyRound, covers: "square", loop: "fly", end: "trail", sounds: CHANDY_SOUNDS },
+  chandyRound: { ch: EFFECT_SPRITES.chandyRound, covers: "square", start: "pass", sounds: CHANDY_SOUNDS },
   chandyShatter: { ch: EFFECT_SPRITES.chandyShatter, covers: "square", start: "shatter", sounds: CHANDY_SOUNDS },
   chandyDodgeRow: { ch: EFFECT_SPRITES.chandyDodgeRow, covers: "square", start: "travel", loop: "hold", end: "fade", sounds: CHANDY_DODGE_SOUNDS },
   chandyDodgeCol: { ch: EFFECT_SPRITES.chandyDodgeCol, covers: "square", start: "travel", loop: "hold", end: "fade", sounds: CHANDY_DODGE_SOUNDS },

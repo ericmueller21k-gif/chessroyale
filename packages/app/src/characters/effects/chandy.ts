@@ -8,6 +8,7 @@
  */
 import type { Anim, Character, Frame, Layer, Speck } from "../sprite.ts";
 import { lazyAnim, lazyParts } from "../sprite.ts";
+import { BOSS_POWERS } from "@chessroyale/core";
 import { SQUARE } from "./common.ts";
 
 export const CHANDY_FX_PALETTE: Record<string, string> = {
@@ -311,7 +312,7 @@ export const DIZZY = fx("chandy-dizzy", "Rapid fire's hits and dizzy stars", {
   clear: () => ({ loop: false, frames: [{ ms: 80, layers: [], specks: dizzy(0).filter((_, i) => i % 2 === 0), cue: "clear" }, EMPTY()] }),
 });
 
-// ---- The queen lock: the aim down her file (cyan, dashed), the round flying down it, its trail, and the shatter of the piece it hits.
+// ---- The queen lock: the aim down her file (cyan, dashed), the round flying down it shedding sparks, and the shatter of the piece it hits.
 
 /** A dashed line across a square, left to right (a quarter turn for a file), with a dark edge so it reads on light and dark squares. */
 function dashed(): Cv {
@@ -322,32 +323,7 @@ function dashed(): Cv {
   }
   return c;
 }
-/** The round, pointing down (it always comes from his side): a hot head at the bottom, a tapering tail up. */
-function bolt(len: number): Cv {
-  const c = cv();
-  for (let y = 0; y < S; y++)
-    for (let x = 0; x < S; x++) {
-      const fromHead = S - 1 - y;
-      const half = fromHead < 3 ? 2.6 : fromHead < len ? 2.2 * (1 - (fromHead - 3) / len) + 0.6 : -1;
-      const d = Math.abs(x + 0.5 - 16);
-      if (d > half) continue;
-      put(c, x, y, d < half * 0.4 ? "Q" : d < half * 0.75 ? "O" : "F");
-    }
-  return c;
-}
-/** The round's trail down a square it crossed: a hot core and a fading glow. */
-function trail(): Cv {
-  const c = cv();
-  for (let y = 0; y < S; y++)
-    for (let x = 10; x < 22; x++) {
-      const d = Math.abs(x + 0.5 - 16);
-      put(c, x, y, d < 1.2 ? "Q" : d < 2.6 ? "O" : d < 4 ? "F" : (y + x) % 3 === 0 ? "S" : "s");
-    }
-  return c;
-}
 one("aim", dashed);
-one("bolt", () => bolt(26));
-one("trail", trail);
 /** The queen lock's aim: one square of the dashed cyan line down her file (`on`, then the `aim` loop; `fade`). */
 export const QUEEN_AIM = fx("chandy-queen-aim", "The queen lock's aim", {
   on: () => ({ loop: false, frames: [{ ms: 80, layers: [L("aim", 1)], cue: "aim" }] }),
@@ -360,18 +336,72 @@ export const QUEEN_AIM = fx("chandy-queen-aim", "The queen lock's aim", {
   }),
   fade: () => ({ loop: false, frames: [{ ms: 60, layers: [L("aim", 1)], pal: { O: "#129cc3" }, cue: "aimOff" }, EMPTY()] }),
 });
-/** The round flying down a square (`fly`, a flicker), and the trail it leaves (`trail`, fading to nothing). */
+/**
+ * The round (Eric, Nov 20: "it moves towards your piece ... a particle shot that's not just dotted lines"): one round flying down the
+ * file from his side, a hot head with a tapering streak behind it, sparks peeling off where it passed. Each square plays it as its own
+ * slice, `shotStepMs` after the square before (Chandy.tsx), the head 8 art px further down each quarter of that: the slices line up into
+ * one round moving smoothly down the board. `k`: how far down (the head's middle at 8k + 3; frames past 3 are the streak leaving).
+ */
+const HEAD_R = 3.5;
+const TAIL = 40;
+function bolt(k: number): Cv {
+  const c = cv();
+  const hy = 8 * k + 3;
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const d = Math.abs(x + 0.5 - 16);
+      const head = Math.hypot(d, y + 0.5 - hy);
+      if (head <= HEAD_R) {
+        put(c, x, y, head < 1.4 ? "w" : head < 2.4 ? "Q" : "O");
+        continue;
+      }
+      const t = (hy - y) / TAIL;
+      if (t < 0 || t > 1) continue;
+      const half = 2.4 * (1 - t) + 0.3;
+      if (d > half) continue;
+      put(c, x, y, d < half * 0.4 ? "Q" : d < half * 0.75 ? "O" : "F");
+    }
+  return c;
+}
+/** The slices of the round on one square: the head coming in and on out, then its streak leaving (9 in all). */
+const BOLT_FRAMES = 9;
+for (let k = 0; k < BOLT_FRAMES; k++) one(`bolt${k}`, () => bolt(k));
+/** The sparks the round sheds on a square, `tick` quarter-squares after it entered (2 x 2 px, white-hot to dark as they cool, gone). */
+const sparks = (tick: number): Speck[] => {
+  const out: Speck[] = [];
+  for (let i = 0; i < 8; i++) {
+    const y0 = 2 + i * 4;
+    const age = tick - Math.max(0, Math.ceil((y0 - 3) / 8));
+    if (age < 0) continue;
+    const k = age < 2 ? "Q" : age < 5 ? "O" : age < 9 ? "F" : age < 14 ? "q" : null;
+    if (!k) continue;
+    const side = i % 2 ? 1 : -1;
+    const x = Math.round(16 + side * (3 + age * (0.6 + ((i * 5) % 3) * 0.35)));
+    const y = Math.round(y0 + age * 0.3);
+    out.push([x, y, k], [x + 1, y, k], [x, y + 1, k], [x + 1, y + 1, k]);
+  }
+  return out.filter(([x, y]) => x >= 1 && y >= 1 && x <= S - 2 && y <= S - 2);
+};
+/**
+ * The queen lock's round on one square: `pass` (it flies through, shedding sparks that cool and fade) and `hit` (the square it stops
+ * on: its head reaches the piece's middle half a square in, where SHATTER takes over).
+ */
 export const PIERCING_ROUND = fx("chandy-round", "The queen lock's piercing round", {
-  fly: () => ({ loop: true, frames: [at("bolt", 60), at("bolt", 60, { pal: { O: "#e4ffff" } })] }),
-  trail: () => ({
-    loop: false,
-    frames: [
-      at("trail", 80, { cue: "whoosh" }),
-      at("trail", 120, { pal: { Q: "#58e6ff", O: "#129cc3", F: "#0a5470" } }),
-      at("trail", 80, { pal: { Q: "#129cc3", O: "#0a5470", F: "#0a547080" } }),
-      EMPTY(),
-    ],
-  }),
+  pass: () => {
+    const q = BOSS_POWERS.chandy.shotStepMs / 4;
+    return {
+      loop: false,
+      frames: [
+        ...Array.from({ length: BOLT_FRAMES }, (_, k): Frame => ({ ms: q, layers: [L(`bolt${k}`)], specks: sparks(k), ...(k === 0 ? { cue: "whoosh" } : {}) })),
+        ...[11, 14, 17].map((tick): Frame => ({ ms: 50, layers: [], specks: sparks(tick) })),
+        EMPTY(),
+      ],
+    };
+  },
+  hit: () => {
+    const q = BOSS_POWERS.chandy.shotStepMs / 4;
+    return { loop: false, frames: [{ ms: q, layers: [L("bolt0")], cue: "whoosh" }, { ms: q, layers: [L("bolt1")] }, { ms: 40, layers: [L("bolt2")] }, EMPTY()] };
+  },
 });
 const shards = (t: number): Speck[] => {
   const out: Speck[] = [];

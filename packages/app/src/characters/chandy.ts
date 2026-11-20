@@ -439,23 +439,35 @@ export function paintRifle(c: Cv, butt: Pt, deg: number, stage: RifleStage): Pt 
   const sRaw = vx * LX + vy * LY;
   const sl = Math.sign(sRaw || 1) * Math.max(0.55, Math.abs(sRaw));
   const reach = len * RIFLE_LEN_K + 14;
-  for (let y = Math.floor(butt[1] - reach); y <= Math.ceil(butt[1] + reach); y++)
-    for (let x = Math.floor(butt[0] - reach); x <= Math.ceil(butt[0] + reach); x++) {
+  // Each shape's box along the rifle (u, v), and the pixels the boxes cover: a point outside a polygon's box is never in it, so the
+  // pixels and shapes skipped here are only ones that drew nothing (Nov 20: this loop over every pixel and shape, a polygon's box
+  // worked out again per pixel, was most of the 2.5 s stall building his frames at a battle's start, which swallowed Dodge's volley).
+  const boxes = shapes.map((sh) => {
+    if ("rect" in sh) return sh.rect;
+    const us = sh.poly.map((p) => p[0]);
+    const vs = sh.poly.map((p) => p[1]);
+    return [Math.min(...us), Math.max(...us), Math.min(...vs), Math.max(...vs)] as const;
+  });
+  const corners = [Math.min(...boxes.map((b) => b[0])), Math.max(...boxes.map((b) => b[1]))].flatMap((u) =>
+    [Math.min(...boxes.map((b) => b[2])), Math.max(...boxes.map((b) => b[3]))].map((v) => [butt[0] + u * RIFLE_LEN_K * ux + v * vx, butt[1] + u * RIFLE_LEN_K * uy + v * vy]),
+  );
+  const [x0, x1, y0, y1] = [0, 1].flatMap((i) => [Math.floor(Math.min(...corners.map((p) => p[i]!))) - 1, Math.ceil(Math.max(...corners.map((p) => p[i]!))) + 1]) as [number, number, number, number];
+  for (let y = Math.max(Math.floor(butt[1] - reach), y0); y <= Math.min(Math.ceil(butt[1] + reach), y1); y++)
+    for (let x = Math.max(Math.floor(butt[0] - reach), x0); x <= Math.min(Math.ceil(butt[0] + reach), x1); x++) {
       const dx = x + 0.5 - butt[0];
       const dy = y + 0.5 - butt[1];
       const u = (dx * ux + dy * uy) / RIFLE_LEN_K;
       const v = dx * vx + dy * vy;
       let k: string | null = null;
-      for (const sh of shapes) {
+      for (let s = 0; s < shapes.length; s++) {
+        const sh = shapes[s]!;
+        const [u0, u1, v0, v1] = boxes[s]!;
+        if (u < u0 || u > u1 || v < v0 || v > v1) continue;
         let t: number;
-        if ("rect" in sh) {
-          const [u0, u1, v0, v1] = sh.rect;
-          if (u < u0 || u > u1 || v < v0 || v > v1) continue;
-          t = (v - v0) / (v1 - v0 || 1);
-        } else {
+        if ("rect" in sh) t = (v - v0) / (v1 - v0 || 1);
+        else {
           if (!inPoly(sh.poly, u, v)) continue;
-          const vs = sh.poly.map((p) => p[1]);
-          t = (v - Math.min(...vs)) / (Math.max(...vs) - Math.min(...vs) || 1);
+          t = (v - v0) / (v1 - v0 || 1);
         }
         if (sh.hole) {
           k = ".";

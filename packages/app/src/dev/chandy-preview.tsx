@@ -13,6 +13,7 @@
  * Test hooks: `window.__chandyPreview` (what's playing).
  */
 import { render } from "preact";
+import { BOSS_POWERS } from "@chessroyale/core";
 import { useEffect, useState } from "preact/hooks";
 import { CHANDY, CHANDY_CLONE, RIFLE_STAGES, STAGES, chandyAnim, type RifleStage } from "../characters/chandy.ts";
 import { BoardEffects, SpriteAnim, type BoardItem } from "../components/BossEffect.tsx";
@@ -57,7 +58,8 @@ function powerItems(p: Power, since: number): BoardItem[] {
     case "queenAim":
       return [sq("d1", "chandyCrosshair", "lock", "held"), ...[8, 7, 6, 5, 4, 3, 2].map((r) => sq(`d${r}`, "chandyQueenAim"))];
     case "queenShot":
-      return [sq("d1", "chandyCrosshair", "held"), ...[8, 7, 6, 5].map((r) => sq(`d${r}`, "chandyRound", "trail")), sq("d5", "chandyRound", "fly"), sq("d4", "chandyShatter")];
+      // (One round from his edge down the d-file to the pawn on d2, a square every shotStepMs; the pawn shatters as it's reached.)
+      return [sq("d1", "chandyCrosshair", "held"), ...[8, 7, 6, 5, 4, 3, 2].map((r, i): BoardItem => ({ square: `d${r}`, name: "chandyRound", anim: r === 2 ? "hit" : "pass", since: since + i * BOSS_POWERS.chandy.shotStepMs, quiet: i > 0 })), { square: "d2", name: "chandyShatter", anim: "shatter", since: since + 6.5 * BOSS_POWERS.chandy.shotStepMs }];
   }
 }
 

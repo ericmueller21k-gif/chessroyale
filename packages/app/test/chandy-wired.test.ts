@@ -8,7 +8,7 @@ import { CHANDY_FIRE_AT, CHANDY_FX, dodgeRounds, dodgeTimeline, safeSquares, lin
 import { BOSS_KITS, stagedKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength } from "../src/characters/power-art.ts";
 import { CHANDY } from "../src/characters/chandy.ts";
-import { chandyItems, dodgeFen, dodgeView } from "../src/components/Chandy.tsx";
+import { chandyFen, chandyItems, dodgeFen, dodgeView, shotHitAt } from "../src/components/Chandy.tsx";
 import { WARN } from "../src/components/BossPowers.tsx";
 import type { MomentProps } from "../src/components/PowerParts.tsx";
 import { refusedLine } from "../src/refused.ts";
@@ -39,7 +39,7 @@ describe("his moments against his art", () => {
     expect(CHANDY_FX.shields).toBeGreaterThanOrEqual(after("chandyShield", "up"));
     expect(CHANDY_FX.rapidFire).toBeGreaterThanOrEqual(after("chandyDizzy", "hit") + 2 * 150);
     expect(CHANDY_FX.queenAim).toBeGreaterThanOrEqual(after("chandyQueenAim", "on"));
-    expect(CHANDY_FX.queenShot).toBeGreaterThanOrEqual(CHANDY_FIRE_AT + 7 * 60 + animLength(EFFECTS.chandyShatter.ch.anims.shatter!));
+    expect(CHANDY_FX.queenShot).toBeGreaterThanOrEqual(shotHitAt(8) + animLength(EFFECTS.chandyShatter.ch.anims.shatter!));
     expect(CHANDY_FX.lockOn).toBeGreaterThanOrEqual(120 + animLength(EFFECTS.chandyCrosshair.ch.anims.lock!));
     expect(CHANDY_FX.upgrade).toBe(2000);
   });
@@ -66,6 +66,25 @@ describe("his board layer", () => {
     const m = { kind: "lockOn" as const, key: "k", at: 1000, ms: CHANDY_FX.lockOn, square: "c3" };
     expect(chandyItems(boss, [m], 1050).length).toBe(0);
     expect(chandyItems(boss, [m], 1200)[0]).toMatchObject({ anim: "lock", then: "held3" });
+  });
+
+  it("the queen lock's shot: the hit piece stays on the board until the round reaches it, the round flying a square at a time (Eric, Nov 20)", () => {
+    // (The game's board has lost the d2 pawn as his turn began; the round flies d8 to d2.)
+    const after = "4k3/8/8/8/8/8/8/3QK3 b - - 0 1";
+    const boss = bossWith(EMPTY, [], after);
+    const m = { kind: "queenShot" as const, key: "s", at: 1000, ms: CHANDY_FX.queenShot, square: "d2", squares: ["d8", "d7", "d6", "d5", "d4", "d3", "d2"], shape: "p" };
+    const hit = 1000 + shotHitAt(7);
+    expect(hit).toBe(1000 + CHANDY_FIRE_AT + 6.5 * BOSS_POWERS.chandy.shotStepMs);
+    expect(chandyFen(boss, [m], 1000, after)).toBe("4k3/8/8/8/8/8/3P4/3QK3 b - - 0 1");
+    expect(chandyFen(boss, [m], hit - 1, after)).toContain("3P4");
+    expect(chandyFen(boss, [m], hit, after)).toBe(after);
+    expect(chandyFen(boss, [{ ...m, fizzled: ["d1"] }], 1000, after)).toBe(after);
+    // (The round reaches each square in turn, one square's slice each, stopping on d2; the shatter only as it arrives.)
+    const at = (t: number) => chandyItems(boss, [m], t);
+    expect(at(1000 + CHANDY_FIRE_AT + 2 * BOSS_POWERS.chandy.shotStepMs).filter((i) => i.name === "chandyRound").map((i) => i.square)).toEqual(["d8", "d7", "d6"]);
+    expect(at(hit - 1).some((i) => i.name === "chandyShatter")).toBe(false);
+    expect(at(hit).filter((i) => i.name === "chandyRound").map((i) => i.anim)).toEqual(["pass", "pass", "pass", "pass", "pass", "pass", "hit"]);
+    expect(at(hit).find((i) => i.name === "chandyShatter")).toMatchObject({ square: "d2", since: hit });
   });
 });
 

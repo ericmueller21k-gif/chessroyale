@@ -34,7 +34,7 @@ import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.t
 import type { BossView, DodgeRun, GameView, LightsView, RushView } from "../game.ts";
 import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
 import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
-import { DodgeLayer, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
+import { DodgeLayer, chandyFen, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { SideFigures } from "./TowerBar.tsx";
@@ -409,7 +409,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
     if (thinking && stepped !== null && stepped === boss.crowdMoves) kingSay("fireTile", `fire-tile-${boss.id}-${stepped}`);
   }, [thinking, stepped]);
   const fenPlain = funMove?.move && !funPlayed ? fenAtPly(history, history.length - 1, bases) : introFen;
-  const fenShown = burning.length && now < burnAt + BURN.goneAt ? burning.reduce((f, b) => withPiece(f, b.square, { color: boss.crowdSide, type: b.piece! }), fenPlain) : fenPlain;
+  const fenBurnt = burning.length && now < burnAt + BURN.goneAt ? burning.reduce((f, b) => withPiece(f, b.square, { color: boss.crowdSide, type: b.piece! }), fenPlain) : fenPlain;
+  // Chandy's queen lock: the piece his round hits on its square until the round reaches it.
+  const fenShown = chandyFen(own("chandy"), moments, now, fenBurnt);
   const lastShown = funMove?.move ? (funPlayed ? funMove.move : null) : introLast;
   // The Big Bounce: the board before it, less the pieces up in the air, then the new position as they come down; the
   // eval bar keeps the position before it until they've all settled. The board jolts as he lands and at the crash.
