@@ -91,9 +91,10 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         : team
           ? gameWinner === team ? "win" : gameWinner ? "loss" : "draw"
           : placement === 1 ? "win" : "draw";
+  // (A tower floor resigned is a floor lost: "Defeat", its line says so; Eric, Nov 20.)
   const title = afk
     ? "Removed for being away"
-    : resigned
+    : resigned && !tower
       ? "You resigned"
       : boss || team
         ? tone === "win" ? "Victory!" : tone === "loss" ? "Defeat" : "A draw"
