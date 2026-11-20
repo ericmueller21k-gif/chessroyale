@@ -4,7 +4,7 @@ import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, PlayerBadge, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
 import { SQUADS_STARTED, SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
-import { CROWD_PARTY_LINES, PartyCore, needsCrowdInvite, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
+import { CROWD_PARTY_LINES, PartyCore, TOWER_PARTY_LINES, needsCrowdInvite, newPartyRecord, partyClosing, type BossStart, type PartyRecord, type TowerPartyPlan } from "./squads-party.ts";
 import { crowdInviteOpen } from "./friends.ts";
 import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
 import { openLobbyCode } from "./codes.ts";
@@ -20,10 +20,17 @@ import { serverScoreAt } from "./engine.ts";
 import { countCall } from "./ops.ts";
 import { LiveReporter } from "./live.ts";
 import { liveHub } from "./live-hub.ts";
-import { isPaused } from "./kill-switches.ts";
+import { isPaused, pausedBosses } from "./kill-switches.ts";
+import { TOWER_LINES, commitPartyFloor, preparePartyFloor, type LobbyGone, type PartyFloorPrep, type PartyRefusal } from "./tower.ts";
+import { partyOpenText } from "./town-chat.ts";
+import { chatRoomOf, townPartyPoster } from "./town-chat-api.ts";
+import { towerPool } from "@chessroyale/core";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
+
+/** A Battle Tower party's plan as the party keeps it (TowerPartyPlan), from a floor ready to begin (tower.ts preparePartyFloor). */
+const planOf = (prep: PartyFloorPrep): TowerPartyPlan["plan"] => (prep.plan.kind === "continue" ? { kind: "continue", floor: prep.floor, back: prep.plan.back } : prep.plan);
 
 /** What a socket carries: who it is once they've said hello, and what the request said about them. */
 interface Attached {
@@ -483,14 +490,16 @@ export class SquadsParty extends DurableObject<Env> {
    * "boss", boss-party.ts) has no queue: its START makes the battle. A 50 v 50 party ("crowd", Nov 16) queues into the public
    * 50 v 50 matchmaking; `owner` (its maker's account) is the only one in without an invite.
    */
-  async create(code: string, queueName: string, fillMs: number, kind?: "boss" | "crowd", poolName?: string, owner?: string): Promise<boolean> {
+  async create(code: string, queueName: string, fillMs: number, kind?: "boss" | "crowd" | "tower", poolName?: string, owner?: string, towerWin = false): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = { ...newPartyRecord(code, Date.now(), kind, owner), queueName, fillMs, ...(poolName ? { poolName } : {}) };
+    // (A Battle Tower party's test switch: its floors open where Qxf7 mates the boss, index.ts.)
+    if (towerWin && this.record.tower) this.record.tower.win = true;
     await this.persist(this.core());
     return true;
   }
 
-  async status(): Promise<{ members: number; state: PartyRecord["state"]; kind?: "boss" | "crowd" } | null> {
+  async status(): Promise<{ members: number; state: PartyRecord["state"]; kind?: "boss" | "crowd" | "tower" } | null> {
     if (!this.record || (await this.closeIfDue())) return null;
     return { members: this.record.members.length, state: this.record.state, ...(this.record.kind ? { kind: this.record.kind } : {}) };
   }
@@ -564,19 +573,23 @@ export class SquadsParty extends DurableObject<Env> {
         core.resendTo(result.memberId);
       }
       await this.persist(core);
+      await this.towerUpkeep();
       return;
     }
     const memberId = attached.playerId;
     if (!memberId) return;
     const was = this.record.state;
     const core = this.core();
+    // (A Battle Tower party's Open party: its line goes in the town's chat room the app is in, the town's own but where the test switches are on.)
+    if (msg.t === "open") msg = { ...msg, room: chatRoomOf(msg.room, this.env.TEST_SWITCHES === "1") };
     core.message(memberId, msg, { test: !!attached.test });
     if (msg.t === "leave") ws.close(4001, "Left the party");
     await this.persist(core, msg.t === "leave" ? ws : undefined);
     // (A 50 v 50 party's Find match drops its invites still out: off the friends' lists too.)
     if (this.record?.kind === "crowd" && was !== "queueing" && this.record.state === "queueing") this.ctx.waitUntil(this.dropInvites());
-    if (this.record.kind === "boss") {
+    if (this.record.kind === "boss" || this.record.kind === "tower") {
       await this.revokeInBattle();
+      await this.towerUpkeep();
       return this.makeBattle();
     }
     await this.askMatchmaker();
@@ -593,6 +606,7 @@ export class SquadsParty extends DurableObject<Env> {
     if (!want) return;
     this.making = true;
     try {
+      if (this.record.kind === "tower") return await this.makeTowerFloor(want);
       const code = this.record.code;
       const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, bossPartyOverrides(want), undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
       if (!this.record) return;
@@ -621,7 +635,7 @@ export class SquadsParty extends DurableObject<Env> {
 
   /** Its battle kicked someone (the AFK kick): out of the party too, never back in (by member id). */
   async kickMember(id: string): Promise<void> {
-    if (!this.record || this.record.kind !== "boss") return;
+    if (!this.record || (this.record.kind !== "boss" && this.record.kind !== "tower")) return;
     const core = this.core();
     core.kickMember(id);
     await this.persist(core);
@@ -629,10 +643,155 @@ export class SquadsParty extends DurableObject<Env> {
 
   /** Its battle from START `id` is over: that battle's passes go. */
   async battleOver(id: number): Promise<void> {
-    if (!this.record || this.record.kind !== "boss") return;
+    if (!this.record || (this.record.kind !== "boss" && this.record.kind !== "tower")) return;
     const core = this.core();
     core.battleOver(id);
     await this.persist(core);
+    await this.towerUpkeep();
+  }
+
+  /** A Battle Tower party as the clerk's list of open parties shows it, or null: it isn't open to newcomers (PartyCore.towerListing). */
+  async towerListing(): Promise<{ leader: string; members: number; max: number } | null> {
+    if (!this.record || this.record.kind !== "tower" || (await this.closeIfDue())) return null;
+    return this.core().towerListing();
+  }
+
+  /** A party floor's match room, asked whether it still holds the floor (tower.ts settleStale). */
+  private lobbyGone: LobbyGone = async (f) => (f.lobby ? !(await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(f.lobby)).holdsTowerFloor(f.id)) : null);
+
+  /**
+   * A Battle Tower party's upkeep after anything changes (docs/decisions/2026-11-20-tower-party.md): its plan read again from everyone's
+   * copies when its people changed (or a floor ended), its Open party line posted in the town's chat, and taken out again once it
+   * lapses (full, started, or its leader gone).
+   */
+  private async towerUpkeep() {
+    if (!this.record || this.record.kind !== "tower") return;
+    for (let tries = 0; tries < 3 && this.record?.kind === "tower" && this.core().towerPlanStale(); tries++) {
+      const people = this.core().towerPeople();
+      const plan = people.length < 2 ? { kind: "wait" as const, message: TOWER_PARTY_LINES.needTwo } : await this.readTowerPlan(people);
+      if (!this.record) return;
+      const core = this.core();
+      const recheck = plan.kind === "wait" && "recheck" in plan;
+      core.towerRecheck(recheck ? Date.now() + 3000 : null);
+      core.setTowerPlan({ key: people.join(","), plan: plan.kind === "wait" ? { kind: "wait", message: plan.message } : plan });
+      await this.persist(core);
+    }
+    const hub = this.env.LIVE ? liveHub(this.env) : null;
+    const code = this.record.code;
+    const core = this.core();
+    const lapsed = core.takeLapsedOpen();
+    const post = core.takeOpen();
+    if (!lapsed && !post) return;
+    await this.persist(core);
+    // (Only this party's own line: the town's numbers start again after a restart (the review of #835, finding 4).)
+    if (lapsed && hub) await hub.townRemoveParty(lapsed.line, code, lapsed.room).catch(() => undefined);
+    if (post) {
+      const put = hub ? await this.postOpenLine(post, code).catch(() => null) : null;
+      if (!this.record) return;
+      const after = this.core();
+      if (put && "message" in put) after.openRefused(put.message);
+      else after.openPosted(put ? put.n : null);
+      // (It lapsed while it went up: out again at once.)
+      const gone = after.takeLapsedOpen();
+      await this.persist(after);
+      if (gone && hub) await hub.townRemoveParty(gone.line, code, gone.room).catch(() => undefined);
+    }
+  }
+
+  /**
+   * The leader's Open party line, into the town's chat (the review of #835, finding 2): the town chat's checks for the leader first (a
+   * ban, a moderator's chat ban, the chat paused: townPartyPoster), their account's name on it, and the room's one line an account and
+   * its wait between them (TownChat.partyOpen). Its number there, or the words to tell the leader why not.
+   */
+  private async postOpenLine(post: { uid: string; name: string; free: number; room: string }, code: string): Promise<{ n: number } | { message: string }> {
+    const now = Date.now();
+    const may = this.env.DB ? await (async () => {
+      const sql = d1Sql(this.env.DB!);
+      await ensureSchema(sql, this.env.DB);
+      return townPartyPoster(sql, post.uid, now, isPaused(this.env, "town-chat", now));
+    })() : { ok: true as const, name: post.name };
+    if (!may.ok) return { message: may.message };
+    const put = (await liveHub(this.env).townPartyOpen(post.uid, partyOpenText(may.name, post.free), code, post.room)) as { n: number } | { retryMs: number };
+    return "n" in put ? put : { message: TOWER_PARTY_LINES.openWait(put.retryMs) };
+  }
+
+  /** A member's name here, by account (a plan's words). */
+  private nameOf(uid: string): string {
+    return this.record?.members.find((m) => m.userId === uid)?.name ?? "A member";
+  }
+
+  /** The plan for these people, from their copies (tower.ts preparePartyFloor); while one's floor is under way, why it waits (and a recheck soon). */
+  private async readTowerPlan(people: string[]): Promise<TowerPartyPlan["plan"] | { kind: "wait"; message: string; recheck: true }> {
+    if (!this.env.DB) return { kind: "wait", message: TOWER_LINES.noRun };
+    const sql = d1Sql(this.env.DB);
+    const read = await (async () => {
+      await ensureSchema(sql, this.env.DB);
+      return preparePartyFloor(sql, people, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
+    })().catch(() => null);
+    if (!read) return { kind: "wait", message: TOWER_PARTY_LINES.reading, recheck: true };
+    if (read.ok) return planOf(read.prep);
+    // (A deleted member's seat holds the plan until they're kicked or leave, and both read it again: no recheck meanwhile (the delta
+    // review of #835, finding 9). Everything else that refuses passes on its own: asked again in a moment.)
+    return "gone" in read ? { kind: "wait", message: this.refusalLine(read) } : { kind: "wait", message: this.refusalLine(read), recheck: true };
+  }
+
+  /** Why a party floor can't begin, in words (preparePartyFloor's refusal). */
+  private refusalLine(read: PartyRefusal): string {
+    if ("busy" in read) return read.party ? TOWER_LINES.saving(this.nameOf(read.busy)) : TOWER_LINES.busy(this.nameOf(read.busy));
+    if ("gone" in read) return TOWER_LINES.gone(this.nameOf(read.gone));
+    return "resting" in read ? TOWER_LINES.resting : TOWER_LINES.noRun;
+  }
+
+  /**
+   * A Battle Tower party's START (docs/decisions/2026-11-20-tower-party.md): the plan read again from everyone's copies (it must be the
+   * one they readied for: else it's shown afresh, everyone un-readied), the floor's match room made (towerPartySettings: the party rule,
+   * ties to the engine's best; its floor and bosses from the run), then the floor begun on every copy at once (commitPartyFloor: all or
+   * nothing), then everyone placed in it. Anything refused on the way: nobody is placed, and they're told why.
+   */
+  private async makeTowerFloor(want: BossStart) {
+    if (!this.record) return;
+    const fail = async (message: string, reread = false) => {
+      if (!this.record) return;
+      const core = this.core();
+      if (reread) core.towerReread();
+      core.placedIn(null, want.id, message);
+      await this.persist(core);
+      if (reread) await this.towerUpkeep();
+    };
+    if (!this.env.DB) return fail(TOWER_LINES.noRun);
+    // (Online boss battles resting, a kill switch: no party floor begins; its copies stay as they are.)
+    if (isPaused(this.env, "raid")) return fail(pausedLine("raid"));
+    const sql = d1Sql(this.env.DB);
+    const uids = [...want.members].sort((a, b) => a.seat - b.seat).flatMap((m) => (m.userId ? [m.userId] : []));
+    const read = await (async () => {
+      await ensureSchema(sql, this.env.DB);
+      return preparePartyFloor(sql, uids, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
+    })().catch(() => null);
+    if (!this.record) return;
+    if (!read) return fail("Couldn't reach the tower. Try again.");
+    if (!read.ok) return fail(this.refusalLine(read), true);
+    const prep: PartyFloorPrep = read.prep;
+    const shown = this.record.tower?.plan;
+    const now = planOf(prep);
+    if (!shown || shown.key !== uids.join(",") || JSON.stringify(shown.plan) !== JSON.stringify(now)) return fail(TOWER_LINES.changed, true);
+    const code = this.record.code;
+    const fight = Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(16).padStart(2, "0")).join("");
+    const overrides = JSON.parse(JSON.stringify({ ...prep.settings, ...(this.record.tower?.win ? { bossWinTest: true } : {}) })) as NonNullable<Parameters<ReturnType<Env["LOBBIES"]["get"]>["create"]>[1]>;
+    const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, overrides, undefined, undefined, partyLobby(want, code, Date.now(), { fight }))) !== false).catch(() => null);
+    if (!this.record) return;
+    if (!lobby) return fail("Couldn't start the floor. Try again.");
+    const ends = new Set(prep.plan.kind === "new" ? prep.plan.ends.map((e) => e.uid) : []);
+    const started = Date.now();
+    const ok = await commitPartyFloor(sql, prep, { id: fight, startedAt: started, lobby }, started, ends).catch((e: unknown) => {
+      console.log(`party ${code}: the floor's copies not begun (${String(e)})`);
+      return false;
+    });
+    if (!this.record) return;
+    if (!ok) return fail(TOWER_LINES.changed, true);
+    const core = this.core();
+    core.placedIn(lobby, want.id);
+    await this.persist(core);
+    await this.towerUpkeep();
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -642,10 +801,34 @@ export class SquadsParty extends DurableObject<Env> {
     const core = this.core();
     core.disconnect(memberId);
     await this.persist(core, ws);
+    await this.towerUpkeep();
   }
 
   async alarm() {
     if (!this.record || (await this.closeIfDue())) return;
+    // (A Battle Tower party: a member's last floor was still being written: its plan read again.)
+    if (this.record.kind === "tower") {
+      const core = this.core();
+      if ((this.record.tower?.recheckAt ?? Infinity) <= Date.now()) {
+        core.towerRecheck(null);
+        core.towerReread();
+        await this.persist(core);
+      }
+      // (Its floor still showing under way: its room asked whether it's over, should the room's own word never have come.)
+      const check = core.takeFloorCheck();
+      if (check) {
+        await this.persist(core);
+        const done = await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(check.lobby))
+          .partyBattleDone(this.record.code, check.start)
+          .catch(() => false);
+        if (done && this.record) {
+          const after = this.core();
+          after.battleOver(check.start);
+          await this.persist(after);
+        }
+      }
+      return this.towerUpkeep();
+    }
     // (A 50 v 50 party: its away leader's hold on the lead ends; a search with nobody here stops.)
     if (this.record.kind === "crowd") {
       const core = this.core();

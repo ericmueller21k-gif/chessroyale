@@ -1,4 +1,4 @@
-import { TOWN_CHAT, pausedLine, tokenBossName } from "@chessroyale/core";
+import { TOWER_PARTY, TOWN_CHAT, pausedLine, tokenBossName } from "@chessroyale/core";
 import type { Sql, User } from "./accounts.ts";
 import { caseOf } from "./fairplay.ts";
 import { CHAT_OFF, chatBlock } from "./chat-mod.ts";
@@ -44,6 +44,7 @@ export const forgetTownCache = () => {
   caches.clear();
   forced.clear();
   signed.clear();
+  partyLists.clear();
 };
 /**
  * Lets go of this instance's copy of the room once it's older than TOWN_CHAT.readCacheMs: called on every request the
@@ -52,6 +53,7 @@ export const forgetTownCache = () => {
  */
 export function expireTownCache(now: number) {
   for (const [room, c] of caches) if (now - c.at > TOWN_CHAT.readCacheMs) caches.delete(room);
+  for (const [room, c] of partyLists) if (now - c.at > TOWER_PARTY.listCacheMs) partyLists.delete(room);
 }
 /** Keeps a fresh copy of the room, and lets it go TOWN_CHAT.readCacheMs later (the request's waitUntil keeps the timer). */
 function keep(snap: TownSnapshot, now: number, waitUntil: ((p: Promise<unknown>) => void) | undefined, room: string) {
@@ -100,6 +102,52 @@ export async function townSlice(hub: TownHub, since: number, now: number, room?:
   }
   const snap = caches.get(chat)!.snap;
   return townSince(snap, since, TOWN_CHAT.keep, room);
+}
+
+/** The room as this instance holds it: its copy (the one `townSlice` reads), read again from the hub once older than TOWN_CHAT.readCacheMs. */
+async function townSnapshot(hub: Pick<TownHub, "townRead">, now: number, waitUntil: ((p: Promise<unknown>) => void) | undefined, chat: string): Promise<TownSnapshot> {
+  const hit = caches.get(chat);
+  if (hit && now - hit.at <= TOWN_CHAT.readCacheMs) return hit.snap;
+  const snap = await hub.townRead(chat);
+  keep(snap, now, waitUntil, chat);
+  return snap;
+}
+
+/** A Battle Tower party as the clerk's list of open parties shows it (squads-party.ts `towerListing`), with its code. */
+export interface OpenTowerParty {
+  code: string;
+  leader: string;
+  members: number;
+  max: number;
+}
+/** A party asked how it shows on the list (its Durable Object's `towerListing`): null when it can't take someone new. */
+export type TowerListing = (code: string) => Promise<{ leader: string; members: number; max: number } | null>;
+
+/** The Battle Tower parties whose open line stands in a copy of the room: their codes, newest first, each once. */
+export const partyCodesOf = (snap: Pick<TownSnapshot, "lines">): string[] => [...new Set(snap.lines.flatMap((l) => (l.sys === "party" && l.party ? [l.party] : [])).reverse())];
+
+/** This instance's list of open parties in each room, made at most once every TOWER_PARTY.listCacheMs and shared by every reader (while it's being made too). */
+const partyLists = new Map<string, { at: number; list: Promise<OpenTowerParty[]> }>();
+
+/**
+ * The clerk's list of open parties (Eric, Nov 20), as this Worker instance makes it (the delta review of #835, finding 1: never the hub and a
+ * dozen parties asked for each reader): the codes from this instance's copy of the town's room (no hub call while the town's readers keep it
+ * fresh; else one), each party asked whether it takes someone new, newest first, TOWER_PARTY.listMax at most. Twice that many are asked, so a
+ * line whose party can't take anyone (it filled or started a moment ago) doesn't push one that can off the list. Made at most once every
+ * TOWER_PARTY.listCacheMs per room, and every reader on this instance gets that one.
+ */
+export async function townOpenParties(hub: Pick<TownHub, "townRead">, listing: TowerListing, now: number, waitUntil?: (p: Promise<unknown>) => void, chat = TOWN_CHAT_ROOM): Promise<OpenTowerParty[]> {
+  const hit = partyLists.get(chat);
+  if (hit && now - hit.at <= TOWER_PARTY.listCacheMs) return hit.list;
+  const list = (async () => {
+    const codes = partyCodesOf(await townSnapshot(hub, now, waitUntil, chat)).slice(0, 2 * TOWER_PARTY.listMax);
+    const rows = await Promise.all(codes.map(async (code) => ((l) => (l ? { code, ...l } : null))(await listing(code).catch(() => null))));
+    return rows.filter((r): r is OpenTowerParty => r !== null).slice(0, TOWER_PARTY.listMax);
+  })();
+  partyLists.set(chat, { at: now, list });
+  // (A failed read isn't kept: the next reader asks again.)
+  list.catch(() => partyLists.get(chat)?.list === list && partyLists.delete(chat));
+  return list;
 }
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -170,6 +218,21 @@ export async function townRemoveResponse(request: Request, hub: TownHub, admin: 
   const { removed, town } = (await hub.townRemove(n, chat)) as { removed: boolean; town: TownSnapshot };
   keep(town, now, waitUntil, chat);
   return removed ? json({ ok: true }) : json({ message: "That line has already gone." }, 404);
+}
+
+/**
+ * Whether a Battle Tower party's leader may put its Open party line in the town's chat (the review of #835, finding 2): what a typed line
+ * must pass, as townPostResponse (not banned, no moderator's chat ban, the chat not paused; the party itself takes only accounts), with
+ * its words if not; else the name it goes out under (the account's, never the party's; one the filter refuses as "Player"). How often:
+ * the room's (TownChat.partyOpen).
+ */
+export async function townPartyPoster(sql: Sql, userId: string, now: number, paused: boolean): Promise<{ ok: true; name: string } | { ok: false; message: string }> {
+  if (paused) return { ok: false, message: TOWN_CHAT_PAUSED };
+  if ((await caseOf(sql, userId))?.status === "banned") return { ok: false, message: BANNED_FROM_CHAT };
+  if (await chatBlock(sql, userId, now)) return { ok: false, message: CHAT_OFF };
+  const row = await sql.first<{ name: string }>("SELECT name FROM users WHERE id = ?", userId);
+  if (!row) return { ok: false, message: SIGN_IN_TO_TOWN_CHAT };
+  return { ok: true, name: isBlockedText(row.name) ? "Player" : row.name };
 }
 
 /**

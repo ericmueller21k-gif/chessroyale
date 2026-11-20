@@ -18,6 +18,8 @@ export interface Fight {
   id: string;
   startedAt: number;
   device?: string;
+  /** A party's floor: its match room (its result is the room's; Nov 20). */
+  lobby?: string;
 }
 
 /** A run, as the server shows it. */
@@ -32,7 +34,20 @@ export interface TowerRun {
   beaten: string[][];
   fight: Fight | null;
   startedAt: number;
+  /** A party copy's (Nov 20): the others who climbed it, and whether it's played on alone. */
+  mates?: { uid: string; name: string }[];
+  alone?: boolean;
 }
+
+/** What the run's strip shows of a floor (the floor, its bosses, the floors beaten): a solo floor's FloorPlay, or a party floor's (Nov 20). */
+export interface TowerStripInfo {
+  readonly floor: number;
+  readonly bosses: readonly string[];
+  readonly beaten: readonly string[][];
+}
+
+/** Which of your runs: your solo run, or your party copy played on alone (Nov 20: solo from then on). */
+export type RunKind = "solo" | "party";
 
 /** GET /api/tower: your open runs and best floors (0: none won yet). */
 export interface TowerState {
@@ -92,12 +107,16 @@ async function ask<T>(path: string, body?: object): Promise<Answer<T>> {
   }
 }
 
+/** The body's `kind` for a party copy played alone (none for the solo run, as before). */
+const kindOf = (kind: RunKind = "solo") => (kind === "party" ? { kind } : {});
+
 export const towerApi = {
   state: () => ask<TowerState>("/api/tower"),
   newRun: (confirm: boolean) => ask<{ run: TowerRun }>("/api/tower/run", confirm ? { confirm: true } : {}),
-  start: () => ask<FloorStart>("/api/tower/floor/start", { device: deviceId() }),
-  finish: (fight: string, outcome: FloorOutcome) => ask<{ outcome: FloorOutcome; floor: number; status: string; run: TowerRun | null; best: number }>("/api/tower/floor/finish", { fight, outcome }),
-  stop: (fight: string, moves: number | undefined, free = false) => ask<{ stopped: "between" | "free" | "lost"; floor?: number; status?: string; run: TowerRun | null }>("/api/tower/stop", { fight, ...(moves !== undefined ? { moves } : {}), ...(free ? { free: true } : {}) }),
+  start: (kind?: RunKind) => ask<FloorStart>("/api/tower/floor/start", { device: deviceId(), ...kindOf(kind) }),
+  finish: (fight: string, outcome: FloorOutcome, kind?: RunKind) => ask<{ outcome: FloorOutcome; floor: number; status: string; run: TowerRun | null; best: number }>("/api/tower/floor/finish", { fight, outcome, ...kindOf(kind) }),
+  stop: (fight: string, moves: number | undefined, free = false, kind?: RunKind) =>
+    ask<{ stopped: "between" | "free" | "lost"; floor?: number; status?: string; run: TowerRun | null }>("/api/tower/stop", { fight, ...(moves !== undefined ? { moves } : {}), ...(free ? { free: true } : {}), ...kindOf(kind) }),
 };
 
 /** A boss as the screens draw it: his own, or a safe stand-in for an id this app doesn't know (a boss renamed or removed since). */
@@ -145,6 +164,8 @@ export interface KeptFloor {
   xp?: string;
   /** The theme its battle plays (pickFloorTheme), picked as it first plays and kept, so a reload plays the same (Nov 19). */
   music?: string;
+  /** Your party copy played on alone (Nov 20): its start, result and leave say so. Unset: your solo run. */
+  kind?: "party";
 }
 
 const KEY = "brc.tower.solo";
@@ -221,7 +242,7 @@ export function readKept(text: string | null): KeptFloor | null {
   if (k.done !== undefined && !["won", "lost", "drawn", "left"].includes(k.done)) return null;
   const g = k.game;
   const game = g && typeof g === "object" && g.snapshot && typeof g.snapshot === "object" && (g.snapshot as Partial<RunnerSnapshot>).state && Array.isArray((g.snapshot as Partial<RunnerSnapshot>).boards) && Array.isArray(g.moves) ? { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}) } : undefined;
-  return { v: 1, fight: k.fight, floor: k.floor!, bosses: k.bosses, settings: k.settings, beaten: k.beaten, ...(game ? { game } : {}), ...(k.done ? { done: k.done } : {}), ...(Number.isInteger(k.moves) ? { moves: k.moves } : {}), ...(typeof k.xp === "string" ? { xp: k.xp } : {}), ...(typeof k.music === "string" ? { music: k.music } : {}) };
+  return { v: 1, fight: k.fight, floor: k.floor!, bosses: k.bosses, settings: k.settings, beaten: k.beaten, ...(game ? { game } : {}), ...(k.done ? { done: k.done } : {}), ...(Number.isInteger(k.moves) ? { moves: k.moves } : {}), ...(typeof k.xp === "string" ? { xp: k.xp } : {}), ...(typeof k.music === "string" ? { music: k.music } : {}), ...(k.kind === "party" ? { kind: "party" as const } : {}) };
 }
 
 export function loadKept(): KeptFloor | null {
@@ -292,15 +313,15 @@ export async function settleKept(k: KeptFloor): Promise<TowerEnd> {
   const done = k.done ?? "left";
   const base = { outcome: done, floor: k.floor };
   if (done === "left") {
-    const a = await towerApi.stop(k.fight, k.moves);
+    const a = await towerApi.stop(k.fight, k.moves, false, k.kind);
     if (!a.ok && a.status !== 409) return { ...base, status: "open", run: null, best: 0, error: a.body.message ?? TOWER_WORDS.offline };
     clearKept();
     const s = await towerApi.state();
     const best = s.ok ? s.body.best.solo : 0;
-    const run = s.ok ? s.body.runs.solo : null;
+    const run = s.ok ? s.body.runs[k.kind ?? "solo"] : null;
     return { ...base, status: a.ok && a.body.stopped === "free" ? "open" : run && run.floor === k.floor ? "open" : "out", run, best };
   }
-  const a = await towerApi.finish(k.fight, done);
+  const a = await towerApi.finish(k.fight, done, k.kind);
   // (A 409 carrying the fight: the floor still under way (a win too soon): the result stays kept, sent again later; audit 2, finding 5.)
   if (!a.ok && a.status === 409 && a.body.fight) return { ...base, status: "open", run: a.body.run ?? null, best: a.body.best ?? 0, error: a.body.message ?? TOWER_WORDS.offline };
   if (a.ok) {
@@ -413,15 +434,15 @@ export interface FloorEntry {
 export type FloorAsk = { kind: "entry"; entry: FloorEntry } | { kind: "resting" | "elsewhere"; start: FloorStart } | { kind: "broken" } | { kind: "error"; message: string };
 
 /** The run's floor started (or the one under way answered) and what it means here (floorPlan): as the floor room's board comes up. */
-export async function askFloor(best: number): Promise<FloorAsk> {
-  const a = await towerApi.start();
+export async function askFloor(best: number, kind: RunKind = "solo"): Promise<FloorAsk> {
+  const a = await towerApi.start(kind);
   if (!a.ok) return a.status === 409 && a.body.confirm ? { kind: "broken" } : { kind: "error", message: a.body.message ?? TOWER_WORDS.offline };
   const start = a.body;
   const kept = loadKept();
   const plan = floorPlan(start, kept, deviceId());
   if (plan === "resting" || plan === "elsewhere") return { kind: plan, start };
   if (plan === "rejoin") return { kind: "entry", entry: { start, kept: kept!, game: kept!.game!, best } };
-  return { kind: "entry", entry: { start, kept: { v: 1, fight: start.fight.id, floor: start.floor, bosses: start.bosses, settings: start.settings, beaten: start.run.beaten }, game: null, best } };
+  return { kind: "entry", entry: { start, kept: { v: 1, fight: start.fight.id, floor: start.floor, bosses: start.bosses, settings: start.settings, beaten: start.run.beaten, ...(kind === "party" ? { kind } : {}) }, game: null, best } };
 }
 
 let floorHandler: ((e: FloorEntry) => void) | null = null;
@@ -436,4 +457,41 @@ export function onEnterFloor(fn: (e: FloorEntry) => void): () => void {
 /** Into a floor's battle: the only way one starts (the floor room's walk-in done, town/Town.tsx; or one rejoined after a reload, App.tsx). */
 export function enterTowerFloor(e: FloorEntry): void {
   floorHandler?.(e);
+}
+
+// ---------------- A party's floor on this device (Nov 20) ----------------
+
+/** A party floor's match room on this device: its code, and the run's strip (so a reload in its match is still the tower's). */
+export interface KeptPartyFloor extends TowerStripInfo {
+  lobby: string;
+}
+const PARTY_KEY = "brc.tower.partyFloor";
+
+/** The party floor being played here, as its match starts. */
+export function keepPartyFloor(f: KeptPartyFloor): void {
+  try {
+    localStorage.setItem(PARTY_KEY, JSON.stringify(f));
+  } catch {
+    // (No storage: a reload in its match plays on without the strip, and goes home after it.)
+  }
+}
+
+/** The party floor kept here for this match room's code, or null. */
+export function partyFloorOf(code: string): KeptPartyFloor | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(PARTY_KEY) ?? "null") as Partial<KeptPartyFloor> | null;
+    if (!v || typeof v.lobby !== "string" || v.lobby.toUpperCase() !== code.toUpperCase() || !Number.isInteger(v.floor) || !Array.isArray(v.bosses) || !Array.isArray(v.beaten)) return null;
+    return { lobby: v.lobby, floor: v.floor!, bosses: v.bosses.filter((b): b is string => typeof b === "string"), beaten: v.beaten.filter(Array.isArray) as string[][] };
+  } catch {
+    return null;
+  }
+}
+
+/** The party floor's match is over here. */
+export function forgetPartyFloor(): void {
+  try {
+    localStorage.removeItem(PARTY_KEY);
+  } catch {
+    // No storage.
+  }
 }

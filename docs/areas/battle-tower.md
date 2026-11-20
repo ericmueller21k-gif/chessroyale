@@ -3,7 +3,8 @@
 Lane: the director (the rules: `god-king`; the floor art: `characters`; saving: the director, full lane). **Built so far: the
 board layer (PR 1); every boss on it (PRs 2-5); several bosses in the match runner (PR 6: a runner option, `settings.bossIds`); the
 climb's rules (PR 8: core `tower.ts`, a floor's start from the deal); saving (PR 9: server `tower.ts`, the routes); the solo battle (PR 10); the
-town's tower is the tower, no screen of its own (PR 11b).**
+town's tower is the tower, no screen of its own (PR 11b); the party (PR 12: a copy each, climbing on together, alone after; the clerk's
+three ways).**
 The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
 
 ## What it will be
@@ -18,8 +19,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   challenge room as the model: `town/shops/challenge.ts`), its number big on both side walls; you walk in to the board and the
   floor's bosses come out of the top door. Between floors you may stop: the run is saved on the server (guests too) and resumes
   on that floor; a solo floor rejoins after a reload.
-- A party picks every move: the most picked is played, a tie goes to the engine's best (`partyMove`), the Boss Battle party's
-  no-pick rules.
+- A party (up to 4) picks every move: the most picked is played, a tie goes to the engine's best (`partyMove`, `partyCloseCp` 0), the
+  Boss Battle party's no-pick rules. Every member keeps a copy of the party's climb (below, "The party").
 - Built on **the board layer** (`packages/chess/src/board-layer.ts`, built Nov 18): one state per square, edge and piece, every
   boss's marks at once, the most restrictive winning, one "always a legal move" lift; today's bosses move onto it with no change
   to any boss battle (PRs 2-5).
@@ -83,9 +84,9 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 
 - **Server `tower.ts`**: a climb is stored on the server, a guest's too, so it's stopped after any floor and continued on any device.
   `tower_runs` (one row a climb: `seed` the server's, `floor` the floor to fight, `met` core's deal (`floors` dealt, `deck`, `decks`),
-  `fight` the floor under way `{ id, startedAt, device? }` (device: the starting device's id, answered back) or null, `last` the last result taken `{ id, outcome, floor, status }`, `status`
-  open, top, out or abandoned (only the sign-in merge sets that); `kind` and `members` for the party, which nothing writes yet:
-  PR 12) and `tower_best` (the highest floor won, an account and kind, at most `BATTLE_TOWER.floors`; it only rises, worked out
+  `fight` the floor under way `{ id, startedAt, device? }` (device: the starting device's id, answered back; a party's floor `{ id,
+  startedAt, lobby }`) or null, `last` the last result taken `{ id, outcome, floor, status, party? }`, `status`
+  open, top, out or abandoned (only the sign-in merge sets that); `kind` 'party' and `members` for a party copy: PR 12, below) and `tower_best` (the highest floor won, an account and kind, at most `BATTLE_TOWER.floors`; it only rises, worked out
   again from the runs after every result). One open run an account and kind (`tower_runs_open`, a unique index). A run that ended
   (or was set aside by the merge) stays until the next new run of its kind; a confirmed new run deletes the open one it replaces in
   its batch, after the best counts its floors.
@@ -144,6 +145,67 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   under way on another device") before sending the counted stop for a floor with nothing to restore.
 - `beaten` (and the download's `floors`) can name a boss later renamed or removed from the roster: draw unknown ids safely.
 
+## The party (built, PR 12, Eric, Nov 20)
+
+- **The clerk's card** (`town/TowerDesk.tsx`): three ways, always shown: **Solo** (Start or Continue, Start over, and "Alone: floor N":
+  your party copy played on by yourself), **Invite friends** (makes the party; the friends sheet, `InviteSheet` with the tower's line,
+  each friend's Invite: the invite kind "tower", "invited you to climb the Battle Tower", whose Accept joins the party and opens the
+  town's tower), **Open party** (makes the party; the leader's line in the town's chat, "Ann is looking for 3 more to climb the Battle
+  Tower", with **Go to the tower**: `TownChat.tsx` `PartyGo`, Town.tsx `goTower`: on the street the tower's own Go in, landing by the
+  clerk with his card open, the clerk riding with that walk (a walk elsewhere calls it off); in the lobby, a walk to the clerk; greyed
+  elsewhere, and on the street while a boss's challenge plays). Under the three ways (the third, **Open your own party**),
+  the **open parties** (Eric, Nov 20): a box of one size, three rows tall (exactly: no scroll for three), scrolling inside, each party's
+  leader, "2/4" and Join (seated on the party's welcome, its words otherwise; `GET /api/tower/parties`: the party lines standing in the
+  Worker instance's copy of the town's room, each party's `towerListing`: room in it, no floor under way, not a run's own members climbing
+  on; made once an instance every `TOWER_PARTY.listCacheMs` and shared by its readers, `townOpenParties`; read every
+  `TOWER_PARTY.listPollMs` while the card shows), "No open parties right now." when none. Only for whoever could join: a guest where
+  signing in is set up gets none and "Sign in to climb with a party." (and the card stops asking); none on a device the age gate marked too
+  young or while the town's chat is paused, as the town shows no party lines then (the delta review of #835, findings 1 and 4). The panel under them is one layout whatever you're doing (the review of #835, finding 11): the
+  party's 4 seats (seat colors, ★ the leader, ✓ ready, each other member's Kick, the leader's, asked first and greyed during a floor),
+  the line (the plan, or your solo climb's note; three lines high, fixed, its words written to fit: your own climb named with its floor, the
+  others counted, the leader's "2 not ready yet."; `tower-plan.ts`), READY or START (asked first when the plan ends your own party climb or takes it back
+  floors) and Leave party, then the solo climb (Continue or Start, Start over, Alone). The party's half is greyed outside a party, the
+  solo half inside one. Open your own party greyed but for its leader, full, open, during a floor, or a run's own members climbing on
+  (`tower.closed`: such a party isn't opened to newcomers).
+- **The party** (`squads-party.ts` kind "tower", `squads-do.ts`; routes `POST /api/tower/party`, `/api/tower/party/CODE[/ws]`): Boss
+  Battle's party for `TOWER_PARTY.max` (4), one seat an account, accounts only, no bots, two or more to START. Its plan (`NetParty.tower`:
+  "Your climb together goes on: floor N. Yours goes back from floor 30, and 1 more.", or "A new climb from floor 1. It ends 2 party
+  climbs.") is the Durable
+  Object's read of everyone's copies (`preparePartyFloor`), read again when its people change or a floor ends (3 s later while a member's
+  last floor is still being written); a change of plan un-readies everyone; START reads it again and must find the plan they readied for;
+  a seat whose account has been deleted holds it ("… Kick them to climb on"; not read again until a kick or a leave). Kick is refused from
+  START until the room says the floor is over (`towerFloorOn`; the view's `tower.floor`); should its word never come (a room nobody
+  reached, or its call lost), the party asks the room every `TOWER_PARTY.floorCheckMs` (`takeFloorCheck`, the room's `partyBattleDone`)
+  and ends the floor itself once the room has closed or reached its results. The open line lapses when the party fills, starts, its leader leaves or its plan turns to
+  a run's own members climbing on, and
+  `TOWN_CHAT.lineMs` after it went up (`takeLapsedOpen`, the alarm; the live hub's `townRemoveParty`, only its own line); one an account,
+  a new one at most every `TOWER_PARTY.openGapMs`, the leader passing the town chat's checks first (`townPartyPoster`); the line carries
+  the leader's account (`from`), so muting or blocking them hides it. A party closed to the town (a run's own members climbing on) still
+  seats anyone with its code (a friend's invite comes in the same way); a newcomer only turns the plan into a new climb, asked first.
+- **One run, a copy each** (server `tower.ts`): a `tower_runs` row of kind 'party' for every member, the same seed and deal, `members`
+  `{run, uids, alone?, party?, partyMet?}`. START: the floor's match room made (`towerPartySettings`: the party rule, ties to the engine's best, the floor's
+  strength), then the floor begun on every copy in one batch (`commitPartyFloor`: a new run replaces only copies whose holders agreed; a
+  run on, only while every copy is as read). The room writes each member's end to their copy (`LobbyCore.takeTowerEnds`, lobby-do's
+  `towerQueue`, `writeTowerEnds`: one that fails is passed over, not waited for; a crate that keeps failing stops holding its floor up after
+  `MATCH_SAVE.strictMinutes`, then the floor is written without it, logged; `partyFloorWrite`, keyed by the floor's id): the party's result for those
+  still in it, a leave for those who left (free before the party's 2nd move, else a loss), a free leave for anyone who never came; a win
+  raises the party best and pays a crate on `TOWER_PARTY.crateFloors` (once an account). A device can't finish or leave a party floor.
+- **Climbing on together:** two or more members of a run, all holding an open copy of it, nobody new: on together from the lowest floor any
+  of them reached with the party (`members.party`, set only by the party's writes; a copy played on alone keeps the deal there, `partyMet`,
+  copied as its first floor alone begins), the copies above it going back to it, each named in the plan and asked first (the review of
+  #835, finding 1: floors won alone never carry a party, its crates or its best up). Anyone new: a new run from floor 1. **Alone:** the solo routes with `kind: "party"` (`towerApi` `kind`, `KeptFloor.kind`),
+  marked `alone`, the device's word; floors won alone raise the solo best. A party floor whose room has gone without its result is let go
+  free (`settleStale`, the room's `holdsTowerFloor`).
+- **The floor room and the match:** the party's START walks everyone into the elevator and the floor room (`onPartyFloor`, Town.tsx), the
+  others' pawns in seat colors walking in after you to their marks (`MATE_MARKS`, `mateAt`); then the room's match (`enterPartyFloor` →
+  App's `joinLobby` with the party's pass and seat; `NetMatch.towerParty` for the strip, kept by the room's code across a reload:
+  `keepPartyFloor`); its result (`TowerPartyResult`), then back in the floor room (won: the party's START is the way up, `TowerPartyUp`).
+- Quests: a party floor is "tower" (any and win, never the boss quests). The sign-in merge names the account in place of the guest in
+  others' copies (once, where both were in it; only read through when the guest holds a party copy: `holdsPartyCopy`); deleting takes the
+  account out of them, and a new run's copies are written only for accounts still there (the batch refused otherwise); the download says
+  how many climbed a copy, never who. `?win=1` (Qxf7 mates) only where `TEST_SWITCHES` is on, never an admin's on the live site.
+- Calls made: [2026-11-20-tower-party.md](../decisions/2026-11-20-tower-party.md).
+
 ## The audit
 
 An independent auditor (Fable, high) checks the build three times (after PRs 6, 10 and 12): its brief is
@@ -159,7 +221,7 @@ take from `startSide`) fixed in PR 8 (above).
 | Several bosses on one board | built: `MatchState.bosses`, `focus`, `moved` (`packages/core/src/match.ts`); the runner's side section (`sideBosses`, `startSide`, `prepareSide`, `focusNow`); the dispatcher's `side*` functions (`boss-powers.ts`); `BATTLE_TOWER.rageScale` and `apart` (`settings.ts`) |
 | The climb | built: core `tower.ts`, `BATTLE_TOWER` in `packages/core/src/settings.ts`; the runner's `towerStrength` (`settings.towerFloor`) |
 | Saving | built: `packages/server/src/tower.ts` (`tower_runs`, `tower_best`, the routes' logic and `towerResponse`), routed from `api.ts`; `account-data.ts` (store `tower`); the sign-in merge in `accounts.ts` (`towerMoves`) |
-| The party | Boss Battle's party (`PartyCore`, kind "tower", max 4), the lobby on the draw rule "party" |
+| The party | built: `packages/server/src/squads-party.ts` (kind "tower"), `squads-do.ts` (its START, plan, open line), `tower.ts` (the copies: `partyPlan`, `preparePartyFloor`, `commitPartyFloor`, `partyFloorWrite`), `lobby.ts` (`takeTowerEnds`), `lobby-do.ts` (`towerQueue`), `town-chat.ts` (the "party" line); app `tower-party.ts`, `town/TowerDesk.tsx`, `town/TownChat.tsx`, `screens/TowerResult.tsx` (`TowerPartyResult`) |
 | The screens | built (solo): the town's tower (`town/TowerDesk.tsx`, `shops/tower-floor.ts`, `tower-floor-scene.ts`, `tower-floor-art.ts`, Town.tsx), `TowerBar.tsx`, `TowerResult.tsx`, app `tower.ts`; no screen and no home card (Eric, Nov 19: the town's clerk only) |
 
 ## Tests (planned)
@@ -174,4 +236,12 @@ only for the floor started, the same result sent again, a win too soon, a free l
 since it began, a deal that doesn't parse, the best and its cap, the merge, the download and deleting) and
 `account-data.test.ts` (Ann's climb in every store's world); `e2e/account-delete.spec.ts` (a climb on the local D1: its `e2e/areas.json`
 entry, "The Battle Tower's saving"); `e2e/battle-tower.spec.ts` (the clerk, the elevator, floor 1 won, back in the room, up to floor 2's bar, a reload rejoining, a loss ending the run,
-a free leave down to the lobby, Continue after a reload, no Last Stand); app `tower.test.ts` (the restore's pure parts), `tower-floor.test.ts` (the floor room).
+a free leave down to the lobby, Continue after a reload, no Last Stand); the party: server `tower-party.test.ts` (copies to every member,
+climbing on together only with the run's own members, someone new a new run once each agreed, a leave, the room's ends, a crate floor,
+alone, the merge and deleting, the party's plan, START and open line; since the review of #835: floors won alone never carrying a party
+up, a deleted account's seat, the merge naming the account once, the line's lapse, Kick during a floor, the plan's floors going back, the
+town's one line an account, the clerk's list) and `tower-party-do.test.ts` (the party's Durable Object on a fake runtime: START's plan changed since READY,
+the room made but the commit refused, the raid kill switch, the open line's checks and lapse; the room's writes, `writeTowerEnds`), app
+`tower.test.ts` (the plan's words), and `e2e/tower-party.spec.ts` (two pages: Invite friends, the friend's Accept, READY and START, both
+walking in, floor 1 won together, both copies on floor 2, one going on alone; Open your own party's line, its "Go to the tower" (no typing
+opened) bringing a player to the clerk, who joins from the list of open parties; the clerk's card on both screens); app `tower.test.ts` (the restore's pure parts), `tower-floor.test.ts` (the floor room).

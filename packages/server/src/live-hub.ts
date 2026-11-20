@@ -249,6 +249,23 @@ export class LiveHub extends DurableObject<Env> {
     return { post, town: t.snapshot(now) };
   }
 
+  /**
+   * A Battle Tower party open to the town, its leader's (`by`; town-chat.ts `partyOpen`, Nov 20): its line's number (taken out again by
+   * townRemoveParty), or how long before that account may open another (`retryMs`).
+   */
+  async townPartyOpen(by: string, text: string, code: string, room = TOWN_CHAT_ROOM): Promise<{ n: number } | { retryMs: number }> {
+    countCall("hub.townPartyOpen");
+    const r = this.townIn(room).partyOpen(by, text, code, Date.now());
+    if (!r.ok) return { retryMs: r.retryMs };
+    await this.townAlarm();
+    return { n: r.line.n };
+  }
+
+  /** A party's line taken out by its party (town-chat.ts `removeParty`: only that party's own line). Whether it was. */
+  async townRemoveParty(n: number, code: string, room = TOWN_CHAT_ROOM): Promise<boolean> {
+    return this.townIn(room).removeParty(n, code, Date.now());
+  }
+
   /** A boss challenged from the town: its battle started or finished (town-chat.ts `challenge`); the line it posted, or null. */
   async townChallenge(sender: Pick<TownSender, "id" | "name">, bossName: string, note: ChallengeNote): Promise<TownLine | null> {
     countCall("hub.townChallenge");

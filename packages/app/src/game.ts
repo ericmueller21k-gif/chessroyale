@@ -1,4 +1,4 @@
-import type { FloorPlay } from "./tower.ts";
+import type { FloorPlay, TowerStripInfo } from "./tower.ts";
 import { toSan, type BoardRound, type Base, type BoardSlot, type Capture, type LivePick, type NetBoss, type NetFinal, type NetLightsOut, type NetStanding, type NetVote, type Phase2Seat } from "@chessroyale/chess";
 import { brilliance, type MaterialSlip } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
@@ -473,6 +473,8 @@ export interface GameView {
   readonly exitHome: boolean;
   /** A Battle Tower floor (solo: solo.ts): its run, for the strip and the result's buttons. */
   readonly tower?: FloorPlay | null;
+  /** A Battle Tower party's floor (online, Nov 20): the floor, its bosses and those beaten, for the strip and the result's way back. */
+  readonly towerParty?: TowerStripInfo | null;
   /** Online: a bot takes the seat you leave (the lobby fills seats with bots); else the match goes on without it. */
   readonly seatToBot?: boolean;
   /**

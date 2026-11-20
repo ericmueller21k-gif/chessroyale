@@ -49,3 +49,35 @@ export function TowerResult({ match, onBack }: { match: GameView; onBack: () => 
     </div>
   );
 }
+
+/**
+ * A party floor's result (Nov 20; docs/decisions/2026-11-20-tower-party.md): the game's own result screen, the floor in its line (the
+ * party's win, its loss or draw, or your leave), and one button, "Back to the tower": into the floor room with your party (its room
+ * has written every member's copy: town/Town.tsx reads yours there).
+ */
+export function TowerPartyResult({ match, onBack }: { match: GameView; onBack: () => void }) {
+  const [held, setHeld] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setHeld(false), HOLD_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const p = match.phase;
+  const left = p.kind === "results" && !!p.left;
+  const won = !left && p.kind === "results" && !!p.bossResult && floorOutcome(p.bossResult) === "won";
+  const floor = match.towerParty!.floor;
+  const top = won && floor >= BATTLE_TOWER.floors;
+  const n = floor + 1;
+  const line = top ? `Floor ${BATTLE_TOWER.floors} cleared: the top of the tower!` : won ? `Floor ${floor} cleared!` : left ? `You left floor ${floor}.` : `Your party's climb ended on floor ${floor}.`;
+  const sub = won && !top ? `Next: floor ${n} · ${floorBossCount(n)} ${floorBossCount(n) === 1 ? "boss" : "bosses"} · rating ${floorRating(n)}` : "Every member's climb is saved with the party's result.";
+  return (
+    <div class="tw-result" data-tower-result={won && !top ? "won" : top ? "top" : "out"} data-tower-party="">
+      <p class="tw-result-line">{line}</p>
+      <p class="tw-result-sub">{sub}</p>
+      <div class="actions">
+        <button type="button" class="btn btn-primary" style={{ whiteSpace: "nowrap" }} disabled={held} onClick={onBack}>
+          Back to the tower
+        </button>
+      </div>
+    </div>
+  );
+}

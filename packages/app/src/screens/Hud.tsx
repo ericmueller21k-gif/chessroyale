@@ -90,9 +90,9 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   if (boss && mouse)
     return (
       <>
-        {sideOf(boss) ? <TowerBar boss={boss} match={match} /> : <BossBar boss={boss} match={match} move={match.tower ? undefined : match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />}
+        {sideOf(boss) ? <TowerBar boss={boss} match={match} /> : <BossBar boss={boss} match={match} move={match.tower || match.towerParty ? undefined : match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />}
         {/* (A Battle Tower floor: the run's strip, a row under the bar, as wide as the board.) */}
-        {match.tower && (
+        {(match.tower || match.towerParty) && (
           <div class="tw-strip-line">
             <TowerStrip match={match} computer />
           </div>
@@ -107,7 +107,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
           <span class="hud-stage">
             {match.final ? (
               "FINAL"
-            ) : boss && match.tower ? (
+            ) : boss && (match.tower || match.towerParty) ? (
               // (A Battle Tower floor: the run's strip in place of "BOSS · move 1".)
               <TowerStrip match={match} />
             ) : boss ? (

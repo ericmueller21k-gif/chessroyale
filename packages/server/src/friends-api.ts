@@ -1,4 +1,4 @@
-import { FRIENDS, isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroyale/core";
+import { FRIENDS, TOWER_PARTY, isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, accountOf, isSignedIn, readCookie, signInRequired, type AccountEnv, type WaitUntil } from "./api.ts";
 import { cachedUserId } from "./presence.ts";
@@ -57,7 +57,8 @@ const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_
  *   fields only; banned, test accounts and, where signing in is set up, guests left out). Its own rate limit (CAPACITY.rateLimits.search).
  * POST /api/friends/ACTION with JSON, each answering with the list as it is after it (or { message } and a status):
  *   request {id} · answer {id, accept} · cancel {id} · remove {id} · block {id} · unblock {id}
- *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open, or your 50 v 50 party
+ *   invite {id, kind, code}: to your private lobby (kind: its mode), Squads party ("squads") or Battle Tower party ("tower", with a free
+ *     seat), still open, or your 50 v 50 party
  *     ("crowdparty": a member only, while it has room and isn't searching; its seat shows "…" until they answer);
  *     invite {id, check: true}: only whether they'd take one (asked before making a lobby or party for it)
  *   dismiss {id}: an invite to you (by who sent it; a 50 v 50 party's seat shows "+" again) · settings {invites?, showOnline?, dnd?}
@@ -192,6 +193,12 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
  */
 async function inviteTarget(env: FriendsEnv, asked: InviteKind, code: string): Promise<InviteKind | null> {
   if (asked === "squads") return !env.PARTIES || (await env.PARTIES.get(env.PARTIES.idFromName(code)).status().catch(() => null)) ? "squads" : null;
+  // (A Battle Tower party with a free seat: Nov 20. Its code is its way in, as a Boss Battle party's link.)
+  if (asked === "tower") {
+    if (!env.PARTIES) return "tower";
+    const s = await env.PARTIES.get(env.PARTIES.idFromName(code)).status().catch(() => null);
+    return s?.kind === "tower" && s.members < TOWER_PARTY.max ? "tower" : null;
+  }
   if (!env.LOBBIES) return asked;
   const s = await env.LOBBIES.get(env.LOBBIES.idFromName(code)).status().catch(() => null);
   return s && s.phase === "waiting" && !s.matchmade ? s.mode : null;

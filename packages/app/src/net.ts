@@ -1,3 +1,4 @@
+import type { TowerStripInfo } from "./tower.ts";
 import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
@@ -196,6 +197,8 @@ export class NetMatch implements GameView {
    * this form" (winFormShown): the team's next move beats his form, the server's doing (LobbyCore.winFormTrigger checks the admin).
    */
   hiddenRoom = false;
+  /** A Battle Tower party's floor (Nov 20): the run's strip, and the way back into the tower after it. */
+  towerParty: TowerStripInfo | null = null;
   private winFormSent = false;
   /**
    * The Hidden Boss's phase 2 online (Nov 13; recluse-online.ts): his phase change and the four boards, run by the server, after his
