@@ -466,7 +466,7 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   await still(page, "shared-floor-babur-wrangler");
 });
 
-test("a shared floor of Puddles and Babur (Eric, Nov 20): every part's name, level and seed meter inside its own part, phone and computer", async ({ page }) => {
+test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, the first in turn order): Babur's pump stays in his part, greyed and tagged OFF, never a balloon; Puddles, first, keeps his; every part's words inside its outline", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await intoTower(page);
   const made = await page.evaluate(async () => {
@@ -475,13 +475,13 @@ test("a shared floor of Puddles and Babur (Eric, Nov 20): every part's name, lev
     return { ok: run.ok, user: me.user.id as string };
   });
   expect(made.ok).toBe(true);
+  // (Puddles moves first, so his Watering grows pieces as ever; Babur's balloons are off. BATTLE_TOWER.addsPieces.)
   await localSql(page, "UPDATE tower_runs SET floor = 2, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["gardener", "tiger"]], deck: [], decks: 1 }), made.user);
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
   await floorThenMatch(page, 2, 2);
-  const bar = page.locator(".tw-bar");
-  await expect(bar.locator('.tw-part[data-boss="gardener"] .seed-meter')).toBeVisible();
-  // Every part's words and meters (its text and what's in it) inside the part's yellow outline, within 1 px: a row never spills across it.
+  // (Eric, Nov 20: every part's name, level and seed meter inside its own part's outline, within 1 px; Puddles' row wraps.)
+  await expect(page.locator('.tw-part[data-boss="gardener"] .seed-meter')).toBeVisible();
   const spill = () =>
     page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>(".tw-bar .tw-part")].flatMap((part) => {
@@ -498,10 +498,26 @@ test("a shared floor of Puddles and Babur (Eric, Nov 20): every part's name, lev
       }),
     );
   expect(await spill()).toEqual([]);
-  if (STILLS) {
-    mkdirSync(STILLS, { recursive: true });
-    // (The still without his words over the bar: the bubble is his own, and it hides the row while he speaks.)
-    await expect(bar.locator(".tw-bubble")).toHaveCount(0, { timeout: 30_000 });
-    await bar.screenshot({ path: `${STILLS}/tower-part-fit-${test.info().project.name}.png` });
+  const desk = test.info().project.name === "desktop";
+  const pump = page.locator(desk ? '.tw-side-fig[data-boss="tiger"] .tg-pump-slot' : '.tw-part[data-boss="tiger"] .tg-pump-slot');
+  const off = async () => {
+    await expect(pump).toHaveAttribute("data-off", "");
+    await expect(pump).toHaveAttribute("aria-label", "Balloons: off on this floor");
+    await expect(pump).toHaveAttribute("data-balloon", "");
+    await expect(pump.locator(".tg-off-tag")).toHaveText("OFF");
+    expect(await pump.locator(".tg-pump").evaluate((el) => getComputedStyle(el).filter)).toContain("grayscale");
+  };
+  await expect(page.locator(".tg-pump")).toHaveCount(1);
+  await off();
+  // (Puddles is the primary: his seed meter as ever, no "no pieces" in its label.)
+  await expect(page.locator('.tw-part[data-boss="gardener"] .seed-meter')).toHaveAttribute("aria-label", /^Seeds \d+ of \d+$/);
+  const powers = () => page.evaluate(() => Object.fromEntries((window as any).match.boss.side.bosses.map((b: any) => [b.id, { noAdd: !!b.powers.noAdd, placed: b.powers.balloons?.placed ?? 0 }])));
+  // (Two of your moves: Babur's turn comes and goes with nothing on his pump.)
+  for (let n = 1; n <= 2; n++) {
+    await playAMove(page);
+    await expect.poll(async () => (await phase(page)) === "play" && (await moves(page)) === n, { timeout: 90_000 }).toBe(true);
+    await off();
   }
+  expect(await powers()).toEqual({ gardener: { noAdd: false, placed: 0 }, tiger: { noAdd: true, placed: 0 } });
+  await still(page, "shared-floor-primary-off");
 });

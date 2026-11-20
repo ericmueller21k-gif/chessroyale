@@ -174,6 +174,14 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   a shared floor. Sawyer's cut and gap over the square highlights on every screen (bosses.md). Checks: `several-bosses.test.ts` (every
   `noUltimate` boss on a floor of two; Wrangler's one showdown on a lone floor and off the tower) and `e2e/battle-tower.spec.ts` ("a shared floor of Babur and Wrangler").
   [2026-11-20-tower-fixes.md](../decisions/2026-11-20-tower-fixes.md).
+- **One primary for the powers that add pieces (Eric, Nov 20: "Only one is active during the battle tower").** `BATTLE_TOWER.addsPieces`:
+  Babur's balloons, Puddles' grown pieces, Timber's workshop drops, Don Dough's rising dough, Sawyer's split pawn. On a floor of several,
+  only the first of them in turn order keeps it; the runner marks the others' powers `noAdd` as the floor starts (`towerNoAdd`, beside
+  `towerNoUlt`; solo and the party's room agree; a restore keeps it). Puddles off the primary: his Watering still comes, every seed that
+  would grow a piece coming up as nothing. On screen: Babur's pump stays in his part (a computer's beside his figure), empty, greyed,
+  tagged OFF ("Balloons: off on this floor"); Puddles' seed meter's label says no pieces grow. Checks: `several-bosses.test.ts` ("one
+  primary for the powers that add pieces") and `e2e/battle-tower.spec.ts` ("a shared floor of Puddles and Babur").
+  [2026-11-20-tower-primary-boss.md](../decisions/2026-11-20-tower-primary-boss.md).
 
 ### For PR 10 (the app)
 

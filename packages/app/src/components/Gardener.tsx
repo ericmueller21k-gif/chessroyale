@@ -355,6 +355,9 @@ const SEED_COLORS: Record<string, string> = { k: "#3a2412", t: "#efc875", m: "#c
  * From the view's `garden` and the garden's clock; held while a watering is being placed. Redraws itself four times a second while a
  * seed is on its way (the screens around it draw only now and then).
  */
+/** His seed meter's words when his Watering grows no pieces this battle (a tower floor of several whose primary is another boss). */
+export const SEEDS_NO_PIECES = "no pieces grow on this floor, only plants";
+
 export function SeedMeter({ boss }: { boss: BossView }) {
   const g = boss.powers?.garden ?? null;
   const [, bump] = useState(0);
@@ -373,8 +376,11 @@ export function SeedMeter({ boss }: { boss: BossView }) {
   if (!r) return null;
   const max = BOSS_POWERS.seedMax;
   const pct = Math.round(r.fill * 100);
+  // (His pieces off this battle: a tower floor of several whose primary is another boss (noAdd, BATTLE_TOWER.addsPieces). His seeds and
+  // Watering go on, plants only: the meter says so.)
+  const noPieces = !!boss.powers?.noAdd;
   return (
-    <span class={`seed-meter${r.held ? " held" : ""}${r.count >= max ? " full" : ""}`} role="meter" aria-label={`Seeds ${r.count} of ${max}`} aria-valuenow={r.count} aria-valuemin={0} aria-valuemax={max} data-seeds={r.count} data-fill={pct} data-held={r.held ? "1" : "0"}>
+    <span class={`seed-meter${r.held ? " held" : ""}${r.count >= max ? " full" : ""}`} role="meter" aria-label={`Seeds ${r.count} of ${max}${noPieces ? `: ${SEEDS_NO_PIECES}` : ""}`} title={noPieces ? `Seeds: ${SEEDS_NO_PIECES}` : undefined} data-no-pieces={noPieces ? "" : undefined} aria-valuenow={r.count} aria-valuemin={0} aria-valuemax={max} data-seeds={r.count} data-fill={pct} data-held={r.held ? "1" : "0"}>
       <svg class="seed-icon" viewBox="0 0 9 9" width="9" height="9" shape-rendering="crispEdges" aria-hidden="true">
         {SEED_ICON.flatMap((row, y) => [...row].map((c, x) => (c === "." ? null : <rect key={`${x},${y}`} x={x} y={y} width="1" height="1" fill={SEED_COLORS[c]} />)))}
       </svg>

@@ -369,6 +369,11 @@ export interface NetBossPowers {
   /** No ultimate this battle (a Battle Tower floor: Wrangler, BATTLE_TOWER.noUltimate): the meter shows empty and dimmed. Missing: false. */
   noUlt?: boolean;
   /**
+   * His power that adds pieces is off this battle (a Battle Tower floor of several, BATTLE_TOWER.addsPieces: another boss is the
+   * primary): Babur's pump shows greyed. Missing: false.
+   */
+  noAdd?: boolean;
+  /**
    * Hollow's dark (missing for other bosses): each dark square, the crowd turn it fell as and its last turn (it thins
    * then); the squares whose dark cleared as this turn began; his bulbs still lit (his moves to his next cover); whether
    * he claimed the dark side before move 1; and after which crowd move his Lights out came (null: not yet).
