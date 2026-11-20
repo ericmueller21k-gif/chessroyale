@@ -9,7 +9,8 @@ import { test, submitMove, tapInTown, localSql } from "./helpers.ts";
  * the room. And then the next, you go up whatever the elevator, you go to the next floor and then you continue on."): Chess Town's
  * skyscraper, its clerk (Start), the elevator, the floor room (its number, its bosses walking out), the match (?win=1: Qxf7 mates), the
  * usual result, back in the room with the elevator open, up to floor 2 and its two bosses, a reload mid-floor rejoining; a loss costing a
- * life and the climb going on (Nov 20: a heart greyed in the room and the strip), the third loss ending the run with its floors lost listed;
+ * life and the climb going on (Nov 20: a heart greyed in the room and the strip, the clerk's card listing the floors lost), the third loss
+ * ending the run with its floors lost listed;
  * a free leave before your 2nd move, and Continue after a reload; no Last Stand on a floor. `STILLS=<dir>` writes the stills.
  */
 
@@ -169,8 +170,15 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await page.locator('[data-tower-result="lost"]').getByRole("button", { name: "Back to the tower" }).click();
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   await heartsAre(page.locator(".tw-room-lives .tw-hearts"), 0);
-  const last = await tapRoom(page, "pass", "Elevator", "top");
-  await last.getByRole("button", { name: "Up to floor 4" }).click();
+  // Down to the lobby: the clerk's card shows the climb's lives and its floors lost (the recap); Continue goes on to floor 4.
+  const way = await tapRoom(page, "pass", "Way down", "front");
+  await way.getByRole("button", { name: "Down to the lobby" }).click();
+  await expect(room(page)).not.toHaveAttribute("data-part", "top", { timeout: 20_000 });
+  const desk = await tapRoom(page, "keeper", "Clerk");
+  await heartsAre(desk.locator(".tw-desk-lives .tw-hearts"), 0);
+  await expect(desk.locator(".tw-desk-lives")).toContainText("Lost floors 2 and 3");
+  await still(page, "clerk-recap");
+  await desk.getByRole("button", { name: "Continue: floor 4" }).click();
   await floorThenMatch(page, 4, 3);
   await loseFloor(page, "Your run ends here: leaving now counts as a loss.");
   const out = page.locator('[data-tower-result="out"]');
