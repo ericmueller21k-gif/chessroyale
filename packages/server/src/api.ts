@@ -15,7 +15,7 @@ import { requestId } from "./ledger.ts";
 import { pickBossCrate } from "./rewards.ts";
 import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
 import { questsAnswer, rerollQuest, setTestQuests } from "./quests.ts";
-import { towerResponse } from "./tower.ts";
+import { towerResponse, type LobbyGone } from "./tower.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
 import { hiddenRoomResponse } from "./hidden-room-api.ts";
@@ -212,7 +212,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/quests" &&
     !path.startsWith("/api/quests/") &&
     path !== "/api/tower" &&
-    !path.startsWith("/api/tower/")
+    // (A Battle Tower party's own routes, /api/tower/party…, are the Worker's: index.ts.)
+    (!path.startsWith("/api/tower/") || path.startsWith("/api/tower/party"))
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -785,7 +786,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // saved as an account's. Solo resting (PAUSE_SOLO): no new run or floor; one under way still answers, finishes or stops. The bosses
   // resting are never dealt.
   if (path === "/api/tower" || path.startsWith("/api/tower/")) {
-    const tower = await towerResponse(request, sql, current.id, { off: pausedBosses(env, now), soloPaused: isPaused(env, "solo", now), testSwitches: (env as AdminEnv).TEST_SWITCHES === "1" }, now);
+    // (A party copy played alone whose party floor's room has gone without its result: let go, free. The room is asked: tower.ts settleStale.)
+    const lobbies = (env as { LOBBIES?: DurableObjectNamespace<import("./lobby-do.ts").Lobby> }).LOBBIES;
+    const lobbyGone: LobbyGone | undefined = lobbies ? async (f) => (f.lobby ? !(await lobbies.get(lobbies.idFromName(f.lobby)).holdsTowerFloor(f.id)) : null) : undefined;
+    const tower = await towerResponse(request, sql, current.id, { off: pausedBosses(env, now), soloPaused: isPaused(env, "solo", now), testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", ...(lobbyGone ? { lobbyGone } : {}) }, now);
     if (tower) return tower;
   }
 

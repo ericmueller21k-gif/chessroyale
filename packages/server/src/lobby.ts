@@ -85,6 +85,7 @@ import {
   type NetBoss,
 } from "@chessroyale/chess";
 import { seatName } from "./text-filter.ts";
+import type { PartyFloorEnd } from "./tower.ts";
 import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeCandidate, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
 
 /**
@@ -370,6 +371,8 @@ export interface LobbyRecord {
   };
   /** Signed-in players' account ids (by player id), so results go on their profiles. */
   accounts?: Record<string, string>;
+  /** A Battle Tower party's floor's ends for its members' copies, waiting to be written in order (lobby-do.ts; server tower.ts partyFloorWrite). */
+  towerQueue?: { fight: string; end: PartyFloorEnd }[];
   /** The match's end has been queued for profiles (saveQueue): everyone's results, once. */
   resultsSaved?: boolean;
   /** Results waiting to be written (lobby-do.ts), oldest first; each leaves only once written. */
@@ -657,6 +660,11 @@ export interface PartyLobby {
    * so nothing to tell one; and the admin's "Win this form" may be pressed in it (winFormTrigger).
    */
   room?: true;
+  /**
+   * A Battle Tower party's floor (Nov 20; server tower.ts): its id on every member's copy of the climb (`fight`), and the accounts whose
+   * copies have been told how it ended for them (`told`: takeTowerEnds), each once.
+   */
+  tower?: { fight: string; told?: string[] };
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"], party?: PartyLobby): LobbyRecord {
@@ -1401,6 +1409,34 @@ export class LobbyCore {
     this.leaveMatch(this.human(target)!, "kicked");
     if (this.wrapUpIfEmpty()) return;
     this.nobodyToWaitFor();
+  }
+
+  /**
+   * A Battle Tower party's floor (party.tower): how it ended for each member's copy, once each (Nov 20). Someone who left (resigned,
+   * gone too long, kicked, or before move 1) as they left, with the party's moves by then (their leave: free before the 2nd, else a
+   * loss: tower.ts partyFloorWrite); everyone still in it, the party's result as the match ends; and anyone admitted who never came, a
+   * free leave. Called after every event (so a leave is told with the moves as it happened).
+   */
+  takeTowerEnds(): PartyFloorEnd[] {
+    const t = this.r.party?.tower;
+    if (!t) return [];
+    const told = new Set(t.told ?? []);
+    const out: PartyFloorEnd[] = [];
+    const add = (uid: string | undefined, end: (uid: string) => PartyFloorEnd) => {
+      if (!uid || told.has(uid)) return;
+      told.add(uid);
+      out.push(end(uid));
+    };
+    const moves = this.runner?.boss?.crowdMoves ?? 0;
+    for (const l of this.r.left ?? []) add(this.r.accounts?.[l.id], (uid) => ({ uid, outcome: "left", moves }));
+    if (this.r.phase === "results") {
+      const result = this.runner?.boss?.result;
+      const outcome = result === "crowd" ? "won" : result === "draw" ? "drawn" : "lost";
+      for (const h of this.r.humans) add(this.r.accounts?.[h.id], (uid) => ({ uid, outcome }));
+      for (const a of Object.values(this.r.party!.admits)) add(a.userId, (uid) => ({ uid, outcome: "left", moves: 0 }));
+    }
+    if (out.length) t.told = [...told];
+    return out;
   }
 
   /** A party's battle is over: once, for its Durable Object to tell the party (its passes then go). */

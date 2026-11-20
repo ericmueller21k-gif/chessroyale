@@ -166,7 +166,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     {
       ip: request.headers.get("cf-connecting-ip"),
       session: readCookie(request, SESSION_COOKIE),
-      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party" || url.pathname === "/api/crowd/party"),
+      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party" || url.pathname === "/api/crowd/party" || url.pathname === "/api/tower/party"),
       friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
       search: request.method === "GET" && url.pathname === "/api/friends/search",
     },
@@ -335,7 +335,19 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000, "crowd", pooled, may.uid));
       return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
     }
-    const bp = url.pathname.match(/^\/api\/(boss|crowd)\/party\/([A-Z2-9]{5})(\/ws)?$/i);
+    // The Battle Tower's party (Nov 20; docs/decisions/2026-11-20-tower-party.md): POST /api/tower/party → { code }: a new party, its
+    // maker the first member (the clerk's Invite friends or Open party); in by its code (a friend's invite, the town's Join);
+    // GET /api/tower/party/CODE → { open, members, state } | 404; …/ws: its WebSocket. Squads' object (PARTIES) with kind "tower": its
+    // START makes each floor's match room and begins the floor on every member's copy (tower.ts). Solo's kill switch rests it, as the
+    // tower's solo floors.
+    if (url.pathname === "/api/tower/party" && request.method === "POST") {
+      if (isPaused(rawEnv, "solo")) return pausedResponse("solo");
+      const may = await mayPlay(request, env, waitUntil);
+      if (may instanceof Response) return may;
+      const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "tower"));
+      return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
+    }
+    const bp = url.pathname.match(/^\/api\/(boss|crowd|tower)\/party\/([A-Z2-9]{5})(\/ws)?$/i);
     if (bp) {
       const stub = env.PARTIES.get(env.PARTIES.idFromName(bp[2]!.toUpperCase()));
       // (Only a party of the path's own kind: a Boss Battle party's code never opens as a 50 v 50 party's, or the other way.)

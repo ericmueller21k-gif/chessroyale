@@ -146,8 +146,8 @@ export const TOWER_LINES = {
   notFree: "That boss is back: leaving now counts as a loss.",
   partyStart: "A party's climb starts from its START at the clerk.",
   partyFloor: "Your party is on this floor. Its result comes from the match.",
-  busy: (name: string) => `${name}'s climb is under way. Try again when it's done.`,
-  saving: "Your last floor is still being saved. Try again in a moment.",
+  busy: (name: string) => `${name} is on a floor of their climb right now.`,
+  saving: (name: string) => `${name}'s last floor is still being saved.`,
   changed: "Something changed. Check the plan and ready up again.",
   bad: "Bad request",
 } as const;
@@ -367,8 +367,11 @@ export async function startTowerFloor(sql: Sql, userId: string, now: number, opt
   return { status: 409, body: { message: TOWER_LINES.notUnderWay } };
 }
 
-/** Whether a party's match room has gone (closed, its code free): its answer, or null when it couldn't be asked. */
-export type LobbyGone = (code: string) => Promise<boolean | null>;
+/**
+ * Whether a party floor's match room has gone (closed, or its code another room's now: it no longer holds that floor, `fight`): its
+ * answer, or null when it couldn't be asked.
+ */
+export type LobbyGone = (fight: Fight) => Promise<boolean | null>;
 
 /**
  * A party copy's floor whose match room has gone without writing its result (the room always writes it, its closing waiting for it:
@@ -376,7 +379,7 @@ export type LobbyGone = (code: string) => Promise<boolean | null>;
  * was (or another write changed the copy meanwhile): read it again. Not when the room is still there, or couldn't be asked.
  */
 async function settleStale(sql: Sql, row: RunRow, fight: Fight, now: number, gone: LobbyGone | undefined): Promise<boolean> {
-  if (!fight.lobby || !gone || (await gone(fight.lobby).catch(() => null)) !== true) return false;
+  if (!fight.lobby || !gone || (await gone(fight).catch(() => null)) !== true) return false;
   console.log(`tower: ${row.id}: the party floor's room ${fight.lobby} has gone without a result; the floor is let go (free)`);
   await sql.run("UPDATE tower_runs SET fight = NULL, updated_at = ? WHERE id = ? AND fight = ?", now, row.id, row.fight);
   return true;
@@ -640,8 +643,11 @@ export interface PartyFloorPrep {
   bosses: string[];
 }
 
-/** Why a party floor can't begin now. `busy`: the account whose copy is under way (alone, or a party floor still being written). */
-export type PartyRefusal = { message: string; busy?: string; resting?: true };
+/**
+ * Why a party floor can't begin now: `busy`, the account whose copy has a floor under way (`party`: a party floor its room hasn't
+ * written yet; else one they play alone); `resting`, the tower's bosses resting; else a run that can't be played.
+ */
+export type PartyRefusal = { busy: string; party: boolean } | { resting: true } | { broken: true };
 
 /** The open party copies of these accounts, by account. */
 async function partyCopies(sql: Sql, uids: readonly string[]): Promise<Map<string, RunRow>> {
@@ -664,7 +670,7 @@ export async function preparePartyFloor(sql: Sql, uids: readonly string[], now: 
       copies = await partyCopies(sql, uids);
       if (!fightOf(copies.get(uid)?.fight ?? null)) continue;
     }
-    return { ok: false, message: f.lobby ? TOWER_LINES.saving : TOWER_LINES.busy("A member"), busy: uid };
+    return { ok: false, busy: uid, party: !!f.lobby };
   }
   const plan = partyPlan(uids, copies);
   let run: TowerRun;
@@ -672,14 +678,14 @@ export async function preparePartyFloor(sql: Sql, uids: readonly string[], now: 
   if (plan.kind === "continue") {
     const base = [...copies.values()].filter((r) => uids.includes(r.user_id)).sort((a, b) => a.floor - b.floor || uids.indexOf(a.user_id) - uids.indexOf(b.user_id))[0]!;
     const before = runOf(base);
-    if (!before.floors.length) return { ok: false, message: TOWER_LINES.noRun };
+    if (!before.floors.length) return { ok: false, broken: true };
     const started = startFloor(before, opts.pool);
-    if (!started || !started.run.floors[before.floors.length - 1]?.length) return { ok: false, message: TOWER_LINES.resting, resting: true };
+    if (!started || !started.run.floors[before.floors.length - 1]?.length) return { ok: false, resting: true };
     run = started.run;
     members = { run: plan.run, uids: membersOf(base.members)!.uids };
   } else {
     const fresh = newRun(opts.seed ?? crypto.getRandomValues(new Uint32Array(1))[0]!, opts.pool);
-    if (!fresh.floors[0]?.length) return { ok: false, message: TOWER_LINES.resting, resting: true };
+    if (!fresh.floors[0]?.length) return { ok: false, resting: true };
     run = startFloor(fresh, opts.pool)?.run ?? fresh;
     members = { run: randomHex(9), uids: [...uids] };
   }

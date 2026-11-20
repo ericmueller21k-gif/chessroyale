@@ -249,6 +249,14 @@ export class LiveHub extends DurableObject<Env> {
     return { post, town: t.snapshot(now) };
   }
 
+  /** A Battle Tower party open to the town (town-chat.ts `partyOpen`, Nov 20): its line's number (taken out again by townRemove). */
+  async townPartyOpen(text: string, code: string, room = TOWN_CHAT_ROOM): Promise<number> {
+    countCall("hub.townPartyOpen");
+    const line = this.townIn(room).partyOpen(text, code, Date.now());
+    await this.townAlarm();
+    return line.n;
+  }
+
   /** A boss challenged from the town: its battle started or finished (town-chat.ts `challenge`); the line it posted, or null. */
   async townChallenge(sender: Pick<TownSender, "id" | "name">, bossName: string, note: ChallengeNote): Promise<TownLine | null> {
     countCall("hub.townChallenge");

@@ -38,13 +38,22 @@ export interface TownLine {
   color?: number;
   /**
    * A line the server says itself, not a player (`from` and `name` empty; no menu): "challenge", a boss challenged from the town and
-   * how its battle ended (`challenge`), in its own blue; "enter", a player came into the town (`arrive`: Nov 12), in a quiet gray.
+   * how its battle ended (`challenge`), in its own blue; "enter", a player came into the town (`arrive`: Nov 12), in a quiet gray;
+   * "party", a Battle Tower party open to the town (Nov 20: `party`, its code, for the line's Join).
    */
   sys?: TownSys;
+  /** A "party" line's party: its code (the app's Join goes into it). */
+  party?: string;
 }
 
 /** The server's own kinds of line. */
-export type TownSys = "challenge" | "enter";
+export type TownSys = "challenge" | "enter" | "party";
+
+/**
+ * A Battle Tower party's open line (Eric, Nov 20: "it maybe sends a message in the town that just says like player is ... looking for
+ * others to join"): "Ann is looking for 3 more to climb the Battle Tower".
+ */
+export const partyOpenText = (name: string, free: number): string => `${name} is looking for ${free} more to climb the Battle Tower`;
 
 /** What the server knows of someone sending, from their account (never from the request). */
 export interface TownSender {
@@ -317,9 +326,17 @@ export class TownChat {
     return this.notice(text, now);
   }
 
+  /**
+   * A Battle Tower party open to the town (Nov 20): its line, with its code for the app's Join. It lapses sooner than the town's lines
+   * do when the party fills, starts or its leader leaves (the party's Durable Object takes it out: `remove`).
+   */
+  partyOpen(text: string, code: string, now: number): TownLine {
+    return this.notice(text, now, "party", code);
+  }
+
   /** A line the server says itself (`sys`), held as players' lines are, for TOWN_CHAT.lineMs. */
-  private notice(text: string, now: number, sys: TownSys = "challenge"): TownLine {
-    const line: TownLine = { n: ++this.n, at: now, from: "", name: "", text, sys };
+  private notice(text: string, now: number, sys: TownSys = "challenge", party?: string): TownLine {
+    const line: TownLine = { n: ++this.n, at: now, from: "", name: "", text, sys, ...(party ? { party } : {}) };
     this.held.push(line);
     if (this.held.length > this.o.holdMax) this.held.splice(0, this.held.length - this.o.holdMax);
     return line;

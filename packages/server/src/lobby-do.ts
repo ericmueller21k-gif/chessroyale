@@ -3,14 +3,15 @@ import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@c
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, MATCH_STARTED, atTheDoor, hostBoardOk, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type PendingResult, type ServerScoreRequest } from "./lobby.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, ageAnswer, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
-import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
+import { ICONS, d1Sql, ensureSchema, grantReward, isPixelIcon, recordResult, shopState } from "./accounts.ts";
+import { partyFloorWrite, towerCrateKey } from "./tower.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, countRecluseNoResult, serverAllMovesAt, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
-import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, RECLUSE_ONLINE, XP, battleCounts } from "@chessroyale/core";
+import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, RECLUSE_ONLINE, XP, battleCounts, towerPool } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
@@ -183,6 +184,9 @@ export class Lobby extends DurableObject<Env> {
    */
   private queueResults(core: LobbyCore, rec: LobbyRecord) {
     if (!this.env.DB) return;
+    // (A Battle Tower party's floor: each member's copy told how it ended for them, in order, beside their result: tower.ts.)
+    const fight = rec.party?.tower?.fight;
+    if (fight) for (const end of core.takeTowerEnds()) (rec.towerQueue ??= []).push({ fight, end });
     const left = core.takeLeftResults();
     const over = rec.phase === "results" && !rec.resultsSaved;
     if (!left.length && !over) return;
@@ -219,7 +223,7 @@ export class Lobby extends DurableObject<Env> {
 
   private async writeSome(): Promise<boolean> {
     const rec = this.record;
-    if (!rec?.saveQueue?.length || !this.env.DB) return true;
+    if (!rec || !waitingWrites(rec) || !this.env.DB) return true;
     let written = 0;
     let failure: unknown = null;
     const take = (p: PendingResult) => {
@@ -231,7 +235,22 @@ export class Lobby extends DurableObject<Env> {
       await ensureSchema(sql, this.env.DB);
       const env = await withSecrets(this.env);
       const how: SaveContext = { sql, mode: this.mode(), mail: caseMailer(env), signedInOnly: signInRequired(env), paused: isPaused(this.env, "rewards"), off: pausedBosses(this.env) };
-      for (const p of rec.saveQueue.slice(0, MATCH_SAVE.perWake)) {
+      // A Battle Tower party's floor's ends, first and in order (a leave before the floor's end: its own), each taken out once written
+      // (written again, it changes nothing: tower.ts partyFloorWrite). One that fails stops them for this wake.
+      for (const t of (rec.towerQueue ?? []).slice()) {
+        try {
+          await partyFloorWrite(how.sql, Date.now(), t.fight, t.end, {
+            pool: towerPool(how.off),
+            ...(how.paused ? {} : { crate: (uid: string, floor: number) => grantReward(how.sql, uid, 0, 1, towerCrateKey(floor)) }),
+          });
+          rec.towerQueue!.splice(rec.towerQueue!.indexOf(t), 1);
+          written++;
+        } catch (e) {
+          failure = e;
+          break;
+        }
+      }
+      for (const p of (rec.saveQueue ?? []).slice(0, MATCH_SAVE.perWake)) {
         try {
           await writeResult(how, rec, p);
           take(p);
@@ -240,7 +259,7 @@ export class Lobby extends DurableObject<Env> {
           failure = e;
           p.failedAt ??= Date.now();
           take(p);
-          rec.saveQueue.push(p);
+          rec.saveQueue!.push(p);
         }
       }
     } catch (e) {
@@ -277,7 +296,7 @@ export class Lobby extends DurableObject<Env> {
     for (const req of this.phase2Queue.splice(0)) this.ctx.waitUntil(this.servePhase2(req));
     // The results, written in the background too: a slow D1 never holds up the match's next event (the review of #610, m2). The alarm
     // just armed is already their next try (a second on), which finds the write done, or still running and shares it.
-    if (this.record.saveQueue?.length && Date.now() >= this.saveRetryAt) this.ctx.waitUntil(this.writeResults());
+    if (waitingWrites(this.record) && Date.now() >= this.saveRetryAt) this.ctx.waitUntil(this.writeResults());
   }
 
   /**
@@ -288,7 +307,7 @@ export class Lobby extends DurableObject<Env> {
     const rec = this.record;
     if (!rec) return;
     const close = lobbyClosing(rec, this.connectedNow(closing));
-    const retry = rec.saveQueue?.length ? Math.max(Date.now() + 1000, this.saveRetryAt) : null;
+    const retry = waitingWrites(rec) ? Math.max(Date.now() + 1000, this.saveRetryAt) : null;
     const closeAt = close ? (retry !== null ? Math.max(close.at, retry) : close.at) : null;
     const times = [core.nextAlarm, closeAt, retry].filter((t): t is number => typeof t === "number");
     if (times.length) await this.ctx.storage.setAlarm(Math.min(...times));
@@ -355,7 +374,7 @@ export class Lobby extends DurableObject<Env> {
     const close = lobbyClosing(this.record, this.connectedNow());
     if (!close || close.at > Date.now()) return false;
     // Results not written yet (D1 failing): it stays until they are, written on its alarms, up to MATCH_SAVE.retryHours.
-    if (this.record.saveQueue?.length && Date.now() < close.at + MATCH_SAVE.retryHours * 3_600_000) return false;
+    if (waitingWrites(this.record) && Date.now() < close.at + MATCH_SAVE.retryHours * 3_600_000) return false;
     await this.close(close.reason);
     return true;
   }
@@ -375,7 +394,7 @@ export class Lobby extends DurableObject<Env> {
           await ensureSchema(sql, this.env.DB);
           // (Anyone's result not queued yet, and a last try for any waiting.)
           this.queueResults(this.core(rec.code), rec);
-          if (rec.saveQueue?.length) await this.writeResults();
+          if (waitingWrites(rec)) await this.writeResults();
           if (this.env.LIVE) await liveHub(this.env).forget(rec.code);
           else await forgetLobby(sql, rec.code);
         } catch (e) {
@@ -459,6 +478,14 @@ export class Lobby extends DurableObject<Env> {
   async exists(): Promise<boolean> {
     if (!this.record || (await this.closeIfDue())) return false;
     return true;
+  }
+
+  /**
+   * Whether this room still holds a Battle Tower party's floor `fight` (its result written or waiting to be): false once it has closed,
+   * or its code is another room's now (tower.ts settleStale lets such a floor go, free).
+   */
+  async holdsTowerFloor(fight: string): Promise<boolean> {
+    return !!this.record && this.record.party?.tower?.fight === fight;
   }
 
   /** Whether the lobby is open, and where its match is (null: no such lobby, or it has closed). */
@@ -765,8 +792,9 @@ export function lobbyXpGame(
     cap: rec.unvouched || phase2Unvouched(rec, r.playerId) ? "solo" : vs,
     signedInOnly,
     now,
-    // (Quests, phase 3: a raid is "boss", Crowd "crowd" (50 v 50), the rest "classic".)
-    quest: mode === "boss" ? "boss" : mode === "crowd" ? "crowd" : "classic",
+    // (Quests, phase 3: a raid is "boss", Crowd "crowd" (50 v 50), the rest "classic". A Battle Tower party's floor "tower": never the
+    // boss quests, as a solo floor's (Eric, Nov 20).)
+    quest: o.towerFloor ? "tower" : mode === "boss" ? "boss" : mode === "crowd" ? "crowd" : "classic",
   };
 }
 
@@ -789,6 +817,9 @@ export interface SaveContext {
  * except that fair play, XP, the Welcome Crate and the token stop holding the result up MATCH_SAVE.strictMinutes after its first failed
  * try (then logged): a lasting bug in one of them never costs the result, and a minute or two of D1 trouble never costs them.
  */
+/** Results (and a Battle Tower party floor's ends) still to write. */
+const waitingWrites = (rec: LobbyRecord): number => (rec.saveQueue?.length ?? 0) + (rec.towerQueue?.length ?? 0);
+
 export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingResult): Promise<void> {
   const since = rec.createdAt;
   const lenient = p.failedAt !== undefined && Date.now() - p.failedAt >= MATCH_SAVE.strictMinutes * 60_000;

@@ -4,7 +4,7 @@ import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, PlayerBadge, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
 import { SQUADS_STARTED, SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
-import { CROWD_PARTY_LINES, PartyCore, needsCrowdInvite, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
+import { CROWD_PARTY_LINES, PartyCore, TOWER_PARTY_LINES, needsCrowdInvite, newPartyRecord, partyClosing, type BossStart, type PartyRecord, type TowerPartyPlan } from "./squads-party.ts";
 import { crowdInviteOpen } from "./friends.ts";
 import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
 import { openLobbyCode } from "./codes.ts";
@@ -20,7 +20,11 @@ import { serverScoreAt } from "./engine.ts";
 import { countCall } from "./ops.ts";
 import { LiveReporter } from "./live.ts";
 import { liveHub } from "./live-hub.ts";
-import { isPaused } from "./kill-switches.ts";
+import { isPaused, pausedBosses } from "./kill-switches.ts";
+import { TOWER_LINES, commitPartyFloor, preparePartyFloor, type LobbyGone, type PartyFloorPrep } from "./tower.ts";
+import { partyOpenText } from "./town-chat.ts";
+import { chatRoomOf } from "./town-chat-api.ts";
+import { towerPool } from "@chessroyale/core";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
@@ -483,14 +487,14 @@ export class SquadsParty extends DurableObject<Env> {
    * "boss", boss-party.ts) has no queue: its START makes the battle. A 50 v 50 party ("crowd", Nov 16) queues into the public
    * 50 v 50 matchmaking; `owner` (its maker's account) is the only one in without an invite.
    */
-  async create(code: string, queueName: string, fillMs: number, kind?: "boss" | "crowd", poolName?: string, owner?: string): Promise<boolean> {
+  async create(code: string, queueName: string, fillMs: number, kind?: "boss" | "crowd" | "tower", poolName?: string, owner?: string): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = { ...newPartyRecord(code, Date.now(), kind, owner), queueName, fillMs, ...(poolName ? { poolName } : {}) };
     await this.persist(this.core());
     return true;
   }
 
-  async status(): Promise<{ members: number; state: PartyRecord["state"]; kind?: "boss" | "crowd" } | null> {
+  async status(): Promise<{ members: number; state: PartyRecord["state"]; kind?: "boss" | "crowd" | "tower" } | null> {
     if (!this.record || (await this.closeIfDue())) return null;
     return { members: this.record.members.length, state: this.record.state, ...(this.record.kind ? { kind: this.record.kind } : {}) };
   }
@@ -564,19 +568,23 @@ export class SquadsParty extends DurableObject<Env> {
         core.resendTo(result.memberId);
       }
       await this.persist(core);
+      await this.towerUpkeep();
       return;
     }
     const memberId = attached.playerId;
     if (!memberId) return;
     const was = this.record.state;
     const core = this.core();
+    // (A Battle Tower party's Open party: its line goes in the town's chat room the app is in, the town's own but where the test switches are on.)
+    if (msg.t === "open") msg = { ...msg, room: chatRoomOf(msg.room, this.env.TEST_SWITCHES === "1") };
     core.message(memberId, msg, { test: !!attached.test });
     if (msg.t === "leave") ws.close(4001, "Left the party");
     await this.persist(core, msg.t === "leave" ? ws : undefined);
     // (A 50 v 50 party's Find match drops its invites still out: off the friends' lists too.)
     if (this.record?.kind === "crowd" && was !== "queueing" && this.record.state === "queueing") this.ctx.waitUntil(this.dropInvites());
-    if (this.record.kind === "boss") {
+    if (this.record.kind === "boss" || this.record.kind === "tower") {
       await this.revokeInBattle();
+      await this.towerUpkeep();
       return this.makeBattle();
     }
     await this.askMatchmaker();
@@ -593,6 +601,7 @@ export class SquadsParty extends DurableObject<Env> {
     if (!want) return;
     this.making = true;
     try {
+      if (this.record.kind === "tower") return await this.makeTowerFloor(want);
       const code = this.record.code;
       const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, bossPartyOverrides(want), undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
       if (!this.record) return;
@@ -621,7 +630,7 @@ export class SquadsParty extends DurableObject<Env> {
 
   /** Its battle kicked someone (the AFK kick): out of the party too, never back in (by member id). */
   async kickMember(id: string): Promise<void> {
-    if (!this.record || this.record.kind !== "boss") return;
+    if (!this.record || (this.record.kind !== "boss" && this.record.kind !== "tower")) return;
     const core = this.core();
     core.kickMember(id);
     await this.persist(core);
@@ -629,10 +638,119 @@ export class SquadsParty extends DurableObject<Env> {
 
   /** Its battle from START `id` is over: that battle's passes go. */
   async battleOver(id: number): Promise<void> {
-    if (!this.record || this.record.kind !== "boss") return;
+    if (!this.record || (this.record.kind !== "boss" && this.record.kind !== "tower")) return;
     const core = this.core();
     core.battleOver(id);
     await this.persist(core);
+    await this.towerUpkeep();
+  }
+
+  /** A party floor's match room, asked whether it still holds the floor (tower.ts settleStale). */
+  private lobbyGone: LobbyGone = async (f) => (f.lobby ? !(await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(f.lobby)).holdsTowerFloor(f.id)) : null);
+
+  /**
+   * A Battle Tower party's upkeep after anything changes (docs/decisions/2026-11-20-tower-party.md): its plan read again from everyone's
+   * copies when its people changed (or a floor ended), its Open party line posted in the town's chat, and taken out again once it
+   * lapses (full, started, or its leader gone).
+   */
+  private async towerUpkeep() {
+    if (!this.record || this.record.kind !== "tower") return;
+    for (let tries = 0; tries < 3 && this.record?.kind === "tower" && this.core().towerPlanStale(); tries++) {
+      const people = this.core().towerPeople();
+      const plan = people.length < 2 ? { kind: "wait" as const, message: TOWER_PARTY_LINES.needTwo } : await this.readTowerPlan(people);
+      if (!this.record) return;
+      const core = this.core();
+      const recheck = plan.kind === "wait" && "recheck" in plan;
+      core.towerRecheck(recheck ? Date.now() + 3000 : null);
+      core.setTowerPlan({ key: people.join(","), plan: plan.kind === "wait" ? { kind: "wait", message: plan.message } : plan });
+      await this.persist(core);
+    }
+    const hub = this.env.LIVE ? liveHub(this.env) : null;
+    const core = this.core();
+    const lapsed = core.takeLapsedOpen();
+    const post = core.takeOpen();
+    if (!lapsed && !post) return;
+    await this.persist(core);
+    if (lapsed && hub) await hub.townRemove(lapsed.line, lapsed.room).catch(() => undefined);
+    if (post) {
+      const n = hub ? await hub.townPartyOpen(partyOpenText(post.name, post.free), this.record.code, post.room).catch(() => null) : null;
+      if (!this.record) return;
+      const after = this.core();
+      after.openPosted(n);
+      // (It lapsed while it went up: out again at once.)
+      const gone = after.takeLapsedOpen();
+      await this.persist(after);
+      if (gone && hub) await hub.townRemove(gone.line, gone.room).catch(() => undefined);
+    }
+  }
+
+  /** A member's name here, by account (a plan's words). */
+  private nameOf(uid: string): string {
+    return this.record?.members.find((m) => m.userId === uid)?.name ?? "A member";
+  }
+
+  /** The plan for these people, from their copies (tower.ts preparePartyFloor); while one's floor is under way, why it waits (and a recheck soon). */
+  private async readTowerPlan(people: string[]): Promise<TowerPartyPlan["plan"] | { kind: "wait"; message: string; recheck: true }> {
+    if (!this.env.DB) return { kind: "wait", message: TOWER_LINES.noRun };
+    const sql = d1Sql(this.env.DB);
+    const read = await (async () => {
+      await ensureSchema(sql, this.env.DB);
+      return preparePartyFloor(sql, people, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
+    })().catch(() => null);
+    if (!read) return { kind: "wait", message: TOWER_PARTY_LINES.reading, recheck: true };
+    if (read.ok) return read.prep.plan.kind === "continue" ? { kind: "continue", floor: read.prep.floor } : read.prep.plan;
+    if ("busy" in read) return { kind: "wait", message: read.party ? TOWER_LINES.saving(this.nameOf(read.busy)) : TOWER_LINES.busy(this.nameOf(read.busy)), recheck: true };
+    return { kind: "wait", message: "resting" in read ? TOWER_LINES.resting : TOWER_LINES.noRun, recheck: true };
+  }
+
+  /**
+   * A Battle Tower party's START (docs/decisions/2026-11-20-tower-party.md): the plan read again from everyone's copies (it must be the
+   * one they readied for: else it's shown afresh, everyone un-readied), the floor's match room made (towerPartySettings: the party rule,
+   * ties to the engine's best; its floor and bosses from the run), then the floor begun on every copy at once (commitPartyFloor: all or
+   * nothing), then everyone placed in it. Anything refused on the way: nobody is placed, and they're told why.
+   */
+  private async makeTowerFloor(want: BossStart) {
+    if (!this.record) return;
+    const fail = async (message: string, reread = false) => {
+      if (!this.record) return;
+      const core = this.core();
+      if (reread) core.towerReread();
+      core.placedIn(null, want.id, message);
+      await this.persist(core);
+      if (reread) await this.towerUpkeep();
+    };
+    if (!this.env.DB) return fail(TOWER_LINES.noRun);
+    const sql = d1Sql(this.env.DB);
+    const uids = [...want.members].sort((a, b) => a.seat - b.seat).flatMap((m) => (m.userId ? [m.userId] : []));
+    const read = await (async () => {
+      await ensureSchema(sql, this.env.DB);
+      return preparePartyFloor(sql, uids, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
+    })().catch(() => null);
+    if (!this.record) return;
+    if (!read) return fail("Couldn't reach the tower. Try again.");
+    if (!read.ok) return fail("busy" in read ? (read.party ? TOWER_LINES.saving(this.nameOf(read.busy)) : TOWER_LINES.busy(this.nameOf(read.busy))) : "resting" in read ? TOWER_LINES.resting : TOWER_LINES.noRun, true);
+    const prep: PartyFloorPrep = read.prep;
+    const shown = this.record.tower?.plan;
+    const now = prep.plan.kind === "continue" ? { kind: "continue" as const, floor: prep.floor } : prep.plan;
+    if (!shown || shown.key !== uids.join(",") || JSON.stringify(shown.plan) !== JSON.stringify(now)) return fail(TOWER_LINES.changed, true);
+    const code = this.record.code;
+    const fight = Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(16).padStart(2, "0")).join("");
+    const overrides = JSON.parse(JSON.stringify(prep.settings)) as NonNullable<Parameters<ReturnType<Env["LOBBIES"]["get"]>["create"]>[1]>;
+    const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, overrides, undefined, undefined, partyLobby(want, code, Date.now(), { fight }))) !== false).catch(() => null);
+    if (!this.record) return;
+    if (!lobby) return fail("Couldn't start the floor. Try again.");
+    const ends = new Set(prep.plan.kind === "new" ? prep.plan.ends.map((e) => e.uid) : []);
+    const started = Date.now();
+    const ok = await commitPartyFloor(sql, prep, { id: fight, startedAt: started, lobby }, started, ends).catch((e: unknown) => {
+      console.log(`party ${code}: the floor's copies not begun (${String(e)})`);
+      return false;
+    });
+    if (!this.record) return;
+    if (!ok) return fail(TOWER_LINES.changed, true);
+    const core = this.core();
+    core.placedIn(lobby, want.id);
+    await this.persist(core);
+    await this.towerUpkeep();
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -642,10 +760,21 @@ export class SquadsParty extends DurableObject<Env> {
     const core = this.core();
     core.disconnect(memberId);
     await this.persist(core, ws);
+    await this.towerUpkeep();
   }
 
   async alarm() {
     if (!this.record || (await this.closeIfDue())) return;
+    // (A Battle Tower party: a member's last floor was still being written: its plan read again.)
+    if (this.record.kind === "tower") {
+      const core = this.core();
+      if ((this.record.tower?.recheckAt ?? Infinity) <= Date.now()) {
+        core.towerRecheck(null);
+        core.towerReread();
+        await this.persist(core);
+      }
+      return this.towerUpkeep();
+    }
     // (A 50 v 50 party: its away leader's hold on the lead ends; a search with nobody here stops.)
     if (this.record.kind === "crowd") {
       const core = this.core();
