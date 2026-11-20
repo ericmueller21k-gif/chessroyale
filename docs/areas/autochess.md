@@ -54,7 +54,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 - **Levels:** your level is how many pieces (not the king) you may have on the board. Start at 4, top 10. **+2 XP free at each round's
   start** (round 1 too); **Buy XP gives 4 XP for 4 gold**; XP to the next level 4, 8, 12, 16, 20, 24 (4 to 5 ... 9 to 10), the extra
   carrying over. Placing past your level is refused ("Your level allows 4 pieces on the board. Buy XP to level up."). Each side's strip
-  shows its level and XP ("Lv 4 · 2/4 XP", a thin gold line under it); a level-up pops the number and plays a chime.
+  shows its level and XP ("Lv 4 · 2/4 XP", a thin gold line under it); a level-up pops the number and plays the app's level-up (a steel pan run into a chord, `END_SCREEN.levelUp`; shared with the end screen and a finished quest since Nov 20).
 - **Lock in is off** (v7, Eric: "the whole function/feature"; `lockIn: false`): no button, no bonus for anyone (the bot never locks), and every buy step runs its full time. The code stays
   behind the setting (`?lockin=1` for testers): with it on, a gold bar under the shop locks your board, bench and shop for the rest of the step, **the first side to lock in gets 3
   gold at once**, the other side sees "Locked in" by the opponent's name, and when both have locked the step ends at once; the bot locks at a seeded time in the open part of the step, or now and then never.
@@ -142,7 +142,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 | The rules, pure and tested | `packages/app/src/autochess/`: `army.ts` (squares, kings, the buy, hold, place and sell checks and words, the bench's carry-over; stars: `starUpTarget`, `starUp`, `paidFor`, `sellValue`), `shop.ts` (the four offers, the odds by level, rolls and the star-up draw, refills, rerolls, buying and holding from a slot), `level.ts` (XP and levels), `lockin.ts` (off since v7), `adjust.ts` (the move step: the stars step, `adjustSecondsFor`, `starTargets`; v7's legal moves, the random pick; the one move, taking it back, the step switch; the v6 teleport step), `reveal.ts` (what shows of their board while you buy), `economy.ts` (gold, streaks, refunds and cash-ins, HP, levels, the match), `position.ts` (FEN, who moves first, material), `bot.ts`, `fight.ts` (the fight, refereed by the HunChess engine's rules), `words.ts`, `sounds.ts` (the eleven sounds), `engine.ts` (the link to the engine's worker), `hunchess-worker.ts` (the worker) |
 | The HunChess engine | `packages/chess/src/hunchess/` (`@chessroyale/chess/hunchess`): `board.ts` (the board, moves, every fight rule), `search.ts`, `eval.ts`, `pst.ts`; its strength and speed: `reports/hunchess-engine.md`, scripts `packages/sim/scripts/hunchess-*.ts` |
 | The floating gold | `components/FloatGold.tsx` |
-| The sounds' play names | `sound.ts` (`acReroll`, `acPlace`, `acHold`, `sell`, `acXp`, `acLevel`, `acLock`, `acReveal`, `acCash`, `acStar2`, `acStar3`); made ahead by the sound worker through `characters/boss-sounds.ts` (`autochess`) |
+| The sounds' play names | `sound.ts` (`acReroll`, `acPlace`, `acHold`, `sell`, `acXp`, `acLevel`, `acLock`, `acReveal`, `acCash`, `acStar2`, `acStar3`); made ahead by the sound worker through `characters/boss-sounds.ts` (`autochess`), all but `acLevel`: the shared steel pan level-up, made as it plays (`levelUp` in `sound.ts`) |
 | Home's button, the route | `screens/Home.tsx` (`onAutoChess`), `App.tsx` (`/autochess`) |
 
 ## Settings

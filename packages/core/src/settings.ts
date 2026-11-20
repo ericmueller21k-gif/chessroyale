@@ -4410,11 +4410,13 @@ export const END_SCREEN = {
    * The level-up, in the steel pan (Eric, Nov 20, after the mallet chord was "way too goofy" and the bells too deep: "the pan is
    * actually better than the bells ... let's make that the official one for now"): a quick run (G5 C6 E6 G6, `stepMs` apart),
    * then a chord (C6 E6 G6 C7) at `chordAtMs`. One sound for the end screen's level-up, auto chess's and a finished quest.
-   * `gain` trims the whole sound to no louder than the chime it replaced (peak and loudness measured, Nov 20).
+   * `gain` trims the whole sound (the run and chord keep their balance) so its peak, the chord's four notes struck together, stays
+   * under half a move's, as every synthesized sound's does, and its loudness under the chime's it replaced (measured Nov 20: at
+   * 1 the peak was 0.62, a move's 0.57; at 0.42 about 0.26, the reveal's three dings 0.29). Louder or softer: this one number.
    */
-  levelUp: { run: [783.99, 1046.5, 1318.51, 1567.98], stepMs: 60, runLevel: 0.8, chord: [1046.5, 1318.51, 1567.98, 2093], chordAtMs: 300, chordLevel: 0.75, gain: 1 },
+  levelUp: { run: [783.99, 1046.5, 1318.51, 1567.98], stepMs: 60, runLevel: 0.8, chord: [1046.5, 1318.51, 1567.98, 2093], chordAtMs: 300, chordLevel: 0.75, gain: 0.42 },
   /** The end of the fill: one soft pan note (G6), quieter than the level-up (was a bright two-note bell: "goofy"). */
-  ding: { hz: 1567.98, level: 0.6 },
+  ding: { hz: 1567.98, level: 0.35 },
   /** Each moved quest's slide, and the gap before the next. */
   questMs: 650,
   questGapMs: 250,
