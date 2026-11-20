@@ -1,5 +1,5 @@
 import type { QuestPaid } from "./quests.ts";
-import { XP } from "./settings.ts";
+import { END_SCREEN, XP } from "./settings.ts";
 
 /**
  * XP and levels: the rules (XP in settings.ts; docs/decisions/2026-11-09-xp-rules.md). Pure: the server decides a game's XP with
@@ -239,6 +239,17 @@ export function xpStretches(before: number, after: number): XpStretch[] {
 export function xpFillMs(gain: number): number {
   const { min, max } = XP.fillMs;
   return gain <= 0 ? 0 : Math.round(min + (max - min) * Math.min(1, gain / XP.perLevel));
+}
+
+/**
+ * The pitch (Hz) of an end screen ping once `xpSoFar` XP has been counted (END_SCREEN.ping): it follows the XP counted, not the
+ * game's share, easing up to its top and holding there. `count`: the count-up's (lower).
+ */
+export function xpPingHz(xpSoFar: number, count = false): number {
+  const { hz, semitones, topXp, holdMs, countRatio } = END_SCREEN.ping;
+  const fullAt = topXp * (1 - holdMs / END_SCREEN.fillMs.max);
+  const r = Math.max(0, Math.min(1, xpSoFar / fullAt));
+  return hz * 2 ** (((1 - (1 - r) ** 2) * semitones) / 12) * (count ? countRatio : 1);
 }
 
 /**

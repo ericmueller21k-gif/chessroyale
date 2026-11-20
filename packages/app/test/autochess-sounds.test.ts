@@ -3,12 +3,13 @@ import { AUTOCHESS_SOUNDS, autochessSound, type AutochessSound } from "../src/au
 import { makeBossSound } from "../src/characters/boss-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 
-// Auto chess's sounds (v6, Eric Oct 20: "sounds that feel good"): reroll, place, hold, sell, XP, level up, lock in, a reveal and a
+// Auto chess's sounds (v6, Eric Oct 20: "sounds that feel good"): reroll, place, hold, sell, XP, lock in, a reveal and a
 // pawn's cash-in in the fight (the HunChess engine, Oct 21), and a star-up (v8, Eric Oct 22: "a cool level up sound", a bigger one for the third star),
 // synthesized, each under a piece's move in peak and loudness (as every synthesized sound here is) and each clearly its own.
+// (The level-up is the app's shared steel pan one since Nov 20: sound.ts's levelUp, END_SCREEN.levelUp.)
 
 const RATE = 44100;
-const NAMES: AutochessSound[] = ["reroll", "place", "hold", "sell", "xp", "level", "lock", "reveal", "cash", "star2", "star3"];
+const NAMES: AutochessSound[] = ["reroll", "place", "hold", "sell", "xp", "lock", "reveal", "cash", "star2", "star3"];
 
 /** What a sound measures: its peak, its loudness (mean level over the whole sample, dBFS), how long it sounds (s) and how bright (zero crossings a second). */
 function measure(s: Float32Array) {
@@ -28,7 +29,7 @@ function measure(s: Float32Array) {
 }
 
 describe("auto chess: the sounds (v6)", () => {
-  it("there is one for each thing: reroll, place, hold, sell, XP, level up, lock in, a reveal, a cash-in, a second star, a third star", () => {
+  it("there is one for each thing: reroll, place, hold, sell, XP, lock in, a reveal, a cash-in, a second star, a third star", () => {
     expect([...AUTOCHESS_SOUNDS].sort()).toEqual([...NAMES].sort());
   });
 
@@ -67,11 +68,10 @@ describe("auto chess: the sounds (v6)", () => {
     }
     // The ones that are about gold sound nothing like the thunk: sell is bright and long, place is low and short.
     expect(m.sell.zcr).toBeGreaterThan(m.place.zcr * 10);
-    expect(m.level.sounds).toBeGreaterThan(m.xp.sounds * 2);
     expect(m.place.zcr).toBeLessThan(500);
   });
 
-  it("is made quickly enough to be made ahead of its cue without a stall (under 120 ms each, the longest, the level-up's chime, included)", () => {
+  it("is made quickly enough to be made ahead of its cue without a stall (under 120 ms each)", () => {
     // (The best of 3 makes: the cost of making it. One make alone also counts whatever else the machine did meanwhile, as
     // when CI runs the other test files beside this one: a 125 ms level-up chime there, Nov 7.)
     for (const name of NAMES) {
@@ -85,7 +85,7 @@ describe("auto chess: the sounds (v6)", () => {
     }
   });
 
-  it("the star-up sounds (v8): the second star's is about 0.6 s, the third's is bigger and about a second, and both are brighter and longer than a level-up's chime is quick", () => {
+  it("the star-up sounds (v8): the second star's is about 0.6 s, the third's is bigger and about a second, and both ring in the highs", () => {
     const two = measure(autochessSound("star2", RATE));
     const three = measure(autochessSound("star3", RATE));
     expect(two.length).toBeGreaterThan(0.5);

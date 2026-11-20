@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { XP } from "../src/settings.ts";
-import { XP_NONE_LINES, crateCount, everyLevel, gameXp, isXpNone, levelOf, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpInLevel, xpParts, xpShownParts, xpStretches } from "../src/xp.ts";
+import { END_SCREEN, XP } from "../src/settings.ts";
+import { XP_NONE_LINES, crateCount, everyLevel, gameXp, isXpNone, levelOf, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpPingHz, xpInLevel, xpParts, xpShownParts, xpStretches } from "../src/xp.ts";
 import { pausedLine, pauseVariable } from "../src/pauses.ts";
 
 const min = 60_000;
@@ -132,6 +132,35 @@ describe("the XP box's fill (Eric, Nov 9: it never skips)", () => {
     expect(xpFillMs(1)).toBeGreaterThanOrEqual(XP.fillMs.min);
     expect(xpFillMs(170)).toBeGreaterThan(xpFillMs(50));
     expect(xpFillMs(5_000)).toBe(XP.fillMs.max);
+  });
+
+  it("the end screen's pings (Eric, Nov 20: \"it sounds like it jumps\"): the pitch follows the XP counted so far, a smooth rise from C6 up a major sixth that a top game holds for about a second; a 100 XP game only climbs a little; the count-up's an octave down", () => {
+    const { hz, semitones, topXp, holdMs } = END_SCREEN.ping;
+    const top = hz * 2 ** (semitones / 12);
+    const semis = (f: number) => 12 * Math.log2(f / hz);
+    expect(xpPingHz(0)).toBeCloseTo(1046.5, 1);
+    expect(semitones).toBe(9);
+    // (Smooth: never down, and no step of a semitone or more between one XP and the next.)
+    for (let xp = 1; xp <= 600; xp++) {
+      expect(xpPingHz(xp)).toBeGreaterThanOrEqual(xpPingHz(xp - 1));
+      expect(semis(xpPingHz(xp)) - semis(xpPingHz(xp - 1))).toBeLessThan(0.1);
+    }
+    // A 100 XP game: a little over half the way; a top game: the top, and held past it.
+    expect(semis(xpPingHz(100))).toBeGreaterThan(3);
+    expect(semis(xpPingHz(100))).toBeLessThan(5.5);
+    expect(xpPingHz(topXp)).toBeCloseTo(top, 3);
+    expect(xpPingHz(5_000)).toBeCloseTo(top, 3);
+    // The top is reached with about `holdMs` of a top game's fill left (the bar's ease in and out, as the end screen fills it).
+    const ms = END_SCREEN.fillMs.max;
+    let reached = ms;
+    for (let t = ms; t >= 0; t -= 10) {
+      const k = t / ms;
+      if (xpPingHz(topXp * k * k * (3 - 2 * k)) < top - 0.01) break;
+      reached = t;
+    }
+    expect(ms - reached).toBeGreaterThan(holdMs * 0.8);
+    expect(ms - reached).toBeLessThan(holdMs * 1.3);
+    expect(xpPingHz(120, true)).toBeCloseTo(xpPingHz(120) / 2, 6);
   });
 
   it("sampled every frame it only rises, by small steps; a level-up reaches the end and starts again from empty", () => {

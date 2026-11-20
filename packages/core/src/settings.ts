@@ -4382,8 +4382,11 @@ export const END_SCREEN = {
   lobLift: 18,
   /** The number's size when it lands in the slot (a share of its size). */
   lobEndScale: 0.38,
-  /** The bar's fill: between these, by how much of a level it gains. */
-  fillMs: { min: 1300, max: 2200 },
+  /**
+   * The bar's fill: between these, by how much of a level it gains. (max 2800 since Nov 20, was 2200: a top game's fill "a bit
+   * longer" so its pings' hold at the top pitch is felt; `ping` below.)
+   */
+  fillMs: { min: 1300, max: 2800 },
   /** The shortest fill of one stretch (between two levels). */
   stretchMinMs: 120,
   /** A level (a division) reached: the pause at full while "Level 3!" pops. */
@@ -4392,6 +4395,26 @@ export const END_SCREEN = {
   gapMs: 300,
   /** The pings at most this often (a 150 XP count would otherwise ask for 90 a second). */
   pingGapMs: 42,
+  /**
+   * The pings' pitch (Eric, Nov 20, of the six-note scale stepped by the bar's share: "it sounds like it jumps ... it should be
+   * progressive, ... goes up a bit higher pitch, then it stays at a certain amount"; then "keep going up a little bit more ... if
+   * you only get 100 XP, then it wouldn't do that. But say if you got like 500 XP ... it would get higher pitched, and then it
+   * would only stay there for maybe like a second"). It follows the XP counted so far, not this game's share: from `hz` (C6) up
+   * `semitones` (a major sixth), eased 1-(1-r)^2, r = XP so far / the XP that reaches the top. A top game (`topXp`) reaches the
+   * top with about `holdMs` of its fill (fillMs.max) left and holds there; a 100 XP game only climbs a little. RP counts as XP
+   * by its bar's share. The count-up's pings: the same rule at `countRatio` (an octave down). `level`, `countLevel`: how loud.
+   * core's xp.ts: xpPingHz.
+   */
+  ping: { hz: 1046.5, semitones: 9, topXp: 500, holdMs: 1000, countRatio: 0.5, level: 0.065, countLevel: 0.05 },
+  /**
+   * The level-up, in the steel pan (Eric, Nov 20, after the mallet chord was "way too goofy" and the bells too deep: "the pan is
+   * actually better than the bells ... let's make that the official one for now"): a quick run (G5 C6 E6 G6, `stepMs` apart),
+   * then a chord (C6 E6 G6 C7) at `chordAtMs`. One sound for the end screen's level-up, auto chess's and a finished quest.
+   * `gain` trims the whole sound to no louder than the chime it replaced (peak and loudness measured, Nov 20).
+   */
+  levelUp: { run: [783.99, 1046.5, 1318.51, 1567.98], stepMs: 60, runLevel: 0.8, chord: [1046.5, 1318.51, 1567.98, 2093], chordAtMs: 300, chordLevel: 0.75, gain: 1 },
+  /** The end of the fill: one soft pan note (G6), quieter than the level-up (was a bright two-note bell: "goofy"). */
+  ding: { hz: 1567.98, level: 0.6 },
   /** Each moved quest's slide, and the gap before the next. */
   questMs: 650,
   questGapMs: 250,

@@ -7,7 +7,7 @@
  * choice is remembered on the device.
  */
 
-import { QUICK_CHAT } from "@chessroyale/core";
+import { END_SCREEN, QUICK_CHAT, xpPingHz } from "@chessroyale/core";
 import { autochessSound, type AutochessSound } from "./autochess/sounds.ts";
 import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
 import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.ts";
@@ -765,6 +765,16 @@ export const REEL_VOICES = {
   },
 } as const;
 export type ReelVoice = keyof typeof REEL_VOICES;
+
+/**
+ * A level reached (the end screen's XP or RP bar, auto chess, a finished quest), always in the steel pan whatever the reveal's
+ * voice: a quick run into a chord (END_SCREEN.levelUp; Eric, Nov 20: "the pan is actually better than the bells").
+ */
+function levelUp(t: number) {
+  const { run, stepMs, runLevel, chord, chordAtMs, chordLevel, gain } = END_SCREEN.levelUp;
+  run.forEach((f, i) => REEL_VOICES.pan.note(t + (i * stepMs) / 1000, f, runLevel * gain));
+  for (const f of chord) REEL_VOICES.pan.note(t + chordAtMs / 1000, f, chordLevel * gain);
+}
 const VOICE_KEY = "brc.reelVoice";
 let reelVoice: ReelVoice = (() => {
   try {
@@ -1219,7 +1229,7 @@ export type SoundName =
   // Quest progress on home (Nov 10; questSound below).
   | "questTick"
   | "questDone"
-  // The end screen's rewards (mockup, Nov 20; xpPing below): a count's ping, the number landing in its bar, the bar's last ding.
+  // The end screen's rewards (mockup, Nov 20; xpPing below): a count's ping, the number landing in its bar, the bar's last soft note.
   | "xpPing"
   | "xpLand"
   | "xpDing";
@@ -1281,30 +1291,23 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.
   pop: (t) => bubblePop(t, 1),
   popSoft: (t) => bubblePop(t, 0.45),
-  // (Placeholders until Eric's pack: a small bell note per count, and the auto chess level-up's arpeggio and chord. QUEST_SOUND_FILES.)
+  // (Placeholders until Eric's pack: a small bell note per count, and the level-up's steel pan run and chord. QUEST_SOUND_FILES.)
   questTick: (t) => (QUEST_SOUND_FILES.tick ? fileSample(QUEST_SOUND_FILES.tick, t) : strike(t, 1568, [[1, 1, 0.09], [2, 0.3, 0.05]], 0.1)),
-  // (The ping climbs a pentatonic scale as the count goes (xpPing's `k`, 0 to 1): rapid, musical, never a siren. The count-up's are an
-  // octave down and softer than the bar's.)
-  xpPing: (t) => {
-    const scale = [1046.5, 1174.7, 1318.5, 1568, 1760, 2093];
-    const f = scale[Math.min(scale.length - 1, Math.floor(pingK * scale.length))]! * (pingLow ? 0.5 : 1);
-    strike(t, f, [[1, 1, 0.07], [2.76, 0.18, 0.03], [5.4, 0.06, 0.015]], pingLow ? 0.05 : 0.065, { glide: 0.01 });
-  },
+  // (The ping's pitch follows the XP counted so far (xpPing's `xp`; core's xpPingHz, END_SCREEN.ping): a smooth rise that holds at
+  // its top, never a siren. The count-up's are an octave down and softer than the bar's.)
+  xpPing: (t) => strike(t, xpPingHz(pingXp, pingCount), [[1, 1, 0.07], [2.76, 0.18, 0.03], [5.4, 0.06, 0.015]], pingCount ? END_SCREEN.ping.countLevel : END_SCREEN.ping.level, { glide: 0.01 }),
   xpLand: (t) => {
     strike(t, 523.25, [[1, 1, 0.12], [2, 0.4, 0.06]], 0.09, { glide: 0.25 });
     tap(t, 900, 0.08);
   },
-  xpDing: (t) => {
-    strike(t, 1568, [[1, 1, 0.5], [2.76, 0.25, 0.2], [5.4, 0.08, 0.08]], 0.08);
-    strike(t + 0.07, 2093, [[1, 1, 0.7], [2.76, 0.2, 0.25]], 0.07);
-  },
-  questDone: (t) => (QUEST_SOUND_FILES.done ? fileSample(QUEST_SOUND_FILES.done, t) : autochess("level")(t)),
+  xpDing: (t) => REEL_VOICES.pan.note(t, END_SCREEN.ding.hz, END_SCREEN.ding.level),
+  questDone: (t) => (QUEST_SOUND_FILES.done ? fileSample(QUEST_SOUND_FILES.done, t) : levelUp(t)),
   sell: autochess("sell"),
   acReroll: autochess("reroll"),
   acPlace: autochess("place"),
   acHold: autochess("hold"),
   acXp: autochess("xp"),
-  acLevel: autochess("level"),
+  acLevel: levelUp,
   acLock: autochess("lock"),
   acReveal: autochess("reveal"),
   acCash: autochess("cash"),
@@ -1666,8 +1669,6 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   acPlace: [["autochess", "place"]],
   acHold: [["autochess", "hold"]],
   acXp: [["autochess", "xp"]],
-  questDone: [["autochess", "level"]],
-  acLevel: [["autochess", "level"]],
   acLock: [["autochess", "lock"]],
   acReveal: [["autochess", "reveal"]],
   acCash: [["autochess", "cash"]],
@@ -2097,17 +2098,17 @@ export function playOnTap(name: SoundName) {
  */
 export type QuestSound = "tick" | "done";
 const QUEST_SOUND_FILES: Record<QuestSound, string | null> = { tick: null, done: null };
-/** The next xpPing's place in its count (0 to 1: the pitch) and whether it's the count-up's (low). */
-let pingK = 0;
-let pingLow = false;
-export function xpPing(k: number, low = false) {
-  pingK = Math.max(0, Math.min(0.999, k));
-  pingLow = low;
+/** The next xpPing's XP counted so far (its pitch) and whether it's the count-up's (lower). */
+let pingXp = 0;
+let pingCount = false;
+export function xpPing(xp: number, count = false) {
+  pingXp = xp;
+  pingCount = count;
   play("xpPing");
 }
 
 export const questSound = (s: QuestSound) => play(s === "tick" ? "questTick" : "questDone");
-/** Made ahead (the done sound's placeholder, in the sound worker), as the overlay opens to show progress. */
+/** A quest pack's done sound fetched ahead, as the overlay opens to show progress (the placeholder is made as it plays). */
 export const warmQuestSounds = () => warmSounds(["questDone"]);
 
 /** Plays a sound; `voice` previews a roulette voice without choosing it (Settings → Sound, "Reveal sound"). */
