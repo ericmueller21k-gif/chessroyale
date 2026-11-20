@@ -121,3 +121,35 @@ describe("sending a kept result", () => {
     expect(loadKept()).toBeNull();
   });
 });
+
+describe("the party's plan in words (tower-plan.ts planWords; the review of #835, finding 10; the delta review, finding 3)", async () => {
+  const { planWaiting, planWords } = await import("../src/tower-plan.ts");
+  it("on together: your own climb going back, with its floor, and the others' counted; the up button where START goes; asked first only when it's yours", () => {
+    const plan = { kind: "continue" as const, floor: 5, back: [{ id: "a", floor: 30 }, { id: "b", floor: 12 }] };
+    expect(planWords(plan, "c")).toEqual({ line: "Your climb together goes on: floor 5. 2 party climbs go back to it.", up: "Up to floor 5", ask: null, ok: true });
+    expect(planWords({ ...plan, back: [{ id: "a", floor: 30 }] }, "c").line).toBe("Your climb together goes on: floor 5. 1 party climb goes back to it.");
+    const mine = planWords(plan, "b");
+    expect(mine.line).toBe("Your climb together goes on: floor 5. Yours goes back from floor 12, and 1 more.");
+    expect(mine.ask).toEqual({ heading: "Back to floor 5?", note: "Your climb goes back from floor 12 to floor 5, where your party left off. Your best floors stay." });
+    expect(planWords({ ...plan, back: [{ id: "b", floor: 12 }] }, "b").line).toBe("Your climb together goes on: floor 5. Yours goes back from floor 12.");
+    expect(planWords({ kind: "continue", floor: 3, back: [] }, "a")).toMatchObject({ line: "Your climb together goes on: floor 3.", ask: null });
+  });
+  it("a new climb: yours ended, with its floor, and the others' counted; asked first when it's yours; waiting: no START", () => {
+    expect(planWords({ kind: "new", ends: [{ id: "a", floor: 6 }] }, "a")).toEqual({
+      line: "A new climb from floor 1. It ends yours on floor 6.",
+      up: "New climb: floor 1",
+      ask: { heading: "Start a new climb?", note: "Your party climb on floor 6 ends, and this party starts on floor 1." },
+      ok: true,
+    });
+    const ends = [{ id: "a", floor: 6 }, { id: "b", floor: 40 }, { id: "c", floor: 9 }];
+    expect(planWords({ kind: "new", ends }, "a").line).toBe("A new climb from floor 1. It ends yours on floor 6, and 2 more.");
+    expect(planWords({ kind: "new", ends }, "d").line).toBe("A new climb from floor 1. It ends 3 party climbs.");
+    expect(planWords({ kind: "new", ends: [] }, "a").line).toBe("A new climb from floor 1.");
+    expect(planWords({ kind: "wait", message: "Reading everyone's climbs…" }, "a")).toMatchObject({ ok: false, up: "START", ask: null });
+  });
+  it("no names in the line, so a party of four's is never longer than its worst case (the clerk's card keeps three lines for it)", () => {
+    const back = ["a", "b", "c", "d"].map((id) => ({ id, floor: 99 }));
+    const worst = [planWords({ kind: "continue", floor: 98, back }, "a").line, planWords({ kind: "new", ends: back }, "a").line].map((l) => planWaiting(l, 3));
+    expect(worst).toEqual(["Your climb together goes on: floor 98. Yours goes back from floor 99, and 3 more. 3 not ready yet.", "A new climb from floor 1. It ends yours on floor 99, and 3 more. 3 not ready yet."]);
+  });
+});

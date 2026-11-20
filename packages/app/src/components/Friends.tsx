@@ -235,10 +235,11 @@ export function InviteFriends() {
 }
 
 /**
- * The friends sheet (online first), each with Invite. A 50 v 50 party's (a "+" tapped, Nov 16) says so, and shows a friend already
- * in the party or invited greyed with what they are, Invite greyed for everyone once the party has no room (never hidden).
+ * The friends sheet (online first), each with Invite. A 50 v 50 party's (a "+" tapped, Nov 16) or a Battle Tower party's (the clerk's
+ * Invite friends, Nov 20: its own `line`) says so, and shows a friend already in the party or invited greyed with what they are,
+ * Invite greyed for everyone once the party has no room (never hidden).
  */
-export function InviteSheet({ onClose, party }: { onClose: () => void; party?: { inParty: ReadonlySet<string>; invited: ReadonlySet<string>; full: boolean } }) {
+export function InviteSheet({ onClose, party }: { onClose: () => void; party?: { inParty: ReadonlySet<string>; invited: ReadonlySet<string>; full: boolean; line?: string } }) {
   const { state } = useFriends(true);
   const [note, setNote] = useState<string | null>(null);
   // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
@@ -256,7 +257,7 @@ export function InviteSheet({ onClose, party }: { onClose: () => void; party?: {
             ✕
           </button>
         </div>
-        {party && <p class="fd-sub">Up to {CROWD_PARTY_MAX - 1} friends queue with you, all on your team.</p>}
+        {party && <p class="fd-sub">{party.line ?? `Up to ${CROWD_PARTY_MAX - 1} friends queue with you, all on your team.`}</p>}
         {state && !state.friends.length && <p class="fd-sub">{party ? "No friends yet. Tap a player's name, then Add friend." : "No friends yet. Tap a player's name, then Add friend. Or share the link."}</p>}
         <div class="fr-list">
           {state?.friends.map((f) => (

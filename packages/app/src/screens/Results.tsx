@@ -18,7 +18,7 @@ import { XpResult, useGameXp } from "../components/XpResult.tsx";
 import { NO_RESULT_LINE } from "./Recluse2.tsx";
 import { CrowdPodium } from "../components/Podium.tsx";
 import { phase2Headline } from "../recluse-phase2.ts";
-import { TowerResult } from "./TowerResult.tsx";
+import { TowerPartyResult, TowerResult } from "./TowerResult.tsx";
 
 /** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
 export const UNVOUCHED_LINE = "Only one device checked this match: it pays as a solo game.";
@@ -280,7 +280,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         )}
         {avgMs > 0 && <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>}
         {/* (A Battle Tower floor: its own buttons, Continue or the run's end.) */}
-        {match.tower ? <TowerResult match={match} onBack={onHome} /> : <div class="actions">
+        {match.tower ? <TowerResult match={match} onBack={onHome} /> : match.towerParty ? <TowerPartyResult match={match} onBack={onHome} /> : <div class="actions">
           {/* (Its words on one line: "Back to town" after a boss challenged in the town.) */}
           <button type="button" class="btn btn-secondary" style={{ whiteSpace: "nowrap" }} onClick={onHome}>
             {homeText}

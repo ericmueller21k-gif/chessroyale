@@ -1053,8 +1053,8 @@ export function rememberCrowdPass(lobby: string, pass: string) {
  * A party's kind: Squads', Boss Battle's (docs/decisions/2026-10-30-boss-party.md; /api/boss/party) or 50 v 50's (Nov 16,
  * docs/decisions/2026-11-16-crowd-party.md; /api/crowd/party: friends in by invite only).
  */
-export type PartyKind = "squads" | "boss" | "crowd";
-const partyStoreName = (kind: PartyKind) => (kind === "boss" ? "bossparty" : kind === "crowd" ? "crowdparty" : "party");
+export type PartyKind = "squads" | "boss" | "crowd" | "tower";
+const partyStoreName = (kind: PartyKind) => (kind === "boss" ? "bossparty" : kind === "crowd" ? "crowdparty" : kind === "tower" ? "towerparty" : "party");
 const partyKey = (code: string, kind: PartyKind = "squads") => `brc.${partyStoreName(kind)}.${code.toUpperCase()}`;
 const partyCurrentKey = (kind: PartyKind) => `brc.${partyStoreName(kind)}.current`;
 /** The party this device was last in (after a lobby, "Back to your party" reopens it). */
@@ -1089,9 +1089,11 @@ export async function partyStatus(code: string, kind: PartyKind = "squads"): Pro
 /** POST /api/squads/party (or Boss Battle's): a new party's code. */
 export async function createParty(kind: PartyKind = "squads"): Promise<{ code: string } | { error: string } | { banned: true }> {
   // (?pool=NAME: a queue of its own, a test switch; a 50 v 50 party's ?partyfill=SECONDS too.)
-  const pool = kind !== "boss" ? queuePool() : null;
+  const pool = kind === "squads" || kind === "crowd" ? queuePool() : null;
   const fill = kind === "crowd" ? partyFill() : null;
-  const query = new URLSearchParams([...(pool ? [["pool", pool]] : []), ...(fill ? [["fill", fill]] : [])]).toString();
+  // (A Battle Tower party's floors where Qxf7 mates, ?win=1: a test switch the server checks.)
+  const win = kind === "tower" && new URLSearchParams(location.search).get("win") === "1";
+  const query = new URLSearchParams([...(pool ? [["pool", pool]] : []), ...(fill ? [["fill", fill]] : []), ...(win ? [["win", "1"]] : [])]).toString();
   try {
     const res = await fetch(`/api/${kind}/party${query ? `?${query}` : ""}`, { method: "POST" });
     const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string; banned?: boolean };
@@ -1204,7 +1206,8 @@ export class PartyClient {
             this.placedAt = p.at;
             this.onPlaced(p.lobby, p.pass, 0);
           }
-        } else if (msg.party.state === "placed" && p && String(p.at) !== stored(`${partyKey(this.code, this.kind)}.placed`)) {
+        } else if (msg.party.state === "placed" && p && (this.kind !== "tower" || !!p.pass) && String(p.at) !== stored(`${partyKey(this.code, this.kind)}.placed`)) {
+          // (A Battle Tower party's floor begun before you joined: no pass of yours in it, so not yours: you stay in the party.)
           store(`${partyKey(this.code, this.kind)}.placed`, String(p.at));
           this.close();
           this.onPlaced(p.lobby, p.pass, this.me?.seat ?? 0);
@@ -1247,8 +1250,12 @@ export class PartyClient {
   promote(id: string) {
     this.send({ t: "promote", id });
   }
-  start() {
-    this.send({ t: "start" });
+  start(confirm = false) {
+    this.send({ t: "start", ...(confirm ? { confirm: true } : {}) });
+  }
+  /** A Battle Tower party's leader: Open party (its line in the town's chat `room`: the town's own, or a test's). */
+  open(room?: string) {
+    this.send({ t: "open", ...(room ? { room } : {}) });
   }
   bot(add: boolean) {
     this.send({ t: "bot", add });

@@ -5,14 +5,16 @@ import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
 import { Matchmaker } from "./matchmaker.ts";
 import { DuelGame } from "./duel-do.ts";
-import { LiveHub } from "./live-hub.ts";
+import { LiveHub, liveHub } from "./live-hub.ts";
+import { cachedUserId } from "./presence.ts";
+import { TOWER_PARTY_LINES } from "./squads-party.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
 import { purgeTokenDrops } from "./boss-tokens.ts";
 import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
 import { duelEntrant, purgeConduct, purgeDuelGames, rankedLeaves } from "./ranked.ts";
-import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
+import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, ageAnswer, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { banCheck } from "./fairplay.ts";
 import { BAN_COOKIE, BAN_HEADER, UNMARK, banAnswer, banGate } from "./ban-gate.ts";
 import { caseMailer } from "./fairplay-mail.ts";
@@ -24,7 +26,7 @@ import { deepCheckRun, recountDeep } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
-import { expireTownCache } from "./town-chat-api.ts";
+import { chatRoomOf, expireTownCache, signedInReader, townOpenParties } from "./town-chat-api.ts";
 import { handleFriendsApi } from "./friends-api.ts";
 import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
@@ -166,7 +168,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     {
       ip: request.headers.get("cf-connecting-ip"),
       session: readCookie(request, SESSION_COOKIE),
-      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party" || url.pathname === "/api/crowd/party"),
+      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party" || url.pathname === "/api/crowd/party" || url.pathname === "/api/tower/party"),
       friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
       search: request.method === "GET" && url.pathname === "/api/friends/search",
     },
@@ -335,7 +337,41 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000, "crowd", pooled, may.uid));
       return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
     }
-    const bp = url.pathname.match(/^\/api\/(boss|crowd)\/party\/([A-Z2-9]{5})(\/ws)?$/i);
+    // The Battle Tower's party (Nov 20; docs/decisions/2026-11-20-tower-party.md): POST /api/tower/party → { code }: a new party, its
+    // maker the first member (the clerk's Invite friends or Open party); in by its code (a friend's invite, the town's Join);
+    // GET /api/tower/party/CODE → { open, members, state } | 404; …/ws: its WebSocket. Squads' object (PARTIES) with kind "tower": its
+    // START makes each floor's match room and begins the floor on every member's copy (tower.ts). Solo's kill switch rests it, as the
+    // tower's solo floors.
+    if (url.pathname === "/api/tower/party" && request.method === "POST") {
+      if (isPaused(rawEnv, "solo")) return pausedResponse("solo");
+      const may = await mayPlay(request, env, waitUntil);
+      if (may instanceof Response) return may;
+      // (`?win=1`, a test switch: its floors open where Qxf7 mates the boss, as a solo floor's ?win=1; e2e/tower-party.spec.ts. Only where
+      // TEST_SWITCHES is on, never an admin's on the live site: a party floor pays everyone in it (the review of #835, finding 9).)
+      const win = url.searchParams.get("win") === "1" && env.TEST_SWITCHES === "1";
+      const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "tower", undefined, undefined, win));
+      return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
+    }
+    // GET /api/tower/parties[?townroom=] → { parties: [{ code, leader, members, max }], message? }: the Battle Tower parties a newcomer can
+    // join now (the clerk's list, Eric, Nov 20): those whose Open party line stands in the town's chat, each able to take someone new (room
+    // in it, no floor under way, not a run's own members climbing on). Newest first, TOWER_PARTY.listMax at most. Made once per Worker
+    // instance every TOWER_PARTY.listCacheMs from its copy of the town's room, never per reader (town-chat-api.ts `townOpenParties`: the
+    // delta review of #835, finding 1). Only for whoever could join one (an account, signed in where signing in is set up; else none, with
+    // the words why), and none where the town shows no party lines (finding 4): on a device the age gate marked too young, and while the
+    // town's chat is paused. Joining keeps the party's own checks (accounts only, full refused with its words).
+    if (url.pathname === "/api/tower/parties" && request.method === "GET") {
+      const none = (message?: string) => json({ parties: [], ...(message ? { message } : {}) });
+      if (!env.LIVE || !env.DB || ageAnswer(request) === "under" || isPaused(rawEnv, "town-chat")) return none();
+      const sql = d1Sql(env.DB);
+      await ensureSchema(sql, env.DB);
+      const now = Date.now();
+      const token = readCookie(request, SESSION_COOKIE);
+      if (!(signInRequired(env) ? await signedInReader(sql, token, now) : await cachedUserId(sql, token, now))) return none(TOWER_PARTY_LINES.signIn);
+      const listing = (code: string) => env.PARTIES.get(env.PARTIES.idFromName(code)).towerListing();
+      const parties = await townOpenParties(liveHub(env), listing, now, waitUntil, chatRoomOf(url.searchParams.get("townroom"), env.TEST_SWITCHES === "1")).catch(() => []);
+      return json({ parties });
+    }
+    const bp = url.pathname.match(/^\/api\/(boss|crowd|tower)\/party\/([A-Z2-9]{5})(\/ws)?$/i);
     if (bp) {
       const stub = env.PARTIES.get(env.PARTIES.idFromName(bp[2]!.toUpperCase()));
       // (Only a party of the path's own kind: a Boss Battle party's code never opens as a 50 v 50 party's, or the other way.)

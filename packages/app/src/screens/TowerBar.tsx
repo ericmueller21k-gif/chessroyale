@@ -55,7 +55,8 @@ export function speakerOf(side: { bosses: readonly { id?: string }[]; toMove: nu
 
 /** The run's strip: "Battle Tower · Floor 4 of 99", the bosses beaten (the last 6, or 9 on a computer; the rest counted), the next floor's rating, the moves left. */
 export function TowerStrip({ match, computer = false }: { match: GameView; computer?: boolean }) {
-  const play = match.tower;
+  // (A solo floor's run, or a party floor's: Nov 20.)
+  const play = match.tower ?? match.towerParty;
   const boss = match.boss;
   if (!play) return null;
   const left = boss ? Math.max(0, boss.maxMoves - boss.crowdMoves) : null;

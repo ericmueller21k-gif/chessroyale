@@ -56,11 +56,32 @@ import { NAME_COLORS, nameColorIndex } from "./names.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { useChatBackground, useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
+/**
+ * A party line's "Go to the tower" (Eric, Nov 20: "wouldn't it make more sense to just say like go to the battle tower ... you should be
+ * able to click on the clerk and see the parties and like which ones you could join"): into the Battle Tower's lobby by its clerk, his
+ * card open on the open parties (Town.tsx goTower). Greyed where it can't take you (inside another building: out first). Its press is its
+ * own, never the box's (Eric's exception to the typing rule, Nov 20); one label, so its pill never changes size.
+ */
+function PartyGo({ go }: { go?: () => void }) {
+  return (
+    <button
+      type="button"
+      class="tc-join"
+      disabled={!go}
+      onClick={(e) => {
+        e.stopPropagation();
+        go?.();
+      }}
+    >
+      Go to the tower
+    </button>
+  );
+}
 
 /** What of the town's lines this device reads now (TownChat's `hear`). */
 const hearing = (): "all" | "enter" | "none" => (mayReadTownChat() ? "all" : mayHearTown() ? "enter" : "none");
 
-export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room's tone (shops.ts' `chatTone`), whatever the sky outside. */ tone?: SkyTone; /** A guest's tap on their greyed typing line: the app's sign-in. */ onSignIn?: () => void } = {}) {
+export function TownChat({ tone: room, onSignIn, onGoTower }: { /** Inside a shop: its room's tone (shops.ts' `chatTone`), whatever the sky outside. */ tone?: SkyTone; /** A guest's tap on their greyed typing line: the app's sign-in. */ onSignIn?: () => void; /** A party line's "Go to the tower" (none: greyed here). */ onGoTower?: () => void } = {}) {
   const wrap = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -122,11 +143,16 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
     log.drop((l) => l.uid !== undefined);
     if (hear === "none") return;
     return openTownFeed({
-      // (The server's own lines, no name, no menu, no account behind them: a boss challenged from the town and how it went, in its
-      // blue; "Ann has entered the town.", in a quiet gray: Nov 12.)
+      // (The server's own lines, no name, no menu: a boss challenged from the town and how it went, in its blue; "Ann has entered the
+      // town.", in a quiet gray: Nov 12. A Battle Tower party's line keeps its leader's account (`from`): muting or blocking them takes it
+      // out with their own lines (the delta review of #835, finding 8); the others have no one behind them.)
       line: (l) =>
         l.sys
-          ? log.say("", l.text, l.sys === "enter" ? "arrival" : "server", Date.now(), { uid: "", n: l.n })
+          ? log.say("", l.text, l.sys === "enter" ? "arrival" : "server", Date.now(), {
+              uid: l.sys === "party" ? l.from : "",
+              n: l.n,
+              ...(l.sys === "party" && typeof l.party === "string" && /^[A-Z2-9]{5}$/.test(l.party) ? { party: l.party } : {}),
+            })
           : log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n, color: l.color }),
       drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
       paused: () => redraw((n) => n + 1),
@@ -263,8 +289,8 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
         return;
       }
       if (!e.isPrimary || !seeable()) return;
-      // The typing line, the "↓ new" marker and a line's menu are their own: a press there isn't the box's.
-      if (target.closest(".tc-form, .tc-new, .tc-menu")) return;
+      // The typing line, the "↓ new" marker, a line's menu and a party line's Join are their own: a press there isn't the box's.
+      if (target.closest(".tc-form, .tc-new, .tc-menu, .tc-join")) return;
       log.poke(); // (reading: the wait before the fade starts over)
       // (A mouse's up may come off the box: it's captured. A finger is captured by its own touch, and the browser's scroll of the stream isn't touched.)
       if (e.pointerType === "mouse") el.setPointerCapture?.(e.pointerId);
@@ -415,6 +441,8 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
               {l.name && ": "}
               {/* (A player's line: our pixel emoji drawn for their `:name:` codes, as in every chat; Nov 7.) */}
               {l.kind === "player" ? <ChatText text={l.text} /> : l.text}
+              {/* (A Battle Tower party open to the town: Join takes you into it, its clerk's card your party's: Nov 20.) */}
+              {l.party && <PartyGo go={onGoTower} />}
             </div>
           );
         })}

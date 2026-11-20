@@ -498,11 +498,26 @@ export interface NetParty {
    * from a member (`invited`: still open, each a seat showing "…" until they come or it lapses at `expiresAt`, server time). The
    * leader's Find match queues everyone connected into the public 50 v 50 matchmaking, on one team; `placed` is that lobby.
    */
-  kind?: "crowd";
+  kind?: "crowd" | "tower";
   invited?: { uid: string; name: string; expiresAt: number }[];
+  /**
+   * A Battle Tower party (Nov 20, docs/decisions/2026-11-20-tower-party.md): "tower" (`kind`), seats and READY as a Boss Battle party's.
+   * `plan`: what the leader's START does now, from everyone's copies (the server's: their climb on together from a floor, or a new
+   * one from floor 1, naming each member whose own party climb it ends, or why it can't yet); `open`: its line stands in the town's
+   * chat ("Open party"); `floor`: a floor of the party's is under way (its START to the room's end: Kick greyed then); `closed`: its
+   * people are a run's own members climbing on, so it isn't opened to the town (nobody new is looked for). Any change of plan
+   * un-readies everyone.
+   */
+  tower?: { plan: NetTowerPlan; open: boolean; floor?: true; closed?: true };
   /** A 50 v 50 party whose last search stopped because everyone was away (CROWD_PARTY.awayStopMs); gone at the next Find match. */
   stopped?: "away";
 }
+
+/**
+ * A Battle Tower party's plan (NetParty.tower): `ends` names members (their ids) whose open party climb (on `floor`) a new run ends;
+ * `back`, members whose copy, played on alone, goes back from `floor` to the party's (each asked first, as for `ends`).
+ */
+export type NetTowerPlan = { kind: "continue"; floor: number; back: { id: string; floor: number }[] } | { kind: "new"; ends: { id: string; floor: number }[] } | { kind: "wait"; message: string };
 
 export type PartyClientMessage =
   | { t: "hello"; v: number; token?: string; name?: string; device?: "phone" | "computer"; look?: unknown }
@@ -519,8 +534,13 @@ export type PartyClientMessage =
   | { t: "promote"; id: string }
   /** A Boss Battle party, the leader: the boss ("" random) and the difficulty (everyone un-readied). */
   | { t: "choose"; boss: string; difficulty: BossDifficultyId }
-  /** A Boss Battle party, the leader: START, once everyone is ready (the battle is made and everyone placed in it). */
-  | { t: "start" }
+  /**
+   * A Boss Battle party, the leader: START, once everyone is ready (the battle is made and everyone placed in it). A Battle Tower
+   * party's leader whose own climb the plan ends sends `confirm` (asked first; a member's READY is theirs).
+   */
+  | { t: "start"; confirm?: boolean }
+  /** A Battle Tower party, the leader: Open party (its line in the town's chat, with Join; it lapses when the party fills, starts or its leader leaves). */
+  | { t: "open"; room?: string }
   /** A Boss Battle party, admins and tests only: a bot member in a free seat (`add`), or the last one out. */
   | { t: "bot"; add: boolean }
   /** A Boss Battle party: what you wear (your pawn on the others' stages). */

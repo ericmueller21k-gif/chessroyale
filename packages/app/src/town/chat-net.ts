@@ -33,9 +33,10 @@ export interface TownLine {
   color?: number;
   /**
    * The server's own line (no player behind it: `from` and `name` empty): "challenge", a boss challenged from the town and how it ended;
-   * "enter", "Ann has entered the town." (Nov 12).
+   * "enter", "Ann has entered the town." (Nov 12); "party", a Battle Tower party open to the town (Nov 20: `party`, its code, for Join).
    */
-  sys?: "challenge" | "enter";
+  sys?: "challenge" | "enter" | "party";
+  party?: string;
 }
 
 interface Slice {

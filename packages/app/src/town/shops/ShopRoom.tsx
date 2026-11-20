@@ -514,6 +514,8 @@ export interface ShopCtl {
    * squares) over `settleMs`; your steps `stepMs` each. The number of steps, or -1: no way there (the Battle Tower's floor walk-in).
    */
   walkTo?: (sq: Sq, off?: { c: number; r: number }, stepMs?: number) => number;
+  /** Walks you into talking range of the Shopkeeper, as a tap on it (its card opens as you stop); there already, its card opens again. */
+  toKeeper?: () => void;
   /**
    * A door card's button (Nov 20): `act` now at the door, or, its card opened from the door's picture across the room, a run to the door
    * first (the card closes), then `act` there. The Battle Tower's own door buttons (Town.tsx towerPass) go through it too.
@@ -562,7 +564,7 @@ export interface RoomIntro {
   onDone: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, fx = null, challengeCard = null, talkCard = null, passCard, at = null }: { /** The boss's card's own challenge (the Hidden Boss's room, Nov 13: its count, Challenge and Cancel), in place of Challenge alone. */ challengeCard?: ComponentChildren; /** The keeper's card's own buttons in place of Talk (the Battle Tower's clerk, Nov 19: Start, or Continue and Start over). */ talkCard?: ComponentChildren; /** A door's card's own buttons, by the room it leads to, in place of its one button (the Battle Tower's elevator and way down); null: as usual. */ passCard?: (to: RoomPart) => ComponentChildren | null; /** You start on this square (the Battle Tower's floor, back from its match: on your mark), not at a door. */ at?: Sq | null; /** The room's own scene (RoomFx), or none. */ fx?: RoomFx | null; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it; the room you left, when a room has more than one such door: the walk-up's landing). */ arrived?: boolean | RoomPart; /** Through a door to another of the home's rooms (Rolling Dough's, the walk-up's stairs): the room it leads to. */ onPass?: (to: RoomPart) => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, fx = null, challengeCard = null, talkCard = null, passCard, at = null, atKeeper = false }: { /** You start in talking range of the Shopkeeper, its card open (the town chat's "Go to the tower": by the clerk, Nov 20). */ atKeeper?: boolean; /** The boss's card's own challenge (the Hidden Boss's room, Nov 13: its count, Challenge and Cancel), in place of Challenge alone. */ challengeCard?: ComponentChildren; /** The keeper's card's own buttons in place of Talk (the Battle Tower's clerk, Nov 19: Start, or Continue and Start over). */ talkCard?: ComponentChildren; /** A door's card's own buttons, by the room it leads to, in place of its one button (the Battle Tower's elevator and way down); null: as usual. */ passCard?: (to: RoomPart) => ComponentChildren | null; /** You start on this square (the Battle Tower's floor, back from its match: on your mark), not at a door. */ at?: Sq | null; /** The room's own scene (RoomFx), or none. */ fx?: RoomFx | null; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it; the room you left, when a room has more than one such door: the walk-up's landing). */ arrived?: boolean | RoomPart; /** Through a door to another of the home's rooms (Rolling Dough's, the walk-up's stairs): the room it leads to. */ onPass?: (to: RoomPart) => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -579,7 +581,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
       setCard(c);
       setPassTo(to);
       setMsg("");
-    }, intro, zzz, arrived, () => onChallenge?.(), onReady, fx, at));
+    }, intro, zzz, arrived, () => onChallenge?.(), onReady, fx, at, atKeeper));
     ctl.current = r;
 
     return () => {
@@ -838,6 +840,8 @@ function startRoom(
   fx: RoomFx | null = null,
   /** You start on this square, not at a door (the Battle Tower's floor, back from its match). */
   startAt: Sq | null = null,
+  /** You start in talking range of the Shopkeeper (as a tap on it would take you from the door), its card open. */
+  atKeeper = false,
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
@@ -857,7 +861,8 @@ function startRoom(
   const g = cv.getContext("2d")!;
   // (Through the door from the home's other room: just inside it, facing away from it, into the room.)
   const arrive = arrived ? passArrive(room, typeof arrived === "string" ? arrived : undefined) : null;
-  const you = new Walker(startAt ?? arrive ?? room.start, f.youStepMs, true, f.walkEase);
+  const keeperSq = (from: Sq): Sq | null => (def.keeper[0] ? tapTarget(room, from, def.keeper[0].c, def.keeper[0].r).dest : null);
+  const you = new Walker(startAt ?? (atKeeper ? keeperSq(room.start) : null) ?? arrive ?? room.start, f.youStepMs, true, f.walkEase);
   // (A room's rows run toward the camera, the town's away: up the screen is a row less. The walker's views and the arrow keys
   // follow it: Walker.rowsUp. Facing the counter, north: up the screen, its back.)
   you.rowsUp = -1;
@@ -5119,6 +5124,21 @@ function startRoom(
     youAt: () => {
       you.pose(performance.now(), pose);
       return { c: pose.x, r: pose.y };
+    },
+    toKeeper: () => {
+      // (A walk of its own, as a tap: a door card's run under way is called off.)
+      going = null;
+      const h = you.here();
+      if (!you.moving() && inTalkRange(room, h.c, h.r)) {
+        shut = "";
+        return setCard("talk");
+      }
+      const to = keeperSq(h);
+      const path = to && findPath(room, h, to);
+      if (path) {
+        close();
+        you.go(path);
+      }
     },
     busy: () => !!cab && CLAW_PLAY.open,
     stop: () => {

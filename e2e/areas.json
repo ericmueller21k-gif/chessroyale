@@ -162,11 +162,15 @@
     },
     "The Battle Tower's saving (Nov 19, PR 9): the server's climbs and bests, its routes (/api/tower), the sign-in merge, the download and deleting": {
       "paths": ["packages/server/src/tower.ts"],
-      "specs": ["e2e/account-delete.spec.ts", "e2e/battle-tower.spec.ts"]
+      "specs": ["e2e/account-delete.spec.ts", "e2e/battle-tower.spec.ts", "e2e/tower-party.spec.ts"]
     },
     "The Battle Tower's solo play (Nov 19, PR 10; PR 11b: no screen in the flow, Tower.tsx kept unused): a floor's battle (the split bar, the run's strip, the stacked figures), its result, the floor kept on the device and rejoined; the town's tower (its clerk's card, the elevator, the floor room's walk-in)": {
       "paths": ["packages/app/src/tower.ts", "packages/app/src/tower.css", "packages/app/src/screens/Tower.tsx", "packages/app/src/screens/TowerBar.tsx", "packages/app/src/screens/TowerResult.tsx", "packages/app/src/town/TowerDesk.tsx", "packages/app/src/town/shops/tower-*.ts", "packages/app/src/town/houses/tower.ts"],
-      "specs": ["e2e/battle-tower.spec.ts", "e2e/town-street.spec.ts"]
+      "specs": ["e2e/battle-tower.spec.ts", "e2e/town-street.spec.ts", "e2e/tower-party.spec.ts"]
+    },
+    "The Battle Tower's party (Nov 20, PR 12): the clerk's three ways (Solo, Invite friends, Open party), the party's seats, plan, READY and START, the town chat's party line and its Join, everyone walking into the floor room, a party floor's match and result, a copy played on alone": {
+      "paths": ["packages/app/src/tower-party.ts", "packages/app/src/tower-plan.ts"],
+      "specs": ["e2e/tower-party.spec.ts", "e2e/battle-tower.spec.ts"]
     },
     "Quests (Nov 9, XP phase 3): dealt, counted and paid by the server, the overlay on home and its entry in the top bar, a quest's line in the result's toast": {
       "paths": ["packages/server/src/quests.ts", "packages/app/src/quests.ts", "packages/app/src/components/QuestsOverlay.tsx"],

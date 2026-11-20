@@ -83,7 +83,9 @@ import { HiddenRoomClient, type RoomOutcome } from "./hidden-net.ts";
 import { HiddenCard, HiddenCount, RoomNote } from "./HiddenRoom.tsx";
 import { TowerDesk } from "./TowerDesk.tsx";
 import { Confirm } from "../components/MatchMenu.tsx";
-import { TOWER_WORDS, askFloor, enterTowerFloor, towerApi, type FloorPlay, type FloorStart } from "../tower.ts";
+import { TOWER_WORDS, askFloor, enterTowerFloor, towerApi, type FloorPlay, type FloorStart, type RunKind, type TowerStripInfo } from "../tower.ts";
+import { enterPartyFloor, onPartyFloor, partyMates, rejoinTowerParty, towerParty, type PartyFloor } from "../tower-party.ts";
+import { TowerPartyUp } from "./TowerDesk.tsx";
 import type { FloorScript } from "./shops/tower-floor-scene.ts";
 import { FLOOR_YOU, TOWER_FLOOR_FEEL, floorTimes, upWords } from "./shops/tower-floor.ts";
 import type { LivePawn, RecluseScene } from "./shops/recluse-scene.ts";
@@ -159,10 +161,11 @@ const bossIn = (id: string): boolean => BOSS_ROSTER.some((b) => b.id === id && a
  */
 const bossReady = (id: string): boolean => bossIn(id) || testParams().has("introPreview");
 
-/** A Battle Tower floor's match just ended (its result, sent once: tower.ts FloorPlay.settle): back into the tower. */
-export interface TowerBack {
-  play: FloorPlay;
-}
+/**
+ * Back into the tower: a floor's match just ended (its result, sent once: tower.ts FloorPlay.settle), a party floor's (its result the
+ * room's: Nov 20), or a friend's party joined from their invite (`lobby`: the tower's lobby, to its clerk).
+ */
+export type TowerBack = { play: FloorPlay } | { party: TowerStripInfo } | { lobby: true };
 /** Reduced motion asked for: no walking in the tower's floor room (the design's §4). */
 const stillNow = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -217,7 +220,7 @@ export function TownScreen({
   // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
   // (Rolling Dough, Nov 11: a home with two rooms; `arrived` you came through the door between them, `n` the room's mount, a new one each
   // time through it.)
-  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null; arrived?: boolean | RoomPart; n?: number; fx?: RoomFx | null; at?: { c: number; r: number } } | null>(null);
+  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null; arrived?: boolean | RoomPart; n?: number; fx?: RoomFx | null; at?: { c: number; r: number }; atKeeper?: boolean } | null>(null);
   const insideNow = useRef(inside);
   insideNow.current = inside;
   /** The shop you're in (its home's id), for the away rule's beats; null in the town square. */
@@ -249,7 +252,12 @@ export function TownScreen({
   awayOut.current = () => (onAway ?? onBack)();
   /** A boss's challenge (shops/challenge.ts), where it is: "town" when there's none. */
   const flow = useRef<ChallengeFlow>("town");
-  const step = (e: ChallengeEvent) => (flow.current = nextFlow(flow.current, e));
+  /** Whether no challenge is under way (`flow` is "town"), as drawn: the town chat's "Go to the tower" shows greyed meanwhile (finding 6). */
+  const [noChallenge, setNoChallenge] = useState(true);
+  const step = (e: ChallengeEvent) => {
+    flow.current = nextFlow(flow.current, e);
+    setNoChallenge(flow.current === "town");
+  };
   const [shopOut, setShopOut] = useState(false);
   const shopCtl = useRef<ShopCtl | null>(null);
   const fade = useRef<HTMLDivElement>(null);
@@ -284,6 +292,10 @@ export function TownScreen({
   /** A floor's start answered with a question (its bosses resting, under way elsewhere, a run that can't be played). */
   const [towerAsk, setTowerAsk] = useState<{ kind: "resting" | "elsewhere"; start: FloorStart } | { kind: "broken" } | null>(null);
   const towerTimers = useRef<number[]>([]);
+  /** Which run the clerk's Continue went up with: your solo run, or your party copy played alone (Nov 20). */
+  const towerKind = useRef<RunKind>("solo");
+  /** Your party's START placed its floor (tower-party.ts): up the elevator to it, everyone walking in. */
+  const partyNext = useRef<PartyFloor | null>(null);
   const clearTowerTimers = () => {
     towerTimers.current.forEach((t) => clearTimeout(t));
     towerTimers.current = [];
@@ -366,8 +378,9 @@ export function TownScreen({
   /**
    * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
    * A boss's challenge (`challenge`) goes in the same way, the boss beside you, with its intro's art loading too; the room plays it.
+   * `clerk`: this walk in was the town chat's "Go to the tower" (you land by its clerk, his card open).
    */
-  const goIn = async (id: HomeId, x: number, y: number, challenge = false) => {
+  const goIn = async (id: HomeId, x: number, y: number, challenge = false, clerk = false) => {
     if (doorBusy.current) return;
     doorBusy.current = true;
     opening.current = { home: id, challenge };
@@ -417,7 +430,26 @@ export function TownScreen({
     // (You start inside zoomed out, the − pressed: SHOP_FEEL.startZoom, a challenge's camera too.)
     setShopOut(F.startZoom === 1);
     if (fight) step("inside");
-    setInside({ ...got, fx, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null });
+    // (The town chat's "Go to the tower": in by the clerk, its card open on the open parties.)
+    const atKeeper = id === "tower" && clerk;
+    setInside({ ...got, fx, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null, ...(atKeeper ? { atKeeper } : {}) });
+  };
+  /**
+   * A Battle Tower party's line's "Go to the tower" (Eric, Nov 20: "wouldn't it make more sense to just say like go to the battle tower
+   * ... you should be able to click on the clerk and see the parties"): on the street, the tower's own Go in (you walk to its door and
+   * go in), landing by the clerk with his card open on the open parties; in the tower's lobby, you walk to the clerk. Elsewhere (in
+   * another building, up in the tower, or while a boss's challenge plays on the street) it's greyed: out first. The clerk rides with that
+   * walk: a walk elsewhere calls it off, so a later way in by the door is the door's (the delta review of #835, finding 6).
+   */
+  const goTower = () => {
+    const at = insideNow.current;
+    if (at) {
+      if (at.room.def.home === "tower" && !at.room.def.part) shopCtl.current?.toKeeper?.();
+      return;
+    }
+    const i = HOMES.findIndex((h) => h.id === "tower");
+    if (i < 0 || flow.current !== "town") return;
+    ctl.current?.goIn(i, true);
   };
   /**
    * The intro is done: the boss's transition sweeps in (outside the town's tree: it stays as the town closes), the battle starts
@@ -521,22 +553,34 @@ export function TownScreen({
    * that floor's bosses; null (and a note why) when there's none to play.
    */
   const towerUp = async (from: RoomPart): Promise<FloorScript | null> => {
-    if (from === "top" && floorS.current?.mode !== "won") return null;
+    const pf = partyNext.current;
+    if (from === "top" && floorS.current?.mode !== "won" && !pf) return null;
     const a = await towerApi.state();
     if (!a.ok) {
       setNote(a.body.message ?? TOWER_WORDS.offline);
       return null;
     }
     towerBest.current = a.body.best.solo;
-    const run = a.body.runs.solo;
+    // (A party floor: your copy's floor under way in its room, everyone's pawn walking in, in seat order.)
+    if (pf) {
+      const copy = a.body.runs.party;
+      partyNext.current = null;
+      if (!copy || copy.fight?.lobby !== pf.lobby) {
+        setNote(TOWER_WORDS.offline);
+        return null;
+      }
+      return { floor: copy.floor, mode: "fight", bosses: copy.bosses, times: null, t0: null, board: null, party: { ...pf, floor: copy.floor, bosses: copy.bosses, beaten: copy.beaten }, mates: partyMates() };
+    }
+    const run = a.body.runs[towerKind.current];
     if (!run) {
-      setNote("Talk to the clerk to start a climb.");
+      setNote(towerKind.current === "party" ? "No party climb to go on with." : "Talk to the clerk to start a climb.");
       return null;
     }
-    return { floor: run.floor, mode: "fight", bosses: run.bosses, times: null, t0: null, board: null };
+    return { floor: run.floor, mode: "fight", bosses: run.bosses, times: null, t0: null, board: null, kind: towerKind.current };
   };
-  /** The clerk's Start or Continue: you walk into the elevator, and up. */
-  const towerGo = () => {
+  /** The clerk's Start or Continue (`kind`: your solo run, or your party copy played alone): you walk into the elevator, and up. */
+  const towerGo = (kind: RunKind = "solo") => {
+    towerKind.current = kind;
     shopCtl.current?.close?.();
     const steps = shopCtl.current?.walkTo?.({ c: 4, r: 1 }) ?? -1;
     towerTimers.current.push(window.setTimeout(() => void goThrough("top"), Math.max(0, steps) * TOWN_FEEL.youStepMs + 150));
@@ -554,7 +598,7 @@ export function TownScreen({
     const off = { c: FLOOR_YOU.at.c - FLOOR_YOU.sq.c, r: FLOOR_YOU.at.r - FLOOR_YOU.sq.r };
     if (s.mode !== "fight") return void shopCtl.current?.walkTo?.(FLOOR_YOU.sq, off);
     const still = stillNow();
-    s.times = floorTimes(s.bosses.length, 1, still);
+    s.times = floorTimes(s.bosses.length, 1, still, undefined, s.mates?.length ?? 0);
     const at = (ms: number, fn: () => void) => towerTimers.current.push(window.setTimeout(() => insideNow.current?.n === n && floorS.current === s && fn(), ms));
     at(s.times.youGo, () => shopCtl.current?.walkTo?.(FLOOR_YOU.sq, off, TOWER_FLOOR_FEEL.stepMs));
     at(s.times.go, () => void floorGo(s, still));
@@ -568,7 +612,7 @@ export function TownScreen({
     if (doorBusy.current) return;
     doorBusy.current = true;
     const F = TOWER_FLOOR_FEEL;
-    const ask = askFloor(towerBest.current ?? 0);
+    const ask = s.party ? null : askFloor(towerBest.current ?? 0, s.kind ?? "solo");
     const cv = box.current?.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas") ?? null;
     if (cv && s.board && !still) {
       cv.style.transformOrigin = `${s.board.x.toFixed(1)}px ${s.board.y.toFixed(1)}px`;
@@ -577,7 +621,12 @@ export function TownScreen({
     }
     fadeTo(1, SHOP_FEEL.fadeMs, still ? 0 : F.zoomMs - SHOP_FEEL.fadeMs);
     await later(still ? SHOP_FEEL.fadeMs : F.zoomMs);
-    const a = await ask;
+    // (A party floor: its match room, joined with your pass and seat.)
+    if (s.party) {
+      if (!gone.current) enterPartyFloor(s.party);
+      return;
+    }
+    const a = await ask!;
     if (a.kind === "entry" && !gone.current) return enterTowerFloor(a.entry);
     if (cv) cv.style.transition = cv.style.transform = cv.style.transformOrigin = "";
     doorBusy.current = false;
@@ -592,11 +641,10 @@ export function TownScreen({
     opening.current = { home: "tower", challenge: false };
     // (The tower's theme, as at its door: loading now, playing as its room shows, Nov 19.)
     roomMusicLoad(homeTheme("tower"));
-    const end = await b.play.settle();
-    if (end.best) towerBest.current = end.best;
-    const lobby = !!end.error || (end.outcome === "left" && end.status === "open");
-    floorS.current = lobby ? null : { floor: b.play.floor, mode: end.outcome === "won" && end.status === "open" ? "won" : "out", bosses: [], times: null, t0: null, board: null };
-    const room = chunk(import("./shops/ShopRoom.tsx")).then(async (m) => ({ room: await (lobby ? m.loadRoom("tower") : m.loadTowerFloor(b.play.floor)), View: m.ShopRoom }));
+    const back = "play" in b ? await towerBackSolo(b.play) : "party" in b ? await towerBackParty(b.party) : { lobby: true, error: null, floor: 1, mode: "out" as const };
+    const { lobby, floor } = back;
+    floorS.current = lobby ? null : { floor, mode: back.mode, bosses: [], times: null, t0: null, board: null, ...("party" in b ? { mates: partyMates() } : {}) };
+    const room = chunk(import("./shops/ShopRoom.tsx")).then(async (m) => ({ room: await (lobby ? m.loadRoom("tower") : m.loadTowerFloor(floor)), View: m.ShopRoom }));
     const got = await room.catch(() => null);
     const fx = await (roomFxOf("tower", lobby ? "front" : "top") ?? Promise.resolve(null)).catch(() => null);
     if (!got || !box.current) {
@@ -604,12 +652,57 @@ export function TownScreen({
       doorBusy.current = false;
       return;
     }
-    if (end.error) setNote(end.error);
+    if (back.error) setNote(back.error);
     ctl.current?.pause();
     setShopOut(SHOP_FEEL.startZoom === 1);
     setInside({ ...got, intro: null, fx, n: 1, ...(lobby ? { arrived: "top" as const } : { at: FLOOR_YOU.sq }) });
     roomMusic(roomTheme(got.room.def));
   };
+  /** A solo floor's (or a party copy's played alone) result sent: into the floor room (won: the elevator open), or the lobby. */
+  const towerBackSolo = async (play: FloorPlay): Promise<{ lobby: boolean; error: string | null; floor: number; mode: "won" | "out" }> => {
+    const end = await play.settle();
+    if (end.best) towerBest.current = end.best;
+    const lobby = !!end.error || (end.outcome === "left" && end.status === "open");
+    return { lobby, error: end.error ?? null, floor: play.floor, mode: end.outcome === "won" && end.status === "open" ? "won" : "out" };
+  };
+  /**
+   * A party floor's match over (its room writes every copy: Nov 20): your copy read until it's written (a few seconds at most), then the
+   * floor room on your mark, won (your party's START is the way up) or out; back in your party, whose plan is read again.
+   */
+  const towerBackParty = async (f: TowerStripInfo): Promise<{ lobby: boolean; error: string | null; floor: number; mode: "won" | "out" }> => {
+    void rejoinTowerParty();
+    for (let tries = 0; tries < 12; tries++) {
+      const a = await towerApi.state();
+      if (a.ok) {
+        towerBest.current = a.body.best.solo;
+        const copy = a.body.runs.party;
+        if (!copy?.fight?.lobby) return { lobby: false, error: null, floor: f.floor, mode: copy && copy.floor > f.floor ? "won" : "out" };
+      }
+      await later(1000);
+    }
+    return { lobby: true, error: TOWER_WORDS.offline, floor: f.floor, mode: "out" };
+  };
+  // (Your party's START placed its floor: up to it, from the tower's lobby or its floor room; anywhere else, straight into its match.)
+  useEffect(
+    () =>
+      onPartyFloor((f) => {
+        const at = insideNow.current;
+        if (at?.room.def.home === "tower" && flow.current === "town") {
+          partyNext.current = f;
+          if (at.room.def.part === "top") return void goThrough("top");
+          shopCtl.current?.close?.();
+          const steps = shopCtl.current?.walkTo?.({ c: 4, r: 1 }) ?? -1;
+          towerTimers.current.push(window.setTimeout(() => void goThrough("top"), Math.max(0, steps) * TOWN_FEEL.youStepMs + 150));
+          return;
+        }
+        void towerApi.state().then((a) => {
+          const copy = a.ok ? a.body.runs.party : null;
+          if (copy && copy.fight?.lobby === f.lobby) enterPartyFloor({ ...f, floor: copy.floor, bosses: copy.bosses, beaten: copy.beaten });
+          else setNote(TOWER_WORDS.offline);
+        });
+      }),
+    [],
+  );
   /**
    * A challenge started inside (Don Dough's, once his Challenge's beat and walk-out have played in his back room, you through its door;
    * Nov 11): his intro and the front room load, the back room fades to black and the front room fades in in challenge mode (Eric: "The
@@ -761,6 +854,8 @@ export function TownScreen({
         </button>
       );
     const s = floorS.current;
+    // (In a party: its START is the way up, the leader's once everyone's READY: Nov 20.)
+    if (towerParty() && s?.mode === "won") return <TowerPartyUp />;
     const w = upWords(s?.mode ?? "out", s?.floor ?? 1);
     return (
       <>
@@ -775,12 +870,12 @@ export function TownScreen({
   if (testSwitchesAllowed())
     (window as unknown as { __towerFloor?: () => unknown }).__towerFloor = () => {
       const s = floorS.current;
-      return s && insideNow.current?.room.def.home === "tower" && insideNow.current.room.def.part === "top" ? { floor: s.floor, mode: s.mode, bosses: s.bosses, t: s.t0 === null ? null : performance.now() - s.t0, go: s.times?.go ?? null } : null;
+      return s && insideNow.current?.room.def.home === "tower" && insideNow.current.room.def.part === "top" ? { floor: s.floor, mode: s.mode, bosses: s.bosses, t: s.t0 === null ? null : performance.now() - s.t0, go: s.times?.go ?? null, mates: s.mates?.length ?? 0 } : null;
     };
   /** Leave a floor under way from the lobby's question: free (its bosses rest), or counted (under way elsewhere, nothing kept here). */
   const towerLeave = async (start: FloorStart, free: boolean) => {
     setTowerAsk(null);
-    const a = await towerApi.stop(start.fight.id, free ? 0 : undefined, free);
+    const a = await towerApi.stop(start.fight.id, free ? 0 : undefined, free, towerKind.current);
     if (!a.ok && a.body.message) setNote(a.body.message);
   };
   useEffect(() => {
@@ -842,7 +937,7 @@ export function TownScreen({
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand ?? back?.stand ?? null, () => step("cancel"), (share, step) => {
+    }, (id, x, y, challenge, clerk) => void goIn(id, x, y, challenge, clerk), stand ?? back?.stand ?? null, () => step("cancel"), (share, step) => {
       if (share === null) {
         loaded = true;
         startGuest();
@@ -974,6 +1069,7 @@ export function TownScreen({
             zzz={() => !!ctl.current?.town.you.zzz}
             arrived={inside.room.def.home === "tower" ? (inside.arrived ?? false) : !!inside.arrived}
             at={inside.at ?? null}
+            atKeeper={!!inside.atKeeper}
             talkCard={inside.room.def.home === "tower" && !inside.room.def.part ? <TowerDesk onGo={towerGo} onBest={(b) => void (towerBest.current = b)} /> : null}
             passCard={inside.room.def.home === "tower" ? towerPass : undefined}
             onPass={(to) => askIfWaiting(() => void goThrough(to))}
@@ -1017,7 +1113,7 @@ export function TownScreen({
         )}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
-          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} />
+          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} onGoTower={(!inside && noChallenge) || (inside?.room.def.home === "tower" && !inside.room.def.part) ? goTower : undefined} />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
           <div class={card?.kind === "person" ? "town-card town-person" : card?.kind === "home" && !card.confirm && home && shopOf(home.id) ? "town-card town-door" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
@@ -1375,7 +1471,8 @@ function startTown(
   onCard: (c: Card | null) => void,
   seat: Seat | null,
   onPlay: (seat: Seat, face: string | null) => void,
-  onGoIn: (id: HomeId, x: number, y: number, challenge: boolean) => void,
+  /** At a home's door after its "Go in" (`clerk`: the town chat's "Go to the tower" sent you: you land by the tower's clerk). */
+  onGoIn: (id: HomeId, x: number, y: number, challenge: boolean, clerk: boolean) => void,
   /** Back from a boss's challenge: where you stood (you start there). */
   stand: Stand | null = null,
   /** A boss's challenge called off on the way to its door (a tap elsewhere walked you away). */
@@ -1682,6 +1779,8 @@ function startTown(
   let away = false;
   /** A home's "Go in" sent you to its door (its index in HOMES; -1: none): you go in once you stand there. */
   let goingIn = -1;
+  /** That walk is the town chat's "Go to the tower" (set with `goingIn`, so a walk elsewhere calls it off with it). */
+  let goingClerk = false;
   /**
    * A boss's challenge (shops/challenge.ts): the boss walking to its door with you (its index in the bosses; -1: none), and where you
    * stood as you challenged it (the battle's "Back to town" brings you back there).
@@ -1895,7 +1994,8 @@ function startTown(
       goingIn = -1;
       const at = { x: r.W / 2, y: r.H / 2 };
       r.squareAt(h.entry.c, h.entry.r, at);
-      onGoIn(h.id, at.x, at.y, challenging >= 0);
+      onGoIn(h.id, at.x, at.y, challenging >= 0, goingClerk);
+      goingClerk = false;
     }
     stepClose(dt);
     updateCamera(dt, now);
@@ -2772,8 +2872,8 @@ function startTown(
     confirm: () => card && setCard({ ...card, confirm: true }),
     /** A stand-in's Talk (Rolling Dough's guard out front): his card says the boss is inside, a line at random, never the same twice running. */
     talk: () => card?.kind === "boss" && setCard({ ...card, line: pickLine(ZEBRA_OUTSIDE_LINES, card.line ?? null) }),
-    /** A home's "Go in" (a shop's: shops/shops.ts): you walk to the square in front of its door, and go in once there. */
-    goIn: (i: number) => {
+    /** A home's "Go in" (a shop's: shops/shops.ts): you walk to the square in front of its door, and go in once there (`clerk`: "Go to the tower"). */
+    goIn: (i: number, clerk = false) => {
       const h = HOMES[i]!;
       setCard(null);
       leaveClose();
@@ -2782,6 +2882,7 @@ function startTown(
       const to = spotNear(town, town.you.walker, h.door, false);
         if (!to || !walkWalker(town.you.walker, to)) return;
       goingIn = i;
+      goingClerk = clerk;
       follow = true;
       glide = null;
     },
@@ -2808,6 +2909,7 @@ function startTown(
       const beside = spotNear(town, boss.walker, to, true);
       if (beside) walkWalker(boss.walker, beside);
       goingIn = i;
+      goingClerk = false;
       follow = true;
       glide = null;
       return true;

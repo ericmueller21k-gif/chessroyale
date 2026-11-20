@@ -17,8 +17,11 @@ export function bossPartyOverrides(s: Pick<BossStart, "boss" | "difficulty">): N
   return JSON.parse(JSON.stringify({ ...bossPartySettings(s.difficulty), ...pick })) as NonNullable<LobbyRecord["overrides"]>;
 }
 
-/** The battle's party record (LobbyRecord.party) from START, its members given until `startBy` to arrive. */
-export function partyLobby(s: BossStart, partyCode: string, now: number): PartyLobby {
+/**
+ * The battle's party record (LobbyRecord.party) from START, its members given until `startBy` to arrive. A Battle Tower party's floor:
+ * `tower`, the floor's id on every member's copy (the room writes each one's end: LobbyCore.takeTowerEnds).
+ */
+export function partyLobby(s: BossStart, partyCode: string, now: number, tower?: { fight: string }): PartyLobby {
   const admits = Object.fromEntries(s.members.map((m) => [m.pass, { seat: m.seat, member: m.id, ...(m.userId ? { userId: m.userId } : {}) }]));
-  return { admits, size: s.members.length, bots: s.bots, leaderSeat: s.leaderSeat, startBy: now + BOSS_PARTY.joinWaitSec * 1000, seats: {}, partyCode, startId: s.id };
+  return { admits, size: s.members.length, bots: s.bots, leaderSeat: s.leaderSeat, startBy: now + BOSS_PARTY.joinWaitSec * 1000, seats: {}, partyCode, startId: s.id, ...(tower ? { tower: { fight: tower.fight } } : {}) };
 }
