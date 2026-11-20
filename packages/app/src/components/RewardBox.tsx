@@ -41,7 +41,8 @@ export function RewardBox({ xp }: { xp: XpGrant }) {
   const done = r.quests ?? [];
   const crates = r.daily + r.crates + done.reduce((n, q) => n + q.crates, 0);
   const keys = r.keys + done.reduce((n, q) => n + q.keys, 0);
-  const level = r.levels.at(-1);
+  // (The level reached, as the XP box pops it: since levels of 500 (Nov 20) only every other level pays, so the last paid may be one below.)
+  const level = r.levels.length ? Math.max(xp.levelAfter, r.levels.at(-1)!) : undefined;
   const title = level ? `Level ${level}!` : done.length && !r.daily ? (done.length === 1 ? "Quest done!" : "Quests done!") : "Daily reward";
   return (
     <div class="reward-toast" role="status" aria-label={title} data-testid="reward-box">
