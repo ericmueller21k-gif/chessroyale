@@ -365,15 +365,15 @@ describe("completion: paid once through the ledger, in the game's XP", () => {
   it("the weekly: 1,500 XP, a Winter Crate and a key; its XP can level you up, and that level's rewards come with it", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
-    await setTestXp(sql, ann.id, 500, T0);
+    await setTestXp(sql, ann.id, 200, T0);
     await set(sql, ann.id, [["squad-up"], ["warm-up"], ["regular", 9]]);
     const x = await grantXp(sql, ann.id, game("duel:AAAAA", "duel"));
     const weekly = questDef("regular")!;
     expect(x?.parts.at(-1)).toEqual({ label: "Quest", xp: weekly.xp });
     expect(x?.rewards?.quests?.map((q) => [q.quest, q.xp, q.crates, q.keys])).toEqual([["regular", weekly.xp, 1, 1]]);
-    // (500 + 120 + 1,500 = 2,120: Level 3. Levels 2 and 3 paid by this game.)
-    expect(x).toMatchObject({ before: 500, after: 2_120, levelAfter: 3 });
-    expect(x?.rewards?.levels).toEqual([2, 3]);
+    // (200 + 120 + 1,500 = 1,820: Level 4 (levels of 500 since Nov 20). Levels 2 and 4 paid by this game; 3 pays nothing.)
+    expect(x).toMatchObject({ before: 200, after: 1_820, levelAfter: 4 });
+    expect(x?.rewards?.levels).toEqual([2, 4]);
     const l = await lockerState(sql, ann.id);
     expect([l.seriesCrates[XP.rewardCrate], l.keys]).toEqual([1 + 2 * XP.levelCrates, 1 + 2 * XP.levelKeys]);
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);

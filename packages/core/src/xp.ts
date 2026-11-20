@@ -72,6 +72,13 @@ export function levelReward(level: number): { crates: number; keys: number; boss
   return { crates: pays ? XP.levelCrates : 0, keys: pays ? XP.levelKeys : 0, bossPicks: level > 1 && level % XP.bossCrateEvery === 0 ? 1 : 0 };
 }
 
+/** How often something comes by level, in plain words: "every level", "every other level", "every 20th level" (the FAQ, the Crates tab). */
+export function everyLevel(n: number): string {
+  if (n <= 1) return "every level";
+  if (n === 2) return "every other level";
+  return `every ${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th")} level`;
+}
+
 /** Whether a grant's rewards hold anything. */
 export const hasRewards = (r: XpRewards | undefined | null): r is XpRewards => !!r && (r.daily > 0 || r.crates > 0 || r.keys > 0 || r.bossPicks > 0 || !!r.quests?.length);
 

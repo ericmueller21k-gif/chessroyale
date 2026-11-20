@@ -433,7 +433,7 @@ export interface Locker {
   seriesCrates?: Record<string, number>;
   /** Crate keys (an older server: null). */
   keys: number | null;
-  /** Boss crates to pick (every 10th level's, Nov 9; missing from an older server). */
+  /** Boss crates to pick (every XP.bossCrateEvery-th level's, Nov 9; missing from an older server). */
   bossPicks?: number;
   /** Boss tokens you have, by boss id (only those you have some of; missing from an older server). */
   tokens?: Record<string, number>;

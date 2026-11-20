@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { XP } from "../src/settings.ts";
-import { XP_NONE_LINES, crateCount, gameXp, isXpNone, levelOf, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpInLevel, xpParts, xpShownParts, xpStretches } from "../src/xp.ts";
+import { XP_NONE_LINES, crateCount, everyLevel, gameXp, isXpNone, levelOf, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpInLevel, xpParts, xpShownParts, xpStretches } from "../src/xp.ts";
 import { pausedLine, pauseVariable } from "../src/pauses.ts";
 
 const min = 60_000;
@@ -192,6 +192,7 @@ describe("phase 2's rewards (Nov 9): the words and the numbers", () => {
     expect(rewardLines(r, "Winter Crate · Series 1")).toEqual({ daily: "+1 Winter Crate", level: "+2 Winter Crates · +1 crate key", pick: "Choose your boss crate", quests: [] });
     expect(rewardLines({ ...r, daily: 0, crates: 4, keys: 2, bossPicks: 2 }, "Winter Crate · Series 1")).toEqual({ daily: null, level: "+4 Winter Crates · +2 crate keys", pick: "Choose your 2 boss crates", quests: [] });
     expect(crateCount(1, "Beta Crate · Series 001")).toBe("1 Beta Crate");
+    expect([1, 2, 3, 11, 20, 22].map(everyLevel)).toEqual(["every level", "every other level", "every 3rd level", "every 11th level", "every 20th level", "every 22nd level"]);
   });
 
   it("a stored grant's rewards read back, and anything unreadable as none", () => {

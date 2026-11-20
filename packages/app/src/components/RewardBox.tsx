@@ -6,8 +6,9 @@ import { play } from "../sound.ts";
 import { BetaCrateArt, HunchessCrateArt, KeyArt, WinterCrateArt } from "./Items.tsx";
 
 /**
- * What a game paid beside its XP (Nov 9, XP phase 2; core's XpRewards): a level-up's crates and key ("Level 8!"), every 10th level's
- * boss crate to choose, and the daily reward's crate. A toast at the top of the result screen once the XP box's bar has filled (the
+ * What a game paid beside its XP (Nov 9, XP phase 2; core's XpRewards): a paying level's crates and key ("Level 8!": every 2nd level
+ * since Nov 20, so a level-up between shows no toast; its "Level 7!" pop in the XP box still plays), every 20th level's boss crate to
+ * choose, and the daily reward's crate. A toast at the top of the result screen once the XP box's bar has filled (the
  * friends' invite toast's look): the crate and the key with how many, and the lines ("+1 Winter Crate · +1 crate key", "Daily
  * reward: +1 Winter Crate", "Choose your boss crate in Crates."). It takes no taps (whatever is under it stays tappable) and goes
  * after XP.rewardToastMs; phase 3 adds a quest the game completed ("Quest done: Boss Hunter +300 XP"). It doesn't come back for that game, and the crates and keys are in your inventory already. Fixed over the

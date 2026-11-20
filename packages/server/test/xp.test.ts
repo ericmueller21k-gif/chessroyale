@@ -41,14 +41,15 @@ describe("granting a game's XP", () => {
     expect(x).toEqual({
       before: 6_900,
       after: 7_070,
-      levelBefore: 7,
-      levelAfter: 8,
+      levelBefore: 14,
+      levelAfter: 15,
       parts: [
         { label: "12 min", xp: 120 },
         { label: "Win", xp: 50 },
       ],
-      // (Phase 2: a 12-move game is short of the daily reward's 15; the levels owed are paid, 2 to 8: the test switch's six too.)
-      rewards: { crate: XP.rewardCrate, daily: 0, crates: 7 * XP.levelCrates, keys: 7 * XP.levelKeys, bossPicks: 0, levels: [2, 3, 4, 5, 6, 7, 8] },
+      // (Phase 2: a 12-move game is short of the daily reward's 15; the levels owed are paid, every 2nd from 2 to 14 (levels of 500
+      // since Nov 20): the test switch's six too.)
+      rewards: { crate: XP.rewardCrate, daily: 0, crates: 7 * XP.levelCrates, keys: 7 * XP.levelKeys, bossPicks: 0, levels: [2, 4, 6, 8, 10, 12, 14] },
     });
     expect(await xpOf(sql, ann.id)).toBe(7_070);
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
@@ -148,7 +149,7 @@ describe("the solo time cap (review M2): XP.soloMinutesPerDay minutes an XP day"
     expect((await solo("solo:c", 25))?.parts).toEqual([{ label: "Daily solo limit", xp: limit - 1_100 }]);
     expect(await xpOf(sql, ann.id)).toBe(limit);
     // (Nothing left: the reason, not a box of +0s; with a win, the win alone.)
-    expect(await solo("solo:d", 12)).toEqual({ before: limit, after: limit, levelBefore: 2, levelAfter: 2, parts: [], none: "limit" });
+    expect(await solo("solo:d", 12)).toEqual({ before: limit, after: limit, levelBefore: 3, levelAfter: 3, parts: [], none: "limit" });
     expect((await solo("solo:e", 12, true))?.parts).toEqual([
       { label: "Daily solo limit", xp: 0 },
       { label: "Win", xp: XP.win },
@@ -205,7 +206,7 @@ describe("where the XP is kept", () => {
     const ann = await signedIn(sql, "ann@example.com");
     await setTestXp(sql, ann.id, 6_750, T0);
     expect((await profile(sql, ann)).xp).toBe(6_750);
-    expect((await publicProfile(sql, ann.id, T0))?.level).toBe(7);
+    expect((await publicProfile(sql, ann.id, T0))?.level).toBe(14);
     // (The test switch sets it, down too; never below 0 or past XP.testMax.)
     expect(await setTestXp(sql, ann.id, 10, T0)).toBe(10);
     expect(await setTestXp(sql, ann.id, -1, T0)).toBeNull();
