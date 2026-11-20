@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { BOSS_ROSTER, MOO_CINEMATIC, bossBannerMs, isPlayable, menuBosses, playableBosses, type PowerEvent } from "@chessroyale/core";
 import { KING_ATTACKERS, MOO_BEATS, MOO_FX, POWER_FX, START_FEN, bossThinkMs, fullMoonLeadMs, fullMoonMs } from "@chessroyale/chess";
-import { cineBeats, closeFrame, closeOpacity, cineFigure, fieldOpacity, litOpacity, moonAt, moonLightBeats, moonLightOn } from "../src/components/MooCinematic.tsx";
+import { cineBeats, closeFrame, closeOpacity, cineFigure, fieldOpacity, litOpacity, moonArtBox, moonAt, moonLightBeats, moonLightOn, moonMiddle } from "../src/components/MooCinematic.tsx";
+import { MOO_HORIZON } from "../src/characters/moo-horizon.ts";
 import { lightNow } from "../src/components/recluse-light.ts";
 import { momentsOf, powerLine } from "../src/components/BossPowers.tsx";
 import { FADE_MS, MOO_UI, beamPhase, fallAtOf, fullMoonMoment, heldMarks, moonPixels, moonStep, noteMooMoments, scorchItems, waxLevel } from "../src/components/Moo.tsx";
@@ -272,23 +273,48 @@ describe("the Full Moon's cinematic", () => {
     expect(MOO_UI.moments.fullMoon.lineAt).toBe(b.hopBack + 300);
   });
 
-  it("brings the moon down from the top of the sky over the field's own, then bursts it into the Hidden Boss's light: the glow, the rays, the white-out whole at the cut, dying back in the close-up as the eyes whiten (Eric, Nov 20)", () => {
+  it("raises the moon from half hidden behind the hill into the sky, always behind the hills, then bursts it into the Hidden Boss's light from where it rose to: the glow, the rays, the white-out whole at the cut, dying back in the close-up as the eyes whiten (Eric, Nov 20)", () => {
     const b = cineBeats();
     const c = MOO_CINEMATIC;
-    // The moon: up with the field, gone at the cut (the field's own back after the close-up), coming down and nearer all the way, and
-    // always over the field's moon (57 art pixels across its middle), which stays put under it.
+    // The moon: up with the field, gone at the cut (the field's own back after the close-up, its moon where this one ends), rising all
+    // the way, never growing smaller.
     expect(moonAt(b.landed - 1)).toBeNull();
     expect(moonAt(b.close)).toBeNull();
     expect(moonAt(b.landed + c.fadeInMs)!.opacity).toBe(1);
+    expect(c.moonTo).toEqual({ scale: 1, y: 0 });
     const steps = Array.from({ length: 41 }, (_, i) => moonAt(b.landed + ((b.close - 1 - b.landed) * i) / 40)!);
     for (let i = 1; i < steps.length; i++) {
-      expect(steps[i]!.y).toBeGreaterThan(steps[i - 1]!.y);
-      expect(steps[i]!.scale).toBeGreaterThan(steps[i - 1]!.scale);
+      expect(steps[i]!.y).toBeLessThan(steps[i - 1]!.y);
+      expect(steps[i]!.scale).toBeGreaterThanOrEqual(steps[i - 1]!.scale);
     }
-    for (const m of steps) expect(Math.abs(m.y)).toBeLessThanOrEqual(57 * (m.scale - 1) + 0.5);
-    // (It starts partly over the top of the sky, about its whole width: the field is 200 art pixels wide.)
-    expect(80.5 + c.moonFrom.y - 56.5 * c.moonFrom.scale).toBeLessThan(0);
-    expect(116 * c.moonFrom.scale).toBeGreaterThanOrEqual(180);
+    // Behind the hill line (the front layer's solid rows, MOO_HORIZON): its rows there are hidden. It starts about half hidden, rises
+    // until it's clear of it, and its top always stays in the sky (inside the field, never off its top).
+    const hidden = (m: { scale: number; y: number }) => {
+      const box = moonArtBox(m);
+      const r = box.w / 2;
+      const cy = box.y + box.h / 2;
+      let all = 0;
+      let behind = 0;
+      for (let x = Math.ceil(box.x); x < box.x + box.w; x++) {
+        const half = Math.sqrt(Math.max(0, r * r - (x + 0.5 - 100) ** 2));
+        for (let y = Math.ceil(cy - half); y < cy + half; y++) {
+          all++;
+          if (y >= MOO_HORIZON[x]!) behind++;
+        }
+      }
+      return behind / all;
+    };
+    expect(MOO_HORIZON).toHaveLength(200);
+    expect(hidden(steps[0]!)).toBeGreaterThan(0.4);
+    expect(hidden(steps[0]!)).toBeLessThan(0.6);
+    for (let i = 1; i < steps.length; i++) expect(hidden(steps[i]!)).toBeLessThanOrEqual(hidden(steps[i - 1]!));
+    expect(hidden(steps.at(-1)!)).toBeLessThan(0.02);
+    for (const m of steps) expect(moonArtBox(m).y).toBeGreaterThanOrEqual(0);
+    // The light comes from the moon: where it has risen to, and at the cut from where it ends (above the hill line).
+    expect(moonMiddle(b.landed + 2000)).toEqual({ x: 100, y: 80.5 + moonAt(b.landed + 2000)!.y });
+    expect(moonMiddle(b.close - 1).y).toBeCloseTo(80.5 + c.moonTo.y, 0);
+    expect(moonMiddle(b.close)).toEqual({ x: 100, y: 80.5 + c.moonTo.y });
+    expect(moonMiddle(b.close).y).toBeLessThan(MOO_HORIZON[100]!);
     // The light: the glow, then the rays, then the white, whole at the cut; whole a moment into the close-up, gone by the eyes' last step.
     const T = moonLightBeats();
     expect([T.riseAt, T.radiateAt, T.whiteAt, T.whiteFull, T.downAt, T.revealAt]).toEqual([...[T.riseAt, T.radiateAt, T.whiteAt, T.whiteFull, T.downAt, T.revealAt]].sort((x, y) => x - y));
