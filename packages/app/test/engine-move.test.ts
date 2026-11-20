@@ -2,7 +2,8 @@ import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vite
 import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_CHILD, type Settings } from "@chessroyale/core";
 import { legalMoves, type UciEngine } from "@chessroyale/chess";
 import { loadOpenings, SoloMatch } from "../src/solo.ts";
-import { engineMoveTitle } from "../src/components/BossDock.tsx";
+import { engineMoveTitle, winFormLabel } from "../src/components/BossDock.tsx";
+import { FloorPlay } from "../src/tower.ts";
 import { NetMatch } from "../src/net.ts";
 import { seatKey, setQueue, yours } from "../src/board/yours.ts";
 
@@ -147,12 +148,18 @@ describe("Win this form: who sees it", () => {
     expect(shown(false)).toBe(false);
     expect(shown(true)).toBe(false);
   });
-  it("an admin doesn't against another boss, or outside Boss alone", () => {
+  it("an admin sees it against any boss since Nov 20 (\"Win this match\"), in Boss alone or a solo raid with bots; never with no boss", () => {
     who.admin = true;
-    expect(shown(false, raid({ bossId: "clown", bossHidden: false }))).toBe(false);
-    expect(shown(true)).toBe(false);
+    expect(shown(false, raid({ bossId: "clown", bossHidden: false }))).toBe(true);
+    expect(shown(true)).toBe(true);
+    expect(shown(false, DEFAULT_SETTINGS)).toBe(false);
   });
-  it("online, only in the Hidden Boss's room's fight, for an admin (Nov 13, Eric's test kit; the server checks again)", () => {
+  it("its words: \"Win this match\" for every boss, \"Win this form\" for the Hidden Boss's", () => {
+    expect(winFormLabel(false, false)).toBe("Win this match (testing)");
+    expect(winFormLabel(false, true)).toBe("Your next move wins this match (testing)");
+    expect(winFormLabel(true, false)).toBe("Win this form (testing)");
+  });
+  it("online, in any boss battle, for an admin (Nov 13 the Hidden Boss's room's fight; Nov 20 every boss; the server checks again)", () => {
     const shownOnline = (hiddenRoom: boolean, boss: string) => {
       const m = new NetMatch("ABCDE", "Ann", null as never, false);
       m.hiddenRoom = hiddenRoom;
@@ -165,11 +172,57 @@ describe("Win this form: who sees it", () => {
     };
     // (A player, in his room's fight or anywhere: none, and pressing sends nothing.)
     expect(shownOnline(true, "recluse")).toEqual({ on: false, sent: 0, armed: false });
+    expect(shownOnline(false, "clown")).toEqual({ on: false, sent: 0, armed: false });
     who.admin = true;
-    expect(shownOnline(false, "recluse")).toEqual({ on: false, sent: 0, armed: false });
-    expect(shownOnline(true, "clown")).toEqual({ on: false, sent: 0, armed: false });
+    expect(shownOnline(false, "recluse")).toEqual({ on: true, sent: 1, armed: true });
+    expect(shownOnline(false, "clown")).toEqual({ on: true, sent: 1, armed: true });
     expect(shownOnline(true, "recluse")).toEqual({ on: true, sent: 1, armed: true });
   });
+
+  /** A stand-in engine: its searches answer at once with the first legal moves. */
+  const quick = {
+    topMoves: async (fen: string, n: number) => legalMoves(fen).slice(0, n).map((move) => ({ move, expected: 0.5 })),
+    scoreMoves: async (_fen: string, moves: string[]) => moves.map((move) => ({ move, expected: 0.5 })),
+    topMovesAt: async (fen: string) => legalMoves(fen).slice(0, 1).map((move) => ({ move, expected: 0.5 })),
+    playAtElo: async (fen: string) => legalMoves(fen)[0]!,
+  } as unknown as UciEngine;
+  /** Your first turn, 🏆 pressed (greyed then: armed), one move: the boss is beaten as a mate would beat him. */
+  async function winOne(m: SoloMatch) {
+    m.start();
+    for (let i = 0; i < 400 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(100);
+    expect(m.phase.kind).toBe("play");
+    expect(m.winFormShown).toBe(true);
+    m.winForm();
+    expect(m.winFormArmed).toBe(true);
+    m.submit(legalMoves((m.phase as { board: { fen: string } }).board.fen)[0]!);
+    for (let i = 0; i < 400 && !m.boss?.result; i++) await vi.advanceTimersByTimeAsync(100);
+    expect(m.boss!.result).toBe("crowd");
+    expect(m.boss!.crowdMoves).toBe(1);
+  }
+
+  it("Win this match, Boss alone against Boingo: the next move wins, the result as for a mate (Nov 20)", async () => {
+    who.admin = true;
+    const m = new SoloMatch([quick], "Ann", raid({ bossId: "clown", bossHidden: false, bossAloneMaia: 0 }), false, false);
+    await winOne(m);
+    for (let i = 0; i < 400 && m.phase.kind !== "results"; i++) await vi.advanceTimersByTimeAsync(100);
+    expect(m.phase.kind).toBe("results");
+    m.dispose();
+  }, 60_000);
+
+  it("Win this match on a Battle Tower floor (two bosses): the next move wins it, and the floor is reported won", async () => {
+    who.admin = true;
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) });
+    const floor = { towerFloor: 2, bossId: "gingerbread", bossIds: ["gingerbread", "clown"], bossAvoid: "" } satisfies Partial<Settings>;
+    const m = new SoloMatch([quick], "Ann", raid({ bossDifficulty: 0, bossAloneMaia: 0, bossHidden: false, bossUnfinished: false, ...floor }), false, false);
+    m.tower = new FloorPlay({ v: 1, fight: "a1b2c3d4e5f6a7b8c9", floor: 2, bosses: floor.bossIds, settings: floor, beaten: [["moo"]] }, 0);
+    m.tower.begin();
+    const done = vi.spyOn(m.tower, "done").mockImplementation(() => undefined as never);
+    await winOne(m);
+    for (let i = 0; i < 400 && done.mock.calls.length === 0; i++) await vi.advanceTimersByTimeAsync(100);
+    expect(done).toHaveBeenCalledWith("won", 1);
+    m.dispose();
+  }, 60_000);
 
   it("his child beaten (🏆) and grown up: a premove queued in his fall is dropped as the man's game starts, from the start on the same board (the review of the child form online, m2)", async () => {
     who.admin = true;

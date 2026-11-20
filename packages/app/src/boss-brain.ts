@@ -16,10 +16,11 @@ export const isAdmin = () => !!account().profile?.admin;
  */
 export const engineMoveAllowed = (bossAlone: boolean) => BOSS_POWERS.engineMoveButton && bossAlone && isAdmin();
 /**
- * Testing, admins only, Boss alone against the Hidden Boss (Nov 13, for Eric's timing test of his music and phase change): "Win
- * this form" (SoloMatch.winForm). Never for a player.
+ * Testing, admins only, any boss battle on this device (Boss alone, a solo Battle Tower floor; Nov 13 the Hidden Boss's "Win this
+ * form", Nov 20 every boss's "Win this match": docs/decisions/2026-11-20-admin-win-match.md): the 🏆 (SoloMatch.winForm). Never for a
+ * player.
  */
-export const winFormAllowed = (bossAlone: boolean, bossId: string | null | undefined) => bossAlone && bossId === "recluse" && isAdmin();
+export const winFormAllowed = (bossOn: boolean) => bossOn && isAdmin();
 
 /** The brain an admin asked for in the link ("" for the boss's own). */
 export function pickedBrain(): BossBrain | "" {

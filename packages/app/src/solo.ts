@@ -1038,17 +1038,18 @@ export class SoloMatch implements GameView {
     this.armLights();
   }
 
-  /** Testing, admins in Boss alone against the Hidden Boss: "Win this form" shows (winFormAllowed). */
+  /** Testing, admins in any boss battle (Boss alone, a Battle Tower floor): the 🏆 shows, "Win this match" ("Win this form" against the Hidden Boss; winFormAllowed). */
   get winFormShown(): boolean {
-    return winFormAllowed(this.settings.raid && !this.raidBots, this.runner?.boss?.id);
+    return winFormAllowed(!!this.runner?.boss);
   }
   get winFormArmed(): boolean {
     return this.phase.kind === "simul" ? !!this.phase2?.winNext : !!this.runner?.bossForceWin;
   }
   /**
-   * "Win this form" (Nov 13, Eric's timing test): your next move beats his adult form, the same end a mate takes (the runner's
-   * bossForceWin: his fall, the phase change and its music follow as for real); in phase 2, your next move wins every board and
-   * the result plays.
+   * "Win this match" (Nov 20, Eric's tower test; the Hidden Boss's "Win this form", Nov 13): your next move beats the boss (or the
+   * floor's bosses), the same end a mate takes (the runner's bossForceWin: the result, its XP, a tower floor's write and the elevator
+   * up follow as for real; against the Hidden Boss his fall, the phase change and its music); in his phase 2, your next move wins
+   * every board and the result plays.
    */
   winForm() {
     if (!this.winFormShown || this.stopped) return;

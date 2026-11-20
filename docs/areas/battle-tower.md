@@ -243,6 +243,14 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   how many climbed a copy, never who. `?win=1` (Qxf7 mates) only where `TEST_SWITCHES` is on, never an admin's on the live site.
 - Calls made: [2026-11-20-tower-party.md](../decisions/2026-11-20-tower-party.md).
 
+## Admins' 🏆 "Win this match" (Nov 20)
+
+- An admin's 🏆 (beside the ⚡ and 🐟) on any floor, solo or party: pressed, the next move wins the floor as a mate would, so the result,
+  the floor's write and the elevator up follow (docs/areas/bosses.md, "Win this match"). A solo floor's quick win is the device's report:
+  the server takes an admin's at once (`TowerEnv.admin`: `soloWinMinSeconds` holds for everyone else; TEST_SWITCHES as before). A party
+  floor: the room's `winFormTrigger`, an admin's seat only; the floor is then a test game (no XP), its ends written as for real.
+  [2026-11-20-admin-win-match.md](../decisions/2026-11-20-admin-win-match.md).
+
 ## The audit
 
 An independent auditor (Fable, high) checks the build three times (after PRs 6, 10 and 12): its brief is
@@ -270,12 +278,12 @@ rules (Chandy's last chance in every order, Folio's crease line at the floor's r
 for every boss in a pair and two threes (more by hand: `KIT_PARITY_SIDES`); core `tower.test.ts` (the design's table, the deal over 300 seeds and two pools, the run's steps and lives, finding 7's start) and the runner's
 side of finding 7 in `several-bosses.test.ts`; server `tower.test.ts` (the index, every route's happy path and refusals, a result once and
 only for the floor started, the same result sent again, a win too soon, a free leave against a counted one, a floor whose bosses rest
-since it began, a deal that doesn't parse, the best and its cap, the merge, the download and deleting; lives: a life spent and the climb
+since it began, a deal that doesn't parse, the best and its cap, an admin's quick win taken and a player's refused, the merge, the download and deleting; lives: a life spent and the climb
 on, the third loss out, a run saved before lives, floor 99 lost, a counted leave, lives through the merge) and
 `account-data.test.ts` (Ann's climb in every store's world); `e2e/account-delete.spec.ts` (a climb on the local D1: its `e2e/areas.json`
 entry, "The Battle Tower's saving"); `e2e/battle-tower.spec.ts` (the clerk, the elevator, floor 1 won, back in the room, up to floor 2's bar, a reload rejoining, a loss costing a
 life (a heart greyed in the room and the strip) and the climb going on, the third loss ending the run with its floors lost,
-a free leave down to the lobby, Continue after a reload, no Last Stand); the party: server `tower-party.test.ts` (copies to every member,
+a free leave down to the lobby, Continue after a reload, no Last Stand, an admin's 🏆 winning floor 1 and riding up); the party: server `tower-party.test.ts` (copies to every member,
 climbing on together only with the run's own members, someone new a new run once each agreed, a leave, the room's ends, a crate floor,
 alone, the merge and deleting, the party's plan, START and open line; lives (Nov 20): a loss a life on every copy alike, a counted leave
 on the leaver's alone, the fewest lives climbing on together, the third loss out, a life spent in the room never given back by going back

@@ -470,8 +470,8 @@ export interface LobbyRecord {
    */
   party?: PartyLobby;
   /**
-   * Testing (an admin's "Win this form" in the Hidden Boss's room's fight, Nov 13): the team's next move beats his form (the runner's
-   * bossForceWin, which lives on the runner, not in its state: kept here so a restored lobby still has it).
+   * Testing (an admin's 🏆 in any boss battle, Nov 20; the Hidden Boss's "Win this form", Nov 13): the team's next move beats the boss
+   * (the runner's bossForceWin, which lives on the runner, not in its state: kept here so a restored lobby still has it).
    */
   winForm?: true;
   /**
@@ -1658,26 +1658,29 @@ export class LobbyCore {
   }
 
   /**
-   * Testing (Eric, Nov 13: "buttons to instantly win and trigger next phase on the next move"): an admin's "Win this form" in the
-   * Hidden Boss's fight from his room (PartyLobby.room; the Durable Object checks ADMIN_EMAILS and passes `admin`): the team's next
-   * move beats his form by the same end a mate takes (the runner's bossForceWin: stageComplete, then finishBossBattle's "crowd"); online
-   * that's his adult form, then (Nov 13) his phase change and the four boards, where the team's next move wins every board still on
-   * (bosses/recluse.ts). Anyone else, any other battle, a boss not his, a battle over: nothing. The battle is a test game then (no XP), as the ultimate's trigger makes it.
+   * Testing: an admin's 🏆 (the Durable Object checks ADMIN_EMAILS and passes `admin`), in any boss battle (Eric, Nov 20: "end the
+   * current match as like a victory, so I can test going up each floor": a raid, a party's, a Battle Tower party floor; Nov 13 the
+   * Hidden Boss's room's fight only): the team's next move beats the boss by the same end a mate takes (the runner's bossForceWin:
+   * stageComplete, then finishBossBattle's "crowd"; a tower floor's ends follow, takeTowerEnds). Against the Hidden Boss that's his
+   * form, then his phase change and the four boards, where the team's next move wins every board still on (bosses/recluse.ts). Anyone
+   * else (a player, a bot, a spectator), no boss battle, a battle over: nothing. The battle is a test game then (no XP), as the
+   * ultimate's trigger makes it. docs/decisions/2026-11-20-admin-win-match.md.
    */
   winFormTrigger(playerId: string, admin: boolean): boolean {
     const runner = this.runner;
+    if (!admin || !this.human(playerId) || this.r.phase === "results") return false;
     // (His phase 2 on: the team's next move wins every board still on, bosses/recluse.ts.)
-    if (admin && this.r.party?.room && this.human(playerId) && this.r.recluse2 && this.r.phase !== "results") {
+    if (this.r.recluse2) {
       if (!recluseLobby.winForm(this.phase2Lobby)) return false;
       this.r.overrides = { ...this.r.overrides, tested: true };
       console.log(`test trigger: ${playerId} wins the Hidden Boss's four boards in ${this.r.code}`);
       return true;
     }
-    if (!admin || !this.r.party?.room || !this.human(playerId) || !runner?.boss || runner.boss.id !== HIDDEN_ROOM.boss || runner.boss.result || this.r.phase === "results") return false;
+    if (!runner?.boss || runner.boss.result) return false;
     runner.bossForceWin = true;
     this.r.winForm = true;
     this.r.overrides = { ...this.r.overrides, tested: true };
-    console.log(`test trigger: ${playerId} wins the Hidden Boss's form in ${this.r.code}`);
+    console.log(`test trigger: ${playerId} wins the boss battle (${runner.boss.id}) in ${this.r.code}`);
     return true;
   }
 
