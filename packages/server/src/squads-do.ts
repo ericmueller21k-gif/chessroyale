@@ -21,13 +21,16 @@ import { countCall } from "./ops.ts";
 import { LiveReporter } from "./live.ts";
 import { liveHub } from "./live-hub.ts";
 import { isPaused, pausedBosses } from "./kill-switches.ts";
-import { TOWER_LINES, commitPartyFloor, preparePartyFloor, type LobbyGone, type PartyFloorPrep } from "./tower.ts";
+import { TOWER_LINES, commitPartyFloor, preparePartyFloor, type LobbyGone, type PartyFloorPrep, type PartyRefusal } from "./tower.ts";
 import { partyOpenText } from "./town-chat.ts";
-import { chatRoomOf } from "./town-chat-api.ts";
+import { chatRoomOf, townPartyPoster } from "./town-chat-api.ts";
 import { towerPool } from "@chessroyale/core";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
+
+/** A Battle Tower party's plan as the party keeps it (TowerPartyPlan), from a floor ready to begin (tower.ts preparePartyFloor). */
+const planOf = (prep: PartyFloorPrep): TowerPartyPlan["plan"] => (prep.plan.kind === "continue" ? { kind: "continue", floor: prep.floor, back: prep.plan.back } : prep.plan);
 
 /** What a socket carries: who it is once they've said hello, and what the request said about them. */
 interface Attached {
@@ -668,22 +671,42 @@ export class SquadsParty extends DurableObject<Env> {
       await this.persist(core);
     }
     const hub = this.env.LIVE ? liveHub(this.env) : null;
+    const code = this.record.code;
     const core = this.core();
     const lapsed = core.takeLapsedOpen();
     const post = core.takeOpen();
     if (!lapsed && !post) return;
     await this.persist(core);
-    if (lapsed && hub) await hub.townRemove(lapsed.line, lapsed.room).catch(() => undefined);
+    // (Only this party's own line: the town's numbers start again after a restart (the review of #835, finding 4).)
+    if (lapsed && hub) await hub.townRemoveParty(lapsed.line, code, lapsed.room).catch(() => undefined);
     if (post) {
-      const n = hub ? await hub.townPartyOpen(partyOpenText(post.name, post.free), this.record.code, post.room).catch(() => null) : null;
+      const put = hub ? await this.postOpenLine(post, code).catch(() => null) : null;
       if (!this.record) return;
       const after = this.core();
-      after.openPosted(n);
+      if (put && "message" in put) after.openRefused(put.message);
+      else after.openPosted(put ? put.n : null);
       // (It lapsed while it went up: out again at once.)
       const gone = after.takeLapsedOpen();
       await this.persist(after);
-      if (gone && hub) await hub.townRemove(gone.line, gone.room).catch(() => undefined);
+      if (gone && hub) await hub.townRemoveParty(gone.line, code, gone.room).catch(() => undefined);
     }
+  }
+
+  /**
+   * The leader's Open party line, into the town's chat (the review of #835, finding 2): the town chat's checks for the leader first (a
+   * ban, a moderator's chat ban, the chat paused: townPartyPoster), their account's name on it, and the room's one line an account and
+   * its wait between them (TownChat.partyOpen). Its number there, or the words to tell the leader why not.
+   */
+  private async postOpenLine(post: { uid: string; name: string; free: number; room: string }, code: string): Promise<{ n: number } | { message: string }> {
+    const now = Date.now();
+    const may = this.env.DB ? await (async () => {
+      const sql = d1Sql(this.env.DB!);
+      await ensureSchema(sql, this.env.DB);
+      return townPartyPoster(sql, post.uid, now, isPaused(this.env, "town-chat", now));
+    })() : { ok: true as const, name: post.name };
+    if (!may.ok) return { message: may.message };
+    const put = (await liveHub(this.env).townPartyOpen(post.uid, partyOpenText(may.name, post.free), code, post.room)) as { n: number } | { retryMs: number };
+    return "n" in put ? put : { message: TOWER_PARTY_LINES.openWait(put.retryMs) };
   }
 
   /** A member's name here, by account (a plan's words). */
@@ -700,9 +723,15 @@ export class SquadsParty extends DurableObject<Env> {
       return preparePartyFloor(sql, people, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
     })().catch(() => null);
     if (!read) return { kind: "wait", message: TOWER_PARTY_LINES.reading, recheck: true };
-    if (read.ok) return read.prep.plan.kind === "continue" ? { kind: "continue", floor: read.prep.floor } : read.prep.plan;
-    if ("busy" in read) return { kind: "wait", message: read.party ? TOWER_LINES.saving(this.nameOf(read.busy)) : TOWER_LINES.busy(this.nameOf(read.busy)), recheck: true };
-    return { kind: "wait", message: "resting" in read ? TOWER_LINES.resting : TOWER_LINES.noRun, recheck: true };
+    if (read.ok) return planOf(read.prep);
+    return { kind: "wait", message: this.refusalLine(read), recheck: true };
+  }
+
+  /** Why a party floor can't begin, in words (preparePartyFloor's refusal). */
+  private refusalLine(read: PartyRefusal): string {
+    if ("busy" in read) return read.party ? TOWER_LINES.saving(this.nameOf(read.busy)) : TOWER_LINES.busy(this.nameOf(read.busy));
+    if ("gone" in read) return TOWER_LINES.gone(this.nameOf(read.gone));
+    return "resting" in read ? TOWER_LINES.resting : TOWER_LINES.noRun;
   }
 
   /**
@@ -732,10 +761,10 @@ export class SquadsParty extends DurableObject<Env> {
     })().catch(() => null);
     if (!this.record) return;
     if (!read) return fail("Couldn't reach the tower. Try again.");
-    if (!read.ok) return fail("busy" in read ? (read.party ? TOWER_LINES.saving(this.nameOf(read.busy)) : TOWER_LINES.busy(this.nameOf(read.busy))) : "resting" in read ? TOWER_LINES.resting : TOWER_LINES.noRun, true);
+    if (!read.ok) return fail(this.refusalLine(read), true);
     const prep: PartyFloorPrep = read.prep;
     const shown = this.record.tower?.plan;
-    const now = prep.plan.kind === "continue" ? { kind: "continue" as const, floor: prep.floor } : prep.plan;
+    const now = planOf(prep);
     if (!shown || shown.key !== uids.join(",") || JSON.stringify(shown.plan) !== JSON.stringify(now)) return fail(TOWER_LINES.changed, true);
     const code = this.record.code;
     const fight = Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(16).padStart(2, "0")).join("");

@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { BATTLE_TOWER, DEFAULT_SETTINGS, TOWER_PARTY, finishFloor, floorSettings, mulberry32, newRun, towerPartySettings, towerPool, type Settings } from "@chessroyale/core";
+import { BATTLE_TOWER, DEFAULT_SETTINGS, TOWER_PARTY, TOWN_CHAT, finishFloor, floorSettings, mulberry32, newRun, towerPartySettings, towerPool, type Settings } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
-import { commitPartyFloor, finishTowerFloor, membersOf, partyFloorWrite, partyPlan, preparePartyFloor, startTowerFloor, stopTower, towerMoves, towerState, type Fight, type PartyFloorPrep } from "../src/tower.ts";
+import { commitPartyFloor, finishTowerFloor, holdsPartyCopy, membersOf, partyFloorWrite, partyPlan, preparePartyFloor, startTowerFloor, stopTower, towerMoves, towerState, type Fight, type PartyFloorPrep } from "../src/tower.ts";
+import { TownChat } from "../src/town-chat.ts";
 import { PartyCore, TOWER_PARTY_LINES, newPartyRecord } from "../src/squads-party.ts";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 import { partyLobby } from "../src/boss-party.ts";
@@ -150,9 +151,9 @@ describe("teaming up again (Eric: \"how can they all team up again later from th
     await end(sql, fight, [bo.id, ann.id], "won", T0 + 2e6);
     expect(await copyOf(sql, ann.id)).toMatchObject({ floor: 4, seed });
     expect(await copyOf(sql, cy.id)).toMatchObject({ floor: 3, seed });
-    // (All three again: the lowest copy's floor (Cy's 3); Ann's and Bo's copies go back to it.)
+    // (All three again: the lowest copy's floor (Cy's 3); Ann's and Bo's copies go back to it, each named.)
     const three = await begin(sql, [ann.id, bo.id, cy.id], T0 + 3e6);
-    expect(three.prep.plan).toEqual({ kind: "continue", run: membersOf((await copyOf(sql, cy.id))!.members)!.run, floor: 3 });
+    expect(three.prep.plan).toEqual({ kind: "continue", run: membersOf((await copyOf(sql, cy.id))!.members)!.run, floor: 3, back: [{ uid: ann.id, floor: 4 }, { uid: bo.id, floor: 4 }] });
     expect(three.ok).toBe(true);
     for (const u of [ann.id, bo.id, cy.id]) expect(await copyOf(sql, u)).toMatchObject({ floor: 3, fight: JSON.stringify(three.fight) });
     expect(await best(sql, ann.id, "party")).toBe(3);
@@ -183,7 +184,10 @@ describe("teaming up again (Eric: \"how can they all team up again later from th
     expect(partyPlan(["a"], new Map([["a", copy("r", ab, 4)]]))).toEqual({ kind: "new", ends: [{ uid: "a", floor: 4 }] });
     expect(partyPlan(ab, new Map([["a", copy("r", ab, 4)]]))).toEqual({ kind: "new", ends: [{ uid: "a", floor: 4 }] });
     expect(partyPlan(ab, new Map([["a", copy("r", ab, 4)], ["b", copy("s", ab, 4)]]))).toMatchObject({ kind: "new" });
-    expect(partyPlan(ab, new Map([["a", copy("r", ab, 6)], ["b", copy("r", ab, 4)]]))).toEqual({ kind: "continue", run: "r", floor: 4 });
+    expect(partyPlan(ab, new Map([["a", copy("r", ab, 6)], ["b", copy("r", ab, 4)]]))).toEqual({ kind: "continue", run: "r", floor: 4, back: [{ uid: "a", floor: 6 }] });
+    // (The party's own floor (`party`), never a floor won alone above it: the review of #835, finding 1.)
+    const alone = (floor: number, party: number) => ({ floor, members: JSON.stringify({ run: "r", uids: ab, alone: true, party }) });
+    expect(partyPlan(ab, new Map([["a", alone(30, 5)], ["b", alone(9, 5)]]))).toEqual({ kind: "continue", run: "r", floor: 5, back: [{ uid: "a", floor: 30 }, { uid: "b", floor: 9 }] });
     // (A copy that doesn't name a member (an account deleted since and back is another account): new.)
     expect(partyPlan(ab, new Map([["a", copy("r", ["a"], 6)], ["b", copy("r", ab, 4)]]))).toMatchObject({ kind: "new" });
   });
@@ -233,7 +237,93 @@ describe("alone after disbanding", () => {
   });
 });
 
+describe("the party's own floor (the review of #835, finding 1: floors won alone never carry a party up)", () => {
+  it("floors won alone never carry a re-formed party above the floor it reached together (no forged crates or party bests)", async () => {
+    const sql = await world();
+    const [ann, bo] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com")];
+    const first = await begin(sql, [ann.id, bo.id], T0);
+    for (const u of [ann.id, bo.id]) await partyFloorWrite(sql, T0 + 1, first.fight.id, { uid: u, outcome: "left", moves: 0 }, { pool: POOL });
+    const partyDeal = (await copyOf(sql, ann.id))!.met;
+    let t = T0 + 10;
+    for (const uid of [ann.id, bo.id])
+      for (let i = 0; i < 24; i++) {
+        const s = await startTowerFloor(sql, uid, t, { pool: POOL, kind: "party" });
+        t += BATTLE_TOWER.soloWinMinSeconds * 1000 + 1;
+        await finishTowerFloor(sql, uid, t++, { fight: (s.body as { fight: { id: string } }).fight.id, outcome: "won" }, { pool: POOL, minWinMs: BATTLE_TOWER.soloWinMinSeconds * 1000, kind: "party" });
+      }
+    expect(await copyOf(sql, ann.id)).toMatchObject({ floor: 25 });
+    // (Today: { kind: "continue", floor: 25 }, and one party win there paid the floor-25 crate and a party best of 25.)
+    const again = await preparePartyFloor(sql, [ann.id, bo.id], t + 10, { pool: POOL });
+    expect(again.ok && again.prep.plan).toMatchObject({ kind: "continue", floor: 1, back: [{ uid: ann.id, floor: 25 }, { uid: bo.id, floor: 25 }] });
+    // (Begun: both copies back on floor 1 with the party's own deal, no longer alone; a win there pays no crate, and the party best is 1.)
+    const fight: Fight = { id: "f00000000000000099", startedAt: t + 10, lobby: "ROOMC" };
+    expect(again.ok && (await commitPartyFloor(sql, again.prep, fight, t + 10, new Set()))).toBe(true);
+    for (const u of [ann.id, bo.id]) {
+      const c = (await copyOf(sql, u))!;
+      expect(c.floor).toBe(1);
+      expect(JSON.parse(c.met).floors).toEqual(JSON.parse(partyDeal).floors);
+      expect(membersOf(c.members)).toEqual({ run: membersOf(c.members)!.run, uids: [ann.id, bo.id], party: 1 });
+    }
+    const paid: string[] = [];
+    for (const u of [ann.id, bo.id]) await partyFloorWrite(sql, t + 70_000, fight.id, { uid: u, outcome: "won" }, { pool: POOL, crate: async (uid, floor) => void paid.push(`${uid}:${floor}`) });
+    expect(paid).toEqual([]);
+    expect([await best(sql, ann.id, "party"), await best(sql, bo.id, "party")]).toEqual([1, 1]);
+    expect(membersOf((await copyOf(sql, ann.id))!.members)!.party).toBe(2);
+  });
+
+  it("one member played on alone, the other didn't: on from the other's copy (the party's floor), the one alone going back to it", async () => {
+    const sql = await world();
+    const [ann, bo] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com")];
+    const first = await begin(sql, [ann.id, bo.id], T0);
+    await end(sql, first.fight, [ann.id, bo.id], "won", T0 + 60_000);
+    let t = T0 + 70_000;
+    for (let i = 0; i < 3; i++) {
+      const s = await startTowerFloor(sql, ann.id, t, { pool: POOL, kind: "party" });
+      t += BATTLE_TOWER.soloWinMinSeconds * 1000 + 1;
+      expect((await finishTowerFloor(sql, ann.id, t++, { fight: (s.body as { fight: { id: string } }).fight.id, outcome: "won" }, { pool: POOL, minWinMs: 0, kind: "party" })).status).toBe(200);
+    }
+    expect(membersOf((await copyOf(sql, ann.id))!.members)).toMatchObject({ alone: true, party: 2 });
+    const again = await begin(sql, [bo.id, ann.id], t + 1);
+    expect(again.prep.plan).toMatchObject({ kind: "continue", floor: 2, back: [{ uid: ann.id, floor: 5 }] });
+    expect(again.ok).toBe(true);
+    expect((await copyOf(sql, ann.id))!.met).toBe((await copyOf(sql, bo.id))!.met);
+  });
+});
+
 describe("the sign-in merge and deleting an account", () => {
+  it("a seat whose account has been deleted gets no copy, and its id goes into nobody's members (the review of #835, finding 5)", async () => {
+    const sql = await world();
+    const [ann, bo, cy] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com"), await signedIn(sql, "cy@example.com")];
+    await deleteAccount(sql, bo, T0);
+    expect(await preparePartyFloor(sql, [ann.id, bo.id], T0 + 1, { pool: POOL })).toEqual({ ok: false, gone: bo.id });
+    // (Deleted between the plan and its START's commit: the whole batch is refused, nobody's copy written.)
+    const read = await preparePartyFloor(sql, [ann.id, cy.id], T0 + 2, { pool: POOL, seed: 5 });
+    expect(read.ok).toBe(true);
+    await deleteAccount(sql, cy, T0 + 3);
+    const fight: Fight = { id: "f00000000000000098", startedAt: T0 + 4, lobby: "ROOMD" };
+    expect(read.ok && (await commitPartyFloor(sql, read.prep, fight, T0 + 4, new Set()))).toBe(false);
+    expect((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM tower_runs"))!.n).toBe(0);
+  });
+
+  it("merge: a copy naming both the guest and the account it signs in to names the account once; the statement only when the guest holds a party copy (finding 8)", async () => {
+    const sql = await world();
+    const guest = (await createGuest(sql, T0, "Player")).user;
+    const acct = await signedIn(sql, "ann@example.com");
+    const cy = await signedIn(sql, "cy@example.com");
+    // (Where signing in isn't asked for: the guest and the account it later signs in to climbed one run with Cy.)
+    const { fight } = await begin(sql, [guest.id, acct.id, cy.id], T0);
+    await end(sql, fight, [guest.id, acct.id, cy.id], "won", T0 + 60_000);
+    await sql.batch(towerMoves(guest.id, acct.id, T0 + 1, { party: await holdsPartyCopy(sql, guest.id) }));
+    expect(membersOf((await copyOf(sql, cy.id))!.members)!.uids).toEqual([acct.id, cy.id]);
+    expect(membersOf((await copyOf(sql, acct.id))!.members)!.uids).toEqual([acct.id, cy.id]);
+    const data = (await accountDownload(sql, cy, T0 + 2)) as { tower: { runs: Record<string, unknown>[] } };
+    expect(data.tower.runs[0]).toMatchObject({ climbers: 2 });
+    // (A guest with no party copy: no statement reads the party copies.)
+    expect(await holdsPartyCopy(sql, (await createGuest(sql, T0, "Player")).user.id)).toBe(false);
+    expect(towerMoves("g", "a", 1).some((x) => x.sql.includes("json_each"))).toBe(false);
+    expect(towerMoves("g", "a", 1, { party: true }).some((x) => x.sql.includes("json_each"))).toBe(true);
+  });
+
   it("merge: a guest's id in the others' copies becomes the account's (the same person: the run's members still climb it); delete: gone from them", async () => {
     const sql = await world();
     const guest = (await createGuest(sql, T0, "Player")).user;
@@ -242,7 +332,8 @@ describe("the sign-in merge and deleting an account", () => {
     const { fight } = await begin(sql, [guest.id, bo.id, cy.id], T0);
     await end(sql, fight, [guest.id, bo.id, cy.id], "won", T0 + 60_000);
     const acct = "acct-of-the-guest";
-    await sql.batch(towerMoves(guest.id, acct, T0 + 1));
+    expect(await holdsPartyCopy(sql, guest.id)).toBe(true);
+    await sql.batch(towerMoves(guest.id, acct, T0 + 1, { party: true }));
     for (const u of [bo.id, cy.id, acct]) expect(membersOf((await copyOf(sql, u))!.members)!.uids).toEqual([acct, bo.id, cy.id]);
     expect(await best(sql, acct, "party")).toBe(1);
     // (Bo deletes their account: their copy and best go, and their id from Cy's copy.)
@@ -316,7 +407,7 @@ describe("the party (squads-party.ts, kind \"tower\")", () => {
     P.core.message(bo, { t: "open", room: "town" });
     expect(P.core.takeOpen()).toBeNull();
     P.core.message(lead, { t: "open", room: "town" });
-    expect(P.core.takeOpen()).toEqual({ name: "Ann", free: 2, room: "town" });
+    expect(P.core.takeOpen()).toEqual({ uid: "ua", name: "Ann", free: 2, room: "town" });
     P.core.openPosted(41);
     expect(P.view(lead).tower!.open).toBe(true);
     expect(P.core.takeLapsedOpen()).toBeNull();
@@ -333,6 +424,122 @@ describe("the party (squads-party.ts, kind \"tower\")", () => {
     Q.core.openPosted(7);
     Q.core.message(ql, { t: "leave" });
     expect(Q.core.takeLapsedOpen()).toEqual({ line: 7, room: "town" });
+  });
+});
+
+describe("the party, after the review of #835", () => {
+  function party() {
+    let now = T0;
+    const sent: { to: string; msg: PartyServerMessage | Record<string, unknown> }[] = [];
+    let n = 0;
+    const core = new PartyCore(newPartyRecord("TOWER", now, "tower"), { now: () => now, send: (to, msg) => sent.push({ to, msg }), random: () => `r${++n}` });
+    const join = (uid: string, name: string) => (core.connect(undefined, { name, device: "phone", v: SQUADS_PROTOCOL, userId: uid }) as { memberId: string }).memberId;
+    return { core, join, sent, tick: (ms: number) => (now += ms), now: () => now };
+  }
+  /** Everyone ready for `plan` and the leader's START (with `confirm`): the floor's room made (placedIn). */
+  function started(P: ReturnType<typeof party>, lead: string, others: string[], key: string) {
+    P.core.setTowerPlan({ key, plan: { kind: "continue", floor: 3, back: [] } });
+    for (const o of others) P.core.message(o, { t: "ready", on: true });
+    P.core.message(lead, { t: "start" });
+    const s = P.core.takeStart()!;
+    P.core.placedIn("FLOOR", s.id);
+    return s;
+  }
+
+  it("3 (12d): Open party's line lapses with the town's lines (TOWN_CHAT.lineMs after it went up): the button's live again, and the alarm is set for it", () => {
+    const P = party();
+    const lead = P.join("ua", "Ann");
+    P.core.message(lead, { t: "open", room: "town" });
+    expect(P.core.takeOpen()).toEqual({ uid: "ua", name: "Ann", free: 3, room: "town" });
+    P.tick(500);
+    P.core.openPosted(12);
+    expect(P.core.nextAlarm).toBe(P.now() + TOWN_CHAT.lineMs);
+    P.tick(TOWN_CHAT.lineMs - 1);
+    expect(P.core.takeLapsedOpen()).toBeNull();
+    expect(P.core.view(lead).tower!.open).toBe(true);
+    P.tick(1);
+    expect(P.core.takeLapsedOpen()).toEqual({ line: 12, room: "town" });
+    expect(P.core.view(lead).tower!.open).toBe(false);
+    expect(P.core.nextAlarm).toBeNull();
+    // (Open party again: a new line to post.)
+    P.core.message(lead, { t: "open", room: "town" });
+    expect(P.core.takeOpen()).toMatchObject({ uid: "ua" });
+  });
+
+  it("2: the town's refusal (a chat ban, too soon) drops the line and tells the leader its words", () => {
+    const P = party();
+    const lead = P.join("ua", "Ann");
+    P.core.message(lead, { t: "open" });
+    expect(P.core.takeOpen()).not.toBeNull();
+    P.core.openRefused(TOWER_PARTY_LINES.openWait(42_000));
+    expect(P.core.view(lead).tower!.open).toBe(false);
+    expect(P.sent.filter((x) => x.to === lead).map((x) => x.msg)).toContainEqual({ t: "error", message: "You can open a party to the town once a minute. Try again in 42 s." });
+    expect(P.core.takeOpen()).toBeNull();
+  });
+
+  it("6: Kick is greyed while a floor is under way (START to the room's end), live again after; an Open party after a floor stands", () => {
+    const P = party();
+    const lead = P.join("ua", "Ann");
+    const bo = P.join("ub", "Bo");
+    const cy = P.join("uc", "Cy");
+    const s = started(P, lead, [bo, cy], "ua,ub,uc");
+    expect(P.core.view(lead).tower!.floor).toBe(true);
+    P.core.message(lead, { t: "kick", id: bo });
+    expect(P.core.record.members.map((m) => m.userId)).toEqual(["ua", "ub", "uc"]);
+    // (Open party isn't taken during a floor.)
+    P.core.message(lead, { t: "open" });
+    expect(P.core.takeOpen()).toBeNull();
+    P.core.battleOver(s.id);
+    expect(P.core.view(lead).tower!.floor).toBeUndefined();
+    P.core.message(lead, { t: "kick", id: bo });
+    expect(P.core.record.members.map((m) => m.userId)).toEqual(["ua", "uc"]);
+    // (After a floor (the party still "placed"), its line goes up and stands: it lapsed at once before the review.)
+    P.core.message(lead, { t: "open" });
+    expect(P.core.takeOpen()).toMatchObject({ uid: "ua", free: 2 });
+    P.core.openPosted(5);
+    expect(P.core.takeLapsedOpen()).toBeNull();
+  });
+
+  it("10: a plan that takes the leader's copy back floors needs their confirm; the view names who goes back, by member", () => {
+    const P = party();
+    const lead = P.join("ua", "Ann");
+    const bo = P.join("ub", "Bo");
+    P.core.setTowerPlan({ key: "ua,ub", plan: { kind: "continue", floor: 5, back: [{ uid: "ua", floor: 30 }] } });
+    expect(P.core.view(bo).tower!.plan).toEqual({ kind: "continue", floor: 5, back: [{ id: lead, floor: 30 }] });
+    P.core.message(bo, { t: "ready", on: true });
+    P.core.message(lead, { t: "start" });
+    expect(P.core.takeStart()).toBeNull();
+    P.core.message(lead, { t: "start", confirm: true });
+    expect(P.core.takeStart()).not.toBeNull();
+  });
+});
+
+describe("the town's party line (town-chat.ts, the review of #835, findings 2 and 4)", () => {
+  it("one line an account (a newer replaces the older), a new one at most every TOWER_PARTY.openGapMs; a party takes out only its own line", () => {
+    const t = new TownChat();
+    const a = t.partyOpen("ua", "Ann is looking for 3 more to climb the Battle Tower", "AAAAA", T0);
+    expect(a.ok).toBe(true);
+    const n = (a as { line: { n: number } }).line.n;
+    expect(t.partyOpen("ua", "Ann is looking for 3 more", "BBBBB", T0 + 1000)).toEqual({ ok: false, retryMs: TOWER_PARTY.openGapMs - 1000 });
+    const b = t.partyOpen("ua", "Ann is looking for 2 more", "BBBBB", T0 + TOWER_PARTY.openGapMs);
+    expect(b.ok).toBe(true);
+    const snap = t.snapshot(T0 + TOWER_PARTY.openGapMs);
+    expect(snap.lines.filter((l) => l.sys === "party").map((l) => l.party)).toEqual(["BBBBB"]);
+    expect(snap.gone).toContain(n);
+    // (Another account's line stands beside it.)
+    expect(t.partyOpen("ub", "Bo is looking for 3 more", "CCCCC", T0 + TOWER_PARTY.openGapMs).ok).toBe(true);
+    // (A party takes out only its own line: never a line of the same number that's another's, as after a restart.)
+    const m = (b as { line: { n: number } }).line.n;
+    expect(t.removeParty(m, "AAAAA", T0 + TOWER_PARTY.openGapMs + 1)).toBe(false);
+    expect(t.removeParty(m, "BBBBB", T0 + TOWER_PARTY.openGapMs + 1)).toBe(true);
+    const played = t.post({ id: "uz", name: "Zed" }, "hello", T0 + TOWER_PARTY.openGapMs + 2);
+    expect(played.ok && t.removeParty(played.line.n, "CCCCC", T0 + TOWER_PARTY.openGapMs + 3)).toBe(false);
+    expect(t.line(played.ok ? played.line.n : 0, T0 + TOWER_PARTY.openGapMs + 3)).not.toBeNull();
+    // (A deleted account's party line goes with its other lines; everything is gone after its time.)
+    expect(t.dropAccount("ub", T0 + TOWER_PARTY.openGapMs + 4, true)).toBe(true);
+    expect(t.snapshot(T0 + TOWER_PARTY.openGapMs + 4).lines.some((l) => l.party === "CCCCC")).toBe(false);
+    t.sweep(T0 + 2 * TOWER_PARTY.openGapMs + TOWN_CHAT.lineMs);
+    expect(t.empty).toBe(true);
   });
 });
 

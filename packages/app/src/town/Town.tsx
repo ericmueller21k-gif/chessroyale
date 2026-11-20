@@ -828,7 +828,7 @@ export function TownScreen({
       );
     const s = floorS.current;
     // (In a party: its START is the way up, the leader's once everyone's READY: Nov 20.)
-    if (towerParty() && s?.mode === "won") return <TowerPartyUp floor={s.floor} />;
+    if (towerParty() && s?.mode === "won") return <TowerPartyUp />;
     const w = upWords(s?.mode ?? "out", s?.floor ?? 1);
     return (
       <>

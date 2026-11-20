@@ -478,8 +478,12 @@
   cursor: pointer;
 }
 
-/* A Battle Tower party's open line's Join (Nov 20): a small pill after its words, greyed once you're in a party. */
+/* A Battle Tower party's open line's Join (Nov 20): a small pill after its words, greyed once you're in a party. Its box is the widest
+   of its words (every label laid in one grid cell, the others unseen), so a new label never widens it (the review of #835, finding 11). */
 .tc-join {
+  display: inline-grid;
+  justify-items: center;
+  vertical-align: middle;
   margin-left: 6px;
   min-height: 28px;
   padding: 2px 10px;
@@ -495,4 +499,10 @@
 .tc-join:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.tc-join > span {
+  grid-area: 1 / 1;
+}
+.tc-join > .tc-join-size {
+  visibility: hidden;
 }

@@ -17,14 +17,17 @@ import "../tower.css";
  *   climb played on by yourself (from then on solo: Eric, "you can continue on your own, but it's just solo from that point forward").
  * - **Invite friends**: a party (made the first time) and your friends list to invite from.
  * - **Open party**: a party, and its line in the town's chat ("Ann is looking for 3 more to climb the Battle Tower", with Join).
- * The panel under them keeps its size: your solo climb, or, in a party, its seats, what START does (`plan`) and READY or START. Nothing
- * hidden: an option that doesn't apply now shows greyed. `onGo`: a floor of yours is ready, you walk into the elevator (Town.tsx).
+ * The panel under them holds the same things, in the same places, whatever you're doing (Eric's "nothing hidden": the review of #835,
+ * finding 11): the party's four seats (each other member's Kick: the leader's, greyed during a floor), the line saying what START does
+ * (`plan`) or how your climb stands, READY or START and Leave party, then your solo climb (Continue or Start, Start over, Alone). What
+ * doesn't apply now shows greyed: the party's half until you're in one, the solo half while you are. `onGo`: a floor of yours is ready,
+ * you walk into the elevator (Town.tsx).
  */
 export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onBest: (best: number) => void }) {
   const [st, setSt] = useState<TowerState | null>(null);
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState<string | null>(null);
-  const [ask, setAsk] = useState<{ kind: "over"; floor: number } | { kind: "ready" | "start"; floor: number } | null>(null);
+  const [ask, setAsk] = useState<{ kind: "over"; floor: number } | { kind: "ready" | "start"; heading: string; note: string } | { kind: "kick"; id: string; name: string } | null>(null);
   const [inviting, setInviting] = useState(false);
   const [, redraw] = useState(0);
   const alive = useRef(true);
@@ -67,10 +70,17 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
     if (err !== null) setNote(err || null);
     return err === null;
   };
+  /** A press of yours: the party's last refusal (its words on the plan line) is answered. */
+  const fresh = () => {
+    const live = towerParty();
+    if (live) live.error = null;
+  };
   const invite = async () => {
+    fresh();
     if (await party()) setInviting(true);
   };
   const open = async () => {
+    fresh();
     if (await party()) openTowerParty(chatTestRoom() ?? undefined);
   };
   const run = st?.runs.solo ?? null;
@@ -86,15 +96,28 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
   // (Your party copy under way with your party: its floor is the room's; played alone: the clerk's Continue picks it up.)
   const copyBusy = !!copy?.fight?.lobby;
   const seats = Array.from({ length: TOWER_PARTY.max }, (_, seat) => view?.members.find((m) => m.seat === seat) ?? null);
+  // (A floor of the party's under way: no Kick until it ends (the director's call on the review of #835, finding 6).)
+  const floorOn = !!view?.tower?.floor;
   const readyOrStart = (confirmed = false) => {
     if (!p) return;
+    fresh();
     if (leading) {
-      if (plan.endsMine !== null && !confirmed) return setAsk({ kind: "start", floor: plan.endsMine });
+      if (plan.ask && !confirmed) return setAsk({ kind: "start", ...plan.ask });
       return p.start(confirmed);
     }
-    if (!me?.ready && plan.endsMine !== null && !confirmed) return setAsk({ kind: "ready", floor: plan.endsMine });
+    if (!me?.ready && plan.ask && !confirmed) return setAsk({ kind: "ready", ...plan.ask });
     p.ready(!me?.ready);
   };
+  const soloNote = st
+    ? copy && copyBusy
+      ? `Your party is on floor ${copy.floor}.`
+      : run
+        ? "Your run is saved."
+        : copy
+          ? `Your party climb is on floor ${copy.floor}.`
+          : "A climb of 99 floors. One loss ends it."
+    : "Reading your climb…";
+  const status = p ? (p.error ?? note ?? (plan.ok && leading && waiting.length ? `${plan.line} Waiting for ${waiting.map((w) => w.name).join(", ")}.` : plan.line || "Joining…")) : (note ?? soloNote);
   return (
     <div class="tw-desk">
       <div class="tw-desk-ways" role="group" aria-label="How to climb">
@@ -108,63 +131,51 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
           Open party
         </button>
       </div>
-      <div class="tw-desk-panel">
-        {!p ? (
-          <>
-            {run ? (
-              <button type="button" class="town-btn primary" disabled={busy} onClick={() => onGo("solo")}>
-                Continue: floor {run.floor}
-              </button>
-            ) : (
-              <button type="button" class="town-btn primary" disabled={busy || !st} onClick={() => void start(false)}>
-                Start
-              </button>
-            )}
-            <div class="tw-desk-row">
-              <button type="button" class="town-btn tw-over" disabled={busy || !run} onClick={() => run && setAsk({ kind: "over", floor: run.floor })}>
-                Start over
-              </button>
-              <button type="button" class="town-btn tw-over" disabled={busy || !copy || copyBusy} title={copy ? undefined : "No party climb to go on with"} onClick={() => onGo("party")}>
-                {copy ? `Alone: floor ${copy.floor}` : "Alone"}
-              </button>
-            </div>
-            <p class="town-card-text tw-desk-note" role="status">
-              {note ??
-                (st
-                  ? copy && copyBusy
-                    ? `Your party is on floor ${copy.floor}.`
-                    : run
-                      ? "Your run is saved."
-                      : copy
-                        ? `Your party climb is on floor ${copy.floor}.`
-                        : "A climb of 99 floors. One loss ends it."
-                  : "Reading your climb…")}
-            </p>
-          </>
+      <div class={`tw-desk-panel${p ? " in-party" : " solo"}`}>
+        <ul class="tw-seats" aria-label="Your party">
+          {seats.map((m, seat) => (
+            <li key={seat} class={`tw-seat${m ? "" : " free"}${m && !m.connected ? " away" : ""}`} style={{ "--pt-c": PARTY_COLORS[seat] ?? PARTY_COLORS[0] }}>
+              <span class="tw-seat-dot" aria-hidden="true" />
+              <span class="tw-seat-name">{m ? `${m.name}${m.id === p?.memberId ? " (you)" : ""}` : "Open seat"}</span>
+              {m && (m.id === view?.leaderId ? <span class="tw-seat-mark" aria-label="leader">★</span> : m.ready ? <span class="tw-seat-mark" aria-label="ready">✓</span> : null)}
+              {/* (Kick: on each other member's seat, the leader's to press, greyed during a floor; asked first: they never come back in.) */}
+              {m && p && m.id !== p.memberId && m.id !== view?.leaderId && (
+                <button type="button" class="tw-kick" aria-label={`Kick ${m.name}`} disabled={!leading || floorOn} onClick={() => setAsk({ kind: "kick", id: m.id, name: m.name })}>
+                  ✕
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        <p class="town-card-text tw-desk-note tw-plan" role="status">
+          {status}
+        </p>
+        <div class="tw-desk-row">
+          <button type="button" class="town-btn primary" disabled={!p || !view || !plan.ok || (leading && waiting.length > 0)} aria-pressed={p && !leading ? !!me?.ready : undefined} onClick={() => readyOrStart()}>
+            {p && !leading ? (me?.ready ? "READY ✓" : "READY") : "START"}
+          </button>
+          <button type="button" class="town-btn tw-over" disabled={!p} onClick={() => (leaveTowerParty(), void load())}>
+            Leave party
+          </button>
+        </div>
+        {/* (Your solo climb, greyed while you're in a party: Leave party first.) */}
+        {run ? (
+          <button type="button" class="town-btn primary tw-solo-go" disabled={busy || !!p} onClick={() => onGo("solo")}>
+            Continue: floor {run.floor}
+          </button>
         ) : (
-          <>
-            <ul class="tw-seats" aria-label="Your party">
-              {seats.map((m, seat) => (
-                <li key={seat} class={`tw-seat${m ? "" : " free"}${m && !m.connected ? " away" : ""}`} style={{ "--pt-c": PARTY_COLORS[seat] ?? PARTY_COLORS[0] }}>
-                  <span class="tw-seat-dot" aria-hidden="true" />
-                  <span class="tw-seat-name">{m ? `${m.name}${m.id === p.memberId ? " (you)" : ""}` : "Open seat"}</span>
-                  {m && (m.id === view?.leaderId ? <span class="tw-seat-mark" aria-label="leader">★</span> : m.ready ? <span class="tw-seat-mark" aria-label="ready">✓</span> : null)}
-                </li>
-              ))}
-            </ul>
-            <p class="town-card-text tw-desk-note tw-plan" role="status">
-              {p.error ?? note ?? (plan.ok && leading && waiting.length ? `${plan.line} Waiting for ${waiting.map((w) => w.name).join(", ")}.` : plan.line || "Joining…")}
-            </p>
-            <div class="tw-desk-row">
-              <button type="button" class="town-btn primary" disabled={!view || !plan.ok || (leading && waiting.length > 0)} aria-pressed={leading ? undefined : !!me?.ready} onClick={() => readyOrStart()}>
-                {leading ? "START" : me?.ready ? "READY ✓" : "READY"}
-              </button>
-              <button type="button" class="town-btn tw-over" onClick={() => (leaveTowerParty(), void load())}>
-                Leave party
-              </button>
-            </div>
-          </>
+          <button type="button" class="town-btn primary tw-solo-go" disabled={busy || !st || !!p} onClick={() => void start(false)}>
+            Start
+          </button>
         )}
+        <div class="tw-desk-row">
+          <button type="button" class="town-btn tw-over" disabled={busy || !run || !!p} onClick={() => run && setAsk({ kind: "over", floor: run.floor })}>
+            Start over
+          </button>
+          <button type="button" class="town-btn tw-over" disabled={busy || !copy || copyBusy || !!p} title={copy ? undefined : "No party climb to go on with"} onClick={() => onGo("party")}>
+            {copy ? `Alone: floor ${copy.floor}` : "Alone"}
+          </button>
+        </div>
       </div>
       {/* (Over the whole page, not inside the card: the card is placed by a transform.) */}
       {ask &&
@@ -172,8 +183,10 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
           <div class="mm-scrim" onClick={() => setAsk(null)}>
             {ask.kind === "over" ? (
               <Confirm heading="Start over from floor 1?" note={TOWER_WORDS.replace(ask.floor)} go="Start over" onCancel={() => setAsk(null)} onGo={() => (setAsk(null), void start(true))} />
+            ) : ask.kind === "kick" ? (
+              <Confirm heading={`Kick ${ask.name}?`} note="They leave the party and can't come back into it." go="Kick" onCancel={() => setAsk(null)} onGo={() => (setAsk(null), fresh(), p?.kick(ask.id))} />
             ) : (
-              <Confirm heading="Start a new climb?" note={`Your party climb on floor ${ask.floor} ends, and this party starts on floor 1.`} go={ask.kind === "start" ? "Start" : "Ready"} onCancel={() => setAsk(null)} onGo={() => (setAsk(null), readyOrStart(true))} />
+              <Confirm heading={ask.heading} note={ask.note} go={ask.kind === "start" ? "Start" : "Ready"} onCancel={() => setAsk(null)} onGo={() => (setAsk(null), readyOrStart(true))} />
             )}
           </div>,
           document.body,
@@ -193,11 +206,12 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
 
 /**
  * Your party's way up from the floor room (Nov 20): back from a floor it won, the elevator's card is the party's START (the leader's, once
- * everyone's READY) or your READY, with what START does (`plan`: on to floor N+1, or a new climb when the party changed, asked first).
+ * everyone's READY) or your READY, with what START does (`plan`: on to its floor, or a new climb when the party changed; asked first when
+ * it ends your climb or takes it back floors). The leader's button says where START goes, from the plan (the review of #835, finding 10).
  */
-export function TowerPartyUp({ floor }: { floor: number }) {
+export function TowerPartyUp() {
   const [, redraw] = useState(0);
-  const [ask, setAsk] = useState<{ kind: "ready" | "start"; floor: number } | null>(null);
+  const [ask, setAsk] = useState<{ kind: "ready" | "start"; heading: string; note: string } | null>(null);
   useEffect(() => onTowerParty(() => redraw((n) => n + 1)), []);
   const p = towerParty();
   const view = p?.party ?? null;
@@ -208,11 +222,12 @@ export function TowerPartyUp({ floor }: { floor: number }) {
   const waiting = view ? view.members.filter((m) => m.id !== view.leaderId && m.connected && !m.ready) : [];
   const go = (confirmed = false) => {
     if (!p) return;
-    if (plan.endsMine !== null && !confirmed && (leading || !me?.ready)) return setAsk({ kind: leading ? "start" : "ready", floor: plan.endsMine });
+    p.error = null;
+    if (plan.ask && !confirmed && (leading || !me?.ready)) return setAsk({ kind: leading ? "start" : "ready", ...plan.ask });
     if (leading) p.start(confirmed);
     else p.ready(!me?.ready);
   };
-  const word = leading ? `Up to floor ${floor + 1}` : me?.ready ? "READY ✓" : "READY";
+  const word = leading ? plan.up : me?.ready ? "READY ✓" : "READY";
   return (
     <>
       <button type="button" class="town-btn primary" disabled={!view || !plan.ok || (leading && waiting.length > 0)} aria-pressed={leading ? undefined : !!me?.ready} onClick={() => go()}>
@@ -224,7 +239,7 @@ export function TowerPartyUp({ floor }: { floor: number }) {
       {ask &&
         createPortal(
           <div class="mm-scrim" onClick={() => setAsk(null)}>
-            <Confirm heading="Start a new climb?" note={`Your party climb on floor ${ask.floor} ends, and this party starts on floor 1.`} go={ask.kind === "start" ? "Start" : "Ready"} onCancel={() => setAsk(null)} onGo={() => (setAsk(null), go(true))} />
+            <Confirm heading={ask.heading} note={ask.note} go={ask.kind === "start" ? "Start" : "Ready"} onCancel={() => setAsk(null)} onGo={() => (setAsk(null), go(true))} />
           </div>,
           document.body,
         )}

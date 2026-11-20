@@ -377,8 +377,11 @@ export interface LobbyRecord {
   };
   /** Signed-in players' account ids (by player id), so results go on their profiles. */
   accounts?: Record<string, string>;
-  /** A Battle Tower party's floor's ends for its members' copies, waiting to be written in order (lobby-do.ts; server tower.ts partyFloorWrite). */
-  towerQueue?: { fight: string; end: PartyFloorEnd }[];
+  /**
+   * A Battle Tower party's floor's ends for its members' copies, waiting to be written (lobby-do.ts writeTowerEnds; server tower.ts
+   * partyFloorWrite), one a member; `failedAt`: its first failed try (a crate's grant stops holding it up MATCH_SAVE.strictMinutes on).
+   */
+  towerQueue?: { fight: string; end: PartyFloorEnd; failedAt?: number }[];
   /** The match's end has been queued for profiles (saveQueue): everyone's results, once. */
   resultsSaved?: boolean;
   /** Results waiting to be written (lobby-do.ts), oldest first; each leaves only once written. */

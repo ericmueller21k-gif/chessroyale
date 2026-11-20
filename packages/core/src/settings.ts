@@ -1193,11 +1193,11 @@ export const BOSS_PARTY = { max: 3, closeCp: 30, afkKickSec: 60, joinWaitSec: 30
  * The Battle Tower's party (Eric, Nov 18 and 20; docs/decisions/2026-11-20-tower-party.md): Boss Battle's party (its seats, READY and
  * START, Kick and Promote, the party rule) for up to `max` climbers, the tie always the engine's best (`closeCp` 0: Eric's "followed
  * by best engine move if draws"). A party's floor won at one of `crateFloors` pays a crate, once an account (the design's section 3:
- * a party's floor is the server's word, a solo floor the device's). `openLineMinutes`: the clerk's "Open party" line in the town's
- * chat lasts at most this long (the town's lines last TOWN_CHAT.lineMs), and lapses sooner when the party fills, starts or its leader
- * leaves.
+ * a party's floor is the server's word, a solo floor the device's). The clerk's "Open party" line in the town's chat lasts as the town's
+ * lines do (TOWN_CHAT.lineMs, then the button is live again), and lapses sooner when the party fills, starts or its leader leaves; one
+ * line an account at a time (a newer replaces the older), and a new one at most every `openGapMs` (the review of #835, finding 2).
  */
-export const TOWER_PARTY = { max: 4, closeCp: 0, crateFloors: [25, 50, 75, 99] as readonly number[] } as const;
+export const TOWER_PARTY = { max: 4, closeCp: 0, crateFloors: [25, 50, 75, 99] as readonly number[], openGapMs: 60_000 } as const;
 
 /**
  * The Hidden Boss's room challenge (Eric, Nov 12 and 13; docs/decisions/2026-11-13-hidden-boss-challenge.md): in the top-floor room

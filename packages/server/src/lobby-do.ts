@@ -235,21 +235,10 @@ export class Lobby extends DurableObject<Env> {
       await ensureSchema(sql, this.env.DB);
       const env = await withSecrets(this.env);
       const how: SaveContext = { sql, mode: this.mode(), mail: caseMailer(env), signedInOnly: signInRequired(env), paused: isPaused(this.env, "rewards"), off: pausedBosses(this.env) };
-      // A Battle Tower party's floor's ends, first and in order (a leave before the floor's end: its own), each taken out once written
-      // (written again, it changes nothing: tower.ts partyFloorWrite). One that fails stops them for this wake.
-      for (const t of (rec.towerQueue ?? []).slice()) {
-        try {
-          await partyFloorWrite(how.sql, Date.now(), t.fight, t.end, {
-            pool: towerPool(how.off),
-            ...(how.paused ? {} : { crate: (uid: string, floor: number) => grantReward(how.sql, uid, 0, 1, towerCrateKey(floor)) }),
-          });
-          rec.towerQueue!.splice(rec.towerQueue!.indexOf(t), 1);
-          written++;
-        } catch (e) {
-          failure = e;
-          break;
-        }
-      }
+      // A Battle Tower party's floor's ends, first (writeTowerEnds).
+      const tower = await writeTowerEnds(how, rec);
+      written += tower.written;
+      if (tower.failure !== null) failure = tower.failure;
       for (const p of (rec.saveQueue ?? []).slice(0, MATCH_SAVE.perWake)) {
         try {
           await writeResult(how, rec, p);
@@ -817,6 +806,41 @@ export interface SaveContext {
  * except that fair play, XP, the Welcome Crate and the token stop holding the result up MATCH_SAVE.strictMinutes after its first failed
  * try (then logged): a lasting bug in one of them never costs the result, and a minute or two of D1 trouble never costs them.
  */
+/**
+ * A Battle Tower party floor's ends still to write (`towerQueue`), each taken out once written (written again, it changes nothing: tower.ts
+ * partyFloorWrite). Each member has at most one end a floor (LobbyCore.takeTowerEnds' `told`), so one that fails is passed over, not
+ * waited for: it's tried again on the next wake, and the others are written now (the review of #835, finding 7). A crate floor's crate
+ * failing holds its end up for MATCH_SAVE.strictMinutes after its first failed try, as writeResult's rewards: then the floor is written
+ * without its crate (logged), so a lasting fault in the ledger never costs the party's floor. `crate`: the grant (tests stand one in).
+ */
+export async function writeTowerEnds(
+  c: Pick<SaveContext, "sql" | "paused" | "off">,
+  rec: LobbyRecord,
+  now = Date.now(),
+  crate: (sql: Sql, uid: string, floor: number) => Promise<unknown> = (sql, uid, floor) => grantReward(sql, uid, 0, 1, towerCrateKey(floor), now),
+): Promise<{ written: number; failure: unknown }> {
+  let written = 0;
+  let failure: unknown = null;
+  for (const t of (rec.towerQueue ?? []).slice()) {
+    const lenient = t.failedAt !== undefined && now - t.failedAt >= MATCH_SAVE.strictMinutes * 60_000;
+    const pay = (uid: string, floor: number) =>
+      crate(c.sql, uid, floor).catch((e: unknown) => {
+        if (!lenient) throw e;
+        console.log(`towerCrate for ${rec.code}: floor ${floor} written without its crate (${String(e)})`);
+        countCall("lobby.towerCrateFailed");
+      });
+    try {
+      await partyFloorWrite(c.sql, now, t.fight, t.end, { pool: towerPool(c.off), ...(c.paused ? {} : { crate: pay }) });
+      rec.towerQueue!.splice(rec.towerQueue!.indexOf(t), 1);
+      written++;
+    } catch (e) {
+      failure = e;
+      t.failedAt ??= now;
+    }
+  }
+  return { written, failure };
+}
+
 /** Results (and a Battle Tower party floor's ends) still to write. */
 const waitingWrites = (rec: LobbyRecord): number => (rec.saveQueue?.length ?? 0) + (rec.towerQueue?.length ?? 0);
 

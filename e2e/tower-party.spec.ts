@@ -114,8 +114,10 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   await boClerk.getByRole("button", { name: "READY", exact: true }).click();
   await expect(boClerk.getByRole("button", { name: "READY ✓" })).toBeVisible();
 
-  // Ann's START: both into the elevator, the floor room (each the other's pawn walking in), then the match.
-  const start = clerk.getByRole("button", { name: "START" });
+  // Ann's START: both into the elevator, the floor room (each the other's pawn walking in), then the match. (Her solo climb's Start shows
+  // greyed under the party's half: the review of #835, finding 11.)
+  await expect(clerk.getByRole("button", { name: "Start", exact: true })).toBeDisabled();
+  const start = clerk.getByRole("button", { name: "START", exact: true });
   await expect(start).toBeEnabled({ timeout: 20_000 });
   await start.click();
   for (const p of [ann.page, bo.page]) await expect.poll(async () => (await floorNow(p))?.floor ?? null, { timeout: 60_000 }).toBe(1);
@@ -185,8 +187,15 @@ test("the clerk's card: its three ways always there; Open party's line in the to
   // Bo in the town (the same chat): his Join brings him into Ann's party.
   await bo.page.goto(`/town?debug&pace=quick&sky=day&townroom=${chat}`);
   await expect(bo.page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  await line(bo.page).getByRole("button", { name: "Join" }).click();
-  await expect(line(bo.page).getByRole("button", { name: "Joined: see the clerk" })).toBeDisabled({ timeout: 20_000 });
+  const join = line(bo.page).getByRole("button", { name: "Join" });
+  const wide = (await join.boundingBox())!.width;
+  await join.click();
+  // (Joined once the party has welcomed him, its pill no wider; and the press never opened typing: Eric's typing rule, the review of
+  // #835, 12e.)
+  const joined = line(bo.page).getByRole("button", { name: "Joined" });
+  await expect(joined).toBeDisabled({ timeout: 20_000 });
+  expect((await joined.boundingBox())!.width).toBeCloseTo(wide, 0);
+  await expect(bo.page.locator(".tc-form")).toHaveAttribute("data-open", "0");
   await expect(clerk.locator(".tw-seat:not(.free)")).toHaveCount(2, { timeout: 20_000 });
   await expect(clerk.locator(".tw-plan")).toContainText("A new climb from floor 1", { timeout: 20_000 });
   // The friends pop-up (its slide-in done).

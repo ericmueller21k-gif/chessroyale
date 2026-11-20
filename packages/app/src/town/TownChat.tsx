@@ -56,11 +56,18 @@ import { NAME_COLORS, nameColorIndex } from "./names.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { useChatBackground, useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
-import { joinTowerParty, towerParty } from "../tower-party.ts";
+import { joinTowerPartyAnswer, towerParty } from "../tower-party.ts";
 
-/** A party line's Join (Nov 20): into that Battle Tower party (greyed once you're in it or another); the clerk in the tower is its card. */
-function PartyJoin({ code }: { code: string }) {
-  const [state, setState] = useState<"idle" | "busy" | "in" | "gone">(() => (towerParty()?.code === code ? "in" : "idle"));
+/** The Join pill's words (each laid in its box, so the widest sets its size and a change never widens it). */
+const JOIN_WORDS = { idle: "Join", busy: "Join", in: "Joined", gone: "Closed" } as const;
+
+/**
+ * A party line's Join (Nov 20): into that Battle Tower party (greyed once you're in it or another); the clerk in the tower is its card.
+ * "Joined" only once the party has welcomed you; turned away, its words go in your chat as a line only you see (`say`), and Join is
+ * live again (the review of #835, finding 11).
+ */
+function PartyJoin({ code, say }: { code: string; say: (words: string) => void }) {
+  const [state, setState] = useState<"idle" | "busy" | "in" | "gone">(() => (towerParty()?.code === code && towerParty()?.memberId ? "in" : "idle"));
   const busy = state !== "idle" || !!towerParty();
   return (
     <button
@@ -70,10 +77,19 @@ function PartyJoin({ code }: { code: string }) {
       onClick={(e) => {
         e.stopPropagation();
         setState("busy");
-        void joinTowerParty(code).then((ok) => setState(ok ? "in" : "gone"));
+        void joinTowerPartyAnswer(code).then((words) => {
+          if (words === null) say("You're in the party: the clerk in the Battle Tower is its card.");
+          else say(words);
+          setState(words === null ? "in" : words === "That party has closed." ? "gone" : "idle");
+        });
       }}
     >
-      {state === "in" ? "Joined: see the clerk" : state === "gone" ? "Closed" : "Join"}
+      {(["Joined", "Closed"] as const).map((w) => (
+        <span key={w} class="tc-join-size" aria-hidden="true">
+          {w}
+        </span>
+      ))}
+      <span>{JOIN_WORDS[state]}</span>
     </button>
   );
 }
@@ -437,7 +453,7 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
               {/* (A player's line: our pixel emoji drawn for their `:name:` codes, as in every chat; Nov 7.) */}
               {l.kind === "player" ? <ChatText text={l.text} /> : l.text}
               {/* (A Battle Tower party open to the town: Join takes you into it, its clerk's card your party's: Nov 20.) */}
-              {l.party && <PartyJoin code={l.party} />}
+              {l.party && <PartyJoin code={l.party} say={(w) => log.whisper(w)} />}
             </div>
           );
         })}

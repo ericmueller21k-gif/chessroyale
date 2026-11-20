@@ -1,4 +1,4 @@
-import { TOWN_CHAT } from "@chessroyale/core";
+import { TOWER_PARTY, TOWN_CHAT } from "@chessroyale/core";
 import { FILLERS, chatRefusal } from "./text-filter.ts";
 
 /**
@@ -225,6 +225,11 @@ export class TownChat {
   /** When the last "entered" line went out, and the names that came since it (held for one line when TOWN_CHAT.enterBurstMs is up). */
   private lastEnter = -Infinity;
   private entering: string[] = [];
+  /**
+   * Each account's Battle Tower party line (Nov 20; the review of #835, finding 2): its number and when it went up. One an account at a
+   * time (a newer replaces the older), a new one at most every TOWER_PARTY.openGapMs; kept for the longer of that and a line's life.
+   */
+  private parties = new Map<string, { n: number; at: number }>();
 
   constructor(private o: TownChatOptions = TOWN_CHAT) {}
 
@@ -327,11 +332,29 @@ export class TownChat {
   }
 
   /**
-   * A Battle Tower party open to the town (Nov 20): its line, with its code for the app's Join. It lapses sooner than the town's lines
-   * do when the party fills, starts or its leader leaves (the party's Durable Object takes it out: `remove`).
+   * A Battle Tower party open to the town (Nov 20), its leader's (`by`, their account; the party's Durable Object has run the town chat's
+   * checks for them): its line, with its code for the app's Join. One an account: a newer takes the older one's place; a new one sooner
+   * than `gapMs` after the last is refused (`retryMs`). It lapses sooner than the town's lines do when the party fills, starts or its
+   * leader leaves (the party's Durable Object takes it out: `removeParty`).
    */
-  partyOpen(text: string, code: string, now: number): TownLine {
-    return this.notice(text, now, "party", code);
+  partyOpen(by: string, text: string, code: string, now: number, gapMs: number = TOWER_PARTY.openGapMs): { ok: true; line: TownLine } | { ok: false; retryMs: number } {
+    this.sweep(now);
+    const was = this.parties.get(by);
+    if (was && now - was.at < gapMs) return { ok: false, retryMs: was.at + gapMs - now };
+    if (was) this.remove(was.n, now);
+    const line = this.notice(text, now, "party", code);
+    this.parties.delete(by);
+    this.parties.set(by, { n: line.n, at: now });
+    return { ok: true, line };
+  }
+
+  /**
+   * A party's own line taken out by its party (it lapsed): only while line `n` is that party's (`code`), never a line that took its number
+   * since (the room's numbers start again after a restart, and every deploy restarts it: the review of #835, finding 4). Whether it was.
+   */
+  removeParty(n: number, code: string, now: number): boolean {
+    const l = this.held.find((x) => x.n === n);
+    return !!l && l.sys === "party" && l.party === code && this.remove(n, now);
   }
 
   /** A line the server says itself (`sys`), held as players' lines are, for TOWN_CHAT.lineMs. */
@@ -371,7 +394,11 @@ export class TownChat {
     if (forget) this.sent.delete(accountId);
     const mine = this.held.filter((l) => l.from === accountId);
     for (const l of mine) this.remove(l.n, now);
-    return mine.length > 0;
+    // (Their Battle Tower party's line too: it carries their name.)
+    const party = this.parties.get(accountId);
+    const theirs = !!party && this.remove(party.n, now);
+    if (forget) this.parties.delete(accountId);
+    return mine.length > 0 || theirs;
   }
 
   /**
@@ -394,6 +421,12 @@ export class TownChat {
       if (!recent.length) this.sent.delete(id);
       else if (recent.length !== s.length) this.sent.set(id, recent);
     }
+    for (const [id, p] of this.parties) if (now - p.at >= this.partyKeep) this.parties.delete(id);
+  }
+
+  /** How long an account's party line is remembered: its life, or the wait for the next, the longer. */
+  private get partyKeep(): number {
+    return Math.max(this.o.lineMs, TOWER_PARTY.openGapMs);
   }
 
   /** When the next thing held goes (a line, a removal or a send), or null when the room holds nothing. */
@@ -403,13 +436,14 @@ export class TownChat {
     if (this.gone.length) at = Math.min(at, this.gone[0]!.at + this.o.lineMs);
     const keep = Math.max(this.o.repeatMs, this.o.gapMs);
     for (const s of this.sent.values()) if (s.length) at = Math.min(at, s[0]!.at + keep);
+    for (const p of this.parties.values()) at = Math.min(at, p.at + this.partyKeep);
     if (this.entering.length) at = Math.min(at, this.lastEnter + this.o.enterBurstMs);
     return at === Infinity ? null : at;
   }
 
   /** Whether it holds anything at all (tests: nothing outlives its minute). */
   get empty(): boolean {
-    return !this.held.length && !this.gone.length && !this.sent.size;
+    return !this.held.length && !this.gone.length && !this.sent.size && !this.parties.size;
   }
 }
 

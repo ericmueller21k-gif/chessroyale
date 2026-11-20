@@ -93,18 +93,31 @@ export interface Fight {
  * A party copy's `members` (Nov 20): the run it's a copy of (`run`, one key on every member's copy), who climbed it (`uids`: the party
  * that began it, fixed from its first floor: nobody new joins a run), and `alone` while its holder plays it on by themselves (from
  * their first floor alone until the run's members climb it together again).
+ *
+ * `party` (the review of #835, finding 1): the floor this copy last reached with its party, set only by the party's writes (a START's
+ * commit: the floor begun; the match room's write: the floor after), never by the alone routes, so floors won alone (the device's word)
+ * never carry a re-formed party up. While it's played alone, `partyMet` keeps the run's deal as it stood on that floor (copied as its
+ * first floor alone begins, when the copy is still on its party floor), so the party climbs on from there. A copy from before has
+ * neither: its floor stands for both (no party copies existed before this PR).
  */
 export interface PartyMembers {
   run: string;
   uids: string[];
   alone?: true;
+  party?: number;
+  partyMet?: string;
 }
 /** A copy's `members`, or null (a solo run's, or one that doesn't parse). */
 export function membersOf(text: string | null): PartyMembers | null {
   const m = parsed(text);
-  return m && typeof m.run === "string" && Array.isArray(m.uids) ? { run: m.run, uids: strings(m.uids), ...(m.alone === true ? { alone: true as const } : {}) } : null;
+  if (!m || typeof m.run !== "string" || !Array.isArray(m.uids)) return null;
+  const party = typeof m.party === "number" && Number.isInteger(m.party) && m.party >= 1 ? { party: m.party } : {};
+  return { run: m.run, uids: strings(m.uids), ...(m.alone === true ? { alone: true as const } : {}), ...party, ...(typeof m.partyMet === "string" ? { partyMet: m.partyMet } : {}) };
 }
-const membersText = (m: PartyMembers) => JSON.stringify({ run: m.run, uids: m.uids, ...(m.alone ? { alone: true } : {}) });
+const membersText = (m: PartyMembers) =>
+  JSON.stringify({ run: m.run, uids: m.uids, ...(m.alone ? { alone: true } : {}), ...(m.party !== undefined ? { party: m.party } : {}), ...(m.partyMet !== undefined ? { partyMet: m.partyMet } : {}) });
+/** The floor a copy's party reached (`party`; a copy from before: its floor), never above the copy's own. */
+const partyFloorOf = (row: Pick<RunRow, "floor">, m: PartyMembers) => Math.min(row.floor, m.party ?? row.floor);
 /** A device's id for its starts: what the app makes (tower.ts deviceId). */
 const DEVICE_ID = /^[0-9a-f]{16,32}$/;
 
@@ -148,6 +161,7 @@ export const TOWER_LINES = {
   partyStart: "A party's climb starts from its START at the clerk.",
   partyFloor: "Your party is on this floor. Its result comes from the match.",
   busy: (name: string) => `${name} is on a floor of their climb right now.`,
+  gone: (name: string) => `${name}'s account has been deleted. Kick them to climb on.`,
   saving: (name: string) => `${name}'s last floor is still being saved.`,
   changed: "Something changed. Check the plan and ready up again.",
   bad: "Bad request",
@@ -349,9 +363,10 @@ export async function startTowerFloor(sql: Sql, userId: string, now: number, opt
     const floor = run.floors.length;
     if (!started || !started.run.floors[floor - 1]?.length) return { status: 503, body: { message: TOWER_LINES.resting } };
     const fight: Fight = { id: randomHex(9), startedAt: now, ...(device ? { device } : {}) };
-    // (A party copy played on alone is marked so (PartyMembers.alone) as its first floor alone begins.)
+    // (A party copy played on alone is marked so (PartyMembers.alone) as its first floor alone begins; its party floor and the deal
+    // there are kept as they stand then (`party`, `partyMet`): the party's to climb on from, never moved by a floor alone.)
     const m = kind === "party" ? membersOf(row.members) : null;
-    const members = m ? membersText({ ...m, alone: true }) : row.members;
+    const members = !m || m.alone ? row.members : membersText({ ...m, alone: true, party: partyFloorOf(row, m), partyMet: row.met });
     // (Only over the run as it was read: a result or another start in between, and this one reads it again.)
     const done = await sql.first(
       "UPDATE tower_runs SET met = ?, members = ?, fight = ?, updated_at = ? WHERE id = ? AND status = 'open' AND fight IS NULL AND met = ? AND members IS ? RETURNING id",
@@ -540,9 +555,11 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
  * kind's. Two open runs of one kind: the higher floor stays open (the account's on a tie), the other is abandoned; then every run of
  * the guest's is the account's (one open each: the unique index holds). A party copy's `members` naming the guest (a party played
  * where signing in isn't asked for: local and tests) name the account instead: the same person, so the run's members can still climb
- * it together (Nov 20; deleting an account takes its id out of them: towerDeletes).
+ * it together (Nov 20; deleting an account takes its id out of them: towerDeletes); a copy naming both names the account once. That
+ * statement reads every party copy, so it's only in the batch when the guest holds a party copy (`party`: holdsPartyCopy, read before
+ * the batch; in production never, as guests can't sit in a tower party: the review of #835, finding 8).
  */
-export const towerMoves = (from: string, to: string, now: number): Stmt[] => [
+export const towerMoves = (from: string, to: string, now: number, opts: { party?: boolean } = {}): Stmt[] => [
   stmt(
     `INSERT INTO tower_best (user_id, kind, floor, at) SELECT ?, kind, floor, at FROM tower_best WHERE user_id = ?
      ON CONFLICT (user_id, kind) DO UPDATE SET floor = excluded.floor, at = excluded.at WHERE excluded.floor > tower_best.floor`,
@@ -565,8 +582,25 @@ export const towerMoves = (from: string, to: string, now: number): Stmt[] => [
     from,
   ),
   stmt("UPDATE tower_runs SET user_id = ? WHERE user_id = ?", to, from),
-  stmt("UPDATE tower_runs SET members = replace(members, ?, ?) WHERE kind = 'party' AND instr(members, ?) > 0", JSON.stringify(from), JSON.stringify(to), JSON.stringify(from)),
+  ...(opts.party
+    ? [
+        stmt(
+          `UPDATE tower_runs SET members = json_set(members, '$.uids', json((
+             SELECT json_group_array(CASE WHEN value = ? THEN ? ELSE value END) FROM json_each(tower_runs.members, '$.uids')
+             WHERE value <> ? OR NOT EXISTS (SELECT 1 FROM json_each(tower_runs.members, '$.uids') WHERE value = ?))))
+           WHERE kind = 'party' AND json_valid(members) AND EXISTS (SELECT 1 FROM json_each(tower_runs.members, '$.uids') WHERE value = ?)`,
+          from,
+          to,
+          from,
+          to,
+          from,
+        ),
+      ]
+    : []),
 ];
+
+/** Whether this account holds a party copy, open or not (the sign-in merge's towerMoves `party`): one indexed read. */
+export const holdsPartyCopy = async (sql: Sql, userId: string): Promise<boolean> => !!(await sql.first("SELECT 1 AS x FROM tower_runs WHERE user_id = ? AND kind = 'party' LIMIT 1", userId));
 
 /** The last result taken, for the download: its outcome and floor (not the floor's id, the game's own). */
 function lastResult(text: string | null) {
@@ -610,14 +644,18 @@ export const towerDeletes = (userId: string): Stmt[] => [
 
 // ---------------- A party's climb (Nov 20; docs/decisions/2026-11-20-tower-party.md) ----------------
 
-/** What a party's START does, from its people's copies now: their run on together, or a new one (`ends`: the open copies it replaces). */
-export type PartyPlan = { kind: "continue"; run: string; floor: number } | { kind: "new"; ends: { uid: string; floor: number }[] };
+/**
+ * What a party's START does, from its people's copies now: their run on together from the party's floor (`back`: each copy above it,
+ * played on alone, and its floor now: it goes back), or a new one (`ends`: the open copies it replaces).
+ */
+export type PartyPlan = { kind: "continue"; run: string; floor: number; back: { uid: string; floor: number }[] } | { kind: "new"; ends: { uid: string; floor: number }[] };
 
 /**
  * What a party's START does (Eric, Nov 20: "how can they all team up again later from the same starting spot?"): when its people (two
  * or more) each hold an open copy of one run, and every one of them climbed it (each copy's `members`: nobody new joins a run already
- * climbed), they go on with it together, from the lowest floor among their copies (the director's call: nobody is carried up a floor
- * they didn't win with the party). Anything else is a new run from floor 1, for everyone: `ends` names each open party copy it would
+ * climbed), they go on with it together, from the lowest floor any of them reached with the party (each copy's `party`: the director's
+ * call, nobody is carried up a floor they didn't win with the party; floors won alone never count: the review of #835, finding 1), the
+ * copies above it going back to it (`back`, each asked first). Anything else is a new run from floor 1, for everyone: `ends` names each open party copy it would
  * replace (each asked first: Eric, "starting a new party run with another party asks first").
  */
 export function partyPlan(uids: readonly string[], copies: ReadonlyMap<string, Pick<RunRow, "floor" | "members">>): PartyPlan {
@@ -627,7 +665,8 @@ export function partyPlan(uids: readonly string[], copies: ReadonlyMap<string, P
   const run = held[0]!.m!.run;
   const same = held.every((h) => h.m!.run === run && uids.every((u) => h.m!.uids.includes(u)));
   if (!same) return { kind: "new", ends };
-  return { kind: "continue", run, floor: Math.min(...held.map((h) => h.row!.floor)) };
+  const floor = Math.min(...held.map((h) => partyFloorOf(h.row!, h.m!)));
+  return { kind: "continue", run, floor, back: held.flatMap((h) => (h.row!.floor > floor ? [{ uid: h.uid, floor: h.row!.floor }] : [])) };
 }
 
 /** A party floor ready to begin: the plan, its run as the floor starts (its deal; the floor to fight its last), and what the commit checks. */
@@ -646,9 +685,10 @@ export interface PartyFloorPrep {
 
 /**
  * Why a party floor can't begin now: `busy`, the account whose copy has a floor under way (`party`: a party floor its room hasn't
- * written yet; else one they play alone); `resting`, the tower's bosses resting; else a run that can't be played.
+ * written yet; else one they play alone); `gone`, a member whose account has been deleted (no copy for it: the review of #835, finding
+ * 5); `resting`, the tower's bosses resting; else a run that can't be played.
  */
-export type PartyRefusal = { busy: string; party: boolean } | { resting: true } | { broken: true };
+export type PartyRefusal = { busy: string; party: boolean } | { gone: string } | { resting: true } | { broken: true };
 
 /** The open party copies of these accounts, by account. */
 async function partyCopies(sql: Sql, uids: readonly string[]): Promise<Map<string, RunRow>> {
@@ -663,6 +703,10 @@ async function partyCopies(sql: Sql, uids: readonly string[]): Promise<Map<strin
  * the floor: the lowest copy's run on, or a new run from the server's seed. Refused while a copy's floor is under way.
  */
 export async function preparePartyFloor(sql: Sql, uids: readonly string[], now: number, opts: { pool: readonly string[]; lobbyGone?: LobbyGone; seed?: number }): Promise<{ ok: true; prep: PartyFloorPrep } | ({ ok: false } & PartyRefusal)> {
+  // (A seat whose account has been deleted since (its socket still open): no copy is made for it, nor its id written into the others'.)
+  const known = uids.length ? await sql.all<{ id: string }>(`SELECT id FROM users WHERE id IN (${uids.map(() => "?").join(", ")})`, ...uids) : [];
+  const gone = uids.find((u) => !known.some((k) => k.id === u));
+  if (gone) return { ok: false, gone };
   let copies = await partyCopies(sql, uids);
   // (In seat order: the first member whose floor is under way is the one named.)
   for (const uid of uids) {
@@ -679,13 +723,20 @@ export async function preparePartyFloor(sql: Sql, uids: readonly string[], now: 
   let run: TowerRun;
   let members: PartyMembers;
   if (plan.kind === "continue") {
-    const base = [...copies.values()].filter((r) => uids.includes(r.user_id)).sort((a, b) => a.floor - b.floor || uids.indexOf(a.user_id) - uids.indexOf(b.user_id))[0]!;
-    const before = runOf(base);
-    if (!before.floors.length) return { ok: false, broken: true };
+    // (The run's deal on the party's floor: from a copy on that floor, or from one played alone past it, its deal there as kept.)
+    const base = uids
+      .map((u) => copies.get(u)!)
+      .map((r) => {
+        const m = membersOf(r.members)!;
+        return r.floor === plan.floor ? { r, met: r.met } : m.party === plan.floor && m.partyMet ? { r, met: m.partyMet } : null;
+      })
+      .find((x) => x !== null);
+    const before = base ? runOf({ ...base.r, met: base.met }) : null;
+    if (!base || !before || before.floors.length !== plan.floor) return { ok: false, broken: true };
     const started = startFloor(before, opts.pool);
     if (!started || !started.run.floors[before.floors.length - 1]?.length) return { ok: false, resting: true };
     run = started.run;
-    members = { run: plan.run, uids: membersOf(base.members)!.uids };
+    members = { run: plan.run, uids: membersOf(base.r.members)!.uids };
   } else {
     const fresh = newRun(opts.seed ?? crypto.getRandomValues(new Uint32Array(1))[0]!, opts.pool);
     if (!fresh.floors[0]?.length) return { ok: false, resting: true };
@@ -693,6 +744,8 @@ export async function preparePartyFloor(sql: Sql, uids: readonly string[], now: 
     members = { run: randomHex(9), uids: [...uids] };
   }
   const floor = run.floors.length;
+  // (The floor the party begins: its own, on every copy.)
+  members.party = floor;
   return { ok: true, prep: { plan, uids: [...uids], run, members, copies, settings: towerPartySettings(floorSettings(run)), floor, bosses: [...(run.floors[floor - 1] ?? [])] } };
 }
 
@@ -711,7 +764,11 @@ export async function commitPartyFloor(sql: Sql, prep: PartyFloorPrep, fight: Fi
   if (prep.plan.kind === "new") {
     const statements = [
       ...prep.uids.map((u) => stmt("DELETE FROM tower_runs WHERE user_id = ? AND kind = 'party' AND (status <> 'open' OR (? = 1 AND fight IS NULL))", u, ended.has(u) ? 1 : 0)),
-      ...prep.uids.map((u) => stmt(`INSERT INTO tower_runs (${RUN_COLUMNS}) VALUES (?, ?, 'party', ?, ?, ?, ?, ?, NULL, 'open', ?, ?)`, randomHex(12), u, prep.run.seed, floor, met, members, fightText, now, now)),
+      // (Each copy only for an account still there: one deleted since the plan was read makes its user_id NULL, which the table
+      // refuses, so the whole batch is refused and nobody's copy changes: the review of #835, finding 5.)
+      ...prep.uids.map((u) =>
+        stmt(`INSERT INTO tower_runs (${RUN_COLUMNS}) VALUES (?, (SELECT id FROM users WHERE id = ?), 'party', ?, ?, ?, ?, ?, NULL, 'open', ?, ?)`, randomHex(12), u, prep.run.seed, floor, met, members, fightText, now, now),
+      ),
     ];
     try {
       await sql.batch(statements);
@@ -783,7 +840,8 @@ export async function partyFloorWrite(sql: Sql, now: number, fightId: string, en
       "UPDATE tower_runs SET floor = ?, met = ?, members = ?, status = ?, fight = NULL, last = ?, updated_at = ? WHERE id = ? AND fight = ?",
       after.floors.length,
       metOf(after),
-      m ? membersText({ run: m.run, uids: m.uids }) : row.members,
+      // (The party's floor now: the floor after, the party's own (PartyMembers.party); played alone no more.)
+      m ? membersText({ run: m.run, uids: m.uids, party: after.floors.length }) : row.members,
       after.status,
       JSON.stringify({ id: fightId, outcome: end.outcome, floor, status: after.status, party: true }),
       now,

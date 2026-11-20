@@ -344,8 +344,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       if (isPaused(rawEnv, "solo")) return pausedResponse("solo");
       const may = await mayPlay(request, env, waitUntil);
       if (may instanceof Response) return may;
-      // (`?win=1`, a test switch: its floors open where Qxf7 mates the boss, as a solo floor's ?win=1; e2e/tower-party.spec.ts.)
-      const win = url.searchParams.get("win") === "1" && (await testSwitches(request, env, waitUntil));
+      // (`?win=1`, a test switch: its floors open where Qxf7 mates the boss, as a solo floor's ?win=1; e2e/tower-party.spec.ts. Only where
+      // TEST_SWITCHES is on, never an admin's on the live site: a party floor pays everyone in it (the review of #835, finding 9).)
+      const win = url.searchParams.get("win") === "1" && env.TEST_SWITCHES === "1";
       const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "tower", undefined, undefined, win));
       return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
     }

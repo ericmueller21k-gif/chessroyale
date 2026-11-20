@@ -173,6 +173,21 @@ export async function townRemoveResponse(request: Request, hub: TownHub, admin: 
 }
 
 /**
+ * Whether a Battle Tower party's leader may put its Open party line in the town's chat (the review of #835, finding 2): what a typed line
+ * must pass, as townPostResponse (not banned, no moderator's chat ban, the chat not paused; the party itself takes only accounts), with
+ * its words if not; else the name it goes out under (the account's, never the party's; one the filter refuses as "Player"). How often:
+ * the room's (TownChat.partyOpen).
+ */
+export async function townPartyPoster(sql: Sql, userId: string, now: number, paused: boolean): Promise<{ ok: true; name: string } | { ok: false; message: string }> {
+  if (paused) return { ok: false, message: TOWN_CHAT_PAUSED };
+  if ((await caseOf(sql, userId))?.status === "banned") return { ok: false, message: BANNED_FROM_CHAT };
+  if (await chatBlock(sql, userId, now)) return { ok: false, message: CHAT_OFF };
+  const row = await sql.first<{ name: string }>("SELECT name FROM users WHERE id = ?", userId);
+  if (!row) return { ok: false, message: SIGN_IN_TO_TOWN_CHAT };
+  return { ok: true, name: isBlockedText(row.name) ? "Player" : row.name };
+}
+
+/**
  * A boss challenged from the town (Eric, Nov 2: the server's own lines in the town's chat, "Ann challenged Alfil!" and "Ann beat
  * Alfil!"): its battle started (POST /api/boss/solo/start {town: boss}) or that battle finished (POST /api/boss/solo/finish
  * {battle, outcome}, once: the battle is taken off in one statement first). Only for a player who may be in the town's chat

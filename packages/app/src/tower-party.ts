@@ -1,5 +1,5 @@
 import type { NetTowerPlan } from "@chessroyale/chess/squads";
-import { PartyClient, createParty, currentParty, forgetParty, partyStatus } from "./squads.ts";
+import { PartyClient, createParty, currentParty, forgetParty, partyStatus, possessive } from "./squads.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 
 /**
@@ -104,6 +104,39 @@ export async function joinTowerParty(code: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * The town line's Join (the review of #835, finding 11): into the party `code`, answered once the party has said: null once it welcomed
+ * you, else its words (it turned you away, it has closed, or it didn't answer within `waitMs`).
+ */
+export async function joinTowerPartyAnswer(code: string, waitMs = 20_000): Promise<string | null> {
+  if (!(await joinTowerParty(code))) return "That party has closed.";
+  const c = client;
+  if (!c || c.code !== code.toUpperCase()) return "Couldn't join that party. Try again.";
+  return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let off: (() => void) | null = null;
+    const end = (words: string | null) => {
+      if (timer) clearTimeout(timer);
+      off?.();
+      timer = null;
+      off = null;
+      resolve(words);
+    };
+    const check = () => {
+      if (c.memberId) return end(null);
+      if (c.error) return end(c.error);
+      if (c.done) end("Couldn't join that party. Try again.");
+    };
+    off = c.subscribe(check);
+    timer = setTimeout(() => {
+      // (No answer: out again, so the line's Join and the clerk agree.)
+      if (!c.memberId && client === c) leaveTowerParty();
+      end("Couldn't reach that party. Try again.");
+    }, waitMs);
+    check();
+  });
+}
+
 /** A new party (the clerk's Invite friends or Open party), you its leader. Its error's words, or null once you're in. */
 export async function makeTowerParty(): Promise<string | null> {
   if (towerParty()) return null;
@@ -128,15 +161,40 @@ export function leaveTowerParty() {
   use(null);
 }
 
-/** The plan's words for this device (`me`: your member id): what START does, and whether it ends your own party climb (asked first). */
-export function planWords(plan: NetTowerPlan | undefined, me: string | null, nameOf: (id: string) => string): { line: string; endsMine: number | null; ok: boolean } {
-  if (!plan) return { line: "", endsMine: null, ok: false };
-  if (plan.kind === "wait") return { line: plan.message, endsMine: null, ok: false };
-  if (plan.kind === "continue") return { line: `Your climb together goes on: floor ${plan.floor}.`, endsMine: null, ok: true };
+/** What READY or START asks first (your own climb ends, or goes back floors), or null. */
+export interface PlanAsk {
+  heading: string;
+  note: string;
+}
+
+/**
+ * The plan's words for this device (`me`: your member id): what START does (`line`), the up button's words in the floor room (`up`), and
+ * what READY or START asks first (`ask`): when it ends your own party climb, or takes it back floors you played alone (the director's
+ * call on the review of #835, finding 10: "Ann's climb goes back from floor 30", asked first as for an end).
+ */
+export function planWords(plan: NetTowerPlan | undefined, me: string | null, nameOf: (id: string) => string): { line: string; up: string; ask: PlanAsk | null; ok: boolean } {
+  if (!plan) return { line: "", up: "START", ask: null, ok: false };
+  if (plan.kind === "wait") return { line: plan.message, up: "START", ask: null, ok: false };
+  if (plan.kind === "continue") {
+    const back = [...(plan.back ?? [])].sort((a, b) => Number(b.id === me) - Number(a.id === me));
+    const goes = back.map((b, i) => `${b.id === me ? (i ? "yours" : "Your") : possessive(nameOf(b.id))}${i ? "" : " climb goes back"} from floor ${b.floor}`);
+    const mine = back.find((b) => b.id === me)?.floor;
+    return {
+      line: `Your climb together goes on: floor ${plan.floor}.${goes.length ? ` ${goes.join(", ")}.` : ""}`,
+      up: `Up to floor ${plan.floor}`,
+      ask: mine === undefined ? null : { heading: `Back to floor ${plan.floor}?`, note: `Your climb goes back from floor ${mine} to floor ${plan.floor}, where your party left off. Your best floors stay.` },
+      ok: true,
+    };
+  }
   const mine = plan.ends.find((e) => e.id === me)?.floor ?? null;
   const others = plan.ends.filter((e) => e.id !== me).map((e) => `${nameOf(e.id)}'s on floor ${e.floor}`);
   const ending = [...(mine !== null ? [`yours on floor ${mine}`] : []), ...others];
-  return { line: `A new climb from floor 1.${ending.length ? ` It ends ${ending.join(" and ")}.` : ""}`, endsMine: mine, ok: true };
+  return {
+    line: `A new climb from floor 1.${ending.length ? ` It ends ${ending.join(" and ")}.` : ""}`,
+    up: "New climb: floor 1",
+    ask: mine === null ? null : { heading: "Start a new climb?", note: `Your party climb on floor ${mine} ends, and this party starts on floor 1.` },
+    ok: true,
+  };
 }
 
 /** A party floor to go into: its room, your pass and seat, the floor, its bosses and the floors beaten (the run's strip). */

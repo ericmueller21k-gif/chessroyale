@@ -1,4 +1,4 @@
-import { BOSS_DIFFICULTY, BOSS_PARTY, CROWD_PARTY, CROWD_PARTY_MAX, SQUADS, SQUADS_LOBBY, TOWER_PARTY, cleanLook, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
+import { BOSS_DIFFICULTY, BOSS_PARTY, CROWD_PARTY, CROWD_PARTY_MAX, SQUADS, SQUADS_LOBBY, TOWER_PARTY, TOWN_CHAT, cleanLook, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
 import type { LobbyCloseReason } from "@chessroyale/chess";
 import { seatName } from "./text-filter.ts";
 import { SQUADS_PROTOCOL, type NetParty, type NetTowerPlan, type PartyClientMessage, type PartyServerMessage } from "@chessroyale/chess/squads";
@@ -61,13 +61,18 @@ export const KICKED = "You were removed from the party.";
 export const TOWER_PARTY_LINES = {
   needTwo: "A party climbs with two or more. Invite a friend, or open the party to the town.",
   reading: "Reading everyone's climbs…",
+  /** Open party again too soon (TOWER_PARTY.openGapMs: the review of #835, finding 2). */
+  openWait: (ms: number) => `You can open a party to the town once a minute. Try again in ${Math.max(1, Math.ceil(ms / 1000))} s.`,
 } as const;
 
 /**
  * A Battle Tower party's plan as worked out from its people's copies (server tower.ts partyPlan; the Durable Object reads them):
  * for the people it was read for (`key`, their accounts in seat order), what START does, by account; or why it can't yet.
  */
-export type TowerPartyPlan = { key: string; plan: { kind: "continue"; floor: number } | { kind: "new"; ends: { uid: string; floor: number }[] } | { kind: "wait"; message: string } };
+export type TowerPartyPlan = {
+  key: string;
+  plan: { kind: "continue"; floor: number; back?: { uid: string; floor: number }[] } | { kind: "new"; ends: { uid: string; floor: number }[] } | { kind: "wait"; message: string };
+};
 
 /** A 50 v 50 party's refusals (docs/decisions/2026-11-16-crowd-party.md): it's friends only, by invite. */
 export const CROWD_PARTY_LINES = {
@@ -214,7 +219,7 @@ export class PartyCore {
       max: this.max,
       ...(boss && this.r.boss ? { boss: { ...this.r.boss } } : {}),
       ...(crowd ? { kind: "crowd" as const, invited: this.openInvites().map(({ uid, name, expiresAt }) => ({ uid, name, expiresAt })) } : {}),
-      ...(tower ? { kind: "tower" as const, tower: { plan: this.towerPlanView(), open: !!this.r.tower?.open } } : {}),
+      ...(tower ? { kind: "tower" as const, tower: { plan: this.towerPlanView(), open: !!this.r.tower?.open, ...(this.towerFloorOn ? { floor: true as const } : {}) } } : {}),
       state: this.r.state,
       ...(placed ? { placed } : {}),
       ...(this.r.state === "queueing" && this.r.busy ? { busy: { ...this.r.busy } } : {}),
@@ -441,7 +446,9 @@ export class PartyCore {
       }
       case "kick": {
         const m = member(msg.id);
-        if (id !== leader || !m || m.id === id) return;
+        // (A Battle Tower party's floor under way: no Kick until it ends (the director's call on the review of #835, finding 6): a kick
+        // there is a leave, a loss after the party's 2nd move, so a leader could end a member's climb. The match's AFK kick still applies.)
+        if (id !== leader || !m || m.id === id || this.towerFloorOn) return;
         return this.remove(m, true);
       }
       case "promote": {
@@ -544,7 +551,9 @@ export class PartyCore {
       const plan = this.r.tower?.plan;
       if (!plan || plan.key !== this.towerKey() || plan.plan.kind === "wait") return;
       const lead = this.r.members.find((m) => m.id === id);
-      if (plan.plan.kind === "new" && plan.plan.ends.some((e) => e.uid === lead?.userId) && !confirm) return;
+      // (A plan that ends the leader's own climb, or takes it back floors (the review of #835, finding 10), needs their yes.)
+      const mine = plan.plan.kind === "new" ? plan.plan.ends : (plan.plan.back ?? []);
+      if (mine.some((e) => e.uid === lead?.userId) && !confirm) return;
     }
     const people = this.r.members.filter((m) => m.connected && !m.bot);
     const lead = this.r.members.find((m) => m.id === id)!;
@@ -595,9 +604,18 @@ export class PartyCore {
     if (people.length < 2) return { kind: "wait", message: TOWER_PARTY_LINES.needTwo };
     const p = this.r.tower?.plan;
     if (!p || p.key !== people.join(",")) return { kind: "wait", message: TOWER_PARTY_LINES.reading };
-    if (p.plan.kind !== "new") return p.plan;
+    if (p.plan.kind === "wait") return p.plan;
     const idOf = (uid: string) => this.r.members.find((m) => m.userId === uid)?.id ?? "";
-    return { kind: "new", ends: p.plan.ends.map((e) => ({ id: idOf(e.uid), floor: e.floor })).filter((e) => e.id) };
+    const byId = (xs: { uid: string; floor: number }[]) => xs.map((e) => ({ id: idOf(e.uid), floor: e.floor })).filter((e) => e.id);
+    return p.plan.kind === "new" ? { kind: "new", ends: byId(p.plan.ends) } : { kind: "continue", floor: p.plan.floor, back: byId(p.plan.back ?? []) };
+  }
+
+  /**
+   * A Battle Tower party's floor is under way: its START taken (its room being made) or placed, until the room says it's over
+   * (battleOver). Kick is greyed then (the director's call on the review of #835, finding 6), and an Open party line lapses.
+   */
+  private get towerFloorOn(): boolean {
+    return this.r.kind === "tower" && (!!this.r.starting || !!this.r.passes);
   }
 
   /**
@@ -605,37 +623,56 @@ export class PartyCore {
    * while the party is full or its battle is being made.
    */
   private openParty(id: string, room: string) {
-    if (this.r.kind !== "tower" || id !== this.leaderNow() || this.r.tower?.open || this.r.starting || this.r.members.length >= this.max) return;
+    if (this.r.kind !== "tower" || id !== this.leaderNow() || this.r.tower?.open || this.towerFloorOn || this.r.members.length >= this.max) return;
     this.r.tower = { ...(this.r.tower ?? { plan: null }), open: { line: null, at: this.io.now(), by: id, room } };
     this.broadcast();
   }
 
-  /** The open line to post (asked for, not posted yet): its leader's name, the seats still free and the town's chat room. */
-  takeOpen(): { name: string; free: number; room: string } | null {
+  /** The open line to post (asked for, not posted yet): its leader's account and name, the seats still free and the town's chat room. */
+  takeOpen(): { uid: string; name: string; free: number; room: string } | null {
     const o = this.r.tower?.open;
     if (!o || o.line !== null) return null;
     const lead = this.r.members.find((m) => m.id === this.leaderNow());
-    return lead ? { name: lead.name, free: Math.max(0, this.max - this.r.members.length), room: o.room } : null;
+    return lead?.userId ? { uid: lead.userId, name: lead.name, free: Math.max(0, this.max - this.r.members.length), room: o.room } : null;
   }
 
-  /** The open line went up (its number in the town's chat), or couldn't (null: it's dropped, the button live again). */
+  /** The open line went up (its number in the town's chat, from now), or couldn't (null: it's dropped, the button live again). */
   openPosted(line: number | null) {
     const o = this.r.tower?.open;
     if (!o) return;
     if (line === null) delete this.r.tower!.open;
-    else o.line = line;
+    else {
+      o.line = line;
+      o.at = this.io.now();
+    }
     this.broadcast();
+  }
+
+  /** The town's chat refused the leader's line (a chat ban, the chat paused, too soon after the last): dropped, and they're told why. */
+  openRefused(message: string) {
+    const o = this.r.tower?.open;
+    if (!o) return;
+    delete this.r.tower!.open;
+    if (this.r.members.some((m) => m.id === o.by && m.connected)) this.io.send(o.by, { t: "error", message });
+    this.broadcast();
+  }
+
+  /** When the open line lapses with the town's lines (TOWN_CHAT.lineMs after it went up), or null. */
+  private get openLapsesAt(): number | null {
+    const o = this.r.tower?.open;
+    return o && o.line !== null ? o.at + TOWN_CHAT.lineMs : null;
   }
 
   /**
    * The open line lapses when the party fills, its battle starts, or its leader leaves (Eric: "lapses when the party fills or its
-   * leader starts or leaves"; a leader who leaves passes the party on, and the line with their name goes): its number to take out of
-   * the town's chat, once.
+   * leader starts or leaves"; a leader who leaves passes the party on, and the line with their name goes), and with the town's own
+   * lines, TOWN_CHAT.lineMs after it went up (the review of #835, finding 3: the town has dropped it by then, so Open party is live
+   * again): its number to take out of the town's chat, once.
    */
   takeLapsedOpen(): { line: number; room: string } | null {
     const o = this.r.tower?.open;
     if (!o || o.line === null) return null;
-    const lapsed = this.r.members.length >= this.max || !!this.r.starting || this.r.state === "placed" || this.leaderNow() !== o.by;
+    const lapsed = this.r.members.length >= this.max || this.towerFloorOn || this.leaderNow() !== o.by || this.io.now() >= (this.openLapsesAt ?? Infinity);
     if (!lapsed) return null;
     delete this.r.tower!.open;
     this.broadcast();
@@ -719,7 +756,7 @@ export class PartyCore {
 
   /** When to ask again (the Durable Object's alarm), or when a 50 v 50 party's away leader's hold on the lead ends. */
   get nextAlarm(): number | null {
-    const times = [this.r.state === "queueing" && this.r.queue ? this.r.queue.retryAt : null, this.leadHeldUntil(), this.r.tower?.recheckAt ?? null].filter((t): t is number => t !== null);
+    const times = [this.r.state === "queueing" && this.r.queue ? this.r.queue.retryAt : null, this.leadHeldUntil(), this.r.tower?.recheckAt ?? null, this.openLapsesAt].filter((t): t is number => t !== null);
     return times.length ? Math.min(...times) : null;
   }
 

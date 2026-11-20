@@ -504,15 +504,19 @@ export interface NetParty {
    * A Battle Tower party (Nov 20, docs/decisions/2026-11-20-tower-party.md): "tower" (`kind`), seats and READY as a Boss Battle party's.
    * `plan`: what the leader's START does now, from everyone's copies (the server's: their climb on together from a floor, or a new
    * one from floor 1, naming each member whose own party climb it ends, or why it can't yet); `open`: its line stands in the town's
-   * chat ("Open party"). Any change of plan un-readies everyone.
+   * chat ("Open party"); `floor`: a floor of the party's is under way (its START to the room's end: Kick greyed then). Any change of plan
+   * un-readies everyone.
    */
-  tower?: { plan: NetTowerPlan; open: boolean };
+  tower?: { plan: NetTowerPlan; open: boolean; floor?: true };
   /** A 50 v 50 party whose last search stopped because everyone was away (CROWD_PARTY.awayStopMs); gone at the next Find match. */
   stopped?: "away";
 }
 
-/** A Battle Tower party's plan (NetParty.tower): `ends` names members (their ids) whose open party climb (on `floor`) a new run ends. */
-export type NetTowerPlan = { kind: "continue"; floor: number } | { kind: "new"; ends: { id: string; floor: number }[] } | { kind: "wait"; message: string };
+/**
+ * A Battle Tower party's plan (NetParty.tower): `ends` names members (their ids) whose open party climb (on `floor`) a new run ends;
+ * `back`, members whose copy, played on alone, goes back from `floor` to the party's (each asked first, as for `ends`).
+ */
+export type NetTowerPlan = { kind: "continue"; floor: number; back: { id: string; floor: number }[] } | { kind: "new"; ends: { id: string; floor: number }[] } | { kind: "wait"; message: string };
 
 export type PartyClientMessage =
   | { t: "hello"; v: number; token?: string; name?: string; device?: "phone" | "computer"; look?: unknown }
