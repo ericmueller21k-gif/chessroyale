@@ -581,6 +581,12 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 20 ~19:55 UTC
+- #852 primary boss MERGED 2b74a1f (deployed; main green). #853 part-fit MERGED 2f2e264 (watcher b29swf7nh: deploy + main run).
+- #854 levels-500 (full lane, full-e2e label): independent review = no blockers; nits fixed in 56c5a55 (toast names level reached; comments). Delta re-review running; CI watcher bi46lp20u. Merge when both OK. Known: if ever reverted, turn on PAUSE_REWARDS first (old code reads lvl: ops as old levels).
+- End-screen build helper started: session_01JuCWRsaFBsdu6YXSR71bcP, claude/end-screen-build (high). Watcher for .done running.
+- Follow-ups noted: TO MOVE tag over Puddles' head on 3-boss phone floors (pre-existing); Sawyer tints under other bosses' layers on shared floors; admin ult button stick; "next boss crate" line for testers at 9,000-9,499 XP.
+
 ## Nov 20 ~19:15 UTC
 - #852 primary boss: review clean (2 nits fixed in b341f73: Timber clock frozen when off; FAQ line). CI watcher bqhfcsnfm -> merge when green.
 - Part-fit (Haiku, session_01JuCWRv5xBiLwy9YVjc8hCW, claude/tower-part-fit): Puddles' name/meters spill out of his split-bar part. Watcher ba11qr36r.
