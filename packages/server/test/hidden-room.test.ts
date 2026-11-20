@@ -295,7 +295,7 @@ describe("the fight from the room: the four on the party rule, against him; the 
     expect(F.core.takePartyOver()).toBeNull();
   });
 
-  it("Win this form: refused for a player and outside his room's fight; an admin's beats his form on the team's next move, as a mate's end", () => {
+  it("Win this form: refused for a player; an admin's beats his form on the team's next move, as a mate's end", () => {
     const F = roomFight(2, 2);
     F.advance(1000);
     F.advance(60_000);
@@ -323,11 +323,14 @@ describe("the fight from the room: the four on the party rule, against him; the 
     expect(F.runner().boss!.result).toBe("crowd");
   });
 
-  it("Win this form is refused in any other battle (a Boss Battle party's, without `room`)", () => {
+  it("the admin's 🏆 works in any boss battle since Nov 20 (a Boss Battle party's, without `room`), still never a player's", () => {
     const F = roomFight(2, 2);
     delete F.core.record.party!.room;
     F.advance(61_000);
-    expect(F.core.winFormTrigger("p1", true)).toBe(false);
+    expect(F.core.winFormTrigger("p2", false)).toBe(false);
+    expect(F.runner().bossForceWin).toBe(false);
+    expect(F.core.winFormTrigger("p1", true)).toBe(true);
+    expect(F.runner().bossForceWin).toBe(true);
   });
 });
 

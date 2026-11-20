@@ -513,6 +513,11 @@ export interface TowerEnv {
   soloPaused: boolean;
   /** TEST_SWITCHES is "1" here (local, e2e, staging): a win isn't held to BATTLE_TOWER.soloWinMinSeconds. */
   testSwitches: boolean;
+  /**
+   * The session is an admin's (ADMIN_EMAILS, api.ts): neither is their win (the 🏆 "Win this match" ends a floor on their next move:
+   * Eric, Nov 20, docs/decisions/2026-11-20-admin-win-match.md). Everyone else's still is.
+   */
+  admin?: boolean;
   /** Whether a party floor's match room has gone (a party copy's floor whose room never wrote its result: settleStale). */
   lobbyGone?: LobbyGone;
 }
@@ -544,7 +549,7 @@ export async function towerResponse(request: Request, sql: Sql, userId: string, 
   const kind: TowerKind = b.kind === "party" ? "party" : "solo";
   if (path === "/api/tower/run") return kind === "party" ? json({ message: TOWER_LINES.partyStart }, 400) : answer(env.soloPaused ? SOLO_RESTING : await newTowerRun(sql, userId, now, { confirm: b.confirm === true, pool }));
   if (path === "/api/tower/floor/start") return answer(await startTowerFloor(sql, userId, now, { pool, paused: env.soloPaused, device: b.device, kind, ...(env.lobbyGone ? { lobbyGone: env.lobbyGone } : {}) }));
-  if (path === "/api/tower/floor/finish") return answer(await finishTowerFloor(sql, userId, now, b, { pool, minWinMs: env.testSwitches ? 0 : BATTLE_TOWER.soloWinMinSeconds * 1000, kind }));
+  if (path === "/api/tower/floor/finish") return answer(await finishTowerFloor(sql, userId, now, b, { pool, minWinMs: env.testSwitches || env.admin ? 0 : BATTLE_TOWER.soloWinMinSeconds * 1000, kind }));
   return answer(await stopTower(sql, userId, now, b, { pool, kind }));
 }
 

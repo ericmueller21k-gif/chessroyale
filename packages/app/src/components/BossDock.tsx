@@ -622,18 +622,26 @@ export function EngineMove({ match, icon = false }: { match: GameView; icon?: bo
 }
 
 /**
- * Testing, admins only, Boss alone against the Hidden Boss (Nov 13, Eric's timing test of his music and phase change): "Win this
- * form" (SoloMatch.winForm): pressed, your next move beats his adult form (his fall and phase change follow as for a mate) or, in
- * phase 2, wins every board. A tiny 🏆 beside the God King on a phone; in the title line on a computer. Greyed once pressed, and
- * whenever nothing is left to win.
+ * Testing, admins only, any boss battle (Eric, Nov 20: "a button that lets me just end the current match as like a victory, so I can
+ * test going up each floor"; the Hidden Boss's per-form one since Nov 13): "Win this match" (SoloMatch.winForm, online the server's
+ * winFormTrigger): pressed, your next move wins, the same end a mate takes (the result, a Battle Tower floor's write and the elevator
+ * up follow). Against the Hidden Boss "Win this form": his adult form (his fall and phase change follow as for a mate) or, in phase
+ * 2, every board. A tiny 🏆 beside the God King on a phone; in the title line on a computer. Greyed once pressed, and whenever
+ * nothing is left to win.
  */
 export function WinForm({ match, icon = false }: { match: GameView; icon?: boolean }) {
   if (!match.winFormShown || !match.winForm) return null;
   const simul = match.simul;
   const p = match.phase.kind;
   const open = simul ? simul.playing && !simul.decided : p !== "phaseChange" && !match.boss?.result;
-  return <TestButton cls="win-form" icon={icon} glyph="🏆" label={match.winFormArmed ? "Your next move wins this form (testing)" : "Win this form (testing)"} disabled={!open || !!match.winFormArmed} onClick={() => match.winForm?.()} />;
+  return <TestButton cls="win-form" icon={icon} glyph="🏆" label={winFormLabel(!!simul || match.boss?.id === "recluse", !!match.winFormArmed)} disabled={!open || !!match.winFormArmed} onClick={() => match.winForm?.()} />;
 }
+
+/** The 🏆's words: the Hidden Boss's per form (`form`), every other boss's the match. */
+export const winFormLabel = (form: boolean, armed: boolean): string => {
+  const what = form ? "this form" : "this match";
+  return armed ? `Your next move wins ${what} (testing)` : `Win ${what} (testing)`;
+};
 
 /**
  * Testing, admins (Boss alone): the boss's brain at work, e.g. "Maia 1450 · no guard · Maia's #1 · 120 ms"; and

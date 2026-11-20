@@ -436,11 +436,14 @@ export interface GameView {
   readonly engineThinking?: boolean;
   /** Plays Stockfish's best move as your own, through the normal move path. */
   engineMove?(): void;
-  /** Testing, admins against the Hidden Boss: the "Win this form" button shows (Boss alone, and online in his room's fight from the town). */
+  /**
+   * Testing, admins in any boss battle (solo and online, Battle Tower floors too; Nov 20): the 🏆 shows, "Win this match" ("Win this
+   * form" against the Hidden Boss).
+   */
   readonly winFormShown?: boolean;
-  /** It was pressed: your next move wins the form (his adult form, or phase 2's four boards). */
+  /** It was pressed: your next move wins the match (the Hidden Boss's form, or his phase 2's four boards). */
   readonly winFormArmed?: boolean;
-  /** Arms it: your next move beats his adult form (the phase change follows as for a mate), or in phase 2 wins every board. */
+  /** Arms it: your next move beats the boss, the same end a mate takes (the Hidden Boss: his form, or in phase 2 every board). */
   winForm?(): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;

@@ -789,7 +789,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // (A party copy played alone whose party floor's room has gone without its result: let go, free. The room is asked: tower.ts settleStale.)
     const lobbies = (env as { LOBBIES?: DurableObjectNamespace<import("./lobby-do.ts").Lobby> }).LOBBIES;
     const lobbyGone: LobbyGone | undefined = lobbies ? async (f) => (f.lobby ? !(await lobbies.get(lobbies.idFromName(f.lobby)).holdsTowerFloor(f.id)) : null) : undefined;
-    const tower = await towerResponse(request, sql, current.id, { off: pausedBosses(env, now), soloPaused: isPaused(env, "solo", now), testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", ...(lobbyGone ? { lobbyGone } : {}) }, now);
+    const tower = await towerResponse(request, sql, current.id, { off: pausedBosses(env, now), soloPaused: isPaused(env, "solo", now), testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", admin, ...(lobbyGone ? { lobbyGone } : {}) }, now);
     if (tower) return tower;
   }
 

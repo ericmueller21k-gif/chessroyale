@@ -521,6 +521,20 @@ describe("the API", () => {
     expect((await call(d1, cookie, "/api/tower/nope", {})).status).toBe(404);
   });
 
+  it("an admin's quick win (the 🏆, Nov 20) is taken without test switches; a non-admin's on the same server is still too soon", async () => {
+    const { sql, d1 } = await world();
+    const env = { ADMIN_EMAILS: "eric@example.com" };
+    const quick = async (email: string) => {
+      const who = await signedIn(sql, email, Date.now());
+      const cookie = await cookieOf(sql, who.id);
+      await call(d1, cookie, "/api/tower/run", {}, env);
+      const fight = ((await call(d1, cookie, "/api/tower/floor/start", {}, env)).body.fight as { id: string }).id;
+      return call(d1, cookie, "/api/tower/floor/finish", { fight, outcome: "won" }, env);
+    };
+    expect(await quick("eric@example.com")).toMatchObject({ status: 200, body: { status: "open", best: 1, run: { floor: 2 } } });
+    expect(await quick("ann@example.com")).toMatchObject({ status: 409, body: { message: "That floor only just began." } });
+  });
+
   it("a boss resting (its kill switch) is never dealt", async () => {
     const { sql, d1 } = await world();
     const ann = await signedIn(sql, "ann@example.com", Date.now());

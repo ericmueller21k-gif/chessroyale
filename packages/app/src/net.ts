@@ -3,7 +3,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, heldVotes, mulberry32, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, heldVotes, mulberry32, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -193,8 +193,8 @@ export class NetMatch implements GameView {
   partyPass: string | null = null;
   partySeat = 0;
   /**
-   * The Hidden Boss's fight from his room in the town (Nov 13; town/hidden-net.ts): its party battle of four. An admin in it gets "Win
-   * this form" (winFormShown): the team's next move beats his form, the server's doing (LobbyCore.winFormTrigger checks the admin).
+   * The Hidden Boss's fight from his room in the town (Nov 13; town/hidden-net.ts): its party battle of four. (An admin's "Win this
+   * form", as in any boss battle since Nov 20: winFormShown; LobbyCore.winFormTrigger checks the admin.)
    */
   hiddenRoom = false;
   /** A Battle Tower party's floor (Nov 20): the run's strip, and the way back into the tower after it. */
@@ -616,16 +616,19 @@ export class NetMatch implements GameView {
     this.listeners.clear();
   }
 
-  /** Testing, an admin in the Hidden Boss's room's fight: "Win this form" shows (never for a player; the server checks again). */
+  /**
+   * Testing, an admin in any boss battle (a raid, a party's, a Battle Tower party floor, the Hidden Boss's room's fight; Nov 20): the
+   * 🏆 shows, "Win this match" ("Win this form" against the Hidden Boss). Never for a player: the server checks again (winFormTrigger).
+   */
   get winFormShown(): boolean {
-    return this.hiddenRoom && isAdmin() && this.boss?.id === HIDDEN_ROOM.boss;
+    return isAdmin() && !!this.boss;
   }
   get winFormArmed(): boolean {
     const p2 = this.phase2.p;
     if (p2) return (this.winFormSent || !!p2.winNext) && !p2.done;
     return this.winFormSent && !this.boss?.result;
   }
-  /** "Win this form" (Eric's test kit, Nov 13): the team's next move beats his form, by the same end a mate takes, on the server. */
+  /** "Win this match" / "Win this form" (Eric's test kit, Nov 13 and 20): the team's next move beats the boss (his form), by the same end a mate takes, on the server. */
   winForm() {
     // (His phase 2: the team's next move wins every board still on. Before it, his adult form.)
     const p2 = this.phase2.p;
