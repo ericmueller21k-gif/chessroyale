@@ -581,6 +581,11 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 20 ~23:00 UTC
+- Merged today after #855: #856 Saw Swap (live, main green), #857 end-screen sounds (pan level-up, soft last note, XP-scaled pings; + Sawyer gap move-dot fix), #858 boss-bar picker, #859 flakes (shared mate-safe `pickMove` in e2e/helpers.ts; boss-select waits for the figure). Watch main's run on f75947d.
+- Waiting on Eric: God King charge pick A/B/C (notes/briefs/god-king-cry.md; the CC0 yells were rejected: "sound like he's dying"). Optional: Saw Swap scoring of the checking move (judge hook) — asked, no answer.
+- Follow-ups noted: TO MOVE tag over Puddles' head on 3-boss phone floors; Sawyer tints under other bosses' layers on shared floors; admin ult button stick; "next boss crate" line for testers at 9,000-9,499 XP; Saw Swap dock line repeat after a Last Stand (raids).
+
 ## Nov 20 ~21:40 UTC
 - #855 end screen MERGED 65dfe8e (fix: boss headline from bossResult after reload; "X wins" checks). Watcher b262f6icj: deploy + main run.
 - Sounds helper (Fable, medium) started: session_01JuCWRvUXzKxGd3XtTzaqqk, claude/end-screen-sounds. Eric's final picks in notes/briefs/end-screen-sounds.md.
