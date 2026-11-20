@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import { legalMoves } from "@chessroyale/chess";
+import { BATTLE_TOWER } from "@chessroyale/core";
 import { test, asAdmin, submitMove, tapInTown, localSql } from "./helpers.ts";
 
 /**
@@ -155,9 +156,17 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await floorThenMatch(page, 1, 1);
   await heartsAre(page.locator(".tw-strip .tw-hearts").first(), 2);
   await submitMove(page, "h5f7");
-  // The usual result screen, the floor and the run in its line; one button back.
+  // The end screen (Nov 20): "Victory!", the floor in its line, the floor's boss facing your pawn, the rewards to their end (a skip
+  // tap on the headline: 4 moves earn no XP), the next floor's line and one button back.
   const won = page.locator('[data-tower-result="won"]');
-  await expect(won).toContainText("Floor 1 cleared!", { timeout: 120_000 });
+  await expect(page.getByTestId("es-line")).toHaveText("Floor 1 cleared!", { timeout: 120_000 });
+  await expect(page.getByTestId("es-title")).toHaveText("Victory!");
+  await expect(page.getByTestId("es-lineup").locator(".es-fig, .es-portrait")).toHaveCount(1);
+  await expect(page.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: the game ended before move 10.", { timeout: 20_000 });
+  await page.getByTestId("es-title").click();
+  await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 10_000 });
+  await expect(page.locator(".es-quests-none")).toHaveText("No quests moved this game.");
+  await expect(won).toContainText("Next: floor 2");
   const back = won.getByRole("button", { name: "Back to the tower" });
   await expect(back).toBeEnabled({ timeout: 20_000 });
   await still(page, "result-won");
@@ -186,7 +195,12 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(page.getByRole("alertdialog")).toContainText("counts as a loss: it costs a life (1 life left after).");
   await page.getByRole("alertdialog").getByRole("button", { name: "Resign" }).click();
   const lost = page.locator('[data-tower-result="lost"]');
-  await expect(lost).toContainText("You lost floor 2. It still counts: 1 life left.", { timeout: 30_000 });
+  // (The end screen, Nov 20: the floor's line in the headline, red; its two bosses 1-2-1, gloating; never the tower's floor count.)
+  await expect(page.getByTestId("es-line")).toHaveText("Floor 2 lost · 1 life left", { timeout: 30_000 });
+  await expect(page.locator(".es-head")).toHaveClass(/es-loss/);
+  await expect(page.getByTestId("es-lineup").locator(".es-fig, .es-portrait")).toHaveCount(2);
+  await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
+  await expect(page.locator(".es-head")).not.toContainText(String(BATTLE_TOWER.floors));
   await expect(lost).toContainText("Next: floor 3", { timeout: 20_000 });
   await expect(lost.getByRole("button", { name: "Back to the tower" })).toBeEnabled({ timeout: 20_000 });
   await lost.scrollIntoViewIfNeeded();
@@ -204,7 +218,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await still(page, "strip-life-spent");
   // Floor 3 lost too: no life left, still climbing; floor 4's loss (the third) ends the run, its floors lost listed.
   await loseFloor(page, "counts as a loss: it costs a life (no lives left after).");
-  await expect(page.locator('[data-tower-result="lost"]')).toContainText("You lost floor 3. It still counts: no lives left.", { timeout: 30_000 });
+  await expect(page.getByTestId("es-line")).toHaveText("Floor 3 lost · no lives left", { timeout: 30_000 });
   await page.locator('[data-tower-result="lost"]').getByRole("button", { name: "Back to the tower" }).click();
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   await heartsAre(page.locator(".tw-room-lives .tw-hearts"), 0);
@@ -220,7 +234,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await floorThenMatch(page, 4, 3);
   await loseFloor(page, "Your run ends here: leaving now counts as a loss.");
   const out = page.locator('[data-tower-result="out"]');
-  await expect(out).toContainText("Your run ended on floor 4.", { timeout: 30_000 });
+  await expect(page.getByTestId("es-line")).toHaveText("Run over on floor 4", { timeout: 30_000 });
   await expect(out).toContainText("Lost floors 2, 3 and 4. Best solo: floor 1", { timeout: 20_000 });
   await expect(out.getByRole("button", { name: "Back to the tower" })).toBeEnabled({ timeout: 20_000 });
   await out.scrollIntoViewIfNeeded();
@@ -256,7 +270,7 @@ test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, th
   await expect(page.getByRole("button", { name: "Your next move wins this match (testing)" })).toBeDisabled();
   await playAMove(page);
   const won = page.locator('[data-tower-result="won"]');
-  await expect(won).toContainText("Floor 1 cleared!", { timeout: 120_000 });
+  await expect(page.getByTestId("es-line")).toHaveText("Floor 1 cleared!", { timeout: 120_000 });
   expect(await moves(page)).toBe(1);
   await won.getByRole("button", { name: "Back to the tower" }).click();
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
