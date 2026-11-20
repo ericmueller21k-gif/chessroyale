@@ -3,6 +3,7 @@ import { BATTLE_TOWER, BOSS_BRAIN, BOSS_POWERS, mulberry32, newRun, startFloor, 
 import type { BossState, Settings } from "@chessroyale/core";
 import { MatchRunner, bossRules, crowdAllowed, legalMoves, pieceAt, rageOf, rageSpeedOf, rageTick, sideRates } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings, runBattle, sideTracked, type KitBattle } from "./boss-kit-lib.ts";
+import { grows } from "../src/bosses/gardener.ts";
 
 /**
  * Several bosses on one side (Battle Tower PR 6; docs/decisions/2026-11-18-several-bosses.md): the deal, the turn order, the
@@ -522,4 +523,64 @@ describe("several bosses: the design's out-of-turn rules", () => {
     // (Only there: every other move in the order dealt.)
     expect(movers.filter((m, i) => i > 0 && m === movers[i - 1]).length).toBe(1);
   }, 60_000);
+});
+
+describe("several bosses: one primary for the powers that add pieces (BATTLE_TOWER.addsPieces; Eric, Nov 20)", () => {
+  /** What each listed boss's power has added this battle, read from his own part (a balloon even put on Babur's pump counts). */
+  const addedBy = (b: BossState): boolean => {
+    const p = b.powers!;
+    if (b.id === "tiger") return (p.balloon?.placed ?? 0) > 0;
+    if (b.id === "timber") return (p.workshop?.drops ?? 0) > 0;
+    if (b.id === "zebra") return (p.zebra?.drops ?? 0) > 0;
+    if (b.id === "sawyer") return !!p.split?.square;
+    if (b.id === "gardener") return (p.garden?.water?.rolled ?? []).some(grows);
+    throw new Error(`no reading for ${b.id}: a boss added to BATTLE_TOWER.addsPieces needs one here`);
+  };
+  // (Every power early: Babur's balloons ready as they go on, ten seeds at each of Puddles' waterings, the admins' trigger from turn 2.)
+  const fast: Partial<Settings> = { bossStageTest: 4, bossSeedTest: 10 };
+
+  it("the deal: on a tower floor only the first listed boss in turn order keeps it (not the first boss), whoever else is there; one listed, a lone floor or off the tower: none off; a restored battle keeps it", () => {
+    expect(BATTLE_TOWER.addsPieces).toEqual(["tiger", "gardener", "timber", "zebra", "sawyer"]);
+    const offOf = (r: MatchRunner) => r.sideBosses().map((b) => `${b.id}:${!!b.powers!.noAdd}`);
+    expect(offOf(runner(["moo", "zebra", "tiger"], "", 5, { towerFloor: 3 }))).toEqual(["moo:false", "zebra:false", "tiger:true"]);
+    expect(offOf(runner(["sawyer", "gardener", "timber"], "", 5, { towerFloor: 4 }))).toEqual(["sawyer:false", "gardener:true", "timber:true"]);
+    expect(offOf(runner(["moo", "tiger"], "", 5, { towerFloor: 2 }))).toEqual(["moo:false", "tiger:false"]);
+    expect(offOf(runner(["gardener", "tiger"]))).toEqual(["gardener:false", "tiger:false"]);
+    for (const id of BATTLE_TOWER.addsPieces) expect(runner([id], "", 5, { towerFloor: 1 }).boss!.powers!.noAdd).toBeUndefined();
+    // (The view every screen draws, and a battle saved and restored: still off.)
+    const r = runner(["gardener", "tiger"], "", 5, { towerFloor: 2 });
+    expect(r.bossView()!.side!.bosses.map((b) => `${b.id}:${!!b.powers!.noAdd}`)).toEqual(["gardener:false", "tiger:true"]);
+    const back = MatchRunner.restore(JSON.parse(JSON.stringify(r.snapshot())), { settings: r.settings, rng: mulberry32(1), engines: [fakeEngine()], library: [KIT_OPENING] });
+    expect(sideBoss(back, "tiger").powers!.noAdd).toBe(true);
+    expect(sideBoss(back, "gardener").powers!.noAdd).toBeUndefined();
+  });
+
+  it("each listed boss behind another listed one on a tower floor never adds a piece in a played battle (the primary still does); off the tower, the same battle, both do; alone on a floor, his own power is on", async () => {
+    for (const id of BATTLE_TOWER.addsPieces) {
+      // (Babur first, but behind Puddles: Eric's own pair, both ways round.)
+      const primary = id === "tiger" ? "gardener" : "tiger";
+      const added: Record<string, Set<string>> = { tower: new Set(), off: new Set() };
+      for (const where of ["tower", "off"] as const) {
+        const k: KitBattle = { ...battle([primary, id], "", 2, 30), patch: { ...fast, ...(where === "tower" ? { towerFloor: 2 } : {}) } };
+        const run = await runBattle(k, null, (r) => {
+          for (const b of r.sideBosses()) {
+            expect(b.powers!.noAdd, `${b.id} on ${where}`).toBe(where === "tower" && b.id === id ? true : undefined);
+            if (addedBy(b)) added[where]!.add(b.id);
+          }
+        });
+        expect(run.failures).toEqual([]);
+      }
+      expect([...added.tower!], `${primary} + ${id} on a tower floor`).toEqual([primary]);
+      expect(added.off!.has(primary) && added.off!.has(id), `${primary} + ${id} off the tower: ${[...added.off!]}`).toBe(true);
+    }
+    // (Alone on a floor: Babur's balloons and Puddles' grown pieces, Eric's pair, as anywhere.)
+    for (const id of ["tiger", "gardener"]) {
+      let seen = false;
+      await runBattle({ ...battle([id], "", 2, 30), bosses: undefined, patch: { ...fast, towerFloor: 1 } }, null, (r) => {
+        expect(r.boss!.powers!.noAdd).toBeUndefined();
+        seen ||= addedBy(r.boss!);
+      });
+      expect(seen, `${id} alone on a floor`).toBe(true);
+    }
+  }, 240_000);
 });
