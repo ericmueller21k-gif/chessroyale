@@ -65,15 +65,17 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   [the box](../decisions/2026-11-09-xp-box.md)): every counted game's XP is decided on the server (`server/xp.ts` `grantXp`, the rules in
   core's `xp.ts`, the numbers `XP` in settings.ts) and granted through the ledger (asset kind `xp`, the wallet's `xp` column), once per game
   per player. 10 XP a whole minute you played (up to 30), +50 a win, from 10 of your own moves; none for leaving, a test game, a banned
-  account, or a guest where sign-in is set up. Your level is 1 + XP ÷ 1,000 (`levelOf`). Each result row keeps the game's `play_ms`,
+  account, or a guest where sign-in is set up. Your level is 1 + XP ÷ 500 (`levelOf`; 1,000 until Nov 20: [2026-11-20-levels-500.md](../decisions/2026-11-20-levels-500.md)). Each result row keeps the game's `play_ms`,
   `moves` and its XP (`xp_before`, `xp_parts`, `xp_none`); a solo game is timed by the server between `POST /api/xp/solo/start` and its
   `POST /api/results` (table `solo_games`); a solo result it never timed earns nothing, a solo win needs 5 of its minutes, and solo time
   XP is capped at `XP.soloMinutesPerDay` (120) minutes an XP day. A friends' lobby's win pays once an XP day per opponent. A match that rested on one device's word (Nov 10: a host scoring alone, a boss move nobody checked; a Squads lobby of one party) pays as a solo game, under both solo caps; in the Hidden Boss's phase 2 online, a move of his from a device or the server's quick move does so for its board players only (`phase2Unvouched`, Nov 13). Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
 - **The daily reward and level rewards** (Nov 9, phase 2; `server/rewards.ts`, decisions `2026-11-09-xp-phase2-*.md`): the XP day's first
   counted game with `XP.dailyMinMoves` (15) of your own moves (solo: also 3 minutes of the server's time) pays +200 XP ("Daily reward
-  +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`). Each level reached pays a Winter Crate and a crate key (`XP.levelCrates`, 2 until Nov 18),
-  every 10th also a boss crate to pick (`wallets.boss_picks`), once per level (`level:<n>:<ledger id>`), every level owed at the next
-  counted game (at most 20 a game). Both go through the ledger in the game's XP grant; what a game paid is kept on its result
+  +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`). Every other level reached (2, 4, 6, …; `XP.levelRewardEvery`, since Nov 20's levels of 500) pays a Winter Crate and a crate key
+  (`XP.levelCrates`, 2 until Nov 18), every 20th (`XP.bossCrateEvery`, 10 before Nov 20) also a boss crate to pick (`wallets.boss_picks`),
+  once per level (`lvl:<n>:<ledger id>`), every paying level owed at the next counted game (at most 20 a game). The ledger's older
+  `level:<n>` ops are levels of 1,000: counted as today's by reward, the nth crate and key and the nth pick (`paidLevels`), so none is
+  paid again ([2026-11-20-levels-500.md](../decisions/2026-11-20-levels-500.md)). Both go through the ledger in the game's XP grant; what a game paid is kept on its result
   (`results.xp_rewards`) and shown in a toast at the top once the bar fills (`components/RewardBox.tsx`). `PAUSE_REWARDS` grants
   nothing ("Rewards are paused for a moment."). Merge adds the crates and picks; deleting closes them; the download has them. A level
   a merged guest was paid counts as paid for the account (`owedLevels` reads the merge's ledger legs; Nov 10: it was paid again).

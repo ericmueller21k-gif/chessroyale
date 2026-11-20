@@ -475,10 +475,10 @@ test("the XP box on a slow phone: the result screen's frames while the bar fills
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(3 * 60_000);
   await page.addInitScript(instrument);
-  // (990 XP, then a won game counted as 12 minutes: 170 XP, through a level-up. e2e/xp.spec.ts has the fill's own checks.)
-  await page.goto("/?debug&nolanding&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12");
+  // (490 XP, then a won game counted as 12 minutes: 170 XP, through a level-up (500 a level). e2e/xp.spec.ts has the fill's own checks.)
+  await page.goto("/?debug&nolanding&pace=quick&win=1&boss=gingerbread&xp=490&xpgame=12");
   await expect.poll(async () => (await page.context().cookies()).some((c) => c.name === "hc_session"), { timeout: 20_000 }).toBe(true);
-  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { xp?: number }).xp, { timeout: 20_000 }).toBe(990);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { xp?: number }).xp, { timeout: 20_000 }).toBe(490);
   await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   // (Slowed from the mate on: the result screen comes, the box waits for its XP, then fills.)
