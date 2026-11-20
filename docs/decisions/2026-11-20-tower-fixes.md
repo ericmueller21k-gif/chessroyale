@@ -8,8 +8,13 @@ Didn't see it during the game."
   the last move's, the selection's and check's square tints drop to z-index 0, under his layers (1); the pieces (2) stay over all.
   CSS only (`styles.css`, by `:has()`), so every screen that draws him (solo, online, crowd, the tower) agrees. The move dots keep
   z-index 2 (taps, and other bosses' under-layers: the review of #784).
-- **Wrangler's ultimate off in the tower:** `BATTLE_TOWER.noUltimate: ["pig"]`. The runner marks the boss's powers `noUlt` as a tower
-  floor starts (one boss or several, so solo and the party's room agree); the showdown never comes (his line-up, his scout, his "ready"
+- **Wrangler's ultimate off on shared tower floors, once a game everywhere** (Eric, later the same day: "if wrangler is solo in battle
+  tower he fires his ult off still, I noticed it comes early just make sure in all modes for him he can only ult once a game then it turns
+  gray"). `showdownMax` 2 → 1, and Wrangler's rules use the template's once-a-battle pieces as Chandy's do (`ultimateMax`,
+  `spentMeterShown`, `ultimateRunning` keeping the one counted): after it his meter stays on the bar, empty and dimmed ("Rage: no more
+  ultimates this battle"), the trigger refuses. "It comes early" is his designed pace (meter full after his 5th move, `showdownMeterTurns`;
+  Eric, Oct 13: "after three or four moves"): not retuned. `BATTLE_TOWER.noUltimate: ["pig"]`: the runner marks the boss's powers
+  `noUlt` as a tower floor of several starts (alone on a floor he keeps his one; solo and the party's room agree); the showdown never comes (his line-up, his scout, his "ready"
   line, the admins' trigger), and his meter shows empty and dimmed all floor (the existing "paused" look; aria "Rage: no ultimate in the
   Battle Tower"). The gates are generic (prepareTurn's ultimate step, ultimateNow, the test trigger, the meter), plus his own showdown
   checks; a boss added to the list whose ultimate is set up elsewhere needs its own gate (the unit test runs every boss listed).

@@ -436,7 +436,7 @@ export class MatchRunner {
       boss: {
         id: def.id,
         ...this.firstForm(def.id),
-        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(setUp ?? {}), ...this.towerNoUlt(def.id) },
+        powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(setUp ?? {}) },
         tier: this.settings.bossFixedElo || raidBossElo([]),
         // (A tower floor: the floor's strength, no offset or difficulty.)
         elo: this.towerStrength()?.rating ?? bossStrength(this.settings.bossFixedElo || raidBossElo([]), def, this.settings.bossDifficulty),
@@ -2614,8 +2614,8 @@ export class MatchRunner {
   }
 
   /**
-   * A Battle Tower floor (settings.towerFloor) and a boss whose ultimate is off there (BATTLE_TOWER.noUltimate: Wrangler, Eric, Nov 20):
-   * his powers say so from the start (noUlt), the same solo and online. Off the tower: nothing.
+   * A Battle Tower floor of several (settings.towerFloor, startSide) and a boss whose ultimate is off there (BATTLE_TOWER.noUltimate:
+   * Wrangler, Eric, Nov 20): his powers say so from the start (noUlt), the same solo and online. Alone on a floor, or off the tower: nothing.
    */
   private towerNoUlt(id: string): { noUlt?: true } {
     return this.settings.towerFloor && BATTLE_TOWER.noUltimate.includes(id) ? { noUlt: true } : {};

@@ -477,32 +477,38 @@ describe("several bosses: the design's out-of-turn rules", () => {
     expect(movers[replay + 1]?.id).toBe("gingerbread");
   }, 60_000);
 
-  it("a tower floor's boss in BATTLE_TOWER.noUltimate (Wrangler, Eric, Nov 20) never casts his ultimate, his meter empty and dimmed all floor; off the tower he does", async () => {
+  it("a tower floor of several: a boss in BATTLE_TOWER.noUltimate (Wrangler, Eric, Nov 20) never casts his ultimate, his meter empty and dimmed all floor; alone on a floor, or off the tower, he does, once", async () => {
     expect(BATTLE_TOWER.noUltimate).toContain("pig");
     for (const id of BATTLE_TOWER.noUltimate) {
-      // (His ultimate's test switch and the admins' trigger pulled from turn 2: still nothing, on a floor of two and a lone floor.)
+      // (His ultimate's test switch and the admins' trigger pulled from turn 2: still nothing on a floor of two.)
       const test = id === "pig" ? "showdown" : "ultimate";
-      for (const bosses of [[id, id === "gingerbread" ? "clown" : "gingerbread"], null]) {
-        const meters: string[] = [];
-        const k: KitBattle = { ...battle(bosses ?? [id], test, 2, 20), ...(bosses ? {} : { bosses: undefined }), patch: { towerFloor: bosses ? 2 : 1 } };
-        const run = await runBattle(k, null, (r) => {
-          const b = r.several() ? sideBoss(r, id) : r.boss!;
-          expect(b.powers!.noUlt).toBe(true);
-          expect(b.powers!.ultAt).toBeUndefined();
-          // (The view, what every screen draws: his meter at 0, held (dimmed), marked off.)
-          const v = r.bossView()!;
-          const mine = v.side ? v.side.bosses.find((x) => x.id === id)! : v;
-          meters.push(`${mine.powers!.rage}:${mine.powers!.paused}:${mine.powers!.noUlt}:${rageOf(b)}`);
-        });
-        expect(run.failures).toEqual([]);
-        expect(run.events.has(id === "pig" ? "showdown" : "warn")).toBe(false);
-        expect(new Set(meters)).toEqual(new Set(["0:true:true:0"]));
-      }
+      const meters: string[] = [];
+      const k: KitBattle = { ...battle([id, id === "gingerbread" ? "clown" : "gingerbread"], test, 2, 20), patch: { towerFloor: 2 } };
+      const run = await runBattle(k, null, (r) => {
+        const b = sideBoss(r, id);
+        expect(b.powers!.noUlt).toBe(true);
+        expect(b.powers!.ultAt).toBeUndefined();
+        // (The view, what every screen draws: his meter at 0, held (dimmed), marked off.)
+        const mine = r.bossView()!.side!.bosses.find((x) => x.id === id)!;
+        meters.push(`${mine.powers!.rage}:${mine.powers!.paused}:${mine.powers!.noUlt}:${rageOf(b)}`);
+      });
+      expect(run.failures).toEqual([]);
+      expect(run.events.has(id === "pig" ? "showdown" : "warn")).toBe(false);
+      expect(new Set(meters)).toEqual(new Set(["0:true:true:0"]));
     }
-    // (Off the tower: the same battle's showdown comes.)
-    const off = await runBattle(battle(["pig", "gingerbread"], "showdown", 2, 20), null);
-    expect(off.events.has("showdown")).toBe(true);
-  }, 120_000);
+    // (Alone on a tower floor (Eric: "if wrangler is solo in battle tower he fires his ult off still"), and off the tower: his showdown
+    // comes, once a battle, the trigger pulled every turn.)
+    for (const k of [{ ...battle(["pig"], "showdown", 2, 30), bosses: undefined, patch: { towerFloor: 1 } }, battle(["pig", "gingerbread"], "showdown", 2, 30)] as KitBattle[]) {
+      let most = 0;
+      const run = await runBattle(k, null, (r) => {
+        const b = r.several() ? sideBoss(r, "pig") : r.boss!;
+        expect(b.powers!.noUlt).toBeUndefined();
+        most = Math.max(most, b.powers!.ults ?? 0);
+      });
+      expect(run.events.has("showdown")).toBe(true);
+      expect(most).toBe(1);
+    }
+  }, 180_000);
 
   it("Wrangler's reply to the showdown's duel is the side's very next move, out of turn; the order then goes on after him", async () => {
     const movers: string[] = [];
