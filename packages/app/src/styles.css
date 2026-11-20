@@ -17187,8 +17187,9 @@ img.qicon {
 }
 /* While his cut or gap is on the board, the square highlights (the last move, the selection, check) go under it (Eric, Nov 20:
    "the black horse green color on the tile should be behind the 'cut'"): back to the squares' own layer, under his z-index 1,
-   the pieces (2) still over everything. The move dots stay over (taps, other bosses' under-layers: review of #784). */
-.board-wrap:has(> .sw-gap, > .sw-cut-board) .hb square:is(.last-move, .selected, .check) {
+   the pieces (2) still over everything. The move dots stay over (taps, other bosses' under-layers: review of #784), a dot on a
+   last-move or check square too (sawyer.spec:239 on CI, Nov 20: such a dot went under the gap). */
+.board-wrap:has(> .sw-gap, > .sw-cut-board) .hb square:is(.last-move, .selected, .check):not(.move-dest) {
   z-index: 0;
 }
 

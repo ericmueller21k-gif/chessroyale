@@ -31,7 +31,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   (review of #575, m3). **After a game that moved a quest** (Nov 10, [decision](../decisions/2026-11-10-quest-progress.md)): home compares the counts
   with the ones this device last saw (`hunchess.quests.shown`, per account) and opens it by itself (same "never over" rules), each moved bar sliding to
   its new count in turn (`QUESTS.show`); one it finishes glows, pops, says "Done!" and bursts its reward; sounds by name (`questSound` in sound.ts,
-  placeholders until Eric's pack: `QUEST_SOUND_FILES`). e2e sets `hunchess.quests.noPop` unless `questsSeen: false`. The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
+  placeholders until Eric's pack: `QUEST_SOUND_FILES`; "done" is the shared steel pan level-up, `END_SCREEN.levelUp`, since Nov 20). e2e sets `hunchess.quests.noPop` unless `questsSeen: false`. The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
   every button keeps 40 px) and a computer's **Daily Quests** in its side menu, between Play with friends and Shop & crates (`nav.quests`: home with the
   overlay open, via `intent`; Eric, Nov 10, [decision](../decisions/2026-11-10-desktop-quests.md); nothing on the card); for everyone, greyed ("Sign in
   for quests") for a guest where sign-in is set up. A game that finishes a quest says so in its result's toast ("Quest done: Boss Hunter +300 XP").

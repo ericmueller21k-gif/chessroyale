@@ -1,0 +1,8 @@
+# End screen sounds: the steel pan level-up, a soft last note, pings that rise with the XP (Nov 20, 2026)
+
+**Eric, Nov 20**, after listening to demos: "the pan is actually better than the bells ... let's make that the official one for now ... I don't want to get hung up on this ... the other ones sound good, the different XP ones." Of the old pings: "it sounds like it jumps"; "if you only get 100 XP, then it wouldn't do that. But say if you got like 500 XP ... it would get higher pitched, and then it would only stay there for maybe like a second."
+
+- **Level-up**: one sound in the steel pan (the reveal's default voice): G5 C6 E6 G6 60 ms apart, then a C6 E6 G6 C7 chord at 0.3 s. It replaces the mallet chime everywhere it played: the end screen's level-up, auto chess's (`acLevel`) and a finished quest (`questDone`; a quest pack's file still overrides). The old chime is removed from auto chess's pack.
+- **The fill's last note** (`xpDing`, was a bright two-note bell: "goofy"): one soft pan G6.
+- **Pings**: the pitch follows the XP counted so far, not this game's share: C6 up 9 semitones, eased, reaching the top with about 1 s of a 500 XP fill left. The count-up's: the same an octave down. The fill's longest is 2.8 s (was 2.2 s). All in `END_SCREEN` (`ping`, `levelUp`, `ding`, `fillMs`); the rule is `xpPingHz` in core's xp.ts.
+- **Calls made**: the level-up is trimmed by one number (`levelUp.gain` 0.4) so its peak stays under half a move's, as every synthesized sound's; the last note's level is 0.35 (the brief's 0.6 was for an untrimmed level-up). RP's pings count a full RP bar as a level of XP. The longer fill applies to RP too (same setting). The level-up is made as it plays, not in the sound worker (8 short notes).
