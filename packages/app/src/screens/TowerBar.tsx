@@ -77,7 +77,7 @@ const PART_FIGURE_H = 46;
 
 /** A figure's drawn part in its idle's first frame (sprite px): its canvas has room around it for his moves and props. */
 const drawn = new Map<string, { top: number; bottom: number; left: number; right: number }>();
-function drawnBox(name: string, art: Character, idle: string): { top: number; bottom: number; left: number; right: number } {
+export function drawnBox(name: string, art: Character, idle: string): { top: number; bottom: number; left: number; right: number } {
   let b = drawn.get(name);
   if (b) return b;
   b = { top: 0, bottom: art.h, left: 0, right: art.w };

@@ -136,6 +136,7 @@ export function useQuests(on: boolean, busy = false) {
         if (!live.current) return;
         setAnswer({ a, at: Date.now() });
         const user = account().profile?.user.id ?? "";
+        noteQuestCounts(user, a);
         const moved = questsMoved(lastShown(user), a);
         const pop = Object.keys(moved).length > 0 && !popsOff();
         const due = questsDueToday(a);
@@ -158,6 +159,7 @@ export function useQuests(on: boolean, busy = false) {
       if (!live.current) return;
       setAnswer({ a, at: Date.now() });
       rememberShown(account().profile?.user.id ?? "", a);
+      noteQuestCounts(account().profile?.user.id ?? "", a);
     };
     void rerollQuestNow(id)
       .then(got)
@@ -170,4 +172,40 @@ export function useQuests(on: boolean, busy = false) {
   }, []);
   const show = useCallback(() => setOpen(true), []);
   return { answer: answer?.a ?? null, receivedAt: answer?.at ?? 0, open: open && !!answer, from, show, close, reroll };
+}
+
+/**
+ * The end screen's quests (Nov 20, docs/decisions/2026-11-20-end-screen.md): the quests a match moved, each with the count it had.
+ * Each quest's count as this page last read it (home's, the last end screen's), per account: the next end screen compares against it,
+ * so each match shows its own moves, not every move since home. (Not home's QUESTS_SHOWN_KEY: home still slides what it hasn't shown.)
+ */
+let counts: { user: string; at: Record<string, number> } | null = null;
+function noteQuestCounts(user: string, a: QuestsAnswer): void {
+  counts = { user, at: Object.fromEntries(a.quests.map((q) => [q.id, q.progress])) };
+}
+/** One quest a match moved: the quest after it, and the count it had. */
+export interface QuestMoved {
+  quest: QuestsAnswer["quests"][number];
+  from: number;
+}
+/** The answer for each grant, asked once: a second end screen for the same game (Squads' card, then its results) shows the same. */
+const movedBy = new WeakMap<object, Promise<QuestMoved[]>>();
+/**
+ * The quests this game moved (its XP `grant` has come: the server counted them in the same batch). Against this page's last read, or
+ * (none this page) home's last shown; none if neither knows the quest.
+ */
+export function questsMovedBy(grant: object): Promise<QuestMoved[]> {
+  let p = movedBy.get(grant);
+  if (p) return p;
+  const user = account().profile?.user.id ?? "";
+  const before = counts?.user === user ? counts.at : lastShown(user);
+  p = fetchQuests()
+    .then((a) => {
+      noteQuestCounts(user, a);
+      const was = questsMoved(before, a);
+      return a.quests.filter((q) => q.id in was).map((q) => ({ quest: q, from: was[q.id]! }));
+    })
+    .catch(() => []);
+  movedBy.set(grant, p);
+  return p;
 }
