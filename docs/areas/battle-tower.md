@@ -177,7 +177,9 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 
 ## The party (built, PR 12, Eric, Nov 20)
 
-- **The clerk's card** (`town/TowerDesk.tsx`): three ways, always shown: **Solo** (Start or Continue, Start over, and "Alone: floor N":
+- **The clerk's card** (`town/TowerDesk.tsx`): in the middle of the room, above a phone's walking keys, every label and line in it
+  centered (Eric, Nov 20: [2026-11-20-ui-centered.md](../decisions/2026-11-20-ui-centered.md); `e2e/battle-tower.spec.ts` measures it);
+  three ways, always shown: **Solo** (Start or Continue, Start over, and "Alone: floor N":
   your party copy played on by yourself), **Invite friends** (makes the party; the friends sheet, `InviteSheet` with the tower's line,
   each friend's Invite: the invite kind "tower", "invited you to climb the Battle Tower", whose Accept joins the party and opens the
   town's tower), **Open party** (makes the party; the leader's line in the town's chat, "Ann is looking for 3 more to climb the Battle

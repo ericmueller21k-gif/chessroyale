@@ -1136,3 +1136,16 @@ Nothing checked whose a sound was, so the placeholders went live and stayed.
 (`boss-sounds-own.test.ts`) that fails on any sound named after, or made from, another boss's pack. No more borrowed placeholders.
 docs/decisions/2026-11-18-chandy-sounds.md.
 
+
+## A card hung off to the left (Nov 20, 2026)
+
+**What happened:** Eric opened the Battle Tower's clerk's card on his phone: a centered "Clerk" over a left "OPEN PARTIES" label and a
+left hearts row, the card hung off the left of the screen (placed over the clerk's head, clamped to the edge), and a tall box holding
+one line at its top ("Reading the open parties…"). "Those are the small things that add up."
+
+**Why:** each piece was added in its own PR with its own alignment (a list's label left, a flex row with no `justify-content`), and the
+card used the small speech-bubble placement made for one-button cards. No rule said what a card's alignment is, so each author chose.
+
+**The fix:** one rule (the card centered; its titles, labels and short lines centered; true lists may stay left), the clerk's card in
+the middle of the room above a phone's walking keys, its empty line and plan line centered in their boxes; the rule is in
+`.claude/LESSONS.md`, and `e2e/battle-tower.spec.ts` measures the card's place and its lines. docs/decisions/2026-11-20-ui-centered.md.

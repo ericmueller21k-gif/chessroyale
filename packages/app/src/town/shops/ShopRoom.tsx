@@ -644,7 +644,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
   return (
     <div class="town-shop" ref={box}>
       <canvas class="town-shop-canvas" ref={canvas} aria-label={back ? `Inside ${def.boss}'s back room` : `Inside ${def.boss}'s shop`} />
-      <div class={card === "crate" ? "town-card shop-crate" : bossCard && card === "talk" ? "town-card shop-don" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
+      <div class={card === "crate" ? "town-card shop-crate" : bossCard && card === "talk" ? "town-card shop-don" : card === "talk" && talkCard && !def.locked ? "town-card town-mid" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
         {card === "talk" && (
           <>
             <h2>{def.name ?? "Shopkeeper"}</h2>
@@ -4380,6 +4380,10 @@ function startRoom(
   let cardX = NaN;
   let cardY = NaN;
   let cardA = NaN;
+  /** The open card stands in the middle of the room (the crate's, a keeper's panel: `.town-mid`), read as it's measured. */
+  let cardMid = false;
+  /** How far down the room a card in the middle may reach (the walking keys' top on a phone; else the room's height). */
+  let cardFloor = 0;
   /**
    * The door whose card is open from a tap on its picture (Nov 20, Eric: "tap on the door, like no matter where you're standing, and then
    * hit go in, and then it would just run you to the door"): its place in `doorUps`, or -1 (a card opened as you arrived, or none).
@@ -4450,14 +4454,26 @@ function startRoom(
       if (cardEl.style.display === "none") return; // (drawn next time round)
       cardW = cardEl.offsetWidth;
       cardH = cardEl.offsetHeight;
+      cardMid = card === "crate" || cardEl.classList.contains("town-mid");
+      // (A card in the middle that reaches over the walking keys' column (a phone) stands in the middle of the room above them, so they
+      // stay in view and tappable: read once as it opens.)
+      cardFloor = H;
+      const keys = cardMid ? box.parentElement?.querySelector(":scope > .town-controls")?.getBoundingClientRect() : undefined;
+      if (keys && keys.width) {
+        const at = box.getBoundingClientRect();
+        if (keys.left - at.left < (W + cardW) / 2 + 8) cardFloor = keys.top - at.top - 8;
+      }
     }
-    // The crate's card stands in the middle of the box; the others over the Shopkeeper's head or yours, their tails pointing there.
+    // The crate's card and a keeper's panel (the Battle Tower's clerk: Eric, Nov 20, "the whole box itself should be centered") stand in
+    // the middle of the box, with no tail; the others over the Shopkeeper's head or yours, their tails pointing there.
     let ax = W / 2;
-    let ay = H / 2 + cardH / 2 + 14;
-    if (card === "talk" && kidBox.on) ((ax = kidBox.hx), (ay = kidBox.hy - 16));
-    // (A door's card opened from its picture: over the door, its tail pointing at it.)
-    else if (aimI >= 0 && upBox(doorUps[aimI]!.u, doorBx)) ((ax = Math.max(0, Math.min(W, (doorBx.x0 + doorBx.x1) / 2))), (ay = Math.max(0, Math.min(H, doorBx.y0 + 6))));
-    else if (card !== "crate" && youHead.on) ((ax = youHead.x), (ay = youHead.y - 16));
+    let ay = cardFloor / 2 + cardH / 2 + 14;
+    if (!cardMid) {
+      if (card === "talk" && kidBox.on) ((ax = kidBox.hx), (ay = kidBox.hy - 16));
+      // (A door's card opened from its picture: over the door, its tail pointing at it.)
+      else if (aimI >= 0 && upBox(doorUps[aimI]!.u, doorBx)) ((ax = Math.max(0, Math.min(W, (doorBx.x0 + doorBx.x1) / 2))), (ay = Math.max(0, Math.min(H, doorBx.y0 + 6))));
+      else if (youHead.on) ((ax = youHead.x), (ay = youHead.y - 16));
+    }
     const left = Math.max(8, Math.min(W - cardW - 8, ax - cardW / 2));
     const top = Math.max(8, Math.min(H - cardH - 8, ay - cardH - 14));
     if (!(Math.abs(left - cardX) < 0.05 && Math.abs(top - cardY) < 0.05)) {
