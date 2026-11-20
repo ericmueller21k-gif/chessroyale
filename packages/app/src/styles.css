@@ -28116,6 +28116,8 @@ body.cs-on .mm-scrim {
 }
 .podium .pod-head {
   margin: 0;
+  /* (An h2 since the end screen's headline (Nov 20) is the page's h1: it keeps its look.) */
+  font-weight: 800;
   /* (Clear of the gear in the corner: "Black wins on the judge's verdict" is the longest.) */
   padding: 0 34px;
   font-size: 24px;

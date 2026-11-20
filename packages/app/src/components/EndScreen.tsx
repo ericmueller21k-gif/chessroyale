@@ -307,7 +307,7 @@ interface Step {
  * fill; then the quests (`quests`: their rows drawn). Only transforms, opacity and texts change. A tap anywhere but a button or a field
  * skips to the end, the same as a remount after it ran (`already`). `onLevel`: a level reached (the pawn's hop).
  */
-function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly Step[]; quests: RefObject<HTMLDivElement>; questsIn: () => Promise<void>; root: RefObject<HTMLElement>; onLevel: () => void; onEmblem: (id: string | null) => void; onStart: () => void }) {
+function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly Step[]; quests: RefObject<HTMLDivElement>; questsIn: () => Promise<void>; root: RefObject<HTMLElement>; onLevel: () => void; onEmblem: (id: string | null) => void; onStart: () => void; onDone: () => void }) {
   const opts = useRef(o);
   opts.current = o;
   // (The skip, from the first frame: a tap before the game's XP has come skips too.)
@@ -326,7 +326,10 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
   useLayoutEffect(() => {
     if (!o.ready) return;
     const { steps, quests, questsIn, root } = opts.current;
-    const set = (s: "run" | "done") => root.current?.setAttribute("data-es", s);
+    const set = (s: "run" | "done") => {
+      root.current?.setAttribute("data-es", s);
+      if (s === "done") opts.current.onDone();
+    };
     const timers: number[] = [];
     const frames: number[] = [];
     let anim: Animation | null = null;
@@ -643,7 +646,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { 
   const xpP = xpPlan(xp, waited);
   const rpP = rp ? rpPlan(rp.change ?? null, rp.now) : null;
   const steps: Step[] = [...(rpP ? [{ plan: rpP, slot: rpSlot, refs: rpRefs }] : []), { plan: xpP, slot: xpSlot, refs: xpRefs }];
-  const [ran, setRan] = useState(false);
+  const [ended, setEnded] = useState(false);
   useEndSequence({
     ready,
     already: !!already.current,
@@ -655,8 +658,8 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { 
     onEmblem: setEmblem,
     onStart: () => {
       if (xp) markXpFilled(xp);
-      setRan(true);
     },
+    onDone: () => setEnded(true),
   });
   const why = xp === undefined ? null : xp === null ? none : xp.none ? XP_NONE_LINES[xp.none] : null;
   const parts = xp === undefined ? "Counting your XP…" : counted ? xpShownParts(xp.parts).map((p) => (p.xp === null ? p.label : `${p.label} +${fmt(p.xp)}`)).join(" · ") : "";
@@ -674,8 +677,8 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { 
       {middle?.(hopAt)}
       <Track plan={xpP} refs={xpRefs} />
       <QuestRows moves={moves} box={qBox} line={questLine} />
-      {/* (What the bars and rows don't show, once the sequence has started: a level's or the daily reward's crates and keys.) */}
-      {(ran || already.current) && counted && xp!.rewards && <RewardBox xp={xp!} endScreen />}
+      {/* (What the bars and rows don't show, once the sequence has ended: a level's or the daily reward's crates and keys.) */}
+      {ended && counted && xp!.rewards && <RewardBox xp={xp!} endScreen />}
     </div>
   );
 }

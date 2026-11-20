@@ -336,6 +336,11 @@
   font-size: 13px;
   font-weight: 800;
 }
+.es-who > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .es-emblem {
   flex: none;
   transform: scale(0.75);
