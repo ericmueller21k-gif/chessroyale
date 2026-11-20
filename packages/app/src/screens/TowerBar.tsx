@@ -145,6 +145,8 @@ export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
         return (
           <span class={`tw-part${on ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id}>
             {on && <span class="tw-tag">TO MOVE</span>}
+            {/* (His prop where it fits a part: Babur's pump, BossUi.towerProp; Eric, Nov 20: his balloons weren't to be seen.) */}
+            <BossBarExtra boss={b} until={until} part="towerProp" />
             {/* (His words from his own part of the bar: the boss who says them, the one who cast a moment, else the boss to move.) */}
             {!computer && <VoiceBubble voice={bossVoice} class="bc-bubble tw-bubble" balanced mine={(k) => speakerOf(side, k) === i} />}
             <span class="tw-part-face" aria-hidden="true">

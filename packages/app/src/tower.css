@@ -741,3 +741,28 @@
   max-width: 220px;
   margin-bottom: 6px;
 }
+
+/* ---- A boss's prop in his part (BossUi.towerProp): Babur's pump, 1x (34 x 36), standing on the figure's row at the part's left on a
+   phone, at the part's right end on a computer; positioned, so it never sizes or moves the part (Eric, Nov 20: his balloons weren't to be
+   seen on a shared floor). Dimmed with the rest of his part while he's not to move. ---- */
+.tw-part > .tg-pump-slot {
+  position: absolute;
+  left: 2px;
+  right: auto;
+  top: 12px;
+  bottom: auto;
+  width: 34px;
+  height: 36px;
+}
+.tw-part > .tg-pump-slot > .tg-pump {
+  width: 34px;
+  height: 36px;
+}
+@media (min-width: 900px) and (pointer: fine) {
+  .tw-part > .tg-pump-slot {
+    left: auto;
+    right: 4px;
+    top: auto;
+    bottom: 0;
+  }
+}

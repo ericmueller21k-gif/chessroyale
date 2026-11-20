@@ -411,3 +411,52 @@ test("a shared floor (audit 2, finding 1): every boss drawn from his own part: S
   // (The still for Eric: his cut on her turn.)
   await still(page, "shared-floor");
 });
+
+test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his part of the split bar, his balloon on it; Wrangler's meter empty and dimmed, no showdown in the tower", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  // (The showdown's test switch fills Wrangler's meter from turn 2 anywhere else: on a tower floor it stays empty.)
+  await intoTower(page, "&power=showdown");
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 2, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["tiger", "pig"]], deck: [], decks: 1 }), made.user);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
+  await floorThenMatch(page, 2, 2);
+  // Babur's pump in his own part, inside it, never resizing it (phone and computer alike).
+  const part = page.locator('.tw-part[data-boss="tiger"]');
+  const pump = part.locator("> .tg-pump-slot");
+  await expect(pump).toHaveAttribute("data-place", "tower");
+  const inside = async () => {
+    const [a, b] = [(await part.boundingBox())!, (await pump.boundingBox())!];
+    return b.x >= a.x - 0.5 && b.y >= a.y - 0.5 && b.x + b.width <= a.x + a.width + 0.5 && b.y + b.height <= a.y + a.height + 0.5;
+  };
+  expect(await inside()).toBe(true);
+  // Wrangler's meter: on the bar, empty and dimmed, saying why.
+  const meter = page.locator('.tw-part[data-boss="pig"] .rage-meter');
+  const off = async () => {
+    await expect(meter).toHaveAttribute("data-ult-off", "");
+    await expect(meter).toHaveClass(/paused/);
+    await expect(meter).toHaveAttribute("aria-valuenow", "0");
+    await expect(meter).toHaveAttribute("aria-label", "Rage: no ultimate in the Battle Tower");
+  };
+  await off();
+  // A few moves: a balloon goes on his pump as his turn begins; Wrangler's meter never fills and no showdown comes.
+  const pig = () => page.evaluate(() => (window as any).match.boss.side.bosses.find((b: any) => b.id === "pig").powers);
+  let balloon = "";
+  for (let n = 1; n <= 4 && !balloon; n++) {
+    await playAMove(page);
+    await expect.poll(async () => (await phase(page)) === "play" && (await moves(page)) === n, { timeout: 90_000 }).toBe(true);
+    balloon = (await pump.getAttribute("data-balloon")) ?? "";
+    const p = await pig();
+    expect(p.ultAt).toBeNull();
+    expect(p.noUlt).toBe(true);
+    await off();
+  }
+  expect(balloon, "a balloon on Babur's pump").not.toBe("");
+  expect(await inside()).toBe(true);
+  await still(page, "shared-floor-babur-wrangler");
+});
