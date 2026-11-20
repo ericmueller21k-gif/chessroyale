@@ -1,3 +1,4 @@
+- Nov 20 ~15:20 UTC: #847+#848 LIVE; main 72291bb RED by a flake: [phone] moo.spec:453 boot wait (Boss Battle heading 5 s) passed on retry. Fix helper session_01JuCWRvToLZfC3p3a5PBfy6 (high, claude/fix-moo-flake; suspect moonrise assets in the entry chunk), watcher b861wdat2. Hold merges until fixed.
 - Nov 20 ~14:50 UTC: #847 pie freeze look MERGED (5225eef), #848 moonrise MERGED (72291bb); deploy + main run watched. Queue empty, no helpers.
 - Nov 20 ~14:35 UTC: pie-freeze look -> #847 (0e83f5e) CI bisxh2nbb; moonrise -> #848 (9bd68b8, moon now the field moon size: call, told Eric) CI b9h4bdder. GIFs sent. No helpers running.
 - Nov 20 ~14:15 UTC: ERIC Moo: moon must RISE from behind the hill (half hidden -> up, same timing), always behind the terrain; light from the new spot; close-up unchanged -> helper session_01JuCWRt26x7iueoa3zk7nRb (high, claude/moo-moonrise), watcher brx6gvk4k. Running Opus: pie-freeze look + moonrise (2 high).
