@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { account, loadAccount, startSoloBossBattle } from "../src/account.ts";
+import { account, loadAccount, retryAccount, startSoloBossBattle } from "../src/account.ts";
+import { siteSignedOut } from "../src/site-gate.ts";
+import { FRONT_DOOR } from "@chessroyale/core";
 import { testSwitchesAllowed } from "../src/test-switches.ts";
 
 /**
@@ -94,6 +96,74 @@ describe("loading the account", () => {
     const calls = server([403]);
     await loadAccount();
     expect(calls.filter((c) => c.startsWith("/api/me"))).toHaveLength(1);
+  });
+});
+
+describe("the account's load failing: it knows why (Nov 20: Profile on \"Loading…\" for good, Eric signed out of the site's gate)", () => {
+  // (A load whose options failed returns before your profile's second try, 400 ms on: let it finish here, not in the next test.)
+  afterEach(() => new Promise((ok) => setTimeout(ok, 600)));
+  /** The gate's answer to a script's request, as `redirect: "manual"` gives it: an opaque redirect (not constructible: a stand-in). */
+  const gateRedirect = () => ({ type: "opaqueredirect", status: 0, ok: false, headers: new Headers(), json: async () => null }) as unknown as Response;
+
+  it("signed out of the site's gate (a redirect to its login): \"gate\", noticed app-wide, and not asked again", async () => {
+    const calls: { path: string; redirect?: string }[] = [];
+    vi.stubGlobal("fetch", async (path: string, init?: RequestInit) => {
+      calls.push({ path, redirect: init?.redirect });
+      return gateRedirect();
+    });
+    await loadAccount();
+    expect(account().failed).toBe("gate");
+    expect(account().config?.accounts).toBe(false);
+    expect(siteSignedOut()).toBe(true);
+    // (Asked with redirect "manual", so the gate's answer is read, not followed into a failure like being offline.)
+    expect(calls.every((c) => c.redirect === "manual")).toBe(true);
+    expect(calls.filter((c) => c.path.startsWith("/api/me"))).toHaveLength(1);
+  });
+
+  it("the gate's 401 for a script's request (naming Cloudflare Access): \"gate\" too", async () => {
+    vi.stubGlobal("fetch", async () => new Response("", { status: 401, headers: { "www-authenticate": 'Cloudflare-Access resource_metadata="x"' } }));
+    await loadAccount();
+    expect(account().failed).toBe("gate");
+  });
+
+  it("let in again, Try again loads the account, and the app-wide notice goes", async () => {
+    vi.stubGlobal("fetch", async () => gateRedirect());
+    await loadAccount();
+    expect(siteSignedOut()).toBe(true);
+    server([200]);
+    await retryAccount();
+    expect(account().failed).toBeNull();
+    expect(account().profile?.user.id).toBe("u");
+    expect(account().config?.accounts).toBe(true);
+    expect(siteSignedOut()).toBe(false);
+  });
+
+  it("no answer at all (offline): \"offline\"", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    await loadAccount();
+    expect(account().failed).toBe("offline");
+    expect(siteSignedOut()).toBe(false);
+  });
+
+  it("the server's own error twice: \"server\"", async () => {
+    server([500]);
+    await loadAccount();
+    expect(account().failed).toBe("server");
+  });
+
+  it("a request that never answers is given up in time (FRONT_DOOR.accountTimeoutMs), never waited on for good", async () => {
+    vi.stubGlobal("fetch", (_path: string, init?: RequestInit) => new Promise((_ok, fail) => init?.signal?.addEventListener("abort", () => fail(init.signal!.reason))));
+    const timing = FRONT_DOOR as { accountTimeoutMs: number };
+    const was = timing.accountTimeoutMs;
+    timing.accountTimeoutMs = 30;
+    try {
+      await loadAccount();
+    } finally {
+      timing.accountTimeoutMs = was;
+    }
+    expect(account().failed).toBe("offline");
   });
 });
 

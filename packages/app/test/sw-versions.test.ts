@@ -52,8 +52,11 @@ const tab = (entry: string | null) => ({
   },
 });
 
-/** The worker of version `current`, with `caches` as the device has them and `tabs` open; the network has nothing (`net`, else 404). */
-function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>[], net: (path: string) => Response | null = () => null) {
+/**
+ * The worker of version `current`, with `caches` as the device has them and `tabs` open; the network has nothing (`net`, else 404; an
+ * Error: no answer at all, the fetch fails as it does offline).
+ */
+function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>[], net: (path: string) => Response | Error | null = () => null) {
   const code = readFileSync(new URL("../sw-template.js", import.meta.url), "utf8")
     .replace("__VERSION__", current)
     .replace("__FILES__", "[]")
@@ -73,7 +76,9 @@ function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>
   const fetch = async (req: string | { url: string }) => {
     const p = pathOf(req);
     fetched.push(p);
-    return net(p) ?? new Response("", { status: 404 });
+    const answer = net(p);
+    if (answer instanceof Error) throw answer;
+    return answer ?? new Response("", { status: 404 });
   };
   new Function("self", "caches", "location", "fetch", code)(self, store, { origin: ORIGIN }, fetch);
   /** Runs an event to its end (its waitUntil), returning what it answered (respondWith), if anything. */
@@ -89,6 +94,8 @@ function worker(current: string, store: FakeCaches, tabs: ReturnType<typeof tab>
     activate: () => fire("activate", {}),
     loaded: () => fire("message", { data: { type: "brc-loaded" } }),
     get: (path: string) => fire("fetch", { request: { method: "GET", mode: "no-cors", url: ORIGIN + path } }),
+    /** A page opened (a navigation: a link, a reload, the installed app's start). */
+    open: (path: string) => fire("fetch", { request: { method: "GET", mode: "navigate", url: ORIGIN + path } }),
   };
 }
 
@@ -173,6 +180,35 @@ describe("a deploy while a tab is open: the new worker takes over", () => {
     expect((await sw.get("/assets/Gone-x.js"))!.headers.get("content-type")).toContain("text/html");
     await new Promise((ok) => setTimeout(ok, 0));
     expect(await store.match("/assets/Gone-x.js")).toBeUndefined();
+  });
+});
+
+describe("a page opened: the network's answer, or the saved app only offline (Nov 20)", () => {
+  /** What a page's fetch gets for a redirect: the browser follows it (status 0, no body). Not constructible, so a stand-in. */
+  const gateRedirect = () => ({ type: "opaqueredirect", status: 0, ok: false }) as unknown as Response;
+  async function deviceWithApp(v: string) {
+    const store = await device([v]);
+    await (await store.open(v)).put("/", new Response("saved app", { headers: { "content-type": "text/html" } }));
+    return store;
+  }
+
+  it("the site's gate answers with a redirect to its login: passed on for the browser to follow, never the saved app", async () => {
+    const c = V("c");
+    const sw = worker(c, await deviceWithApp(c), [], (p) => (p === "/" || p === "/profile" ? gateRedirect() : null));
+    expect((await sw.open("/profile"))!.type).toBe("opaqueredirect");
+    expect((await sw.open("/"))!.type).toBe("opaqueredirect");
+  });
+
+  it("an error page the network answered is passed on too", async () => {
+    const c = V("c");
+    const sw = worker(c, await deviceWithApp(c), [], () => new Response("down", { status: 503 }));
+    expect((await sw.open("/"))!.status).toBe(503);
+  });
+
+  it("no answer at all (offline): the saved app, so solo play still opens", async () => {
+    const c = V("c");
+    const sw = worker(c, await deviceWithApp(c), [], () => new TypeError("Failed to fetch"));
+    expect(await (await sw.open("/lobby/ABCD"))!.text()).toBe("saved app");
   });
 });
 

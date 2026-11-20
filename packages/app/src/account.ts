@@ -1,6 +1,7 @@
-import { ASK_AGE_LINE, CHAT_MOD, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
+import { ASK_AGE_LINE, CHAT_MOD, FRONT_DOOR, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
 import { loadStep } from "./loadbar.ts";
+import { gateAnswered, noteSiteReached, noteSiteSignedOut, onSiteGate, siteSignedOut } from "./site-gate.ts";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
@@ -81,6 +82,24 @@ export interface AccountState {
   pending: PendingSignIn | null;
   /** Why a sign-in that waited for the answer didn't finish (its code ran out, say): shown once on the sign-in options. */
   signInNote: { message: string; email: string } | null;
+  /**
+   * Why your account didn't load (null: it loaded, or it's loading): Profile and Settings say why, with Try again (Nov 20: Profile sat
+   * on "Loading…" for good). The app plays on without an account meanwhile (`config.accounts` false).
+   */
+  failed: AccountFailure | null;
+}
+
+/**
+ * Why the account's load failed: no answer reached us ("offline": no connection, or none in time), our server's own failure ("server"),
+ * or the site's gate before launch, signed out of it ("gate": site-gate.ts).
+ */
+export type AccountFailure = "offline" | "server" | "gate";
+
+/** What a failed request's error was (api()'s errors): the gate's answer, no answer at all, or the server's. */
+export function failureOf(e: unknown): AccountFailure {
+  const err = e as { gate?: boolean; status?: number };
+  if (err?.gate) return "gate";
+  return err?.status === undefined ? "offline" : "server";
 }
 
 /** The age question's answer: old enough to sign in, or too young (docs/decisions/2026-10-16-age-gate-and-real-money.md). */
@@ -93,7 +112,7 @@ export type AgeAnswer = "ok" | "under";
  */
 export type PendingSignIn = { kind: "email"; email: string; code: string } | { kind: "google"; next: string };
 
-let state: AccountState = { config: null, profile: null, age: null, ageNote: null, pending: null, signInNote: null };
+let state: AccountState = { config: null, profile: null, age: null, ageNote: null, pending: null, signInNote: null, failed: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<AccountState>) => {
   state = { ...state, ...patch };
@@ -107,7 +126,14 @@ export function onAccountChange(fn: () => void): () => void {
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "content-type": "application/json", ...init?.headers } });
+  // (`redirect: "manual"`: our API never redirects a script's request, so a redirect is the site's gate, read as such: followed, its
+  // login page on another origin failed like being offline, and nothing knew why. site-gate.ts.)
+  const res = await fetch(path, { credentials: "same-origin", redirect: "manual", ...init, headers: { "content-type": "application/json", ...init?.headers } });
+  if (gateAnswered(res)) {
+    noteSiteSignedOut();
+    throw Object.assign(new Error("You're signed out of the site."), { status: 0, gate: true });
+  }
+  noteSiteReached();
   const read = (await res.json().catch(() => null)) as (T & { message?: string; askAge?: boolean; tooYoung?: boolean }) | null;
   if (!res.ok) {
     const body: { message?: string; askAge?: boolean; tooYoung?: boolean } = read ?? {};
@@ -153,14 +179,16 @@ const ACTION_RETRY_MS = 800;
  */
 async function profileFrom(path: string): Promise<Profile> {
   try {
-    return await api<Profile>(path);
+    return await api<Profile>(path, inTime());
   } catch (e) {
     const status = (e as { status?: number }).status;
     if (status !== undefined && status < 500) throw e;
     await new Promise((r) => setTimeout(r, PROFILE_RETRY_MS));
-    return api<Profile>(path);
+    return api<Profile>(path, inTime());
   }
 }
+/** A load request given up after FRONT_DOOR.accountTimeoutMs (an error with no status: "offline"), so no screen waits on it for good. */
+const inTime = (): RequestInit => (typeof AbortSignal.timeout === "function" ? { signal: AbortSignal.timeout(FRONT_DOOR.accountTimeoutMs) } : {});
 const PROFILE_RETRY_MS = 400;
 
 /**
@@ -202,6 +230,7 @@ export function askAgeAgain(why: string = ASK_AGE_LINE) {
 
 /** Loads the sign-in options and your profile (making a guest account the first time). */
 export async function loadAccount(name?: string): Promise<void> {
+  lastName = name;
   let config: NonNullable<AccountState["config"]> | null = null;
   // Your profile is asked for beside the options, not after them (Nov 10: home waits on it, and each request is a round trip). The
   // server plays a device it knows is too young under the default name, whatever name this one sends.
@@ -209,23 +238,33 @@ export async function loadAccount(name?: string): Promise<void> {
   const me = profileFrom(`/api/me${name && !storedYoung ? `?name=${encodeURIComponent(name)}` : ""}`);
   me.catch(() => undefined);
   try {
-    config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
+    config = await api<NonNullable<AccountState["config"]>>("/api/auth/config", inTime());
     const young = storedYoung || config.age === "under";
     set({ config, age: young ? "under" : (config.age ?? null) });
     if (young) rememberTooYoung();
-    if (!config.accounts) return loadStep("last");
+    if (!config.accounts) return void (set({ failed: null }), loadStep("last"));
     loadStep("account");
-    set({ profile: await me });
+    set({ profile: await me, failed: null });
     loadStep("last");
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
     if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
-  } catch {
-    // No server (local dev) or offline: play on without an account. A server that did answer keeps its test switch when
-    // only your profile failed (Oct 25: a CI run lost its ?boss= link that way, the switch going with the profile).
-    set({ config: { accounts: false, google: false, email: false, ...(config?.testSwitches ? { testSwitches: true } : {}) } });
+  } catch (e) {
+    // No server (local dev) or offline: play on without an account, and say why where the account shows (`failed`). A server that did
+    // answer keeps its test switch when only your profile failed (Oct 25: a CI run lost its ?boss= link that way, the switch going with
+    // the profile).
+    set({ config: { accounts: false, google: false, email: false, ...(config?.testSwitches ? { testSwitches: true } : {}) }, failed: failureOf(e) });
     loadStep("last");
   }
 }
+let lastName: string | undefined;
+
+/** Try again (Profile's and Settings' button, and back online after failing offline): the account's load once more. */
+export function retryAccount(): Promise<void> {
+  return loadAccount(lastName);
+}
+// (Back online after failing offline, or let in by the site's gate again, from another tab, say: the account loads by itself.)
+if (typeof addEventListener === "function") addEventListener("online", () => void (state.failed === "offline" && retryAccount()));
+onSiteGate(() => void (!siteSignedOut() && state.failed === "gate" && retryAccount()));
 
 async function sendAgeAnswer(ok: boolean): Promise<AgeAnswer> {
   const { age } = await api<{ age: AgeAnswer }>("/api/auth/age", { method: "POST", body: JSON.stringify({ oldEnough: ok }) });

@@ -9868,6 +9868,21 @@ button.fd-logo {
   flex: none;
   color: var(--fd-gold-text);
 }
+/* Your account didn't load (AccountTrouble.tsx: Profile's card, Settings' ACCOUNT): why, and its buttons under it. */
+.fd-account-trouble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+/* Signed out of the site's gate (SiteGateNotice.tsx): the same pop-up, drawn app-wide outside the front door's page, so it brings
+   the front door's text color and font with it, over every screen (the sheets' 59 and up stay above it). */
+.site-gate {
+  color: var(--fd-text);
+  font-family: inherit;
+  z-index: 58;
+}
 .fd-notice-text {
   flex: 1 1 0;
   min-width: 0;

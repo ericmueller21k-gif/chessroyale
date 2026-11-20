@@ -7,6 +7,7 @@ import { loadStep } from "./loadbar.ts";
 import { BanScreen, useBanned } from "./components/FairPlay.tsx";
 import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
+import { SiteGateNotice } from "./components/SiteGateNotice.tsx";
 import { SearchBar } from "./components/SearchBar.tsx";
 import { startStatus } from "./status.ts";
 import { hapticsDebug } from "./haptics.ts";
@@ -88,6 +89,7 @@ function Root() {
       <App />
       <ReportSheet />
       <MaintenanceBanner />
+      <SiteGateNotice />
       <SearchBar />
     </ErrorBoundary>
   );

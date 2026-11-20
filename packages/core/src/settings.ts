@@ -3023,6 +3023,11 @@ export const FRONT_DOOR = {
    * ever going, and the town's and the home page's chats, which ride on it, stopped until a reload (Nov 11).
    */
   liveTimeoutMs: 10_000,
+  /**
+   * Your account's load (the sign-in options and /api/me, each try): a request with no answer by now is given up, and the profile says
+   * it couldn't reach us, with Try again (Nov 20: a load that never ended left Profile on "Loading…" for good).
+   */
+  accountTimeoutMs: 20_000,
   /** A running match counts while its lobby has reported within this long (it reports at least once a minute). */
   matchStaleMs: 3 * 60_000,
   /** The queue: after the fill time, bots pop into the empty seats for this long before the match begins. */
