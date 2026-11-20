@@ -722,7 +722,8 @@ export const tigerBattle = {
       }
     }
     const st = balloonsOf(p);
-    if (!st.nozzle && !boss.result && b.bossToMove() && boss.crowdMoves < b.settings.bossMaxMoves) {
+    // (Off this battle (noAdd: a tower floor of several whose primary is another boss, BATTLE_TOWER.addsPieces): his pump stays empty.)
+    if (!st.nozzle && !p.noAdd && !boss.result && b.bossToMove() && boss.crowdMoves < b.settings.bossMaxMoves) {
       const roll = rollBalloon(p.seed, st.secret ?? Math.imul(p.seed ^ 0x5bd1e995, 0x01000193) >>> 0, st.placed, b.settings.bossBalloonTest, s, st.inRow ?? 0);
       const stageMs = s.balloonStageSec * 1000;
       const ahead = Math.max(0, Math.min(s.balloonStages, Math.round(b.settings.bossStageTest ?? 0)));
