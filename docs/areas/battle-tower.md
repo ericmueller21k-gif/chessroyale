@@ -123,11 +123,20 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   loss ends it. The run keeps the floors lost (`TowerRun.lost`, `livesLeft`); a best counts only floors won (`floorsWonBest`, the
   director's call). Floor 99 lost with a life left: the climb is done (top), its best 98. The climb sim uses core's rule.
 - **The party:** one count for the party, every copy alike (the room writes one result to all); climbing on together again, the fewest
-  lives any copy holds on that floor (`preparePartyFloor`); the plan says them once one is spent (`NetTowerPlan.lives`).
+  lives any copy holds (`preparePartyFloor`: each copy's floors lost below its own party floor, so a life spent in the party's room stays
+  spent when the plan goes back below it, as after one member's free leave; floors lost alone come back with the floors played alone:
+  the review of #839, finding 1); the plan says them once one is spent (`NetTowerPlan.lives`). A floor the party goes back to and loses
+  again reads "Lost floor 2 twice".
 - **On screen** (nothing hidden, nothing shifts): two hearts, a spent one greyed (`components/TowerHearts.tsx`), always, in the run's
   strip, the floor room's corner (`.tw-room-lives`) and the clerk's card (the solo climb's line: hearts and "Lost floor 8"). After a lost
   floor: "You lost floor 8. It still counts: 1 life left." and the next floor (`data-tower-result="lost"`), the room's elevator open;
-  the run's end lists the floors lost ("Lost floors 8, 11 and 12. Best solo: floor 10"). The leave's confirm says what it costs.
+  the run's end lists the floors lost ("Lost floors 8, 11 and 12. Best solo: floor 10"). The leave's confirm says what it costs. The
+  result screen takes the server's word once it answers: a win sent after the floor was counted lost on another device reads as the
+  loss, and a leave the server made free (bosses rested since the floor began) reads "You left floor 8. It waits for you."
+  (`data-tower-result="free"`), the lobby next; a free leave whose stop answer was lost (sent again: "between", the run still on the
+  floor) is free too. The clerk's words follow the setting ("Two lives: the third loss ends it.", "Two lives a climb": `livesWords`,
+  `ordinal`). The clerk's plan line keeps its own 12 px / 1.3 by its selector (`.tw-desk .tw-plan`), never by which stylesheet loads
+  last (the review of #839: the town's hearts made tower.css load first, and the town card's 13 px / 1.35 overflowed its three lines).
 - Calls made: [2026-11-20-tower-lives.md](../decisions/2026-11-20-tower-lives.md).
 
 ## The solo flow (built, PR 10's battle; PR 11b's flow, Eric, Nov 19)
@@ -262,7 +271,8 @@ life (a heart greyed in the room and the strip) and the climb going on, the thir
 a free leave down to the lobby, Continue after a reload, no Last Stand); the party: server `tower-party.test.ts` (copies to every member,
 climbing on together only with the run's own members, someone new a new run once each agreed, a leave, the room's ends, a crate floor,
 alone, the merge and deleting, the party's plan, START and open line; lives (Nov 20): a loss a life on every copy alike, a counted leave
-on the leaver's alone, the fewest lives climbing on together, the third loss out; since the review of #835: floors won alone never carrying a party
+on the leaver's alone, the fewest lives climbing on together, the third loss out, a life spent in the room never given back by going back
+below it, lives spent alone coming back; since the review of #835: floors won alone never carrying a party
 up, a deleted account's seat, the merge naming the account once, the line's lapse, Kick during a floor, the plan's floors going back, the
 town's one line an account, the clerk's list) and `tower-party-do.test.ts` (the party's Durable Object on a fake runtime: START's plan changed since READY,
 the room made but the commit refused, the raid kill switch, the open line's checks and lapse; the room's writes, `writeTowerEnds`), app

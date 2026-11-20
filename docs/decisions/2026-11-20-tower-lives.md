@@ -38,3 +38,16 @@ This replaces the design's "One loss and you're out" (2026-11-18-battle-tower-de
   "Lost floors 8, 11 and 12. Best solo: floor 10". A resign after your 2nd move reads as a loss ("You lost floor 8."); its confirm
   says "it costs a life (1 life left after)", or with none left, as before, "Your run ends here".
 - **Pay:** unchanged code: a lost floor is a lost game (no win XP, no crate: crates are paid only on a party's win), the next floor's as usual.
+
+## After the independent review (Nov 20)
+
+- **A life spent in the party's room stays spent** (finding 1): climbing on together counts each copy's floors lost below its own party
+  floor, not the plan's. One member's free leave kept their copy on a floor the others lost in the room; going back to it gave that
+  life back. Now it doesn't, and the party replays the floor with the life spent. A floor lost there again reads "Lost floor 2 twice"
+  (mine). The run's beaten bosses still leave out a floor once lost, even after the replay wins it (cosmetic, rare; left).
+- **A win never ends a run** (finding 4), even with `lives` lowered below a run's floors lost.
+- **The screens take the server's word** (findings 2, 3, 6): a floor counted lost elsewhere reads lost; a free leave whose answer was
+  lost is free; a leave the server made free reads "You left floor 8. It waits for you."
+- **The clerk's words follow `BATTLE_TOWER.lives`** (finding 5).
+- **The plan line's type** (the e2e failure): its own 12 px / 1.3 by selector, not by stylesheet order; the words were never too long.
+
