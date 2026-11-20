@@ -100,8 +100,8 @@ export const TOWER_WORDS = {
   resting: "This floor's bosses are resting for a bit. Leaving it now is free: the same floor waits for you.",
   broken: "This run can't be played. Start a new one.",
   replace: (floor: number) => `Your run on floor ${floor} ends, and a new one starts on floor 1.`,
-  /** The clerk's line with no climb under way (Nov 20: lives): "A climb of 99 floors. Two lives: the third loss ends it." */
-  climb: `A climb of ${BATTLE_TOWER.floors} floors. ${capital(livesWords(BATTLE_TOWER.lives))}: the ${ordinal(BATTLE_TOWER.lives + 1)} loss ends it.`,
+  /** The clerk's line with no climb under way (Nov 20: lives; Nov 20, Eric: no floor count shown): "How high can you climb? Two lives: the third loss ends it." */
+  climb: `How high can you climb? ${capital(livesWords(BATTLE_TOWER.lives))}: the ${ordinal(BATTLE_TOWER.lives + 1)} loss ends it.`,
   /** The clerk's card's lives line with no solo climb: "Two lives a climb". */
   livesAClimb: `${capital(livesWords(BATTLE_TOWER.lives))} a climb`,
 } as const;

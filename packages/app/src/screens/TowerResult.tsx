@@ -53,7 +53,7 @@ export function TowerResult({ match, onBack }: { match: GameView; onBack: () => 
     ? `You left floor ${floor}. It waits for you.`
     : status === "top"
       ? won
-        ? `Floor ${BATTLE_TOWER.floors} cleared: the top of the tower!`
+        ? "You reached the top of the tower!"
         : `${notWon(outcome, floor)} It still counts: the top of the tower!`
       : status === "open"
         ? won
@@ -100,7 +100,7 @@ export function TowerPartyResult({ match, onBack }: { match: GameView; onBack: (
   const line = left
     ? `You left floor ${floor}.`
     : top && won
-      ? `Floor ${BATTLE_TOWER.floors} cleared: the top of the tower!`
+      ? "You reached the top of the tower!"
       : won
         ? `Floor ${floor} cleared!`
         : lives >= 0

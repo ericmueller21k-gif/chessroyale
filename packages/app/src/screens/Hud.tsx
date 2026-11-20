@@ -91,10 +91,10 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
     return (
       <>
         {sideOf(boss) ? <TowerBar boss={boss} match={match} /> : <BossBar boss={boss} match={match} move={match.tower || match.towerParty ? undefined : match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />}
-        {/* (A Battle Tower floor: the run's strip, a row under the bar, as wide as the board.) */}
+        {/* (A Battle Tower floor: the run's strip, a centered line between the bar and the board, with a buffer above and below.) */}
         {(match.tower || match.towerParty) && (
           <div class="tw-strip-line">
-            <TowerStrip match={match} computer />
+            <TowerStrip match={match} />
           </div>
         )}
         <BossTools match={match} crowd={crowd} />

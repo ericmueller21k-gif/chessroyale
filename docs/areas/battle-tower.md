@@ -127,6 +127,11 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   spent when the plan goes back below it, as after one member's free leave; floors lost alone come back with the floors played alone:
   the review of #839, finding 1); the plan says them once one is spent (`NetTowerPlan.lives`). A floor the party goes back to and loses
   again reads "Lost floor 2 twice".
+- **The strip** (Nov 20, Eric: "it should just say Battle Tower floor 1, … right in the center"; `screens/TowerBar.tsx` `TowerStrip`): one
+  centered line, "Battle Tower · Floor N" and the hearts, nothing else. No floor total (nobody is to know how many floors there are),
+  no next floor and no moves left (the boss card says those). On a computer it sits in a fixed 34 px line between the boss bar and the
+  board (`.tw-strip-line`), centered with an even buffer above and below; on a phone it's the top stage's line. The beaten bosses are on
+  the tower's card only. The clerk's line asks "How high can you climb?" instead of naming the floors.
 - **On screen** (nothing hidden, nothing shifts): two hearts, a spent one greyed (`components/TowerHearts.tsx`), always, in the run's
   strip, the floor room's corner (`.tw-room-lives`) and the clerk's card (the solo climb's line: hearts and "Lost floor 8"). After a lost
   floor: "You lost floor 8. It still counts: 1 life left." and the next floor (`data-tower-result="lost"`), the room's elevator open;

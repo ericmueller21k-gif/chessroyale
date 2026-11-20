@@ -118,7 +118,9 @@ describe("the tower's rules on the device", () => {
   it("the clerk's words follow the lives setting, never a number written in (the review of #839, finding 5)", () => {
     // (Today's setting, 2: built from livesWords and ordinal, so another number changes the words with it.)
     expect(BATTLE_TOWER.lives).toBe(2);
-    expect([TOWER_WORDS.climb, TOWER_WORDS.livesAClimb]).toEqual([`A climb of ${BATTLE_TOWER.floors} floors. Two lives: the third loss ends it.`, "Two lives a climb"]);
+    // (Nov 20, Eric: no floor count shown to players, so the clerk's line asks how high instead of naming the 99.)
+    expect([TOWER_WORDS.climb, TOWER_WORDS.livesAClimb]).toEqual(["How high can you climb? Two lives: the third loss ends it.", "Two lives a climb"]);
+    expect(TOWER_WORDS.climb).not.toContain(String(BATTLE_TOWER.floors));
     expect([0, 1, 2, 3, 10, 12].map(livesWords)).toEqual(["no lives", "one life", "two lives", "three lives", "ten lives", "12 lives"]);
     expect([1, 2, 3, 4, 10, 11, 12, 13, 21, 22, 23, 101].map(ordinal)).toEqual(["first", "second", "third", "fourth", "tenth", "11th", "12th", "13th", "21st", "22nd", "23rd", "101st"]);
   });

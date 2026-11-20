@@ -98,7 +98,7 @@ async function floorThenMatch(page: Page, n: number, bosses: number) {
   await expect.poll(async () => (await floorNow(page))?.t ?? 0, { timeout: 10_000 }).toBeGreaterThan(1200);
   await still(page, `floor-${n}-walk-in`);
   await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
-  await expect(page.locator(".tw-strip").first()).toContainText(`Floor ${n} of 99`);
+  await expect(page.locator(".tw-strip").first()).toContainText(`Floor ${n}`);
 }
 
 test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floor 2, a reload rejoins; a loss costs a life and the climb goes on, the third ends the run", async ({ page }) => {
