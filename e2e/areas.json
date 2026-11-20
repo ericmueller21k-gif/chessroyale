@@ -115,8 +115,7 @@
     "packages/app/src/hints.ts",
     "packages/app/src/progress.ts",
     "packages/app/src/refused.ts",
-    "public/**"
-  ],
+    "public/**", "packages/app/src/town/shops/ShopRoom.tsx", "packages/app/src/town/shops/room.ts"],
   "none": [
     "**/*.md",
     "docs/**",
