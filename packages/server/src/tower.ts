@@ -663,9 +663,11 @@ async function partyCopies(sql: Sql, uids: readonly string[]): Promise<Map<strin
  */
 export async function preparePartyFloor(sql: Sql, uids: readonly string[], now: number, opts: { pool: readonly string[]; lobbyGone?: LobbyGone; seed?: number }): Promise<{ ok: true; prep: PartyFloorPrep } | ({ ok: false } & PartyRefusal)> {
   let copies = await partyCopies(sql, uids);
-  for (const [uid, row] of copies) {
-    const f = fightOf(row.fight);
-    if (!f) continue;
+  // (In seat order: the first member whose floor is under way is the one named.)
+  for (const uid of uids) {
+    const row = copies.get(uid);
+    const f = row ? fightOf(row.fight) : null;
+    if (!row || !f) continue;
     if (await settleStale(sql, row, f, now, opts.lobbyGone)) {
       copies = await partyCopies(sql, uids);
       if (!fightOf(copies.get(uid)?.fight ?? null)) continue;
