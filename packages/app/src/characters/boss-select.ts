@@ -283,6 +283,11 @@ export const SAY_AT: Readonly<Record<string, { x: number; y: number }>> = {
   gardener: { x: 0.45, y: 0.3 },
   tiger: { x: 0.45, y: 0.42 },
   folio: { x: 0.5, y: 0.25 },
+  // The admins' four (BOSS_ADMIN_FIRST): Don Dough's line, Dash, Timber and Chandy (Nov 20, read off their stage at 1440 x 900).
+  zebra: { x: 0.52, y: 0.37 },
+  dash: { x: 0.36, y: 0.26 },
+  timber: { x: 0.42, y: 0.44 },
+  chandy: { x: 0.5, y: 0.47 },
 };
 
 /** A boss not in SAY_AT: a face about a third of the way down, in the middle. */
