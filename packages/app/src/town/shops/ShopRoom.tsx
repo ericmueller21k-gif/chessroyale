@@ -4618,7 +4618,18 @@ function startRoom(
     return null;
   };
   /** What a press or its release at (x, y) is on (tap.ts `pressKey`): the same at both walks you, as in the town. */
-  const keyAt = (x: number, y: number): string => (onSlot(x, y) ? "claw-slot" : guardAt(x, y) ? `zebra-${guardAt(x, y)}` : onKid(x, y) ? pressKey(room, true, null) : doorAt(x, y) >= 0 ? `door-pic-${doorAt(x, y)}` : pressKey(room, false, squareAt(x, y)));
+  const keyAt = (x: number, y: number): string => (onSlot(x, y) ? "claw-slot" : guardAt(x, y) ? `zebra-${guardAt(x, y)}` : onKid(x, y) ? pressKey(room, true, null) : doorTap(x, y) >= 0 ? `door-pic-${doorTap(x, y)}` : pressKey(room, false, squareAt(x, y)));
+  /**
+   * The door whose card a tap at (x, y) opens at once (its picture, from anywhere: Nov 20), or -1. Not the Shopkeeper over it, and not the
+   * floor just inside a door: that still walks you there, its card showing as you arrive (as before).
+   */
+  const doorTap = (x: number, y: number): number => {
+    if (onKid(x, y)) return -1;
+    const i = doorAt(x, y);
+    if (i < 0) return -1;
+    const sq = squareAt(x, y);
+    return sq && (onDoor(room, sq.c, sq.r) || onPass(room, sq.c, sq.r)) ? -1 : i;
+  };
   /** What a tap at (x, y) means: the Shopkeeper (its picture), the way out (its picture), or the square under it. */
   const plan = (x: number, y: number) => {
     const here = you.here();
@@ -4660,7 +4671,7 @@ function startRoom(
     // (A card open: a tap closes it; one on a door's picture opens that door's card instead, Nov 20.)
     if (closing) {
       const xy = local(e);
-      const di = onKid(xy.x, xy.y) ? -1 : doorAt(xy.x, xy.y);
+      const di = doorTap(xy.x, xy.y);
       return press.down(e.clientX, e.clientY, di >= 0 ? `door-pic-${di}` : "");
     }
     // (What's under the finger now, as you see it: the camera may glide on before the release (it trails your walk), and a release
@@ -4685,7 +4696,7 @@ function startRoom(
     drag = null;
     const xy = local(e);
     if (closing) {
-      const di = onKid(xy.x, xy.y) ? -1 : doorAt(xy.x, xy.y);
+      const di = doorTap(xy.x, xy.y);
       const r = press.up(di >= 0 ? `door-pic-${di}` : "");
       if (r === "walk" && di >= 0) aimDoor(di);
       else if (r !== "drag") close();
@@ -4704,7 +4715,7 @@ function startRoom(
       return;
     }
     // (A door's picture, from anywhere in the room: its card at once; its button runs you there. Nov 20.)
-    const di = onKid(xy.x, xy.y) ? -1 : doorAt(xy.x, xy.y);
+    const di = doorTap(xy.x, xy.y);
     if (di >= 0) return aimDoor(di);
     const p = plan(xy.x, xy.y);
     if (p?.dest) setOff(p.dest);
@@ -4752,8 +4763,21 @@ function startRoom(
   cv.dataset.room = def.home;
   // (Rolling Dough: which of its rooms.)
   if (def.part) cv.dataset.part = def.part;
-  const hookAt = (kind: "keeper" | "door" | "pass" | "square" | "slot" | "guard-a" | "guard-b", sq?: readonly [number, number] | RoomPart) => {
+  const hookAt = (kind: "keeper" | "door" | "pass" | "pic" | "square" | "slot" | "guard-a" | "guard-b", sq?: readonly [number, number] | DoorTo) => {
     if (!testSwitchesAllowed()) return null;
+    // (A door's picture (Nov 20; `sq`: where it leads, "out" the way out): a point on it, high on its picture, that a tap finds, or null.)
+    if (kind === "pic") {
+      const i = doorUps.findIndex((d) => d.to === sq);
+      if (i < 0 || !upBox(doorUps[i]!.u, doorBx)) return null;
+      const { x0, y0, x1, y1 } = doorBx;
+      for (const fy of [0.35, 0.5, 0.2, 0.65])
+        for (const fx of [0.5, 0.35, 0.65]) {
+          const x = x0 + (x1 - x0) * fx;
+          const y = y0 + (y1 - y0) * fy;
+          if (x > 0 && x < W && y > 0 && y < H && doorTap(x, y) === i) return { x, y };
+        }
+      return null;
+    }
     // (Rolling Dough's front room: the middle of the part of a guard's tap box (`guardAt`, head to feet) that's on screen this frame.
     // On a computer, with the camera at rest on you in the middle of the room, his feet are below the room's bottom edge: his middle was
     // off screen and this said null while a finger could still tap his head and chest; Nov 12.)

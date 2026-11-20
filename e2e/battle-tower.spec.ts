@@ -138,6 +138,37 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(again.getByRole("button", { name: "Start", exact: true })).toBeEnabled({ timeout: 20_000 });
 });
 
+test("the elevator tapped from across the lobby (Eric, Nov 20): its card at once, where you stand; Go up runs you to it and up", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  await intoTower(page);
+  // (A run to play: the clerk's Start makes one, as the server does; here asked straight, so the elevator's own Go up takes you.)
+  const made = await page.evaluate(async () => (await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } })).status);
+  expect(made).toBe(200);
+  // You stand just inside the way in, at the far end of the room from the elevator in the back wall.
+  await expect(room(page)).toHaveAttribute("data-you", /,/);
+  const from = (await room(page).getAttribute("data-you"))!;
+  expect(Number(from.split(",")[1])).toBeGreaterThanOrEqual(6);
+  const lift = page.getByRole("dialog", { name: "Elevator", exact: true });
+  await expect(async () => {
+    const xy = await page.evaluate(() => (window as any).__shopAt?.("pic", "top") ?? null);
+    const cv = await room(page).boundingBox();
+    expect(xy && cv, "the elevator's picture on screen").toBeTruthy();
+    await page.mouse.click(cv!.x + xy!.x, cv!.y + xy!.y);
+    await expect(lift).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: 20_000 });
+  // The card opened from there: you haven't moved.
+  await page.waitForTimeout(400);
+  await expect(lift).toBeVisible();
+  await expect(room(page)).toHaveAttribute("data-you", from);
+  await still(page, "elevator-card-from-afar");
+  await lift.getByRole("button", { name: "Go up" }).click();
+  // The card closes, you run to the elevator (just inside it, row 1), and up: the floor room, floor 1.
+  await expect(lift).toBeHidden();
+  await expect(room(page)).toHaveAttribute("data-you", /^[45],1$/, { timeout: 15_000 });
+  await expect.poll(async () => (await floorNow(page))?.floor ?? null, { timeout: 30_000 }).toBe(1);
+  await expect(room(page)).toHaveAttribute("data-part", "top");
+});
+
 test("no Last Stand on a floor; a free leave before your 2nd move goes down to the lobby, and the clerk says Continue after a reload", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await page.addInitScript(() => {
