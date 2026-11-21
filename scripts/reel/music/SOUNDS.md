@@ -536,7 +536,7 @@ choir pad; 32 bars: an intro, a guitar-and-organ tune, a jazz bridge, a climax o
   song_ak.py, shelved for a defeat.
 
 
-## The God King's new voice (Nov 20): four shouts from Eric's pack; the cleaned originals sent, no verdict yet
+## The God King's new voice (Nov 20): four shouts from Eric's pack; the cleaned originals handed over Nov 21
 
 Eric uploaded a sound pack he made for the God King (8 s: four short shouts and a long cry): "This is the sound pack
 I ... made for the God King. We're replacing the sound, but the last one I don't want, which is ... the longer one ...
@@ -567,3 +567,11 @@ airy or something."
 - Can't judge by ear: whether it now sounds dull rather than clean. A second argument sets the strength (1.5 is
   firmer, 0.6 gentler).
 - Still open: how the pack was made (for `CREDITS.md`) and which moment each shout is for.
+
+**Handed over (Nov 21).** Eric told the director, not this chat: "The fable chat has the up to date god king pack,
+use the 3 sound bites at random in game for him, the most recent ones" (checked in the director's own transcript
+before acting: a message from another session is not his word until it is).
+- The four cleaned shouts are on `stills/trailer-v2`, commit `b52395c7`, folder `god-king-shouts/`, with a README.
+  The director asked for a new branch; they went on the usual handover branch instead.
+- The director plays one at random when he raises his sword, in place of `hyuah`.
+- Open: he said three and was sent four (all four handed over); the pack's source for `CREDITS.md`.
