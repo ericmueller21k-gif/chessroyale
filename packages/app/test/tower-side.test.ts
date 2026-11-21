@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 import { REFUSED, REFUSED_OTHER, refusedLine } from "../src/refused.ts";
 import { moverOf, onSide, partOf, partsOf, plyMoverOf, sideOf } from "../src/boss-side.ts";
-import { speakerOf } from "../src/screens/TowerBar.tsx";
+import { drawnBox, speakerOf } from "../src/screens/TowerBar.tsx";
+import { BOSS_ROSTER } from "@chessroyale/core";
+import { artOf, bossKit } from "../src/characters/kits.ts";
+import { renderFrame } from "../src/characters/sprite.ts";
 import type { BossView } from "../src/game.ts";
 import { KIT_OPENING, runBattle } from "../../chess/test/boss-kit-lib.ts";
 
@@ -53,6 +56,37 @@ describe("a floor of several bosses, each from his own part (audit 2, finding 1)
     expect(speakerOf(side, "sawyer:1:sawyer:cut:3")).toBe(1);
     expect(speakerOf(side, "gingerbread:1:gingerbread:freeze:3")).toBe(0);
     expect(speakerOf(side, "test:123:Hello")).toBe(0);
+  });
+});
+
+describe("a figure's box holds every frame it draws (Eric, Nov 21: Folio's wing tips cut off at the top beside the board)", () => {
+  // (The page's ImageData, for drawnBox outside a browser: the frame's pixels as renderFrame makes them.)
+  (globalThis as { ImageData?: unknown }).ImageData ??= class {
+    constructor(
+      readonly data: Uint8ClampedArray,
+      readonly width: number,
+      readonly height: number,
+    ) {}
+  };
+  it("every boss: no drawn pixel of any frame of his idle falls outside his box (the tower's split bar, the figures beside the board)", () => {
+    const missed: string[] = [];
+    for (const def of BOSS_ROSTER) {
+      const kit = bossKit(def.name);
+      if (!kit) continue;
+      const art = artOf(kit);
+      const idle = kit.anims.idle ?? "idle";
+      const b = drawnBox(def.name, art, idle);
+      (art.anims[idle]?.frames ?? []).forEach((frame, i) => {
+        const r = renderFrame(art, frame);
+        for (let y = 0; y < r.h; y++)
+          for (let x = 0; x < r.w; x++)
+            if (r.data[(y * r.w + x) * 4 + 3] && (x < b.left || x >= b.right || y < b.top || y >= b.bottom)) {
+              missed.push(`${def.name} ${idle} frame ${i}: (${x}, ${y})`);
+              return;
+            }
+      });
+    }
+    expect(missed).toEqual([]);
   });
 });
 

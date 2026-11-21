@@ -623,11 +623,8 @@
   border: 3px solid transparent;
   border-radius: 12px;
 }
-/* (The others dimmed, never hidden; their words not: a boss's moment's line shows by his own part, whole: audit 2, finding 1.) */
-.tw-part:not(.tw-to-move) > :not(.tw-bubble) {
-  opacity: 0.5;
-  filter: grayscale(0.7);
-}
+/* (Never dimmed, never hidden: Eric, Nov 21, "we shouldn't be darkening whichever boss's turn it's not ... I can barely see even bulbs
+   here". The boss to move is marked by the yellow outline and the TO MOVE tag alone.) */
 .tw-part.tw-to-move {
   border-color: #f2c14e;
   background: rgba(255, 255, 255, 0.07);
@@ -752,13 +749,24 @@
   position: relative;
   display: block;
 }
-.tw-side-fig:not(.tw-to-move) .tw-fig-box,
-.tw-side-fig:not(.tw-to-move) .tw-part-portrait {
-  opacity: 0.5;
-  filter: grayscale(0.7);
-}
 .tw-side-fig.tw-to-move {
   transform: translateX(18px);
+}
+/* A boss's own moment that draws him somewhere else (Eric, Nov 21: Jefferson "showing twice"): his figure, and only his (`.tw-casting`,
+   TowerBar.tsx), steps out of his part or his place beside the board for it, as a lone boss's does (styles.css, `.pm-caster`): on a phone for
+   every moment he casts at the board's corner, on a computer only while the moment draws him on the board (`.boss-moment`, the Full Moon).
+   Hidden, not removed: his box keeps its size and place; every other boss stays drawn. */
+.screen:has(.power-moment:not(.pm-stay)) .tw-casting .tw-fig-box {
+  visibility: hidden;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen:has(.power-moment:not(.pm-stay)) .tw-casting .tw-fig-box {
+    visibility: visible;
+  }
+  .screen:has(.power-moment .boss-moment) .tw-casting .tw-fig-box,
+  .screen:has(.power-moment.pm-fullmoon) .tw-casting .tw-fig-box {
+    visibility: hidden;
+  }
 }
 .tw-fig {
   display: block;
@@ -809,10 +817,6 @@
   bottom: auto;
   width: 42.5px;
   height: 45px;
-}
-.tw-part:not(.tw-to-move) > .tg-pump-slot {
-  opacity: 1;
-  filter: none;
 }
 .tw-part > .tg-pump-slot > .tg-pump,
 .tw-side-body > .tg-pump-slot > .tg-pump {

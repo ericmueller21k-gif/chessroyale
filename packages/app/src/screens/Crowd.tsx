@@ -19,7 +19,7 @@ import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.tsx";
 import { KING_COMMAND, KING_SUMMON, LAST_STAND, lastStandMs } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
-import { BossSide } from "../components/BossCharacter.tsx";
+import { SideFigures, TowerBoardLives } from "./TowerBar.tsx";
 import { allowanceNote, allowanceShort, bossAlone, missLine, elimination, finalName, isCrowdFifty, myTeam, oneVOneBegins, scoreDp, stagesAhead, stagesLine, versus, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { StreakFire } from "../components/StreakFire.tsx";
 import { GavelPiece } from "../components/Gavel.tsx";
@@ -364,7 +364,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // one goes in their lists; docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md).
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
-  const bossSide = useMemo(() => (match.boss ? <BossSide match={match} /> : null), [match, still]);
+  // (A Battle Tower floor of several: every boss's figure, never the one in focus alone: Eric, Nov 21, "it makes the other one disappear"
+  // during the God King's move. SideFigures, as the play and boss screens.)
+  const bossSide = useMemo(() => (match.boss ? <SideFigures match={match} /> : null), [match, still]);
   const under = useMemo(() => (match.boss ? besideBoard(match, layout, <UnderBoard match={match} />) : <UnderBoard match={match} />), [match, still, layout.strip, layout.computer]);
   const boardClock = useMemo(() => (match.boss ? null : <BoardClock match={match} you={you} turn={null} />), [match, still, you]);
   // (The position after the move, worked out once it's played, not every frame.)
@@ -639,6 +641,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
           {command && t >= command.startAt - start && <KingCommand {...command} />}
           {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} boss={match.boss} />}
+          {/* (The run's hearts beside the board on a computer stay through the reveal, as on the play and boss screens.) */}
+          {match.boss && <TowerBoardLives match={match} />}
         </Board>
         </div>
       </div>

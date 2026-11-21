@@ -536,6 +536,94 @@ test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, t
   await still(page, "shared-floor-primary-off");
 });
 
+test("a shared floor's moments (Eric, Nov 21): every boss drawn through the God King's move and strike; a boss's own moment draws him once; nobody dimmed; the screen never scrolls", async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  const desk = test.info().project.name === "desktop";
+  // (Every frame a moment plays: each boss's figure, as the screen draws it (a computer's beside the board, a phone's in his part of the
+  // bar). Never one missing, the caster's own steps out only while the moment draws him elsewhere, as alone (`.tw-casting`); never dimmed.)
+  await page.addInitScript((computer: boolean) => {
+    const w = window as any;
+    w.__seen = { king: 0, moment: 0, elsewhere: 0 };
+    w.__bad = [];
+    const note = (s: string) => w.__bad.length < 20 && !w.__bad.includes(s) && w.__bad.push(s);
+    const tick = () => {
+      const king = document.querySelector(".king-summon, .king-command");
+      const moment = document.querySelector(".power-moment:not(.pm-stay)");
+      const holders = [...document.querySelectorAll<HTMLElement>(computer ? ".tw-side .tw-side-fig" : ".tw-bar .tw-part")];
+      if (holders.length) {
+        for (const h of holders) {
+          for (let e: HTMLElement | null = h; e && !e.classList.contains("screen"); e = e.parentElement) {
+            const cs = getComputedStyle(e);
+            if (parseFloat(cs.opacity) < 0.99 || cs.filter.includes("grayscale")) note(`${h.dataset.boss}: dimmed (${e.className})`);
+          }
+        }
+      }
+      if (king || moment) {
+        if (king) w.__seen.king++;
+        if (moment) w.__seen.moment++;
+        // (Drawn elsewhere: on a computer while the moment draws him on the board; on a phone for every moment he casts.)
+        const elsewhere = !!moment && (computer ? !!document.querySelector(".power-moment .boss-moment, .power-moment.pm-fullmoon") : true);
+        if (elsewhere && document.querySelector(".tw-casting")) w.__seen.elsewhere++;
+        for (const h of holders) {
+          const box = h.querySelector<HTMLElement>(".tw-fig-box");
+          const r = box?.getBoundingClientRect();
+          const on = !!box && !!r && r.width > 2 && r.height > 2 && box.checkVisibility({ visibilityProperty: true, opacityProperty: true });
+          const casting = h.classList.contains("tw-casting");
+          if (casting && elsewhere && on) note(`${h.dataset.boss}: drawn twice (${moment?.className})`);
+          if (!(casting && elsewhere) && !on) note(`${h.dataset.boss}: missing (${(king ?? moment)!.className})`);
+        }
+        if (holders.length < 2) note(`${holders.length} figures (${(king ?? moment)!.className})`);
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, desk);
+  // (Jefferson's Roman candle at once (?power=candle): on a computer he steps onto the board for it, on a phone to its corner.)
+  await intoTower(page, "&power=candle");
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 2, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["grex", "folio"]], deck: [], decks: 1 }), made.user);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
+  await floorThenMatch(page, 2, 2);
+  // Your moves, the God King's move on the 2nd and his strike on the 3rd, until both have played and Jefferson's candle has.
+  const seen = () => page.evaluate(() => (window as any).__seen as { king: number; moment: number; elsewhere: number });
+  const king = page.getByRole("button", { name: /God King: tap to summon/ });
+  for (let n = 1; n <= 6; n++) {
+    await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
+    if (n === 2 || n === 3) {
+      await expect(page.locator(".gk-bubble")).toHaveCount(0, { timeout: 20_000 });
+      await king.click();
+      await page.getByRole("menuitem", { name: n === 2 ? /move/i : /Strike/ }).first().click();
+      await expect.poll(async () => (await seen()).king, { timeout: 10_000 }).toBeGreaterThan(0);
+      await expect(page.locator(".king-command, .king-summon")).toHaveCount(0, { timeout: 20_000 });
+      if (n === 2) continue;
+      await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
+    }
+    await playAMove(page);
+    const s = await seen();
+    if (n >= 3 && s.elsewhere > 0) break;
+  }
+  const s = await seen();
+  expect(s.king, "the God King's moments seen").toBeGreaterThan(0);
+  expect(s.elsewhere, "a moment drawing its caster elsewhere seen").toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as any).__bad)).toEqual([]);
+  await still(page, "shared-floor-moments");
+  // The screen never scrolls (eric.md, "Nothing hidden, nothing shifts"; Eric, Nov 21: "there's never supposed to be a scroll bar for
+  // this"): the floor's split bar and the strip line counted in the board's room, at every computer window, the dock in view.
+  const sizes: [number, number][] = desk ? [[1280, 800], [1366, 768], [1440, 900], [1600, 900], [1880, 1025]] : [[page.viewportSize()!.width, page.viewportSize()!.height]];
+  for (const [w, h] of sizes) {
+    await page.setViewportSize({ width: w, height: h });
+    await expect
+      .poll(() => page.evaluate(() => ({ y: document.documentElement.scrollHeight - innerHeight, x: document.documentElement.scrollWidth - innerWidth, dock: Math.ceil(document.querySelector(".boss-dock")!.getBoundingClientRect().bottom) <= innerHeight })), { message: `${w} x ${h}` })
+      .toEqual({ y: 0, x: 0, dock: true });
+  }
+});
+
 test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's the giraffe's turn or your turn, not his turn\"): his hidden rook drawn a pawn whoever is to move @phone-only", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   // (On every change to the page: a black rook drawn on the square where his rook hides is a leak, noted with whose turn the view says.)

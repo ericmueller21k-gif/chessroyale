@@ -45,7 +45,7 @@ const pts = (x: number) => (Math.abs(x) < 0.05 ? "0.0" : (x > 0 ? "+" : "−") +
  * score on the cut line. Tap it for the full leaderboard. Then every board as
  * a tiny live board (yours ringed).
  */
-export function Hud({ match, stripFrozen = false }: { match: GameView; stripFrozen?: boolean }) {
+export function Hud({ match, stripFrozen = false, caster = null }: { match: GameView; stripFrozen?: boolean; /** A floor of several: the boss whose moment plays now (TowerBar). */ caster?: string | null }) {
   const [open, setOpen] = useState(false);
   const computer = useMedia(COMPUTER_LAYOUT);
   const mouse = useMedia(MOUSE_LAYOUT);
@@ -90,7 +90,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   if (boss && mouse)
     return (
       <>
-        {sideOf(boss) ? <TowerBar boss={boss} match={match} /> : <BossBar boss={boss} match={match} move={match.tower || match.towerParty ? undefined : match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />}
+        {sideOf(boss) ? <TowerBar boss={boss} match={match} caster={caster} /> : <BossBar boss={boss} match={match} move={match.tower || match.towerParty ? undefined : match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />}
         {/* (A Battle Tower floor: the run's strip, a centered line between the bar and the board, with a buffer above and below.) */}
         {(match.tower || match.towerParty) && (
           <div class="tw-strip-line">
@@ -190,7 +190,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
         {/* The gear: its list has Sound, Animations, Resign and Report a bug (a crowd match, Crowd or a raid, adds the Motion trail row). */}
         <MatchMenu exit={exitFor(match)} crowd={crowd} />
       </div>
-      {boss ? sideOf(boss) ? <TowerBar boss={boss} match={match} /> : <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
+      {boss ? sideOf(boss) ? <TowerBar boss={boss} match={match} caster={caster} /> : <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
     </>
   );
