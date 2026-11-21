@@ -4602,10 +4602,11 @@ export class LobbyCore {
   /**
    * Where Smudgy's rook hides now (null: nowhere), for what the home page shows of a running battle: anyone may look at it
    * (the live window), so its board is the one the crowd sees, the rook a pawn. `taken`: the crowd's move just played, which
-   * may be the one that took it (the votes on it are named on the board as it was).
+   * may be the one that took it (the votes on it are named on the board as it was). A floor of several bosses: Smudgy's own
+   * part, whoever is in focus (Nov 21, docs/decisions/2026-11-21-smudgy-shared-mask.md).
    */
   private hiddenRook(taken?: string): string | null {
-    const boss = this.runner?.state.boss;
+    const boss = this.runner?.sideBosses().find((b) => b.powers?.camo);
     const camo = boss?.powers?.camo;
     if (!boss || boss.result || !camo) return null;
     if (camo.square) return camo.square;

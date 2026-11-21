@@ -115,6 +115,20 @@ describe("Smudgy online", () => {
     expect(L.core.liveSummary().board!.fen).toBe(round.board!.fen);
   });
 
+  it("a shared floor (Eric, Nov 21): the live window draws his hidden rook a pawn while another boss is in focus", () => {
+    // (?paint=1's start: his rook hidden on d7. Jefferson first in turn order, so he's in focus as the crowd's turn begins.)
+    const L = smudgy({ bossId: "grex", bossIds: ["grex", "smudgy"], bossPaintTest: 1 });
+    const round = L.toRound();
+    expect(L.runner().boss!.id).toBe("grex");
+    expect(round.boss!.side!.bosses.find((b) => b.id === "smudgy")!.powers!.camo!.square).toBe("d7");
+    expect(pieceAt(round.board!.fen, "d7")).toEqual({ color: "b", type: "r" });
+    expect(pieceAt(L.core.liveSummary().board!.fen, "d7")).toEqual({ color: "b", type: "p" });
+    // (Smudgy in focus: the same.)
+    (L.runner() as unknown as { setFocus(i: number): void }).setFocus(1);
+    expect(L.runner().boss!.id).toBe("smudgy");
+    expect(pieceAt(L.core.liveSummary().board!.fen, "d7")).toEqual({ color: "b", type: "p" });
+  });
+
   it("Repaint: the host is asked to pick among the pairs; its pick is his whole turn; its \"\" leaves him his move", () => {
     const L = smudgy({ bossPowerTest: "repaint" });
     expect(L.runner().boards.get(0)!.history.slice(0, 4)).toEqual([...REPAINT_TEST_MOVES]);

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { PowerBoard, battleDecor, crowdView } from "../components/BossPowers.tsx";
+import { partsOf } from "../boss-side.ts";
 import { applyMove, inCheck, pieceAt, sideToMove } from "@chessroyale/chess";
 import { seenFen, seenSan } from "../camo.ts";
 import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
@@ -621,7 +622,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           override={plunge}
         />
         <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} decor={/* (The marks before the fire, and before the move until it's played; a Last Stand's undone move: as the state has them.) */ battleDecor(match.boss, { reveal: stand ? null : { move: mine.result.playedMove, fenBefore: fen, played } })} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined} premove={{ key: seatKey(match, board.id, team ?? sideToMove(fen)), side: team ?? sideToMove(fen), watch: true }}>
-          {match.boss?.powers && <PowerBoard boss={match.boss} orientation={orientation} fen={onBoard.fen} />}
+          {/* (Every boss on the side, each from his own part, as on the play screen: on a shared floor Hollow's dark stays on whoever moves next; Nov 21.) */}
+          {match.boss?.powers && partsOf(match.boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} fen={onBoard.fen} />)}
           {!played && (
             <CrowdGhosts
               fen={fen}
