@@ -386,6 +386,41 @@ describe("boss powers online", () => {
   });
 });
 
+describe("your own moves online (XP's minimum, boss tokens): a turn you called the God King to play is yours (Eric, Nov 21)", () => {
+  it("a call counts once, as a pick does; a turn with no pick doesn't; the time runs to the call", () => {
+    const L = raid({ bossId: "gingerbread", bossKillEvery: 99 });
+    const toRound = () => {
+      for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+      return L.last("p1", "round")!;
+    };
+    // Move 1: both pick.
+    crowdMove(L);
+    hostBoss(L);
+    // Move 2: p1 calls the God King (twice: still one turn), p2 picks.
+    const r2 = toRound();
+    expect(L.core.save().runner!.state.boss!.kingCharges).toBeGreaterThan(0);
+    L.core.message("p1", { t: "king", key: r2.key });
+    L.core.message("p1", { t: "king", key: r2.key });
+    L.core.message("p2", { t: "pick", key: r2.key, move: (r2.boss?.powers?.allowed ?? legalMoves(r2.board!.fen))[0]! });
+    expect(L.hostScores("p1")).toBe(true);
+    expect(L.last("p2", "reveal")!.picks.find((p) => p.playerId === "p1")).toMatchObject({ move: null });
+    const called = L.now;
+    L.advance(30_000);
+    hostBoss(L);
+    // Move 3: p1 lets the clock run out; p2 picks.
+    const r3 = toRound();
+    L.core.message("p2", { t: "pick", key: r3.key, move: (r3.boss?.powers?.allowed ?? legalMoves(r3.board!.fen))[0]! });
+    for (let i = 0; i < 30 && !L.last("p1", "scoreRequest"); i++) L.advance(5_000);
+    expect(L.hostScores("p1")).toBe(true);
+    expect(L.last("p2", "reveal")!.picks.find((p) => p.playerId === "p1")).toMatchObject({ move: null });
+    // p1: the pick and the call (not the missed turn); p2: 3 picks. Boss tokens count the same.
+    expect([L.core.xpSpan("p1")!.moves, L.core.xpSpan("p2")!.moves]).toEqual([2, 3]);
+    expect([L.core.bossBattleSpan("p1")!.moves, L.core.bossBattleSpan("p2")!.moves]).toEqual([2, 3]);
+    // (p1's time in the match runs to the call's turn, not past it: the missed turn adds nothing.)
+    expect(L.core.xpSpan("p1")!.ms).toBe(called - L.core.save().startedAt!);
+  });
+});
+
 describe("Hollow online", () => {
   /** To the next crowd turn's round message (past the boss's move and his moments). */
   const toRound = (L: ReturnType<typeof setup>) => {
@@ -441,6 +476,8 @@ describe("Hollow online", () => {
     // p1: a missed move (-25), never more; p2: the only pick (0 on its own), less 10 for two wrong attempts.
     expect(pick("p1")).toMatchObject({ move: null, roundScore: DEFAULT_SETTINGS.missedMoveScore });
     expect(pick("p2").roundScore).toBeCloseTo(-2 * BOSS_POWERS.darkTryCost, 6);
+    // (Still p1's turn for XP's minimum, Nov 21: they tried until the dark ended it. Both have 2 of their own moves.)
+    expect([L.core.xpSpan("p1")!.moves, L.core.xpSpan("p2")!.moves]).toEqual([2, 2]);
   });
 
   it("Lights out: at the start of his turn, before his move; the server times each round and judges each player's taps; the misses cost; then his move", () => {
