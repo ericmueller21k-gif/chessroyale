@@ -295,6 +295,22 @@ test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN S
   // (The Slams' banners when the trigger went in: his meter can bring a Slam of its own before he takes your queen, Nov 19
   // (the trades' material fills it), so the loop waits for the one after the trigger, not the first.)
   let slamsAtTrigger: number | null = null;
+  // (A Slam of his meter's warned (RAGE!) or under way: the trigger is refused while one is (it never overlaps another), so
+  // a take of your queen then can't test this. Nov 20: the queen offered on RAGE!'s turn, the Slam came at the start of his
+  // turn and his move took it; the trigger did nothing, and the battle ended before another Slam. So while one is, the
+  // queen is not offered and kept out of reach.)
+  const slamPending = async () => {
+    const p = await page.evaluate(() => (window as any).match.boss?.powers ?? null);
+    return !!p && (p.warned || p.ultAt !== null);
+  };
+  /** Your move leaves your queen where one of his pieces attacks it. */
+  const queenAttacked = (fen: string, mv: string) => {
+    const c = new Chess(fen);
+    const me = c.turn();
+    c.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] ?? "q" });
+    const at = c.findPiece({ type: "q", color: me });
+    return at.some((sq) => c.attackers(sq, me === "w" ? "b" : "w").length > 0);
+  };
   // (Until the Slam has landed, however many moves that takes: a time cap, not a move cap, so the test checks the banners
   // and not whether he took your queen soon enough. Nov 5: 14 moves ran out before it on CI.)
   const cap = Date.now() + 7 * 60_000;
@@ -313,6 +329,8 @@ test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN S
       if (slamsAtTrigger === null) {
         slamsAtTrigger = await count("MAMMOTH SLAM!");
         await page.evaluate(() => (window as any).match.triggerUltimate());
+        // (It took: no Slam of his was under way, so the next Slam is the trigger's, not one his meter brings later.)
+        expect(await page.evaluate(() => !!(window as any).match.boss?.powers?.ultNext), "the trigger took as he took your queen").toBe(true);
       }
     }
     const legal = new Chess(s.fen).moves({ verbose: true }).filter((m) => !m.promotion && (!s.allowed || s.allowed.includes(m.from + m.to)));
@@ -321,6 +339,10 @@ test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN S
       // Your queen takes his: the trade.
       slew++;
       await play(page, takeQueen.from + takeQueen.to);
+      continue;
+    }
+    if (await slamPending()) {
+      await play(page, (await goodMove(page, queenAttacked)) ?? (await goodMove(page)));
       continue;
     }
     const hang = legal.find((m) => m.piece === "q" && !m.captured && hangs(s.fen, m));

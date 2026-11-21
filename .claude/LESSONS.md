@@ -359,6 +359,11 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     once. Never a picker of its own: blind pawn pushes against a real engine lose by move 5 now and then, and the match ends early.
   - A check on the boss select's stage figure waits for its paint (`figureDrawn`): it comes with the match's chunk, and a first tap can beat it.
 
+- **A trigger pulled into a Slam already on its way** (Nov 21, [story](../docs/history/lessons.md#a-trigger-pulled-into-a-slam-already-on-its-way-nov-21-2026)):
+  - A test that pulls the test trigger (`triggerUltimate`) states that it took (`powers.ultNext`): it's refused while an ultimate is
+    warned-and-coming or under way, and a later one from the meter then passes for it. The test sets its moment up only when nothing is
+    pending (`powers.warned`, `powers.ultAt`), never counting on the meter staying low.
+
 ## Eric's rules hold
 
 - **A boss's sounds are its own** (Nov 18, [story](../docs/history/lessons.md#chandy-played-other-bosses-sounds-nov-18-2026)):
