@@ -1,0 +1,9 @@
+Tower shared floors: every boss's bar prop (mockup, Nov 21). Stills on branch stills/tower-bar-props; test link ?barprops=a|b on this branch.
+Props missing from the split bar (the lone bar's BossUi.barProp): Jefferson's candles, Hollow's ten bulbs, Timber's workshop, Dash's tally, Don Dough's timers (Babur's pump already shows).
+Option A, with his figure: phone, the part's free corner left of his figure (as Babur's pump); computer, beside his figure by the board, toward the window's edge, on a chip of the bar's dark.
+Option B, a prop line: one row under the meters in every part (empty where a boss has none), the prop in one row; phone and computer alike. The bar grows about 21 px (phone) / 20 px (computer).
+Stills: A-phone-floor-of-2.png, A-phone-floor-of-3.png, A-computer-floor-of-3.png, B-phone-floor-of-2.png, B-phone-floor-of-3.png, B-computer-floor-of-3.png.
+Recommend: B on a phone, A on a computer.
+Why, phone: A's corner is ~60 px of a part of 2 and ~35 px of 3: Jefferson's candles shrink to specks, and on a floor of 3 Timber's workshop runs into his figure and TO MOVE. B's line gives every prop the part's width and reads on a floor of 3.
+Why, computer: the split bar's parts (~195 px) have no room left beside portrait and name, and B's line shrinks the board ~27 px and draws the props small; beside each figure there are ~110 px free, the same place Babur's pump already uses, and the board keeps its size.
+For the build: Jefferson's candles show only while the candle is live (as on a lone bar); B's taller phone bar must count in the board's room (--bd-room); A on a computer narrower than 1280 has less room left of the figures (scale the prop to it).

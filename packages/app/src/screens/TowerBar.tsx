@@ -1,4 +1,7 @@
-import { useMemo, useState } from "preact/hooks";
+import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
+import { testParams } from "../test-switches.ts";
+import { bossUi } from "../components/BossPowers.tsx";
 import { artOf, bossKit } from "../characters/kits.ts";
 import { SpriteAnim, frameImage } from "../components/BossEffect.tsx";
 import type { Character } from "../characters/sprite.ts";
@@ -154,6 +157,44 @@ function Figure({ boss, scale, since, still }: { boss: BossView; scale: number; 
   );
 }
 
+/**
+ * MOCKUP (Nov 21, branch claude/tower-bar-props, not for main): each boss's bar prop (BossUi.barProp) on a floor of several, two ways
+ * behind the test link `?barprops=a|b`. A: in his part (a phone's free corner left of his figure; a computer's at the part's right).
+ * B: a prop line under the meters, in every part (empty where his boss has none), the prop in one row. The prop is the lone bar's own
+ * drawing, scaled to fit its box (`PropFit`), never sized by it.
+ */
+export const barPropsOption = (): "a" | "b" | null => {
+  const v = testParams().get("barprops");
+  return v === "a" || v === "b" ? v : null;
+};
+/** The prop's own drawing at its natural size, scaled (never above `max`) to fit the box it's put in, held at the box's `align` side. */
+function PropFit({ children, max = 2, align = "center" }: { children: ComponentChildren; max?: number; align?: "left" | "right" | "center" }) {
+  const outer = useRef<HTMLSpanElement>(null);
+  const inner = useRef<HTMLSpanElement>(null);
+  const [s, setS] = useState(1);
+  useLayoutEffect(() => {
+    const o = outer.current, i = inner.current;
+    if (!o || !i) return;
+    const fit = () => {
+      const w = i.offsetWidth, h = i.offsetHeight;
+      if (!w || !h) return;
+      setS(Math.min(max, o.clientWidth / w, o.clientHeight / h));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(o);
+    ro.observe(i);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <span ref={outer} class={`tw-prop-fit tw-prop-${align}`}>
+      <span ref={inner} class="tw-prop-in" style={{ transform: `scale(${s})` }}>
+        {children}
+      </span>
+    </span>
+  );
+}
+
 /** The split bar: one part a boss, in turn order (left to right), the boss to move lit; his words over the bar. */
 export function TowerBar({ boss, match, caster = null }: { boss: BossView; match: GameView; caster?: string | null }) {
   const side = sideOf(boss)!;
@@ -161,11 +202,14 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
   const still = useMedia("(prefers-reduced-motion: reduce)");
   const [since] = useState(() => Date.now());
   const n = side.bosses.length;
+  const opt = barPropsOption();
+  // (Option B's line is on every part when any boss here has a prop: the parts keep one size.)
+  const line = opt === "b" && side.bosses.some((b) => !!bossUi(b)?.barProp && !bossUi(b)?.towerProp);
   // (A phone's bar is 400 px at 428: n parts, 4 px gaps, each with 4 px of padding and a 3 px outline either side.)
   const scale = useMemo(() => sharedScale(side.bosses.map((b) => b.name), (400 - 8 - 4 * (n - 1)) / n - 14, PART_FIGURE_H), [side.bosses.map((b) => b.name).join(","), n]);
   const until = match.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
   return (
-    <div class={`boss-bar tw-bar tw-bar-${n}`} role="status" aria-label={`${side.bosses.map((b) => b.name).join(", ")}; ${side.bosses[side.toMove]?.name ?? ""} to move`}>
+    <div class={`boss-bar tw-bar tw-bar-${n}${opt ? ` tw-props-${opt}` : ""}${line ? " tw-has-line" : ""}`} role="status" aria-label={`${side.bosses.map((b) => b.name).join(", ")}; ${side.bosses[side.toMove]?.name ?? ""} to move`}>
       {side.bosses.map((b, i) => {
         const on = i === side.toMove;
         return (
@@ -174,6 +218,13 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
             {/* (His prop where it fits a part, a phone's: Babur's pump, BossUi.towerProp; Eric, Nov 20: his balloons weren't to be seen. A
                 computer's stands beside his figure by the board: TowerSide. One pump on the page, never two.) */}
             {!computer && <BossBarExtra boss={b} until={until} part="towerProp" />}
+            {opt === "a" && !computer && !bossUi(b)?.towerProp && (
+              <span class="tw-prop tw-prop-corner">
+                <PropFit align="left" max={0.75}>
+                  <BossBarExtra boss={b} until={until} part="prop" />
+                </PropFit>
+              </span>
+            )}
             {/* (His words from his own part of the bar: the boss who says them, the one who cast a moment, else the boss to move.) */}
             {!computer && <VoiceBubble voice={bossVoice} class="bc-bubble tw-bubble" balanced mine={(k) => speakerOf(side, k) === i} />}
             <span class="tw-part-face" aria-hidden="true">
@@ -187,6 +238,15 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
                 <BossBarExtra boss={b} until={until} part="ult" />
                 <BossBarExtra boss={b} until={until} />
               </span>
+              {line && (
+                <span class="tw-prop tw-prop-line">
+                  {!bossUi(b)?.towerProp && (
+                    <PropFit max={1}>
+                      <BossBarExtra boss={b} until={until} part="prop" />
+                    </PropFit>
+                  )}
+                </span>
+              )}
             </span>
           </span>
         );
@@ -207,6 +267,7 @@ export function TowerSide({ boss, match, caster = null }: { boss: BossView; matc
   const [since] = useState(() => Date.now());
   const scale = useMemo(() => sharedScale(side.bosses.map((b) => b.name), 150, 170), [side.bosses.map((b) => b.name).join(",")]);
   const n = side.bosses.length;
+  const opt = barPropsOption();
   return (
     <div class="boss-side tw-side">
       {side.bosses.map((b, i) => (
@@ -217,6 +278,14 @@ export function TowerSide({ boss, match, caster = null }: { boss: BossView; matc
             <Figure boss={b} scale={scale} since={since} still={still} />
             {/* (His prop beside him, a computer's: Babur's pump by his feet, toward the window's edge, as by a lone boss's figure.) */}
             {computer && <BossBarExtra boss={b} until={until} part="towerProp" />}
+            {/* (MOCKUP option A, a computer's: his prop beside him toward the window's edge, as Babur's pump.) */}
+            {computer && opt === "a" && !bossUi(b)?.towerProp && (
+              <span class="tw-prop tw-prop-side">
+                <PropFit align="right" max={2}>
+                  <BossBarExtra boss={b} until={until} part="prop" />
+                </PropFit>
+              </span>
+            )}
           </span>
         </span>
       ))}

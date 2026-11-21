@@ -55,7 +55,7 @@ export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
 const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI, CHANDY_UI] as BossUi[]).map((u) => [u.id, u]));
-const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
+export const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
 export const WARN: MomentUi = {

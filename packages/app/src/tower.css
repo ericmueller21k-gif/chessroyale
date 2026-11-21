@@ -862,3 +862,73 @@
     line-height: 14px;
   }
 }
+
+/* ---- MOCKUP (Nov 21, claude/tower-bar-props; not for main): every boss's bar prop on a floor of several, `?barprops=a|b`. The prop is
+   the lone bar's own drawing at its natural size (its lone phone size), scaled to fit (TowerBar.tsx PropFit); its own placement inside
+   the lone bar's free room undone here. Positioned, so nothing it draws sizes or moves the part. ---- */
+.tw-prop-fit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  overflow: visible;
+  pointer-events: none;
+}
+.tw-prop-left { justify-content: flex-start; }
+.tw-prop-right { justify-content: flex-end; }
+.tw-prop-center { justify-content: center; }
+.tw-prop-in {
+  flex: none;
+  display: block;
+  transform-origin: center;
+}
+.tw-prop-left > .tw-prop-in { transform-origin: left center; }
+.tw-prop-right > .tw-prop-in { transform-origin: right center; }
+.tw-prop-in > * {
+  position: relative !important;
+  inset: auto !important;
+  transform: none !important;
+}
+/* (Each prop at its natural one-row size: the candles' and bulbs' sprites 1x, the workshop's six squares in one row, the timers 57 px.) */
+.tw-prop-in > .pw-pips { width: 99px; }
+.tw-prop-in > .life-strip { width: 95px; }
+.tw-prop-in > .ws-strip { --ws: 28px; grid-template-columns: repeat(6, var(--ws)); }
+.tw-prop-in > .dd-timers { --dd-w: 57px; }
+.tw-props-a .tw-prop-corner > .tw-prop-fit > .tw-prop-in > .ws-strip { grid-template-columns: repeat(3, var(--ws)); }
+
+/* Option A, a phone: the part's free corner left of his figure (where Babur's pump stands), the TO MOVE tag's side left free. */
+.tw-prop-corner {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: calc((100% - 6px) / 2 - 24px);
+  height: 46px;
+}
+/* Option A, a computer: beside his figure by the board, toward the window's edge (as Babur's pump), on his feet's line. */
+.tw-prop-side {
+  position: absolute;
+  right: calc(100% + 6px);
+  bottom: 4px;
+  width: 112px;
+  height: 64px;
+}
+/* Option B: a line under the meters, the part's width, in every part (empty where his boss has no prop), one row. */
+.tw-prop-line {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 20px;
+  margin-top: 1px;
+}
+.tw-props-b .tw-part-text { align-self: stretch; }
+@media (min-width: 900px) and (pointer: fine) {
+  .tw-prop-line { height: 26px; }
+  .tw-props-b .tw-part-text { flex: 1 1 0; }
+}
+/* (Beside the board the page is light: the prop on a chip of the bar's own dark, so what's drawn for the bar (an empty timer's dashes)
+   still reads.) */
+.tw-prop-side .tw-prop-in {
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #3a0d12, #1b0d22);
+}
