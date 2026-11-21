@@ -18,7 +18,8 @@ import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.tsx";
 import { KING_COMMAND, KING_SUMMON, LAST_STAND, lastStandMs } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
-import { BossSide } from "../components/BossCharacter.tsx";
+import { SideFigures, TowerBoardLives } from "./TowerBar.tsx";
+import { partsOf } from "../boss-side.ts";
 import { allowanceNote, allowanceShort, bossAlone, missLine, elimination, finalName, isCrowdFifty, myTeam, oneVOneBegins, scoreDp, stagesAhead, stagesLine, versus, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { StreakFire } from "../components/StreakFire.tsx";
 import { GavelPiece } from "../components/Gavel.tsx";
@@ -363,7 +364,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // one goes in their lists; docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md).
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
-  const bossSide = useMemo(() => (match.boss ? <BossSide match={match} /> : null), [match, still]);
+  // (A Battle Tower floor of several: every boss's figure, never the one in focus alone: Eric, Nov 21, "it makes the other one disappear"
+  // during the God King's move. SideFigures, as the play and boss screens.)
+  const bossSide = useMemo(() => (match.boss ? <SideFigures match={match} /> : null), [match, still]);
   const under = useMemo(() => (match.boss ? besideBoard(match, layout, <UnderBoard match={match} />) : <UnderBoard match={match} />), [match, still, layout.strip, layout.computer]);
   const boardClock = useMemo(() => (match.boss ? null : <BoardClock match={match} you={you} turn={null} />), [match, still, you]);
   // (The position after the move, worked out once it's played, not every frame.)
@@ -621,7 +624,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           override={plunge}
         />
         <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} decor={/* (The marks before the fire, and before the move until it's played; a Last Stand's undone move: as the state has them.) */ battleDecor(match.boss, { reveal: stand ? null : { move: mine.result.playedMove, fenBefore: fen, played } })} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined} premove={{ key: seatKey(match, board.id, team ?? sideToMove(fen)), side: team ?? sideToMove(fen), watch: true }}>
-          {match.boss?.powers && <PowerBoard boss={match.boss} orientation={orientation} fen={onBoard.fen} />}
+          {/* (Every boss's marks on a floor of several, as on the play and boss screens: partsOf.) */}
+          {match.boss?.powers && partsOf(match.boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} fen={onBoard.fen} />)}
           {!played && (
             <CrowdGhosts
               fen={fen}
@@ -637,6 +641,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
           {command && t >= command.startAt - start && <KingCommand {...command} />}
           {stand && standMove && played && <LastStand side={sideToMove(fen)} orientation={orientation} fen={fen} move={standMove} startAt={start + playAt} boss={match.boss} />}
+          {/* (The run's hearts beside the board on a computer stay through the reveal, as on the play and boss screens.) */}
+          {match.boss && <TowerBoardLives match={match} />}
         </Board>
         </div>
       </div>
