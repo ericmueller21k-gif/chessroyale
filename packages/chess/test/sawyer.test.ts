@@ -45,8 +45,20 @@ import {
   sideToMove,
   swapPlacement,
   swapSquare,
+  boardsAgree,
+  judgedBoard,
+  runQuickJob,
+  lookTrusted,
+  plainOf,
+  agreedBoard,
+  applyRecheck,
+  recheckAnchor,
+  recheckTargets,
+  swapIn,
+  swapJudged,
   type Battle,
   type EngineLike,
+  type JudgeJob,
   type Opening,
 } from "../src/index.ts";
 
@@ -853,5 +865,251 @@ describe("Sawyer's Saw Swap (Eric, Nov 20: once a battle, in check with his king
     expect(SAW_SWAP.landAt).toBe(SAW_SWAP.liftAt + SAW_SWAP.slideMs);
     expect(SAW_SWAP.liftAt).toBeGreaterThanOrEqual(SAW_SWAP.downAt + SAW_SWAP.downMs);
     expect(SAW_SWAP.total).toBeGreaterThan(SAW_SWAP.closeAt);
+  });
+});
+
+describe("The judge and the Saw Swap (Eric, Nov 21: a check that sets it off is scored on the board after the swap)", () => {
+  // The crowd White: Nb5-c7+ forks his king on e8 (his half) and his rook on a8; the swap takes the king to a8, the rook to e8 and the
+  // knight to g7, out of check. Nb5-d6+ checks him too (it qualifies as well); Kg1-h1 is quiet. The crowd Black: the mirror,
+  // ...Nb4-c2+ against his king on e1 and rook on a1.
+  const FORK = { w: "r3k3/8/8/1N6/8/8/8/6K1 w - - 0 1", b: "6k1/8/8/8/1n6/8/8/R3K3 b - - 0 1" } as const;
+  const FORK_MOVE = { w: "b5c7", b: "b4c2" } as const;
+  const QUIET = { w: "g1h1", b: "g8h8" } as const;
+  /**
+   * The engine as the test wants it: on the fork's own board, the fork wins the rook (0.9), the quiet move 0.6, any other 0.5; on any
+   * other board (the board after the swap, him to move) his best is 0.8, so the crowd's after it is 0.2.
+   */
+  const engineFor = (side: "w" | "b") => fakeEngine((fen, m) => (fen === FORK[side] ? (m === FORK_MOVE[side] ? 0.9 : m === QUIET[side] ? 0.6 : 0.5) : 0.8));
+  const forkRaid = (side: "w" | "b", patch: Partial<Settings> = {}, engine: EngineLike = engineFor(side)) => {
+    const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "sawyer", lastStandLoss: 999, lastStandLossFloor: 999, ...patch } as Settings;
+    const r = new MatchRunner({ settings, rng: mulberry32(5), engines: [engine], library: [opening(LINE)], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: side });
+    const board = r.boards.get(0)!;
+    r.boards.set(0, { ...board, fen: FORK[side], history: [], bases: [{ ply: 0, fen: FORK[side] }], lastMove: null });
+    return r;
+  };
+  /** The crowd's move scored (and played): the round's scored moves, by move, and its best. */
+  const judged = async (r: MatchRunner, move: string) => {
+    r.deal();
+    const res = await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
+    const b = res.boards[0]!;
+    return { best: b.bestMove, score: Object.fromEntries(b.scored.map((m) => [m.move, m])), loss: b.result.players[0]!.loss };
+  };
+
+  it("a fork that checks him is scored on the board after the swap, him to move, either side; a quiet move as it stands", async () => {
+    for (const side of ["w", "b"] as const) {
+      const boss = side === "w" ? "b" : "w";
+      const r = forkRaid(side);
+      const look = r.judgeAfter();
+      expect(look[FORK_MOVE[side]], side).toBe(sawSwapFen(applyMove(FORK[side], FORK_MOVE[side]), boss));
+      // (Only moves that set it off: every one checks him, and none is the quiet move.)
+      for (const m of Object.keys(look)) expect(inCheck(applyMove(FORK[side], m)), m).toBe(true);
+      expect(look[QUIET[side]]).toBeUndefined();
+      // Picked, the fork loses: 0.2 after the swap against the quiet move's 0.6 (as plain chess, it was the best by far, at 0.9).
+      const { best, score, loss } = await judged(r, FORK_MOVE[side]);
+      expect(score[FORK_MOVE[side]]!.expected, side).toBeCloseTo(0.2, 9);
+      expect(score[QUIET[side]]!.expected).toBe(0.6);
+      expect(best).toBe(QUIET[side]);
+      expect(loss).toBeCloseTo(40, 6);
+      // (And the swap does come as it lands, as the judge foresaw.)
+      expect(r.boss!.powers!.sawSwap).toBeTruthy();
+      expect(fenOf(r)).toBe(look[FORK_MOVE[side]]);
+    }
+  });
+
+  it("once the swap is used, the same fork is scored as it stands (the best, at 0.9), and the quiet move loses against it", async () => {
+    for (const side of ["w", "b"] as const) {
+      const r = forkRaid(side);
+      r.state = { ...r.state, boss: { ...r.boss!, powers: { ...r.boss!.powers!, sawSwap: { at: 1, king: side === "w" ? ["e8", "a8"] : ["e1", "a1"] } } } };
+      expect(r.judgeAfter()).toEqual({});
+      const { best, score, loss } = await judged(r, QUIET[side]);
+      expect(best, side).toBe(FORK_MOVE[side]);
+      expect(score[FORK_MOVE[side]]!.expected).toBe(0.9);
+      expect(loss).toBeCloseTo(30, 6);
+    }
+  });
+
+  it("a check that doesn't set it off is scored as it stands: his king on the crowd's half, a swap that leaves him in check, a tower floor", async () => {
+    // (His king on e4, the crowd's half: Ra1-a4+.)
+    const half = forkRaid("w");
+    const board = half.boards.get(0)!;
+    const rookCheck = "8/8/8/8/4k3/8/8/R5K1 w - - 0 1";
+    half.boards.set(0, { ...board, fen: rookCheck, bases: [{ ply: 0, fen: rookCheck }] });
+    expect(inCheck(applyMove(rookCheck, "a1a4"))).toBe(true);
+    expect(half.judgeAfter()).toEqual({});
+    // (Rg1-e1+: after the swap his king on a8 is still in check from the rook on a1. Ra1-e1+ does set it off.)
+    const still = "4k3/8/8/8/8/8/8/R5RK w - - 0 1";
+    half.boards.set(0, { ...board, fen: still, bases: [{ ply: 0, fen: still }] });
+    expect(inCheck(applyMove(still, "g1e1"))).toBe(true);
+    expect(half.judgeAfter().g1e1).toBeUndefined();
+    expect(half.judgeAfter().a1e1).toBe(sawSwapFen(applyMove(still, "a1e1"), "b"));
+    // (A tower floor with sawSwapInTower off: none, and the fork scores as plain chess's best.)
+    const tower = forkRaid("w", { towerFloor: 3 });
+    expect(tower.judgeAfter()).toEqual({});
+    expect((await judged(tower, QUIET.w)).best).toBe(FORK_MOVE.w);
+    // (The move cap: a crowd move that is the battle's last never brings it.)
+    const cap = forkRaid("w");
+    cap.state = { ...cap.state, boss: { ...cap.boss!, crowdMoves: cap.settings.bossMaxMoves - 1 } };
+    expect(cap.judgeAfter()).toEqual({});
+  });
+
+  it("a mate stands: a check that mates him is never looked past", () => {
+    // (Re1 mates on the e-file: his own rooks and pawns round him; the swap would take him out, but the mate stands.)
+    const r = forkRaid("w");
+    const board = r.boards.get(0)!;
+    const mating = "3rkr2/3p1p2/8/8/8/8/8/R5K1 w - - 0 1";
+    r.boards.set(0, { ...board, fen: mating, bases: [{ ply: 0, fen: mating }] });
+    expect(legalMoves(applyMove(mating, "a1e1"))).toEqual([]);
+    expect(r.judgeAfter().a1e1).toBeUndefined();
+  });
+
+  it("the runner takes a scorer's look only for the moves it finds set it off itself (a host's word can't move another move's score)", () => {
+    const r = forkRaid("w");
+    r.deal();
+    const res = r.resolveBoard(0, ["h0"], { h0: QUIET.w }, { bestMove: FORK_MOVE.w, bestExpected: 0.9, expectedAfter: { [FORK_MOVE.w]: 0.9, [QUIET.w]: 0.6 }, swapped: { [QUIET.w]: 0.01, [FORK_MOVE.w]: 0.2, b5a7: 2 } });
+    const by = Object.fromEntries(res.scored.map((m) => [m.move, m.expected]));
+    expect(by[QUIET.w]).toBe(0.6);
+    expect(by[FORK_MOVE.w]).toBe(0.2);
+    expect(by.b5a7).toBeUndefined();
+    expect(res.bestMove).toBe(QUIET.w);
+    // (Its reply on the board without the swap goes with it, for the Last Stand: the move's own number is the swap's.)
+    const plain = r.resolveBoard(0, ["h0"], { h0: QUIET.w }, { bestMove: FORK_MOVE.w, bestExpected: 0.9, expectedAfter: { [FORK_MOVE.w]: 0.9, [QUIET.w]: 0.6 } });
+    expect(plain.bestMove).toBe(FORK_MOVE.w);
+  });
+
+  it("many judges: the job's boards are searched, reported from the crowd's side and checked; two judges' looks must match", async () => {
+    const side = "w";
+    const r = forkRaid(side);
+    const swap = r.judgeAfter();
+    const engine = engineFor(side);
+    const job: JudgeJob = { id: "j", fen: FORK[side], picks: [FORK_MOVE[side]], bots: [], seed: 1, rules: { botCandidateMoves: 8, botRandomMoveChance: 0, botPowerUpLoss: 2 }, swap };
+    const report = await runQuickJob(engine, job);
+    expect(report.swap).toEqual(Object.keys(swap).sort().map((move) => ({ move, expected: 1 - 0.8 })));
+    const board = judgedBoard(job, report)!;
+    expect(board.swapped).toEqual(Object.fromEntries(Object.keys(swap).map((m) => [m, 1 - 0.8])));
+    // (The numbers on the board as it stands stay the engine's: the lobby's runner applies the look, once.)
+    expect(board.expectedAfter[FORK_MOVE[side]]).toBe(0.9);
+    // A look that leaves one out, names another move, or isn't a chance: doesn't hold together. An older app's, with none: as it stands.
+    expect(judgedBoard(job, { ...report, swap: report.swap!.slice(1) })).toBeNull();
+    expect(judgedBoard(job, { ...report, swap: report.swap!.map((m, i) => (i ? m : { ...m, move: QUIET[side] })) })).toBeNull();
+    expect(judgedBoard(job, { ...report, swap: report.swap!.map((m) => ({ ...m, expected: 1.5 })) })).toBeNull();
+    const { swap: _none, ...older } = report;
+    expect(judgedBoard(job, older)!.swapped).toBeUndefined();
+    // Two judges: alike, they agree; a look that differs is a disagreement, and a verdict keeps the look only when both looked exactly
+    // alike (one device's look is never trusted alone: the review of #863); else those moves as they stand (plainOf).
+    expect(boardsAgree(board, judgedBoard(job, report)!).agree).toBe(true);
+    const off = judgedBoard(job, { ...report, swap: report.swap!.map((m) => (m.move === FORK_MOVE[side] ? { ...m, expected: 0.25 } : m)) })!;
+    expect(boardsAgree(board, off).agree).toBe(false);
+    expect(lookTrusted(board, [judgedBoard(job, report)!]).swapped).toEqual(board.swapped);
+    expect(lookTrusted(board, [off])).toEqual(plainOf(board));
+    expect(plainOf(board).swapped).toBeUndefined();
+    // (Without a look in the job: no searches, no `swap`.)
+    const { swap: _s, ...plainJob } = job;
+    expect((await runQuickJob(engine, plainJob)).swap).toBeUndefined();
+  });
+
+  // ---- The review of #863 ----
+
+  /** A job on the fork for one bot that always plays the best it sees (its temperature near 0, no random moves). */
+  const botJob = (swap: Record<string, string>, patch: Partial<JudgeJob> = {}): JudgeJob => ({
+    id: "j",
+    fen: FORK.w,
+    picks: [FORK_MOVE.w],
+    bots: [{ skill: 0.001, powerUps: 0 }],
+    seed: 1,
+    rules: { botCandidateMoves: 8, botRandomMoveChance: 0, botPowerUpLoss: 99 },
+    swap,
+    ...patch,
+  });
+
+  it("finding 3: an older app's report, without the look, beside a newer one's: compared as plain chess, never a disagreement; the board used is the one without it", async () => {
+    const swap = forkRaid("w").judgeAfter();
+    const job = botJob(swap);
+    const engine = engineFor("w");
+    const newer = judgedBoard(job, await runQuickJob(engine, job))!;
+    const { swap: _s, ...older } = job;
+    const old = judgedBoard(job, await runQuickJob(engine, older))!;
+    // (The bot: with the look it plays the quiet move, 0.6 against the fork's 0.2 after the swap; as plain chess, the fork at 0.9.)
+    expect(newer.botPicks).toEqual([QUIET.w]);
+    expect(newer.plainBots).toEqual({ picks: [FORK_MOVE.w], powerUps: [] });
+    expect(old.swapped).toBeUndefined();
+    expect(old.botPicks).toEqual([FORK_MOVE.w]);
+    // The older app abstains on the look: the two agree (as plain chess), either way round.
+    expect(boardsAgree(newer, old)).toEqual({ agree: true, diff: 0 });
+    expect(boardsAgree(old, newer).agree).toBe(true);
+    // The board used: the older app's, without the look (one device's look alone is never used), the bot as plain chess has it.
+    expect(agreedBoard(newer, old)).toEqual(old);
+    expect(agreedBoard(old, newer)).toEqual(old);
+    expect(plainOf(newer)).toEqual(old);
+    // Two newer apps alike: the look stands, and their bot's pick with it.
+    expect(agreedBoard(newer, judgedBoard(job, await runQuickJob(engine, job))!)).toEqual(newer);
+  });
+
+  it("finding 1: one device's look stands only beside another exactly alike; a newer report scores the bots' picks both ways", async () => {
+    const swap = forkRaid("w").judgeAfter();
+    const job = botJob(swap);
+    const report = await runQuickJob(engineFor("w"), job);
+    const board = judgedBoard(job, report)!;
+    // (A lone judge, or a dispute's verdict with no second look alike: as plain chess, the bot too.)
+    expect(lookTrusted(board, [])).toEqual(plainOf(board));
+    expect(lookTrusted(board, [null])).toEqual(plainOf(board));
+    const lied = judgedBoard(job, { ...report, swap: report.swap!.map((m) => ({ ...m, expected: 1 })) })!;
+    expect(lied.botPicks).toEqual([FORK_MOVE.w]);
+    expect(lookTrusted(lied, [board])).toEqual(plainOf(lied));
+    expect(lookTrusted(board, [judgedBoard(job, report)!])).toEqual(board);
+    // (Both ways' bots' picks are scored, so the board without the look always holds together.)
+    for (const m of [...board.botPicks, ...board.plainBots!.picks]) expect(board.expectedAfter[m]).toBeDefined();
+  });
+
+  it("finding 4: the re-check works on the final numbers, anchored off the moves that set off the swap, and never searches them", async () => {
+    const [fork, check, quiet] = [FORK_MOVE.w, "b5d6", QUIET.w];
+    // (As plain chess the fork is the best, 0.9; after the swap it's 0.2 and the quiet move, 0.6, is the best.)
+    const e = { bestMove: fork, bestExpected: 0.9, expectedAfter: { [fork]: 0.9, [check]: 0.5, [quiet]: 0.6, g1g2: 0.5, g1f1: 0.58 } };
+    const swapped = { [fork]: 0.2, [check]: 0.2 };
+    const s = DEFAULT_SETTINGS;
+    // Before: anchored on the fork, whose number is then thrown away; g1f1 (2 points from the game's best) a close call at 32.
+    expect(recheckTargets(e, [fork, "g1g2", "g1f1"], s)).toEqual(["g1f1", "g1g2"]);
+    // Now: anchored on the quiet move; g1g2 loses 10 (a close call), g1f1 2 (none); neither check that sets it off is ever searched.
+    expect(recheckAnchor(e, swapped)).toBe(quiet);
+    expect(recheckTargets(e, [fork, check, "g1g2", "g1f1"], s, [], swapped)).toEqual(["g1g2"]);
+    // (A move that sets it off, picked above the anchor, is never one: its number is the board after the swap's.)
+    expect(recheckTargets(e, [check, "g1g2"], s, [], { [check]: 0.95 })).toEqual(["g1g2"]);
+    expect(recheckTargets({ ...e, bestMove: quiet, bestExpected: 0.6 }, [check, "g1g2"], s, [], { [check]: 0.95 })).toEqual(["g1g2"]);
+    // The deep numbers re-anchored on the quiet move; the look's moves keep the board's own numbers (the runner puts the look in).
+    const checked = applyRecheck(e, ["g1g2"], [{ move: quiet, expected: 0.62 }, { move: "g1g2", expected: 0.55 }], swapped);
+    expect(checked.expectedAfter.g1g2).toBeCloseTo(0.53, 9);
+    expect(checked.expectedAfter[fork]).toBe(0.9);
+    const final = swapJudged(checked, swapped);
+    expect(final.bestMove).toBe(quiet);
+    expect(final.expectedAfter[fork]).toBe(0.2);
+    // Without a look: exactly as before (anchored on the judge's best).
+    expect(applyRecheck(e, ["g1g2"], [{ move: fork, expected: 0.92 }, { move: "g1g2", expected: 0.5 }])).toMatchObject({ expectedAfter: { g1g2: 0.48 } });
+    // Solo, end to end: a pick 10 points from the game's best is re-checked with the quiet move, never with the fork or the other check.
+    const searched: string[][] = [];
+    const base = engineFor("w");
+    const r = forkRaid("w", {}, { ...base, scoreMovesAt: async (fen, moves) => (searched.push([...moves]), base.scoreMoves(fen, moves)) });
+    const { loss, score } = await judged(r, "g1g2");
+    expect(searched).toEqual([[quiet, "g1g2"]]);
+    expect(loss).toBeCloseTo(10, 6);
+    expect(score[fork]!.expected).toBeCloseTo(0.2, 9);
+  });
+
+  it("finding 5: a move that sets it off, outside the bots' top moves, joins their candidates when the judge scores it above them", async () => {
+    // (swapIn: b5d6 after the swap at 0.95 joins a list whose best is 0.6; one at 0.3 doesn't; a listed one is re-scored.)
+    const list = [{ move: QUIET.w, expected: 0.6 }, { move: "g1g2", expected: 0.5 }];
+    expect(swapIn(list, [{ move: "b5d6", expected: 0.95 }]).map((m) => m.move)).toEqual(["b5d6", QUIET.w, "g1g2"]);
+    expect(swapIn(list, [{ move: "b5d6", expected: 0.3 }])).toEqual(list);
+    expect(swapIn(list, [{ move: "g1g2", expected: 0.7 }]).map((m) => m.move)).toEqual(["g1g2", QUIET.w]);
+    // The judge's job: the bots see one top move (the fork, 0.2 after the swap); b5d6, outside it, scores 0.95 after the swap (the best
+    // move the judge names): the bot plays it, and the report scores it.
+    const swap = forkRaid("w").judgeAfter();
+    expect(Object.keys(swap).sort()).toEqual([FORK_MOVE.w, "b5d6"].sort());
+    const engine = fakeEngine((fen, m) => (fen === FORK.w ? (m === FORK_MOVE.w ? 0.9 : m === QUIET.w ? 0.6 : 0.5) : fen === swap.b5d6 ? 0.05 : 0.8));
+    const job = botJob(swap, { picks: [], rules: { botCandidateMoves: 1, botRandomMoveChance: 0, botPowerUpLoss: 99 } });
+    const report = await runQuickJob(engine, job);
+    expect(report.top.map((m) => m.move)).toEqual([FORK_MOVE.w]);
+    const board = judgedBoard(job, report)!;
+    expect(board.botPicks).toEqual(["b5d6"]);
+    expect(board.expectedAfter.b5d6).toBe(0.5);
+    expect(swapJudged(board, board.swapped!).bestMove).toBe("b5d6");
   });
 });

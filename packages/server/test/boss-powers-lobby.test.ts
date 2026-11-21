@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BRAIN, BOSS_POWERS, bossBannerMs, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, playableBosses, type Settings } from "@chessroyale/core";
 import { FIRE_BURN_MS, KING_ATTACK, applyMove, blockedBy, choosePieThrow, powerFxMs, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, runJudgeJob, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
-import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
+import { LobbyCore, newLobbyRecord, type LobbyIO, type ServerScoreRequest } from "../src/lobby.ts";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -25,7 +25,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 type Msg = ServerMessage;
 
 /** A fake lobby: clock, outboxes per player, and a fake host that scores with a hash "engine". */
-function setup(settings: Partial<Settings> = {}, icons: Record<string, string> = {}, seed = 7) {
+function setup(settings: Partial<Settings> = {}, icons: Record<string, string> = {}, seed = 7, io: Partial<LobbyIO> = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const core = new LobbyCore(
@@ -34,6 +34,7 @@ function setup(settings: Partial<Settings> = {}, icons: Record<string, string> =
       now: () => now,
       send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
       icon: (id) => icons[id],
+      ...io,
     },
     library,
     mulberry32(seed),
@@ -76,8 +77,8 @@ function setup(settings: Partial<Settings> = {}, icons: Record<string, string> =
 
 
 /** A raid of two people against a boss, with a power brought at once (the test switch), the Last Stand off. */
-function raid(patch: Partial<Settings>, lastBoss: (string | null)[] = [null, null]) {
-  const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, ...patch });
+function raid(patch: Partial<Settings>, lastBoss: (string | null)[] = [null, null], io: Partial<LobbyIO> = {}) {
+  const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, ...patch }, {}, 7, io);
   lastBoss.forEach((b, i) => L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, 1500, undefined, undefined, b));
   L.core.message("p1", { t: "start" });
   L.advance(1000);
@@ -1051,6 +1052,105 @@ describe("Sawyer online", () => {
     expect(b.boss.board.lastMove).toBe(req.allowed![0]);
     expect(b.boss.lastMove!.through).toBeUndefined();
     expect(error).toHaveBeenCalledWith(expect.stringContaining(`boss move refused: ${across}`));
+  });
+
+  it("the Saw Swap with judges (the review of #863): its look counts only when two devices give it alike; a lone judge's, a dispute's, or one beside an older app's is plain chess, and nobody is struck for it", async () => {
+    // The crowd White: Nb5-c7+ forks his king and rook (0.9 as plain chess, 0.2 after the swap); the quiet Kg1-h1 0.6; any other 0.5.
+    const FORK = "r3k3/8/8/1N6/8/8/8/6K1 w - - 0 1";
+    const [FORKM, QUIETM, OTHER] = ["b5c7", "g1h1", "g1g2"];
+    const score = (fen: string, m: string) => (fen === FORK ? (m === FORKM ? 0.9 : m === QUIETM ? 0.6 : 0.5) : 0.8);
+    const scores = async (fen: string, moves: readonly string[]) => [...new Set(moves)].sort().map((move) => ({ move, expected: score(fen, move) }));
+    const engine: EngineLike = {
+      topMoves: async (fen, n) => (await scores(fen, legalMoves(fen))).sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1)).slice(0, n),
+      scoreMoves: scores,
+      scoreMovesAt: scores,
+    };
+    /** How each of the two judges drawn answers (any other device: honestly, as the referee): an older app ignores the job's look. */
+    type Way = "honest" | "liar" | "old" | "silent";
+    async function turn(ways: [Way, Way], people = 2) {
+      const asked: ServerScoreRequest[] = [];
+      const queue: ServerScoreRequest[] = [];
+      const how: string[] = [];
+      const ids = Array.from({ length: people }, (_, i) => `p${i + 1}`);
+      const io: Partial<LobbyIO> = { serverEngine: true, serverScore: (q) => void (asked.push(q), queue.push(q)), settled: (jobs) => void how.push(...jobs.map((j) => j.how)) };
+      const L = raid({ bossId: "sawyer" }, ids.map(() => null), io);
+      crowdMove(L, ids);
+      hostBoss(L);
+      for (const id of ids) L.core.message(id, { t: "speed", nps: 800_000 });
+      const runner = (L.core as unknown as { runner: MatchRunner }).runner;
+      const board = runner.boards.get(0)!;
+      const ply = board.history.length;
+      runner.boards.set(0, { ...board, fen: FORK, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: FORK }] });
+      expect(runner.state.boss!.crowdSide).toBe("w");
+      for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+      const r = L.last("p1", "round")!;
+      expect(r.board!.fen).toBe(FORK);
+      // (The boss view names the moves the judge looks past, for the hints and the eval bar: finding 2.)
+      expect(Object.keys(r.boss!.powers!.swap ?? {}).sort()).toEqual([FORKM, "b5d6"].sort());
+      // p1 the fork; everyone else g1g2, 10 points under the quiet move after the swap (40 under the fork as plain chess): a close call.
+      ids.forEach((id, i) => L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: i ? OTHER : FORKM }));
+      const order = Object.values(L.core.record.judges?.tasks ?? {})[0]?.judges ?? [];
+      expect(order.length).toBe(2);
+      const wayOf = (id: string): Way => (id === order[0] ? ways[0] : id === order[1] ? ways[1] : "honest");
+      const revealed = () => [...(L.inbox.get("p1") ?? [])].reverse().find((m): m is Extract<Msg, { t: "reveal" }> => m.t === "reveal" && m.key === r.key);
+      // (Devices answer first, a referee's job too, then the engine server: a second opinion that's in first settles a dispute.)
+      for (let i = 0; i < 40 && !revealed(); i++) {
+        for (const id of [...ids, ...ids]) {
+          const jobs = (L.inbox.get(id) ?? []).flatMap((m) => (m.t === "judge" ? m.jobs.map((job) => ({ job, key: m.key })) : []));
+          L.inbox.set(id, (L.inbox.get(id) ?? []).filter((m) => m.t !== "judge"));
+          const way = wayOf(id);
+          for (const { job, key } of jobs) {
+            if (way === "silent") continue;
+            const { swap: _look, ...older } = job;
+            const made = await runJudgeJob(engine, way === "old" ? older : job);
+            const report = way === "liar" ? { ...made, swap: made.swap!.map((m) => (m.move === FORKM ? { ...m, expected: 0.95 } : m)) } : made;
+            L.core.message(id, { t: "judged", key, id: job.id, report });
+          }
+        }
+        for (const q of queue.splice(0)) L.core.serverScored(q.id, await scores(q.fen, q.moves));
+        L.advance(1000);
+      }
+      const v = revealed()!;
+      expect(v).toBeTruthy();
+      const loss = Object.fromEntries(v.picks.map((p) => [p.playerId, p.loss]));
+      const strikes = Object.fromEntries(ids.map((id) => [id, L.core.record.judges?.devices[id]?.strikes ?? 0]));
+      return { how, loss, strikes, asked, order };
+    }
+    const noStrikes = { p1: 0, p2: 0 };
+    // Two honest judges alike: the look counts. The fork loses 40 (0.2 against the quiet 0.6), g1g2 10; the re-check of g1g2 on the
+    // engine server is anchored on the quiet move, and neither check that sets it off is sent (finding 4).
+    const both = await turn(["honest", "honest"]);
+    expect(both.how).toEqual(["agreed"]);
+    expect(both.loss.p1).toBeCloseTo(40, 6);
+    expect(both.loss.p2).toBeCloseTo(10, 6);
+    expect(both.asked.map((q) => q.moves)).toEqual([[QUIETM, OTHER]]);
+    expect(both.strikes).toEqual(noStrikes);
+    // A lone judge (its partner silent): its look is one device's word, which nothing can check: plain chess (the fork the best).
+    const lone = await turn(["honest", "silent"]);
+    expect(lone.how).toEqual(["single"]);
+    expect(lone.loss.p1).toBe(0);
+    expect(lone.loss.p2).toBeCloseTo(40, 6);
+    // Two devices only, one lying about the look (the fork at 0.95 after the swap): the engine server's verdict, plain chess's, and the
+    // look as plain chess too; nothing tells who lied, so nobody is struck.
+    for (const liar of [0, 1] as const) {
+      const dispute = await turn(liar ? ["honest", "liar"] : ["liar", "honest"]);
+      expect(dispute.how).toEqual(["verdict"]);
+      expect(dispute.loss.p1).toBe(0);
+      expect(dispute.strikes).toEqual(noStrikes);
+    }
+    // A third device: two of three alike decide, the look counts, and the liar is struck.
+    const three = await turn(["liar", "honest"], 3);
+    expect(three.how).toEqual(["majority"]);
+    expect(three.loss.p1).toBeCloseTo(40, 6);
+    expect(three.strikes[three.order[0]!]).toBe(1);
+    expect(three.strikes[three.order[1]!]).toBe(0);
+    // An older app (no look) beside a newer one: it abstains on the look; the two agree as plain chess, nobody struck (finding 3).
+    for (const ways of [["old", "honest"], ["honest", "old"]] as [Way, Way][]) {
+      const mixed = await turn(ways);
+      expect(mixed.how).toEqual(["agreed"]);
+      expect(mixed.loss.p1).toBe(0);
+      expect(mixed.strikes).toEqual(noStrikes);
+    }
   });
 
   it("the admins' trigger: the board saw as the next crowd turn begins, without the warning", () => {
