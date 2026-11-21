@@ -320,6 +320,26 @@ export function stepFor(room: Room, c: number, r: number, dc: number, dr: number
   return diag;
 }
 
+/**
+ * An arrow key's step from (c, r) in a room with a piece you walk round (Eric, Nov 21: "make it so if you just press like up while you're
+ * on like near your side of the chessboard, it would just make you run around it"; the Battle Tower's floor table). `round`: 1 on that
+ * piece's squares (blocked in `room` too), or null. A step that way onto one of them is the first step of the shortest way to the first
+ * square past it that way (round its nearer side), so a held key runs you round it and on; with nothing past it to stand on, the plain
+ * step (blocked: you stop). Allocates only when it walks you round (a path, once a step).
+ */
+export function stepRound(room: Room, round: Uint8Array | null, c: number, r: number, dc: number, dr: number): Sq | null {
+  const s = stepFor(room, c, r, dc, dr);
+  if (!s || !round || !inRoom(room, s.c, s.r) || !round[s.r * room.n + s.c]) return s;
+  const uc = Math.sign(s.c - c);
+  const ur = Math.sign(s.r - r);
+  for (let tc = s.c + uc, tr = s.r + ur; inRoom(room, tc, tr); tc += uc, tr += ur) {
+    if (round[tr * room.n + tc]) continue;
+    if (!walkable(room, tc, tr)) return s;
+    return findPath(room, { c, r }, { c: tc, r: tr })?.[0] ?? s;
+  }
+  return s;
+}
+
 /** Steps from `from` to every square (-1: can't get there), a square at a time, round what's blocked. */
 export function stepsFrom(room: Room, from: Sq): Int16Array {
   const { n } = room;

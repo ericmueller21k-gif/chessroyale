@@ -144,7 +144,10 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // (town/TowerDesk.tsx, the only way in: Eric, Nov 19). No crate. Its theme: the tower's own (`tower`, its home's: Nov 19), as in its floor
   // room and a floor's battle. A bright lobby under a white
   // ceiling: the day tone.
-  tower: { home: "tower", boss: "Battle Tower", name: "Clerk", crate: null, kid: "towerclerk", at: [2.5, 2.4], tall: 57, keeper: [{ c: 2, r: 2 }, { c: 3, r: 2 }], prizes: [], roof: "store", chatTone: "day" },
+  // His card opens only from the floor right in front of his counter (Eric, Nov 21: "only ... if you click like right in front of the
+  // clerk, or if you click on the penguin guy ... but not anywhere else on this floor"): `talkAt`, row 4 under the counter's three squares,
+  // not the 3 squares round him every other Shopkeeper's small card shows in. A tap on him or the counter walks you there.
+  tower: { home: "tower", boss: "Battle Tower", name: "Clerk", crate: null, kid: "towerclerk", at: [2.5, 2.4], tall: 57, keeper: [{ c: 2, r: 2 }, { c: 3, r: 2 }], talkAt: [{ c: 1, r: 4 }, { c: 2, r: 4 }, { c: 3, r: 4 }], prizes: [], roof: "store", chatTone: "day" },
   zebra: { home: "zebra", boss: "Don Dough", crate: null, says: ZEBRA_BACK_LINES, kid: "zebrakeeper", at: [12.5, 7.3], tall: 73, flip: true, keeper: [{ c: 12, r: 7 }, { c: 13, r: 7 }], prizes: [], roof: "bakery", chatTone: "day" },
 };
 

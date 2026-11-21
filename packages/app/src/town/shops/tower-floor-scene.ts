@@ -15,9 +15,9 @@ import type { TownBossId } from "../world.ts";
 import { paintTable, third } from "./intro.ts";
 import type { FxDraw, RoomFx } from "./ShopRoom.tsx";
 import { sideWalls } from "./side-walls.ts";
-import { SHOP_TOWER_FLOOR_N, SHOP_TOWER_FLOOR_STOOL_PALETTE, SHOP_TOWER_FLOOR_TABLE_PALETTE, SHOP_TOWER_FLOOR_WALL_H, towerFloorWallGrid } from "./tower-floor-art.ts";
+import { SHOP_TOWER_FLOOR_ARROW_PALETTE, SHOP_TOWER_FLOOR_N, SHOP_TOWER_FLOOR_STOOL_PALETTE, SHOP_TOWER_FLOOR_TABLE_PALETTE, SHOP_TOWER_FLOOR_WALL_H, towerFloorWallGrid } from "./tower-floor-art.ts";
 import { BOSS_ZEBRA } from "./zebra-don.ts";
-import { FLOOR_TABLE, bossAt, mateAt, piecesAt, type BossNow, type FloorMode, type FloorTimes } from "./tower-floor.ts";
+import { FLOOR_TABLE, TOWER_FLOOR_FEEL, arrowBlink, bossAt, floorArrow, mateAt, piecesAt, type BossNow, type FloorMode, type FloorTimes } from "./tower-floor.ts";
 import { PAWN_FOOT, pawnImage } from "../render.ts";
 import { PARTY_COLORS } from "../../board/logic.ts";
 import type { RunKind } from "../../tower.ts";
@@ -43,6 +43,8 @@ export interface FloorScript {
   mates?: readonly { seat: number }[];
   /** The run's lives (Nov 20): going into the floor, or after it (the room's corner shows them: Town.tsx). */
   lives?: number;
+  /** The floor arrow as drawn last (Nov 21; the scene writes it, the tests read it): the door it points at, its middle on the room's canvas; `on` false: not drawn. */
+  arrow?: { on: boolean; to: "top" | "front"; x: number; y: number; a: number };
 }
 
 /** A boss's town figure (his own; Don Dough's, met in his back room, his intro's), or null: a boss this app doesn't draw (drawn safely: not at all). */
@@ -81,6 +83,40 @@ function tableArt() {
 const pt = newPt();
 const at = (d: FxDraw, c: number, r: number) => proj(d.v, c - d.camX, d.camY - r, 0, pt);
 const now1: BossNow = { c: 0, r: 0, a: 0, walking: false };
+
+/**
+ * The floor arrow's outline (Nov 21): (across, forward) in squares from its middle, forward toward the door: its shaft's tail, the head's
+ * shoulders, its tip. From TOWER_FLOOR_FEEL's sizes.
+ */
+const ARROW_SHAPE: readonly (readonly [number, number])[] = (() => {
+  const F = TOWER_FLOOR_FEEL;
+  const tail = -F.arrowLen / 2;
+  const neck = F.arrowLen / 2 - F.arrowHeadLen;
+  const s = F.arrowShaft / 2;
+  const h = F.arrowHead / 2;
+  return [
+    [-s, tail],
+    [s, tail],
+    [s, neck],
+    [h, neck],
+    [0, F.arrowLen / 2],
+    [-h, neck],
+    [-s, neck],
+  ];
+})();
+const AN = ARROW_SHAPE.length;
+/** The arrow's corners on the floor and on its slab's top, and its top's inset shine, this frame (made once). */
+const arrowLo = ARROW_SHAPE.map(() => newPt());
+const arrowHi = ARROW_SHAPE.map(() => newPt());
+const arrowIn = ARROW_SHAPE.map(() => newPt());
+const blink = { a: 1, nudge: 0 };
+/** A closed path through the arrow's corners `pts`. */
+function arrowPath(g: CanvasRenderingContext2D, pts: readonly { x: number; y: number }[]): void {
+  g.beginPath();
+  g.moveTo(pts[0]!.x, pts[0]!.y);
+  for (let i = 1; i < pts.length; i++) g.lineTo(pts[i]!.x, pts[i]!.y);
+  g.closePath();
+}
 
 /** The floor room's scene for `floor` (its walls' number), driven by `s`. */
 export function towerFloorFx(s: FloorScript): RoomFx {
@@ -165,11 +201,71 @@ export function towerFloorFx(s: FloorScript): RoomFx {
     },
   });
   const mates = [0, 1, 2].map(mateFig);
+  /** Reduced motion asked for as the room loads: the arrow held, full, not blinking. */
+  const still = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const shown = (s.arrow ??= { on: false, to: "top", x: 0, y: 0, a: 0 });
+  /**
+   * The floor arrow (Eric, Nov 21: "a little like 3D blinking arrow that points after you go back and after you win ... right on the
+   * floor, right in front of the door"): a gold slab lying on the floor before the next door, pointing at it, blinking. Drawn before every
+   * figure and upright piece but the back wall's (z 0.02, under you and your party standing on it): a mark on the floor.
+   */
+  const arrowFig = {
+    z: 0.02,
+    draw: (d: FxDraw, now: number) => {
+      const A = floorArrow(s.mode);
+      shown.on = false;
+      if (!A) return;
+      const F = TOWER_FLOOR_FEEL;
+      arrowBlink(t(now), still, blink);
+      for (let i = 0; i < AN; i++) {
+        const [x, w] = ARROW_SHAPE[i]!;
+        const c = A.c + x;
+        const r = A.r + A.dir * (w + blink.nudge);
+        const ri = A.r + A.dir * (w * 0.5 + blink.nudge);
+        if (!proj(d.v, c - d.camX, d.camY - r, 0, arrowLo[i]!) || !proj(d.v, c - d.camX, d.camY - r, F.arrowLift, arrowHi[i]!)) return;
+        if (!proj(d.v, A.c + x * 0.5 - d.camX, d.camY - ri, F.arrowLift, arrowIn[i]!)) return;
+      }
+      const P = SHOP_TOWER_FLOOR_ARROW_PALETTE;
+      const g = d.g;
+      g.save();
+      g.globalAlpha = blink.a;
+      // (Its slab's sides: each edge's its own fill (in one path, sides wound opposite ways would cancel); the top covers those facing away.)
+      g.fillStyle = P.side;
+      for (let i = 0; i < AN; i++) {
+        const j = (i + 1) % AN;
+        g.beginPath();
+        g.moveTo(arrowLo[i]!.x, arrowLo[i]!.y);
+        g.lineTo(arrowLo[j]!.x, arrowLo[j]!.y);
+        g.lineTo(arrowHi[j]!.x, arrowHi[j]!.y);
+        g.lineTo(arrowHi[i]!.x, arrowHi[i]!.y);
+        g.closePath();
+        g.fill();
+      }
+      arrowPath(g, arrowHi);
+      g.fillStyle = P.top;
+      g.fill();
+      g.lineWidth = 1;
+      g.lineJoin = "round";
+      g.strokeStyle = P.edge;
+      g.stroke();
+      arrowPath(g, arrowIn);
+      g.globalAlpha = blink.a * 0.7;
+      g.fillStyle = P.rim;
+      g.fill();
+      g.restore();
+      if (!at(d, A.c, A.r)) return;
+      shown.on = true;
+      shown.to = A.to;
+      shown.x = pt.x;
+      shown.y = pt.y;
+      shown.a = blink.a;
+    },
+  };
   const list: { z: number; draw: (d: FxDraw, now: number) => void }[] = [];
   return {
     figures: (now) => {
       list.length = 0;
-      list.push(walls, north, desk, south);
+      list.push(walls, arrowFig, north, desk, south);
       if (s.mode === "fight" && s.times)
         for (let i = 0; i < s.bosses.length && i < 3; i++) {
           const b = bossAt(i, s.bosses.length, t(now), s.times, now1);

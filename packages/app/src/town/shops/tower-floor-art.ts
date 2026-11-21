@@ -803,6 +803,18 @@ export function towerFloorPieces(floor: number): Readonly<Record<string, Charact
   }
   return got;
 }
+/**
+ * The squares the table stands on (its middle on the circle's, 4.5, 4.5: columns and rows 4-5), solid (Eric, Nov 21: "make it so you can't
+ * run through the chessboard"), a held arrow key walking you round it (room.ts `stepRound`).
+ */
+export const SHOP_TOWER_FLOOR_TABLE_SQUARES: readonly { c: number; r: number }[] = [
+  { c: 4, r: 4 },
+  { c: 5, r: 4 },
+  { c: 4, r: 5 },
+  { c: 5, r: 5 },
+];
+/** The floor arrow to the next door (Nov 21, tower-floor-scene.ts): its top in gold, its rim pale, its sides the deep gold, its edge the outline. */
+export const SHOP_TOWER_FLOOR_ARROW_PALETTE = { top: PALETTE.G!, rim: PALETTE.Y!, side: PALETTE.h!, edge: PALETTE.k! } as const;
 /** The camera's fixed look (square coordinates, a square's middle on its whole number): the room seen whole. */
 export const SHOP_TOWER_FLOOR_CAM = { x: 4.5, y: 4.2 } as const;
 
