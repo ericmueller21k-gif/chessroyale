@@ -536,6 +536,10 @@ export const sawyerBattle = {
     const boss = b.state.boss;
     if (!sawyerBattle.swapToCome(b, s) || !boss || (b.state.bosses?.length ?? 0) > 1 || b.bossToMove() || boss.crowdMoves + 1 >= b.settings.bossMaxMoves) return {};
     const board = b.boards.get(b.state.boards[0]!)!;
+    // (Worked out once per position and allowed moves: the lobby asks for it several times a turn, the jobs, the prefetch, the scores.)
+    const key = `${board.fen}|${board.history.length}|${boss.crowdMoves}|${[...allowed].sort().join(",")}`;
+    const memo = b.memo.get("sawSwapJudge") as { key: string; swaps: Record<string, string> } | undefined;
+    if (memo?.key === key) return { ...memo.swaps };
     const mine = other(boss.crowdSide);
     const out: Record<string, string> = {};
     for (const m of [...allowed].sort()) {
@@ -549,7 +553,8 @@ export const sawyerBattle = {
       const fen = sawSwapFen(after, mine);
       if (fen && boardEnd({ ...board, history: [...board.history, m] }) === null) out[m] = fen;
     }
-    return out;
+    b.memo.set("sawSwapJudge", { key, swaps: out });
+    return { ...out };
   },
 
   /** The split's halves follow a move just played on the battle's board. */
