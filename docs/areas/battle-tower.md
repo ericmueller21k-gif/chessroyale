@@ -165,6 +165,11 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   moment names its boss (`PowerEvent.boss`, the view only), so its banner, caster and words are his and his bubble shows by his part of
   the bar (`speakerOf`: a line keyed by his id); `refusedLine` asks every boss on the side; the move list's faces by ply
   (`side.movers`, from `MatchState.movers`) and "Ginger is thinking…" name the boss. One boss: unchanged.
+- **Hidden information on a shared floor (Eric, Nov 21: Smudgy's rook showed on Jefferson's turn):** what a boss hides is read from his
+  own part whoever is in focus: Smudgy's mask (`camo.ts` `camoOf`, for every screen, solo and online) and the home page's live window
+  (`lobby.ts` `hiddenRook`, the side's bosses); the reveal after your move draws every part's board layer (`Crowd.tsx`), so Hollow's dark
+  stays on its squares while another boss is next. Checks: app `camo.test.ts`, `tower-side.test.ts`, server `smudgy-lobby.test.ts`,
+  e2e `battle-tower.spec.ts` ("a shared floor with Smudgy"). [2026-11-21-smudgy-shared-mask.md](../decisions/2026-11-21-smudgy-shared-mask.md).
 
 - **Eric's playtest fixes (Nov 20):** Wrangler has no ultimate on a floor of several (`BATTLE_TOWER.noUltimate: ["pig"]`: the runner marks
   his powers `noUlt` as a shared floor starts; his meter stays on the bar empty and dimmed, aria "Rage: no ultimate in the Battle Tower");
