@@ -471,9 +471,10 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
   await floorThenMatch(page, 2, 2);
-  // Babur's pump: a phone's in his own part of the split bar, inside it; a computer's beside his figure by the board, clear of it. One.
+  // Babur's pump: a phone's in his own card of the split bar, inside it (Nov 21's accordion: where a lone bar has it, so a folded window
+  // may leave it out of sight); a computer's beside his figure by the board, clear of it. One.
   const desk = test.info().project.name === "desktop";
-  const holder = page.locator(desk ? '.tw-side-fig[data-boss="tiger"]' : '.tw-part[data-boss="tiger"]');
+  const holder = page.locator(desk ? '.tw-side-fig[data-boss="tiger"]' : '.tw-part[data-boss="tiger"] .tw-bcard');
   const pump = holder.locator(".tg-pump-slot");
   await expect(pump).toHaveAttribute("data-place", "tower");
   await expect(page.locator(".tg-pump")).toHaveCount(1);
@@ -525,16 +526,17 @@ test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, t
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
   await floorThenMatch(page, 2, 2);
-  // (Eric, Nov 20: every part's name, level and seed meter inside its own part's outline, within 1 px; Puddles' row wraps.)
+  // (Eric, Nov 20: the name, level and seed meter inside the part's outline, within 1 px. Nov 21's accordion: a folded part is a window
+  // onto his card's left side by design, so the open part's card, whole inside its outline.)
   await expect(page.locator('.tw-part[data-boss="gardener"] .seed-meter')).toBeVisible();
   const spill = () =>
     page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>(".tw-bar .tw-part")].flatMap((part) => {
+      [...document.querySelectorAll<HTMLElement>(".tw-bar .tw-part.tw-part-open")].flatMap((part) => {
         const a = part.getBoundingClientRect();
         // (The box inside the 3 px outline: its border is part's own, clientLeft/clientWidth.)
         const left = a.left + part.clientLeft;
         const right = left + part.clientWidth;
-        return [...part.querySelectorAll<HTMLElement>(".tw-part-text, .tw-part-text *")]
+        return [...part.querySelectorAll<HTMLElement>(".boss-main, .boss-main *")]
           .filter((c) => {
             const b = c.getBoundingClientRect();
             return b.width > 0 && (b.left < left - 1 || b.right > right + 1);
@@ -653,6 +655,112 @@ test("a shared floor's moments (Eric, Nov 21): every boss drawn through the God 
       .poll(() => page.evaluate(() => ({ y: document.documentElement.scrollHeight - innerHeight, x: document.documentElement.scrollWidth - innerWidth, dock: Math.ceil(document.querySelector(".boss-dock")!.getBoundingClientRect().bottom) <= innerHeight })), { message: `${w} x ${h}` })
       .toEqual({ y: 0, x: 0, dock: true });
   }
+});
+
+test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the others folded; a turn change slides; a tapped part opens and folds back; the board as on a lone boss's floor; a folded boss's words never cut by his window", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const desk = test.info().project.name === "desktop";
+  const boardBox = async () => {
+    const b = (await page.locator(".board-wrap").first().boundingBox())!;
+    return [b.x, b.y, b.width, b.height].map((v) => Math.round(v));
+  };
+  // (The board's size and its gap under the boss bar: a lone bar is a little taller than the split bar (main's: 99 px against 95 on a
+  // phone), so a floor of several draws the board that much higher; its size and its place under the bar are the lone floor's.)
+  const underBar = async () => {
+    const [x, y, w, h] = await boardBox();
+    const bar = (await page.locator(".boss-bar").first().boundingBox())!;
+    return { x, w, h, gap: Math.round(y - (bar.y + bar.height)) };
+  };
+  // A lone boss's floor (floor 1): the board's size and place. Left at once (free before your 2nd move).
+  await intoTower(page);
+  await (await tapRoom(page, "keeper", "Clerk")).getByRole("button", { name: "Start", exact: true }).click();
+  await floorThenMatch(page, 1, 1);
+  const lone = await underBar();
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("button", { name: "Leave the match" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Leave" }).click();
+  await expect(room(page)).toHaveAttribute("data-room", "tower", { timeout: 60_000 });
+  // A floor of three (the deal set in the local database): Timber, Dash and Don Dough, in turn.
+  const user = await page.evaluate(async () => (await (await fetch("/api/me", { credentials: "same-origin" })).json()).user.id as string);
+  await localSql(page, "UPDATE tower_runs SET floor = 4, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["grex", "hollow"], ["tiger", "pig"], ["timber", "dash", "zebra"]], deck: [], decks: 1 }), user);
+  await (await tapRoom(page, "keeper", "Clerk")).getByRole("button", { name: "Continue: floor 4" }).click();
+  await floorThenMatch(page, 4, 3);
+  // Each part's share of the room inside the outlines (its client width), which is open, and whose turn it is.
+  const parts = () =>
+    page.evaluate(() => {
+      const ps = [...document.querySelectorAll<HTMLElement>(".tw-bar .tw-part")];
+      const sum = ps.reduce((a, p) => a + p.clientWidth, 0);
+      const side = (window as any).match.boss.side;
+      return { toMove: side.bosses[side.toMove].id as string, parts: ps.map((p) => ({ id: p.dataset.boss!, share: p.clientWidth / sum, open: p.getAttribute("aria-expanded") === "true", tag: !!p.querySelector(":scope > .tw-tag") })) };
+    });
+  // (Settled: the open part 75% (within 1%), the folded ones the rest, equal.)
+  const settled = async (openId: string) =>
+    expect
+      .poll(async () => {
+        const { parts: ps } = await parts();
+        const open = ps.filter((p) => p.open);
+        const folded = ps.filter((p) => !p.open);
+        return open.length === 1 && open[0]!.id === openId && Math.abs(open[0]!.share - 0.75) < 0.01 && folded.every((p) => Math.abs(p.share - 0.125) < 0.01);
+      }, { timeout: 5000, message: `${openId} open at 75%` })
+      .toBe(true);
+  let at = await parts();
+  await settled(at.toMove);
+  expect(at.parts.filter((p) => p.tag).map((p) => p.id)).toEqual([at.toMove]);
+  const bar = await page.locator(".tw-bar").boundingBox();
+  // The board's size and place under the bar as on the lone boss's floor; its place kept through every slide below (the bar's height
+  // never changes).
+  const under = await underBar();
+  expect({ ...under, gap: 0 }).toEqual({ ...lone, gap: 0 });
+  expect(Math.abs(under.gap - lone.gap), "the board's gap under the bar (px, its rounding)").toBeLessThanOrEqual(1);
+  const board = await boardBox();
+  // A turn change: the next boss to move opens, the last folds.
+  const was = at.toMove;
+  await playAMove(page);
+  await expect.poll(async () => (await phase(page)) === "play" && (await moves(page)) === 1, { timeout: 90_000 }).toBe(true);
+  at = await parts();
+  expect(at.toMove).not.toBe(was);
+  await settled(at.toMove);
+  expect(await boardBox()).toEqual(board);
+  // A folded part tapped: it opens, the boss to move folds (his TO MOVE tag stays); tapped again: back to the boss to move.
+  const other = at.parts.find((p) => !p.open)!.id;
+  await page.locator(`.tw-part[data-boss="${other}"]`).click();
+  await settled(other);
+  expect((await parts()).parts.filter((p) => p.tag).map((p) => p.id)).toEqual([at.toMove]);
+  await page.locator(`.tw-part[data-boss="${other}"]`).click();
+  await settled(at.toMove);
+  // Tapped open again, then the turn changes: the new boss to move opens.
+  await page.locator(`.tw-part[data-boss="${other}"]`).click();
+  await settled(other);
+  await playAMove(page);
+  await expect.poll(async () => (await phase(page)) === "play" && (await moves(page)) === 2, { timeout: 90_000 }).toBe(true);
+  at = await parts();
+  await settled(at.toMove);
+  expect(await boardBox()).toEqual(board);
+  expect(await page.locator(".tw-bar").boundingBox()).toEqual(bar);
+  if (desk) return await still(page, "accordion");
+  // A folded boss's words (a phone's): drawn over the bar beside his window, whole (no box around them cuts them), his part still folded.
+  const quiet = at.parts.find((p) => !p.open)!.id;
+  const line = "Tick tock, the clock is mine.";
+  await page.evaluate(([t, who]) => (globalThis as { sayBoss?: (t: string, who?: string) => boolean }).sayBoss!(t, who), [line, quiet] as const);
+  const bubble = page.locator(`.tw-part[data-boss="${quiet}"] .tw-say .bc-bubble[aria-label="${line}"]`);
+  await expect(bubble).toBeVisible({ timeout: 10_000 });
+  await expect(async () => {
+    const cut = await bubble.evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      const out: string[] = [];
+      for (let e = b.parentElement; e && !e.classList.contains("screen"); e = e.parentElement) {
+        const cs = getComputedStyle(e);
+        const a = e.getBoundingClientRect();
+        if ((cs.overflowX !== "visible" || cs.overflowY !== "visible") && (r.left < a.left - 0.5 || r.right > a.right + 0.5 || r.top < a.top - 0.5 || r.bottom > a.bottom + 0.5)) out.push(e.className);
+      }
+      const barBox = document.querySelector(".tw-bar")!.getBoundingClientRect();
+      if (r.width < 40 || r.left < barBox.left - 0.5 || r.right > barBox.right + 0.5 || r.top < barBox.top - 0.5 || r.bottom > barBox.bottom + 0.5) out.push(`off the bar: ${JSON.stringify(r)}`);
+      return out;
+    });
+    expect(cut).toEqual([]);
+  }).toPass({ timeout: 5000 });
+  expect((await parts()).parts.find((p) => p.id === quiet)!.open).toBe(false);
+  await still(page, "accordion");
 });
 
 test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's the giraffe's turn or your turn, not his turn\"): his hidden rook drawn a pawn whoever is to move @phone-only", async ({ page }) => {
