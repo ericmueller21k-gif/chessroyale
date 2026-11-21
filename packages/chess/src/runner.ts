@@ -103,6 +103,10 @@ import {
   sideCrowdAllowed,
   ultimateNow,
   sideEvaluation,
+  swapIn,
+  swapJudged,
+  swapMap,
+  swapScores,
   sideIcedSquares,
   sideMustScore,
   sideOffers,
@@ -250,7 +254,15 @@ export interface LastStandRound {
  * A board's numbers from the judge (as scoring takes them), plus, from the same searches, each move's best reply
  * and any forced mate in its line (moves, from the mover's side: negative when the mover gets mated).
  */
-export type BoardEvaluation = GroupEvaluation & { replies?: Readonly<Record<string, string>>; mates?: Readonly<Record<string, number>> };
+export type BoardEvaluation = GroupEvaluation & {
+  replies?: Readonly<Record<string, string>>;
+  mates?: Readonly<Record<string, number>>;
+  /**
+   * Boss battle, Sawyer's Saw Swap: the scorer's look past the moves that set it off (judgeAfter), the crowd's expected score after each
+   * and the swap (swapScores). resolveBoard scores those moves on them, the ones it finds set it off itself only (swapsFor).
+   */
+  swapped?: Readonly<Record<string, number>>;
+};
 
 export interface RoundReport {
   stage: number;
@@ -528,6 +540,32 @@ export class MatchRunner {
     return this.state.boss ? fireBurns(this.state.boss) : [];
   }
 
+  /**
+   * Boss battle, the crowd's turn: the judge's look past its moves (BossRules.judgeAfter: Sawyer's Saw Swap, Eric, Nov 21): the moves
+   * this turn that set off a power as they land, each with the board after it (the boss to move), on which the judge scores the move.
+   * The lobby sends them in the scoring job (`swap`) and the devices prefetch their boards with the turn's own. None on another board,
+   * on the boss's turn, or with several bosses on the side (judgeSwaps).
+   */
+  judgeAfter(boardId = this.state.boards[0]!): Record<string, string> {
+    const b = this.state.boss;
+    const board = this.boards.get(boardId);
+    if (!b?.powers || this.several() || boardId !== this.state.boards[0] || !board || sideToMove(board.fen) !== b.crowdSide) return {};
+    const look = bossRules(b)?.judgeAfter;
+    return look ? look(this.battle, this.crowdAllowed(boardId) ?? legalMoves(board.fen)) : {};
+  }
+
+  /**
+   * The scorer's Saw Swap scores (BoardEvaluation.swapped) this runner takes: for the moves it finds set off the swap itself
+   * (judgeAfter), each a chance. Any other (a host's word on another move, junk) is left out: that move is scored as it stands.
+   */
+  private swapsFor(boardId: number, swapped: unknown): Record<string, number> {
+    if (!swapped || typeof swapped !== "object") return {};
+    const want = this.judgeAfter(boardId);
+    return Object.fromEntries(
+      Object.entries(swapped as Record<string, unknown>).filter((e): e is [string, number] => Object.hasOwn(want, e[0]) && typeof e[1] === "number" && Number.isFinite(e[1]) && e[1] >= 0 && e[1] <= 1),
+    );
+  }
+
   /** Boss battle: the moves the crowd may play this turn (a power's limits, the Last Stand's barred move); null: any. */
   crowdAllowed(boardId = this.state.boards[0]!): string[] | null {
     const b = this.state.boss;
@@ -719,7 +757,8 @@ export class MatchRunner {
 
   /** Starts this round's top-move searches now, so scoring after the picks lock is quick. */
   prefetch(): void {
-    this.top.prefetch(this.opts.engines, [...this.groups.keys()].map((id) => this.boards.get(id)!.fen));
+    // (With the boards after Sawyer's Saw Swap the judge looks at: judgeAfter.)
+    this.top.prefetch(this.opts.engines, [...[...this.groups.keys()].map((id) => this.boards.get(id)!.fen), ...Object.values(this.judgeAfter())]);
   }
 
   /** The engine's own top moves in a position (the same cached search as topMovesFor's), no boss rule applied. */
@@ -744,9 +783,11 @@ export class MatchRunner {
     const side = crowdTurn ? this.sideBosses() : [];
     const escapes = sideMustScore(side, fen).filter((m) => !all.some((x) => x.move === m) && (!allowed || allowed.includes(m)));
     const withEscapes = escapes.length ? [...all, ...(await engine.scoreMoves(fen, escapes))] : all;
-    if (!allowed) return sideRanked(side, withEscapes, fen).slice(0, Math.max(all.length, 1));
+    // (Sawyer's Saw Swap: a move that sets it off as the judge scores it, on the board after the swap.)
+    const swap = crowdTurn ? await swapScores((f) => this.top.get(engine, f), this.judgeAfter(id)) : [];
+    if (!allowed) return sideRanked(side, swapIn(withEscapes, swap), fen).slice(0, Math.max(all.length, 1));
     const top = judgeCandidates({ allowed }, withEscapes, (await allowedSearch(engine, { fen, allowed }, withEscapes)) ?? []);
-    return sideRanked(side, top.length ? top : all, fen);
+    return sideRanked(side, swapIn(top.length ? top : all, swap), fen);
   }
 
   /**
@@ -901,7 +942,9 @@ export class MatchRunner {
     // (The boss's rules may offer the bots more moves, scored first: Chub & Chirp's race, the moves that pull a carrot.)
     const offers = sideOffers(this.sideBosses(), board.fen).filter((m) => (!allowed || allowed.includes(m)) && !top.some((t) => t.move === m));
     const offered = offers.length ? await engine.scoreMoves(board.fen, offers) : [];
-    const botPicks = this.botPicksFor(boardId, playerIds, [...top, ...offered]);
+    // (Sawyer's Saw Swap: each move that sets it off is scored on the board after it, the bots' picks too: judgeAfter.)
+    const swap = await swapScores((f) => this.top.get(engine, f), this.judgeAfter(boardId));
+    const botPicks = this.botPicksFor(boardId, playerIds, swapIn([...top, ...offered], swap));
     const picks: Record<string, string | null> = {};
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
     const known = new Map(top.map((m) => [m.move, m.expected]));
@@ -922,6 +965,7 @@ export class MatchRunner {
       expectedAfter: checked.expectedAfter,
       // (Kept from the same searches, for the God King's Last Stand: what a blunder loses. No extra engine time.)
       ...repliesFrom([top, extra]),
+      ...(swap.length ? { swapped: swapMap(swap) } : {}),
     });
   }
 
@@ -942,7 +986,10 @@ export class MatchRunner {
     // path's numbers come in raw). Then the best move is the highest-scored of the judge's best and the picks (bestOf:
     // after any re-check, which weighed a pick above the first line against it like for like), on every path.
     const pickList = playerIds.map((id) => picks[id] ?? null);
-    const judged = sideEvaluation(this.sideBosses(), limited.evaluation, board.fen);
+    // (Sawyer's Saw Swap, Eric, Nov 21: a move that sets it off is scored on the board after the swap, from the scorer's look past it,
+    // for the moves this runner finds set it off itself. Its reply on the board without the swap goes: the Last Stand names none.)
+    const looked = swapJudged(limited.evaluation, this.swapsFor(boardId, rawEvaluation.swapped));
+    const judged = sideEvaluation(this.sideBosses(), looked, board.fen);
     const evaluation = bestOf(judged, pickList);
     // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
     const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
@@ -975,8 +1022,9 @@ export class MatchRunner {
     // judge's top moves at random). The lobby resolves its rounds here too, so solo and online agree.
     const flag = this.state.boss && !king.plays && !pickList.some((m) => m) ? (this.sideBosses().reduce<string | null>((f, b) => f ?? bossRules(b)?.outOfTime?.(b, board.fen, this.crowdAllowed(boardId) ?? legalMoves(board.fen), scored.map((m) => m.move)) ?? null, null)) : null;
     if (flag) result.playedMove = flag;
-    const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
-    // Fair play where the boss's judge changed the numbers (Chub & Chirp's race): the turn counts only when the engine's
+    const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, looked);
+    // Fair play where the boss's judge changed the numbers (Chub & Chirp's race; Sawyer's Saw Swap, its moves scored after the swap):
+    // the turn counts only when the engine's
     // best keeps its own score, i.e. it is the race's best too (the race keeps only the race's best's score, and raises
     // none above 0.1%: below that the logit's clamp can lift one, by under 0.001). Fair play then records the engine's own
     // numbers (`fairScored`), as on a turn without the race: each move's loss is at most the round's, or within 0.1 point

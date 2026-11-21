@@ -71,6 +71,7 @@ import {
   quickPart,
   boardsAgree,
   sharedReplies,
+  sharedSwaps,
   distanceFrom,
   judgedBoard,
   recheckTargets,
@@ -3060,7 +3061,9 @@ export class LobbyCore {
     }
     if (this.judging()) this.planJudges(key, crowd && !final);
     else if (this.r.hostId) {
-      const fens = [...runner.groups.keys()].map((id) => runner.boards.get(id)!.fen);
+      // (With the boards after Sawyer's Saw Swap the judge looks at: the scoring job's `swap`.)
+      const swap = runner.judgeAfter();
+      const fens = [...[...runner.groups.keys()].map((id) => runner.boards.get(id)!.fen), ...Object.values(swap)];
       const skills = new Map(this.r.bots.map((b) => [b.id, b.skill]));
       const ids = [...runner.groups.values()][0] ?? [];
       // Crowd: the host decides the bots' picks now, so everyone who has picked can watch them come in.
@@ -3075,6 +3078,7 @@ export class LobbyCore {
               ...(runner.boss && runner.crowdAllowed() ? { allowed: runner.crowdAllowed()! } : {}),
               ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
               ...(runner.raceJob() ? { race: runner.raceJob()! } : {}),
+              ...(Object.keys(swap).length ? { swap } : {}),
             }
           : undefined;
       this.send(this.r.hostId, { t: "prefetch", fens, ...(plan ? { plan } : {}) }, false);
@@ -3378,6 +3382,7 @@ export class LobbyCore {
       ...(this.runner!.boss && this.runner!.crowdAllowed(boardId) ? { allowed: this.runner!.crowdAllowed(boardId)! } : {}),
       ...(this.runner!.fireBurn().length ? { burn: this.runner!.fireBurn() } : {}),
       ...(this.runner!.raceJob() ? { race: this.runner!.raceJob()! } : {}),
+      ...(Object.keys(this.runner!.judgeAfter(boardId)).length ? { swap: this.runner!.judgeAfter(boardId) } : {}),
     }));
     // Close calls that can decide the cut are re-checked first.
     const bubble = this.cutPriority();
@@ -3464,7 +3469,15 @@ export class LobbyCore {
       const bestMove = s?.bestMove && legal.includes(s.bestMove) ? s.bestMove : legal[0]!;
       if (expectedAfter[bestMove] === undefined) expectedAfter[bestMove] = bestExpected;
       // (The host's replies and mates from the same searches: what a blunder loses, for the God King's Last Stand.)
-      return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter, ...(isRecord(s?.replies) ? { replies: s.replies } : {}), ...(isRecord(s?.mates) ? { mates: s.mates } : {}) });
+      // (Sawyer's Saw Swap: the moves that set it off, scored after it; the runner takes only the ones it finds set it off.)
+      return runner.resolveBoard(job.boardId, ids, picks, {
+        bestMove,
+        bestExpected,
+        expectedAfter,
+        ...(isRecord(s?.replies) ? { replies: s.replies } : {}),
+        ...(isRecord(s?.mates) ? { mates: s.mates } : {}),
+        ...(isRecord(s?.swapped) ? { swapped: s.swapped } : {}),
+      });
     });
     const think = Object.fromEntries(Object.entries(round.picks).map(([id, p]) => [id, p.thinkMs]));
     // A miss uses the whole of the player's time for the move (out of tries in Hollow's dark: the time until then).
@@ -3724,7 +3737,8 @@ export class LobbyCore {
     const byBoard = assignJudges(() => this.jrng(), boards, devices, Math.min(cfg.perJob, devices.length), cfg);
     this.jr.plan = { key, byBoard: Object.fromEntries([...byBoard].map(([b, j]) => [String(b), j])) };
     const fens = new Map<string, string[]>();
-    for (const [boardId, judges] of byBoard) for (const j of judges) fens.set(j, [...(fens.get(j) ?? []), runner.boards.get(boardId)!.fen]);
+    // (Each board with the boards after Sawyer's Saw Swap its judges look at: the job's `swap`.)
+    for (const [boardId, judges] of byBoard) for (const j of judges) fens.set(j, [...(fens.get(j) ?? []), runner.boards.get(boardId)!.fen, ...Object.values(runner.judgeAfter(boardId))]);
     const skills = new Map(this.r.bots.map((b) => [b.id, b.skill]));
     const [firstBoard, firstIds] = [...runner.groups.entries()][0] ?? [0, []];
     const barred = runner.boss?.barred;
@@ -3737,6 +3751,7 @@ export class LobbyCore {
           ...(runner.boss && runner.crowdAllowed(firstBoard) ? { allowed: runner.crowdAllowed(firstBoard)! } : {}),
           ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
           ...(runner.raceJob() ? { race: runner.raceJob()! } : {}),
+          ...(Object.keys(runner.judgeAfter(firstBoard)).length ? { swap: runner.judgeAfter(firstBoard) } : {}),
           seed: seedFor(key, firstBoard),
           rules: this.judgeRules(),
         }
@@ -3771,6 +3786,7 @@ export class LobbyCore {
         ...(sj.allowed ? { allowed: sj.allowed } : {}),
         ...(sj.burn ? { burn: sj.burn } : {}),
         ...(sj.race ? { race: sj.race } : {}),
+        ...(sj.swap ? { swap: sj.swap } : {}),
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);
@@ -4181,9 +4197,11 @@ export class LobbyCore {
     // (A tie: the judge with fewer strikes.)
     const strikesOf = (j: string) => this.jr.devices[j]?.strikes ?? 0;
     const closer = distances[0]! < distances[1]! || (distances[0] === distances[1] && strikesOf(a) <= strikesOf(b)) ? a : b;
-    // (The server names no replies: only those both judges name alike count, as when they agree.)
+    // (The server names no replies: only those both judges name alike count, as when they agree. Nor does it look past Sawyer's Saw
+    // Swap: only the scores after it both judges give alike count; a move they differ on is scored as it stands.)
     const verdict = closer === a ? first : verdictBoard(t.job, moves, t.boards[b]!)!;
-    t.done = { board: { ...verdict, replies: sharedReplies([verdict, t.boards[a]!, t.boards[b]!]) }, how: "verdict" };
+    const swapped = sharedSwaps([t.boards[a]!, t.boards[b]!]);
+    t.done = { board: { ...verdict, replies: sharedReplies([verdict, t.boards[a]!, t.boards[b]!]), ...(swapped ? { swapped } : {}) }, how: "verdict" };
     const refereed = !!t.refereed;
     console.log(`judges: verdict for ${t.job.id} in ${this.r.code}: ${a} ${distances[0]!.toFixed(1)} and ${b} ${distances[1]!.toFixed(1)} points off${refereed ? " (a third device decides who's to blame)" : ""}`);
     // A third device will say exactly who was off; without one, blame goes by distance from the verdict.
@@ -4313,6 +4331,7 @@ export class LobbyCore {
         botPowerUps: b.botPowerUps.map((i) => t.botIds[i]!),
         replies: b.replies,
         mates: b.mates,
+        ...(b.swapped ? { swapped: b.swapped } : {}),
       };
     });
     // Crowd: the early bot picks someone sent must be what two agreeing judges worked out (from the same seed).

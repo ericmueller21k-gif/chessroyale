@@ -20,7 +20,7 @@
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type SawCut, type SplitPawn } from "@chessroyale/core";
 import { BOSS_OPENING, boardEnd, newBoard } from "../boards.ts";
 import { marksStop, moveEdges, type EdgeMark } from "../board-layer.ts";
-import { inCheck, kingAttacked, legalMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
+import { applyMove, inCheck, kingAttacked, legalMoves, pieceAt, sideToMove, withPiece } from "../rules.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { VALUE, crowdHalf, from, meterFull, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type TurnContext } from "./base.ts";
 
@@ -451,6 +451,8 @@ export const SAWYER: BossRules = {
     if (move) sawyerBattle.track(b, move);
     sawyerBattle.sawSwap(b);
   },
+  // The judge: a crowd move that sets off the Saw Swap is scored on the board after the swap (Eric, Nov 21).
+  judgeAfter: (b, allowed) => sawyerBattle.judgeSwaps(b, allowed),
   // (Several bosses: another boss's move, his halves follow it too; a half another boss's power moved or changed is let go.)
   followMove: (b, move) => sawyerBattle.track(b, move),
   followBoard(b) {
@@ -492,10 +494,8 @@ export const sawyerBattle = {
    */
   sawSwap(b: Battle, s: Pick<BossPowerSettings, "sawSwapInTower"> = BOSS_POWERS): boolean {
     const boss = b.state.boss;
-    const p = boss?.powers;
-    if (!boss || !p || boss.id !== "sawyer" || p.sawSwap || boss.result) return false;
-    if (b.settings.towerFloor && !s.sawSwapInTower) return false;
-    if (!b.bossToMove() || boss.crowdMoves >= b.settings.bossMaxMoves) return false;
+    if (!sawyerBattle.swapToCome(b, s) || !boss || !b.bossToMove() || boss.crowdMoves >= b.settings.bossMaxMoves) return false;
+    const p = boss.powers!;
     const id = b.state.boards[0]!;
     const board = b.boards.get(id)!;
     if (boardEnd(board) !== null) return false;
@@ -512,6 +512,44 @@ export const sawyerBattle = {
       boss: { ...boss, powers: { ...p, ...(split ? { split } : {}), sawSwap: { at: boss.crowdMoves, king }, events: [...p.events, { kind: "sawSwap", turn: p.turn, square: king[1], squares: [...king] }] } },
     };
     return true;
+  },
+
+  /**
+   * The Saw Swap may still come this battle: the boss is Sawyer, he hasn't swapped yet, the battle's on, and it isn't a Battle Tower
+   * floor (lone or shared) unless `sawSwapInTower`. sawSwap's own test, and the judge's (judgeSwaps): one rule for both.
+   */
+  swapToCome(b: Battle, s: Pick<BossPowerSettings, "sawSwapInTower"> = BOSS_POWERS): boolean {
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    return !!boss && !!p && boss.id === "sawyer" && !p.sawSwap && !boss.result && !(b.settings.towerFloor && !s.sawSwapInTower);
+  },
+
+  /**
+   * The judge's look past the crowd's move (Eric, Nov 21: "score that checking move as if the swap happens"): of `allowed`, the crowd's
+   * moves this turn (the crowd to move), those that set off the Saw Swap as they land, each with the board after the swap (him to move),
+   * which the judge scores the move on instead of the board right after it (BossRules.judgeAfter). sawSwap's own rules, a move ahead:
+   * the swap still to come (swapToCome), the crowd's move not the battle's last (the move cap) nor one that ends the game on the board
+   * (a mate stands; a draw), and sawSwapFen. Sorted by move; empty when none. A side of several bosses (a tower floor, where the swap is
+   * off: sawSwapInTower) gets none: which boss moves after the crowd isn't settled until its move lands.
+   */
+  judgeSwaps(b: Battle, allowed: readonly string[], s: Pick<BossPowerSettings, "sawSwapInTower"> = BOSS_POWERS): Record<string, string> {
+    const boss = b.state.boss;
+    if (!sawyerBattle.swapToCome(b, s) || !boss || (b.state.bosses?.length ?? 0) > 1 || b.bossToMove() || boss.crowdMoves + 1 >= b.settings.bossMaxMoves) return {};
+    const board = b.boards.get(b.state.boards[0]!)!;
+    const mine = other(boss.crowdSide);
+    const out: Record<string, string> = {};
+    for (const m of [...allowed].sort()) {
+      let after: string;
+      try {
+        after = applyMove(board.fen, m);
+        if (!inCheck(after)) continue;
+      } catch {
+        continue;
+      }
+      const fen = sawSwapFen(after, mine);
+      if (fen && boardEnd({ ...board, history: [...board.history, m] }) === null) out[m] = fen;
+    }
+    return out;
   },
 
   /** The split's halves follow a move just played on the battle's board. */

@@ -47,6 +47,8 @@ import {
   allowedSearch,
   jobRanked,
   jobOffers,
+  swapMap,
+  swapScores,
   jobEscapes,
   sideToMove,
   judgeCandidates,
@@ -1281,7 +1283,8 @@ export class NetMatch implements GameView {
     };
     await each(jobs, async (engine, job) => {
       // The top moves were searched while players thought (the prefetch), so usually only the picks are left.
-      const report = await runQuickJob(engine, job, this.top.get(engine, job.fen));
+      // (Sawyer's Saw Swap's boards too: prefetched alike.)
+      const report = await runQuickJob(engine, job, this.top.get(engine, job.fen), (f) => this.top.get(engine, f));
       quick.set(job.id, report);
       this.send({ t: "judged", key, id: job.id, report });
     });
@@ -1302,12 +1305,13 @@ export class NetMatch implements GameView {
         // Many judges: the bots pick from the lobby's seed, exactly as the scoring job will (it checks this plan).
         const top = await this.top.get(engines[0]!, plan.fen);
         const bots = plan.bots.map((b) => ({ skill: b.skill, powerUps: b.powerUps ?? 0 }));
-        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}), ...(plan.burn ? { burn: plan.burn } : {}), ...(plan.race ? { race: plan.race } : {}) } as unknown as JudgeJob;
+        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}), ...(plan.burn ? { burn: plan.burn } : {}), ...(plan.race ? { race: plan.race } : {}), ...(plan.swap ? { swap: plan.swap } : {}) } as unknown as JudgeJob;
         // (A boss power left none of the top moves open: the bots pick from a search over the allowed ones, as the job will.
-        // The Carrot Patch's pulls: scored first, the bots' to pick too, as the job's.)
+        // The Carrot Patch's pulls: scored first, the bots' to pick too, as the job's. Sawyer's Saw Swap: its moves scored after it.)
         const open = await allowedSearch(engines[0]!, job, top);
         const offers = open ? [] : jobOffers(job).filter((mv) => !top.some((t) => t.move === mv));
-        const chosen = judgeBotPicks(job, top, open ?? (offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : []));
+        const swap = await swapScores((f) => this.top.get(engines[0]!, f), plan.swap);
+        const chosen = judgeBotPicks(job, top, open ?? (offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : []), swap);
         const picks = Object.fromEntries(plan.bots.map((b, i) => [b.id, chosen.picks[i]!]));
         if (this.key === plan.key) this.send({ t: "botPlan", key: plan.key, picks, powerUps: chosen.powerUps.map((i) => plan.bots[i]!.id) });
         return;
@@ -1318,7 +1322,8 @@ export class NetMatch implements GameView {
       // (G-REX's fire: the bots count a piece left on a tile ablaze as gone. The Carrot Patch: the race counted.)
       const base = judgeCandidates(limits, all, (await allowedSearch(engines[0]!, { ...limits, fen: plan.fen }, all)) ?? []);
       const offers = jobOffers({ fen: plan.fen, race: plan.race, ...limits }).filter((mv) => !base.some((t) => t.move === mv));
-      const top = jobRanked({ fen: plan.fen, burn: plan.burn, race: plan.race }, [...base, ...(offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : [])]);
+      const swap = await swapScores((f) => this.top.get(engines[0]!, f), plan.swap);
+      const top = jobRanked({ fen: plan.fen, burn: plan.burn, race: plan.race }, [...base, ...(offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : [])], swap);
       const best = top[0]?.expected ?? 0.5;
       const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
       const legal = plan.allowed ?? legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
@@ -1358,9 +1363,11 @@ export class NetMatch implements GameView {
           // (The Carrot Patch's pulls: scored first, the bots' to pick too.)
           const offers = jobOffers({ fen: job.fen, race: job.race, ...limits }).filter((mv) => !top.some((t) => t.move === mv));
           const offered = offers.length ? await engine.scoreMoves(job.fen, offers) : [];
-          // (G-REX's fire: the bots count a piece left on a tile ablaze as gone; the Carrot Patch: the race counted. The
-          // scores stay the engine's.)
-          const ranked = jobRanked(job, [...top, ...offered]);
+          // (Sawyer's Saw Swap: each board after it searched (prefetched), the moves that set it off scored there.)
+          const swap = await swapScores((f) => this.top.get(engine, f), job.swap);
+          // (G-REX's fire: the bots count a piece left on a tile ablaze as gone; the Carrot Patch: the race counted; the Saw Swap's moves
+          // after it. The scores stay the engine's: the lobby's runner applies them all, once.)
+          const ranked = jobRanked(job, [...top, ...offered], swap);
           const candidates = ranked.map((mv) => ({ move: mv.move, loss: Math.max(0, (ranked[0]!.expected - mv.expected) * 100) }));
           const legal = job.allowed ?? legalMoves(job.fen).filter((mv) => mv !== job.barred);
           const botPicks: Record<string, string> = {};
@@ -1398,7 +1405,8 @@ export class NetMatch implements GameView {
           const checked = serverRecheck || !people
             ? { bestMove: top[0]!.move, bestExpected: best, expectedAfter }
             : await recheckCloseCalls(engine, job.fen, { bestMove: top[0]!.move, bestExpected: best, expectedAfter }, [...Object.values(job.humanPicks), ...Object.values(botPicks)], this.settings, job.priority);
-          out[i] = { boardId: job.boardId, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, botPicks, botThinkMs, botPowerUps, replies, mates };
+          const swapped = swapMap(swap);
+          out[i] = { boardId: job.boardId, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, botPicks, botThinkMs, botPowerUps, replies, mates, ...(swapped ? { swapped } : {}) };
         }
       }),
     );

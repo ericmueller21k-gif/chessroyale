@@ -421,6 +421,56 @@ export async function allowedSearch(engine: Pick<EngineLike, "scoreMoves">, job:
   return engine.scoreMoves(job.fen, moves);
 }
 
+// ---------------- The judge's look past a move (BossRules.judgeAfter: Sawyer's Saw Swap) ----------------
+
+/**
+ * The judge's look past the crowd's move (Eric, Nov 21): for each move that sets off a power as it lands (`swap`: move → the board
+ * after it, the boss to move; the runner's judgeAfter, sent in the job), that board's search (`search`: the top-moves search every
+ * position the judge looks at gets, so a device prefetches it while players think and two devices run it alike), its best line read
+ * from the crowd's side: the crowd's expected score after the move and the power. By move. A board with no line (none should be:
+ * sawSwapFen leaves him a move the engine plays) is left out, and its move is scored as it stands.
+ */
+export async function swapScores(search: (fen: string) => Promise<readonly MoveScore[]>, swap: Readonly<Record<string, string>> | null | undefined): Promise<MoveScore[]> {
+  const out: MoveScore[] = [];
+  for (const move of Object.keys(swap ?? {}).sort()) {
+    const [best] = await search(swap![move]!);
+    if (best) out.push({ move, expected: 1 - best.expected });
+  }
+  return out;
+}
+
+/** The look's scores by move (swapScores), for an evaluation's `swapped`; none: undefined. */
+export const swapMap = (swap: readonly MoveScore[]): Record<string, number> | undefined => (swap.length ? Object.fromEntries(swap.map((m) => [m.move, m.expected])) : undefined);
+
+/**
+ * Scores as the judge ranks them with its look past the move (swapScores: for the bots and the hints): each move it looked past takes
+ * the look's score (its reply and mate were the boss's answers on the board without the power: gone), best first (ties by move). Moves
+ * it didn't look past keep their place: without one among them, the list as it is.
+ */
+export function swapIn(scores: readonly MoveScore[], swap: readonly MoveScore[] | null | undefined): MoveScore[] {
+  const by = new Map((swap ?? []).map((m) => [m.move, m]));
+  if (!scores.some((m) => by.has(m.move))) return [...scores];
+  return scores.map((m) => by.get(m.move) ?? m).sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1));
+}
+
+/**
+ * A board's evaluation with the judge's look past the move in (`swapped`: move → the crowd's expected score after the power, the
+ * runner's own moves only: swapsFor): each of those moves takes that score, scored or not before (it was searched either way), its
+ * reply and mate dropped (the boss's answers on the board without the power, which the Last Stand would show); then the best move is
+ * the highest scored (ties keep the judge's best, then by move). The same object when there are none. Pure: the host, the judges and
+ * the lobby work it out alike.
+ */
+export function swapJudged<E extends JudgedEvaluation & { replies?: Readonly<Record<string, string>>; mates?: Readonly<Record<string, number>> }>(evaluation: E, swapped: Readonly<Record<string, number>>): E {
+  const moves = Object.keys(swapped);
+  if (!moves.length) return evaluation;
+  const expectedAfter = { ...evaluation.expectedAfter, ...swapped };
+  const drop = <T>(r: Readonly<Record<string, T>> | undefined) => (r ? Object.fromEntries(Object.entries(r).filter(([m]) => !Object.hasOwn(swapped, m))) : r);
+  let bestMove = evaluation.bestMove;
+  let bestExpected = expectedAfter[bestMove] ?? evaluation.bestExpected;
+  for (const [m, e] of Object.entries(expectedAfter).sort((a, b) => (a[0] < b[0] ? -1 : 1))) if (e > bestExpected) [bestMove, bestExpected] = [m, e];
+  return { ...evaluation, bestMove, bestExpected, expectedAfter, ...(evaluation.replies ? { replies: drop(evaluation.replies) } : {}), ...(evaluation.mates ? { mates: drop(evaluation.mates) } : {}) };
+}
+
 // ---------------- Several bosses on one side (the Battle Tower) ----------------
 
 /*
