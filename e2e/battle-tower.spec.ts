@@ -566,3 +566,54 @@ test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, t
   expect(await powers()).toEqual({ gardener: { noAdd: false, placed: 0 }, tiger: { noAdd: true, placed: 0 } });
   await still(page, "shared-floor-primary-off");
 });
+
+test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's the giraffe's turn or your turn, not his turn\"): his hidden rook drawn a pawn whoever is to move @phone-only", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  // (On every change to the page: a black rook drawn on the square where his rook hides is a leak, noted with whose turn the view says.)
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__leaks = [];
+    new MutationObserver(() => {
+      const b = w.match?.boss;
+      const sq = b?.side?.bosses?.find((x: any) => x.id === "smudgy")?.powers?.camo?.square;
+      if (sq && document.querySelector(`.hb-board piece.black.rook[data-square="${sq}"]`)) w.__leaks.push(`${sq} on ${b.id}'s turn (${w.match?.phase?.kind})`);
+    }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-square"] });
+  });
+  // ?paint=1: his rook hidden on d7 from the start (camo.ts). Floor 2: Jefferson, then Smudgy (the deal set in the local database).
+  await intoTower(page, "&paint=1");
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 2, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["grex", "smudgy"]], deck: [], decks: 1 }), made.user);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
+  await floorThenMatch(page, 2, 2);
+  // What the page draws on the hidden square, and whose turn the view's top level says.
+  const look = () =>
+    page.evaluate(() => {
+      const m = (window as any).match;
+      const b = m?.boss;
+      const square: string | null = b?.side?.bosses?.find((x: any) => x.id === "smudgy")?.powers?.camo?.square ?? null;
+      const el = square ? document.querySelector(`.hb-board piece[data-square="${square}"]`) : null;
+      const role = el ? ["pawn", "rook"].find((r) => el.classList.contains(r)) ?? "other" : null;
+      return { phase: m?.phase?.kind ?? null, focus: (b?.id ?? null) as string | null, square, drawn: el ? `${el.classList.contains("white") ? "w" : "b"} ${role}` : null };
+    });
+  // Your turn with Jefferson next (the view's top level his): a pawn on d7.
+  let at = await look();
+  await expect.poll(async () => ((at = await look()), at.phase === "play" && at.drawn !== null), { timeout: 20_000 }).toBe(true);
+  expect(at).toMatchObject({ phase: "play", focus: "grex", square: "d7", drawn: "b pawn" });
+  await still(page, "shared-smudgy-your-turn");
+  // Your move; then Jefferson's turn: the hidden square still a pawn while he plays.
+  await playAMove(page);
+  await expect.poll(async () => ((at = await look()), at.phase === "boss" && at.focus === "grex" && at.drawn !== null), { timeout: 60_000 }).toBe(true);
+  expect(at.drawn).toBe("b pawn");
+  await still(page, "shared-smudgy-his-turn");
+  // Back to you, Smudgy next: the same.
+  await expect.poll(async () => ((at = await look()), at.phase === "play" && at.focus === "smudgy" && at.drawn !== null), { timeout: 60_000 }).toBe(true);
+  expect(at.drawn).toBe("b pawn");
+  // (No frame drew his rook on its square.)
+  expect(await page.evaluate(() => (window as any).__leaks)).toEqual([]);
+});
