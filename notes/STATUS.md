@@ -581,6 +581,10 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 21 ~02:30 UTC
+- #861 God King shouts MERGED 12c841b: gkHyuah = one of shout-1..4 (Eric's own pack via the Fable music session `fable` session_01JuCWRs7vACHciUbhC3eY8V, stills/trailer-v2 b52395c7) at random. Open: Eric said 3 (there are 4) — drop one on his word; the pack's source for CREDITS.md.
+- Waiting on Eric: optional Saw Swap scoring of the checking move.
+
 ## Nov 21 ~00:50 UTC
 - #860 alfil flake MERGED a6a4fe6; main's full run GREEN (15/15, no retries). All of today's work merged and live.
 - Waiting on Eric: God King charge pick A/B/C (notes/briefs/god-king-cry.md); optional Saw Swap scoring of the checking move.
