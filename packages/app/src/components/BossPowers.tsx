@@ -178,10 +178,11 @@ export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), 
  * in the free room at the right (`prop`; none yet). Through the boss's turn on its screen it draws itself every frame (the
  * strip relights as his darkness lands): the header around it draws only now and then (useStillKey).
  */
-export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView; until?: number; part?: "bar" | "ult" | "prop" | "towerProp" }) {
+export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView; until?: number; part?: "bar" | "ult" | "prop" | "towerProp" | "cardProp" }) {
   const ui = bossUi(boss);
-  // (`towerProp`: a tower floor's split bar, his prop only where it's drawn there: BossUi.towerProp.)
-  const draw = part === "ult" ? ui?.ultBar : part === "prop" ? ui?.barProp : part === "towerProp" ? (ui?.towerProp ? ui.barProp : undefined) : ui?.bar;
+  // (`towerProp`: a computer's tower floor of several, his prop by his figure where it's drawn there: BossUi.towerProp. `cardProp`: every
+  // other bar prop, in his card of the split bar: TowerBar.)
+  const draw = part === "ult" ? ui?.ultBar : part === "prop" ? ui?.barProp : part === "towerProp" ? (ui?.towerProp ? ui.barProp : undefined) : part === "cardProp" ? (ui?.towerProp ? undefined : ui?.barProp) : ui?.bar;
   useFrameNow(!!draw && !!until);
   return draw?.({ boss, moments: () => momentsOf(boss, until) }) ?? null;
 }

@@ -143,28 +143,35 @@ export function BossBar({ boss, match, move }: { boss: BossView; match?: GameVie
         </span>
         {/* (The move number, a computer's: left of the status, where the title line said it, Nov 1.) */}
         {move && <span class="boss-move">{move}</span>}
-        <span class="boss-next">
-          {match?.bossNote != null
-            ? match.bossNote
-            : boss.result
-            ? boss.result === "crowd"
-              ? "Defeated!"
-              : boss.result === "boss"
-                ? "The boss won"
-                : "A draw"
-            : boss.strikeIn !== null
-              ? boss.strikeIn <= 1
-                ? "Strikes after this move"
-                : `Strikes in ${boss.strikeIn} moves`
-              : // (A boss that never strikes, the Hidden Boss: the moves left, since the title says which move it is.)
-                movesLeft(boss)}
-        </span>
+        <BossNext boss={boss} match={match} />
         <span class="boss-prop">{meters && <BossBarExtra boss={boss} until={until} part="prop" />}</span>
         {/* (His words, a phone's: inside the bar, from the name column's left edge to its right padding, under the status, so never
             over it: one row when short, else two balanced rows. A computer's are by his figure beside the board.) */}
         {char && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced />}
       </span>
     </div>
+  );
+}
+
+/** The lone bar's status at its top right ("Strikes in 3 moves", "58 moves left", the result); a Battle Tower floor's card has it too (TowerBar). */
+export function BossNext({ boss, match }: { boss: BossView; match?: GameView }) {
+  return (
+    <span class="boss-next">
+      {match?.bossNote != null
+        ? match.bossNote
+        : boss.result
+        ? boss.result === "crowd"
+          ? "Defeated!"
+          : boss.result === "boss"
+            ? "The boss won"
+            : "A draw"
+        : boss.strikeIn !== null
+          ? boss.strikeIn <= 1
+            ? "Strikes after this move"
+            : `Strikes in ${boss.strikeIn} moves`
+          : // (A boss that never strikes, the Hidden Boss: the moves left, since the title says which move it is.)
+            movesLeft(boss)}
+    </span>
   );
 }
 
