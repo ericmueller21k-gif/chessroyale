@@ -228,7 +228,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(room(page)).not.toHaveAttribute("data-part", "top", { timeout: 20_000 });
   const desk = await tapRoom(page, "keeper", "Clerk");
   await heartsAre(desk.locator(".tw-desk-lives .tw-hearts"), 0);
-  await expect(desk.locator(".tw-desk-lives")).toContainText("Lost floors 2 and 3");
+  await expect(desk.locator(".tw-desk-lives")).toContainText("No lives left");
   await still(page, "clerk-recap");
   await desk.getByRole("button", { name: "Continue: floor 4" }).click();
   await floorThenMatch(page, 4, 3);
