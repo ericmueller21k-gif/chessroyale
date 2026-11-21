@@ -64,7 +64,9 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **XP and levels** (Nov 9; [2026-11-09-xp-rules.md](../decisions/2026-11-09-xp-rules.md), [storage](../decisions/2026-11-09-xp-storage.md),
   [the box](../decisions/2026-11-09-xp-box.md)): every counted game's XP is decided on the server (`server/xp.ts` `grantXp`, the rules in
   core's `xp.ts`, the numbers `XP` in settings.ts) and granted through the ledger (asset kind `xp`, the wallet's `xp` column), once per game
-  per player. 10 XP a whole minute you played (up to 30), +50 a win, from 10 of your own moves; none for leaving, a test game, a banned
+  per player. 10 XP a whole minute you played (up to 30), +50 a win, from 10 of your own moves (every turn you took: a pick, a
+  turn you called the God King to play, a turn Hollow's dark ended at your last wrong try; never a missed one: core's `ownMoves` on a
+  device, the match room's `lock` online, Nov 21: [2026-11-21-xp-king-turns.md](../decisions/2026-11-21-xp-king-turns.md)); none for leaving, a test game, a banned
   account, or a guest where sign-in is set up. Your level is 1 + XP ÷ 500 (`levelOf`; 1,000 until Nov 20: [2026-11-20-levels-500.md](../decisions/2026-11-20-levels-500.md)). Each result row keeps the game's `play_ms`,
   `moves` and its XP (`xp_before`, `xp_parts`, `xp_none`); a solo game is timed by the server between `POST /api/xp/solo/start` and its
   `POST /api/results` (table `solo_games`); a solo result it never timed earns nothing, a solo win needs 5 of its minutes, and solo time
@@ -223,7 +225,8 @@ offered, how long each answer lasts).
   `packages/server/test/quests.test.ts` (dealing, resets, carry-over, the reroll, progress per mode, paid once under replays and races,
   the weekly, the pause, merge, download and delete, the API); `e2e/quests.spec.ts`.
 - XP: `packages/core/test/xp.test.ts` (the rules, the fill), `packages/server/test/xp.test.ts` (granted once, races, the caps, each "No
-  XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); `e2e/xp.spec.ts`.
+  XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); your own moves counting God King
+  turns: `packages/app/test/tower-keep.test.ts` (solo) and `packages/server/test/boss-powers-lobby.test.ts` (online); `e2e/xp.spec.ts`.
 - The Battle Tower: `packages/server/test/tower.test.ts` (the routes, a floor's result once, the merge, the download and deleting).
 - Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `ban-sign-in.test.ts` (each sign-in refused
   for a banned account and ban evasion, no session; [fairplay.md](fairplay.md)); `age-gate.test.ts` (Sign up behind the

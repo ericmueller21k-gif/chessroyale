@@ -200,6 +200,24 @@ test('"No XP: you resigned before move 10.": resigning at once, no test switch o
   await expect(page.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: you resigned before move 10.", { timeout: 20_000 });
 });
 
+test("a turn you called the God King to play is one of your moves in the result the server counts (Eric, Nov 21)", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  // (Eric's floor, won by mate on move 12 with 3 calls, said "No XP: the game ended before move 10": the calls weren't counted.)
+  const sent: { moves?: unknown }[] = [];
+  page.on("request", (r) => void (r.method() === "POST" && new URL(r.url()).pathname === "/api/results" && sent.push(r.postDataJSON())));
+  // (?win=1: from a mate in one, Qxf7; the God King plays the judge's best, the mate. A test switch: the game itself is a test game.)
+  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread");
+  await bossAloneFromHome(page);
+  await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+  expect(await page.evaluate(() => (window as any).match.boss.kingCharges)).toBeGreaterThan(0);
+  await page.evaluate(() => (window as any).match.callKing());
+  await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
+  expect(await page.evaluate(() => (window as any).match.moves.map((m: { move: unknown; abstained?: boolean }) => [m.move, !!m.abstained]))).toEqual([[null, true]]);
+  // Your one move was the God King's, and it's yours: 1 (it was 0).
+  await expect.poll(() => sent.length, { timeout: 20_000 }).toBe(1);
+  expect(sent[0]!.moves).toBe(1);
+});
+
 test("each other \"No XP\" line, in the same box and size (the server's answer faked): ended early, left, a guest, banned, the daily solo limit", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   for (const [none, line] of [

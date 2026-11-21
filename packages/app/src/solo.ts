@@ -795,7 +795,8 @@ export class SoloMatch implements GameView {
     // Boss alone, his bulbs (Nov 5): the 3rd and 7th out, the dark plays your move; the last, the battle is his.
     if (out.forced) return void this.darkForcedTurn();
     if (out.blackout) return this.blackoutTurn();
-    if (out.out) return void this.score(null);
+    // (Your turn, though no move went in: XP's minimum counts it, as the match room does online. Nov 21.)
+    if (out.out) return void this.score(null, true);
     // (A tower floor: the wrong try kept as it happens, so a reload mid-turn has the same bulbs out (Nov 20). The dark's move and the
     // blackout are kept by the step after them: a rejoin can't play a dark's move still due.)
     this.keepFloor();
@@ -1701,7 +1702,8 @@ export class SoloMatch implements GameView {
     void this.score(move);
   }
 
-  private async score(move: string | null) {
+  /** `darkOut`: Hollow's dark ended your turn at your last wrong try (no move: still your turn, MoveRecord.darkOut). */
+  private async score(move: string | null, darkOut = false) {
     if (this.phase.kind !== "play") return;
     const { board, allowedMs: allowed } = this.phase;
     if (move !== null && Date.now() < this.playStartedAt - 300) return; // Before the clock starts.
@@ -1741,7 +1743,7 @@ export class SoloMatch implements GameView {
     const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
     const mine = report.boards.find((b) => b.playerIds.includes(HUMAN))!;
     const record = moveRecordFrom(report.stage, report.round, mine, (id) => id === HUMAN);
-    if (record) this.moves.push(record);
+    if (record) this.moves.push(darkOut && record.move === null && !record.abstained ? { ...record, darkOut: true } : record);
     // Crowd 50 v 50: your miss past CrowdMisses.allowed (the 4th in the game) removes you for being away, as resigning.
     if (report.away?.includes(HUMAN)) return this.removeAway();
     if (inFinal) return this.showFinalMove(report);

@@ -483,6 +483,8 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("more for a longer game, plus 50 XP for a win. A game earns at most 350 XP.");
     expect(t).toContain("(1,200 XP a day before win bonuses)");
     expect(t).toContain("A game counts from your 10th move.");
+    // (Eric, Nov 21: a turn the God King played for you is yours: core's ownMoves, the match room's lock.)
+    expect(t).toContain("Every turn you take is one of your moves, a turn you call the God King to play included; a turn you let run out isn't.");
     expect(t).toContain('"No XP: the game ended before move 10."');
     expect(t).toContain('"No XP: you resigned before move 10."');
     expect(t).toContain("if you left the match");

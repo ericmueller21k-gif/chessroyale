@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, towerPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, towerPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, ownMoves, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -516,7 +516,8 @@ export function App() {
         ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
         evalBar: evalBarOn(),
         game,
-        moves: solo.moves.filter((m) => m.move !== null).length,
+        // (Every turn you took: a turn you called the God King to play counts, a missed one doesn't. Eric, Nov 21: ownMoves.)
+        moves: ownMoves(solo.moves),
         won: !resigned && (mode === "classic" ? placement === 1 : teamWon === true),
         resigned: how === "resigned",
         // (Removed for idling: "No XP: you left the match.", as online. Review m6.)

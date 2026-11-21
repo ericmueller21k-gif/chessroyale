@@ -1,8 +1,8 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, ownMoves, type Settings } from "@chessroyale/core";
 import { legalMoves, type UciEngine } from "@chessroyale/chess";
 import { loadOpenings, SoloMatch } from "../src/solo.ts";
-import { FloorPlay, loadKept, type KeptFloor } from "../src/tower.ts";
+import { FloorPlay, leaveIsFree, loadKept, type KeptFloor } from "../src/tower.ts";
 
 /**
  * Audit 2's finding 2 (docs/decisions/2026-11-19-battle-tower-audit-2.md): a tower floor is kept on the device as each step of the
@@ -130,6 +130,40 @@ describe("a tower floor kept on the device (audit 2, finding 2)", () => {
     // (Kept again as the round began: a second reload straight away gives the same 25 s back, not a fresh clock.)
     expect(loadKept()!.game!.turnMs).toBe(used + 5_000);
     r.dispose();
+  });
+
+  it("a turn you called the God King to play is one of your moves for XP, kept with the floor; a missed turn isn't (Eric, Nov 21)", async () => {
+    const m = floorMatch(kept0);
+    m.start();
+    const pick = () => {
+      const fen = (m.phase as { board: { fen: string } }).board.fen;
+      m.submit((m.runner.crowdAllowed() ?? legalMoves(fen))[0]!);
+    };
+    // Move 1 yours; move 2 the God King's (called twice: one turn), and the floor's leave is no longer free.
+    await until(m, () => yourTurn(m), "your first turn");
+    pick();
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    const charges = m.boss!.kingCharges!;
+    expect(charges).toBeGreaterThan(0);
+    m.callKing();
+    m.callKing();
+    await until(m, () => m.moves.length === 2, "the King's turn kept");
+    expect(m.moves[1]).toMatchObject({ move: null, abstained: true });
+    expect(m.boss!.kingCharges).toBe(charges - 1);
+    expect(leaveIsFree(m.runner.boss!.crowdMoves)).toBe(false);
+    // Kept with the floor as the bosses' reply shows: a rejoin counts the call too.
+    await until(m, () => loadKept()?.game?.moves.length === 2, "the floor kept after the King's turn");
+    expect(ownMoves(loadKept()!.game!.moves)).toBe(2);
+    // Move 3: the clock runs out, no pick: not yours.
+    await until(m, () => yourTurn(m), "your third turn");
+    await step((m.phase as { deadline: number }).deadline - Date.now() + 2_000);
+    await until(m, () => m.moves.length === 3, "the missed turn kept");
+    expect(m.moves[2]!.move).toBeNull();
+    expect(m.moves[2]!.abstained).toBeUndefined();
+    // The result's count (App.tsx sends ownMoves(solo.moves)): the pick and the call, where only the pick counted before.
+    expect(ownMoves(m.moves)).toBe(2);
+    expect(m.moves.filter((x) => x.move !== null)).toHaveLength(1);
+    m.dispose();
   });
 
   it("Hollow's wrong try into the dark is kept as it happens: a reload mid-turn has the same bulbs out (Nov 20)", async () => {

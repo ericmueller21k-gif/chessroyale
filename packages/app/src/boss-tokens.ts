@@ -1,4 +1,5 @@
 import { account, finishSoloBossBattle, onAccountChange, onlineBattleToken, refreshProfile, startSoloBossBattle } from "./account.ts";
+import { ownMoves, type OwnTurn } from "@chessroyale/core";
 
 /**
  * Boss tokens on the result screen (Eric, Nov 2; docs/decisions/2026-11-02-boss-tokens.md). The server decides every drop; this
@@ -44,7 +45,7 @@ export function noteSoloBattle(match: object, town?: string): void {
 export function battleOutcome(match: TokenMatch): { outcome: "won" | "lost" | "drew" | "surrendered"; moves: number } | null {
   const p = match.phase;
   if (p?.kind !== "results" || !p.bossResult) return null;
-  const moves = (match.moves ?? []).filter((m) => m.move !== null).length;
+  const moves = ownMoves(match.moves ?? []);
   if (p.left) return (p.left as { how?: string }).how === "resigned" ? { outcome: "surrendered", moves } : null;
   return { outcome: p.bossResult === "crowd" ? "won" : p.bossResult === "boss" ? "lost" : "drew", moves };
 }
@@ -53,8 +54,8 @@ export function battleOutcome(match: TokenMatch): { outcome: "won" | "lost" | "d
 export interface TokenMatch {
   settings: { raid?: boolean };
   phase?: { kind: string; bossResult?: "crowd" | "boss" | "draw"; left?: unknown };
-  /** Your moves (a pass is `null`): how many, for the town's chat line. */
-  moves?: readonly { move: unknown }[];
+  /** Your moves (a pass is `null`; a God King call is yours: core's OwnTurn): how many, for the town's chat line. */
+  moves?: readonly OwnTurn[];
   serverPaced?: boolean;
   code?: string;
 }

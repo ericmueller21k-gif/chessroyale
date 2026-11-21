@@ -4308,7 +4308,7 @@ export const BOSS_TOKENS = {
  *   - A game's XP: `perMinute` for each whole minute you played (up to `maxMinutes`), plus `win` for a win. Minutes are your time in
  *     the game as the server measured it (online: the match room, from the match's start to your last move that went in; solo: the
  *     server's own clock between the game's start and its result, never the device's word).
- *   - It counts only with `minMoves` of your own moves (or your team's turns you picked in); else no XP, and the screen says why.
+ *   - It counts only with `minMoves` of your own moves (every turn you took: a pick, or a God King call to play it; a turn you let run out isn't; or your team's turns you picked in); else no XP, and the screen says why.
  *   - No XP for leaving the match (idle, removed), for a guest where sign-in is set up, a test game, or a banned account.
  *   - The win bonus is capped where two accounts could trade wins: a friends' lobby pays it once a day per set of opponents, and solo
  *     games (whose result is the device's word) `soloWinsPerDay` times a day. The day starts at `dayStartUtcHour` (08:00 UTC is
