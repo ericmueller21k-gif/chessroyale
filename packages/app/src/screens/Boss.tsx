@@ -37,7 +37,7 @@ import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
 import { DodgeLayer, chandyFen, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
-import { SideFigures } from "./TowerBar.tsx";
+import { SideFigures, TowerBoardLives } from "./TowerBar.tsx";
 import { moverOf, onSide, partOf, partsOf, sideOf } from "../boss-side.ts";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossCharacter, BossFace, BossTag, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
@@ -629,6 +629,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 <strong class="boss-strike-name">{name(victim)}</strong>
               </div>
             )}
+            <TowerBoardLives match={match} />
           </Board>
         </div>
       </div>
