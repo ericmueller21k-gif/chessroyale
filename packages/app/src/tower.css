@@ -62,13 +62,15 @@
   transform: translateY(-50%);
   pointer-events: none;
 }
-/* On a computer: beside the board, level with its bottom rank (the h1 square), a third of a square high, its left edge 8 px from the
-   board's edge. Drawn over the board's wrap (its size: --board-size), taps pass through. */
+/* On a computer: beside the board, in its bottom rank (the h1 square), the two hearts one above the other (the room beside the board is
+   a little more than a heart wide: your pawn stands in it), a third of a square high each, 2 px from the board's edge. Drawn over the
+   board's wrap (its size: --board-size), taps pass through. */
 .tw-board-lives {
   position: absolute;
-  left: calc(100% + 8px);
+  left: calc(100% + 2px);
   top: calc(var(--board-size, 100%) * 15 / 16);
   transform: translateY(-50%);
+  flex-direction: column;
   pointer-events: none;
   z-index: 1;
 }
