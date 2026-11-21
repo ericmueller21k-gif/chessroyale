@@ -581,6 +581,11 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 21 ~04:50 UTC
+- MERGED: #863 Saw Swap judge (bd31db0; watcher bf82fo89f), #864 lore + banter data (f8cd957; not wired).
+- RUNNING: XP king turns (xhigh, session_01JuCWRtyA876RKoKgt6NCgo, claude/xp-king-turns; FULL lane: full-e2e + independent review + delta), pixel hearts (Haiku, session_01JuCWRtvcaWjK3dTmuJDz35, claude/tower-pixel-hearts).
+- QUEUE (Opus): Smudgy mask (xhigh alone) → tower-shared-anim-audit (stacked list) + tower-room-arrow-board (+ clerk tap area) → banter wiring (TOWER_BANTER/CLERK_LINES).
+
 ## Nov 21 ~04:40 UTC
 - #863 Saw Swap judge: review fixes in (one device's look never trusted alone; old app abstains; re-check on final numbers, never swap moves; online hints/eval agree; bots can pick a swap move). Delta re-review OK. Follow-up nits (not blocking): (1) with `deepOnDevices` ON + engine server, an older app beside a newer one can get the honest newer app struck at the device re-check stage (lobby.ts tryDeep ~4034 / serverScored blame ~4183; judge.ts deepTargets ~186): skip re-check blame when the two re-check boards differ on `!!swapped`; (2) the Crowd's early bot-plan check accepts plain or look picks (display only).
 - Queue after #863 merges: Smudgy mask (xhigh, alone) → then tower-shared-anim-audit (the stacked list, notes/briefs/tower-shared-anim-audit.md) + tower-room-arrow-board, side by side.
