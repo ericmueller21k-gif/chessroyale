@@ -3,6 +3,7 @@ import { expect, type Page } from "@playwright/test";
 import { legalMoves } from "@chessroyale/chess";
 import { BATTLE_TOWER } from "@chessroyale/core";
 import { test, asAdmin, submitMove, tapInTown, localSql } from "./helpers.ts";
+import { frameStats, instrument } from "./perf-probe.js";
 
 /**
  * The Battle Tower (PR 10's battle; PR 11b's flow, Eric, Nov 19: "you walk into the battle tower, you talk to the clerk, you start a
@@ -667,9 +668,9 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
   // (The board's size and its gap under the boss bar: a lone bar is a little taller than the split bar (main's: 99 px against 95 on a
   // phone), so a floor of several draws the board that much higher; its size and its place under the bar are the lone floor's.)
   const underBar = async () => {
-    const [x, y, w, h] = await boardBox();
+    const b = (await page.locator(".board-wrap").first().boundingBox())!;
     const bar = (await page.locator(".boss-bar").first().boundingBox())!;
-    return { x, w, h, gap: Math.round(y - (bar.y + bar.height)) };
+    return { x: Math.round(b.x), w: Math.round(b.width), h: Math.round(b.height), gap: Math.round(b.y - (bar.y + bar.height)) };
   };
   // A lone boss's floor (floor 1): the board's size and place. Left at once (free before your 2nd move).
   await intoTower(page);
@@ -761,6 +762,39 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
   }).toPass({ timeout: 5000 });
   expect((await parts()).parts.find((p) => p.id === quiet)!.open).toBe(false);
   await still(page, "accordion");
+});
+
+test("the split bar's slide on a slow phone (Eric, Nov 21's accordion): a part tapped open and folded back, its windows sliding 300 ms, stays within budget", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  await page.addInitScript(instrument);
+  await intoTower(page);
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 4, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["grex", "hollow"], ["tiger", "pig"], ["timber", "dash", "zebra"]], deck: [], decks: 1 }), made.user);
+  await (await tapRoom(page, "keeper", "Clerk")).getByRole("button", { name: "Continue: floor 4" }).click();
+  await floorThenMatch(page, 4, 3);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  // (Your turn, the bar at rest: a folded part tapped open, then folded back, three times; the frames through each slide.)
+  const folded = page.locator(".tw-bar .tw-part:not(.tw-part-open)").first();
+  const id = await folded.getAttribute("data-boss");
+  const part = page.locator(`.tw-part[data-boss="${id}"]`);
+  const dts: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    await page.evaluate(() => ((window as any).__perf.frames = []));
+    await part.click();
+    await page.waitForTimeout(600);
+    dts.push(...((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  }
+  const s = frameStats(dts);
+  console.log(`The split bar's slide (slowed phone): p95 ${s.p95} ms, ${Math.round(s.slow * 100)}% dropped (${Math.round(s.slow * s.n)} of ${s.n} over 20 ms), longest ${s.max} ms`);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
 });
 
 test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's the giraffe's turn or your turn, not his turn\"): his hidden rook drawn a pawn whoever is to move @phone-only", async ({ page }) => {
