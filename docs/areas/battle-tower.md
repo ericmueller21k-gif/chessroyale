@@ -132,7 +132,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   no next floor and no moves left (the boss card says those). On a computer it's the top of the column right of the board (Nov 21, Eric:
   "we need all that space for the boss for the bar at the top ... put it to the right above the moves black container"): the first row
   of that column's tools (`BossTools`, `.tw-col-title`: a fixed 20 px row, centered over the Moves box, level with the bar's top), the
-  tools in the 28 px row under it, then the Moves box, so the bar sits right above the board; on a phone it's the top stage's line. The beaten bosses are on
+  tools in the 28 px row under it, then the Moves box, so the bar sits right above the board; the 28 px the line took went to a taller bar,
+  not the board (Eric, Nov 21, below: "Shouldn't we be making the boss thing bigger?"); on a phone it's the top stage's line. The beaten bosses are on
   the tower's card only. The clerk's line asks "How high can you climb?" instead of naming the floors.
 - **On screen** (nothing hidden, nothing shifts): two pixel hearts on a 9 x 8 grid (Nov 21, Eric: "drawn hearts ... like video game
   pixelated"; `components/TowerHearts.tsx`, colors in `tower.css` `.tw-px-*`), a spent one hollow, always: beside the board on a
@@ -191,8 +192,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   the moment draws him on the board), keeping its box. The reveal screen (your move's, the God King's move and strike: `Crowd.tsx`) draws
   every boss's figure (`SideFigures`), every boss's board layer and the hearts. Nobody is dimmed: the yellow outline and TO MOVE mark the
   boss to move. A figure's box is the union of every frame of his idle (`drawnBox`), never clipping. On a computer the floor's title is in the
-  bar's row beside it (two rows, 52 px, under the shortest tower bar's 57), so the board's room is every boss battle's (`board-size.css`,
-  `--bd-room` 123 px) and nothing scrolls at any window. Checks: `e2e/battle-tower.spec.ts` ("a shared
+  bar's row beside it (two rows, 52 px, under the bar's 89), the bar 28 px taller than a boss battle's, in the board's room (`board-size.css`,
+  `--bd-room` 151 px), so the board is main's size and place and nothing scrolls at any window. Checks: `e2e/battle-tower.spec.ts` ("a shared
   floor's moments"), `test/tower-side.test.ts` (every boss's box). Left: a computer's cast animation in place on the side figure.
 - **The split bar as an accordion (Eric, Nov 21:** "maybe it's like 75% for the one that's active ... if you want to see what that boss
   is ... you just tap on theirs and then it expands their container"): `TowerBar.tsx`, `tower.css`. Each boss's card is the lone bar's own
@@ -201,10 +202,17 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   hidden) onto its card's left side. The open part (`.tw-part-open`, `aria-expanded`: the boss to move, or one tapped open until the turn
   changes or it's tapped again) takes `OPEN_SHARE` (75%) of the room inside the outlines, the folded ones the rest; the windows slide
   300 ms (flex-grow; reduced motion: instant). A folded boss's words (a phone's) are drawn over the bar beside his window, toward the open
-  part (`.tw-say`), never cut by it; his part doesn't open for them. The bar keeps main's height (95 px a phone, 61 px a computer), so the
-  board never moves; a lone bar's height differs (99 px a phone, about 49 a computer), so a lone floor's board sits 4 px lower on a phone
-  and 12 px higher on a computer, as on main (its size and its gap under the bar the same). Eric's named exception to "nothing shifts": this bar's parts. Checks: `e2e/battle-tower.spec.ts` ("the split
-  bar as an accordion", on a computer also the floor's title over the Moves box and nothing between the bar and the board; `@perf` "the split bar's slide on a slow phone"). [2026-11-21-tower-accordion-bar.md](../decisions/2026-11-21-tower-accordion-bar.md).
+  part (`.tw-say`), never cut by it; his part doesn't open for them. The bar's height never changes (95 px a phone), so the board never
+  moves; a phone's lone bar is 99 px, so a lone floor's board sits 4 px lower there, as on main (its size and its gap under the bar the same).
+  **A computer's bar is taller (Eric, Nov 21: "Shouldn't we be making the boss thing bigger? ... the bigger boss bar"):** 89 px, the split
+  bar (61 on main) and a lone floor's alike (its padding the card's plus the outline), the 28 px the floor's title line had; the board
+  keeps main's size and a floor of several's place at every window (a lone floor's board is now there too, 10 px lower than main's). What's
+  in it grows: his face in one 84 x 74 box for every boss (fit whole), his name, LVL and meters at 1.2, the status 13 px, Hollow's bulbs and
+  Jefferson's candles at 1.5 (3x pixels, never wider than the room); Timber's workshop, Tick's tally and Don Dough's timers (not in the
+  tower's pool yet) and Babur's pump (by his figure, or a taller bar of its own) keep their size. Short computer windows (under 600 px)
+  keep 61 px. Eric's named exception to "nothing shifts": this bar's parts. Checks: `e2e/battle-tower.spec.ts` ("the split
+  bar as an accordion", on a computer also the floor's title over the Moves box, nothing between the bar and the board, both bars 89 px and the board in one
+  place; "a shared floor's moments": the board main's size and place and no scroll at 1280 × 800, 1366 × 768, 1440 × 900, 1600 × 900, 1880 × 1025; `@perf` "the split bar's slide on a slow phone"). [2026-11-21-tower-accordion-bar.md](../decisions/2026-11-21-tower-accordion-bar.md).
 - **One primary for the powers that add pieces (Eric, Nov 20: "Only one is active during the battle tower").** `BATTLE_TOWER.addsPieces`:
   Babur's balloons, Puddles' grown pieces, Timber's workshop drops, Don Dough's rising dough, Sawyer's split pawn. On a floor of several,
   only the first of them in turn order keeps it; the runner marks the others' powers `noAdd` as the floor starts (`towerNoAdd`, beside
