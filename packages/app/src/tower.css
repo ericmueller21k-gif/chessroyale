@@ -765,17 +765,26 @@
   opacity: 0.5;
 }
 
-/* ---- A computer's strip row, and the figures stacked beside the board ---- */
-/* (A fixed-height line in the gap between the boss bar and the board's turn bar: the screen's 8 px row gap above it taken back, so it
-   fills the gap exactly (60 to 96 px on a 1280 × 800 computer), its strip centered in it: the same buffer above and below, always.) */
-.tw-strip-line {
+/* ---- A computer's title over the column beside the board, and the figures stacked beside the board ---- */
+/* (Eric, Nov 21: "we need all that space for the boss for the bar at the top ... put it to the right above the moves black container".)
+   The run's title is the first line of the column's tools (`.gm-tools`, game-frame.css: the bar's row, the Moves box's left edge and
+   width), its top level with the bar's top, centered; the tools on the line under it at the right, then the Moves box. The two lines
+   (20 + 4 + 28 px) fit the shortest tower bar's row (a lone floor's, about 49 px and its 8 px margin), so the board stays right under
+   the bar and the room (`--bd-room`) is every boss battle's. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game > .gm-tools:has(> .tw-col-title) {
+    align-self: start;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    row-gap: 4px;
+    height: auto;
+  }
+}
+.tw-col-title {
+  flex: 0 0 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  margin-top: -8px;
-  height: 36px;
-  padding: 0 4px;
+  height: 20px;
+  line-height: 20px;
 }
 .boss-side.tw-side {
   align-self: stretch;

@@ -56,12 +56,8 @@
     --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 28px - var(--side-w));
     --bs-need: calc(var(--bs-reach, 0px) - (var(--win-w) - var(--scr)) / 2 - var(--gutter));
   }
-  /* A Battle Tower floor: the run's strip line between the bar and the board (`.tw-strip-line`, 36 px less the 8 px gap it takes back)
-     is in the room too (Eric, Nov 21, at 1880 × 1025: "there's never supposed to be a scroll bar for this ... It's not resizing": the
-     board took its 28 px and the page scrolled by 15 to 20 px from 1366 × 768 up). */
-  .screen.game:has(> .boss-dock):has(> .tw-strip-line) {
-    --bd-room: calc(123px + 28px);
-  }
+  /* (A Battle Tower floor: no line of its own between the bar and the board since Nov 21's second change: its title is at the top of
+     the column beside the board, over the tools (tower.css, `.tw-col-title`), in the bar's row. Its room is every boss battle's.) */
   .screen.game:has(> .boss-dock):has(.tg-pump-slot.tg-tall) {
     --bd-h: calc((var(--app-h) - var(--bd-room) + 38px) / 1.1876);
   }
