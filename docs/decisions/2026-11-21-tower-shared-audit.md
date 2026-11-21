@@ -58,11 +58,11 @@ Per boss and power (phone / computer, after the fixes; "drawn elsewhere" moments
 | Puddles | seeds | water | ok | ok |
 | Babur | balloons (pump) | hoops | ok | ok |
 | Folio | draft | crease, fold | ok | ok |
-| Timber, Dash, Don Dough, Chandy | (admins first) | | see the run below | |
+| Timber, Dash, Don Dough, Chandy | (admins first) | | not met: the server deals them to its own admins only, and the e2e seat isn't one | the same fixes apply (they read the caster's id, every boss alike); their props are left (below) |
 | The God King | move, strike | (no Last Stand on a floor) | ok | ok |
 
-(The admins-first four: the second run's results are in the PR body. Every row's "ok" is the probe's: no boss missing in any frame of a
-moment, the caster's own figure hidden exactly while the moment draws him elsewhere, nobody dimmed.)
+(Every row's "ok" is the probe's: no boss missing in any frame of a moment, the caster's own figure hidden exactly while the moment draws
+him elsewhere, nobody dimmed. The four admins-first bosses can be run the same way once the e2e has a server admin's tower seat.)
 
 ## The fixes (one shared fix per class)
 
