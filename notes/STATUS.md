@@ -1671,3 +1671,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 18:15: main full run on 30898935 (#732) GREEN, no retries.
 - Nov 15 18:35: #733 Babur LIVE (e47619c7). Main run RED: town-street:294 [phone] failed both tries: expect.poll(marked) read mid-reload threw (poll doesn't retry throws). Fix (test only, guard test) -> PR claude/town-reload-read (899ecd3e), CI running; asked Eric's OK.
 - Nov 15 18:55: #734 CI GREEN; held for Eric's OK (guard test). Main is red until it merges (town-street:294).
+- Nov 21 05:36: #867 (Smudgy shared mask) quick review OK, waiting on CI. Tower room helper started (session_01JuCWRvKKbQdJDJ8m4PpDLs, Opus high, branch claude/tower-room-arrow). Tower audit helper still running. #865 deployed; main run pending.
+  Nit from #867 review: Saw Swap moves pieces as a board change and Smudgy has no hook for it; if `sawSwapInTower` is ever turned on, add sawyer+smudgy to `BATTLE_TOWER.apart` or give Smudgy a board-change hook.
