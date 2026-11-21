@@ -155,7 +155,8 @@
     "e2e/ci-timings.json",
     "e2e/ci-select.d.mts",
     "e2e/perf-probe.js",
-    "e2e/perf-probe.d.ts"
+    "e2e/perf-probe.d.ts",
+    "packages/app/src/characters/tower-banter.ts"
   ],
   "areas": {
     "XP and levels (Nov 9): the XP box on every result screen, the level on home and the profiles; the server's grant": {
