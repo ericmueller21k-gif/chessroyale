@@ -91,12 +91,6 @@ export function Hud({ match, stripFrozen = false, caster = null }: { match: Game
     return (
       <>
         {sideOf(boss) ? <TowerBar boss={boss} match={match} caster={caster} /> : <BossBar boss={boss} match={match} move={match.tower || match.towerParty ? undefined : match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />}
-        {/* (A Battle Tower floor: the run's strip, a centered line between the bar and the board, with a buffer above and below.) */}
-        {(match.tower || match.towerParty) && (
-          <div class="tw-strip-line">
-            <TowerStrip match={match} />
-          </div>
-        )}
         <BossTools match={match} crowd={crowd} />
       </>
     );
@@ -203,6 +197,13 @@ export function Hud({ match, stripFrozen = false, caster = null }: { match: Game
 function BossTools({ match, crowd }: { match: GameView; crowd: boolean }) {
   return (
     <div class="gm-tools">
+      {/* (A Battle Tower floor: the run's title at the top of the column, over the tools and the Moves box (Eric, Nov 21: "put it to the
+          right above the moves black container"), so the bar sits right above the board. tower.css, `.tw-col-title`.) */}
+      {(match.tower || match.towerParty) && (
+        <div class="tw-col-title">
+          <TowerStrip match={match} />
+        </div>
+      )}
       <span class="match-tools">
         <BrainDebug match={match} hidden />
         <UltimateTest match={match} icon />

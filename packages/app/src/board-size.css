@@ -56,10 +56,11 @@
     --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 28px - var(--side-w));
     --bs-need: calc(var(--bs-reach, 0px) - (var(--win-w) - var(--scr)) / 2 - var(--gutter));
   }
-  /* A Battle Tower floor: the run's strip line between the bar and the board (`.tw-strip-line`, 36 px less the 8 px gap it takes back)
-     is in the room too (Eric, Nov 21, at 1880 × 1025: "there's never supposed to be a scroll bar for this ... It's not resizing": the
-     board took its 28 px and the page scrolled by 15 to 20 px from 1366 × 768 up). */
-  .screen.game:has(> .boss-dock):has(> .tw-strip-line) {
+  /* A Battle Tower floor: its bar 28 px taller (89 px: tower.css), in the room too, so its board is main's size (Eric, Nov 21: "Why would
+     we make the board bigger? Shouldn't we be making the boss thing bigger?"). Its title is over the column beside the board (`.tw-col-title`),
+     the room the line under the bar had (36 px less the 8 px gap it took back) now the bar's; the page never scrolls (Eric, Nov 21, at
+     1880 × 1025: "there's never supposed to be a scroll bar for this"). */
+  .screen.game:has(> .boss-dock):has(> .gm-tools > .tw-col-title) {
     --bd-room: calc(123px + 28px);
   }
   .screen.game:has(> .boss-dock):has(.tg-pump-slot.tg-tall) {

@@ -648,13 +648,23 @@ test("a shared floor's moments (Eric, Nov 21): every boss drawn through the God 
   expect(await page.evaluate(() => (window as any).__bad)).toEqual([]);
   await still(page, "shared-floor-moments");
   // The screen never scrolls (eric.md, "Nothing hidden, nothing shifts"; Eric, Nov 21: "there's never supposed to be a scroll bar for
-  // this"): the floor's split bar and the strip line counted in the board's room, at every computer window, the dock in view.
-  const sizes: [number, number][] = desk ? [[1280, 800], [1366, 768], [1440, 900], [1600, 900], [1880, 1025]] : [[page.viewportSize()!.width, page.viewportSize()!.height]];
-  for (const [w, h] of sizes) {
+  // this"): the floor's split bar counted in the board's room, at every computer window, the dock in view. On a computer the bar is 89 px
+  // and the board main's size and place (Eric, Nov 21: "Why would we make the board bigger? Shouldn't we be making the boss thing
+  // bigger?"): main's boards measured at each window, its top under main's 61 px bar and title line, 103 px from the window's.
+  const sizes: [number, number, number][] = desk ? [[1280, 800, 600], [1366, 768, 616], [1440, 900, 744], [1600, 900, 744], [1880, 1025, 872]] : [[page.viewportSize()!.width, page.viewportSize()!.height, 0]];
+  for (const [w, h, side] of sizes) {
     await page.setViewportSize({ width: w, height: h });
     await expect
-      .poll(() => page.evaluate(() => ({ y: document.documentElement.scrollHeight - innerHeight, x: document.documentElement.scrollWidth - innerWidth, dock: Math.ceil(document.querySelector(".boss-dock")!.getBoundingClientRect().bottom) <= innerHeight })), { message: `${w} x ${h}` })
-      .toEqual({ y: 0, x: 0, dock: true });
+      .poll(
+        () =>
+          page.evaluate((desk) => {
+            const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+            const [board, bar] = [r(".board-wrap"), r(".tw-bar")];
+            return { y: document.documentElement.scrollHeight - innerHeight, x: document.documentElement.scrollWidth - innerWidth, dock: Math.ceil(r(".boss-dock").bottom) <= innerHeight, ...(desk ? { board: [Math.round(board.width), Math.round(board.height), Math.round(board.top)], bar: Math.round(bar.height) } : {}) };
+          }, desk),
+        { message: `${w} x ${h}` },
+      )
+      .toEqual({ y: 0, x: 0, dock: true, ...(desk ? { board: [side, side, 103], bar: 89 } : {}) });
   }
 });
 
@@ -665,15 +675,16 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
     const b = (await page.locator(".board-wrap").first().boundingBox())!;
     return [b.x, b.y, b.width, b.height].map((v) => Math.round(v));
   };
-  // (The board's size and its gap under the boss bar: a lone bar is a little taller than the split bar (main's: 99 px against 95 on a
-  // phone), so a floor of several draws the board that much higher; its size and its place under the bar are the lone floor's.)
+  // (The board's size and its gap under the boss bar: a phone's lone bar is a little taller than the split bar (main's: 99 px against 95),
+  // so a floor of several draws the board that much higher; its size and its place under the bar are the lone floor's. A computer's two
+  // bars are one height (89 px, Eric, Nov 21: "the bigger boss bar"), so its board is in the very same place.)
   const underBar = async () => {
     // (Both on screen first: right after a match starts the bar can be between renders, its box not yet there.)
     await expect(page.locator(".boss-bar").first()).toBeVisible();
     await expect(page.locator(".board-wrap").first()).toBeVisible();
     const b = (await page.locator(".board-wrap").first().boundingBox())!;
     const bar = (await page.locator(".boss-bar").first().boundingBox())!;
-    return { x: Math.round(b.x), w: Math.round(b.width), h: Math.round(b.height), gap: Math.round(b.y - (bar.y + bar.height)) };
+    return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height), bar: Math.round(bar.height), gap: Math.round(b.y - (bar.y + bar.height)) };
   };
   // A lone boss's floor (floor 1): the board's size and place. Left at once (free before your 2nd move).
   await intoTower(page);
@@ -714,8 +725,24 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
   // The board's size and place under the bar as on the lone boss's floor; its place kept through every slide below (the bar's height
   // never changes).
   const under = await underBar();
-  expect({ ...under, gap: 0 }).toEqual({ ...lone, gap: 0 });
-  expect(Math.abs(under.gap - lone.gap), "the board's gap under the bar (px, its rounding)").toBeLessThanOrEqual(1);
+  if (desk) {
+    expect([lone.bar, under.bar], "the lone and the split bar's heights (px)").toEqual([89, 89]);
+    expect(under).toEqual(lone);
+  } else {
+    expect({ ...under, y: 0, bar: 0, gap: 0 }).toEqual({ ...lone, y: 0, bar: 0, gap: 0 });
+    expect(Math.abs(under.gap - lone.gap), "the board's gap under the bar (px, its rounding)").toBeLessThanOrEqual(1);
+  }
+  if (desk) {
+    // The floor's title on a computer (Eric, Nov 21: "put it to the right above the moves black container"): at the top of the column
+    // right of the board, level with the bar's top, over the Moves box (its left edge and width) and the tools; the current floor, no
+    // total. Nothing between the bar and the board: only the 8 px gap every boss battle has.
+    const col = await page.evaluate(() => {
+      const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+      const [t, bar, board, mv, gear] = [".tw-col-title", ".tw-bar", ".board-wrap", ".mv-side", ".gm-tools .mm-more"].map(r) as [DOMRect, DOMRect, DOMRect, DOMRect, DOMRect];
+      return { text: document.querySelector(".tw-col-title")!.textContent, line: document.querySelectorAll(".tw-strip-line").length, right: t.left >= board.right, top: Math.round(t.top - bar.top), x: [Math.round(t.left - mv.left), Math.round(t.width - mv.width)], over: t.bottom <= (gear.top + gear.bottom) / 2 && (gear.top + gear.bottom) / 2 <= mv.top, gap: Math.round(board.top - bar.bottom) };
+    });
+    expect(col).toEqual({ text: "Battle Tower · Floor 4", line: 0, right: true, top: 0, x: [0, 0], over: true, gap: 8 });
+  }
   const board = await boardBox();
   // A turn change: the next boss to move opens, the last folds.
   const was = at.toMove;

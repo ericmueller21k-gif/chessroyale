@@ -608,8 +608,7 @@
    open part (the boss to move, or one tapped open) takes 75% of the room the gaps and outlines leave (its flex-grow, set inline), the
    folded ones share the rest. The card is the lone bar's own box (`.boss-bar.has-char`, styles.css), laid out once at the open part's
    width (the bar a size container: --tw-open of 100cqw less the gaps and outlines): a folded window shows its left side, his figure;
-   opening reveals more of the same card. The bar keeps today's height (95 px a phone, 61 px a computer): the board's size math is
-   unchanged. The windows slide (flex-grow, 300 ms); instantly with reduced motion. Eric's named exception to "nothing shifts". ---- */
+   opening reveals more of the same card. The bar's height never changes (95 px a phone; a computer's 89, below, in the board's room). The windows slide (flex-grow, 300 ms); instantly with reduced motion. Eric's named exception to "nothing shifts". ---- */
 .tw-bar {
   display: flex;
   align-items: stretch;
@@ -743,6 +742,48 @@
     height: 55px;
   }
 }
+/* ---- A computer's tower bar, taller (Eric, Nov 21: "Shouldn't we be making the boss thing bigger? ... I would be going with the one of
+   these two that you'd use the bigger boss bar"): the 28 px the floor's title left between the bar and the board (it's over the column
+   beside the board now: `.tw-col-title`) go to the bar, not the board. The split bar 89 px (61 before), each card 83 inside its outline;
+   a lone floor's bar the same 89 px, its padding the card's plus the outline's 3 px, so both kinds of floor look alike and their boards
+   sit in one place, main's for a floor of several (board-size.css keeps the room at 151 px: the board main's size). What's in the bar grows
+   as a phone's does: his face in one 84 x 74 box for every boss (fit whole, as the bar fits it to 48 px wide elsewhere; the name column
+   starts at one place), his name, LVL and meters a size up (the column at 1.2), the status a size up, and the props that size themselves to
+   the room (Hollow's bulbs, Jefferson's candles: drawn at 2x on a computer) at 1.5, 3x, whole pixels, never wider than the room. The props
+   of bosses not in the tower's pool yet (Timber's workshop, Tick's tally, Don Dough's timers) and Babur's pump (by his figure, or the
+   taller bar's own sums) keep their size. Boss battles outside the tower, and a phone: unchanged. ---- */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .tw-bar {
+    height: 89px;
+  }
+  .tw-bcard.boss-bar {
+    height: 83px;
+  }
+  /* (At least: Babur's taller bar, where his pump has no room by his figure, is as tall as his pump, as on main: styles.css `.tg-tall`.) */
+  .screen.game:has(> .gm-tools > .tw-col-title) > .boss-bar:not(.tw-bar) {
+    box-sizing: border-box;
+    min-height: 89px;
+    padding: 6px 13px 7px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char {
+    gap: 12px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-icon .boss-portrait {
+    width: 84px;
+    height: 74px;
+    margin: 0;
+    object-fit: contain;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-name {
+    zoom: 1.2;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-next {
+    font-size: 13px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-prop > :is(.life-strip, .pw-pips) {
+    zoom: 1.5;
+  }
+}
 
 /* ---- The result's buttons ---- */
 .tw-result {
@@ -765,17 +806,40 @@
   opacity: 0.5;
 }
 
-/* ---- A computer's strip row, and the figures stacked beside the board ---- */
-/* (A fixed-height line in the gap between the boss bar and the board's turn bar: the screen's 8 px row gap above it taken back, so it
-   fills the gap exactly (60 to 96 px on a 1280 × 800 computer), its strip centered in it: the same buffer above and below, always.) */
-.tw-strip-line {
+/* ---- A computer's title over the column beside the board, and the figures stacked beside the board ---- */
+/* (Eric, Nov 21: "we need all that space for the boss for the bar at the top ... put it to the right above the moves black container".)
+   The run's title is the first line of the column's tools (`.gm-tools`, game-frame.css: the bar's row, the Moves box's left edge and
+   width), its top level with the bar's top, centered; the tools on the line under it at the right, then the Moves box. The two rows
+   (20 + 4 + 28 px) fit the tower bar's row (89 px, both kinds of floor, below), so the board stays right under the bar; the title's old
+   28 px are the bar's (board-size.css). */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  /* (Two fixed rows, the tools' as tall as their one line elsewhere (28 px; the gear's 42 px button overflows it, centered, as there).) */
+  .screen.game > .gm-tools:has(> .tw-col-title) {
+    align-self: start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: 20px 28px;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 4px;
+    height: 52px;
+  }
+  .screen.game > .gm-tools > .tw-col-title {
+    grid-column: 1 / -1;
+  }
+  .screen.game > .gm-tools:has(> .tw-col-title) > .match-tools {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .screen.game > .gm-tools:has(> .tw-col-title) > .mm {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}
+.tw-col-title {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  margin-top: -8px;
-  height: 36px;
-  padding: 0 4px;
+  height: 20px;
+  line-height: 20px;
 }
 .boss-side.tw-side {
   align-self: stretch;
