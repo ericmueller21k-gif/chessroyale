@@ -1167,3 +1167,20 @@ The new end screen (#855) played no part.
 move that lets the other side mate at once), used by recluse, boss-bar and boss-dock; the tail test waits for the figure's paint, as the
 stage's other checks do (reproduced with the chunk delayed 2.5 s: the same TypeError before, a pass after).
 docs/decisions/2026-11-20-flaky-pick-move.md.
+
+
+## A trigger pulled into a Slam already on its way (Nov 21, 2026)
+
+**What happened:** main's full run on f75947d went red on `alfil.spec.ts`'s "Slam right after a queen is taken" test, which passed
+only on its retry: "the triggered Slam landed within the time cap: its own banner, once · Expected: 2 · Received: 1". Its banners:
+TUSKS! | TUSKS! | RAGE! | MAMMOTH SLAM! | QUEEN DOWN!, then the battle ran on to a draw.
+
+**Why:** the test offered its queen on the turn his meter warned (RAGE!). His meter's own Slam came at the start of his turn and his
+move took the queen, so the test's trigger came while that Slam was under way, and the trigger is refused then (it never overlaps
+another: `triggerUltimate`). The test never looked whether it took. Forced locally (the queen held back until RAGE!), the trigger was
+refused every time, and those runs passed only because the meter later brought another Slam that the test counted as the trigger's.
+The game was right; Sawyer's timing (#856) and the end screen (#855) played no part.
+
+**The fix:** the test offers its queen only when no Slam is warned or under way (`powers.warned`, `powers.ultAt`) and keeps it out of
+reach while one is, and it states that the trigger took (`powers.ultNext`). Forced again: 8 of 8 passed the way the test means
+(RAGE! | MAMMOTH SLAM! | QUEEN DOWN! | MAMMOTH SLAM!, the trigger taken); unforced, 12 of 12.
