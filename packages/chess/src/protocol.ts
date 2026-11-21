@@ -146,6 +146,8 @@ export interface BoardScore {
    */
   replies?: Record<string, string>;
   mates?: Record<string, number>;
+  /** Boss battle, Sawyer's Saw Swap: the job's `swap` moves' scores after the swap (the crowd's expected: swapScores). */
+  swapped?: Record<string, number>;
 }
 
 export interface ScoreJob {
@@ -174,6 +176,13 @@ export interface ScoreJob {
    * themselves stay the engine's (the lobby's runner counts the race, once, for everyone).
    */
   race?: CarrotRace;
+  /**
+   * Boss battle, Sawyer's Saw Swap (missing otherwise and from older servers; an older app ignores it, and those moves are scored as
+   * they stand): each crowd move that sets it off, with the board after the swap (him to move: the runner's judgeAfter). The host
+   * searches each board (prefetched with the turn's own: they're in `prefetch`'s fens) and sends the crowd's score after each
+   * (`swapped`); the bots pick with them counted; the lobby's runner scores those moves on them, once, for everyone.
+   */
+  swap?: Record<string, string>;
   /** Picks that can decide the cut (players near the cut line): re-checked first (recheckCut* in settings). */
   priority?: string[];
 }
@@ -346,6 +355,12 @@ export interface NetBossPowers {
   events: PowerEvent[];
   /** The crowd's turn: the moves it may play (null: any legal move). */
   allowed: string[] | null;
+  /**
+   * Sawyer's Saw Swap still to come, the crowd's turn (missing otherwise and from older servers): each crowd move that sets it off, with
+   * the board after the swap (him to move: the runner's judgeAfter), on which the judge scores that move. The hints and the eval bar
+   * fold it in as the judge does (swapScores, swapIn), so a paid hint never recommends the check the judge charges as a blunder.
+   */
+  swap?: Record<string, string>;
   /** G-REX's fire tiles (missing from older servers): each square, the crowd turn it landed, its stage (1-3) now. */
   fire?: { square: string; lit: number; stage: number }[];
   /** What the fire did after the crowd's last move: pieces destroyed, tiles that fizzled under the king, pieces the candle charred. */
@@ -849,7 +864,10 @@ export type ServerMessage = { now: number } & (
   | { t: "judge"; key: string; jobs: JudgeJob[] }
   /** `serverRecheck`: the engine server re-checks the close calls, so the host skips its own re-check. */
   | { t: "scoreRequest"; key: string; jobs: ScoreJob[]; serverRecheck?: boolean }
-  /** To the host at the start of a round: every board, so it can search them while players think. */
+  /**
+   * To the host at the start of a round: every board, so it can search them while players think (and the boards after Sawyer's Saw
+   * Swap the judge looks at: the jobs' `swap`).
+   */
   | {
       t: "prefetch";
       fens: string[];
@@ -865,6 +883,8 @@ export type ServerMessage = { now: number } & (
         burn?: string[];
         /** Boss battle, Chub & Chirp's Carrot Patch: the race (the bots pick with it counted). */
         race?: CarrotRace;
+        /** Boss battle, Sawyer's Saw Swap: the moves that set it off, each with the board after it (the bots pick with them counted). */
+        swap?: Record<string, string>;
         /** Many judges: the bots pick from this seed and these rules (judgeBotPicks), so the scoring job agrees. */
         seed?: number;
         rules?: JudgeRules;
