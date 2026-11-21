@@ -25,11 +25,58 @@
 .tw-heart {
   width: 15px;
   height: 13px;
-  fill: #e11d48;
 }
-.tw-heart.spent {
-  fill: currentColor;
-  opacity: 0.3;
+/* The pixel heart's colors (components/TowerHearts.tsx): a dark red border, red, a light highlight. A spent one is hollow: its border
+   greyed, its slot a faint shape (--tw-slot: dark theme first, light below). */
+:root {
+  --tw-slot: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme="light"] {
+  --tw-slot: rgba(0, 0, 0, 0.12);
+}
+.tw-px-b {
+  fill: #7a1426;
+}
+.tw-px-r {
+  fill: #e0283e;
+}
+.tw-px-h {
+  fill: #ff8f9a;
+}
+.tw-heart.spent .tw-px-b {
+  fill: #8a8580;
+  opacity: 0.6;
+}
+.tw-heart.spent .tw-px-r,
+.tw-heart.spent .tw-px-h {
+  fill: var(--tw-slot);
+}
+/* The match's lives on a phone: at the strip's right end, the strip's text still centered (absolute, so it takes no room from it). */
+.hud-stage:has(> .tw-strip) {
+  position: relative;
+}
+.tw-strip-lives {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+/* On a computer: beside the board, in its bottom rank (the h1 square), the two hearts one above the other (the room beside the board is
+   a little more than a heart wide: your pawn stands in it), a third of a square high each, 2 px from the board's edge. Drawn over the
+   board's wrap (its size: --board-size), taps pass through. */
+.tw-board-lives {
+  position: absolute;
+  left: calc(100% + 2px);
+  top: calc(var(--board-size, 100%) * 15 / 16);
+  transform: translateY(-50%);
+  flex-direction: column;
+  pointer-events: none;
+  z-index: 1;
+}
+.tw-board-lives .tw-heart {
+  width: calc(var(--board-size, 100%) / 24 * 9 / 8);
+  height: calc(var(--board-size, 100%) / 24);
 }
 /* The clerk's card: your solo climb's lives and floors lost, one line whatever it says (greyed in a party, as the solo half). */
 .tw-desk-lives {

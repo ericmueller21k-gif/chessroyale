@@ -154,7 +154,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await clerk.getByRole("button", { name: "Start", exact: true }).click();
   // Into the elevator, the floor room: floor 1, one boss; the match.
   await floorThenMatch(page, 1, 1);
-  await heartsAre(page.locator(".tw-strip .tw-hearts").first(), 2);
+  await heartsAre(page.locator(".tw-match-lives").first(), 2);
   await submitMove(page, "h5f7");
   // The end screen (Nov 20): "Victory!", the floor in its line, the floor's boss facing your pawn, the rewards to their end (a skip
   // tap on the headline: a test floor earns no XP), the next floor's line and one button back.
@@ -214,7 +214,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   const on = await tapRoom(page, "pass", "Elevator", "top");
   await on.getByRole("button", { name: "Up to floor 3" }).click();
   await floorThenMatch(page, 3, 2);
-  await heartsAre(page.locator(".tw-strip .tw-hearts").first(), 1);
+  await heartsAre(page.locator(".tw-match-lives").first(), 1);
   await still(page, "strip-life-spent");
   // Floor 3 lost too: no life left, still climbing; floor 4's loss (the third) ends the run, its floors lost listed.
   await loseFloor(page, "counts as a loss: it costs a life (no lives left after).");
@@ -228,7 +228,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(room(page)).not.toHaveAttribute("data-part", "top", { timeout: 20_000 });
   const desk = await tapRoom(page, "keeper", "Clerk");
   await heartsAre(desk.locator(".tw-desk-lives .tw-hearts"), 0);
-  await expect(desk.locator(".tw-desk-lives")).toContainText("Lost floors 2 and 3");
+  await expect(desk.locator(".tw-desk-lives")).toContainText("No lives left");
   await still(page, "clerk-recap");
   await desk.getByRole("button", { name: "Continue: floor 4" }).click();
   await floorThenMatch(page, 4, 3);
