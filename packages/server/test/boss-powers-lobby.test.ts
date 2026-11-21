@@ -420,6 +420,28 @@ describe("your own moves online (XP's minimum, boss tokens): a turn you called t
     // (p1's time in the match runs to the call's turn, not past it: the missed turn adds nothing.)
     expect(L.core.xpSpan("p1")!.ms).toBe(called - L.core.save().startedAt!);
   });
+
+  it("a call after your own clock has run out is refused (a missed turn, not one of your moves): the review of #865", () => {
+    const L = raid({ bossId: "gingerbread", bossKillEvery: 99 });
+    const toRound = () => {
+      for (let i = 0; i < 10 && L.core.save().phase !== "play"; i++) L.advance(10_000);
+      return L.last("p1", "round")!;
+    };
+    crowdMove(L);
+    hostBoss(L);
+    const r2 = toRound();
+    const charges = L.core.save().runner!.state.boss!.kingCharges;
+    // (p1's own deadline already past, as a low time bank's is while the round waits for p2's.)
+    const live = (L.core as unknown as { r: { round: { deadlines?: Record<string, number> } } }).r.round;
+    live.deadlines = { ...(live.deadlines ?? {}), p1: L.now - 60_000 };
+    L.core.message("p1", { t: "king", key: r2.key });
+    expect(L.core.save().runner!.state.boss!.kingCharges).toBe(charges);
+    L.core.message("p2", { t: "pick", key: r2.key, move: (r2.boss?.powers?.allowed ?? legalMoves(r2.board!.fen))[0]! });
+    for (let i = 0; i < 30 && !L.last("p1", "scoreRequest"); i++) L.advance(5_000);
+    expect(L.hostScores("p1")).toBe(true);
+    // p1: only move 1's pick (the late call was refused); p2: 2 picks.
+    expect([L.core.xpSpan("p1")!.moves, L.core.xpSpan("p2")!.moves]).toEqual([1, 2]);
+  });
 });
 
 describe("Hollow online", () => {

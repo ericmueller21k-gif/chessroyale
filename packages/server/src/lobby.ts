@@ -1730,6 +1730,12 @@ export class LobbyCore {
       case "king": {
         const round = this.r.round;
         if (this.r.phase !== "play" || round?.key !== msg.key || !this.runner?.boss?.kingCharges || !this.runner.player(playerId)?.alive) return;
+        // (A call to play the move is this player's turn: on their own clock, as a pick is (late, or before the clock starts:
+        // refused, nothing spent; the review of #865). His strike keeps its own check, callStrike's.)
+        if (!msg.strike) {
+          const now = this.io.now();
+          if (now > (round.deadlines?.[playerId] ?? round.deadline) + this.settings.lateGraceMs || now < round.startedAt - 500) return;
+        }
         // (A boss the God King's help doesn't work against, the Hidden Boss: a call is never a turn, a strike or a tally,
         // but each try spends a charge as if it had worked (runner.kingTried; Eric, Oct 14), as solo's does. The caller's
         // own app has him mock it and shows the charge gone; everyone else sees it with the move's reveal.)
