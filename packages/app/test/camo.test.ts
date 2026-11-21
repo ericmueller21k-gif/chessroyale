@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mulberry32 } from "@chessroyale/core";
 import { MatchRunner, applyMove, fenAtPly, legalMoves, maskedFen, pieceAt, type Base, type CamoView } from "@chessroyale/chess";
-import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "../../chess/test/boss-kit-lib.ts";
-import { camoHidden, hiddenTrail, seenFen, seenSan, seenSanOrNull, trackCamo, type CamoBoss } from "../src/camo.ts";
+import { KIT_OPENING, crowdPick, fakeEngine, kitSettings, runBattle } from "../../chess/test/boss-kit-lib.ts";
+import { camoHidden, camoOf, hiddenTrail, seenFen, seenSan, seenSanOrNull, trackCamo, type CamoBoss } from "../src/camo.ts";
 import { hintsFrom } from "../src/hints.ts";
 import { REFUSED, refusedLine } from "../src/refused.ts";
 
@@ -158,6 +158,67 @@ describe("the board the crowd sees (a real battle, every step)", () => {
     trackCamo(view("e7"));
     trackCamo(null);
     expect(seenFen(fen)).toBe(fen);
+  });
+});
+
+describe("a shared floor (the Battle Tower; Eric, Nov 21: \"it shows the rook when it's the giraffe's turn or your turn, not his turn\")", () => {
+  // (The view's top level is the boss in focus: Smudgy's Camouflage is read from his own part whoever that is. Smudgy first and not
+  // first, floors of two and three; the view as solo's screens get it and as it reaches a device online, through JSON.)
+  const floors: { bosses: string[]; seed: number }[] = [
+    { bosses: ["smudgy", "grex"], seed: 12 },
+    { bosses: ["grex", "smudgy"], seed: 11 },
+    { bosses: ["smudgy", "gingerbread", "moo"], seed: 3 },
+    { bosses: ["gingerbread", "moo", "smudgy"], seed: 3 },
+  ];
+  for (const f of floors) {
+    it(`${f.bosses.join(" + ")}: the hidden rook is a pawn on every turn (his, every other boss's, the crowd's), now and in the history`, async () => {
+      const turns = new Set<string>();
+      const where: string[] = [];
+      await runBattle({ boss: f.bosses[0]!, bosses: f.bosses, seed: f.seed, side: "w", test: "", triggerFrom: 99, strikes: [], maxMoves: 40, opening: KIT_OPENING }, null, (r, fen, who) => {
+        const truth = r.sideBosses().find((b) => b.id === "smudgy")!.powers!.camo!.square;
+        const view = r.bossView()!;
+        const at = `${who === "crowd" ? `the crowd (next: ${view.id})` : `${view.id}'s turn`} at crowd move ${view.crowdMoves}`;
+        for (const shown of [view, JSON.parse(JSON.stringify(view))] as CamoBoss[]) {
+          trackCamo(shown);
+          expect(camoOf(shown)?.square ?? null, at).toBe(truth ?? null);
+          if (!truth) {
+            expect(seenFen(fen), at).toBe(fen);
+            continue;
+          }
+          const seen = seenFen(fen);
+          expect(pieceAt(fen, truth), at).toEqual({ color: "b", type: "r" });
+          expect(pieceAt(seen, truth), at).toEqual({ color: "b", type: "p" });
+          expect(rooks(seen, "b"), at).toBe(rooks(fen, "b") - 1);
+          expect(camoHidden(), at).toBe(true);
+          // (Every position since the swap, as the move list and browsing back draw them.)
+          const trail = hiddenTrail(shown)!;
+          trail.forEach((sq, ply) => {
+            if (sq === null) return;
+            const was = fenAtPly(view.board.history, ply, view.board.bases);
+            expect(pieceAt(seenFen(was), sq), `${at}, ply ${ply}`).toEqual({ color: "b", type: "p" });
+          });
+        }
+        if (truth) {
+          turns.add(who === "crowd" ? `crowd before ${view.id}` : view.id!);
+          where.push(at);
+        }
+      });
+      // (The rook hid on every boss's turn and on the crowd's turn before each.)
+      for (const id of f.bosses) {
+        expect([...turns], `${id}'s turn`).toContain(id);
+        expect([...turns], `the crowd's turn before ${id}`).toContain(`crowd before ${id}`);
+      }
+      expect(where.length).toBeGreaterThan(6);
+    }, 120_000);
+  }
+
+  it("one boss alone reads his own camouflage; a floor without Smudgy, none", () => {
+    const camo = { side: "h", step: 2, off: false, square: "e7", swap: null, strikeAt: null, reveal: null } as CamoView;
+    const board = { fen: "4k3/4r3/8/8/8/8/8/4K3 w - - 0 1", history: [], bases: [] };
+    expect(camoOf({ id: "smudgy", crowdSide: "w", board, powers: { camo } })).toBe(camo);
+    expect(camoOf({ id: "grex", crowdSide: "w", board, powers: {}, side: { bosses: [{ id: "grex", powers: {} }, { id: "smudgy", powers: { camo } }] } })).toBe(camo);
+    expect(camoOf({ id: "grex", crowdSide: "w", board, powers: {}, side: { bosses: [{ id: "grex", powers: {} }, { id: "moo", powers: {} }] } })).toBeNull();
+    expect(camoOf({ id: "hopper", crowdSide: "w", board, powers: { camo } })).toBeNull();
   });
 });
 
