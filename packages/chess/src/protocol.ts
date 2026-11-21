@@ -355,6 +355,12 @@ export interface NetBossPowers {
   events: PowerEvent[];
   /** The crowd's turn: the moves it may play (null: any legal move). */
   allowed: string[] | null;
+  /**
+   * Sawyer's Saw Swap still to come, the crowd's turn (missing otherwise and from older servers): each crowd move that sets it off, with
+   * the board after the swap (him to move: the runner's judgeAfter), on which the judge scores that move. The hints and the eval bar
+   * fold it in as the judge does (swapScores, swapIn), so a paid hint never recommends the check the judge charges as a blunder.
+   */
+  swap?: Record<string, string>;
   /** G-REX's fire tiles (missing from older servers): each square, the crowd turn it landed, its stage (1-3) now. */
   fire?: { square: string; lit: number; stage: number }[];
   /** What the fire did after the crowd's last move: pieces destroyed, tiles that fizzled under the king, pieces the candle charred. */

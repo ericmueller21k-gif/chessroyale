@@ -48,7 +48,8 @@ import {
   boardsAgree,
   judgedBoard,
   runQuickJob,
-  sharedSwaps,
+  lookTrusted,
+  plainOf,
   type Battle,
   type EngineLike,
   type JudgeJob,
@@ -987,11 +988,14 @@ describe("The judge and the Saw Swap (Eric, Nov 21: a check that sets it off is 
     expect(judgedBoard(job, { ...report, swap: report.swap!.map((m) => ({ ...m, expected: 1.5 })) })).toBeNull();
     const { swap: _none, ...older } = report;
     expect(judgedBoard(job, older)!.swapped).toBeUndefined();
-    // Two judges: alike, they agree; a look that differs is a disagreement, and a verdict keeps only the scores both give alike.
+    // Two judges: alike, they agree; a look that differs is a disagreement, and a verdict keeps the look only when both looked exactly
+    // alike (one device's look is never trusted alone: the review of #863); else those moves as they stand (plainOf).
     expect(boardsAgree(board, judgedBoard(job, report)!).agree).toBe(true);
     const off = judgedBoard(job, { ...report, swap: report.swap!.map((m) => (m.move === FORK_MOVE[side] ? { ...m, expected: 0.25 } : m)) })!;
     expect(boardsAgree(board, off).agree).toBe(false);
-    expect(sharedSwaps([board, off])).toEqual(Object.fromEntries(Object.keys(swap).filter((m) => m !== FORK_MOVE[side]).map((m) => [m, 1 - 0.8])));
+    expect(lookTrusted(board, [judgedBoard(job, report)!]).swapped).toEqual(board.swapped);
+    expect(lookTrusted(board, [off])).toEqual(plainOf(board));
+    expect(plainOf(board).swapped).toBeUndefined();
     // (Without a look in the job: no searches, no `swap`.)
     const { swap: _s, ...plainJob } = job;
     expect((await runQuickJob(engine, plainJob)).swap).toBeUndefined();

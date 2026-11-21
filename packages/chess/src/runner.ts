@@ -304,6 +304,9 @@ function ownOf(b: BossState): BossOwn {
   return own as BossOwn;
 }
 
+/** The boss view's `swap` (NetBoss powers): the judge's look past the crowd's moves, when it has one. */
+const swapView = (look: Record<string, string>): { swap?: Record<string, string> } => (Object.keys(look).length ? { swap: look } : {});
+
 export class MatchRunner {
   state: MatchState;
   boards = new Map<number, BoardState>();
@@ -958,7 +961,8 @@ export class MatchRunner {
     // Close calls are re-checked where a person is playing (a group of bots affects nobody real).
     const people = playerIds.some((id) => !this.player(id).isBot && humanPicks.get(id)?.move);
     const evaluation = { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter: Object.fromEntries(known) };
-    const checked = people ? await recheckCloseCalls(engine, board.fen, evaluation, Object.values(picks), this.settings) : evaluation;
+    // (Sawyer's Saw Swap: on the final numbers, the moves that set it off never searched again: recheckView.)
+    const checked = people ? await recheckCloseCalls(engine, board.fen, evaluation, Object.values(picks), this.settings, [], swapMap(swap)) : evaluation;
     return this.resolveBoard(boardId, playerIds, picks, {
       bestMove: checked.bestMove,
       bestExpected: checked.bestExpected,
@@ -1024,13 +1028,15 @@ export class MatchRunner {
     if (flag) result.playedMove = flag;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, looked);
     // Fair play where the boss's judge changed the numbers (Chub & Chirp's race; Sawyer's Saw Swap, its moves scored after the swap):
-    // the turn counts only when the engine's
-    // best keeps its own score, i.e. it is the race's best too (the race keeps only the race's best's score, and raises
-    // none above 0.1%: below that the logit's clamp can lift one, by under 0.001). Fair play then records the engine's own
-    // numbers (`fairScored`), as on a turn without the race: each move's loss is at most the round's, or within 0.1 point
-    // of it for a move already lost (expected under 0.1%). Any other such turn doesn't count (`power`): there the engine's numbers can charge a
-    // carrot move more than the game does, and the race's read differently from any engine's (another best, other finds,
-    // only moves, decided).
+    // the turn counts only when the engine's best keeps its own score in the game's numbers. For the race that means it is the
+    // race's best too (the race keeps only the race's best's score, and raises none above 0.1%: below that the logit's clamp can
+    // lift one, by under 0.001), so fair play's record, the engine's own numbers (`fairScored`, as on a turn without the race),
+    // charges each move at most the round's loss, or within 0.1 point of it for a move already lost (expected under 0.1%). For the
+    // Saw Swap it means the engine's best isn't a move that sets it off; fair play then records the engine's own numbers too, but
+    // those can differ from the game's for the moves that do (a check the swap breaks reads as good as plain chess has it; one the
+    // swap helps, even the game's best, reads as plain chess's loss, which can be more than the round's). Any other such turn
+    // doesn't count (`power`): there the engine's numbers can charge a carrot move more than the game does, and the race's read
+    // differently from any engine's (another best, other finds, only moves, decided).
     const power = this.several() ? sidePowerTurn(this.sideBosses(), board.fen) : powerTurn(this.state.boss, board.fen);
     let fairScored: BoardRound["fairScored"];
     let raceOff = false;
@@ -2318,6 +2324,8 @@ export class MatchRunner {
               // each names its boss, for its banner's caster and his words: audit 2, finding 1.)
               events: this.several() ? this.sideBosses().flatMap((x) => (x.powers?.events ?? []).map((e) => ({ ...e, boss: x.id }))) : p.events,
               allowed: sideToMove(fen) === b.crowdSide ? (this.several() ? sideCrowdAllowed(this.sideBosses(), fen) : crowdAllowed(b, fen)) : null,
+              // (Sawyer's Saw Swap: the moves the judge scores after it, with their boards, for the online hints and eval bar.)
+              ...(part ? {} : swapView(this.judgeAfter())),
               fire: (p.fire ?? []).map((t) => ({ square: t.square, lit: t.lit, stage: fireStage(t, p.turn) })),
               burnt: p.burnt ?? [],
               candle: p.candle ? { at: p.candle.at, left: p.candle.left } : null,

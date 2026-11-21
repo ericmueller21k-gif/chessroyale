@@ -71,9 +71,12 @@ import {
   quickPart,
   boardsAgree,
   sharedReplies,
-  sharedSwaps,
+  agreedBoard,
+  lookTrusted,
+  plainOf,
   distanceFrom,
   judgedBoard,
+  recheckAnchor,
   recheckTargets,
   kingMoveMs,
   kingStrikeMs,
@@ -3918,8 +3921,9 @@ export class LobbyCore {
       const { agree, diff } = boardsAgree(t.boards[a]!, t.boards[b]!, this.jcfg.tolerance);
       if (agree) {
         this.jr.stats.agreed++;
-        // (Their replies aren't compared: only those both name alike count. Big Boy's Last Stand turns on the reply.)
-        return this.accept(t, { ...t.boards[a]!, replies: sharedReplies([t.boards[a]!, t.boards[b]!]) }, "agreed");
+        // (Their replies aren't compared: only those both name alike count. Big Boy's Last Stand turns on the reply. Sawyer's Saw Swap:
+        // the look past it counts when both looked alike; beside an older app's board, that one, without it: agreedBoard.)
+        return this.accept(t, { ...agreedBoard(t.boards[a]!, t.boards[b]!), replies: sharedReplies([t.boards[a]!, t.boards[b]!]) }, "agreed");
       }
       this.jr.stats.disagreed++;
       console.log(`judges disagree: ${this.r.code} job ${t.job.id} (${a} v ${b}), worst difference ${(diff * 100).toFixed(1)} points`);
@@ -3940,7 +3944,10 @@ export class LobbyCore {
       // The other judge is gone (dropped, timed out, or its answer didn't hold together): now and then a spot check
       // on the engine server (afterwards: the round doesn't wait). A late one is checked against its answer instead.
       if (t.want >= 2 && !pending.length) this.maybeSpotCheck(t.job, a, t.boards[a]!);
-      return this.accept(t, t.boards[a]!, "single");
+      // (Sawyer's Saw Swap: a lone judge's look past it is one device's word, which the spot check, plain chess's, can't check: those
+      // moves are scored as they stand. With no engine server nothing checks a lone judge's numbers at all, the look's no less than
+      // the rest, and its own re-check is of the board with the look: it stands: the review of #863, finding 1.)
+      return this.accept(t, this.serverOn ? plainOf(t.boards[a]!) : t.boards[a]!, "single");
     }
     if (valid.length === 1) {
       // The first answer is in: the second has a little longer (graceMs, or graceFactor of the first's time).
@@ -3974,7 +3981,7 @@ export class LobbyCore {
     t.waitUntil = undefined;
     const recheck = t.job.recheck;
     if (recheck && t.job.picks.length && (how === "agreed" || how === "majority" || (how === "single" && !this.serverOn))) {
-      const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], recheck, t.job.priority ?? []);
+      const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], recheck, t.job.priority ?? [], board.swapped);
       t.done = { board, how };
       if (!flagged.length) return;
       const from = how === "agreed" ? [...t.judges] : how === "majority" ? [...(t.majorityPair ?? [])] : [t.judges[0]!];
@@ -3983,12 +3990,13 @@ export class LobbyCore {
     }
     if (this.serverOn && t.job.picks.length) {
       const sj = this.r.scoreRequest?.jobs.find((j) => j.boardId === t.boardId);
-      const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], this.settings, sj?.priority ?? []);
+      // (Sawyer's Saw Swap: on the final numbers; its moves never go to the engine server: recheckView.)
+      const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], this.settings, sj?.priority ?? [], board.swapped);
       if (flagged.length) {
         t.done = { board, how };
         t.server = { kind: "recheck", id: `recheck:${t.job.id}`, at: this.io.now() };
         this.jr.stats.serverRecheck++;
-        this.askServer(t.server.id, t.job.fen, [board.bestMove, ...flagged]);
+        this.askServer(t.server.id, t.job.fen, [recheckAnchor(board, board.swapped), ...flagged]);
         return;
       }
     }
@@ -4026,8 +4034,9 @@ export class LobbyCore {
     if (boards.every((b) => b) && boardsAgree(boards[0]!, boards[1]!, this.jcfg.tolerance).agree) {
       this.jr.stats.deepAgreed++;
       t.awaitDeep = undefined;
-      // (A re-check changes only numbers: the replies settled with the quick part stand.)
-      t.done = { ...t.done, board: { ...boards[0]!, replies: t.done.board.replies } };
+      // (A re-check changes only numbers: the replies settled with the quick part stand. The look past the Saw Swap as with the quick
+      // part: agreedBoard.)
+      t.done = { ...t.done, board: { ...agreedBoard(boards[0]!, boards[1]!), replies: t.done.board.replies } };
       return;
     }
     this.jr.stats.deepDisagreed++;
@@ -4043,18 +4052,20 @@ export class LobbyCore {
     if (!t.done) return;
     const board = t.done.board;
     if (this.serverOn) {
-      const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], this.settings, t.job.priority ?? []);
+      const flagged = recheckTargets(board, [...t.job.picks, ...board.botPicks], this.settings, t.job.priority ?? [], board.swapped);
       if (!flagged.length) return;
       console.log(`judges: ${why} on ${t.job.id} in ${this.r.code}; the engine server re-checks`);
       t.server = { kind: "recheck", id: `recheck:${t.job.id}`, at: this.io.now() };
       this.jr.stats.serverRecheck++;
-      this.askServer(t.server.id, t.job.fen, [board.bestMove, ...flagged]);
+      this.askServer(t.server.id, t.job.fen, [recheckAnchor(board, board.swapped), ...flagged]);
       return;
     }
     // No engine server: late, a re-check that did come from a device without a strike stands; disagreeing, or
     // nothing came, the quick numbers.
     const ok = t.deepBoards ? undefined : (w?.from ?? []).find((j) => t.deepReports?.[j] && !(this.jr.devices[j]?.strikes ?? 0));
-    const full = ok ? judgedBoard(t.job, { ...t.reports[ok]!, deep: t.deepReports![ok]! }) : null;
+    const found = ok ? judgedBoard(t.job, { ...t.reports[ok]!, deep: t.deepReports![ok]! }) : null;
+    // (Only a re-check of the board in use: with the look past the Saw Swap or, as when one device's look was set aside, without.)
+    const full = found && !found.swapped === !t.done.board.swapped ? found : null;
     if (full) t.done = { ...t.done, board: { ...full, replies: t.done.board.replies } };
     console.log(`judges: ${why} on ${t.job.id} in ${this.r.code}, and no engine server: ${full ? `${ok}'s re-check` : "the quick numbers"} stand`);
   }
@@ -4108,7 +4119,8 @@ export class LobbyCore {
     console.log(`judges: ${why}; using ${pick}'s answer for job ${t.job.id} in ${this.r.code}`);
     this.jr.stats.fallback++;
     t.server = undefined;
-    t.done = { board: t.boards[pick]!, how: "fallback" };
+    // (Sawyer's Saw Swap: its look only if the other judge looked exactly alike; else those moves as they stand: lookTrusted.)
+    t.done = { board: lookTrusted(t.boards[pick]!, valid.filter((j) => j !== pick).map((j) => t.boards[j])), how: "fallback" };
     this.unvouch("two judges disagreed with no verdict");
   }
 
@@ -4162,15 +4174,15 @@ export class LobbyCore {
       if (moves && t.done) {
         const sj = this.r.scoreRequest?.jobs.find((j) => j.boardId === t.boardId);
         const b = t.done.board;
-        const flagged = recheckTargets(b, [...t.job.picks, ...b.botPicks], this.settings, sj?.priority ?? []);
-        const checked = applyRecheck(b, flagged, moves);
+        const flagged = recheckTargets(b, [...t.job.picks, ...b.botPicks], this.settings, sj?.priority ?? [], b.swapped);
+        const checked = applyRecheck(b, flagged, moves, b.swapped);
         t.done = { ...t.done, board: { ...b, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, rechecked: checked.rechecked } };
         // Two devices' re-checks disagreed: the one further from the server's (by blameMargin) is struck. An app from before
         // Oct 16 leaves out the picks scored above the first line, and only those: a re-check missing nothing else isn't
         // compared, so an honest older device isn't struck (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
         if (t.deepBoards) {
           const older = (j: string) => {
-            const missing = [b.bestMove, ...flagged].filter((m) => !t.deepReports?.[j]?.some((x) => x?.move === m));
+            const missing = [recheckAnchor(b, b.swapped), ...flagged].filter((m) => !t.deepReports?.[j]?.some((x) => x?.move === m));
             return missing.length > 0 && missing.every((m) => (b.expectedAfter[m] ?? -1) > b.bestExpected);
           };
           const ids = Object.keys(t.deepBoards).filter((j) => t.deepBoards![j] && !older(j));
@@ -4198,10 +4210,11 @@ export class LobbyCore {
     const strikesOf = (j: string) => this.jr.devices[j]?.strikes ?? 0;
     const closer = distances[0]! < distances[1]! || (distances[0] === distances[1] && strikesOf(a) <= strikesOf(b)) ? a : b;
     // (The server names no replies: only those both judges name alike count, as when they agree. Nor does it look past Sawyer's Saw
-    // Swap: only the scores after it both judges give alike count; a move they differ on is scored as it stands.)
-    const verdict = closer === a ? first : verdictBoard(t.job, moves, t.boards[b]!)!;
-    const swapped = sharedSwaps([t.boards[a]!, t.boards[b]!]);
-    t.done = { board: { ...verdict, replies: sharedReplies([verdict, t.boards[a]!, t.boards[b]!]), ...(swapped ? { swapped } : {}) }, how: "verdict" };
+    // Swap: the closer judge's look counts only when the other's is exactly alike; else those moves are scored as they stand, the bots
+    // picking as plain chess has them: lookTrusted.)
+    const look = lookTrusted(t.boards[closer]!, [t.boards[closer === a ? b : a]]);
+    const verdict = verdictBoard(t.job, moves, look)!;
+    t.done = { board: { ...verdict, replies: sharedReplies([verdict, t.boards[a]!, t.boards[b]!]), ...(look.swapped ? { swapped: look.swapped } : {}) }, how: "verdict" };
     const refereed = !!t.refereed;
     console.log(`judges: verdict for ${t.job.id} in ${this.r.code}: ${a} ${distances[0]!.toFixed(1)} and ${b} ${distances[1]!.toFixed(1)} points off${refereed ? " (a third device decides who's to blame)" : ""}`);
     // A third device will say exactly who was off; without one, blame goes by distance from the verdict.
@@ -4265,7 +4278,7 @@ export class LobbyCore {
         if (Array.isArray(deep) && t.job.recheck) (t.deepReports ??= {})[playerId] = deep;
         t.judges = [matches[0]!];
         t.majorityPair = [matches[0]!, playerId];
-        this.accept(t, { ...ref.boards[matches[0]!]!, replies: sharedReplies([ref.boards[matches[0]!]!, mine]) }, "majority");
+        this.accept(t, { ...agreedBoard(ref.boards[matches[0]!]!, mine), replies: sharedReplies([ref.boards[matches[0]!]!, mine]) }, "majority");
       } else this.fallback(t, "the second opinion matched neither judge");
       this.afterJudging();
     }
@@ -4334,12 +4347,16 @@ export class LobbyCore {
         ...(b.swapped ? { swapped: b.swapped } : {}),
       };
     });
-    // Crowd: the early bot picks someone sent must be what two agreeing judges worked out (from the same seed).
+    // Crowd: the early bot picks someone sent must be what two agreeing judges worked out (from the same seed). (Sawyer's Saw Swap: with
+    // the look past it or as plain chess has them, from either judge's board, so an older app's plan, or a newer one's beside an older
+    // judge, is never struck for it: the review of #863, finding 3.)
     const plan = round.botPlan;
     const first = boards[0];
-    const firstHow = Object.values(tasks)[0]?.done?.how;
-    if (plan?.by && first && firstHow === "agreed" && Object.entries(plan.picks).some(([id, m]) => first.botPicks[id] !== undefined && first.botPicks[id] !== m)) {
-      this.strike(plan.by, `bot picks it planned for ${round.key} don't follow from the position`);
+    const task = Object.values(tasks)[0];
+    if (plan?.by && first && task?.done?.how === "agreed") {
+      const ways = [task.botIds.map((id) => first.botPicks[id]), ...task.judges.flatMap((j) => { const x = task.boards[j]; return x ? [x.botPicks, ...(x.plainBots ? [x.plainBots.picks] : [])] : []; })];
+      const follows = (picks: readonly (string | undefined)[]) => Object.entries(plan.picks).every(([id, m]) => { const i = task.botIds.indexOf(id); return i < 0 || picks[i] === undefined || picks[i] === m; });
+      if (!ways.some(follows)) this.strike(plan.by, `bot picks it planned for ${round.key} don't follow from the position`);
     }
     this.io.settled?.(Object.values(tasks).map((t) => ({ id: t.job.id, boardId: t.boardId, how: t.done!.how, judges: [...t.judges], board: t.done!.board })));
     this.jr.tasks = undefined;

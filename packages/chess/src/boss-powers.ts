@@ -444,13 +444,18 @@ export const swapMap = (swap: readonly MoveScore[]): Record<string, number> | un
 
 /**
  * Scores as the judge ranks them with its look past the move (swapScores: for the bots and the hints): each move it looked past takes
- * the look's score (its reply and mate were the boss's answers on the board without the power: gone), best first (ties by move). Moves
- * it didn't look past keep their place: without one among them, the list as it is.
+ * the look's score (its reply and mate were the boss's answers on the board without the power: gone), best first (ties by move). A move
+ * it looked past that isn't in the list joins it when its score is above the list's best (the judge's best can be a move outside the top
+ * moves: swapJudged; the review of #863, finding 5), so the bots and the hints can pick it. Moves it didn't look past keep their place:
+ * without one in or above the list, the list as it is.
  */
 export function swapIn(scores: readonly MoveScore[], swap: readonly MoveScore[] | null | undefined): MoveScore[] {
   const by = new Map((swap ?? []).map((m) => [m.move, m]));
-  if (!scores.some((m) => by.has(m.move))) return [...scores];
-  return scores.map((m) => by.get(m.move) ?? m).sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1));
+  const listed = scores.map((m) => by.get(m.move) ?? m);
+  const high = Math.max(...listed.map((m) => m.expected));
+  const joins = (swap ?? []).filter((m) => m.expected > high && !scores.some((x) => x.move === m.move));
+  if (!joins.length && !scores.some((m) => by.has(m.move))) return [...scores];
+  return [...listed, ...joins].sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1));
 }
 
 /**

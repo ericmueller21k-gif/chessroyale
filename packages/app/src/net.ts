@@ -47,6 +47,7 @@ import {
   allowedSearch,
   jobRanked,
   jobOffers,
+  swapIn,
   swapMap,
   swapScores,
   jobEscapes,
@@ -57,6 +58,7 @@ import {
   deepCheck,
   type JudgeJob,
   type JudgeReport,
+  type MoveScore,
   judgeTaps,
   lightsDeadline,
   lightsOutTimeline,
@@ -491,12 +493,13 @@ export class NetMatch implements GameView {
     this.send({ t: "powerUp", key: this.key });
     this.hint = [];
     this.emit();
-    // (A boss power limits the moves: the hints are the best of the allowed ones.)
+    // (A boss power limits the moves: the hints are the best of the allowed ones. Sawyer's Saw Swap: its moves as the judge scores them.)
     const allowed = this.boss?.powers?.allowed ?? undefined;
     void this.engines()
       .then(async (engines) => {
         const all = await this.top.get(engines[0]!, fen);
-        return allowed ? judgeCandidates({ allowed }, all, (await allowedSearch(engines[0]!, { fen, allowed }, all)) ?? []) : all;
+        const top = allowed ? judgeCandidates({ allowed }, all, (await allowedSearch(engines[0]!, { fen, allowed }, all)) ?? []) : all;
+        return this.withSwap(engines[0]!, fen, top);
       })
       .then((top) => {
         if (this.phase.kind === "play" && this.phase.board.fen === fen) {
@@ -508,7 +511,16 @@ export class NetMatch implements GameView {
   }
   async evaluate(fen: string): Promise<number | null> {
     const engines = await this.engines();
-    return whiteExpected(fen, await this.top.get(engines[0]!, fen));
+    return whiteExpected(fen, await this.withSwap(engines[0]!, fen, await this.top.get(engines[0]!, fen)));
+  }
+  /**
+   * Sawyer's Saw Swap still to come on the crowd's turn: the moves that set it off scored on the board after it, as the judge scores
+   * them (the boss view's `swap`; each board's search prefetched alike), so the hints and the eval bar agree with the judge (the review
+   * of #863, finding 2). Any other position, or no look: the top moves as they are.
+   */
+  private async withSwap(engine: UciEngine, fen: string, top: MoveScore[]): Promise<MoveScore[]> {
+    const look = this.boss?.board.fen === fen ? this.boss.powers?.swap : undefined;
+    return look ? swapIn(top, await swapScores((f) => this.top.get(engine, f), look)) : top;
   }
   get inviteUrl() {
     return `${location.origin}/lobby/${this.code}`;
@@ -1404,7 +1416,7 @@ export class NetMatch implements GameView {
           const people = Object.values(job.humanPicks).some((m) => !!m);
           const checked = serverRecheck || !people
             ? { bestMove: top[0]!.move, bestExpected: best, expectedAfter }
-            : await recheckCloseCalls(engine, job.fen, { bestMove: top[0]!.move, bestExpected: best, expectedAfter }, [...Object.values(job.humanPicks), ...Object.values(botPicks)], this.settings, job.priority);
+            : await recheckCloseCalls(engine, job.fen, { bestMove: top[0]!.move, bestExpected: best, expectedAfter }, [...Object.values(job.humanPicks), ...Object.values(botPicks)], this.settings, job.priority, swapMap(swap));
           const swapped = swapMap(swap);
           out[i] = { boardId: job.boardId, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, botPicks, botThinkMs, botPowerUps, replies, mates, ...(swapped ? { swapped } : {}) };
         }
