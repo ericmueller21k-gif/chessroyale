@@ -601,7 +601,7 @@
 - Queue after #863 merges: Smudgy mask (xhigh, alone) → then tower-shared-anim-audit (the stacked list, notes/briefs/tower-shared-anim-audit.md) + tower-room-arrow-board, side by side.
 
 ## Nov 21 ~03:40 UTC
-- iPhone home-screen blur: still there after #849 (Eric's screenshot: the first ~20-25 pt under the status bar frosted, e.g. "Auto chess" title; Chess Town looks fine). Eric: NO code fix ("We'll just deal with the blur ... They'll probably patch this at some point"); just a note for iPhone users. The ios-top-guard helper was stopped and archived (branch claude/ios-top-guard, unmerged; don't use). Known iOS 26 Liquid Glass scroll-edge blur on Home Screen web apps (GitHub issues/PRs across many projects; WebKit 301994/317153 are related status-bar regressions, not the blur itself).
+- iPhone home-screen blur: still there after #849 (Eric's screenshot: the first ~20-25 pt under the status bar frosted, e.g. "Auto chess" title; Chess Town looks fine). Eric, Nov 21: DROPPED entirely. No code fix, no player note, don't raise it again. The ios-top-guard helper was stopped and archived (branch claude/ios-top-guard, unmerged; don't use). Known iOS 26 Liquid Glass scroll-edge blur on Home Screen web apps (GitHub issues/PRs across many projects; WebKit 301994/317153 are related status-bar regressions, not the blur itself).
 - Asked Eric where the player-facing note goes (Settings' THE APP line for iPhone, or the FAQ).
 
 ## Nov 21 ~02:30 UTC
