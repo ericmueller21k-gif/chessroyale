@@ -687,9 +687,42 @@
   pointer-events: none;
 }
 /* (The boss to move folded, another tapped open: his tag centered on his narrow window, so it never runs past the bar's end.) */
-.tw-part:not(.tw-open) > .tw-tag {
+.tw-part:not(.tw-part-open) > .tw-tag {
   left: 50%;
   transform: translateX(-50%);
+}
+/* (A folded boss's words, a phone's (Eric, Nov 21: drawn over the bar beside his window, not inside it): a room the card's width less the
+   tail's 14 px, its edge 14 px past his outline toward the open part, so it always stays over the bar; the bubble at its foot as a lone
+   bar's, its tail at his window. His part doesn't open for the line.) */
+.tw-say {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  width: calc((100cqw - (var(--tw-n) - 1) * 4px - var(--tw-n) * 6px) * var(--tw-open) - 14px);
+  pointer-events: none;
+}
+.tw-say-right {
+  left: calc(100% + 11px);
+}
+.tw-say-left {
+  right: calc(100% + 11px);
+}
+.tw-say .bc-bar-bubble {
+  bottom: 2px;
+}
+.tw-say-left .bc-bar-bubble {
+  left: auto;
+  right: 0;
+}
+/* (Its tail turned to point right, at a window on its right: the square's top and right edges.) */
+.tw-say-left .bc-bar-bubble::after {
+  left: auto;
+  right: -11px;
+  border-bottom: 0;
+  border-left: 0;
+  border-top: 3px solid #1a1406;
+  border-right: 3px solid #1a1406;
 }
 /* (A phone's figure box: the card's height, one width for every boss so the name column starts at one place, his figure at its left
    foot so a folded window shows the most of him.) */

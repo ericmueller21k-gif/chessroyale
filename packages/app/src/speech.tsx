@@ -245,9 +245,11 @@ export function useVoice(voice: Voice): { line: Spoken | null; now: number } {
 export function VoiceBubble({ voice, class: cls, hidden = false, balanced = false, mine }: { voice: Voice; class: string; hidden?: boolean; balanced?: boolean; mine?: (key: string) => boolean }) {
   const { line, now } = useVoice(voice);
   // A test hook (test switches only): `sayBoss(text)` says any line in the boss's voice at once, so the boss-bar check
-  // (e2e/boss-bar-same.spec.ts) can put every line of every boss into its bubble and measure it.
+  // (e2e/boss-bar-same.spec.ts) can put every line of every boss into its bubble and measure it. `who`, a boss's id: his line on a
+  // Battle Tower floor of several (its key starts with his id: TowerBar's speakerOf).
   useEffect(() => {
-    if (voice === bossVoice && testSwitchesAllowed()) (globalThis as { sayBoss?: (text: string) => boolean }).sayBoss = (text) => voice.replace(text, `test:${Date.now()}:${text}`);
+    if (voice === bossVoice && testSwitchesAllowed())
+      (globalThis as { sayBoss?: (text: string, who?: string) => boolean }).sayBoss = (text, who) => voice.replace(text, `${who ? `${who}:` : ""}test:${Date.now()}:${text}`);
   }, [voice]);
   // (`mine`: of several speakers sharing the voice, only the lines this box's speaker says: a Battle Tower floor's bosses, TowerBar.)
   if (!line || hidden || (mine && !mine(line.key))) return null;

@@ -163,6 +163,8 @@ export const OPEN_SHARE = 0.75;
  * onto his card, a lone boss bar laid out once at the open part's width: folded, the window shows the card's left side (his figure,
  * maybe cut off); opening it reveals more of the same card, never a relayout. The windows slide on a turn change (tower.css, 300 ms;
  * instant with reduced motion). A tapped part stays open until the turn changes or it's tapped again. The bar's height never changes.
+ * A folded boss's words are drawn over the bar beside his window (tw-say), never cut by it. Eric's named exception to "nothing shifts"
+ * (docs/rules/eric.md): this bar's parts slide; the bar and everything around it keep their size and place.
  */
 export function TowerBar({ boss, match, caster = null }: { boss: BossView; match: GameView; caster?: string | null }) {
   const side = sideOf(boss)!;
@@ -175,6 +177,8 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
   // (A tapped-open part, until the turn changes: the boss to move's again.)
   const [tapped, setTapped] = useState<{ i: number; toMove: number } | null>(null);
   const open = tapped && tapped.toMove === side.toMove ? tapped.i : side.toMove;
+  // (A folded part tapped opens; the open one tapped again, or the boss to move, folds it back to the boss to move.)
+  const tap = (i: number, back: boolean) => setTapped(back ? null : { i, toMove: side.toMove });
   // (A folded part's flex-grow 1, the open one's 3(n - 1): it takes OPEN_SHARE of the room the gaps and outlines leave.)
   const grow = (OPEN_SHARE / (1 - OPEN_SHARE)) * (n - 1);
   return (
@@ -184,7 +188,7 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
         const isOpen = i === open;
         return (
           <span
-            class={`tw-part${on ? " tw-to-move" : ""}${isOpen ? " tw-open" : ""}${b.id === caster ? " tw-casting" : ""}`}
+            class={`tw-part${on ? " tw-to-move" : ""}${isOpen ? " tw-part-open" : ""}${b.id === caster ? " tw-casting" : ""}`}
             key={`${i}-${b.id}`}
             data-boss={b.id}
             style={{ flexGrow: isOpen ? grow : 1 }}
@@ -192,9 +196,21 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
             tabIndex={0}
             aria-expanded={isOpen}
             aria-label={`${b.name}${on ? ", to move" : ""}`}
-            onClick={() => setTapped(isOpen || on ? null : { i, toMove: side.toMove })}
+            onClick={() => tap(i, isOpen || on)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              tap(i, isOpen || on);
+            }}
           >
             {on && <span class="tw-tag">TO MOVE</span>}
+            {/* (A folded boss's words, a phone's (Eric, Nov 21): over the bar beside his window, never inside it (the window would cut
+                them), toward the open part; his part doesn't open for the line. The room is a card wide, so the bubble fits as a lone bar's.) */}
+            {!computer && !isOpen && (
+              <span class={`tw-say ${i < open ? "tw-say-right" : "tw-say-left"}`}>
+                <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced mine={(k) => speakerOf(side, k) === i} />
+              </span>
+            )}
             <span class="tw-window">
               {/* (His card: the lone bar's own markup and styles (Boss.tsx BossBar), at the open part's width, always.) */}
               <span class="boss-bar has-char tw-bcard" aria-hidden={!isOpen}>
@@ -224,8 +240,9 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
                   <span class="boss-prop">
                     <BossBarExtra boss={b} until={until} part={computer ? "cardProp" : "prop"} />
                   </span>
-                  {/* (His words, a phone's, where a lone bar has them: the boss who says them, the one who cast a moment, else the boss to move.) */}
-                  {!computer && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced mine={(k) => speakerOf(side, k) === i} />}
+                  {/* (His words, a phone's, where a lone bar has them while his part is open: the boss who says them, the one who cast a
+                      moment, else the boss to move. Folded, they're drawn beside his window: tw-say, above.) */}
+                  {!computer && isOpen && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced mine={(k) => speakerOf(side, k) === i} />}
                 </span>
               </span>
             </span>
