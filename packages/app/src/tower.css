@@ -760,9 +760,10 @@
   .tw-bcard.boss-bar {
     height: 83px;
   }
+  /* (At least: Babur's taller bar, where his pump has no room by his figure, is as tall as his pump, as on main: styles.css `.tg-tall`.) */
   .screen.game:has(> .gm-tools > .tw-col-title) > .boss-bar:not(.tw-bar) {
     box-sizing: border-box;
-    height: 89px;
+    min-height: 89px;
     padding: 6px 13px 7px;
   }
   .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char {
