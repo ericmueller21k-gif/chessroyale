@@ -210,15 +210,21 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   is still to come, every crowd move that would set it off (a check with his king on his half where `sawSwapFen` is legal;
   never a mate, a draw, the move cap, a tower floor with `sawSwapInTower` off, or a side of several bosses) is scored on
   the board after the swap, him to move: the runner's `judgeAfter()` (the hook `BossRules.judgeAfter`,
-  `sawyerBattle.judgeSwaps`) lists those moves with their boards; the lobby sends them in the job (`swap`) and in the
-  prefetch's `fens`; the device that scores (solo, the host, each judge) searches each board with the turn's own top-moves
-  search (`swapScores`: prefetched, so no wait at scoring) and reports the crowd's side of its best line (`swap`,
-  `swapped`). The runner folds them in once, in `resolveBoard` (`swapJudged`), for the moves it finds set it off itself;
-  the bots and solo's hints and bar rank with them (`swapIn`). The re-check and the engine server's verdict stay plain
-  chess's (the server never sees the swapped boards): two judges' looks must match exactly (`boardsAgree`), and a
-  verdict keeps only the looks both judges give alike (`sharedSwaps`), the rest scored as they stand. Online hints don't
-  read boss rules (as for the fire). Cost: one search per qualifying move on the scoring device (about 0.5 a turn, 1.6
-  on a turn with any, in a random-playout count), never the engine server.
+  `sawyerBattle.judgeSwaps`) lists those moves with their boards; the lobby sends them in the job (`swap`), in the
+  prefetch's `fens` and in the boss view (`powers.swap`); the device that scores (solo, the host, each judge) searches each board
+  with the turn's own top-moves search (`swapScores`: prefetched, so no wait at scoring) and reports the crowd's side of its best
+  line (`swap`, `swapped`). The runner folds them in once, in `resolveBoard` (`swapJudged`), for the moves it finds set it off
+  itself; the bots, solo's and online's hints and eval bar rank with them (`swapIn`: such a move outside the bots' top moves joins
+  them when it scores above their best). The re-check works on the final numbers, never searching such a move (`recheckView`,
+  `recheckAnchor`: anchored on the judge's best, or the best of the other moves when that's one of them), so the engine server never
+  sees one. **Trust** (the review of #863): the look counts only where two devices gave it exactly alike (two judges agreeing, two
+  of three); a lone judge's with the engine server on, a dispute's verdict or fallback without the other judge's look alike, and a
+  newer app's beside an older one's are scored as plain chess, the bots too (`plainOf`, `lookTrusted`, `agreedBoard`; every report
+  with a look scores the bots' plain picks as well, `plainBots`). An older app's report without the look abstains on it
+  (`boardsAgree` compares the two as plain chess: no disagreement, no strike, and a bot plan made either way stands). The host
+  scoring alone, a lone judge with no engine server and solo keep it (their word stands for every number). Cost: one search per
+  qualifying move on the scoring device (about 0.5 a turn, 1.6 on a turn with any, in a random-playout count), never the engine
+  server's.
 - **Brilliant moves** never come from a power-up move.
 - **Chess960 (Fischer Random)** (DECISIONS.md, "Chess960's rules", Oct 14): the rules foundation for the hidden boss's
   phase 2, not wired into any boss yet. A Chess960 position is a FEN whose castling field names its rooks by file
