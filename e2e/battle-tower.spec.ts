@@ -722,7 +722,7 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
     // total. Nothing between the bar and the board: only the 8 px gap every boss battle has.
     const col = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
-      const [t, bar, board, mv, gear] = [".tw-col-title", ".tw-bar", ".board-wrap", ".mv-side", ".gm-tools .mm-more"].map(r);
+      const [t, bar, board, mv, gear] = [".tw-col-title", ".tw-bar", ".board-wrap", ".mv-side", ".gm-tools .mm-more"].map(r) as [DOMRect, DOMRect, DOMRect, DOMRect, DOMRect];
       return { text: document.querySelector(".tw-col-title")!.textContent, line: document.querySelectorAll(".tw-strip-line").length, right: t.left >= board.right, top: Math.round(t.top - bar.top), x: [Math.round(t.left - mv.left), Math.round(t.width - mv.width)], over: t.bottom <= (gear.top + gear.bottom) / 2 && (gear.top + gear.bottom) / 2 <= mv.top, gap: Math.round(board.top - bar.bottom) };
     });
     expect(col).toEqual({ text: "Battle Tower · Floor 4", line: 0, right: true, top: 0, x: [0, 0], over: true, gap: 8 });
