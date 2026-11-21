@@ -536,7 +536,7 @@ choir pad; 32 bars: an intro, a guitar-and-organ tune, a jazz bridge, a climax o
   song_ak.py, shelved for a defeat.
 
 
-## The God King's new voice (Nov 20): four shouts from Eric's pack, an octave down; sent, no verdict yet
+## The God King's new voice (Nov 20): four shouts from Eric's pack; the cleaned originals sent, no verdict yet
 
 Eric uploaded a sound pack he made for the God King (8 s: four short shouts and a long cry): "This is the sound pack
 I ... made for the God King. We're replacing the sound, but the last one I don't want, which is ... the longer one ...
@@ -550,3 +550,20 @@ voice like an octave deeper than what it is now ... he's supposed to have a deep
   Measured on both: the strongest low partial and the spectrum's centre each halve.
 - Set to the level of the game's present voice cuts (peak -5.5 dBFS; `hyuah`, `last-grunt1`, `last-grunt2`), mono,
   44.1 kHz MP3 as those are. Which shout goes to which moment is his or the director's to say.
+
+**Round 2 (Nov 21): back to the original pitch, with the air taken out.** Eric: "Just use the original ones. But
+maybe see if you can ... cut out ... some weird noise ... I just want like a cleaner like noise ... it makes it sound
+airy or something."
+- Read as: his pack's shouts at their own pitch (no octave drop), cleaned. The other reading (the first deep files,
+  cleaned) is covered by one extra sheet.
+- What the air was, measured: hiss. In his shouts the 5 to 8 kHz band sat only 16 to 24 dB under the voice and
+  measured as noise, not harmonics, and it took over in each shout's tail (up to -8 dB of the moment's sound).
+- Why the deep versions sounded airier: an octave down moved that hiss from 5-10 kHz to 2.5-5 kHz, where the ear is
+  keenest (there: -19 to -24 dB, noise-like). **Lesson: clean a voice before pitching it down, never after.**
+- The cleaning is `voice_clean.py`: the hiss between the harmonics turned down (up to 12 dB), a steep low-pass at
+  5 kHz, a 70 Hz high-pass, and the tail faded once the voice is 22 dB under its loudest. After it: above 5 kHz at
+  -36 to -50 dB (was -16 to -24), each shout 0.26 to 0.30 s (was 0.33 to 0.37). Peak -5.5 dBFS, mono, 44.1 kHz MP3.
+- Sent: the four cleaned shouts, one sheet of before then after, and one sheet of the cleaned shouts an octave down.
+- Can't judge by ear: whether it now sounds dull rather than clean. A second argument sets the strength (1.5 is
+  firmer, 0.6 gentler).
+- Still open: how the pack was made (for `CREDITS.md`) and which moment each shout is for.
