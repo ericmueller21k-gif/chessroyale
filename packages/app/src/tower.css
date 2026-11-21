@@ -768,20 +768,34 @@
 /* ---- A computer's title over the column beside the board, and the figures stacked beside the board ---- */
 /* (Eric, Nov 21: "we need all that space for the boss for the bar at the top ... put it to the right above the moves black container".)
    The run's title is the first line of the column's tools (`.gm-tools`, game-frame.css: the bar's row, the Moves box's left edge and
-   width), its top level with the bar's top, centered; the tools on the line under it at the right, then the Moves box. The two lines
-   (20 + 4 + 28 px) fit the shortest tower bar's row (a lone floor's, about 49 px and its 8 px margin), so the board stays right under
+   width), its top level with the bar's top, centered; the tools on the line under it at the right, then the Moves box. The two rows
+   (20 + 4 + 28 px) fit the shortest tower bar's row (a lone floor's bar, 49 px and up, and its 8 px margin), so the board stays right under
    the bar and the room (`--bd-room`) is every boss battle's. */
 @media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  /* (Two fixed rows, the tools' as tall as their one line elsewhere (28 px; the gear's 42 px button overflows it, centered, as there).) */
   .screen.game > .gm-tools:has(> .tw-col-title) {
     align-self: start;
-    flex-wrap: wrap;
-    align-content: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: 20px 28px;
+    align-items: center;
+    column-gap: 8px;
     row-gap: 4px;
-    height: auto;
+    height: 52px;
+  }
+  .screen.game > .gm-tools > .tw-col-title {
+    grid-column: 1 / -1;
+  }
+  .screen.game > .gm-tools:has(> .tw-col-title) > .match-tools {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .screen.game > .gm-tools:has(> .tw-col-title) > .mm {
+    grid-column: 3;
+    grid-row: 2;
   }
 }
 .tw-col-title {
-  flex: 0 0 100%;
   display: flex;
   height: 20px;
   line-height: 20px;

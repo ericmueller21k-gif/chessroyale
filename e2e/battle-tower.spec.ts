@@ -716,6 +716,17 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
   const under = await underBar();
   expect({ ...under, gap: 0 }).toEqual({ ...lone, gap: 0 });
   expect(Math.abs(under.gap - lone.gap), "the board's gap under the bar (px, its rounding)").toBeLessThanOrEqual(1);
+  if (desk) {
+    // The floor's title on a computer (Eric, Nov 21: "put it to the right above the moves black container"): at the top of the column
+    // right of the board, level with the bar's top, over the Moves box (its left edge and width) and the tools; the current floor, no
+    // total. Nothing between the bar and the board: only the 8 px gap every boss battle has.
+    const col = await page.evaluate(() => {
+      const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+      const [t, bar, board, mv, gear] = [".tw-col-title", ".tw-bar", ".board-wrap", ".mv-side", ".gm-tools .mm-more"].map(r);
+      return { text: document.querySelector(".tw-col-title")!.textContent, line: document.querySelectorAll(".tw-strip-line").length, right: t.left >= board.right, top: Math.round(t.top - bar.top), x: [Math.round(t.left - mv.left), Math.round(t.width - mv.width)], over: t.bottom <= (gear.top + gear.bottom) / 2 && (gear.top + gear.bottom) / 2 <= mv.top, gap: Math.round(board.top - bar.bottom) };
+    });
+    expect(col).toEqual({ text: "Battle Tower · Floor 4", line: 0, right: true, top: 0, x: [0, 0], over: true, gap: 8 });
+  }
   const board = await boardBox();
   // A turn change: the next boss to move opens, the last folds.
   const was = at.toMove;
