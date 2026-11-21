@@ -571,12 +571,12 @@ test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's th
       return { phase: m?.phase?.kind ?? null, focus: (b?.id ?? null) as string | null, square, drawn: el ? `${el.classList.contains("white") ? "w" : "b"} ${role}` : null };
     });
   // Your turn with Jefferson next (the view's top level his): a pawn on d7.
-  await expect.poll(async () => (await look()).drawn, { timeout: 20_000 }).toBe("b pawn");
-  expect(await look()).toMatchObject({ phase: "play", focus: "grex", square: "d7" });
+  let at = await look();
+  await expect.poll(async () => ((at = await look()), at.phase === "play" && at.drawn !== null), { timeout: 20_000 }).toBe(true);
+  expect(at).toMatchObject({ phase: "play", focus: "grex", square: "d7", drawn: "b pawn" });
   await still(page, "shared-smudgy-your-turn");
   // Your move; then Jefferson's turn: the hidden square still a pawn while he plays.
   await playAMove(page);
-  let at = await look();
   await expect.poll(async () => ((at = await look()), at.phase === "boss" && at.focus === "grex" && at.drawn !== null), { timeout: 60_000 }).toBe(true);
   expect(at.drawn).toBe("b pawn");
   await still(page, "shared-smudgy-his-turn");
