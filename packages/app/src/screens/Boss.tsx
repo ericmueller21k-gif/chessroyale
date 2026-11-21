@@ -459,7 +459,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const still = useStillKey(match, now);
   // (A floor of several: whose moment plays now, so his own figure, and only his, steps out of his part or his place beside the board
   // while the moment draws him elsewhere, as a lone boss's does: TowerBar.tsx, tower.css `.tw-casting`. Eric, Nov 21.)
-  const caster = moment && sideOf(boss) ? casterOf(boss, moment).id : null;
+  // (A moment drawn outside the moments' list (Hollow's Lights out, Big Boy's snack) is the boss to move's: his turn brought it.)
+  const side = sideOf(boss);
+  const caster = !side ? null : moment ? casterOf(boss, moment).id : (side.bosses[side.toMove]?.id ?? null);
   const hud = useMemo(() => <Hud match={match} caster={caster} />, [match, still, caster]);
   const bossSide = useMemo(() => <SideFigures match={match} caster={caster} />, [match, still, caster]);
   // (Smudgy's reveal under the paint: the newest move isn't named yet, in the dock or the move list.)

@@ -172,11 +172,21 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 - **Eric's playtest fixes (Nov 20):** Wrangler has no ultimate on a floor of several (`BATTLE_TOWER.noUltimate: ["pig"]`: the runner marks
   his powers `noUlt` as a shared floor starts; his meter stays on the bar empty and dimmed, aria "Rage: no ultimate in the Battle Tower");
   alone on a floor he keeps it, once, as in every mode (`showdownMax` 1, Eric: "if wrangler is solo in battle tower he fires his ult off
-  still ... make sure in all modes for him he can only ult once a game then it turns gray"). Babur's pump on a shared floor (`BossUi.towerProp`): a phone's in his part of the split bar (1.25x, at its left, never dimmed),
+  still ... make sure in all modes for him he can only ult once a game then it turns gray"). Babur's pump on a shared floor (`BossUi.towerProp`): a phone's in his part of the split bar (1.25x, at its left),
   a computer's beside his figure by the board (`TowerSide`, 2x); one pump on the page. The other bosses' bar props are still not drawn on
   a shared floor. Sawyer's cut and gap over the square highlights on every screen (bosses.md). Checks: `several-bosses.test.ts` (every
   `noUltimate` boss on a floor of two; Wrangler's one showdown on a lone floor and off the tower) and `e2e/battle-tower.spec.ts` ("a shared floor of Babur and Wrangler").
   [2026-11-20-tower-fixes.md](../decisions/2026-11-20-tower-fixes.md).
+- **Shared floors' moments audited (Eric, Nov 21):** every boss's powers and ultimate and the God King's move and strike on floors of
+  two and three, phone and computer, against a lone battle ([2026-11-21-tower-shared-audit.md](../decisions/2026-11-21-tower-shared-audit.md),
+  its table). A boss's own moment draws him once: the boss screen passes its caster (`casterOf`; else the boss to move) to the split bar
+  and the side figures (`.tw-casting`), and his figure alone hides as a lone boss's does (a phone: every moment he casts; a computer: while
+  the moment draws him on the board), keeping its box. The reveal screen (your move's, the God King's move and strike: `Crowd.tsx`) draws
+  every boss's figure (`SideFigures`), every boss's board layer and the hearts. Nobody is dimmed: the yellow outline and TO MOVE mark the
+  boss to move. A figure's box is the union of every frame of his idle (`drawnBox`), never clipping. On a computer the strip line counts in
+  the board's room (`board-size.css`, `--bd-room` 151 px), so nothing scrolls at any window. Checks: `e2e/battle-tower.spec.ts` ("a shared
+  floor's moments"), `test/tower-side.test.ts` (every boss's box). Left: every boss's bar prop on a shared floor (mockup first), and a
+  computer's cast animation in place on the side figure.
 - **One primary for the powers that add pieces (Eric, Nov 20: "Only one is active during the battle tower").** `BATTLE_TOWER.addsPieces`:
   Babur's balloons, Puddles' grown pieces, Timber's workshop drops, Don Dough's rising dough, Sawyer's split pawn. On a floor of several,
   only the first of them in turn order keeps it; the runner marks the others' powers `noAdd` as the floor starts (`towerNoAdd`, beside
