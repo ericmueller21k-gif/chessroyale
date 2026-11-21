@@ -34,6 +34,19 @@ export const TOWER_FLOOR_FEEL = {
   /** Into the board (the town's own zoom on a door, on the room's canvas), then black, then the match. */
   zoomMs: 650,
   zoom: 2.4,
+  /**
+   * The floor arrow to the next door (Eric, Nov 21: "a little like 3D blinking arrow ... right on the floor, right in front of the door"):
+   * one blink this long (ms), dimmed to `arrowLow` and nudged `arrowNudge` squares toward the door at its middle; `arrowLen` squares long,
+   * its head `arrowHead` wide and `arrowHeadLen` long, its shaft `arrowShaft` wide; its slab `arrowLift` squares thick.
+   */
+  arrowBlinkMs: 1000,
+  arrowLow: 0.3,
+  arrowNudge: 0.12,
+  arrowLen: 1.3,
+  arrowHead: 1.1,
+  arrowHeadLen: 0.6,
+  arrowShaft: 0.44,
+  arrowLift: 0.16,
 } as const;
 
 /** The table: on the battle circle's middle. */
@@ -155,6 +168,29 @@ export const piecesAt = (t: number, times: FloorTimes, F = TOWER_FLOOR_FEEL): nu
  * (a loss with no life left, or the top), the elevator shut: down to the lobby.
  */
 export type FloorMode = "fight" | "won" | "out";
+
+/**
+ * The floor arrow (Nov 21): after a floor, on the floor right in front of the door you go through next, pointing at it: the elevator, up
+ * to the next floor (`won`), or the way down to the lobby (`out`: the run over, the elevator shut). Its middle (squares) and which way it
+ * points along the rows (-1 north, to the back wall; 1 south). None during a fight. Gone as you go through: the room goes with you.
+ */
+export interface FloorArrow {
+  readonly to: "top" | "front";
+  readonly c: number;
+  readonly r: number;
+  readonly dir: -1 | 1;
+}
+const ARROW_UP: FloorArrow = { to: "top", c: 4.5, r: 1.3, dir: -1 };
+const ARROW_DOWN: FloorArrow = { to: "front", c: 4.5, r: 7.8, dir: 1 };
+export const floorArrow = (mode: FloorMode): FloorArrow | null => (mode === "won" ? ARROW_UP : mode === "out" ? ARROW_DOWN : null);
+/** The arrow's blink at `t` ms (from the room's first frame): how opaque it is, and how far (squares) it's nudged toward the door. Into `out`. */
+export function arrowBlink(t: number, still: boolean, out: { a: number; nudge: number }, F = TOWER_FLOOR_FEEL): { a: number; nudge: number } {
+  // (Reduced motion: held, full.)
+  const u = still ? 0 : 0.5 - 0.5 * Math.cos((2 * Math.PI * Math.max(0, t)) / F.arrowBlinkMs);
+  out.a = 1 - (1 - F.arrowLow) * u;
+  out.nudge = F.arrowNudge * u;
+  return out;
+}
 
 /** The elevator's card in the floor room: up to the next floor once a floor's won; shut otherwise (greyed, nothing hidden). */
 export function upWords(mode: FloorMode, floor: number): { word: string; on: boolean; note: string | null } {

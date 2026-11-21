@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { FLOOR_DOOR, FLOOR_IN, FLOOR_TABLE, FLOOR_YOU, MATE_MARKS, TOWER_FLOOR_FEEL, bossAt, bossMarks, floorTimes, mateAt, piecesAt, upWords, type BossNow } from "../src/town/shops/tower-floor.ts";
-import { SHOP_TOWER_FLOOR_LAYOUT, SHOP_TOWER_FLOOR_N, towerFloorPieces } from "../src/town/shops/tower-floor-art.ts";
-import { makeRoom, passArrive, isFloor, walkable, findPath } from "../src/town/shops/room.ts";
+import { FLOOR_DOOR, FLOOR_IN, FLOOR_TABLE, FLOOR_YOU, MATE_MARKS, TOWER_FLOOR_FEEL, arrowBlink, bossAt, bossMarks, floorArrow, floorTimes, mateAt, piecesAt, upWords, type BossNow } from "../src/town/shops/tower-floor.ts";
+import { SHOP_TOWER_FLOOR_LAYOUT, SHOP_TOWER_FLOOR_N, SHOP_TOWER_FLOOR_TABLE_SQUARES, towerFloorPieces } from "../src/town/shops/tower-floor-art.ts";
+import { SHOP_TOWER_KEEPER, SHOP_TOWER_LAYOUT, SHOP_TOWER_N } from "../src/town/shops/tower-art.ts";
+import { SHOPS } from "../src/town/shops/shops.ts";
+import { makeRoom, passArrive, isFloor, walkable, findPath, stepRound, stepsFrom, inTalkRange, tapTarget, atDoor, type Sq } from "../src/town/shops/room.ts";
+import { TABLE_BOARD } from "../src/town/houses/park.ts";
 
 /** The Battle Tower's floor room (PR 11b, Eric, Nov 19): where everyone stands and when, its doors, its floor tiles. */
 describe("the tower's floor room", () => {
@@ -101,6 +104,146 @@ describe("the tower's floor room", () => {
     expect(upWords("out", 4).on).toBe(false);
     expect(upWords("out", 4).note).toContain("run is over");
     expect(upWords("fight", 4).on).toBe(false);
+  });
+
+  // (Eric, Nov 21: "make it so you can't run through the chessboard ... if you just press like up while you're on like near your side of
+  // the chessboard, it would just make you run around it." The room as ShopRoom builds it: the table's squares blocked and walked round.)
+  const N = SHOP_TOWER_FLOOR_N;
+  const solid = makeRoom(SHOP_TOWER_FLOOR_LAYOUT, [], N);
+  const round = new Uint8Array(N * N);
+  for (const q of SHOP_TOWER_FLOOR_TABLE_SQUARES) solid.blocked[q.r * N + q.c] = round[q.r * N + q.c] = 1;
+  const onTable = (s: Sq) => !!round[s.r * N + s.c];
+  /** Holding one arrow key (`dc` across, `dr` along the rows) from `from`, `n` steps (or until it stops): every square stood on. */
+  const hold = (from: Sq, dc: number, dr: number, n: number): Sq[] => {
+    const out = [from];
+    for (let i = 0; i < n; i++) {
+      const at = out.at(-1)!;
+      const s = stepRound(solid, round, at.c, at.r, dc, dr);
+      if (!s || !walkable(solid, s.c, s.r)) break;
+      expect(Math.abs(s.c - at.c) + Math.abs(s.r - at.r), "one square a step").toBe(1);
+      out.push(s);
+    }
+    return out;
+  };
+
+  it("the table is solid, its squares under its drawing; every other square still reachable, your mark and both doors too", () => {
+    // (The table's board on the circle's middle, `TABLE_BOARD.half` each way: on the four squares, no other.)
+    for (const q of SHOP_TOWER_FLOOR_TABLE_SQUARES) {
+      expect(Math.abs(q.c - FLOOR_TABLE.c)).toBeLessThan(0.5 + TABLE_BOARD.half);
+      expect(Math.abs(q.r - FLOOR_TABLE.r)).toBeLessThan(0.5 + TABLE_BOARD.half);
+    }
+    const from = passArrive(solid, "front")!;
+    const d = stepsFrom(solid, from);
+    const open = makeRoom(SHOP_TOWER_FLOOR_LAYOUT, [], N);
+    for (let r = 0; r < N; r++)
+      for (let c = 0; c < N; c++) {
+        if (onTable({ c, r })) expect(walkable(solid, c, r)).toBe(false);
+        else if (walkable(open, c, r)) expect(d[r * N + c], `${c},${r} reachable`).toBeGreaterThanOrEqual(0);
+      }
+    expect(d[FLOOR_YOU.sq.r * N + FLOOR_YOU.sq.c]).toBeGreaterThanOrEqual(0);
+    for (const to of ["top", "front"] as const) expect(solid.passes.find((p) => p.to === to)!.inside.some((s) => d[s.r * N + s.c]! >= 0)).toBe(true);
+  });
+
+  it("up held from your side walks you round the table (its nearer side) and on north; down, left and right likewise; never onto it", () => {
+    const up = hold(FLOOR_YOU.sq, 0, -1, 12);
+    expect(up.some(onTable)).toBe(false);
+    expect(up.at(-1)!.r, "past the table to the back wall's row").toBe(1);
+    // (From column 4 round its west side, the nearer; from column 5 round its east.)
+    expect(up.at(-1)!.c).toBe(3);
+    expect(hold({ c: 5, r: 7 }, 0, -1, 12).at(-1)!.c).toBe(6);
+    // (Down from the far side, and across from either side: round it and on.)
+    const down = hold({ c: 4, r: 2 }, 0, 1, 12);
+    expect(down.some(onTable)).toBe(false);
+    expect(down.at(-1)!.r).toBe(N - 2);
+    const right = hold({ c: 2, r: 4 }, 1, 0, 12);
+    expect(right.some(onTable)).toBe(false);
+    expect(right.at(-1)!.c).toBe(N - 2);
+    const left = hold({ c: 7, r: 5 }, -1, 0, 12);
+    expect(left.some(onTable)).toBe(false);
+    expect(left.at(-1)!.c).toBe(1);
+    // (Into a wall, or a room with nothing to walk round: the plain step, as before.)
+    expect(stepRound(solid, round, 3, 1, 0, -1)).toEqual({ c: 3, r: 0 });
+    expect(stepRound(solid, null, 4, 6, 0, -1)).toEqual({ c: 4, r: 5 });
+  });
+
+  it("a tap on the table walks you beside it; one beyond it, round it", () => {
+    const t = tapTarget(solid, FLOOR_YOU.sq, 4, 4);
+    expect(t.dest && onTable(t.dest)).toBe(false);
+    const path = findPath(solid, FLOOR_YOU.sq, { c: 4, r: 2 })!;
+    expect(path.some(onTable)).toBe(false);
+    expect(path.at(-1)).toEqual({ c: 4, r: 2 });
+  });
+
+  it("a floor arrow (Nov 21) after a floor, right in front of the door you go through next, pointing at it; none in a fight", () => {
+    expect(floorArrow("fight")).toBeNull();
+    const up = floorArrow("won")!;
+    const down = floorArrow("out")!;
+    expect([up.to, up.dir, down.to, down.dir]).toEqual(["top", -1, "front", 1]);
+    for (const a of [up, down]) {
+      const inside = solid.passes.find((p) => p.to === a.to)!.inside;
+      // (On the floor just inside its door, across its middle: between its two squares.)
+      expect(inside.map((s) => s.c).sort()).toEqual([4, 5]);
+      expect(a.c).toBe(4.5);
+      expect(Math.abs(a.r - inside[0]!.r)).toBeLessThanOrEqual(0.35);
+      // (Its whole length, nudged, on the room's floor: never under the door's own picture or the table.)
+      const tip = a.r + a.dir * (TOWER_FLOOR_FEEL.arrowLen / 2 + TOWER_FLOOR_FEEL.arrowNudge);
+      const tail = a.r - a.dir * (TOWER_FLOOR_FEEL.arrowLen / 2);
+      for (const r of [tip, tail]) {
+        expect(r).toBeGreaterThan(0.5);
+        // (Clear of the front's hem and way in standing up at the last row, which would hide it.)
+        expect(r).toBeLessThan(N - 1.4);
+        expect(Math.abs(r - FLOOR_TABLE.r)).toBeGreaterThan(1.5);
+      }
+      expect(atDoor(solid, Math.round(a.c - 0.5), Math.round(a.r), a.to)).toBe(true);
+    }
+  });
+
+  it("the arrow blinks: full, dimmest and nudged toward its door mid-blink, full again; held full with reduced motion", () => {
+    const F = TOWER_FLOOR_FEEL;
+    const b = { a: 0, nudge: 0 };
+    expect(arrowBlink(0, false, b)).toEqual({ a: 1, nudge: 0 });
+    arrowBlink(F.arrowBlinkMs / 2, false, b);
+    expect(b.a).toBeCloseTo(F.arrowLow);
+    expect(b.nudge).toBeCloseTo(F.arrowNudge);
+    expect(arrowBlink(F.arrowBlinkMs, false, b).a).toBeCloseTo(1);
+    expect(arrowBlink(F.arrowBlinkMs / 2, true, b)).toEqual({ a: 1, nudge: 0 });
+  });
+});
+
+/**
+ * The lobby's clerk (Eric, Nov 21: "This menu should only be coming up if you click like right in front of the clerk, or if you click on
+ * the penguin guy ... but not anywhere else on this floor"): his card shows only on the floor right in front of his counter.
+ */
+describe("the tower's clerk", () => {
+  const def = SHOPS.tower!;
+  const lobby = makeRoom(SHOP_TOWER_LAYOUT, def.keeper, SHOP_TOWER_N, undefined, def.talk, null, def.talkAt ?? null, !!def.talkNear);
+  const N = SHOP_TOWER_N;
+
+  it("talks only from the three squares under his counter, never anywhere else on the floor", () => {
+    expect(def.keeper).toEqual(SHOP_TOWER_KEEPER);
+    const talk: string[] = [];
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (walkable(lobby, c, r) && inTalkRange(lobby, c, r)) talk.push(`${c},${r}`);
+    expect(talk.sort()).toEqual(["1,4", "2,4", "3,4"]);
+  });
+
+  it("a tap on him or his counter walks you in front of it; a tap on the floor near him walks you there, no card", () => {
+    const from = lobby.start;
+    for (const at of [...def.keeper, { c: 2, r: 3 }]) {
+      const t = tapTarget(lobby, from, at.c, at.r);
+      expect(t.kind).toBe("keeper");
+      expect(t.dest!.r).toBe(4);
+      expect(inTalkRange(lobby, t.dest!.c, t.dest!.r)).toBe(true);
+    }
+    // (Eric's screenshot: a tap a few squares out from him, in the old talking range.)
+    for (const sq of [
+      { c: 5, r: 5 },
+      { c: 4, r: 3 },
+      { c: 1, r: 5 },
+    ]) {
+      const t = tapTarget(lobby, from, sq.c, sq.r);
+      expect(t).toEqual({ kind: "square", dest: sq });
+      expect(inTalkRange(lobby, sq.c, sq.r)).toBe(false);
+    }
   });
 });
 

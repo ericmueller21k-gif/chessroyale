@@ -1,5 +1,5 @@
 /**
- * A shop's room (Nov 2, round 1), pure: which squares you can stand on, the way out, the Shopkeeper's talk range, and where a
+ * A shop's room (Nov 2, round 1), pure: which squares you can stand on, the way out, where you talk to the Shopkeeper, and where a
  * tap sends you. A room is `n` x `n` squares (20), row 0 its back (north) wall and row n - 1 its low front with the way out;
  * the camera looks north. Its pieces come from the art's layout (shops/babur-art.ts, shops/puddles-art.ts: `ShopPlace`s).
  * No DOM; tested in packages/app/test/shop-room.test.ts.
@@ -72,10 +72,11 @@ export interface Room {
   /** A tap on a talk piece walks you to the `talkAt` square nearest it, not the nearest to you (the walk-up's hall: each flat's door its own). */
   talkNear: boolean;
   /**
-   * Where you stand to talk, when it isn't "near the Shopkeeper" (Don Dough, Nov 11: at the foot of his table, facing him across it);
-   * null: within talking range of the Shopkeeper's squares.
+   * Where you stand to talk: the shop's own squares (Don Dough, Nov 11: at the foot of his table, facing him across it; the Battle Tower's
+   * clerk), else the floor right in front of the counter, under the Shopkeeper's columns (`frontOf`, Eric, Nov 21: "you have to actually
+   * be near them").
    */
-  talkAt: readonly Sq[] | null;
+  talkAt: readonly Sq[];
   /** The Shopkeeper's squares, and the counter's (a tap on either means "talk"). */
   keeper: readonly Sq[];
   counter: readonly Sq[];
@@ -144,7 +145,28 @@ export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n 
     inside: squares.flatMap((s) => [{ c: s.c, r: s.r + 1 }, { c: s.c, r: s.r - 1 }]).filter((s) => s.r >= 0 && s.r < n && !blocked[s.r * n + s.c]),
     to,
   }));
-  return { n, blocked, exits, doors, keeper, counter, start, floor, levels, pass: passes[0] ?? null, passes, talkAt, talkNear };
+  return { n, blocked, exits, doors, keeper, counter, start, floor, levels, pass: passes[0] ?? null, passes, talkAt: talkAt ?? frontOf(n, blocked, levels, keeper, counter), talkNear };
+}
+
+/**
+ * Where you talk to a Shopkeeper (Eric, Nov 21: the Battle Tower clerk's feel for every Shopkeeper, "you have to actually be near them"):
+ * under each of its columns, the first floor square south of it, past the counter when the counter is in that column (Hollow's dog has
+ * floor between him and his counter: you stand at its front, not behind it). A keeper beside his counter (Babur's) or with none
+ * (Jefferson's dealer): the square right in front of him. Never up on a catwalk (Ginger's).
+ */
+function frontOf(n: number, blocked: Uint8Array, levels: Levels | null, keeper: readonly Sq[], counter: readonly Sq[]): Sq[] {
+  const out: Sq[] = [];
+  for (const k of keeper) {
+    if (out.some((s) => s.c === k.c)) continue;
+    const below = keeper.filter((s) => s.c === k.c).reduce((a, s) => Math.max(a, s.r), k.r);
+    const desk = counter.filter((s) => s.c === k.c && s.r > below).reduce((a, s) => (a < 0 ? s.r : Math.min(a, s.r)), -1);
+    for (let r = (desk < 0 ? below : desk) + 1; r < n; r++)
+      if (!blocked[r * n + k.c] && !isUp(levels, k.c, r)) {
+        out.push({ c: k.c, r });
+        break;
+      }
+  }
+  return out;
 }
 
 /**
@@ -271,11 +293,8 @@ export const passArrive = (room: Room, from?: RoomPart): Sq | null => {
   if (!ins?.length) return null;
   return [...ins].sort((a, b) => Math.abs(a.c - room.n / 2) - Math.abs(b.c - room.n / 2))[0]!;
 };
-/** How far a square is from the Shopkeeper: the larger of the two directions, to its nearest square. */
-export const talkDist = (room: Room, c: number, r: number): number => Math.min(...room.keeper.map((k) => Math.max(Math.abs(k.c - c), Math.abs(k.r - r))));
-/** Near enough to talk to the Shopkeeper (`SHOP_FEEL.talkRange`): on the floor (not up on a catwalk over him). */
-export const inTalkRange = (room: Room, c: number, r: number, range: number = SHOP_FEEL.talkRange): boolean =>
-  room.talkAt ? has(room.talkAt, c, r) : !isUp(room.levels, c, r) && talkDist(room, c, r) <= range;
+/** On a square you talk to the Shopkeeper from (`Room.talkAt`). */
+export const inTalkRange = (room: Room, c: number, r: number): boolean => has(room.talkAt, c, r);
 
 const DIRS = [
   [1, 0],
@@ -318,6 +337,26 @@ export function stepFor(room: Room, c: number, r: number, dc: number, dr: number
     } else if (dr !== 0 && sc === 0 && sr === Math.sign(dr)) return s;
   }
   return diag;
+}
+
+/**
+ * An arrow key's step from (c, r) in a room with a piece you walk round (Eric, Nov 21: "make it so if you just press like up while you're
+ * on like near your side of the chessboard, it would just make you run around it"; the Battle Tower's floor table). `round`: 1 on that
+ * piece's squares (blocked in `room` too), or null. A step that way onto one of them is the first step of the shortest way to the first
+ * square past it that way (round its nearer side), so a held key runs you round it and on; with nothing past it to stand on, the plain
+ * step (blocked: you stop). Allocates only when it walks you round (a path, once a step).
+ */
+export function stepRound(room: Room, round: Uint8Array | null, c: number, r: number, dc: number, dr: number): Sq | null {
+  const s = stepFor(room, c, r, dc, dr);
+  if (!s || !round || !inRoom(room, s.c, s.r) || !round[s.r * room.n + s.c]) return s;
+  const uc = Math.sign(s.c - c);
+  const ur = Math.sign(s.r - r);
+  for (let tc = s.c + uc, tr = s.r + ur; inRoom(room, tc, tr); tc += uc, tr += ur) {
+    if (round[tr * room.n + tc]) continue;
+    if (!walkable(room, tc, tr)) return s;
+    return findPath(room, { c, r }, { c: tc, r: tr })?.[0] ?? s;
+  }
+  return s;
 }
 
 /** Steps from `from` to every square (-1: can't get there), a square at a time, round what's blocked. */
@@ -378,29 +417,18 @@ function best(room: Room, from: Sq, score: (c: number, r: number) => number | nu
   return out;
 }
 
-/**
- * How well a square suits talking (lower is better; null: out of range): in front of the Shopkeeper, as far as the range
- * reaches (the counter between you, the kid in view), as near its middle column as can be.
- */
-function talkSpot(room: Room, c: number, r: number): number | null {
-  if (!inTalkRange(room, c, r)) return null;
-  // (Fixed talk squares: each as good as another; the nearest wins.)
-  if (room.talkAt) return 0;
-  const k = room.keeper;
-  const mid = k.reduce((a, s) => a + s.c, 0) / k.length;
-  const front = Math.max(...k.map((s) => s.r)) + SHOP_FEEL.talkRange;
-  return Math.abs(c - mid) + 2 * Math.abs(r - front);
-}
+/** How well a square suits talking (null: not a talk square): each talk square as good as another, so the nearest wins. */
+const talkSpot = (room: Room, c: number, r: number): number | null => (inTalkRange(room, c, r) ? 0 : null);
 
 /**
- * What a tap means inside: a square to walk to, the Shopkeeper (walk into talking range), the door (walk to the way out) or the door to
+ * What a tap means inside: a square to walk to, the Shopkeeper (walk to a talk square), the door (walk to the way out) or the door to
  * the other room (walk to just inside it).
  */
 export type RoomTap = { kind: "square" | "keeper" | "door" | "pass"; dest: Sq | null };
 
 /**
- * Where a tap on the square (c, r) sends you from `from`: the Shopkeeper or the counter, into talking range (`talkSpot`: in
- * front of it, the counter between you); the way out or a square just inside it, to the nearest of those; a free square, there; anything else solid, the
+ * Where a tap on the square (c, r) sends you from `from`: the Shopkeeper or the counter, to the nearest talk square
+ * (`Room.talkAt`: in front of the counter); the way out or a square just inside it, to the nearest of those; a free square, there; anything else solid, the
  * nearest free square to it. `dest` null: nowhere to go.
  */
 export function tapTarget(room: Room, from: Sq, c: number, r: number): RoomTap {

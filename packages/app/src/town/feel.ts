@@ -733,11 +733,6 @@ export const SHOP_FEEL = {
    */
   startZoom: 1 as 0 | 1,
   /**
-   * You can talk to the Shopkeeper from this many squares away (either direction, from its nearest square). A tap on it walks
-   * you to the square this far in front of it (the counter between you), as the mockup's "at the counter" view stands.
-   */
-  talkRange: 3,
-  /**
    * A door's picture inside a room (the way out, a door to another room, the Battle Tower's elevator) as a finger finds it (Eric, Nov 20:
    * "you should be able to tap on the door, like no matter where you're standing, and then hit go in"): its box as drawn, grown this many
    * pixels each way, and to `doorMinPx` across and high at least.

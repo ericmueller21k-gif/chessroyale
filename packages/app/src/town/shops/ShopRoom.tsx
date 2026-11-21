@@ -18,7 +18,7 @@
  * on it. No ride (or rideInside false: the ride waits outside, as round 1 had it): on foot.
  *
  * You walk by tapping, as in the town (one square at a time, round what's solid: shops/room.ts); a drag looks around and the focus
- * button brings the camera back. Standing within talking range of the Shopkeeper, its card ("Shopkeeper", Talk) shows; Talk opens
+ * button brings the camera back. Standing in front of the Shopkeeper's counter (room.ts Room.talkAt), its card ("Shopkeeper", Talk) shows; Talk opens
  * the crate's card (its picture, its prizes, the price, what you have, and the two ways to buy, through `buyBossCrate`: round 2, the
  * server's purchase, into your inventory since Nov 2; a way you can't pay is greyed, and the answer shows under them). Standing
  * just inside the way out, a card says "Go out".
@@ -47,7 +47,7 @@ import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { STORE_PANELS, opaqueNear, atDoor, doorGoal, doorOf, type DoorTo, onDoorPic, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, passAt, type RoomPart, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, opaqueNear, atDoor, doorGoal, doorOf, type DoorTo, onDoorPic, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, passAt, type RoomPart, tapTarget, findPath, stepRound, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, gotLine, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CrateOpening } from "../../screens/Crates.tsx";
 import type { BossCrateDef } from "@chessroyale/core";
@@ -138,6 +138,11 @@ export interface RoomArt {
   seeThru?: readonly string[];
   /** The squares its people stand on: nobody walks through them. */
   standing?: readonly Sq[];
+  /**
+   * The squares of a piece of its scene that nobody walks through and a held arrow key walks you round (the Battle Tower's floor table,
+   * Nov 21: room.ts `stepRound`).
+   */
+  round?: readonly Sq[];
   /** A dark wash over the whole room, its lights added over it (Rolling Dough's dim back room: SHOP_FEEL.zebra.dim). */
   dim?: number;
   /** The wash's color, "r,g,b" (none: Rolling Dough's near black; the walk-up at night: a deep blue, at dusk a warm dark: Nov 14). */
@@ -426,6 +431,7 @@ export function loadTowerFloor(floor: number): Promise<LoadedRoom> {
       outside: "#d9dcdf",
       fixCam: m.SHOP_TOWER_FLOOR_CAM,
       seeThru: ["entrance", "hem"],
+      round: m.SHOP_TOWER_FLOOR_TABLE_SQUARES,
     })),
   );
 }
@@ -854,6 +860,9 @@ function startRoom(
   const room: Room = makeRoom(art.layout, def.keeper, art.n ?? 20, art.floor, def.talk, lv, def.talkAt ?? null, !!def.talkNear);
   // (Rolling Dough's people stand on their squares: the guards by the door. Nobody walks through them.)
   for (const q of art.standing ?? []) room.blocked[q.r * room.n + q.c] = 1;
+  // (The Battle Tower's floor table: solid, and a held arrow key walks you round it, Nov 21.)
+  const round = art.round?.length ? new Uint8Array(room.n * room.n) : null;
+  for (const q of art.round ?? []) room.blocked[q.r * room.n + q.c] = round![q.r * room.n + q.c] = 1;
   // (Jefferson's idle crew stand on their squares: nobody walks through them. His machines and the floor pallet block where they are
   // now: crewTakes.)
   if (art.crew) for (const k of ["leaner-a", "leaner-b", "crew-c", "crew-d"] as const) room.blocked[art.crew.places[k].at[1] * room.n + art.crew.places[k].at[0]] = 1;
@@ -908,7 +917,7 @@ function startRoom(
     you,
     (c, r) => walkable(room, c, r) && !(boss && boss.goalC() === c && boss.goalR() === r) && !elfTakes(c, r),
     undefined,
-    (c, r, dc, dr) => stepFor(room, c, r, dc, dr),
+    (c, r, dc, dr) => stepRound(room, round, c, r, dc, dr),
   );
   let keysOn = false;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
