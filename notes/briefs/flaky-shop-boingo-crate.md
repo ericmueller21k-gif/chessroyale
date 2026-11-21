@@ -1,0 +1,2 @@
+# Main flake: shop.spec.ts:1454 (Nov 21). Opus, high. Fix at the cause
+Main's full run on bd31db0 (run 44866742465) red on a retry-only pass (phone): `e2e/shop.spec.ts:1454` "Boingo's Boss Crate bought in his Funhouse: the price line is plain words, a buy pops up 'You got Boingo's Bos…'" — `expect(locator('.shop-opening .crate-opening').locator('.reveal-card')).toBeVisible()` failed. Traces in that run's e2e-report-shard-* artifacts. Product or test? Fix the cause (CLAUDE.md "Fix the cause, not add a checker"); lessons story.

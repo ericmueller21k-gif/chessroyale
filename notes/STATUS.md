@@ -581,6 +581,11 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 21 ~05:00 UTC
+- #863 deployed; main run red on a retry-only flake: shop.spec:1454 (Boingo crate reveal) → brief notes/briefs/flaky-shop-boingo-crate.md, queued.
+- #865 XP king turns: full-e2e + independent review running. #866 pixel hearts: CI running; stills sent to Eric.
+- Queue: Smudgy mask (xhigh alone) after #865's review → audit + room (2 high) → flake fix → banter wiring.
+
 ## Nov 21 ~04:50 UTC
 - MERGED: #863 Saw Swap judge (bd31db0; watcher bf82fo89f), #864 lore + banter data (f8cd957; not wired).
 - RUNNING: XP king turns (xhigh, session_01JuCWRtyA876RKoKgt6NCgo, claude/xp-king-turns; FULL lane: full-e2e + independent review + delta), pixel hearts (Haiku, session_01JuCWRtvcaWjK3dTmuJDz35, claude/tower-pixel-hearts).
