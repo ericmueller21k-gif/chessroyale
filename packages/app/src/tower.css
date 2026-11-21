@@ -868,6 +868,7 @@
 /* ---- Babur's balloons off on this floor (noAdd: a floor of several whose primary is another boss, BATTLE_TOWER.addsPieces; Eric, Nov 20):
    his pump stays in its place, empty, greyed and dimmed, an OFF tag over its foot, never dimmed (its label says why). Positioned: nothing
    moves. ---- */
+.tw-bcard .tg-pump-slot.tg-off > .tg-pump,
 .tw-side-body > .tg-pump-slot.tg-off > .tg-pump {
   opacity: 0.55;
   filter: grayscale(1);
