@@ -422,6 +422,13 @@ export interface BossRules {
     evaluation<E extends JudgedEvaluation>(boss: BossState, evaluation: E, fen: string): E;
   };
   /**
+   * The judge's look past the crowd's move (Sawyer's Saw Swap, Eric, Nov 21): of `allowed` (the crowd's moves this turn, the crowd to
+   * move), those that set off a power as they land, each with the board after it (the boss to move). The judge scores such a move on
+   * that board instead of the one right after it: one search of it, on the device that scores the turn (the lobby sends the boards in
+   * the job, `swap`), its best line read from the crowd's side (swapScores, swapJudged). Without it: none.
+   */
+  judgeAfter?(b: Battle, allowed: readonly string[]): Record<string, string>;
+  /**
    * In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). `judged`: the
    * judge's numbers for it (a scored round's; none for a move a power played for the crowd), which Folio's Revision reads.
    */
