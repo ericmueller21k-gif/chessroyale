@@ -581,6 +581,11 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 21 ~05:25 UTC
+- MERGED: #866 pixel hearts (78afefe), #865 XP king turns (c0fcadd; full lane done: review + late-call fix 6364887 + delta OK). Watcher on c0fcadd deploy + main run.
+- RUNNING: Smudgy mask (xhigh, session_01JuCWRscjWXj2uB8v7c2C1K, claude/smudgy-shared-mask), watcher btfyheg6o.
+- QUEUE: tower-shared-anim-audit + tower-room-arrow-board (2 high, after Smudgy) → flaky shop:1454 → banter wiring. Follow-up nit: a late King STRIKE try on the Hidden Boss still spends a charge (kingTried before callStrike's clock check).
+
 ## Nov 21 ~05:00 UTC
 - #863 deployed; main run red on a retry-only flake: shop.spec:1454 (Boingo crate reveal) → brief notes/briefs/flaky-shop-boingo-crate.md, queued.
 - #865 XP king turns: full-e2e + independent review running. #866 pixel hearts: CI running; stills sent to Eric.
