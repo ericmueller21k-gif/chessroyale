@@ -42,11 +42,11 @@ export const TOWER_FLOOR_FEEL = {
   arrowBlinkMs: 1000,
   arrowLow: 0.3,
   arrowNudge: 0.12,
-  arrowLen: 1,
-  arrowHead: 0.84,
-  arrowHeadLen: 0.5,
-  arrowShaft: 0.32,
-  arrowLift: 0.1,
+  arrowLen: 1.3,
+  arrowHead: 1.1,
+  arrowHeadLen: 0.6,
+  arrowShaft: 0.44,
+  arrowLift: 0.16,
 } as const;
 
 /** The table: on the battle circle's middle. */
@@ -181,7 +181,7 @@ export interface FloorArrow {
   readonly dir: -1 | 1;
 }
 const ARROW_UP: FloorArrow = { to: "top", c: 4.5, r: 1.3, dir: -1 };
-const ARROW_DOWN: FloorArrow = { to: "front", c: 4.5, r: 8.2, dir: 1 };
+const ARROW_DOWN: FloorArrow = { to: "front", c: 4.5, r: 7.8, dir: 1 };
 export const floorArrow = (mode: FloorMode): FloorArrow | null => (mode === "won" ? ARROW_UP : mode === "out" ? ARROW_DOWN : null);
 /** The arrow's blink at `t` ms (from the room's first frame): how opaque it is, and how far (squares) it's nudged toward the door. Into `out`. */
 export function arrowBlink(t: number, still: boolean, out: { a: number; nudge: number }, F = TOWER_FLOOR_FEEL): { a: number; nudge: number } {

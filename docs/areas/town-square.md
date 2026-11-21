@@ -908,8 +908,13 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 ## The Battle Tower (Nov 19; everyone's town)
 
 - **Front** (`houses/tower.ts`, 144 x 592): Colosseum Row 45-48, its sign "BATTLE TOWER"; nobody out front (`hasFigure`); box: slate glass sides, no roof. Card: Go in.
-- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls and your best on the "BEST FLOORS" board, `RoomFx.signBody`): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"), his card `town/TowerDesk.tsx` (ShopRoom `talkCard`); the elevator, a door up (`top`); its picture tapped from anywhere opens its card, Go up runs you to it ("A door tapped from anywhere", above).
-- **Floor room** (PR 11b: `shops/tower-floor-art.ts`, `tower-floor.ts` the flow, `tower-floor-scene.ts`; `loadTowerFloor(n)`): N on its walls; its walk-in held (`RoomFx.hold`, `ShopCtl.walkTo`), the elevator open (`RoomFx.swap`); back from a match on your mark (ShopRoom `at`); the way down to the lobby. battle-tower.md.
+- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls and your best on the "BEST FLOORS" board, `RoomFx.signBody`): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"), his card `town/TowerDesk.tsx` (ShopRoom `talkCard`), shown only standing on the three squares under his counter (`talkAt`, row 4; Nov 21, Eric: "only ... right in front of the clerk, or ... on the penguin guy"), never the 3 squares round him: a tap on him or the counter walks you there; the elevator, a door up (`top`); its picture tapped from anywhere opens its card, Go up runs you to it ("A door tapped from anywhere", above).
+- **Floor room** (PR 11b: `shops/tower-floor-art.ts`, `tower-floor.ts` the flow, `tower-floor-scene.ts`; `loadTowerFloor(n)`): N on its walls; its walk-in held (`RoomFx.hold`, `ShopCtl.walkTo`), the elevator open (`RoomFx.swap`); back from a match on your mark (ShopRoom `at`); the way down to the lobby. **The table is solid** (Nov 21: its four squares, the art's
+  `round`, `SHOP_TOWER_FLOOR_TABLE_SQUARES`): a tap beyond it walks you round; a held arrow key that would step onto it walks you round its
+  nearer side and on (`room.ts stepRound`). **The floor arrow** (Nov 21): after a floor, a blinking gold slab arrow on the floor right in
+  front of the next door, pointing at it: the elevator (won, or a life spent), the way down (the run over); drawn by the scene under every
+  figure (`tower-floor.ts floorArrow`, `arrowBlink`, its sizes in `TOWER_FLOOR_FEEL`; reduced motion: held full). battle-tower.md.
+  [2026-11-21-tower-room-arrow.md](../decisions/2026-11-21-tower-room-arrow.md).
 - e2e `town-street.spec.ts` ("the Battle Tower"), `battle-tower.spec.ts`. [2026-11-19-tower-building.md](../decisions/2026-11-19-tower-building.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md)
 
 ## Chandy's Swamp (Nov 16; an admin's town only, as Chandy is admins first)

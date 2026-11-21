@@ -19,7 +19,7 @@ const STILLS = process.env.STILLS;
 const phase = (page: Page) => page.evaluate(() => (window as any).match?.phase?.kind ?? null);
 const fen = (page: Page) => page.evaluate(() => (window as any).match?.phase?.board?.fen ?? null);
 const moves = (page: Page) => page.evaluate(() => (window as any).match?.boss?.crowdMoves ?? null);
-type Floor = { floor: number; mode: string; bosses: string[]; t: number | null; go: number | null } | null;
+type Floor = { floor: number; mode: string; bosses: string[]; t: number | null; go: number | null; arrow: { to: string; x: number; y: number; a: number } | null } | null;
 const floorNow = (page: Page): Promise<Floor> => page.evaluate(() => (window as any).__towerFloor?.() ?? null);
 const room = (page: Page) => page.locator("canvas.town-shop-canvas");
 
@@ -174,8 +174,39 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   // Back in the floor room, standing there, the elevator open: up to floor 2.
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   expect((await floorNow(page))!.floor).toBe(1);
-  await page.waitForTimeout(800);
+  // (Eric, Nov 21: "a little like 3D blinking arrow ... right on the floor, right in front of the door": in front of the elevator, under
+  // its middle, blinking.)
+  await expect.poll(async () => (await floorNow(page))?.arrow?.to ?? null, { timeout: 10_000 }).toBe("top");
+  const arrow = (await floorNow(page))!.arrow!;
+  // (The elevator's two squares, columns 4 and 5 of the back wall, at their feet: the arrow between them, in front.)
+  const [d4, d5] = (await page.evaluate(() => [[4, 0], [5, 0]].map((sq) => (window as any).__shopAt?.("square", sq) ?? null))) as { x: number; y: number }[];
+  expect(Math.abs(arrow.x - (d4!.x + d5!.x) / 2), "the arrow under the elevator's middle").toBeLessThanOrEqual(3);
+  expect(arrow.y, "the arrow on the floor in front of it").toBeGreaterThan(d4!.y);
+  const blinks = await page.evaluate(
+    () =>
+      new Promise<number[]>((ok) => {
+        const out: number[] = [];
+        const t0 = performance.now();
+        const f = () => (out.push((window as any).__towerFloor?.()?.arrow?.a ?? -1), performance.now() - t0 < 1600 ? requestAnimationFrame(f) : ok(out));
+        requestAnimationFrame(f);
+      }),
+  );
+  expect(Math.min(...blinks), "the arrow dims").toBeLessThan(0.6);
+  expect(Math.max(...blinks), "and comes back").toBeGreaterThan(0.95);
   await still(page, "back-elevator-open");
+  // (Eric, Nov 21: "you can't run through the chessboard ... if you just press like up ... it would just make you run around it": up
+  // held from your mark walks you round the table (columns and rows 4-5) to its far side, never onto it.)
+  await page.evaluate(() => {
+    const cv = document.querySelector("canvas.town-shop-canvas") as HTMLCanvasElement;
+    const seen = ((window as any).__youSeen = [cv.dataset.you]);
+    new MutationObserver(() => seen.push(cv.dataset.you)).observe(cv, { attributes: true, attributeFilter: ["data-you"] });
+  });
+  await page.keyboard.down("ArrowUp");
+  await expect.poll(async () => Number((await room(page).getAttribute("data-you"))?.split(",")[1] ?? 9), { timeout: 15_000 }).toBeLessThanOrEqual(2);
+  await page.keyboard.up("ArrowUp");
+  const walked = (await page.evaluate(() => (window as any).__youSeen)) as string[];
+  expect(walked[0], "from your mark").toBe("4,7");
+  expect(walked.filter((k) => ["4,4", "5,4", "4,5", "5,5"].includes(k)), "never on the table").toEqual([]);
   const lift = await tapRoom(page, "pass", "Elevator", "top");
   await lift.getByRole("button", { name: "Up to floor 2" }).click();
   await floorThenMatch(page, 2, 2);

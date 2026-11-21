@@ -244,12 +244,12 @@ export function towerFloorFx(s: FloorScript): RoomFx {
       arrowPath(g, arrowHi);
       g.fillStyle = P.top;
       g.fill();
-      g.lineWidth = 1;
+      g.lineWidth = Math.max(1, arrowHi[0]!.k * 0.03);
       g.lineJoin = "round";
       g.strokeStyle = P.edge;
       g.stroke();
       arrowPath(g, arrowIn);
-      g.globalAlpha = blink.a * 0.7;
+      g.globalAlpha = blink.a * 0.45;
       g.fillStyle = P.rim;
       g.fill();
       g.restore();
