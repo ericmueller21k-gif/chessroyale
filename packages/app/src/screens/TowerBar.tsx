@@ -1,4 +1,4 @@
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { artOf, bossKit } from "../characters/kits.ts";
 import { SpriteAnim, frameImage } from "../components/BossEffect.tsx";
 import type { Character } from "../characters/sprite.ts";
@@ -7,7 +7,7 @@ import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { MOUSE_LAYOUT } from "../components/MatchMenu.tsx";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
-import { BossLevel } from "./Boss.tsx";
+import { BossLevel, BossNext } from "./Boss.tsx";
 import { BossPortrait } from "../components/BossPortrait.tsx";
 import { portraitName } from "../characters/portraits.ts";
 import { livesOf, towerBoss } from "../tower.ts";
@@ -89,9 +89,6 @@ export function TowerBoardLives({ match }: { match: GameView }) {
   return <TowerHearts lives={livesOf(play.lives)} class="tw-match-lives tw-board-lives" />;
 }
 
-/** The figure box's height in a phone's part (px): the bar's 99 less its name, level and meters lines. */
-const PART_FIGURE_H = 46;
-
 /**
  * A figure's drawn part (sprite px): the union of every frame of the animations it plays in its box (its idle: a bob, a wing's flap),
  * so no frame is ever cut off by the box (Eric, Nov 21: Folio's wing tips "getting cut off a bit at the top ... these boxes weren't built
@@ -154,38 +151,102 @@ function Figure({ boss, scale, since, still }: { boss: BossView; scale: number; 
   );
 }
 
-/** The split bar: one part a boss, in turn order (left to right), the boss to move lit; his words over the bar. */
+/** A phone card's figure box (px, tower.css .tw-card-face): the card's 89 px less its padding, about the lone bar's 58 wide. */
+const CARD_FIGURE_W = 60;
+const CARD_FIGURE_H = 78;
+/** The share of the bar's width the open part takes (Eric, Nov 21: "maybe it's like 75% for the one that's active"); the folded share the rest. */
+export const OPEN_SHARE = 0.75;
+
+/**
+ * The split bar as an accordion (Eric, Nov 21): one part a boss, in turn order (left to right). The open part, the boss to move unless
+ * another was tapped open, takes OPEN_SHARE of the bar's width; the folded ones share the rest. Each part is a window (overflow hidden)
+ * onto his card, a lone boss bar laid out once at the open part's width: folded, the window shows the card's left side (his figure,
+ * maybe cut off); opening it reveals more of the same card, never a relayout. The windows slide on a turn change (tower.css, 300 ms;
+ * instant with reduced motion). A tapped part stays open until the turn changes or it's tapped again. The bar's height never changes.
+ * A folded boss's words are drawn over the bar beside his window (tw-say), never cut by it. Eric's named exception to "nothing shifts"
+ * (docs/rules/eric.md): this bar's parts slide; the bar and everything around it keep their size and place.
+ */
 export function TowerBar({ boss, match, caster = null }: { boss: BossView; match: GameView; caster?: string | null }) {
   const side = sideOf(boss)!;
   const computer = useMedia("(min-width: 900px) and (pointer: fine)");
   const still = useMedia("(prefers-reduced-motion: reduce)");
   const [since] = useState(() => Date.now());
   const n = side.bosses.length;
-  // (A phone's bar is 400 px at 428: n parts, 4 px gaps, each with 4 px of padding and a 3 px outline either side.)
-  const scale = useMemo(() => sharedScale(side.bosses.map((b) => b.name), (400 - 8 - 4 * (n - 1)) / n - 14, PART_FIGURE_H), [side.bosses.map((b) => b.name).join(","), n]);
+  const scale = useMemo(() => sharedScale(side.bosses.map((b) => b.name), CARD_FIGURE_W, CARD_FIGURE_H), [side.bosses.map((b) => b.name).join(",")]);
   const until = match.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
+  // (A tapped-open part, until the turn changes: the boss to move's again.)
+  const [tapped, setTapped] = useState<{ i: number; toMove: number } | null>(null);
+  // (Forgotten on every turn change, so a full round of turns back to the same boss doesn't bring it back (quick review, Nov 21);
+  // the toMove check below covers the render before this runs. A floor of a different size forgets it too.)
+  useEffect(() => setTapped(null), [side.toMove, n]);
+  const open = tapped && tapped.toMove === side.toMove && tapped.i < n ? tapped.i : side.toMove;
+  // (A folded part tapped opens; the open one tapped again, or the boss to move, folds it back to the boss to move.)
+  const tap = (i: number, back: boolean) => setTapped(back ? null : { i, toMove: side.toMove });
+  // (A folded part's flex-grow 1, the open one's 3(n - 1): it takes OPEN_SHARE of the room the gaps and outlines leave.)
+  const grow = (OPEN_SHARE / (1 - OPEN_SHARE)) * (n - 1);
   return (
-    <div class={`boss-bar tw-bar tw-bar-${n}`} role="status" aria-label={`${side.bosses.map((b) => b.name).join(", ")}; ${side.bosses[side.toMove]?.name ?? ""} to move`}>
+    <div class={`boss-bar tw-bar tw-bar-${n}`} style={{ "--tw-n": n, "--tw-open": OPEN_SHARE }} role="status" aria-label={`${side.bosses.map((b) => b.name).join(", ")}; ${side.bosses[side.toMove]?.name ?? ""} to move`}>
       {side.bosses.map((b, i) => {
         const on = i === side.toMove;
+        const isOpen = i === open;
         return (
-          <span class={`tw-part${on ? " tw-to-move" : ""}${b.id === caster ? " tw-casting" : ""}`} key={`${i}-${b.id}`} data-boss={b.id}>
+          <span
+            class={`tw-part${on ? " tw-to-move" : ""}${isOpen ? " tw-part-open" : ""}${b.id === caster ? " tw-casting" : ""}`}
+            key={`${i}-${b.id}`}
+            data-boss={b.id}
+            style={{ flexGrow: isOpen ? grow : 1 }}
+            role="button"
+            tabIndex={0}
+            aria-expanded={isOpen}
+            aria-label={`${b.name}${on ? ", to move" : ""}`}
+            onClick={() => tap(i, isOpen || on)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              tap(i, isOpen || on);
+            }}
+          >
             {on && <span class="tw-tag">TO MOVE</span>}
-            {/* (His prop where it fits a part, a phone's: Babur's pump, BossUi.towerProp; Eric, Nov 20: his balloons weren't to be seen. A
-                computer's stands beside his figure by the board: TowerSide. One pump on the page, never two.) */}
-            {!computer && <BossBarExtra boss={b} until={until} part="towerProp" />}
-            {/* (His words from his own part of the bar: the boss who says them, the one who cast a moment, else the boss to move.) */}
-            {!computer && <VoiceBubble voice={bossVoice} class="bc-bubble tw-bubble" balanced mine={(k) => speakerOf(side, k) === i} />}
-            <span class="tw-part-face" aria-hidden="true">
-              {computer ? <BossFace boss={b} label="" live /> : <Figure boss={b} scale={scale} since={since} still={still} />}
-            </span>
-            <span class="tw-part-text">
-              <strong class="tw-part-name">{b.name}</strong>
-              <span class="tw-part-meters">
-                <BossLevel boss={b} />
-                <RageMeter boss={b} />
-                <BossBarExtra boss={b} until={until} part="ult" />
-                <BossBarExtra boss={b} until={until} />
+            {/* (A folded boss's words, a phone's (Eric, Nov 21): over the bar beside his window, never inside it (the window would cut
+                them), toward the open part; his part doesn't open for the line. The room is a card wide, so the bubble fits as a lone bar's.) */}
+            {!computer && !isOpen && (
+              <span class={`tw-say ${i < open ? "tw-say-right" : "tw-say-left"}`}>
+                <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced mine={(k) => speakerOf(side, k) === i} />
+              </span>
+            )}
+            <span class="tw-window">
+              {/* (His card: the lone bar's own markup and styles (Boss.tsx BossBar), at the open part's width, always.) */}
+              <span class="boss-bar has-char tw-bcard" aria-hidden={!isOpen}>
+                {computer ? (
+                  <span class="boss-icon" aria-hidden="true">
+                    <BossFace boss={b} live />
+                  </span>
+                ) : (
+                  <span class="tw-card-face" aria-hidden="true">
+                    <Figure boss={b} scale={scale} since={since} still={still} />
+                  </span>
+                )}
+                <span class="boss-main">
+                  <span class="boss-name">
+                    <strong>{b.name}</strong>
+                    <BossLevel boss={b} />
+                    <span class="boss-ult">
+                      <RageMeter boss={b} />
+                      <BossBarExtra boss={b} until={until} part="ult" />
+                    </span>
+                    <span class="boss-passive">
+                      <BossBarExtra boss={b} until={until} />
+                    </span>
+                  </span>
+                  <BossNext boss={b} match={match} />
+                  {/* (His prop where a lone bar has it. A computer's Babur pump stands beside his figure by the board: TowerSide; one pump on the page.) */}
+                  <span class="boss-prop">
+                    <BossBarExtra boss={b} until={until} part={computer ? "cardProp" : "prop"} />
+                  </span>
+                  {/* (His words, a phone's, where a lone bar has them while his part is open: the boss who says them, the one who cast a
+                      moment, else the boss to move. Folded, they're drawn beside his window: tw-say, above.) */}
+                  {!computer && isOpen && <VoiceBubble voice={bossVoice} class="bc-bubble bc-bar-bubble" balanced mine={(k) => speakerOf(side, k) === i} />}
+                </span>
               </span>
             </span>
           </span>

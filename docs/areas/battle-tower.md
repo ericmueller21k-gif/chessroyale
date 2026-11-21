@@ -178,9 +178,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 - **Eric's playtest fixes (Nov 20):** Wrangler has no ultimate on a floor of several (`BATTLE_TOWER.noUltimate: ["pig"]`: the runner marks
   his powers `noUlt` as a shared floor starts; his meter stays on the bar empty and dimmed, aria "Rage: no ultimate in the Battle Tower");
   alone on a floor he keeps it, once, as in every mode (`showdownMax` 1, Eric: "if wrangler is solo in battle tower he fires his ult off
-  still ... make sure in all modes for him he can only ult once a game then it turns gray"). Babur's pump on a shared floor (`BossUi.towerProp`): a phone's in his part of the split bar (1.25x, at its left),
-  a computer's beside his figure by the board (`TowerSide`, 2x); one pump on the page. The other bosses' bar props are still not drawn on
-  a shared floor. Sawyer's cut and gap over the square highlights on every screen (bosses.md). Checks: `several-bosses.test.ts` (every
+  still ... make sure in all modes for him he can only ult once a game then it turns gray"). Babur's pump on a shared floor (`BossUi.towerProp`): a phone's in his card of the split bar (where a lone bar has it,
+  Nov 21's accordion, below), a computer's beside his figure by the board (`TowerSide`, 2x); one pump on the page. Sawyer's cut and gap over the square highlights on every screen (bosses.md). Checks: `several-bosses.test.ts` (every
   `noUltimate` boss on a floor of two; Wrangler's one showdown on a lone floor and off the tower) and `e2e/battle-tower.spec.ts` ("a shared floor of Babur and Wrangler").
   [2026-11-20-tower-fixes.md](../decisions/2026-11-20-tower-fixes.md).
 - **Shared floors' moments audited (Eric, Nov 21):** every boss's powers and ultimate and the God King's move and strike on floors of
@@ -191,8 +190,18 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   every boss's figure (`SideFigures`), every boss's board layer and the hearts. Nobody is dimmed: the yellow outline and TO MOVE mark the
   boss to move. A figure's box is the union of every frame of his idle (`drawnBox`), never clipping. On a computer the strip line counts in
   the board's room (`board-size.css`, `--bd-room` 151 px), so nothing scrolls at any window. Checks: `e2e/battle-tower.spec.ts` ("a shared
-  floor's moments"), `test/tower-side.test.ts` (every boss's box). Left: every boss's bar prop on a shared floor (mockup first), and a
-  computer's cast animation in place on the side figure.
+  floor's moments"), `test/tower-side.test.ts` (every boss's box). Left: a computer's cast animation in place on the side figure.
+- **The split bar as an accordion (Eric, Nov 21:** "maybe it's like 75% for the one that's active ... if you want to see what that boss
+  is ... you just tap on theirs and then it expands their container"): `TowerBar.tsx`, `tower.css`. Each boss's card is the lone bar's own
+  markup (figure or portrait, name, LVL, meters, the status, his bar prop: Jefferson's candles, Hollow's bulbs, Timber's workshop, Dash's
+  tally, Don Dough's timers, Babur's pump), laid out once at the open width; each part (`.tw-part`) is a window (`.tw-window`, overflow
+  hidden) onto its card's left side. The open part (`.tw-part-open`, `aria-expanded`: the boss to move, or one tapped open until the turn
+  changes or it's tapped again) takes `OPEN_SHARE` (75%) of the room inside the outlines, the folded ones the rest; the windows slide
+  300 ms (flex-grow; reduced motion: instant). A folded boss's words (a phone's) are drawn over the bar beside his window, toward the open
+  part (`.tw-say`), never cut by it; his part doesn't open for them. The bar keeps main's height (95 px a phone, 61 px a computer), so the
+  board never moves; a lone bar's height differs (99 px a phone, about 49 a computer), so a lone floor's board sits 4 px lower on a phone
+  and 12 px higher on a computer, as on main (its size and its gap under the bar the same). Eric's named exception to "nothing shifts": this bar's parts. Checks: `e2e/battle-tower.spec.ts` ("the split
+  bar as an accordion"; `@perf` "the split bar's slide on a slow phone"). [2026-11-21-tower-accordion-bar.md](../decisions/2026-11-21-tower-accordion-bar.md).
 - **One primary for the powers that add pieces (Eric, Nov 20: "Only one is active during the battle tower").** `BATTLE_TOWER.addsPieces`:
   Babur's balloons, Puddles' grown pieces, Timber's workshop drops, Don Dough's rising dough, Sawyer's split pawn. On a floor of several,
   only the first of them in turn order keeps it; the runner marks the others' powers `noAdd` as the floor starts (`towerNoAdd`, beside
