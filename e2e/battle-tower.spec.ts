@@ -668,6 +668,9 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
   // (The board's size and its gap under the boss bar: a lone bar is a little taller than the split bar (main's: 99 px against 95 on a
   // phone), so a floor of several draws the board that much higher; its size and its place under the bar are the lone floor's.)
   const underBar = async () => {
+    // (Both on screen first: right after a match starts the bar can be between renders, its box not yet there.)
+    await expect(page.locator(".boss-bar").first()).toBeVisible();
+    await expect(page.locator(".board-wrap").first()).toBeVisible();
     const b = (await page.locator(".board-wrap").first().boundingBox())!;
     const bar = (await page.locator(".boss-bar").first().boundingBox())!;
     return { x: Math.round(b.x), w: Math.round(b.width), h: Math.round(b.height), gap: Math.round(b.y - (bar.y + bar.height)) };

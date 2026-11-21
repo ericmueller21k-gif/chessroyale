@@ -1,4 +1,4 @@
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { artOf, bossKit } from "../characters/kits.ts";
 import { SpriteAnim, frameImage } from "../components/BossEffect.tsx";
 import type { Character } from "../characters/sprite.ts";
@@ -176,7 +176,10 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
   const until = match.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
   // (A tapped-open part, until the turn changes: the boss to move's again.)
   const [tapped, setTapped] = useState<{ i: number; toMove: number } | null>(null);
-  const open = tapped && tapped.toMove === side.toMove ? tapped.i : side.toMove;
+  // (Forgotten on every turn change, so a full round of turns back to the same boss doesn't bring it back (quick review, Nov 21);
+  // the toMove check below covers the render before this runs. A floor of a different size forgets it too.)
+  useEffect(() => setTapped(null), [side.toMove, n]);
+  const open = tapped && tapped.toMove === side.toMove && tapped.i < n ? tapped.i : side.toMove;
   // (A folded part tapped opens; the open one tapped again, or the boss to move, folds it back to the boss to move.)
   const tap = (i: number, back: boolean) => setTapped(back ? null : { i, toMove: side.toMove });
   // (A folded part's flex-grow 1, the open one's 3(n - 1): it takes OPEN_SHARE of the room the gaps and outlines leave.)

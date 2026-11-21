@@ -14,6 +14,10 @@ removed (old → new) and says whether any of them guards a rule here.
   until it applies. Tapping a mode, a tab, an ⓘ or an info bar doesn't move the things around it. It's the default, not a
   sweep: screens already built a little differently aren't changed for it, but every new change is checked against it.
   Where a case seems to call for the opposite, ask Eric; he names the exceptions.
+  - Named exception (Eric, Nov 21): the Battle Tower's split bar on a floor of several bosses is an accordion. The boss to move's
+    card is wide and the others fold to a slice; the slices slide on each turn, and a tap opens one ("that way we can show
+    everything we need"). The bar itself and everything around it keep their size and place.
+    [2026-11-21-tower-accordion-bar.md](../decisions/2026-11-21-tower-accordion-bar.md).
   - Eric, Oct 18: "nothing should actually be forced moving around… those things need to be static."
   - Eric, Oct 25: "if we start making it where you have to press other things to make other options appear, it's just going
     to get sloppy over time… containers should never be getting shifted and… buttons hidden behind pressing other things."
