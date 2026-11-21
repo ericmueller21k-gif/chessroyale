@@ -9,7 +9,6 @@ import { STORE_PANELS, ceilingPanel, findPath, inTalkRange, makeRoom, onDoor, st
 import { POOL_LINE, buyBossCrate, canAfford, gotLine, inInventoryLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
 import { bossCrateOf } from "@chessroyale/core";
 import { ALL_HOMES } from "../src/town/world.ts";
-import { SHOP_FEEL } from "../src/town/feel.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; shops/room.ts): which squares you can stand on, the way out, the Shopkeeper's talking range and
@@ -150,7 +149,7 @@ describe("the rooms' own pieces", () => {
     for (const [c, r] of [[15, 5], [18, 5], [14, 4], [14, 3]] as const) expect(at(c, r), `by the showpiece ${c},${r}`).toBe(true);
     // Rivet behind the middle of the workbench, as Blocky and Woolly stand.
     expect(SHOPS.timber!.keeper).toEqual([{ c: 9, r: 2 }, { c: 10, r: 2 }]);
-    expect(tapTarget(timber, timber.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
+    expect(tapTarget(timber, timber.start, 9, 2).dest).toEqual({ c: 10, r: 4 });
   });
 
   it("Dash's: the counter, the halfpipe (4 x 2), the Cheetah Chug, the racks, benches, cases and boxes are solid; the battle circle, its marks and the running lane to the counter are walkable", () => {
@@ -171,7 +170,7 @@ describe("the rooms' own pieces", () => {
     // of the shoe boxes; the crate on its east end.
     expect(SHOPS.dash!.keeper).toEqual([{ c: 9, r: 2 }, { c: 10, r: 2 }]);
     expect(SHOPS.dash!.at).toEqual([9, 1.5]);
-    expect(tapTarget(dash, dash.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
+    expect(tapTarget(dash, dash.start, 9, 2).dest).toEqual({ c: 10, r: 4 });
     expect(SHOP_BLITZ_CRATE_AT).toEqual([124, 16]);
   });
 
@@ -195,23 +194,19 @@ describe("the rooms' own pieces", () => {
       }
   });
 
-  it("talking range: three squares either way from the Shopkeeper's squares (SHOP_FEEL.talkRange)", () => {
-    expect(SHOP_FEEL.talkRange).toBe(3);
-    // Stripes beside the counter's east end (12, 2 and 13, 2); Drizzle behind its middle (9, 2 and 10, 2).
-    expect(inTalkRange(babur, 12, 5)).toBe(true);
-    expect(inTalkRange(babur, 16, 5)).toBe(true);
-    expect(inTalkRange(babur, 9, 4)).toBe(true);
-    expect(inTalkRange(babur, 12, 6)).toBe(false);
-    expect(inTalkRange(babur, 8, 4)).toBe(false);
-    expect(inTalkRange(puddles, 6, 4)).toBe(true);
-    expect(inTalkRange(puddles, 13, 5)).toBe(true);
-    expect(inTalkRange(puddles, 9, 6)).toBe(false);
-    expect(inTalkRange(puddles, 5, 4)).toBe(false);
+  it("talk squares (Eric, Nov 21: \"you have to actually be near them\"): right in front of the Shopkeeper, under his columns", () => {
+    // Stripes beside the counter's east end (12, 2 and 13, 2): the two squares right in front of him; Drizzle behind its middle (9, 2
+    // and 10, 2): the counter's front under him. Nowhere else (the old 3-square range is gone): shop-talk-front.test.ts.
+    expect(babur.talkAt).toEqual([{ c: 12, r: 3 }, { c: 13, r: 3 }]);
+    expect(inTalkRange(babur, 12, 3)).toBe(true);
+    for (const [c, r] of [[12, 4], [12, 5], [16, 5], [9, 4], [11, 3]] as const) expect(inTalkRange(babur, c, r), `${c},${r}`).toBe(false);
+    expect(puddles.talkAt).toEqual([{ c: 9, r: 4 }, { c: 10, r: 4 }]);
+    for (const [c, r] of [[6, 4], [13, 5], [10, 5], [8, 4], [9, 1]] as const) expect(inTalkRange(puddles, c, r), `${c},${r}`).toBe(false);
   });
 
-  it("a tap on the Shopkeeper walks you in front of it, the counter between you, as far as talking reaches", () => {
-    expect(tapTarget(babur, babur.start, 12, 2).dest).toEqual({ c: 12, r: 5 });
-    expect(tapTarget(puddles, puddles.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
+  it("a tap on the Shopkeeper walks you to the nearest of his talk squares", () => {
+    expect(tapTarget(babur, babur.start, 12, 2).dest).toEqual({ c: 12, r: 3 });
+    expect(tapTarget(puddles, puddles.start, 9, 2).dest).toEqual({ c: 10, r: 4 });
   });
 });
 

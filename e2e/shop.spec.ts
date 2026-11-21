@@ -162,9 +162,9 @@ test("Babur's tent: Go in, start zoomed out, talk to the Shopkeeper, the crate's
   await page.getByRole("button", { name: "Zoom out" }).click();
   await expect.poll(async () => (await shopCam(page))!.zoom).toBe(1);
 
-  // The Shopkeeper (Stripes, beside the counter): a tap walks you up in front of it; its card; Talk opens the crate's.
+  // The Shopkeeper (Stripes, beside the counter): a tap walks you right in front of him (12, 3); its card; Talk opens the crate's.
   await talk(page);
-  await expect(room(page)).toHaveAttribute("data-you", "12,5");
+  await expect(room(page)).toHaveAttribute("data-you", "12,3");
   const crate = page.getByRole("dialog", { name: "Babur's Boss Crate", exact: true });
   await expect(crate).toBeVisible();
   await expect(crate.getByRole("heading", { name: "Babur's Boss Crate" })).toBeVisible();
@@ -539,10 +539,9 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   await still("bend");
   await walkTo([7, 6]);
   // The dog behind the counter: a tap on him walks you in front of it, the counter between you; his card says "Shopkeeper".
-  // (Aimed once you've stopped on (7, 6) and the view rests on you. There you're within talking range and his card opens by itself:
-  // closed first, or the tap would only close it. Nov 5: docs/decisions/2026-11-05-ginger-steps.md.)
+  // (Aimed once you've stopped on (7, 6) and the view rests on you. Two squares from him his card stays shut: you talk from the
+  // counter's front only, Nov 21: docs/decisions/2026-11-21-shopkeepers-talk-in-front.md.)
   await viewOnYou(page);
-  if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect.poll(() => shopAt(page, "keeper"), { message: "the dog is drawn round the bend" }).not.toBeNull();
   const at = (await shopAt(page, "keeper"))!;
@@ -609,7 +608,7 @@ test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: t
   const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
   await expect(card).toBeVisible({ timeout: 15_000 });
   await expect(card.getByRole("heading", { name: "Shopkeeper", exact: true })).toBeVisible();
-  await expect(room(page)).toHaveAttribute("data-you", /^(9|10),(4|5)$/);
+  await expect(room(page)).toHaveAttribute("data-you", /^(9|10),4$/);
   await still("counter");
   await card.getByRole("button", { name: "Talk" }).click();
   const crate = page.getByRole("dialog", { name: "Wrangler's Boss Crate", exact: true });
@@ -667,7 +666,7 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
   await expect(card).toBeVisible({ timeout: 20_000 });
   await expect(card.getByRole("heading")).toHaveText(["Shopkeeper"]);
-  await expect(room(page)).toHaveAttribute("data-you", /^(9|10),(4|5)$/);
+  await expect(room(page)).toHaveAttribute("data-you", /^(9|10),4$/);
   await still("counter");
   await card.getByRole("button", { name: "Talk" }).click();
   const crate = page.getByRole("dialog", { name: "Folio's Boss Crate", exact: true });
@@ -791,7 +790,7 @@ test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his wa
   const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
   await expect(card).toBeVisible({ timeout: 20_000 });
   await expect(card.getByRole("heading", { name: "Shopkeeper", exact: true })).toBeVisible();
-  await expect(room(page)).toHaveAttribute("data-you", /^(16|17),6$/);
+  await expect(room(page)).toHaveAttribute("data-you", /^(16|17),4$/);
   await still("dealer");
   await card.getByRole("button", { name: "Talk" }).click();
   const crate = page.getByRole("dialog", { name: "Jefferson's Boss Crate", exact: true });
@@ -883,7 +882,7 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
 
   const tapTo = async (sq: readonly [number, number]) => {
     await viewOnYou(page);
-    // (Within talking range of the shopkeeper his card is open: closed first, or the tap would close it.)
+    // (On the shopkeeper's talk square his card is open: closed first, or the tap would close it.)
     if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
     await expect.poll(() => shopAt(page, "square", sq), { message: `(${sq}) is on screen` }).not.toBeNull();
     const xy = (await shopAt(page, "square", sq))!;
@@ -1220,7 +1219,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
     requestAnimationFrame(tick);
   });
   await talk(page);
-  await expect(room(page)).toHaveAttribute("data-you", "12,5");
+  await expect(room(page)).toHaveAttribute("data-you", "12,3");
   await expect.poll(async () => (await ride())?.anim).toBe("idle");
   const seen = await page.evaluate(() => [...(window as unknown as { __seen: Set<string> }).__seen]);
   const moves = seen.filter((k) => k.startsWith("move:"));

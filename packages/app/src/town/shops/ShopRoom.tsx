@@ -18,7 +18,7 @@
  * on it. No ride (or rideInside false: the ride waits outside, as round 1 had it): on foot.
  *
  * You walk by tapping, as in the town (one square at a time, round what's solid: shops/room.ts); a drag looks around and the focus
- * button brings the camera back. Standing within talking range of the Shopkeeper, its card ("Shopkeeper", Talk) shows; Talk opens
+ * button brings the camera back. Standing in front of the Shopkeeper's counter (room.ts Room.talkAt), its card ("Shopkeeper", Talk) shows; Talk opens
  * the crate's card (its picture, its prizes, the price, what you have, and the two ways to buy, through `buyBossCrate`: round 2, the
  * server's purchase, into your inventory since Nov 2; a way you can't pay is greyed, and the answer shows under them). Standing
  * just inside the way out, a card says "Go out".

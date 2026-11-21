@@ -773,9 +773,15 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   its move a cycle a step, its side, back (up the room) or front (down it) the way you go, at its pace (`RIDES.speed`). You come out still
   on it. false: it waits outside and you walk in on foot, as round 1 had it. No ride: on foot.
 - **The Shopkeeper**: the boss's kid's sheet (Stripes for Babur, beside the counter's east end: behind it the 58 px counter hides him;
-  Drizzle for Puddles, behind the middle of the low counter), its idle playing, a blue "Shopkeeper" tag. Standing still within
-  `talkRange` (3) squares of it, its card shows (**"Shopkeeper"**, **Talk**); a tap on it or the counter walks you in front of it, the
-  counter between you. A card you close stays closed until you move on.
+  Drizzle for Puddles, behind the middle of the low counter), its idle playing, a blue "Shopkeeper" tag. Standing still on a
+  square right in front of its counter, its card shows (**"Shopkeeper"**, **Talk**); a tap on it or the counter walks you to the nearest
+  of those squares. A card you close stays closed until you move on. **Talk squares** (Nov 21, Eric: "I do want it to be the same for
+  the other clerks. Like, you have to actually be near them"): `Room.talkAt`, a shop's own (`talkAt` in shops.ts: Don Dough's table
+  foot, the walk-up's doors, the Battle Tower clerk's counter front), else `room.ts frontOf`: under each of the keeper's columns, the
+  first floor square south of the counter (or of the keeper, when no counter is in that column: Babur's, Jefferson's, Chandy's stand);
+  never a catwalk square. No more talking range (`SHOP_FEEL.talkRange` is gone). Every shop's squares are checked walkable and
+  reachable from the door: `packages/app/test/shop-talk-front.test.ts`.
+  [2026-11-21-shopkeepers-talk-in-front.md](../decisions/2026-11-21-shopkeepers-talk-in-front.md).
 - **A panel stands in the middle of the room** (Nov 20, Eric: "the whole box itself should be centered"): the crate's card and a
   keeper's panel (the Battle Tower's clerk: `.town-mid`, ShopRoom.tsx `cardMid`) stand centered in the room with no tail; on a phone,
   where one reaches over the walking keys' column, in the middle of the room above them (`cardFloor`). The small cards stay over their
@@ -908,7 +914,7 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 ## The Battle Tower (Nov 19; everyone's town)
 
 - **Front** (`houses/tower.ts`, 144 x 592): Colosseum Row 45-48, its sign "BATTLE TOWER"; nobody out front (`hasFigure`); box: slate glass sides, no roof. Card: Go in.
-- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls and your best on the "BEST FLOORS" board, `RoomFx.signBody`): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"), his card `town/TowerDesk.tsx` (ShopRoom `talkCard`), shown only standing on the three squares under his counter (`talkAt`, row 4; Nov 21, Eric: "only ... right in front of the clerk, or ... on the penguin guy"), never the 3 squares round him: a tap on him or the counter walks you there; the elevator, a door up (`top`); its picture tapped from anywhere opens its card, Go up runs you to it ("A door tapped from anywhere", above).
+- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls and your best on the "BEST FLOORS" board, `RoomFx.signBody`): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"), his card `town/TowerDesk.tsx` (ShopRoom `talkCard`), shown only standing on the three squares under his counter (`talkAt`, row 4; Nov 21, Eric: "only ... right in front of the clerk, or ... on the penguin guy"), as every Shopkeeper's (theirs under their own columns: "Talk squares", above): a tap on him or the counter walks you there; the elevator, a door up (`top`); its picture tapped from anywhere opens its card, Go up runs you to it ("A door tapped from anywhere", above).
 - **Floor room** (PR 11b: `shops/tower-floor-art.ts`, `tower-floor.ts` the flow, `tower-floor-scene.ts`; `loadTowerFloor(n)`): N on its walls; its walk-in held (`RoomFx.hold`, `ShopCtl.walkTo`), the elevator open (`RoomFx.swap`); back from a match on your mark (ShopRoom `at`); the way down to the lobby. **The table is solid** (Nov 21: its four squares, the art's
   `round`, `SHOP_TOWER_FLOOR_TABLE_SQUARES`): a tap beyond it walks you round; a held arrow key that would step onto it walks you round its
   nearer side and on (`room.ts stepRound`). **The floor arrow** (Nov 21): after a floor, a blinking gold slab arrow on the floor right in
@@ -1379,7 +1385,7 @@ noted wherever a slice changed one.
   crates bought go into the inventory and are opened there with the usual strip. Nov 2: the home card's "Go in" alone; the chat's tone
   in each room (Babur's by day outside, Puddles' by night); a drag inside follows the finger as the town's, a finger and a mouse. Unit:
   `packages/app/test/shop-room.test.ts` (both rooms' walls, counter, pieces and pond solid, the way out, every free square reachable,
-  the talking range and where a tap on the Shopkeeper sends you; the crates' words; a way's button needing its price; the buy going
+  the talk squares and where a tap on the Shopkeeper sends you; the crates' words; a way's button needing its price; the buy going
   to the server).
 - **The street town's specs run on WebGL** (Nov 6; town-street, town-rows, town-fixed, town-controls, once each): their pixel reads
   work because a WebGL canvas's `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`).
