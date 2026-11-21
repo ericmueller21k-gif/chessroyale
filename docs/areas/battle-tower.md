@@ -199,8 +199,8 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   changes or it's tapped again) takes `OPEN_SHARE` (75%) of the room inside the outlines, the folded ones the rest; the windows slide
   300 ms (flex-grow; reduced motion: instant). A folded boss's words (a phone's) are drawn over the bar beside his window, toward the open
   part (`.tw-say`), never cut by it; his part doesn't open for them. The bar keeps main's height (95 px a phone, 61 px a computer), so the
-  board never moves; a lone bar is a little taller (99 px a phone), so a lone floor's board sits that much lower (its size and its gap
-  under the bar the same). Eric's named exception to "nothing shifts": this bar's parts. Checks: `e2e/battle-tower.spec.ts` ("the split
+  board never moves; a lone bar's height differs (99 px a phone, about 49 a computer), so a lone floor's board sits 4 px lower on a phone
+  and 12 px higher on a computer, as on main (its size and its gap under the bar the same). Eric's named exception to "nothing shifts": this bar's parts. Checks: `e2e/battle-tower.spec.ts` ("the split
   bar as an accordion"; `@perf` "the split bar's slide on a slow phone"). [2026-11-21-tower-accordion-bar.md](../decisions/2026-11-21-tower-accordion-bar.md).
 - **One primary for the powers that add pieces (Eric, Nov 20: "Only one is active during the battle tower").** `BATTLE_TOWER.addsPieces`:
   Babur's balloons, Puddles' grown pieces, Timber's workshop drops, Don Dough's rising dough, Sawyer's split pawn. On a floor of several,

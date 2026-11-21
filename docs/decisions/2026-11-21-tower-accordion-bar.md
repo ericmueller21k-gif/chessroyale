@@ -9,5 +9,5 @@
 - **Eric's named exception to "nothing shifts"** (docs/rules/eric.md): this bar's parts slide. The bar keeps main's height, so the board and
   everything else keep their size and place.
 - **Calls made:** TO MOVE rides the top outline (centered on a folded window); a phone's card has its name and status a size smaller and its
-  prop at 82%; a lone floor's board sits 4 px lower on a phone and 12 px on a computer than a shared floor's (a lone bar is taller: as on
-  main), not changed here: the check holds the board's size and its gap under the bar.
+  prop at 82%; a lone floor's board sits 4 px lower on a phone and 12 px higher on a computer than a shared floor's (the bars' heights
+  differ, as on main): not changed here; the check holds the board's size and its gap under the bar.
