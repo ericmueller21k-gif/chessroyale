@@ -581,6 +581,10 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 21 ~04:40 UTC
+- #863 Saw Swap judge: review fixes in (one device's look never trusted alone; old app abstains; re-check on final numbers, never swap moves; online hints/eval agree; bots can pick a swap move). Delta re-review OK. Follow-up nits (not blocking): (1) with `deepOnDevices` ON + engine server, an older app beside a newer one can get the honest newer app struck at the device re-check stage (lobby.ts tryDeep ~4034 / serverScored blame ~4183; judge.ts deepTargets ~186): skip re-check blame when the two re-check boards differ on `!!swapped`; (2) the Crowd's early bot-plan check accepts plain or look picks (display only).
+- Queue after #863 merges: Smudgy mask (xhigh, alone) → then tower-shared-anim-audit (the stacked list, notes/briefs/tower-shared-anim-audit.md) + tower-room-arrow-board, side by side.
+
 ## Nov 21 ~03:40 UTC
 - iPhone home-screen blur: still there after #849 (Eric's screenshot: the first ~20-25 pt under the status bar frosted, e.g. "Auto chess" title; Chess Town looks fine). Eric: NO code fix ("We'll just deal with the blur ... They'll probably patch this at some point"); just a note for iPhone users. The ios-top-guard helper was stopped and archived (branch claude/ios-top-guard, unmerged; don't use). Known iOS 26 Liquid Glass scroll-edge blur on Home Screen web apps (GitHub issues/PRs across many projects; WebKit 301994/317153 are related status-bar regressions, not the blur itself).
 - Asked Eric where the player-facing note goes (Settings' THE APP line for iPhone, or the FAQ).
