@@ -5,6 +5,7 @@ import type { Character } from "../characters/sprite.ts";
 import { BossBarExtra, RageMeter } from "../components/BossPowers.tsx";
 import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
+import { MOUSE_LAYOUT } from "../components/MatchMenu.tsx";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
 import { BossLevel } from "./Boss.tsx";
 import { BossPortrait } from "../components/BossPortrait.tsx";
@@ -54,9 +55,8 @@ export function speakerOf(side: { bosses: readonly { id?: string }[]; toMove: nu
 }
 
 /**
- * The run's strip (Eric, Nov 20): "Battle Tower · Floor 4" and the run's lives (two hearts, a spent one greyed), centered. No floor count
- * (nobody is to know how many floors there are), no next floor and no moves left (the boss card says those). The beaten bosses stay on
- * the tower's own card.
+ * The run's strip (Eric, Nov 20; Nov 21: the hearts moved out of it): "Battle Tower · Floor 4", centered. No floor count (nobody is to know
+ * how many floors there are), no next floor and no moves left (the boss card says those). The beaten bosses stay on the tower's own card.
  */
 export function TowerStrip({ match }: { match: GameView }) {
   // (A solo floor's run, or a party floor's: Nov 20.)
@@ -67,9 +67,26 @@ export function TowerStrip({ match }: { match: GameView }) {
       <span class="tw-strip-top">
         Battle Tower<span> · Floor {play.floor}</span>
       </span>
-      <TowerHearts lives={livesOf(play.lives)} />
     </span>
   );
+}
+
+/** The run's lives (Eric, Nov 21: two pixel hearts, a spent one hollow, no word): the strip's right end on a phone (TowerStripLives). */
+export function TowerStripLives({ match }: { match: GameView }) {
+  const play = match.tower ?? match.towerParty;
+  if (!play) return null;
+  return <TowerHearts lives={livesOf(play.lives)} class="tw-match-lives tw-strip-lives" />;
+}
+
+/**
+ * The run's lives on a computer (Eric, Nov 21: "right along the H file ... H1"): just outside the board's right edge, level with its bottom
+ * rank, drawn over the board's wrap (children of its Board; tower.css `.tw-board-lives`). Nothing on a phone (its strip has them).
+ */
+export function TowerBoardLives({ match }: { match: GameView }) {
+  const mouse = useMedia(MOUSE_LAYOUT);
+  const play = match.tower ?? match.towerParty;
+  if (!play || !mouse) return null;
+  return <TowerHearts lives={livesOf(play.lives)} class="tw-match-lives tw-board-lives" />;
 }
 
 /** The figure box's height in a phone's part (px): the bar's 99 less its name, level and meters lines. */

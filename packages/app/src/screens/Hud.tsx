@@ -10,7 +10,7 @@ import { BoardsStrip } from "../components/TinyBoard.tsx";
 import { bossAlone, cutCountdown, isCrowd, shortCountdown, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
 import { BossBar } from "./Boss.tsx";
-import { TowerBar, TowerStrip, sideOf } from "./TowerBar.tsx";
+import { TowerBar, TowerStrip, TowerStripLives, sideOf } from "./TowerBar.tsx";
 
 /**
  * Your total time left (the bank), ticking down while you think. Each move
@@ -108,8 +108,11 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
             {match.final ? (
               "FINAL"
             ) : boss && (match.tower || match.towerParty) ? (
-              // (A Battle Tower floor: the run's strip in place of "BOSS · move 1".)
-              <TowerStrip match={match} />
+              // (A Battle Tower floor: the run's strip in place of "BOSS · move 1", its lives at the strip's right end.)
+              <>
+                <TowerStrip match={match} />
+                <TowerStripLives match={match} />
+              </>
             ) : boss ? (
               <>
                 BOSS<span class="muted"> · {match.bossNote != null ? "phase 2" : `move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`}</span>

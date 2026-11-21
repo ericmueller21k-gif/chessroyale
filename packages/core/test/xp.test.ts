@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { END_SCREEN, XP } from "../src/settings.ts";
-import { XP_NONE_LINES, crateCount, everyLevel, gameXp, isXpNone, levelOf, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpPingHz, xpInLevel, xpParts, xpShownParts, xpStretches } from "../src/xp.ts";
+import { XP_NONE_LINES, crateCount, everyLevel, gameXp, isXpNone, levelOf, ownMoves, tookTurn, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpPingHz, xpInLevel, xpParts, xpShownParts, xpStretches } from "../src/xp.ts";
 import { pausedLine, pauseVariable } from "../src/pauses.ts";
 
 const min = 60_000;
@@ -34,6 +34,20 @@ describe("XP and levels (Eric, Nov 9)", () => {
     expect(gameXp({ ...counted, moves: NaN })).toEqual({ none: "short" });
     // (A resign after the minimum is a counted loss.)
     expect(gameXp({ ...counted, resigned: true })).toEqual({ minutes: 12, time: 120, win: 0 });
+  });
+
+  it("your own moves are the turns you took: a turn you called the God King to play counts, a missed one doesn't (Eric, Nov 21)", () => {
+    // (Eric's floor: won by mate on move 12, the God King called on 3 of them. It said "No XP: the game ended before move 10.")
+    const floor = Array.from({ length: 12 }, (_, i) => (i === 2 || i === 5 || i === 8 ? { move: null, abstained: true } : { move: "e2e4" }));
+    expect(ownMoves(floor)).toBe(12);
+    expect(gameXp({ ...counted, moves: ownMoves(floor) })).toEqual({ minutes: 12, time: 120, win: 0 });
+    // A turn with no pick (the clock ran out) isn't yours; Hollow's dark ending your turn at your last wrong try is.
+    expect(tookTurn({ move: null })).toBe(false);
+    expect(tookTurn({ move: null, darkOut: true })).toBe(true);
+    const missed = [...floor.slice(0, 9), { move: null }, { move: null }, { move: null, darkOut: true }];
+    expect(ownMoves(missed)).toBe(10);
+    expect(ownMoves(missed.slice(0, 11))).toBe(9);
+    expect(gameXp({ ...counted, moves: ownMoves(missed.slice(0, 11)) })).toEqual({ none: "short" });
   });
 
   it("no XP for leaving, a guest, a test game or a banned account, in that order of what's said", () => {

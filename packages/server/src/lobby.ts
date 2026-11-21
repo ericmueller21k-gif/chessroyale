@@ -512,9 +512,12 @@ export interface LobbyRecord {
   feats?: Record<string, { brilliant: number; best: { san: string; score: number } | null }>;
   /** When the match began (after any pre-start show). */
   startedAt?: number;
-  /** Boss tokens: how many of each person's picks went in (their own moves), by player id: `bossBattleSpan`. */
+  /**
+   * Boss tokens and XP: each person's own moves, by player id (`bossBattleSpan`, `xpSpan`): the turns they took, a pick that went
+   * in or a God King call among them (since Nov 21; lock).
+   */
   picked?: Record<string, number>;
-  /** XP (Nov 9): when each person's last pick went in (the turn's lock), by player id: their time in the match ends there (`xpSpan`). */
+  /** XP (Nov 9): when each person's last turn went in (the turn's lock), by player id: their time in the match ends there (`xpSpan`). */
   pickedAt?: Record<string, number>;
   /** Quick chat (Crowd matches and boss raids, from the lobby before the match: the queue, a private lobby). */
   chat?: ChatRecord;
@@ -1727,6 +1730,12 @@ export class LobbyCore {
       case "king": {
         const round = this.r.round;
         if (this.r.phase !== "play" || round?.key !== msg.key || !this.runner?.boss?.kingCharges || !this.runner.player(playerId)?.alive) return;
+        // (A call to play the move is this player's turn: on their own clock, as a pick is (late, or before the clock starts:
+        // refused, nothing spent; the review of #865). His strike keeps its own check, callStrike's.)
+        if (!msg.strike) {
+          const now = this.io.now();
+          if (now > (round.deadlines?.[playerId] ?? round.deadline) + this.settings.lateGraceMs || now < round.startedAt - 500) return;
+        }
         // (A boss the God King's help doesn't work against, the Hidden Boss: a call is never a turn, a strike or a tally,
         // but each try spends a charge as if it had worked (runner.kingTried; Eric, Oct 14), as solo's does. The caller's
         // own app has him mock it and shows the charge gone; everyone else sees it with the move's reveal.)
@@ -3363,9 +3372,11 @@ export class LobbyCore {
     const fake = this.r.round.stall?.fake;
     if (fake && this.io.now() < fake.until) return this.setTimer("lock", fake.until);
     this.r.phase = "scoring";
-    // (Boss tokens: each person's own moves, the picks that went in this turn.)
+    // (Each person's own moves (XP's minimum and the daily reward's, boss tokens, the Welcome Crate): every turn they took, a pick
+    // that went in, a call for the God King to play it, or Hollow's dark ended at their last wrong try; never a missed turn. Eric,
+    // Nov 21: a turn the God King played for you is yours. Core's ownMoves counts the same on a device.)
     for (const h of this.r.humans) {
-      if (!this.r.round.picks[h.id]?.move) continue;
+      if (!this.r.round.picks[h.id]?.move && !this.called(h.id) && this.r.round.darkOut?.[h.id] === undefined) continue;
       (this.r.picked ??= {})[h.id] = (this.r.picked?.[h.id] ?? 0) + 1;
       // (XP: their time in the match runs to their last move that went in; watching after it adds nothing.)
       (this.r.pickedAt ??= {})[h.id] = this.io.now();
@@ -4455,7 +4466,7 @@ export class LobbyCore {
   }
 
   /**
-   * Boss tokens (core's battleCounts; server/boss-tokens.ts): a person's own moves in a boss battle (their picks that went in)
+   * Boss tokens (core's battleCounts; server/boss-tokens.ts): a person's own moves in a boss battle (the turns they took, xpSpan's)
    * and how long they played it, from the match's start to its end, or to when they left. Null: not a boss battle (a raid).
    */
   bossBattleSpan(playerId: string): { moves: number; ms: number } | null {
@@ -4466,9 +4477,9 @@ export class LobbyCore {
   }
 
   /**
-   * XP (Nov 9; server/xp.ts): a person's own moves in the match (their picks that went in) and their time in it as this room
-   * measured it, from the match's start to their last move that went in (knocked out at 8 minutes: 8 minutes; watching after
-   * adds nothing). Null: the match never started.
+   * XP (Nov 9; server/xp.ts): a person's own moves in the match (the turns they took: their picks that went in, their calls for
+   * the God King to play one, since Nov 21) and their time in it as this room measured it, from the match's start to their last
+   * move that went in (knocked out at 8 minutes: 8 minutes; watching after adds nothing). Null: the match never started.
    */
   xpSpan(playerId: string): { moves: number; ms: number } | null {
     if (!this.r.startedAt) return null;

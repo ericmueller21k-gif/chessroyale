@@ -158,6 +158,26 @@ export interface XpFacts {
   banned?: boolean;
 }
 
+/** One turn of yours as a game's record keeps it (the app's MoveRecord): your pick (null: none), and why there was none. */
+export interface OwnTurn {
+  move: unknown;
+  /** You called the God King to play this turn's move (a boss battle): your turn, with no pick of your own. */
+  abstained?: boolean;
+  /** Hollow's dark ended your turn at your last wrong try: your turn, with no pick that went in. */
+  darkOut?: boolean;
+}
+
+/** A turn you took: you picked, called the God King to play it, or tried into Hollow's dark until it ended your turn. Not a miss. */
+export const tookTurn = (t: OwnTurn): boolean => t.move !== null || !!t.abstained || !!t.darkOut;
+
+/**
+ * Your own moves in a game's record, for XP's minimum (XpFacts.moves) and every count like it (the daily reward's, the Welcome
+ * Crate's, a town challenge's "in 12 moves"): each turn you took (tookTurn). A turn the God King played because you called him is
+ * yours (Eric, Nov 21: a floor won on move 12 with 3 calls said "No XP: the game ended before move 10"); a turn you missed isn't.
+ * Online, the match room counts the same (server lobby.ts `lock`). docs/decisions/2026-11-21-xp-king-turns.md.
+ */
+export const ownMoves = (turns: readonly OwnTurn[]): number => turns.filter(tookTurn).length;
+
 /** A game's XP before any cap: none and why, or its whole minutes, time XP and win XP. */
 export type GameXp = { none: XpNone } | { none?: undefined; minutes: number; time: number; win: number };
 

@@ -128,12 +128,15 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   the review of #839, finding 1); the plan says them once one is spent (`NetTowerPlan.lives`). A floor the party goes back to and loses
   again reads "Lost floor 2 twice".
 - **The strip** (Nov 20, Eric: "it should just say Battle Tower floor 1, … right in the center"; `screens/TowerBar.tsx` `TowerStrip`): one
-  centered line, "Battle Tower · Floor N" and the hearts, nothing else. No floor total (nobody is to know how many floors there are),
+  centered line, "Battle Tower · Floor N", nothing else (Nov 21: the hearts left it). No floor total (nobody is to know how many floors there are),
   no next floor and no moves left (the boss card says those). On a computer it sits in a fixed 34 px line between the boss bar and the
   board (`.tw-strip-line`), centered with an even buffer above and below; on a phone it's the top stage's line. The beaten bosses are on
   the tower's card only. The clerk's line asks "How high can you climb?" instead of naming the floors.
-- **On screen** (nothing hidden, nothing shifts): two hearts, a spent one greyed (`components/TowerHearts.tsx`), always, in the run's
-  strip, the floor room's corner (`.tw-room-lives`) and the clerk's card (the solo climb's line: hearts and "Lost floor 8"). After a lost
+- **On screen** (nothing hidden, nothing shifts): two pixel hearts on a 9 x 8 grid (Nov 21, Eric: "drawn hearts ... like video game
+  pixelated"; `components/TowerHearts.tsx`, colors in `tower.css` `.tw-px-*`), a spent one hollow, always: beside the board on a
+  computer (`TowerBoardLives`, `.tw-board-lives`: level with the bottom rank, just outside its right edge), at the strip's right end on
+  a phone (`TowerStripLives`), the floor room's corner (`.tw-room-lives`) and the clerk's card, whose line says "2 lives left", "1 life
+  left" or "No lives left" (no "No floors lost"). After a lost
   floor: "You lost floor 8. It still counts: 1 life left." and the next floor (`data-tower-result="lost"`), the room's elevator open;
   the run's end lists the floors lost ("Lost floors 8, 11 and 12. Best solo: floor 10"). The leave's confirm says what it costs. The
   result screen takes the server's word once it answers: a win sent after the floor was counted lost on another device reads as the

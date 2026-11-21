@@ -1,4 +1,4 @@
-import { SideFigures } from "./TowerBar.tsx";
+import { SideFigures, TowerBoardLives } from "./TowerBar.tsx";
 import { onSide, partOf, partsOf, sideOf } from "../boss-side.ts";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
@@ -326,6 +326,7 @@ export function PlayScreen({
             {command && <KingCommand {...command} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
             <OneVOneBanner match={match} />
+            <TowerBoardLives match={match} />
           </Board>
         </div>
         {/* (On a phone the power-up row is in the middle box below, with the status line: see the footer.) */}

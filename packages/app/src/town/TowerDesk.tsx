@@ -4,11 +4,14 @@ import { BATTLE_TOWER, TOWER_PARTY } from "@chessroyale/core";
 import { Confirm } from "../components/MatchMenu.tsx";
 import { InviteSheet } from "../components/Friends.tsx";
 import { PARTY_COLORS } from "../board/logic.ts";
-import { TOWER_WORDS, livesOf, lostWords, loadKept, settle, towerApi, type RunKind, type TowerState } from "../tower.ts";
+import { TOWER_WORDS, livesLeftWords, livesOf, loadKept, settle, towerApi, type RunKind, type TowerState } from "../tower.ts";
 import { TowerHearts } from "../components/TowerHearts.tsx";
 import { joinTowerPartyAnswer, leaveTowerParty, makeTowerParty, onTowerParty, openTowerParties, openTowerParty, planWaiting, planWords, towerParty, type OpenParty } from "../tower-party.ts";
 import { chatTestRoom } from "./chat-net.ts";
 import "../tower.css";
+
+/** The clerk's card's lives line, capitalized ("2 lives left", "No lives left", Eric, Nov 21). */
+const capitalLine = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * The Battle Tower's clerk's card (PR 11b, Eric, Nov 19: "you walk into the battle tower, you talk to the clerk, you start a match"): the
@@ -221,7 +224,7 @@ export function TowerDesk({ onGo, onBest }: { onGo: (kind: RunKind) => void; onB
         {/* (Your solo climb, greyed while you're in a party: Leave party first. Its lives and floors lost always on their line (Nov 20).) */}
         <p class="tw-desk-lives" data-tower-lives={run ? livesOf(run.lives) : BATTLE_TOWER.lives}>
           <TowerHearts lives={run ? livesOf(run.lives) : BATTLE_TOWER.lives} />
-          <span>{!run ? TOWER_WORDS.livesAClimb : lostWords(run.lost ?? []) || "No floors lost"}</span>
+          <span>{!run ? TOWER_WORDS.livesAClimb : capitalLine(livesLeftWords(livesOf(run.lives)))}</span>
         </p>
         {run ? (
           <button type="button" class="town-btn primary tw-solo-go" disabled={busy || !!p} onClick={() => onGo("solo")}>

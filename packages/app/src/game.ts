@@ -67,6 +67,12 @@ export interface MoveRecord {
   /** Your pick separated the field (a brilliant move, made without a power-up). */
   brilliant?: boolean;
   usedPowerUp?: boolean;
+  /**
+   * No move of your own, but your turn (core's OwnTurn: XP's minimum counts it, ownMoves): you called the God King to play it
+   * (`abstained`), or Hollow's dark ended it at your last wrong try (`darkOut`, solo: online the match room counts it).
+   */
+  abstained?: boolean;
+  darkOut?: boolean;
 }
 
 /**
@@ -133,6 +139,7 @@ export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, 
     ...(picked.some((p) => p.counted !== undefined) ? { avgRaw: picked.reduce((s, p) => s + p.loss!, 0) / picked.length } : {}),
     brilliant: !!(mine.result.brilliant ?? bril)?.players.includes(me.playerId),
     usedPowerUp: !!me.usedPowerUp,
+    ...(me.abstained ? { abstained: true } : {}),
   };
 }
 
