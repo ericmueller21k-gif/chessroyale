@@ -678,8 +678,9 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   await expect(crate.getByRole("button", { name: "Buy with 3 Folio tokens" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
-  // The "being written" edge: the west-back corner, the margin line, the sketched lantern and lattice. (Two hops: from the counter the
-  // corner is off a phone's screen.)
+  // The "being written" edge: the west-back corner, the margin line, the sketched lantern and lattice. (Three hops: from the counter the
+  // corner is off a phone's screen, and from its front, a row nearer since Nov 21, so is (6, 8).)
+  await walkTo([8, 6]);
   await walkTo([6, 8]);
   await walkTo([3, 6]);
   await still("edge");
@@ -810,7 +811,8 @@ test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his wa
     await page.mouse.click(xy.x, xy.y);
     await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 30_000 });
   };
-  for (const sq of [[12, 6], [9, 6], [7, 6]] as const) await walkTo(sq);
+  // (From his front, on row 4 since Nov 21, a step back to row 6 first: (12, 6) is off a phone's screen from there.)
+  for (const sq of [[15, 6], [12, 6], [9, 6], [7, 6]] as const) await walkTo(sq);
   // (Once it's back at the west end of its row: from there its next stop is (6, 5), and you'll stand on the square after it.)
   await expect.poll(async () => (await crew(page))!.lift.at[0], { message: "the lift at its row's west end", timeout: 40_000 }).toBeLessThanOrEqual(5.5);
   await walkTo([7, 5]);
