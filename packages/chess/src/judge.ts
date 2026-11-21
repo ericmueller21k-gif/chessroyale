@@ -11,8 +11,8 @@
 import { DEFAULT_SETTINGS, botChoose, botLeanFor, mulberry32, type CrowdBotSpread } from "@chessroyale/core";
 import { applyMove, legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
-import { applyRecheck, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
-import { allowedSearch, fireEscapes, fireRanked, jobAllows, judgeCandidates, judgeTop, racePulls, raceRanked, type CarrotRace } from "./boss-powers.ts";
+import { applyRecheck, recheckAnchor, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
+import { allowedSearch, fireEscapes, fireRanked, jobAllows, judgeCandidates, judgeTop, racePulls, raceRanked, swapIn, swapScores, type CarrotRace } from "./boss-powers.ts";
 
 /** The lobby's rules for the bots' picks (so every judge picks for them exactly as the lobby would). */
 export interface JudgeRules {
@@ -53,6 +53,13 @@ export interface JudgeJob {
    * (the lobby's runner counts the race, once, for everyone).
    */
   race?: CarrotRace;
+  /**
+   * Boss battle, Sawyer's Saw Swap (BossRules.judgeAfter; an older app ignores it, and its numbers stand as plain chess's): each crowd
+   * move that sets it off, with the board after the swap (him to move). The device searches each of those boards (the top-moves search,
+   * prefetched with the turn's own) and reports its best line from the crowd's side (`swap`); the bots pick with them counted. The lobby's
+   * runner scores those moves on them, once, for everyone.
+   */
+  swap?: Record<string, string>;
   /** No engine server: the device re-checks close calls itself, with these settings, `priority` moves first. */
   recheck?: RecheckSettings;
   priority?: string[];
@@ -66,6 +73,8 @@ export interface JudgeReport {
   extra: MoveScore[];
   /** The re-check's deep search, when the job asked for one and there were close calls. */
   deep?: MoveScore[];
+  /** The job's `swap`: for each of its moves, the crowd's expected score after it and the Saw Swap (swapScores). */
+  swap?: MoveScore[];
 }
 
 /** A board's scores as worked out from a report (or the engine server's verdict). */
@@ -79,15 +88,22 @@ export interface JudgedBoard {
   replies: Record<string, string>;
   mates: Record<string, number>;
   rechecked: string[];
+  /** The job's `swap` moves' scores after the Saw Swap (the crowd's expected), when the job had any and the report gave them. */
+  swapped?: Record<string, number>;
+  /**
+   * With `swapped`: the bots' picks as plain chess would have them (the job without its look: every such report scores them too), for
+   * a board the lobby uses without the look (plainOf: one device's look alone is never trusted; the review of #863, finding 1).
+   */
+  plainBots?: { picks: string[]; powerUps: number[] };
 }
 
 /** The bots' picks, from the top moves (or the allowed search: see judgeCandidates) and the job's seed: the same on every device and in the lobby. */
-export function judgeBotPicks(job: JudgeJob, top: readonly MoveScore[], extra: readonly MoveScore[] = []): { picks: string[]; powerUps: number[] } {
+export function judgeBotPicks(job: JudgeJob, top: readonly MoveScore[], extra: readonly MoveScore[] = [], swap?: readonly MoveScore[]): { picks: string[]; powerUps: number[] } {
   // (The Carrot Patch's pulls the job scored are the bots' to pick too: jobOffers.)
   const offers = new Set(jobOffers(job));
   const offered = extra.filter((m) => offers.has(m.move) && !top.some((t) => t.move === m.move));
   const base = judgeCandidates(job, top, extra);
-  const t = jobRanked(job, [...base, ...offered.filter((m) => jobAllows(job, m.move) && !base.some((b) => b.move === m.move))]);
+  const t = jobRanked(job, [...base, ...offered.filter((m) => jobAllows(job, m.move) && !base.some((b) => b.move === m.move))], swap);
   const best = t[0]?.expected ?? 0.5;
   const candidates = t.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
   const all = legalMoves(job.fen).filter((m) => jobAllows(job, m));
@@ -112,26 +128,34 @@ function outsideTop(top: readonly MoveScore[], moves: readonly string[]): string
   return [...new Set(moves.filter((m) => !have.has(m)))].sort();
 }
 
-/** What a device does with a job. `top`: the top-moves search if it already ran (prefetched while players thought). */
-export async function runJudgeJob(engine: EngineLike, job: JudgeJob, top?: Promise<MoveScore[]> | MoveScore[]): Promise<JudgeReport> {
-  const report = await runQuickJob(engine, job, top);
+/**
+ * What a device does with a job. `top`: the top-moves search if it already ran (prefetched while players thought); `search`: the same
+ * search of any position (the Saw Swap's boards, prefetched alike), else a fresh one.
+ */
+export async function runJudgeJob(engine: EngineLike, job: JudgeJob, top?: Promise<MoveScore[]> | MoveScore[], search?: (fen: string) => Promise<MoveScore[]>): Promise<JudgeReport> {
+  const report = await runQuickJob(engine, job, top, search);
   const deep = await deepCheck(engine, job, report);
   return deep ? { ...report, deep } : report;
 }
 
-/** The job's quick part: the top moves and the search over picks outside them (no re-check). */
-export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promise<MoveScore[]> | MoveScore[]): Promise<JudgeReport> {
+/** The job's quick part: the top moves and the search over picks outside them (no re-check), and the Saw Swap's boards (`swap`). */
+export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promise<MoveScore[]> | MoveScore[], search?: (fen: string) => Promise<MoveScore[]>): Promise<JudgeReport> {
   const all = await (top ?? engine.topMoves(job.fen, job.rules.botCandidateMoves));
+  // (Sawyer's Saw Swap: each board after it searched, the moves that set it off scored there; the bots pick with them counted.)
+  const swap = job.swap ? await swapScores(search ?? ((fen) => engine.topMoves(fen, job.rules.botCandidateMoves)), job.swap) : undefined;
+  const withSwap = (r: JudgeReport): JudgeReport => (swap ? { ...r, swap } : r);
   // A boss power left none of the top moves open: the second search covers every allowed move (and every pick).
   const open = await allowedSearch(engine, job, all);
-  if (open) return { top: all, extra: open };
+  if (open) return withSwap({ top: all, extra: open });
   // (The Carrot Patch's pulls: scored first, the bots may pick them.)
   const offers = outsideTop(all, jobOffers(job));
   const offered = offers.length ? await engine.scoreMoves(job.fen, offers) : [];
-  const bots = judgeBotPicks(job, all, offered);
-  const missing = outsideTop([...all, ...offered], [...job.picks, ...bots.picks, ...jobEscapes(job)]);
+  const bots = judgeBotPicks(job, all, offered, swap);
+  // (With the look, the bots' picks as plain chess has them too: the lobby uses those when the look isn't checked: plainOf.)
+  const plain = swap ? judgeBotPicks(job, all, offered).picks : [];
+  const missing = outsideTop([...all, ...offered], [...job.picks, ...bots.picks, ...plain, ...jobEscapes(job)]);
   const extra = [...offered, ...(missing.length ? await engine.scoreMoves(job.fen, missing) : [])];
-  return { top: all, extra };
+  return withSwap({ top: all, extra });
 }
 
 /**
@@ -149,20 +173,26 @@ export function jobOffers(job: Pick<JudgeJob, "fen" | "race" | "allowed" | "barr
   return job.race ? racePulls(job.fen, job.race).filter((m) => jobAllows(job, m)) : [];
 }
 
-/** Top moves as a job's bots see them: G-REX's fire (a piece left on a tile ablaze is gone), the Carrot Patch's race counted; best first. */
-export function jobRanked(job: Pick<JudgeJob, "fen" | "burn" | "race">, top: readonly MoveScore[]): MoveScore[] {
-  const fire = fireRanked(top, job.fen, job.burn ?? [], sideToMove(job.fen));
+/**
+ * Top moves as a job's bots see them: the Saw Swap's moves scored after it (`swap`: swapScores), G-REX's fire (a piece left on a tile
+ * ablaze is gone), the Carrot Patch's race counted; best first.
+ */
+export function jobRanked(job: Pick<JudgeJob, "fen" | "burn" | "race">, top: readonly MoveScore[], swap?: readonly MoveScore[]): MoveScore[] {
+  const fire = fireRanked(swapIn(top, swap), job.fen, job.burn ?? [], sideToMove(job.fen));
   return job.race ? raceRanked(fire, job.fen, job.race) : fire;
 }
 
 /** The moves the job's re-check searches, from its quick report (none: no re-check, or no close calls). */
 export function deepTargets(job: JudgeJob, report: JudgeReport): { best: string; flagged: string[] } | null {
   if (!job.recheck || !Array.isArray(report?.top) || !report.top.length || !Array.isArray(report.extra)) return null;
-  const bots = judgeBotPicks(job, report.top, report.extra);
-  const base = baseBoard(job, report, bots);
+  const swap = reportSwap(job, report);
+  if (swap === null) return null;
+  const bots = judgeBotPicks(job, report.top, report.extra, swap);
+  const base = baseBoard(job, report, bots, swap);
   if (!base) return null;
-  const flagged = recheckTargets(base, [...job.picks, ...bots.picks], job.recheck, job.priority);
-  return flagged.length ? { best: base.bestMove, flagged } : null;
+  // (With the look past the Saw Swap: on the final numbers, its moves never searched again: recheckView.)
+  const flagged = recheckTargets(base, [...job.picks, ...bots.picks], job.recheck, job.priority, base.swapped);
+  return flagged.length ? { best: recheckAnchor(base, base.swapped), flagged } : null;
 }
 
 /**
@@ -185,8 +215,24 @@ export function quickPart(job: JudgeJob): JudgeJob {
 const okScore = (m: MoveScore | undefined, legal: ReadonlySet<string>) =>
   !!m && typeof m.move === "string" && legal.has(m.move) && typeof m.expected === "number" && Number.isFinite(m.expected) && m.expected >= 0 && m.expected <= 1;
 
-/** The board before any re-check; null if the report doesn't hold together. */
-function baseBoard(job: JudgeJob, report: JudgeReport, bots: { picks: string[]; powerUps: number[] }): JudgedBoard | null {
+/**
+ * A report's Saw Swap scores (`swap`), checked: undefined when the job named no move (or an older app sent none: its numbers stand as
+ * plain chess's); null when they don't hold together (each of the job's moves exactly once, its number a chance).
+ */
+function reportSwap(job: Pick<JudgeJob, "swap">, report: Pick<JudgeReport, "swap">): MoveScore[] | undefined | null {
+  const want = Object.keys(job.swap ?? {});
+  if (!want.length || report.swap === undefined) return undefined;
+  if (!Array.isArray(report.swap) || report.swap.length !== want.length) return null;
+  const named = new Set(want);
+  if (!report.swap.every((m) => okScore(m, named))) return null;
+  return new Set(report.swap.map((m) => m.move)).size === want.length ? report.swap : null;
+}
+
+/**
+ * The board before any re-check; null if the report doesn't hold together. With a look past the Saw Swap (`swap`), the bots' picks as
+ * plain chess has them must be scored too (plainBots).
+ */
+function baseBoard(job: JudgeJob, report: JudgeReport, bots: { picks: string[]; powerUps: number[] }, swap?: readonly MoveScore[]): JudgedBoard | null {
   const legal = new Set(legalMoves(job.fen));
   if (!Array.isArray(report.top) || !Array.isArray(report.extra) || !report.top.length) return null;
   // (No legal position has more than 218 moves: anything longer is junk, and isn't worth the lobby's time.)
@@ -196,10 +242,21 @@ function baseBoard(job: JudgeJob, report: JudgeReport, bots: { picks: string[]; 
   if (!top.length) return null;
   const expectedAfter: Record<string, number> = Object.fromEntries(top.map((m) => [m.move, m.expected]));
   for (const m of report.extra) if (expectedAfter[m.move] === undefined) expectedAfter[m.move] = m.expected;
-  // Every pick (people's and bots') must be scored.
-  if (![...job.picks, ...bots.picks].every((m) => expectedAfter[m] !== undefined)) return null;
+  // Every pick (people's and bots', with the look and without) must be scored.
+  const plain = swap ? judgeBotPicks(job, report.top, report.extra) : null;
+  if (![...job.picks, ...bots.picks, ...(plain?.picks ?? [])].every((m) => expectedAfter[m] !== undefined)) return null;
   const { replies, mates } = repliesFrom([top, report.extra]);
-  return { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter, botPicks: bots.picks, botPowerUps: bots.powerUps, replies: legalReplies(job.fen, replies), mates, rechecked: [] };
+  return {
+    bestMove: top[0]!.move,
+    bestExpected: top[0]!.expected,
+    expectedAfter,
+    botPicks: bots.picks,
+    botPowerUps: bots.powerUps,
+    replies: legalReplies(job.fen, replies),
+    mates,
+    rechecked: [],
+    ...(swap && plain ? { swapped: Object.fromEntries(swap.map((m) => [m.move, m.expected])), plainBots: plain } : {}),
+  };
 }
 
 /** A judge's replies that are legal moves after their move; any other is junk, dropped (read as not known). */
@@ -226,6 +283,42 @@ export function sharedReplies(boards: readonly Pick<JudgedBoard, "replies">[]): 
   return Object.fromEntries(Object.entries(first?.replies ?? {}).filter(([m, r]) => rest.every((b) => b.replies?.[m] === r)));
 }
 
+/** Two boards' looks past the Saw Swap are the same: both looked, every move alike. */
+function sameLook(a: Pick<JudgedBoard, "swapped">, b: Pick<JudgedBoard, "swapped">): boolean {
+  const x = a.swapped;
+  const y = b.swapped;
+  return !!x && !!y && Object.keys(x).length === Object.keys(y).length && Object.entries(x).every(([m, e]) => y[m] === e);
+}
+
+/**
+ * The board as plain chess has it: without its look past the Saw Swap, the bots picking as without it (plainBots). Every other number
+ * is the same (the look's scores are kept apart until the runner applies them). A board without a look: itself.
+ */
+export function plainOf(b: JudgedBoard): JudgedBoard {
+  if (!b.swapped) return b;
+  const { swapped: _s, plainBots, ...rest } = b;
+  return plainBots ? { ...rest, botPicks: plainBots.picks, botPowerUps: plainBots.powerUps } : rest;
+}
+
+/**
+ * Of two boards that agree (boardsAgree), the one to use (the review of #863, findings 1 and 3): with its look past the Saw Swap when
+ * both looked alike (two devices' word on it); else the one without a look (an older app's: the newer's look is one device's alone, so
+ * those moves are scored as they stand).
+ */
+export function agreedBoard(a: JudgedBoard, b: JudgedBoard): JudgedBoard {
+  if (sameLook(a, b) || (!a.swapped && !b.swapped)) return a;
+  return a.swapped ? plainOf(b) : a;
+}
+
+/**
+ * A board that stands on one judge's numbers without a second device matching it (a lone judge, a dispute's verdict or fallback: the
+ * review of #863, finding 1): its look past the Saw Swap only when `others` (the other judges' boards) all looked exactly alike; else as
+ * plain chess (plainOf). The engine server never sees the board after the swap, so nothing else could check a look.
+ */
+export function lookTrusted(b: JudgedBoard, others: readonly (JudgedBoard | null | undefined)[]): JudgedBoard {
+  return others.length && others.every((o) => !!o && sameLook(b, o)) ? b : plainOf(b);
+}
+
 /**
  * A board's scores from a judge's report, exactly as the device itself worked them out; null if the report doesn't
  * hold together (moves that aren't legal, numbers out of range, a pick left unscored, a re-check missing or wrong).
@@ -233,26 +326,39 @@ export function sharedReplies(boards: readonly Pick<JudgedBoard, "replies">[]): 
  */
 export function judgedBoard(job: JudgeJob, report: JudgeReport): JudgedBoard | null {
   if (!report || typeof report !== "object") return null;
-  const bots = Array.isArray(report.top) && report.top.length && Array.isArray(report.extra) ? judgeBotPicks(job, report.top, report.extra) : null;
-  const base = bots && baseBoard(job, report, bots);
+  const swap = reportSwap(job, report);
+  if (swap === null) return null;
+  const bots = Array.isArray(report.top) && report.top.length && Array.isArray(report.extra) ? judgeBotPicks(job, report.top, report.extra, swap) : null;
+  const base = bots && baseBoard(job, report, bots, swap);
   if (!base) return null;
   if (!job.recheck) return base;
-  const flagged = recheckTargets(base, [...job.picks, ...base.botPicks], job.recheck, job.priority);
+  const flagged = recheckTargets(base, [...job.picks, ...base.botPicks], job.recheck, job.priority, base.swapped);
   if (!flagged.length) return base;
   const legal = new Set(legalMoves(job.fen));
   if (!Array.isArray(report.deep) || !report.deep.every((m) => okScore(m, legal))) return null;
   // (A deep search that left the best move out changes nothing, as on the device: applyRecheck keeps the numbers.)
-  const checked = applyRecheck(base, flagged, report.deep);
+  const checked = applyRecheck(base, flagged, report.deep, base.swapped);
   return { ...base, bestMove: checked.bestMove, bestExpected: checked.bestExpected, expectedAfter: checked.expectedAfter, rechecked: checked.rechecked };
 }
 
-/** Two judges' boards agree: the same best move and bot picks, and every score within `tolerance` (expected score). */
-export function boardsAgree(a: JudgedBoard, b: JudgedBoard, tolerance = 0): { agree: boolean; diff: number } {
+/**
+ * Two judges' boards agree: the same best move and bot picks, and every score within `tolerance` (expected score), the looks past the Saw
+ * Swap too. An older app's board, without a look, abstains on it (the review of #863, finding 3): the two are compared as plain chess
+ * (plainOf), so an honest older app is never in a disagreement over it (agreedBoard then uses the board without the look).
+ */
+export function boardsAgree(x: JudgedBoard, y: JudgedBoard, tolerance = 0): { agree: boolean; diff: number } {
+  const [a, b] = !x.swapped !== !y.swapped ? [plainOf(x), plainOf(y)] : [x, y];
   const keys = new Set([...Object.keys(a.expectedAfter), ...Object.keys(b.expectedAfter)]);
   let diff = Math.abs(a.bestExpected - b.bestExpected);
   for (const k of keys) {
     const x = a.expectedAfter[k];
     const y = b.expectedAfter[k];
+    diff = Math.max(diff, x === undefined || y === undefined ? 1 : Math.abs(x - y));
+  }
+  // (The Saw Swap's scores too, when both looked: a look past a move the other didn't take, or a different number, is a disagreement.)
+  for (const k of new Set([...Object.keys(a.swapped ?? {}), ...Object.keys(b.swapped ?? {})])) {
+    const x = a.swapped?.[k];
+    const y = b.swapped?.[k];
     diff = Math.max(diff, x === undefined || y === undefined ? 1 : Math.abs(x - y));
   }
   const same =

@@ -164,7 +164,9 @@ export class Lobby extends DurableObject<Env> {
         if (!job || !Object.values(job.humanPicks).some((m) => !!m) || !hostBoardOk(job, b)) return b;
         const picks = [...Object.values(job.humanPicks), ...Object.values(b.botPicks ?? {})];
         const t = Date.now();
-        const out = await serverRecheck(this.env, job.fen, { bestMove: b.bestMove, bestExpected: b.bestExpected, expectedAfter: b.expectedAfter }, picks, DEFAULT_SETTINGS, jobs.length, job.priority);
+        // (Sawyer's Saw Swap: the host's look past the job's moves, as the runner will take it: on the final numbers, never sent.)
+        const swapped = Object.fromEntries(Object.entries(b.swapped ?? {}).filter(([m, e]) => !!job.swap && Object.hasOwn(job.swap, m) && typeof e === "number" && Number.isFinite(e) && e >= 0 && e <= 1));
+        const out = await serverRecheck(this.env, job.fen, { bestMove: b.bestMove, bestExpected: b.bestExpected, expectedAfter: b.expectedAfter }, picks, DEFAULT_SETTINGS, jobs.length, job.priority, swapped);
         const changed = Object.keys(out.expectedAfter).filter((m) => out.expectedAfter[m] !== b.expectedAfter[m]);
         if (changed.length) console.log(`engine re-check: ${changed.length} moves in ${Date.now() - t} ms`);
         return { ...b, ...out };

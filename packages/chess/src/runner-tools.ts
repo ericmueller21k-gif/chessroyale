@@ -4,7 +4,7 @@ import { recentMoves, type BoardState } from "./boards.ts";
 import { applyMove, gameEnd, legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
-import { moveLoss, pullsOf, raceAfter, raceAdjust, raceWorth, steerPick, topEach, type CarrotRace } from "./boss-powers.ts";
+import { moveLoss, pullsOf, raceAfter, raceAdjust, raceWorth, steerPick, swapJudged, topEach, type CarrotRace } from "./boss-powers.ts";
 
 /**
  * The match runner's parts that don't need the runner (runner.ts, which re-exports them): the judge's re-check of close
@@ -36,6 +36,35 @@ export interface RecheckSettings {
 type Evaluation = { bestMove: string; bestExpected: number; expectedAfter: Record<string, number> };
 
 /**
+ * The re-check's view of a board with the judge's look past some moves in (Sawyer's Saw Swap: `swapped`, each such move's score after
+ * the swap; the review of #863, finding 4). It works on the final numbers (swapJudged's), so close calls are measured from the best the
+ * game charges from; those moves are never searched again (their numbers come from the board after the swap, which the deep search and
+ * the engine server never see); its anchor is the judge's best, or, when that is one of them, the best of the other moves (ties by move).
+ * `high`: the best a loss is measured from (the picks aside). Without a look: the evaluation as it is. null: no move left to anchor on.
+ */
+export function recheckView(
+  evaluation: Evaluation,
+  swapped?: Readonly<Record<string, number>> | null,
+): { view: Evaluation; fixed: ReadonlySet<string>; high: number } | null {
+  const fixed = new Set(Object.keys(swapped ?? {}));
+  if (!fixed.size) return { view: evaluation, fixed, high: evaluation.bestExpected };
+  const final = swapJudged(evaluation, swapped!);
+  const anchor = fixed.has(evaluation.bestMove)
+    ? Object.entries(evaluation.expectedAfter)
+        .filter(([m]) => !fixed.has(m))
+        .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0]
+    : evaluation.bestMove;
+  if (anchor === undefined) return null;
+  const bestExpected = anchor === evaluation.bestMove ? evaluation.bestExpected : evaluation.expectedAfter[anchor]!;
+  return { view: { bestMove: anchor, bestExpected, expectedAfter: final.expectedAfter }, fixed, high: final.bestExpected };
+}
+
+/** The move the re-check's deep search re-anchors on (searched with the close calls): the judge's best, or recheckView's. */
+export function recheckAnchor(evaluation: Evaluation, swapped?: Readonly<Record<string, number>> | null): string {
+  return recheckView(evaluation, swapped)?.view.bestMove ?? evaluation.bestMove;
+}
+
+/**
  * Which picks the re-check searches again, with the best move (its anchor: the top moves' first line): those losing
  * between recheckLoss[0] and [1] points, the most picked first, up to recheckMax. Picks that can decide a cut
  * (`priority`, from the lobby: players near the cut line) come first, over the wider recheckCutLoss range, up to
@@ -43,40 +72,61 @@ type Evaluation = { bestMove: string; bestExpected: number; expectedAfter: Recor
  * of those, whenever there's a re-check, and starts one when a pick of the anchor loses to it within those ranges (a
  * close call like any other): every loss is measured from its number, so it's weighed like for like against the anchor
  * before it counts as the best (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
+ * With the judge's look past some moves (`swapped`: Sawyer's Saw Swap), on the final numbers and never those moves (recheckView).
  * The same choice on every device and on the server (it's how a judge's re-check is verified).
  */
-export function recheckTargets(evaluation: Evaluation, picks: readonly (string | null)[], s: RecheckSettings, priority: readonly string[] = []): string[] {
+export function recheckTargets(
+  evaluation: Evaluation,
+  picks: readonly (string | null)[],
+  s: RecheckSettings,
+  priority: readonly string[] = [],
+  swapped?: Readonly<Record<string, number>> | null,
+): string[] {
   if (s.recheckMax <= 0) return [];
-  const best = Math.max(evaluation.bestExpected, ...picks.flatMap((m) => (m && evaluation.expectedAfter[m] !== undefined ? [evaluation.expectedAfter[m]!] : [])));
+  const look = recheckView(evaluation, swapped);
+  if (!look) return [];
+  const e = look.view;
+  const best = Math.max(look.high, ...picks.flatMap((m) => (m && e.expectedAfter[m] !== undefined ? [e.expectedAfter[m]!] : [])));
   const count = new Map<string, number>();
-  for (const m of picks) if (m) count.set(m, (count.get(m) ?? 0) + 1);
-  const exp = (m: string) => evaluation.expectedAfter[m] ?? -1;
+  for (const m of picks) if (m && !look.fixed.has(m)) count.set(m, (count.get(m) ?? 0) + 1);
+  const exp = (m: string) => e.expectedAfter[m] ?? -1;
   const lossOf = (m: string) => {
-    const e = evaluation.expectedAfter[m];
-    return e === undefined ? 0 : (best - e) * 100;
+    const x = e.expectedAfter[m];
+    return x === undefined ? 0 : (best - x) * 100;
   };
   const byCount = (a: string, b: string) => count.get(b)! - count.get(a)! || (a < b ? -1 : a > b ? 1 : 0);
   const close = (m: string, [lo, hi]: readonly [number, number]) => lossOf(m) >= lo && lossOf(m) <= hi;
   // Picks scored above the anchor, the highest first.
-  const above = [...count.keys()].filter((m) => exp(m) > evaluation.bestExpected).sort((a, b) => exp(b) - exp(a) || (a < b ? -1 : 1));
-  const inRange = (m: string, range: readonly [number, number]) => m !== evaluation.bestMove && !above.includes(m) && close(m, range);
+  const above = [...count.keys()].filter((m) => exp(m) > e.bestExpected).sort((a, b) => exp(b) - exp(a) || (a < b ? -1 : 1));
+  const inRange = (m: string, range: readonly [number, number]) => m !== e.bestMove && !above.includes(m) && close(m, range);
   const wanted = new Set(priority);
   const cut = s.recheckCutMax && s.recheckCutLoss ? s.recheckCutLoss : null;
   const first = cut ? [...count.keys()].filter((m) => wanted.has(m) && inRange(m, cut)).sort(byCount).slice(0, s.recheckCutMax) : [];
   const rest = [...count.keys()].filter((m) => !first.includes(m) && inRange(m, s.recheckLoss)).sort(byCount).slice(0, Math.max(0, s.recheckMax - first.length));
   if (!above.length) return [...first, ...rest];
-  const anchor = evaluation.bestMove;
+  const anchor = e.bestMove;
   const anchorClose = count.has(anchor) && (close(anchor, s.recheckLoss) || (!!cut && wanted.has(anchor) && close(anchor, cut)));
   return first.length || rest.length || anchorClose ? [...above, ...first, ...rest] : [];
 }
 
-/** Puts a re-check's deep numbers in: re-anchored to the deep number for the best move; a move that beats the best becomes it. */
-export function applyRecheck(evaluation: Evaluation, flagged: readonly string[], deep: readonly MoveScore[]): Evaluation & { rechecked: string[] } {
-  const deepBest = deep.find((m) => m.move === evaluation.bestMove);
-  if (!flagged.length || !deepBest) return { ...evaluation, rechecked: [] };
-  const shift = evaluation.bestExpected - deepBest.expected;
+/**
+ * Puts a re-check's deep numbers in: re-anchored to the deep number for its anchor (the best move, or recheckView's with a look past some
+ * moves: `swapped`, whose numbers it never touches); a move that beats the best becomes it. The numbers stay the position's own (a look's
+ * scores are put in after, by the runner: swapJudged).
+ */
+export function applyRecheck(
+  evaluation: Evaluation,
+  flagged: readonly string[],
+  deep: readonly MoveScore[],
+  swapped?: Readonly<Record<string, number>> | null,
+): Evaluation & { rechecked: string[] } {
+  const look = recheckView(evaluation, swapped);
+  const anchor = look?.view.bestMove;
+  const deepBest = deep.find((m) => m.move === anchor);
+  if (!look || !flagged.length || !deepBest) return { ...evaluation, rechecked: [] };
+  const shift = look.view.bestExpected - deepBest.expected;
   const expectedAfter = { ...evaluation.expectedAfter };
-  for (const m of deep) if (m.move !== evaluation.bestMove && flagged.includes(m.move)) expectedAfter[m.move] = Math.min(1, Math.max(0, m.expected + shift));
+  for (const m of deep) if (m.move !== anchor && flagged.includes(m.move) && !look.fixed.has(m.move)) expectedAfter[m.move] = Math.min(1, Math.max(0, m.expected + shift));
   let bestMove = evaluation.bestMove;
   let bestExpected = evaluation.bestExpected;
   for (const m of flagged) if ((expectedAfter[m] ?? 0) > bestExpected) [bestMove, bestExpected] = [m, expectedAfter[m]!];
@@ -88,7 +138,8 @@ export function applyRecheck(evaluation: Evaluation, flagged: readonly string[],
  * budget, so a good move is now and then marked a mistake (reports/judge-accuracy.md). The picks recheckTargets
  * chooses are searched again with the best move, in one search restricted to them at recheckNodes, and those
  * numbers replace the first ones. Big losses are rechecked too (up to recheckLoss[1]): a sacrifice the quick
- * search called a blunder is the worst miss.
+ * search called a blunder is the worst miss. `swapped`: the judge's look past some moves (Sawyer's Saw Swap): on the final
+ * numbers, those moves never searched again (recheckView).
  */
 export async function recheckCloseCalls(
   engine: EngineLike,
@@ -97,13 +148,14 @@ export async function recheckCloseCalls(
   picks: readonly (string | null)[],
   s: RecheckSettings,
   priority: readonly string[] = [],
+  swapped?: Readonly<Record<string, number>> | null,
 ): Promise<Evaluation & { rechecked: string[] }> {
   const none = { ...evaluation, rechecked: [] as string[] };
   if (!engine.scoreMovesAt) return none;
-  const flagged = recheckTargets(evaluation, picks, s, priority);
+  const flagged = recheckTargets(evaluation, picks, s, priority, swapped);
   if (!flagged.length) return none;
-  const deep = await engine.scoreMovesAt(fen, [evaluation.bestMove, ...flagged], s.recheckNodes);
-  return applyRecheck(evaluation, flagged, deep);
+  const deep = await engine.scoreMovesAt(fen, [recheckAnchor(evaluation, swapped), ...flagged], s.recheckNodes);
+  return applyRecheck(evaluation, flagged, deep, swapped);
 }
 
 

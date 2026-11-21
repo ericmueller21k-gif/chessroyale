@@ -282,10 +282,12 @@ export async function serverRecheck(
   settings: RecheckSettings,
   boards = 1,
   priority: readonly string[] = [],
+  /** Sawyer's Saw Swap: the host's look past the moves that set it off (on the final numbers; those moves are never sent: recheckView). */
+  swapped?: Readonly<Record<string, number>>,
 ): Promise<{ bestMove: string; bestExpected: number; expectedAfter: Record<string, number> }> {
   const nodes = Math.max(400_000, Math.round(SERVER_RECHECK_NODES / Math.max(1, boards)));
   try {
-    const out = await recheckCloseCalls(serverEngine(env, nodes), fen, evaluation, picks, { ...settings, recheckNodes: nodes }, priority);
+    const out = await recheckCloseCalls(serverEngine(env, nodes), fen, evaluation, picks, { ...settings, recheckNodes: nodes }, priority, swapped);
     return { bestMove: out.bestMove, bestExpected: out.bestExpected, expectedAfter: out.expectedAfter };
   } catch {
     return evaluation;
