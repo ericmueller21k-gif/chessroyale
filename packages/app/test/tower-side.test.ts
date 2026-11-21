@@ -7,6 +7,7 @@ import { BOSS_ROSTER } from "@chessroyale/core";
 import { artOf, bossKit } from "../src/characters/kits.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
 import type { BossView } from "../src/game.ts";
+import { KIT_OPENING, runBattle } from "../../chess/test/boss-kit-lib.ts";
 
 /**
  * Audit 2's finding 1 (docs/decisions/2026-11-19-battle-tower-audit-2.md): on a floor of several bosses the screens draw each boss from
@@ -87,4 +88,24 @@ describe("a figure's box holds every frame it draws (Eric, Nov 21: Folio's wing 
     }
     expect(missed).toEqual([]);
   });
+});
+
+describe("Hollow's dark on a shared floor (Nov 21, beside Smudgy's mask: docs/decisions/2026-11-21-smudgy-shared-mask.md)", () => {
+  // (The screens draw the board layer of every part (Play, Boss, and the reveal since Nov 21: Crowd.tsx), so his dark covers its
+  // squares on every turn, not only while he's in focus. His part carries it whoever is.)
+  for (const [bosses, seed] of [[["gingerbread", "hollow"], 11], [["hollow", "gingerbread", "moo"], 11]] as const) {
+    it(`${bosses.join(" + ")}: his part has the dark on every turn, his, the others', the crowd's`, async () => {
+      const away: string[] = [];
+      await runBattle({ boss: bosses[0], bosses, seed, side: "w", test: "", triggerFrom: 99, strikes: [], maxMoves: 30, opening: KIT_OPENING }, null, (r, _fen, who) => {
+        const truth = (r.sideBosses().find((b) => b.id === "hollow")!.powers!.dark ?? []).map((d) => d.square);
+        const view = JSON.parse(JSON.stringify(r.bossView())) as BossView;
+        const at = `${who === "crowd" ? `the crowd (next: ${view.id})` : `${view.id}'s turn`} at crowd move ${view.crowdMoves}`;
+        expect((partOf(view, "hollow").powers?.dark ?? []).map((d) => d.square), at).toEqual(truth);
+        expect(partsOf(view).some((b) => b.id === "hollow" && (b.powers?.dark ?? []).length === truth.length), at).toBe(true);
+        if (truth.length && view.id !== "hollow") away.push(at);
+      });
+      // (The dark stood while another boss was in focus: where the view's top level alone would have dropped it.)
+      expect(away.length).toBeGreaterThan(2);
+    }, 120_000);
+  }
 });

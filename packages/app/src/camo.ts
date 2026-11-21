@@ -16,6 +16,10 @@ import { fenAtPly, maskedFen, pieceAt, toSan, type Base, type CamoView } from "@
  *
  * Once the rook is revealed (it struck, gave check, left you no move you could see, or you took it) or the battle is
  * over (`boss.result`), nothing is hidden: every board shows the true position, past ones too.
+ *
+ * A Battle Tower floor of several bosses: the view's top level is the boss in focus, so Smudgy's Camouflage is read from
+ * his own part (`side.bosses`) whoever is in focus: his turn, another boss's, and the crowd's before either (Eric, Nov 21:
+ * the rook showed on the other boss's turn; docs/decisions/2026-11-21-smudgy-shared-mask.md).
  */
 
 /** The part of a boss view the mask reads. */
@@ -25,6 +29,18 @@ export interface CamoBoss {
   result?: string | null;
   board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null };
   powers?: { camo?: CamoView | null } | null;
+  /** A floor of several bosses: each one's own part (the view's top level is the boss in focus). */
+  side?: { bosses: readonly { id?: string; powers?: { camo?: CamoView | null } | null }[] } | null;
+}
+
+/**
+ * Smudgy's Camouflage in this battle: on a floor of several, his own part's whoever is in focus (Nov 21); alone, his. Null
+ * when he isn't in the battle.
+ */
+export function camoOf(boss: CamoBoss): CamoView | null {
+  const parts = boss.side?.bosses;
+  const his = parts && parts.length >= 2 ? parts.find((b) => b.id === "smudgy") : boss.id === "smudgy" ? boss : null;
+  return his?.powers?.camo ?? null;
 }
 
 const other = (side: "w" | "b") => (side === "w" ? "b" : "w");
@@ -36,7 +52,7 @@ const other = (side: "w" | "b") => (side === "w" ? "b" : "w");
  * whatever the walk found.
  */
 export function hiddenTrail(boss: CamoBoss): (string | null)[] | null {
-  const camo = boss.powers?.camo;
+  const camo = camoOf(boss);
   const now = camo?.square;
   if (!camo || !now) return null;
   const n = boss.board.history.length;
@@ -80,7 +96,7 @@ let seenKey = "";
  * reveal, over) clears it.
  */
 export function trackCamo(boss: CamoBoss | null | undefined): void {
-  const camo = boss && boss.id === "smudgy" && !boss.result ? boss.powers?.camo : null;
+  const camo = boss && !boss.result ? camoOf(boss) : null;
   if (!boss || !camo?.square) {
     if (latest !== null || table.size) {
       table = new Map();
