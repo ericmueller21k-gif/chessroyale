@@ -18,8 +18,8 @@ import "../tower.css";
 
 /**
  * A Battle Tower floor's battle (PR 10, the approved mockups 1 to 6 on stills/battle-tower): the run's strip in place of the title
- * line, the boss bar split in equal parts for 2 or 3 bosses (each figure whole, one scale for all; the boss to move lit with a TO
- * MOVE tag, the others dimmed, never hidden), and on a computer the figures stacked beside the board in turn order, the one to move
+ * line, the boss bar split in equal parts for 2 or 3 bosses (each figure whole, one scale for all; the boss to move outlined with a TO
+ * MOVE tag, the others drawn as he is: never dimmed, never hidden: Eric, Nov 21), and on a computer the figures stacked beside the board in turn order, the one to move
  * stepped forward. One boss: today's bar and figure. Every part keeps its size and place for the whole floor.
  */
 
@@ -92,27 +92,36 @@ export function TowerBoardLives({ match }: { match: GameView }) {
 /** The figure box's height in a phone's part (px): the bar's 99 less its name, level and meters lines. */
 const PART_FIGURE_H = 46;
 
-/** A figure's drawn part in its idle's first frame (sprite px): its canvas has room around it for his moves and props. */
+/**
+ * A figure's drawn part (sprite px): the union of every frame of the animations it plays in its box (its idle: a bob, a wing's flap),
+ * so no frame is ever cut off by the box (Eric, Nov 21: Folio's wing tips "getting cut off a bit at the top ... these boxes weren't built
+ * properly to factor in for the slight movements"). Its canvas has room around it for his moves and props, left out. Worked out once a
+ * boss and cached: the box keeps one size for the whole battle.
+ */
 const drawn = new Map<string, { top: number; bottom: number; left: number; right: number }>();
-export function drawnBox(name: string, art: Character, idle: string): { top: number; bottom: number; left: number; right: number } {
-  let b = drawn.get(name);
+export function drawnBox(name: string, art: Character, anims: string | readonly string[]): { top: number; bottom: number; left: number; right: number } {
+  const list = typeof anims === "string" ? [anims] : anims;
+  const key = `${name}|${list.join(",")}`;
+  let b = drawn.get(key);
   if (b) return b;
   b = { top: 0, bottom: art.h, left: 0, right: art.w };
-  const frame = art.anims[idle]?.frames[0];
-  if (frame && typeof ImageData !== "undefined") {
-    const d = frameImage(art, frame).data;
+  if (typeof ImageData !== "undefined") {
     let top = art.h, bottom = -1, left = art.w, right = -1;
-    for (let y = 0; y < art.h; y++)
-      for (let x = 0; x < art.w; x++)
-        if (d[(y * art.w + x) * 4 + 3]) {
-          top = Math.min(top, y);
-          bottom = Math.max(bottom, y);
-          left = Math.min(left, x);
-          right = Math.max(right, x);
-        }
+    for (const a of list)
+      for (const frame of art.anims[a]?.frames ?? []) {
+        const d = frameImage(art, frame).data;
+        for (let y = 0; y < art.h; y++)
+          for (let x = 0; x < art.w; x++)
+            if (d[(y * art.w + x) * 4 + 3]) {
+              if (y < top) top = y;
+              if (y > bottom) bottom = y;
+              if (x < left) left = x;
+              if (x > right) right = x;
+            }
+      }
     if (bottom >= 0) b = { top, bottom: bottom + 1, left, right: right + 1 };
   }
-  drawn.set(name, b);
+  drawn.set(key, b);
   return b;
 }
 
@@ -146,7 +155,7 @@ function Figure({ boss, scale, since, still }: { boss: BossView; scale: number; 
 }
 
 /** The split bar: one part a boss, in turn order (left to right), the boss to move lit; his words over the bar. */
-export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
+export function TowerBar({ boss, match, caster = null }: { boss: BossView; match: GameView; caster?: string | null }) {
   const side = sideOf(boss)!;
   const computer = useMedia("(min-width: 900px) and (pointer: fine)");
   const still = useMedia("(prefers-reduced-motion: reduce)");
@@ -160,7 +169,7 @@ export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
       {side.bosses.map((b, i) => {
         const on = i === side.toMove;
         return (
-          <span class={`tw-part${on ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id}>
+          <span class={`tw-part${on ? " tw-to-move" : ""}${b.id === caster ? " tw-casting" : ""}`} key={`${i}-${b.id}`} data-boss={b.id}>
             {on && <span class="tw-tag">TO MOVE</span>}
             {/* (His prop where it fits a part, a phone's: Babur's pump, BossUi.towerProp; Eric, Nov 20: his balloons weren't to be seen. A
                 computer's stands beside his figure by the board: TowerSide. One pump on the page, never two.) */}
@@ -188,10 +197,9 @@ export function TowerBar({ boss, match }: { boss: BossView; match: GameView }) {
 
 /**
  * A computer's figures beside the board on a floor of several: stacked top to bottom in turn order (the bar's, left to right), one
- * scale for all, each one's feet at the foot of his third of the board's height; the boss to move stepped toward the board and in full
- * color, the others dimmed (as the phone's bar).
+ * scale for all, each one's feet at the foot of his third of the board's height; the boss to move stepped toward the board, none dimmed (Eric, Nov 21).
  */
-export function TowerSide({ boss, match }: { boss: BossView; match: GameView }) {
+export function TowerSide({ boss, match, caster = null }: { boss: BossView; match: GameView; caster?: string | null }) {
   const side = sideOf(boss)!;
   const computer = useMedia("(min-width: 900px) and (pointer: fine)");
   const until = match.phase.kind === "boss" && !match.phase.lights && !match.phase.thinking && !match.phase.intro ? match.phase.until : 0;
@@ -202,7 +210,7 @@ export function TowerSide({ boss, match }: { boss: BossView; match: GameView }) 
   return (
     <div class="boss-side tw-side">
       {side.bosses.map((b, i) => (
-        <span class={`tw-side-fig${i === side.toMove ? " tw-to-move" : ""}`} key={`${i}-${b.id}`} data-boss={b.id} style={{ bottom: `${((n - 1 - i) * 100) / n}%`, height: `${100 / n}%` }}>
+        <span class={`tw-side-fig${i === side.toMove ? " tw-to-move" : ""}${b.id === caster ? " tw-casting" : ""}`} key={`${i}-${b.id}`} data-boss={b.id} style={{ bottom: `${((n - 1 - i) * 100) / n}%`, height: `${100 / n}%` }}>
           {/* (His words over his own head, whoever is to move: the figure's drawn box, not his third of the board's height.) */}
           <span class="tw-side-body">
             <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" mine={(k) => speakerOf(side, k) === i} />
@@ -217,6 +225,6 @@ export function TowerSide({ boss, match }: { boss: BossView; match: GameView }) 
 }
 
 /** The figures beside the board (a computer's): the floor's several stacked (TowerSide), else the boss's own (BossSide). */
-export function SideFigures({ match }: { match: GameView }) {
-  return match.boss && sideOf(match.boss) ? <TowerSide boss={match.boss} match={match} /> : <BossSide match={match} />;
+export function SideFigures({ match, caster = null }: { match: GameView; caster?: string | null }) {
+  return match.boss && sideOf(match.boss) ? <TowerSide boss={match.boss} match={match} caster={caster} /> : <BossSide match={match} />;
 }

@@ -457,8 +457,13 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // The screen draws every frame for its effects; the parts that don't move with them (the header, the boss by the
   // board, the chat) only as the match changes and five times a second, as on your move's screen (useStillKey).
   const still = useStillKey(match, now);
-  const hud = useMemo(() => <Hud match={match} />, [match, still]);
-  const bossSide = useMemo(() => <SideFigures match={match} />, [match, still]);
+  // (A floor of several: whose moment plays now, so his own figure, and only his, steps out of his part or his place beside the board
+  // while the moment draws him elsewhere, as a lone boss's does: TowerBar.tsx, tower.css `.tw-casting`. Eric, Nov 21.)
+  // (A moment drawn outside the moments' list (Hollow's Lights out, Big Boy's snack) is the boss to move's: his turn brought it.)
+  const side = sideOf(boss);
+  const caster = !side ? null : moment ? casterOf(boss, moment).id : (side.bosses[side.toMove]?.id ?? null);
+  const hud = useMemo(() => <Hud match={match} caster={caster} />, [match, still, caster]);
+  const bossSide = useMemo(() => <SideFigures match={match} caster={caster} />, [match, still, caster]);
   // (Smudgy's reveal under the paint: the newest move isn't named yet, in the dock or the move list.)
   const hush = !!smudgy?.hush;
   const under = useMemo(() => besideBoard(match, layout, <UnderBoard match={match} />, hush), [match, still, layout.strip, layout.computer, hush]);
