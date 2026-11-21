@@ -581,6 +581,10 @@
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
+## Nov 21 ~03:40 UTC
+- iPhone home-screen blur: still there after #849 (Eric's screenshot: the first ~20-25 pt under the status bar frosted, e.g. "Auto chess" title; Chess Town looks fine). Eric: NO code fix ("We'll just deal with the blur ... They'll probably patch this at some point"); just a note for iPhone users. The ios-top-guard helper was stopped and archived (branch claude/ios-top-guard, unmerged; don't use). Known iOS 26 Liquid Glass scroll-edge blur on Home Screen web apps (GitHub issues/PRs across many projects; WebKit 301994/317153 are related status-bar regressions, not the blur itself).
+- Asked Eric where the player-facing note goes (Settings' THE APP line for iPhone, or the FAQ).
+
 ## Nov 21 ~02:30 UTC
 - #861 God King shouts MERGED 12c841b: gkHyuah = one of shout-1..4 (Eric's own pack via the Fable music session `fable` session_01JuCWRs7vACHciUbhC3eY8V, stills/trailer-v2 b52395c7) at random. Open: Eric said 3 (there are 4) — drop one on his word; the pack's source for CREDITS.md.
 - Waiting on Eric: optional Saw Swap scoring of the checking move.
