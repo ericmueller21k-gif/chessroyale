@@ -743,6 +743,47 @@
     height: 55px;
   }
 }
+/* ---- A computer's tower bar, taller (Eric, Nov 21: "Shouldn't we be making the boss thing bigger? ... I would be going with the one of
+   these two that you'd use the bigger boss bar"): the 28 px the floor's title left between the bar and the board (it's over the column
+   beside the board now: `.tw-col-title`) go to the bar, not the board. The split bar 89 px (61 before), each card 83 inside its outline;
+   a lone floor's bar the same 89 px, its padding the card's plus the outline's 3 px, so both kinds of floor look alike and their boards
+   sit in one place, main's for a floor of several (board-size.css keeps the room at 151 px: the board main's size). What's in the bar grows
+   as a phone's does: his face in one 84 x 74 box for every boss (fit whole, as the bar fits it to 48 px wide elsewhere; the name column
+   starts at one place), his name, LVL and meters a size up (the column at 1.2), the status a size up, and the props that size themselves to
+   the room (Hollow's bulbs, Jefferson's candles: drawn at 2x on a computer) at 1.5, 3x, whole pixels, never wider than the room. The props
+   of bosses not in the tower's pool yet (Timber's workshop, Tick's tally, Don Dough's timers) and Babur's pump (by his figure, or the
+   taller bar's own sums) keep their size. Boss battles outside the tower, and a phone: unchanged. ---- */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .tw-bar {
+    height: 89px;
+  }
+  .tw-bcard.boss-bar {
+    height: 83px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) > .boss-bar:not(.tw-bar) {
+    box-sizing: border-box;
+    height: 89px;
+    padding: 6px 13px 7px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char {
+    gap: 12px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-icon .boss-portrait {
+    width: 84px;
+    height: 74px;
+    margin: 0;
+    object-fit: contain;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-name {
+    zoom: 1.2;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-next {
+    font-size: 13px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-prop > :is(.life-strip, .pw-pips) {
+    zoom: 1.5;
+  }
+}
 
 /* ---- The result's buttons ---- */
 .tw-result {
