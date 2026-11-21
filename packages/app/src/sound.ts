@@ -84,7 +84,12 @@ const SAMPLE_FILES = {
   // The God King (boss battle): CC0 retro cuts, see public/sounds/god-king/CREDITS.md.
   gkSummon: "/sounds/god-king/summon.mp3",
   gkAppear: "/sounds/god-king/appear.mp3",
-  gkHyuah: "/sounds/god-king/hyuah.mp3",
+  // His sword-raise shout: one of four from Eric's own pack, picked at random each time (Eric, Nov 21: "use the 3 sound bites at
+  // random in game for him, the most recent ones"; the music helper's cleaned, original-pitch cuts; was hyuah.mp3, a CC0 grunt).
+  gkShout1: "/sounds/god-king/shout-1.mp3",
+  gkShout2: "/sounds/god-king/shout-2.mp3",
+  gkShout3: "/sounds/god-king/shout-3.mp3",
+  gkShout4: "/sounds/god-king/shout-4.mp3",
   gkBolt: "/sounds/god-king/bolt.mp3",
   gkHit: "/sounds/god-king/hit.mp3",
   gkLeave: "/sounds/god-king/leave.mp3",
@@ -469,6 +474,9 @@ export function mediaGain(el: HTMLMediaElement): { ctx: AudioContext; gain: Gain
   }
   return { ctx, gain: g };
 }
+
+/** The God King's sword-raise shouts, one at random each time (`gkHyuah`). */
+const GK_SHOUTS = ["gkShout1", "gkShout2", "gkShout3", "gkShout4"] as const;
 
 function sample(name: keyof typeof SAMPLE_FILES, at: number, level = 1, rate = 1) {
   const buf = samples.get(name);
@@ -1254,7 +1262,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   },
   gkSummon: (t) => sample("gkSummon", t, 0.7),
   gkAppear: (t) => sample("gkAppear", t, 0.7),
-  gkHyuah: (t) => sample("gkHyuah", t, 0.9),
+  gkHyuah: (t) => sample(GK_SHOUTS[Math.floor(Math.random() * GK_SHOUTS.length)]!, t, 0.9),
   gkBolt: (t) => sample("gkBolt", t, 0.8),
   gkHit: (t) => sample("gkHit", t, 0.8),
   gkSlash: (t) => sample("gkSlash", t, 0.85),
