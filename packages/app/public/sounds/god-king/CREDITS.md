@@ -7,7 +7,7 @@ same name to change it; the game plays them at these moments of the God King's a
 |---|---|---|
 | summon.mp3 | lightning starts converging | Juhani Junkala, *The Essential Retro Video Game Sound Effects Collection [512 sounds]*, `sfx_movement_portal6` |
 | appear.mp3 | the flash: the God King appears | Junkala, `sfx_sounds_fanfare1` |
-| shout-1.mp3 … shout-4.mp3 | he raises his sword: one of the four at random | Eric's own sound pack for the God King (Nov 20; source to be confirmed), four short shouts cut apart and cleaned of hiss at their own pitch (`scripts/reel/music/voice_clean.py`, branch `claude/trailer-v2`). Replaced `hyuah.mp3` (HaelDB `3grunt3`), Nov 21 |
+| shout-1.mp3 … shout-4.mp3 | he raises his sword: one of the four at random | Eric's own voice, recorded by him for the God King (Nov 20; Eric, Nov 21: "those are my own sounds. I made them with my own voice"), four short shouts cut apart and cleaned of hiss at their own pitch (`scripts/reel/music/voice_clean.py`, branch `claude/trailer-v2`). Replaced `hyuah.mp3` (HaelDB `3grunt3`), Nov 21 |
 | bolt.mp3 | his bolt strikes | Junkala, `sfx_exp_shortest_hard4` |
 | hit.mp3 | the boss loses HP (the last of his three slashes) | Junkala, `sfx_damage_hit3` |
 | cutin.mp3 | his cut-in banner sweeps in | A synthesized whoosh into Junkala's `sfx_wpn_sword2` |
