@@ -1673,3 +1673,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 18:55: #734 CI GREEN; held for Eric's OK (guard test). Main is red until it merges (town-street:294).
 - Nov 21 05:36: #867 (Smudgy shared mask) quick review OK, waiting on CI. Tower room helper started (session_01JuCWRvKKbQdJDJ8m4PpDLs, Opus high, branch claude/tower-room-arrow). Tower audit helper still running. #865 deployed; main run pending.
   Nit from #867 review: Saw Swap moves pieces as a board change and Smudgy has no hook for it; if `sawSwapInTower` is ever turned on, add sawyer+smudgy to `BATTLE_TOWER.apart` or give Smudgy a board-change hook.
+- Nov 21 06:30: #867 merged (ebf4dc4), deployed, main green. #865 main green. Tower room helper done → PR #868 (head 0d1f1697), CI watcher bb32n87wh; stills sent. Tower audit helper (claude/tower-shared-audit) still running (watcher bkojj8pmu).
