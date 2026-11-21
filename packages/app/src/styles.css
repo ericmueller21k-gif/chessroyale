@@ -9696,6 +9696,23 @@ button.fd-logo {
   justify-content: space-between;
   gap: 10px;
 }
+/*
+ * A phone's top bar built like Chess Town's (Eric, Nov 21, a trial on Home only): a solid bar pinned to the screen's top edge, from the
+ * very top (under the status bar) to the row's bottom, instead of a row in the page's flow. On the installed iPhone app, iOS 26 frosts
+ * page content in a band under the status bar; the town's pinned bar stays sharp. Same place, same look: the page's 10 px top padding (a phone's home, below) and
+ * 18 px side margins move into the bar, so the row sits where it did. Revert: delete this rule.
+ * docs/decisions/2026-11-21-home-top-bar.md.
+ */
+@media (max-width: 1023px) {
+  .fd-home:not(.queueing) > .fd-top {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: calc(-1 * (env(safe-area-inset-top) + 10px)) calc(-18px - env(safe-area-inset-right)) 0 calc(-18px - env(safe-area-inset-left));
+    padding: calc(env(safe-area-inset-top) + 10px) calc(18px + env(safe-area-inset-right)) 0 calc(18px + env(safe-area-inset-left));
+    background: var(--fd-bg);
+  }
+}
 .fd-top-right,
 .fd-top-end {
   display: flex;

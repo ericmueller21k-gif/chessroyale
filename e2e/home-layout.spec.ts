@@ -424,6 +424,13 @@ test("phone: home fits the screen with no scrolling from 360×640 up, in every m
     await expect(page.locator(".fd-top").getByRole("button", { name: /^Friends/ })).toBeVisible();
     await expect(page.locator(".fd-top").getByRole("button", { name: "Chat", exact: true })).toBeVisible();
     await expect(page.locator(".fd-hero").getByRole("button", { name: "View profile", exact: true })).toBeVisible();
+    // (The top bar built like Chess Town's, Nov 21: pinned, solid from the screen's very top, its row 10 px down as before.)
+    const bar = await page.evaluate(() => {
+      const b = document.querySelector(".fd-top")!;
+      const s = getComputedStyle(b);
+      return { pos: s.position, top: Math.round(b.getBoundingClientRect().top), pad: parseFloat(s.paddingTop) };
+    });
+    expect(bar, `${width}×${height}: the top bar`).toEqual({ pos: "sticky", top: 0, pad: 10 });
   }
 });
 
