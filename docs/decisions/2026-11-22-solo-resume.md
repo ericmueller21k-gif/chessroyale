@@ -34,5 +34,6 @@ tabs (`storage` events), and shows while another tab plays the game.
 
 Known, pre-launch (the review of #885; floors share both, left as they are): **N1**, time XP across a resume counts the time away
 (the server times the game from its start: bounded by `soloMinutesPerDay`); **N2**, a reload while he thinks plays his reply again on
-the rejoin, usually blind, but Chandy's first capture shows its crosshair before the keep. A resume that can't start its first round
+the rejoin, usually blind, but Chandy's first capture shows its crosshair before the keep (the one thing still shown before it's
+kept: his move is a search's, kept once it's played; keeping it sooner needs the runner to take a planned move, a follow-up). A resume that can't start its first round
 (N3) drops the game with "Couldn't resume that game."

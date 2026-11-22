@@ -602,7 +602,7 @@ export class SoloMatch implements GameView {
     this.runner = MatchRunner.restore(game.snapshot, {
       settings: this.baseSettings,
       rng: this.rng,
-      engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
+      engines: this.engines.map((e) => whileOn(withServerRecheck(e, () => this.runner?.state.boards.length ?? 1), () => this.stopped)),
       library: openings(),
       clock: gardenClock,
     });
@@ -747,8 +747,8 @@ export class SoloMatch implements GameView {
     this.runner = new MatchRunner({
       settings: this.settings,
       rng: this.rng,
-      // Re-checks go to the engine server first (see withServerRecheck).
-      engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
+      // Re-checks go to the engine server first (see withServerRecheck); none once the match has stopped (whileOn).
+      engines: this.engines.map((e) => whileOn(withServerRecheck(e, () => this.runner?.state.boards.length ?? 1), () => this.stopped)),
       library: openings(),
       raidSide: this.raidSide,
       // (The hippo gardener's seeds: this device's time while the page is in view.)
@@ -2360,7 +2360,7 @@ function record<T>(v: unknown, ok: (x: unknown) => x is T): Record<string, T> {
 /** The engine's searches (a stopped match's are never sent: whileOn). */
 const SEARCHES = new Set<PropertyKey>(["topMoves", "topMovesAt", "scoreMoves", "scoreMovesAt", "analyse", "playAtElo"]);
 /** `e` while `stopped()` is false; after, its searches wait forever (never sent to its worker), so whatever awaits one ends there. */
-function whileOn(e: UciEngine, stopped: () => boolean): UciEngine {
+function whileOn<E extends object>(e: E, stopped: () => boolean): E {
   return new Proxy(e, {
     get(t, k, r) {
       const v: unknown = Reflect.get(t, k, r);
