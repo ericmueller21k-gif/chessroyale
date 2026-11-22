@@ -11466,11 +11466,16 @@ button.fd-logo {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+/* (Eric, Nov 22: the picture and the words sit centered as one block, the words centered too, not hugging the left edge.) */
 .fd-root .rd-pair .rd-card.rd-half {
   gap: 6px;
   min-width: 0;
   min-height: 56px;
   padding: 6px;
+  justify-content: center;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-text {
+  text-align: center;
 }
 .fd-root .rd-pair .rd-card.rd-half .rd-face {
   width: 32px;
