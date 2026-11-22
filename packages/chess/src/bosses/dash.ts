@@ -576,6 +576,89 @@ export function rushTimeline(s: RushSettings = BOSS_POWERS.dashScramble) {
   return { countdownMs: s.countdownMs, scatterAt: s.scatterAt, scatterUntil: s.scatterAt + s.scatterMs, linesAt: s.countdownMs, askAt: s.countdownMs + Math.round(s.linesMs * 0.45), placeAt, placeUntil, total: placeUntil + s.resultMs };
 }
 
+/** One of his copies' passes across the board in the Rush's sweep: from square `a` to square `b`, `start` to `start + ms` (ms from the Rush's start). */
+export interface RushRun {
+  copy: number;
+  start: number;
+  ms: number;
+  a: string;
+  b: string;
+}
+
+const RUSH_COPIES = 5;
+const RUSH_RUN_MS = 900;
+const RUSH_SLOT_MS = 1100;
+const RUSH_STAGGER_MS = 80;
+const rushSq = (f: number, r: number) => `${"abcdefgh"[f]}${r + 1}`;
+const rushSteps = (a: string, b: string) => Math.max(Math.abs(a.charCodeAt(0) - b.charCodeAt(0)), Math.abs(Number(a[1]) - Number(b[1])));
+/** 32-bit FNV-1a of a string: the sweep's seed (the same number as the app's `hash`, boss-beats.ts, it was drawn with until Nov 22). */
+function rushHash(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h;
+}
+
+/** A line across the whole board through `s`: its rank, or one of its diagonals (one at least four squares long), either way. */
+function rushLine(s: string, kind: number, reverse: boolean): [string, string] {
+  const f = s.charCodeAt(0) - 97;
+  const r = Number(s[1]) - 1;
+  const diag = (df: number): [string, string] | null => {
+    // (Down-left to up-right, or up-left to down-right.)
+    const back = df > 0 ? Math.min(f, r) : Math.min(f, 7 - r);
+    const on = df > 0 ? Math.min(7 - f, 7 - r) : Math.min(7 - f, r);
+    return back + on >= 3 ? [rushSq(f - back, df > 0 ? r - back : r + back), rushSq(f + on, df > 0 ? r + on : r - on)] : null;
+  };
+  const line = (kind % 3 === 1 ? diag(1) : kind % 3 === 2 ? diag(-1) : null) ?? diag(kind % 2 ? -1 : 1) ?? [rushSq(0, r), rushSq(7, r)];
+  return reverse ? [line[1], line[0]] : line;
+}
+
+/**
+ * His sweep (the screen draws it: DashRush.tsx): his copies' passes (three slots, five copies each, a little apart) and when each swept
+ * piece goes (`gone`, by its square before the sweep: a copy over it) and lands (`land`: a copy over its new square, in a later slot).
+ * The scoops go first, then the drops; any slot left over is a pass through a square of the seed's. The same on every screen (from the
+ * sweep itself). Its times are the sweep's beats (rushBeats).
+ */
+export function rushRuns(rush: Pick<DashRush, "at" | "moves">, s: Pick<RushSettings, "scatterAt"> = BOSS_POWERS.dashScramble): { runs: RushRun[]; gone: Record<string, number>; land: Record<string, number> } {
+  const seed = rushHash(`${rush.at}:${rush.moves.map((m) => m.from + m.to).join()}`);
+  const pending = [...rush.moves.map((m, i) => ({ drop: false, i, square: m.from })), ...rush.moves.map((m, i) => ({ drop: true, i, square: m.to }))];
+  const scoopSlot: Record<number, number> = {};
+  const runs: RushRun[] = [];
+  const gone: Record<string, number> = {};
+  const land: Record<string, number> = {};
+  for (let slot = 0; slot < 3; slot++)
+    for (let copy = 0; copy < RUSH_COPIES; copy++) {
+      const k = slot * RUSH_COPIES + copy;
+      const start = s.scatterAt + slot * RUSH_SLOT_MS + copy * RUSH_STAGGER_MS;
+      const ti = pending.findIndex((t) => !t.drop || (scoopSlot[t.i] !== undefined && scoopSlot[t.i]! < slot));
+      const task = ti >= 0 ? pending.splice(ti, 1)[0]! : null;
+      const through = task ? task.square : rushSq((seed >>> (k % 24)) % 8, (seed >>> ((k * 3) % 24)) % 8);
+      const [a, b] = rushLine(through, (seed >>> k) + k, ((seed >>> (k + 3)) & 1) === 1);
+      runs.push({ copy, start, ms: RUSH_RUN_MS, a, b });
+      if (!task) continue;
+      const at = start + (RUSH_RUN_MS * rushSteps(a, through)) / Math.max(1, rushSteps(a, b));
+      if (task.drop) land[rush.moves[task.i]!.from] = at;
+      else {
+        gone[rush.moves[task.i]!.from] = at;
+        scoopSlot[task.i] = slot;
+      }
+    }
+  return { runs, gone, land };
+}
+
+/**
+ * The Rush's beats: each time its screen first shows something by the clock alone, with no update (ms from its start, in order; each
+ * the first whole ms it shows at). Written once, here, from what the screen draws by (rushRuns' sweep, rushTimeline's stages), and read
+ * by a kept solo battle (SoloMatch.moment: kept as each shows) and its test. His sweep's start, each swept piece gone from its square and
+ * on its new one, the sweep's end (so a rejoin after it never plays it again), your ten seconds (the swept pieces' edges), time's up (the
+ * board as it was). His lines and the countdowns show nothing a rejoin could use twice.
+ */
+export function rushBeats(rush: Pick<DashRush, "at" | "moves">, s: RushSettings = BOSS_POWERS.dashScramble): number[] {
+  const tl = rushTimeline(s);
+  const { gone, land } = rushRuns(rush, s);
+  const shows = [tl.scatterAt, ...Object.values(gone), ...Object.values(land), tl.scatterUntil, tl.placeAt, tl.placeUntil].map(Math.ceil);
+  return [...new Set(shows)].sort((a, b) => a - b);
+}
+
 /**
  * His fields for the screens (NetBossPowers' `dash`): his last slap and flag, the counts, and the Time Scramble under way (the
  * crowd turn it came, its moves and seconds: scrambleLeft with the turn gives the countdown's moves left).

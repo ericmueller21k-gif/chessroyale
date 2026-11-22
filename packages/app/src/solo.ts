@@ -1,6 +1,6 @@
 import { DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { LIGHTS_OUT, type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -444,9 +444,10 @@ export class SoloMatch implements GameView {
    * The rule (the third review of #885: every finding of the first two was this one bug, patched power by power): **a kept battle never
    * shows what it hasn't kept**. So it keeps in the one place its updates reach the screen (show: set and emit), before they do, whenever
    * the kept game would change (`keptKey`: the times alone changing don't write), and at each beat a timed moment's screen shows by the
-   * clock alone (its `reveals`: a Dodge's teleports, the Rush's sweep, a Lights out round's targets), a little ahead of it (armReveal).
-   * A reload, a crash or another tab then resumes at or after everything this page has shown, never before it (audit 2's finding 2 and
-   * every finding since). `force`: written even if nothing but the times changed (a reveal, the page going, a resign's tab check).
+   * clock alone (its `reveals`, its timeline's beats: a Dodge's teleports, each piece of the Rush's sweep and its end, a Lights out round's
+   * targets), a little ahead of it (armReveal). A reload, a crash or another tab then resumes at or after everything this page has shown
+   * (inside a sweep or a drop, at or after its last beat shown: the motion since then plays again, never a piece), never before it (audit
+   * 2's finding 2 and every finding since). `force`: written even if nothing but the times changed (a reveal, the page going, a resign's tab check).
    */
   private keep(force = false) {
     const keeper = this.keeper;
@@ -503,31 +504,32 @@ export class SoloMatch implements GameView {
   /**
    * The timed moment on (Chandy's Dodge, Dash's Scramble Rush, Hollow's Lights out: nobody's clock runs, it plays on while hidden): when it
    * began, your inputs in it (`mine`: the Dodge's vote, the Rush's placements, Lights out's rounds over and taps), and the beats its screen
-   * shows by the clock alone, with no update (ms from its start). A new timed power adds itself here, or a reload replays it seen.
+   * shows by the clock alone, with no update (ms from its start, in order): its timeline's own list, the one its screen draws by
+   * (dodgeTimeline's `beats`, rushBeats, lightsOutTimeline's `beats`), never a copy written here. A new timed power exports its beats
+   * beside its timeline and adds itself here, or a reload replays it seen.
    */
   private moment(): { at: number; mine?: unknown; reveals: readonly number[] } | null {
-    if (this.dodge) {
-      const tl = dodgeTimeline();
-      return { at: this.dodge.at, ...(this.dodge.mine ? { mine: this.dodge.mine } : {}), reveals: [tl.volley.at, ...tl.rounds.flatMap((r) => [r.openAt, r.voteAt, ...r.teleports])] };
-    }
+    if (this.dodge) return { at: this.dodge.at, ...(this.dodge.mine ? { mine: this.dodge.mine } : {}), reveals: dodgeTimeline().beats };
     if (this.rush) {
-      const tl = rushTimeline();
-      return { at: this.rush.at, mine: { places: this.rush.places, moved: this.rush.moved }, reveals: [tl.scatterAt, tl.placeAt] };
+      const swept = this.runner.state.boss?.powers?.dash?.rush;
+      return { at: this.rush.at, mine: { places: this.rush.places, moved: this.rush.moved }, reveals: swept ? rushBeats(swept) : [] };
     }
     if (this.lights) {
-      const tl = this.lightsTimeline();
       const l = this.lights;
-      return { at: l.at, mine: { endedAt: l.endedAt, taps: l.taps, tapAt: l.tapAt }, reveals: [LIGHTS_OUT.dropAt, ...tl.rounds.map((r) => r.at), tl.backAt] };
+      return { at: l.at, mine: { endedAt: l.endedAt, taps: l.taps, tapAt: l.tapAt }, reveals: this.lightsTimeline().beats };
     }
     return null;
   }
-  /** The moment as kept now: the time into it (as at its next reveal once that's under REVEAL_LEAD_MS away), your inputs in it. */
+  /**
+   * The moment as kept now: the time into it (as at the last beat due within REVEAL_LEAD_MS, once one is: two beats closer than that, as
+   * the Rush's sweep's can be, both kept), your inputs in it.
+   */
   private momentNow(): KeptGame["moment"] {
     const m = this.moment();
     if (!m) return undefined;
     const into = Math.max(0, Date.now() - m.at);
-    const next = m.reveals.find((t) => t > into);
-    return { ms: next !== undefined && next - into <= REVEAL_LEAD_MS ? next : into, ...(m.mine !== undefined ? { mine: m.mine } : {}) };
+    const due = m.reveals.filter((t) => t > into && t - into <= REVEAL_LEAD_MS).at(-1);
+    return { ms: due ?? into, ...(m.mine !== undefined ? { mine: m.mine } : {}) };
   }
 
   /** The step just played shows for `ms`, then the next round (that step's update kept it: show). */
@@ -541,7 +543,7 @@ export class SoloMatch implements GameView {
 
   /**
    * A tower floor's clock while you're away (the director's call on audit 2's finding 2): no time passes. The time you've used on this
-   * turn is kept with the game as the page is hidden or closed, and given back as used on a rejoin (`resumeTurnMs`); while the page is
+   * turn is kept with the game as the page is hidden or closed, and given back as used on a rejoin (`resumed`, its `turnMs`); while the page is
    * hidden your turn's clock stands still (`awayAt`), as a locked phone left overnight would otherwise come back lost on time.
    */
   private awayAt = 0;

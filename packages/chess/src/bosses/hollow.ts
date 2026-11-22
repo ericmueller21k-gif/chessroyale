@@ -507,13 +507,19 @@ export const LIGHTS_OUT = {
  * and the grace (`over` false).
  */
 export function lightsOutTimeline(rounds: readonly { ms: number; endedAt?: number }[], graceMs: number) {
-  let t = LIGHTS_OUT.dropAt + LIGHTS_OUT.dropMs + LIGHTS_OUT.gapMs;
+  const dropEnd = LIGHTS_OUT.dropAt + LIGHTS_OUT.dropMs;
+  let t = dropEnd + LIGHTS_OUT.gapMs;
   const out = rounds.map((r) => {
     const round = { at: t, until: t + r.ms, answersAt: r.endedAt ?? t + r.ms + graceMs, over: r.endedAt !== undefined };
     t = round.answersAt + LIGHTS_OUT.answerMs;
     return round;
   });
-  return { rounds: out, backAt: t, total: t + LIGHTS_OUT.backMs };
+  // Its beats: each time its screen first shows something by the clock alone, with no update (in order). Written once, here, from the
+  // times the screen draws by (LightsOut.tsx), and read by a kept solo battle (SoloMatch.moment: kept as each shows) and its test: his
+  // drop and its end (the board dims at his smashes inside it, the art's cues, so a rejoin after it never plays it again), each round's
+  // targets, the lights back. (A round's answers come with the update that ends it.)
+  const beats = [LIGHTS_OUT.dropAt, dropEnd, ...out.map((r) => r.at), t];
+  return { rounds: out, backAt: t, total: t + LIGHTS_OUT.backMs, beats };
 }
 
 /** A player's own deadline in a round (ms from the test's start, before the late grace): its seconds, and a second more for each tap they've made. */
