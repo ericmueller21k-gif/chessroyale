@@ -41,3 +41,10 @@ replace its file and its numbers; no code change (`src/music.ts`, `townMusic`).
 `tower-loop`: one seamless loop, no intro (as Chandy's), from `tower-music/` on branch `stills/trailer-v2` (song `song_an.py`), re-encoded
 from its 192 kbps handoff to 128 kbps as above (same length, lined up at 0, `pad` and `pad + loopSeconds`). Keyed `tower` (the tower's home
 id): its lobby and its floor room play it; a floor's battle plays one of its bosses' own themes (docs/decisions/2026-11-19-tower-music.md).
+
+## Chub & Chirp's theme (Nov 22)
+
+`hopper-loop`: one seamless loop, no intro (as Chandy's), 129.92 s, from `boss-music-stereo-192/` on branch `stills/trailer-v2` (commit
+`0313337a`, song `song_x.py`), re-encoded from its 192 kbps handoff to 128 kbps as above (same length, lined up with it at `pad`, 30 s and
+just before `pad + loopSeconds`). Keyed `hopper` (the roster id). Eric, Nov 22: "Yes let's add that one." Its own crickets and rabbit-foot
+thumps echo `hopper-sounds.ts`; if a playtest mistakes them for the fight's sounds, the music helper turns them down.
