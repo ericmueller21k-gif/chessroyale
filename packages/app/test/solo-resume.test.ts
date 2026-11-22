@@ -360,6 +360,44 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     r.dispose();
   }, 120_000);
 
+  // (The delta review of #885, D4: a power-up's hints showed at once, but it was spent only as the move was scored and its use kept
+  // nowhere, so a reload gave it back: the engine's top 3 on every move, a reload each.)
+  it("a power-up used, its hints seen, then a reload: resumed with it spent and its hints fetched again; spent once as your move is scored", async () => {
+    const m = battle({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "gingerbread", bossFixedElo: 1600, bossAloneClock: true } as Settings);
+    m.start();
+    await until(m, () => yourTurn(m), "your first turn");
+    // (One power-up, as the God King's Last Stand gives: lastStandPowerUps for each charge he leaves.)
+    const st = m.runner.state;
+    (m.runner as unknown as { state: typeof st }).state = { ...st, players: st.players.map((p) => (p.id === HUMAN ? { ...p, powerUps: 1 } : p)) };
+    pick(m);
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    expect(m.powerUpsLeft()).toBe(1);
+    m.usePowerUp();
+    // (Kept as it's used, before its hints show: a page killed now, with no event, can't give it back either.)
+    expect(loadKeptSolo()!.kept.powerUp).toBe(true);
+    await step(100);
+    expect(m.hint?.length, "the engine's top moves on screen").toBeGreaterThan(0);
+    setVisible("hidden");
+    const k = loadKeptSolo()!;
+    expect(k.kept).toMatchObject({ powerUp: true, turnMs: expect.any(Number) });
+    // (A tower floor's kept game carries it too: the same reader, the same rejoin.)
+    expect(readKept(JSON.stringify({ v: 1, fight: "f", floor: 1, bosses: ["gingerbread"], settings: {}, beaten: [], game: k.kept }))!.game!.powerUp).toBe(true);
+    m.dispose();
+    setVisible("visible");
+    const r = resumed(k);
+    await until(r, () => yourTurn(r) && !!r.hint?.length, "your turn, resumed, its hints back");
+    expect((r.phase as { board: { fen: string } }).board.fen).toBe((m.phase as { board: { fen: string } }).board.fen);
+    expect(r.powerUpsLeft()).toBe(0);
+    // (Reloaded again before your move: still spent.)
+    expect(loadKeptSolo()!.kept.powerUp).toBe(true);
+    pick(r);
+    await until(r, () => yourTurn(r) && r.moves.length === 2, "your third turn, resumed");
+    expect(r.runner.state.players.find((p) => p.id === HUMAN)!.powerUps).toBe(0);
+    expect(r.powerUpsLeft()).toBe(0);
+    expect(loadKeptSolo()!.kept.powerUp).toBeUndefined();
+    r.dispose();
+  }, 120_000);
+
   // (The review of #885, I4: only a resign's end (emit) cleared it; a battle played to its end (set) stayed kept, and the next start
   // asked "Forfeit your game in progress?" about the game just finished.)
   for (const bossId of ["gingerbread", "hollow", "hopper"]) {

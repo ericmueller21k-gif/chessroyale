@@ -225,6 +225,15 @@ export class SoloMatch implements GameView {
   }
   usePowerUp() {
     if (this.phase.kind !== "play" || this.hint || this.powerUpsLeft() <= 0) return;
+    this.hint = [];
+    // (A boss battle kept on the device: kept as it's used, before its hints show, so a reload can't give it back (KeptGame.powerUp: the
+    // delta review of #885, D4). It's spent as your move is scored, as ever.)
+    this.keepFloor();
+    if (!this.stopped) this.showHints();
+  }
+  /** This turn's power-up used (`hint` set): the engine's top moves, shown as they come. */
+  private showHints() {
+    if (this.phase.kind !== "play") return;
     const fen = this.phase.board.fen;
     this.hint = [];
     this.emit();
@@ -413,7 +422,9 @@ export class SoloMatch implements GameView {
     if (!keeper || this.stopped || !this.runner?.boss || this.runner.boss.result) return;
     this.watchAway();
     const turnMs = this.turnUsedMs();
-    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}), ...(pending ? { pending: { ...pending, ...this.plannedPicks() } } : {}) });
+    // (This turn's power-up used, its hints seen (D4): on your turn its hint; before a rejoin's turn begins, the kept one's.)
+    const powerUp = !pending && (this.phase.kind === "play" ? this.hint !== null : this.resumePowerUp);
+    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}), ...(powerUp ? { powerUp: true } : {}), ...(pending ? { pending: { ...pending, ...this.plannedPicks() } } : {}) });
   }
   /**
    * A Solo raid's bot picks planned this round, kept with your move (KeptGame.pending): from your pick on they're on screen (livePicks), so
@@ -442,6 +453,8 @@ export class SoloMatch implements GameView {
    * hidden your turn's clock stands still (`awayAt`), as a locked phone left overnight would otherwise come back lost on time.
    */
   private resumeTurnMs = 0;
+  /** Rejoined on a turn whose power-up was used (KeptGame.powerUp): it starts spent, its hints fetched again (D4). */
+  private resumePowerUp = false;
   private awayAt = 0;
   private awayWatch: (() => void) | null = null;
   /** The time you've used on this turn of yours (ms): its clock's, less its pauses; 0 when it isn't your turn. */
@@ -506,6 +519,7 @@ export class SoloMatch implements GameView {
     // (The time you'd used on your turn as you went: given back as used, nothing for the time away: keepFloor. Your move kept as it was
     // accepted, still being scored then: played as that turn's move, at its own time (I2).)
     this.resumeTurnMs = game.pending ? game.pending.thinkMs : (game.turnMs ?? 0);
+    this.resumePowerUp = !game.pending && !!game.powerUp;
     this.pendingMove = game.pending ?? null;
     this.begun = this.runner.boss ? this.runner.boss.crowdMoves > 0 || game.intro : false;
     this.bossIntroDone = game.intro;
@@ -1759,6 +1773,8 @@ export class SoloMatch implements GameView {
     // (A tower floor rejoined on your turn: the time you'd used on it, as used: keepFloor.)
     const used = this.resumeTurnMs;
     this.resumeTurnMs = 0;
+    const spent = this.resumePowerUp;
+    this.resumePowerUp = false;
     this.playStartedAt = Date.now() + intro - used;
     this.hint = null;
     const allowed = this.runner.allowedMsFor(HUMAN);
@@ -1771,6 +1787,8 @@ export class SoloMatch implements GameView {
     }
     this.set(play);
     this.timer = setTimeout(() => this.submit(null), intro + allowed - used + this.settings.lateGraceMs);
+    // (Rejoined on a turn whose power-up was used (D4): spent, as it was, its hints fetched again.)
+    if (spent) this.showHints();
     // (Dash's clock tap or stall skit, each once a battle: his beats on this move's clock, if one comes on this move.)
     const plan = this.runner.stallPlan(HUMAN);
     if (plan) {
