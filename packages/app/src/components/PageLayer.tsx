@@ -10,9 +10,10 @@ import { play } from "../sound.ts";
  * - **Your inventory** (`InventoryLayer`; Eric: "How do we make it so people don't have to like leave the town if they want to go to their
  *   inventory?"): the shop screen's own tabs (`ShopScreen`, not a copy) in the shop page's own frame (Eric: "it should still look the
  *   same, like when you go to your inventory from the main menu"), opaque, the whole window, over anything.
- * - **Chess Town on a computer** (App.tsx `townLayer`; Eric: "you should be able to just click play with friends, daily quests, shop in
- *   crates, and profile without exiting out of Chesttown"): the side menu's page in the town's middle column only (`inColumn`), so the
- *   side menu and the right column (the town's tools, the chat) stay as they are and usable.
+ * - **Chess Town** (App.tsx `townLayer`; Eric: "you should be able to just click play with friends, daily quests, shop in crates, and
+ *   profile without exiting out of Chesttown"): on a computer the side menu's page in the town's middle column only (`inColumn`), so the
+ *   side menu and the right column (the town's tools, the chat) stay as they are and usable; on a phone the bar's Quests, Shop & crates
+ *   and Friends, over the whole screen as the inventory's.
  * Its Back, Escape and the phone's or browser's back gesture close it (one step pushed in the history; back takes it, the page never
  * navigates). Nothing under it hears a key or a tap (but typing in the right column's chat, as without it). Its opener owns it: when the
  * screen underneath moves on (a party's floor, a match starting, the town left), the layer goes with it.
@@ -47,9 +48,11 @@ const ours = () => !!(history.state as Record<string, unknown> | null)?.[STEP];
 const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || !!t.closest('[role="textbox"]'));
 
-export function PageLayer({ label, testid, inColumn = false, see = false, onClose, children }: {
+export function PageLayer({ label, testid, town = false, inColumn = false, see = false, onClose, children }: {
   label: string;
   testid: string;
+  /** Chess Town's (a phone's, a computer's): under the town's "Leave Chess Town?", which a page in it can ask. */
+  town?: boolean;
   /** The town's middle column only (the frame's sides stay usable), not the whole window. */
   inColumn?: boolean;
   /** No background of its own: a pop-up's card (Daily Quests, Play with friends) over its own dimmed back, the town under it. */
@@ -100,7 +103,7 @@ export function PageLayer({ label, testid, inColumn = false, see = false, onClos
     <div
       ref={root}
       tabIndex={-1}
-      class={`page-layer${inColumn ? " in-column" : ""}${see ? " see" : ""}`}
+      class={`page-layer${town ? " in-town" : ""}${inColumn ? " in-column" : ""}${see ? " see" : ""}`}
       role="dialog"
       aria-modal={inColumn ? undefined : "true"}
       aria-label={label}

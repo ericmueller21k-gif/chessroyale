@@ -30,7 +30,7 @@ import { setLiveBusy, setLiveDoing, startLive } from "./live.ts";
 import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
-import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
+import { COMPUTER as TOWN_FRAMED, TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO, requestWaiting } from "./town/LeaveTown.tsx";
 import { setGoodbyeFrom } from "./town/goodbye.ts";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
@@ -539,6 +539,8 @@ export function App() {
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
   /** A computer (the front door's frame): the queue fills in place, with the lobby's chat beside it. */
   const computer = useMedia("(min-width: 1024px)");
+  // (The town in the front door's frame: a computer with a mouse, TownPage.tsx. Its page layers sit in its middle column there.)
+  const townFramed = useMedia(TOWN_FRAMED);
 
   // The Hidden Boss's chatter, all through his fight, whatever screen shows it.
   useRecluseTalk(match);
@@ -2188,9 +2190,19 @@ export function App() {
       />
     );
     const pop = !profileOpen && (l.page === "quests" || l.page === "friends");
+    // (A computer's: in the town's middle column, the page's column inside it. A phone's: the whole screen in the page's own frame, as
+    // the inventory layer's.)
     return (
-      <PageLayer inColumn see={pop} label={label} testid="town-layer" onClose={closeTownLayer}>
-        {pop ? page : <div class="fd-center">{page}</div>}
+      <PageLayer town inColumn={townFramed} see={pop} label={label} testid="town-layer" onClose={closeTownLayer}>
+        {pop ? (
+          page
+        ) : townFramed ? (
+          <div class="fd-center">{page}</div>
+        ) : (
+          <div class={`fd-root fd-on-${l.page}`}>
+            <main class="fd-center">{page}</main>
+          </div>
+        )}
       </PageLayer>
     );
   };
@@ -2209,6 +2221,7 @@ export function App() {
         <TownPage
           nav={townNav}
           layer={townLayer && { page: townLayerPage(townLayer.page, profileOpen), node: townLayerNode(townLayer) }}
+          pages={{ quests: townNav.quests, shop: townNav.shop, friends: townNav.friends }}
           askLeave={askLeave}
           seat={townSeat}
           stand={townStand}

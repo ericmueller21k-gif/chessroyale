@@ -685,19 +685,20 @@ test("new messages: sending from it works while the lines show (the tap opens ty
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.new);
 });
 
-test("the header's chat icon cycles always on, new messages only, off (both bubbles green, then just the top one, then both gray) and the gear's sheet sets the mode; off shows no box and no field, and the lines that came meanwhile show when it's on again; the mode is remembered; the icons never cover the title", async ({ page }) => {
+test("the header's chat icon cycles always on, new messages only, off (both bubbles green, then just the top one, then both gray) and the gear's sheet sets the mode; off shows no box and no field, and the lines that came meanwhile show when it's on again; the mode is remembered; the icons never cover the back button", async ({ page }) => {
   await open(page);
   const ic = await rectOf(page, "button.tc-mode");
   const gear = await rectOf(page, 'button[aria-label="Town settings"]');
   expect(gear.x, "the gear is the last").toBeGreaterThan(ic.x);
   if (test.info().project.name === "phone") {
-    // At the right end of the title's line, never over the title.
-    const title = await rectOf(page, ".town-bar h1");
+    // On the bar's line, right of the back button, the gear at the right end (since Nov 22 the title is for screen readers only, and
+    // home's Quests, Shop & crates and Friends sit between the chat icon and the gear).
+    const back = await rectOf(page, ".town-back");
     const bar = await rectOf(page, ".town-bar");
-    expect(meets(ic, title) || meets(gear, title), "the icons don't cover the title").toBe(false);
-    expect(ic.x, "right of the title").toBeGreaterThan(title.x + title.w);
+    expect(meets(ic, back) || meets(gear, back), "the icons don't cover the back button").toBe(false);
+    expect(ic.x, "right of the back button").toBeGreaterThan(back.x + back.w);
     expect(gear.x + gear.w, "at the right end").toBeGreaterThan(bar.x + bar.w - 24);
-    for (const r of [ic, gear]) expect(Math.abs(r.y + r.h / 2 - (title.y + title.h / 2)), "on the title's line").toBeLessThan(6);
+    for (const r of [ic, gear]) expect(Math.abs(r.y + r.h / 2 - (back.y + back.h / 2)), "on the back button's line").toBeLessThan(6);
   } else {
     // A computer (Nov 7, no bar): under "TOWN" in the right column's top slot, on one line, never over it.
     const town = await rectOf(page, ".rc-slot .rc-h");

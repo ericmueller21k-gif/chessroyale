@@ -16,6 +16,7 @@ export type { Stand };
  * the main bundle never loads the town's code.)
  */
 import type { TowerBack } from "./Town.tsx";
+import type { TownPages } from "./TownChatTools.tsx";
 export interface BotGameAsk {
   seat: string;
   name: string;
@@ -45,6 +46,8 @@ type Props = {
   stand: Stand | null;
   /** Back from a Battle Tower floor's match (PR 11b): the town opens in the tower (Town.tsx TowerBack). */
   tower: TowerBack | null;
+  /** A phone's bar's Quests, Shop & crates and Friends (Nov 22): each opens over the town (App.tsx's town layer). */
+  pages?: TownPages;
 };
 type Screen = FunctionComponent<Props & { framed: boolean }>;
 
@@ -53,7 +56,7 @@ type Screen = FunctionComponent<Props & { framed: boolean }>;
  * column's box, between the side menu and the live panel. A phone or a tablet (a tablet on its side included: touch) has the
  * whole screen, as it always had.
  */
-const COMPUTER = "(min-width: 1024px) and (hover: hover) and (pointer: fine)";
+export const COMPUTER = "(min-width: 1024px) and (hover: hover) and (pointer: fine)";
 
 /** Whether your account is known: the server's answer, and your profile where there are accounts (or none: no server). */
 const accountKnown = () => {
@@ -119,6 +122,10 @@ export function TownPage({ nav, layer, ...props }: Props & { nav: FrontNav; laye
       {screen}
     </FrontFrame>
   ) : (
-    screen
+    // (A phone's: the layer over the whole screen, PageLayer.tsx.)
+    <>
+      {screen}
+      {layer?.node}
+    </>
   );
 }

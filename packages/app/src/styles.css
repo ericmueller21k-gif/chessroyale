@@ -8118,10 +8118,12 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
    right column (the frame's own sizes), so both stay put and usable. Under the town's "Leave Chess Town?" (a sheet, 60) and the pages'
    overlays; over the town. Its page in the page's own column (920 px, centered), as from the main menu. A pop-up's card (Daily Quests,
    Play with friends: `see`) dims the town under it, its back the column's, not the window's. */
+.page-layer.in-town {
+  z-index: 55;
+}
 .page-layer.in-column {
   left: var(--fd-menu);
   right: var(--fd-rail);
-  z-index: 55;
 }
 .fd-root.framed.fd-on-town .page-layer.in-column > .fd-center {
   width: 100%;

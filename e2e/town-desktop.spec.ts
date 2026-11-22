@@ -25,7 +25,7 @@ const ready = (p: Page) => p.locator("canvas.town-canvas[data-ready='1']").waitF
 const onlyComputer = () => test.skip(test.info().project.name !== "desktop", "a computer's window: the desktop project");
 
 /** The bar's parts and the box's, measured. */
-const PARTS = { screen: ".town-screen", bar: ".town-bar", back: ".town-back", title: ".town-bar h1", chatBtn: ".tc-mode", gear: '[aria-label="Town settings"]', box: ".town-box", canvas: "canvas.town-canvas", controls: ".town-controls", zoom: ".town-zoom", focus: ".town-recenter", chat: ".town-chat" } as const;
+const PARTS = { screen: ".town-screen", bar: ".town-bar", back: ".town-back", map: ".tm-toggle", chatBtn: ".tc-mode", quests: '.town-bar [aria-label="Quests"]', shop: '.town-bar [aria-label="Shop & crates"]', friends: ".town-bar .fd-top-friends", gear: '[aria-label="Town settings"]', box: ".town-box", canvas: "canvas.town-canvas", controls: ".town-controls", zoom: ".town-zoom", focus: ".town-recenter", chat: ".town-chat" } as const;
 async function parts(p: Page) {
   // (One read of every box, as the page is now; a part that isn't there is null. Read one by one, each missing part waited the action
   // timeout, 15 s: a computer has no bar, so 45 s a read.)
@@ -231,24 +231,74 @@ test("a mouse window narrower than the frame (900 × 700) has the whole screen a
   const t = await parts(page);
   nearBox(t.screen, [0, 0, 900, 700], 1, "the whole screen");
   expect(t.chatBtn[0], "the chat icon is at the right").toBeGreaterThan(900 / 2);
-  expect(Math.abs(900 - 14 - (t.gear[0] + t.gear[2])), "the gear is at the right end").toBeLessThanOrEqual(1);
+  expect(Math.abs(900 - 18 - (t.gear[0] + t.gear[2])), "the gear is at the right end (home's 18 px margin since Nov 22)").toBeLessThanOrEqual(1);
+});
+
+test("a phone's bar (Nov 22): back and home's six buttons fit a 320 px phone at 40 px, in order, none touching; Shop & crates and Play with friends open over the town and close back to the same town", async ({ browser }) => {
+  onlyComputer();
+  const ctx = await browser.newContext({ ...devices["iPhone 13"], viewport: { width: 320, height: 568 } });
+  const page = await ctx.newPage();
+  await page.goto("/town?sky=day&townafk=off");
+  await ready(page);
+  await page.waitForTimeout(600);
+  const bar = page.locator(".town-bar");
+  const boxes = (await bar.locator("button").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }))) as Box[];
+  expect(boxes.length, "seven buttons").toBe(7);
+  // (In home's order after back and the map: the chat (its label says its mode), Quests, Shop & crates, Friends (Play with friends), the gear.)
+  const labels = await bar.locator("button").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
+  expect([labels[0], labels[1], labels[3], labels[4], labels[6]]).toEqual(["Back", "Map", "Quests", "Shop & crates", "Town settings"]);
+  expect(labels[2]).toMatch(/chat/i);
+  expect(labels[5]).toMatch(/^Play with friends/);
+  for (const [i, b] of boxes.entries()) {
+    expect(b[2], `button ${i}: at least 40 px`).toBeGreaterThanOrEqual(40);
+    expect(b[0], `button ${i}: on the screen`).toBeGreaterThanOrEqual(0);
+    expect(b[0] + b[2], `button ${i}: on the screen`).toBeLessThanOrEqual(320);
+    const prev = boxes[i - 1];
+    if (prev) expect(b[0], `button ${i}: after the one before, not touching`).toBeGreaterThanOrEqual(prev[0] + prev[2] + 4 - 0.5);
+  }
+  const cv = page.locator("canvas.town-canvas");
+  const square = await cv.getAttribute("data-you");
+  await cv.evaluate((el) => void ((el as unknown as { mark: number }).mark = 1));
+  const layer = page.getByTestId("town-layer");
+  const same = async (what: string) => {
+    await expect(layer, what).toHaveCount(0);
+    await expect(page.getByRole("alertdialog", { name: "Leave Chess Town?" }), what).toHaveCount(0);
+    expect(await cv.evaluate((el) => (el as unknown as { mark?: number }).mark), `${what}: the same town`).toBe(1);
+    expect(await cv.getAttribute("data-you"), `${what}: your square`).toBe(square);
+    expect(new URL(page.url()).pathname, what).toBe("/town");
+  };
+  // The shop over the whole screen, in its own page; its Back closes it.
+  await bar.getByRole("button", { name: "Shop & crates" }).click();
+  await expect(layer.getByRole("tab", { name: "Crates" })).toBeVisible();
+  nearBox(await box(page, '[data-testid="town-layer"]'), [0, 0, 320, 568], 1, "the whole screen");
+  await layer.getByRole("button", { name: "Back" }).first().click();
+  await same("the shop's Back");
+  // Play with friends (home's sheet): the back gesture closes it, not the town's "Leave Chess Town?".
+  await bar.getByRole("button", { name: /^Play with friends/ }).click();
+  await expect(layer.getByRole("dialog", { name: "Play with friends" })).toBeVisible();
+  await page.goBack();
+  await same("the back gesture");
+  await ctx.close();
 });
 
 /**
- * Phones and tablets: the town's boxes, with the frame absent: each is the whole screen, the bar's back button, title, chat icon and
+ * Phones and tablets: the town's boxes, with the frame absent: each is the whole screen, the bar's back button, map, chat icon, Quests, Shop & crates, Friends and
  * gear, the world, the arrow keys over the zoom pair and the focus button (Eric, Nov 4: the pair and the focus button 27 px and 57 px
  * wide, 87 px together with the keys' width, right-aligned: town-arrow-keys-v3), and the chat box. The bar, the world and the chat box
- * are main's (5e70aeed), to the pixel; the controls' boxes are the arrow keys' layout. Measured the same way (`devices["iPhone 13"]`
+ * are main's (5e70aeed), to the pixel (the bar's buttons since Nov 22: back and home's six, measured then); the controls' boxes are the arrow keys' layout. Measured the same way (`devices["iPhone 13"]`
  * with each window size: a touch screen, a tablet on its side included). The town animates, so boxes, not pixels.
  */
 const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
   "390x844": {
     screen: [0, 0, 390, 844],
     bar: [0, 0, 390, 52],
-    back: [14, 7.5, 36, 36],
-    title: [62, 16.5, 126, 18],
-    chatBtn: [296, 7.5, 36, 36],
-    gear: [340, 7.5, 36, 36],
+    back: [18, 3.5, 44, 44],
+    map: [78, 3.5, 44, 44],
+    chatBtn: [128, 3.5, 44, 44],
+    quests: [178, 3.5, 44, 44],
+    shop: [228, 3.5, 44, 44],
+    friends: [278, 3.5, 44, 44],
+    gear: [328, 3.5, 44, 44],
     box: [0, 52, 390, 792],
     canvas: [0, 52, 390, 792],
     controls: [289, 740, 87, 90],
@@ -259,10 +309,13 @@ const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
   "430x932": {
     screen: [0, 0, 430, 932],
     bar: [0, 0, 430, 52],
-    back: [14, 7.5, 36, 36],
-    title: [62, 16.5, 126, 18],
-    chatBtn: [336, 7.5, 36, 36],
-    gear: [380, 7.5, 36, 36],
+    back: [18, 3.5, 44, 44],
+    map: [98, 3.5, 44, 44],
+    chatBtn: [152, 3.5, 44, 44],
+    quests: [206, 3.5, 44, 44],
+    shop: [260, 3.5, 44, 44],
+    friends: [314, 3.5, 44, 44],
+    gear: [368, 3.5, 44, 44],
     box: [0, 52, 430, 880],
     canvas: [0, 52, 430, 880],
     controls: [329, 828, 87, 90],
@@ -273,10 +326,13 @@ const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
   "768x1024": {
     screen: [0, 0, 768, 1024],
     bar: [0, 0, 768, 52],
-    back: [14, 7.5, 36, 36],
-    title: [62, 16.5, 126, 18],
-    chatBtn: [674, 7.5, 36, 36],
-    gear: [718, 7.5, 36, 36],
+    back: [18, 3.5, 44, 44],
+    map: [436, 3.5, 44, 44],
+    chatBtn: [490, 3.5, 44, 44],
+    quests: [544, 3.5, 44, 44],
+    shop: [598, 3.5, 44, 44],
+    friends: [652, 3.5, 44, 44],
+    gear: [706, 3.5, 44, 44],
     box: [0, 52, 768, 972],
     canvas: [0, 52, 768, 972],
     controls: [667, 920, 87, 90],
@@ -287,10 +343,13 @@ const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
   "1024x768": {
     screen: [0, 0, 1024, 768],
     bar: [0, 0, 1024, 52],
-    back: [14, 7.5, 36, 36],
-    title: [62, 16.5, 126, 18],
-    chatBtn: [930, 7.5, 36, 36],
-    gear: [974, 7.5, 36, 36],
+    back: [18, 3.5, 44, 44],
+    map: [692, 3.5, 44, 44],
+    chatBtn: [746, 3.5, 44, 44],
+    quests: [800, 3.5, 44, 44],
+    shop: [854, 3.5, 44, 44],
+    friends: [908, 3.5, 44, 44],
+    gear: [962, 3.5, 44, 44],
     box: [0, 52, 1024, 716],
     canvas: [0, 52, 1024, 716],
     controls: [923, 664, 87, 90],
@@ -299,7 +358,7 @@ const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
     chat: [8, 60, 500, 340],
   }
 };
-test("phones and tablets: the town's boxes are main's at 390 × 844, 430 × 932, 768 × 1024 and a tablet on its side (1024 × 768, touch); no frame, both icons at the right", async ({ browser }) => {
+test("phones and tablets: the town's boxes are main's at 390 × 844, 430 × 932, 768 × 1024 and a tablet on its side (1024 × 768, touch); no frame; the bar's back and home's six buttons (Nov 22)", async ({ browser }) => {
   onlyComputer();
   for (const size of Object.keys(MAIN)) {
     const [w, h] = size.split("x").map(Number) as [number, number];
@@ -311,8 +370,9 @@ test("phones and tablets: the town's boxes are main's at 390 × 844, 430 × 932,
     await expect(page.locator(".fd-root, .fd-side, .fd-right"), `${size}: no frame`).toHaveCount(0);
     const t = await parts(page);
     for (const k of Object.keys(PARTS) as (keyof typeof PARTS)[]) nearBox(t[k], MAIN[size]![k], 0.6, `${size}: ${k}`);
-    expect(t.chatBtn[0], `${size}: the chat icon is right of the title`).toBeGreaterThanOrEqual(t.title[0] + t.title[2]);
-    expect(Math.abs(t.gear[0] - (t.chatBtn[0] + t.chatBtn[2] + 8)), `${size}: the icons sit together at the right`).toBeLessThanOrEqual(1);
+    // (Since Nov 22 the bar is back, then home's buttons: the map, the chat, Quests, Shop & crates, Friends and the gear, together at the right.)
+    await expect(page.locator(".town-bar h1"), `${size}: the title for screen readers only`).toHaveClass(/town-sr-title/);
+    expect(Math.abs(t.gear[0] + t.gear[2] - (w - 18)), `${size}: the gear at the right end`).toBeLessThanOrEqual(1);
     await ctx.close();
   }
 });
