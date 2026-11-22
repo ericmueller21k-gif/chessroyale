@@ -5,3 +5,6 @@
 - In the layer the side menu stays drawn and usable: the open page's item highlighted; another of those four switches the layer; Chess Town closes it; Home, Boss Battle, Auto chess (any game mode) leave the town as they do today. Settings: as today unless it's trivially the same (say what you did).
 - Phone: unchanged in this job (Eric is looking at where those go on the phone's town).
 - Checks: one focused check in the town spec (computer): open each of the four from the town, the town still there after closing (your pawn's square kept, still connected), Home leaves. Stills: the town with Shop & crates open over it, and with Profile. Decision note ~5 lines; docs/areas/hub.md and town-square.md.
+
+## Phone (Eric, Nov 22, added to the same job): "I don't think we need the word Chesstown here ... the back button, yes ... we should be adding more icons ... they should be the same as the main menu, so it's not confusing on mobile ... re-add for inventory, for quests, and we can put all those just up top."
+The town's phone top bar: back button kept, the title text dropped (aria-label kept), home's own top-bar buttons (Chat, Quests, Shop & crates, Friends, gear; same icons, order, look) beside the town's map; Quests, Shop & crates, Friends open as the same layers. Fit from 320 px with 40 px tap targets, or ask.
