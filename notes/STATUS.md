@@ -1709,3 +1709,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 
 - Nov 22, 13:20: #881 solo abandon MERGED (d9b094bb) after a review + 3 delta re-reviews. Follow-up nit N4 (rereview3-881.md on review/solo-abandon-delta3): Chandy's Dodge losing hit, a close in its ~7.5 s kill records a loss as left (no flip): fold into the solo resume/forfeit job (step 2). #880 carrot odds merged + live. #878 gold rides, #879 hopper theme live.
 - Running: flaky smudgy (session_01JuCWRuThqp6dE8dyzgqfvQ, high), turf mockup (session_01JuCWRsPGebdBiuokCUNzT3, high). Next: hopper pawn bounce (xhigh, alone), then solo resume/forfeit (step 2, + N4), turf build after Eric OKs the mockup.
+
+- Nov 22, 14:45: #882 flaky smudgy merged (main green), #883 pawn bounce merged. Follow-up nits from review-883.md (review/hopper-pawn-bounce): the last-move highlight after a bounce; a several-bosses test for the bounce; `due(b, s)` ignores s for pawnBounceMax: fold into the Turf build. Turf mockup sent to Eric (stills/hopper-turf-mockup), awaiting OK. Started solo resume/forfeit (brief notes/briefs/solo-resume-forfeit.md, includes #881's N4).
