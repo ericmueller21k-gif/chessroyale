@@ -33,7 +33,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   its new count in turn (`QUESTS.show`); one it finishes glows, pops, says "Done!" and bursts its reward; sounds by name (`questSound` in sound.ts,
   placeholders until Eric's pack: `QUEST_SOUND_FILES`; "done" is the shared steel pan level-up, `END_SCREEN.levelUp`, since Nov 20). e2e sets `hunchess.quests.noPop` unless `questsSeen: false`. The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
   every button keeps 40 px) and a computer's **Daily Quests** in its side menu, between Play with friends and Shop & crates (`nav.quests`: home with the
-  overlay open, via `intent`; in Chess Town the same card over the town, `QuestsLayer`, Nov 22, [town-square.md](town-square.md); Eric, Nov 10, [decision](../decisions/2026-11-10-desktop-quests.md); nothing on the card); for everyone, greyed ("Sign in
+  overlay open, via `intent`; in Chess Town the same card over the town, `QuestsLayer`, from the side menu or, on a phone, the town bar's own Quests (the town bar has home's Quests, Shop & crates and Friends since Nov 22), [town-square.md](town-square.md); Eric, Nov 10, [decision](../decisions/2026-11-10-desktop-quests.md); nothing on the card); for everyone, greyed ("Sign in
   for quests") for a guest where sign-in is set up. A game that finishes a quest says so in its result's toast ("Quest done: Boss Hunter +300 XP").
   Guards: `e2e/home-layout.spec.ts`, "quests (Nov 9, phase 3 …)", and `e2e/quests.spec.ts`, phone and computer.
 

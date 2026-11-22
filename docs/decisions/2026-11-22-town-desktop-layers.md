@@ -11,4 +11,9 @@ game mode, you can't."
   never move or hide. Quests and Play with friends stay cards (as on home), over the town dimmed. Making or joining a lobby from it, and
   your profile's Settings and friends, leave the town, so they ask "Leave Chess Town?" first (Eric's rule). **Settings stays as it was**
   (asks, then leaves): its page links on to the FAQ and Auto chess, which leave anyway. "You'll head back to Play." reads "...to Home."
-  (phone too: it's the same home). The walkthrough's PLAY slide no longer lights the side menu's Home. The phone's town is unchanged.
+  (phone too: it's the same home). The walkthrough's PLAY slide no longer lights the side menu's Home.
+- **The phone (Eric, Nov 22, via the director):** "I don't think we need the word Chesstown here ... we can put in the inventory icon ...
+  they should be the same as the main menu ... we can re-add for inventory, for quests, and we can put all those just up top"; "They can
+  definitely fit." The bar is back, map, chat, Quests, Shop & crates, Friends, gear in home's buttons, no title in sight. Calls: the chat
+  icon stays the town's (it shows the chat's mode) and the gear stays Town settings, in home's look; Friends opens Play with friends' sheet
+  (the director's word; the friends page would rewrite the town's address), labeled "Play with friends"; the layers cover the screen.
