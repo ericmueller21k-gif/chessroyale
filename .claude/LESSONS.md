@@ -222,6 +222,15 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A drag test holds the drag through each moment that can cut it off (the lock, the step's end, lock in, a cancelled pointer),
     and asserts no ghost, gold or piece changed; and a finger's drag is tested with real touch events, not only a mouse.
 
+- **Three review rounds, one cause** (Nov 22, #885, [story](../docs/history/lessons.md#three-review-rounds-one-cause-nov-22-2026)):
+  - A kept battle never shows what it hasn't kept. It keeps in the one place its updates reach the screen (`SoloMatch.show`: `set`
+    and `emit`), before they do, and at each beat a timed moment shows by the clock alone (`moment().reveals`), a little ahead of it.
+    Never a keep at the power a review named: the next power is the next finding.
+  - A new timed power (one whose screen changes with its clock, nobody's turn running) adds itself to `SoloMatch.moment()`: when it
+    began, your inputs in it, its reveals; and a rejoin carries it on from `KeptGame.moment`, never starting it again.
+  - When reviews keep finding the same kind of bug in new places, stop patching places: name the rule they all break, put it where
+    every path passes, and walk every path in one test against it (`solo-resume.test.ts`, "keep before show").
+
 ## Servers: everything ends
 
 - **A lobby that never closed** (Oct 7, [story](../docs/history/lessons.md#a-lobby-that-never-closed-oct-7-2026)):

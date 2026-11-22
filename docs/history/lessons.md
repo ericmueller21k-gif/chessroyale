@@ -1197,3 +1197,30 @@ Qh4 5.Na7 Qxf2#. Nov 20's fix had made one picker (`pickMove`) for exactly this,
 search of the test's five moves (both sides, every swap, any reply of his) found 9 mating lines with the old picker and none with
 `pickMove`. Smudgy's `yourMove` fails at once on a finished battle, naming the end, the position and the moves.
 docs/decisions/2026-11-22-flaky-smudgy-swap.md.
+
+
+## Three review rounds, one cause (Nov 22, 2026)
+
+**What happened:** PR #885 (solo Resume or Forfeit: a solo boss battle kept on the device and played on after a reload) went through
+three reviews, and each found holes the last round's fixes had left. Round 1: a reload while your move was scored took it back (I2);
+Chandy's Dodge replayed from round 1, its answers known (I3). Round 2: a Solo raid's crowd re-drawn by a reload (D1); a Dodge round
+replayed after its teleports (D2); a power-up's hints free again (D4); the God King's call replayed as no move (D5). Round 3: two
+windows, the second one's Resume opening a Dodge round before the teleports the first had shown (E1); Dash's Scramble Rush and Hollow's
+Lights out replayed after their sweep or their answers, seen in passing.
+
+**Why:** every one was the same bug. The battle showed the player something (a move scored, the bots' picks, a power-up's hints, a
+teleport, a sweep, a verdict) before the kept game held it, so a reload, a crash or another tab resumed from before it was seen. Each
+round added a keep at the power its review named, and each new keep was right; the next review found the next power. The cause was
+where the keeps lived: scattered at the steps someone had thought of, with no rule that said where one must be.
+
+**The fix:** the rule, in one place. A kept battle keeps in `show()`, which every update passes on its way to the screen (`set` and
+`emit`), before it reaches it, whenever the kept game would change (the times alone don't write: a Solo raid's turn has about 56
+updates, mostly its bots' progress, and 4 writes); and at each beat a timed moment's screen shows by the clock alone (a Dodge's
+teleports, the Rush's sweep, each Lights out round), 100 ms ahead of it. One `KeptGame.moment` (the time into it, your inputs) serves
+every timed power; a rejoin carries the Rush and Lights out on from it as the Dodge already did, and keeps what it was kept with until
+its first round (EN1). The scattered keeps went, and so did the `stopped` check after each: a stopped match's searches are never sent
+and its timers are cleared, so the step that found the stop ends there wherever it is. Keeping the steps the old keeps skipped showed
+two rejoins that had never been reached (the dark's move due, a strike due after the crowd's move), now played as they would have
+been. One test walks every timed power and moment in Boss alone and a Solo raid and checks the kept game at every update and every
+beat. docs/decisions/2026-11-22-solo-resume.md.
+
