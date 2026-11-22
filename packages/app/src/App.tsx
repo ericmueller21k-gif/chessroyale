@@ -1512,12 +1512,13 @@ export function App() {
     keepSolo(m, k.bots, lostToTab(m), k.at, { user: k.user, game: k.game, battle: k.battle });
     use(m);
     try {
-      m.resume(k.kept);
+      await m.resume(k.kept);
     } catch {
-      // (A kept game this version can't play on (a damaged entry): dropped; its game on the server is recorded as left at the next load.)
+      // (A kept game this version can't play on (a damaged entry; its first round, after his brain's load, failing too: N3): dropped,
+      // with a plain line, never a stuck screen; its game on the server is recorded as left at the next load.)
       m.dispose();
       clearKeptSolo(k.game);
-      setMatch(null);
+      setMatch((cur) => (cur === m ? null : cur));
       setError("Couldn't resume that game.");
     }
   };
@@ -1560,7 +1561,7 @@ export function App() {
     setTowerBack(null);
     history.replaceState(null, "", `/tower${location.search}`);
     use(m);
-    if (e.game) m.resume(e.game);
+    if (e.game) void m.resume(e.game);
     else m.start();
   };
   useEffect(() => onEnterFloor((e) => void startTowerFloor(e)), []);

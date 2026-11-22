@@ -249,6 +249,29 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     }
   }, 120_000);
 
+  // (The review of #885, N3: only the resume's first, synchronous part was inside App.tsx's catch.)
+  it("a resume whose first round fails, after his brain's load, rejects: the app's Resume drops it with a plain line, never a stuck screen", async () => {
+    const m = battle({ ...ALONE, bossId: "gingerbread", bossPowerTest: undefined } as Settings);
+    m.start();
+    await until(m, () => yourTurn(m), "your first turn");
+    pick(m);
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    const k = loadKeptSolo()!;
+    m.dispose();
+    const r = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...k.settings }, false, false);
+    vi.spyOn(r as unknown as { nextRound: () => void }, "nextRound").mockImplementation(() => {
+      throw new Error("no first round");
+    });
+    let outcome: string | null = null;
+    void r.resume(k.kept).then(
+      () => void (outcome = "resumed"),
+      (e: Error) => void (outcome = e.message),
+    );
+    for (let i = 0; i < 300 && outcome === null; i++) await step();
+    expect(outcome).toBe("no first round");
+    r.dispose();
+  }, 120_000);
+
   it("a Solo raid (bots in the crowd): kept with the crowd's move in from its reveal; resumed the same, its bots back in their seats (its Again is a Solo raid's)", async () => {
     const raid = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "gingerbread", bossFixedElo: 1600 } as Settings;
     const m = battle(raid, true);

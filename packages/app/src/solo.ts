@@ -473,8 +473,10 @@ export class SoloMatch implements GameView {
   /**
    * A tower floor rejoined after a reload (or a reopened app): the match as it was kept at its last step, played on from there (the
    * boss's brain loaded again; his entrance not played again once it has). The position is the same, so a reload can't dodge a loss.
+   * Settles once its first round has begun: it rejects if the game can't be played on from what was kept, its brain's load and first
+   * round included (the review of #885, N3: App.tsx's Resume then drops it with a plain line, never a stuck screen).
    */
-  resume(game: KeptGame) {
+  async resume(game: KeptGame): Promise<void> {
     warmEngineServer();
     this.runner = MatchRunner.restore(game.snapshot, {
       settings: this.baseSettings,
@@ -492,8 +494,18 @@ export class SoloMatch implements GameView {
     this.pendingMove = game.pending ?? null;
     this.begun = this.runner.boss ? this.runner.boss.crowdMoves > 0 || game.intro : false;
     this.bossIntroDone = game.intro;
-    if (game.intro) this.startBrain(() => this.nextRound());
-    else this.nextRound();
+    await new Promise<void>((done, fail) => {
+      const go = () => {
+        try {
+          this.nextRound();
+          done();
+        } catch (e) {
+          fail(e);
+        }
+      };
+      if (game.intro) this.startBrain(go);
+      else go();
+    });
   }
 
   /**

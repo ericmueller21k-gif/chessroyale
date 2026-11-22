@@ -9,3 +9,8 @@ playing it; Resume and Forfeit act on it as it is at the tap, never the card's c
 over, ended or replaced stops at its next keep ("Played in another tab."). Both are refused while another tab plays it (its live note,
 past the mark) or once its result waits to be sent ("That game has already ended.", and that result goes). A card on screen follows
 other tabs (`storage` events).
+
+Known, pre-launch (the review of #885; floors share both, left as they are): **N1**, time XP across a resume counts the time away
+(the server times the game from its start: bounded by `soloMinutesPerDay`); **N2**, a reload while he thinks plays his reply again on
+the rejoin, usually blind, but Chandy's first capture shows its crosshair before the keep. A resume that can't start its first round
+(N3) drops the game with "Couldn't resume that game."
