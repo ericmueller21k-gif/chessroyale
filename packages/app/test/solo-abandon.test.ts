@@ -15,12 +15,16 @@ vi.mock("../src/account.ts", () => ({
   startSoloGame: async () => (calls.push("start"), `game${calls.filter((c) => c === "start").length}`),
   markSoloGameReal: async (game: string, facts: { mode: string }) => (calls.push(`real ${game} ${facts.mode}`), markAnswers.shift() ?? true),
   keepSoloLive: (game: string) => void calls.push(`live ${game}`),
+  keepSoloResult: (game: string, result: { won?: boolean }) => void calls.push(`keep ${game} won ${result.won}`),
   endSoloLive: (game: string) => void calls.push(`end ${game}`),
   onlineGameXp: async () => null,
   refreshProfile: async () => undefined,
 }));
 vi.mock("../src/boss-tokens.ts", () => ({ accountReady: async () => true }));
 vi.mock("../src/test-switches.ts", () => ({ testParams: () => new URLSearchParams() }));
+/** The page's pagehide listeners (none in Node: the watch adds one with its first real game). */
+const onHide: (() => void)[] = [];
+vi.stubGlobal("addEventListener", (type: string, f: () => void) => void (type === "pagehide" && onHide.push(f)));
 
 const { noteFloorGame, noteSoloGame, postingSoloResult, soloGameId } = await import("../src/xp.ts");
 
@@ -30,12 +34,21 @@ function game() {
   const g = {
     moves: [] as { move: string | null; abstained?: boolean }[],
     over: false,
+    /** Its result once decided (SoloMatch.decided, as the app's result builds it), and how often the page going was told. */
+    result: null as { won: boolean } | null,
+    hides: 0,
     turn(move: string | null, abstained = false) {
       g.moves = [...g.moves, { move, abstained }];
       for (const f of [...listeners]) f();
     },
-    end() {
+    /** Decided, an end moment playing (a beaten boss's fall): an update with no new turn. */
+    decide(won = true) {
+      g.result = { won };
+      for (const f of [...listeners]) f();
+    },
+    end(result?: { won: boolean }) {
       g.over = true;
+      if (result) g.result = result;
       for (const f of [...listeners]) f();
     },
     watch: {
@@ -45,6 +58,8 @@ function game() {
       subscribe: (f: () => void) => (listeners.add(f), () => void listeners.delete(f)),
       over: () => g.over,
       facts: () => ({ mode: "boss" as const, players: 1, team: null, bossId: "gingerbread", bossElo: 1600 }),
+      result: () => g.result,
+      hide: () => void g.hides++,
     },
     listeners,
   };
@@ -123,6 +138,46 @@ describe("a solo game's SOLO_ABANDON.minMoves-th own move", () => {
     for (let i = 0; i < SOLO_ABANDON.minMoves + 5; i++) (test.turn("e4"), floor.turn("e4"));
     await settle();
     expect(calls.filter((c) => c !== "start")).toEqual([]);
+  });
+
+  it("decided (the review of #881, P1): its result is kept on the device at once, before any end moment plays, once; the page going is told", async () => {
+    calls.length = 0;
+    const g = game();
+    noteSoloGame(g, g.watch);
+    await soloGameId(g);
+    for (let i = 0; i < SOLO_ABANDON.minMoves; i++) g.turn("e4");
+    await settle();
+    // (Real: the page going is told to this game, which ends a reveal of its deciding move: SoloMatch.endOnHide.)
+    onHide.forEach((f) => f());
+    expect(g.hides).toBe(1);
+    g.decide();
+    await settle();
+    expect(calls.filter((c) => c.startsWith("keep"))).toEqual(["keep game1 won true"]);
+    // (Its fall's updates, the result screen: kept once; the result screen's post sends it, App.tsx. Then the page going isn't told.)
+    g.decide();
+    g.end();
+    await settle();
+    expect(calls.filter((c) => c.startsWith("keep"))).toEqual(["keep game1 won true"]);
+    onHide.forEach((f) => f());
+    expect(g.hides).toBe(1);
+    // (A result with no end moment before it (the page going on its deciding move's reveal: straight to the result) is kept as it shows.)
+    calls.length = 0;
+    const quick = game();
+    noteSoloGame(quick, quick.watch);
+    await soloGameId(quick);
+    for (let i = 0; i < SOLO_ABANDON.minMoves; i++) quick.turn("e4");
+    quick.end({ won: false });
+    await settle();
+    expect(calls.filter((c) => c.startsWith("keep"))).toEqual([`keep ${await soloGameId(quick)} won false`]);
+    // (Under minMoves the game is never recorded as left: nothing kept before the result screen's post.)
+    calls.length = 0;
+    const short = game();
+    noteSoloGame(short, short.watch);
+    for (let i = 0; i < SOLO_ABANDON.minMoves - 1; i++) short.turn("e4");
+    short.decide();
+    short.end();
+    await settle();
+    expect(calls.filter((c) => c.startsWith("keep"))).toEqual([]);
   });
 
   it("a new game's start waits for the last result's post (a start records the open game as left if it's real)", async () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { account, loadAccount, recordSoloResult, retryAccount, startSoloBossBattle, startSoloGame, verifyEmailCode } from "../src/account.ts";
+import { account, keepSoloResult, loadAccount, recordSoloResult, retryAccount, signOut, startSoloBossBattle, startSoloGame, verifyEmailCode } from "../src/account.ts";
 import { siteSignedOut } from "../src/site-gate.ts";
 import { FRONT_DOOR, SOLO_ABANDON } from "@chessroyale/core";
 import { testSwitchesAllowed } from "../src/test-switches.ts";
@@ -212,7 +212,9 @@ describe("the account's load and a solo game left (SOLO_ABANDON, Nov 22)", () =>
   const live = (minutesAgo: number) => JSON.stringify({ game: "abc", at: Date.now() - minutesAgo * 60_000 });
   const GAME = "0123456789abcdef01";
   const result = { mode: "boss" as const, placement: 1, players: 1, evalBar: true, game: GAME };
-  const kept = (user = "u") => ({ "brc.soloUnsent": JSON.stringify({ user, result }) });
+  /** A kept result (`at`: its post went that many ms ago, maybe still on its way; none: no post on its way). */
+  const kept = (user = "u", at?: number) => ({ "brc.soloUnsent": JSON.stringify({ user, result, ...(at === undefined ? {} : { at: Date.now() - at }) }) });
+  const resent = `/api/results ${JSON.stringify({ ...result, resent: true })} (keepalive)`;
   /** An answer with this status (0: none at all, offline). */
   const answer = (status: number) => () => (status ? Response.json({ message: "nope" }, { status }) : Promise.reject(new TypeError("Failed to fetch")));
   /** Every status a result's post can meet: kept (sent again later) or final. */
@@ -248,7 +250,7 @@ describe("the account's load and a solo game left (SOLO_ABANDON, Nov 22)", () =>
     expect(d.kept()).toBe(false);
   });
 
-  it("the review's case: a page gone mid-post keeps the result; the next load doesn't settle, names its game, and sends it again", async () => {
+  it("the review's case: a page gone mid-post keeps the result; the next load doesn't settle and names its game, and sends it again once its post can't still be on its way (D2)", async () => {
     let d = device({});
     await loadAccount();
     // (The post never answers: the page was closed or reloaded.)
@@ -256,13 +258,63 @@ describe("the account's load and a solo game left (SOLO_ABANDON, Nov 22)", () =>
     void recordSoloResult(result);
     await vi.waitFor(() => expect(d.calls).toHaveLength(1));
     const store = Object.fromEntries(d.store);
-    expect(store["brc.soloUnsent"]).toBeTruthy();
-    // A fresh load: the profile read spares the kept game (`unsent`, never settled or stale), then the result goes again (`resent`).
+    expect(JSON.parse(store["brc.soloUnsent"]!).at).toBeGreaterThan(Date.now() - 1000);
+    // A fresh load at once: the profile read spares the kept game (`unsent`, never settled or stale), but nothing goes again yet: its
+    // post (keepalive) may still land, and a re-send overtaking it would take the game and its XP (the delta review, D2).
     d = device(store);
     await loadAccount();
     expect(d.me()).toBe(`/api/me?unsent=${GAME}`);
-    await vi.waitFor(() => expect(d.calls).toContain(`/api/results ${JSON.stringify({ ...result, resent: true })} (keepalive)`));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(d.calls.some((c) => c.startsWith("/api/results"))).toBe(false);
+    expect(d.kept()).toBe(true);
+    // (Nor a start: it names the game instead.)
+    await startSoloGame({});
+    expect(d.calls.filter((c) => c.startsWith("/api/xp") || c.startsWith("/api/results"))).toEqual([`/api/xp/solo/start ${JSON.stringify({ unsent: GAME })}`]);
+    // SOLO_ABANDON.resendAfterMs on: the load sends it again (`resent`), and it's taken off on the answer.
+    d = device(kept("u", SOLO_ABANDON.resendAfterMs + 1));
+    await loadAccount();
+    expect(d.me()).toBe(`/api/me?unsent=${GAME}`);
+    await vi.waitFor(() => expect(d.calls).toContain(resent));
     await vi.waitFor(() => expect(d.kept()).toBe(false));
+  });
+
+  it("a post that failed (D2): kept with no post on its way, so the next load or start sends it again at once", async () => {
+    let d = device({});
+    await loadAccount();
+    d = device({}, answer(503));
+    await recordSoloResult(result);
+    const store = Object.fromEntries(d.store);
+    expect(JSON.parse(store["brc.soloUnsent"]!)).toEqual({ user: "u", result });
+    d = device(store);
+    await startSoloGame({});
+    expect(d.calls.filter((c) => !c.startsWith("/api/me"))).toEqual([resent, `/api/xp/solo/start {}`]);
+    expect(d.kept()).toBe(false);
+  });
+
+  it("the review's P1: a game decided, its result kept at once (keepSoloResult) and the page gone in its end moment: the next load sends it", async () => {
+    let d = device({});
+    await loadAccount();
+    keepSoloResult(GAME, { mode: "boss", placement: 1, players: 1, evalBar: true });
+    const store = Object.fromEntries(d.store);
+    expect(JSON.parse(store["brc.soloUnsent"]!)).toEqual({ user: "u", result });
+    d = device(store);
+    await loadAccount();
+    expect(d.me()).toBe(`/api/me?unsent=${GAME}`);
+    await vi.waitFor(() => expect(d.calls).toContain(resent));
+    await vi.waitFor(() => expect(d.kept()).toBe(false));
+  });
+
+  it("signing out sends a kept result first, even one whose post may be on its way (the delta review, D3): else the guest drops it and the game is recorded as left", async () => {
+    let d = device({});
+    await loadAccount();
+    for (const at of [undefined, 0]) {
+      d = device(kept("u", at));
+      await signOut();
+      expect(d.calls.map((c) => c.split(" ")[0])).toEqual(["/api/results", "/api/auth/logout"]);
+      expect(d.kept()).toBe(false);
+      d = device({});
+      await loadAccount();
+    }
   });
 
   it("sent again at the load: kept again on the same failures as the first post, taken off on an answer", async () => {
@@ -281,19 +333,16 @@ describe("the account's load and a solo game left (SOLO_ABANDON, Nov 22)", () =>
     await vi.waitFor(() => expect(d.kept()).toBe(false));
     d = device(kept(), answer(503));
     await startSoloGame({});
-    expect(d.calls.filter((c) => !c.startsWith("/api/me"))).toEqual([
-      `/api/results ${JSON.stringify({ ...result, resent: true })} (keepalive)`,
-      `/api/xp/solo/start ${JSON.stringify({ unsent: GAME })}`,
-    ]);
+    expect(d.calls.filter((c) => !c.startsWith("/api/me"))).toEqual([resent, `/api/xp/solo/start ${JSON.stringify({ unsent: GAME })}`]);
     d = device({});
     await startSoloGame({ xpgame: 3 });
     expect(d.calls).toEqual([`/api/xp/solo/start ${JSON.stringify({ xpgame: 3 })}`]);
   });
 
-  it("an email sign-in sends a kept result first (a guest's open game is recorded as left as it joins an account)", async () => {
+  it("an email sign-in sends a kept result first, even one whose post may be on its way (a guest's open game is recorded as left as it joins an account)", async () => {
     let d = device({});
     await loadAccount();
-    d = device(kept());
+    d = device(kept("u", 0));
     await verifyEmailCode("ann@example.com", "123456");
     expect(d.calls.map((c) => c.split(" ")[0])).toEqual(["/api/results", "/api/auth/email/verify"]);
     expect(d.kept()).toBe(false);
