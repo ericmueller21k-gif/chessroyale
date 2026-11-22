@@ -33,12 +33,12 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   its new count in turn (`QUESTS.show`); one it finishes glows, pops, says "Done!" and bursts its reward; sounds by name (`questSound` in sound.ts,
   placeholders until Eric's pack: `QUEST_SOUND_FILES`; "done" is the shared steel pan level-up, `END_SCREEN.levelUp`, since Nov 20). e2e sets `hunchess.quests.noPop` unless `questsSeen: false`. The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
   every button keeps 40 px) and a computer's **Daily Quests** in its side menu, between Play with friends and Shop & crates (`nav.quests`: home with the
-  overlay open, via `intent`; Eric, Nov 10, [decision](../decisions/2026-11-10-desktop-quests.md); nothing on the card); for everyone, greyed ("Sign in
+  overlay open, via `intent`; in Chess Town the same card over the town, `QuestsLayer`, Nov 22, [town-square.md](town-square.md); Eric, Nov 10, [decision](../decisions/2026-11-10-desktop-quests.md); nothing on the card); for everyone, greyed ("Sign in
   for quests") for a guest where sign-in is set up. A game that finishes a quest says so in its result's toast ("Quest done: Boss Hunter +300 XP").
   Guards: `e2e/home-layout.spec.ts`, "quests (Nov 9, phase 3 …)", and `e2e/quests.spec.ts`, phone and computer.
 
 - **The first-time walkthrough** (`components/Walkthrough.tsx`, slides in `tutorial.ts`): 13 slides; each lights every visible
-  `data-tour` element (a computer's side menu and home button both). Only the last slide has OK and "Don't show me this again";
+  `data-tour` element (a computer's side menu and home button both; PLAY's slide only PLAY since the side menu's Play became Home, Nov 22). Only the last slide has OK and "Don't show me this again";
   `?tour=1` reopens it. Decision: [2026-11-07-walkthrough-v2.md](../decisions/2026-11-07-walkthrough-v2.md).
 
 - **Kill switches and the maintenance banner** ([ops.md](ops.md) "Kill switches"): a mode, Solo and Boss alone, or
@@ -222,7 +222,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Your profile (Nov 11):** "View profile" in the card's bottom-right corner (13 px words and its box at the bottom edge on cards under 110 px); `e2e/home-layout.spec.ts`, "View profile never covers your name".
   - **Portrait (Nov 11, Eric: rotation off on phones):** a phone held sideways (landscape, 500 px high or less) is covered by `#rotate-lock` in `index.html`; the installed app is locked by its manifest, and `main.tsx` asks `screen.orientation.lock` where a browser allows it.
-  - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
+  - **Computer** (1024 px+): a side menu (from the top: **Home**, Eric, Nov 22: "instead of making it say play, we should just change it to
+    ... home", it was Play; Chess Town, Boss Battle, Play with friends, Daily Quests, Shop & crates, Profile, and Settings at the bottom; in
+    Chess Town the middle four open over the town: [town-square.md](town-square.md)), the play column in the center in the phone's order (Eric, Oct 18): the RANKED
     row, its panel, the line above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side (a little shorter) at the
     bottom; the right column (Nov 7, Eric's mockup; the same place on every framed page: a 62 px slot, TOWN and its tools in the
     town; FRIENDS ›; the live line; the global chat, [chat.md](chat.md)). The pawn hops on a computer too (Oct 24: the hop was phone-only). Nov 11: no pawn or chat button in the top area on a computer.
