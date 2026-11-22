@@ -4,7 +4,7 @@ import { crateDef, hasRewards, rewardLines, type CrateLook, type XpGrant, type X
 import { refreshProfile } from "../account.ts";
 import { play } from "../sound.ts";
 import { BetaCrateArt, HunchessCrateArt, KeyArt, WinterCrateArt } from "./Items.tsx";
-import { InventoryLayer } from "./InventoryLayer.tsx";
+import { InventoryLayer } from "./PageLayer.tsx";
 
 /**
  * What a game paid beside its XP (Nov 9, XP phase 2; core's XpRewards): a paying level's crates and key ("Level 8!": every 2nd level

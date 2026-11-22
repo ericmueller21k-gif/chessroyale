@@ -3,6 +3,7 @@ import { BossPortrait } from "./BossPortrait.tsx";
 import { QUESTS, type QuestIcon, type QuestView } from "@chessroyale/core";
 import { questSound, warmQuestSounds } from "../sound.ts";
 import { KeyArt, WinterCrateArt } from "./Items.tsx";
+import { questCountdowns, useQuests } from "../quests.ts";
 
 /**
  * The daily quests overlay (design: notes/briefs/design-xp-quests.md, section 5; Eric's reference of Nov 9): a framed card over
@@ -256,9 +257,10 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, paused, fro
   // (A layout effect, as the other notices': Escape closes it from its first frame, and "Got it" has the focus.)
   useLayoutEffect(() => {
     ok.current?.focus({ preventScroll: true });
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    // (Its Escape is its own, heard first: nothing under it (a page layer, a screen, the town) acts on it too.)
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), onClose());
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
   }, [onClose]);
   const dailies = quests.filter((q) => q.period === "daily");
   const weekly = quests.filter((q) => q.period === "weekly");
@@ -305,4 +307,15 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, paused, fro
       </div>
     </div>
   );
+}
+
+/**
+ * Daily Quests over Chess Town on a computer (App.tsx's town layer, Nov 22: Eric, "you should be able to just click ... daily quests ...
+ * without exiting out of Chesttown"): the same card as home's, read the same way (useQuests), shown as soon as the answer is in.
+ */
+export function QuestsLayer({ onClose }: { onClose: () => void }) {
+  const q = useQuests(true);
+  if (!q.answer) return null;
+  const left = questCountdowns(q.answer, q.receivedAt);
+  return <QuestsOverlay quests={q.answer.quests} dailyResetIn={left.daily} weeklyResetIn={left.weekly} paused={!!q.answer.paused} from={q.from} onReroll={q.reroll} onClose={onClose} />;
 }

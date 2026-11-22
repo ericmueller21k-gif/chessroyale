@@ -22,8 +22,14 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   dynamic `import()`, so none of its code, art or styles are in the main bundle. The back button goes home (and the
   address back to `/`). Stockfish isn't warmed on this page, and nothing of Maia's loads
   while you walk round it (Eric's frame-rate rule, `docs/rules/eric.md`); a game with a bot loads it when it opens.
-- **Layout.** A slim bar (the back button, "Town square", and at its right end the chat icon and the gear: "The chat log"),
-  then the world fills the rest of the screen. **On a computer (Oct 29, Eric) the town sits in the front door's frame:** the side
+- **Layout.** A slim bar, then the world fills the rest of the screen. **A phone's bar (Nov 22, Eric: "I don't think we need the word
+  Chesstown here ... we should be adding more icons ... they should be the same as the main menu, so it's not confusing on mobile"):**
+  the back button, then the map, the chat icon ("The chat log"), home's **Quests, Shop & crates and Friends** and the gear (Town
+  settings), all in home's top bar's buttons (`.fd-icon-btn`, home's outline icons; `PageButtons` in `TownChatTools.tsx`, town.css); the
+  title ("Town square", a room's name) for screen readers only. Quests, Shop & crates and Friends (Play with friends' sheet) open over
+  the town as page layers (below), never leaving it. Home's sizes: 44 px buttons, 18 px margins, 10 px gaps (6 px below 430 px); seven
+  fit every phone, never under 40 px: 4 px gaps below 390 px, 40 px buttons below 375 px, 4 px gaps and 8 px margins below 352 px (320 px
+  exactly). The same bar inside the rooms. **On a computer (Oct 29, Eric) the town sits in the front door's frame:** the side
   menu on the left (Chess Town marked as where you are) and the live panel with the global chat on the right, as on home, and the
   town filling the center column's box, edge to edge (`.fd-center`, which is home's middle box: the same left, top, width and
   height at every size from 1024 px up; the box is as high as the window, so at 1024 to 1279 px, where home's own box grows
@@ -35,8 +41,17 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   `TownPage` wraps the town in `FrontFrame page="town"` there (`fd-on-town`, 1080 px at most, as home's), and the town adds
   `in-frame` to its screen (`town.css`: in the page's flow, the window's height, not fixed). On a computer **the chat icon sits right
   after the "Town square" title and the gear alone at the right end** (`town-chat.css`: the tools' box `display: contents`, the gear
-  `margin-left: auto`): the chat's place was hard to see at the far right. Every side-menu item leaves the town (`goHome` in
-  `App.tsx` closes it), Chess Town opens it again. Leaving asks "Leave Chess Town?" first (`town/LeaveTown.tsx`; Stay focused,
+  `margin-left: auto`): the chat's place was hard to see at the far right. **The side menu's Play with friends, Daily Quests, Shop & crates and Profile open
+  over the town** (Nov 22, Eric: "you should be able to just click play with friends, daily quests, shop in crates, and profile without
+  exiting out of Chesttown"; [decision](../decisions/2026-11-22-town-desktop-layers.md)): a page layer (`components/PageLayer.tsx`
+  `inColumn`, App.tsx `townLayer`) over the town's middle column only, the town mounted under it as it was (your pawn, the chat, a party,
+  the server's presence), the side menu and the right column as they are and usable. The shop and your profile are their own screens in
+  the page's 920 px column; Daily Quests and Play with friends are home's cards over the town dimmed. The open page's item is lit; another
+  of the four switches the layer in place; Back, Escape, the back gesture (one history step of its own) and Chess Town close it; no key
+  reaches the town under it (typing in the right column's chat goes on). What leaves from inside it (a lobby made or joined, Settings,
+  your friends) asks first. Main menu (it was Play until Nov 22), Boss Battle, Settings and your friends leave the town (`goHome` in `App.tsx`
+  closes it), Chess Town opens it again. On a phone (and any window without the frame) the bar's Quests, Shop & crates and Friends open
+  the same layers over the whole screen (the shop in its page's own frame, as the inventory layer). Leaving asks "Leave Chess Town?" first (`town/LeaveTown.tsx`; Stay focused,
   Escape is Stay; both set in layout effects so a key in the sheet's first frame isn't lost, Nov 10), from the street and inside any building
   (Nov 13): the side menu, back, the back gesture, an invite's Join (`setInviteHost` in `App.tsx`: Stay keeps the invite) and a profile's
   Challenge over the town (Stay makes no game). The town pushes a step of its own into the history as it shows (`TOWN_STEP`, App.tsx), so
@@ -1397,8 +1412,10 @@ noted wherever a slice changed one.
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
   (within a pixel), the menu and the right column are home's with the global chat showing, Chess Town is marked, no bar (Nov 7): the chat icon
   and the gear centered in the right column's slot under TOWN, the world fills the box, the buttons keep
-  their corner and the chat box its place, the chips and an open card are inside the box and the page doesn't scroll; the side menu's Play and
-  Chess Town go home and back; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse
+  their corner and the chat box its place, the chips and an open card are inside the box and the page doesn't scroll; the side menu's Main menu and
+  Chess Town go home and back; the four pages open over the town (Nov 22) and close back to the same town, your square kept and no goodbye
+  sent, Home still asking to leave; a phone's bar at 320 px holds back and home's six buttons at 40 px, and its Shop & crates and Play
+  with friends open over the town and close back to it; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse
   window has the whole screen and both icons at the right; and phones (390 × 844, 430 × 932) and tablets (768 × 1024, 1024 × 768 touch) have
   main's boxes (taken at 5e70aeed) for the screen, the bar, its four buttons, the world, the controls and the chat box, and no frame.
 - `packages/app/test/town-camera.test.ts`: the projection (the focus in the middle column, wrapping both ways, a tap picks

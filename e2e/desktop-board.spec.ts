@@ -478,7 +478,7 @@ test("a computer's game screens: the side menu is on each; icons only below 1800
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
   // (Daily Quests (Eric, Nov 10): its tooltip says "Sign in for quests" while quests aren't yours.)
-  const items = ["Play", "Chess Town", "Boss Battle", "Play with friends", "Daily Quests", "Shop & crates", "Profile", "Settings"];
+  const items = ["Main menu", "Chess Town", "Boss Battle", "Play with friends", "Daily Quests", "Shop & crates", "Profile", "Settings"];
   const check = async (at: string, labels: boolean) => {
     const side = page.locator(".gm-frame > .fd-side");
     await expect(side, `${at}: the side menu`).toBeVisible();

@@ -138,7 +138,7 @@ test("the town square at /town: the world is drawn and fills its box under the b
 
   // Back asks first ("Leave Chess Town?", e2e/town-leave.spec.ts), and Leave goes home, with the address back to /. (A computer's is the
   // side menu's Play since Nov 7, no bar: it asks the same.)
-  if (computer) await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play", exact: true }).click();
+  if (computer) await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Main menu", exact: true }).click();
   else await page.getByRole("button", { name: "Back", exact: true }).click();
   await page.getByRole("alertdialog", { name: "Leave Chess Town?" }).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();

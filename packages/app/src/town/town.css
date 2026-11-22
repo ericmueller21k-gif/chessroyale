@@ -88,6 +88,73 @@
   line-height: 1;
   cursor: pointer;
 }
+/*
+ * A phone's bar (Eric, Nov 22: "I don't think we need the word Chesstown here ... we should be adding more icons ... they should be the
+ * same as the main menu, so it's not confusing on mobile"): back, then the map, the chat, Quests, Shop & crates, Friends and the gear, all
+ * in home's top bar's buttons (`.fd-icon-btn`: 44 px rounded squares, home's 29 px outline icons), no title in sight. Home's margins and
+ * gaps (18 px; 10 px gaps, 6 below 430 px). Seven buttons fit every phone (the director, Nov 22: never a tap target under 40 px): below
+ * 390 px the gaps go to 4 px; below 375 px the buttons are 40 px (home's) with 6 px gaps; below 352 px 4 px gaps and 8 px margins
+ * (7 x 40 + 6 x 4 + 2 x 8 = 320).
+ */
+.town-screen:not(.in-frame) .town-bar,
+.town-screen:not(.in-frame) .town-bar .town-tools {
+  gap: 10px;
+}
+.town-screen:not(.in-frame) .town-bar {
+  padding: env(safe-area-inset-top) calc(18px + env(safe-area-inset-right)) 0 calc(18px + env(safe-area-inset-left));
+}
+.town-bar .fd-icon-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.town-bar .fd-icon-btn svg {
+  width: 29px;
+  height: 29px;
+}
+.town-bar .fd-icon-btn .tc-bub {
+  stroke: var(--fd-panel-2);
+}
+@media (max-width: 429px) {
+  .town-screen:not(.in-frame) .town-bar,
+  .town-screen:not(.in-frame) .town-bar .town-tools {
+    gap: 6px;
+  }
+}
+@media (max-width: 389px) {
+  .town-screen:not(.in-frame) .town-bar,
+  .town-screen:not(.in-frame) .town-bar .town-tools {
+    gap: 4px;
+  }
+}
+@media (max-width: 374px) {
+  .town-screen:not(.in-frame) .town-bar,
+  .town-screen:not(.in-frame) .town-bar .town-tools {
+    gap: 6px;
+  }
+  .town-bar .fd-icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+@media (max-width: 351px) {
+  .town-screen:not(.in-frame) .town-bar,
+  .town-screen:not(.in-frame) .town-bar .town-tools {
+    gap: 4px;
+  }
+  .town-screen:not(.in-frame) .town-bar {
+    padding-left: calc(8px + env(safe-area-inset-left));
+    padding-right: calc(8px + env(safe-area-inset-right));
+  }
+}
 /* The world's box: whatever is left. The world works its camera out from this box's shape. */
 .town-box {
   position: relative;
