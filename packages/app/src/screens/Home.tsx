@@ -1284,7 +1284,6 @@ export function HomeScreen({
           {panel}
           {go}
           {chessTownButton}
-          <h2 class={`fd-label fd-other-label${off}`}>Other modes</h2>
           <div class={`rd-pair${off}`} inert={searching}>
             {soloCard}
             {autoCard}

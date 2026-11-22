@@ -81,7 +81,7 @@ test("50 v 50: Exit keeps you queued; home's rows show the search in their own b
   // Greyed in place and not tappable: the RANKED label, the line and PLAY, Chess Town, Other modes and its cards. Lit: the top, your card.
   await expect(play(page)).toBeDisabled();
   expect(await page.evaluate(() => [".fd-go", ".fd-town", ".rd-pair"].map((s) => document.querySelector<HTMLElement>(s)!.inert))).toEqual([true, true, true]);
-  for (const s of [".fd-ranked > .fd-label", ".fd-go", ".fd-town", ".fd-other-label", ".rd-pair"]) await expect(page.locator(s)).toHaveClass(/\bfd-off\b/);
+  for (const s of [".fd-ranked > .fd-label", ".fd-go", ".fd-town", ".rd-pair"]) await expect(page.locator(s)).toHaveClass(/\bfd-off\b/);
   await expect(page.locator(".fd-hero")).not.toHaveClass(/\bfd-off\b/);
   expect(await page.locator(".fd-hero").evaluate((e) => (e as HTMLElement).inert || !!e.closest("[inert]"))).toBe(false);
   // No bar on home (the rows say it).
