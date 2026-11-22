@@ -3417,6 +3417,12 @@ export const SOLO_ABANDON = {
    * load and a start don't send it again yet (a re-send overtaking it would take the game and its XP), only name it (ms).
    */
   resendAfterMs: 15_000,
+  /**
+   * Step 2, Resume / Forfeit (Eric, Nov 22): a solo boss battle (Boss alone, a Solo raid) is kept on the device from this many of your
+   * own moves, so a reload offers "You have a game in progress" with Resume and Forfeit (past `minMoves` a Forfeit is a loss; under it
+   * nothing is recorded). Stale after `staleHours`, as the server's record.
+   */
+  keepFromMoves: 1,
 } as const;
 
 /** One of 1 v 1's time controls: a bank for the game and an increment after every timed move, as chess writes them. */

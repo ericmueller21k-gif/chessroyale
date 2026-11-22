@@ -124,6 +124,14 @@ export function noteFloorGame(match: object, rejoin: { xp?: string } | null, kee
   noteSoloGame(match);
   void soloGameId(match).then((id) => id && keep(id));
 }
+/**
+ * A solo boss battle resumed from this device (step 2, Resume): it goes on with its own game on the server (its row open, its 10-move
+ * mark as it was: a mark sent again changes nothing), never a new start, which would record it as left. Watched as at its start.
+ */
+export function resumeSoloGame(match: object, game: string, watch: SoloGameWatch): void {
+  soloGames.set(match, Promise.resolve(game));
+  watchSoloGame(match, watch);
+}
 /** The id the server gave this solo game as it began (null: none). */
 export const soloGameId = (match: object): Promise<string | null> => soloGames.get(match) ?? Promise.resolve(null);
 

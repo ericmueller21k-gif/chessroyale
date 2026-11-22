@@ -22,7 +22,8 @@ import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
 import { PageLayer, layerTakesPop } from "./components/PageLayer.tsx";
-import { account, askAgeAgain, askAgeForGoogle, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult, setTestXp } from "./account.ts";
+import { KEPT_ELSEWHERE, KEPT_ENDED, account, askAgeAgain, askAgeForGoogle, askForfeitFirst, keptSoloOpen, leftSoloLive, loadAccount, mustSignInToPlayOnline, offerKeptSolo, playerName, recordSoloResult, reofferKeptSolo, setTestXp, takeKeptSolo } from "./account.ts";
+import { SoloKeep, clearKeptSolo, onKeptAnswers, type KeptSolo } from "./solo-kept.ts";
 import { leavesNote } from "./ranked.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo, difficultyMaia } from "./boss-difficulty.ts";
@@ -61,8 +62,8 @@ import { bossMusic, recluseMusic, themeKnown, type MusicBattle } from "./music.t
 import { breadcrumbs, noteWhere } from "./problems.ts";
 import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
-import { noteSoloBattle } from "./boss-tokens.ts";
-import { noteFloorGame, noteSoloGame, postingSoloResult, settleSoloXp, soloGameId, soloTestGame, type SoloGameWatch } from "./xp.ts";
+import { noteSoloBattle, resumeSoloBattle, soloBattleId } from "./boss-tokens.ts";
+import { noteFloorGame, noteSoloGame, postingSoloResult, resumeSoloGame, settleSoloXp, soloGameId, soloTestGame, type SoloGameWatch } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
 import { kingSay, type KingCue } from "./godKing.ts";
 import { game } from "./lazy-game.ts";
@@ -175,6 +176,33 @@ const soloWatch = (m: SoloMatch): SoloGameWatch => ({
     };
   },
 });
+
+/**
+ * A solo boss battle (Boss alone, a Solo raid) kept on this device after every step, so a reload offers Resume or Forfeit (step 2,
+ * Nov 22; solo-kept.ts). Never the Hidden Boss (his forms and phase 2 aren't in the runner's snapshot): his game is never written.
+ * `ids`: a resumed game's (the account and the server's ids, as kept); else they come with its start's answers. `lost`: another tab
+ * took the game over (its Resume) or ended it: this tab's match stops (the review of #885, I1).
+ */
+function keepSolo(m: SoloMatch, bots: boolean, lost: () => void, at = Date.now(), ids?: { user: string; game: string; battle: string | null }): void {
+  const watch = soloWatch(m);
+  const keep = new SoloKeep({
+    at,
+    bots,
+    settings: () => m.settings,
+    facts: () => watch.facts(),
+    boss: () => {
+      const b = m.runner?.boss;
+      return b && b.id !== "recluse" ? (b.id ?? null) : null;
+    },
+    lost,
+  });
+  m.kept = keep;
+  if (ids) return keep.ready(ids.user, ids.game, ids.battle);
+  void Promise.all([soloGameId(m), soloBattleId(m)]).then(([game, battle]) => {
+    const user = account().profile?.user.id;
+    if (game && user) keep.ready(user, game, battle);
+  });
+}
 
 /**
  * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
@@ -529,7 +557,7 @@ export function App() {
       // Not important.
     }
   };
-  const { config, profile } = useAccount();
+  const { config, profile, soloKept } = useAccount();
   useEffect(() => {
     if (!signinParam) return;
     if (signinParam === "age") askAgeAgain();
@@ -1429,6 +1457,8 @@ export function App() {
       return setError(pausedLine("solo"));
     }
     unlockAudio();
+    // (A solo boss battle kept on this device (step 2): "Forfeit your game in progress?" first, never recorded as left unasked.)
+    if (!(await askForfeitFirst(account().profile?.user.id))) return;
     setLoading(true);
     // (Solo's code, its opening library and the match's screens, each fetched once: usually here already, play was near.)
     const [engines, soloCode] = await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
@@ -1450,10 +1480,63 @@ export function App() {
     // XP (Nov 9): the server times every solo game by its own clock, from now to its result (xp.ts). Left after SOLO_ABANDON.minMoves of
     // your own moves, it counts as a loss (Nov 22): the server is told at that move (never for a game with a test switch on).
     noteSoloGame(m, soloTestGame(practiceOn()) ? undefined : soloWatch(m));
+    // (A boss battle, kept on this device as it's played, so a reload can resume it: step 2. Not a test game: it counts for nothing.)
+    if (m.settings.raid && !soloTestGame(practiceOn())) keepSolo(m, fill, lostToTab(m));
     use(m);
     if (fill) m.fill();
     else m.start();
   };
+
+  /**
+   * Resume (the card's: components/GameInProgress.tsx): back into the kept boss battle exactly where it was (SoloMatch.resume: its
+   * snapshot, your moves, the time used on your turn), with the same game on the server (its 10-move mark as it was) and the same boss
+   * battle (its token timed from its start). The kept game as it is at the tap, never the card's copy, claimed for this tab (account.ts
+   * takeKeptSolo: another tab may have played on, ended or taken it since the card came: the review of #885, I1), then checked with the
+   * server: a game recorded or replaced since isn't resumed.
+   */
+  const resumeKept = async (card: KeptSolo) => {
+    offerKeptSolo(null);
+    if (match) return;
+    if (isPaused("solo")) return setError(pausedLine("solo"));
+    const k = takeKeptSolo(card);
+    if (typeof k === "string") return setError(k);
+    unlockAudio();
+    setLoading(true);
+    const [open, engines, soloCode] = await Promise.all([keptSoloOpen(k), enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
+    setLoading(false);
+    if (!open) return setError(KEPT_ENDED);
+    if (!soloCode) return setError("Couldn't load the game. Check your connection and try again.");
+    const m = new soloCode.SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...k.settings }, false, k.bots);
+    resumeSoloBattle(m, k.battle);
+    resumeSoloGame(m, k.game, soloWatch(m));
+    keepSolo(m, k.bots, lostToTab(m), k.at, { user: k.user, game: k.game, battle: k.battle });
+    use(m);
+    try {
+      await m.resume(k.kept);
+    } catch {
+      // (A kept game this version can't play on (a damaged entry; its first round, after his brain's load, failing too: N3): dropped,
+      // with a plain line, never a stuck screen; its game on the server is recorded as left at the next load.)
+      m.dispose();
+      clearKeptSolo(k.game);
+      setMatch((cur) => (cur === m ? null : cur));
+      setError("Couldn't resume that game.");
+    }
+  };
+  /** Another tab took this kept battle over or ended it (solo-kept.ts SoloKeep's `lost`, I1): this tab's board stops, back home. */
+  const lostToTab = (m: SoloMatch) => () => {
+    m.dispose();
+    void soloGameId(m).then((g) => g && leftSoloLive(g));
+    setMatch((cur) => (cur === m ? null : cur));
+    setError(KEPT_ELSEWHERE);
+  };
+  useEffect(() => onKeptAnswers({ resume: (k) => void resumeKept(k), note: setError }));
+  // (The kept battle's card (step 2): never over a match; offered again as Boss Battle opens with no match on.)
+  useEffect(() => {
+    if (match && soloKept) offerKeptSolo(null);
+  }, [!!match, soloKept]);
+  useEffect(() => {
+    if (raidOpen && !match) reofferKeptSolo();
+  }, [raidOpen, !!match]);
 
   /**
    * Into a Battle Tower floor (tower.ts enterTowerFloor, the only way in): Boss alone's battle with the floor's bosses at its strength
@@ -1478,7 +1561,7 @@ export function App() {
     setTowerBack(null);
     history.replaceState(null, "", `/tower${location.search}`);
     use(m);
-    if (e.game) m.resume(e.game);
+    if (e.game) void m.resume(e.game);
     else m.start();
   };
   useEffect(() => onEnterFloor((e) => void startTowerFloor(e)), []);

@@ -163,6 +163,10 @@
       "paths": ["packages/server/src/xp.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/PageLayer.tsx"],
       "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/quests.spec.ts", "e2e/tower-party.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
     },
+    "A solo boss battle kept on the device (Nov 22, step 2): the reload's card, Resume or Forfeit, and another start asking first": {
+      "paths": ["packages/app/src/solo-kept.ts", "packages/app/src/components/GameInProgress.tsx"],
+      "specs": ["e2e/xp.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/battle-tower.spec.ts"]
+    },
     "The Battle Tower's saving (Nov 19, PR 9): the server's climbs and bests, its routes (/api/tower), the sign-in merge, the download and deleting": {
       "paths": ["packages/server/src/tower.ts"],
       "specs": ["e2e/account-delete.spec.ts", "e2e/battle-tower.spec.ts", "e2e/tower-party.spec.ts"]

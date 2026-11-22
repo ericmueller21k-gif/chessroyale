@@ -13,7 +13,7 @@ import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
 import { pickBossCrate } from "./rewards.ts";
-import { SOLO_TESTED, abandonSoloGame, endSoloGame, gameXpOf, grantXp, markSoloGame, setTestXp, soloGameKey, soloRealOf, soloStaleBefore, startSoloGame } from "./xp.ts";
+import { SOLO_TESTED, abandonSoloGame, endSoloGame, forfeitSoloGame, gameXpOf, grantXp, markSoloGame, setTestXp, soloGameKey, soloGameOpen, soloRealOf, soloStaleBefore, startSoloGame } from "./xp.ts";
 import { questsAnswer, rerollQuest, setTestQuests } from "./quests.ts";
 import { towerResponse, type LobbyGone } from "./tower.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
@@ -383,13 +383,19 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
     // (A solo game left after SOLO_ABANDON.minMoves goes on your record as a loss before your results are read (xp.ts): the app's load
     // asks for it (`settle=1`, when no tab of this device is still playing one); any read, once it began SOLO_ABANDON.staleHours ago.
-    // Never `unsent`: a finished game whose result the device still has to send.)
+    // Never `unsent`: a finished game whose result the device still has to send. Nor, at the load, `resume`: the game the device keeps
+    // to resume (step 2), unless it began staleHours ago; the answer says whether it's still open (`soloOpen`), so a game recorded or
+    // replaced meanwhile (another device's start) is never offered.)
     if (current) {
       const unsent = soloGameKey(url.searchParams.get("unsent"));
-      const which = { ...(url.searchParams.get("settle") === "1" ? {} : { staleBefore: soloStaleBefore(now) }), ...(unsent ? { except: unsent } : {}) };
+      const resume = soloGameKey(url.searchParams.get("resume"));
+      const stale = soloStaleBefore(now);
+      const which = { ...(url.searchParams.get("settle") === "1" ? (resume ? { resumable: { game: resume, staleBefore: stale } } : {}) : { staleBefore: stale }), ...(unsent ? { except: unsent } : {}) };
       const settled = abandonSoloGame(sql, current.id, which).catch((e: unknown) => console.log(`solo game left: ${String(e)}`));
+      const open = resume ? settled.then(() => soloGameOpen(sql, current.id, resume)) : null;
       // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
-      return new Response(JSON.stringify({ ...(await profile(sql, current, admins, { ...leaves, after: settled })), ...(admin ? { admin: true } : {}) }), { headers });
+      const me = await profile(sql, current, admins, { ...leaves, after: settled });
+      return new Response(JSON.stringify({ ...me, ...(admin ? { admin: true } : {}), ...(open ? { soloOpen: await open } : {}) }), { headers });
     }
     // (A device that answered "too young" plays under the default name.)
     const g = await createGuest(sql, now, ageAnswer(request) === "under" ? "Player" : (url.searchParams.get("name") ?? "Player"));
@@ -769,6 +775,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const real = soloRealOf(b);
     if (!real) return json({ message: "Bad game" }, 400);
     return json({ ok: await markSoloGame(sql, current.id, b?.game, real, now) });
+  }
+  // POST /api/xp/solo/forfeit {game, real?}: the device's kept game given up from its card (step 2, Nov 22): past SOLO_ABANDON.minMoves
+  // (`real`: its loss row's facts, as the mark's) a loss now, as a game left; under it nothing (xp.ts forfeitSoloGame). {lost}.
+  if (path === "/api/xp/solo/forfeit" && request.method === "POST") {
+    const b = (await request.json().catch(() => null)) as { game?: unknown; real?: unknown } | null;
+    return json({ lost: await forfeitSoloGame(sql, current.id, b?.game, b?.real ? soloRealOf(b.real) : null, now) });
   }
   if (path === "/api/xp" && request.method === "GET") return json({ xp: await gameXpOf(sql, current.id, url.searchParams.get("game"), now) });
   if (path === "/api/xp/test" && request.method === "POST") {

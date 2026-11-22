@@ -1386,6 +1386,12 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 
 ## Rules for this area (from `.claude/LESSONS.md`)
 
+- A kept battle (Boss alone, a Solo raid, a tower floor) never shows what it hasn't kept: it keeps in `SoloMatch.show` (every `set`
+  and `emit`) and at each beat a timed moment shows by the clock (Nov 22, "Three review rounds, one cause"). A new timed power (its
+  screen changing with its clock while nobody's turn runs, as the Dodge, the Rush and Lights out) adds itself to `SoloMatch.moment()`
+  (its start, your inputs, its reveals) and resumes from `KeptGame.moment` in `playRound`; the walk in `app/test/solo-resume.test.ts`
+  ("keep before show") gets its boss and switch.
+
 - Code shared by every boss draws nothing of one boss's (his effect, his color): a boss's own look goes in its kit, and a test
   walks every kit (Nov 11, "Hollow's dark at Babur's mate").
 - A search in rounds carries its source on from round to round, and a power that fires only when a search finds
