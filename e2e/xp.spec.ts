@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { SOLO_ABANDON } from "@chessroyale/core";
-import { test, bossAloneFromHome, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
+import { test, bossAloneFromHome, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * XP and levels on the end screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't want it
@@ -325,7 +325,11 @@ async function closeRewardCard(page: Page) {
 const ownSoFar = (page: Page) =>
   page.evaluate(() => (((window as any).match?.moves ?? []) as { move: unknown; abstained?: boolean }[]).filter((m) => m.move !== null || m.abstained).length);
 
-/** Plays your turns in a boss battle alone until `n` are yours: each a quiet move the boss's powers allow (pickMove), once it's your turn. */
+/**
+ * Plays your turns in a boss battle alone until `n` are yours, once it's your turn: the engine's best move the boss's powers allow
+ * (pickMove's quiet one if none). The game must still be going after `n` (main's run on Nov 22: pickMove's quiet knight and pawn
+ * moves only dodge a mate in one, and Ginger mated in a few before the 12th, the battle on its results).
+ */
 async function playOwnMoves(page: Page, n: number) {
   for (let i = 0; i < 3 * n && (await ownSoFar(page)) < n; i++) {
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
@@ -333,7 +337,9 @@ async function playOwnMoves(page: Page, n: number) {
       const m = (window as any).match;
       return { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null, n: m.moves.length as number };
     });
-    await submitMove(page, pickMove(s.fen, { allowed: s.allowed, prefer: (m) => m.piece === "n" || (m.piece === "p" && "abcde".includes(m.from[0]!)) }), s.fen);
+    const { fen, top } = await engineTop(page);
+    const best = fen === s.fen ? top.map((t) => t.move).find((mv) => !s.allowed || s.allowed.includes(mv)) : undefined;
+    await submitMove(page, best ?? pickMove(s.fen, { allowed: s.allowed }), s.fen);
     await expect.poll(() => page.evaluate(() => (window as any).match.moves.length), { timeout: 30_000 }).toBeGreaterThan(s.n);
   }
   expect(await ownSoFar(page)).toBe(n);
