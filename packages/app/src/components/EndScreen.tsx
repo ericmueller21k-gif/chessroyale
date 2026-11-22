@@ -12,7 +12,7 @@ import { YourPawn } from "./BossDock.tsx";
 import { BossPortrait } from "./BossPortrait.tsx";
 import { QuestPicture } from "./QuestsOverlay.tsx";
 import { RankEmblem } from "./RankEmblem.tsx";
-import { RewardBox, type RewardAway } from "./RewardBox.tsx";
+import { RewardBox } from "./RewardBox.tsx";
 import { play, questSound, warmSounds, xpPing } from "../sound.ts";
 import "../end-screen.css";
 
@@ -604,7 +604,7 @@ export interface EndRp {
  * time a level was reached: the pawn's hop), the XP bar, the quests. `xp`: the game's grant (undefined: still coming; null: none came,
  * for `none`'s reason). The toast for what the bars and rows don't show (crates, keys) once it has run.
  */
-export function EndRewards({ xp, none = "No XP for this game.", rp, middle, away = null }: { xp: XpGrant | null | undefined; none?: string; rp?: EndRp; middle?: (hopAt: number) => ComponentChildren; away?: RewardAway }) {
+export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { xp: XpGrant | null | undefined; none?: string; rp?: EndRp; middle?: (hopAt: number) => ComponentChildren }) {
   const root = useRef<HTMLDivElement>(null);
   const qBox = useRef<HTMLDivElement>(null);
   const xpSlot = useRef<HTMLSpanElement>(null);
@@ -682,7 +682,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, away
       <Track plan={xpP} refs={xpRefs} />
       <QuestRows moves={moves} box={qBox} line={questLine} />
       {/* (What the bars and rows don't show, once the sequence has ended: a level's or the daily reward's crates and keys.) */}
-      {ended && counted && xp!.rewards && <RewardBox xp={xp!} endScreen away={away} />}
+      {ended && counted && xp!.rewards && <RewardBox xp={xp!} endScreen />}
     </div>
   );
 }

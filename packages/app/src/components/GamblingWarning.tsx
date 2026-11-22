@@ -22,9 +22,10 @@ export function GamblingWarning() {
   // closes it. A passive effect waits for the next paint, and a key in that gap was lost: PR #435's CI and main, Nov 1.)
   useLayoutEffect(() => {
     if (!open) return;
-    const key = (e: KeyboardEvent) => e.key === "Escape" && close();
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    // (Its Escape is its own, heard first: nothing under it (the inventory layer, a screen) acts on it too.)
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), close());
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
   }, [open]);
   return (
     <>

@@ -20,6 +20,7 @@ import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
+import { inventoryTakesPop } from "./components/InventoryLayer.tsx";
 import { account, askAgeAgain, askAgeForGoogle, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult, setTestXp } from "./account.ts";
 import { leavesNote } from "./ranked.ts";
 import { isAdmin } from "./boss-brain.ts";
@@ -854,6 +855,8 @@ export function App() {
   backToTownRef.current = backToTown;
   useEffect(() => {
     const onPop = () => {
+      // (The inventory layer's own step (InventoryLayer.tsx): back closes it, and nothing under it moves.)
+      if (inventoryTakesPop()) return;
       if (townSkip.current) return void (townSkip.current = false);
       // The phone's or the browser's back in Chess Town (not at a table's game): it has gone back already, so Stay puts the
       // town's address back and Leave goes home (the front door, as the town's back button does).
