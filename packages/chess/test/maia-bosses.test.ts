@@ -186,7 +186,10 @@ describe("every boss on the Maia path", () => {
         const move = [...allowed].sort().find((m) => isKnight(fen, m) && empty(fen, m)) ?? [...allowed].sort()[0]!;
         await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
       }
-      expect(played.maia).toBeGreaterThan(20);
+      // (Most of his moves are Maia's: over 20 of a battle that runs long; Chub & Chirp may win his carrot race outright first against
+      // this crowd, which never pulls a carrot (since Nov 22's smaller spin prizes his brain goes for his 5th carrot): then over half
+      // the crowd's moves.)
+      expect(played.maia).toBeGreaterThan(Math.min(20, r.boss!.crowdMoves / 2));
       expect(played.strike).toBe(1);
       // Today's Stockfish move (its limited-strength search) was never needed: Maia always had an allowed move.
       expect(engine.elo).toBe(0);

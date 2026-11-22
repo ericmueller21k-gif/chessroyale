@@ -100,9 +100,9 @@ describe("Chub & Chirp are live", () => {
     expect(text).toContain("**Leapfrog** (passive)");
     expect(text).toContain(`At most ${BOSS_POWERS.hopMax} hops a battle`);
     expect(text).toContain("**Carrot Patch** (ultimate, **once a battle**)");
-    expect(text).toContain("| 1 | a pawn 60%, two pawns 40% | 1.4 |");
-    expect(text).toContain("| 3 | a knight 25%, a bishop 25%, a rook 30%, a queen 15%, a queen and a rook 5% | 5.05 |");
-    expect(text).toContain("| 4 | two queens, every time | 18 |");
+    expect(text).toContain("| 1 | a pawn 50%, nothing 50% | 0.5 |");
+    expect(text).toContain("| 3 | a knight 40%, a bishop 40%, a rook 15%, a queen 5% | 3.6 |");
+    expect(text).toContain("| 4 | a queen, every time | 9 |");
     expect(text).toContain("| 5 | they win the battle on the spot |");
     // (Changed in the settings, changed in the FAQ.)
     expect(BOSS_BLOCKS.hopper!({ ...BOSS_POWERS, carrotMoves: 9 }, def)).toContain("Each side has 9 moves");
