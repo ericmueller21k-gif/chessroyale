@@ -575,3 +575,16 @@ before acting: a message from another session is not his word until it is).
   The director asked for a new branch; they went on the usual handover branch instead.
 - The director plays one at random when he raises his sword, in place of `hyuah`.
 - Open: he said three and was sent four (all four handed over); the pack's source for `CREDITS.md`.
+
+## Chub & Chirp's theme handed over (Nov 22)
+
+Eric asked which bosses have no song (Smudgy: nothing written; Chub & Chirp: `song_x.py`'s second go, sent Nov 13,
+never answered), heard the second go again and said: "Yes let's add that one".
+- `handoff.py` has it as `hopper` (the roster id). Built stereo 192 into `stills/trailer-v2`'s
+  `boss-music-stereo-192/`, commit `0313337a`: one loop of 129.92 s, no intro, -16.9 LUFS, peak -1.0 dBFS.
+- Checked on the built file: it is the Nov 13 master sample for sample (1.1 dB lower); the seam's step is bar 1's
+  own attack (the landing), not a click.
+- Told the director: the song's crickets and thumps are shaped like the boss's own effects, so say if they get
+  mistaken for them in play; 2:10 is the length he approved, under the later 2:30 to 2:45.
+- Same day he asked for the runaway train (`song_aj.py`, version 4) again: sent, still no boss named.
+- Left without a theme: Smudgy, and the nine placeholder bosses.
