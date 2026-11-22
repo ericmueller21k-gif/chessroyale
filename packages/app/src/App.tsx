@@ -62,7 +62,7 @@ import { breadcrumbs, noteWhere } from "./problems.ts";
 import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
-import { noteFloorGame, noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
+import { noteFloorGame, noteSoloGame, postingSoloResult, settleSoloXp, soloGameId, soloTestGame, type SoloGameWatch } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
 import { kingSay, type KingCue } from "./godKing.ts";
 import { game } from "./lazy-game.ts";
@@ -97,6 +97,26 @@ const LegalScreen = lazyGroup(() => import("./screens/Legal.tsx")).screen("Legal
 const AutoChessScreen = lazyGroup(() => import("./screens/AutoChess.tsx")).screen("AutoChessScreen");
 /** A solo match (SoloMatch, solo.ts), told apart without loading its chunk. */
 const isSolo = (m: unknown): m is SoloMatch => !!(m as { isSolo?: boolean } | null)?.isSolo;
+
+/** A solo game as xp.ts watches it for your SOLO_ABANDON.minMoves-th own move: its loss row's facts as its result would give them. */
+const soloWatch = (m: SoloMatch): SoloGameWatch => ({
+  get moves() {
+    return m.moves;
+  },
+  subscribe: (f) => m.subscribe(f),
+  over: () => m.phase.kind === "results",
+  facts: () => {
+    const raid = !!m.settings.raid;
+    const boss = m.runner.boss;
+    return {
+      mode: raid ? "boss" : m.settings.mode,
+      players: m.totalPlayers,
+      team: m.standings().find((s) => s.isYou)?.team ?? null,
+      bossId: boss?.id ?? null,
+      bossElo: raid && boss ? (boss.tier ?? boss.elo) : null,
+    };
+  },
+});
 
 /**
  * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
@@ -509,7 +529,8 @@ export function App() {
         : match.phase.gameWinner === me.team;
     // XP (Nov 9): the server's clock times the game (its id from the start); your moves, the win, a resign and a test switch are this
     // device's word, which can only lower it. The answer's XP goes to the result screen's box (xp.ts).
-    void soloGameId(solo).then(async (game) => {
+    // (A new solo game's start waits for this post: xp.ts postingSoloResult.)
+    postingSoloResult(soloGameId(solo).then(async (game) => {
       const xp = await recordSoloResult({
         mode,
         placement,
@@ -534,7 +555,7 @@ export function App() {
         ...(solo.tower ? { tower: true } : {}),
       });
       settleSoloXp(solo, xp);
-    });
+    }));
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
   /** A computer (the front door's frame): the queue fills in place, with the lobby's chat beside it. */
@@ -1416,8 +1437,9 @@ export function App() {
     // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
     // (`town`: a boss challenged from the town: the server announces it in the town's chat, and how it ended.)
     if (m.settings.raid) noteSoloBattle(m, opts.town);
-    // XP (Nov 9): the server times every solo game by its own clock, from now to its result (xp.ts).
-    noteSoloGame(m);
+    // XP (Nov 9): the server times every solo game by its own clock, from now to its result (xp.ts). Left after SOLO_ABANDON.minMoves of
+    // your own moves, it counts as a loss (Nov 22): the server is told at that move (never for a game with a test switch on).
+    noteSoloGame(m, soloTestGame(practiceOn()) ? undefined : soloWatch(m));
     use(m);
     if (fill) m.fill();
     else m.start();

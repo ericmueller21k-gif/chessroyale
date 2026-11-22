@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { account, loadAccount, retryAccount, startSoloBossBattle } from "../src/account.ts";
 import { siteSignedOut } from "../src/site-gate.ts";
-import { FRONT_DOOR } from "@chessroyale/core";
+import { FRONT_DOOR, SOLO_ABANDON } from "@chessroyale/core";
 import { testSwitchesAllowed } from "../src/test-switches.ts";
 
 /**
@@ -188,5 +188,48 @@ describe("a solo boss battle's start (Nov 10)", () => {
     vi.stubGlobal("fetch", async () => (n++, Response.json({ message: "no" }, { status: 403 })));
     await expect(startSoloBossBattle()).rejects.toThrow("no");
     expect(n).toBe(1);
+  });
+});
+
+describe("the account's load and a solo game left (SOLO_ABANDON, Nov 22)", () => {
+  /** Storage holding these keys; the server answers everything, noting each request (and a POST's body). */
+  function device(stored: Record<string, string>) {
+    const store = new Map(Object.entries(stored));
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) });
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (path: string, init?: RequestInit) => {
+      calls.push(`${path}${init?.body ? ` ${String(init.body)}` : ""}`);
+      if (path.startsWith("/api/auth/config")) return Response.json(CONFIG);
+      if (path.startsWith("/api/results")) return Response.json({ ok: true, xp: null });
+      return Response.json(PROFILE);
+    });
+    return { calls, store, me: () => calls.find((c) => c.startsWith("/api/me"))! };
+  }
+  const live = (minutesAgo: number) => JSON.stringify({ game: "abc", at: Date.now() - minutesAgo * 60_000 });
+
+  it("asks for it to be recorded (settle) unless another tab played a turn of one within SOLO_ABANDON.liveMinutes", async () => {
+    let d = device({});
+    await loadAccount("Ann");
+    expect(d.me()).toBe("/api/me?name=Ann&settle=1");
+    d = device({ "brc.soloLive": live(1) });
+    await loadAccount();
+    expect(d.me()).toBe("/api/me");
+    d = device({ "brc.soloLive": live(SOLO_ABANDON.liveMinutes + 1) });
+    await loadAccount();
+    expect(d.me()).toBe("/api/me?settle=1");
+  });
+
+  it("a finished game's result that couldn't be sent: not settled, sent once the account is the same one, then forgotten", async () => {
+    const result = { mode: "boss", placement: 1, players: 1, game: "0123456789abcdef01" };
+    const d = device({ "brc.soloUnsent": JSON.stringify({ user: "u", result }) });
+    await loadAccount();
+    expect(d.me()).toBe("/api/me");
+    await vi.waitFor(() => expect(d.calls).toContain(`/api/results ${JSON.stringify(result)}`));
+    await vi.waitFor(() => expect(d.store.has("brc.soloUnsent")).toBe(false));
+    // (Another account's: kept, never sent as this one's.)
+    const other = device({ "brc.soloUnsent": JSON.stringify({ user: "someone else", result }) });
+    await loadAccount();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(other.calls.some((c) => c.startsWith("/api/results"))).toBe(false);
   });
 });

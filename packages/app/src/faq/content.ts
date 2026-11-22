@@ -42,6 +42,7 @@ import {
   ITEM_COLORS,
   LEAVES,
   LEAVING,
+  SOLO_ABANDON,
   OPENING_ALLOWANCE,
   CROWD_SCORING,
   type CrowdScoring,
@@ -136,6 +137,8 @@ export interface FaqSources {
   startVote: Pick<PregameVote, "options" | "defaultOption">;
   /** Resigning and leaving: how long someone may be gone from a match and still have their seat. */
   leaving: { awayMs: number };
+  /** A solo game left after this many of your own moves counts as a loss (SOLO_ABANDON, Nov 22). */
+  soloAbandon: { minMoves: number };
   /** Squads' "Jump to my next board" (Relay): on for a device that hasn't set it. */
   squadsWatching: { jumpToNext: boolean };
   /** The Hidden Boss's second phase: its boards, clock and ultimate. */
@@ -182,6 +185,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   clockVote: PREGAME_VOTES.find((v) => v.id === "speed")!,
   startVote: PREGAME_VOTES.find((v) => v.id === "start")!,
   leaving: LEAVING,
+  soloAbandon: SOLO_ABANDON,
   squadsWatching: SQUADS_LOBBY.watching,
   phase2: RECLUSE_PHASE2,
   allowance: OPENING_ALLOWANCE,
@@ -417,7 +421,7 @@ function leaving(src: FaqSources): string {
 
 - **To resign:** tap the **gear** at the top right of the match (on a computer, click it), then **Resign**. It asks once more, so a stray tap never resigns. (There's no undo; only [1 v 1](#mode-1v1) has draw offers.)
 - **1 v 1:** resigning ends the game, a loss. Before both first moves are made it's **Leave** instead: the game is called off, with no result, but leaving a ranked game before it starts, or resigning very early, costs rank points ([1 v 1](#mode-1v1), leaving early).
-- **Solo games and Boss alone:** the game ends there, and it counts as a loss.
+- **Solo games and Boss alone:** the game ends there, and it counts as a loss. Leaving a solo game after ${n(src.soloAbandon.minMoves, "move")} counts as a loss too (closing the app, a reload).
 - **Online (Crowd, Boss Battles, Squads):** you can't end the game for everyone else, so resigning means you leave it. You're out in the last place still open, it counts as a loss (in a match that counts for ranking, for your ranking too), and a bot plays your seat so your team isn't a player short (with Bots off, only when your side would otherwise have nobody left). In Squads your squad plays on with a bot in your seat, and your record has the worst place your squad could still finish.
 - **Before the first move** (the votes, a boss's entrance), it's just **Leave**: you go home, a bot takes your seat, and nothing goes on your record.
 - **Already out** (cut, or struck down by the boss)? **Leave the match** takes you home, and your place stands.

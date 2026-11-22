@@ -1,5 +1,5 @@
-import { XP, type XpGrant } from "@chessroyale/core";
-import { onlineGameXp, refreshProfile, startSoloGame } from "./account.ts";
+import { SOLO_ABANDON, XP, ownMoves, type OwnTurn, type XpGrant } from "@chessroyale/core";
+import { endSoloLive, keepSoloLive, markSoloGameReal, onlineGameXp, refreshProfile, startSoloGame, type SoloRealFacts } from "./account.ts";
 import { testParams } from "./test-switches.ts";
 import { accountReady } from "./boss-tokens.ts";
 
@@ -12,17 +12,70 @@ import { accountReady } from "./boss-tokens.ts";
 
 /** Each solo game's id on the server, asked for as it began (null: none, no account yet). */
 const soloGames = new WeakMap<object, Promise<string | null>>();
-/** A solo game begins: the server times it. `?xpgame=MINUTES` (a test switch): it counts as a game that long. */
-export function noteSoloGame(match: object): void {
+/**
+ * The last solo result on its way to the server (App.tsx, as its result screen shows): a new game's start waits for it, as a start
+ * records the open game as left if it's real (SOLO_ABANDON) and "Again" can come quicker than the post.
+ */
+let posting: Promise<unknown> = Promise.resolve();
+export const postingSoloResult = (p: Promise<unknown>): void => void (posting = p.catch(() => undefined));
+/**
+ * A solo game begins: the server times it. `?xpgame=MINUTES` (a test switch): it counts as a game that long. `watch`: the game to tell
+ * the server about at your SOLO_ABANDON.minMoves-th own move (watchSoloGame); none for a Battle Tower floor or a test game.
+ */
+export function noteSoloGame(match: object, watch?: SoloGameWatch): void {
   const minutes = Number(testParams().get("xpgame"));
   // (A START tapped the moment the app opens waits for your account, as boss tokens' does.)
   const body = Number.isFinite(minutes) && testParams().has("xpgame") ? { xpgame: minutes } : {};
+  const before = posting;
   soloGames.set(
     match,
     accountReady()
-      .then((ok) => (ok ? startSoloGame(body) : null))
+      .then(async (ok) => {
+        if (!ok) return null;
+        await before;
+        return startSoloGame(body);
+      })
       .catch(() => null),
   );
+  if (watch) watchSoloGame(match, watch);
+}
+
+/** A solo game as watchSoloGame reads it: your turns so far (its record), its updates, whether it's over, and its loss row's facts. */
+export interface SoloGameWatch {
+  readonly moves: readonly OwnTurn[];
+  subscribe(f: () => void): () => void;
+  over(): boolean;
+  facts(): SoloRealFacts;
+}
+
+/**
+ * Leaving a solo game after SOLO_ABANDON.minMoves of your own moves counts as a loss (Eric, Nov 22; server/xp.ts): at that move (core's
+ * ownMoves, as XP counts them) the server is told once that the game is real, and from then this device notes at each turn that a
+ * tab is playing it (account.ts keepSoloLive), so the app's load in another tab leaves it be. Its end (the result screen) takes the
+ * note off; the result itself takes the game off the server.
+ */
+function watchSoloGame(match: object, w: SoloGameWatch): void {
+  let real = false;
+  let seen = -1;
+  const id = () => soloGameId(match);
+  const off = w.subscribe(() => {
+    if (w.over()) {
+      off();
+      if (real) void id().then((g) => g && endSoloLive(g));
+      return;
+    }
+    if (w.moves.length === seen) return;
+    seen = w.moves.length;
+    if (!real && ownMoves(w.moves) < SOLO_ABANDON.minMoves) return;
+    const first = !real;
+    real = true;
+    const facts = first ? w.facts() : null;
+    void id().then((g) => {
+      if (!g) return;
+      keepSoloLive(g);
+      if (facts) void markSoloGameReal(g, facts).catch(() => undefined);
+    });
+  });
 }
 /**
  * A Battle Tower floor's XP game (every floor is a counted solo game): a new floor's noted as it begins, its id handed to `keep` (kept

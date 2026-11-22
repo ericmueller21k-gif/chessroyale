@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, SOLO_ABANDON, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, num, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -711,6 +711,11 @@ describe("the FAQ: leaving or resigning", () => {
     expect(t).toContain(`Back within ${LEAVING.awayMs / 60_000} minutes, you're still in your seat`);
     expect(text({ ...FAQ_DEFAULTS, leaving: { awayMs: 90_000 } })).toContain("Back within 90 seconds, you're still in your seat");
     expect(faqAnchors(faqPage())).toContain("leaving");
+  });
+
+  it("says a solo game left after SOLO_ABANDON.minMoves of your moves counts as a loss (Nov 22)", () => {
+    expect(text()).toContain(`Leaving a solo game after ${SOLO_ABANDON.minMoves} moves counts as a loss too (closing the app, a reload).`);
+    expect(text({ ...FAQ_DEFAULTS, soloAbandon: { minMoves: 12 } })).toContain("Leaving a solo game after 12 moves counts as a loss too");
   });
 });
 
