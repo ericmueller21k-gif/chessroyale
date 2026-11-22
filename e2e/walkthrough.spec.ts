@@ -15,7 +15,8 @@ test.use({ tutorialSeen: false });
 
 /** Each slide's title, and how many elements it lights: a computer, then a phone (a phone has no side menu). */
 const SLIDES: [title: string, desktop: number, phone: number][] = [
-  ["PLAY", 2, 1],
+  // (One on a computer since Nov 22: the side menu's Play is Home, not a spot of this slide.)
+  ["PLAY", 1, 1],
   ["50 v 50", 1, 1],
   ["1 v 1", 1, 1],
   ["Squads", 1, 1],

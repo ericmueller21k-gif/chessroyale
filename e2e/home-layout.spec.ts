@@ -239,7 +239,7 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     await expect(page.locator(".fd-queue-line")).toContainText(/Finding players · \d+ s, then bots fill the rest/);
     // The frame stays: the side menu (on Play) and the live panel, with the lobby between them.
     await expect(menu).toBeVisible();
-    await expect(menu.getByRole("button", { name: "Play", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(menu.getByRole("button", { name: "Main menu", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(panel.getByRole("status")).toContainText("online");
     const m = (await menu.boundingBox())!;
     const pn = (await panel.boundingBox())!;
@@ -320,7 +320,7 @@ test("computer: in the queue, your profile opens over it; another menu item goes
   await menu.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.locator(".dq-bar .dq-text")).toHaveText("Searching 50 v 50");
-  await menu.getByRole("button", { name: "Play", exact: true }).click();
+  await menu.getByRole("button", { name: "Main menu", exact: true }).click();
   await expect(page.locator(".fd-search")).toBeVisible();
   // Back in the lobby (Lobby), unchecked: Settings leaves the queue first, then Settings.
   await page.locator(".fd-search-acts").getByRole("button", { name: /^Lobby/ }).click();
@@ -329,7 +329,7 @@ test("computer: in the queue, your profile opens over it; another menu item goes
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   expect(await page.evaluate(() => (window as any).match?.closed)).toBe(true);
   await expect(page.locator(".dq-bar")).toHaveCount(0);
-  await menu.getByRole("button", { name: "Play", exact: true }).click();
+  await menu.getByRole("button", { name: "Main menu", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
 });
 
@@ -737,7 +737,7 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   expect(new URL(page.url()).pathname).toBe("/town");
   // (Back asks first: "Leave Chess Town?", Leave goes home; e2e/town-leave.spec.ts. A computer has no Back since Nov 7: the side menu's
   // Play, which asks the same.)
-  if (test.info().project.name === "desktop") await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play", exact: true }).click();
+  if (test.info().project.name === "desktop") await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Main menu", exact: true }).click();
   else await page.getByRole("button", { name: "Back", exact: true }).click();
   await page.getByRole("alertdialog", { name: "Leave Chess Town?" }).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
@@ -800,7 +800,7 @@ test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry ope
   await expect(page.locator(".fd-hero button.fd-quests-btn, .fd-hero [aria-label=Quests]")).toHaveCount(0);
   if (computer) {
     await expect(page.locator(".fd-top .fd-top-quests")).toHaveCount(0);
-    await expect(page.locator(".fd-side .fd-menu-item")).toHaveText(["Play", "Chess Town", "Boss Battle", "Play with friends", "Daily Quests", "Shop & crates", "Profile", "Settings"]);
+    await expect(page.locator(".fd-side .fd-menu-item")).toHaveText(["Main menu", "Chess Town", "Boss Battle", "Play with friends", "Daily Quests", "Shop & crates", "Profile", "Settings"]);
   } else await expect(page.locator(".fd-top .fd-top-quests")).toHaveCount(1);
   await entry.click();
   await expect(quests).toBeVisible();

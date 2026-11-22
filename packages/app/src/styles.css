@@ -8094,24 +8094,48 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   font-size: 13px;
   color: #c7d2fe;
 }
-/* Your inventory as a layer (components/InventoryLayer.tsx, Nov 22): the shop page itself, in its own frame, over whatever you're on:
+/* A page as a layer (components/PageLayer.tsx, Nov 22). Your inventory: the shop page itself, in its own frame, over whatever you're on:
    the whole window but a maintenance banner (where the page starts too), opaque, scrolling inside itself (nothing under it scrolls),
    above the screens' sheets and the reward card. On a computer its column is the page's: the frame's middle one, the sides empty. */
-.inv-layer {
+.page-layer {
   position: fixed;
   inset: var(--banner-h, 0px) 0 0 0;
   z-index: 85;
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--fd-bg);
+  outline: none;
 }
-.inv-layer > .fd-root {
+.page-layer > .fd-root {
   min-height: 100%;
 }
 @media (min-width: 1024px) {
-  .inv-layer > .fd-root.framed > .fd-center {
+  .page-layer > .fd-root.framed > .fd-center {
     grid-column: 2;
   }
+}
+/* Chess Town on a computer (App.tsx townLayer): the side menu's page over the town's middle column only, between the side menu and the
+   right column (the frame's own sizes), so both stay put and usable. Under the town's "Leave Chess Town?" (a sheet, 60) and the pages'
+   overlays; over the town. Its page in the page's own column (920 px, centered), as from the main menu. A pop-up's card (Daily Quests,
+   Play with friends: `see`) dims the town under it, its back the column's, not the window's. */
+.page-layer.in-town {
+  z-index: 55;
+}
+.page-layer.in-column {
+  left: var(--fd-menu);
+  right: var(--fd-rail);
+}
+.fd-root.framed.fd-on-town .page-layer.in-column > .fd-center {
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}
+.page-layer.see {
+  background: transparent;
+}
+.page-layer.in-column .fd-sheet-scrim,
+.page-layer.in-column .qo-back {
+  position: absolute;
 }
 .crate-row-held {
   font-size: 12px;

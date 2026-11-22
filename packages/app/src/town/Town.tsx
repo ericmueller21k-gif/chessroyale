@@ -79,6 +79,7 @@ import { afterFail, lossWatch } from "./gl-fail.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO, setRequestWaiting } from "./LeaveTown.tsx";
+import type { TownPages } from "./TownChatTools.tsx";
 import { HiddenRoomClient, type RoomOutcome } from "./hidden-net.ts";
 import { HiddenCard, HiddenCount, RoomNote } from "./HiddenRoom.tsx";
 import { TowerDesk } from "./TowerDesk.tsx";
@@ -184,7 +185,13 @@ export function TownScreen({
   onAway,
   onSignIn,
   tower = null,
+  pages,
 }: {
+  /**
+   * A phone's bar (Eric, Nov 22: "We can put in the inventory icon ... they should be the same as the main menu, so it's not confusing on
+   * mobile"): home's Quests, Shop & crates and Friends buttons, each opening its page over the town (App.tsx's town layer), never leaving it.
+   */
+  pages?: TownPages;
   /** Back from a Battle Tower floor's match (PR 11b): the town opens straight in the tower, in the floor room or (a free leave) the lobby. */
   tower?: TowerBack | null;
   onBack: () => void;
@@ -1048,22 +1055,20 @@ export function TownScreen({
           {slot && createPortal(<TownChatTools map mapDisabled={!!inside} />, slot)}
         </>
       ) : (
+        // A phone's bar (Eric, Nov 22: "I don't think we need the word Chesstown here ... we should be adding more icons ... they should be the
+        // same as the main menu"): back, then the map, the chat, home's Quests, Shop & crates and Friends, and the gear, in home's top bar's
+        // buttons. The title is gone from sight (kept for screen readers). Inside a room too.
         <header class="town-bar">
           {/* (Inside a shop, back takes you out to the town square.) */}
           {/* (The tower's floor room: back is down to the lobby.) */}
-          <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => askIfWaiting(() => void (inTowerFloor ? goThrough("front") : goOut())) : () => askLeave(TOWN_BACK_TO, onBack)}>
-            ‹
+          <button type="button" class="town-back fd-icon-btn" aria-label="Back" onClick={inside ? () => askIfWaiting(() => void (inTowerFloor ? goThrough("front") : goOut())) : () => askLeave(TOWN_BACK_TO, onBack)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M15 5l-7 7 7 7" />
+            </svg>
           </button>
-          {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2. On a computer's narrow header, on up to two smaller lines.) */}
-          {inside ? (
-            <h1 class="town-shop-name" title={HOMES.find((h) => h.id === inside.room.def.home)?.name}>
-              {HOMES.find((h) => h.id === inside.room.def.home)?.name ?? "Town square"}
-            </h1>
-          ) : (
-            <h1>Town square</h1>
-          )}
-          {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
-          <TownChatTools map mapDisabled={!!inside} />
+          {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2.) */}
+          <h1 class="town-sr-title">{inside ? (HOMES.find((h) => h.id === inside.room.def.home)?.name ?? "Town square") : "Town square"}</h1>
+          <TownChatTools map mapDisabled={!!inside} pages={pages} />
         </header>
       )}
       <div class={inside ? "town-box town-inside" : "town-box"} ref={box}>

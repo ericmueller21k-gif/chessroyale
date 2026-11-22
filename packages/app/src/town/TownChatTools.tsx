@@ -13,6 +13,10 @@ import { GearIcon } from "../components/MatchMenu.tsx";
 import { CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, chatBackground, chatMode, nextChatMode, onChatBackground, onChatMode, setChatBackground, setChatMode, type ChatMode } from "./chat.ts";
 import { NAMES_CHOICE, NAMES_LABEL, NAMES_MODES, namesMode, namesNote, onNamesMode, setNamesMode, type NamesMode } from "./tags.ts";
 import { mapOn, onMapOn, setMapOn } from "./minimap.ts";
+import { FriendsIcon, GearIcon as HomeGearIcon, ShopIcon } from "../components/FrontDoor.tsx";
+import { QuestsBarIcon } from "../components/QuestsOverlay.tsx";
+import { questsForYou } from "../quests.ts";
+import { friendsBadge, useFriends } from "../friends.ts";
 import "./town-chat.css";
 
 /** The chat's mode now, redrawing when it changes (the icon, the sheet and the box all read it here). */
@@ -82,7 +86,42 @@ function MapIcon({ on }: { on: boolean }) {
   );
 }
 
-export function TownChatTools({ map = false, mapDisabled = false }: { map?: boolean; mapDisabled?: boolean }) {
+/** A phone's town bar's pages (Nov 22): each opens over the town (App.tsx's town layer). */
+export interface TownPages {
+  quests: () => void;
+  shop: () => void;
+  friends: () => void;
+}
+
+/**
+ * Home's phone top bar's Quests, Shop & crates and Friends (Home.tsx `.fd-top`: the same icons, order and look; Eric, Nov 22), in a phone's
+ * town bar between the chat and the gear. Quests greyed until quests are yours, as home's; Friends with its count of what's new.
+ */
+function PageButtons({ pages }: { pages: TownPages }) {
+  useFriends();
+  const news = friendsBadge();
+  const questsOn = questsForYou();
+  return (
+    <>
+      <button type="button" class="fd-icon-btn fd-top-quests" aria-label="Quests" title={questsOn === false ? "Sign in for quests" : "Quests"} disabled={questsOn !== true} onClick={pages.quests}>
+        <QuestsBarIcon />
+      </button>
+      <button type="button" class="fd-icon-btn" aria-label="Shop & crates" onClick={pages.shop}>
+        <ShopIcon />
+      </button>
+      <button type="button" class="fd-icon-btn fd-top-friends" aria-label={news ? `Play with friends, ${news} new` : "Play with friends"} onClick={pages.friends}>
+        <FriendsIcon />
+        {news > 0 && (
+          <span class="fd-news" aria-hidden="true">
+            {news}
+          </span>
+        )}
+      </button>
+    </>
+  );
+}
+
+export function TownChatTools({ map = false, mapDisabled = false, pages }: { map?: boolean; mapDisabled?: boolean; pages?: TownPages }) {
   const mode = useChatMode();
   const [open, setOpen] = useState(false);
   const [mapShown, setMapShown] = useState(mapOn);
@@ -90,15 +129,17 @@ export function TownChatTools({ map = false, mapDisabled = false }: { map?: bool
   return (
     <div class="town-tools">
       {map && (
-        <button type="button" class="town-tool tm-toggle" aria-label="Map" aria-pressed={mapShown} title={mapShown ? "Hide the map" : "Show the map"} disabled={mapDisabled} onClick={() => setMapOn(!mapShown)}>
+        <button type="button" class={`town-tool tm-toggle${pages ? " fd-icon-btn" : ""}`} aria-label="Map" aria-pressed={mapShown} title={mapShown ? "Hide the map" : "Show the map"} disabled={mapDisabled} onClick={() => setMapOn(!mapShown)}>
           <MapIcon on={mapShown} />
         </button>
       )}
-      <button type="button" class="town-tool tc-mode" data-mode={mode} aria-label={CHAT_MODE_LABEL[mode]} title={CHAT_MODE_LABEL[mode]} onClick={() => setChatMode(nextChatMode(mode))}>
+      <button type="button" class={`town-tool tc-mode${pages ? " fd-icon-btn" : ""}`} data-mode={mode} aria-label={CHAT_MODE_LABEL[mode]} title={CHAT_MODE_LABEL[mode]} onClick={() => setChatMode(nextChatMode(mode))}>
         <ChatIcon mode={mode} />
       </button>
-      <button type="button" class="town-tool" aria-label="Town settings" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
-        <GearIcon size={22} />
+      {pages && <PageButtons pages={pages} />}
+      {/* (A phone's bar: home's gear, as its other buttons are home's.) */}
+      <button type="button" class={`town-tool${pages ? " fd-icon-btn" : ""}`} aria-label="Town settings" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+        {pages ? <HomeGearIcon /> : <GearIcon size={22} />}
       </button>
       {/* (Over everything: on a computer the tools sit in the right column's slot, so the sheet goes to the page's top.) */}
       {open && createPortal(<Settings mode={mode} onClose={() => setOpen(false)} />, document.body)}
