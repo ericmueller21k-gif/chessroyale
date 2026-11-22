@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_ADMIN_FIRST, DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
-import { dodgeTimeline, legalMoves, type UciEngine } from "@chessroyale/chess";
+import { dodgeArena, dodgeTimeline, legalMoves, type UciEngine } from "@chessroyale/chess";
 import { KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
@@ -236,14 +236,66 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
       const r = resumed(k);
       await until(r, () => r.phase.kind === "boss" && !!(r.phase as { dodge?: unknown }).dodge, "the Dodge, resumed");
       expect(dodge(r)!.results).toEqual(results);
-      // (Its screen at the round due's opening, not the scope-in: that round's vote, in its own time.)
+      // (Its screen where it was as that round closed (the time into the Dodge kept with it: D2), not the scope-in: the round due's vote
+      // next, in its own time.)
       const d = (r.phase as { dodge: { round: number; at: number } }).dodge;
       expect(d.round).toBe(results.length);
-      const open = dodgeTimeline().rounds[results.length]!.openAt;
-      expect(Date.now() - d.at).toBeGreaterThanOrEqual(open);
-      expect(Date.now() - d.at).toBeLessThan(open + 300);
+      const closed = dodgeTimeline().rounds[results.length - 1]!.closeAt;
+      expect(k.kept.dodgeMs).toBeGreaterThanOrEqual(closed);
+      expect(Date.now() - d.at).toBeGreaterThanOrEqual(closed);
+      expect(Date.now() - d.at).toBeLessThan(closed + 300);
       await until(r, () => dodge(r)!.results.length > results.length || r.phase.kind === "results", "the next round closed");
       expect(dodge(r)!.results.slice(0, results.length)).toEqual(results);
+      r.dispose();
+    } finally {
+      if (at >= 0) admins.splice(at, 0, "chandy");
+    }
+  }, 120_000);
+
+  // (The delta review of #885, D2: a round was kept only as it closed, so a reload after its teleports reopened it in full, the final safe
+  // square known; every round could be made safe and his ultimate never landed. The director's call: the time into the Dodge is kept as
+  // the page goes, and the rejoin carries the round on from there.)
+  it("Chandy's Dodge, the page hidden mid-round past its last teleport, your vote in: resumed there, your vote kept, the round closing in its own time", async () => {
+    const admins = BOSS_ADMIN_FIRST as string[];
+    const at = admins.indexOf("chandy");
+    if (at >= 0) admins.splice(at, 1);
+    try {
+      const m = battle({ ...ALONE, bossId: "chandy", bossPowerTest: "dodge" } as Settings);
+      m.start();
+      const dodge = (x: SoloMatch) => x.runner?.state.boss?.powers?.chandy?.dodge ?? null;
+      const view = (x: SoloMatch) => (x.phase as { dodge?: { at: number; round: number; mine?: string } }).dodge ?? null;
+      for (let i = 0; i < 6000 && !(dodge(m) && dodge(m)!.results.length === 1 && view(m)); i++) {
+        if (yourTurn(m)) pick(m);
+        await step();
+      }
+      expect(dodge(m)?.results.length, "round 1 closed").toBe(1);
+      const r2 = dodgeTimeline().rounds[1]!;
+      // (Into round 2 past its last teleport, before it closes: where the safe square ends up is on screen. Your vote in.)
+      await step(view(m)!.at + r2.teleports.at(-1)! + 200 - Date.now());
+      const square = dodgeArena(dodge(m)!.center).find((sq) => sq !== dodge(m)!.rounds[1]!.safe)!;
+      m.dodgeVote(square);
+      expect(view(m)!.mine).toBe(square);
+      const into = Date.now() - view(m)!.at;
+      expect(into).toBeLessThan(r2.voteEnd);
+      expect(dodge(m)!.results.length).toBe(1);
+      setVisible("hidden");
+      const k = loadKeptSolo()!;
+      expect(k.kept).toMatchObject({ dodgeMs: into, dodgeVote: square });
+      m.dispose();
+      setVisible("visible");
+      const r = resumed(k);
+      await until(r, () => !!view(r), "the Dodge, resumed");
+      // (Round 2 on from where it was, its teleports already shown, your vote in it: not reopened.)
+      expect(view(r)!.round).toBe(1);
+      expect(view(r)!.mine).toBe(square);
+      const now = Date.now() - view(r)!.at;
+      expect(now).toBeGreaterThanOrEqual(into);
+      expect(now).toBeLessThan(into + 300);
+      // (It closes when it would have, with your vote: the square you chose.)
+      await until(r, () => dodge(r)!.results.length === 2, "round 2 closed, resumed");
+      expect(Date.now() - view(r)!.at).toBeLessThan(r2.closeAt + 300);
+      expect(dodge(r)!.results[1]).toMatchObject({ placed: square, hit: true });
+      expect(dodge(r)!.results[1]!.random).toBeUndefined();
       r.dispose();
     } finally {
       if (at >= 0) admins.splice(at, 0, "chandy");

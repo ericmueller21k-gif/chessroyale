@@ -206,6 +206,14 @@ export interface KeptGame {
    */
   powerUp?: true;
   /**
+   * Chandy's Dodge on: the time into it (ms from its start) and your vote in its round on, as the game was kept (as each round closes, as
+   * the page goes): a rejoin carries the round on from there, its teleports already shown and its vote with only its own time left,
+   * never reopening it (the director's call on the delta review of #885, D2). Unset: no Dodge on (a rejoin mid-Dodge without it opens
+   * the round due).
+   */
+  dodgeMs?: number;
+  dodgeVote?: string;
+  /**
    * Your move as it was accepted, kept before it's scored (the judge's await), so a reload while it's scored can't take it back: a rejoin
    * plays it as that turn's move (the review of #885, I2). Its time (`thinkMs`), a power-up used on it, Hollow's dark ending the turn,
    * the God King called to play it (`king`: the delta review, D5); in a Solo raid the bots' picks planned by then, shown from your pick
@@ -305,7 +313,7 @@ export function readKeptGame(v: unknown): KeptGame | null {
   const picks = Array.isArray(p?.picks) ? p.picks.filter((x): x is [string, string] => Array.isArray(x) && typeof x[0] === "string" && typeof x[1] === "string").map(([id, move]): [string, string] => [id, move]) : [];
   const botPowerUps = Array.isArray(p?.botPowerUps) ? p.botPowerUps.filter((id): id is string => typeof id === "string") : [];
   const pending = p && typeof p === "object" && (p.move === null || typeof p.move === "string") && typeof p.thinkMs === "number" && Number.isFinite(p.thinkMs) ? { move: p.move, thinkMs: Math.max(0, p.thinkMs), ...(p.powerUp ? { powerUp: true as const } : {}), ...(p.darkOut ? { darkOut: true as const } : {}), ...(p.king === true && p.move === null ? { king: true as const } : {}), ...(picks.length ? { picks } : {}), ...(botPowerUps.length ? { botPowerUps } : {}) } : null;
-  return { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}), ...(g.powerUp === true ? { powerUp: true as const } : {}), ...(pending ? { pending } : {}) };
+  return { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}), ...(g.powerUp === true ? { powerUp: true as const } : {}), ...(typeof g.dodgeMs === "number" && Number.isFinite(g.dodgeMs) && g.dodgeMs >= 0 ? { dodgeMs: g.dodgeMs, ...(typeof g.dodgeVote === "string" ? { dodgeVote: g.dodgeVote } : {}) } : {}), ...(pending ? { pending } : {}) };
 }
 
 /** A kept floor read back, or null when there's none or it isn't one (another version, a damaged entry). */

@@ -424,7 +424,10 @@ export class SoloMatch implements GameView {
     const turnMs = this.turnUsedMs();
     // (This turn's power-up used, its hints seen (D4): on your turn its hint; before a rejoin's turn begins, the kept one's.)
     const powerUp = !pending && (this.phase.kind === "play" ? this.hint !== null : this.resumePowerUp);
-    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}), ...(powerUp ? { powerUp: true } : {}), ...(pending ? { pending: { ...pending, ...this.plannedPicks() } } : {}) });
+    // (Chandy's Dodge on: the time into it and your vote in its round, so a rejoin carries the round on from here (D2).)
+    const d = this.dodge;
+    const dodge = d ? { dodgeMs: Math.max(0, Date.now() - d.at), ...(d.mine ? { dodgeVote: d.mine } : {}) } : {};
+    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}), ...(powerUp ? { powerUp: true } : {}), ...dodge, ...(pending ? { pending: { ...pending, ...this.plannedPicks() } } : {}) });
   }
   /**
    * A Solo raid's bot picks planned this round, kept with your move (KeptGame.pending): from your pick on they're on screen (livePicks), so
@@ -473,9 +476,13 @@ export class SoloMatch implements GameView {
       globalThis.removeEventListener?.("pagehide", gone);
     };
   }
-  /** The page hidden (or closed) on your turn: its clock stops, and the time used so far is kept with the floor. */
+  /**
+   * The page hidden (or closed) on your turn: its clock stops, and the time used so far is kept with the floor. During Chandy's Dodge
+   * (nobody's clock runs; it plays on while hidden): the time into it is kept (keepFloor), so a rejoin carries its round on from here (D2).
+   */
   private goneAway() {
     const keeper = this.keeper;
+    if (keeper && !this.stopped && this.dodge) return this.keepFloor();
     if (!keeper || this.stopped || this.phase.kind !== "play" || this.awayAt) return;
     this.awayAt = Date.now();
     if (this.timer) clearTimeout(this.timer);
@@ -520,6 +527,7 @@ export class SoloMatch implements GameView {
     // accepted, still being scored then: played as that turn's move, at its own time (I2).)
     this.resumeTurnMs = game.pending ? game.pending.thinkMs : (game.turnMs ?? 0);
     this.resumePowerUp = !game.pending && !!game.powerUp;
+    this.resumeDodge = game.dodgeMs === undefined ? null : { ms: game.dodgeMs, ...(game.dodgeVote ? { vote: game.dodgeVote } : {}) };
     this.pendingMove = game.pending ?? null;
     this.begun = this.runner.boss ? this.runner.boss.crowdMoves > 0 || game.intro : false;
     this.bossIntroDone = game.intro;
@@ -1059,14 +1067,19 @@ export class SoloMatch implements GameView {
   /** Dodge on (your turn waits for it): its key, when it began, the round on and your vote in it. */
   private dodge: { key: string; at: number; round: number; mine?: string } | null = null;
 
-  /** As your turn begins: the scope-in, the warning volley, then three rounds of the vote, each closed here as the server closes them online. */
-  private dodgeTurn() {
+  /**
+   * As your turn begins: the scope-in, the warning volley, then three rounds of the vote, each closed here as the server closes them online.
+   * `kept`: resumed mid-Dodge (KeptGame.dodgeMs): on from the time kept, the rounds closed by then kept too (dodgeStep), so the round on
+   * goes on where it was (its teleports already shown, its vote with only its own time left, your vote in it kept), never reopened with
+   * its answers known (the review of #885, I3; the delta review, D2). Mid-Dodge with no time kept: the round due, as it opens.
+   */
+  private dodgeTurn(kept: { ms: number; vote?: string } | null = null) {
     if (this.timer) clearTimeout(this.timer);
-    // (Resumed mid-Dodge, its rounds played kept (dodgeStep): on from the round due, as if it had just opened, never from round 1 again
-    // with the answers known: the review of #885, I3.)
-    const done = this.runner.state.boss?.powers?.chandy?.dodge?.results.length ?? 0;
-    const at = Date.now() - (done ? (dodgeTimeline().rounds[done]?.openAt ?? 0) : 0);
-    this.dodge = { key: `d-${at}`, at, round: done };
+    const full = this.runner.state.boss?.powers?.chandy?.dodge;
+    const done = full?.results.length ?? 0;
+    const at = Date.now() - (kept ? kept.ms : done ? (dodgeTimeline().rounds[done]?.openAt ?? 0) : 0);
+    const mine = kept?.vote && full && dodgeArena(full.center).includes(kept.vote) ? kept.vote : undefined;
+    this.dodge = { key: `d-${at}`, at, round: done, ...(mine ? { mine } : {}) };
     this.showDodge();
     this.armDodge();
   }
@@ -1089,11 +1102,11 @@ export class SoloMatch implements GameView {
     if (!d || !full || this.stopped) return;
     if (!dodgeOver(full)) {
       this.runner.finishDodgeRound(this.you.alive && d.mine ? { [HUMAN]: d.mine } : {});
-      // (A boss battle kept on the device: each round kept as it closes (a hit that ends the battle is decided, never kept), so a
-      // reload plays on from the next round (I3).)
-      this.keepFloor();
       d.round++;
       d.mine = undefined;
+      // (A boss battle kept on the device: each round kept as it closes, with the time into the Dodge (D2), so a reload plays on from
+      // here (I3). The losing hit too: the battle's result comes only after his kill (finishBossBattle), so a rejoin goes to that loss.)
+      this.keepFloor();
       this.showDodge();
       return this.armDodge();
     }
@@ -1680,12 +1693,16 @@ export class SoloMatch implements GameView {
 
   /** A resumed game's move, accepted and still being scored as it was kept (KeptGame.pending): played as its turn begins (nextRound). */
   private pendingMove: KeptGame["pending"] | null = null;
+  /** A game resumed mid-Dodge: the time into it and your vote, as kept (KeptGame.dodgeMs): its round goes on from there (dodgeTurn). */
+  private resumeDodge: { ms: number; vote?: string } | null = null;
 
   private nextRound() {
     this.keepFloor();
-    // (Only the turn the game was kept on: its human turn comes next, with nothing played first.)
+    // (Only the turn the game was kept on: its human turn comes next, with nothing played first; a Dodge kept mid-round, only if it's on.)
     const pending = this.pendingMove;
     this.pendingMove = null;
+    const dodgeKept = this.resumeDodge;
+    this.resumeDodge = null;
     if (this.runner.isOver()) return this.finish();
     // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
     if (this.runner.endGameIfOver()) return this.finish();
@@ -1741,7 +1758,7 @@ export class SoloMatch implements GameView {
       if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.runner.queenLockDue() ? this.queenLockTurn() : this.bossTurn());
       // (Dash's Scramble Rush, as your turn begins: the turn waits for it; Chandy's Dodge too.)
       if (this.runner.rushDue()) return void this.rushTurn();
-      if (this.runner.dodgeDue()) return void this.dodgeTurn();
+      if (this.runner.dodgeDue()) return void this.dodgeTurn(dodgeKept);
       // (A failed Lights out or Scramble Rush: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
