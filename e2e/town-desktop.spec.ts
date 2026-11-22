@@ -181,10 +181,18 @@ test("the side menu's Play with friends, Daily Quests, Shop & crates and Profile
     await expect(page.locator(".fd-right .rc-h").first()).toHaveText("TOWN");
   };
   const shop = (l: typeof layer) => expect(l.getByRole("tab", { name: "Crates" })).toBeVisible();
+  // (LAYER_STILLS=<folder>, outside the repo: a still of each page over the town.)
+  const still = async (name: string) => {
+    if (!process.env.LAYER_STILLS) return;
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${process.env.LAYER_STILLS}/town-${name}-desktop.png` });
+  };
   // Shop & crates; the arrow keys don't walk the town under it; Profile switches the layer (no new step); its Back closes it.
   await opens("Shop & crates", "Shop & crates", shop);
+  await still("shop");
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowUp");
   await opens("Profile", "Profile", (l) => expect(l.getByRole("button", { name: "Back" }).first()).toBeVisible());
+  await still("profile");
   expect(await page.evaluate(() => history.length), "one step for the layer, switched in place").toBe(steps + 1);
   await layer.getByRole("button", { name: "Back" }).first().click();
   await sameTown("Profile's Back");
