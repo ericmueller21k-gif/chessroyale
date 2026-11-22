@@ -26,12 +26,20 @@ function BankTime({ match }: { match: GameView }) {
     return () => clearInterval(t);
   }, [ticking]);
   const me = match.standings().find((s) => s.isYou);
-  if (!me || me.out) return null;
-  const bank = ticking
+  if (!me) return null;
+  const bank = ticking && !me.out
     ? Math.max(0, me.bankMs + match.settings.timeIncrementSeconds * 1000 - Math.max(0, now - p.startsAt))
     : me.bankMs;
+  return <BankBox bank={bank} out={me.out} />;
+}
+
+/**
+ * The bank's box. Out (a cut, a team final's step, the final's places as its last move plays), it keeps its place and width, unseen
+ * (`.hud-bank.out`), so the top bar's other boxes don't shift (Eric's "nothing shifts"; the second delta review of #881, N1).
+ */
+export function BankBox({ bank, out }: { bank: number; out: boolean }) {
   return (
-    <span class={`hud-bank${bank < 60_000 ? " low" : ""}`} title="Your total time left (bank): +5 s every move, at most 30 s per move">
+    <span class={`hud-bank${out ? " out" : bank < 60_000 ? " low" : ""}`} aria-hidden={out ? "true" : undefined} title={out ? undefined : "Your total time left (bank): +5 s every move, at most 30 s per move"}>
       {clockShown(bank)}
     </span>
   );

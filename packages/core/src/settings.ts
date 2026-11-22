@@ -3386,6 +3386,31 @@ export const LEAVING = {
   confirmWaitMs: 4_000,
 } as const;
 
+/**
+ * A solo game left after `minMoves` of your own moves counts as a loss (Eric, Nov 22: "if I just refresh my browser, it doesn't show
+ * in the match history ... otherwise no one would ever resign"; then "we only store games that people are actually playing";
+ * docs/decisions/2026-11-22-solo-abandon.md). A solo game (Solo, a solo raid, Boss Battle alone) is played on the device; the server
+ * only notes its start (server/xp.ts, `solo_games`). At your `minMoves`th own move (core's ownMoves, as XP counts them) the app tells
+ * the server once that the game is real. A real game whose result never comes is recorded as a loss (last place, `abandoned`, no XP,
+ * no boss token, no quest, never the Welcome Crate's count) at the first of: you start another solo game, the app loads, or
+ * `staleHours` have passed since it began (checked at your next profile read). A late result for it then writes nothing. Under
+ * `minMoves`, nothing is stored or recorded. Never a Battle Tower floor (its own leave rules: BATTLE_TOWER) nor a game with a test switch.
+ */
+export const SOLO_ABANDON = {
+  minMoves: 10,
+  staleHours: 24,
+  /**
+   * Another tab of this device still playing a real game (its last move this recent) keeps the app's load in a second tab from
+   * recording it as left: a game in a tab left alone longer than this counts as left.
+   */
+  liveMinutes: 10,
+  /**
+   * A finished game's result whose post went this recently may still be on its way (from a page since gone, or another tab): the app's
+   * load and a start don't send it again yet (a re-send overtaking it would take the game and its XP), only name it (ms).
+   */
+  resendAfterMs: 15_000,
+} as const;
+
 /** One of 1 v 1's time controls: a bank for the game and an increment after every timed move, as chess writes them. */
 export interface DuelControl {
   id: string;

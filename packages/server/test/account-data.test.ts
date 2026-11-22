@@ -166,11 +166,11 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   ranked_conduct: "user_id match_id at mode kind games rp nonce",
   reports: "id reporter target reason at match line line_at",
   results:
-    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned play_ms moves xp_before xp_parts xp_none xp_rewards",
+    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned play_ms moves xp_before xp_parts xp_none xp_rewards solo_game",
   series_crates: "user_id crate n",
   sessions: "token_hash user_id created_at expires_at",
   solo_battles: "user_id id started_at",
-  solo_games: "user_id id started_at test_minutes",
+  solo_games: "user_id id started_at test_minutes real_at mode players team boss_id boss_elo",
   tower_best: "user_id kind floor at",
   tower_runs: "id user_id kind seed floor met members fight last status started_at updated_at",
   users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online dnd pawn_color age_ok_at chat_on test",

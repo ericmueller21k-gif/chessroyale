@@ -1,5 +1,5 @@
-import { XP, XP_DAILY, gameXp, isXpNone, questPartLabel, readRewards, xpDayStart, xpGrant, xpParts, type QuestGame, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
-import type { Sql } from "./accounts.ts";
+import { BOSS_TIERS, SOLO_ABANDON, XP, XP_DAILY, bossDef, gameXp, isXpNone, questPartLabel, readRewards, xpDayStart, xpGrant, xpParts, type QuestGame, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
+import type { Sql, Stmt } from "./accounts.ts";
 import { cond, ledgerAccount, leg, opStatements, type Cond, type Op } from "./ledger.ts";
 import { questStatements, questsPaidBy } from "./quests.ts";
 import { dailyOp, gameRewards, payLevels } from "./rewards.ts";
@@ -38,6 +38,21 @@ export const XP_SCHEMA = [
 ];
 
 /**
+ * A solo game left after SOLO_ABANDON.minMoves of your own moves counts as a loss (Eric, Nov 22; settings.ts SOLO_ABANDON;
+ * docs/decisions/2026-11-22-solo-abandon.md). `real_at`: when the device said its minMoves-th own move came (`markSoloGame`; NULL:
+ * not yet, so nothing is ever recorded for it); with it, what its loss row needs that the server can't know (the device's word,
+ * checked as /api/results checks a result's): the mode, the players, your team, the boss and its tier.
+ */
+export const XP_COLUMNS = [
+  { table: "solo_games", column: "real_at", type: "INTEGER" },
+  { table: "solo_games", column: "mode", type: "TEXT" },
+  { table: "solo_games", column: "players", type: "INTEGER" },
+  { table: "solo_games", column: "team", type: "TEXT" },
+  { table: "solo_games", column: "boss_id", type: "TEXT" },
+  { table: "solo_games", column: "boss_elo", type: "INTEGER" },
+];
+
+/**
  * `test_minutes` for a solo game an admin started with ?xpgame where TEST_SWITCHES is off (production): a test game, no XP (review
  * m1, Nov 9). Any other value is the switch's minutes (TEST_SWITCHES on), or NULL for none.
  */
@@ -46,20 +61,129 @@ export const SOLO_TESTED = -1;
 /** A solo game's id: 18 hex characters. */
 const SOLO_GAME = /^[0-9a-f]{18}$/;
 
-/** A solo game begins (any solo game: Solo, a Solo raid, Boss alone): the server notes when, by its own clock. Answers its id. */
-export async function startSoloGame(sql: Sql, userId: string, now: number, testMinutes: number | null = null): Promise<string> {
+/**
+ * A solo game begins (any solo game: Solo, a Solo raid, Boss alone, a Battle Tower floor): the server notes when, by its own clock.
+ * Answers its id. It replaces the one open before it, and that one, if real (past SOLO_ABANDON.minMoves) and still without its result,
+ * is recorded as a loss in the same transaction (abandonStatements), unless it's `unsent`: the device's finished game whose result it
+ * still has to send (then that result, when it comes, is recorded, with no XP).
+ */
+export async function startSoloGame(sql: Sql, userId: string, now: number, testMinutes: number | null = null, unsent: string | null = null): Promise<string> {
   const id = newId(9);
-  await sql.run(
-    `INSERT INTO solo_games (user_id, id, started_at, test_minutes) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)
-     ON CONFLICT (user_id) DO UPDATE SET id = excluded.id, started_at = excluded.started_at, test_minutes = excluded.test_minutes`,
-    userId,
-    id,
-    now,
-    testMinutes,
-    userId,
-  );
+  await sql.batch([
+    ...abandonStatements(userId, unsent ? { except: unsent } : {}),
+    st("DELETE FROM solo_games WHERE user_id = ?", userId),
+    st(`INSERT INTO solo_games (user_id, id, started_at, test_minutes) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)`, userId, id, now, testMinutes, userId),
+  ]);
   return id;
 }
+
+/** The device's word at its SOLO_ABANDON.minMoves-th own move: what the game's loss row would need, checked as /api/results checks a result's. */
+export interface SoloReal {
+  mode: "classic" | "crowd" | "boss";
+  players: number;
+  team: "w" | "b" | null;
+  bossId: string | null;
+  bossElo: number | null;
+}
+
+/** A mark's body as a SoloReal (null: no number of players). */
+export function soloRealOf(b: unknown): SoloReal | null {
+  const o = (b ?? {}) as { mode?: unknown; players?: unknown; team?: unknown; bossId?: unknown; bossElo?: unknown };
+  if (typeof o.players !== "number" || !Number.isFinite(o.players)) return null;
+  const mode = o.mode === "crowd" || o.mode === "boss" ? o.mode : "classic";
+  return {
+    mode,
+    players: Math.max(1, Math.min(1000, Math.round(o.players))),
+    team: o.team === "w" || o.team === "b" ? o.team : null,
+    bossId: typeof o.bossId === "string" && bossDef(o.bossId) ? o.bossId : null,
+    bossElo: mode === "boss" && typeof o.bossElo === "number" && BOSS_TIERS.includes(o.bossElo) ? o.bossElo : null,
+  };
+}
+
+/**
+ * The game is real (POST /api/xp/solo/real, sent once by the app at your SOLO_ABANDON.minMoves-th own move): left now, it would be
+ * recorded as a loss. Only the account's open game, once, and never an admin's test game where test switches are off (SOLO_TESTED);
+ * the app never sends it for a Battle Tower floor or a game with a test switch on. False: no such game open (finished, replaced).
+ */
+export async function markSoloGame(sql: Sql, userId: string, game: unknown, real: SoloReal, now: number): Promise<boolean> {
+  if (!soloGameKey(game)) return false;
+  const row = await sql.first<{ id: string }>(
+    `UPDATE solo_games SET real_at = ?, mode = ?, players = ?, team = ?, boss_id = ?, boss_elo = ?
+     WHERE user_id = ? AND id = ? AND real_at IS NULL AND (test_minutes IS NULL OR test_minutes <> ${SOLO_TESTED}) RETURNING id`,
+    now,
+    real.mode,
+    real.players,
+    real.team,
+    real.bossId,
+    real.bossElo,
+    userId,
+    game,
+  );
+  return !!row;
+}
+
+/**
+ * Which real game to record as left: the account's open one (`game`: only if it's this one; `staleBefore`: only if it began before
+ * then, SOLO_ABANDON.staleHours ago; `except`: never this one, a finished game whose result the device still has to send: the
+ * device's word, as a game's mark is).
+ */
+export interface AbandonWhich {
+  game?: string;
+  staleBefore?: number;
+  except?: string;
+}
+
+/**
+ * The statements that record the account's real solo game as a loss (SOLO_ABANDON): last place, `abandoned` = 1, played when it
+ * became real, no XP, nothing ranked; then (with `drop`) take it off. In one transaction with whatever comes after, the row is read
+ * and taken off at once, so a result coming in meanwhile (endSoloGame) either took it first, and this records nothing, or finds it
+ * gone. Never twice: the loss keeps the game's id (`results.solo_game`), and neither it nor a late result (recordResult's
+ * `soloGame`) is written beside a row of the same game. A deleted account gets nothing (`users`).
+ */
+export function abandonStatements(userId: string, which: AbandonWhich, drop = false): Stmt[] {
+  const { cond, params } = abandonWhere(userId, which);
+  return [
+    st(
+      `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, played_at, boss_elo, boss_id, ranked, held, abandoned, solo_game)
+       SELECT s.user_id, s.mode, 0, s.players, s.players, s.team, CASE WHEN s.team IS NOT NULL OR s.mode = 'boss' THEN 0 END, s.real_at, s.boss_elo,
+         s.boss_id, 0, 0, 1, s.id
+       FROM solo_games s WHERE ${cond("s.")}
+         AND EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id)
+         AND NOT EXISTS (SELECT 1 FROM results r WHERE r.user_id = s.user_id AND r.solo_game = s.id)`,
+      ...params,
+    ),
+    ...(drop ? [st(`DELETE FROM solo_games WHERE ${cond("")}`, ...params)] : []),
+  ];
+}
+
+/** The real solo game `which` names, in SQL (`t`: the table's alias and a dot, or nothing), and its parameters. */
+function abandonWhere(userId: string, which: AbandonWhich) {
+  const cond = (t: string) =>
+    `${t}user_id = ? AND ${t}real_at IS NOT NULL${which.game ? ` AND ${t}id = ?` : ""}${which.staleBefore !== undefined ? ` AND ${t}started_at <= ?` : ""}${which.except ? ` AND ${t}id <> ?` : ""}`;
+  const params = [userId, ...(which.game ? [which.game] : []), ...(which.staleBefore !== undefined ? [which.staleBefore] : []), ...(which.except ? [which.except] : [])];
+  return { cond, params };
+}
+
+/**
+ * Records the account's real solo game as left and takes it off (SOLO_ABANDON; the app's load and every profile read: GET /api/me):
+ * `which` says which (none: whichever is open). A game under SOLO_ABANDON.minMoves, or one that got its result, is never touched.
+ * A read first: almost every profile read finds none, and writes nothing. Step 2's Forfeit is this with `{ game }`. True: one was
+ * there (recorded now, or by whatever took it first).
+ */
+export async function abandonSoloGame(sql: Sql, userId: string, which: AbandonWhich = {}): Promise<boolean> {
+  const { cond, params } = abandonWhere(userId, which);
+  if (!(await sql.first<{ n: number }>(`SELECT 1 AS n FROM solo_games WHERE ${cond("")}`, ...params))) return false;
+  await sql.batch(abandonStatements(userId, which, true));
+  return true;
+}
+
+/** The time before which a real game counts as left whatever the app says (SOLO_ABANDON.staleHours since it began). */
+export const soloStaleBefore = (now: number): number => now - SOLO_ABANDON.staleHours * 3_600_000;
+
+/** A solo game's id as a device sent it (null: not one). Its result is written once per id (recordResult's `soloGame`). */
+export const soloGameKey = (game: unknown): string | null => (typeof game === "string" && SOLO_GAME.test(game) ? game : null);
+
+const st = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 
 /**
  * A solo game's end, as its result comes in: its time by the server's clock (and the test switch's minutes), once. Null: unknown,
@@ -67,9 +191,10 @@ export async function startSoloGame(sql: Sql, userId: string, now: number, testM
  * get it back, as its result is answered "no XP". Rare (a failed write), and the safe way round: never paid twice.)
  */
 export async function endSoloGame(sql: Sql, userId: string, game: unknown, now: number): Promise<{ id: string; ms: number; testMinutes: number | null } | null> {
-  if (typeof game !== "string" || !SOLO_GAME.test(game)) return null;
-  const row = await sql.first<{ started_at: number; test_minutes: number | null }>("DELETE FROM solo_games WHERE user_id = ? AND id = ? RETURNING started_at, test_minutes", userId, game);
-  return row ? { id: game, ms: Math.max(0, now - row.started_at), testMinutes: row.test_minutes } : null;
+  const id = soloGameKey(game);
+  if (!id) return null;
+  const row = await sql.first<{ started_at: number; test_minutes: number | null }>("DELETE FROM solo_games WHERE user_id = ? AND id = ? RETURNING started_at, test_minutes", userId, id);
+  return row ? { id, ms: Math.max(0, now - row.started_at), testMinutes: row.test_minutes } : null;
 }
 
 /** How the win bonus is capped for this game. */

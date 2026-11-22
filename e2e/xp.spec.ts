@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
+import { SOLO_ABANDON } from "@chessroyale/core";
+import { test, bossAloneFromHome, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * XP and levels on the end screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't want it
@@ -318,3 +319,53 @@ async function closeRewardCard(page: Page) {
   await card.getByRole("button", { name: "▶ OK" }).click();
   await expect(card).toHaveCount(0);
 }
+
+/** Your turns played in this solo game so far (a missed one isn't; none before the game is made, just after START). */
+const ownSoFar = (page: Page) =>
+  page.evaluate(() => (((window as any).match?.moves ?? []) as { move: unknown; abstained?: boolean }[]).filter((m) => m.move !== null || m.abstained).length);
+
+/** Plays your turns in a boss battle alone until `n` are yours: each a quiet move the boss's powers allow (pickMove), once it's your turn. */
+async function playOwnMoves(page: Page, n: number) {
+  for (let i = 0; i < 3 * n && (await ownSoFar(page)) < n; i++) {
+    await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+    const s = await page.evaluate(() => {
+      const m = (window as any).match;
+      return { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null, n: m.moves.length as number };
+    });
+    await submitMove(page, pickMove(s.fen, { allowed: s.allowed, prefer: (m) => m.piece === "n" || (m.piece === "p" && "abcde".includes(m.from[0]!)) }), s.fen);
+    await expect.poll(() => page.evaluate(() => (window as any).match.moves.length), { timeout: 30_000 }).toBeGreaterThan(s.n);
+  }
+  expect(await ownSoFar(page)).toBe(n);
+}
+
+test(`a solo game left after ${SOLO_ABANDON.minMoves} of your moves counts as a loss on your profile; under it, nothing (Eric, Nov 22)`, { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  // (No test switch that makes a test game: those are never marked.)
+  await page.goto("/?debug&boss=gingerbread");
+  const marks: unknown[] = [];
+  page.on("request", (r) => void (r.method() === "POST" && new URL(r.url()).pathname === "/api/xp/solo/real" && marks.push(r.postDataJSON())));
+  const recent = async () => {
+    const id = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+    return ((await (await page.request.get(`/api/profile/${id}`)).json()) as { recent: { mode: string; online: boolean; won: boolean | null }[] }).recent;
+  };
+  // Under the mark: a reload and another start record nothing, and the server was never told.
+  await bossAloneFromHome(page);
+  await playOwnMoves(page, SOLO_ABANDON.minMoves - 1);
+  await page.reload();
+  await bossAloneFromHome(page);
+  await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+  expect(marks).toEqual([]);
+  expect(await recent()).toEqual([]);
+  // At the mark (this game's): told once; a reload, and the app's load records it as a loss, a boss battle lost, solo.
+  await playOwnMoves(page, SOLO_ABANDON.minMoves);
+  await expect.poll(() => marks.length, { timeout: 10_000 }).toBe(1);
+  expect(marks[0]).toMatchObject({ mode: "boss", players: 1, bossId: "gingerbread" });
+  await page.reload();
+  await expect.poll(async () => (await recent()).length, { timeout: 20_000 }).toBe(1);
+  expect((await recent())[0]).toMatchObject({ mode: "boss", online: false, won: false });
+  // Another game starts: still one, never recorded again.
+  await bossAloneFromHome(page);
+  await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+  expect(await recent()).toHaveLength(1);
+  expect(marks).toHaveLength(1);
+});

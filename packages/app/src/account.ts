@@ -1,4 +1,4 @@
-import { ASK_AGE_LINE, CHAT_MOD, FRONT_DOOR, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
+import { ASK_AGE_LINE, CHAT_MOD, FRONT_DOOR, SOLO_ABANDON, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
 import { loadStep } from "./loadbar.ts";
 import { gateAnswered, noteSiteReached, noteSiteSignedOut, onSiteGate, siteSignedOut } from "./site-gate.ts";
@@ -236,7 +236,13 @@ export async function loadAccount(name?: string): Promise<void> {
   // Your profile is asked for beside the options, not after them (Nov 10: home waits on it, and each request is a round trip). The
   // server plays a device it knows is too young under the default name, whatever name this one sends.
   const storedYoung = storedTooYoung();
-  const me = profileFrom(`/api/me${name && !storedYoung ? `?name=${encodeURIComponent(name)}` : ""}`);
+  // (A solo game left after SOLO_ABANDON.minMoves goes on your record as a loss as the profile is read (`settle`), unless a tab of
+  // this device is still playing it or a finished one's result is still to be sent, whose game is named (`unsent`): server/xp.ts.)
+  const unsent = unsentResult();
+  const q = new URLSearchParams();
+  if (name && !storedYoung) q.set("name", name);
+  if (!unsent && !soloLiveOnDevice()) q.set("settle", "1");
+  const me = profileFrom(meUrl(q));
   me.catch(() => undefined);
   try {
     config = await api<NonNullable<AccountState["config"]>>("/api/auth/config", inTime());
@@ -247,6 +253,7 @@ export async function loadAccount(name?: string): Promise<void> {
     loadStep("account");
     set({ profile: await me, failed: null });
     loadStep("last");
+    if (unsent) void sendUnsentResult(true);
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
     if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch (e) {
@@ -274,7 +281,7 @@ function retryOnReturn() {
 
 async function sendAgeAnswer(ok: boolean): Promise<AgeAnswer> {
   const { age } = await api<{ age: AgeAnswer }>("/api/auth/age", { method: "POST", body: JSON.stringify({ oldEnough: ok }) });
-  if (age === "under") set({ profile: await api<Profile>("/api/me") });
+  if (age === "under") set({ profile: await api<Profile>(meUrl()) });
   return age;
 }
 
@@ -353,7 +360,7 @@ export async function refreshChatStanding(now = Date.now()): Promise<void> {
   if (!state.profile || now - chatReadAt < CHAT_MOD.recheckMs) return;
   chatReadAt = now;
   try {
-    set({ profile: await api<Profile>("/api/me") });
+    set({ profile: await api<Profile>(meUrl()) });
   } catch {
     // Offline: as it was.
   }
@@ -566,7 +573,7 @@ export async function onlineBattleToken(code: string): Promise<string | null> {
 
 /** Your profile again (after a token dropped: its count in your locker). */
 export async function refreshProfile(): Promise<void> {
-  if (state.profile) set({ profile: await api<Profile>("/api/me") });
+  if (state.profile) set({ profile: await api<Profile>(meUrl()) });
 }
 
 /**
@@ -600,8 +607,12 @@ export async function deleteLockerItems(items: string[]): Promise<void> {
   set({ profile: { ...state.profile, locker } });
 }
 
-/** Off to Google; it sends you back to `next` (this page by default). */
+/**
+ * Off to Google; it sends you back to `next` (this page by default). (A finished game's result still to be sent goes first, outliving
+ * the page: a guest's open game is recorded as left as it joins an account, SOLO_ABANDON.)
+ */
 export const signInWithGoogle = (next = location.pathname) => {
+  void sendUnsentResult();
   location.href = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
 };
 
@@ -617,6 +628,8 @@ export async function sendEmailCode(email: string): Promise<void> {
  * from before the question): then the code is kept, here and on the server, and the answer sends it again (finishPendingSignIn).
  */
 export async function verifyEmailCode(email: string, code: string): Promise<void> {
+  // (A finished game's result still to be sent goes first: a guest's open game is recorded as left as it joins an account.)
+  await sendUnsentResult();
   try {
     // (Signing in uses an age answer up: the next sign-in into an account that hasn't answered asks again.)
     set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }), age: null, pending: null });
@@ -627,6 +640,9 @@ export async function verifyEmailCode(email: string, code: string): Promise<void
 }
 
 export async function signOut(): Promise<void> {
+  // (A finished game's result still to be sent goes first: the next account's device would drop it as another's, and the game would
+  // then be recorded as left.)
+  await sendUnsentResult();
   set({ profile: await api<Profile>("/api/auth/logout", { method: "POST" }), age: tooYoung() ? "under" : null });
 }
 
@@ -685,20 +701,192 @@ export async function recordSoloResult(r: {
   tower?: boolean;
 }): Promise<XpGrant | null> {
   if (!state.profile) return null;
+  // (A game you finished is never recorded as left (SOLO_ABANDON): its result is kept on the device before it's posted, so a page closed
+  // or reloaded mid-post still has it, and taken off only once the server has answered; sent again before your next solo game and at
+  // the next load (sendUnsentResult). `keepalive`: the post itself outlives a page that goes.)
+  if (r.game) {
+    sendOtherFirst(r.game);
+    keepUnsent({ user: state.profile.user.id, result: r, at: Date.now() });
+  }
+  let answer: { xp?: XpGrant | null };
   try {
-    const answer = await api<{ xp?: XpGrant | null }>("/api/results", { method: "POST", body: JSON.stringify(r) });
-    set({ profile: await api<Profile>("/api/me") });
-    return answer.xp ?? null;
-  } catch {
-    // Not important enough to bother the player.
+    answer = await api<{ xp?: XpGrant | null }>("/api/results", { method: "POST", body: JSON.stringify(r), keepalive: true });
+  } catch (e) {
+    // (Not important enough to bother the player.)
+    if (r.game) answered(r.game, !sendAgain(e));
     return null;
   }
+  if (r.game) answered(r.game, true);
+  try {
+    set({ profile: await api<Profile>(meUrl()) });
+  } catch {
+    // The profile as it was.
+  }
+  return answer.xp ?? null;
 }
+
+/**
+ * A post that may not have reached the server's record, to send again: no answer (offline, the page gone, the site's gate), a server
+ * error (any 5xx, 502 "couldn't be read" included) or too many requests (429). Any other answer (a 2xx, a 4xx refusal) is final.
+ */
+const sendAgain = (e: unknown): boolean => {
+  const status = (e as { status?: number } | null)?.status;
+  return !status || status === 429 || status >= 500;
+};
 
 /** A solo game begins (XP, Nov 9): the server notes when, by its own clock; its id goes back with the result. Null: no account yet. */
 export async function startSoloGame(body: { xpgame?: number }): Promise<string | null> {
   if (!state.profile) return null;
-  return (await api<{ game: string | null }>("/api/xp/solo/start", { method: "POST", body: JSON.stringify(body) })).game;
+  // (A start records the open game as left if it's real (SOLO_ABANDON): a finished game's result that couldn't be sent goes first, and
+  // if it still can't be, the start names it (`unsent`) so its game is never recorded as left.)
+  await sendUnsentResult(true);
+  const unsent = unsentGame();
+  return (await api<{ game: string | null }>("/api/xp/solo/start", { method: "POST", body: JSON.stringify({ ...body, ...(unsent ? { unsent } : {}) }) })).game;
+}
+
+/** What a solo game's loss would record if it's left after SOLO_ABANDON.minMoves (the server checks it: server/xp.ts SoloReal). */
+export interface SoloRealFacts {
+  mode: "classic" | "crowd" | "boss";
+  players: number;
+  team: "w" | "b" | null;
+  bossId: string | null;
+  bossElo: number | null;
+}
+
+/**
+ * Your SOLO_ABANDON.minMoves-th own move in a solo game: the server is told that it's real (left now, a loss). True once it answered
+ * (a refusal too: the game isn't open any more); false: try again at your next move (no answer, a server error, too many requests).
+ */
+export async function markSoloGameReal(game: string, facts: SoloRealFacts): Promise<boolean> {
+  try {
+    await api("/api/xp/solo/real", { method: "POST", body: JSON.stringify({ game, ...facts }) });
+    return true;
+  } catch (e) {
+    return !sendAgain(e);
+  }
+}
+
+/**
+ * A tab of this device playing a real solo game (SOLO_ABANDON): the game's id and its last turn, kept on the device so the app's load in
+ * another tab doesn't record it as left while it's played (`liveMinutes`). This tab's own game is `liveHere`. Taken off as it ends
+ * and as the page goes (a reload: then the load records it as left).
+ */
+const SOLO_LIVE_KEY = "brc.soloLive";
+let liveHere: string | null = null;
+let hideWatched = false;
+export function keepSoloLive(game: string): void {
+  liveHere = game;
+  if (!hideWatched && typeof addEventListener === "function") {
+    hideWatched = true;
+    addEventListener("pagehide", () => void (liveHere && endSoloLive(liveHere)));
+  }
+  try {
+    localStorage.setItem(SOLO_LIVE_KEY, JSON.stringify({ game, at: Date.now() }));
+  } catch {
+    // No storage: this tab still knows.
+  }
+}
+export function endSoloLive(game: string): void {
+  if (liveHere === game) liveHere = null;
+  try {
+    if ((JSON.parse(localStorage.getItem(SOLO_LIVE_KEY) ?? "null") as { game?: string } | null)?.game === game) localStorage.removeItem(SOLO_LIVE_KEY);
+  } catch {
+    // No storage.
+  }
+}
+/** A real solo game is being played on this device: in this tab, or in another whose last turn was under SOLO_ABANDON.liveMinutes ago. */
+export function soloLiveOnDevice(now = Date.now()): boolean {
+  if (liveHere) return true;
+  try {
+    const kept = JSON.parse(localStorage.getItem(SOLO_LIVE_KEY) ?? "null") as { at?: unknown } | null;
+    return typeof kept?.at === "number" && now - kept.at < SOLO_ABANDON.liveMinutes * 60_000;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A finished solo game's result not yet answered by the server, with the account it's for: kept as the game was decided, on its way,
+ * or it couldn't be sent. `at`: when its post went (one may still be on its way, from this tab, another or a page since gone); none
+ * while no post is (kept as the game was decided, or its post failed).
+ */
+const UNSENT_KEY = "brc.soloUnsent";
+type Unsent = { user: string; result: Record<string, unknown>; at?: number };
+function keepUnsent(u: Unsent | null): void {
+  try {
+    if (u) localStorage.setItem(UNSENT_KEY, JSON.stringify(u));
+    else localStorage.removeItem(UNSENT_KEY);
+  } catch {
+    // No storage: the result is lost, as before.
+  }
+}
+/**
+ * The post of `game`'s result answered: taken off (`final`: a 2xx or a refusal), or kept with no post on its way (a failure to send
+ * again: sendAgain). Unless another game's result has been kept since.
+ */
+function answered(game: unknown, final: boolean): void {
+  const u = unsentResult();
+  if (u && u.result.game === game) keepUnsent(final ? null : { user: u.user, result: u.result });
+}
+function unsentResult(): Unsent | null {
+  try {
+    const u = JSON.parse(localStorage.getItem(UNSENT_KEY) ?? "null") as Unsent | null;
+    return u && typeof u.user === "string" && u.result && typeof u.result === "object" ? u : null;
+  } catch {
+    return null;
+  }
+}
+/**
+ * A real solo game's result the moment it's decided (xp.ts, SOLO_ABANDON), before any end moment plays: kept on the device with no post
+ * on its way yet. The result screen's post then takes it over (recordSoloResult); a page gone first has it sent at the next load.
+ */
+export function keepSoloResult(game: string, result: Record<string, unknown>): void {
+  if (!state.profile) return;
+  sendOtherFirst(game);
+  keepUnsent({ user: state.profile.user.id, result: { ...result, game } });
+}
+/**
+ * A new game's result is about to take the one slot: another game's kept there is sent first, else it would be overwritten and that game
+ * left with no result at all (the second delta review, N2). Whatever its `at`: by now its post has long had time to land, and a result
+ * sent twice is recorded once. Its post starts here, before the slot changes (sendUnsentResult reads it and posts at once), and its
+ * answer leaves the new one be (`answered` checks the game).
+ */
+function sendOtherFirst(game: string): void {
+  const other = unsentGame();
+  if (other && other !== game) void sendUnsentResult();
+}
+/** The game of a result still to be sent, which the server then never records as left (`unsent`, server/xp.ts). */
+function unsentGame(): string | null {
+  const game = unsentResult()?.result.game;
+  return typeof game === "string" ? game : null;
+}
+/** GET /api/me, naming the game of a result still to be sent: a profile read never records it as left (SOLO_ABANDON.staleHours). */
+function meUrl(q = new URLSearchParams()): string {
+  const unsent = unsentGame();
+  if (unsent) q.set("unsent", unsent);
+  return `/api/me${q.size ? `?${q}` : ""}`;
+}
+/**
+ * Sends a kept result again (`resent`: no time XP for it, as the server's clock ran on after the game: server api.ts); its game's row
+ * is then taken off as usual, and a game recorded already writes nothing. Kept again on the same failures as the first post
+ * (sendAgain). Another account's (signed out since, a guest merged into an account) is dropped: never sent as this one's.
+ * `waitPosted` (the load's and a start's): not while a post of it may still be on its way (`at`, under SOLO_ABANDON.resendAfterMs ago:
+ * a re-send overtaking it would take its game, and the game's XP); reads and starts name its game meanwhile (`unsent`). A sign-in or
+ * out sends it whatever: the account changes after.
+ */
+async function sendUnsentResult(waitPosted = false): Promise<void> {
+  const u = unsentResult();
+  if (!u || !state.profile) return;
+  if (u.user !== state.profile.user.id) return keepUnsent(null);
+  const now = Date.now();
+  if (waitPosted && u.at !== undefined && now - u.at >= 0 && now - u.at < SOLO_ABANDON.resendAfterMs) return;
+  keepUnsent({ ...u, at: now });
+  try {
+    await api("/api/results", { method: "POST", body: JSON.stringify({ ...u.result, resent: true }), keepalive: true });
+    answered(u.result.game, true);
+  } catch (e) {
+    answered(u.result.game, !sendAgain(e));
+  }
 }
 
 /** Your XP from an online game (its lobby's code), once its room has written it; null until then. */
@@ -709,7 +897,7 @@ export async function onlineGameXp(code: string): Promise<XpGrant | null> {
 /** The test switch ?xp=<n> (test servers only, since Nov 9: review of #574 M1): sets your XP, then your profile again. */
 export async function setTestXp(xp: number): Promise<void> {
   await api("/api/xp/test", { method: "POST", body: JSON.stringify({ xp }) });
-  set({ profile: await api<Profile>("/api/me") });
+  set({ profile: await api<Profile>(meUrl()) });
 }
 
 /** Your quests (Nov 9, phase 3; the server deals the day's on the day's first read: server/quests.ts). */

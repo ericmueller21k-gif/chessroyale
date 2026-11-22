@@ -57,9 +57,9 @@ const DAY = 86_400_000;
 
 /** A result's columns in the download (not `held`, which would say fair play is looking at the account). */
 const RESULT_COLUMNS =
-  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards";
+  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, solo_game";
 /** A kept result's columns (every column but its id and account: a test pins the table's columns, so a new one is seen). */
-const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards";
+const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, solo_game";
 
 export const ACCOUNT_STORES: AccountStore[] = [
   {
@@ -74,14 +74,14 @@ export const ACCOUNT_STORES: AccountStore[] = [
     tables: ["results"],
     export: (sql, u) => all(sql, `SELECT ${RESULT_COLUMNS} FROM results WHERE user_id = ? ORDER BY played_at, id`, u.id),
     // Kept as nobody's, written again with new ids (an old id sits between its match's other rows, which keep the
-    // lobby and the time), in no order: only the day, and nothing that could find the match (the lobby, the exact time)
-    // or the player (the rating).
+    // lobby and the time), in no order: only the day, and nothing that could find the match (the lobby, the exact time, a solo
+    // game's id) or the player (the rating).
     erase: (u) => [
       stmt(
         `INSERT INTO results (user_id, ${KEPT_RESULT})
          SELECT ?, mode, online, placement, players, team, team_won, avg_score, NULL, played_at - played_at % ${DAY}, brilliant, NULL,
            cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL, abandoned,
-           play_ms, moves, NULL, xp_parts, xp_none, xp_rewards
+           play_ms, moves, NULL, xp_parts, xp_none, xp_rewards, NULL
          FROM results WHERE user_id = ? ORDER BY random()`,
         DELETED_ID,
         u.id,
@@ -127,13 +127,14 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u) => ["boss_token_drops", "solo_battles"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
   },
   {
-    // XP (xp.ts, Nov 9): the solo game the server is timing (when it began, and a test's minutes). The XP itself is the wallet's
+    // XP (xp.ts, Nov 9): the solo game the server is timing (when it began, and a test's minutes; since Nov 22, when it became real
+    // past SOLO_ABANDON.minMoves and what its loss would record: the mode, players, team, boss and tier). The XP itself is the wallet's
     // (above, with its ledger rows below), and each game's is on its result (its time, moves, XP and rewards). Phase 2 (Nov 9): the
     // series crates you hold (the daily reward's and levels'; the boss crates to pick are the wallet's `boss_picks`, above).
     name: "xp",
     tables: ["solo_games", "series_crates"],
     export: async (sql, u) => ({
-      soloGame: await sql.first("SELECT started_at, test_minutes FROM solo_games WHERE user_id = ?", u.id),
+      soloGame: await sql.first("SELECT started_at, test_minutes, real_at, mode, players, team, boss_id, boss_elo FROM solo_games WHERE user_id = ?", u.id),
       seriesCrates: await all(sql, "SELECT crate, n FROM series_crates WHERE user_id = ? ORDER BY crate", u.id),
     }),
     // (The series crates go with the ledger's store, below.)
