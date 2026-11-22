@@ -252,8 +252,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // Whether the player had the eval bar on (Oct 10, 2026: Settings can switch it off): 1 on, 0 off, NULL unknown (older
   // results, older apps). To see later who turns it off and how they do.
   { table: "results", column: "eval_bar", type: "INTEGER" },
-  // A result recorded because its player abandoned the match (Nov 6: gone too long, idle or removed mid-match): 1; NULL otherwise
-  // (and for every result from before). The Welcome Crate's count of finished games leaves these out (welcome.ts).
+  // A result recorded because its player abandoned the match (Nov 6: gone too long, idle or removed mid-match; since Nov 22, a solo game
+  // left after SOLO_ABANDON.minMoves, written by xp.ts abandonStatements): 1; NULL otherwise (and for every result from before). The
+  // Welcome Crate's count of finished games leaves these out (welcome.ts).
   { table: "results", column: "abandoned", type: "INTEGER" },
   // A report made during a match: that match's lobby code (one report per reporter, player and match).
   { table: "reports", column: "match", type: "TEXT" },
@@ -870,7 +871,10 @@ export interface MatchResult {
   held?: boolean;
   /** The player had the eval bar on (Settings), as far as their app said. */
   evalBar?: boolean | null;
-  /** Recorded because the player abandoned the match (gone too long, idle or removed: the match room says; never the app's word). */
+  /**
+   * Recorded because the player abandoned the match (gone too long, idle or removed: the match room says; never the app's word). A solo
+   * game left (SOLO_ABANDON) is written by the server's own statement (xp.ts abandonStatements), never through this.
+   */
   abandoned?: boolean;
   /** XP (Nov 9; xp.ts): the player's time in the game and own moves, as the server counted them, and the game's XP as granted. */
   playMs?: number | null;

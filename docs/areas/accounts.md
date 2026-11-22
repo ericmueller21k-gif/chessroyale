@@ -61,6 +61,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   browser's word, so they never count for ranking (even the ones from before Oct 7, stored with `ranked` NULL) nor
   toward "Boss tiers beaten" (docs/decisions/2026-10-16-server-side-rating.md). Each
   result keeps whether its player had the eval bar on (`results.eval_bar`, NULL from older apps; see [hub.md](hub.md)).
+- **A solo game left after `SOLO_ABANDON.minMoves` (10) of your own moves is a loss** (Nov 22; [2026-11-22-solo-abandon.md](../decisions/2026-11-22-solo-abandon.md)): the app says so once at that move (`POST /api/xp/solo/real`; never a tower floor or a test game); a real `solo_games` row with no result is written as a loss (last place, `abandoned`, no XP or rewards: `xp.ts abandonStatements`) at the next solo start, the app's load (`GET /api/me?settle=1`, unless another tab played it in the last `liveMinutes`) or any profile read `staleHours` after it began.
+  Once per game (`results.solo_game` guards the loss and a late result); a start waits for the last result's post, and a result that couldn't be sent goes first. Tests: `server/test/solo-abandon.test.ts`, `app/test/solo-abandon.test.ts`, `e2e/xp.spec.ts`.
 - **XP and levels** (Nov 9; [2026-11-09-xp-rules.md](../decisions/2026-11-09-xp-rules.md), [storage](../decisions/2026-11-09-xp-storage.md),
   [the box](../decisions/2026-11-09-xp-box.md)): every counted game's XP is decided on the server (`server/xp.ts` `grantXp`, the rules in
   core's `xp.ts`, the numbers `XP` in settings.ts) and granted through the ledger (asset kind `xp`, the wallet's `xp` column), once per game
