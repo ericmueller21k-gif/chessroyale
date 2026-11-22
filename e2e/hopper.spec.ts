@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { BOSS_POWERS } from "@chessroyale/core";
 import { BOARD_SEL, test, bossAloneFromHome, engineTop, watchFor } from "./helpers.ts";
 
 /**
@@ -223,7 +224,8 @@ test("Chub & Chirp's Carrot Patch (the test switches): the cast and its ladder, 
   expect(r.stopped).toBe(true);
   expect(r.shown).toBe(key(c.spin.rolled));
   expect(r.won).toBe(key(c.spin.rolled));
-  const allowed: Record<number, string[]> = { 0: ["-"], 1: ["p", "pp"], 2: ["pp", "n", "b"], 3: ["n", "b", "r", "q", "qr"], 4: ["qq"] };
+  // (Each count's possible cards, from the settings: the odds changed Nov 22.)
+  const allowed: Record<number, string[]> = Object.fromEntries(BOSS_POWERS.carrotOdds.map((row, tier) => [tier, row.map((x) => key(x.prize))]));
   for (const card of r.cards) expect(allowed[c.spin.tier]).toContain(card);
   const board = new Chess(end.board.fen);
   for (const sq of c.spin.squares) {
