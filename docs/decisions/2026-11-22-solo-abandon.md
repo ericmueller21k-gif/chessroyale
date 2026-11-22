@@ -7,4 +7,4 @@ Calls: only the app's load asks for the loss, never a read mid-game, nor while a
 A second tab's start (a Battle Tower floor's too), or an email sign-in there, does record the first's game: one open solo game per account, by design.
 Test-switch and practice games aren't marked. The loss is last place, dated at the 10th move, once per game id. A finished game's
 result stays on the device from the moment it's decided until the server answers it ([review fixes](2026-11-22-solo-abandon-review-fixes.md),
-[decided](2026-11-22-solo-abandon-decided.md)): never left.
+[decided](2026-11-22-solo-abandon-decided.md), [ends](2026-11-22-solo-abandon-ends.md)): never left.
