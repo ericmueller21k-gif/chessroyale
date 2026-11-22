@@ -147,9 +147,9 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   expect(a!.seed).toBe(b!.seed);
   expect(JSON.parse(a!.members).run).toBe(JSON.parse(b!.members).run);
 
-  // Back to the tower: each in the floor room, floor 1 won, the party's way up.
+  // Back to the Battle Tower: each in the floor room, floor 1 won, the party's way up.
   for (const p of [ann.page, bo.page]) {
-    await p.getByRole("button", { name: "Back to the tower" }).click();
+    await p.getByRole("button", { name: "Back to the Battle Tower" }).click();
     await expect.poll(async () => (await floorNow(p))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   }
 

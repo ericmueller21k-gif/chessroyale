@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { artOf, bossKit } from "../characters/kits.ts";
+import { artOf, bossKit, liveKit } from "../characters/kits.ts";
+import type { Stage } from "../characters/boss-beats.ts";
 import { SpriteAnim, frameImage } from "../components/BossEffect.tsx";
 import type { Character } from "../characters/sprite.ts";
 import { BossBarExtra, RageMeter } from "../components/BossPowers.tsx";
-import { BossFace, BossSide } from "../components/BossCharacter.tsx";
+import { BossFace, BossSide, bossStage } from "../components/BossCharacter.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { MOUSE_LAYOUT } from "../components/MatchMenu.tsx";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
@@ -136,17 +137,25 @@ function sharedScale(names: readonly string[], w: number, h: number): number {
 
 /**
  * A boss's figure in his idle, at `scale` screen px a sprite px, cut to his drawn part (his canvas's room around him left out); a still
- * portrait for a boss with no figure (or an id this app doesn't know).
+ * portrait for a boss with no figure (or an id this app doesn't know). Drawn from his own part's state as the lone bar's figure is
+ * (BossCharacter): the idle of his kit as it is now (`liveKit`, read as each frame is drawn: Moo & Moon's powered idle, gold and glowing,
+ * from his Full Moon's `swap` to his daze's `calm`, Eric, Nov 22) and his recolor (`lookOf`). The box is his plain idle's, one size all battle.
  */
-function Figure({ boss, scale, since, still }: { boss: BossView; scale: number; since: number; still: boolean }) {
+function Figure({ boss, stage, scale, since, still }: { boss: BossView; stage: Stage; scale: number; since: number; still: boolean }) {
   const kit = bossKit(boss.name);
   if (!kit) return <BossFace boss={boss} class="tw-part-portrait" label="" live />;
   const art = artOf(kit);
   const idle = kit.anims.idle ?? "idle";
   const b = drawnBox(boss.name, art, idle);
+  // (His idle loop in the kit as it draws at `now`: a powered or staged twin where he has one, on his own art (a phone bar's own drawing).)
+  const live = (now: number) => {
+    const k = liveKit(kit, boss, now, stage);
+    const a = k === kit ? idle : (k.loops?.idle ?? k.anims.idle ?? idle);
+    return art.anims[a] ? a : idle;
+  };
   return (
     <span class="tw-fig-box" style={{ width: `${(b.right - b.left) * scale}px`, height: `${(b.bottom - b.top) * scale}px` }}>
-      <SpriteAnim ch={art} anim={idle} since={since} still={still} class="tw-fig" style={{ width: `${art.w * scale}px`, height: `${art.h * scale}px`, left: `${-b.left * scale}px`, top: `${-b.top * scale}px` }} />
+      <SpriteAnim ch={art} anim={live(Date.now())} pick={still ? undefined : live} look={kit.lookOf?.(boss)} since={since} still={still} class="tw-fig" style={{ width: `${art.w * scale}px`, height: `${art.h * scale}px`, left: `${-b.left * scale}px`, top: `${-b.top * scale}px` }} />
     </span>
   );
 }
@@ -223,7 +232,7 @@ export function TowerBar({ boss, match, caster = null }: { boss: BossView; match
                   </span>
                 ) : (
                   <span class="tw-card-face" aria-hidden="true">
-                    <Figure boss={b} scale={scale} since={since} still={still} />
+                    <Figure boss={b} stage={bossStage(match.phase, b)} scale={scale} since={since} still={still} />
                   </span>
                 )}
                 <span class="boss-main">
@@ -275,7 +284,7 @@ export function TowerSide({ boss, match, caster = null }: { boss: BossView; matc
           {/* (His words over his own head, whoever is to move: the figure's drawn box, not his third of the board's height.) */}
           <span class="tw-side-body">
             <VoiceBubble voice={bossVoice} class="bc-bubble tw-side-bubble" mine={(k) => speakerOf(side, k) === i} />
-            <Figure boss={b} scale={scale} since={since} still={still} />
+            <Figure boss={b} stage={bossStage(match.phase, b)} scale={scale} since={since} still={still} />
             {/* (His prop beside him, a computer's: Babur's pump by his feet, toward the window's edge, as by a lone boss's figure.) */}
             {computer && <BossBarExtra boss={b} until={until} part="towerProp" />}
           </span>

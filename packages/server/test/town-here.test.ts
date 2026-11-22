@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { HERE_LIMITS, TownHere, type HereBeat } from "../src/town-here.ts";
 import { readBeat, readLimits } from "../src/town-here-api.ts";
+import { TownChat } from "../src/town-chat.ts";
 
 const S = 1000;
 const at = (c: number, r: number, idleMs = 0, hidden = false, shop: string | null = null): HereBeat => ({ c, r, idleMs, hidden, shop });
@@ -131,5 +132,23 @@ describe("who's in the town square (town-here.ts): the server drops an away pawn
     expect(h.beat("ann", "Ann", "other", at(1, 3), 11 * S)).toBe(true);
     // Silent past its limit (a hidden phone): back, it has come in again.
     expect(h.beat("ann", "Ann", "other", at(1, 3), 11 * S + 330 * S)).toBe(true);
+  });
+
+  it("back from a Battle Tower floor (Eric, Nov 22: \"it never says anything in the chat when you're going in and out of the different floors\"): never come in, however long the floor; the next real arrival still has", () => {
+    const h = new TownHere();
+    const chat = new TownChat();
+    const ann = { id: "ann", name: "Ann" };
+    expect(chat.arrive(ann, 0, h.beat("ann", "Ann", "town", at(1, 2), 0))).not.toBeNull();
+    // Into the tower's lobby, up to a floor (the town left for its match: a leave), a 10-minute floor, back into the floor room.
+    h.beat("ann", "Ann", "town", at(1, 2, 0, false, "tower"), 30 * S);
+    h.leave("ann");
+    const back = 30 * S + 10 * 60 * S;
+    expect(h.beat("ann", "Ann", "town", { ...at(4, 4, 0, false, "tower"), floor: true }, back)).toBe(false);
+    expect(chat.arrive(ann, back, false)).toBeNull();
+    expect(readBeat({ c: 4, r: 4, shop: "tower", floor: true })).toEqual({ c: 4, r: 4, idleMs: 0, hidden: false, shop: "tower", floor: true });
+    expect(readBeat({ c: 4, r: 4, floor: "yes" })).toEqual({ c: 4, r: 4, idleMs: 0, hidden: false, shop: null });
+    // Home and back an hour later, a real arrival: the line.
+    h.leave("ann");
+    expect(chat.arrive(ann, back + 60 * 60 * S, h.beat("ann", "Ann", "town", at(1, 2), back + 60 * 60 * S))).toMatchObject({ text: "Ann has entered the town.", sys: "enter" });
   });
 });

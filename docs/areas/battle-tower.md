@@ -155,7 +155,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 - **No tower screen** (PR 10's `/tower` page out of the flow, its code kept unused at Eric's word): the clerk's card (`town/TowerDesk.tsx`: Start, or Continue: floor N with a small
   Start over that asks) → you walk into the elevator → the floor room (`shops/tower-floor*.ts`: N on its walls, you to your mark, its bosses out
   of the elevator one by one, the pieces up, the zoom) → `enterTowerFloor()` → Boss alone's battle (no Last Stand; `TowerBar.tsx`) → the
-  end screen ([2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md): `useTowerEnd` in `TowerResult.tsx` puts "Floor 3 cleared!" / "Floor 4 lost · 1 life left" in the headline, the floor's bosses 1-2-1, the next floor's line and one button, Back to the tower, live once the server has the result) → the floor room on your mark: won (or a life spent), the elevator open
+  end screen ([2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md): `useTowerEnd` in `TowerResult.tsx` puts "Floor 3 cleared!" / "Floor 4 lost · 1 life left" in the headline, the floor's bosses 1-2-1, the next floor's line and one button, Back to the Battle Tower (Eric, Nov 22), live once the server has the result) → the floor room on your mark: won (or a life spent), the elevator open
   (Up to floor N+1), a blinking arrow on the floor before it; out, shut, the arrow before the way down. The room's table is solid: held keys
   walk you round it (Nov 21: [2026-11-21-tower-room-arrow.md](../decisions/2026-11-21-tower-room-arrow.md); town-square.md, "Floor room"). Bests on the lobby's board. Between floors leave by the way down or Back. A match's address is `/tower`: a reload rejoins it
   (`brc.tower.solo`, the restore). A start carries this device's id (`brc.tower.device`, kept in `fight`): a lost start answer is still its own. Calls: [2026-11-19-tower-solo-screens.md](../decisions/2026-11-19-tower-solo-screens.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md).
@@ -209,7 +209,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   floor's moments"), `test/tower-side.test.ts` (every boss's box). Left: a computer's cast animation in place on the side figure.
 - **The split bar as an accordion (Eric, Nov 21:** "maybe it's like 75% for the one that's active ... if you want to see what that boss
   is ... you just tap on theirs and then it expands their container"): `TowerBar.tsx`, `tower.css`. Each boss's card is the lone bar's own
-  markup (figure or portrait, name, LVL, meters, the status, his bar prop: Jefferson's candles, Hollow's bulbs, Timber's workshop, Dash's
+  markup (figure or portrait, his figure drawn from his live look as the lone bar's is: Moo's Full Moon gold, Nov 22, name, LVL, meters, the status, his bar prop: Jefferson's candles, Hollow's bulbs, Timber's workshop, Dash's
   tally, Don Dough's timers, Babur's pump), laid out once at the open width; each part (`.tw-part`) is a window (`.tw-window`, overflow
   hidden) onto its card's left side. The open part (`.tw-part-open`, `aria-expanded`: the boss to move, or one tapped open until the turn
   changes or it's tapped again) takes `OPEN_SHARE` (75%) of the room inside the outlines, the folded ones the rest; the windows slide

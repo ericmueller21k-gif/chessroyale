@@ -994,6 +994,8 @@ export function TownScreen({
       onState: (st) => void (t.town.you.zzz = st === "zzz"),
       onOut: () => awayOut.current(),
       onOthers: t.others,
+      // (Back from a tower floor's match: the same visit, no "entered the town" line: Eric, Nov 22.)
+      floor: !!tower,
     });
     return () => {
       gone.current = true;

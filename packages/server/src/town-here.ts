@@ -22,6 +22,12 @@ export interface HereBeat {
   hidden: boolean;
   /** Inside a shop: its home's id (others in the town don't see them). */
   shop: string | null;
+  /**
+   * Back from a Battle Tower floor's match (Eric, Nov 22: "it never says anything in the chat when you're going in and out of the
+   * different floors"): the town left for the floor and came back, the same visit, never an arrival (`beat`). The device's word, sent
+   * until a beat is answered: it can only keep its own "entered" line out of the chat.
+   */
+  floor?: boolean;
 }
 
 /** The numbers a pawn is dropped by (a test's own, shortened, where the test switches are on). */
@@ -80,11 +86,12 @@ export class TownHere {
 
   /**
    * A device's beat: where its player is now. Whether their pawn has just come into `room` (it wasn't there: new, past its limit, or
-   * in another room), for the town chat's "Ann has entered the town." (town-chat.ts `arrive`, which skips a quick reconnect).
+   * in another room), for the town chat's "Ann has entered the town." (town-chat.ts `arrive`, which skips a quick reconnect). A pawn
+   * back from a tower floor (`floor`) never has: it went out to the floor from this town and is back in it.
    */
   beat(id: string, name: string, room: string, b: HereBeat, now: number, limits: HereLimits = HERE_LIMITS, look: ItemLook | null = null, pawn?: PawnColor): boolean {
     const was = this.here.get(id);
-    const fresh = !was || was.room !== room || TownHere.past(was, now);
+    const fresh = !b.floor && (!was || was.room !== room || TownHere.past(was, now));
     const hiddenSince = b.hidden ? (was?.hiddenSince ?? now) : null;
     if (!was && this.here.size >= HOLD_MAX) this.sweep(now);
     if (!was && this.here.size >= HOLD_MAX) return false;
