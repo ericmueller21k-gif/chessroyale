@@ -2324,8 +2324,9 @@ p {
 }
 /* "You have a game in progress" (components/GameInProgress.tsx, step 2): the confirm's card, centered, over every screen (the town's
    layers included), the boss's face over his name and your move number, Forfeit and Resume side by side. */
+/* (Over the page layers (85) and the chat's sheets (90): it waits for an answer.) */
 .gp-scrim {
-  z-index: 72;
+  z-index: 95;
 }
 .gp-card {
   justify-items: center;
