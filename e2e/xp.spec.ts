@@ -320,8 +320,9 @@ async function closeRewardCard(page: Page) {
   await expect(card).toHaveCount(0);
 }
 
-/** Your turns played in this solo game so far (a missed one isn't). */
-const ownSoFar = (page: Page) => page.evaluate(() => ((window as any).match.moves as { move: unknown; abstained?: boolean }[]).filter((m) => m.move !== null || m.abstained).length);
+/** Your turns played in this solo game so far (a missed one isn't; none before the game is made, just after START). */
+const ownSoFar = (page: Page) =>
+  page.evaluate(() => (((window as any).match?.moves ?? []) as { move: unknown; abstained?: boolean }[]).filter((m) => m.move !== null || m.abstained).length);
 
 /** Plays your turns in a boss battle alone until `n` are yours: each a quiet move the boss's powers allow (pickMove), once it's your turn. */
 async function playOwnMoves(page: Page, n: number) {
