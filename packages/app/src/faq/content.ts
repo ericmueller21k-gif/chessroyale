@@ -13,6 +13,7 @@
  * - Something built but not yet on for players is marked "Being tested"; something only planned, "Planned".
  */
 import {
+  BATTLE_TOWER,
   BOT_LEVELS,
   CROWD_PARTY,
   CROWD_PARTY_MAX,
@@ -208,6 +209,8 @@ const term = (x: number) => (x < 0 ? `− ${num(-x)}` : `+ ${num(x)}`);
 const es = (x: number) => x.toFixed(2);
 /** "1 turn", "3 turns". */
 const n = (x: number, word: string, plural = `${word}s`) => `${num(x)} ${x === 1 ? word : plural}`;
+/** A small count in words ("three"), else digits. */
+const countWords = (x: number) => ["no", "one", "two", "three", "four", "five"][x] ?? num(x);
 /** "a to b" for a range. */
 const range = (r: readonly [number, number] | readonly number[], unit = "") => `${num(r[0]!)}${unit} to ${num(r[1]!)}${unit}`;
 const ordinal = (x: number) => `${x}${x % 100 >= 11 && x % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][x % 10] ?? "th")}`;
@@ -1011,6 +1014,9 @@ In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with t
 When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's, Big Boy's, Alfil's and Chub & Chirp's ultimates come at the start of their own turn instead (Lights Out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler has a meter of his own with no warning (below).
 
 Then the meter empties and fills again for the next one. While an ultimate is still under way (the Blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman Candle's fireballs still falling or burning, the board flipped or sawn in two, Lights Out and the extra move after it, Alfil's Slam while your pieces are up) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap. Chub & Chirp's Carrot Patch comes once a battle: after it, their meter is gone.
+${Object.entries(BATTLE_TOWER.ultsOnFloorOf)
+  .map(([size, most]) => `\nOn a Battle Tower floor of ${countWords(Number(size))} bosses, each boss has at most ${countWords(most)} ${most === 1 ? "ultimate" : "ultimates"} there, whatever he could have elsewhere: after ${most === 1 ? "it" : "his last"}, his meter stays on his bar for the rest of the floor, empty and dimmed.`)
+  .join("")}
 
 ### The level in a boss's bar {#boss-level}
 

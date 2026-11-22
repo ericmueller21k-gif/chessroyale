@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import { legalMoves } from "@chessroyale/chess";
 import { BATTLE_TOWER } from "@chessroyale/core";
-import { test, asAdmin, submitMove, tapInTown, localSql } from "./helpers.ts";
+import { test, asAdmin, asSignedIn, submitMove, tapInTown, localSql } from "./helpers.ts";
 import { frameStats, instrument } from "./perf-probe.js";
 
 /**
@@ -168,7 +168,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 10_000 });
   await expect(page.locator(".es-quests-none")).toHaveText("No quests moved this game.");
   await expect(won).toContainText("Next: floor 2");
-  const back = won.getByRole("button", { name: "Back to the tower" });
+  const back = won.getByRole("button", { name: "Back to the Battle Tower" });
   await expect(back).toBeEnabled({ timeout: 20_000 });
   await still(page, "result-won");
   await back.click();
@@ -234,10 +234,10 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
   await expect(page.locator(".es-head")).not.toContainText(String(BATTLE_TOWER.floors));
   await expect(lost).toContainText("Next: floor 3", { timeout: 20_000 });
-  await expect(lost.getByRole("button", { name: "Back to the tower" })).toBeEnabled({ timeout: 20_000 });
+  await expect(lost.getByRole("button", { name: "Back to the Battle Tower" })).toBeEnabled({ timeout: 20_000 });
   await lost.scrollIntoViewIfNeeded();
   await still(page, "result-lost");
-  await lost.getByRole("button", { name: "Back to the tower" }).click();
+  await lost.getByRole("button", { name: "Back to the Battle Tower" }).click();
   // Back in the floor room on your mark, a heart greyed, the elevator open: up to floor 3, its strip's heart greyed too.
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   await heartsAre(page.locator(".tw-room-lives .tw-hearts"), 1);
@@ -251,7 +251,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   // Floor 3 lost too: no life left, still climbing; floor 4's loss (the third) ends the run, its floors lost listed.
   await loseFloor(page, "counts as a loss: it costs a life (no lives left after).");
   await expect(page.getByTestId("es-line")).toHaveText("Floor 3 lost · no lives left", { timeout: 30_000 });
-  await page.locator('[data-tower-result="lost"]').getByRole("button", { name: "Back to the tower" }).click();
+  await page.locator('[data-tower-result="lost"]').getByRole("button", { name: "Back to the Battle Tower" }).click();
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   await heartsAre(page.locator(".tw-room-lives .tw-hearts"), 0);
   // Down to the lobby: the clerk's card shows the climb's lives and its floors lost (the recap); Continue goes on to floor 4.
@@ -268,10 +268,10 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   const out = page.locator('[data-tower-result="out"]');
   await expect(page.getByTestId("es-line")).toHaveText("Run over on floor 4", { timeout: 30_000 });
   await expect(out).toContainText("Lost floors 2, 3 and 4. Best solo: floor 1", { timeout: 20_000 });
-  await expect(out.getByRole("button", { name: "Back to the tower" })).toBeEnabled({ timeout: 20_000 });
+  await expect(out.getByRole("button", { name: "Back to the Battle Tower" })).toBeEnabled({ timeout: 20_000 });
   await out.scrollIntoViewIfNeeded();
   await still(page, "result-out-recap");
-  await out.getByRole("button", { name: "Back to the tower" }).click();
+  await out.getByRole("button", { name: "Back to the Battle Tower" }).click();
   // The run's over: the elevator shut (its Up greyed), down to the lobby, where the clerk offers Start again.
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("out");
   const shut = await tapRoom(page, "pass", "Elevator", "top");
@@ -287,6 +287,8 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
 test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, the next move wins floor 1, then up to floor 2", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await asAdmin(page);
+  // (Signed in, so the town's beats carry your pawn: the check after the floor.)
+  await asSignedIn(page, "tower");
   await intoTower(page);
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await clerk.getByRole("button", { name: /^(Start|Continue)/ }).first().click();
@@ -304,8 +306,16 @@ test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, th
   const won = page.locator('[data-tower-result="won"]');
   await expect(page.getByTestId("es-line")).toHaveText("Floor 1 cleared!", { timeout: 120_000 });
   expect(await moves(page)).toBe(1);
-  await won.getByRole("button", { name: "Back to the tower" }).click();
+  await still(page, "back-to-the-battle-tower");
+  // (Back in the town from a floor (Eric, Nov 22): its beats say so until one is answered, so the town's chat never says "entered the
+  // town" for it (server town-here.ts `beat`, its unit test).)
+  const beats: { floor?: boolean; leave?: boolean }[] = [];
+  page.on("request", (r) => void (r.url().endsWith("/api/town/here") && r.method() === "POST" && beats.push(JSON.parse(r.postData() ?? "{}"))));
+  await won.getByRole("button", { name: "Back to the Battle Tower" }).click();
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
+  await expect.poll(() => beats.filter((b) => !b.leave).length, { timeout: 20_000 }).toBeGreaterThan(1);
+  expect(beats.filter((b) => !b.leave)[0]?.floor, "the first beat back says it's from a floor").toBe(true);
+  expect(beats.filter((b) => !b.leave).at(-1)?.floor, "and once answered, no more").toBeUndefined();
   const lift = await tapRoom(page, "pass", "Elevator", "top");
   await lift.getByRole("button", { name: "Up to floor 2" }).click();
   await floorThenMatch(page, 2, 2);
@@ -511,6 +521,48 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   expect(balloon, "a balloon on Babur's pump").not.toBe("");
   expect(await inside()).toBe(true);
   await still(page, "shared-floor-babur-wrangler");
+});
+
+test("a floor of three (Eric, Nov 22: \"they only ult once each at most\"): Big Boy's one Big Bounce, then his meter stays empty and dimmed, saying so", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  // (?power=bounce: Big Boy, first in turn order, warned at his turn change on your 4th turn, the Bounce after your 4th move.)
+  await intoTower(page, "&power=bounce");
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 4, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["grex", "hollow"], ["tiger", "pig"], ["bigboy", "gingerbread", "clown"]], deck: [], decks: 1 }), made.user);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 4" }).click();
+  await floorThenMatch(page, 4, 3);
+  const caps = await page.evaluate(() => (window as any).match.boss.side.bosses.map((b: any) => `${b.id}:${b.powers.ultMax}`));
+  expect(caps).toEqual([`bigboy:${BATTLE_TOWER.ultsOnFloorOf[3]}`, `gingerbread:${BATTLE_TOWER.ultsOnFloorOf[3]}`, `clown:${BATTLE_TOWER.ultsOnFloorOf[3]}`]);
+  const big = () => page.evaluate(() => (window as any).match.boss.side.bosses.find((b: any) => b.id === "bigboy").powers);
+  const meter = page.locator('.tw-part[data-boss="bigboy"] .rage-meter');
+  // Your moves until his Bounce has come and is over (it lasts its own turn), then one more: his meter empty, dimmed, never filling.
+  let after = 0;
+  for (let n = 1; n <= 8 && after < 2; n++) {
+    await playAMove(page);
+    await expect.poll(async () => (await phase(page)) === "play" && (await moves(page)) === n, { timeout: 90_000 }).toBe(true);
+    const p = await big();
+    expect(p.ults).toBeLessThanOrEqual(1);
+    if (p.ults !== 1 || p.ultAt !== null) continue;
+    after++;
+    expect(p.warned).toBe(false);
+    await expect(meter).toHaveClass(/paused/);
+    await expect(meter).toHaveAttribute("aria-valuenow", "0");
+    await expect(meter).toHaveAttribute("aria-label", "Rage: no more ultimates on this floor");
+  }
+  expect(after, "his one Bounce came and two turns of yours after it").toBe(2);
+  // (His part tapped open, as a player would to look: the spent meter in view.)
+  const part = page.locator('.tw-part[data-boss="bigboy"]');
+  if ((await part.getAttribute("aria-expanded")) !== "true") await part.click();
+  await expect(part).toHaveAttribute("aria-expanded", "true");
+  await expect(meter).toBeVisible();
+  await page.waitForTimeout(400);
+  await still(page, "floor-of-three-one-ult");
 });
 
 test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, the first in turn order): Babur's pump stays in his part, greyed and tagged OFF, never a balloon; Puddles, first, keeps his; every part's words inside its outline", async ({ page }) => {
@@ -876,4 +928,55 @@ test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's th
   expect(at.drawn).toBe("b pawn");
   // (No frame drew his rook on its square.)
   expect(await page.evaluate(() => (window as any).__leaks)).toEqual([]);
+});
+
+test("Moo & Moon's Full Moon on a shared floor (Eric, Nov 22: \"the cow didn't get his repaint ... it just didn't keep that persistently\"): his figure in the split bar (a computer's beside the board) powered up, gold, folded and open, as a lone bar's", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const desk = test.info().project.name === "desktop";
+  // (?power=fullmoon: his Full Moon as soon as it can come. Floor 2: Moo, then Ginger.)
+  await intoTower(page, "&power=fullmoon");
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 2, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["moo", "gingerbread"]], deck: [], decks: 1 }), made.user);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
+  await floorThenMatch(page, 2, 2);
+  // His figure's powered-up gold (the lemon of his fur, #fbe53c, which his own colors never have: moo.spec.ts), his part open or not.
+  const look = () =>
+    page.evaluate((computer) => {
+      const m = (window as any).match;
+      const part = document.querySelector<HTMLElement>('.tw-part[data-boss="moo"]');
+      const cv = document.querySelector<HTMLCanvasElement>(computer ? '.tw-side-fig[data-boss="moo"] canvas' : '.tw-part[data-boss="moo"] canvas');
+      let gold = -1;
+      if (cv) {
+        const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+        gold = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] === 251 && d[i + 1] === 229 && d[i + 2] === 60 && d[i + 3]! > 0) gold++;
+      }
+      const moo = m?.boss?.side?.bosses?.find((b: any) => b.id === "moo");
+      return { phase: m?.phase?.kind ?? null, full: !!moo?.powers?.fullMoon, open: part?.getAttribute("aria-expanded") === "true", gold };
+    }, desk);
+  expect((await look()).gold, "himself before it").toBe(0);
+  // Your moves until his Full Moon is on and it's your turn again (the transformation played while he thought).
+  let at = await look();
+  for (let n = 0; n < 10 && !(at.full && at.phase === "play"); n++) {
+    await playAMove(page);
+    await expect.poll(async () => ((at = await look()), at.phase === "play"), { timeout: 90_000 }).toBe(true);
+  }
+  expect(at.full, "his Full Moon came").toBe(true);
+  // (Ginger to move: his part folded.)
+  await expect.poll(async () => ((at = await look()), at.gold), { timeout: 10_000 }).toBeGreaterThan(100);
+  expect(at.open).toBe(false);
+  await still(page, "moo-full-moon-folded");
+  if (!desk) {
+    // Tapped open: the same.
+    await page.locator('.tw-part[data-boss="moo"]').click();
+    await expect.poll(async () => ((at = await look()), at.open && at.gold > 100), { timeout: 10_000 }).toBe(true);
+    await page.waitForTimeout(400);
+    await still(page, "moo-full-moon-open");
+  }
 });

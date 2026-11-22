@@ -27,7 +27,7 @@ export interface TowerEndView {
 /**
  * A tower floor's result (PR 10; PR 11b, Eric, Nov 19: "After the round ends, it's like a victory or defeat screen, like it normally is.
  * And then it takes you back."; the end screen, Nov 20: its line in the headline): the floor and the run, its result sent to the server
- * (once), and one button, "Back to the tower" (greyed until the server answers), into the floor room: won, the elevator open to the next
+ * (once), and one button, "Back to the Battle Tower" (Eric, Nov 22: not "the tower", which could read as leaving it; greyed until the server answers), into the floor room: won, the elevator open to the next
  * floor. Lost, drawn or left (counted) with a life to spend (Eric, Nov 20: "it just takes you on to the next match, and it just
  * counts"): "Floor 8 lost · 1 life left", the elevator open too; with none, the run over, its floors lost listed (the recap). Until the
  * server answers, the run's lives going in say which (the server's word then stands). A leave the server made free: "Floor 8 left · it
@@ -88,7 +88,7 @@ export function useTowerEnd(match: GameView): TowerEndView | null {
 
 /**
  * A party floor's end (Nov 20; docs/decisions/2026-11-20-tower-party.md): the floor in its line (the party's win, its loss or draw, or
- * your leave), and one button, "Back to the tower": into the floor room with your party (its room has written every member's copy:
+ * your leave), and one button, "Back to the Battle Tower": into the floor room with your party (its room has written every member's copy:
  * town/Town.tsx reads yours there).
  */
 function partyEnd(match: GameView, left: boolean): TowerEndView {
@@ -128,7 +128,7 @@ export function TowerResult({ end, onBack }: { end: TowerEndView; onBack: () => 
       <p class="tw-result-sub">{end.sub}</p>
       <div class="actions">
         <button type="button" class="btn btn-primary" style={{ whiteSpace: "nowrap" }} disabled={end.waiting} onClick={onBack}>
-          Back to the tower
+          Back to the Battle Tower
         </button>
       </div>
     </div>

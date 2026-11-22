@@ -2333,6 +2333,7 @@ export class MatchRunner {
               stepped: p.stepped ?? null,
               ultNext: !!p.ultNext,
               ...(p.noUlt ? { noUlt: true } : {}),
+              ...(p.ultMax !== undefined ? { ultMax: p.ultMax } : {}),
               ...(p.noAdd ? { noAdd: true } : {}),
               ...(bossRules(b)?.view?.(p) ?? {}),
             },
@@ -2679,6 +2680,16 @@ export class MatchRunner {
   }
 
   /**
+   * A Battle Tower floor of several (settings.towerFloor, startSide) of a size BATTLE_TOWER.ultsOnFloorOf caps (three: one each, Eric,
+   * Nov 22): every boss's powers carry the cap from the start (ultMax; the dispatcher's ultCapped gates it), the same solo and online, a
+   * restored battle too. Another size, or off the tower: nothing (each boss's own cap).
+   */
+  private towerUltMax(n: number): { ultMax?: number } {
+    const max = this.settings.towerFloor ? BATTLE_TOWER.ultsOnFloorOf[n] : undefined;
+    return max === undefined ? {} : { ultMax: max };
+  }
+
+  /**
    * A Battle Tower floor of several (settings.towerFloor, startSide): of its bosses whose power adds pieces (BATTLE_TOWER.addsPieces),
    * only the first in the floor's turn order (`ids`, the order dealt) keeps it; the others' is off all floor (noAdd; Eric, Nov 20: "Only
    * one is active during the battle tower"). Set as the floor starts, the same solo and online; one such boss, or off the tower: nothing.
@@ -2727,7 +2738,7 @@ export class MatchRunner {
     const own: BossOwn[] = defs.map((d, i) => ({
       id: d.id,
       ...this.firstForm(d.id),
-      powers: { ...initPowers(seeds[i]!, fen, crowdSide), ...(i === claimer ? { claimed: true } : {}), ...(setUps[i] ?? {}), ...this.towerNoUlt(d.id), ...this.towerNoAdd(ids, d.id) },
+      powers: { ...initPowers(seeds[i]!, fen, crowdSide), ...(i === claimer ? { claimed: true } : {}), ...(setUps[i] ?? {}), ...this.towerNoUlt(d.id), ...this.towerNoAdd(ids, d.id), ...this.towerUltMax(ids.length) },
       tier,
       elo: floor?.rating ?? bossStrength(tier, d, this.settings.bossDifficulty),
     }));

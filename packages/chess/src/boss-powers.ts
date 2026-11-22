@@ -33,6 +33,7 @@ import {
   rageTick,
   topEach,
   turnOf,
+  ultCapped,
   unleashed,
   type Battle,
   type BossAsks,
@@ -48,7 +49,7 @@ import {
 import { bossRules } from "./bosses/index.ts";
 
 // Every boss's file, and the shared pieces of the base boss, for the whole package.
-export { bossPowers, heldBy, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, unleashed };
+export { bossPowers, heldBy, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, ultCapped, unleashed };
 // (The pass guard: one rule for every power that spends his whole turn.)
 export { PASS_WAIT, passAnswer, passLoses, passScores, type PassScore } from "./bosses/base.ts";
 // The board layer (every boss's marks at once: board-layer.ts).
@@ -104,6 +105,8 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   const turn = turnOf(boss);
   if (p.turn === turn) return boss;
   const crowd = boss.crowdSide;
+  // (He has had every ultimate this battle allows him (ultMax: a Battle Tower floor of three): none comes again.)
+  const capped = ultCapped(p);
   const events: PowerEvent[] = [];
   const lost = Math.max(p.lost, p.material - materialOf(fen, other(crowd)));
   // The meter over time: each crowd move since the last turn began, faster while the crowd is ahead on the judged eval.
@@ -111,12 +114,12 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   const charge = (p.charge ?? 0) + moved * rageTick(p.judged, s);
   // (An ultimate at the start of the boss's turn keeps the test trigger until then.)
   const { ultNext, ...rest } = p;
-  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && (hold || rules.ultimateOnHisTurn || rules.triggerAtHisTurn) ? { ultNext } : {}) };
-  const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext, lastMove, rageSpeed: rageSpeedOf(boss.id, s), s, events, ...(crowdMoves ? { crowdMoves } : {}) };
+  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && !capped && (hold || rules.ultimateOnHisTurn || rules.triggerAtHisTurn) ? { ultNext } : {}) };
+  const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext && !capped, lastMove, rageSpeed: rageSpeedOf(boss.id, s), s, events, ...(crowdMoves ? { crowdMoves } : {}) };
   // The ultimate under way: while its effect runs, nothing gathers in the meter (it stays empty); once it's over, the
-  // meter fills again from empty, and the next can come.
+  // meter fills again from empty, and the next can come. (Capped, ultMax: it stays empty for the rest of the battle.)
+  if (next.ultAt !== undefined || capped) next.rageUsed = ragePoints(next, s);
   if (next.ultAt !== undefined) {
-    next.rageUsed = ragePoints(next, s);
     if (!(rules.ultimateRunning ? rules.ultimateRunning(next, turn, s) : turn <= next.ultAt)) {
       delete next.warnAt;
       delete next.ultAt;
@@ -126,8 +129,9 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   const before = next.ultAt;
   // (`hold`: several bosses on one side, and this turn change isn't his (sideTurn): his ultimate's step waits, its warning and
   // the test trigger kept.)
-  // (No ultimate this battle, noUlt: a Battle Tower floor's Wrangler. The step never runs.)
-  const ultNow = before === undefined && !hold && !next.noUlt ? rules.ultimate(next, t) : false;
+  // (No ultimate this battle, noUlt: a Battle Tower floor's Wrangler; or none left, ultMax: a floor of three's after his one. The step
+  // never runs.)
+  const ultNow = before === undefined && !hold && !next.noUlt && !capped ? rules.ultimate(next, t) : false;
   if (before === undefined && next.ultAt !== undefined) unleashed(next, s);
   rules.everyTurn?.(next, t);
   if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
@@ -144,7 +148,7 @@ export function ultimateNow(boss: BossState, fen: string, crowdMoves: () => read
   const powers = bossPowers(boss);
   const p = boss.powers;
   const rules = bossRules(boss);
-  if (!powers || !p || !rules?.ultimateNow || p.ultAt !== undefined || p.noUlt) return false;
+  if (!powers || !p || !rules?.ultimateNow || p.ultAt !== undefined || p.noUlt || ultCapped(p)) return false;
   const t: TurnContext = { turn: turnOf(boss), fen, crowd: boss.crowdSide, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!p.ultNext, lastMove: null, rageSpeed: rageSpeedOf(boss.id, s), s, events: [], crowdMoves };
   return rules.ultimateNow(p, t);
 }
@@ -159,7 +163,8 @@ export const ultimateUnderWay = (boss: Pick<BossState, "powers"> | null | undefi
 export function strikeRage(boss: BossState, s: Pick<BossPowerSettings, "rageStrike"> = BOSS_POWERS): BossState {
   const p = boss.powers;
   // (A boss with a meter of its own, Wrangler: the strike adds nothing to it.)
-  if (!p || !bossPowers(boss) || ultimateUnderWay(boss) || bossRules(boss)?.meter) return boss;
+  // (Capped, ultMax: nothing gathers for the rest of the battle.)
+  if (!p || !bossPowers(boss) || ultimateUnderWay(boss) || ultCapped(p) || bossRules(boss)?.meter) return boss;
   return { ...boss, powers: { ...p, charge: (p.charge ?? 0) + s.rageStrike } };
 }
 
@@ -174,7 +179,7 @@ export function strikeRage(boss: BossState, s: Pick<BossPowerSettings, "rageStri
  */
 export function triggerUltimate(boss: BossState | null | undefined): { boss: BossState | null | undefined; ok: boolean } {
   const p = boss?.powers;
-  if (!boss || !p || !bossPowers(boss) || boss.result || p.ultAt !== undefined || p.noUlt) return { boss, ok: false };
+  if (!boss || !p || !bossPowers(boss) || boss.result || p.ultAt !== undefined || p.noUlt || ultCapped(p)) return { boss, ok: false };
   if (p.ultNext) return { boss, ok: true };
   return { boss: { ...boss, powers: { ...p, ultNext: true } }, ok: true };
 }
@@ -325,6 +330,9 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
   if (!p || !bossPowers(boss)) return null;
   // (No ultimate this battle: the meter stays, empty, dimmed by ragePaused.)
   if (p.noUlt) return 0;
+  // (His last a battle allows him has come (ultMax: a tower floor of three): from the turn after it, the meter stays, empty, dimmed by
+  // ragePaused, whoever he is (never gone, as a lone Smudgy's or Chub & Chirp's goes after theirs: nothing hidden).)
+  if (ultCapped(p) && (p.ultAt === undefined || turnOf(boss!) > p.ultAt)) return 0;
   // (A meter of its own: Wrangler's.)
   const own = bossRules(boss)?.meter;
   if (own) return own(p, turnOf(boss!), { ...BOSS_POWERS, ...s });
@@ -344,6 +352,8 @@ export const ragePaused = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
   const rules = bossRules(boss);
   if (p?.noUlt) return true;
+  // (Capped, ultMax: from the turn after his last, for the rest of the battle.)
+  if (ultCapped(p) && (p!.ultAt === undefined || turnOf(boss!) > p!.ultAt)) return true;
   if (!p || p.ultAt === undefined || turnOf(boss!) <= p.ultAt) return false;
   if (rules?.meter) return !!rules.spentMeterShown && ultimateSpent(boss);
   return !ultimateSpent(boss) || !!rules?.spentMeterShown;
