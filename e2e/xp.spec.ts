@@ -156,7 +156,8 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   for (const x of all) expect(shape(x), "every part in its place and size").toEqual(shape(all[0]!));
   expect(all[0]!.box[3], "the bar's fixed height").toBe(BOX_H);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/xp-counted-${testInfo.project.name}.png` });
-  // Home: the real level and its ring (Level 2, 32% of the way round).
+  // Home: the real level and its ring (Level 2, 32% of the way round). (Level 2's reward card first: it waits for OK since Nov 22.)
+  await closeRewardCard(page);
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(page.locator(".fd-level")).toHaveText("LVL 2");
   const filled = await page.evaluate(() => {
@@ -304,7 +305,16 @@ test("a tap anywhere but a button skips the whole sequence to its end (Eric, Nov
   const after = (await samples(page)).filter((s) => s.t > at + 300);
   for (const s of after) expect(s.share, "at its end, still").toBeCloseTo(0.32, 3);
   expect(after.length).toBeGreaterThan(10);
-  // The buttons still work: Play again's neighbor, Home.
+  // The buttons still work: Play again's neighbor, Home (Level 2's reward card closed first: it waits for OK since Nov 22).
+  await closeRewardCard(page);
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(page.locator(".fd-level")).toHaveText("LVL 2");
 });
+
+/** The level-up's reward card (Nov 22): it waits over the end screen until OK. */
+async function closeRewardCard(page: Page) {
+  const card = page.getByTestId("reward-box");
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await card.getByRole("button", { name: "▶ OK" }).click();
+  await expect(card).toHaveCount(0);
+}
