@@ -48,3 +48,12 @@ id): its lobby and its floor room play it; a floor's battle plays one of its bos
 `0313337a`, song `song_x.py`), re-encoded from its 192 kbps handoff to 128 kbps as above (same length, lined up with it at `pad`, 30 s and
 just before `pad + loopSeconds`). Keyed `hopper` (the roster id). Eric, Nov 22: "Yes let's add that one." Its own crickets and rabbit-foot
 thumps echo `hopper-sounds.ts`; if a playtest mistakes them for the fight's sounds, the music helper turns them down.
+
+## Smudgy's theme (Nov 22)
+
+`smudgy-loop`: one seamless loop, no intro (as Chandy's), 166.5 s, from `boss-music-stereo-192/` on branch `stills/trailer-v2` (commit
+`e74fb337`, song `song_ao.py`), re-encoded from its 192 kbps handoff to 128 kbps as above (same length, lined up with it at `pad`, 30 s and
+just before `pad + loopSeconds`). Keyed `smudgy` (the roster id). Eric, Nov 22, on the third version: "Yeah, this is the one." Its slow
+opening (the first 20 s) is part of the loop, so every pass replays it; its quiet middle (1:05 to 1:33) sits about 3 dB under the rest, the
+calmest boss theme on purpose. Its splats, brush swishes, drips and giggles echo `smudgy-sounds.ts`; if a playtest mistakes them for the
+fight's sounds, the music helper turns them down.
