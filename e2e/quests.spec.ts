@@ -154,7 +154,7 @@ test("a game that finishes quests: \"Quests +1,800\" under its XP, both rows don
   await expect(rows.locator(".es-q-reward")).toHaveText(["+300 XP", "+1,500 XP"]);
   await expect(rows.nth(0)).toHaveClass(/es-q-done/);
   await expect(rows.nth(1)).toHaveClass(/es-q-done/);
-  // The toast: only what the rows don't show, the weekly's crate and key (its XP is in its row; Warm Up paid only XP).
+  // The card: only what the rows don't show, the weekly's crate and key (its XP is in its row; Warm Up paid only XP).
   const toast = page.getByTestId("reward-box");
   await expect(toast).toContainText("Quest done: Regular · +1 Winter Crate · +1 crate key");
   await expect(toast).not.toContainText("Warm Up");
@@ -162,6 +162,9 @@ test("a game that finishes quests: \"Quests +1,800\" under its XP, both rows don
     await page.waitForTimeout(200);
     await page.screenshot({ path: `${SHOTS}/quests-toast-${testInfo.project.name}.png` });
   }
+  // (The reward card waits for you since Nov 22: its OK, then the end screen's buttons.)
+  await toast.getByRole("button", { name: "▶ OK" }).click();
+  await expect(toast).toHaveCount(0);
   // Home: both done (their bars full, a check, "Done!"); no reroll on a finished daily.
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(entry(page)).toBeEnabled({ timeout: 20_000 });

@@ -160,8 +160,8 @@
   ],
   "areas": {
     "XP and levels (Nov 9): the XP box on every result screen, the level on home and the profiles; the server's grant": {
-      "paths": ["packages/server/src/xp.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx"],
-      "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
+      "paths": ["packages/server/src/xp.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/InventoryLayer.tsx"],
+      "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/quests.spec.ts", "e2e/tower-party.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
     },
     "The Battle Tower's saving (Nov 19, PR 9): the server's climbs and bests, its routes (/api/tower), the sign-in merge, the download and deleting": {
       "paths": ["packages/server/src/tower.ts"],
