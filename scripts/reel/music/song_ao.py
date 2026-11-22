@@ -37,17 +37,18 @@ The slow middle is his Camouflage: the tune hides, at half speed, in a soft pian
 
 The second go (Eric, Nov 22, of the first: "It's almost there"): the calm is twelve bars longer (17 s) and has no
 brush in it ("we want to cut out the brushes going back and forth"); the brush is quieter everywhere ("just a bit
-quieter, even for the whole song"); and the music box he liked there has a solo: "two of those ... musical box sounds
+quieter, even for the whole song"); and the sparkle he liked there has a solo: "two of those ... musical box sounds
 ... the equivalent of ... playing on a piano, like two fingers next to each other as far as the notes go ... keep the
 piano piece ... playing with it, but then make it ... a longer, more original solo ... throw in a little sharp note
 ... change up the timing ... a little slow, fast, add a couple, like big chords to it too, or like one or two chords."
-So: pairs of notes a step apart (`pairs="thirds"` sets them a third apart, to hear the other reading of his words),
-slow bars and quick ones, an E natural and an F sharp that don't belong to the key, and two chords of four notes
-rolled on the box with the soft piano's widest chord and the strings swelling under them.
-
-Every melody, riff and chord progression here is original: none of it is any song's or any game's. Kept off, from
-SOUNDS.md's list: brass, flute and ocarina, accordion and sawtooth leads, a thumb piano, a plain marimba or xylophone
-as the lead, low plucks that buzz, chimes left ringing, runs up and down a scale, a tune of 8ths on the grid.
+The third go, of that solo (pairs of notes a step apart, low on the music box, with two notes from outside the key):
+"you did the wrong instrument. I like that one, but I meant ... the other one ... It starts between 2 and 3 seconds
+... it sounds like a glockenspiel ... the tempo and like the way it moves is fine, but the notes themselves aren't
+sounding really what I'm looking for ... That one sounds just too off." So the solo keeps its rhythm bar for bar and
+has new notes: a tune in the key's five plain notes (A flat, B flat, C, E flat, F), its long notes doubled a third,
+a fourth, a fifth or a sixth below (nothing a step apart, nothing from outside the key); the "sharp" notes are two
+short bright ones. It is played high, where the music box rings like a glockenspiel: the ding first heard two seconds
+into the song. `voice="drop"` plays it on the other sparkle there (the drips' round plink), in case he meant that one.
 """
 import sys
 from fractions import Fraction
@@ -152,16 +153,17 @@ F1_PIANO = (
     "-:4 | -:4 | B4:1 -:1/2 D5:1/2 B4:1/3 A4:1/3 G4:1/3 E4:1 | D4:1.5 G4:1/2 A4:1 B4:1 | -:4 | -:4 | "
     "F#4:1/2 B4:1/2 D#5:1 F#5:2 | E5:1 C#5:1 A#4:1 F#4:1"
 )
-# The music box's solo (bars 45 to 60): two notes at a time, a step apart (two fingers side by side). Slow bars, then
-# quick ones; an E natural (bar 52) and an F sharp (bar 60) from outside the key; bars 57 and 59 are the big chords.
+# The glockenspiel's solo (bars 45 to 60), high on the music box. A tune in the key's five plain notes; the long
+# notes are two notes together, the lower a third, fourth, fifth or sixth under ("+"); slow bars, then quick ones;
+# "!" is a short bright one; bars 57 and 59 are the big chords. (The rhythm is the second go's, bar for bar.)
 SOLO = (
-    "Eb6+F6:2 -:1 Bb5+C6:1 | C6+D6:3 -:1 | Eb6+F6:1 F6+G6:1 Ab6+Bb6:2 | Eb6+F6:1.5 Db6+Eb6:1/2 Bb5+C6:2 | "
-    "Bb5+C6:1/2 Bb5+C6:1/2 Eb6+F6:1 -:1/2 Bb5+C6:1/2 Eb6+F6:1/2 F6+G6:1/2 | C6+D6:2 -:1 C6+D6:1/3 Eb6+F6:1/3 F6+G6:1/3 | "
-    "Ab6+Bb6:1.5 F6+G6:1/2 Eb6+F6:1 Bb5+C6:1 | C6+D6:1 -:1/2 E6:1/2 F6+G6:2 | "
-    "Eb6+F6:2.5 -:1/2 F6+G6:1 | Bb6+C7:2 Ab6+Bb6:1 F6+G6:1 | Eb6+F6:1/2 Db6+Eb6:1/2 Eb6+F6:1/2 Ab6+Bb6:1/2 F6+G6:2 | Eb6+F6:1 Bb5+C6:1 Ab5+Bb5:2 | "
-    "-:3 Eb6+F6:1 | F6+G6:1/2 Eb6+F6:1/2 Ab6+Bb6:1/2 F6+G6:1/2 Bb6+C7:1 Ab6+Bb6:1 | -:4 | Ab6+Bb6:1 Eb6+F6:1 F#6:1/2 G6:1/2 -:1"
+    "Ab6+C7:2 -:1 Bb6:1 | F6+Ab6:3 -:1 | F6:1 Ab6:1 Ab6+C7:2 | F6+Bb6:1.5 Ab6:1/2 Db6+F6:2 | "
+    "Eb6:1/2 F6:1/2 Eb6+Ab6:1 -:1/2 C7:1/2 Bb6:1/2 Ab6:1/2 | F6+Bb6:2 -:1 Bb6:1/3 C7:1/3 Eb7:1/3 | "
+    "C7+F7:1.5 Eb7:1/2 Ab6+C7:1 Eb6+Ab6:1 | F6+Bb6:1 -:1/2 Eb7!:1/2 Ab6+C7:2 | "
+    "F6+Ab6:2.5 -:1/2 C7:1 | F6+C7:2 Bb6:1 F6:1 | Ab6:1/2 Bb6:1/2 C7:1/2 Eb7:1/2 Ab6+F7:2 | Bb6+Eb7:1 C7:1 F6+Bb6:2 | "
+    "-:3 C7:1 | F7:1/2 Eb7:1/2 C7:1/2 Ab6:1/2 F6+Bb6:1 Ab6+C7:1 | -:4 | Eb6+Bb6:1 Eb6+Ab6:1 G6:1/2 Eb7!:1/2 -:1"
 )
-BIG = ((CALM + 16, "Ab5 C6 Eb6 G6"), (CALM + 18, "C6 Eb6 G6 Bb6"))  # the box's two big chords, rolled upward
+BIG = ((CALM + 16, "F6 Ab6 C7 Eb7"), (CALM + 18, "Eb6 Ab6 C7 Eb7"))  # its two big chords, rolled upward
 FAST_END = "E5:1 A5:1 B5:1 D6:1/3 E6:1/3 G6:1/3"  # the last bar before the splash: up the chord that leads home
 TAG = "F#5:3 A5:1/3 F#5:1/3 E5:1/3 | D5:3 -:1 | B5:2 A5:2 | G5:2 E5:2 | F#5:8 | -:8"
 for _line, _beats in ((TUNE_A, 32), (TUNE_A2, 32), (TUNE_A3, 32), (HARM_A, 32), (COUNTER, 32), (INTRO, 24), (HIDDEN, 32), (PULLS, 32),
@@ -170,25 +172,18 @@ for _line, _beats in ((TUNE_A, 32), (TUNE_A2, 32), (TUNE_A3, 32), (HARM_A, 32), 
 
 
 def pairs_of(start, text):
-    """'Eb6+F6:2 -:1 E6:.5' -> [(beat, beats, [midi, ...])]: notes struck together are joined by '+'."""
+    """'Ab6+C7:2 -:1 Eb7!:.5' -> [(beat, beats, [midi, ...], short)]: notes struck together are joined by '+'; '!'
+    after a note makes it a short bright one."""
     out, t = [], Fraction(start)
     for tok in text.replace("|", " ").split():
         name, d = tok.split(":")
         if name != "-":
-            out.append((float(t), float(Fraction(d)), [n(one) for one in name.split("+")]))
+            out.append((float(t), float(Fraction(d)), [n(one) for one in name.rstrip("!").split("+")], name.endswith("!")))
         t += Fraction(d)
     return out
 
 
-def under(m, scale, steps):
-    """The note `steps` notes of the scale (a set of 0 to 11) below `m`."""
-    while steps:
-        m -= 1
-        steps -= m % 12 in scale
-    return m
-
-
-def render(window=None, pairs="steps") -> np.ndarray:
+def render(window=None, voice="box") -> np.ndarray:
     x = Ride(RIDE, BEATS, None, os=2, seed=211, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -444,15 +439,20 @@ def render(window=None, pairs="steps") -> np.ndarray:
             for j, m in enumerate(c.pad):
                 felt(bar0(bar) + off, m + 12, vol * 0.6, (-0.2, 0.0, 0.2, 0.35)[j], late=0.055 * (5 + j))
 
-    def box(b, m, vol=0.035, pan=0.3, late=0.0):
-        k = int(1.4 * sr)
-        put("box", b, x.struck("box", m)[:k] * tail(k, 0.2) * vol, pan, late=late)
+    def box(b, m, vol=0.035, pan=0.3, late=0.0, ring=1.4):
+        k = int(ring * sr)
+        put("box", b, x.struck("box", m)[:k] * tail(k, min(0.2, 0.6 * ring)) * vol, pan, late=late)
 
-    def chime(b, ms, vol=0.05, pan=0.0, roll_s=0.0):
-        """The music box's solo voice: one note, two together, or a chord rolled upward; the top one sings."""
+    def chime(b, ms, vol=0.04, pan=0.0, roll_s=0.0, short=False):
+        """The solo's voice: one note, two together, or a chord rolled upward; the top one sings. The music box, up
+        where it rings like a glockenspiel; or (`voice` "drop") the drips' round plink."""
         for j, m in enumerate(ms):
             side = pan if len(ms) == 1 else pan - 0.14 + 0.28 * j / (len(ms) - 1)
-            box(b, m, vol * (1.0 if j == len(ms) - 1 else 0.82), side, late=roll_s * j)
+            v = vol * (1.0 if j == len(ms) - 1 else 0.75) * (1.25 if short else 1.0)
+            if voice == "drop":
+                plink(b, m, 1.5 * v, side, late=roll_s * j)
+            else:
+                box(b, m, v, side, late=roll_s * j, ring=0.22 if short else 1.4)
 
     def twinkle(bar, vol=1.0, spots=((1.5, 4, 0.3), (3.0, 2, -0.3))):
         """The music box: two high notes a bar."""
@@ -628,9 +628,9 @@ def render(window=None, pairs="steps") -> np.ndarray:
 
     # Bars 41-60: camouflage, in A flat. The kit is gone and so is the brush; one bass note under everything for twelve
     # bars, then the bass moves; slow strings on chords with the raised fourth; the drips at half speed. The tune hides
-    # in the soft piano at half speed, twice. Four bars as they were (a music box's few notes); then the music box's
-    # solo, two notes at a time; a big chord (F minor, bar 57), a quick answer, a bigger one (A flat, bar 59), and a
-    # last word with a note that doesn't belong. His drip, a dab, and once, a giggle.
+    # in the soft piano at half speed, twice. Four bars as they were (the music box's few high notes); then the same
+    # voice's solo; a big chord (F minor, bar 57), a quick answer, a bigger one (A flat, bar 59), and a last word
+    # that ends on a short bright note. His drip, a dab, and once, a giggle.
     splat(bar0(CALM), 0.12, -0.3)
     for bar in range(CALM, WALTZ):
         b = bar0(bar)
@@ -640,24 +640,16 @@ def render(window=None, pairs="steps") -> np.ndarray:
             roll(bar, 0.05, off=2.0)
         strings(bar, 0.056 if loud else 0.04, slow=True)
         bass(b, chord(bar).bass, 3.7, 0.3 if loud else 0.24)
-        drips(bar, 0.7 if bar < CALM + 4 else 0.5, keep=2)
+        drips(bar, 0.7 if bar < CALM + 4 else 0.4, keep=2)
         if bar < CALM + 4:
             twinkle(bar, 0.8, spots=((2.5, 4, 0.3),) if bar % 2 else ((1.5, 2, -0.3), (3.5, 3, 0.3)))
     for start, vol in ((CALM, 1.0), (CALM + 8, 0.8)):
         for b, d, m in notes(bar0(start), HIDDEN):
             felt(b, m, 0.17 * vol, 0.05), felt(b, m + 12, 0.06 * vol, -0.1)
-    for i, (b, d, ms) in enumerate(pairs_of(bar0(CALM + 4), SOLO)):
-        if pairs == "thirds" and len(ms) == 2:
-            # The other reading: the lower note a third under the upper (a fourth where a third would be the note a
-            # hanging chord is waiting for).
-            root, kind, _, _ = CHORDS[int(b // 4)]
-            kind = ("s" if b % 4 < 2 else "7") if kind == "s7" else kind
-            scale = {8, 10, 0, 2 if kind == "L" else 1, 3, 5, 7}
-            low = under(ms[1], scale, 2)
-            ms = [under(ms[1], scale, 3) if kind == "s" and (low - root) % 12 == 4 else low, ms[1]]
-        chime(b, ms, 0.05, 0.25 * np.sin(1.3 * i))
+    for i, (b, d, ms, short) in enumerate(pairs_of(bar0(CALM + 4), SOLO)):
+        chime(b, ms, 0.048, 0.25 * np.sin(1.3 * i), short=short)
     for bar, text in BIG:
-        chime(bar0(bar), [n(one) for one in text.split()], 0.055, 0.0, roll_s=0.045)
+        chime(bar0(bar), [n(one) for one in text.split()], 0.05, 0.0, roll_s=0.045)
     drip(bar0(CALM + 1) + 3, 0.06, 0.4), dab(bar0(CALM + 3) + 2.5, 0.05), giggle(bar0(WALTZ) - 0.9, 0.03)
 
     # Bars 61-68: his little waltz. The kit comes back small (the kick, a rim for the snare, the brush); the bass walks
@@ -774,8 +766,8 @@ def render(window=None, pairs="steps") -> np.ndarray:
     return x.play(x.mixdown(levels, lowpass=9000, room=0.18))
 
 
-def main(out: str, pairs: str = "steps") -> None:
-    write_wav(out, render(pairs=pairs))
+def main(out: str, voice: str = "box") -> None:
+    write_wav(out, render(voice=voice))
 
 
 if __name__ == "__main__":

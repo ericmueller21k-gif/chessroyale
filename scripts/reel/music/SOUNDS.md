@@ -589,7 +589,7 @@ never answered), heard the second go again and said: "Yes let's add that one".
 - Same day he asked for the runaway train (`song_aj.py`, version 4) again: sent, still no boss named.
 - Left without a theme: Smudgy, and the nine placeholder bosses.
 
-## Smudgy's theme (Nov 22): song AO; second go sent ("It's almost there")
+## Smudgy's theme (Nov 22): song AO; third go sent (a new solo on the glockenspiel-like ding)
 
 Eric: "think like paint, paint strokes, and like paint splattering, maybe. Bit more like a whimsical, but somehow it
 needs to have like a vibe of like a calmness, but still somehow be, fast pace ... 170 or like 175 BPM. Maybe starts out
@@ -638,3 +638,25 @@ box thing ... or that little sparkly sound, that's really good"). Asked:
     under (how he played his own two-note hits for Folio). `python3 song_ao.py out.wav thirds` builds that one.
 - Measured: in the calm the box and the soft piano are level (-24 dB RMS each; the box sits higher, so it leads); the
   calm 3 dB under the main parts. -16.0 LUFS, peak -2.1 dBFS.
+
+**Third go (Nov 22).** Eric on the second go's solo: "No, you did the wrong instrument. I like that one, but I meant
+... the other one ... It starts between 2 and 3 seconds ... it sounds like a glockenspiel. That's the one I was
+talking about using ... throughout it more." And: "we needed to go a different direction entirely with ... the solo.
+It's not hitting ... That one sounds just too off. I think the actual tempo and like the way it moves is fine, but the
+notes themselves aren't sounding really what I'm looking for."
+- **Which sound he meant, as far as it can be told.** Two sparkles play in the calm: the music box's few high notes
+  (`twinkle`: first heard 2.1 s into the song, and 2.4 s into the clip he was sent) and the drips' short plink (on
+  every beat of the calm). "Starts between 2 and 3 seconds" and "use it more" both fit the music box's high notes:
+  up there (E6 to B7) it is a plain ringing ding; the second go's solo had the same voice an octave lower, in pairs a
+  step apart, where it clangs. So the solo is now up in that register. The same solo on the plink went as a clip.
+- **The notes.** The rhythm is the second go's bar for bar ("the way it moves is fine"). New tune, in the key's five
+  plain notes (A flat, B flat, C, E flat, F): it falls C, B flat, A flat, climbs to a top F twice, and ends on a short
+  bright E flat. The long notes are doubled a third, fourth, fifth or sixth below; nothing a step apart; nothing from
+  outside the key; no leaning on the chords' raised fourth. The two big chords stay (bars 57 and 59).
+- **"A little sharp note"** was read in the second go as a note from outside the key (E natural, F sharp). That may
+  have been the "too off". Now it is a short bright note, in key. **Lessons:** when he names a sound by ear ("music
+  box", "xylophone", "glockenspiel"), ask which by where it is first heard before building on it, or send the passage
+  on each candidate; "sharp" from him is as likely to mean crisp as raised; pairs of notes a step apart, high up,
+  read as "off": double with thirds to sixths.
+- Measured: the solo -26 dB RMS on its own (the soft piano under it -24; the solo's notes sit at 1.5 to 3 kHz, so
+  it leads); the calm 3 dB under the main parts, the big chords 3 dB over their neighbors; -16.0 LUFS, peak -2.1 dBFS.
