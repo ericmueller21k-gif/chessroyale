@@ -338,34 +338,65 @@ async function playOwnMoves(page: Page, n: number) {
   expect(await ownSoFar(page)).toBe(n);
 }
 
-test(`a solo game left after ${SOLO_ABANDON.minMoves} of your moves counts as a loss on your profile; under it, nothing (Eric, Nov 22)`, { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(5 * 60_000);
-  // (No test switch that makes a test game: those are never marked.)
+test(`a solo battle left mid-game: the reload's card, "You have a game in progress", Resume (the same board) or Forfeit (past ${SOLO_ABANDON.minMoves} of your moves a loss on your profile; under it, nothing) (Eric, Nov 22)`, { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  // (No test switch that makes a test game: those are never marked, nor kept.)
   await page.goto("/?debug&boss=gingerbread");
-  const marks: unknown[] = [];
-  page.on("request", (r) => void (r.method() === "POST" && new URL(r.url()).pathname === "/api/xp/solo/real" && marks.push(r.postDataJSON())));
+  const marks: { game: string }[] = [];
+  const forfeits: unknown[] = [];
+  page.on("request", (r) => {
+    const path = new URL(r.url()).pathname;
+    if (r.method() === "POST" && path === "/api/xp/solo/real") marks.push(r.postDataJSON());
+    if (r.method() === "POST" && path === "/api/xp/solo/forfeit") forfeits.push(r.postDataJSON());
+  });
   const recent = async () => {
     const id = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
     return ((await (await page.request.get(`/api/profile/${id}`)).json()) as { recent: { mode: string; online: boolean; won: boolean | null }[] }).recent;
   };
-  // Under the mark: a reload and another start record nothing, and the server was never told.
+  const card = page.getByTestId("game-in-progress");
+  const yourTurn = () => expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+  const position = () => page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }));
+  // Under the mark: a reload shows the card; Forfeit records nothing, and the server was never told.
   await bossAloneFromHome(page);
   await playOwnMoves(page, SOLO_ABANDON.minMoves - 1);
   await page.reload();
-  await bossAloneFromHome(page);
-  await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await expect(card).toContainText("You have a game in progress");
+  await expect(card).toContainText(`Ginger · Move ${SOLO_ABANDON.minMoves - 1}`);
+  await expect(card).toContainText(`Under ${SOLO_ABANDON.minMoves} moves, forfeiting doesn't count.`);
+  await card.getByRole("button", { name: "Forfeit" }).click();
+  await expect(card).toHaveCount(0);
   expect(marks).toEqual([]);
+  expect(forfeits).toEqual([]);
   expect(await recent()).toEqual([]);
-  // At the mark (this game's): told once; a reload, and the app's load records it as a loss, a boss battle lost, solo.
-  await playOwnMoves(page, SOLO_ABANDON.minMoves);
+  // Past the mark (12 moves): told once; a reload records nothing (the load names the game it keeps) and shows the card.
+  await bossAloneFromHome(page);
+  await playOwnMoves(page, 12);
   await expect.poll(() => marks.length, { timeout: 10_000 }).toBe(1);
   expect(marks[0]).toMatchObject({ mode: "boss", players: 1, bossId: "gingerbread" });
+  await yourTurn();
+  const before = await position();
   await page.reload();
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await expect(card).toContainText("Ginger · Move 12");
+  await expect(card).toContainText("Forfeiting counts as a loss.");
+  expect(await recent()).toEqual([]);
+  // Resume: the same battle, the same board, your turn.
+  await card.getByRole("button", { name: "Resume" }).click();
+  await expect(card).toHaveCount(0);
+  await yourTurn();
+  expect(await position()).toEqual(before);
+  // A reload again, and Forfeit: one loss on your profile, a boss battle lost, solo.
+  await page.reload();
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await card.getByRole("button", { name: "Forfeit" }).click();
+  await expect(card).toHaveCount(0);
   await expect.poll(async () => (await recent()).length, { timeout: 20_000 }).toBe(1);
   expect((await recent())[0]).toMatchObject({ mode: "boss", online: false, won: false });
-  // Another game starts: still one, never recorded again.
+  expect(forfeits).toHaveLength(1);
+  // Another game starts with no question (none kept): still one loss, never recorded again; every mark was that one game's.
   await bossAloneFromHome(page);
-  await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+  await yourTurn();
   expect(await recent()).toHaveLength(1);
-  expect(marks).toHaveLength(1);
+  expect(new Set(marks.map((m) => m.game)).size).toBe(1);
 });
