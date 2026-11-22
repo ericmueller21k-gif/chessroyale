@@ -1,0 +1,3 @@
+Done. Cause: the test's own move picker walked into Qxf2# (his rook hidden on f7 opens the f-file); fixed by moving it and the five
+other specs' pickers onto helpers.ts pickMove. CI never ran: workflows start only on a pull request, and none is open for this branch.
+Locally the six changed specs passed on both projects (45 passed, 13 skipped). Please open the PR from .pr-body.md and watch its CI.
