@@ -148,6 +148,8 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   // were; the phone's back closes it, and her end screen is there under it, the party's way back with it.
   const card = ann.page.getByTestId("reward-box");
   await expect(card).toContainText("Level 2!", { timeout: 30_000 });
+  if (STILLS) await card.evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
+  await still(ann.page, "reward-card");
   const at = ann.page.url();
   await card.getByRole("button", { name: "▶ Go to inventory" }).click();
   const layer = ann.page.getByTestId("inventory-layer");
