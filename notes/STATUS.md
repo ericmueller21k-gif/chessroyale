@@ -1711,3 +1711,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Running: flaky smudgy (session_01JuCWRuThqp6dE8dyzgqfvQ, high), turf mockup (session_01JuCWRsPGebdBiuokCUNzT3, high). Next: hopper pawn bounce (xhigh, alone), then solo resume/forfeit (step 2, + N4), turf build after Eric OKs the mockup.
 
 - Nov 22, 14:45: #882 flaky smudgy merged (main green), #883 pawn bounce merged. Follow-up nits from review-883.md (review/hopper-pawn-bounce): the last-move highlight after a bounce; a several-bosses test for the bounce; `due(b, s)` ignores s for pawnBounceMax: fold into the Turf build. Turf mockup sent to Eric (stills/hopper-turf-mockup), awaiting OK. Started solo resume/forfeit (brief notes/briefs/solo-resume-forfeit.md, includes #881's N4).
+
+- Nov 22, 15:40: #884 (tower smudgy flake, recorded every frame) merged. Main red again on a flake: xp.spec.ts:341 (solo-abandon e2e; START never clickable after the reload; first try 5.0 min, retry 2.1). Handed to the solo-resume helper (session_01JuCWRsBwG9vgo9CGtaGdTR) to fix at the cause in its PR.
