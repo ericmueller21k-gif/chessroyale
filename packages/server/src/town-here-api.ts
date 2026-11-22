@@ -57,7 +57,7 @@ export function readBeat(b: Record<string, unknown>): HereBeat | null {
   if (c === null || r === null) return null;
   const idle = typeof b.idleMs === "number" && Number.isFinite(b.idleMs) ? Math.min(Math.max(0, b.idleMs), 86_400_000) : 0;
   const shop = typeof b.shop === "string" && /^[a-z0-9-]{1,24}$/.test(b.shop) ? b.shop : null;
-  return { c, r, idleMs: idle, hidden: b.hidden === true, shop };
+  return { c, r, idleMs: idle, hidden: b.hidden === true, shop, ...(b.floor === true ? { floor: true } : {}) };
 }
 
 /** A test's shortened numbers (seconds, each 1 to 3600), where the test switches are on; else the real ones. */

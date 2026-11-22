@@ -177,6 +177,8 @@ export interface SpriteAnimProps {
   onFrame?: (frame: Frame) => void;
   /** Drawn once, at its first frame, and never again (reduced motion: a still). */
   still?: boolean;
+  /** The animation to show, read as each frame is drawn, else `anim` (a Battle Tower card's figure: Moo's powered idle from his Full Moon's `swap`). */
+  pick?: (now: number) => string;
 }
 
 /** A frame of a sprite's animation as shown (spriteFrameAt): which animation, which frame, and its run's tag. */
@@ -212,8 +214,10 @@ export function framesSince(ch: Character, anim: string, prev: Shown | null, s: 
  */
 export const LATE_CUE_MS = 1_000;
 
-export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look, onFrame, still = false }: SpriteAnimProps) {
+export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look, onFrame, still = false, pick }: SpriteAnimProps) {
   const cv = useRef<HTMLCanvasElement>(null);
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
   useLayoutEffect(() => {
     const g = cv.current?.getContext("2d");
@@ -224,7 +228,8 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
     let prev: Shown | null = null;
     const draw = () => {
       const now = Date.now();
-      const s = spriteFrameAt(ch, anim, then, now, since);
+      const a = pickRef.current?.(now) ?? anim;
+      const s = spriteFrameAt(ch, a, then, now, since);
       const shown = `${s.anim}:${s.frame}`;
       // (Drawn again for a new battle's lights too.)
       const key = `${shown}:${ch.swap?.()?.id ?? ""}`;
@@ -235,7 +240,7 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
         g.putImageData(frameImage(ch, frame, look), 0, 0);
         onFrame?.(frame);
         cv.current?.setAttribute("data-frame", shown);
-        for (const f of framesSince(ch, anim, prev, s, prev ? undefined : { now, since })) {
+        for (const f of framesSince(ch, a, prev, s, prev ? undefined : { now, since })) {
           const fr = ch.anims[f.anim]!.frames[f.frame]!;
           const sound = fr.cue ? sounds[fr.cue] : undefined;
           const tag = `${ch.id}:${id}:${f.tag}:${f.frame}`;

@@ -98,6 +98,8 @@ export interface HereSelf {
   idleMs: number;
   hidden: boolean;
   shop: string | null;
+  /** Back from a Battle Tower floor (server town-here.ts `HereBeat.floor`). */
+  floor?: true;
 }
 
 /**
@@ -132,7 +134,9 @@ export function awayLimits(): AwayLimits | null {
  * The town's away rule and its beats, until the returned function is called. `onState`: here or the "zzz" (yours to draw); `onOut`:
  * you were away too long (once; the town leaves for home). `busy`: a challenge or the claw machine has you. `shop`: the room you're
  * in (null: the town square). `loading`: the town's loading screen is up (holds the idle clock, not the background's: afk.ts
- * `setLoading`). `onOthers`: the server's answer was put in the town (who left: a card open on them closes).
+ * `setLoading`). `onOthers`: the server's answer was put in the town (who left: a card open on them closes). `floor`: the town opened
+ * back from a Battle Tower floor's match: its beats say so (`floor: true`) until one is answered, so the server counts it the same visit
+ * and the chat says nothing (Eric, Nov 22; server town-here.ts `beat`).
  */
 export function watchAway(o: {
   town: Town;
@@ -142,6 +146,7 @@ export function watchAway(o: {
   onState: (s: AwayState) => void;
   onOut: () => void;
   onOthers?: (gone: Person[], dressed: Person[]) => void;
+  floor?: boolean;
 }): () => void {
   const limits = awayLimits();
   const clock = new AwayClock(Date.now(), limits);
@@ -155,9 +160,10 @@ export function watchAway(o: {
   let again = false;
   let beatAt = 0;
   let sent = "";
+  let floor = !!o.floor;
   const self = (): HereSelf => {
     const h = o.town.you.walker.here();
-    return { c: h.c, r: h.r, idleMs: clock.idleMs(Date.now()), hidden: document.hidden, shop: o.shop() };
+    return { c: h.c, r: h.r, idleMs: clock.idleMs(Date.now()), hidden: document.hidden, shop: o.shop(), ...(floor ? { floor: true } : {}) };
   };
   const post = (body: Record<string, unknown>, keepalive: boolean) =>
     fetch("/api/town/here", { method: "POST", credentials: "same-origin", keepalive, headers: { "content-type": "application/json" }, body: JSON.stringify({ ...body, ...extras }) });
@@ -169,7 +175,10 @@ export function watchAway(o: {
     beatAt = Date.now();
     sent = `${me.c},${me.r},${state},${me.shop}`;
     void post(online ? { ...me } : { watch: true }, false)
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (res.ok) floor = false;
+        return res.ok ? res.json() : null;
+      })
       .then((b: { others?: unknown } | null) => {
         if (done || !b || !Array.isArray(b.others)) return;
         const { gone, dressed } = applyHere(o.town, b.others.filter(isOther), performance.now());
