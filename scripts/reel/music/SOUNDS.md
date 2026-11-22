@@ -44,6 +44,8 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A spaghetti-western gallop: a "wah" voice calling and a lone whistle (a glide, a waver, an echo) answering, two bars each, over a galloping slap bass, a kick on 1 and 3 and a cracking snare, a dry strummed guitar with runs of three; then a distorted guitar (clipped hard, through a speaker's curve) with the same tune an octave lower; a standoff of a bell, timpani and a gunshot | song_ac.py | Nov 13, Wrangler's third go: chosen for the game, in the version with the call and whistle line his notes gave |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
+| A music box played high (E6 to B7), where it rings like a glockenspiel, as a calm's solo: single notes and pairs a third to a sixth apart, in the key's five plain notes, slow bars then quick ones, two big rolled chords, over a soft piano | song_ao.py (`chime`, `SOLO`) | Nov 22, Smudgy's third go: "Yeah, this is the one. This is the one." (the same voice an octave lower in pairs a step apart: "the wrong instrument ... too off") |
+| Calm and fast at once: a bowed violin's long notes, a chord a bar, over a 172 two-step and a pattern of drips; a rush up to 226 that comes back at once on a splash | song_ao.py | Nov 22, of the first go: "It's almost there"; then the same |
 
 ## The recipe that worked: write the next themes this way
 
@@ -100,6 +102,8 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 | A Western march: a lone trumpet's tune, a whistle doubling it, hooves, a high square-wave line of even 16ths all through (song_ab.py) | Nov 13: "I'm going to be honest, I didn't care for that one" (no more said; a brass tune had missed twice before) |
 | An acid synth (a sawtooth through a ringing filter, sliding between notes) as a calm's main voice (song_y.py's first go, 1:01) | "almost sounds like a cheetah ... it just almost sounds like it was on accident in the song" (short bursts of it in the drop he passed) |
 | An accordion (three sawtooth-like reeds a few cents apart, one an octave up) with the tune, at the lead's level (song_ad.py's first go, 0:27) | Nov 14: "some loud synth obnoxious instrument starts playing ... something very light ... like a flute ... it's way too loud. It should be just like more background, quiet, lighter" (detuned sawtooth stacks read as "synth" to him: see the acid line above) |
+| A brush swishing left and right on every 8th as the kit's cymbals, at the hats' usual level (song_ao.py's first go), and any brush at all in a calm | Nov 22: "cut out the brushes going back and forth ... make them just a bit quieter, even for the whole song ... the repetitive brushstroke" (3 dB down passed) |
+| Pairs of notes a step apart on a music box, and notes from outside the key, in a calm's solo (song_ao.py's second go) | Nov 22: "the notes themselves aren't sounding really what I'm looking for ... just too off" |
 
 ## What another pair of ears heard (Nov 13)
 
@@ -589,7 +593,7 @@ never answered), heard the second go again and said: "Yes let's add that one".
 - Same day he asked for the runaway train (`song_aj.py`, version 4) again: sent, still no boss named.
 - Left without a theme: Smudgy, and the nine placeholder bosses.
 
-## Smudgy's theme (Nov 22): song AO; third go sent (a new solo on the glockenspiel-like ding)
+## Smudgy's theme (Nov 22): song AO; the third go approved and handed over
 
 Eric: "think like paint, paint strokes, and like paint splattering, maybe. Bit more like a whimsical, but somehow it
 needs to have like a vibe of like a calmness, but still somehow be, fast pace ... 170 or like 175 BPM. Maybe starts out
@@ -660,3 +664,12 @@ notes themselves aren't sounding really what I'm looking for."
   read as "off": double with thirds to sixths.
 - Measured: the solo -26 dB RMS on its own (the soft piano under it -24; the solo's notes sit at 1.5 to 3 kHz, so
   it leads); the calm 3 dB under the main parts, the big chords 3 dB over their neighbors; -16.0 LUFS, peak -2.1 dBFS.
+
+**Approved and handed over (Nov 22).** Of the third go and its two clips: "Yeah, this is the one. This is the one.
+And number 1 is the answer ... solo 1, not solo 2": the song as sent, the solo on the music box's high ringing notes.
+- `handoff.py` has it as `smudgy` (the roster id). Built stereo 192 into `stills/trailer-v2`'s
+  `boss-music-stereo-192/`, commit `e74fb337`: one loop of 166.5 s, no intro piece, -16.0 LUFS, peak -2.1 dBFS.
+- Checked on the built file: it is the approved master sample for sample; the loop point is clean.
+- Told the director: the slow opening is part of the loop; the song carries his own sounds (say if they are
+  mistaken for the fight's); its quiet middle is 3 dB under the rest.
+- Every built boss now has a theme. Without one: the nine placeholder bosses.
