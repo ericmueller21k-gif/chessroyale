@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
-import { legalMoves, type UciEngine } from "@chessroyale/chess";
+import { BOSS_ADMIN_FIRST, DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
+import { dodgeTimeline, legalMoves, type UciEngine } from "@chessroyale/chess";
 import { KEPT_ELSEWHERE, KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
@@ -210,6 +210,43 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     // A Battle Tower floor's kept game carries it too.
     const floor = readKept(JSON.stringify({ v: 1, fight: "f", floor: 1, bosses: ["hopper"], settings: {}, beaten: [], game: k.kept }));
     expect(floor!.game!.pending).toEqual(k.kept.pending);
+  }, 120_000);
+
+  // (The review of #885, I3: Dodge's rounds weren't kept, so a reload replayed it from round 1, the answers known, a hit taken back.)
+  it("Chandy's Dodge: each round kept as it closes; resumed, it goes on from the round due, never from round 1 again", async () => {
+    // (Chandy is admins-first: met here as an admin's ?boss=chandy&power=dodge meets him.)
+    const admins = BOSS_ADMIN_FIRST as string[];
+    const at = admins.indexOf("chandy");
+    if (at >= 0) admins.splice(at, 1);
+    try {
+      const m = battle({ ...ALONE, bossId: "chandy", bossPowerTest: "dodge" } as Settings);
+      m.start();
+      const dodge = (x: SoloMatch) => x.runner?.state.boss?.powers?.chandy?.dodge ?? null;
+      for (let i = 0; i < 6000 && !(dodge(m) && dodge(m)!.results.length >= 1); i++) {
+        if (yourTurn(m)) pick(m);
+        await step();
+      }
+      const results = dodge(m)!.results;
+      expect(results.length, "a Dodge round closed").toBeGreaterThanOrEqual(1);
+      const k = loadKeptSolo()!;
+      const kept = (k.kept.snapshot.state as { boss?: { powers?: { chandy?: { dodge?: { results: unknown[] } } } } }).boss?.powers?.chandy?.dodge;
+      expect(kept?.results).toEqual(results);
+      m.dispose();
+      const r = resumed(k);
+      await until(r, () => r.phase.kind === "boss" && !!(r.phase as { dodge?: unknown }).dodge, "the Dodge, resumed");
+      expect(dodge(r)!.results).toEqual(results);
+      // (Its screen at the round due's opening, not the scope-in: that round's vote, in its own time.)
+      const d = (r.phase as { dodge: { round: number; at: number } }).dodge;
+      expect(d.round).toBe(results.length);
+      const open = dodgeTimeline().rounds[results.length]!.openAt;
+      expect(Date.now() - d.at).toBeGreaterThanOrEqual(open);
+      expect(Date.now() - d.at).toBeLessThan(open + 300);
+      await until(r, () => dodge(r)!.results.length > results.length || r.phase.kind === "results", "the next round closed");
+      expect(dodge(r)!.results.slice(0, results.length)).toEqual(results);
+      r.dispose();
+    } finally {
+      if (at >= 0) admins.splice(at, 0, "chandy");
+    }
   }, 120_000);
 
   it("a Solo raid (bots in the crowd): kept with the crowd's move in from its reveal; resumed the same, its bots back in their seats (its Again is a Solo raid's)", async () => {

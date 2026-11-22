@@ -1021,8 +1021,11 @@ export class SoloMatch implements GameView {
   /** As your turn begins: the scope-in, the warning volley, then three rounds of the vote, each closed here as the server closes them online. */
   private dodgeTurn() {
     if (this.timer) clearTimeout(this.timer);
-    const at = Date.now();
-    this.dodge = { key: `d-${at}`, at, round: 0 };
+    // (Resumed mid-Dodge, its rounds played kept (dodgeStep): on from the round due, as if it had just opened, never from round 1 again
+    // with the answers known: the review of #885, I3.)
+    const done = this.runner.state.boss?.powers?.chandy?.dodge?.results.length ?? 0;
+    const at = Date.now() - (done ? (dodgeTimeline().rounds[done]?.openAt ?? 0) : 0);
+    this.dodge = { key: `d-${at}`, at, round: done };
     this.showDodge();
     this.armDodge();
   }
@@ -1045,6 +1048,9 @@ export class SoloMatch implements GameView {
     if (!d || !full || this.stopped) return;
     if (!dodgeOver(full)) {
       this.runner.finishDodgeRound(this.you.alive && d.mine ? { [HUMAN]: d.mine } : {});
+      // (A boss battle kept on the device: each round kept as it closes (a hit that ends the battle is decided, never kept), so a
+      // reload plays on from the next round (I3).)
+      this.keepFloor();
       d.round++;
       d.mine = undefined;
       this.showDodge();
