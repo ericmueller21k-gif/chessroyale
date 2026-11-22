@@ -15,6 +15,7 @@ import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
 import { useGameXp } from "../components/XpResult.tsx";
 import { EndHeadline, EndDuo, EndRewards, type EndTone } from "../components/EndScreen.tsx";
+import type { RewardAway } from "../components/RewardBox.tsx";
 import { partsOf } from "../boss-side.ts";
 import { NO_RESULT_LINE } from "./Recluse2.tsx";
 import { CrowdPodium } from "../components/Podium.tsx";
@@ -24,6 +25,16 @@ import { TowerResult, useTowerEnd } from "./TowerResult.tsx";
 /** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
 export const UNVOUCHED_LINE = "Only one device checked this match: it pays as a solo game.";
 /** A 50 v 50 you played in a party of friends (CROWD_PARTY.ranked off): why yours didn't count, in place of the unranked line. */
+/**
+ * Why the rewards card's "Go to inventory" waits (the Nov 22 mockup): a Battle Tower floor (solo: your run; a party's: the party).
+ * The mockup's `?mockAway=run|party` shows either on any result screen, for the stills.
+ */
+function rewardAway(m: { tower?: unknown; towerParty?: unknown }): RewardAway {
+  const mock = new URLSearchParams(location.search).get("mockAway");
+  if (mock === "run" || mock === "party") return mock;
+  return m.towerParty ? "party" : m.tower ? "run" : null;
+}
+
 export const PARTIED_LINE = "Party matches aren't ranked, so your ranking didn't change.";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeText = "Home" }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void; /** Its leaving button's words: "Back to town" after a boss challenged in the town. */ homeText?: string }) {
@@ -199,7 +210,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           )
         )}
         {/* The rewards (Eric, Nov 20): XP EARNED counting up and lobbing into its bar, the screen's middle, the bar, the quests. */}
-        <EndRewards xp={xp} middle={middle} />
+        <EndRewards xp={xp} middle={middle} away={rewardAway(match)} />
         {bossWords && <p class={`team-result ${noResult ? "" : bossResult === "crowd" ? "good" : bossResult === "boss" ? "bad" : ""}`}>{bossWords}</p>}
         {/* What he saved you from: the blunder, the boss's reply, the best move, your chances (tap to open). */}
         {bossResult && match.boss?.lastStand?.fen && <LastStandCard stand={match.boss.lastStand} side={match.boss.crowdSide} />}
