@@ -1,6 +1,6 @@
 import { SOLO_ABANDON, bossDef } from "@chessroyale/core";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { KEPT_ELSEWHERE, forfeitKeptSolo } from "../account.ts";
+import { forfeitKeptSolo } from "../account.ts";
 import { useAccount } from "../screens/Profile.tsx";
 import { forfeitAsk, keptMoves, keptNote, keptReal, onForfeitAsk, resumeKeptSolo, type KeptSolo } from "../solo-kept.ts";
 import { BossPortrait } from "./BossPortrait.tsx";
@@ -33,13 +33,8 @@ export function GameInProgress() {
           note={`Your game against ${bossName(k.boss)} (move ${keptMoves(k)}) ends. ${forfeitNote(k)}`}
           go="Forfeit"
           onCancel={() => ask.answer(false)}
-          onGo={() =>
-            // (Refused while another tab plays it: nothing starts; ended meanwhile (its result sent): the start goes on.)
-            void forfeitKeptSolo(k).then((why) => {
-              if (why === KEPT_ELSEWHERE) keptNote(why);
-              ask.answer(why !== KEPT_ELSEWHERE);
-            })
-          }
+          // (Ended meanwhile (its result sent): the start goes on too. A tab still playing it stops at its next keep.)
+          onGo={() => void forfeitKeptSolo(k).then(() => ask.answer(true))}
         />
       </div>
     );

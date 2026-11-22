@@ -281,9 +281,10 @@ export async function loadAccount(name?: string): Promise<void> {
 let lastName: string | undefined;
 
 /**
- * The kept solo battle as the load found it (step 2): this account's, not stale, still open on the server (`soloOpen`), and not being
- * played in another tab of this device right now (account.ts's live note, SOLO_ABANDON.liveMinutes): offered on its card. A stale one
- * (the server records it as left) or this account's that isn't open (recorded, finished, or replaced by another device's start) is
+ * The kept solo battle as the load found it (step 2): this account's, not stale and still open on the server (`soloOpen`): offered on its
+ * card, even while another tab's live note names it (the delta review of #885, D3: a page the phone killed without `pagehide` leaves
+ * its note behind, and its own reload read it as another tab's; a Resume's claim makes a takeover safe: solo-kept.ts SoloKeep). A stale
+ * one (the server records it as left) or this account's that isn't open (recorded, finished, or replaced by another device's start) is
  * dropped. Another account's stays on the device, never offered.
  */
 function keptOnLoad(kept: KeptSolo | null, user: string, open: boolean | undefined): KeptSolo | null {
@@ -293,7 +294,7 @@ function keptOnLoad(kept: KeptSolo | null, user: string, open: boolean | undefin
     clearKeptSolo(kept.game);
     return null;
   }
-  return kept.user === user && open === true && !soloLiveElsewhere(kept.game) ? kept : null;
+  return kept.user === user && open === true ? kept : null;
 }
 
 /**
@@ -324,42 +325,40 @@ export function offerKeptSolo(k: KeptSolo | null): void {
   if (state.soloKept !== k) set({ soloKept: k });
 }
 /**
- * A card on screen follows what another tab of this device does (the review of #885, I1): played on there (its move number), ended,
- * forfeited, or being played (its live note): offered again as it is now, or taken off.
+ * A card on screen follows what another tab of this device does (the review of #885, I1): played on there (its move number), ended or
+ * forfeited: offered again as it is now, or taken off.
  */
 let followingTabs = false;
 function followOtherTabs(): void {
   if (followingTabs || typeof addEventListener !== "function") return;
   followingTabs = true;
   addEventListener("storage", (e: StorageEvent) => {
-    if (state.soloKept && (e.key === null || e.key === KEPT_KEY || e.key === SOLO_LIVE_KEY || e.key === UNSENT_KEY)) reofferKeptSolo();
+    if (state.soloKept && (e.key === null || e.key === KEPT_KEY || e.key === UNSENT_KEY)) reofferKeptSolo();
   });
 }
 
 /** Why a Resume or Forfeit from the card is refused (shown on home: solo-kept.ts keptNote). */
 export const KEPT_ENDED = "That game has already ended.";
+/** A tab whose kept game another tab took over, ended or replaced, as it stops (App.tsx lostToTab). */
 export const KEPT_ELSEWHERE = "Played in another tab.";
 /**
  * Resume's tap (the review of #885, I1): the kept game as it is now, not the card's copy (another tab may have played on, ended or
- * taken it since the card came): still this game, not ended (its result kept unsent: then sent, keptEnded), not being played in another
- * tab (its live note), and claimed for this tab, so a tab that plays it on stops at its next keep. The entry to play, or why not.
+ * taken it since the card came): still this game, not ended (its result kept unsent: then sent, keptEnded), and claimed for this tab,
+ * so a tab that plays it on stops at its next keep. Not refused while another tab's live note names it (the delta review, D3: one tab's
+ * page killed without `pagehide` locked its own reload out for SOLO_ABANDON.liveMinutes; the claim already makes a takeover safe). The
+ * entry to play, or why not.
  */
 export function takeKeptSolo(card: KeptSolo): KeptSolo | string {
   if (keptEnded(card)) return KEPT_ENDED;
   const k = keptNow(card.user);
   if (!k || k.game !== card.game) return KEPT_ENDED;
-  if (soloLiveElsewhere(k.game)) return KEPT_ELSEWHERE;
   claimKeptSolo(k);
   return k;
 }
 
-/**
- * Boss Battle opened with no match on (step 2): the kept game for this account offered again, as at the load (not stale, not being played
- * in another tab). Resume checks it with the server.
- */
+/** Boss Battle opened with no match on (step 2): the kept game for this account offered again, as at the load. Resume checks it with the server. */
 export function reofferKeptSolo(): void {
-  const k = keptNow(state.profile?.user.id);
-  offerKeptSolo(k && !soloLiveElsewhere(k.game) ? k : null);
+  offerKeptSolo(keptNow(state.profile?.user.id));
 }
 
 /**
@@ -383,15 +382,14 @@ export async function keptSoloOpen(k: KeptSolo): Promise<boolean> {
  * Forfeit (step 2): the kept game given up, as it is now (the card's copy may be old: takeKeptSolo's checks, I1). Past
  * SOLO_ABANDON.minMoves it's recorded as a loss now (POST /api/xp/solo/forfeit, with its facts in case its 10-move mark never landed);
  * under it, just dropped, nothing recorded. Dropped on the device at once either way: a forfeit that gets no answer leaves a real game on
- * the server, recorded as left at the next load or start. Null: done; else why not (ended, its result sent instead, never a forfeit over
- * it (I4); or being played in another tab).
+ * the server, recorded as left at the next load or start. A tab still playing it stops at its next keep (a Forfeit is an explicit loss:
+ * never refused for another tab's live note, D3). Null: done; else why not (ended, its result sent instead, never a forfeit over it: I4).
  */
 export async function forfeitKeptSolo(card: KeptSolo): Promise<string | null> {
   if (state.soloKept?.game === card.game) set({ soloKept: null });
   if (keptEnded(card)) return KEPT_ENDED;
   const k = keptNow(card.user);
   if (!k || k.game !== card.game) return KEPT_ENDED;
-  if (soloLiveElsewhere(k.game)) return KEPT_ELSEWHERE;
   clearKeptSolo(k.game);
   if (!keptReal(k)) return null;
   try {
@@ -933,20 +931,10 @@ export function endSoloLive(game: string): void {
 }
 /**
  * This tab no longer plays `game`: another tab took it over (solo-kept.ts SoloKeep's `lost`). Its live note is that tab's now: left on
- * the device, and this tab reads it as another's.
+ * the device (this tab's `pagehide` doesn't take it off).
  */
 export function leftSoloLive(game: string): void {
   if (liveHere === game) liveHere = null;
-}
-/** `game` is being played in another tab of this device (its live note, under SOLO_ABANDON.liveMinutes old; never this tab's own). */
-function soloLiveElsewhere(game: string, now = Date.now()): boolean {
-  if (liveHere === game) return false;
-  try {
-    const kept = JSON.parse(localStorage.getItem(SOLO_LIVE_KEY) ?? "null") as { game?: unknown; at?: unknown } | null;
-    return kept?.game === game && typeof kept.at === "number" && now - kept.at < SOLO_ABANDON.liveMinutes * 60_000;
-  } catch {
-    return false;
-  }
 }
 /** A real solo game is being played on this device: in this tab, or in another whose last turn was under SOLO_ABANDON.liveMinutes ago. */
 export function soloLiveOnDevice(now = Date.now()): boolean {

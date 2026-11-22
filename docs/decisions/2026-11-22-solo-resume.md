@@ -6,9 +6,11 @@ awaits its rework; a 50 v 50's votes and chat, and the Hidden Boss's forms, aren
 your move in, from the moment it's accepted, before it's scored (a floor too: a reload while it's scored or on its reveal can't take it back; I2); its clock stands still while hidden, as a floor's. Resume asks the
 server first. Any start with one kept asks first, a tower floor's at the clerk. Two tabs (the review of #885, I1): the kept game names the tab
 playing it; Resume and Forfeit act on it as it is at the tap, never the card's copy; a Resume claims it, and a tab whose game was taken
-over, ended or replaced stops at its next keep ("Played in another tab."). Both are refused while another tab plays it (its live note,
-past the mark) or once its result waits to be sent ("That game has already ended.", and that result goes). A card on screen follows
-other tabs (`storage` events).
+over, ended or replaced stops at its next keep ("Played in another tab."). Both are refused once its result waits to be sent ("That
+game has already ended.", and that result goes), never for another tab's live note (the director's call on the delta review's D3: a
+page the phone killed without `pagehide` leaves its note behind, and its own reload was locked out of the card and every solo start's
+Forfeit for 10 minutes; the claim makes a takeover safe, and a Forfeit is an explicit loss). A card on screen follows other tabs
+(`storage` events), and shows while another tab plays the game.
 
 Known, pre-launch (the review of #885; floors share both, left as they are): **N1**, time XP across a resume counts the time away
 (the server times the game from its start: bounded by `soloMinutesPerDay`); **N2**, a reload while he thinks plays his reply again on

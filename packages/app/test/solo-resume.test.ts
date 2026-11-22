@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_ADMIN_FIRST, DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
 import { dodgeTimeline, legalMoves, type UciEngine } from "@chessroyale/chess";
-import { KEPT_ELSEWHERE, KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
+import { KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
 import { readKept } from "../src/tower.ts";
@@ -444,11 +444,27 @@ describe("the card's answers and the load (step 2)", () => {
     expect(account().soloKept).toBeNull();
   });
 
-  it("being played in another tab of this device (its live note): no card at the load", async () => {
-    device(kept());
-    store.set("brc.soloLive", JSON.stringify({ game: GAME, at: Date.now() - 60_000 }));
+  // (The delta review of #885, D3: a live note gated the card and refused Resume and Forfeit, so one tab whose page the phone killed
+  // without `pagehide` read its own dead page's note as another tab's: no card, and every solo start's Forfeit refused, for up to
+  // SOLO_ABANDON.liveMinutes. A Resume's claim makes a takeover safe; a Forfeit is an explicit loss.)
+  it("one tab, its page killed without pagehide (its live note left behind): the card is offered, and the start's Forfeit goes through", async () => {
+    const d = device(kept({ tab: "the-page-that-died", at: Date.now() - 10 * 60_000 }, 14));
+    // (Its last turn's note, 2 minutes ago: then the phone killed the page in the background, no pagehide.)
+    store.set("brc.soloLive", JSON.stringify({ game: GAME, at: Date.now() - 2 * 60_000 }));
     await loadAccount();
-    expect(account().soloKept).toBeNull();
+    expect(account().soloKept).toMatchObject({ game: GAME });
+    offerKeptSolo(null);
+    reofferKeptSolo();
+    expect(account().soloKept).toMatchObject({ game: GAME });
+    // (Play, a Solo raid or a tower floor: the question, and its Forfeit (GameInProgress.tsx onGo) is a loss, then the start goes on.)
+    const ask = askForfeitFirst("u");
+    const q = forfeitAsk()!;
+    expect(q.kept.game).toBe(GAME);
+    expect(await forfeitKeptSolo(q.kept)).toBeNull();
+    q.answer(true);
+    expect(await ask).toBe(true);
+    expect(d.held()).toBe(false);
+    expect(d.calls.filter((c) => c.startsWith("POST"))).toEqual([`POST /api/xp/solo/forfeit ${JSON.stringify({ game: GAME, real: FACTS })}`]);
   });
 
   it(`Forfeit past ${SOLO_ABANDON.minMoves} moves: a loss now (its facts sent, in case its mark never landed); under it, just dropped, nothing sent`, async () => {
@@ -552,24 +568,26 @@ describe("the card's answers and the load (step 2)", () => {
     await vi.waitFor(() => expect(d.calls).toContain(`POST /api/results ${JSON.stringify({ ...loss, resent: true })}`));
   });
 
-  it("two tabs: while another tab plays it (its live note), Resume and Forfeit are refused, and nothing is posted", async () => {
-    const d = device(kept());
+  it("two tabs: while another tab plays it (its live note), Resume claims it (that tab stops at its next keep) and Forfeit goes through", async () => {
+    const d = device(kept({ tab: "tab-a" }));
     await loadAccount();
     const card = account().soloKept!;
     store.set("brc.soloLive", JSON.stringify({ game: GAME, at: Date.now() - 60_000 }));
-    expect(takeKeptSolo(card)).toBe(KEPT_ELSEWHERE);
-    expect(await forfeitKeptSolo(card)).toBe(KEPT_ELSEWHERE);
-    expect(d.held()).toBe(true);
-    expect(d.calls.filter((c) => c.startsWith("POST"))).toEqual([]);
+    const k = takeKeptSolo(card);
+    expect(typeof k).toBe("object");
+    expect(loadKeptSolo()!.tab).not.toBe("tab-a");
+    expect(await forfeitKeptSolo(card)).toBeNull();
+    expect(d.held()).toBe(false);
+    expect(d.calls.filter((c) => c.startsWith("POST"))).toEqual([`POST /api/xp/solo/forfeit ${JSON.stringify({ game: GAME, real: FACTS })}`]);
     // (Gone or replaced since the card came: there's nothing of it to forfeit.)
-    store.delete("brc.soloLive");
+    d.calls.length = 0;
     store.set("brc.soloKept", JSON.stringify(kept({ game: "another-game-0123" })));
     expect(await forfeitKeptSolo(card)).toBe(KEPT_ENDED);
     expect(takeKeptSolo(card)).toBe(KEPT_ENDED);
     expect(d.calls.filter((c) => c.startsWith("POST"))).toEqual([]);
   });
 
-  it("a card on screen follows another tab (a storage event): its move number as played on there; taken off while it's played there", async () => {
+  it("a card on screen follows another tab (a storage event): its move number as played on there; taken off once it's forfeited there", async () => {
     const heard = new Map<string, (e: { key: string | null }) => void>();
     vi.stubGlobal("addEventListener", (t: string, f: (e: { key: string | null }) => void) => void heard.set(t, f));
     device(kept({}, 12));
@@ -578,12 +596,16 @@ describe("the card's answers and the load (step 2)", () => {
     store.set("brc.soloKept", JSON.stringify(kept({ tab: "tab-a" }, 14)));
     heard.get("storage")!({ key: "brc.soloKept" });
     expect(keptMoves(account().soloKept!)).toBe(14);
+    // (Its live note doesn't take the card off (D3): a Resume here would claim it.)
     store.set("brc.soloLive", JSON.stringify({ game: GAME, at: Date.now() }));
     heard.get("storage")!({ key: "brc.soloLive" });
+    expect(keptMoves(account().soloKept!)).toBe(14);
+    store.delete("brc.soloKept");
+    heard.get("storage")!({ key: "brc.soloKept" });
     expect(account().soloKept).toBeNull();
     // (No card on screen: nothing is offered by another tab's writes.)
-    store.delete("brc.soloLive");
-    heard.get("storage")!({ key: "brc.soloLive" });
+    store.set("brc.soloKept", JSON.stringify(kept({ tab: "tab-a" }, 15)));
+    heard.get("storage")!({ key: "brc.soloKept" });
     expect(account().soloKept).toBeNull();
   });
 
