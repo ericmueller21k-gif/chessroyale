@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SOLO_ABANDON } from "@chessroyale/core";
-import { test, bossAloneFromHome, pickMove, submitMove } from "./helpers.ts";
+import { test, bossAloneFromHome, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * XP and levels on the end screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't want it
@@ -338,9 +338,44 @@ async function playOwnMoves(page: Page, n: number) {
   expect(await ownSoFar(page)).toBe(n);
 }
 
+/** What a page has done since the test began: its loads (a reload, the app's own included), and its errors. */
+function pageLog(page: Page) {
+  const log = { loads: 0, errors: [] as string[] };
+  page.on("load", () => void log.loads++);
+  page.on("pageerror", (e) => void log.errors.push(e.message.slice(0, 160)));
+  page.on("console", (m) => void (m.type() === "error" && log.errors.push(m.text().slice(0, 160))));
+  return log;
+}
+/**
+ * Home → Boss Battle → START, and the battle's first turn. Failing within 30 s, never at the test's timeout, naming what the screen
+ * shows (the director, Nov 22: main's run waited 5 minutes on a START that never came, the page back on home): the address, the
+ * headings, any card or dialog on screen, the match's phase, and the page's loads and errors so far.
+ */
+async function bossAloneNow(page: Page, log: ReturnType<typeof pageLog>) {
+  const screen = () =>
+    page.evaluate(() => ({
+      at: location.pathname + location.search,
+      headings: [...document.querySelectorAll("h1, h2")].map((h) => h.textContent?.trim()).filter(Boolean),
+      cards: [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].filter((d) => (d as HTMLElement).checkVisibility?.() ?? true).map((d) => d.textContent?.trim().slice(0, 80)),
+      phase: (window as any).match?.phase?.kind ?? null,
+    }));
+  const fail = async (what: string) => {
+    throw new Error(`${what}: ${JSON.stringify({ ...(await screen()), loads: log.loads, errors: log.errors.slice(-5) })}`);
+  };
+  const ok = (l: import("@playwright/test").Locator) => l.waitFor({ timeout: 30_000 }).then(() => true, () => false);
+  if (!(await ok(page.getByRole("main").getByRole("button", { name: /^Boss Battle/ })))) await fail("Home's Boss Battle never came");
+  await openSoloBoss(page);
+  const start = page.getByRole("main").getByRole("button", { name: "START" });
+  if (!(await ok(start))) await fail("Boss Battle's START never came");
+  await start.click();
+  const turn = await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play").then(() => true, () => false);
+  if (!turn) await fail("The battle's first turn never came");
+}
+
 test(`a solo battle left mid-game: the reload's card, "You have a game in progress", Resume (the same board) or Forfeit (past ${SOLO_ABANDON.minMoves} of your moves a loss on your profile; under it, nothing) (Eric, Nov 22)`, { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(6 * 60_000);
   // (No test switch that makes a test game: those are never marked, nor kept.)
+  const log = pageLog(page);
   await page.goto("/?debug&boss=gingerbread");
   const marks: { game: string }[] = [];
   const forfeits: unknown[] = [];
@@ -357,7 +392,7 @@ test(`a solo battle left mid-game: the reload's card, "You have a game in progre
   const yourTurn = () => expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
   const position = () => page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }));
   // Under the mark: a reload shows the card; Forfeit records nothing, and the server was never told.
-  await bossAloneFromHome(page);
+  await bossAloneNow(page, log);
   await playOwnMoves(page, SOLO_ABANDON.minMoves - 1);
   await page.reload();
   await expect(card).toBeVisible({ timeout: 30_000 });
@@ -370,7 +405,7 @@ test(`a solo battle left mid-game: the reload's card, "You have a game in progre
   expect(forfeits).toEqual([]);
   expect(await recent()).toEqual([]);
   // Past the mark (12 moves): told once; a reload records nothing (the load names the game it keeps) and shows the card.
-  await bossAloneFromHome(page);
+  await bossAloneNow(page, log);
   await playOwnMoves(page, 12);
   await expect.poll(() => marks.length, { timeout: 10_000 }).toBe(1);
   expect(marks[0]).toMatchObject({ mode: "boss", players: 1, bossId: "gingerbread" });
@@ -395,8 +430,7 @@ test(`a solo battle left mid-game: the reload's card, "You have a game in progre
   expect((await recent())[0]).toMatchObject({ mode: "boss", online: false, won: false });
   expect(forfeits).toHaveLength(1);
   // Another game starts with no question (none kept): still one loss, never recorded again; every mark was that one game's.
-  await bossAloneFromHome(page);
-  await yourTurn();
+  await bossAloneNow(page, log);
   expect(await recent()).toHaveLength(1);
   expect(new Set(marks.map((m) => m.game)).size).toBe(1);
 });
