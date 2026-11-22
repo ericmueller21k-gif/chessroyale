@@ -166,6 +166,33 @@ describe("a solo game's result, known as it's decided (SOLO_ABANDON)", () => {
     m.dispose();
   }, 60_000);
 
+  it("Chandy's Dodge won (his second hit: the review of #881, N4): the page going during its kill plays its end out and ends the battle, the result known; a Dodge not over plays on", async () => {
+    const m = await toPlay();
+    const pm = m as unknown as { dodge: unknown; timer: ReturnType<typeof setTimeout> | null; dodgeStep(): void };
+    const boss = m.runner.state.boss!;
+    // (Dodge on screen, his kill under way on its own timer (armDodge: about 7.5 s), the battle over: stageComplete and dodgeOver as the
+    // runner has them once his second hit lands, stubbed; everything else real.)
+    const dodgeOn = (over: boolean) => {
+      pm.dodge = { key: "d-1", at: Date.now(), round: 2 };
+      Object.assign(boss, { powers: { ...boss.powers, chandy: { dodge: { rounds: [{}, {}, {}], results: over ? [{}, {}, {}] : [{}] } } } });
+      if (pm.timer) clearTimeout(pm.timer);
+      pm.timer = setTimeout(() => pm.dodgeStep(), 7_500);
+    };
+    const complete = vi.spyOn(m.runner, "stageComplete").mockReturnValue(true);
+    // Not over (a round still to close): the page going closes nothing early.
+    dodgeOn(false);
+    m.endOnHide();
+    expect(pm.dodge).not.toBeNull();
+    expect(m.decided).toBeNull();
+    // Over: its end now, the battle ended, its result known before the page goes.
+    dodgeOn(true);
+    m.endOnHide();
+    expect(pm.dodge).toBeNull();
+    expect(m.decided).toMatchObject({ kind: "results" });
+    complete.mockRestore();
+    m.dispose();
+  }, 60_000);
+
   it("Classic, out at a cut: your place is your result from the cut screen on (a page closed on \"You're out\" keeps it), the same the result screen then shows", async () => {
     // (One move a stage; you never pick, so your miss sinks you to the first cut.)
     const m = new SoloMatch([quick], "Ann", { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, stageRounds: [] } as Settings);
