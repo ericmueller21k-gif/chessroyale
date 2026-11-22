@@ -225,9 +225,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **Three review rounds, one cause** (Nov 22, #885, [story](../docs/history/lessons.md#three-review-rounds-one-cause-nov-22-2026)):
   - A kept battle never shows what it hasn't kept. It keeps in the one place its updates reach the screen (`SoloMatch.show`: `set`
     and `emit`), before they do, and at each beat a timed moment shows by the clock alone (`moment().reveals`), a little ahead of it.
+    Those beats are written once, beside the power's timeline, from the times its screen draws by (`dodgeTimeline().beats`,
+    `rushBeats`, `lightsOutTimeline().beats`): `moment()` and the walk read that list, never a copy (Nov 22, F1: the Rush's sweep
+    was its screen's own times, in no list, and a copied list missed it). A sweep's or a drop's beats include its end.
     Never a keep at the power a review named: the next power is the next finding.
-  - A new timed power (one whose screen changes with its clock, nobody's turn running) adds itself to `SoloMatch.moment()`: when it
-    began, your inputs in it, its reveals; and a rejoin carries it on from `KeptGame.moment`, never starting it again.
+  - A new timed power (one whose screen changes with its clock, nobody's turn running) exports its beats beside its timeline and adds
+    itself to `SoloMatch.moment()`: when it began, your inputs in it, those beats; and a rejoin carries it on from `KeptGame.moment`,
+    never starting it again.
   - When reviews keep finding the same kind of bug in new places, stop patching places: name the rule they all break, put it where
     every path passes, and walk every path in one test against it (`solo-resume.test.ts`, "keep before show").
 
