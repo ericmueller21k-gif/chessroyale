@@ -9,9 +9,11 @@ import { SOLO_ABANDON } from "@chessroyale/core";
 
 const calls: string[] = [];
 let resultDone: () => void = () => undefined;
+/** The server's answers to the next marks: true answered (a refusal too), false to send again (account.ts markSoloGameReal). */
+const markAnswers: (boolean | Promise<boolean>)[] = [];
 vi.mock("../src/account.ts", () => ({
   startSoloGame: async () => (calls.push("start"), `game${calls.filter((c) => c === "start").length}`),
-  markSoloGameReal: async (game: string, facts: { mode: string }) => void calls.push(`real ${game} ${facts.mode}`),
+  markSoloGameReal: async (game: string, facts: { mode: string }) => (calls.push(`real ${game} ${facts.mode}`), markAnswers.shift() ?? true),
   keepSoloLive: (game: string) => void calls.push(`live ${game}`),
   endSoloLive: (game: string) => void calls.push(`end ${game}`),
   onlineGameXp: async () => null,
@@ -71,6 +73,41 @@ describe("a solo game's SOLO_ABANDON.minMoves-th own move", () => {
     await settle();
     expect(calls).toEqual(["start", "live game1", "real game1 boss", "live game1", "live game1", "end game1"]);
     expect(g.listeners.size).toBe(0);
+  });
+
+  it("a mark the server didn't answer (offline, a server error) is sent again at each later turn, one at a time, until it's answered", async () => {
+    calls.length = 0;
+    markAnswers.push(false, false);
+    const g = game();
+    noteSoloGame(g, g.watch);
+    await soloGameId(g);
+    for (let i = 0; i < SOLO_ABANDON.minMoves; i++) g.turn("e4");
+    await settle();
+    expect(calls.filter((c) => c.startsWith("real"))).toHaveLength(1);
+    g.turn("e4");
+    await settle();
+    expect(calls.filter((c) => c.startsWith("real"))).toHaveLength(2);
+    // (Answered at the third: no more.)
+    g.turn(null);
+    g.turn("e4");
+    g.turn("e4");
+    await settle();
+    expect(calls.filter((c) => c.startsWith("real"))).toEqual(["real game1 boss", "real game1 boss", "real game1 boss"]);
+    // (Turns while one is on its way: still one mark at a time; sent again at the turn after it failed.)
+    calls.length = 0;
+    let fail: (ok: boolean) => void = () => undefined;
+    markAnswers.push(new Promise<boolean>((r) => (fail = r)));
+    const slow = game();
+    noteSoloGame(slow, slow.watch);
+    await soloGameId(slow);
+    for (let i = 0; i < SOLO_ABANDON.minMoves + 2; i++) slow.turn("e4");
+    await settle();
+    expect(calls.filter((c) => c.startsWith("real"))).toEqual(["real game1 boss"]);
+    fail(false);
+    await settle();
+    slow.turn("e4");
+    await settle();
+    expect(calls.filter((c) => c.startsWith("real"))).toEqual(["real game1 boss", "real game1 boss"]);
   });
 
   it("under minMoves: nothing; a game not watched (a tower floor, a test game) never tells the server", async () => {

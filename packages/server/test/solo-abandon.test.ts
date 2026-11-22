@@ -163,6 +163,86 @@ describe("a solo game left after SOLO_ABANDON.minMoves", () => {
     ]);
   });
 
+  it("the review's case: a finished game's result kept on the device is never recorded as left (load, stale reads); sent again, it's the win", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    // Won at move 25; the post never got there (the page was closed mid-post). The next load names the kept game and doesn't settle.
+    const g = await w.start(ann);
+    at(T0 + 3 * MIN);
+    await w.real(ann, g);
+    at(T0 + 20 * MIN);
+    expect((await w.call(`/api/me?unsent=${g}`, ann.cookie)).body).toMatchObject({ stats: { all: { matches: 0 } } });
+    // (Back a day later: a read naming it is no stale read for it.)
+    at(T0 + (SOLO_ABANDON.staleHours + 2) * 60 * MIN);
+    await w.call(`/api/me?unsent=${g}`, ann.cookie);
+    expect(await losses(w.sql, ann.id)).toEqual([]);
+    // Sent again: the win, with no time XP (N2); then nothing more is recorded for it, by a load or a late copy.
+    expect((await w.result(ann, g, { resent: true })).body).toEqual({ ok: true, xp: expect.objectContaining({ before: 0, after: 0, parts: [] }) });
+    await w.call("/api/me?settle=1", ann.cookie);
+    await w.result(ann, g);
+    expect(await w.rows(ann.id)).toEqual([
+      { mode: "boss", online: 0, placement: 1, players: 1, team: null, team_won: 1, boss_id: null, boss_elo: null, abandoned: null, played_at: T0 + (SOLO_ABANDON.staleHours + 2) * 60 * MIN, play_ms: 0, moves: 25, xp_none: null, solo_game: g },
+    ]);
+    // (A read that doesn't name it, once stale, records it: `unsent` spares only the game it names.)
+    const h = await w.start(ann);
+    await w.real(ann, h);
+    at(T0 + (2 * SOLO_ABANDON.staleHours + 3) * 60 * MIN);
+    await w.call(`/api/me?unsent=${g}`, ann.cookie);
+    expect(await losses(w.sql, ann.id)).toEqual([{ solo_game: h }]);
+  });
+
+  it("a start naming a kept game (`unsent`) replaces it with no loss; its result then records the win; a bad name spares nothing", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    const a = await w.start(ann);
+    await w.real(ann, a);
+    const b = await w.start(ann, { unsent: a });
+    expect(await losses(w.sql, ann.id)).toEqual([]);
+    expect(await w.sql.first("SELECT id, real_at FROM solo_games WHERE user_id = ?", ann.id)).toEqual({ id: b, real_at: null });
+    at(T0 + 40 * MIN);
+    expect((await w.result(ann, a, { resent: true })).body).toEqual({ ok: true, xp: null });
+    expect((await w.rows(ann.id)).map((r) => [r.solo_game, r.abandoned, r.team_won])).toEqual([[a, null, 1]]);
+    await w.real(ann, b);
+    await w.start(ann, { unsent: "not a game" });
+    expect(await losses(w.sql, ann.id)).toEqual([{ solo_game: b }]);
+  });
+
+  it("a re-sent result (`resent`) earns no time XP, and so no win XP nor the daily reward, however long after its start (N2)", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    const bob = await w.player("bob@example.com");
+    const a = await w.start(ann);
+    const b = await w.start(bob);
+    // (Played two minutes in airplane mode; sent hours later.)
+    at(T0 + 3 * 60 * MIN);
+    const resent = (await w.result(ann, a, { resent: true })).body.xp as { after: number; parts: unknown[] };
+    const sent = (await w.result(bob, b)).body.xp as { after: number; parts: { label: string }[] };
+    expect(resent).toMatchObject({ after: 0, parts: [] });
+    expect(sent.after).toBeGreaterThan(0);
+    expect(sent.parts.map((p) => p.label)).toContain("Win");
+    expect(await w.sql.first("SELECT COUNT(*) AS n FROM ledger WHERE account IN (SELECT account FROM wallets WHERE user_id = ?)", ann.id)).toEqual({ n: 0 });
+  });
+
+  it("a guest joining an account: the guest's real game is recorded as left and moves with its results; an unmarked one goes (N4)", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    const join = async (start: (g: { id: string; cookie: string }) => Promise<string | null>) => {
+      const guest = await w.player(null);
+      const game = await start(guest);
+      await signInWithIdentity(w.sql, (await getUser(w.sql, guest.id))!, "email", "ann@example.com", {}, Date.now());
+      expect(await w.sql.first("SELECT (SELECT COUNT(*) FROM solo_games WHERE user_id = ?) + (SELECT COUNT(*) FROM results WHERE user_id = ?) AS n", guest.id, guest.id)).toEqual({ n: 0 });
+      return game;
+    };
+    const left = await join(async (g) => {
+      const id = await w.start(g);
+      await w.real(g, id);
+      return id;
+    });
+    expect(await losses(w.sql, ann.id)).toEqual([{ solo_game: left }]);
+    await join((g) => w.start(g));
+    expect(await w.rows(ann.id)).toHaveLength(1);
+  });
+
   it("a result racing the loss: whichever takes the game first is recorded, the other writes nothing", async () => {
     const w = await world();
     const ann = await w.player("ann@example.com");

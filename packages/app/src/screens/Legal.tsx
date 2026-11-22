@@ -396,7 +396,8 @@ function Privacy() {
         </li>
         <li>
           <strong>Local storage</strong> keeps your settings and choices on this device: theme, sound, eval bar, chat on or off,
-          players you muted, your boss picks, the match you're in, so you can rejoin it, an "under {AGE_GATE.minAge}" answer, and
+          players you muted, your boss picks, the match you're in, so you can rejoin it, the solo game you're playing and its result until
+          our server has it, an "under {AGE_GATE.minAge}" answer, and
           that a banned account was used here.
         </li>
         <li>
