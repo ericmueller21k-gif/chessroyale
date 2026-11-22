@@ -94,6 +94,8 @@ test("a level-up: its card (\"Level 2!\", a Winter Crate and a key, beside the d
   await expect(layer.getByRole("tab", { name: "Crates" })).toHaveAttribute("aria-selected", "true");
   expect(page.url()).toBe(at);
   const crates = layer.locator(".crates");
+  await expect(crates).toBeVisible();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/levelup-inventory-layer-${testInfo.project.name}.png` });
   await expect(crates.getByText("Keys × 1")).toBeVisible();
   await expect(crates.getByText("Crates × 2")).toBeVisible();
   const winter = crates.locator('.series-crate-row[data-crate="winter-1"]');

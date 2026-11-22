@@ -8094,17 +8094,24 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   font-size: 13px;
   color: #c7d2fe;
 }
-/* Your inventory as a layer (components/InventoryLayer.tsx, Nov 22): the shop screen's own tabs over whatever you're on, the whole
-   window but a maintenance banner, scrolling inside itself (nothing under it scrolls), above the screens' sheets and the reward card. */
+/* Your inventory as a layer (components/InventoryLayer.tsx, Nov 22): the shop page itself, in its own frame, over whatever you're on:
+   the whole window but a maintenance banner (where the page starts too), opaque, scrolling inside itself (nothing under it scrolls),
+   above the screens' sheets and the reward card. On a computer its column is the page's: the frame's middle one, the sides empty. */
 .inv-layer {
   position: fixed;
   inset: var(--banner-h, 0px) 0 0 0;
   z-index: 85;
-  display: flex;
-  justify-content: center;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--bg);
+  background: var(--fd-bg);
+}
+.inv-layer > .fd-root {
+  min-height: 100%;
+}
+@media (min-width: 1024px) {
+  .inv-layer > .fd-root.framed > .fd-center {
+    grid-column: 2;
+  }
 }
 .crate-row-held {
   font-size: 12px;

@@ -5,7 +5,8 @@ import { play } from "../sound.ts";
 
 /**
  * Your inventory as a layer (Nov 22; Eric: "How do we make it so people don't have to like leave the town if they want to go to their
- * inventory?"): the shop screen's own Crates, Locker and Shop tabs (`ShopScreen`, not a copy) over whatever you're on, so nothing
+ * inventory?"): the shop screen's own Crates, Locker and Shop tabs (`ShopScreen`, not a copy) in the shop page's own frame (Eric: "it
+ * should still look the same, like when you go to your inventory from the main menu"), opaque, over whatever you're on, so nothing
  * underneath unmounts: a Battle Tower run, a party, the town stay as they were. Its Back, Escape and the phone's back gesture close it
  * (one step pushed in the history; back takes it, the page never navigates). Nothing under it hears a key or a tap. Its opener owns
  * it: when the screen underneath moves on (a party's floor, a match starting), the layer goes with it and you go along.
@@ -70,7 +71,13 @@ export function InventoryLayer({ onClose, initial = "crates" }: { onClose: () =>
   }, []);
   return createPortal(
     <div ref={root} class="inv-layer" role="dialog" aria-modal="true" aria-label="Inventory" data-testid="inventory-layer">
-      <ShopScreen initial={initial} onBack={() => closeRef.current()} />
+      {/* (The shop page's own frame (App.tsx's FrontFrame page="shop"), so it looks the same as from the main menu (Eric, Nov 22: "I
+          don't want it to look like it's just some pop-up"): its font, colors and column. No side menu: its links would leave.) */}
+      <div class="fd-root framed fd-on-shop">
+        <main class="fd-center">
+          <ShopScreen initial={initial} onBack={() => closeRef.current()} />
+        </main>
+      </div>
     </div>,
     document.body,
   );

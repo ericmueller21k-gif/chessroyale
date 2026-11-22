@@ -17,7 +17,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
   at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
 - **The inventory layer** (Nov 22; [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md); `components/InventoryLayer.tsx`):
-  the same `ShopScreen` (opened on Crates) over whatever screen you're on, from the end screen's reward card ("Go to inventory"), so
+  the same `ShopScreen` (opened on Crates) in the shop page's own frame (it looks the same as from the main menu; on a computer the
+  same middle column, without the side menu and chat rail, whose links would leave), opaque, over whatever screen you're on, from the end screen's reward card ("Go to inventory"), so
   you stay in a Battle Tower run or a party. Opening crates and equipping work in it as on the page. Back, Escape or the phone's back
   gesture close it (one history step of its own: App.tsx's popstate asks `inventoryTakesPop` first); no key reaches the screen under
   it (a capture-phase guard), and the pop-ups inside it (the delete dialog, the gambling warning, the shop's note) take their own Escape

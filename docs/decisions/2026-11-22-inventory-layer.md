@@ -15,7 +15,12 @@ so nothing underneath unmounts: you stay in the tower run, the party, the town. 
   reveal, the crate and key at 96 px with their counts, the lines, "Already in your inventory.", then **OK** (Escape, a tap outside)
   and **Go to inventory**. It waits for you (it was a toast that took no taps and went by itself).
 - **The layer** (`components/InventoryLayer.tsx`): the shop screen itself (`ShopScreen initial="crates"`, not a copy), full window, in a
-  portal on the body. Calls made:
+  portal on the body. **It looks the same as the inventory page from the main menu** (Eric, Nov 22, via the director: "it should still
+  look the same ... even if it's just like a lay laid over the top ... I don't want it to look like it's just some pop-up"): it sits in
+  the page's own frame (`fd-root framed fd-on-shop` → `fd-center`: the front door's font, colors and column), opaque, no dimmed back,
+  no card or shadow. Calls made:
+  - **On a computer** its column is the page's (the frame's middle column, same place and width), but the side menu and the chat rail
+    aren't drawn: their links would take you out of the run or party the layer exists to keep. The sides are the page's background.
   - **Back:** its Back button, Escape and the phone's back gesture close it. It pushes one history step (carrying the step under it, so
     the town's `townStep` still reads); a pop closes it, a close by button goes back over its own step, and App.tsx's one popstate
     listener asks `inventoryTakesPop()` first so the town's "leave town?" never sees those pops. The page never navigates.
