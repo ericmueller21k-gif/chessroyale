@@ -589,7 +589,7 @@ never answered), heard the second go again and said: "Yes let's add that one".
 - Same day he asked for the runaway train (`song_aj.py`, version 4) again: sent, still no boss named.
 - Left without a theme: Smudgy, and the nine placeholder bosses.
 
-## Smudgy's theme (Nov 22): song AO, first go sent, no verdict yet
+## Smudgy's theme (Nov 22): song AO; second go sent ("It's almost there")
 
 Eric: "think like paint, paint strokes, and like paint splattering, maybe. Bit more like a whimsical, but somehow it
 needs to have like a vibe of like a calmness, but still somehow be, fast pace ... 170 or like 175 BPM. Maybe starts out
@@ -618,3 +618,23 @@ avoided or said I don't like, so try to not use any of those." No plan this time
   Chandy's and Babur's up to 4 kHz and 1 to 2.5 dB darker above (meant: calm). -16.0 LUFS, peak -1.6 dBFS.
 - Can't judge by ear, flagged to him: whether the violin reads as a violin and not a thin synth up high (bars 17 on);
   whether the brush on the 8ths reads as a brush or as hiss; whether the splats are funny or in the way.
+
+**Second go (Nov 22).** Eric on the first: "It's almost there." Liked: the calm's music box ("that nice little musical
+box thing ... or that little sparkly sound, that's really good"). Asked:
+- "cut out the brushes going back and forth" in the calm, and "make them just a bit quieter, even for the whole
+  song ... that like the repetitive brushstroke back and forth": none in the calm now; the brush's bus 3.3 dB down
+  everywhere (-39.3 dB RMS in the main parts, from -36).
+- the calm "like 15 seconds longer": twelve bars more (16.7 s; twenty bars, 27.8 s), so the song is 2:46.5.
+- a solo for the music box: "two of those ... musical box sounds ... the equivalent of ... playing on a piano, like two
+  fingers next to each other as far as the notes go ... keep the piano piece ... playing with it, but then make it ...
+  a longer, more original solo ... throw in a little sharp note ... change up the timing ... a little slow, fast, add
+  a couple, like big chords to it too, or like one or two chords."
+  - The soft piano's hidden tune plays twice under it, as it was. The first four bars are as they were.
+  - Sixteen bars of solo in pairs of notes; slow bars, then 8ths and a triplet; an E natural (bar 52) and an F sharp
+    (bar 60) from outside the key; two big chords (bars 57 and 59: four notes rolled on the box, the soft piano's
+    widest chord, the strings swelling: those bars 3 dB over their neighbors).
+  - **"Two fingers next to each other" read two ways, both sent.** In the song: notes a step apart (his words, taken
+    as said: whole steps only, which sit in every chord there). As a clip: the same solo with the lower note a third
+    under (how he played his own two-note hits for Folio). `python3 song_ao.py out.wav thirds` builds that one.
+- Measured: in the calm the box and the soft piano are level (-24 dB RMS each; the box sits higher, so it leads); the
+  calm 3 dB under the main parts. -16.0 LUFS, peak -2.1 dBFS.

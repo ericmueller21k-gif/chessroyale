@@ -25,20 +25,32 @@ The slow middle is his Camouflage: the tune hides, at half speed, in a soft pian
                 music box, drips; the violin, low and slow; the last two bars run up to 172
   bars   9-24   first coat, in D: the tune on the violin, low, then (bar 17) an octave up; the kit's two-step
   bars  25-40   second coat, in F: the piano has the tune, the violin long notes under it; then they trade two bars each
-  bars  41-48   camouflage, in A flat: no kit; the tune at half speed on the soft piano over one bass note
-  bars  49-56   his little waltz: a motif three beats long against the bar's four, on the piano; the violin's long pulls
-  bars  57-64   the rush: the waltz climbing by whole steps, 172 up to 226, the splats coming faster
-  bars  65-72   splatter (226), in B: three colors a major third apart; the violin and the piano trade two bars each
-  bars  73-80   the tune at 226, both of them, on the way home
-  bars  81-82   one big splash; everything stops; the paint runs down
-  bars  83-98   the finished picture, in D (172): the tune on two violins and the piano
-  bars  99-106  the tag: the last stroke; the brush slows to the canvas's pulse, which is bar 1's
+  bars  41-60   camouflage, in A flat: no kit and no brush; the tune at half speed on the soft piano, twice; from
+                bar 45 the music box's solo over it, two notes at a time; two big chords (bars 57 and 59)
+  bars  61-68   his little waltz: a motif three beats long against the bar's four, on the piano; the violin's long pulls
+  bars  69-76   the rush: the waltz climbing by whole steps, 172 up to 226, the splats coming faster
+  bars  77-84   splatter (226), in B: three colors a major third apart; the violin and the piano trade two bars each
+  bars  85-92   the tune at 226, both of them, on the way home
+  bars  93-94   one big splash; everything stops; the paint runs down
+  bars  95-110  the finished picture, in D (172): the tune on two violins and the piano
+  bars 111-118  the tag: the last stroke; the brush slows to the canvas's pulse, which is bar 1's
+
+The second go (Eric, Nov 22, of the first: "It's almost there"): the calm is twelve bars longer (17 s) and has no
+brush in it ("we want to cut out the brushes going back and forth"); the brush is quieter everywhere ("just a bit
+quieter, even for the whole song"); and the music box he liked there has a solo: "two of those ... musical box sounds
+... the equivalent of ... playing on a piano, like two fingers next to each other as far as the notes go ... keep the
+piano piece ... playing with it, but then make it ... a longer, more original solo ... throw in a little sharp note
+... change up the timing ... a little slow, fast, add a couple, like big chords to it too, or like one or two chords."
+So: pairs of notes a step apart (`pairs="thirds"` sets them a third apart, to hear the other reading of his words),
+slow bars and quick ones, an E natural and an F sharp that don't belong to the key, and two chords of four notes
+rolled on the box with the soft piano's widest chord and the strings swelling under them.
 
 Every melody, riff and chord progression here is original: none of it is any song's or any game's. Kept off, from
 SOUNDS.md's list: brass, flute and ocarina, accordion and sawtooth leads, a thumb piano, a plain marimba or xylophone
 as the lead, low plucks that buzz, chimes left ringing, runs up and down a scale, a tune of 8ths on the grid.
 """
 import sys
+from fractions import Fraction
 from types import SimpleNamespace
 
 import numpy as np
@@ -46,17 +58,18 @@ import numpy as np
 from song_r import beats, notes
 from synth import Ride, n, write_wav
 
-BARS = 106
+CALM, WALTZ, RUSH, FAST, LAND, HOME, TAG_AT = 41, 61, 69, 77, 93, 95, 111  # the bar each part starts at
+BARS = 118
 BEATS = 4 * BARS
-TAPE = 150.0  # (the tempos below are scaled a hair, about 0.4%, so the tape is this long: quick transforms)
+TAPE = 166.5  # (the tempos below are scaled a hair, about 0.5%, so the tape is this long: quick transforms)
 bar0 = lambda bar: 4 * (bar - 1)  # the beat a bar (from 1) starts at
 RIDE = [
     (bar0(1), bar0(7), 86, 86, 1.0, 1.0, 0.0),  # the blank canvas
     (bar0(7), bar0(9), 86, 172, 1.0, 1.0, 0.0),  # loading the brush
-    (bar0(9), bar0(57), 172, 172, 1.0, 1.0, 0.0),
-    (bar0(57), bar0(65), 172, 226, 1.0, 1.0, 0.0),  # the rush
-    (bar0(65), bar0(81), 226, 226, 1.0, 1.0, 0.0),  # splatter
-    (bar0(81), BEATS, 172, 172, 1.0, 1.0, 0.0),  # back at once: a landing, not a slowing
+    (bar0(9), bar0(RUSH), 172, 172, 1.0, 1.0, 0.0),
+    (bar0(RUSH), bar0(FAST), 172, 226, 1.0, 1.0, 0.0),  # the rush
+    (bar0(FAST), bar0(LAND), 226, 226, 1.0, 1.0, 0.0),  # splatter
+    (bar0(LAND), BEATS, 172, 172, 1.0, 1.0, 0.0),  # back at once: a landing, not a slowing
 ]
 
 PC = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
@@ -95,7 +108,8 @@ CHORDS = (
     blend("D", "home")
     + blend("D", "home") + blend("D", "away")
     + blend("F", "home") + blend("F", "away")
-    + named("Ab:M Ab:L Ab:M Ab:L F:m/Ab Ab:L Db:M/Ab Eb:s/Ab", "Ab") + blend("Ab", "away")
+    + named("Ab:M Ab:L Ab:M Ab:L F:m/Ab Ab:L Db:M/Ab Eb:s/Ab  Ab:M Ab:L Ab:M Ab:L F:m Ab:L Db:M Eb:s  F:m Db:M Ab:M Eb:s7", "Ab")
+    + blend("Ab", "away")
     + named("B:T C#:T Eb:T F:T G:T A:T B:T F#:s7")
     + named("B:T B:T G:T G:T Eb:T Eb:T B:T F#:s7") + blend("B", "away")
     + named("D:M D:M", "D")
@@ -138,14 +152,43 @@ F1_PIANO = (
     "-:4 | -:4 | B4:1 -:1/2 D5:1/2 B4:1/3 A4:1/3 G4:1/3 E4:1 | D4:1.5 G4:1/2 A4:1 B4:1 | -:4 | -:4 | "
     "F#4:1/2 B4:1/2 D#5:1 F#5:2 | E5:1 C#5:1 A#4:1 F#4:1"
 )
+# The music box's solo (bars 45 to 60): two notes at a time, a step apart (two fingers side by side). Slow bars, then
+# quick ones; an E natural (bar 52) and an F sharp (bar 60) from outside the key; bars 57 and 59 are the big chords.
+SOLO = (
+    "Eb6+F6:2 -:1 Bb5+C6:1 | C6+D6:3 -:1 | Eb6+F6:1 F6+G6:1 Ab6+Bb6:2 | Eb6+F6:1.5 Db6+Eb6:1/2 Bb5+C6:2 | "
+    "Bb5+C6:1/2 Bb5+C6:1/2 Eb6+F6:1 -:1/2 Bb5+C6:1/2 Eb6+F6:1/2 F6+G6:1/2 | C6+D6:2 -:1 C6+D6:1/3 Eb6+F6:1/3 F6+G6:1/3 | "
+    "Ab6+Bb6:1.5 F6+G6:1/2 Eb6+F6:1 Bb5+C6:1 | C6+D6:1 -:1/2 E6:1/2 F6+G6:2 | "
+    "Eb6+F6:2.5 -:1/2 F6+G6:1 | Bb6+C7:2 Ab6+Bb6:1 F6+G6:1 | Eb6+F6:1/2 Db6+Eb6:1/2 Eb6+F6:1/2 Ab6+Bb6:1/2 F6+G6:2 | Eb6+F6:1 Bb5+C6:1 Ab5+Bb5:2 | "
+    "-:3 Eb6+F6:1 | F6+G6:1/2 Eb6+F6:1/2 Ab6+Bb6:1/2 F6+G6:1/2 Bb6+C7:1 Ab6+Bb6:1 | -:4 | Ab6+Bb6:1 Eb6+F6:1 F#6:1/2 G6:1/2 -:1"
+)
+BIG = ((CALM + 16, "Ab5 C6 Eb6 G6"), (CALM + 18, "C6 Eb6 G6 Bb6"))  # the box's two big chords, rolled upward
 FAST_END = "E5:1 A5:1 B5:1 D6:1/3 E6:1/3 G6:1/3"  # the last bar before the splash: up the chord that leads home
 TAG = "F#5:3 A5:1/3 F#5:1/3 E5:1/3 | D5:3 -:1 | B5:2 A5:2 | G5:2 E5:2 | F#5:8 | -:8"
 for _line, _beats in ((TUNE_A, 32), (TUNE_A2, 32), (TUNE_A3, 32), (HARM_A, 32), (COUNTER, 32), (INTRO, 24), (HIDDEN, 32), (PULLS, 32),
-                      (F1_VIOLIN, 32), (F1_PIANO, 32), (FAST_END, 4), (TAG, 32)):
+                      (F1_VIOLIN, 32), (F1_PIANO, 32), (FAST_END, 4), (TAG, 32), (SOLO, 64)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(window=None) -> np.ndarray:
+def pairs_of(start, text):
+    """'Eb6+F6:2 -:1 E6:.5' -> [(beat, beats, [midi, ...])]: notes struck together are joined by '+'."""
+    out, t = [], Fraction(start)
+    for tok in text.replace("|", " ").split():
+        name, d = tok.split(":")
+        if name != "-":
+            out.append((float(t), float(Fraction(d)), [n(one) for one in name.split("+")]))
+        t += Fraction(d)
+    return out
+
+
+def under(m, scale, steps):
+    """The note `steps` notes of the scale (a set of 0 to 11) below `m`."""
+    while steps:
+        m -= 1
+        steps -= m % 12 in scale
+    return m
+
+
+def render(window=None, pairs="steps") -> np.ndarray:
     x = Ride(RIDE, BEATS, None, os=2, seed=211, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -185,9 +228,9 @@ def render(window=None) -> np.ndarray:
             kind = "s" if beat < 2 else "7"
         pad, tones = KIND[kind]
         still = fold((key if key is not None else root) + 7, 76)
-        deep = 36 if 65 <= bar <= 72 else 40
-        climb = 57 <= bar <= 63  # the rush: the bass a whole step up each bar, and the waltz with it
-        bass = 35 + 2 * (bar - 57) if climb else fold(root if low is None else low, deep)
+        deep = 36 if FAST <= bar <= FAST + 7 else 40
+        climb = RUSH <= bar <= RUSH + 6  # the rush: the bass a whole step up each bar, and the waltz with it
+        bass = 35 + 2 * (bar - RUSH) if climb else fold(root if low is None else low, deep)
         return SimpleNamespace(
             bass=bass, turn=turn,
             pad=sorted(fold(root + i, 57) for i in pad),
@@ -390,15 +433,26 @@ def render(window=None) -> np.ndarray:
     def felt(b, m, vol=0.1, pan=0.0, late=0.0):
         put("felt", b, x.struck("felt", m) * vol, pan, late=late)
 
-    def roll(bar, vol=0.07, off=0.0):
-        """The soft piano's chord, rolled from the bottom."""
+    def roll(bar, vol=0.07, off=0.0, wide=False):
+        """The soft piano's chord, rolled from the bottom. `wide`: a big one, both hands: the bass under it and the
+        chord again an octave up."""
         c = chord(bar, off)
         for j, m in enumerate([c.bass + 12] + c.pad):
             felt(bar0(bar) + off, m, vol * (1.0 if j else 1.2), (-0.3, -0.15, 0.0, 0.15, 0.3)[j], late=0.055 * j)
+        if wide:
+            felt(bar0(bar) + off, c.bass, vol * 1.1, -0.2)
+            for j, m in enumerate(c.pad):
+                felt(bar0(bar) + off, m + 12, vol * 0.6, (-0.2, 0.0, 0.2, 0.35)[j], late=0.055 * (5 + j))
 
-    def box(b, m, vol=0.035, pan=0.3):
+    def box(b, m, vol=0.035, pan=0.3, late=0.0):
         k = int(1.4 * sr)
-        put("box", b, x.struck("box", m)[:k] * tail(k, 0.2) * vol, pan)
+        put("box", b, x.struck("box", m)[:k] * tail(k, 0.2) * vol, pan, late=late)
+
+    def chime(b, ms, vol=0.05, pan=0.0, roll_s=0.0):
+        """The music box's solo voice: one note, two together, or a chord rolled upward; the top one sings."""
+        for j, m in enumerate(ms):
+            side = pan if len(ms) == 1 else pan - 0.14 + 0.28 * j / (len(ms) - 1)
+            box(b, m, vol * (1.0 if j == len(ms) - 1 else 0.82), side, late=roll_s * j)
 
     def twinkle(bar, vol=1.0, spots=((1.5, 4, 0.3), (3.0, 2, -0.3))):
         """The music box: two high notes a bar."""
@@ -572,74 +626,91 @@ def render(window=None) -> np.ndarray:
     fill(32, 0.8, start=3.0), fill(40)
     swipe(bar0(41) - 2, 2.0, 0.06)
 
-    # Bars 41-48: camouflage, in A flat. The kit is gone; one bass note under everything; slow strings on chords with
-    # the raised fourth; the brush on the beats, as in bar 1; the drips at half speed. The tune hides in the soft piano
-    # at half speed. A music box; his drip, a dab, and once, a giggle.
-    splat(bar0(41), 0.12, -0.3)
-    for bar in range(41, 49):
+    # Bars 41-60: camouflage, in A flat. The kit is gone and so is the brush; one bass note under everything for twelve
+    # bars, then the bass moves; slow strings on chords with the raised fourth; the drips at half speed. The tune hides
+    # in the soft piano at half speed, twice. Four bars as they were (a music box's few notes); then the music box's
+    # solo, two notes at a time; a big chord (F minor, bar 57), a quick answer, a bigger one (A flat, bar 59), and a
+    # last word with a note that doesn't belong. His drip, a dab, and once, a giggle.
+    splat(bar0(CALM), 0.12, -0.3)
+    for bar in range(CALM, WALTZ):
         b = bar0(bar)
-        roll(bar, 0.05)
-        strings(bar, 0.04, slow=True)
-        bass(b, chord(bar).bass, 3.7, 0.24)
-        for i in range(4):
-            swish(b + i, 0.26, 0.024 * (1.0 if i % 2 == 0 else 0.75), 0.5 if i % 2 else -0.5)
-        drips(bar, 0.7, keep=2)
-        twinkle(bar, 0.8, spots=((2.5, 4, 0.3),) if bar % 2 else ((1.5, 2, -0.3), (3.5, 3, 0.3)))
-    for b, d, m in notes(bar0(41), HIDDEN):
-        felt(b, m, 0.17, 0.05), felt(b, m + 12, 0.06, -0.1)
-    drip(bar0(42) + 3, 0.06, 0.4), dab(bar0(44) + 2.5, 0.05), drip(bar0(46) + 1.5, 0.055, -0.4), giggle(bar0(47) + 3, 0.03)
+        loud = bar in (CALM + 16, CALM + 18)
+        roll(bar, 0.1 if loud else 0.05, wide=loud)
+        if chord(bar).turn:
+            roll(bar, 0.05, off=2.0)
+        strings(bar, 0.056 if loud else 0.04, slow=True)
+        bass(b, chord(bar).bass, 3.7, 0.3 if loud else 0.24)
+        drips(bar, 0.7 if bar < CALM + 4 else 0.5, keep=2)
+        if bar < CALM + 4:
+            twinkle(bar, 0.8, spots=((2.5, 4, 0.3),) if bar % 2 else ((1.5, 2, -0.3), (3.5, 3, 0.3)))
+    for start, vol in ((CALM, 1.0), (CALM + 8, 0.8)):
+        for b, d, m in notes(bar0(start), HIDDEN):
+            felt(b, m, 0.17 * vol, 0.05), felt(b, m + 12, 0.06 * vol, -0.1)
+    for i, (b, d, ms) in enumerate(pairs_of(bar0(CALM + 4), SOLO)):
+        if pairs == "thirds" and len(ms) == 2:
+            # The other reading: the lower note a third under the upper (a fourth where a third would be the note a
+            # hanging chord is waiting for).
+            root, kind, _, _ = CHORDS[int(b // 4)]
+            kind = ("s" if b % 4 < 2 else "7") if kind == "s7" else kind
+            scale = {8, 10, 0, 2 if kind == "L" else 1, 3, 5, 7}
+            low = under(ms[1], scale, 2)
+            ms = [under(ms[1], scale, 3) if kind == "s" and (low - root) % 12 == 4 else low, ms[1]]
+        chime(b, ms, 0.05, 0.25 * np.sin(1.3 * i))
+    for bar, text in BIG:
+        chime(bar0(bar), [n(one) for one in text.split()], 0.055, 0.0, roll_s=0.045)
+    drip(bar0(CALM + 1) + 3, 0.06, 0.4), dab(bar0(CALM + 3) + 2.5, 0.05), giggle(bar0(WALTZ) - 0.9, 0.03)
 
-    # Bars 49-56: his little waltz. The kit comes back small (the kick, a rim for the snare, the brush); the bass walks
+    # Bars 61-68: his little waltz. The kit comes back small (the kick, a rim for the snare, the brush); the bass walks
     # the blend again; the piano's three-beat motif turns against the bar, growing; the violin's long pulls climb over
     # it. The seventh chord is B: the next color.
-    for bar in range(49, 57):
+    for bar in range(WALTZ, RUSH):
         groove(bar, vol=0.85, snares=(), rims=(4, 12), pad=0.03, drops=0.9)
-    waltz(bar0(49), 10, 0.55, 0.9)
-    bowed(bar0(49), PULLS, 0.8)
-    spatter(bar0(52) + 3, 0.8)
-    fill(56, 0.8)
-    swipe(bar0(57) - 2, 2.0, 0.06)
+    waltz(bar0(WALTZ), 10, 0.55, 0.9)
+    bowed(bar0(WALTZ), PULLS, 0.8)
+    spatter(bar0(WALTZ + 3) + 3, 0.8)
+    fill(RUSH - 1, 0.8)
+    swipe(bar0(RUSH) - 2, 2.0, 0.06)
 
-    # Bars 57-64: the rush. The chords climb by whole steps (B, C sharp, E flat, F, G, A, B) while the pace climbs from
+    # Bars 69-76: the rush. The chords climb by whole steps (B, C sharp, E flat, F, G, A, B) while the pace climbs from
     # 172 to 226; the waltz goes on, the violin with it; the bass runs; the snare comes onto every beat, then rolls;
     # the splats come faster.
-    for i, bar in enumerate(range(57, 65)):
+    for i, bar in enumerate(range(RUSH, FAST)):
         groove(bar, vol=0.9 + 0.02 * i, kicks=(0, 10) if i < 4 else (0, 6, 10) if i < 6 else (0, 4, 8, 12), snares=(4, 12) if i < 6 else (4, 8, 12),
                ghosts=(7, 15), shakes=1.0, run=True, pad=0.03 + 0.003 * i, lower=i >= 4)
-    waltz(bar0(57), 10, 0.85, 1.0, violin=0.85)
-    for bar, offs in ((57, (0,)), (59, (2,)), (61, (0, 2.5)), (62, (1.5,)), (63, (0, 2, 3)), (64, (0, 1, 2, 3))):
+    waltz(bar0(RUSH), 10, 0.85, 1.0, violin=0.85)
+    for i, offs in ((0, (0,)), (2, (2,)), (4, (0, 2.5)), (5, (1.5,)), (6, (0, 2, 3)), (7, (0, 1, 2, 3))):
         for j, off in enumerate(offs):
-            splat(bar0(bar) + off, 0.13 + 0.012 * (bar - 57), 0.6 if (bar + j) % 2 else -0.6)
+            splat(bar0(RUSH + i) + off, 0.13 + 0.012 * i, 0.6 if (i + j) % 2 else -0.6)
     for i in range(16):
-        snare(bar0(64) + i / 4, 0.07 + 0.008 * i)
-    spatter(bar0(60) + 3, 0.9), spatter(bar0(62) + 3), spatter(bar0(63) + 1, 0.9, up=12)
-    swipe(bar0(65) - 2, 2.0, 0.07)
+        snare(bar0(FAST - 1) + i / 4, 0.07 + 0.008 * i)
+    spatter(bar0(RUSH + 3) + 3, 0.9), spatter(bar0(RUSH + 5) + 3), spatter(bar0(RUSH + 6) + 1, 0.9, up=12)
+    swipe(bar0(FAST) - 2, 2.0, 0.07)
 
-    # Bars 65-72: splatter, at 226. Three colors a major third apart (B, G, E flat), two bars each; the violin and the
+    # Bars 77-84: splatter, at 226. Three colors a major third apart (B, G, E flat), two bars each; the violin and the
     # piano trade two bars each, then play the last two together; an 808 under each bar; splats off the beat.
-    splash(bar0(65), 0.22), x.crash(bar0(65), 0.16, decay=0.6)
-    for bar in range(65, 81):
+    splash(bar0(FAST), 0.22), x.crash(bar0(FAST), 0.16, decay=0.6)
+    for bar in range(FAST, LAND):
         groove(bar, kicks=(0, 6, 10), ghosts=(7, 15), run=True, pad=0.034, lower=True, deep=0.42)
-    bowed(bar0(65), F1_VIOLIN), keys(bar0(65), F1_PIANO)
-    for bar, offs in ((66, (3.5,)), (68, (2.5, 3.5)), (69, (1.5,)), (70, (3.5,)), (72, (0.5, 1.5, 2.5, 3.5)), (74, (3.5,)), (76, (1.5, 3.5)), (78, (3.5,))):
+    bowed(bar0(FAST), F1_VIOLIN), keys(bar0(FAST), F1_PIANO)
+    for i, offs in ((1, (3.5,)), (3, (2.5, 3.5)), (4, (1.5,)), (5, (3.5,)), (7, (0.5, 1.5, 2.5, 3.5)), (9, (3.5,)), (11, (1.5, 3.5)), (13, (3.5,))):
         for j, off in enumerate(offs):
-            splat(bar0(bar) + off, 0.15, 0.6 if (bar + j) % 2 else -0.6)
-    spatter(bar0(67), 0.9, up=12), spatter(bar0(71) + 3)
+            splat(bar0(FAST + i) + off, 0.15, 0.6 if (i + j) % 2 else -0.6)
+    spatter(bar0(FAST + 2), 0.9, up=12), spatter(bar0(FAST + 6) + 3)
 
-    # Bars 73-80: the tune at 226, the violin and the piano together, a second violin under them; B blends its way
+    # Bars 85-92: the tune at 226, the violin and the piano together, a second violin under them; B blends its way
     # down to D. The last bar runs up the chord that leads home; the snare rolls; a swipe.
-    x.crash(bar0(73), 0.14, decay=0.6)
-    bowed(bar0(73), bars_of(TUNE_A, 1, 7), up=-3), keys(bar0(73), bars_of(TUNE_A, 1, 7), 0.9, up=-3 - 12)
-    bowed(bar0(73), bars_of(HARM_A, 1, 7), 0.6, -0.25, up=-3, bus="lead2")
-    bowed(bar0(80), FAST_END), keys(bar0(80), FAST_END, 0.9, up=-12)
+    x.crash(bar0(FAST + 8), 0.14, decay=0.6)
+    bowed(bar0(FAST + 8), bars_of(TUNE_A, 1, 7), up=-3), keys(bar0(FAST + 8), bars_of(TUNE_A, 1, 7), 0.9, up=-3 - 12)
+    bowed(bar0(FAST + 8), bars_of(HARM_A, 1, 7), 0.6, -0.25, up=-3, bus="lead2")
+    bowed(bar0(LAND - 1), FAST_END), keys(bar0(LAND - 1), FAST_END, 0.9, up=-12)
     for i in range(16):
-        snare(bar0(80) + i / 4, 0.07 + 0.009 * i)
-    spatter(bar0(76) + 3), spatter(bar0(79) + 3, up=12)
-    swipe(bar0(81) - 2, 2.0, 0.075)
+        snare(bar0(LAND - 1) + i / 4, 0.07 + 0.009 * i)
+    spatter(bar0(FAST + 11) + 3), spatter(bar0(FAST + 14) + 3, up=12)
+    swipe(bar0(LAND) - 2, 2.0, 0.075)
 
-    # Bars 81-82: one big splash on the beat; everything stops; the paint runs down the wall, drop by drop; he
+    # Bars 93-94: one big splash on the beat; everything stops; the paint runs down the wall, drop by drop; he
     # giggles; two notes of the violin and the brush, and the picture is there.
-    b = bar0(81)
+    b = bar0(LAND)
     splash(b, 0.5, big=True)
     for i, (off, name) in enumerate(((1.0, "A6"), (1.75, "F#6"), (2.5, "E6"), (3.5, "D6"), (4.5, "B5"), (5.5, "A5"))):
         plink(b + off, n(name), 0.07 * 0.86**i, (-0.5, 0.4, -0.2, 0.5, -0.4, 0.2)[i])
@@ -648,38 +719,38 @@ def render(window=None) -> np.ndarray:
     for i in range(4):
         tap(b + 7 + i / 4, 0.03 + 0.006 * i, 0.4 if i % 2 else -0.4)
 
-    # Bars 83-98: the finished picture, in D. The tune on the violin with a second violin a third or a sixth under it,
-    # the piano an octave below; everything in: the shaker, the strings, both sets of drips, an 808 on each bar. Its
-    # second half stays home, by way of B flat.
-    splat(bar0(83), 0.2, 0.0), x.crash(bar0(83), 0.16, decay=0.6)
-    for bar in range(83, 99):
+    # Bars 95-110: the finished picture, in D. The tune on the violin with a second violin a third or a sixth under
+    # it, the piano an octave below; everything in: the shaker, the strings, both sets of drips, an 808 on each bar.
+    # Its second half stays home, by way of B flat.
+    splat(bar0(HOME), 0.2, 0.0), x.crash(bar0(HOME), 0.16, decay=0.6)
+    for bar in range(HOME, TAG_AT):
         groove(bar, ghosts=(7, 15), shakes=1.0, pad=0.034, lower=True, deep=0.36)
-    bowed(bar0(83), TUNE_A), bowed(bar0(83), HARM_A, 0.62, -0.25, bus="lead2"), keys(bar0(83), TUNE_A, 0.6, up=-12)
-    bowed(bar0(91), TUNE_A3), bowed(bar0(91), COUNTER, 0.6, -0.25, bus="lead2"), keys(bar0(91), TUNE_A3, 0.6, up=-12)
-    spatter(bar0(86) + 3), spatter(bar0(90) + 3, 0.9, up=12), spatter(bar0(94) + 3), spatter(bar0(97) + 3, 0.9)
-    fill(90, 0.8, start=3.0), fill(98)
+    bowed(bar0(HOME), TUNE_A), bowed(bar0(HOME), HARM_A, 0.62, -0.25, bus="lead2"), keys(bar0(HOME), TUNE_A, 0.6, up=-12)
+    bowed(bar0(HOME + 8), TUNE_A3), bowed(bar0(HOME + 8), COUNTER, 0.6, -0.25, bus="lead2"), keys(bar0(HOME + 8), TUNE_A3, 0.6, up=-12)
+    spatter(bar0(HOME + 3) + 3), spatter(bar0(HOME + 7) + 3, 0.9, up=12), spatter(bar0(HOME + 11) + 3), spatter(bar0(HOME + 14) + 3, 0.9)
+    fill(HOME + 7, 0.8, start=3.0), fill(TAG_AT - 1)
 
-    # Bars 99-106: the tag. The stroke and its flick once more over a lighter kit; then the violin's last long note
+    # Bars 111-118: the tag. The stroke and its flick once more over a lighter kit; then the violin's last long note
     # while the kit thins to the brush on the beats; then only the soft piano, a music box and a drop on every other
     # beat: bar 1's pulse.
-    for bar in range(99, 103):
+    for bar in range(TAG_AT, TAG_AT + 4):
         groove(bar, vol=0.85, snares=(), rims=(4, 12), pad=0.03, drops=0.9)
-    for bar in (103, 104):
+    for bar in (TAG_AT + 4, TAG_AT + 5):
         b = bar0(bar)
         roll(bar, 0.06), strings(bar, 0.03, slow=True)
         bass(b, chord(bar).bass, 3.6, 0.26)
         for i in range(4):
             swish(b + i, 0.26, 0.026 * (1.0 if i % 2 == 0 else 0.75), 0.5 if i % 2 else -0.5)
         drips(bar, 0.75, keep=2)
-    for bar in (105, 106):
+    for bar in (TAG_AT + 6, TAG_AT + 7):
         b = bar0(bar)
         roll(bar, 0.06), strings(bar, 0.022, slow=True)
         for i in (0, 2):
             swish(b + i, 0.4, 0.028, 0.5 if i else -0.5)
             plink(b + i, chord(bar).sky[2], 0.04, 0.3 if i else -0.3)
         twinkle(bar, 0.9)
-    bowed(bar0(99), TAG)
-    drip(bar0(106) + 1, 0.06, 0.4)
+    bowed(bar0(TAG_AT), TAG)
+    drip(bar0(BARS) + 1, 0.06, 0.4)
 
     # The bass and the strings duck under each kick and under the splash.
     marks = x.buses.pop("duck")[0]
@@ -699,13 +770,13 @@ def render(window=None) -> np.ndarray:
     x.echo("drips", 0.75, 0.2, 0.08)
     x.echo("pizz", 0.5, 0.25, 0.12)
     levels = {"lead": 0.72, "lead2": 0.9, "piano": 1.2, "felt": 1.0, "box": 1.8, "keys": 1.25, "pad": 1.7, "bass": 0.4, "sub": 0.42, "kick": 0.56,
-              "snare": 1.04, "drum": 1.4, "strokes": 1.0, "hats": 5.0, "drips": 2.0, "pizz": 2.0, "splat": 0.45, "land": 0.4, "fx": 1.25}
+              "snare": 1.04, "drum": 1.4, "strokes": 0.68, "hats": 5.0, "drips": 2.0, "pizz": 2.0, "splat": 0.45, "land": 0.4, "fx": 1.25}
     return x.play(x.mixdown(levels, lowpass=9000, room=0.18))
 
 
-def main(out: str) -> None:
-    write_wav(out, render())
+def main(out: str, pairs: str = "steps") -> None:
+    write_wav(out, render(pairs=pairs))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:])
