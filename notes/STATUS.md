@@ -1704,3 +1704,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Step 1 (Opus xhigh, full lane): session_01JuCWRuaGjv9vzWcKKdMDjv, branch claude/solo-abandon, brief notes/briefs/solo-abandon.md. Needs the full-e2e label + an independent review.
 - Step 2 (after step 1 merges): Resume / Forfeit prompt in Boss Battle, reusing the tower's restore; fresh helper.
 - #877 (home cards) waiting on CI after a typecheck fix (12a99330).
+
+- Nov 22: main red on a flake (smudgy.spec.ts:189, phone, the battle ended mid-test): brief notes/briefs/flaky-smudgy-swap.md, queued (Opus high) after the solo-abandon fix helper. Queue after that: hopper pawn bounce (xhigh), hopper turf mockup (high), solo resume/forfeit (step 2). #880 carrot odds in CI; #881 solo abandon fixes in progress (session_01JuCWRvzV3aUYdmxrJ1bJ7B).
