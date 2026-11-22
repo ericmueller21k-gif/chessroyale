@@ -1123,7 +1123,9 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
 - **"Ann has entered the town."** (Eric, Nov 12: "it's not persistent enough… we have to wait for someone to say something… when you
   join… it should say… has entered the town"): the server's line when a signed-in player's pawn comes into the town (`TownHere.beat`
   says it's fresh: new, past its limit, or from another room; the live hub hands it to that town's chat room, `TownChat.arrive`). Once
-  per visit: back within `TOWN_CHAT.enterRejoinMs` (2 minutes) of your last beat (a reload, a trip home or to a game) posts nothing. A
+  per visit: back within `TOWN_CHAT.enterRejoinMs` (2 minutes) of your last beat (a reload, a trip home or to a game) posts nothing. Back from a
+  Battle Tower floor's match never posts one, however long the floor (Eric, Nov 22: the town's beats say `floor: true` until one is answered;
+  [2026-11-22-tower-polish.md](../decisions/2026-11-22-tower-polish.md)). A
   busy town doesn't flood: arrivals within `enterBurstMs` (6 s) of an "entered" line wait and go out as one line when it's up ("Ann and
   Bo entered the town.", "Ann, Bo and Cy entered the town.", "Ann, Bo and 3 others entered the town."), so at most one every 6 s.
   Everyone in the town reads them (guests, chat off: they arrive and show when it's on), and a device marked too young reads these

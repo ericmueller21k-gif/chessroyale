@@ -197,7 +197,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   floor's moments"), `test/tower-side.test.ts` (every boss's box). Left: a computer's cast animation in place on the side figure.
 - **The split bar as an accordion (Eric, Nov 21:** "maybe it's like 75% for the one that's active ... if you want to see what that boss
   is ... you just tap on theirs and then it expands their container"): `TowerBar.tsx`, `tower.css`. Each boss's card is the lone bar's own
-  markup (figure or portrait, name, LVL, meters, the status, his bar prop: Jefferson's candles, Hollow's bulbs, Timber's workshop, Dash's
+  markup (figure or portrait, his figure drawn from his live look as the lone bar's is: Moo's Full Moon gold, Nov 22, name, LVL, meters, the status, his bar prop: Jefferson's candles, Hollow's bulbs, Timber's workshop, Dash's
   tally, Don Dough's timers, Babur's pump), laid out once at the open width; each part (`.tw-part`) is a window (`.tw-window`, overflow
   hidden) onto its card's left side. The open part (`.tw-part-open`, `aria-expanded`: the boss to move, or one tapped open until the turn
   changes or it's tapped again) takes `OPEN_SHARE` (75%) of the room inside the outlines, the folded ones the rest; the windows slide
