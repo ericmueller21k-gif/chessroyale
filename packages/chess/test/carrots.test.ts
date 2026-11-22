@@ -510,12 +510,12 @@ describe("the Carrot Patch: the race", () => {
 });
 
 describe("the Carrot Patch: the spin", () => {
-  it("his tier is his carrots; each tier's odds are the sheet's (tier 3 the softened table); tier 0 a blank; tier 4 two queens; a roll is the seed's", () => {
+  it("his tier is his carrots; each tier's odds are the sheet's (tier 3 the softened table); tier 0 a blank; tier 4 a queen (Nov 22); a roll is the seed's", () => {
     const rows = BOSS_POWERS.carrotOdds;
     expect(rows.map((row) => row.reduce((t, x) => t + x.p, 0))).toEqual([1, 1, 1, 1, 1]);
-    expect(prizeWorth().map((x) => Math.round(x * 100) / 100)).toEqual([0, 1.4, 2.6, 5.05, 18]);
+    expect(prizeWorth().map((x) => Math.round(x * 100) / 100)).toEqual([0, 0.5, 1.2, 3.6, 9]);
     expect(spinRoll(1, 5, 0)).toEqual([]);
-    expect(spinRoll(1, 5, 4)).toEqual(["q", "q"]);
+    expect(spinRoll(1, 5, 4)).toEqual(["q"]);
     expect(spinRoll(1, 5, 5)).toEqual([]);
     for (const tier of [1, 2, 3]) {
       const counts = new Map<string, number>();

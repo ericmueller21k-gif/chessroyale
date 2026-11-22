@@ -1876,25 +1876,27 @@ export const BOSS_POWERS = {
   carrotSharp: 1.2,
   carrotHurry: 0.85,
   carrotWinWorth: 30,
+  /** Toned down Nov 22 (Eric: "2 carrots gives him a pawn with like a 10% chance for a bishop or knight ... 3 ... one knight or bishop
+   *  ... 2 queens is too much, it'd just be 1 queen ... 1 carrot, half the time a pawn, half the time nothing";
+   *  docs/decisions/2026-11-22-carrot-odds.md). */
   carrotOdds: [
     [{ prize: [], p: 1 }],
     [
-      { prize: ["p"], p: 0.6 },
-      { prize: ["p", "p"], p: 0.4 },
+      { prize: ["p"], p: 0.5 },
+      { prize: [], p: 0.5 },
     ],
     [
-      { prize: ["p", "p"], p: 0.4 },
-      { prize: ["n"], p: 0.3 },
-      { prize: ["b"], p: 0.3 },
+      { prize: ["p"], p: 0.9 },
+      { prize: ["n"], p: 0.05 },
+      { prize: ["b"], p: 0.05 },
     ],
     [
-      { prize: ["n"], p: 0.25 },
-      { prize: ["b"], p: 0.25 },
-      { prize: ["r"], p: 0.3 },
-      { prize: ["q"], p: 0.15 },
-      { prize: ["q", "r"], p: 0.05 },
+      { prize: ["n"], p: 0.4 },
+      { prize: ["b"], p: 0.4 },
+      { prize: ["r"], p: 0.15 },
+      { prize: ["q"], p: 0.05 },
     ],
-    [{ prize: ["q", "q"], p: 1 }],
+    [{ prize: ["q"], p: 1 }],
   ] as readonly (readonly { prize: readonly string[]; p: number }[])[],
   carrotPrizes: [["q", "q"], ["q", "r"], ["q"], ["r"], ["b"], ["n"], ["p", "p"], ["p"]] as readonly (readonly string[])[],
   carrotLooks: 4,

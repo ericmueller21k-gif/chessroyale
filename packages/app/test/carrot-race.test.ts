@@ -11,7 +11,7 @@ const odds = BOSS_POWERS.carrotOdds;
 
 describe("the ladder and the odds in words", () => {
   it("says the sheet's ladder, from the settings", () => {
-    expect([0, 1, 2, 3, 4, 5].map((t) => ladderWords(t))).toEqual(["nothing", "a pawn or two", "up to a knight or bishop", "up to a queen and a rook", "two queens", "they win"]);
+    expect([0, 1, 2, 3, 4, 5].map((t) => ladderWords(t))).toEqual(["nothing", "up to a pawn", "up to a knight or bishop", "up to a queen", "a queen", "they win"]);
   });
 
   it("names each prize, and each count's odds", () => {
@@ -19,9 +19,9 @@ describe("the ladder and the odds in words", () => {
     expect(prizeWords(["r", "q"])).toBe("a queen and a rook");
     expect(prizeWords(["q", "q"])).toBe("two queens");
     expect(oddsWords(0)).toBe("nothing: every card on the reel is blank");
-    expect(oddsWords(2)).toBe("two pawns 40%, a knight 30%, a bishop 30%");
-    expect(oddsWords(4)).toBe("two queens, every time");
-    expect([0, 1, 2, 3, 4].map((t) => Math.round(averageWorth(t) * 100) / 100)).toEqual([0, 1.4, 2.6, 5.05, 18]);
+    expect(oddsWords(2)).toBe("a pawn 90%, a knight 5%, a bishop 5%");
+    expect(oddsWords(4)).toBe("a queen, every time");
+    expect([0, 1, 2, 3, 4].map((t) => Math.round(averageWorth(t) * 100) / 100)).toEqual([0, 0.5, 1.2, 3.6, 9]);
   });
 });
 
@@ -36,9 +36,9 @@ describe("the reel", () => {
     }
   });
 
-  it("no carrots: every card blank; four: every card two queens", () => {
+  it("no carrots: every card blank; four: every card a queen (Nov 22)", () => {
     expect(reelStrip(0).every((p) => p.length === 0)).toBe(true);
-    expect(reelStrip(4).every((p) => prizeKey(p) === "qq")).toBe(true);
+    expect(reelStrip(4).every((p) => prizeKey(p) === "q")).toBe(true);
   });
 
   it("spreads each prize out along the strip (never bunched), the same strip whatever was rolled", () => {
