@@ -620,6 +620,12 @@ export interface BossPowerState {
    */
   noUlt?: boolean;
   /**
+   * At most this many ultimates this battle, whatever his own rules allow (a Battle Tower floor of three, BATTLE_TOWER.ultsOnFloorOf:
+   * one each, Nov 22). Once `ults` reaches it, his last one's effect runs out as ever, then the ultimate never comes again: its step
+   * never runs, the test trigger refuses, and the meter stays empty (nothing gathers) and dimmed. Missing: his own cap only.
+   */
+  ultMax?: number;
+  /**
    * This battle his power that adds pieces is off (a Battle Tower floor of several, BATTLE_TOWER.addsPieces: another boss there is the
    * primary, Nov 20): Babur's balloons never go on his pump, Timber's workshop and Don Dough's dough never drop, Sawyer's pawn never
    * splits, and Puddles' Watering grows no pieces (their seeds come up as nothing).

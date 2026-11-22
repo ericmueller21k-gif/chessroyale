@@ -185,6 +185,18 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   Nov 21's accordion, below), a computer's beside his figure by the board (`TowerSide`, 2x); one pump on the page. Sawyer's cut and gap over the square highlights on every screen (bosses.md). Checks: `several-bosses.test.ts` (every
   `noUltimate` boss on a floor of two; Wrangler's one showdown on a lone floor and off the tower) and `e2e/battle-tower.spec.ts` ("a shared floor of Babur and Wrangler").
   [2026-11-20-tower-fixes.md](../decisions/2026-11-20-tower-fixes.md).
+- **A floor of three: one ultimate each (Eric, Nov 22:** "when there's 3 bosses, they should each be maxed out at 1 ult ... They only ult
+  once each at most"; Smudgy had ulted twice). `BATTLE_TOWER.ultsOnFloorOf: { 3: 1 }`: the runner puts `ultMax: 1` on every boss's powers
+  as a floor of three starts (`towerUltMax`, beside `towerNoUlt` and `towerNoAdd`; solo and the party's room alike, a restore keeps it, the
+  view carries it), on top of his own cap (the lower wins). The dispatcher's `ultCapped` (bosses/base.ts) gates it for every boss: once his
+  one has come and its effect is over, his ultimate's step never runs again, his meter holds empty (nothing gathers, the God King's strike
+  adds none; Folio's line is never asked for), the admins' trigger refuses (the ⚡ goes, as for a spent boss). On screen his meter stays on
+  the bar, empty and dimmed, titled "Rage: no more ultimates on this floor", whoever he is (a lone Smudgy's goes after his last; here it
+  stays). The ultimate only: Ginger's Super Freeze and Dash's Scramble Rush keep their own caps (the Rush, on the rage meter at half, can
+  no longer come after his one Time Scramble; it nearly always comes first). Floors of one and two: unchanged. The FAQ's rage meter
+  section says it. Checks: `several-bosses.test.ts` ("a tower floor of three, one ultimate each": every tower boss, and the four still to
+  come, on floors of three with the trigger pulled every turn, none ults twice, and the same floors off the tower do).
+  [2026-11-22-tower-three-ult-cap.md](../decisions/2026-11-22-tower-three-ult-cap.md).
 - **Shared floors' moments audited (Eric, Nov 21):** every boss's powers and ultimate and the God King's move and strike on floors of
   two and three, phone and computer, against a lone battle ([2026-11-21-tower-shared-audit.md](../decisions/2026-11-21-tower-shared-audit.md),
   its table). A boss's own moment draws him once: the boss screen passes its caster (`casterOf`; else the boss to move) to the split bar

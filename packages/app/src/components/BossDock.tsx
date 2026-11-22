@@ -547,7 +547,7 @@ export function UltimateTest({ match, icon = false }: { match: GameView; icon?: 
     const can = !!mine && !mine.result && mine.toMove === "crowd" && mine.turnAt !== null && simul.paused == null;
     return <TestButton cls="ult-test" icon={icon} glyph="⚡" label="Lose a heart (testing)" disabled={!can} onClick={() => match.triggerUltimate()} />;
   }
-  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote != null || (bossRules(boss)?.ultimateOnce && p.ults) || (p.ults ?? 0) >= (bossRules(boss)?.ultimateMax ?? Infinity)) return null;
+  if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote != null || (bossRules(boss)?.ultimateOnce && p.ults) || (p.ults ?? 0) >= Math.min(bossRules(boss)?.ultimateMax ?? Infinity, p.ultMax ?? Infinity)) return null;
   // (Hollow's Lights out: the full meter has it on its way until the test has begun.)
   const lights = p.ultimate === "lightsout";
   const underWay = p.ultAt !== null && (!lights || (p.lightsAt != null && p.lightsAt >= p.ultAt));

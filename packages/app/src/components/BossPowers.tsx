@@ -297,7 +297,9 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
   const paused = !!p?.paused || locked;
   // (Spent: the last ultimate a battle allows has come and the meter stays, empty and dimmed: Timber's after his second Gnaw.)
   const rules = bossRules(boss);
-  const spent = paused && !!rules?.spentMeterShown && (p?.ults ?? 0) >= (rules?.ultimateMax ?? Infinity);
+  // (Or every ultimate a Battle Tower floor of three allows him has come, ultMax: one each, whoever he is.)
+  const capped = p?.ultMax !== undefined && (p.ults ?? 0) >= p.ultMax;
+  const spent = paused && (capped || (!!rules?.spentMeterShown && (p?.ults ?? 0) >= (rules?.ultimateMax ?? Infinity)));
   // (No ultimate this battle, a Battle Tower floor's Wrangler: empty and dimmed all battle, as a spent meter.)
   const off = !!p?.noUlt;
   const now = !!p && p.ultAt !== null && !paused;
@@ -329,11 +331,11 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
       class={`rage-meter${glow ? " glow" : ""}${p!.warned ? " warned" : ""}${now ? " now" : ""}${paused ? " paused" : ""}`}
       role="meter"
       data-ult-off={off ? "" : undefined}
-      aria-label={off ? "Rage: no ultimate in the Battle Tower" : spent ? "Rage: no more ultimates this battle" : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
+      aria-label={off ? "Rage: no ultimate in the Battle Tower" : spent ? (capped ? "Rage: no more ultimates on this floor" : "Rage: no more ultimates this battle") : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
-      title={off ? "Rage: no ultimate in the Battle Tower" : spent ? "Rage: no more ultimates this battle" : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
+      title={off ? "Rage: no ultimate in the Battle Tower" : spent ? (capped ? "Rage: no more ultimates on this floor" : "Rage: no more ultimates this battle") : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
     >
       {/* (No width transition while it slides down: a transition would override the slide.) */}
       <i ref={bar} style={drain ? { width: `${pct}%`, transition: "none" } : { width: `${pct}%` }} />

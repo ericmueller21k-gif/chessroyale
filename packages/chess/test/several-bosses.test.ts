@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { BATTLE_TOWER, BOSS_BRAIN, BOSS_POWERS, mulberry32, newRun, startFloor, towerPool } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_BRAIN, BOSS_POWERS, hiddenBosses, mulberry32, newRun, startFloor, towerPool } from "@chessroyale/core";
 import type { BossState, Settings } from "@chessroyale/core";
-import { MatchRunner, bossRules, crowdAllowed, legalMoves, pieceAt, rageOf, rageSpeedOf, rageTick, sideRates } from "../src/index.ts";
-import { KIT_OPENING, fakeEngine, kitSettings, runBattle, sideTracked, type KitBattle } from "./boss-kit-lib.ts";
+import { MatchRunner, bossRules, crowdAllowed, legalMoves, pieceAt, rageNow, rageOf, rageSpeedOf, rageTick, sideRates, triggerUltimate } from "../src/index.ts";
+import { KIT_OPENING, fakeEngine, kitBosses, kitSettings, runBattle, sideTracked, type KitBattle } from "./boss-kit-lib.ts";
 import { grows } from "../src/bosses/gardener.ts";
 
 /**
@@ -582,5 +582,77 @@ describe("several bosses: one primary for the powers that add pieces (BATTLE_TOW
       });
       expect(seen, `${id} alone on a floor`).toBe(true);
     }
+  }, 240_000);
+});
+
+describe("several bosses: a tower floor of three, one ultimate each (BATTLE_TOWER.ultsOnFloorOf; Eric, Nov 22)", () => {
+  const apart = (a: string, b: string) => BATTLE_TOWER.apart.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+  /**
+   * Every boss the tower deals (towerPool), and the bosses with powers still to come to it (not the hidden ones: Timber, Dash, Don
+   * Dough, Chandy, whose own caps are higher than one or the same), in floors of three BATTLE_TOWER.apart allows: each boss in one
+   * at least, the last filled from the first.
+   */
+  const trios = (): string[][] => {
+    const hidden = new Set(hiddenBosses().map((b) => b.id));
+    const ids = [...new Set([...towerPool(), ...kitBosses().map((d) => d.id).filter((id) => !hidden.has(id))])];
+    const left = [...ids];
+    const out: string[][] = [];
+    while (left.length) {
+      const t = [left.shift()!];
+      for (const id of [...left]) if (t.length < 3 && !t.some((x) => apart(x, id))) left.splice(left.indexOf(id), 1) && t.push(id);
+      for (const id of ids) if (t.length < 3 && !t.includes(id) && !t.some((x) => apart(x, id))) t.push(id);
+      out.push(t);
+    }
+    return out;
+  };
+  // (The admins' trigger pulled every turn from turn 2, for every boss: each one's ultimate as soon and as often as it can come.)
+  const floor = (t: string[], patch: Partial<Settings>): KitBattle => ({ boss: t[0]!, bosses: t, seed: 11, side: "w", test: "", triggerFrom: 2, strikes: [], maxMoves: 30, opening: KIT_OPENING, patch });
+
+  it("the deal: on a floor of three every boss's powers carry ultMax 1 (the view every screen draws, a restored battle); a floor of two, a lone floor and off the tower: none", () => {
+    expect(BATTLE_TOWER.ultsOnFloorOf).toEqual({ 3: 1 });
+    const capOf = (r: MatchRunner) => r.sideBosses().map((b) => `${b.id}:${b.powers!.ultMax}`);
+    const r = runner(["smudgy", "moo", "gardener"], "", 5, { towerFloor: 4 });
+    expect(capOf(r)).toEqual(["smudgy:1", "moo:1", "gardener:1"]);
+    expect(r.bossView()!.side!.bosses.map((b) => `${b.id}:${b.powers!.ultMax}`)).toEqual(["smudgy:1", "moo:1", "gardener:1"]);
+    const back = MatchRunner.restore(JSON.parse(JSON.stringify(r.snapshot())), { settings: r.settings, rng: mulberry32(1), engines: [fakeEngine()], library: [KIT_OPENING] });
+    expect(capOf(back)).toEqual(["smudgy:1", "moo:1", "gardener:1"]);
+    expect(capOf(runner(["smudgy", "moo"], "", 5, { towerFloor: 2 }))).toEqual(["smudgy:undefined", "moo:undefined"]);
+    expect(capOf(runner(["smudgy", "moo", "gardener"]))).toEqual(["smudgy:undefined", "moo:undefined", "gardener:undefined"]);
+    expect(runner(["smudgy"], "", 5, { towerFloor: 1 }).boss!.powers!.ultMax).toBeUndefined();
+    expect(runner(["smudgy", "moo"], "", 5, { towerFloor: 2 }).bossView()!.side!.bosses.some((b) => "ultMax" in b.powers!)).toBe(false);
+  });
+
+  it("every tower boss on a floor of three, the trigger pulled every turn: none ults twice; after his one, his meter empty, dimmed and not charging, the trigger refused; off the tower the same floors ult again and again", async () => {
+    const all = trios();
+    expect(all.flat()).toEqual(expect.arrayContaining(towerPool()));
+    const once = new Set<string>();
+    for (const t of all) {
+      const most: Record<string, number> = {};
+      const run = await runBattle(floor(t, { towerFloor: 3 }), null, (r, _fen, who) => {
+        for (const b of r.sideBosses()) {
+          const p = b.powers!;
+          expect(p.ultMax, b.id).toBe(1);
+          expect(p.ults ?? 0, `${b.id} on ${t.join(" + ")}`).toBeLessThanOrEqual(1);
+          most[b.id!] = Math.max(most[b.id!] ?? 0, p.ults ?? 0);
+          if (!p.ults || p.ultAt !== undefined || who !== "crowd") continue;
+          // (His one has come and its effect is over: what every screen draws, his meter, and the trigger.)
+          const v = r.bossView()!.side!.bosses.find((x) => x.id === b.id)!.powers!;
+          expect(`${b.id}:${v.rage}:${v.paused}:${v.warned}:${v.ultNext}:${p.warnAt}`).toBe(`${b.id}:0:true:false:false:undefined`);
+          expect(rageNow(p, rageSpeedOf(b.id), BOSS_POWERS), b.id).toBe(0);
+          expect(triggerUltimate(b).ok, b.id).toBe(false);
+        }
+      });
+      expect(run.failures).toEqual([]);
+      for (const [id, n] of Object.entries(most)) if (n) once.add(id);
+      // (The same floor off the tower, every boss's own cap: some boss ults again, so the cap above is what held them.)
+      const off: Record<string, number> = {};
+      const free = await runBattle(floor(t, {}), null, (r) => {
+        for (const b of r.sideBosses()) off[b.id!] = Math.max(off[b.id!] ?? 0, b.powers!.ults ?? 0);
+      });
+      expect(free.failures).toEqual([]);
+      expect(Math.max(...Object.values(off)), `${t.join(" + ")} off the tower: ${JSON.stringify(off)}`).toBeGreaterThanOrEqual(2);
+    }
+    // (Every boss had his one, but those whose ultimate is off on a shared floor: Wrangler, BATTLE_TOWER.noUltimate.)
+    expect([...once].sort()).toEqual(all.flat().filter((id, i, a) => a.indexOf(id) === i && !BATTLE_TOWER.noUltimate.includes(id)).sort());
   }, 240_000);
 });
