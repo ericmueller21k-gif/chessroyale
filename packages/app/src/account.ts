@@ -789,10 +789,14 @@ function unsentResult(): Unsent | null {
     return null;
   }
 }
-/** Sends a kept result once your account is this one (its game's row is then taken off as usual). Kept again only while offline. */
+/**
+ * Sends a kept result (its game's row is then taken off as usual); kept again only while offline. Another account's (signed out since,
+ * a guest merged into an account) is dropped: never sent as this one's, and it mustn't keep the load from settling a left game.
+ */
 async function sendUnsentResult(): Promise<void> {
   const u = unsentResult();
-  if (!u || u.user !== state.profile?.user.id) return;
+  if (!u || !state.profile) return;
+  if (u.user !== state.profile.user.id) return keepUnsent(null);
   try {
     await api("/api/results", { method: "POST", body: JSON.stringify(u.result) });
     keepUnsent(null);

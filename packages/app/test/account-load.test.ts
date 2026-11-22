@@ -226,10 +226,12 @@ describe("the account's load and a solo game left (SOLO_ABANDON, Nov 22)", () =>
     expect(d.me()).toBe("/api/me");
     await vi.waitFor(() => expect(d.calls).toContain(`/api/results ${JSON.stringify(result)}`));
     await vi.waitFor(() => expect(d.store.has("brc.soloUnsent")).toBe(false));
-    // (Another account's: kept, never sent as this one's.)
+    // (Another account's: dropped, never sent as this one's, so the next load settles again.)
     const other = device({ "brc.soloUnsent": JSON.stringify({ user: "someone else", result }) });
     await loadAccount();
-    await new Promise((r) => setTimeout(r, 10));
+    await vi.waitFor(() => expect(other.store.has("brc.soloUnsent")).toBe(false));
     expect(other.calls.some((c) => c.startsWith("/api/results"))).toBe(false);
+    await loadAccount();
+    expect(other.calls.filter((c) => c.startsWith("/api/me")).at(-1)).toBe("/api/me?settle=1");
   });
 });

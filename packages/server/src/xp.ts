@@ -138,8 +138,7 @@ export interface AbandonWhich {
  * `soloGame`) is written beside a row of the same game. A deleted account gets nothing (`users`).
  */
 export function abandonStatements(userId: string, which: AbandonWhich, drop = false): Stmt[] {
-  const cond = (t: string) => `${t}user_id = ? AND ${t}real_at IS NOT NULL${which.game ? ` AND ${t}id = ?` : ""}${which.staleBefore !== undefined ? ` AND ${t}started_at <= ?` : ""}`;
-  const params = [userId, ...(which.game ? [which.game] : []), ...(which.staleBefore !== undefined ? [which.staleBefore] : [])];
+  const { cond, params } = abandonWhere(userId, which);
   return [
     st(
       `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, played_at, boss_elo, boss_id, ranked, held, abandoned, solo_game)
@@ -154,13 +153,24 @@ export function abandonStatements(userId: string, which: AbandonWhich, drop = fa
   ];
 }
 
+/** The real solo game `which` names, in SQL (`t`: the table's alias and a dot, or nothing), and its parameters. */
+function abandonWhere(userId: string, which: AbandonWhich) {
+  const cond = (t: string) => `${t}user_id = ? AND ${t}real_at IS NOT NULL${which.game ? ` AND ${t}id = ?` : ""}${which.staleBefore !== undefined ? ` AND ${t}started_at <= ?` : ""}`;
+  const params = [userId, ...(which.game ? [which.game] : []), ...(which.staleBefore !== undefined ? [which.staleBefore] : [])];
+  return { cond, params };
+}
+
 /**
  * Records the account's real solo game as left and takes it off (SOLO_ABANDON; the app's load and every profile read: GET /api/me):
- * `which` says which (none: whichever is open). A game under SOLO_ABANDON.minMoves, or one that got its result, is never touched. Step 2's Forfeit is this
- * with `{ game }`.
+ * `which` says which (none: whichever is open). A game under SOLO_ABANDON.minMoves, or one that got its result, is never touched.
+ * A read first: almost every profile read finds none, and writes nothing. Step 2's Forfeit is this with `{ game }`. True: one was
+ * there (recorded now, or by whatever took it first).
  */
-export async function abandonSoloGame(sql: Sql, userId: string, which: AbandonWhich = {}): Promise<void> {
+export async function abandonSoloGame(sql: Sql, userId: string, which: AbandonWhich = {}): Promise<boolean> {
+  const { cond, params } = abandonWhere(userId, which);
+  if (!(await sql.first<{ n: number }>(`SELECT 1 AS n FROM solo_games WHERE ${cond("")}`, ...params))) return false;
   await sql.batch(abandonStatements(userId, which, true));
+  return true;
 }
 
 /** The time before which a real game counts as left whatever the app says (SOLO_ABANDON.staleHours since it began). */
