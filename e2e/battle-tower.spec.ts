@@ -890,6 +890,21 @@ test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's th
       const sq = b?.side?.bosses?.find((x: any) => x.id === "smudgy")?.powers?.camo?.square;
       if (sq && document.querySelector(`.hb-board piece.black.rook[data-square="${sq}"]`)) w.__leaks.push(`${sq} on ${b.id}'s turn (${w.match?.phase?.kind})`);
     }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-square"] });
+    // (Every frame of a boss's turn: whose, and what's drawn on the hidden square. A boss's turn can pass between two polls, so the
+    // test reads this record, never waits to catch the turn live: Nov 22, main's run on d30c64b missed Jefferson's.)
+    w.__bossTurns = [] as string[];
+    const tick = () => {
+      const m = w.match;
+      const b = m?.boss;
+      const sq = b?.side?.bosses?.find((x: any) => x.id === "smudgy")?.powers?.camo?.square;
+      const el = sq ? document.querySelector(`.hb-board piece[data-square="${sq}"]`) : null;
+      if (m?.phase?.kind === "boss" && b?.id && el) {
+        const seen = `${b.id} ${el.classList.contains("white") ? "w" : "b"} ${["pawn", "rook"].find((r) => el.classList.contains(r)) ?? "other"}`;
+        if (w.__bossTurns.at(-1) !== seen) w.__bossTurns.push(seen);
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   });
   // ?paint=1: his rook hidden on d7 from the start (camo.ts). Floor 2: Jefferson, then Smudgy (the deal set in the local database).
   await intoTower(page, "&paint=1");
@@ -920,8 +935,9 @@ test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's th
   await still(page, "shared-smudgy-your-turn");
   // Your move; then Jefferson's turn: the hidden square still a pawn while he plays.
   await playAMove(page);
-  await expect.poll(async () => ((at = await look()), at.phase === "boss" && at.focus === "grex" && at.drawn !== null), { timeout: 60_000 }).toBe(true);
-  expect(at.drawn).toBe("b pawn");
+  const grexTurn = () => page.evaluate(() => ((window as any).__bossTurns as string[]).filter((t) => t.startsWith("grex ")));
+  await expect.poll(async () => (await grexTurn()).length, { timeout: 60_000 }).toBeGreaterThan(0);
+  expect(await grexTurn()).toEqual(["grex b pawn"]);
   await still(page, "shared-smudgy-his-turn");
   // Back to you, Smudgy next: the same.
   await expect.poll(async () => ((at = await look()), at.phase === "play" && at.focus === "smudgy" && at.drawn !== null), { timeout: 60_000 }).toBe(true);
