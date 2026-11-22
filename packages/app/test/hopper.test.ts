@@ -50,7 +50,8 @@ describe("Chub & Chirp are live", () => {
   it("say every line of the draft (CHC-*), as written, each at most 42 characters", () => {
     const all = Object.values(HOPPER_LINES).flat();
     const select = SELECT_LINES.hopper!;
-    expect(all.length + select.length).toBe(60);
+    // (60 in the draft, and the Pawn Bounce's one, Nov 22.)
+    expect(all.length + select.length).toBe(61);
     for (const l of [...all, ...select]) expect(l.length, l).toBeLessThanOrEqual(42);
     expect(HOPPER_LINES.power).toContain("Leapfrog!");
     expect(HOPPER_LINES.ultimate).toContain("Carrot Patch! Race you!");
@@ -61,6 +62,7 @@ describe("Chub & Chirp are live", () => {
     expect(HOPPER_LINES.spinEmpty).toHaveLength(3);
     expect(HOPPER_LINES.carrotsAll).toHaveLength(2);
     expect(HOPPER_LINES.kingAttack).toHaveLength(3);
+    expect(HOPPER_LINES.pawnBounce).toEqual(["Boing! Back you go!"]);
   });
 
   it("have a sound of their own for every cue but none of a piece's, each quieter than a move and the same every time", () => {
@@ -99,6 +101,8 @@ describe("Chub & Chirp are live", () => {
     const text = BOSS_BLOCKS.hopper!(BOSS_POWERS, def);
     expect(text).toContain("**Leapfrog** (passive)");
     expect(text).toContain(`At most ${BOSS_POWERS.hopMax} hops a battle`);
+    expect(text).toContain("**Pawn Bounce** (**once a battle**): when you push a pawn two squares, Chirp hops down and knocks it back one square");
+    expect(BOSS_BLOCKS.hopper!({ ...BOSS_POWERS, pawnBounceMax: 2 }, def)).toContain("**Pawn Bounce** (**2 times a battle**)");
     expect(text).toContain("**Carrot Patch** (ultimate, **once a battle**)");
     expect(text).toContain("| 1 | a pawn 50%, nothing 50% | 0.5 |");
     expect(text).toContain("| 3 | a knight 40%, a bishop 40%, a rook 15%, a queen 5% | 3.6 |");
@@ -111,8 +115,10 @@ describe("Chub & Chirp are live", () => {
 
 describe("their moments, timed by their animations' cues", () => {
   it("the moments' lengths are the beats' (the server waits for them)", () => {
-    expect(HOPPER_FX).toEqual({ hop: B.hop.total, carrots: B.carrots.total, carrot: B.carrot.total, carrotSpin: B.carrotSpin.total, carrotWin: B.carrotWin.total });
-    for (const k of ["hop", "carrots", "carrot", "carrotSpin", "carrotWin"] as const) expect(POWER_FX[k]).toBe(HOPPER_FX[k]);
+    expect(HOPPER_FX).toEqual({ hop: B.hop.total, pawnBounce: B.pawnBounce.total, carrots: B.carrots.total, carrot: B.carrot.total, carrotSpin: B.carrotSpin.total, carrotWin: B.carrotWin.total });
+    for (const k of ["hop", "pawnBounce", "carrots", "carrot", "carrotSpin", "carrotWin"] as const) expect(POWER_FX[k]).toBe(HOPPER_FX[k]);
+    // (The Pawn Bounce plays on the hop's own beats: his `leapfrog` animation, checked below.)
+    expect(B.pawnBounce).toEqual(B.hop);
   });
 
   it("Leapfrog: the banner's end is his `takeoff` (the pawn leaves its square), his `land` the pawn's landing; his hop inside the moment", () => {
@@ -167,6 +173,16 @@ describe("their moments on screen", () => {
     // (After his move, a new turn's events: no hop there, so it doesn't play again.)
     expect(momentsOf(view([], { hop }, 5), 10_000)).toEqual([]);
     expect(HOPPER_LINES.power).toContain(powerLine(bossKit(HOPPER_NAME), list[0]!));
+    expect(momentLineAt(list[0]!)).toBe(0);
+  });
+
+  it("the Pawn Bounce plays on a screen of its own, before his move, for its full time, with its line as it begins", () => {
+    const pawnBounce = { at: 4, from: "e4", to: "e3" };
+    const list = momentsOf(view([{ kind: "pawnBounce", turn: 4, square: "e3", squares: ["e4", "e3"] }], { pawnBounce }), 10_000);
+    expect(list.map((m) => [m.kind, m.ms, m.square, m.squares])).toEqual([["pawnBounce", POWER_FX.pawnBounce, "e3", ["e4", "e3"]]]);
+    expect(list[0]!.at).toBe(10_000 - POWER_FX.pawnBounce);
+    expect(momentsOf(view([], { pawnBounce }, 5), 10_000)).toEqual([]);
+    expect(powerLine(bossKit(HOPPER_NAME), list[0]!)).toBe("Boing! Back you go!");
     expect(momentLineAt(list[0]!)).toBe(0);
   });
 
@@ -272,6 +288,21 @@ describe("the board under their moments", () => {
     expect(pieceAt(air, "e4")).toMatchObject({ color: "w", type: "p" });
     expect(at(B.hop.landAt)).toBe(hopped);
     expect(hopperFen(v, [], m.at, hopped)).toBeNull();
+  });
+
+  it("the Pawn Bounce: your pawn on the square its push reached until it takes off, in the air (on neither) until it lands, then one back", () => {
+    const bounced = "rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    const v = view([], { pawnBounce: { at: 4, from: "e4", to: "e3" } }, 4, bounced);
+    const m = moment("pawnBounce");
+    const at = (t: number) => hopperFen(v, [m], m.at + t, bounced);
+    const before = at(B.pawnBounce.liftAt - 1)!;
+    expect(pieceAt(before, "e4")).toMatchObject({ color: "w", type: "p" });
+    expect(pieceAt(before, "e3")).toBeNull();
+    const air = at(B.pawnBounce.liftAt + 1)!;
+    expect(pieceAt(air, "e4")).toBeNull();
+    expect(pieceAt(air, "e3")).toBeNull();
+    expect(at(B.pawnBounce.landAt)).toBe(bounced);
+    expect(hopperFen(v, [], m.at, bounced)).toBeNull();
   });
 
   it("the spin: his prize pieces only once each has dropped onto its square", () => {

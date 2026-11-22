@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, CharMark, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TowerScatter, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, CharMark, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, PawnBounce, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TowerScatter, TusksCast } from "@chessroyale/core";
 import type { Base, Capture } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -479,6 +479,11 @@ export interface NetBossPowers {
    * crowd's pawn on `over`, to `to` (null: none yet).
    */
   hop?: LeapfrogHop | null;
+  /**
+   * Their last Pawn Bounce (missing for other bosses and from older servers; an older app ignores it), after the crowd's move `at`
+   * (at the start of his turn, before his move): the crowd's double-pushed pawn from `from` back to `to` (null: none yet).
+   */
+  pawnBounce?: PawnBounce | null;
   /**
    * Their Carrot Patch (missing for other bosses and from older servers; an older app ignores it), from its cast on: the
    * crowd move it came after, the carrots' squares and who pulled each (null: still in the ground), each side's count and

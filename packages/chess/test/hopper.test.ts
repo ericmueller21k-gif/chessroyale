@@ -7,14 +7,18 @@ import {
   POWER_FX,
   START_FEN,
   applyMove,
+  BOSS_OPENING,
   bossRules,
+  bounceOption,
   fenAtPly,
   gameEndWith,
   hopFrom,
   hopOptions,
+  isHop,
   kingAttacked,
   legalMoves,
   mateInOne,
+  newBoard,
   pieceAt,
   powerTurn,
   queenSlain,
@@ -389,6 +393,150 @@ describe("Leapfrog in a battle", () => {
   });
 });
 
+describe("the Pawn Bounce (Eric, Nov 22): the crowd's first double push knocked back a square, once a battle", () => {
+  /** A battle from a position of our own (the crowd to move: a base on the board at its ply). */
+  const from = (fen: string, o: Parameters<typeof raid>[0] = {}) => {
+    const r = raid(o);
+    const board = r.boards.get(0)!;
+    r.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []), { ply: board.history.length, fen }] });
+    return r;
+  };
+
+  it("bounceOption: the crowd's double push, either way up, back to the square it passed, the en passant square gone; anything else, none", () => {
+    expect(BOSS_POWERS.pawnBounceMax).toBe(1);
+    const e4 = applyMove(START_FEN, "e2e4");
+    const back = bounceOption(e4, B, "e2e4");
+    expect(back).toEqual({ from: "e4", to: "e3", fen: "rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR b KQkq - 0 1" });
+    sound((back as { fen: string }).fen);
+    // (The other way up: the crowd Black, him White.)
+    expect(bounceOption(after(["Nf3", "e5"]), W, "e7e5")).toEqual({ from: "e5", to: "e6", fen: "rnbqkbnr/pppp1ppp/4p3/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 2" });
+    // (The en passant square goes with it: his d4 pawn could take en passant; after it, it can take on e3 as ever.)
+    const ep = applyMove("4k3/8/8/8/3p4/8/4P3/4K3 w - - 0 30", "e2e4");
+    expect(ep.split(" ")[3]).toBe("e3");
+    const epBack = bounceOption(ep, B, "e2e4") as { fen: string };
+    expect(epBack.fen).toBe("4k3/8/8/8/3p4/4P3/8/4K3 b - - 0 30");
+    expect(legalMoves(epBack.fen)).toContain("d4e3");
+    // Not a double push of the crowd's pawn standing where it landed: none.
+    expect(bounceOption(applyMove(START_FEN, "e2e3"), B, "e2e3")).toBeNull();
+    expect(bounceOption(applyMove(START_FEN, "g1f3"), B, "g1f3")).toBeNull();
+    expect(bounceOption(e4, B, null)).toBeNull();
+    expect(bounceOption(after(["e4", "e5"]), B, "e7e5")).toBeNull();
+    expect(bounceOption("4k3/8/8/8/4Q3/8/8/4K3 b - - 1 30", B, "e2e4")).toBeNull();
+  });
+
+  it("each skip: his king in check, the square behind taken, either king attacked after it, a mate in one he didn't have", () => {
+    // (The push checks his king: he answers it with his move.)
+    expect(bounceOption(applyMove("8/8/8/4k3/8/8/3P4/4K3 w - - 0 30", "d2d4"), B, "d2d4")).toEqual({ why: "inCheck" });
+    // (The square it passed taken: no game reaches it, but the rule says so.)
+    expect(bounceOption("4k3/8/8/8/4P3/4n3/8/4K3 b - - 0 30", B, "e2e4")).toEqual({ why: "blocked" });
+    // (Your push blocked his rook's check: back, it would bare your king.)
+    expect(bounceOption(applyMove("4k3/8/8/8/r6K/8/4P3/8 w - - 0 30", "e2e4"), B, "e2e4")).toEqual({ why: "exposed" });
+    // (Back on e3, your pawn would check his king on f4.)
+    expect(bounceOption(applyMove("8/8/8/8/5k2/8/4P3/4K3 w - - 0 30", "e2e4"), B, "e2e4")).toEqual({ why: "check" });
+    // (Off e4, his queen's line to g2 opens: Qxg2 mate, which he didn't have.)
+    const mated = applyMove("k5r1/1q6/8/8/8/8/4P1PP/5R1K w - - 0 30", "e2e4");
+    expect(mateInOne(mated)).toBeNull();
+    expect(bounceOption(mated, B, "e2e4")).toEqual({ why: "mate" });
+    expect(mateInOne((bounceOption(mated.replace("k5r1", "k7"), B, "e2e4") as { fen: string }).fen)).toBeNull();
+  });
+
+  it("in a battle: at the start of his turn, before his move: a base at its ply (no move added), its moment with this turn's; then his move; once a battle", async () => {
+    const r = raid({ side: W });
+    await crowd(r, "e2e4");
+    expect(r.bossToMove()).toBe(true);
+    expect(r.hopDue()).toBe(true);
+    expect(r.hopCandidates()).toEqual([]);
+    expect(r.hopNeedsEngine()).toBe(false);
+    const plies = r.boards.get(0)!.history.length;
+    const step = r.applyHop(null)!;
+    expect(step).toEqual({ at: 1, from: "e4", to: "e3" });
+    expect(isHop(step)).toBe(false);
+    const board = r.boards.get(0)!;
+    expect(board.history).toHaveLength(plies);
+    expect(board.bases).toContainEqual({ ply: plies, fen: board.fen });
+    expect(fenAtPly(board.history, plies, board.bases)).toBe(board.fen);
+    expect(pieceAt(board.fen, "e3")).toEqual({ color: "w", type: "p" });
+    expect(pieceAt(board.fen, "e4")).toBeNull();
+    expect(board.fen.split(" ")[3]).toBe("-");
+    sound(board.fen);
+    const p = r.boss!.powers!;
+    expect(p.pawnBounce).toEqual(step);
+    expect(p.pawnBounces).toBe(1);
+    expect(p.hop ?? null).toBeNull();
+    expect(p.events.at(-1)).toEqual({ kind: "pawnBounce", turn: p.turn, square: "e3", squares: ["e4", "e3"] });
+    // One a turn: nothing more before his move; he still moves, from the bounced position.
+    expect(r.hopDue()).toBe(false);
+    expect(r.applyHop(null)).toBeNull();
+    const move = await r.playBoss();
+    expect(legalMoves(board.fen)).toContain(move);
+    // The boss view carries it (optional: older apps ignore it), as JSON; your turn after it doesn't count for fair play.
+    expect((JSON.parse(JSON.stringify(r.bossView())) as NetBoss).powers!.pawnBounce).toEqual({ at: 1, from: "e4", to: "e3" });
+    expect(POWER_FX.pawnBounce).toBe(HOPPER_FX.pawnBounce);
+    expect(powerTurn(r.boss)).toBe(true);
+    // Once a battle: your next double push stays where it is.
+    const push = legalMoves(fenOf(r)).filter((m) => m[1] === "2" && m[3] === "4" && pieceAt(fenOf(r), m.slice(0, 2))?.type === "p").sort()[0]!;
+    await crowd(r, push);
+    expect(pieceAt(fenOf(r), push.slice(2, 4))).toEqual({ color: "w", type: "p" });
+    const again = r.hopDue() ? r.applyHop(null) : null;
+    expect(again && !isHop(again)).toBeFalsy();
+    expect(r.boss!.powers!.pawnBounces).toBe(1);
+    expect(powerTurn(r.boss)).toBe(!!again);
+  });
+
+  it("a push it can't bounce waits for your next double push", async () => {
+    // (His army all there, so his meter stays low: no Carrot Patch cast takes his turn.)
+    const r = from("rnbq1bnr/pppppppp/8/8/5k2/8/P3P3/4K3 w - - 0 30", { side: W });
+    await crowd(r, "e2e4");
+    expect(bounceOption(fenOf(r), B, "e2e4")).toEqual({ why: "check" });
+    expect(r.hopDue()).toBe(false);
+    await r.playBoss();
+    await crowd(r, "a2a4");
+    expect(r.carrotDue()).toBe(false);
+    expect(r.hopDue()).toBe(true);
+    expect(r.applyHop(null)).toEqual({ at: 2, from: "a4", to: "a3" });
+  });
+
+  it("one power a turn, the bounce first: with a hop due too, the hop waits for his next turn", async () => {
+    const r = raid({ patch: { bossPowerTest: "leapfrog" }, side: W });
+    await crowd(r, "d2d4");
+    expect(hopOptions(fenOf(r), B).options.map((o) => o.from)).toEqual(["e5"]);
+    expect(r.applyHop(null)).toEqual({ at: 1, from: "d4", to: "d3" });
+    expect(r.boss!.powers!.hop ?? null).toBeNull();
+    expect(r.hopDue()).toBe(false);
+    await r.playBoss();
+    const quiet = legalMoves(fenOf(r)).includes("g1f3") ? "g1f3" : "b1c3";
+    await crowd(r, quiet);
+    expect(r.applyHop(null)).toEqual({ at: 2, from: "e5", over: "e4", to: "e3" });
+  });
+
+  it("Leapfrog hops that same turn: no bounce after it, even one the hop makes possible", async () => {
+    // (Your push blocked his rook's check, so it can't come back: it would bare your king. His c6 pawn hops over your c5 onto
+    // c4, between his rook and your king: back now, it no longer would, but one power a turn.)
+    const r = from("4k3/8/2p5/2P5/r6K/8/4P3/8 w - - 0 30", { side: W });
+    await crowd(r, "e2e4");
+    expect(bounceOption(fenOf(r), B, "e2e4")).toEqual({ why: "exposed" });
+    expect(r.applyHop(null)).toEqual({ at: 1, from: "c6", over: "c5", to: "c4" });
+    expect(bounceOption(fenOf(r), B, "e2e4")).toMatchObject({ from: "e4", to: "e3" });
+    expect(r.hopDue()).toBe(false);
+    expect(r.boss!.powers!.pawnBounces ?? 0).toBe(0);
+  });
+
+  it("a double push in the opening the battle starts from isn't yours: none", () => {
+    const r = raid({ side: B });
+    r.boards.set(0, newBoard(0, { ...BOSS_OPENING, moves: ["g1f3", "e7e5"] }, 2));
+    expect(r.bossToMove()).toBe(true);
+    expect(bounceOption(fenOf(r), W, "e7e5")).toMatchObject({ from: "e5", to: "e6" });
+    expect(r.hopDue()).toBe(false);
+  });
+
+  it("QUEEN SLAIN! never again in his thinking after the bounce", () => {
+    const board = { history: ["d1d8"], bases: [{ ply: 0, fen: "3qk3/8/8/8/8/8/8/3QK3 w - - 0 1" }], captures: [{ ply: 1, side: "w" as const, from: "d1", to: "d8", piece: "q" as const, color: "b" as const }] };
+    const view = { crowdSide: "w" as const, crowdMoves: 5, board, powers: { events: [] as { kind: string }[] } };
+    expect(queenSlain({ ...view, powers: { events: [{ kind: "pawnBounce" }], pawnBounce: { at: 5 } } })).toBe(false);
+    expect(queenSlain({ ...view, powers: { events: [], pawnBounce: { at: 4 } } })).toBe(true);
+  });
+});
+
 // (A bigger run of the same, 120 battles with strikes: reports/hopper-sim.md, "The fuzz".)
 describe("Leapfrog: the ground rules, over many battles (a fuzz, as #267's review)", () => {
   it("every hop and move leaves a legal position the engine plays, with a move or a real ending; replays match; never the last two ranks or a new promotion; never past the cap", async () => {
@@ -412,8 +560,7 @@ describe("Leapfrog: the ground rules, over many battles (a fuzz, as #267's revie
         }
         if (r.hopDue()) {
           const before = fenOf(r);
-          const hop = (await r.playHop())!;
-          counts.hops = (counts.hops ?? 0) + 1;
+          const step = (await r.playHop())!;
           const board = r.boards.get(0)!;
           sound(board.fen);
           expect(legalMoves(board.fen).length).toBeGreaterThan(0);
@@ -421,24 +568,39 @@ describe("Leapfrog: the ground rules, over many battles (a fuzz, as #267's revie
           expect(gameEndWith(board.history, board.bases)).toBeNull();
           expect(board.fen.split(" ")[3]).toBe("-");
           expect(board.fen.split(" ")[5]).toBe(before.split(" ")[5]);
-          expect(Number(hop.to[1])).not.toBe(his === "b" ? 1 : 8);
-          expect(Number(hop.to[1])).not.toBe(his === "b" ? 2 : 7);
-          // (No instant queen: every promotion his move has now, he had before the hop.)
+          // (No instant queen either way: every promotion his move has now, he had before.)
           for (const m of promotions(board.fen)) expect(promotions(before)).toContain(m);
-          expect(Math.abs(Number(hop.to[1]) - Number(hop.from[1]))).toBe(2);
-          expect(pieceAt(board.fen, hop.to)).toEqual({ color: his, type: "p" });
-          expect(pieceAt(board.fen, hop.over)?.type).toBe("p");
           expect(kingAttacked(board.fen, his)).toBe(false);
           expect(r.bossToMove()).toBe(true);
+          // (One a turn: nothing more before his move.)
+          expect(r.hopDue()).toBe(false);
+          if (!isHop(step)) {
+            // (The Pawn Bounce: the crowd's pawn its double push brought one square back, from the move just played.)
+            counts.bounces = (counts.bounces ?? 0) + 1;
+            expect(board.history.at(-1)).toBe(`${step.from[0]}${Number(step.from[1]) + (his === "b" ? -2 : 2)}${step.from}`);
+            expect(Math.abs(Number(step.to[1]) - Number(step.from[1]))).toBe(1);
+            expect(pieceAt(board.fen, step.to)).toEqual({ color: r.boss!.crowdSide, type: "p" });
+            expect(pieceAt(board.fen, step.from)).toBeNull();
+          } else {
+            const hop = step;
+            counts.hops = (counts.hops ?? 0) + 1;
+            expect(Number(hop.to[1])).not.toBe(his === "b" ? 1 : 8);
+            expect(Number(hop.to[1])).not.toBe(his === "b" ? 2 : 7);
+            expect(Math.abs(Number(hop.to[1]) - Number(hop.from[1]))).toBe(2);
+            expect(pieceAt(board.fen, hop.to)).toEqual({ color: his, type: "p" });
+            expect(pieceAt(board.fen, hop.over)?.type).toBe("p");
+          }
         }
         expect(r.boss!.powers!.hops ?? 0).toBeLessThanOrEqual(BOSS_POWERS.hopMax);
+        expect(r.boss!.powers!.pawnBounces ?? 0).toBeLessThanOrEqual(BOSS_POWERS.pawnBounceMax);
         if (r.bossToMove()) await r.playBoss();
         const board = r.boards.get(0)!;
         expect(stockfishRefuses(board.fen)).toBeNull();
         expect(fenAtPly(board.history, board.history.length, board.bases)).toBe(board.fen);
       }
     }
-    // (Enough hops to mean something: the test switch's battles alone bring one each.)
+    // (Enough hops to mean something: the test switch's battles alone bring one each. And bounces: the crowd pushes pawns often.)
     expect(counts.hops).toBeGreaterThanOrEqual(6);
+    expect(counts.bounces).toBeGreaterThanOrEqual(5);
   }, 90_000);
 });

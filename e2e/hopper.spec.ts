@@ -9,6 +9,8 @@ import { BOARD_SEL, test, bossAloneFromHome, engineTop, watchFor } from "./helpe
  * - Leapfrog (?power=leapfrog: the battle starts from 1.e4 e5, your move): at the start of his turn, "LEAPFROG!", his
  *   pawn stays on its square until it takes off, arcs over yours (on neither square meanwhile) and lands beyond it; a
  *   base on the board, no move added; then his move.
+ * - The Pawn Bounce (no switch: your first move a double push): at the start of his turn, "BOUNCE!", your pawn stays on the
+ *   square it reached until it takes off and lands one square back (never on e3 before that); a base, no move added; then his move.
  * - The Carrot Patch (?power=carrotpatch: the cast at the start of his first turn; ?carrots=2: two carrots a step from
  *   his pieces and out of your reach, three a step from yours and out of his): "CARROT PATCH!", the carrots flying and
  *   planted, his ladder; the dock's count; you pull yours (each popping as your move lands, counted), he pulls his; all
@@ -121,6 +123,67 @@ test("Chub & Chirp's Leapfrog (the test switch): his pawn stays on its square un
   expect(hopped.get(to as never)).toMatchObject({ color: crowd === "w" ? "b" : "w", type: "p" });
   expect(hopped.get(over as never)).toMatchObject({ color: crowd, type: "p" });
   expect(hopped.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""))).toContain(board.history[plies + 1]);
+  expect(errors).toEqual([]);
+});
+
+test("Chub & Chirp's Pawn Bounce: your double push knocked back a square at the start of his turn, frame by frame, then his move", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=hopper&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const crowd: "w" | "b" = (await bossNow(page)).crowdSide;
+  const [push, from, to] = crowd === "w" ? ["e2e4", "e4", "e3"] : ["e7e5", "e5", "e6"];
+  const plies = await page.evaluate(() => (window as any).match.phase.board.history.length as number);
+  // (Every frame from your move on: your pawns on the board, and the bounce's state, a pawn in the air and its banner once it's up.)
+  await page.evaluate((mine) => {
+    const w = window as any;
+    w.__bounce = [];
+    const look = () => {
+      const layer = document.querySelector<HTMLElement>(".pm-pawn-bounce .hp-layer");
+      w.__bounce.push({
+        hop: layer?.dataset.hop ?? null,
+        pawns: [...document.querySelectorAll(`.hb-board piece.${mine}.pawn:not(.fading)`)].map((e) => e.getAttribute("data-square")),
+        air: !!layer?.querySelector("piece.hp-piece"),
+        banner: /BOUNCE!/.test(document.querySelector(".fight-banner")?.textContent ?? ""),
+      });
+      if (w.__bounce.length < 3000) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  }, crowd === "w" ? "white" : "black");
+  await play(page, push);
+  await yourMove(page);
+  expect((await bossNow(page)).powers.pawnBounce).toEqual({ at: 1, from, to });
+  const frames: { hop: string | null; pawns: string[]; air: boolean; banner: boolean }[] = await page.evaluate(() => (window as any).__bounce);
+  // Its moment: the banner, then on the board, in order: on the square it reached, in the air, one square back.
+  expect(frames.some((f) => f.banner)).toBe(true);
+  const states = frames.map((f) => f.hop).filter((x): x is string => !!x);
+  expect(states.filter((x, i, a) => x !== a[i - 1])).toEqual(["ready", "air", "landed"]);
+  expect(frames.filter((f) => f.hop === "air").length).toBeGreaterThanOrEqual(3);
+  // Every frame until it lands (your move landing, his thinking, the banner, its takeoff): never on the square behind it.
+  const landed = frames.findIndex((f) => f.hop === "landed");
+  for (const f of frames.slice(0, landed)) expect(f.pawns).not.toContain(to);
+  for (const f of frames.filter((x) => x.hop === "ready")) expect(f.pawns).toContain(from);
+  for (const f of frames.filter((x) => x.hop === "air")) {
+    expect(f.pawns).not.toContain(from);
+    expect(f.air).toBe(true);
+  }
+  // From its landing on: one square back, never again where it was.
+  for (const f of frames.slice(landed)) {
+    expect(f.pawns).toContain(to);
+    expect(f.pawns).not.toContain(from);
+  }
+  // On the board: a base at the push's ply (no move added), the en passant square gone, then his move from it.
+  const board = (await bossNow(page)).board;
+  expect(board.history).toHaveLength(plies + 2);
+  expect(board.history[plies]).toBe(push);
+  const base = board.bases.find((b: { ply: number }) => b.ply === plies + 1).fen as string;
+  expect(base.split(" ")[3]).toBe("-");
+  const bounced = new Chess(base);
+  expect(bounced.get(to as never)).toMatchObject({ color: crowd, type: "p" });
+  expect(bounced.get(from as never)).toBeFalsy();
+  expect(bounced.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""))).toContain(board.history[plies + 1]);
   expect(errors).toEqual([]);
 });
 

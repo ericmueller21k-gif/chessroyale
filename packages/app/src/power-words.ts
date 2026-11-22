@@ -29,6 +29,7 @@ export const POWER_WORDS: Record<PowerId, string> = {
   slam: "Mammoth Slam",
   leapfrog: "hops pawns over yours",
   carrotpatch: "Carrot Patch",
+  pawnbounce: "Pawn Bounce",
   camouflage: "hides a rook among his pawns",
   repaint: "Repaint",
   moonbeam: "stuns a piece with a moonbeam",

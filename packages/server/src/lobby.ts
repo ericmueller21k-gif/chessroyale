@@ -32,6 +32,7 @@ import {
   landsAfterHisMove,
   PASS_WAIT,
   powerMomentMs,
+  isHop,
   lastStandMs,
   queenSlain,
   legalMoves,
@@ -2531,7 +2532,7 @@ export class LobbyCore {
   /**
    * Chub & Chirp's Leapfrog (at the start of his turn, after the crowd's move: the runner's hopDue): everyone sees him get
    * ready (thinking) while the host's engine picks which pawn hops among the candidates (worked out here); one pawn
-   * alone needs no engine and hops at once (after your queen banner, if it's up). Then the hop plays for everyone, and
+   * alone needs no engine and hops at once (after your queen banner, if it's up), as their Pawn Bounce does (no candidates). Then the hop plays for everyone, and
    * his move. No host engine anywhere: the first pawn that can hops.
    */
   private requestHop() {
@@ -2749,13 +2750,13 @@ export class LobbyCore {
       return this.setTimer("nextRound", until);
     }
     if (this.r.bossKind === "hop") {
-      // Chub & Chirp's hop (the host's pick, one of the candidates; else the first): it plays out, then his move. None
-      // due any more (nothing came of it): straight on to his move.
+      // Chub & Chirp's hop (the host's pick, one of the candidates; else the first), or their Pawn Bounce (no pick: it comes
+      // at once): it plays out, then his move. None due any more (nothing came of it): straight on to his move.
       this.r.bossKind = undefined;
       const picked = this.r.bounceCandidates?.includes(move) ? move : null;
       this.r.bounceCandidates = undefined;
       const hop = this.runner!.applyHop(picked);
-      const until = this.io.now() + (hop ? powerMomentMs([{ kind: "hop" }]) : 0);
+      const until = this.io.now() + (hop ? powerMomentMs([{ kind: isHop(hop) ? "hop" : "pawnBounce" }]) : 0);
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }

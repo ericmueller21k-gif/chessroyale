@@ -170,14 +170,15 @@ export interface KitBattle {
  * A boss's powers beyond its passive and ultimate, by their test switches (?power=): each gets a battle of its own in the kit, switched
  * on early, the trigger pulled from the middle (Ginger's Super Freeze, his second meter: Nov 18).
  */
-export const KIT_EXTRA_TESTS: Readonly<Record<string, readonly string[]>> = { gingerbread: ["superfreeze"], sawyer: ["sawswap"] };
+export const KIT_EXTRA_TESTS: Readonly<Record<string, readonly string[]>> = { gingerbread: ["superfreeze"], sawyer: ["sawswap"], hopper: ["pawnbounce"] };
 
 /**
  * A test switch whose power waits on one move of the crowd's (Sawyer's Saw Swap, Nov 20: the check its position is set up for): the
  * crowd's first move in that switch's battle (`moves`, by the side the crowd plays), when it's allowed; its other moves as ever
- * (crowdPick). Its battle must show the power's event (`kind`), or the kit no longer tests it.
+ * (crowdPick). Its battle must show the power's event (`kind`), or the kit no longer tests it. Chub & Chirp's Pawn Bounce (Nov 22): a
+ * double push from the kit's opening (the crowd Black: h7h5; White: d2d4), knocked back at the start of his turn.
  */
-export const KIT_FIRST_MOVE: Readonly<Record<string, { moves: Readonly<Record<"w" | "b", string>>; kind: string }>> = { sawswap: { moves: SAW_SWAP_TEST_CHECK, kind: "sawSwap" } };
+export const KIT_FIRST_MOVE: Readonly<Record<string, { moves: Readonly<Record<"w" | "b", string>>; kind: string }>> = { sawswap: { moves: SAW_SWAP_TEST_CHECK, kind: "sawSwap" }, pawnbounce: { moves: { w: "d2d4", b: "h7h5" }, kind: "pawnBounce" } };
 
 /**
  * The battles each boss gets: his passive switched on early (crowd White); his ultimate switched on early and the
@@ -688,6 +689,8 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null, watch?:
         await c.position(r, "the queen lock's aim");
       }
       if (r.bossToMove()) {
+        // (The steps' events before his move: his move starts the crowd's turn's own, Chub & Chirp's Pawn Bounce's gone by then.)
+        seen();
         const fen = r.boards.get(r.state.boards[0]!)!.fen;
         watch?.(r, fen, "boss");
         const allowed = r.bossAllowed();

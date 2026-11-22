@@ -152,6 +152,7 @@ import {
   stopReason,
   alfilBattle,
   hopperBattle,
+  type HopperStep,
   carrotBattle,
   smudgyBattle,
   mooBattle,
@@ -183,7 +184,7 @@ import {
   type ShowdownScout,
   type CarrotRace,
 } from "./boss-powers.ts";
-import type { BossPowerSettings, BounceResult, CarrotPatch, DodgeResult, LeapfrogHop, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
+import type { BossPowerSettings, BounceResult, CarrotPatch, DodgeResult, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
 import { MATE_TEST_MOVES, TopMovesCache, WIN_TEST_MOVES, bossGuardFrom, bossMoveFrom, netBoard, raceGuard, recheckCloseCalls, repliesFrom, type BossAhead, type BossMoveKind, type BossRace, type EngineLike, type LandingCheck, type RaceCheck } from "./runner-tools.ts";
 // (The judge's re-check, the boss's guards and move, the boards' wire form: their own file, runner-tools.ts, so a page that
 // needs only those, home, doesn't load the runner. Nov 10, phone load.)
@@ -1875,8 +1876,9 @@ export class MatchRunner {
   }
 
   /**
-   * Chub & Chirp's Leapfrog is due: his turn begins and a pawn of his can hop over one of the crowd's (hopperBattle.due).
-   * The hop comes before his move: he moves after it.
+   * Chub & Chirp's Leapfrog is due: his turn begins and a pawn of his can hop over one of the crowd's, or his Pawn Bounce (the
+   * crowd's double push just played knocked back a square: one a turn, the bounce first; hopperBattle.due). Either comes before
+   * his move: he moves after it.
    */
   hopDue(): boolean {
     return hopperBattle.due(this.battle);
@@ -1892,20 +1894,23 @@ export class MatchRunner {
     return hopperBattle.needsEngine(this.battle);
   }
 
-  /** The hop, from this device's engines (hopFrom: the one best for him); null: none was due. */
-  async playHop(engines: readonly EngineLike[] = this.opts.engines): Promise<LeapfrogHop | null> {
+  /** The hop, from this device's engines (hopFrom: the one best for him), or the Pawn Bounce; null: none was due. */
+  async playHop(engines: readonly EngineLike[] = this.opts.engines): Promise<HopperStep | null> {
     const before = this.boards.get(this.state.boards[0]!)!.fen;
     return this.hopped(await hopperBattle.play(this.battle, engines), before);
   }
 
-  /** The hop (from the host's engine online: one of the candidates, else the first; hopperBattle.apply); null: none was due. */
-  applyHop(pick: string | null): LeapfrogHop | null {
+  /** The hop (from the host's engine online: one of the candidates, else the first; hopperBattle.apply), or the Pawn Bounce; null: none was due. */
+  applyHop(pick: string | null): HopperStep | null {
     const before = this.boards.get(this.state.boards[0]!)!.fen;
     return this.hopped(hopperBattle.apply(this.battle, pick), before);
   }
 
-  /** Several bosses: the hop moved a pawn of the side's (`fenBefore`: the position before it): it reaches every other boss's trackers as a move. */
-  private hopped(hop: LeapfrogHop | null, fenBefore: string): LeapfrogHop | null {
+  /**
+   * Several bosses: the hop moved a pawn of the side's, the Pawn Bounce one of the crowd's (`fenBefore`: the position before it): it
+   * reaches every other boss's trackers as a move (Chandy's lock on the bounced pawn follows it).
+   */
+  private hopped(hop: HopperStep | null, fenBefore: string): HopperStep | null {
     if (hop) this.followOthers(`${hop.from}${hop.to}`, fenBefore);
     return hop;
   }

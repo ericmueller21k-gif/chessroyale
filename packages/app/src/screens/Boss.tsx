@@ -318,9 +318,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Each moment's line, into the boss's voice: its text box keeps it up for its time, into the crowd's turn.
   useMomentSpeech(boss, moments, now);
   const funhouse = moments.find((m) => m.kind === "funhouse") ?? null;
-  // (Big Boy's Big Bounce and Chub & Chirp's hop, before his move: as far as the rest of the screen goes, his last move
-  // isn't news.)
-  const bounce = moments.find((m) => m.kind === "bounce" || m.kind === "hop") ?? null;
+  // (Big Boy's Big Bounce and Chub & Chirp's hop and Pawn Bounce, before his move: as far as the rest of the screen goes, his
+  // last move isn't news.)
+  const bounce = moments.find((m) => m.kind === "bounce" || m.kind === "hop" || m.kind === "pawnBounce") ?? null;
   // Boingo's funhouse and its later steps: the board as it was until its spin, the spin, then the new angle. In the
   // funhouse's own screen, the crowd's move he plays for it lands at its beat (FUNHOUSE.moveAt).
   const fun = funhouseView(moments, now, own("clown").powers, bossKit(own("clown").name));

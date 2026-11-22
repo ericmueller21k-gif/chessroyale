@@ -1845,6 +1845,14 @@ export const BOSS_POWERS = {
   hopMax: 2,
   hopNodes: 30_000,
   /**
+   * Chub & Chirp's Pawn Bounce (Eric, Nov 22: "once per game he'll take your pawn that was moved 2 spaces and he jumps it and he hops
+   * it back 1 space"): at the start of his turn after the crowd pushes a pawn two squares, before his move (free, as Leapfrog), that
+   * pawn knocked back one square, the en passant square with it. At most pawnBounceMax a battle; a push it can't bounce (his king
+   * in check, either king attacked after it, a mate in one or a promotion it would hand him, his hop that turn) waits for the next.
+   * Solo, online and in the Battle Tower. docs/decisions/2026-11-22-hopper-pawn-bounce.md.
+   */
+  pawnBounceMax: 1,
+  /**
    * Chub & Chirp's Carrot Patch (their ultimate, once a battle; Eric, Oct 18; docs/decisions/2026-10-18-carrot-patch.md).
    * The cast is his whole turn: carrotCount carrots on empty squares, at least one on each half, no two touching. Where
    * they go (the math): each side's fewest moves to end a move on each square, from the position as it stands, give each
