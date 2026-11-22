@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { boardAltered } from "@chessroyale/chess";
-import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
+import { test, bossAloneFromHome, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * The God King's Last Stand sits out while a boss's power has changed the board (Eric, Oct 24: inside Babur's burning
@@ -35,11 +35,8 @@ const allowedOf = (fen: string, allowed: string[] | null) =>
     .map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), from: m.from, to: m.to, captured: !!m.captured, piece: m.piece }))
     .filter((m) => !allowed || allowed.includes(m.uci));
 
-/** A quiet move of yours, allowed now (a knight first). */
-const quiet = (fen: string, allowed: string[] | null) => {
-  const ok = allowedOf(fen, allowed).filter((m) => !m.captured && !m.uci[4]);
-  return (ok.find((m) => m.piece === "n") ?? ok[0] ?? allowedOf(fen, allowed)[0])!.uci;
-};
+/** A quiet move of yours, allowed now (a knight first; never one that lets him mate at once while another doesn't: pickMove). */
+const quiet = (fen: string, allowed: string[] | null): string => pickMove(fen, { allowed, prefer: (m) => m.piece === "n" });
 
 /** The hoop (2x2 block, named by its lowest file and rank) a square is in, or null. */
 const ringOf = (sq: string, blocks: readonly string[]) =>

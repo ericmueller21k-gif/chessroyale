@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { hoopStops, hoopsValid } from "@chessroyale/chess";
 import { PUMP_OVER, PUMP_OVER_MAX } from "../packages/app/src/characters/side-size.ts";
-import { test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./helpers.ts";
+import { test, bossAloneFromHome, createLobbyFromHome, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * Babur, the circus tiger (id tiger; docs/decisions/2026-10-23-tiger-rules.md and 2026-10-24-tiger-wired.md), played alone, the state
@@ -32,12 +32,8 @@ async function yourMove(page: Page) {
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
 }
 
-/** A quiet move of yours, allowed now (a knight first). */
-function quiet(fen: string, allowed: string[] | null): string {
-  const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion).map((m) => ({ uci: m.from + m.to, piece: m.piece }));
-  const ok = legal.filter((m) => !allowed || allowed.includes(m.uci));
-  return (ok.find((m) => m.piece === "n") ?? ok[0] ?? legal[0])!.uci;
-}
+/** A quiet move of yours, allowed now (a knight first; never one that lets him mate at once while another doesn't: pickMove). */
+const quiet = (fen: string, allowed: string[] | null): string => pickMove(fen, { allowed, prefer: (m) => m.piece === "n" });
 
 /** Every power event the boss view shows, watched every frame (a moment can come and go between two looks). */
 async function watchKinds(page: Page) {
