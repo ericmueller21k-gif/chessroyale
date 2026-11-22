@@ -1284,7 +1284,7 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   pass guard asks no Maia, his race brain's swaps named; Maia within the rest), `packages/app/test/hopper.test.ts` (live: the kit, the
   60 lines and their caps, the sounds' levels, the select screen, the FAQ block, every beat against its animation's cue,
   the moments and their lines, your pull, the board under the moments, the carrots on the board), `carrot-race.test.ts`
-  (the ladder's words; the reel's strip at each count's odds, all blank at 0, all two queens at 4, spread out, the stop on
+  (the ladder's words; the reel's strip at each count's odds, all blank at 0, all a queen at 4 (two queens until Nov 22), spread out, the stop on
   the rolled prize, no near-miss bias over 2,000 spins), `hopper-art.test.ts` (the art's own checks); e2e
   `e2e/hopper.spec.ts` (the test switches, phone and computer: the hop's pawn frame by frame, on its square until the
   takeoff, in the air, landed, then his move from the base; with `?carrots=2`, the cast with its banner, flights, carrots
