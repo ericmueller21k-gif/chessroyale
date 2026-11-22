@@ -18,6 +18,8 @@ import { Cast, PIECE_WORD, SoundAt, casterPoint, hash, type BossUi, type Moment,
  * online sees the same thing (docs/decisions/2026-10-18-hopper-wired.md):
  * - **Leapfrog** (its own screen at the start of his turn, before his move): "LEAPFROG!", then Chirp hops at the
  *   board's corner and his pawn, still on its square until then, takes off, arcs over yours and lands beyond it.
+ * - **The Pawn Bounce** (the same, on the hop's beats; Nov 22): "BOUNCE!", then Chirp hops at the board's corner and your
+ *   pawn, on the square its double push reached until then, bounces back one square.
  * - **The Carrot Patch** (the cast: his whole turn, as your turn begins): "CARROT PATCH!", then Chirp bounds five times
  *   while Chub tosses a carrot each bound; each tumbles to its square and thunks into the soil; then his ladder (what
  *   each count of carrots wins on his spin) for 2.5 s.
@@ -60,8 +62,8 @@ export const PRIZE_DROP = { stagger: 160, fallMs: 450 } as const;
 
 /**
  * The position the board shows during his moments (each moment draws its own pieces on their way): the hop's pawn on
- * its own square until it takes off, then in the air (none on the board) until it lands; his spin's prize pieces only
- * once each has dropped. Null with none of his (the plain position: Boss.tsx).
+ * its own square until it takes off, then in the air (none on the board) until it lands, and so the Pawn Bounce's (your
+ * pawn); his spin's prize pieces only once each has dropped. Null with none of his (the plain position: Boss.tsx).
  */
 export function hopperFen(boss: BossView, moments: readonly Moment[], now: number, fen: string): string | null {
   const p = boss.powers;
@@ -73,6 +75,13 @@ export function hopperFen(boss: BossView, moments: readonly Moment[], now: numbe
     out = fen;
     if (t < B.hop.landAt) out = withoutPiece(out, p.hop.to);
     if (t < B.hop.liftAt) out = withPiece(out, p.hop.from, { color: other(boss.crowdSide), type: "p" });
+  }
+  const bounce = find(moments, "pawnBounce");
+  if (bounce && p.pawnBounce && now < bounce.at + bounce.ms) {
+    const t = now - bounce.at;
+    out ??= fen;
+    if (t < B.pawnBounce.landAt) out = withoutPiece(out, p.pawnBounce.to);
+    if (t < B.pawnBounce.liftAt) out = withPiece(out, p.pawnBounce.from, { color: boss.crowdSide, type: "p" });
   }
   const spin = find(moments, "carrotSpin");
   const squares = p.carrots?.spin?.squares ?? [];
@@ -169,24 +178,40 @@ function Caster({ boss, anim, since, then }: { boss: BossView; anim: string; sin
   return <Cast boss={boss.name} anim={anim} since={since} now={Math.max(Date.now(), since)} then={then} runKey={`hopper:${anim}:${since}`} class="pm-by-hopper" />;
 }
 
-/** "LEAPFROG!", then the hop: his pawn takes off from its square, arcs over yours and lands beyond it. */
-function hopMoment({ boss, t, orientation, banner, cast }: MomentProps) {
-  const h = boss.powers?.hop;
-  const flying = !!h && t >= B.hop.liftAt && t < B.hop.landAt;
-  const u = flying ? (t - B.hop.liftAt) / (B.hop.landAt - B.hop.liftAt) : 0;
+/**
+ * A pawn's arc on the hop's beats (Leapfrog's hop, the Pawn Bounce): its banner until `liftAt`, Chirp's hop at the corner (his
+ * `leapfrog`, its `takeoff` at `liftAt`), the pawn (`side`'s) on `step.from` until `liftAt`, in the air until `landAt` (`lift`: the
+ * arc's height, % of the board), then on `step.to` (the board's: hopperFen).
+ */
+function pawnArc({ t, orientation, banner, cast }: MomentProps, o: { cls: string; title: string; sub?: string; step: { from: string; to: string } | null | undefined; side: "w" | "b"; beats: typeof B.hop; lift: number }) {
+  const { step: h, beats } = o;
+  const flying = !!h && t >= beats.liftAt && t < beats.landAt;
+  const u = flying ? (t - beats.liftAt) / (beats.landAt - beats.liftAt) : 0;
   const from = h ? centreOf(h.from, orientation) : null;
   const to = h ? centreOf(h.to, orientation) : null;
   return (
-    <div class="power-moment pm-hop">
-      {banner("LEAPFROG!", h ? `Over your pawn on ${h.over}` : undefined, "carrot", B.hop.liftAt)}
-      {cast("takeoff", B.hop.liftAt)}
-      <div class="hb-pieces hp-layer" aria-hidden="true" data-hop={!h ? "none" : t < B.hop.liftAt ? "ready" : t < B.hop.landAt ? "air" : "landed"}>
+    <div class={`power-moment ${o.cls}`}>
+      {banner(o.title, o.sub, "carrot", beats.liftAt)}
+      {cast("takeoff", beats.liftAt)}
+      <div class="hb-pieces hp-layer" aria-hidden="true" data-hop={!h ? "none" : t < beats.liftAt ? "ready" : t < beats.landAt ? "air" : "landed"}>
         {flying && from && to && (
-          <AirPiece code={`${COLOR[other(boss.crowdSide)]} pawn`} square={h!.to} at={{ x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u - 11 * Math.sin(Math.PI * u) }} scale={1 + 0.18 * Math.sin(Math.PI * u)} />
+          <AirPiece code={`${COLOR[o.side]} pawn`} square={h!.to} at={{ x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u - o.lift * Math.sin(Math.PI * u) }} scale={1 + 0.18 * Math.sin(Math.PI * u)} />
         )}
       </div>
     </div>
   );
+}
+
+/** "LEAPFROG!", then the hop: his pawn takes off from its square, arcs over yours and lands beyond it. */
+function hopMoment(props: MomentProps) {
+  const h = props.boss.powers?.hop;
+  return pawnArc(props, { cls: "pm-hop", title: "LEAPFROG!", sub: h ? `Over your pawn on ${h.over}` : undefined, step: h, side: other(props.boss.crowdSide), beats: B.hop, lift: 11 });
+}
+
+/** "BOUNCE!", then the Pawn Bounce: your pawn takes off from the square its double push reached and lands one square back. */
+function bounceMoment(props: MomentProps) {
+  const b = props.boss.powers?.pawnBounce;
+  return pawnArc(props, { cls: "pm-pawn-bounce", title: "BOUNCE!", sub: b ? `Your pawn back to ${b.to}` : undefined, step: b, side: props.boss.crowdSide, beats: B.pawnBounce, lift: 9 });
 }
 
 /** The pixel carrot (the dock's icon) as an image, made once. */
@@ -367,18 +392,25 @@ function winMoment({ boss, moment, banner }: MomentProps) {
 }
 
 /** A line from his kit's lines for one of his race's own moments (the same for everyone: by the moment's key). */
-const raceLine = (beat: "carrotHis" | "carrotYours" | "spinBig" | "spinSmall" | "spinEmpty" | "carrotsAll", kit: ReturnType<typeof bossKit>, key: string): string | null => {
+const raceLine = (beat: "carrotHis" | "carrotYours" | "spinBig" | "spinSmall" | "spinEmpty" | "carrotsAll" | "pawnBounce", kit: ReturnType<typeof bossKit>, key: string): string | null => {
   const lines = kit?.lines[beat];
   return lines?.length ? lines[hash(key) % lines.length]! : null;
 };
 
 /**
- * Leapfrog's hop: at the start of his turn, before his move, on a screen of its own (as Big Boy's bounce: the last thing
- * that happened). The Carrot Patch's moments come as a crowd turn begins, after his turn: the cast (his whole turn), a
+ * Leapfrog's hop and the Pawn Bounce: at the start of his turn, before his move, on a screen of its own (as Big Boy's bounce:
+ * the last thing that happened; the bounce with its own line, the hop's animation). The Carrot Patch's moments come as a crowd turn begins, after his turn: the cast (his whole turn), a
  * carrot his move pulled (yours plays as your move lands: yourPulls), his spin, his last carrot.
  */
-const MOMENTS: Record<"hop" | "carrots" | "carrot" | "carrotSpin" | "carrotWin", MomentUi> = {
+const MOMENTS: Record<"hop" | "pawnBounce" | "carrots" | "carrot" | "carrotSpin" | "carrotWin", MomentUi> = {
   hop: { order: 0, kit: "power", own: (boss: BossView) => boss.powers?.events.at(-1)?.kind === "hop" && boss.powers?.hop?.at === boss.crowdMoves, view: hopMoment },
+  pawnBounce: {
+    order: 0,
+    kit: "power",
+    line: (kit, m) => raceLine("pawnBounce", kit, m.key),
+    own: (boss: BossView) => boss.powers?.events.at(-1)?.kind === "pawnBounce" && boss.powers?.pawnBounce?.at === boss.crowdMoves,
+    view: bounceMoment,
+  },
   carrot: { order: 0, kit: "powerHit", line: (kit, m) => raceLine(m.by === "crowd" ? "carrotYours" : "carrotHis", kit, m.key), view: pullMoment },
   carrots: { order: 2, kit: "ultimate", view: castMoment },
   // (His line as the reel starts: on 3 or 4 carrots, on 1 or 2, on none (his count, known already: never the prize). It

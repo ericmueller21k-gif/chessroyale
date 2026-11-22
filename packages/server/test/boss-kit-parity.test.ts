@@ -27,6 +27,7 @@ import {
   dodgeTimeline,
   slamFrom,
   SAW_SWAP_TEST_CHECK,
+  pieceAt,
   type BoardScore,
   type EngineLike,
   type ServerMessage,
@@ -287,6 +288,17 @@ describe("the boss kit: solo and online agree", () => {
     const { trace: net, start } = await online("sawyer", "sawswap", {}, pick);
     const local = await solo(start, pick);
     expect([...net.events].some((e) => e.includes("sawSwap"))).toBe(true);
+    expect(local.turns).toEqual(net.turns);
+    expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
+    expect(local.result).toBe(net.result);
+  }, 60_000);
+
+  it("hopper, the Pawn Bounce: the crowd's first double push knocked back (at the start of his turn, before his move) is the same solo and online", async () => {
+    // (The crowd pushes a pawn two squares when it can, from the position alone: the same on both paths.)
+    const pick = (fen: string, allowed: readonly string[]) => [...allowed].sort().find((m) => /^[a-h]2[a-h]4$|^[a-h]7[a-h]5$/.test(m) && m[0] === m[2] && pieceAt(fen, m.slice(0, 2))?.type === "p") ?? pickFor(fen, allowed);
+    const { trace: net, start } = await online("hopper", "pawnbounce", {}, pick);
+    const local = await solo(start, pick);
+    expect([...net.events].some((e) => e.includes("pawnBounce"))).toBe(true);
     expect(local.turns).toEqual(net.turns);
     expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
     expect(local.result).toBe(net.result);

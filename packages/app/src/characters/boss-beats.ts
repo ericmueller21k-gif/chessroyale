@@ -69,6 +69,8 @@ export type Beat =
   | "spinSmall"
   | "spinEmpty"
   | "carrotsAll"
+  // Chub & Chirp's Pawn Bounce (Nov 22): your double-pushed pawn knocked back a square, before his move.
+  | "pawnBounce"
   // Smudgy's hidden rook revealed by his move (the rules' moment `unmask`; not `strike`, the boss's periodic strike on a
   // piece), and the crowd taking it.
   | "camoStrike"
