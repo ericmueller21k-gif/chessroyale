@@ -517,6 +517,35 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     expect(keptMoves(loadKeptSolo()!)).toBe(3);
   });
 
+  // (The delta review of #885, DN2: the tab stopped at a keep carried on with the step that found it: the boss's search, his reply's timer.)
+  it("a match stopped at a keep (another tab claimed its game while your move was scored) ends there: no search or timer after it", async () => {
+    let calls = 0;
+    const counted = Object.fromEntries(
+      (["topMoves", "scoreMoves", "topMovesAt", "playAtElo"] as const).map((f) => [f, (...a: unknown[]) => (calls++, (slowEngine[f] as (...a: unknown[]) => unknown)(...a))]),
+    ) as unknown as UciEngine;
+    const m = new SoloMatch([counted], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "gingerbread", bossFixedElo: 1600, bossAloneClock: true } as Settings, false, false);
+    let stoppedAt: number | null = null;
+    m.kept = new SoloKeep({ at: Date.now(), bots: false, settings: () => m.settings, facts: () => FACTS, boss: () => m.runner?.boss?.id ?? null, lost: () => ((stoppedAt = calls), m.dispose()) });
+    m.kept.ready("u", GAME, "battle1");
+    m.start();
+    await until(m, () => yourTurn(m), "your first turn");
+    pick(m);
+    // (The judge slow from the second turn's search on, and the God King called: his move waits on it, so it's scored a while.)
+    slow = 2_000;
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    m.callKing();
+    await step(300);
+    expect(m.phase.kind).toBe("scoring");
+    // (Another tab's Resume claims it now; this tab finds out at its next keep, as the judge answers.)
+    store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, tab: "tab-b" }));
+    await step(3_000);
+    expect(stoppedAt, "stopped at its next keep").not.toBeNull();
+    await step(30_000);
+    expect(calls, "nothing searched after the stop").toBe(stoppedAt);
+    expect(vi.getTimerCount(), "no timer of the match's left").toBe(0);
+    expect(loadKeptSolo()).toMatchObject({ tab: "tab-b" });
+  }, 120_000);
+
   it("never the Hidden Boss (his forms and phase 2 aren't in the snapshot): his battle isn't kept", async () => {
     const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "recluse", bossHidden: true, bossFixedElo: 1600 } as Settings, false, true);
     // (As App.tsx's keepSolo: the boss's id only when it isn't him.)

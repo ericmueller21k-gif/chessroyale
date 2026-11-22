@@ -148,7 +148,7 @@ export class SoloMatch implements GameView {
       if (this.live === live) {
         live.picks = picks;
         // (Your move already in and being scored, the bots' plan landing only now: kept again with their picks before they show (D1).)
-        if (this.scored && this.phase.kind === "scoring") {
+        if (this.scored && this.phase.kind === "scoring" && picks.size) {
           this.keepFloor(this.scored);
           if (this.stopped) return;
         }
@@ -443,6 +443,9 @@ export class SoloMatch implements GameView {
   /** The step just played shows for `ms`, then the next round: the floor kept first, so a reload rejoins after the step (keepFloor). */
   private nextRoundIn(ms: number) {
     this.keepFloor();
+    // (Another tab took the game over at this keep (SoloKeep's `lost`): this tab stopped, its step ends here, no more search or timer.
+    // After every keep: the delta review of #885, DN2.)
+    if (this.stopped) return;
     const t = setTimeout(() => {
       if (this.roundTimer === t) this.roundTimer = null;
       this.nextRound();
@@ -941,7 +944,7 @@ export class SoloMatch implements GameView {
     // (A tower floor: the wrong try kept as it happens, so a reload mid-turn has the same bulbs out (Nov 20). The dark's move and the
     // blackout are kept by the step after them: a rejoin can't play a dark's move still due.)
     this.keepFloor();
-    this.emit();
+    if (!this.stopped) this.emit();
   }
 
   /**
@@ -1107,6 +1110,7 @@ export class SoloMatch implements GameView {
       // (A boss battle kept on the device: each round kept as it closes, with the time into the Dodge (D2), so a reload plays on from
       // here (I3). The losing hit too: the battle's result comes only after his kill (finishBossBattle), so a rejoin goes to that loss.)
       this.keepFloor();
+      if (this.stopped) return;
       this.showDodge();
       return this.armDodge();
     }
@@ -1698,6 +1702,7 @@ export class SoloMatch implements GameView {
 
   private nextRound() {
     this.keepFloor();
+    if (this.stopped) return;
     // (Only the turn the game was kept on: its human turn comes next, with nothing played first; a Dodge kept mid-round, only if it's on.)
     const pending = this.pendingMove;
     this.pendingMove = null;
@@ -1920,6 +1925,7 @@ export class SoloMatch implements GameView {
     // picks, there or as they land (D1).)
     this.scored = { move, thinkMs, ...(usedPowerUp ? { powerUp: true } : {}), ...(darkOut ? { darkOut: true } : {}), ...(move === null && this.runner.kingCallers.has(HUMAN) ? { king: true } : {}) };
     this.keepFloor(this.scored);
+    if (this.stopped) return;
     this.set({ kind: "scoring", board, move });
     const t = performance.now();
     // Score while the bots still thinking finish (they light up the leaderboard), then reveal.
@@ -1942,6 +1948,7 @@ export class SoloMatch implements GameView {
     // (A boss battle kept on the device (a floor, a solo battle): kept with your move in, so a reload before his reply never takes it
     // back; his reply is then played on the rejoin, at its round's start.)
     this.keepFloor();
+    if (this.stopped) return;
     if (inFinal) return this.showFinalMove(report);
     if (this.alone && !mine.king && move !== null) {
       // Alone, your move is already on the board: no reveal, straight to the boss's reply. Only a Last Stand stops
