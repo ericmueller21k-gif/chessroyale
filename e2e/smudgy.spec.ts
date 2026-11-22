@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, test, bossAloneFromHome, submitMove } from "./helpers.ts";
+import { BOARD_SEL, test, bossAloneFromHome, pickMove, submitMove } from "./helpers.ts";
 import { REFUSED } from "../packages/app/src/refused.ts";
 
 /**
@@ -30,17 +30,35 @@ const state = (p: Page) =>
 const heard = (p: Page) => p.evaluate(() => ((window as any).__soundLog as string[]).map((n) => n.split(":")[0]!));
 const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
+/** How the battle ended, once it has (the results): his result, the end on the board, the position and the moves. */
+async function ended(page: Page): Promise<string | null> {
+  const r = await page.evaluate(() => {
+    const m = (window as any).match;
+    if (m?.phase.kind !== "results") return null;
+    const { bossResult, timeout, carrots, blackout } = m.phase;
+    return { bossResult, timeout, carrots, blackout, fen: m.boss?.board?.fen as string, history: (m.boss?.board?.history ?? []) as string[], hidden: m.boss?.powers?.camo?.square ?? null };
+  });
+  if (!r) return null;
+  const c = r.fen ? new Chess(r.fen) : null;
+  const end = !c ? "?" : c.isCheckmate() ? "checkmate" : c.isDraw() ? "a draw" : "no end on the board";
+  return `${r.bossResult} (${end}${r.timeout ? ", on time" : ""}${r.carrots ? ", carrots" : ""}${r.blackout ? ", blackout" : ""}) at ${r.fen}, rook hidden on ${r.hidden}, after ${r.history.join(" ")}`;
+}
+
+/** Waits for your turn; a battle that ended instead fails at once, saying how (CI main, Nov 22: Qxf2# after 5 moves). */
 async function yourMove(page: Page) {
-  await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
+  await expect.poll(() => phase(page), { timeout: 90_000 }).toMatch(/^(play|results)$/);
+  expect(await ended(page), "the battle ended mid-test").toBeNull();
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
 }
 
-/** A quiet move of yours that keeps both his sides open (a knight first, never a d- or e-pawn), allowed now. */
-function quiet(fen: string, allowed: string[] | null): string {
-  const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion).map((m) => ({ uci: m.from + m.to, piece: m.piece, from: m.from }));
-  const ok = legal.filter((m) => !allowed || allowed.includes(m.uci)).filter((m) => m.from[0] !== "d" && m.from[0] !== "e");
-  return (ok.find((m) => m.piece === "n") ?? ok[0] ?? legal[0])!.uci;
-}
+/**
+ * A quiet move of yours, allowed now: a knight's first (so no d- or e-pawn opens a bishop onto his rook's sixth-rank square
+ * early), never one that lets him mate at once while another doesn't (helpers.ts pickMove). This spec's own picker never looked
+ * at his threats: with his rook hidden on f7 the f-file is open behind f2, and 1.Na3 a5 2.Nb5 Ra6 3.Na7 e5 4.Nc6 Qh4 5.Na7 Qxf2#
+ * ended the battle mid-test (CI main, Nov 22).
+ */
+const quiet = (fen: string, allowed: string[] | null): string =>
+  pickMove(fen, { allowed, prefer: (m) => m.piece === "n" && m.from[0] !== "d" && m.from[0] !== "e" });
 
 // ---------------- Reading the page ----------------
 

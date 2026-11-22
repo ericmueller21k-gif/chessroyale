@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, test, bossAloneFromHome, engineTop, submitMove } from "./helpers.ts";
+import { BOARD_SEL, test, bossAloneFromHome, engineTop, pickMove, submitMove } from "./helpers.ts";
 import { REFUSED } from "../packages/app/src/refused.ts";
 import { MOO_LINES } from "../packages/app/src/characters/moo.ts";
 import { plainLine } from "../packages/app/src/speech-icons.ts";
@@ -49,12 +49,8 @@ const tap = async (page: Page, square: string) => {
   await page.mouse.click(q.x, q.y);
 };
 
-/** A quiet move of yours, allowed now (no capture, no promotion; a knight's first): the fallback if the engine names none. */
-function quiet(fen: string, allowed: string[] | null): string {
-  const legal = new Chess(fen).moves({ verbose: true }).map((m) => ({ uci: m.from + m.to, piece: m.piece, quiet: !m.captured && !m.promotion }));
-  const ok = legal.filter((m) => !allowed || allowed.includes(m.uci));
-  return (ok.find((m) => m.quiet && m.piece === "n") ?? ok.find((m) => m.quiet) ?? ok[0])!.uci;
-}
+/** A quiet move of yours, allowed now (a knight's first; never one that lets him mate at once: pickMove): the fallback if the engine names none. */
+const quiet = (fen: string, allowed: string[] | null): string => pickMove(fen, { allowed, prefer: (m) => m.piece === "n" });
 
 /**
  * The engine's best move that the powers allow now. A careless player is mated within a few moves of some of his openings (a

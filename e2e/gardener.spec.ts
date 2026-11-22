@@ -4,7 +4,7 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { rollSeed } from "@chessroyale/chess";
 import { GARDENER_LINES } from "../packages/app/src/characters/gardener-lines.ts";
 import { frontMs } from "../packages/app/src/garden-sweep.ts";
-import { test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./helpers.ts";
+import { test, bossAloneFromHome, createLobbyFromHome, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * Puddles, the hippo gardener (id gardener; live since Oct 23: docs/decisions/2026-10-21-gardener-rules.md and 2026-10-23-gardener-wired.md),
@@ -37,12 +37,8 @@ async function yourMove(page: Page) {
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
 }
 
-/** A quiet move of yours, allowed now (a knight first). */
-function quiet(fen: string, allowed: string[] | null): string {
-  const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion).map((m) => ({ uci: m.from + m.to, piece: m.piece }));
-  const ok = legal.filter((m) => !allowed || allowed.includes(m.uci));
-  return (ok.find((m) => m.piece === "n") ?? ok[0] ?? legal[0])!.uci;
-}
+/** A quiet move of yours, allowed now (a knight first; never one that lets him mate at once while another doesn't: pickMove). */
+const quiet = (fen: string, allowed: string[] | null): string => pickMove(fen, { allowed, prefer: (m) => m.piece === "n" });
 
 /** His army short a pawn, a bishop, a knight and the queen, the crowd's whole: a grown piece can come up (set from the page before the first move). */
 const SHORT_FEN = "rn2kb1r/ppppppp1/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

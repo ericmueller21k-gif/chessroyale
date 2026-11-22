@@ -1184,3 +1184,16 @@ The game was right; Sawyer's timing (#856) and the end screen (#855) played no p
 **The fix:** the test offers its queen only when no Slam is warned or under way (`powers.warned`, `powers.ultAt`) and keeps it out of
 reach while one is, and it states that the trigger took (`powers.ultNext`). Forced again: 8 of 8 passed the way the test means
 (RAGE! | MAMMOTH SLAM! | QUEEN DOWN! | MAMMOTH SLAM!, the trigger taken); unforced, 12 of 12.
+
+
+## The same mate, in a spec the fix left out (Nov 22, 2026)
+
+**What happened:** main's full run on 8012d122 went red on `smudgy.spec.ts:189`, which passed only on its retry: `yourMove` waited
+90 s for your turn and got the results ("Smudgy wins" after 5 moves). His swap had hidden his rook on f7, so the f-file stood open
+behind f2, and the spec's own picker (a knight's quiet move first, threats never looked at) played 1.Na3 a5 2.Nb5 Ra6 3.Na7 e5 4.Nc6
+Qh4 5.Na7 Qxf2#. Nov 20's fix had made one picker (`pickMove`) for exactly this, but moved only three specs onto it; six kept their own.
+
+**The fix:** every one of them plays through `pickMove` now (smudgy, moo, gardener, tiger, folio, king-save-altered). An exhaustive
+search of the test's five moves (both sides, every swap, any reply of his) found 9 mating lines with the old picker and none with
+`pickMove`. Smudgy's `yourMove` fails at once on a finished battle, naming the end, the position and the moves.
+docs/decisions/2026-11-22-flaky-smudgy-swap.md.
