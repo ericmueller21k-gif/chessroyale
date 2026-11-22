@@ -1,9 +1,0 @@
-solo-resume-fixes: done. Branch claude/solo-resume; PR #885's review findings fixed, one commit each, all pushed:
-  I4 c7b2e42bd, I1 93a1ce179, I2 494fcf3d7, I3 4fd44c9cc, N3 (+ N1/N2 noted) 15b518c4f; PR body (append "Review fixes") in .pr-body.md.
-Local: typecheck clean; app + server unit tests 299 files, 4,288 passed (solo-resume.test.ts 12 -> 25 tests);
-e2e phone xp.spec + battle-tower.spec 22 passed. No existing check changed or removed; none guards a rule in docs/rules/eric.md.
-Calls made (in the decision note / PR body): the tab that loses its kept game goes home with "Played in another tab." (match disposed);
-Forfeit's refusals show on home's error line; a pending move is scored at once on resume with no board-intro countdown; a resumed
-Dodge's clock is back-dated to its round's opening. Not run: npm run frames:boss.
-Local e2e note: this container's Playwright wants chromium_headless_shell-1194, only 1243 is installed; I pointed
-PLAYWRIGHT_BROWSERS_PATH at a scratchpad folder with a symlink (no repo change).
