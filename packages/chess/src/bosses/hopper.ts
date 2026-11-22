@@ -301,7 +301,7 @@ export async function castAnswer(engines: readonly EngineLike[], fen: string, s:
 /**
  * The test switch (?power=leapfrog): the battle starts from 1.e4 e5 with the crowd to move, so his pawn stands nose to
  * nose with the crowd's as his first turn begins, whatever the crowd plays first (nothing fills the square beyond, pins
- * the pawn or lets the hop give check). The crowd White: 1.e4 e5 (his e5 over your e4 to e3); the crowd Black (?side=b):
+ * the pawn or lets the hop give check); a double push first brings the Pawn Bounce instead, and the hop on his next turn. The crowd White: 1.e4 e5 (his e5 over your e4 to e3); the crowd Black (?side=b):
  * 1.e4 e5 2.Nf3 (his e4 over your e5 to e6).
  */
 export const LEAPFROG_TEST_MOVES: Record<Side, readonly string[]> = { w: ["e2e4", "e7e5"], b: ["e2e4", "e7e5", "g1f3"] };
