@@ -118,8 +118,9 @@ export const keptMoves = (k: Pick<KeptSolo, "kept">): number => ownMoves(k.kept.
 export const keptReal = (k: Pick<KeptSolo, "kept">): boolean => keptMoves(k) >= SOLO_ABANDON.minMoves;
 
 /**
- * What keeps a solo boss battle on the device as it's played (SoloMatch.kept; the same steps as a tower floor's FloorPlay): the game as
- * it stands after every step, written once the server's ids are in (`ready`) and from your first move (SOLO_ABANDON.keepFromMoves).
+ * What keeps a solo boss battle on the device as it's played (SoloMatch.kept; as a tower floor's FloorPlay): the game as it stands at
+ * every update that changes it (SoloMatch.keep: keep before show), written once the server's ids are in (`ready`) and from your first
+ * move (SOLO_ABANDON.keepFromMoves).
  * `end`: the game is decided, resigned or forfeited: cleared, and nothing more is written. Every write after the first checks this tab
  * still holds it (KeptSolo.tab): another tab's Resume took it over, or another tab ended it or started another game, and this one stops
  * (`lost`: App.tsx stops the match, "Played in another tab."), never writing it back.
@@ -156,14 +157,10 @@ export class SoloKeep {
     this.last = game;
     this.write();
   }
-  /** The time you've used on this turn (KeptGame.turnMs), kept with the game as it stands: the page hidden or closed. */
-  keepTurn(ms: number): void {
-    if (this.over || !this.last) return;
-    this.keep({ ...this.last, turnMs: Math.max(0, Math.round(ms)) });
-  }
   /**
-   * Decided, resigned or given up: the kept game goes (only while this tab holds it: a tab whose game another tab took over since its last
-   * keep, its old line ending in the boss's turn, never clears that tab's: the delta review of #885, DN4), and nothing is written again.
+   * Decided, resigned or given up: the kept game goes (only while this tab holds it), and nothing is written again. A battle's own end
+   * keeps nothing (its result's update: the game is no longer one to resume), so another tab may have taken it over since the step before
+   * it was kept; that tab's entry is left be (the delta review of #885, DN4). A resign keeps first (EN2), so a taken-over tab stops there.
    */
   end(): void {
     if (this.over) return;

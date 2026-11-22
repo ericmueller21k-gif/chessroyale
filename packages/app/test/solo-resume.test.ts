@@ -241,7 +241,7 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
       const d = (r.phase as { dodge: { round: number; at: number } }).dodge;
       expect(d.round).toBe(results.length);
       const closed = dodgeTimeline().rounds[results.length - 1]!.closeAt;
-      expect(k.kept.dodgeMs).toBeGreaterThanOrEqual(closed);
+      expect(k.kept.moment!.ms).toBeGreaterThanOrEqual(closed);
       expect(Date.now() - d.at).toBeGreaterThanOrEqual(closed);
       expect(Date.now() - d.at).toBeLessThan(closed + 300);
       await until(r, () => dodge(r)!.results.length > results.length || r.phase.kind === "results", "the next round closed");
@@ -280,7 +280,7 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
       expect(dodge(m)!.results.length).toBe(1);
       setVisible("hidden");
       const k = loadKeptSolo()!;
-      expect(k.kept).toMatchObject({ dodgeMs: into, dodgeVote: square });
+      expect(k.kept).toMatchObject({ moment: { ms: into, mine: square } });
       m.dispose();
       setVisible("visible");
       const r = resumed(k);
@@ -297,6 +297,53 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
       expect(dodge(r)!.results[1]).toMatchObject({ placed: square, hit: true });
       expect(dodge(r)!.results[1]!.random).toBeUndefined();
       r.dispose();
+    } finally {
+      if (at >= 0) admins.splice(at, 0, "chandy");
+    }
+  }, 120_000);
+
+  // (The third review of #885, E1: two windows side by side, both visible, so nothing hides; the other window's Resume took the game over
+  // from the first one's last keep, round 1's close, and opened round 2 before the teleports the first had shown, its safe square known.
+  // The review's case (review-885-delta-2.test.ts), flipped: every teleport is kept as it shows (keep before show: SoloMatch.keep).)
+  it("two windows, Chandy's Dodge: the other window's Resume opens the round at or after every teleport the first has shown", async () => {
+    const admins = BOSS_ADMIN_FIRST as string[];
+    const at = admins.indexOf("chandy");
+    if (at >= 0) admins.splice(at, 1);
+    try {
+      let lostA = 0;
+      const a = new SoloMatch([engine], "Ann", { ...ALONE, bossId: "chandy", bossPowerTest: "dodge" } as Settings, false, false);
+      a.kept = new SoloKeep({ at: Date.now(), bots: false, settings: () => a.settings, facts: () => FACTS, boss: () => a.runner?.boss?.id ?? null, lost: () => (lostA++, a.dispose()) });
+      a.kept.ready("u", GAME, null);
+      a.start();
+      const dodge = (x: SoloMatch) => x.runner?.state.boss?.powers?.chandy?.dodge ?? null;
+      const view = (x: SoloMatch) => (x.phase as { dodge?: { at: number; round: number } }).dodge ?? null;
+      for (let i = 0; i < 6000 && !(dodge(a) && dodge(a)!.results.length === 1 && view(a)); i++) {
+        if (yourTurn(a)) pick(a);
+        await step();
+      }
+      expect(dodge(a)?.results.length, "round 1 closed in A").toBe(1);
+      const r2 = dodgeTimeline().rounds[1]!;
+      // (A shows round 2 past its last teleport, not closed yet, nothing hidden.)
+      await step(view(a)!.at + r2.teleports.at(-1)! + 200 - Date.now());
+      const shown = Date.now() - view(a)!.at;
+      expect(shown).toBeLessThan(r2.closeAt);
+      // Window B: its card's Resume, claimed (as another tab's: both windows run in this one module).
+      const k = takeKeptSolo(loadKeptSolo()!) as KeptSolo;
+      store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, tab: "tab-b" }));
+      // (What B resumes from: A's last keep, its last teleport's, kept a little ahead of it, as at it.)
+      expect(k.kept.moment!.ms).toBeGreaterThanOrEqual(r2.teleports.at(-1)!);
+      const b = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...k.settings }, false, false);
+      void b.resume(k.kept);
+      await until(b, () => !!view(b), "B's Dodge");
+      // B is in round 2 at or after every teleport A showed (its vote with no more time left than A's).
+      expect(view(b)!.round).toBe(1);
+      expect(Date.now() - view(b)!.at).toBeGreaterThanOrEqual(r2.teleports.at(-1)!);
+      expect(Date.now() - view(b)!.at).toBeLessThanOrEqual(shown);
+      // (A stops at its next keep, writing nothing.)
+      await until(b, () => dodge(b)!.results.length === 2, "B's round 2 closed");
+      expect(lostA).toBe(1);
+      expect(loadKeptSolo()).toMatchObject({ tab: "tab-b" });
+      b.dispose();
     } finally {
       if (at >= 0) admins.splice(at, 0, "chandy");
     }
@@ -489,7 +536,7 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     let { keep, lost } = keeper();
     store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, tab: "tab-b" }));
     keep.keep(game(3));
-    keep.keepTurn(5_000);
+    keep.keep(game(4));
     expect(lost).toHaveBeenCalledTimes(1);
     expect(loadKeptSolo()).toMatchObject({ tab: "tab-b" });
     expect(keptMoves(loadKeptSolo()!)).toBe(2);

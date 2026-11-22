@@ -206,13 +206,12 @@ export interface KeptGame {
    */
   powerUp?: true;
   /**
-   * Chandy's Dodge on: the time into it (ms from its start) and your vote in its round on, as the game was kept (as each round closes, as
-   * the page goes): a rejoin carries the round on from there, its teleports already shown and its vote with only its own time left,
-   * never reopening it (the director's call on the delta review of #885, D2). Unset: no Dodge on (a rejoin mid-Dodge without it opens
-   * the round due).
+   * A timed moment on (Chandy's Dodge, Dash's Scramble Rush, Hollow's Lights out: solo.ts `moment`): the time into it (ms from its start)
+   * and your inputs in it (`mine`: the Dodge's vote, the Rush's placements, Lights out's rounds over and taps), as kept at every update
+   * and each of its reveals (keep before show: the third review of #885) and as the page goes: a rejoin carries it on from there, never
+   * replaying what's been shown (the director's call on the delta review's D2). Unset: none on, or not shown yet.
    */
-  dodgeMs?: number;
-  dodgeVote?: string;
+  moment?: { ms: number; mine?: unknown };
   /**
    * Your move as it was accepted, kept before it's scored (the judge's await), so a reload while it's scored can't take it back: a rejoin
    * plays it as that turn's move (the review of #885, I2). Its time (`thinkMs`), a power-up used on it, Hollow's dark ending the turn,
@@ -312,8 +311,10 @@ export function readKeptGame(v: unknown): KeptGame | null {
   const p = g.pending;
   const picks = Array.isArray(p?.picks) ? p.picks.filter((x): x is [string, string] => Array.isArray(x) && typeof x[0] === "string" && typeof x[1] === "string").map(([id, move]): [string, string] => [id, move]) : [];
   const botPowerUps = Array.isArray(p?.botPowerUps) ? p.botPowerUps.filter((id): id is string => typeof id === "string") : [];
+  const m = g.moment;
+  const moment = m && typeof m === "object" && typeof m.ms === "number" && Number.isFinite(m.ms) && m.ms >= 0 ? { ms: m.ms, ...(m.mine !== undefined ? { mine: m.mine } : {}) } : null;
   const pending = p && typeof p === "object" && (p.move === null || typeof p.move === "string") && typeof p.thinkMs === "number" && Number.isFinite(p.thinkMs) ? { move: p.move, thinkMs: Math.max(0, p.thinkMs), ...(p.powerUp ? { powerUp: true as const } : {}), ...(p.darkOut ? { darkOut: true as const } : {}), ...(p.king === true && p.move === null ? { king: true as const } : {}), ...(picks.length ? { picks } : {}), ...(botPowerUps.length ? { botPowerUps } : {}) } : null;
-  return { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}), ...(g.powerUp === true ? { powerUp: true as const } : {}), ...(typeof g.dodgeMs === "number" && Number.isFinite(g.dodgeMs) && g.dodgeMs >= 0 ? { dodgeMs: g.dodgeMs, ...(typeof g.dodgeVote === "string" ? { dodgeVote: g.dodgeVote } : {}) } : {}), ...(pending ? { pending } : {}) };
+  return { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}), ...(g.powerUp === true ? { powerUp: true as const } : {}), ...(moment ? { moment } : {}), ...(pending ? { pending } : {}) };
 }
 
 /** A kept floor read back, or null when there's none or it isn't one (another version, a damaged entry). */
@@ -509,12 +510,6 @@ export class FloorPlay {
     if (this.kept.done) return;
     this.kept = { ...this.kept, game };
     saveKept(this.kept);
-  }
-  /** The time you've used on this turn, kept with the game as it stands (KeptGame.turnMs): the snapshot is the turn's start's. */
-  keepTurn(ms: number): void {
-    const game = this.kept.game;
-    if (this.kept.done || !game) return;
-    this.keep({ ...game, turnMs: Math.max(0, Math.round(ms)) });
   }
   /**
    * The theme this floor's battle plays (KeptFloor.music): picked once, as it first asks (`has`: null while themes.json isn't read yet:

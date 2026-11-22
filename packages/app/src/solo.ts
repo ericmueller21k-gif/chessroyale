@@ -1,6 +1,6 @@
 import { DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
+import { LIGHTS_OUT, type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -36,6 +36,13 @@ const FINAL_SHOW_MS = 3200;
 /** Boss battle: how long the boss's move shows, how long it thinks at least, and how long a strike shows. */
 const BOSS_KILL_MS = 3800;
 /** The moments of the crowd's move that his thinking waits for (Alfil's early landing, Moo's Full Moon, Folio, Boingo's pop, Zebra, Chandy, Big Boy's topple, Sawyer's Saw Swap): the server's sum (thinkMinAt). */
+/**
+ * How far ahead of a timed moment's reveal it's kept (ms; keep): a tab whose game another tab took over finds out at that keep and stops
+ * before its screen draws the reveal, even with its timer a few frames late.
+ */
+const REVEAL_LEAD_MS = 100;
+/** What a kept game holds beside the snapshot, your moves and the intro (KeptGame). */
+type Extras = Pick<KeptGame, "turnMs" | "powerUp" | "pending" | "moment">;
 const landedMs = (snap: BossView) => landedEarlyMs(snap) + fullMoonMs(snap) + gingerTurnMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap) + chandyTurnMs(snap) + bigboyTurnMs(snap) + sawyerTurnMs(snap);
 /**
  * The opening library (packages/chess/data/openings.json: 350 kB of the first load's main chunk until Nov 6): its own chunk now,
@@ -101,7 +108,15 @@ export class SoloMatch implements GameView {
   moves: MoveRecord[] = [];
   scoringMs: number[] = [];
   private listeners = new Set<() => void>();
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private stepTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The match's next step on a timer. One set once the match has stopped (by the step that found the stop) is cleared at once (DN2). */
+  private get timer(): ReturnType<typeof setTimeout> | null {
+    return this.stepTimer;
+  }
+  private set timer(t: ReturnType<typeof setTimeout> | null) {
+    if (t !== null && this.stopped) clearTimeout(t);
+    else this.stepTimer = t;
+  }
   private rng = Math.random;
   private playStartedAt = 0;
   /** When your last move went in (alone, the boss's thinking time counts from there). */
@@ -114,8 +129,14 @@ export class SoloMatch implements GameView {
   /** Test switch (?side=b): a boss raid alone, playing Black (to see the God King in black). */
   private raidSide = testParams().get("side") === "b" ? ("b" as const) : undefined;
 
+  /**
+   * This match's engines: a search asked once the match has stopped is never sent, nor answered, so a step that found the stop (a keep:
+   * another tab took the game over) goes no further than the update that found it, wherever that is (the delta review of #885, DN2).
+   */
+  private readonly engines: UciEngine[];
+
   constructor(
-    private readonly engines: UciEngine[],
+    engines: UciEngine[],
     readonly playerName: string,
     private readonly baseSettings: Settings = DEFAULT_SETTINGS,
     readonly practice = false,
@@ -126,6 +147,7 @@ export class SoloMatch implements GameView {
     // plays on Boss Battle's clock, 10 + 10 (BOSS_CLOCK; Eric, Oct 30), with no boss strikes (Eric, Oct 31); a Solo raid
     // keeps the raid's clock and strikes.
     // Against Hollow, Boss alone plays his ten bulbs instead of points (Eric, Nov 5: `hollowBulbs`, solo only).
+    this.engines = engines.map((e) => whileOn(e, () => this.stopped));
     if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: true, ...(baseSettings.bossAloneClock ? bossClockSettings(baseSettings) : {}) };
     // (The hippo gardener's seeds count by this page's visible time, not an earlier online match's server.)
     setGardenSource(null);
@@ -147,11 +169,7 @@ export class SoloMatch implements GameView {
     void this.runner.planBotPicks().then((picks) => {
       if (this.live === live) {
         live.picks = picks;
-        // (Your move already in and being scored, the bots' plan landing only now: kept again with their picks before they show (D1).)
-        if (this.scored && this.phase.kind === "scoring" && picks.size) {
-          this.keepFloor(this.scored);
-          if (this.stopped) return;
-        }
+        // (Your move already in and being scored, the bots' plan landing only now: this update keeps them with it before they show (D1).)
         this.emit();
       }
     });
@@ -225,11 +243,9 @@ export class SoloMatch implements GameView {
   }
   usePowerUp() {
     if (this.phase.kind !== "play" || this.hint || this.powerUpsLeft() <= 0) return;
-    this.hint = [];
-    // (A boss battle kept on the device: kept as it's used, before its hints show, so a reload can't give it back (KeptGame.powerUp: the
-    // delta review of #885, D4). It's spent as your move is scored, as ever.)
-    this.keepFloor();
-    if (!this.stopped) this.showHints();
+    // (Kept as it's used, by the update that shows it, before its hints: a reload can't give it back (KeptGame.powerUp: the delta review
+    // of #885, D4). It's spent as your move is scored, as ever.)
+    this.showHints();
   }
   /** This turn's power-up used (`hint` set): the engine's top moves, shown as they come. */
   private showHints() {
@@ -265,11 +281,22 @@ export class SoloMatch implements GameView {
     // (Stopped: an engine answer or a timer on its way changes nothing.)
     if (this.stopped) return;
     this.phase = phase;
-    this.noteEnded();
-    this.listeners.forEach((l) => l());
+    this.show();
   }
 
   private emit() {
+    this.show();
+  }
+
+  /**
+   * Every update on its way to the screen (set, emit). A kept battle keeps first (keep before show: keepShown), so it never shows
+   * what a reload or another tab would resume from before; another tab found holding the game at that keep stops this one, and the
+   * update goes no further.
+   */
+  private show() {
+    const was = this.stopped;
+    this.keepShown();
+    if (this.stopped && !was) return;
     this.noteEnded();
     this.listeners.forEach((l) => l());
   }
@@ -363,6 +390,8 @@ export class SoloMatch implements GameView {
     this.awayWatch = null;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    if (this.revealTimer) clearTimeout(this.revealTimer);
+    this.revealTimer = null;
     this.clearStall();
     this.freeBrain();
     this.runner?.showdownScout?.stop();
@@ -406,28 +435,59 @@ export class SoloMatch implements GameView {
    * Boss alone and a Solo raid, never a test game or the Hidden Boss).
    */
   kept: SoloKeep | null = null;
-  /** What keeps this game on the device after every step: a tower floor's, or a solo boss battle's. */
-  private get keeper(): Pick<SoloKeep, "keep" | "keepTurn"> | null {
+  /** What keeps this game on the device as it's played: a tower floor's, or a solo boss battle's. */
+  private get keeper(): Pick<SoloKeep, "keep"> | null {
     return this.tower ?? this.kept;
   }
 
   /**
-   * The floor's game kept on the device as it stands now, so a reload rejoins it here: as each round begins (nextRound) and as each
-   * step of the bosses' turn has played (nextRoundIn: his move, each power's step), so a reload rejoins after his reply, never before
-   * it to draw another (audit 2, finding 2). With it, the time you've used on this turn (turnUsedMs), and your move as it's accepted,
-   * before it's scored (`pending`: score).
+   * The rule (the third review of #885: every finding of the first two was this one bug, patched power by power): **a kept battle never
+   * shows what it hasn't kept**. So it keeps in the one place its updates reach the screen (show: set and emit), before they do, whenever
+   * the kept game would change (`keptKey`: the times alone changing don't write), and at each beat a timed moment's screen shows by the
+   * clock alone (its `reveals`: a Dodge's teleports, the Rush's sweep, a Lights out round's targets), a little ahead of it (armReveal).
+   * A reload, a crash or another tab then resumes at or after everything this page has shown, never before it (audit 2's finding 2 and
+   * every finding since). `force`: written even if nothing but the times changed (a reveal, the page going, a resign's tab check).
    */
-  private keepFloor(pending?: KeptGame["pending"]) {
+  private keep(force = false) {
     const keeper = this.keeper;
     if (!keeper || this.stopped || !this.runner?.boss || this.runner.boss.result) return;
     this.watchAway();
+    // (Until a rejoin's first round is under way, what it was kept with: its first keeps, the brain's loading among them, lose nothing.)
+    const { turnMs, moment, ...rest } = this.resumed ?? this.extras();
+    const game = { snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...rest };
+    const key = JSON.stringify(moment ? { ...game, moment: { mine: moment.mine } } : game);
+    if (!force && key === this.keptKey) return;
+    this.keptKey = key;
+    keeper.keep({ ...game, ...(turnMs ? { turnMs } : {}), ...(moment ? { moment } : {}) });
+  }
+  /** The last kept game, its times left out: an update that changes nothing else writes nothing. */
+  private keptKey = "";
+  /** An update about to show: kept first (keep), then the timed moment's next reveal armed. */
+  private keepShown(force = false) {
+    this.keep(force);
+    this.armReveal();
+  }
+  /** A timed moment's next reveal: kept REVEAL_LEAD_MS ahead of it, as at it (momentNow), so a tab taken over stops before drawing it. */
+  private revealTimer: ReturnType<typeof setTimeout> | null = null;
+  private armReveal() {
+    if (this.revealTimer) clearTimeout(this.revealTimer);
+    this.revealTimer = null;
+    const m = this.keeper && !this.stopped ? this.moment() : null;
+    if (!m) return;
+    const into = Date.now() - m.at;
+    const next = m.reveals.find((t) => t - REVEAL_LEAD_MS > into);
+    if (next !== undefined) this.revealTimer = setTimeout(() => this.keepShown(true), next - REVEAL_LEAD_MS - into);
+  }
+
+  /** What's kept beside the snapshot, live: the time used on your turn, its power-up used, your move being scored, the timed moment. */
+  private extras(): Extras {
     const turnMs = this.turnUsedMs();
-    // (This turn's power-up used, its hints seen (D4): on your turn its hint; before a rejoin's turn begins, the kept one's.)
-    const powerUp = !pending && (this.phase.kind === "play" ? this.hint !== null : this.resumePowerUp);
-    // (Chandy's Dodge on: the time into it and your vote in its round, so a rejoin carries the round on from here (D2).)
-    const d = this.dodge;
-    const dodge = d ? { dodgeMs: Math.max(0, Date.now() - d.at), ...(d.mine ? { dodgeVote: d.mine } : {}) } : {};
-    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}), ...(powerUp ? { powerUp: true } : {}), ...dodge, ...(pending ? { pending: { ...pending, ...this.plannedPicks() } } : {}) });
+    // (Your move as it's accepted, before it's scored (I2), the King's call with it (D5), the bots' picks planned by then (D1).)
+    const pending = this.scored ? { ...this.scored, ...this.plannedPicks() } : null;
+    // (This turn's power-up used, its hints seen (D4).)
+    const powerUp = !pending && this.phase.kind === "play" && this.hint !== null;
+    const moment = this.momentNow();
+    return { ...(turnMs > 0 ? { turnMs } : {}), ...(powerUp ? { powerUp: true as const } : {}), ...(pending ? { pending } : {}), ...(moment ? { moment } : {}) };
   }
   /**
    * A Solo raid's bot picks planned this round, kept with your move (KeptGame.pending): from your pick on they're on screen (livePicks), so
@@ -437,15 +497,41 @@ export class SoloMatch implements GameView {
     const { picks, powerUps } = this.runner.plannedPicks();
     return picks.length ? { picks, ...(powerUps.length ? { botPowerUps: powerUps } : {}) } : {};
   }
-  /** Your move as it was kept while it's scored (score), until its round is finished: kept again as the bots' plan lands (startLive). */
+  /** Your move as it was accepted, while it's scored (score), until its round is finished. */
   private scored: KeptGame["pending"] | null = null;
 
-  /** The step just played shows for `ms`, then the next round: the floor kept first, so a reload rejoins after the step (keepFloor). */
+  /**
+   * The timed moment on (Chandy's Dodge, Dash's Scramble Rush, Hollow's Lights out: nobody's clock runs, it plays on while hidden): when it
+   * began, your inputs in it (`mine`: the Dodge's vote, the Rush's placements, Lights out's rounds over and taps), and the beats its screen
+   * shows by the clock alone, with no update (ms from its start). A new timed power adds itself here, or a reload replays it seen.
+   */
+  private moment(): { at: number; mine?: unknown; reveals: readonly number[] } | null {
+    if (this.dodge) {
+      const tl = dodgeTimeline();
+      return { at: this.dodge.at, ...(this.dodge.mine ? { mine: this.dodge.mine } : {}), reveals: [tl.volley.at, ...tl.rounds.flatMap((r) => [r.openAt, r.voteAt, ...r.teleports])] };
+    }
+    if (this.rush) {
+      const tl = rushTimeline();
+      return { at: this.rush.at, mine: { places: this.rush.places, moved: this.rush.moved }, reveals: [tl.scatterAt, tl.placeAt] };
+    }
+    if (this.lights) {
+      const tl = this.lightsTimeline();
+      const l = this.lights;
+      return { at: l.at, mine: { endedAt: l.endedAt, taps: l.taps, tapAt: l.tapAt }, reveals: [LIGHTS_OUT.dropAt, ...tl.rounds.map((r) => r.at), tl.backAt] };
+    }
+    return null;
+  }
+  /** The moment as kept now: the time into it (as at its next reveal once that's under REVEAL_LEAD_MS away), your inputs in it. */
+  private momentNow(): KeptGame["moment"] {
+    const m = this.moment();
+    if (!m) return undefined;
+    const into = Math.max(0, Date.now() - m.at);
+    const next = m.reveals.find((t) => t > into);
+    return { ms: next !== undefined && next - into <= REVEAL_LEAD_MS ? next : into, ...(m.mine !== undefined ? { mine: m.mine } : {}) };
+  }
+
+  /** The step just played shows for `ms`, then the next round (that step's update kept it: show). */
   private nextRoundIn(ms: number) {
-    this.keepFloor();
-    // (Another tab took the game over at this keep (SoloKeep's `lost`): this tab stopped, its step ends here, no more search or timer.
-    // After every keep: the delta review of #885, DN2.)
-    if (this.stopped) return;
     const t = setTimeout(() => {
       if (this.roundTimer === t) this.roundTimer = null;
       this.nextRound();
@@ -458,14 +544,11 @@ export class SoloMatch implements GameView {
    * turn is kept with the game as the page is hidden or closed, and given back as used on a rejoin (`resumeTurnMs`); while the page is
    * hidden your turn's clock stands still (`awayAt`), as a locked phone left overnight would otherwise come back lost on time.
    */
-  private resumeTurnMs = 0;
-  /** Rejoined on a turn whose power-up was used (KeptGame.powerUp): it starts spent, its hints fetched again (D4). */
-  private resumePowerUp = false;
   private awayAt = 0;
   private awayWatch: (() => void) | null = null;
   /** The time you've used on this turn of yours (ms): its clock's, less its pauses; 0 when it isn't your turn. */
   private turnUsedMs(now = Date.now()): number {
-    if (this.phase.kind !== "play") return this.resumeTurnMs;
+    if (this.phase.kind !== "play") return 0;
     return Math.max(0, (this.awayAt || now) - this.playStartedAt - this.frozenMs(this.awayAt || now));
   }
   private watchAway() {
@@ -480,18 +563,18 @@ export class SoloMatch implements GameView {
     };
   }
   /**
-   * The page hidden (or closed) on your turn: its clock stops, and the time used so far is kept with the floor. During Chandy's Dodge
-   * (nobody's clock runs; it plays on while hidden): the time into it is kept (keepFloor), so a rejoin carries its round on from here (D2).
+   * The page hidden (or closed) on your turn: its clock stops, and the time used so far is kept with the floor. During a timed moment
+   * (nobody's clock runs; it plays on while hidden): the time into it is kept, so a rejoin carries it on from here (D2).
    */
   private goneAway() {
     const keeper = this.keeper;
-    if (keeper && !this.stopped && this.dodge) return this.keepFloor();
+    if (keeper && !this.stopped && this.moment()) return this.keep(true);
     if (!keeper || this.stopped || this.phase.kind !== "play" || this.awayAt) return;
     this.awayAt = Date.now();
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.cancelStall();
-    keeper.keepTurn(this.turnUsedMs());
+    this.keep(true);
   }
   /** Back on the page: your turn's clock goes on from where it stood (its start and deadline moved on by the time away). */
   private cameBack() {
@@ -526,12 +609,11 @@ export class SoloMatch implements GameView {
     this.moves = [...game.moves];
     // (A Solo raid resumed: its bots in their seats, so its "again" is a Solo raid's.)
     if (this.raidBots) this.players = [{ id: HUMAN, name: this.playerName, isBot: false, connected: true }, ...this.runner.state.players.filter((p) => p.isBot).map((p): LobbyPlayer => ({ id: p.id, name: p.name, isBot: true, connected: true }))];
-    // (The time you'd used on your turn as you went: given back as used, nothing for the time away: keepFloor. Your move kept as it was
-    // accepted, still being scored then: played as that turn's move, at its own time (I2).)
-    this.resumeTurnMs = game.pending ? game.pending.thinkMs : (game.turnMs ?? 0);
-    this.resumePowerUp = !game.pending && !!game.powerUp;
-    this.resumeDodge = game.dodgeMs === undefined ? null : { ms: game.dodgeMs, ...(game.dodgeVote ? { vote: game.dodgeVote } : {}) };
-    this.pendingMove = game.pending ?? null;
+    // (What it was kept with, played by its first round (nextRound), and kept as it was until then: the time you'd used on your turn,
+    // given back as used, nothing for the time away; a power-up used on it; your move as it was accepted, still being scored then, played
+    // as that turn's move at its own time (I2); the timed moment on, from the time into it.)
+    const { snapshot: _snapshot, moves: _moves, intro: _intro, ...extras } = game;
+    this.resumed = extras;
     this.begun = this.runner.boss ? this.runner.boss.crowdMoves > 0 || game.intro : false;
     this.bossIntroDone = game.intro;
     await new Promise<void>((done, fail) => {
@@ -556,6 +638,10 @@ export class SoloMatch implements GameView {
   resign() {
     const exit = this.exit;
     if (!exit) return;
+    // (A kept battle: kept first, its tab checked: a tab whose game another took over stops here ("Played in another tab.") and records
+    // nothing, rather than a loss for a game played on elsewhere (the third review of #885, EN2).)
+    this.keep(true);
+    if (this.stopped) return;
     // (Phase 2: your board is lost and the others play on; already decided, the battle ends here.)
     if (this.phase.kind === "simul" && this.phase2) {
       if (exit === "resign") return this.phase2.resign(0);
@@ -941,10 +1027,9 @@ export class SoloMatch implements GameView {
     if (out.blackout) return this.blackoutTurn();
     // (Your turn, though no move went in: XP's minimum counts it, as the match room does online. Nov 21.)
     if (out.out) return void this.score(null, true);
-    // (A tower floor: the wrong try kept as it happens, so a reload mid-turn has the same bulbs out (Nov 20). The dark's move and the
-    // blackout are kept by the step after them: a rejoin can't play a dark's move still due.)
-    this.keepFloor();
-    if (!this.stopped) this.emit();
+    // (Kept as it shows, so a reload mid-turn has the same bulbs out (Nov 20); the dark's move due and the blackout too: a rejoin plays
+    // them, playRound and stageComplete.)
+    this.emit();
   }
 
   /**
@@ -989,13 +1074,28 @@ export class SoloMatch implements GameView {
     return lightsRoundEnd(this.lightsTimeline().rounds[k]!, pieces, this.you.alive ? [l.tapAt[k] ?? []] : [], this.settings.lateGraceMs);
   }
 
-  /** At the start of his turn (the clocks stopped): the rounds, timed here as the server times them online. */
-  private lightsOutTurn() {
-    const test = this.runner.startLightsOut();
-    const at = Date.now();
-    this.lights = { key: `l-${at}`, at, ended: 0, endedAt: [], taps: test.rounds.map(() => []), tapAt: test.rounds.map(() => []) };
+  /**
+   * At the start of his turn (the clocks stopped): the rounds, timed here as the server times them online. `kept`: resumed during it
+   * (KeptGame.moment; its test is in the state from its start): on from the time kept, its rounds over and your taps as they were, never
+   * started again with its answers seen.
+   */
+  private lightsOutTurn(kept?: KeptGame["moment"]) {
+    const test = kept ? this.runner.state.boss!.powers!.lightsOut! : this.runner.startLightsOut();
+    const at = Date.now() - (kept?.ms ?? 0);
+    const mine = (kept?.mine ?? {}) as { endedAt?: unknown; taps?: unknown; tapAt?: unknown };
+    const list = <T>(v: unknown, ok: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(ok) : []);
+    const endedAt = list(mine.endedAt, (x): x is number => typeof x === "number" && Number.isFinite(x)).slice(0, test.rounds.length);
+    const taps = test.rounds.map((_, i) => list(Array.isArray(mine.taps) ? mine.taps[i] : null, (x): x is string => typeof x === "string"));
+    const tapAt = test.rounds.map((_, i) => list(Array.isArray(mine.tapAt) ? mine.tapAt[i] : null, (x): x is number => typeof x === "number" && Number.isFinite(x)));
+    this.lights = { key: `l-${at}`, at, ended: endedAt.length, endedAt, taps, tapAt };
     this.showLights();
     this.armLights();
+  }
+  /** Lights out under way: begun (its test in the state, this crowd move's), its misses not yet counted. */
+  private lightsOutOn(): boolean {
+    const boss = this.runner.state.boss;
+    const t = boss?.powers?.lightsOut;
+    return !!t && t.at === boss!.crowdMoves && !t.missed && !boss!.result && this.runner.bossToMove();
   }
   private armLights() {
     const l = this.lights!;
@@ -1072,16 +1172,17 @@ export class SoloMatch implements GameView {
 
   /**
    * As your turn begins: the scope-in, the warning volley, then three rounds of the vote, each closed here as the server closes them online.
-   * `kept`: resumed mid-Dodge (KeptGame.dodgeMs): on from the time kept, the rounds closed by then kept too (dodgeStep), so the round on
-   * goes on where it was (its teleports already shown, its vote with only its own time left, your vote in it kept), never reopened with
-   * its answers known (the review of #885, I3; the delta review, D2). Mid-Dodge with no time kept: the round due, as it opens.
+   * `kept`: resumed mid-Dodge (KeptGame.moment): on from the time kept, the rounds closed by then kept too (dodgeStep), so the round on
+   * goes on where it was (its teleports shown so far, its vote with only its own time left, your vote in it kept), never reopened with
+   * its answers known (the review of #885, I3; the delta review, D2; every teleport kept as it shows: the third review, E1). Mid-Dodge with
+   * no time kept (it hadn't shown yet): the round due, as it opens.
    */
-  private dodgeTurn(kept: { ms: number; vote?: string } | null = null) {
+  private dodgeTurn(kept?: KeptGame["moment"]) {
     if (this.timer) clearTimeout(this.timer);
     const full = this.runner.state.boss?.powers?.chandy?.dodge;
     const done = full?.results.length ?? 0;
     const at = Date.now() - (kept ? kept.ms : done ? (dodgeTimeline().rounds[done]?.openAt ?? 0) : 0);
-    const mine = kept?.vote && full && dodgeArena(full.center).includes(kept.vote) ? kept.vote : undefined;
+    const mine = typeof kept?.mine === "string" && full && dodgeArena(full.center).includes(kept.mine) ? kept.mine : undefined;
     this.dodge = { key: `d-${at}`, at, round: done, ...(mine ? { mine } : {}) };
     this.showDodge();
     this.armDodge();
@@ -1107,10 +1208,8 @@ export class SoloMatch implements GameView {
       this.runner.finishDodgeRound(this.you.alive && d.mine ? { [HUMAN]: d.mine } : {});
       d.round++;
       d.mine = undefined;
-      // (A boss battle kept on the device: each round kept as it closes, with the time into the Dodge (D2), so a reload plays on from
-      // here (I3). The losing hit too: the battle's result comes only after his kill (finishBossBattle), so a rejoin goes to that loss.)
-      this.keepFloor();
-      if (this.stopped) return;
+      // (Each round kept as it closes, by the update that shows it, with the time into the Dodge (D2), so a reload plays on from here
+      // (I3). The losing hit too: the battle's result comes only after his kill (finishBossBattle), so a rejoin goes to that loss.)
       this.showDodge();
       return this.armDodge();
     }
@@ -1134,13 +1233,17 @@ export class SoloMatch implements GameView {
   /** The Rush on (your turn waits for it): its key, when it began, your placements so far. */
   private rush: RushView | null = null;
 
-  /** As your turn begins: the countdown and his sweep, his line and the God King's, your ten seconds; timed here as online. */
-  private rushTurn() {
+  /**
+   * As your turn begins: the countdown and his sweep, his line and the God King's, your ten seconds; timed here as online. `kept`: resumed
+   * during it (KeptGame.moment): on from the time kept, your placements as they were, never from its countdown again with his sweep seen.
+   */
+  private rushTurn(kept?: KeptGame["moment"]) {
     if (this.timer) clearTimeout(this.timer);
-    const at = Date.now();
-    this.rush = { key: `r-${at}`, at, places: {}, moved: {} };
+    const at = Date.now() - (kept?.ms ?? 0);
+    const mine = (kept?.mine ?? {}) as { places?: unknown; moved?: unknown };
+    this.rush = { key: `r-${at}`, at, places: record(mine.places, (v): v is string => typeof v === "string"), moved: record(mine.moved, (v): v is number => Number.isInteger(v)) };
     this.showRush();
-    this.timer = setTimeout(() => this.rushStep(), rushTimeline().placeUntil);
+    this.timer = setTimeout(() => this.rushStep(), Math.max(0, at + rushTimeline().placeUntil - Date.now()));
   }
   private showRush() {
     const r = this.rush!;
@@ -1695,19 +1798,24 @@ export class SoloMatch implements GameView {
     return v.playing ? `${v.won} of ${v.of} won` : "";
   }
 
-  /** A resumed game's move, accepted and still being scored as it was kept (KeptGame.pending): played as its turn begins (nextRound). */
-  private pendingMove: KeptGame["pending"] | null = null;
-  /** A game resumed mid-Dodge: the time into it and your vote, as kept (KeptGame.dodgeMs): its round goes on from there (dodgeTurn). */
-  private resumeDodge: { ms: number; vote?: string } | null = null;
+  /**
+   * A resumed game's extras as kept (resume), until its first round is under way: that round plays them (your move still being scored,
+   * the turn's time and power-up, the timed moment on), and every keep until then keeps them as they were (EN1).
+   */
+  private resumed: Extras | null = null;
 
   private nextRound() {
-    this.keepFloor();
+    try {
+      this.playRound(this.resumed);
+    } finally {
+      this.resumed = null;
+    }
+  }
+
+  /** The next round, from the game as it stands. `r`: a rejoin's first, with what it was kept with (only that turn's, as kept). */
+  private playRound(r: Extras | null) {
     if (this.stopped) return;
-    // (Only the turn the game was kept on: its human turn comes next, with nothing played first; a Dodge kept mid-round, only if it's on.)
-    const pending = this.pendingMove;
-    this.pendingMove = null;
-    const dodgeKept = this.resumeDodge;
-    this.resumeDodge = null;
+    const pending = r?.pending ?? null;
     if (this.runner.isOver()) return this.finish();
     // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
     if (this.runner.endGameIfOver()) return this.finish();
@@ -1760,10 +1868,16 @@ export class SoloMatch implements GameView {
       }
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
       // hop come at the start of his turn, before his move.)
+      if (this.runner.bossToMove()) {
+        // (A rejoin kept on the crowd's move, its reveal shown: the boss's strike due after it comes first, as it would have.)
+        if (r && this.runner.bossKillDue()) return this.afterBossRound();
+        // (Rejoined during Lights out (its test is in the state from its start): on from the time kept, never started again.)
+        if (this.lightsOutOn()) return void this.lightsOutTurn(r?.moment ?? { ms: 0 });
+      }
       if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.runner.queenLockDue() ? this.queenLockTurn() : this.bossTurn());
       // (Dash's Scramble Rush, as your turn begins: the turn waits for it; Chandy's Dodge too.)
-      if (this.runner.rushDue()) return void this.rushTurn();
-      if (this.runner.dodgeDue()) return void this.dodgeTurn(dodgeKept);
+      if (this.runner.rushDue()) return void this.rushTurn(r?.moment);
+      if (this.runner.dodgeDue()) return void this.dodgeTurn(r?.moment);
       // (A failed Lights out or Scramble Rush: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
@@ -1792,11 +1906,9 @@ export class SoloMatch implements GameView {
     this.progress.start(this.runner.botThinkTimes(), intro);
     this.startLive(Date.now() + intro, this.runner.botThinkTimes());
     const board = this.runner.boardOf(HUMAN)!;
-    // (A tower floor rejoined on your turn: the time you'd used on it, as used: keepFloor.)
-    const used = this.resumeTurnMs;
-    this.resumeTurnMs = 0;
-    const spent = this.resumePowerUp;
-    this.resumePowerUp = false;
+    // (Rejoined on your turn: the time you'd used on it, as used; your move kept as it was accepted, at its own time (I2).)
+    const used = r ? (r.pending ? r.pending.thinkMs : (r.turnMs ?? 0)) : 0;
+    const spent = !!r && !r.pending && !!r.powerUp;
     this.playStartedAt = Date.now() + intro - used;
     this.hint = null;
     const allowed = this.runner.allowedMsFor(HUMAN);
@@ -1808,6 +1920,11 @@ export class SoloMatch implements GameView {
       return void this.score(pending.move, pending.darkOut);
     }
     this.set(play);
+    // (Rejoined as the dark was to play your move (Boss alone, a 3rd or 7th bulb out: kept as it flashed): it plays it now, as it would have.)
+    if (r && this.runner.darkForcedDue()) {
+      this.darkNote = { move: "", at: Date.now(), tries: this.runner.darkTries()[HUMAN] ?? 0, out: true, forced: true };
+      return void this.darkForcedTurn();
+    }
     this.timer = setTimeout(() => this.submit(null), intro + allowed - used + this.settings.lateGraceMs);
     // (Rejoined on a turn whose power-up was used (D4): spent, as it was, its hints fetched again.)
     if (spent) this.showHints();
@@ -1920,12 +2037,10 @@ export class SoloMatch implements GameView {
       if (move) this.live.mine = { playerId: HUMAN, move, at: now };
       this.live.rushFrom = now;
     }
-    // (A boss battle kept on the device (a floor, a solo battle): kept with your move as it's accepted, before the judge's answer, so a
-    // reload while it's scored never takes it back; the rejoin scores it again (the review of #885, I2). In a Solo raid with the bots'
-    // picks, there or as they land (D1).)
+    // (A boss battle kept on the device (a floor, a solo battle): kept with your move as it's accepted, by the update that shows it, before
+    // the judge's answer, so a reload while it's scored never takes it back; the rejoin scores it again (the review of #885, I2). In a Solo
+    // raid with the bots' picks, there or as they land (D1).)
     this.scored = { move, thinkMs, ...(usedPowerUp ? { powerUp: true } : {}), ...(darkOut ? { darkOut: true } : {}), ...(move === null && this.runner.kingCallers.has(HUMAN) ? { king: true } : {}) };
-    this.keepFloor(this.scored);
-    if (this.stopped) return;
     this.set({ kind: "scoring", board, move });
     const t = performance.now();
     // Score while the bots still thinking finish (they light up the leaderboard), then reveal.
@@ -1945,10 +2060,8 @@ export class SoloMatch implements GameView {
     if (record) this.moves.push(darkOut && record.move === null && !record.abstained ? { ...record, darkOut: true } : record);
     // Crowd 50 v 50: your miss past CrowdMisses.allowed (the 4th in the game) removes you for being away, as resigning.
     if (report.away?.includes(HUMAN)) return this.removeAway();
-    // (A boss battle kept on the device (a floor, a solo battle): kept with your move in, so a reload before his reply never takes it
-    // back; his reply is then played on the rejoin, at its round's start.)
-    this.keepFloor();
-    if (this.stopped) return;
+    // (A boss battle kept on the device: kept with your move in by the next update (its reveal, or his thinking), so a reload before his
+    // reply never takes it back; his reply is then played on the rejoin, at its round's start.)
     if (inFinal) return this.showFinalMove(report);
     if (this.alone && !mine.king && move !== null) {
       // Alone, your move is already on the board: no reveal, straight to the boss's reply. Only a Last Stand stops
@@ -2237,4 +2350,21 @@ function afterFirstFrame(fn: () => void, maxMs = 250) {
   const raf = typeof requestAnimationFrame === "function" ? requestAnimationFrame : null;
   if (raf) raf(() => raf(go));
   setTimeout(go, raf ? maxMs : 0);
+}
+
+/** `v`'s entries that pass `ok`, as a fresh record (a kept game read back: anything else is dropped). */
+function record<T>(v: unknown, ok: (x: unknown) => x is T): Record<string, T> {
+  return v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter((e): e is [string, T] => ok(e[1]))) : {};
+}
+
+/** The engine's searches (a stopped match's are never sent: whileOn). */
+const SEARCHES = new Set<PropertyKey>(["topMoves", "topMovesAt", "scoreMoves", "scoreMovesAt", "analyse", "playAtElo"]);
+/** `e` while `stopped()` is false; after, its searches wait forever (never sent to its worker), so whatever awaits one ends there. */
+function whileOn(e: UciEngine, stopped: () => boolean): UciEngine {
+  return new Proxy(e, {
+    get(t, k, r) {
+      const v: unknown = Reflect.get(t, k, r);
+      return typeof v === "function" && SEARCHES.has(k) ? (...a: unknown[]) => (stopped() ? new Promise(() => undefined) : (v as (...a: unknown[]) => unknown).apply(t, a)) : v;
+    },
+  });
 }
