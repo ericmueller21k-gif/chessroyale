@@ -3404,6 +3404,11 @@ export const SOLO_ABANDON = {
    * recording it as left: a game in a tab left alone longer than this counts as left.
    */
   liveMinutes: 10,
+  /**
+   * A finished game's result whose post went this recently may still be on its way (from a page since gone, or another tab): the app's
+   * load and a start don't send it again yet (a re-send overtaking it would take the game and its XP), only name it (ms).
+   */
+  resendAfterMs: 15_000,
 } as const;
 
 /** One of 1 v 1's time controls: a bank for the game and an increment after every timed move, as chess writes them. */

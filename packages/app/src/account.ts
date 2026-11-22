@@ -253,7 +253,7 @@ export async function loadAccount(name?: string): Promise<void> {
     loadStep("account");
     set({ profile: await me, failed: null });
     loadStep("last");
-    if (unsent) void sendUnsentResult();
+    if (unsent) void sendUnsentResult(true);
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
     if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch (e) {
@@ -640,6 +640,9 @@ export async function verifyEmailCode(email: string, code: string): Promise<void
 }
 
 export async function signOut(): Promise<void> {
+  // (A finished game's result still to be sent goes first: the next account's device would drop it as another's, and the game would
+  // then be recorded as left.)
+  await sendUnsentResult();
   set({ profile: await api<Profile>("/api/auth/logout", { method: "POST" }), age: tooYoung() ? "under" : null });
 }
 
@@ -701,16 +704,16 @@ export async function recordSoloResult(r: {
   // (A game you finished is never recorded as left (SOLO_ABANDON): its result is kept on the device before it's posted, so a page closed
   // or reloaded mid-post still has it, and taken off only once the server has answered; sent again before your next solo game and at
   // the next load (sendUnsentResult). `keepalive`: the post itself outlives a page that goes.)
-  if (r.game) keepUnsent({ user: state.profile.user.id, result: r });
+  if (r.game) keepUnsent({ user: state.profile.user.id, result: r, at: Date.now() });
   let answer: { xp?: XpGrant | null };
   try {
     answer = await api<{ xp?: XpGrant | null }>("/api/results", { method: "POST", body: JSON.stringify(r), keepalive: true });
   } catch (e) {
     // (Not important enough to bother the player.)
-    if (r.game && !sendAgain(e)) dropUnsent(r.game);
+    if (r.game) answered(r.game, !sendAgain(e));
     return null;
   }
-  if (r.game) dropUnsent(r.game);
+  if (r.game) answered(r.game, true);
   try {
     set({ profile: await api<Profile>(meUrl()) });
   } catch {
@@ -733,7 +736,7 @@ export async function startSoloGame(body: { xpgame?: number }): Promise<string |
   if (!state.profile) return null;
   // (A start records the open game as left if it's real (SOLO_ABANDON): a finished game's result that couldn't be sent goes first, and
   // if it still can't be, the start names it (`unsent`) so its game is never recorded as left.)
-  await sendUnsentResult();
+  await sendUnsentResult(true);
   const unsent = unsentGame();
   return (await api<{ game: string | null }>("/api/xp/solo/start", { method: "POST", body: JSON.stringify({ ...body, ...(unsent ? { unsent } : {}) }) })).game;
 }
@@ -799,9 +802,13 @@ export function soloLiveOnDevice(now = Date.now()): boolean {
   }
 }
 
-/** A finished solo game's result not yet answered by the server (on its way, or it couldn't be sent), with the account it's for. */
+/**
+ * A finished solo game's result not yet answered by the server, with the account it's for: kept as the game was decided, on its way,
+ * or it couldn't be sent. `at`: when its post went (one may still be on its way, from this tab, another or a page since gone); none
+ * while no post is (kept as the game was decided, or its post failed).
+ */
 const UNSENT_KEY = "brc.soloUnsent";
-type Unsent = { user: string; result: Record<string, unknown> };
+type Unsent = { user: string; result: Record<string, unknown>; at?: number };
 function keepUnsent(u: Unsent | null): void {
   try {
     if (u) localStorage.setItem(UNSENT_KEY, JSON.stringify(u));
@@ -810,9 +817,13 @@ function keepUnsent(u: Unsent | null): void {
     // No storage: the result is lost, as before.
   }
 }
-/** The server answered the result of `game`: taken off (unless another game's has been kept since). */
-function dropUnsent(game: unknown): void {
-  if (unsentResult()?.result.game === game) keepUnsent(null);
+/**
+ * The post of `game`'s result answered: taken off (`final`: a 2xx or a refusal), or kept with no post on its way (a failure to send
+ * again: sendAgain). Unless another game's result has been kept since.
+ */
+function answered(game: unknown, final: boolean): void {
+  const u = unsentResult();
+  if (u && u.result.game === game) keepUnsent(final ? null : { user: u.user, result: u.result });
 }
 function unsentResult(): Unsent | null {
   try {
@@ -821,6 +832,13 @@ function unsentResult(): Unsent | null {
   } catch {
     return null;
   }
+}
+/**
+ * A real solo game's result the moment it's decided (xp.ts, SOLO_ABANDON), before any end moment plays: kept on the device with no post
+ * on its way yet. The result screen's post then takes it over (recordSoloResult); a page gone first has it sent at the next load.
+ */
+export function keepSoloResult(game: string, result: Record<string, unknown>): void {
+  if (state.profile) keepUnsent({ user: state.profile.user.id, result: { ...result, game } });
 }
 /** The game of a result still to be sent, which the server then never records as left (`unsent`, server/xp.ts). */
 function unsentGame(): string | null {
@@ -837,16 +855,22 @@ function meUrl(q = new URLSearchParams()): string {
  * Sends a kept result again (`resent`: no time XP for it, as the server's clock ran on after the game: server api.ts); its game's row
  * is then taken off as usual, and a game recorded already writes nothing. Kept again on the same failures as the first post
  * (sendAgain). Another account's (signed out since, a guest merged into an account) is dropped: never sent as this one's.
+ * `waitPosted` (the load's and a start's): not while a post of it may still be on its way (`at`, under SOLO_ABANDON.resendAfterMs ago:
+ * a re-send overtaking it would take its game, and the game's XP); reads and starts name its game meanwhile (`unsent`). A sign-in or
+ * out sends it whatever: the account changes after.
  */
-async function sendUnsentResult(): Promise<void> {
+async function sendUnsentResult(waitPosted = false): Promise<void> {
   const u = unsentResult();
   if (!u || !state.profile) return;
   if (u.user !== state.profile.user.id) return keepUnsent(null);
+  const now = Date.now();
+  if (waitPosted && u.at !== undefined && now - u.at >= 0 && now - u.at < SOLO_ABANDON.resendAfterMs) return;
+  keepUnsent({ ...u, at: now });
   try {
     await api("/api/results", { method: "POST", body: JSON.stringify({ ...u.result, resent: true }), keepalive: true });
-    dropUnsent(u.result.game);
+    answered(u.result.game, true);
   } catch (e) {
-    if (!sendAgain(e)) dropUnsent(u.result.game);
+    answered(u.result.game, !sendAgain(e));
   }
 }
 

@@ -13,7 +13,7 @@ import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
 import { ConfirmExit, MatchMenu, type MatchExit } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
-import type { SoloMatch } from "./solo.ts";
+import type { Results, SoloMatch } from "./solo.ts";
 import { FriendsLayer, HomeScreen } from "./screens/Home.tsx";
 import { QuestsLayer } from "./components/QuestsOverlay.tsx";
 import { QueueLine, QueueScreen } from "./screens/Queue.tsx";
@@ -98,13 +98,71 @@ const AutoChessScreen = lazyGroup(() => import("./screens/AutoChess.tsx")).scree
 /** A solo match (SoloMatch, solo.ts), told apart without loading its chunk. */
 const isSolo = (m: unknown): m is SoloMatch => !!(m as { isSolo?: boolean } | null)?.isSolo;
 
-/** A solo game as xp.ts watches it for your SOLO_ABANDON.minMoves-th own move: its loss row's facts as its result would give them. */
+/**
+ * A solo match's result as its post takes it (POST /api/results, recordSoloResult; all but its game's id), from its result: the result
+ * screen's, or `decided`'s from the moment the game is decided (the same).
+ */
+function soloResult(solo: SoloMatch, phase: Results) {
+  const me = solo.standings().find((s) => s.isYou);
+  const runner = solo.runner;
+  const raid = !!solo.settings.raid;
+  // A boss battle shares its result among those still standing (as online); otherwise the team's game.
+  const feats = me ? matchFeats(runner.player(me.id), solo.settings.knockoutsPerStage.length, runner.boss, raid) : null;
+  const bossResult = phase.bossResult;
+  // You resigned: a loss (on your team's record, or against the boss), and you didn't see a boss battle through.
+  const how = phase.left?.how;
+  const resigned = how === "resigned" || how === "afk";
+  const mode: "classic" | "crowd" | "boss" = raid ? "boss" : solo.settings.mode;
+  const placement = phase.placement;
+  const teamWon = resigned
+    ? me?.team || runner.boss
+      ? false
+      : null
+    : bossResult
+    ? feats?.survived && bossResult !== "draw"
+      ? bossResult === "crowd"
+      : null
+    : phase.gameWinner === undefined || !me?.team
+      ? null
+      : phase.gameWinner === me.team;
+  // XP (Nov 9): the server's clock times the game (its id from the start); your moves, the win, a resign and a test switch are this
+  // device's word, which can only lower it. The answer's XP goes to the result screen's box (xp.ts).
+  return {
+    mode,
+    placement,
+    players: solo.totalPlayers,
+    team: me?.team ?? null,
+    teamWon,
+    avgScore: me?.avg ?? null,
+    rating: me?.rating ?? null,
+    brilliant: solo.moves.filter((m) => m.brilliant).length,
+    bestMove: bestMoveOf(solo.moves),
+    ...feats,
+    ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
+    evalBar: evalBarOn(),
+    // (Every turn you took: a turn you called the God King to play counts, a missed one doesn't. Eric, Nov 21: ownMoves.)
+    moves: ownMoves(solo.moves),
+    won: !resigned && (mode === "classic" ? placement === 1 : teamWon === true),
+    resigned: how === "resigned",
+    // (Removed for idling: "No XP: you left the match.", as online. Review m6.)
+    left: how === "afk",
+    test: soloTestGame(practiceOn()),
+    ...(solo.tower ? { tower: true } : {}),
+  };
+}
+
+/**
+ * A solo game as xp.ts watches it for your SOLO_ABANDON.minMoves-th own move: its loss row's facts as its result would give them;
+ * its result from the moment it's decided (to keep on the device before any end moment plays); the page going (SoloMatch.endOnHide).
+ */
 const soloWatch = (m: SoloMatch): SoloGameWatch => ({
   get moves() {
     return m.moves;
   },
   subscribe: (f) => m.subscribe(f),
   over: () => m.phase.kind === "results",
+  result: () => (m.decided ? soloResult(m, m.decided) : null),
+  hide: () => m.endOnHide(),
   facts: () => {
     const raid = !!m.settings.raid;
     const boss = m.runner.boss;
@@ -504,58 +562,10 @@ export function App() {
   useEffect(() => {
     if (!(isSolo(match)) || match.phase.kind !== "results" || savedResult.current === match) return;
     savedResult.current = match;
-    const me = match.standings().find((s) => s.isYou);
-    const runner = match.runner;
-    const raid = !!match.settings.raid;
-    // A boss battle shares its result among those still standing (as online); otherwise the team's game.
-    const feats = me ? matchFeats(runner.player(me.id), match.settings.knockoutsPerStage.length, runner.boss, raid) : null;
-    const bossResult = match.phase.bossResult;
-    // You resigned: a loss (on your team's record, or against the boss), and you didn't see a boss battle through.
-    const how = match.phase.left?.how;
-    const resigned = how === "resigned" || how === "afk";
-    const mode = raid ? "boss" : match.settings.mode;
     const solo = match;
-    const placement = match.phase.placement;
-    const teamWon = resigned
-      ? me?.team || runner.boss
-        ? false
-        : null
-      : bossResult
-      ? feats?.survived && bossResult !== "draw"
-        ? bossResult === "crowd"
-        : null
-      : match.phase.gameWinner === undefined || !me?.team
-        ? null
-        : match.phase.gameWinner === me.team;
-    // XP (Nov 9): the server's clock times the game (its id from the start); your moves, the win, a resign and a test switch are this
-    // device's word, which can only lower it. The answer's XP goes to the result screen's box (xp.ts).
+    const result = soloResult(solo, match.phase);
     // (A new solo game's start waits for this post: xp.ts postingSoloResult.)
-    postingSoloResult(soloGameId(solo).then(async (game) => {
-      const xp = await recordSoloResult({
-        mode,
-        placement,
-        players: solo.totalPlayers,
-        team: me?.team ?? null,
-        teamWon,
-        avgScore: me?.avg ?? null,
-        rating: me?.rating ?? null,
-        brilliant: solo.moves.filter((m) => m.brilliant).length,
-        bestMove: bestMoveOf(solo.moves),
-        ...feats,
-        ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
-        evalBar: evalBarOn(),
-        game,
-        // (Every turn you took: a turn you called the God King to play counts, a missed one doesn't. Eric, Nov 21: ownMoves.)
-        moves: ownMoves(solo.moves),
-        won: !resigned && (mode === "classic" ? placement === 1 : teamWon === true),
-        resigned: how === "resigned",
-        // (Removed for idling: "No XP: you left the match.", as online. Review m6.)
-        left: how === "afk",
-        test: soloTestGame(practiceOn()),
-        ...(solo.tower ? { tower: true } : {}),
-      });
-      settleSoloXp(solo, xp);
-    }));
+    postingSoloResult(soloGameId(solo).then(async (game) => settleSoloXp(solo, await recordSoloResult({ ...result, game }))));
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
   /** A computer (the front door's frame): the queue fills in place, with the lobby's chat beside it. */

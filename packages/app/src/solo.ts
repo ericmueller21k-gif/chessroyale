@@ -28,6 +28,8 @@ import { chunk } from "./stale.ts";
 import { type FloorPlay, type KeptGame, floorOutcome, leaveIsFree } from "./tower.ts";
 
 export const HUMAN = "you";
+/** A solo match's result, as its result screen shows it (and SoloMatch.decided, from the moment it's known). */
+export type Results = Extract<Phase, { kind: "results" }>;
 /** In the final, how long each move is shown before the next turn. */
 const FINAL_SHOW_MS = 3200;
 /** Boss battle: how long the boss's move shows, how long it thinks at least, and how long a strike shows. */
@@ -248,11 +250,44 @@ export class SoloMatch implements GameView {
     // (Stopped: an engine answer or a timer on its way changes nothing.)
     if (this.stopped) return;
     this.phase = phase;
+    this.noteEnded();
     this.listeners.forEach((l) => l());
   }
 
   private emit() {
+    this.noteEnded();
     this.listeners.forEach((l) => l());
+  }
+
+  /**
+   * The game's result from the moment it's decided, not only on the result screen (`phase`): through any end moment that plays first
+   * (a beaten boss's fall, the final's last move held, the Hidden Boss's reaction to phase 2's end). The app keeps it on the device
+   * then, so a page closed or reloaded meanwhile still sends it and a won game is never recorded as left (xp.ts, SOLO_ABANDON).
+   */
+  get decided(): Results | null {
+    return this.phase.kind === "results" ? this.phase : this.ended;
+  }
+  private ended: Results | null = null;
+  /**
+   * Worked out at every update (before its listeners hear of it) from the game's own state, not from the paths that end it: once the
+   * runner has placed everyone (with no form or phase 2 still to come), or phase 2's boards are all decided, the result is as finish
+   * (or finishPhase2) will show it. So any end moment, now or added later, comes after the result is known.
+   */
+  private noteEnded() {
+    if (this.ended || !this.runner || this.phase.kind === "results") return;
+    const g = this.phase2;
+    if (g ? g.outcome.decided : this.runner.isOver() && !this.phase2Due()) this.ended = g ? this.phase2Results() : this.results();
+  }
+
+  /**
+   * The page is going (pagehide: closed or reloaded) on the reveal of a move that ended the game: the runner decides as the reveal
+   * ends (as online), so it ends now, as a tap on the reveal would (skipReveal), and its result is known (`decided`) before the page
+   * goes. Any other reveal plays on (skipping it would start the next turn's clock in a page kept for Back).
+   */
+  endOnHide(): void {
+    if (this.stopped || this.phase.kind !== "reveal") return;
+    const ends = this.runner.boss ? this.runner.stageComplete() && !this.runner.bossKillDue() : !!this.runner.crowdGameEnd();
+    if (ends) this.skipReveal();
   }
 
   dispose() {
@@ -1474,13 +1509,18 @@ export class SoloMatch implements GameView {
    * is the match's (alone, first of one; a solo Crowd's, your place in the crowd, from phase 1's end).
    */
   private finishPhase2() {
-    const o = this.phase2?.outcome ?? { won: 0, of: RECLUSE_PHASE2.boards, beaten: false };
-    // (Your board as it ended, for the result's review: read while the phase is still phase 2's.)
-    const simulBoard = this.simul?.boards.find((b) => b.you);
+    // (Read while the phase is still phase 2's: your board as it ended, for the result's review.)
+    const results = this.phase2Results();
     this.halt();
-    const top = this.runner.state.players.find((p) => p.placement === 1);
-    this.phase = { kind: "results", placement: this.you.placement ?? 1, winner: top?.name ?? "", youWon: o.beaten, bossResult: o.beaten ? "crowd" : "boss", simul: { won: o.won, of: o.of }, ...(simulBoard ? { simulBoard } : {}) };
+    this.phase = results;
     this.emit();
+  }
+  /** Phase 2's result as it stands: its boards' outcome, your board as it ended; your place phase 1's end's. */
+  private phase2Results(): Results {
+    const o = this.phase2?.outcome ?? { won: 0, of: RECLUSE_PHASE2.boards, beaten: false };
+    const simulBoard = this.simul?.boards.find((b) => b.you);
+    const top = this.runner.state.players.find((p) => p.placement === 1);
+    return { kind: "results", placement: this.you.placement ?? 1, winner: top?.name ?? "", youWon: o.beaten, bossResult: o.beaten ? "crowd" : "boss", simul: { won: o.won, of: o.of }, ...(simulBoard ? { simulBoard } : {}) };
   }
 
   /** Your move on your board. */
@@ -1904,15 +1944,16 @@ export class SoloMatch implements GameView {
     // Team final: when a step ends, the weakest on each side go out.
     const out = this.runner.afterFinalTurn();
     this.setFinal({ playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss, ...(p.missNo ? { missNo: p.missNo } : {}) }, out);
+    // (The final's last move: the finalists are placed as it's played, its view already taken, so the result is known (`decided`)
+    // while the move is shown.)
+    if (this.runner.stageComplete()) this.runner.finishFinal();
     this.set({ kind: "final", final: this.finalState! });
     this.timer = setTimeout(() => this.afterFinalMove(), out.length ? FINAL_SHOW_MS + 1800 : FINAL_SHOW_MS);
   }
 
   private afterFinalMove() {
-    if (this.runner.stageComplete()) {
-      this.runner.finishFinal();
-      return this.finish();
-    }
+    if (!this.runner.isOver() && this.runner.stageComplete()) this.runner.finishFinal();
+    if (this.runner.isOver()) return this.finish();
     if (!this.you.alive) return void this.simulateRest();
     void this.finalTurn();
   }
@@ -1993,11 +2034,17 @@ export class SoloMatch implements GameView {
     this.lobbyChat.botsSay({ kind: "end" }, this.runner.state.players.filter((p) => p.isBot).map((p) => p.id));
     this.freeBrain();
     this.runner.showdownScout?.reset();
+    // (The 50 v 50 rework, as online: each row's out at move and points a move: standings().)
+    this.crowdRows = this.runner.crowdResults()?.players ?? null;
+    this.set(this.results());
+  }
+
+  /** The result as the runner has it, once it has placed everyone (finish; `decided` before that, through any end moment). */
+  private results(): Results {
     const winner = this.runner.state.players.find((p) => p.placement === 1);
-    // (The 50 v 50 rework, as online: the podium's titles, and each row's out at move and points a move: standings().)
+    // (The 50 v 50 rework, as online: the podium's titles.)
     const rework = this.runner.crowdResults();
-    this.crowdRows = rework?.players ?? null;
-    this.set({
+    return {
       kind: "results",
       placement: this.you.placement!,
       winner: winner?.name ?? "",
@@ -2009,7 +2056,7 @@ export class SoloMatch implements GameView {
       ...(this.runner.bossTimedOut ? { timeout: true } : {}),
       ...(this.runner.bossCarrotWin ? { carrots: true } : {}),
       ...(this.runner.bossBlackout ? { blackout: true } : {}),
-    });
+    };
   }
 }
 

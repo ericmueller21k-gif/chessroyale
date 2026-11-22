@@ -1,5 +1,5 @@
 import { SOLO_ABANDON, XP, ownMoves, type OwnTurn, type XpGrant } from "@chessroyale/core";
-import { endSoloLive, keepSoloLive, markSoloGameReal, onlineGameXp, refreshProfile, startSoloGame, type SoloRealFacts } from "./account.ts";
+import { endSoloLive, keepSoloLive, keepSoloResult, markSoloGameReal, onlineGameXp, refreshProfile, startSoloGame, type SoloRealFacts } from "./account.ts";
 import { testParams } from "./test-switches.ts";
 import { accountReady } from "./boss-tokens.ts";
 
@@ -40,19 +40,36 @@ export function noteSoloGame(match: object, watch?: SoloGameWatch): void {
   if (watch) watchSoloGame(match, watch);
 }
 
-/** A solo game as watchSoloGame reads it: your turns so far (its record), its updates, whether it's over, and its loss row's facts. */
+/**
+ * A solo game as watchSoloGame reads it: your turns so far (its record), its updates, whether it's over, its loss row's facts, its
+ * result as posted (but its game's id) once it's decided (null before), and what to do as the page goes (SoloMatch.endOnHide).
+ */
 export interface SoloGameWatch {
   readonly moves: readonly OwnTurn[];
   subscribe(f: () => void): () => void;
   over(): boolean;
   facts(): SoloRealFacts;
+  result(): Record<string, unknown> | null;
+  hide(): void;
+}
+
+/** The real solo game this tab is playing, told as the page goes (SoloGameWatch.hide). */
+let onHide: (() => void) | null = null;
+let hideHeard = false;
+function hideTo(f: (() => void) | null): void {
+  onHide = f;
+  if (f && !hideHeard && typeof addEventListener === "function") {
+    hideHeard = true;
+    addEventListener("pagehide", () => onHide?.());
+  }
 }
 
 /**
  * Leaving a solo game after SOLO_ABANDON.minMoves of your own moves counts as a loss (Eric, Nov 22; server/xp.ts): at that move (core's
  * ownMoves, as XP counts them) the server is told that the game is real, and from then this device notes at each turn that a tab is
  * playing it (account.ts keepSoloLive), so the app's load in another tab leaves it be. The mark is done once the server answered;
- * while it fails (no answer, a server error) it's sent again at your next turn, one at a time. Its end (the result screen) takes the
+ * while it fails (no answer, a server error) it's sent again at your next turn, one at a time. Decided, its result is kept on the device
+ * at once, and the page going on the reveal of its last move ends it first (SoloGameWatch.hide). Its end (the result screen) takes the
  * note off; the result itself takes the game off the server.
  */
 function watchSoloGame(match: object, w: SoloGameWatch): void {
@@ -60,17 +77,34 @@ function watchSoloGame(match: object, w: SoloGameWatch): void {
   /** The mark: to send (at the next turn), on its way, or answered. */
   let mark: "due" | "sending" | "done" = "due";
   let seen = -1;
+  /** Its result, kept on the device (once) as the game is decided. */
+  let kept = false;
   const id = () => soloGameId(match);
+  const hide = () => w.hide();
   const off = w.subscribe(() => {
+    const moved = w.moves.length !== seen;
+    seen = w.moves.length;
+    if (moved && !real && ownMoves(w.moves) >= SOLO_ABANDON.minMoves) {
+      real = true;
+      hideTo(hide);
+    }
+    // (Real and decided: its result is kept on the device at once (account.ts keepSoloResult), before any end moment plays (a beaten
+    // boss's fall, the final's last move held), so a page closed or reloaded meanwhile still sends it and it's never recorded as left.
+    // The result screen's post then sends it as usual.)
+    const result = real && !kept ? w.result() : null;
+    if (result) {
+      kept = true;
+      void id().then((g) => g && keepSoloResult(g, result));
+    }
     if (w.over()) {
       off();
-      if (real) void id().then((g) => g && endSoloLive(g));
+      if (real) {
+        if (onHide === hide) hideTo(null);
+        void id().then((g) => g && endSoloLive(g));
+      }
       return;
     }
-    if (w.moves.length === seen) return;
-    seen = w.moves.length;
-    if (!real && ownMoves(w.moves) < SOLO_ABANDON.minMoves) return;
-    real = true;
+    if (!moved || !real) return;
     const facts = mark === "due" ? w.facts() : null;
     if (facts) mark = "sending";
     void id().then(async (g) => {
