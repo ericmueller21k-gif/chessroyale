@@ -131,7 +131,7 @@ test("the menu works as on home: Home goes home, Chess Town comes back to the to
 
   const menu = page.getByRole("navigation", { name: "Menu" });
   // (Home asks first from the town: "Leave Chess Town?", e2e/town-leave.spec.ts.)
-  await menu.getByRole("button", { name: "Home", exact: true }).click();
+  await menu.getByRole("button", { name: "Main menu", exact: true }).click();
   await page.getByRole("alertdialog", { name: "Leave Chess Town?" }).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
@@ -215,8 +215,8 @@ test("the side menu's Play with friends, Daily Quests, Shop & crates and Profile
   await leave.getByRole("button", { name: "Stay" }).click();
   await sameTown("Stay");
   // Home leaves the town, as it always did (asked first).
-  await item("Home").click();
-  await expect(leave.locator(".fd-sub")).toHaveText("You'll head back to Home.");
+  await item("Main menu").click();
+  await expect(leave.locator(".fd-sub")).toHaveText("You'll head back to the main menu.");
   await leave.getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(cv).toHaveCount(0);

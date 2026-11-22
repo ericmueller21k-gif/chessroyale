@@ -25,8 +25,8 @@ let waiting: () => boolean = () => false;
 /** The town's: whether your game request is in now (null: the town is gone). */
 export const setRequestWaiting = (f: (() => boolean) | null) => void (waiting = f ?? (() => false));
 export const requestWaiting = () => waiting();
-/** Where the town's back button and the phone's back gesture go: the front door (the side menu's Home: it was Play until Nov 22). */
-export const TOWN_BACK_TO = "Home";
+/** Where the town's back button and the phone's back gesture go: the front door (the side menu's Main menu: it was Play until Nov 22). */
+export const TOWN_BACK_TO = "the main menu";
 
 export function LeaveTownConfirm({ dest, onStay, onLeave, request = false }: { dest: string; onStay: () => void; onLeave: () => void; /** Your Hidden Boss's request is in: "Cancel your game request?" */ request?: boolean }) {
   const stay = useRef<HTMLButtonElement>(null);

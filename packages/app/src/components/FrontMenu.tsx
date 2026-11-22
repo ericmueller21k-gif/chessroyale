@@ -67,9 +67,9 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
     <nav class="fd-side" aria-label="Menu">
       <Logo onClick={nav.home} />
       <div class="fd-menu">
-        {/* (Home, the home screen (Eric, Nov 22: "instead of making it say play, we should just change it to ... home"; it was Play).
+        {/* (Main menu, the home screen (Eric, Nov 22: "instead of making it say play ... home"; then "We don't need to call it home ... Main menu?": it was Play, then briefly Home, which clashed with the results screen's own Home button).
             Not a walkthrough spot: the PLAY slide is home's PLAY button's.) */}
-        <Item tip={tip} label="Home" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
+        <Item tip={tip} label="Main menu" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
         <Item tip={tip} tour="chess-town" label="Chess Town" on={page === "town"} onClick={nav.chessTown} icon={<Pic ch={ARENA_TOWN_BADGE} scale={1} class="fd-menu-crest" />} />
         <Item tip={tip} tour="boss-battle" label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
         <Item

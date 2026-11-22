@@ -49,7 +49,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   the page's 920 px column; Daily Quests and Play with friends are home's cards over the town dimmed. The open page's item is lit; another
   of the four switches the layer in place; Back, Escape, the back gesture (one history step of its own) and Chess Town close it; no key
   reaches the town under it (typing in the right column's chat goes on). What leaves from inside it (a lobby made or joined, Settings,
-  your friends) asks first. Home (it was Play until Nov 22), Boss Battle, Settings and your friends leave the town (`goHome` in `App.tsx`
+  your friends) asks first. Main menu (it was Play until Nov 22), Boss Battle, Settings and your friends leave the town (`goHome` in `App.tsx`
   closes it), Chess Town opens it again. On a phone (and any window without the frame) the bar's Quests, Shop & crates and Friends open
   the same layers over the whole screen (the shop in its page's own frame, as the inventory layer). Leaving asks "Leave Chess Town?" first (`town/LeaveTown.tsx`; Stay focused,
   Escape is Stay; both set in layout effects so a key in the sheet's first frame isn't lost, Nov 10), from the street and inside any building
@@ -1412,7 +1412,7 @@ noted wherever a slice changed one.
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
   (within a pixel), the menu and the right column are home's with the global chat showing, Chess Town is marked, no bar (Nov 7): the chat icon
   and the gear centered in the right column's slot under TOWN, the world fills the box, the buttons keep
-  their corner and the chat box its place, the chips and an open card are inside the box and the page doesn't scroll; the side menu's Home and
+  their corner and the chat box its place, the chips and an open card are inside the box and the page doesn't scroll; the side menu's Main menu and
   Chess Town go home and back; the four pages open over the town (Nov 22) and close back to the same town, your square kept and no goodbye
   sent, Home still asking to leave; a phone's bar at 320 px holds back and home's six buttons at 40 px, and its Shop & crates and Play
   with friends open over the town and close back to it; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse

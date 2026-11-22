@@ -222,8 +222,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Your profile (Nov 11):** "View profile" in the card's bottom-right corner (13 px words and its box at the bottom edge on cards under 110 px); `e2e/home-layout.spec.ts`, "View profile never covers your name".
   - **Portrait (Nov 11, Eric: rotation off on phones):** a phone held sideways (landscape, 500 px high or less) is covered by `#rotate-lock` in `index.html`; the installed app is locked by its manifest, and `main.tsx` asks `screen.orientation.lock` where a browser allows it.
-  - **Computer** (1024 px+): a side menu (from the top: **Home**, Eric, Nov 22: "instead of making it say play, we should just change it to
-    ... home", it was Play; Chess Town, Boss Battle, Play with friends, Daily Quests, Shop & crates, Profile, and Settings at the bottom; in
+  - **Computer** (1024 px+): a side menu (from the top: **Main menu**, Eric, Nov 22: it was Play, then briefly Home, which clashed with the results screen's Home button; Chess Town, Boss Battle, Play with friends, Daily Quests, Shop & crates, Profile, and Settings at the bottom; in
     Chess Town the middle four open over the town: [town-square.md](town-square.md)), the play column in the center in the phone's order (Eric, Oct 18): the RANKED
     row, its panel, the line above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side (a little shorter) at the
     bottom; the right column (Nov 7, Eric's mockup; the same place on every framed page: a 62 px slot, TOWN and its tools in the

@@ -1,4 +1,4 @@
-# Chess Town on a computer: the side menu's pages open over the town, and Play is Home (Nov 22, 2026)
+# Chess Town on a computer: the side menu's pages open over the town, and Play is Main menu (Nov 22, 2026)
 
 **Eric (Nov 22):** "you should be able to just click play with friends, daily quests, shop in crates, and profile without exiting out of
 Chesttown ... instead of making it say play, we should just change it to ... home. ... things like boss battle, auto chess, basically any
@@ -11,9 +11,11 @@ game mode, you can't."
   never move or hide. Quests and Play with friends stay cards (as on home), over the town dimmed. Making or joining a lobby from it, and
   your profile's Settings and friends, leave the town, so they ask "Leave Chess Town?" first (Eric's rule). **Settings stays as it was**
   (asks, then leaves): its page links on to the FAQ and Auto chess, which leave anyway. "You'll head back to Play." reads "...to Home."
-  (phone too: it's the same home). The walkthrough's PLAY slide no longer lights the side menu's Home.
+  (phone too: it's the same home). The walkthrough's PLAY slide no longer lights the side menu's Main menu.
 - **The phone (Eric, Nov 22, via the director):** "I don't think we need the word Chesstown here ... we can put in the inventory icon ...
   they should be the same as the main menu ... we can re-add for inventory, for quests, and we can put all those just up top"; "They can
   definitely fit." The bar is back, map, chat, Quests, Shop & crates, Friends, gear in home's buttons, no title in sight. Calls: the chat
   icon stays the town's (it shows the chat's mode) and the gear stays Town settings, in home's look; Friends opens Play with friends' sheet
   (the director's word; the friends page would rewrite the town's address), labeled "Play with friends"; the layers cover the screen.
+
+**Renamed, Nov 22 (Eric):** "We don't need to call it home. I should have said that. Is there a better name for it? Main menu?" The side menu's item is **Main menu**, and the town's leave question says "You'll head back to the main menu." ("Home" clashed with the results screen's own Home button.)

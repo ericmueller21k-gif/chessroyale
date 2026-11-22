@@ -178,7 +178,7 @@ test("computer: a side menu, the center and a live panel; the phone keeps one co
   await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   await expect(menu.getByRole("button", { name: "Boss Battle" })).toHaveAttribute("aria-current", "page");
   await expect(menu.getByRole("button", { name: "Boss alone" })).toHaveCount(0);
-  await menu.getByRole("button", { name: "Home", exact: true }).click();
+  await menu.getByRole("button", { name: "Main menu", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await menu.getByRole("button", { name: "Play with friends" }).click();
   await expect(page.getByRole("dialog", { name: "Play with friends" })).toBeVisible();
