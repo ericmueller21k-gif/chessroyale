@@ -1362,6 +1362,17 @@ export const BATTLE_TOWER = {
    */
   noUltimate: ["pig"] as readonly string[],
   /**
+   * The most ultimates each boss has on a tower floor of this many bosses (solo and party alike; the runner sets it on each boss's powers
+   * as the floor starts, `ultMax`, so solo and online agree and a restored battle keeps it). Eric, Nov 22 (a floor of three where Smudgy
+   * ulted twice): "when there's 3 bosses, they should each be maxed out at 1 ult ... They only ult once each at most." On top of each boss's
+   * own cap (maxUltimates, repaintMax, showdownMax, once a battle): the lower wins. After his last, his meter stays on the bar, empty and
+   * dimmed, and stops charging (as Timber's and Chandy's after theirs); the test trigger refuses. The ultimate only: a second meter
+   * (Ginger's Super Freeze, Dash's Scramble Rush) keeps its own cap. A size not listed (a floor of two) keeps every boss's own cap; a lone
+   * floor never reads this (one boss, as in every mode). The gates are the dispatcher's (boss-powers.ts `ultCapped`).
+   * docs/decisions/2026-11-22-tower-three-ult-cap.md.
+   */
+  ultsOnFloorOf: { 3: 1 } as Readonly<Record<number, number>>,
+  /**
    * Bosses whose power adds pieces to the board, not their ultimate: on a tower floor of several, only the first of them in the floor's
    * turn order (the primary) keeps it; the others' is off all floor (the runner marks their powers `noAdd` as the floor starts, so solo
    * and the party's room agree, and a restored battle keeps it). One of them on a floor, a lone floor, and every other mode: unchanged.

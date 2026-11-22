@@ -384,6 +384,11 @@ export interface NetBossPowers {
   /** No ultimate this battle (a Battle Tower floor: Wrangler, BATTLE_TOWER.noUltimate): the meter shows empty and dimmed. Missing: false. */
   noUlt?: boolean;
   /**
+   * At most this many ultimates this battle (a Battle Tower floor of three: BATTLE_TOWER.ultsOnFloorOf, one each): once `ults` reaches it
+   * the meter shows empty and dimmed ("no more ultimates"), and the admins' trigger is gone. Missing: his own cap only.
+   */
+  ultMax?: number;
+  /**
    * His power that adds pieces is off this battle (a Battle Tower floor of several, BATTLE_TOWER.addsPieces: another boss is the
    * primary): Babur's pump shows greyed. Missing: false.
    */

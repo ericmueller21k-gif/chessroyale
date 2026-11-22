@@ -580,6 +580,16 @@ export interface JudgedEvaluation {
 }
 
 /**
+ * He has had every ultimate this battle allows him (`ultMax`, set by the runner on a Battle Tower floor of three: BATTLE_TOWER.ultsOnFloorOf,
+ * Eric, Nov 22), on top of his own rules' cap (the lower wins: theirs still stop him where it's lower). From then: his last one's
+ * effect runs out as ever, its step never runs again, nothing gathers in his meter (shown empty and dimmed), the God King's strike
+ * adds none, and the test trigger refuses. Never without `ultMax`.
+ */
+export function ultCapped(p: Pick<BossPowerState, "ultMax" | "ults"> | null | undefined): boolean {
+  return p?.ultMax !== undefined && (p.ults ?? 0) >= p.ultMax;
+}
+
+/**
  * An ultimate has come (its `ultAt` just set): one more this battle, and the meter is spent. The dispatcher calls it
  * as a turn begins; a boss's rules call it when theirs comes outside one (Lights out from the test trigger, the Big
  * Bounce).

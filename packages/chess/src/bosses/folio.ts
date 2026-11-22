@@ -25,7 +25,7 @@ import { boardEnd } from "../boards.ts";
 import { marksStop, type EdgeMark } from "../board-layer.ts";
 import { applyMove, baseAt, fenAtPly, legalMoves, matingMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
-import { heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
+import { heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, ultCapped, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
 
 /**
  * How long each of its moments holds the screen (ms; POWER_FX in boss-timing.ts). `fold` and `revision` play at the start
@@ -470,7 +470,8 @@ export const folioBattle = {
   creaseDue(b: Battle, s: BossPowerSettings = b.rageRates?.() ?? BOSS_POWERS): boolean {
     const boss = b.state.boss;
     const p = boss?.powers;
-    if (!boss || !p || boss.id !== "folio" || boss.result || p.ultAt !== undefined) return false;
+    // (Capped, ultMax: a tower floor of three's after his one Crease. None comes again, so no line is asked for.)
+    if (!boss || !p || boss.id !== "folio" || boss.result || p.ultAt !== undefined || ultCapped(p)) return false;
     if (p.ultNext) return true;
     if (p.warnAt !== undefined) return false;
     const turn = boss.crowdMoves + 1;
