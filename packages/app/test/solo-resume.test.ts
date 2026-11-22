@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_ADMIN_FIRST, DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
-import { dodgeArena, dodgeTimeline, legalMoves, type UciEngine } from "@chessroyale/chess";
+import { MatchRunner, dodgeArena, dodgeTimeline, legalMoves, lightsOutTimeline, rushTimeline, type UciEngine } from "@chessroyale/chess";
 import { KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
@@ -349,6 +349,256 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     }
   }, 120_000);
 
+  // Keep before show (the third review of #885). Every finding of the first two (I2, I3, D1, D2, D4, D5; then E1, and the Rush and Lights
+  // out seen in passing) was one bug: the battle showed something before the kept game held it, so a reload, a crash or another tab
+  // resumed from before it was seen. The rule, walked: every timed power and moment, in Boss alone and a Solo raid, checked at every update
+  // that reaches the screen, and at every beat a timed moment shows by the clock alone, against the kept game as a rejoin would read it.
+  for (const bots of [false, true])
+    for (const [bossId, power] of [["chandy", "dodge"], ["dash", "rush"], ["hollow", "lightsout"]] as const)
+      it(`keep before show: ${bots ? "a Solo raid" : "Boss alone"} against ${bossId}, its ${power}, the King's call, a power-up${bots ? ", the bots' picks" : ""}: every update kept before it shows, and a rejoin mid-${power} opens it there`, async () => {
+        const admins = BOSS_ADMIN_FIRST as string[];
+        const was = admins.indexOf(bossId);
+        if (was >= 0) admins.splice(was, 1);
+        try {
+          // (No strikes: a bot's death or yours would end the walk early. A rejoin's due strike has its own check.)
+          const m = battle({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId, bossFixedElo: 1600, bossPowerTest: power, bossNoStrikes: true, ...(bots ? {} : { bossAloneClock: true }) } as Settings, bots);
+          const problems: string[] = [];
+          const seen = new Set<string>();
+          let checks = 0;
+          const note = (ok: boolean, what: string, tick = false) => void (!ok && problems.length < 6 && problems.push(`${what} (${tick ? "a tick" : "an update"}: ${m.phase.kind}, move ${m.moves.length})`));
+          type Moment = { kind: "dodge"; at: number; mine?: string } | { kind: "rush"; at: number; places: Record<string, string> } | { kind: "lights"; at: number; rounds: { ms: number; endedAt?: number; answers?: string[] }[] };
+          const momentOf = (x: SoloMatch): Moment | null => {
+            const p = x.phase as { kind: string; dodge?: { at: number; mine?: string }; rush?: { at: number; places: Record<string, string> }; lights?: { at: number; rounds: { ms: number; endedAt?: number; answers?: string[] }[] } };
+            if (p.kind !== "boss") return null;
+            return p.dodge ? { kind: "dodge", ...p.dodge } : p.rush ? { kind: "rush", ...p.rush } : p.lights ? { kind: "lights", ...p.lights } : null;
+          };
+          // (What each screen shows by the clock alone, with no update: the Dodge's lines and teleports, the Rush's sweep, each Lights out
+          // round's targets: ms from the moment's start.)
+          const beats = (v: Moment): number[] => {
+            if (v.kind === "dodge") return [dodgeTimeline().volley.at, ...dodgeTimeline().rounds.flatMap((r) => [r.voteAt, ...r.teleports])];
+            if (v.kind === "rush") return [rushTimeline().scatterAt, rushTimeline().placeAt];
+            return lightsOutTimeline(v.rounds, m.settings.lateGraceMs).rounds.map((r) => r.at);
+          };
+          const check = (tick: boolean) => {
+            const k = loadKeptSolo();
+            if (!k || !m.runner?.boss || m.runner.boss.result || m.decided) return;
+            const v = momentOf(m);
+            const km = k.kept.moment;
+            // (Between updates only what the clock shows: the runner may hold his move while his thinking still shows.)
+            if (tick) {
+              const beat = v && beats(v).filter((b) => b <= Date.now() - v.at).at(-1);
+              if (v && beat !== undefined) note((km?.ms ?? -1) >= beat, "a beat the moment shows by the clock kept", true);
+              return;
+            }
+            checks++;
+            note(JSON.stringify(k.kept.snapshot) === JSON.stringify(m.runner.snapshot()), "the board and powers on screen kept");
+            note(JSON.stringify(k.kept.moves) === JSON.stringify(m.moves), "the moves kept");
+            const ph = m.phase;
+            const pending = k.kept.pending;
+            if (ph.kind === "scoring") {
+              seen.add("scoring");
+              note(pending?.move === ph.move, "the move being scored kept");
+              if (m.kingCalled) seen.add("king"), note(pending?.king === true, "the King's call kept");
+              if (m.hint !== null) note(pending?.powerUp === true, "the power-up kept with the move");
+              // (The bots' picks given to the screen, each shown at its time.)
+              const shown = (m.livePicks() ?? []).filter((x) => x.playerId !== HUMAN);
+              if (shown.length) seen.add("picks"), note(shown.every((x) => new Map(pending?.picks).get(x.playerId) === x.move), "the bots' picks on screen kept");
+            } else note(pending === undefined, "nothing kept as being scored");
+            if (ph.kind === "play" && m.hint !== null) seen.add("powerUp"), note(k.kept.powerUp === true, "the power-up used kept");
+            note(!!v === !!km, "the timed moment on screen kept");
+            if (!v || !km) return;
+            seen.add(v.kind);
+            const into = Date.now() - v.at;
+            note(km.ms >= into, "the time into the moment kept as it shows");
+            const beat = beats(v).filter((b) => b <= into).at(-1);
+            if (beat !== undefined) seen.add(`${v.kind} beat`), note(km.ms >= beat, "a beat the moment shows by the clock kept");
+            const mine = km.mine as { places?: unknown; endedAt?: unknown[] } | string | undefined;
+            if (v.kind === "dodge") note(mine === v.mine, "the Dodge's vote kept");
+            if (v.kind === "rush") note(JSON.stringify((mine as { places?: unknown })?.places ?? {}) === JSON.stringify(v.places), "the Rush's placements kept");
+            if (v.kind === "lights") note(((mine as { endedAt?: unknown[] })?.endedAt?.length ?? 0) === v.rounds.filter((r) => r.answers).length, "Lights out's rounds over kept");
+          };
+          m.subscribe(() => check(false));
+          m.start();
+          await until(m, () => yourTurn(m), "your first turn");
+          // (One power-up, as the God King's Last Stand gives.)
+          const st = m.runner.state;
+          (m.runner as unknown as { state: typeof st }).state = { ...st, players: st.players.map((x) => (x.id === HUMAN ? { ...x, powerUps: 1 } : x)) };
+          let acted = -1;
+          let turns = 0;
+          let pickAt = 0;
+          let probed = false;
+          const tapped = new Set<string>();
+          for (let i = 0; i < 9000 && m.phase.kind !== "results" && !(seen.has(power === "lightsout" ? "lights" : power) && !momentOf(m) && turns >= 5); i++) {
+            const ph = m.phase as { kind: string; startsAt?: number };
+            const v = momentOf(m);
+            if (ph.kind === "play" && Date.now() >= ph.startsAt! && acted !== m.moves.length) {
+              if (pickAt && Date.now() >= pickAt) {
+                pickAt = 0;
+                acted = m.moves.length;
+                turns++;
+                pick(m);
+              } else if (!pickAt) {
+                // (Kept from your first move: the power-up on your second turn, the King's call on your third.)
+                if (turns === 1 && m.powerUpsLeft() > 0) {
+                  m.usePowerUp();
+                  pickAt = Date.now() + 400;
+                } else if (turns === 2 && (m.runner.boss?.kingCharges ?? 0) > 0) {
+                  acted = m.moves.length;
+                  turns++;
+                  m.callKing();
+                } else pickAt = Date.now();
+              }
+            }
+            // (Your inputs in each moment: a vote each round (its safe square: the battle goes on), a piece put back, a tap a round.)
+            if (v?.kind === "dodge") {
+              const d = m.runner.state.boss!.powers!.chandy!.dodge!;
+              const r = dodgeTimeline().rounds[d.results.length];
+              const t = Date.now() - v.at;
+              if (r && t >= r.voteAt && t < r.voteEnd - 300 && !v.mine) m.dodgeVote(d.rounds[d.results.length]!.safe);
+            }
+            if (v?.kind === "rush" && Object.keys(v.places).length === 0 && Date.now() - v.at >= rushTimeline().placeAt + 500) {
+              const first = m.runner.state.boss!.powers!.dash!.rush!.moves[0]!;
+              m.rushPlace(first.from, first.from);
+            }
+            if (v?.kind === "lights") {
+              const tl = lightsOutTimeline(v.rounds, m.settings.lateGraceMs);
+              const k = tl.rounds.findIndex((r, j) => !v.rounds[j]!.answers && Date.now() - v.at >= r.at + 300);
+              const sq = k >= 0 ? m.runner.state.boss!.powers!.lightsOut!.rounds[k]!.answers[0] : undefined;
+              if (sq && !tapped.has(`${k}`)) tapped.add(`${k}`), m.lightsTap(sq);
+            }
+            // A rejoin from the kept game while the moment is under way, past one of its beats: it opens it there, never before.
+            if (v && !probed && seen.has(`${v.kind} beat`) && Date.now() - v.at > beats(v)[1]!) {
+              probed = true;
+              const k = loadKeptSolo()!;
+              const into = Date.now() - v.at;
+              const r = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...k.settings }, false, k.bots);
+              void r.resume(k.kept);
+              await until(r, () => !!momentOf(r) || r.phase.kind === "results", "the rejoin's moment");
+              const rv = momentOf(r)!;
+              note(rv?.kind === v.kind, "the rejoin opens the same moment");
+              const rInto = Date.now() - rv.at;
+              note(rInto >= k.kept.moment!.ms && rInto >= (beats(v).filter((b) => b <= into).at(-1) ?? 0), "the rejoin opens it at or after what was shown");
+              note(rInto < into + 400, "the rejoin opens it where it was");
+              r.dispose();
+            }
+            check(true);
+            await step();
+          }
+          const wanted = [power === "lightsout" ? "lights" : power, `${power === "lightsout" ? "lights" : power} beat`, "scoring", "powerUp", ...(bots ? ["picks"] : [])];
+          expect(problems).toEqual([]);
+          expect(wanted.filter((w) => !seen.has(w)), `walked: ${[...seen].join(", ")}`).toEqual([]);
+          expect(probed, "a rejoin mid-moment").toBe(true);
+          expect(checks).toBeGreaterThan(10);
+          m.dispose();
+        } finally {
+          if (was >= 0) admins.splice(was, 0, bossId);
+        }
+      }, 120_000);
+
+  // (The third review of #885, EN1: a rejoin's keeps before its first round (his brain's loading step, Maia's) wrote no time into the
+  // Dodge, so a crash then reopened the round due, its teleports seen. Until its first round, a rejoin keeps what it was kept with.)
+  it("a rejoin mid-Dodge, his brain loading first: kept as it was meanwhile (its time and your vote), then on from there", async () => {
+    const admins = BOSS_ADMIN_FIRST as string[];
+    const at = admins.indexOf("chandy");
+    if (at >= 0) admins.splice(at, 1);
+    try {
+      const m = battle({ ...ALONE, bossId: "chandy", bossPowerTest: "dodge" } as Settings);
+      m.start();
+      const dodge = (x: SoloMatch) => x.runner?.state.boss?.powers?.chandy?.dodge ?? null;
+      const view = (x: SoloMatch) => (x.phase as { dodge?: { at: number; round: number; mine?: string } }).dodge ?? null;
+      for (let i = 0; i < 6000 && !(dodge(m) && dodge(m)!.results.length === 1 && view(m)); i++) {
+        if (yourTurn(m)) pick(m);
+        await step();
+      }
+      const r2 = dodgeTimeline().rounds[1]!;
+      await step(view(m)!.at + r2.voteAt + 300 - Date.now());
+      m.dodgeVote(dodgeArena(dodge(m)!.center)[0]!);
+      const k = loadKeptSolo()!;
+      expect(k.kept.moment).toMatchObject({ mine: dodgeArena(dodge(m)!.center)[0] });
+      m.dispose();
+      // (His brain's loading step, as Maia's shows it, before the first round.)
+      const r = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...k.settings }, false, false);
+      r.kept = new SoloKeep({ at: k.at, bots: false, settings: () => r.settings, facts: () => FACTS, boss: () => r.runner?.boss?.id ?? null });
+      r.kept.ready(k.user, k.game, k.battle);
+      const self = r as unknown as { startBrain: (next: () => void) => void; set: (p: unknown) => void; bossSnapshot: () => unknown };
+      vi.spyOn(self, "startBrain").mockImplementation((next) => {
+        self.set({ kind: "boss", boss: self.bossSnapshot(), until: 0, intro: true, loading: true });
+        setTimeout(next, 3_000);
+      });
+      void r.resume(k.kept);
+      await step(1_000);
+      expect(r.phase).toMatchObject({ loading: true });
+      expect(loadKeptSolo()!.kept.moment).toEqual(k.kept.moment);
+      await until(r, () => !!view(r), "the Dodge, resumed after the load");
+      expect(view(r)!.mine).toBe(k.kept.moment!.mine);
+      expect(Date.now() - view(r)!.at).toBeLessThan(k.kept.moment!.ms + 300);
+      r.dispose();
+    } finally {
+      if (at >= 0) admins.splice(at, 0, "chandy");
+    }
+  }, 120_000);
+
+  // (Keep before show keeps the moments the old keeps skipped: a rejoin now plays what was due at each. The dark's move: kept as it flashes,
+  // before the dark has picked it.)
+  it("Hollow alone, the dark about to play your move (a 3rd bulb out), a reload: the rejoin plays the dark's move, never yours", async () => {
+    const m = battle({ ...ALONE, bossId: "hollow", bossPowerTest: undefined } as Settings);
+    m.start();
+    await until(m, () => yourTurn(m), "your first turn");
+    pick(m);
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    // (The 3rd bulb just out, as darkTry leaves it: the dark plays this turn's move.)
+    const st = m.runner.state;
+    const boss = st.boss!;
+    (m.runner as unknown as { state: typeof st }).state = { ...st, boss: { ...boss, powers: { ...boss.powers!, strand: { out: 3 }, forced: { turn: boss.crowdMoves + 1, at: 3 } } } };
+    expect(m.runner.darkForcedDue()).toBe(true);
+    const self = m as unknown as { darkNote: unknown; darkForcedTurn: () => Promise<void> };
+    self.darkNote = { move: "e2e4", at: Date.now(), tries: 3, out: true, bulbs: 3, forced: true };
+    void self.darkForcedTurn();
+    const k = loadKeptSolo()!;
+    expect(k.kept.pending).toBeUndefined();
+    m.dispose();
+    const r = resumed(k);
+    // (Nothing picked here: the dark's move is the turn's, as played through.)
+    await until(r, () => r.moves.length === 2, "the dark's move, resumed");
+    expect(r.darkNote).toMatchObject({ forced: true });
+    expect(r.moves[1]!.move).toBe(r.runner.state.boss!.powers!.forced!.move);
+    r.dispose();
+  }, 120_000);
+
+  it("a Solo raid kept on the crowd's move, its strike due: the rejoin strikes first, before his reply, as it would have", async () => {
+    const m = battle({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "gingerbread", bossFixedElo: 1600 } as Settings, true);
+    m.start();
+    await until(m, () => yourTurn(m), "your first turn");
+    for (let i = 0; i < 100 && Date.now() < (m.phase as { startsAt: number }).startsAt; i++) await step();
+    pick(m);
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    for (let i = 0; i < 100 && Date.now() < (m.phase as { startsAt: number }).startsAt; i++) await step();
+    pick(m);
+    // (The crowd's move revealed, his reply not yet: what's kept.)
+    await until(m, () => m.phase.kind === "reveal", "the crowd's move revealed");
+    const k = loadKeptSolo()!;
+    const ply = k.kept.snapshot.boards[0]!.history.length;
+    m.dispose();
+    // (A strike due after that move: stubbed, as the stand-in engine's equal losses leave no clear worst.)
+    const due = vi.spyOn(MatchRunner.prototype, "bossKillDue").mockReturnValue(true);
+    let struckAt: number | null = null;
+    const kill = vi.spyOn(MatchRunner.prototype, "bossKill").mockImplementation(function (this: MatchRunner) {
+      due.mockReturnValue(false);
+      struckAt = this.boards.get(this.state.boards[0]!)!.history.length;
+      return null;
+    });
+    try {
+      const r = resumed(k);
+      await until(r, () => yourTurn(r) && r.moves.length === 2, "your third turn, resumed");
+      expect(kill).toHaveBeenCalledTimes(1);
+      expect(struckAt, "struck before his reply").toBe(ply);
+      r.dispose();
+    } finally {
+      due.mockRestore();
+      kill.mockRestore();
+    }
+  }, 120_000);
+
   // (The review of #885, N3: only the resume's first, synchronous part was inside App.tsx's catch.)
   it("a resume whose first round fails, after his brain's load, rejects: the app's Resume drops it with a plain line, never a stuck screen", async () => {
     const m = battle({ ...ALONE, bossId: "gingerbread", bossPowerTest: undefined } as Settings);
@@ -543,7 +793,8 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     // (Its end leaves the other tab's be.)
     keep.end();
     expect(loadKeptSolo()).toMatchObject({ tab: "tab-b" });
-    // Taken over since its last keep, then its own line ends (the boss's mate: no keep first): the other tab's is left be (DN4).
+    // Taken over since its last keep, then its own line ends with no keep between (the battle's end: its result's update keeps nothing, as
+    // the game is no longer one to resume; the step before it kept): the other tab's is left be (DN4). (A resign keeps first: EN2's case.)
     ({ keep, lost } = keeper());
     store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, tab: "tab-b" }));
     keep.end();
@@ -572,6 +823,25 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     expect(resumedLost).not.toHaveBeenCalled();
     expect(keptMoves(loadKeptSolo()!)).toBe(3);
   });
+
+  // (The third review of #885, EN2: a resign was the one end with no keep before it, so a tab whose game another had taken over recorded
+  // a loss for a game played on there, and that tab played on a game already recorded.)
+  it("a resign in a tab whose game another tab took over: it stops there, \"Played in another tab.\", and records nothing", async () => {
+    let lost = 0;
+    const m = new SoloMatch([engine], "Ann", ALONE, false, false);
+    m.kept = new SoloKeep({ at: Date.now(), bots: false, settings: () => m.settings, facts: () => FACTS, boss: () => m.runner?.boss?.id ?? null, lost: () => (lost++, m.dispose()) });
+    m.kept.ready("u", GAME, "battle1");
+    m.start();
+    await until(m, () => yourTurn(m), "your first turn");
+    pick(m);
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, tab: "tab-b" }));
+    m.resign();
+    expect(lost).toBe(1);
+    expect(m.phase.kind).not.toBe("results");
+    expect(m.decided).toBeNull();
+    expect(loadKeptSolo()).toMatchObject({ tab: "tab-b", game: GAME });
+  }, 120_000);
 
   // (The delta review of #885, DN2: the tab stopped at a keep carried on with the step that found it: the boss's search, his reply's timer.)
   it("a match stopped at a keep (another tab claimed its game while your move was scored) ends there: no search or timer after it", async () => {
