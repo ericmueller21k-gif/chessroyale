@@ -300,7 +300,7 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
 
   // (The delta review of #885, D1: only your move was kept as it was accepted; the bots' picks, on screen from your pick on, were drawn
   // again on the rejoin, so a crowd about to play a blunder could be re-rolled by a reload. Both orders: the bots' plan in before your
-  // pick, and landing while it's scored.)
+  // pick, and landing while it's scored. What's checked: the kept game at the moment the picks first show, and the rejoin's votes.)
   for (const late of [false, true]) {
     it(`a Solo raid, a reload while your move is scored: the rejoin plays the bots' picks already on screen (their plan ${late ? "landing while it's scored" : "in before your pick"})`, async () => {
       const m = battle({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "gingerbread", bossFixedElo: 1600 } as Settings, true, Date.now(), [slowEngine]);
@@ -312,20 +312,26 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
       await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
       for (let i = 0; i < 100 && Date.now() < (m.phase as { startsAt: number }).startsAt; i++) await step();
       slow = 8_000;
-      expect((m.livePicks() ?? []).length, "your turn: no picks shown").toBe(0);
+      // (As the screen hears it: the kept game at the moment the bots' picks first show.)
+      let seen: { shown: Map<string, string>; kept: KeptSolo } | null = null;
+      m.subscribe(() => {
+        const bots = m.phase.kind === "scoring" ? (m.livePicks() ?? []).filter((p) => p.playerId !== HUMAN) : [];
+        if (!seen && bots.length > 10) seen = { shown: new Map(bots.map((p) => [p.playerId, p.move])), kept: loadKeptSolo()! };
+      });
       pick(m);
-      await until(m, () => m.phase.kind === "scoring" && (m.livePicks() ?? []).filter((p) => p.playerId !== HUMAN).length > 10, "the bots' picks on screen");
-      const shown = new Map((m.livePicks() ?? []).filter((p) => p.playerId !== HUMAN).map((p) => [p.playerId, p.move]));
-      const k = loadKeptSolo()!;
+      expect(loadKeptSolo()!.kept.pending?.picks === undefined, "kept at your pick without the bots' picks: their plan is still on its way").toBe(late);
+      await until(m, () => !!seen, "the bots' picks on screen");
+      const { shown, kept: k } = seen!;
       expect(k.kept.pending?.move).toBeTruthy();
       expect(new Map(k.kept.pending?.picks)).toEqual(shown);
       m.dispose();
       const r = resumed(k, [slowEngine]);
-      await until(r, () => r.phase.kind === "scoring" && (r.livePicks() ?? []).filter((p) => p.playerId !== HUMAN).length > 10, "the kept move scored, resumed, the bots' picks in");
-      expect(new Map((r.livePicks() ?? []).filter((p) => p.playerId !== HUMAN).map((p) => [p.playerId, p.move]))).toEqual(shown);
-      // (And the crowd's move played is theirs and yours as kept.)
-      slow = 0;
-      await until(r, () => yourTurn(r) && r.moves.length === 2, "your third turn, resumed");
+      // (The rejoin's round, as it's revealed: every bot's vote as kept, and yours.)
+      await until(r, () => r.phase.kind === "reveal", "the kept move's reveal, resumed");
+      expect(r.moves).toHaveLength(2);
+      const votes = (r.phase as unknown as { mine: { result: { players: { playerId: string; move: string | null }[] } } }).mine.result.players;
+      expect(new Map(votes.filter((p) => p.playerId !== HUMAN).map((p) => [p.playerId, p.move]))).toEqual(shown);
+      expect(votes.find((p) => p.playerId === HUMAN)?.move).toBe(k.kept.pending!.move);
       r.dispose();
     }, 120_000);
   }
