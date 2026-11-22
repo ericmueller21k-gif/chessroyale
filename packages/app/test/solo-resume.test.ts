@@ -496,6 +496,15 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     // (Its end leaves the other tab's be.)
     keep.end();
     expect(loadKeptSolo()).toMatchObject({ tab: "tab-b" });
+    // Taken over since its last keep, then its own line ends (the boss's mate: no keep first): the other tab's is left be (DN4).
+    ({ keep, lost } = keeper());
+    store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, tab: "tab-b" }));
+    keep.end();
+    expect(loadKeptSolo()).toMatchObject({ tab: "tab-b" });
+    // (Held: its end clears it.)
+    ({ keep, lost } = keeper());
+    keep.end();
+    expect(loadKeptSolo()).toBeNull();
     // Forfeited in another tab (none kept), or another game kept there since.
     ({ keep, lost } = keeper());
     store.delete("brc.soloKept");

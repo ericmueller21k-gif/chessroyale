@@ -161,11 +161,14 @@ export class SoloKeep {
     if (this.over || !this.last) return;
     this.keep({ ...this.last, turnMs: Math.max(0, Math.round(ms)) });
   }
-  /** Decided, resigned or given up: the kept game goes (only if it's still this one), and nothing is written again. */
+  /**
+   * Decided, resigned or given up: the kept game goes (only while this tab holds it: a tab whose game another tab took over since its last
+   * keep, its old line ending in the boss's turn, never clears that tab's: the delta review of #885, DN4), and nothing is written again.
+   */
   end(): void {
     if (this.over) return;
     this.over = true;
-    if (this.ids) clearKeptSolo(this.ids.game);
+    if (this.ids && heldHere(loadKeptSolo(), this.ids.game)) clearKeptSolo(this.ids.game);
   }
   get ended(): boolean {
     return this.over;
