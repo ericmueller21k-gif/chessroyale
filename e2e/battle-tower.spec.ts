@@ -731,12 +731,22 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
   // so a floor of several draws the board that much higher; its size and its place under the bar are the lone floor's. A computer's two
   // bars are one height (89 px, Eric, Nov 21: "the bigger boss bar"), so its board is in the very same place.)
   const underBar = async () => {
-    // (Both on screen first: right after a match starts the bar can be between renders, its box not yet there.)
-    await expect(page.locator(".boss-bar").first()).toBeVisible();
-    await expect(page.locator(".board-wrap").first()).toBeVisible();
-    const b = (await page.locator(".board-wrap").first().boundingBox())!;
-    const bar = (await page.locator(".boss-bar").first().boundingBox())!;
-    return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height), bar: Math.round(bar.height), gap: Math.round(b.y - (bar.y + bar.height)) };
+    // (Both read in one evaluate, in the same frame, polled until both are on screen. Main's run on Nov 22 (db80512, desktop): a
+    // visibility check, then one boundingBox at a time, found the board gone between the two (a render), and read null.)
+    let got: { x: number; y: number; w: number; h: number; bar: number; gap: number } | null = null;
+    await expect
+      .poll(async () => {
+        got = await page.evaluate(() => {
+          const shown = (s: string) => [...document.querySelectorAll<HTMLElement>(s)].find((e) => e.getBoundingClientRect().width > 0);
+          const [board, bar] = [shown(".board-wrap"), shown(".boss-bar")];
+          if (!board || !bar) return null;
+          const [b, r] = [board.getBoundingClientRect(), bar.getBoundingClientRect()];
+          return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height), bar: Math.round(r.height), gap: Math.round(b.y - (r.y + r.height)) };
+        });
+        return got;
+      }, { timeout: 10_000, message: "the board and the boss bar both on screen" })
+      .not.toBeNull();
+    return got!;
   };
   // A lone boss's floor (floor 1): the board's size and place. Left at once (free before your 2nd move).
   await intoTower(page);
