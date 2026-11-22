@@ -10337,6 +10337,10 @@ button.fd-logo {
   cursor: pointer;
   transition: transform 80ms;
 }
+/* (Nov 22: Chess Town takes the Other modes heading's room, 26 px here: its 12 px box, its 6 px top margin and one 8 px gap. PLAY keeps its size.) */
+.fd-town {
+  height: calc(clamp(80px, calc(97px - (700px - var(--app-h)) / 2), 97px) + 26px);
+}
 .fd-play:disabled {
   opacity: 0.45;
   cursor: default;
@@ -10475,10 +10479,6 @@ button.fd-logo {
     margin-top: 0;
     margin-bottom: -4px;
   }
-  /* (The column's gap is 8 px here, so the label gets 6 px back: 14 px under PLAY, the spacing Eric approved under the line.) */
-  .fd-other-label {
-    margin-top: 6px;
-  }
   .fd-hero {
     flex: 1 1 0;
     /* (A pawn of 48 px at least, beside the tag on a short card: see the short-card rule below.) */
@@ -10571,14 +10571,6 @@ button.fd-logo {
       font-size: 13px;
     }
   }
-}
-/* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. Centered over
-   the cards (Oct 26, Eric). */
-.fd-other-label {
-  font-size: 11px;
-  /* (12 px, what Archivo's own "normal" comes to: the fallback font's is 13, which moved the column above it for a moment while Archivo loaded.) */
-  line-height: 12px;
-  text-align: center;
 }
 /* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
 .fd-ranked {
@@ -11574,11 +11566,16 @@ button.fd-logo {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+/* (Eric, Nov 22: the picture and the words sit centered as one block, the words centered too, not hugging the left edge.) */
 .fd-root .rd-pair .rd-card.rd-half {
   gap: 6px;
   min-width: 0;
   min-height: 56px;
   padding: 6px;
+  justify-content: center;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-text {
+  text-align: center;
 }
 .fd-root .rd-pair .rd-card.rd-half .rd-face {
   width: 32px;
@@ -13281,9 +13278,12 @@ button.fd-seat {
   }
   /* (Oct 28, Eric: "make the play button bigger with the space we gain": 76 px = 64 + 4 (the options) + 8 (the pair's cards),
      so the live window's board and the page keep their size.) */
-  .fd-root.framed .fd-play,
-  .fd-root.framed .fd-town {
+  .fd-root.framed .fd-play {
     height: 76px;
+    font-size: 40px;
+  }
+  .fd-root.framed .fd-town {
+    height: calc(76px + 24px);
     font-size: 40px;
   }
 }
@@ -13328,9 +13328,12 @@ button.fd-seat {
    * elastic part, so under 812 px of height the two give the 12 px back together, 70 px at the least (a 1280 × 800 laptop): the board
    * keeps the size it had, 233 px at most. From 812 px up, and in a short window (below), they're as they were.)
    */
-  .fd-root.framed .fd-play,
-  .fd-root.framed .fd-town {
+  .fd-root.framed .fd-play {
     height: clamp(70px, calc(76px - (812px - var(--app-h)) / 2), 76px);
+  }
+  /* (Nov 22: Chess Town takes the Other modes heading's 12 px and one 12 px gap here.) */
+  .fd-root.framed .fd-town {
+    height: calc(clamp(70px, calc(76px - (812px - var(--app-h)) / 2), 76px) + 24px);
   }
   /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 60 px here, up from
      48 (Oct 28; 43 before Oct 26): the board keeps the size it had at 680 px tall.) */
@@ -13338,9 +13341,12 @@ button.fd-seat {
     .fd-root.framed .fd-play-col {
       gap: 8px;
     }
-    .fd-root.framed .fd-play,
-    .fd-root.framed .fd-town {
+    .fd-root.framed .fd-play {
       height: 60px;
+      font-size: 32px;
+    }
+    .fd-root.framed .fd-town {
+      height: calc(60px + 20px);
       font-size: 32px;
     }
   }

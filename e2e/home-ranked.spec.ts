@@ -54,10 +54,10 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
       expect(b.font).toBeGreaterThanOrEqual(11);
     }
     expect(buttons.map((b) => b.x)).toEqual([...buttons.map((b) => b.x)].sort((a, b) => a - b));
-    // Chess Town's button is PLAY's size exactly (Eric, Nov 1): the column's full width, as tall as PLAY, its words whole.
+    // Chess Town's button is PLAY's size and width (Eric, Nov 1), plus the Other modes heading's room since Nov 22: its words whole.
     const c = (await card.boundingBox())!;
     const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
-    expect(Math.abs(c.height - play.height), `${w}: Chess Town as tall as PLAY`).toBeLessThan(0.5);
+    expect(c.height - play.height, `${w}: Chess Town taller than PLAY by the Other modes heading's room (Nov 22)`).toBeGreaterThan(15);
     expect(Math.abs(c.width - play.width), `${w}: Chess Town as wide as PLAY`).toBeLessThan(0.5);
     expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
     // (Whole in the page's own font: while Archivo is loading, the fallback font's wider words can run past their box.)
@@ -67,10 +67,8 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     // button under PLAY, the old Boss Arena card gone), on a phone and a computer alike.
     expect(play.y, `${w}`).toBeGreaterThan(r.y + r.height);
     expect(c.y, `${w}: Chess Town under PLAY`).toBeGreaterThanOrEqual(play.y + play.height);
-    const other = await box(page, ".fd-other-label");
-    expect(other.y, `${w}: Other modes under Chess Town`).toBeGreaterThanOrEqual(c.y + c.height);
     const solo = await box(page, ".rd-card");
-    expect(solo.y, `${w}: the cards under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
+    expect(solo.y, `${w}: the cards under Chess Town (no Other modes heading, Nov 22)`).toBeGreaterThanOrEqual(c.y + c.height);
     expect(await sideways(page), `${w}`).toBe(0);
   }
 });
@@ -256,15 +254,13 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   expect(new URL(page.url()).search).toBe("");
 });
 
-test("Other modes under Chess Town: the label, then Boss Battle (the rotating boss faces) and Auto chess (the army picture) side by side at half width each, the card's look; Auto chess opens /autochess, and its gear's Leave is home (no back button since Nov 8)", async ({ page }) => {
+test("Other modes under Chess Town (no heading since Nov 22): Boss Battle (the rotating boss faces) and Auto chess (the army picture) side by side at half width each, the card's look; Auto chess opens /autochess, and its gear's Leave is home (no back button since Nov 8)", async ({ page }) => {
   await named(page, "Knight");
   await page.goto("/");
   const main = page.getByRole("main");
-  const label = main.getByRole("heading", { name: "Other modes", exact: true });
   const town = main.getByRole("button", { name: "Chess Town", exact: true });
   const solo = main.getByRole("button", { name: /^Boss Battle/ });
   const auto = main.getByRole("button", { name: /^Auto chess/ });
-  await expect(label).toBeVisible();
   await expect(auto).toHaveText(/^Auto chessBuild an army$/);
   // Auto chess's picture is the drawn army (a canvas at its own size, with pixels on it), no longer the board's knight.
   await expect(auto.locator("svg.fd-knight")).toHaveCount(0);
@@ -276,10 +272,9 @@ test("Other modes under Chess Town: the label, then Boss Battle (the rotating bo
   await expect(solo.locator("svg.fd-crown")).toHaveCount(0);
   const at = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
   const play = await at(main.getByRole("button", { name: "PLAY", exact: true }));
-  const [l, t, s, a] = [await at(label), await at(town), await at(solo), await at(auto)];
+  const [t, s, a] = [await at(town), await at(solo), await at(auto)];
   expect(t.y, "Chess Town under PLAY").toBeGreaterThanOrEqual(play.y + play.height);
-  expect(l.y, "Other modes under Chess Town").toBeGreaterThanOrEqual(t.y + t.height);
-  expect(s.y, "the cards under Other modes").toBeGreaterThanOrEqual(l.y + l.height);
+  expect(s.y, "the cards under Chess Town").toBeGreaterThanOrEqual(t.y + t.height);
   // (Eric, Oct 26: Boss Battle and Auto chess sit side by side, half width each, the same size; the pair is as wide as Chess Town's
   // button, PLAY's width.)
   expect(Math.abs(t.width - (a.x + a.width - s.x)), "Chess Town as wide as the pair").toBeLessThan(2);
@@ -391,7 +386,7 @@ test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed
   const play = page.getByRole("button", { name: "PLAY", exact: true });
   // (The options' names since Nov 9, Eric: Solo queue, Party, Bots. Only the names changed here.)
   const options = [/^Solo queue/, /^Party/, /^Bots/];
-  const parts: Record<string, string> = { board: ".fd-livewin", hint: ".fd-hint", play: ".fd-play", label: ".fd-other-label", boss: ".rd-card", auto: ".fd-auto-card", panel: ".fd-mode-panel" };
+  const parts: Record<string, string> = { board: ".fd-livewin", hint: ".fd-hint", play: ".fd-play", boss: ".rd-card", auto: ".fd-auto-card", panel: ".fd-mode-panel" };
   const measure = async () => {
     const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
     for (const [k, s] of Object.entries(parts)) if (await page.locator(s).count()) out[k] = await box(page, s);
@@ -533,12 +528,10 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(hint[d] - hint0[d]), `${at}: the line's ${d} after the picks`).toBeLessThanOrEqual(1);
     expect(hint.y + hint.height, `${at}: the line above PLAY`).toBeLessThanOrEqual(playBox.y);
     expect(playBox.y - (hint.y + hint.height), `${at}: the line just above PLAY`).toBeLessThan(12);
-    // (Nov 1: Chess Town's button is between PLAY and Other modes: PLAY's size, right under it, and the label right under that.)
+    // (Nov 1: Chess Town's button is between PLAY and Other modes: PLAY's size, right under it. Nov 22: no heading, the cards right under it.)
     const town = await rect(".fd-town");
-    const other = await rect(".fd-other-label");
     expect(town.y, `${at}: Chess Town right under PLAY`).toBeLessThan(playBox.y + playBox.height + 20);
-    expect(Math.abs(town.height - playBox.height), `${at}: Chess Town as tall as PLAY`).toBeLessThan(0.5);
-    expect(other.y, `${at}: nothing between Chess Town and Other modes`).toBeLessThan(town.y + town.height + 20);
+    expect(town.height - playBox.height, `${at}: Chess Town taller than PLAY by the Other modes heading's room (Nov 22)`).toBeGreaterThan(15);
     // (One line for what PLAY does, and it's the one above.)
     await expect(page.locator(".fd-hint")).toHaveCount(1);
 
