@@ -202,11 +202,11 @@ export interface KeptGame {
   turnMs?: number;
   /**
    * Your move as it was accepted, kept before it's scored (the judge's await), so a reload while it's scored can't take it back: a rejoin
-   * plays it as that turn's move (the review of #885, I2). Its time (`thinkMs`), a power-up used on it, Hollow's dark ending the turn;
-   * in a Solo raid the bots' picks planned by then, shown from your pick on, and those made with a power-up (`picks`, `botPowerUps`:
-   * runner.plannedPicks; the delta review, D1).
+   * plays it as that turn's move (the review of #885, I2). Its time (`thinkMs`), a power-up used on it, Hollow's dark ending the turn,
+   * the God King called to play it (`king`: the delta review, D5); in a Solo raid the bots' picks planned by then, shown from your pick
+   * on, and those made with a power-up (`picks`, `botPowerUps`: runner.plannedPicks; D1).
    */
-  pending?: { move: string | null; thinkMs: number; powerUp?: true; darkOut?: true; picks?: [string, string][]; botPowerUps?: string[] };
+  pending?: { move: string | null; thinkMs: number; powerUp?: true; darkOut?: true; king?: true; picks?: [string, string][]; botPowerUps?: string[] };
 }
 
 /**
@@ -299,7 +299,7 @@ export function readKeptGame(v: unknown): KeptGame | null {
   const p = g.pending;
   const picks = Array.isArray(p?.picks) ? p.picks.filter((x): x is [string, string] => Array.isArray(x) && typeof x[0] === "string" && typeof x[1] === "string").map(([id, move]): [string, string] => [id, move]) : [];
   const botPowerUps = Array.isArray(p?.botPowerUps) ? p.botPowerUps.filter((id): id is string => typeof id === "string") : [];
-  const pending = p && typeof p === "object" && (p.move === null || typeof p.move === "string") && typeof p.thinkMs === "number" && Number.isFinite(p.thinkMs) ? { move: p.move, thinkMs: Math.max(0, p.thinkMs), ...(p.powerUp ? { powerUp: true as const } : {}), ...(p.darkOut ? { darkOut: true as const } : {}), ...(picks.length ? { picks } : {}), ...(botPowerUps.length ? { botPowerUps } : {}) } : null;
+  const pending = p && typeof p === "object" && (p.move === null || typeof p.move === "string") && typeof p.thinkMs === "number" && Number.isFinite(p.thinkMs) ? { move: p.move, thinkMs: Math.max(0, p.thinkMs), ...(p.powerUp ? { powerUp: true as const } : {}), ...(p.darkOut ? { darkOut: true as const } : {}), ...(p.king === true && p.move === null ? { king: true as const } : {}), ...(picks.length ? { picks } : {}), ...(botPowerUps.length ? { botPowerUps } : {}) } : null;
   return { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}), ...(pending ? { pending } : {}) };
 }
 

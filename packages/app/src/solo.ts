@@ -1736,8 +1736,13 @@ export class SoloMatch implements GameView {
     this.begun = true;
     this.runner.deal();
     this.kingCalled = false;
-    // (A move kept as it was accepted (I2): the crowd's picks planned by then, as they were shown (D1).)
+    // (A move kept as it was accepted (I2): the crowd's picks planned by then, as they were shown (D1); the God King called to play it, so
+    // it's scored as his move, a charge spent, not as no move in time (D5).)
     if (pending?.picks) this.runner.restorePlannedPicks({ picks: pending.picks, ...(pending.botPowerUps ? { powerUps: pending.botPowerUps } : {}) });
+    if (pending?.king) {
+      this.kingCalled = true;
+      this.runner.kingCallers.add(HUMAN);
+    }
     this.frozen = null;
     this.clearStall();
     this.darkNote = null;
@@ -1878,7 +1883,7 @@ export class SoloMatch implements GameView {
     // (A boss battle kept on the device (a floor, a solo battle): kept with your move as it's accepted, before the judge's answer, so a
     // reload while it's scored never takes it back; the rejoin scores it again (the review of #885, I2). In a Solo raid with the bots'
     // picks, there or as they land (D1).)
-    this.scored = { move, thinkMs, ...(usedPowerUp ? { powerUp: true } : {}), ...(darkOut ? { darkOut: true } : {}) };
+    this.scored = { move, thinkMs, ...(usedPowerUp ? { powerUp: true } : {}), ...(darkOut ? { darkOut: true } : {}), ...(move === null && this.runner.kingCallers.has(HUMAN) ? { king: true } : {}) };
     this.keepFloor(this.scored);
     this.set({ kind: "scoring", board, move });
     const t = performance.now();

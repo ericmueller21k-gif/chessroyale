@@ -330,6 +330,36 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     }, 120_000);
   }
 
+  // (The delta review of #885, D5: the King's call wasn't kept with the move, so the rejoin scored his turn as no move in time, his
+  // charge kept and the turn not the one you chose.)
+  it("the God King called to play your move, a reload while it's scored: the rejoin plays it as his move, a charge spent, as played through", async () => {
+    const m = battle({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "gingerbread", bossFixedElo: 1600, bossAloneClock: true } as Settings, false, Date.now(), [slowEngine]);
+    m.start();
+    await until(m, () => yourTurn(m), "your first turn");
+    pick(m);
+    // (The judge slow, as a phone's engine or the server's recheck can be: the King's move waits on the next turn's search.)
+    slow = 2_000;
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    const charges = m.runner.boss!.kingCharges ?? 0;
+    expect(charges, "the God King has a charge").toBeGreaterThan(0);
+    m.callKing();
+    await step(300);
+    expect(m.phase.kind).toBe("scoring");
+    const k = loadKeptSolo()!;
+    expect(k.kept.pending).toEqual({ move: null, thinkMs: expect.any(Number), king: true });
+    // (Played through: his move played, a charge spent, your turn abstained.)
+    await until(m, () => yourTurn(m) && m.moves.length === 2, "your third turn");
+    expect(m.moves[1]!.abstained).toBe(true);
+    expect(m.runner.boss!.kingCharges).toBe(charges - 1);
+    m.dispose();
+    slow = 0;
+    const r = resumed(k, [slowEngine]);
+    await until(r, () => yourTurn(r) && r.moves.length === 2, "your third turn, resumed");
+    expect(r.moves[1]).toMatchObject({ move: m.moves[1]!.move, abstained: true });
+    expect(r.runner.boss!.kingCharges).toBe(charges - 1);
+    r.dispose();
+  }, 120_000);
+
   // (The review of #885, I4: only a resign's end (emit) cleared it; a battle played to its end (set) stayed kept, and the next start
   // asked "Forfeit your game in progress?" about the game just finished.)
   for (const bossId of ["gingerbread", "hollow", "hopper"]) {
