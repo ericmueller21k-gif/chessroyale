@@ -46,7 +46,7 @@ import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, SIGNED_IN, socialDeletes } from "./fri
 import type { RankedLeaves } from "@chessroyale/core";
 import { RANKED_COLUMNS, RANKED_SCHEMA, rankedLeaves, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
-import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
+import { XP_COLUMNS, XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
 import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
 import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { TOWER_SCHEMA, holdsPartyCopy, towerMoves } from "./tower.ts";
@@ -288,6 +288,11 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // What the game paid beside its XP (Nov 9, 2026, XP phase 2): JSON {crate, daily, crates, keys, bossPicks, levels} (core's
   // XpRewards), for the result screen's rewards box. NULL: nothing (and every result from before).
   { table: "results", column: "xp_rewards", type: "TEXT" },
+  // A solo result's game (Nov 22, 2026; xp.ts): its id from POST /api/xp/solo/start, so a game is recorded once: as its result, or as
+  // a loss when it was left after SOLO_ABANDON.minMoves (then `abandoned` = 1). NULL online, for a solo game never timed, and before.
+  { table: "results", column: "solo_game", type: "TEXT" },
+  // The solo game the server times (xp.ts): whether it's real yet (SOLO_ABANDON.minMoves), and what its loss row would need.
+  ...XP_COLUMNS,
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
   // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
@@ -879,8 +884,12 @@ const flag = (b: unknown) => (b === true ? 1 : b === false ? 0 : null);
 /** A move in SAN (e.g. Nxe5, O-O-O, e8=Q+), or null. */
 export const cleanSan = (m: unknown) => (typeof m === "string" && /^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/.test(m) ? m : null);
 
-/** `once.since`: written only if this account has no result from this online lobby (`r.lobby`) since then (a lobby writing it again). */
-export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number, once?: { since: number }): Promise<void> {
+/**
+ * `once.since`: written only if this account has no result from this online lobby (`r.lobby`) since then (a lobby writing it again).
+ * `once.soloGame` (a solo result: its game's id, the device's word): written only if this account has no result of that game yet,
+ * its own or the loss recorded when it was left (xp.ts abandonStatements, SOLO_ABANDON), and kept on the row for the next.
+ */
+export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number, once?: { since: number } | { soloGame: string }): Promise<void> {
   const rating = typeof r.rating === "number" && Number.isFinite(r.rating) ? Math.round(r.rating) : null;
   const cuts = count(r.cuts);
   const strikes = count(r.strikes);
@@ -891,13 +900,16 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   // (One batch: the row and the rating it moves go in together. The rating is the latest counting result's, read again, so a
   // result written late, or twice, never puts an older rating back: Nov 10, finding 9.)
   const rated = rating !== null && ranked && !r.held;
+  const since = once && "since" in once ? once.since : null;
+  const soloGame = !r.online && once && "soloGame" in once ? once.soloGame : null;
   await sql.batch([
     stmt(
       `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
          brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
-         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
-       ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
+         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, solo_game)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+       ${since !== null ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}
+       ${soloGame !== null ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND solo_game = ?)" : ""}`,
       userId,
       mode,
       r.online ? 1 : 0,
@@ -928,9 +940,11 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
       typeof r.playMs === "number" && Number.isFinite(r.playMs) ? Math.max(0, Math.round(r.playMs)) : null,
       typeof r.moves === "number" && Number.isFinite(r.moves) ? Math.max(0, Math.min(10_000, Math.round(r.moves))) : null,
       ...xpColumns(r.xp),
+      soloGame,
       // (An account deleted mid-match gets nothing new.)
       userId,
-      ...(once ? [userId, lobby, once.since] : []),
+      ...(since !== null ? [userId, lobby, since] : []),
+      ...(soloGame !== null ? [userId, soloGame] : []),
     ),
     // Only a ranked match moves your ranking (and not while fair play holds your results).
     ...(rated ? [stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, userId)] : []),
@@ -986,8 +1000,11 @@ export interface Profile {
   leaves: RankedLeaves | null;
 }
 
-/** Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. */
-export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS, opts: { leaves?: boolean } = {}): Promise<Profile> {
+/**
+ * Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. `opts.after`: a
+ * write the results wait for (GET /api/me: a solo game left, recorded as a loss first: xp.ts abandonSoloGame), beside the other reads.
+ */
+export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS, opts: { leaves?: boolean; after?: Promise<unknown> } = {}): Promise<Profile> {
   const admin = admins(user);
   // The Welcome Crate's backfill (Nov 6): an account that has finished enough games gets it here, on its next sign-in or app load,
   // once ever (welcome.ts). Never in the way of the profile. The locker's holdings are read after it; nothing else waits on it.
@@ -995,9 +1012,11 @@ export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMI
   // Every part's reads at once (Nov 10): each D1 read is a round trip (about 40 ms from a Worker), and the app's home waits on this.
   // One after another they were 28 round trips, over a second; at once, about four (test/me-round-trips.test.ts).
   const [rows, chatMod, chatOnRow, shop, locker, ranked1v1, xp, leaves] = await Promise.all([
-    sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
-      "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
-      user.id,
+    (opts.after ?? Promise.resolve()).then(() =>
+      sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
+        "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
+        user.id,
+      ),
     ),
     chatStanding(sql, user.id, Date.now()).catch(() => null),
     sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", user.id).catch(() => null),

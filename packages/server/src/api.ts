@@ -13,7 +13,7 @@ import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
 import { pickBossCrate } from "./rewards.ts";
-import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
+import { SOLO_TESTED, abandonSoloGame, endSoloGame, gameXpOf, grantXp, markSoloGame, setTestXp, soloGameKey, soloRealOf, soloStaleBefore, startSoloGame } from "./xp.ts";
 import { questsAnswer, rerollQuest, setTestQuests } from "./quests.ts";
 import { towerResponse, type LobbyGone } from "./tower.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
@@ -381,8 +381,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/me" && request.method === "GET") {
     const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
-    // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
-    if (current) return new Response(JSON.stringify({ ...(await profile(sql, current, admins, leaves)), ...(admin ? { admin: true } : {}) }), { headers });
+    // (A solo game left after SOLO_ABANDON.minMoves goes on your record as a loss before your results are read (xp.ts): the app's load
+    // asks for it (`settle=1`, when no tab of this device is still playing one); any read, once it began SOLO_ABANDON.staleHours ago.)
+    if (current) {
+      const settled = abandonSoloGame(sql, current.id, url.searchParams.get("settle") === "1" ? {} : { staleBefore: soloStaleBefore(now) }).catch((e: unknown) =>
+        console.log(`solo game left: ${String(e)}`),
+      );
+      // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
+      return new Response(JSON.stringify({ ...(await profile(sql, current, admins, { ...leaves, after: settled })), ...(admin ? { admin: true } : {}) }), { headers });
+    }
     // (A device that answered "too young" plays under the default name.)
     const g = await createGuest(sql, now, ageAnswer(request) === "under" ? "Player" : (url.searchParams.get("name") ?? "Player"));
     headers.append("set-cookie", sessionCookie(g.token));
@@ -753,6 +760,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const minutes = !asked ? null : (env as AdminEnv).TEST_SWITCHES === "1" ? Math.max(0, Math.min(XP.maxMinutes, Math.floor(b!.xpgame as number))) : SOLO_TESTED;
     return json({ game: await startSoloGame(sql, current.id, now, minutes) });
   }
+  // POST /api/xp/solo/real {game, mode, players, team, bossId, bossElo}: sent once, at your SOLO_ABANDON.minMoves-th own move of a solo
+  // game (never a Battle Tower floor's or a test game's): left from now on, the game is recorded as a loss (xp.ts markSoloGame). {ok}.
+  if (path === "/api/xp/solo/real" && request.method === "POST") {
+    const b = (await request.json().catch(() => null)) as { game?: unknown } | null;
+    const real = soloRealOf(b);
+    if (!real) return json({ message: "Bad game" }, 400);
+    return json({ ok: await markSoloGame(sql, current.id, b?.game, real, now) });
+  }
   if (path === "/api/xp" && request.method === "GET") return json({ xp: await gameXpOf(sql, current.id, url.searchParams.get("game"), now) });
   if (path === "/api/xp/test" && request.method === "POST") {
     // (Only where TEST_SWITCHES is "1" (local, e2e, staging), never an admin's on production: a jump there would be owed real level
@@ -833,7 +848,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, tower: _tower, ...result } = b;
     // (`playMs`: the server's time, as XP counted it (a test server's ?xpgame minutes included); none for a game it never timed. The
     // Welcome Crate counts a solo game only with WELCOME_GIFT.soloMinSeconds of it and XP.minMoves moves: Nov 10.)
-    await recordResult(sql, current.id, { ...result, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic", playMs: timed ? ms : null, moves, xp } as MatchResult, now);
+    // (Once per game (SOLO_ABANDON, Nov 22): a game already recorded, as left after its minMoves-th move or by an earlier post, writes nothing.)
+    const soloGame = soloGameKey(b.game);
+    await recordResult(sql, current.id, { ...result, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic", playMs: timed ? ms : null, moves, xp } as MatchResult, now, soloGame ? { soloGame } : undefined);
     // (A finished game: maybe the Welcome Crate, once ever. The app's next /api/me shows it.)
     await grantWelcomeCrate(sql, current.id, now).catch(() => false);
     return json({ ok: true, xp });
