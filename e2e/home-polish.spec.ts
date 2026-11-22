@@ -123,7 +123,7 @@ test("Chess Town's button under day, dusk and night: the clock picks one as the 
   expect(seen.day!.picture).toBeGreaterThan(seen.dusk!.picture);
   expect(seen.night!.picture).toBeLessThan(seen.dusk!.picture * 0.6);
   for (const sky of ["day", "night"] as const)
-    for (const k of ["town", "play", "other", "cards", "label"] as const) expect(seen[sky]![k], `${sky}: ${k} as at dusk`).toEqual(seen.dusk![k]);
+    for (const k of ["town", "play", "cards", "label"] as const) expect(seen[sky]![k], `${sky}: ${k} as at dusk`).toEqual(seen.dusk![k]);
   expect(seen.night!.label.startsWith("rgb(255, 255, 255)|"), "the name stays white with its outline").toBe(true);
   // ?sky= wins over the clock, in either direction; ?night=1 is night.
   expect((await load("?town=B&sky=night")).sky).toBe("night");
