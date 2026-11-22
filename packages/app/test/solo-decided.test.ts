@@ -91,6 +91,81 @@ describe("a solo game's result, known as it's decided (SOLO_ABANDON)", () => {
     m.dispose();
   }, 60_000);
 
+  /** A strike due after every crowd move (bossKillDue and bossKill stubbed, a bot struck; everything else real). */
+  const strikesDue = (m: SoloMatch) => {
+    const bot = m.runner.alive().find((p) => p.id !== HUMAN)!.id;
+    const kill = vi.fn(() => bot);
+    Object.assign(m.runner, { bossKillDue: () => true, bossKill: kill });
+    return kill;
+  };
+  const striking = (m: SoloMatch) => m.phase.kind === "boss" && !m.phase.fall && m.phase.until > Date.now();
+
+  it("a Solo raid's last move with a strike due (the second delta review, I1): the page going on its reveal or its strike plays the strike out and ends the battle, the result known", async () => {
+    // (Beaten: the page goes on the last move's reveal. Before that, a strike mid-battle plays on, on its reveal and in the strike.)
+    let m = await toPlay();
+    let kill = strikesDue(m);
+    play(m);
+    await until(m, () => m.phase.kind === "reveal");
+    m.endOnHide();
+    expect(m.phase.kind).toBe("reveal");
+    m.skipReveal();
+    expect(striking(m)).toBe(true);
+    m.endOnHide();
+    expect(striking(m)).toBe(true);
+    expect(m.decided).toBeNull();
+    await until(m, () => m.phase.kind === "play", 500);
+    m.winForm();
+    play(m);
+    await until(m, () => m.phase.kind === "reveal");
+    expect(m.runner.stageComplete()).toBe(true);
+    expect(m.decided).toBeNull();
+    m.endOnHide();
+    expect(kill).toHaveBeenCalledTimes(2);
+    expect(falling(m)).toBe(true);
+    expect(m.decided).toMatchObject({ kind: "results", bossResult: "crowd" });
+    // (The fall then plays once to the result screen: the strike's timer is gone, so nothing runs the next round again.)
+    const decided = m.decided;
+    await until(m, () => m.phase.kind === "results");
+    expect(m.phase).toEqual(decided);
+    expect(kill).toHaveBeenCalledTimes(2);
+    m.dispose();
+    // (The move cap (bossMaxMoves) on the crowd's first move: the page goes during the strike that follows it.)
+    m = new SoloMatch([quick], "Ann", raid({ bossId: "recluse", bossHidden: true, bossMaxMoves: 1 }), false, true);
+    m.start();
+    await until(m, () => m.phase.kind === "play", 500);
+    kill = strikesDue(m);
+    play(m);
+    await until(m, () => m.phase.kind === "reveal");
+    m.skipReveal();
+    expect(striking(m)).toBe(true);
+    expect(m.runner.stageComplete()).toBe(true);
+    expect(m.decided).toBeNull();
+    m.endOnHide();
+    expect(kill).toHaveBeenCalledTimes(1);
+    expect(m.decided).toMatchObject({ kind: "results" });
+    expect(m.decided?.bossResult).toBeDefined();
+    m.dispose();
+  }, 60_000);
+
+  it("the same shape elsewhere: the battle over as the boss's own move shows (a mate, his last carrot): the page going ends it; while he thinks, nothing", async () => {
+    const m = await toPlay();
+    play(m);
+    await until(m, () => m.phase.kind === "reveal");
+    m.skipReveal();
+    await until(m, () => m.phase.kind === "boss" && !!m.phase.thinking, 10);
+    // (His move on its way: the runner says it's over (stubbed), but no step is shown yet, so nothing changes.)
+    const complete = vi.spyOn(m.runner, "stageComplete").mockReturnValue(true);
+    m.endOnHide();
+    expect(m.phase.kind === "boss" && m.phase.thinking).toBe(true);
+    expect(m.decided).toBeNull();
+    complete.mockRestore();
+    await until(m, () => striking(m) && !(m.phase.kind === "boss" && m.phase.thinking), 10);
+    vi.spyOn(m.runner, "stageComplete").mockReturnValue(true);
+    m.endOnHide();
+    expect(m.decided).toMatchObject({ kind: "results" });
+    m.dispose();
+  }, 60_000);
+
   type Inside = {
     runner: { state: Parameters<typeof finishBoss>[0]; isOver(): boolean; stageComplete(): boolean; afterFinalTurn(): string[]; finishFinal(): void; finalView(): unknown };
     createRunner(): void;

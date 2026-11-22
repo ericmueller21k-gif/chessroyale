@@ -3396,6 +3396,10 @@ button.history-label {
 .hud-bank.low {
   color: var(--danger);
 }
+/* (Out: the box keeps its place and width, unseen, so nothing beside it shifts. Hud.tsx BankBox.) */
+.hud-bank.out {
+  visibility: hidden;
+}
 
 /* After a round: the tiny boards light up one after another as every move lands. */
 .strip-slot.wave .tiny-board {

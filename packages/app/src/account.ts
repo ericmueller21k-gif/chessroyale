@@ -704,7 +704,10 @@ export async function recordSoloResult(r: {
   // (A game you finished is never recorded as left (SOLO_ABANDON): its result is kept on the device before it's posted, so a page closed
   // or reloaded mid-post still has it, and taken off only once the server has answered; sent again before your next solo game and at
   // the next load (sendUnsentResult). `keepalive`: the post itself outlives a page that goes.)
-  if (r.game) keepUnsent({ user: state.profile.user.id, result: r, at: Date.now() });
+  if (r.game) {
+    sendOtherFirst(r.game);
+    keepUnsent({ user: state.profile.user.id, result: r, at: Date.now() });
+  }
   let answer: { xp?: XpGrant | null };
   try {
     answer = await api<{ xp?: XpGrant | null }>("/api/results", { method: "POST", body: JSON.stringify(r), keepalive: true });
@@ -838,7 +841,19 @@ function unsentResult(): Unsent | null {
  * on its way yet. The result screen's post then takes it over (recordSoloResult); a page gone first has it sent at the next load.
  */
 export function keepSoloResult(game: string, result: Record<string, unknown>): void {
-  if (state.profile) keepUnsent({ user: state.profile.user.id, result: { ...result, game } });
+  if (!state.profile) return;
+  sendOtherFirst(game);
+  keepUnsent({ user: state.profile.user.id, result: { ...result, game } });
+}
+/**
+ * A new game's result is about to take the one slot: another game's kept there is sent first, else it would be overwritten and that game
+ * left with no result at all (the second delta review, N2). Whatever its `at`: by now its post has long had time to land, and a result
+ * sent twice is recorded once. Its post starts here, before the slot changes (sendUnsentResult reads it and posts at once), and its
+ * answer leaves the new one be (`answered` checks the game).
+ */
+function sendOtherFirst(game: string): void {
+  const other = unsentGame();
+  if (other && other !== game) void sendUnsentResult();
 }
 /** The game of a result still to be sent, which the server then never records as left (`unsent`, server/xp.ts). */
 function unsentGame(): string | null {

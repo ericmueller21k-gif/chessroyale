@@ -271,23 +271,47 @@ export class SoloMatch implements GameView {
   /**
    * Worked out at every update (before its listeners hear of it) from the game's own state, not from the paths that end it: once the
    * runner has placed everyone (with no form or phase 2 still to come), or phase 2's boards are all decided, the result is as finish
-   * (or finishPhase2) will show it. So any end moment, now or added later, comes after the result is known.
+   * (or finishPhase2) will show it. So any end moment, now or added later, comes after the result is known. (Classic, once you're out:
+   * your own result as it will be, your place fixed; who wins isn't known yet: placedInClassic.)
    */
   private noteEnded() {
     if (this.ended || !this.runner || this.phase.kind === "results") return;
     const g = this.phase2;
-    if (g ? g.outcome.decided : this.runner.isOver() && !this.phase2Due()) this.ended = g ? this.phase2Results() : this.results();
+    if (g ? g.outcome.decided : (this.runner.isOver() && !this.phase2Due()) || this.placedInClassic()) this.ended = g ? this.phase2Results() : this.results();
   }
 
   /**
-   * The page is going (pagehide: closed or reloaded) on the reveal of a move that ended the game: the runner decides as the reveal
-   * ends (as online), so it ends now, as a tap on the reveal would (skipReveal), and its result is known (`decided`) before the page
-   * goes. Any other reveal plays on (skipping it would start the next turn's clock in a page kept for Back).
+   * Classic: your own place is fixed once you're out (a cut, a team final's step), whoever goes on to win, so your result is decided
+   * then: a page closed on "You're out" or while the rest plays out keeps that place (the second delta review). Not Crowd: out, your
+   * team can still win the game.
+   */
+  private placedInClassic(): boolean {
+    return this.settings.mode === "classic" && !this.runner.boss && this.you?.placement != null;
+  }
+
+  /** The timer on its way when it's the next round's (nextRoundIn: a step shown, then the next round), until it fires. */
+  private roundTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * The page is going (pagehide: closed or reloaded) once the game is over but not yet ended: the runner decides as the step on screen
+   * ends (as online), so it ends now, and its result is known (`decided`) before the page goes. A boss battle over (`stageComplete`:
+   * a mate, the move cap, the clock, his last carrot, a blackout, a Dodge hit): the crowd's last move's reveal ends as a tap would
+   * (skipReveal), a strike due after it plays (afterBossRound), and the step shown then (that strike, his last move or power) ends with
+   * the next round, which ends the battle (finishBossBattle). A 50 v 50's game over: its last reveal. Anything else plays on (skipping it
+   * would start the next turn's clock in a page kept for Back).
    */
   endOnHide(): void {
-    if (this.stopped || this.phase.kind !== "reveal") return;
-    const ends = this.runner.boss ? this.runner.stageComplete() && !this.runner.bossKillDue() : !!this.runner.crowdGameEnd();
-    if (ends) this.skipReveal();
+    if (this.stopped || this.decided || !this.runner) return;
+    if (!this.runner.boss) {
+      if (this.phase.kind === "reveal" && this.runner.crowdGameEnd()) this.skipReveal();
+      return;
+    }
+    if (!this.runner.stageComplete()) return;
+    if (this.phase.kind === "reveal") this.skipReveal();
+    if (this.stopped || this.decided || this.roundTimer === null || this.timer !== this.roundTimer) return;
+    clearTimeout(this.roundTimer);
+    this.timer = this.roundTimer = null;
+    this.nextRound();
   }
 
   dispose() {
@@ -366,7 +390,11 @@ export class SoloMatch implements GameView {
   /** The step just played shows for `ms`, then the next round: the floor kept first, so a reload rejoins after the step (keepFloor). */
   private nextRoundIn(ms: number) {
     this.keepFloor();
-    this.timer = setTimeout(() => this.nextRound(), ms);
+    const t = setTimeout(() => {
+      if (this.roundTimer === t) this.roundTimer = null;
+      this.nextRound();
+    }, ms);
+    this.timer = this.roundTimer = t;
   }
 
   /**
