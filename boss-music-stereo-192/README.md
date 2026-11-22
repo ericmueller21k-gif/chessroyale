@@ -47,3 +47,34 @@ the second go on Nov 13 and again on Nov 22: "Yes let's add that one". The built
 - The song has its own crickets and rabbit-foot thumps, shaped like the ones the game makes for this boss
   (`hopper-sounds.ts`). If they get mistaken for the fight's own sounds in play, say so and they come down or out.
 - At 2:10 it is shorter than the 2:30 to 2:45 the later themes run: it is the length Eric approved.
+
+## Nov 22: Smudgy's theme (`smudgy`)
+
+`smudgy-loop.mp3` / `.ogg` (stereo, 192 kbps), and its entry in this folder's `themes.json`: one loop of **166.5 s**
+(2:46.5), no intro piece (`introSeconds` 0), pad 0.5 as the others, `bpm` null (its pace changes), -16.0 LUFS, peak
+-2.1 dBFS. Built by `python3 handoff.py --stereo --kbps 192 <folder> smudgy` from `scripts/reel/music/song_ao.py` on
+`claude/trailer-v2`. Eric's direction (Nov 22): paint strokes and splatter, whimsical, calm but fast (about 172), a
+slow 20-second opening, a build that pushes to about 226 and comes back. Third go; his verdict: "Yeah, this is the
+one. This is the one." The built file is that go, sample for sample.
+
+| From | What happens |
+|---|---|
+| 0:00 | the slow opening (half pace): soft piano, slow brush strokes, a music box, the violin low |
+| 0:20 | the tune on the violin over the fast beat (about 172) |
+| 0:43 | the piano has the tune; then the violin and the piano trade |
+| 1:05 | the calm: no kit; a soft piano and a solo high on the music box (it rings like a glockenspiel) |
+| 1:33 | a little waltz on the piano; the beat comes back |
+| 1:44 | the rush: 172 up to about 226 |
+| 1:53 | full speed (226): splats, the tune from 2:02 |
+| 2:10 | one big splash; everything stops; drops |
+| 2:13 | the tune in full, at 172 again |
+| 2:35 | the tag, thinning into the slow opening |
+
+- **The slow opening is part of the loop**, as Chub & Chirp's night and the tower's calm start are: the tag winds
+  down into it, and the loop point is clean on the built file. Every pass replays those 20 seconds.
+- The song has Smudgy's own sounds in it, shaped like the game's (`smudgy-sounds.ts`): splats (most of them from
+  1:44 to 2:10), a brush's swish for the kit's cymbals, a swipe before each change of key, drips, and two quiet
+  giggles (1:32 and 2:12). If any of them gets mistaken for the fight's own sounds in play, say so and it comes
+  down or out.
+- It is the calmest of the boss themes on purpose (his words: "a vibe of like a calmness, but still ... fast pace"):
+  its quiet middle (1:05 to 1:33) is about 3 dB under the rest.

@@ -89,6 +89,17 @@
       "bpm": null,
       "lufs": -16.9,
       "peakDb": -1.0
+    },
+    "smudgy": {
+      "boss": "Smudgy",
+      "source": "scripts/reel/music/song_ao.py",
+      "intro": null,
+      "loop": "smudgy-loop",
+      "introSeconds": 0.0,
+      "loopSeconds": 166.5,
+      "bpm": null,
+      "lufs": -16.0,
+      "peakDb": -2.1
     }
   }
 }
