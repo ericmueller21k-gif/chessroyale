@@ -1,5 +1,0 @@
-solo-resume: done. Branch claude/solo-resume, last code commit 261b4456; PR title and body in .pr-body.md (full lane: please add `full-e2e`).
-Stills: branch stills/solo-resume (card-phone.png 390x844, card-desktop.png 1280x800, plus -dark of each).
-CI has not run: check.yml and e2e.yml run only on a pull request (or main), and the brief says not to open the PR. Locally green:
-typecheck; unit tests outside packages/chess (4,720 passed); e2e xp + battle-tower + resign (39 passed), boss-smoke phone (18 passed).
-Flake note (director's message): xp.spec's solo test now fails fast naming the screen (bossAloneNow); the cause was not reproduced locally (see the PR body).
