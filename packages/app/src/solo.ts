@@ -147,6 +147,11 @@ export class SoloMatch implements GameView {
     void this.runner.planBotPicks().then((picks) => {
       if (this.live === live) {
         live.picks = picks;
+        // (Your move already in and being scored, the bots' plan landing only now: kept again with their picks before they show (D1).)
+        if (this.scored && this.phase.kind === "scoring") {
+          this.keepFloor(this.scored);
+          if (this.stopped) return;
+        }
         this.emit();
       }
     });
@@ -408,8 +413,18 @@ export class SoloMatch implements GameView {
     if (!keeper || this.stopped || !this.runner?.boss || this.runner.boss.result) return;
     this.watchAway();
     const turnMs = this.turnUsedMs();
-    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}), ...(pending ? { pending } : {}) });
+    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}), ...(pending ? { pending: { ...pending, ...this.plannedPicks() } } : {}) });
   }
+  /**
+   * A Solo raid's bot picks planned this round, kept with your move (KeptGame.pending): from your pick on they're on screen (livePicks), so
+   * a rejoin plays them, never a fresh draw of the crowd's move (the delta review of #885, D1). None planned yet: kept as they land.
+   */
+  private plannedPicks(): Pick<NonNullable<KeptGame["pending"]>, "picks" | "botPowerUps"> {
+    const { picks, powerUps } = this.runner.plannedPicks();
+    return picks.length ? { picks, ...(powerUps.length ? { botPowerUps: powerUps } : {}) } : {};
+  }
+  /** Your move as it was kept while it's scored (score), until its round is finished: kept again as the bots' plan lands (startLive). */
+  private scored: KeptGame["pending"] | null = null;
 
   /** The step just played shows for `ms`, then the next round: the floor kept first, so a reload rejoins after the step (keepFloor). */
   private nextRoundIn(ms: number) {
@@ -1721,6 +1736,8 @@ export class SoloMatch implements GameView {
     this.begun = true;
     this.runner.deal();
     this.kingCalled = false;
+    // (A move kept as it was accepted (I2): the crowd's picks planned by then, as they were shown (D1).)
+    if (pending?.picks) this.runner.restorePlannedPicks({ picks: pending.picks, ...(pending.botPowerUps ? { powerUps: pending.botPowerUps } : {}) });
     this.frozen = null;
     this.clearStall();
     this.darkNote = null;
@@ -1859,8 +1876,10 @@ export class SoloMatch implements GameView {
       this.live.rushFrom = now;
     }
     // (A boss battle kept on the device (a floor, a solo battle): kept with your move as it's accepted, before the judge's answer, so a
-    // reload while it's scored never takes it back; the rejoin scores it again (the review of #885, I2).)
-    this.keepFloor({ move, thinkMs, ...(usedPowerUp ? { powerUp: true } : {}), ...(darkOut ? { darkOut: true } : {}) });
+    // reload while it's scored never takes it back; the rejoin scores it again (the review of #885, I2). In a Solo raid with the bots'
+    // picks, there or as they land (D1).)
+    this.scored = { move, thinkMs, ...(usedPowerUp ? { powerUp: true } : {}), ...(darkOut ? { darkOut: true } : {}) };
+    this.keepFloor(this.scored);
     this.set({ kind: "scoring", board, move });
     const t = performance.now();
     // Score while the bots still thinking finish (they light up the leaderboard), then reveal.
@@ -1873,6 +1892,7 @@ export class SoloMatch implements GameView {
       inFinal ? Promise.resolve() : this.progress.finishAll(this.runner.alive().map((p) => p.id)),
     ]);
     if (this.stopped) return;
+    this.scored = null;
     const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
     const mine = report.boards.find((b) => b.playerIds.includes(HUMAN))!;
     const record = moveRecordFrom(report.stage, report.round, mine, (id) => id === HUMAN);

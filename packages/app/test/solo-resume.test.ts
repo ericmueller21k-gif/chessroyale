@@ -93,6 +93,7 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) });
     page.visibilityState = "visible";
     page.listeners.clear();
+    slow = 0;
     vi.stubGlobal("document", {
       get visibilityState() {
         return page.visibilityState;
@@ -296,6 +297,38 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     expect(r.players[0]!.id).toBe(HUMAN);
     r.dispose();
   }, 120_000);
+
+  // (The delta review of #885, D1: only your move was kept as it was accepted; the bots' picks, on screen from your pick on, were drawn
+  // again on the rejoin, so a crowd about to play a blunder could be re-rolled by a reload. Both orders: the bots' plan in before your
+  // pick, and landing while it's scored.)
+  for (const late of [false, true]) {
+    it(`a Solo raid, a reload while your move is scored: the rejoin plays the bots' picks already on screen (their plan ${late ? "landing while it's scored" : "in before your pick"})`, async () => {
+      const m = battle({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "gingerbread", bossFixedElo: 1600 } as Settings, true, Date.now(), [slowEngine]);
+      m.start();
+      await until(m, () => yourTurn(m), "your first turn");
+      for (let i = 0; i < 100 && Date.now() < (m.phase as { startsAt: number }).startsAt; i++) await step();
+      pick(m);
+      if (late) slow = 8_000;
+      await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+      for (let i = 0; i < 100 && Date.now() < (m.phase as { startsAt: number }).startsAt; i++) await step();
+      slow = 8_000;
+      expect((m.livePicks() ?? []).length, "your turn: no picks shown").toBe(0);
+      pick(m);
+      await until(m, () => m.phase.kind === "scoring" && (m.livePicks() ?? []).filter((p) => p.playerId !== HUMAN).length > 10, "the bots' picks on screen");
+      const shown = new Map((m.livePicks() ?? []).filter((p) => p.playerId !== HUMAN).map((p) => [p.playerId, p.move]));
+      const k = loadKeptSolo()!;
+      expect(k.kept.pending?.move).toBeTruthy();
+      expect(new Map(k.kept.pending?.picks)).toEqual(shown);
+      m.dispose();
+      const r = resumed(k, [slowEngine]);
+      await until(r, () => r.phase.kind === "scoring" && (r.livePicks() ?? []).filter((p) => p.playerId !== HUMAN).length > 10, "the kept move scored, resumed, the bots' picks in");
+      expect(new Map((r.livePicks() ?? []).filter((p) => p.playerId !== HUMAN).map((p) => [p.playerId, p.move]))).toEqual(shown);
+      // (And the crowd's move played is theirs and yours as kept.)
+      slow = 0;
+      await until(r, () => yourTurn(r) && r.moves.length === 2, "your third turn, resumed");
+      r.dispose();
+    }, 120_000);
+  }
 
   // (The review of #885, I4: only a resign's end (emit) cleared it; a battle played to its end (set) stayed kept, and the next start
   // asked "Forfeit your game in progress?" about the game just finished.)

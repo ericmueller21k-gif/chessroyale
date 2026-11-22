@@ -892,6 +892,23 @@ export class MatchRunner {
     return run;
   }
 
+  /**
+   * This round's bot picks planned so far (planBotPicks), and the bots whose planned pick used a power-up: kept on the device with a solo
+   * boss battle's move as it's accepted (app solo.ts score), so a reload while it's scored plays the crowd already on screen, never a
+   * fresh draw (the delta review of #885, D1).
+   */
+  plannedPicks(): { picks: [string, string][]; powerUps: string[] } {
+    return { picks: [...this.planned], powerUps: [...this.botPowerUps].filter((id) => this.planned.has(id)) };
+  }
+  /** Picks kept (plannedPicks) put back after deal(): this round's plan and scoring play them (a legal pick of a bot picking this round). */
+  restorePlannedPicks(kept: { picks: readonly (readonly [string, string])[]; powerUps?: readonly string[] }): void {
+    for (const [boardId, ids] of this.groups) {
+      const legal = this.crowdAllowed(boardId) ?? legalMoves(this.boards.get(boardId)!.fen);
+      for (const [id, move] of kept.picks) if (ids.includes(id) && this.player(id).isBot && legal.includes(move)) this.planned.set(id, move);
+    }
+    for (const id of kept.powerUps ?? []) if (this.planned.has(id)) this.botPowerUps.add(id);
+  }
+
   /** Picks for every player on a board: humans as given, bots from the engine's top moves. */
   botPicksFor(boardId: number, playerIds: readonly string[], top: readonly MoveScore[]): Record<string, string> {
     const board = this.boards.get(boardId)!;
