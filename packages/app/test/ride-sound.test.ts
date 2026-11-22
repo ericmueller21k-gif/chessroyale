@@ -87,7 +87,7 @@ vi.mock("../src/sound.ts", () => ({
   onAudioRebuilt: (fn: () => void) => (sound.rebuilt.push(fn), () => undefined),
 }));
 
-const { rideMoving, rideStep, rideHop, rideSoundState, rideSoundForTests, warmRideSound, RIDE_LOOP, DECLICK_S } = await import("../src/ride-sound.ts");
+const { rideMoving, rideStep, rideHop, rideSoundId, rideSoundState, rideSoundForTests, warmRideSound, RIDE_LOOP, DECLICK_S } = await import("../src/ride-sound.ts");
 const { Walker } = await import("../src/town/world.ts");
 const { RIDE_CELLS } = await import("../src/town/ride-cells.ts");
 const { TOWN_FEEL } = await import("../src/town/feel.ts");
@@ -345,5 +345,28 @@ describe("the pogo's boings: one a step, on the hop (Eric, Nov 15: \"from one sq
     expect(loop).toHaveLength(1);
     expect([loop[0]!.loopStart, loop[0]!.loopEnd, loop[0]!.playbackRate.value]).toEqual([RIDE_LOOP.start, RIDE_LOOP.end, DOZER.rate]);
     expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", live: 1, boings: 2 });
+  });
+});
+
+describe("a ride's HunChess colorway sounds as its ride (Eric, Nov 22: the gold pogo had no boing)", () => {
+  it("every ride with a sound: its -hunchess item maps to it, and items with no colorway keep their own id", () => {
+    for (const id of Object.keys(RIDE_SOUND.rides)) expect(rideSoundId(`${id}-hunchess`), id).toBe(id);
+    expect(rideSoundId("boingo-pogo")).toBe("boingo-pogo");
+    expect(rideSoundId(null)).toBeNull();
+  });
+
+  it("the gold pogo boings on each step, from the pogo's own file (nothing new fetched)", () => {
+    const asked = sound.asked.length;
+    warmRideSound("boingo-pogo-hunchess");
+    rideStep("boingo-pogo-hunchess", Date.now(), TOWN_FEEL.youStepMs);
+    const started = ctx.sources.filter((s) => s.started);
+    expect(started).toHaveLength(1);
+    expect([started[0]!.started![1], started[0]!.started![2]]).toEqual([POGO.boings[0], POGO.lengthS]);
+    expect(sound.asked.length).toBe(asked);
+  });
+
+  it("the gold dozer's loop plays while it moves, as the dozer's", () => {
+    move("sawyer-dozer-hunchess", 100);
+    expect(playing()).toHaveLength(1);
   });
 });

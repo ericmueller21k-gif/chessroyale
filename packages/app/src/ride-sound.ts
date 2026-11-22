@@ -19,7 +19,7 @@
  * hidden, stops it the same way) and stops the loop. Each end takes `DECLICK_S`, no more: a bare cut mid-wave clicks (the dozer's
  * loop begins at -0.19, its samples step 0.005 apart).
  */
-import { RIDE_SOUND, type RideLoopSound, type RideStepSound } from "@chessroyale/core";
+import { RIDE_SOUND, hunchessBase, type RideLoopSound, type RideStepSound } from "@chessroyale/core";
 import { gameBus, isMuted, isPageHidden, loadAudioFile, onAudioRebuilt, onMuteChange } from "./sound.ts";
 import { RIDE_CELLS } from "./town/ride-cells.ts";
 
@@ -43,8 +43,16 @@ let listening = false;
 /** (Tests replace it.) */
 let clock = () => performance.now();
 
+/**
+ * The ride whose sound an item plays: its own id, or for a HunChess colorway (`<ride>-hunchess`, the Welcome Crate's gold and black)
+ * its ride's (Eric, Nov 22: the gold pogo had no boing, as RIDE_SOUND is keyed by the ride, not each colorway). Every entry point maps
+ * through this, so a ride's sound, its file and its hop are its colorways' too, with nothing to add per colorway.
+ */
+export const rideSoundId = (id: string | null | undefined): string | null => (id ? (hunchessBase(id) ?? id) : null);
+
 /** Fetches and decodes a ride's loop once (the town warms yours after its first frame; a first move asks for it too). */
-export function warmRideSound(id: string | null | undefined) {
+export function warmRideSound(item: string | null | undefined) {
+  const id = rideSoundId(item);
   if (!id || !RIDE_SOUND.rides[id] || buffers.has(id) || asking.has(id)) return;
   asking.add(id);
   void loadAudioFile(rideSoundFile(id)).then((b) => {
@@ -54,7 +62,8 @@ export function warmRideSound(id: string | null | undefined) {
 }
 
 /** A frame loop: you moved this frame, on this ride (its id; null: on foot). Call it only on the frames you move. */
-export function rideMoving(id: string | null | undefined) {
+export function rideMoving(item: string | null | undefined) {
+  const id = rideSoundId(item);
   if (!id) return;
   if (voice?.id === id) {
     lastMove = clock();
@@ -104,7 +113,8 @@ export function rideHop(id: string, on: RideStepSound["on"]): number {
  * A step event (your walker began a step, at `at` ms on the frame clock, `stepMs` long), on this ride (its id; null: on foot). A
  * `steps` ride's next boing, scheduled on the audio clock at the step's hop; a past moment (a late frame) plays at once.
  */
-export function rideStep(id: string | null | undefined, at: number, stepMs: number) {
+export function rideStep(item: string | null | undefined, at: number, stepMs: number) {
+  const id = rideSoundId(item);
   if (!id) return;
   const s = RIDE_SOUND.rides[id];
   if (s?.kind !== "steps" || isMuted() || isPageHidden()) return;
