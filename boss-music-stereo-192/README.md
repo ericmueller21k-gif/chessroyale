@@ -33,3 +33,17 @@ Eric's own plan for the song (a fast breakbeat with a saw lead and an organ solo
 the new one, Chandy, that's being built right now, and it sounds great. Nothing to fix." The loop point is clean on the
 built file. Chandy is not in the roster yet, so `chandy` is my guess at his id: rename the entry and the files if his
 roster id is different.
+
+## Nov 22: Chub & Chirp's theme (`hopper`)
+
+`hopper-loop.mp3` / `.ogg` (stereo, 192 kbps), and its entry in this folder's `themes.json`: one loop of 129.920187 s
+(2:10), no intro piece (`introSeconds` 0), pad 0.5 as the others, `bpm` null (its pace changes: the two takeoffs run
+sharp, the calm is slower), -16.9 LUFS, peak -1.0 dBFS. Built by
+`python3 handoff.py --stereo --kbps 192 <folder> hopper` from `scripts/reel/music/song_x.py` on `claude/trailer-v2`.
+Eric's direction (Nov 13): night crickets, a tune that builds, a drop, an off-beat thumping, a big landing hop. He heard
+the second go on Nov 13 and again on Nov 22: "Yes let's add that one". The built file is that go, sample for sample
+(1.1 dB lower, the level the other themes are handed over at).
+- The loop point is clean on the built file: the last bar's hop lands on bar 1's downbeat, then the night opens.
+- The song has its own crickets and rabbit-foot thumps, shaped like the ones the game makes for this boss
+  (`hopper-sounds.ts`). If they get mistaken for the fight's own sounds in play, say so and they come down or out.
+- At 2:10 it is shorter than the 2:30 to 2:45 the later themes run: it is the length Eric approved.
