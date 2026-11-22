@@ -50,12 +50,15 @@ export interface SoloGameWatch {
 
 /**
  * Leaving a solo game after SOLO_ABANDON.minMoves of your own moves counts as a loss (Eric, Nov 22; server/xp.ts): at that move (core's
- * ownMoves, as XP counts them) the server is told once that the game is real, and from then this device notes at each turn that a
- * tab is playing it (account.ts keepSoloLive), so the app's load in another tab leaves it be. Its end (the result screen) takes the
+ * ownMoves, as XP counts them) the server is told that the game is real, and from then this device notes at each turn that a tab is
+ * playing it (account.ts keepSoloLive), so the app's load in another tab leaves it be. The mark is done once the server answered;
+ * while it fails (no answer, a server error) it's sent again at your next turn, one at a time. Its end (the result screen) takes the
  * note off; the result itself takes the game off the server.
  */
 function watchSoloGame(match: object, w: SoloGameWatch): void {
   let real = false;
+  /** The mark: to send (at the next turn), on its way, or answered. */
+  let mark: "due" | "sending" | "done" = "due";
   let seen = -1;
   const id = () => soloGameId(match);
   const off = w.subscribe(() => {
@@ -67,13 +70,13 @@ function watchSoloGame(match: object, w: SoloGameWatch): void {
     if (w.moves.length === seen) return;
     seen = w.moves.length;
     if (!real && ownMoves(w.moves) < SOLO_ABANDON.minMoves) return;
-    const first = !real;
     real = true;
-    const facts = first ? w.facts() : null;
-    void id().then((g) => {
-      if (!g) return;
+    const facts = mark === "due" ? w.facts() : null;
+    if (facts) mark = "sending";
+    void id().then(async (g) => {
+      if (!g) return void (mark = "done");
       keepSoloLive(g);
-      if (facts) void markSoloGameReal(g, facts).catch(() => undefined);
+      if (facts) mark = (await markSoloGameReal(g, facts).catch(() => false)) ? "done" : "due";
     });
   });
 }

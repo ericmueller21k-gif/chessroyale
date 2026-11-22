@@ -382,11 +382,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
     // (A solo game left after SOLO_ABANDON.minMoves goes on your record as a loss before your results are read (xp.ts): the app's load
-    // asks for it (`settle=1`, when no tab of this device is still playing one); any read, once it began SOLO_ABANDON.staleHours ago.)
+    // asks for it (`settle=1`, when no tab of this device is still playing one); any read, once it began SOLO_ABANDON.staleHours ago.
+    // Never `unsent`: a finished game whose result the device still has to send.)
     if (current) {
-      const settled = abandonSoloGame(sql, current.id, url.searchParams.get("settle") === "1" ? {} : { staleBefore: soloStaleBefore(now) }).catch((e: unknown) =>
-        console.log(`solo game left: ${String(e)}`),
-      );
+      const unsent = soloGameKey(url.searchParams.get("unsent"));
+      const which = { ...(url.searchParams.get("settle") === "1" ? {} : { staleBefore: soloStaleBefore(now) }), ...(unsent ? { except: unsent } : {}) };
+      const settled = abandonSoloGame(sql, current.id, which).catch((e: unknown) => console.log(`solo game left: ${String(e)}`));
       // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
       return new Response(JSON.stringify({ ...(await profile(sql, current, admins, { ...leaves, after: settled })), ...(admin ? { admin: true } : {}) }), { headers });
     }
@@ -753,12 +754,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // /api/results carries it back, and answers the game's XP. GET /api/xp?game=CODE: your XP from an online game, once its room has
   // written it ({xp}: null until then). POST /api/xp/test {xp} (test switches only): sets your XP, for tests and stills.
   if (path === "/api/xp/solo/start" && request.method === "POST") {
-    const b = (await request.json().catch(() => ({}))) as { xpgame?: unknown } | null;
+    // (`unsent`: the device's finished game whose result it still has to send, never recorded as left by this start: SOLO_ABANDON.)
+    const b = (await request.json().catch(() => ({}))) as { xpgame?: unknown; unsent?: unknown } | null;
     // (?xpgame=MINUTES counts the game that long only where TEST_SWITCHES is "1" (local, e2e, staging). Anywhere else, an admin's
     // included, it's a test switch like the others: the game is a test game, no XP (SOLO_TESTED). Review m1, Nov 9.)
     const asked = typeof b?.xpgame === "number" && Number.isFinite(b.xpgame) && testSwitchesOn(env as AdminEnv, current);
     const minutes = !asked ? null : (env as AdminEnv).TEST_SWITCHES === "1" ? Math.max(0, Math.min(XP.maxMinutes, Math.floor(b!.xpgame as number))) : SOLO_TESTED;
-    return json({ game: await startSoloGame(sql, current.id, now, minutes) });
+    return json({ game: await startSoloGame(sql, current.id, now, minutes, soloGameKey(b?.unsent)) });
   }
   // POST /api/xp/solo/real {game, mode, players, team, bossId, bossElo}: sent once, at your SOLO_ABANDON.minMoves-th own move of a solo
   // game (never a Battle Tower floor's or a test game's): left from now on, the game is recorded as a loss (xp.ts markSoloGame). {ok}.
@@ -814,14 +816,19 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // one already ended) earns no XP at all; a win needs XP.soloWinMinMinutes of the server's time and is capped (XP.soloWinsPerDay
   // a day), and the time too (XP.soloMinutesPerDay a day). Review M1 and M2, Nov 9. Answers {ok, xp}.
   if (path === "/api/results" && request.method === "POST") {
-    const b = (await request.json().catch(() => null)) as (Partial<MatchResult> & { game?: unknown; won?: unknown; resigned?: unknown; left?: unknown; test?: unknown; tower?: unknown }) | null;
+    const b = (await request.json().catch(() => null)) as
+      | (Partial<MatchResult> & { game?: unknown; won?: unknown; resigned?: unknown; left?: unknown; test?: unknown; tower?: unknown; resent?: unknown })
+      | null;
     if (!b || typeof b.placement !== "number" || typeof b.players !== "number") return json({ message: "Bad result" }, 400);
     const timed = await endSoloGame(sql, current.id, b.game, now);
     // (An app from before XP sends no moves: NULL, as for every result from before.)
     const moves = typeof b.moves === "number" && Number.isFinite(b.moves) ? Math.max(0, Math.min(10_000, Math.round(b.moves))) : null;
     const tested = timed?.testMinutes === SOLO_TESTED;
     const forced = tested ? null : (timed?.testMinutes ?? null);
-    const ms = forced !== null ? forced * 60_000 : (timed?.ms ?? 0);
+    // (`resent`: a finished game's result the device kept and sends again (SOLO_ABANDON, Nov 22), the device's word, which can only
+    // lower: the server's clock ran on after the game, so it pays no time, and so no win (XP.soloWinMinMinutes) nor the daily reward's
+    // minutes. Airplane mode can't stretch a short game.)
+    const ms = b.resent === true ? 0 : forced !== null ? forced * 60_000 : (timed?.ms ?? 0);
     const xp = !timed
       ? null
       : await grantXp(sql, current.id, {
@@ -845,7 +852,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
           console.log(`xp for a solo game: ${String(e)}`);
           return null;
         });
-    const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, tower: _tower, ...result } = b;
+    const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, tower: _tower, resent: _resent, ...result } = b;
     // (`playMs`: the server's time, as XP counted it (a test server's ?xpgame minutes included); none for a game it never timed. The
     // Welcome Crate counts a solo game only with WELCOME_GIFT.soloMinSeconds of it and XP.minMoves moves: Nov 10.)
     // (Once per game (SOLO_ABANDON, Nov 22): a game already recorded, as left after its minMoves-th move or by an earlier post, writes nothing.)

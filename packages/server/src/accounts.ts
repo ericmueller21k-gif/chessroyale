@@ -46,7 +46,7 @@ import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, SIGNED_IN, socialDeletes } from "./fri
 import type { RankedLeaves } from "@chessroyale/core";
 import { RANKED_COLUMNS, RANKED_SCHEMA, rankedLeaves, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
-import { XP_COLUMNS, XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
+import { XP_COLUMNS, XP_SCHEMA, abandonStatements, xpColumns, xpOf } from "./xp.ts";
 import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
 import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { TOWER_SCHEMA, holdsPartyCopy, towerMoves } from "./tower.ts";
@@ -719,6 +719,10 @@ async function signIn(
       // id, where deleting the account couldn't reach it, and a case can't be shed by signing in
       // (docs/decisions/2026-10-16-integrity-followups.md).
       await sql.batch([
+        // (The guest's open solo game (xp.ts): if real (SOLO_ABANDON), recorded as left first, so the loss moves with its results; then
+        // taken off, as nothing could reach it under the guest's id.)
+        ...abandonStatements(current.id, {}),
+        stmt("DELETE FROM solo_games WHERE user_id = ?", current.id),
         stmt("UPDATE results SET user_id = ? WHERE user_id = ?", owner.id, current.id),
         ...fairPlayMoves(current.id, owner.id, now, await identityHashes(owner)),
         ...chatModMoves(current.id, owner.id, now),

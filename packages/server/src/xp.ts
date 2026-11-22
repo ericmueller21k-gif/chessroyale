@@ -64,12 +64,13 @@ const SOLO_GAME = /^[0-9a-f]{18}$/;
 /**
  * A solo game begins (any solo game: Solo, a Solo raid, Boss alone, a Battle Tower floor): the server notes when, by its own clock.
  * Answers its id. It replaces the one open before it, and that one, if real (past SOLO_ABANDON.minMoves) and still without its result,
- * is recorded as a loss in the same transaction (abandonStatements).
+ * is recorded as a loss in the same transaction (abandonStatements), unless it's `unsent`: the device's finished game whose result it
+ * still has to send (then that result, when it comes, is recorded, with no XP).
  */
-export async function startSoloGame(sql: Sql, userId: string, now: number, testMinutes: number | null = null): Promise<string> {
+export async function startSoloGame(sql: Sql, userId: string, now: number, testMinutes: number | null = null, unsent: string | null = null): Promise<string> {
   const id = newId(9);
   await sql.batch([
-    ...abandonStatements(userId, {}),
+    ...abandonStatements(userId, unsent ? { except: unsent } : {}),
     st("DELETE FROM solo_games WHERE user_id = ?", userId),
     st(`INSERT INTO solo_games (user_id, id, started_at, test_minutes) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)`, userId, id, now, testMinutes, userId),
   ]);
@@ -123,11 +124,13 @@ export async function markSoloGame(sql: Sql, userId: string, game: unknown, real
 
 /**
  * Which real game to record as left: the account's open one (`game`: only if it's this one; `staleBefore`: only if it began before
- * then, SOLO_ABANDON.staleHours ago).
+ * then, SOLO_ABANDON.staleHours ago; `except`: never this one, a finished game whose result the device still has to send: the
+ * device's word, as a game's mark is).
  */
 export interface AbandonWhich {
   game?: string;
   staleBefore?: number;
+  except?: string;
 }
 
 /**
@@ -155,8 +158,9 @@ export function abandonStatements(userId: string, which: AbandonWhich, drop = fa
 
 /** The real solo game `which` names, in SQL (`t`: the table's alias and a dot, or nothing), and its parameters. */
 function abandonWhere(userId: string, which: AbandonWhich) {
-  const cond = (t: string) => `${t}user_id = ? AND ${t}real_at IS NOT NULL${which.game ? ` AND ${t}id = ?` : ""}${which.staleBefore !== undefined ? ` AND ${t}started_at <= ?` : ""}`;
-  const params = [userId, ...(which.game ? [which.game] : []), ...(which.staleBefore !== undefined ? [which.staleBefore] : [])];
+  const cond = (t: string) =>
+    `${t}user_id = ? AND ${t}real_at IS NOT NULL${which.game ? ` AND ${t}id = ?` : ""}${which.staleBefore !== undefined ? ` AND ${t}started_at <= ?` : ""}${which.except ? ` AND ${t}id <> ?` : ""}`;
+  const params = [userId, ...(which.game ? [which.game] : []), ...(which.staleBefore !== undefined ? [which.staleBefore] : []), ...(which.except ? [which.except] : [])];
   return { cond, params };
 }
 
