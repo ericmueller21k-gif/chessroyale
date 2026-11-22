@@ -289,9 +289,10 @@ function Price({ id, onTap }: { id: Offer; onTap: () => void }) {
 function ShopPop({ text, onClose }: { text: string; onClose: () => void }) {
   // (A layout effect: an effect waits for a paint, and an Escape pressed as it opened was lost: shop.spec.ts, CI, Nov 11.)
   useLayoutEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    addEventListener("keydown", key);
-    return () => removeEventListener("keydown", key);
+    // (Its Escape is its own, heard first: nothing under it (the inventory layer, a screen) acts on it too.)
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), onClose());
+    addEventListener("keydown", key, true);
+    return () => removeEventListener("keydown", key, true);
   }, [onClose]);
   return (
     <div class="locker-dialog-back" onClick={onClose}>

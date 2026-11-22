@@ -4,11 +4,11 @@ import { asServerAdmin, bossAloneFromHome, giveCrates, submitMove, test } from "
 
 /**
  * XP phase 2 (Eric, Nov 9: "go with phase two"; docs/decisions/2026-11-09-xp-phase2-*.md), phone and computer: the daily reward in
- * the result's XP box ("Daily reward +200") and its toast ("+1 Winter Crate"); a level-up's toast with its crates and key and the
- * Crates tab after it (the counts, a crate opened with the key, then refused without one, a padlock on the crate it can't open);
+ * the result's XP box ("Daily reward +200") and its card ("+1 Winter Crate"); a level-up's card with its crates and key and the
+ * Crates tab after it (its Go to inventory: the layer over the end screen, Nov 22) (the counts, a crate opened with the key, then refused without one, a padlock on the crate it can't open);
  * every 20th level's boss crate (levels of 500 since Nov 20, rewards every other level), chosen in the Crates tab; an admin's +100 crate keys. Each game is a won Boss alone game counted as
  * 12 minutes (?xpgame=12) against Ginger (?win needs a boss whose powers don't get in its way); its moves are the device's word, so
- * the daily reward's 15 are said by the test (`moves`). REWARD_SHOTS=<dir> saves the stills (the level-up toast, the boss crate
+ * the daily reward's 15 are said by the test (`moves`). REWARD_SHOTS=<dir> saves the stills (the level-up card, the boss crate
  * choice, the Crates tab with keys and a locked crate).
  */
 const SHOTS = process.env.REWARD_SHOTS;
@@ -35,7 +35,7 @@ async function wonGame(page: Page, xp: number, moves: number | null = null) {
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
   await submitMove(page, "h5f7");
   await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
-  // (The end screen's sequence to its end, Nov 20: the toast comes after it.)
+  // (The end screen's sequence to its end, Nov 20: the card comes after it.)
   await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
 }
 
@@ -52,7 +52,7 @@ async function oneXpDay(minutes: number) {
   if (left < minutes * 60_000) await new Promise((r) => setTimeout(r, left + 5_000));
 }
 
-test("the daily reward: the day's first counted game of 15 moves says \"Daily reward +200\" in the XP box, and its toast \"+1 Winter Crate\"; the next game doesn't", async ({ page }) => {
+test("the daily reward: the day's first counted game of 15 moves says \"Daily reward +200\" in the XP box, and its card \"+1 Winter Crate\" (OK closes it); the next game doesn't", async ({ page }) => {
   test.setTimeout(9 * 60_000);
   await oneXpDay(5);
   await wonGame(page, 0, 20);
@@ -62,11 +62,11 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
   await expect(toast).toContainText("Daily reward");
   await expect(toast).toContainText("Daily reward: +1 Winter Crate");
   await expect(toast.locator('[data-thing="crates"]')).toHaveText("×1");
-  // (It takes no taps: the result screen's buttons stay tappable under it, and nothing moved.)
-  expect(await toast.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe("none");
   expect((await locker(page)).seriesCrates).toEqual({ "winter-1": 1 });
-  // It goes on its own.
-  await expect(toast).toHaveCount(0, { timeout: 10_000 });
+  // (The reward card, Nov 22: it waits for you, centered over the end screen; OK closes it, and it doesn't come back for this game.)
+  await expect(toast.getByRole("button", { name: "▶ Go to inventory" })).toBeEnabled();
+  await toast.getByRole("button", { name: "▶ OK" }).click();
+  await expect(toast).toHaveCount(0);
   // The next game today: its own XP, no daily reward (from 100 XP: no level-up either, at 500 a level since Nov 20).
   await wonGame(page, 100, 20);
   await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win +50");
@@ -74,7 +74,7 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
   expect((await locker(page)).seriesCrates).toEqual({ "winter-1": 1 });
 });
 
-test("a level-up: its toast (\"Level 2!\", a Winter Crate and a key, beside the daily's crate); the Crates tab shows them, opens one with the key, then the other is locked and refused", async ({ page }, testInfo) => {
+test("a level-up: its card (\"Level 2!\", a Winter Crate and a key, beside the daily's crate); Go to inventory opens the Crates tab over the end screen, which shows them, opens one with the key, then the other is locked and refused; Back returns to the end screen", async ({ page }, testInfo) => {
   test.setTimeout(4 * 60_000);
   // 490 XP, then +170 and the daily's +200: Level 2 (levels of 500 since Nov 20). (20 moves, so the daily reward's crate comes too: a
   // level pays 1 crate since Nov 18, and the crate left after the open is the daily's.)
@@ -86,9 +86,16 @@ test("a level-up: its toast (\"Level 2!\", a Winter Crate and a key, beside the 
   await expect(toast.locator('[data-thing="keys"]')).toHaveText("×1");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/levelup-toast-${testInfo.project.name}.png` });
   expect(await locker(page)).toMatchObject({ seriesCrates: { "winter-1": 2 }, keys: 1, bossPicks: 0 });
-  // The Crates tab: the key, the two Winter Crates; the Beta Crate (none held) has a padlock.
-  await page.goto("/shop?crates");
-  const crates = page.locator(".crates");
+  // Go to inventory (Nov 22): the Crates tab as a layer over the end screen, the page not navigated. The key, the two Winter Crates; the
+  // Beta Crate (none held) has a padlock.
+  const at = page.url();
+  await toast.getByRole("button", { name: "▶ Go to inventory" }).click();
+  const layer = page.getByTestId("inventory-layer");
+  await expect(layer.getByRole("tab", { name: "Crates" })).toHaveAttribute("aria-selected", "true");
+  expect(page.url()).toBe(at);
+  const crates = layer.locator(".crates");
+  await expect(crates).toBeVisible();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/levelup-inventory-layer-${testInfo.project.name}.png` });
   await expect(crates.getByText("Keys × 1")).toBeVisible();
   await expect(crates.getByText("Crates × 2")).toBeVisible();
   const winter = crates.locator('.series-crate-row[data-crate="winter-1"]');
@@ -114,9 +121,14 @@ test("a level-up: its toast (\"Level 2!\", a Winter Crate and a key, beside the 
   const refused = await page.request.post("/api/locker/open", { data: { crate: "winter-1" } });
   expect([refused.status(), ((await refused.json()) as { message: string }).message]).toEqual([400, "You need a Winter Crate and a crate key to open it."]);
   expect(await locker(page)).toMatchObject({ seriesCrates: { "winter-1": 1 }, keys: 0 });
+  // Its Back: the end screen as it was, the card not again.
+  await layer.getByRole("button", { name: "Back" }).click();
+  await expect(layer).toHaveCount(0);
+  await expect(page.locator(".results h1")).toHaveText("Victory!");
+  await expect(toast).toHaveCount(0);
 });
 
-test("every 20th level: a boss crate to choose; its toast says so, the Crates tab's choice picks Babur's crate, which is then yours to open", async ({ page }, testInfo) => {
+test("every 20th level: a boss crate to choose; its card says so, the Crates tab's choice picks Babur's crate, which is then yours to open", async ({ page }, testInfo) => {
   test.setTimeout(4 * 60_000);
   // 9,400 XP (the levels below never paid: a test switch's jump), then +170: Level 20, every other level from 2 paid at once.
   await wonGame(page, 9_400);

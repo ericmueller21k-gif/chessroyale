@@ -16,6 +16,13 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
   coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
   at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
+- **The inventory layer** (Nov 22; [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md); `components/InventoryLayer.tsx`):
+  the same `ShopScreen` (opened on Crates) in the shop page's own frame (it looks the same as from the main menu; on a computer the
+  same middle column, without the side menu and chat rail, whose links would leave), opaque, over whatever screen you're on, from the end screen's reward card ("Go to inventory"), so
+  you stay in a Battle Tower run or a party. Opening crates and equipping work in it as on the page. Back, Escape or the phone's back
+  gesture close it (one history step of its own: App.tsx's popstate asks `inventoryTakesPop` first); no key reaches the screen under
+  it (a capture-phase guard), and the pop-ups inside it (the delete dialog, the gambling warning, the shop's note) take their own Escape
+  in the capture phase too. Its opener owns it: when that screen goes, so does the layer.
 - **The Shop tab's page** (Eric's mockup, Nov 9; [2026-11-09-shop-page.md](../decisions/2026-11-09-shop-page.md); `ShopPage` in
   `screens/Shop.tsx`). **Look only: no purchase is wired**; a price tapped shows the pop-up "Buying opens soon." (Stripe and coin
   purchases come next). Under the tabs: "Everything in the shop is 50% off during beta." (from `SHOP.discount`). Then the **special
@@ -237,7 +244,7 @@ reward give, `rewardCrate`), `BOSS_TOKENS` and
   `icon-pixels.test.ts`.
 - Unit (Nov 6): `packages/server/test/ledger.test.ts` (an op replayed or raced applies once; each path's key; a 500-op reconciliation with merges and deletes; append-only; each request id replayed; an open raced at each step, held by the test's SQL wrapper, answers one stored item byte for byte; the backfill twice is once; the static guard: no balance write outside `ledger.ts`, the claw's TODO); `ledger-do.test.ts` (a match room stopped between D1 and its storage drops once; Squads retried).
 - Unit (Nov 9): `packages/server/test/rewards.test.ts` (a crate's open takes the crate and a key, refused without, two at once with one
-  key; old crates to Winter; the boss crate pick); e2e `e2e/xp-rewards.spec.ts` (the Crates tab after a level-up, an open, the padlock,
+  key; old crates to Winter; the boss crate pick); e2e `e2e/xp-rewards.spec.ts` (the Crates tab after a level-up, in the inventory layer over the end screen since Nov 22, an open, the padlock,
   the pick, +100 keys). The test helper `stockCrates` (server) and `giveCrates` (e2e) give crates and keys.
 - Unit (Nov 6): `packages/server/test/welcome.test.ts` (the Welcome Crate: 5 not 4, abandoned games, races, the backfill, opening once, never tradeable, no purity, old lockers), `packages/app/test/hunchess-rides.test.ts` (every ride's colorway draws).
 - The Shop page (Nov 9): unit `packages/core/test/shop.test.ts` (the discount's rounding and ribbon); e2e `e2e/shop.spec.ts`, "the Shop

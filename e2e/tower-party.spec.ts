@@ -10,7 +10,8 @@ import { TOWER_PARTY_LINES } from "../packages/server/src/squads-party.ts";
  * invite friends, or another option, which is like basically like open party ... the invite friends one should just give a pop-up for
  * your friends list"): the clerk's three ways (Solo, Invite friends, Open your own party), the friends pop-up's Invite, the friend's Accept into
  * the tower, READY and START, both pawns walking in, floor 1 won together (?win=1: Qxf7 mates), every copy on floor 2, and one of them
- * going on alone ("you can continue on your own, but it's just solo from that point forward"). `STILLS=<dir>` writes the stills.
+ * going on alone ("you can continue on your own, but it's just solo from that point forward"); the reward card's Go to inventory over a
+ * party's end screen (Nov 22: a layer, the party kept). `STILLS=<dir>` writes the stills.
  */
 
 const STILLS = process.env.STILLS;
@@ -132,12 +133,35 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   for (const p of [ann.page, bo.page]) await expect.poll(() => phase(p), { timeout: 120_000 }).toBe("play");
   await expect(ann.page.locator(".tw-strip").first()).toContainText("Floor 1");
 
+  // (Ann's floor pays a level-up, as the server's answer says: a one-move floor pays no XP itself.)
+  await ann.page.route("**/api/xp?game=*", (route) =>
+    route.fulfill({ json: { xp: { before: 490, after: 560, levelBefore: 1, levelAfter: 2, parts: [{ label: "Win", xp: 70 }], rewards: { crate: "winter-1", daily: 0, crates: 1, keys: 1, bossPicks: 0, levels: [2] } } } }),
+  );
   // Both pick Qxf7 (the party rule: every connected member picks): the boss is mated, floor 1 won.
   for (const p of [ann.page, bo.page]) await submitMove(p, "h5f7");
   for (const p of [ann.page, bo.page]) {
     await expect(p.locator('[data-tower-result="won"][data-tower-party]')).toBeVisible({ timeout: 120_000 });
     await expect(p.getByTestId("es-line")).toHaveText("Floor 1 cleared!");
   }
+
+  // Ann's reward card (Nov 22): Go to inventory opens the Crates tab as a layer over her end screen, the page and the party where they
+  // were; the phone's back closes it, and her end screen is there under it, the party's way back with it.
+  const card = ann.page.getByTestId("reward-box");
+  await expect(card).toContainText("Level 2!", { timeout: 30_000 });
+  if (STILLS) await card.evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
+  await still(ann.page, "reward-card");
+  const at = ann.page.url();
+  await card.getByRole("button", { name: "▶ Go to inventory" }).click();
+  const layer = ann.page.getByTestId("inventory-layer");
+  await expect(layer.getByRole("tab", { name: "Crates" })).toHaveAttribute("aria-selected", "true");
+  await expect(layer.locator(".crates")).toBeVisible();
+  await still(ann.page, "inventory-layer");
+  expect(ann.page.url()).toBe(at);
+  await ann.page.goBack();
+  await expect(layer).toHaveCount(0);
+  expect(ann.page.url()).toBe(at);
+  await expect(ann.page.locator('[data-tower-result="won"][data-tower-party]')).toBeVisible();
+  expect(await phase(ann.page)).toBe("results");
 
   // The room wrote every copy: the same run, both on floor 2, nothing under way.
   await expect

@@ -21,7 +21,7 @@ move.
   counting from 0 (`END_SCREEN` in settings.ts), lobbing into the XP bar (`XP.perLevel` a bar), which fills from your old XP to the new
   (a level: it flashes, "Level 3!", on from 0), then the quests the game moved sliding to their counts; what made it under the number
   ("Win +50": never the minutes) or why there was none in its place. Every box at its size from the first frame; a tap anywhere but a
-  button skips to the end; reduced motion: the end at once. The toast after it shows only crates and keys (`RewardBox endScreen`). The results' middle: your squad (its tag and members); the headline "Victory!" (champions) or your place. The card's run plays once: the results show its end. Its rules and storage: [accounts.md](accounts.md), "XP and levels".
+  button skips to the end; reduced motion: the end at once. The reward card after it (Nov 22, [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md)) shows only crates and keys (`RewardBox endScreen`): centered, in the crate screens' blue window, OK and Go to inventory (your inventory as a layer over the end screen, `InventoryLayer`). The results' middle: your squad (its tag and members); the headline "Victory!" (champions) or your place. The card's run plays once: the results show its end. Its rules and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
   less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column: 848 px at

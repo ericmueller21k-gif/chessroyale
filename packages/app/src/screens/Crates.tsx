@@ -1221,9 +1221,10 @@ function DeleteDialog({ stack, wornId, onClose }: { stack: ItemStack; wornId: st
   const n = stack.items.length;
   // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
   useLayoutEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    // (Its Escape is its own, heard first: nothing under it (the inventory layer, a screen) acts on it too.)
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), onClose());
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
   }, []);
   const go = async (ids: string[], keep?: ItemInstance) => {
     setBusy(true);
