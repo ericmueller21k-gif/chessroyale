@@ -124,12 +124,11 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     const town = await box(main.getByRole("button", { name: "Chess Town", exact: true }));
     const solo = await box(main.getByRole("button", { name: /^Boss Battle/ }));
     const auto = await box(main.getByRole("button", { name: /^Auto chess/ }));
-    const other = await box(main.getByRole("heading", { name: "Other modes", exact: true }));
     const modes = await box(main.getByRole("radiogroup", { name: "RANKED" }));
     const types = await box(main.getByRole("radiogroup", { name: "Matchmaking" }));
     const p = await box(play);
     const hint = await box(page.locator(".fd-hint"));
-    expect(Math.abs(town.height - p.height), `${w}: Chess Town as tall as PLAY`).toBeLessThan(0.5);
+    expect(town.height - p.height, `${w}: Chess Town taller than PLAY by the Other modes heading's room (Nov 22)`).toBeGreaterThan(15);
     expect(Math.abs(town.width - modes.width), `${w}: Chess Town full width`).toBeLessThan(2);
     expect(modes.y + modes.height).toBeLessThanOrEqual(types.y);
     expect(types.y + types.height, `${w}: the modes right above PLAY's line`).toBeLessThanOrEqual(hint.y);
@@ -137,8 +136,7 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     expect(hint.y + hint.height, `${w}: the line above PLAY`).toBeLessThanOrEqual(p.y);
     expect(p.y - (hint.y + hint.height), `${w}: the line just above PLAY`).toBeLessThan(12);
     expect(town.y, `${w}: Chess Town below PLAY`).toBeGreaterThanOrEqual(p.y + p.height);
-    expect(other.y, `${w}: Other modes below Chess Town`).toBeGreaterThanOrEqual(town.y + town.height);
-    expect(solo.y, `${w}: the pair under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
+    expect(solo.y, `${w}: the pair under Chess Town (no Other modes heading, Nov 22)`).toBeGreaterThanOrEqual(town.y + town.height);
     expect(Math.abs(solo.y - auto.y), `${w}: Boss Battle and Auto chess side by side`).toBeLessThan(2);
     expect(Math.abs(solo.width - auto.width), `${w}: the two half cards the same width`).toBeLessThan(2);
     expect(Math.abs(solo.width * 2 + 10 - town.width), `${w}: two half cards and their gap are Chess Town's width`).toBeLessThan(2);
