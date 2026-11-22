@@ -75,7 +75,7 @@ test("the town's back button asks 'Leave Chess Town?' first: Stay keeps you on y
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(leaveDialog(page)).toBeVisible();
   const sheet = leaveDialog(page);
-  await expect(sheet.locator(".fd-sub")).toHaveText("You'll head back to Play.");
+  await expect(sheet.locator(".fd-sub")).toHaveText("You'll head back to Home.");
   await expect(sheet.getByRole("button")).toHaveText(["Stay", "Leave"]);
   await expect(sheet.getByRole("button", { name: "Stay" })).toBeFocused();
   await still(page, "back-button");
@@ -98,7 +98,7 @@ test("the phone's back gesture asks too: Stay puts the town back as it was, Leav
   // (The town opened first in this tab, nothing of the app's before it: back takes the town's own step, Nov 13. It left the site before.)
   await page.goBack();
   await expect(leaveDialog(page)).toBeVisible();
-  await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Play.");
+  await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Home.");
   await still(page, "back-gesture");
   await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
   await expectStayed(page, square);
@@ -109,12 +109,13 @@ test("the phone's back gesture asks too: Stay puts the town back as it was, Leav
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
-test("a computer's side menu asks first: 'You'll head back to the Shop.'; Stay keeps the town, Leave opens the Shop", async ({ page }) => {
+// (Settings since Nov 22: Shop & crates, Profile, Daily Quests and Play with friends open over the town and don't leave it, town-desktop.spec.ts.)
+test("a computer's side menu asks first: 'You'll head back to Settings.'; Stay keeps the town, Leave opens Settings", async ({ page }) => {
   onlyComputer();
   const square = await openTown(page);
   const menu = page.getByRole("navigation", { name: "Menu" });
-  await menu.getByRole("button", { name: "Shop & crates" }).click();
-  await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to the Shop.");
+  await menu.getByRole("button", { name: "Settings" }).click();
+  await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Settings.");
   await still(page, "side-menu");
   await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
   await expectStayed(page, square);
@@ -122,9 +123,9 @@ test("a computer's side menu asks first: 'You'll head back to the Shop.'; Stay k
   // Chess Town itself, where you are, asks nothing.
   await menu.getByRole("button", { name: "Chess Town" }).click();
   await expect(leaveDialog(page)).toHaveCount(0);
-  await menu.getByRole("button", { name: "Shop & crates" }).click();
+  await menu.getByRole("button", { name: "Settings" }).click();
   await leaveDialog(page).getByRole("button", { name: "Leave", exact: true }).click();
-  await expect(menu.getByRole("button", { name: "Shop & crates" })).toHaveAttribute("aria-current", "page");
+  await expect(menu.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-current", "page");
   await expect(canvas(page)).toHaveCount(0);
 });
 
@@ -135,7 +136,7 @@ test("inside a room: the back button goes out to the square with no question; th
   for (const n of [1, 2]) {
     await page.goBack();
     await expect(leaveDialog(page)).toBeVisible();
-    await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Play.");
+    await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Home.");
     if (n === 1) await still(page, "room-back-gesture");
     await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
     await expect(leaveDialog(page)).toHaveCount(0);
@@ -178,11 +179,11 @@ test("a computer's side menu inside a room asks too; Leave goes to the front doo
   await openTown(page);
   await goInBabur(page);
   const menu = page.getByRole("navigation", { name: "Menu" });
-  await menu.getByRole("button", { name: "Play", exact: true }).click();
-  await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Play.");
+  await menu.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Home.");
   await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
   await expect(room(page)).toHaveAttribute("data-ready", "1");
-  await menu.getByRole("button", { name: "Play", exact: true }).click();
+  await menu.getByRole("button", { name: "Home", exact: true }).click();
   await leaveDialog(page).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(room(page)).toHaveCount(0);

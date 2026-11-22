@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { settled, tapInTown, test } from "./helpers.ts";
+import { asSignedIn, settled, tapInTown, test } from "./helpers.ts";
 
 /**
  * The town square on a computer (Oct 29, Eric; docs/decisions/2026-10-29-town-on-computer.md, docs/areas/town-square.md): in the front
@@ -104,7 +104,7 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
   });
 }
 
-test("the menu works as on home: Play goes home, Chess Town comes back to the town; nothing jumps while the town loads", async ({ page }) => {
+test("the menu works as on home: Home goes home, Chess Town comes back to the town; nothing jumps while the town loads", async ({ page }) => {
   onlyComputer();
   // Nothing jumps as it loads: the center column's box is one box from the first frame that has it to the world's first frame and after.
   await page.addInitScript(() => {
@@ -130,8 +130,8 @@ test("the menu works as on home: Play goes home, Chess Town comes back to the to
   expect(seen.length, `the center, the menu and the right column each keep one box: ${seen}`).toBe(3);
 
   const menu = page.getByRole("navigation", { name: "Menu" });
-  // (Play asks first from the town: "Leave Chess Town?", e2e/town-leave.spec.ts.)
-  await menu.getByRole("button", { name: "Play", exact: true }).click();
+  // (Home asks first from the town: "Leave Chess Town?", e2e/town-leave.spec.ts.)
+  await menu.getByRole("button", { name: "Home", exact: true }).click();
   await page.getByRole("alertdialog", { name: "Leave Chess Town?" }).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
@@ -139,6 +139,79 @@ test("the menu works as on home: Play goes home, Chess Town comes back to the to
   await ready(page);
   expect(new URL(page.url()).pathname).toBe("/town");
   await expect(menu.getByRole("button", { name: "Chess Town" })).toHaveAttribute("aria-current", "page");
+});
+
+test("the side menu's Play with friends, Daily Quests, Shop & crates and Profile open over the town (Nov 22): the side menu lit and usable, another switches, Back, Escape, the back gesture and Chess Town close it; the town is the same one after, your square kept, no goodbye sent; Home leaves", async ({ page }) => {
+  onlyComputer();
+  test.setTimeout(150_000);
+  await page.goto("/");
+  await asSignedIn(page, "layers");
+  // (The town's beats to the server: a closing town says goodbye ({ leave: true }), so none may go while the layers open and close.)
+  const goodbyes: string[] = [];
+  page.on("request", (r) => r.url().endsWith("/api/town/here") && (r.postData() ?? "").includes('"leave":true') && goodbyes.push(r.url()));
+  await page.goto(`/town?sky=day&townroom=layers${Date.now().toString(36)}&quests=warm-up:1`);
+  await ready(page);
+  const cv = page.locator("canvas.town-canvas");
+  await page.waitForTimeout(600);
+  const square = await cv.getAttribute("data-you");
+  // (The town's own canvas, marked: the same element after, so the town never unmounted under the layer.)
+  await cv.evaluate((el) => void ((el as unknown as { mark: number }).mark = 1));
+  const menu = page.getByRole("navigation", { name: "Menu" });
+  const item = (name: string) => menu.getByRole("button", { name, exact: true });
+  const layer = page.getByTestId("town-layer");
+  const leave = page.getByRole("alertdialog", { name: "Leave Chess Town?" });
+  const center = (await box(page, ".fd-root.framed.fd-on-town > .fd-center"))!;
+  const steps = await page.evaluate(() => history.length);
+  const sameTown = async (what: string) => {
+    await expect(layer, `${what}: closed`).toHaveCount(0);
+    await expect(item("Chess Town"), what).toHaveAttribute("aria-current", "page");
+    expect(await cv.evaluate((el) => (el as unknown as { mark?: number }).mark), `${what}: the same town`).toBe(1);
+    expect(await cv.getAttribute("data-you"), `${what}: your square`).toBe(square);
+    expect(new URL(page.url()).pathname, what).toBe("/town");
+  };
+  const opens = async (name: string, lit: string, inside: (l: typeof layer) => Promise<void>) => {
+    await item(name).click();
+    await expect(leave, `${name}: no question, the town stays`).toHaveCount(0);
+    await expect(layer).toHaveAttribute("aria-label", name);
+    await inside(layer);
+    await expect(item(lit), `${name}: lit`).toHaveAttribute("aria-current", "page");
+    await expect(item("Chess Town")).not.toHaveAttribute("aria-current", "page");
+    // (Over the town's middle column exactly: the side menu and the right column as they were.)
+    nearBox(await box(page, '[data-testid="town-layer"]'), center, 1, `${name}: over the middle column`);
+    await expect(page.locator(".fd-right .rc-h").first()).toHaveText("TOWN");
+  };
+  const shop = (l: typeof layer) => expect(l.getByRole("tab", { name: "Crates" })).toBeVisible();
+  // Shop & crates; the arrow keys don't walk the town under it; Profile switches the layer (no new step); its Back closes it.
+  await opens("Shop & crates", "Shop & crates", shop);
+  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowUp");
+  await opens("Profile", "Profile", (l) => expect(l.getByRole("button", { name: "Back" }).first()).toBeVisible());
+  expect(await page.evaluate(() => history.length), "one step for the layer, switched in place").toBe(steps + 1);
+  await layer.getByRole("button", { name: "Back" }).first().click();
+  await sameTown("Profile's Back");
+  // Daily Quests (home's card, over the town): Escape closes it.
+  await opens("Daily Quests", "Daily Quests", (l) => expect(l.getByRole("heading", { name: "Daily Quests" })).toBeVisible());
+  await page.keyboard.press("Escape");
+  await sameTown("Escape");
+  // Play with friends (home's sheet): the back gesture closes it, not the town's "Leave Chess Town?".
+  await opens("Play with friends", "Play with friends", (l) => expect(l.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Get friend code" })).toBeVisible());
+  await page.goBack();
+  await expect(leave).toHaveCount(0);
+  await sameTown("the back gesture");
+  // Chess Town closes it too.
+  await opens("Shop & crates", "Shop & crates", shop);
+  await item("Chess Town").click();
+  await sameTown("Chess Town");
+  expect(goodbyes, "the town never said goodbye").toEqual([]);
+  // The town's own step is still there: the back gesture asks to leave, as before any layer.
+  await page.goBack();
+  await leave.getByRole("button", { name: "Stay" }).click();
+  await sameTown("Stay");
+  // Home leaves the town, as it always did (asked first).
+  await item("Home").click();
+  await expect(leave.locator(".fd-sub")).toHaveText("You'll head back to Home.");
+  await leave.getByRole("button", { name: "Leave", exact: true }).click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(cv).toHaveCount(0);
 });
 
 test("a mouse window narrower than the frame (900 × 700) has the whole screen and both icons at the right, as a phone does", async ({ page }) => {
