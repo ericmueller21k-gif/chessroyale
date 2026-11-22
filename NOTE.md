@@ -1,0 +1,7 @@
+# Chub & Chirp: Turf, Phase A mockup (Nov 22). Stills over a real battle (live board, the game's own sprite), layer injected by a throwaway script.
+- Tints: his squares carrot orange (his palette's R, 26%) with Chirp's three-toed print pair from the town ride, faint; yours a cool blue (22-26%), open plain. Orange and blue on purpose: a green would read as the last move, and a white/black wash barely shows on tan. Coordinates, last move and dots stay on top.
+- Count: hard numbers with a swatch each, "Chub 26 · You 21 · Open 17". Phone: across the bar's bottom from the name column (his figure stays at the left); computer: the bar's prop slot, right.
+- Holds: three pills always there, greyed with their threshold (Legs 32, Fuse 40, Hop 48) and lit orange when held (nothing hidden, eric.md). A tap (hover on a computer) opens its text under the bar, over the board, pushing nothing. Under 360 px the pills keep icon + number only (check320-*.png).
+- Hop-around: Chirp leaves the bar (his place kept, empty), bounces on 3 of his squares (numbered, fresh prints), the dashed hop to the open square ringed in orange; dock line "Chirp hops his turf…". A banner like LEAPFROG! would open it (not drawn).
+- Still 3's 33 squares are topped up by hand (a real game reaches 32 later); still 1/2 counts are the real game's plus two hop-arounds.
+- Phase B: his voice bubble in a phone's bar shares the count's row; it should sit over it while he talks, or the count moves up a line.
