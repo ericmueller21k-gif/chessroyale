@@ -133,6 +133,16 @@ async function shoot() {
         await p.waitForTimeout(400);
       }
     }
+    // One dark-mode phone still (Eric, Nov 22): the first still again with the phone's colour scheme set to dark.
+    if (dev === "phone") {
+      await p.emulateMedia({ colorScheme: "dark" }); await p.waitForTimeout(500);
+      await p.evaluate(() => { document.querySelectorAll(".turf-mock, .tm-tip").forEach((e) => e.remove()); document.querySelectorAll("[data-mock-was]").forEach((e) => { e.textContent = e.dataset.mockWas; delete e.dataset.mockWas; }); document.querySelectorAll(".turf-mock-hid").forEach((e) => { e.style.visibility = ""; }); });
+      await p.addScriptTag({ content: js });
+      await p.evaluate((c) => window.__mock(c), shots[0][1]);
+      await p.waitForTimeout(250);
+      await p.screenshot({ path: join(outDir, "phone-1-turf-dark.png") });
+      await p.emulateMedia({ colorScheme: "light" }); await p.waitForTimeout(300);
+    }
   }
   writeFileSync(".mock/shot.done", String(Date.now()));
 }

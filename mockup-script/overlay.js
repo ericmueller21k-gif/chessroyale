@@ -1,8 +1,14 @@
 // Throwaway mockup layer (never merged): draws the turf over a live board and the count + holds in the boss bar.
 window.__mock = async function (cfg) {
-  const HIS = "rgba(232, 115, 42, 0.26)";     // Chub's carrot orange (HOPPER_PALETTE R), soft
-  const YOURS = "rgba(40, 105, 255, 0.26)";   // your side: a cool blue, apart from the last-move green
   const SOIL = "#3b3a1a";                     // the town ride's print (riding-chirp.tsx SOIL)
+  const CREAM = "#f3ece0";                    // the bar's text colour: the count's marks on the dark bar
+  // The app's logo (packages/app/public/icons/icon.svg): its <g> paths only, the crowned pawn, no background rect.
+  const LOGO = '<g>' +
+    '<path d="M150 190 L176 110 L216 160 L256 92 L296 160 L336 110 L362 190 Z"/>' +
+    '<rect x="150" y="196" width="212" height="22" rx="6"/>' +
+    '<circle cx="256" cy="262" r="40"/>' +
+    '<path d="M226 300 H286 L300 360 H212 Z"/>' +
+    '<rect x="176" y="362" width="160" height="34" rx="10"/></g>';
   document.querySelectorAll(".turf-mock").forEach((e) => e.remove());
   const board = document.querySelector(".hb-board");
   const flip = document.querySelector(".hb")?.classList.contains("orientation-black");
@@ -18,13 +24,20 @@ window.__mock = async function (cfg) {
   // ---- The board layer: under the last move, dots and pieces (first child of the squares' box).
   const layer = el("div", { class: "turf-mock", style: "position:absolute;inset:0;pointer-events:none;" });
   board.insertBefore(layer, board.firstChild);
-  const cell = (sq, bg) => el("div", { style: `position:absolute;left:${xy(sq).x * 12.5}%;top:${xy(sq).y * 12.5}%;width:12.5%;height:12.5%;background:${bg};` }, layer);
-  for (const sq of cfg.yours) cell(sq, YOURS);
+  // No square tints (Eric, Nov 22): the board keeps its default colours. Each square is a box only.
+  const cell = (sq) => el("div", { style: `position:absolute;left:${xy(sq).x * 12.5}%;top:${xy(sq).y * 12.5}%;width:12.5%;height:12.5%;` }, layer);
+  // Your squares: the crowned pawn, centred, 46% of the square's width, dimmed so it never reads as a piece.
+  for (const sq of cfg.yours) {
+    const c = cell(sq);
+    const svg = el("svg:svg", { viewBox: "0 0 512 512", style: "position:absolute;left:27%;top:27%;width:46%;height:46%;overflow:visible" }, c);
+    svg.innerHTML = LOGO.replace("<g>", '<g fill="#1b1d22" opacity="0.16">');
+  }
+  // His squares: Chirp's print pair as drawn, at 0.32 (fresh hop prints stay 0.62): the prints are the only sign of his turf.
   for (const sq of cfg.his) {
-    const c = cell(sq, HIS);
+    const c = cell(sq);
     const fresh = (cfg.hop?.path ?? []).includes(sq);
     const svg = el("svg:svg", { viewBox: "-12 -12 24 24", style: "position:absolute;inset:14%;width:72%;height:72%;overflow:visible" }, c);
-    const g = el("svg:g", { opacity: fresh ? 0.62 : 0.18, transform: `rotate(${90 + ((hash(sq) % 41) - 20)})` }, svg);
+    const g = el("svg:g", { opacity: fresh ? 0.62 : 0.32, transform: `rotate(${90 + ((hash(sq) % 41) - 20)})` }, svg);
     prints(g, SOIL, 1.6);
   }
   // ---- The hop-around (still 2): the hopped squares' trail, the target, Chirp in the air.
@@ -80,8 +93,8 @@ window.__mock = async function (cfg) {
   .tm-count{display:flex;align-items:center;gap:${phone ? 7 : 8}px;font:700 ${phone ? 11.5 : 12}px/1 system-ui,-apple-system,sans-serif;color:#f3ece0;white-space:nowrap}
   .tm-count .tm-n{display:inline-flex;align-items:center;gap:4px}
   .tm-count b{font-weight:800;font-variant-numeric:tabular-nums}
-  .tm-sw{width:11px;height:11px;border-radius:2px;background:var(--sq-light,#f0d9b5);position:relative;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,0.35)}
-  .tm-sw i{position:absolute;inset:0}
+  .tm-sw{display:inline-block;width:13px;height:13px;flex:none}
+  .tm-sw svg{display:block;width:100%;height:100%;overflow:visible}
   .tm-holds{display:flex;gap:4px;justify-content:flex-end}
   .tm-hold{display:inline-flex;align-items:center;gap:3px;height:18px;padding:0 6px;border-radius:9px;font:800 10px/1 system-ui,-apple-system,sans-serif;letter-spacing:.02em;color:rgba(243,236,224,0.42);background:rgba(255,255,255,0.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.14);white-space:nowrap}
   .tm-hold svg{width:11px;height:11px;flex:none}
@@ -91,12 +104,19 @@ window.__mock = async function (cfg) {
   .tm-tip strong{color:#ffc97e}
   .tm-tip::before{content:"";position:absolute;top:-6px;right:var(--tip-x,20px);width:10px;height:10px;background:#1f1a14;transform:rotate(45deg);box-shadow:-1px -1px 0 #f79a3d}
   `;
-  const sw = (bg, withPrint) => { const s = el("span", { class: "tm-sw" }); if (bg) el("i", { style: `background:${bg}` }, s); if (withPrint) { const v = el("svg:svg", { viewBox: "-12 -12 24 24", style: "position:absolute;inset:0;width:100%;height:100%" }, s); const g = el("svg:g", { opacity: 0.55, transform: "rotate(90)" }, v); prints(g, SOIL, 2); } return s; };
+  // The count's mark for a side: Chub's print pair, your crowned pawn (both in the bar's cream, the bar is dark). Open has none.
+  const mark = (kind) => {
+    if (!kind) return null;
+    const s = el("span", { class: "tm-sw" });
+    if (kind === "print") { const v = el("svg:svg", { viewBox: "-9 -9 18 18" }, s); prints(el("svg:g", { transform: "rotate(90)" }, v), CREAM, 2.2); }
+    else { const v = el("svg:svg", { viewBox: "146 88 220 312" }, s); v.innerHTML = LOGO.replace("<g>", `<g fill="${CREAM}">`); }
+    return s;
+  };
   const count = el("span", { class: "tm-count turf-mock", role: "status", "aria-label": `Squares: ${cfg.names.his} ${cfg.counts.his}, you ${cfg.counts.yours}, open ${cfg.counts.open}` });
-  const item = (bg, print, word, n) => { const s = el("span", { class: "tm-n" }, count); s.appendChild(sw(bg, print)); const t = el("span", {}, s); t.innerHTML = `${word} <b>${n}</b>`; };
-  item(HIS, true, cfg.names.his, cfg.counts.his);
-  item(YOURS, false, "You", cfg.counts.yours);
-  item(null, false, "Open", cfg.counts.open);
+  const item = (kind, word, n) => { const s = el("span", { class: "tm-n" }, count); const m = mark(kind); if (m) s.appendChild(m); const t = el("span", {}, s); t.innerHTML = `${word} <b>${n}</b>`; };
+  item("print", cfg.names.his, cfg.counts.his);
+  item("crown", "You", cfg.counts.yours);
+  item(null, "Open", cfg.counts.open);
   const ICON = {
     legs: '<svg viewBox="0 0 12 12"><path d="M3 7 L6 4 L9 7 M3 10.5 L6 7.5 L9 10.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     fuse: '<svg viewBox="0 0 12 12"><circle cx="6" cy="6.8" r="4.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 4.3 V6.9 L7.7 8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M4.6 1.2 H7.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
