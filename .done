@@ -1,1 +1,0 @@
-done: claude/solo-abandon ready for its PR (.pr-body.md). Local checks green; CI runs once the PR is open (full lane: add full-e2e).
