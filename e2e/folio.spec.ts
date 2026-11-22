@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess, type Square } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { creaseMarks, marksStop } from "@chessroyale/chess";
-import { BOARD_SEL, test, bossAloneFromHome, createLobbyFromHome, engineTop, submitMove } from "./helpers.ts";
+import { BOARD_SEL, test, bossAloneFromHome, createLobbyFromHome, engineTop, pickMove, submitMove } from "./helpers.ts";
 import { REFUSED } from "../packages/app/src/refused.ts";
 import { FOLIO_LINES } from "../packages/app/src/characters/folio-lines.ts";
 
@@ -34,14 +34,16 @@ async function yourMove(page: Page) {
   await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
 }
 
-/** Your quiet moves allowed now (no capture, no promotion, no check), knights first; `keep` filters them. */
+/**
+ * Your quiet move allowed now (no capture, no promotion, no check; `keep`'s first), a knight's first, never one that lets him mate at
+ * once while another doesn't (pickMove). None quiet: a capture or a check, whatever is allowed.
+ */
 function quiet(fen: string, allowed: string[] | null, keep: (m: string) => boolean = () => true): string {
-  const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion && !m.san.includes("+")).map((m) => ({ uci: m.from + m.to, piece: m.piece }));
-  const ok = legal.filter((m) => (!allowed || allowed.includes(m.uci)) && keep(m.uci));
-  const any = legal.filter((m) => !allowed || allowed.includes(m.uci));
-  // (None quiet: a capture or a check, whatever is allowed.)
-  const all = new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")).filter((m) => !allowed || allowed.includes(m));
-  return (ok.find((m) => m.piece === "n") ?? ok[0] ?? any[0])?.uci ?? all[0]!;
+  const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !allowed || allowed.includes(m.from + m.to));
+  const calm = legal.filter((m) => !m.captured && !m.promotion && !m.san.includes("+"));
+  const kept = calm.filter((m) => keep(m.from + m.to));
+  const pool = (kept.length ? kept : calm).map((m) => m.lan);
+  return pickMove(fen, { allowed: pool.length ? pool : allowed, prefer: (m) => m.piece === "n" });
 }
 
 async function play(page: Page, move: string, fen: string) {
