@@ -438,7 +438,8 @@ test(`a solo battle left mid-game: the reload's card, "You have a game in progre
 
 /**
  * The quickest way to lose a battle by mate, from a real position (no test switch: a test game is never kept): a move that lets the boss
- * mate at once if there's one; else your king out (toward the middle); else an f- or g-pawn opening him up; else any.
+ * mate at once if there's one; else your king out (toward the middle); else an f- or g-pawn opening him up; else any. Its own picker on
+ * purpose (LESSONS, "A mate the test walked into"): `pickMove` never lets the boss mate, and this check needs exactly that.
  */
 function loseFast(fen: string, allowed: readonly string[] | null): string {
   const c = new Chess(fen);
