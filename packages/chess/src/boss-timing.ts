@@ -123,6 +123,7 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   tusks: [[0, 1500]],
   slam: [[0, 1500]],
   hop: [[0, 720]],
+  pawnBounce: [[0, 720]],
   carrots: [[0, 1100]],
   carrotWin: [[0, 1500]],
   camouflage: [[0, 1500]],
@@ -251,7 +252,7 @@ export interface QueenSlainView {
   id?: string;
   crowdSide: "w" | "b";
   crowdMoves: number;
-  powers?: { bounce?: { at: number } | null; hop?: { at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null; revision?: { at: number } | null } | null;
+  powers?: { bounce?: { at: number } | null; hop?: { at: number } | null; pawnBounce?: { at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null; revision?: { at: number } | null } | null;
   board: { history: readonly string[]; bases?: readonly Base[] | null; captures?: readonly Capture[] | null };
 }
 
@@ -279,12 +280,12 @@ const hisStepPlayed = (boss: { crowdMoves: number; powers?: { events?: readonly 
  * the move out removed it), never from the board. Only the crowd's own capture of his queen (never his capture of
  * yours: Hollow thinks again after his own move for his extra move). For the clock, only the thinking straight after
  * it waits for the banner: once Big Boy's Big Bounce, one of Alfil's steps (his cast, the fusion, the Slam) or the
- * hopper's hop has played between that move and his (his turn's second thinking, the same newest move), the banner has
+ * hopper's hop or Pawn Bounce has played between that move and his (his turn's second thinking, the same newest move), the banner has
  * shown (the app shows each once: battle-banners.ts), so that thinking is its usual length.
  */
 export function queenSlain(boss: QueenSlainView): boolean {
   const c = newestCapture(boss.board);
-  if (!c || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.hop?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
+  if (!c || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.hop?.at === boss.crowdMoves || boss.powers?.pawnBounce?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
   return c.piece === "q" && c.side === boss.crowdSide && c.color !== boss.crowdSide;
 }
 

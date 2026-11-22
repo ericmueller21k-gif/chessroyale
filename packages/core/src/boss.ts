@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap" | "pawnbounce";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -98,9 +98,10 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * his five moves has a switch of its own (?power=scatter, beam, shields, rapidfire, queenlock: not on his BOSS_ROSTER line): that
  * move unlocked from the start and his move meter full from the second turn (bosses/chandy.ts). Sawyer's ?power=sawswap, his
  * once-a-battle Saw Swap (not on his BOSS_ROSTER line either), starts the battle a few moves in with a check of his king on his half
- * ready for the crowd's next move (SAW_SWAP_TEST_MOVES; it fires as that check lands).
+ * ready for the crowd's next move (SAW_SWAP_TEST_MOVES; it fires as that check lands). Chub & Chirp's ?power=pawnbounce, their
+ * once-a-battle Pawn Bounce (not on their BOSS_ROSTER line either), changes nothing: it comes on the crowd's first double push anyway.
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
  * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
@@ -773,6 +774,10 @@ export interface BossPowerState {
   hop?: LeapfrogHop | null;
   /** How many hops the hopper has made this battle (at most BOSS_POWERS.hopMax). */
   hops?: number;
+  /** The hopper's last Pawn Bounce: the crowd's double-pushed pawn knocked back one square. */
+  pawnBounce?: PawnBounce | null;
+  /** How many Pawn Bounces the hopper has made this battle (at most BOSS_POWERS.pawnBounceMax). */
+  pawnBounces?: number;
   /** The hopper's Carrot Patch, from its cast on (his ultimate, once a battle): the carrots, the race, his spin. */
   carrots?: CarrotPatch | null;
   /** Smudgy's Camouflage (his passive): his two forced moves, the swap, the rook hiding as a pawn, its reveal. */
@@ -1449,6 +1454,16 @@ export interface LeapfrogHop {
   to: string;
 }
 
+/**
+ * The hopper's Pawn Bounce (once a battle; Eric, Nov 22), after the crowd's move `at`, at the start of his turn: the crowd's
+ * pawn its double push brought to `from` knocked back one square, to `to` (the square it passed).
+ */
+export interface PawnBounce {
+  at: number;
+  from: string;
+  to: string;
+}
+
 /** Who pulled a carrot: the crowd, or the boss (Chub & Chirp). */
 export type CarrotSide = "crowd" | "boss";
 
@@ -1716,6 +1731,9 @@ export type PowerEventKind =
   | "slam"
   | "land"
   | "hop"
+  // Chub & Chirp's Pawn Bounce (Nov 22): at the start of his turn, before his move (as the hop), the crowd's pawn its double push
+  // brought to `squares[0]` knocked back to `squares[1]` (`square`).
+  | "pawnBounce"
   | "carrots"
   | "carrot"
   | "carrotSpin"

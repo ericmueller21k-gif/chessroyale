@@ -79,7 +79,7 @@
  */
 import { BOSS_ALONE_SCORING, BOSS_CLOCK, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, darkSquares, touchesDark, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, darkSquares, touchesDark, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, isHop, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -711,7 +711,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
               const candidates = runner.hopCandidates();
               const pick = candidates.length > 1 ? await hopFrom(engines, fen, candidates) : null;
               const h = runner.applyHop(pick?.fen ?? null)!;
-              hopper.hops.push({ at: h.at, from: h.from, over: h.over, to: h.to, of: candidates.length });
+              // (Their Pawn Bounce comes first when due: one a turn. Not a hop.)
+              if (isHop(h)) hopper.hops.push({ at: h.at, from: h.from, over: h.over, to: h.to, of: candidates.length });
             }
           }
           // (Alfil's fusion is his move: then his turn is over.)
