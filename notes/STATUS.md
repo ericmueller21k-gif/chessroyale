@@ -1706,3 +1706,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - #877 (home cards) waiting on CI after a typecheck fix (12a99330).
 
 - Nov 22: main red on a flake (smudgy.spec.ts:189, phone, the battle ended mid-test): brief notes/briefs/flaky-smudgy-swap.md, queued (Opus high) after the solo-abandon fix helper. Queue after that: hopper pawn bounce (xhigh), hopper turf mockup (high), solo resume/forfeit (step 2). #880 carrot odds in CI; #881 solo abandon fixes in progress (session_01JuCWRvzV3aUYdmxrJ1bJ7B).
+
+- Nov 22, 13:20: #881 solo abandon MERGED (d9b094bb) after a review + 3 delta re-reviews. Follow-up nit N4 (rereview3-881.md on review/solo-abandon-delta3): Chandy's Dodge losing hit, a close in its ~7.5 s kill records a loss as left (no flip): fold into the solo resume/forfeit job (step 2). #880 carrot odds merged + live. #878 gold rides, #879 hopper theme live.
+- Running: flaky smudgy (session_01JuCWRuThqp6dE8dyzgqfvQ, high), turf mockup (session_01JuCWRsPGebdBiuokCUNzT3, high). Next: hopper pawn bounce (xhigh, alone), then solo resume/forfeit (step 2, + N4), turf build after Eric OKs the mockup.
