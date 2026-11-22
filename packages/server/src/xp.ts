@@ -131,6 +131,11 @@ export interface AbandonWhich {
   game?: string;
   staleBefore?: number;
   except?: string;
+  /**
+   * A game this device can resume (step 2, Nov 22: the app's load names the game it keeps): never recorded here unless it began before
+   * `staleBefore` (SOLO_ABANDON.staleHours ago), when it counts as left whatever the device says.
+   */
+  resumable?: { game: string; staleBefore: number };
 }
 
 /**
@@ -158,9 +163,16 @@ export function abandonStatements(userId: string, which: AbandonWhich, drop = fa
 
 /** The real solo game `which` names, in SQL (`t`: the table's alias and a dot, or nothing), and its parameters. */
 function abandonWhere(userId: string, which: AbandonWhich) {
+  const keep = which.resumable;
   const cond = (t: string) =>
-    `${t}user_id = ? AND ${t}real_at IS NOT NULL${which.game ? ` AND ${t}id = ?` : ""}${which.staleBefore !== undefined ? ` AND ${t}started_at <= ?` : ""}${which.except ? ` AND ${t}id <> ?` : ""}`;
-  const params = [userId, ...(which.game ? [which.game] : []), ...(which.staleBefore !== undefined ? [which.staleBefore] : []), ...(which.except ? [which.except] : [])];
+    `${t}user_id = ? AND ${t}real_at IS NOT NULL${which.game ? ` AND ${t}id = ?` : ""}${which.staleBefore !== undefined ? ` AND ${t}started_at <= ?` : ""}${which.except ? ` AND ${t}id <> ?` : ""}${keep ? ` AND (${t}id <> ? OR ${t}started_at <= ?)` : ""}`;
+  const params = [
+    userId,
+    ...(which.game ? [which.game] : []),
+    ...(which.staleBefore !== undefined ? [which.staleBefore] : []),
+    ...(which.except ? [which.except] : []),
+    ...(keep ? [keep.game, keep.staleBefore] : []),
+  ];
   return { cond, params };
 }
 
@@ -175,6 +187,29 @@ export async function abandonSoloGame(sql: Sql, userId: string, which: AbandonWh
   if (!(await sql.first<{ n: number }>(`SELECT 1 AS n FROM solo_games WHERE ${cond("")}`, ...params))) return false;
   await sql.batch(abandonStatements(userId, which, true));
   return true;
+}
+
+/**
+ * Whether `game` is still the account's open solo game (step 2: the device's kept game can be resumed). Recorded as left, finished or
+ * replaced by another start (another device's, say): false, and the device drops it.
+ */
+export async function soloGameOpen(sql: Sql, userId: string, game: unknown): Promise<boolean> {
+  const id = soloGameKey(game);
+  return !!id && !!(await sql.first<{ n: number }>("SELECT 1 AS n FROM solo_games WHERE user_id = ? AND id = ?", userId, id));
+}
+
+/**
+ * Forfeit (step 2, Nov 22; POST /api/xp/solo/forfeit): the device's kept game, given up from its card. Past SOLO_ABANDON.minMoves
+ * (`real`: the device's mark, sent with it in case its own mark never landed: markSoloGame, a no-op once marked) it's recorded as a
+ * loss now, as a game left (abandonSoloGame); under it nothing is recorded, and its row is left for the next start to replace.
+ * True: a loss was recorded now or already.
+ */
+export async function forfeitSoloGame(sql: Sql, userId: string, game: unknown, real: SoloReal | null, now: number): Promise<boolean> {
+  const id = soloGameKey(game);
+  if (!id) return false;
+  if (real) await markSoloGame(sql, userId, id, real, now);
+  if (await abandonSoloGame(sql, userId, { game: id })) return true;
+  return !!(await sql.first<{ n: number }>("SELECT 1 AS n FROM results WHERE user_id = ? AND solo_game = ? AND abandoned = 1", userId, id));
 }
 
 /** The time before which a real game counts as left whatever the app says (SOLO_ABANDON.staleHours since it began). */

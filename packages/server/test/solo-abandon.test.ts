@@ -321,3 +321,112 @@ describe("a solo game left after SOLO_ABANDON.minMoves", () => {
     expect(await w.sql.first("SELECT COUNT(*) AS n FROM results WHERE user_id = 'gone'")).toEqual({ n: 0 });
   });
 });
+
+/**
+ * Step 2 (Nov 22): Resume / Forfeit. The device keeps a solo boss battle and names it at its load (`resume`): never recorded as left
+ * there unless stale, and the answer says whether it's still open (`soloOpen`). Forfeit (POST /api/xp/solo/forfeit) records it as a
+ * loss now past SOLO_ABANDON.minMoves, nothing under it.
+ */
+describe("a solo game this device can resume (step 2: Resume / Forfeit)", () => {
+  it("the load's settle skips the game it names (`resume`) and answers it's open; the same game resumed later gets its result as ever", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    const g = await w.start(ann);
+    await w.real(ann, g);
+    at(T0 + 20 * MIN);
+    expect((await w.call(`/api/me?settle=1&resume=${g}`, ann.cookie)).body).toMatchObject({ soloOpen: true, stats: { all: { matches: 0 } } });
+    expect(await losses(w.sql, ann.id)).toEqual([]);
+    // (Its 10-move mark as it was: a second mark changes nothing.)
+    expect((await w.real(ann, g)).body).toEqual({ ok: false });
+    expect(await w.sql.first("SELECT id, real_at FROM solo_games WHERE user_id = ?", ann.id)).toEqual({ id: g, real_at: T0 });
+    // Resumed and won: recorded as the win, timed from its first start, once.
+    at(T0 + 40 * MIN);
+    expect(((await w.result(ann, g)).body.xp as { after: number }).after).toBeGreaterThan(0);
+    expect((await w.rows(ann.id)).map((r) => [r.solo_game, r.abandoned, r.play_ms])).toEqual([[g, null, 40 * MIN]]);
+    // (A read without `resume` never answers soloOpen.)
+    expect((await w.call("/api/me", ann.cookie)).body.soloOpen).toBeUndefined();
+  });
+
+  it("stale (SOLO_ABANDON.staleHours since it began): the load records it as left though it's named, and answers it isn't open", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    const g = await w.start(ann);
+    await w.real(ann, g);
+    at(T0 + SOLO_ABANDON.staleHours * 60 * MIN - 1);
+    expect((await w.call(`/api/me?settle=1&resume=${g}`, ann.cookie)).body.soloOpen).toBe(true);
+    at(T0 + SOLO_ABANDON.staleHours * 60 * MIN);
+    expect((await w.call(`/api/me?settle=1&resume=${g}`, ann.cookie)).body).toMatchObject({ soloOpen: false, stats: { all: { matches: 1 } } });
+    expect(await losses(w.sql, ann.id)).toEqual([{ solo_game: g }]);
+  });
+
+  it("a game recorded or replaced meanwhile (another device's start) isn't open; naming another game settles the open one as before", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    const g = await w.start(ann);
+    await w.real(ann, g);
+    // Another device starts a game: g is recorded as left; the phone that keeps g is told it's gone.
+    const other = await w.start(ann);
+    expect((await w.call(`/api/me?settle=1&resume=${g}`, ann.cookie)).body.soloOpen).toBe(false);
+    expect(await losses(w.sql, ann.id)).toEqual([{ solo_game: g }]);
+    // That device's game made real, the phone's load (still naming g) records it as left: only the named game is spared.
+    await w.real(ann, other);
+    expect((await w.call(`/api/me?settle=1&resume=${g}`, ann.cookie)).body.soloOpen).toBe(false);
+    expect(await losses(w.sql, ann.id)).toEqual([{ solo_game: g }, { solo_game: other }]);
+    // (A bad name spares nothing and answers nothing.)
+    const third = await w.start(ann);
+    await w.real(ann, third);
+    expect((await w.call("/api/me?settle=1&resume=nonsense", ann.cookie)).body.soloOpen).toBeUndefined();
+    expect(await losses(w.sql, ann.id)).toHaveLength(3);
+  });
+
+  it("another account's game is never open for you, and naming it spares nothing of yours", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    const bob = await w.player("bob@example.com");
+    const g = await w.start(ann);
+    await w.real(ann, g);
+    const b = await w.start(bob);
+    await w.real(bob, b);
+    expect((await w.call(`/api/me?settle=1&resume=${g}`, bob.cookie)).body.soloOpen).toBe(false);
+    expect(await losses(w.sql, bob.id)).toEqual([{ solo_game: b }]);
+    expect(await losses(w.sql, ann.id)).toEqual([]);
+  });
+
+  it("Forfeit: past the mark a loss now (once, whoever asks twice); under it nothing; the facts sent with it mark one whose mark never landed", async () => {
+    const w = await world();
+    const ann = await w.player("ann@example.com");
+    const forfeit = (game: string, real?: object) => w.call("/api/xp/solo/forfeit", ann.cookie, { game, ...(real ? { real } : {}) });
+    const facts = { mode: "boss", players: 1, team: null, bossId: "gingerbread", bossElo: 1600 };
+    // Under the mark: nothing recorded; the game's row is left for the next start to replace.
+    const a = await w.start(ann);
+    expect((await forfeit(a)).body).toEqual({ lost: false });
+    expect(await w.rows(ann.id)).toEqual([]);
+    // Marked: a loss now, last place, abandoned, no XP; again: the same answer, one row; its late result writes nothing.
+    const b = await w.start(ann);
+    at(T0 + 5 * MIN);
+    await w.real(ann, b);
+    at(T0 + 9 * MIN);
+    expect((await forfeit(b)).body).toEqual({ lost: true });
+    expect((await forfeit(b)).body).toEqual({ lost: true });
+    expect(await w.rows(ann.id)).toEqual([
+      { mode: "boss", online: 0, placement: 1, players: 1, team: null, team_won: 0, boss_id: "gingerbread", boss_elo: 1600, abandoned: 1, played_at: T0 + 5 * MIN, play_ms: null, moves: null, xp_none: null, solo_game: b },
+    ]);
+    expect(await w.sql.first("SELECT COUNT(*) AS n FROM solo_games WHERE user_id = ?", ann.id)).toEqual({ n: 0 });
+    expect((await w.result(ann, b)).body).toEqual({ ok: true, xp: null });
+    expect(await w.rows(ann.id)).toHaveLength(1);
+    // Past the mark on the device, its mark never answered: the forfeit's facts mark it, and it's a loss.
+    const c = await w.start(ann);
+    expect((await forfeit(c, facts)).body).toEqual({ lost: true });
+    expect(await losses(w.sql, ann.id)).toEqual([{ solo_game: b }, { solo_game: c }]);
+    // A game that isn't open (replaced) or another account's: nothing.
+    const d = await w.start(ann);
+    await w.real(ann, d);
+    await w.start(ann);
+    const bob = await w.player("bob@example.com");
+    const e = await w.start(bob);
+    await w.real(bob, e);
+    expect((await forfeit(e, facts)).body).toEqual({ lost: false });
+    expect(await losses(w.sql, bob.id)).toEqual([]);
+    expect((await forfeit("nonsense")).body).toEqual({ lost: false });
+  });
+});
