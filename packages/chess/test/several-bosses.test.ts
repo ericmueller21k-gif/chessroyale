@@ -633,7 +633,7 @@ describe("several bosses: a tower floor of three, one ultimate each (BATTLE_TOWE
           const p = b.powers!;
           expect(p.ultMax, b.id).toBe(1);
           expect(p.ults ?? 0, `${b.id} on ${t.join(" + ")}`).toBeLessThanOrEqual(1);
-          most[b.id] = Math.max(most[b.id] ?? 0, p.ults ?? 0);
+          most[b.id!] = Math.max(most[b.id!] ?? 0, p.ults ?? 0);
           if (!p.ults || p.ultAt !== undefined || who !== "crowd") continue;
           // (His one has come and its effect is over: what every screen draws, his meter, and the trigger.)
           const v = r.bossView()!.side!.bosses.find((x) => x.id === b.id)!.powers!;
@@ -647,7 +647,7 @@ describe("several bosses: a tower floor of three, one ultimate each (BATTLE_TOWE
       // (The same floor off the tower, every boss's own cap: some boss ults again, so the cap above is what held them.)
       const off: Record<string, number> = {};
       const free = await runBattle(floor(t, {}), null, (r) => {
-        for (const b of r.sideBosses()) off[b.id] = Math.max(off[b.id] ?? 0, b.powers!.ults ?? 0);
+        for (const b of r.sideBosses()) off[b.id!] = Math.max(off[b.id!] ?? 0, b.powers!.ults ?? 0);
       });
       expect(free.failures).toEqual([]);
       expect(Math.max(...Object.values(off)), `${t.join(" + ")} off the tower: ${JSON.stringify(off)}`).toBeGreaterThanOrEqual(2);
