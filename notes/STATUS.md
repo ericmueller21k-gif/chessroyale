@@ -1699,3 +1699,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 22 06:20: Eric OK'd #876's guard test edit ("the whole thing about asking to leave Chesstown first only applies when whatever you're pressing actually forces you out ... go ahead"). Merge #876 on green (head 5cd20d94, CI bu4v2188t). Lesson: explain guard-test asks in one plain line (what the rule protects, what changed), Eric found it confusing.
 - Nov 22 06:45: #876: side menu renamed Home → "Main menu" (Eric); "Home" clashed with the results screen's Home button (desktop tests failed on two Home buttons). Head bf5f62ad, CI running. Eric OK'd the guard edit. Merge on green.
 - Nov 22 07:10: #876 merged (9a98199: town layers, phone bar, side menu "Main menu"). Deploy/main watcher running. Home cards job (Haiku) also removes the "Other modes" heading and gives its room to Chess Town's button (Eric OK'd the mockup: nothing else moves); watcher on .done.
+
+## Nov 22: solo abandon (Eric approved both steps)
+- Step 1 (Opus xhigh, full lane): session_01JuCWRuaGjv9vzWcKKdMDjv, branch claude/solo-abandon, brief notes/briefs/solo-abandon.md. Needs the full-e2e label + an independent review.
+- Step 2 (after step 1 merges): Resume / Forfeit prompt in Boss Battle, reusing the tower's restore; fresh helper.
+- #877 (home cards) waiting on CI after a typecheck fix (12a99330).
