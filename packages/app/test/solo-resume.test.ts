@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
 import { legalMoves, type UciEngine } from "@chessroyale/chess";
-import { account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo } from "../src/account.ts";
+import { KEPT_ELSEWHERE, KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
 
@@ -205,6 +205,49 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     }, 120_000);
   }
 
+  it("a tab whose kept game another tab took over (its Resume), ended or replaced stops at its next keep, never writing it back", async () => {
+    const game = (n: number) => ({ snapshot: { state: {}, boards: [], groups: [], usedFamilies: [], retired: [] } as never, moves: Array.from({ length: n }, () => ({ move: "e4" })) as never, intro: true });
+    const keeper = () => {
+      const lost = vi.fn();
+      const keep = new SoloKeep({ at: Date.now(), bots: false, settings: () => ALONE, facts: () => FACTS, boss: () => "hopper", lost });
+      keep.ready("u", GAME, null);
+      keep.keep(game(1));
+      keep.keep(game(2));
+      expect(keptMoves(loadKeptSolo()!)).toBe(2);
+      return { keep, lost };
+    };
+    // Taken over: another tab's Resume claimed it.
+    let { keep, lost } = keeper();
+    store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, tab: "tab-b" }));
+    keep.keep(game(3));
+    keep.keepTurn(5_000);
+    expect(lost).toHaveBeenCalledTimes(1);
+    expect(loadKeptSolo()).toMatchObject({ tab: "tab-b" });
+    expect(keptMoves(loadKeptSolo()!)).toBe(2);
+    // (Its end leaves the other tab's be.)
+    keep.end();
+    expect(loadKeptSolo()).toMatchObject({ tab: "tab-b" });
+    // Forfeited in another tab (none kept), or another game kept there since.
+    ({ keep, lost } = keeper());
+    store.delete("brc.soloKept");
+    keep.keep(game(3));
+    expect(lost).toHaveBeenCalledTimes(1);
+    expect(loadKeptSolo()).toBeNull();
+    ({ keep, lost } = keeper());
+    store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, game: "another-game-0123", tab: "tab-b" }));
+    keep.keep(game(3));
+    expect(lost).toHaveBeenCalledTimes(1);
+    // A Resume's claim, then the resumed game's keeper: it holds it, and plays on.
+    store.set("brc.soloKept", JSON.stringify({ ...loadKeptSolo()!, game: GAME, tab: "tab-b" }));
+    const k = takeKeptSolo(loadKeptSolo()!) as KeptSolo;
+    const resumedLost = vi.fn();
+    const r = new SoloKeep({ at: k.at, bots: false, settings: () => ALONE, facts: () => FACTS, boss: () => "hopper", lost: resumedLost });
+    r.ready(k.user, k.game, k.battle);
+    r.keep(game(3));
+    expect(resumedLost).not.toHaveBeenCalled();
+    expect(keptMoves(loadKeptSolo()!)).toBe(3);
+  });
+
   it("never the Hidden Boss (his forms and phase 2 aren't in the snapshot): his battle isn't kept", async () => {
     const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "recluse", bossHidden: true, bossFixedElo: 1600 } as Settings, false, true);
     // (As App.tsx's keepSolo: the boss's id only when it isn't him.)
@@ -365,6 +408,73 @@ describe("the card's answers and the load (step 2)", () => {
     expect(d.held()).toBe(false);
     expect(d.calls.some((c) => c.startsWith("POST /api/xp/solo/forfeit"))).toBe(false);
     await vi.waitFor(() => expect(d.calls.some((c) => c.startsWith("POST /api/results"))).toBe(true));
+  });
+
+  // (The review of #885, I1: the card's Resume and Forfeit acted on the copy taken as the card came, so a second tab's card played the
+  // game again from where it stood then, and a loss kept unsent by one tab was replaced by the other tab's result.)
+  it("two tabs: Resume plays the kept game as it is at the tap (moves another tab played on stay), and claims it for this tab", async () => {
+    device(kept({ tab: "tab-a" }, 12));
+    await loadAccount();
+    const card = account().soloKept!;
+    expect(keptMoves(card)).toBe(12);
+    // (Tab A resumed and played on to move 15, then was closed.)
+    store.set("brc.soloKept", JSON.stringify(kept({ tab: "tab-a" }, 15)));
+    const k = takeKeptSolo(card);
+    expect(typeof k).toBe("object");
+    expect(keptMoves(k as KeptSolo)).toBe(15);
+    // (This tab's now: tab A, still open somewhere, stops at its next keep.)
+    const now = loadKeptSolo()!;
+    expect(now.tab).toBeDefined();
+    expect(now.tab).not.toBe("tab-a");
+    expect(keptMoves(now)).toBe(15);
+  });
+
+  it("two tabs: a loss one tab kept unsent (offline) is never replaced from the other's card: Resume refused, that result sent", async () => {
+    const d = device(kept());
+    await loadAccount();
+    const card = account().soloKept!;
+    // (Tab A lost while offline: its kept game dropped, its result kept unsent with no post on its way.)
+    store.delete("brc.soloKept");
+    const loss = { placement: 2, players: 1, mode: "boss", won: false, game: GAME };
+    store.set("brc.soloUnsent", JSON.stringify({ user: "u", result: loss }));
+    expect(takeKeptSolo(card)).toBe(KEPT_ENDED);
+    expect(JSON.parse(store.get("brc.soloUnsent")!).result).toMatchObject({ game: GAME, won: false });
+    await vi.waitFor(() => expect(d.calls).toContain(`POST /api/results ${JSON.stringify({ ...loss, resent: true })}`));
+  });
+
+  it("two tabs: while another tab plays it (its live note), Resume and Forfeit are refused, and nothing is posted", async () => {
+    const d = device(kept());
+    await loadAccount();
+    const card = account().soloKept!;
+    store.set("brc.soloLive", JSON.stringify({ game: GAME, at: Date.now() - 60_000 }));
+    expect(takeKeptSolo(card)).toBe(KEPT_ELSEWHERE);
+    expect(await forfeitKeptSolo(card)).toBe(KEPT_ELSEWHERE);
+    expect(d.held()).toBe(true);
+    expect(d.calls.filter((c) => c.startsWith("POST"))).toEqual([]);
+    // (Gone or replaced since the card came: there's nothing of it to forfeit.)
+    store.delete("brc.soloLive");
+    store.set("brc.soloKept", JSON.stringify(kept({ game: "another-game-0123" })));
+    expect(await forfeitKeptSolo(card)).toBe(KEPT_ENDED);
+    expect(takeKeptSolo(card)).toBe(KEPT_ENDED);
+    expect(d.calls.filter((c) => c.startsWith("POST"))).toEqual([]);
+  });
+
+  it("a card on screen follows another tab (a storage event): its move number as played on there; taken off while it's played there", async () => {
+    const heard = new Map<string, (e: { key: string | null }) => void>();
+    vi.stubGlobal("addEventListener", (t: string, f: (e: { key: string | null }) => void) => void heard.set(t, f));
+    device(kept({}, 12));
+    await loadAccount();
+    expect(keptMoves(account().soloKept!)).toBe(12);
+    store.set("brc.soloKept", JSON.stringify(kept({ tab: "tab-a" }, 14)));
+    heard.get("storage")!({ key: "brc.soloKept" });
+    expect(keptMoves(account().soloKept!)).toBe(14);
+    store.set("brc.soloLive", JSON.stringify({ game: GAME, at: Date.now() }));
+    heard.get("storage")!({ key: "brc.soloLive" });
+    expect(account().soloKept).toBeNull();
+    // (No card on screen: nothing is offered by another tab's writes.)
+    store.delete("brc.soloLive");
+    heard.get("storage")!({ key: "brc.soloLive" });
+    expect(account().soloKept).toBeNull();
   });
 
   it("Resume checks it with the server first: still open, resumed; recorded or replaced since the load, dropped", async () => {

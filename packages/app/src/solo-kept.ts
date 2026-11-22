@@ -29,9 +29,16 @@ export interface KeptSolo {
   facts: SoloRealFacts;
   /** The game as it stood at its last step. */
   kept: KeptGame;
+  /**
+   * The tab playing it (`TAB`; unset: none since it was kept): a Resume claims it, and every keep checks it, so a tab whose game another
+   * tab took over stops there and never writes it back (the review of #885, I1: two tabs each played on from the card they were offered).
+   */
+  tab?: string;
 }
 
-const KEY = "brc.soloKept";
+export const KEPT_KEY = "brc.soloKept";
+/** This tab (this page's load): who holds the kept game (KeptSolo.tab). */
+const TAB = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 /** A kept game read back, or null when there's none or it isn't one (another version, a damaged entry). */
 export function readKeptSolo(text: string | null): KeptSolo | null {
@@ -58,29 +65,38 @@ export function readKeptSolo(text: string | null): KeptSolo | null {
     boss: k.boss,
     facts: k.facts,
     kept: { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}) },
+    ...(typeof k.tab === "string" ? { tab: k.tab } : {}),
   };
 }
 
 export function loadKeptSolo(): KeptSolo | null {
   try {
-    return readKeptSolo(localStorage.getItem(KEY));
+    return readKeptSolo(localStorage.getItem(KEPT_KEY));
   } catch {
     return null;
   }
 }
 
-function saveKeptSolo(k: KeptSolo): void {
+/** Written; false: no storage, or full (a reload then can't resume it, and the game counts as left, as before step 2). */
+function saveKeptSolo(k: KeptSolo): boolean {
   try {
-    localStorage.setItem(KEY, JSON.stringify(k));
+    localStorage.setItem(KEPT_KEY, JSON.stringify(k));
+    return true;
   } catch {
-    // (No storage, or full: a reload then can't resume it, and the game counts as left, as before step 2.)
+    return false;
   }
 }
+
+/** Resume's claim (account.ts takeKeptSolo): the kept game is this tab's from now; another tab playing it stops at its next keep. */
+export const claimKeptSolo = (k: KeptSolo): void => void saveKeptSolo({ ...k, tab: TAB });
+
+/** `k` is held by this tab (it kept it, or its Resume claimed it). */
+const heldHere = (k: KeptSolo | null, game: string): boolean => k?.game === game && k.tab === TAB;
 
 /** The kept game dropped (`game`: only if it's that one: another may have been kept since, by another tab). */
 export function clearKeptSolo(game?: string): void {
   try {
-    if (game === undefined || loadKeptSolo()?.game === game) localStorage.removeItem(KEY);
+    if (game === undefined || loadKeptSolo()?.game === game) localStorage.removeItem(KEPT_KEY);
   } catch {
     // No storage.
   }
@@ -104,12 +120,16 @@ export const keptReal = (k: Pick<KeptSolo, "kept">): boolean => keptMoves(k) >= 
 /**
  * What keeps a solo boss battle on the device as it's played (SoloMatch.kept; the same steps as a tower floor's FloorPlay): the game as
  * it stands after every step, written once the server's ids are in (`ready`) and from your first move (SOLO_ABANDON.keepFromMoves).
- * `end`: the game is decided, resigned or forfeited: cleared, and nothing more is written.
+ * `end`: the game is decided, resigned or forfeited: cleared, and nothing more is written. Every write after the first checks this tab
+ * still holds it (KeptSolo.tab): another tab's Resume took it over, or another tab ended it or started another game, and this one stops
+ * (`lost`: App.tsx stops the match, "Played in another tab."), never writing it back.
  */
 export class SoloKeep {
   private ids: { user: string; game: string; battle: string | null } | null = null;
   private last: KeptGame | null = null;
   private over = false;
+  /** This tab holds the kept game: it wrote it, or its Resume claimed it (`ready`). */
+  private held = false;
   constructor(
     private readonly base: {
       at: number;
@@ -117,12 +137,18 @@ export class SoloKeep {
       settings: () => Settings;
       facts: () => SoloRealFacts;
       boss: () => string | null;
+      /** Another tab took this game over (or ended it): this tab's match stops. */
+      lost?: () => void;
     },
   ) {}
-  /** The account and the server's ids, known once its start answered (a resumed game's at once): what's kept so far is written. */
+  /**
+   * The account and the server's ids, known once its start answered (a resumed game's at once, held by this tab if its Resume's claim was
+   * written): what's kept so far is written.
+   */
   ready(user: string, game: string, battle: string | null): void {
     if (this.over || this.ids) return;
     this.ids = { user, game, battle };
+    this.held = heldHere(loadKeptSolo(), game);
     this.write();
   }
   keep(game: KeptGame): void {
@@ -149,22 +175,30 @@ export class SoloKeep {
     const game = this.last;
     const boss = this.base.boss();
     if (!ids || !game || !boss || ownMoves(game.moves) < SOLO_ABANDON.keepFromMoves) return;
-    saveKeptSolo({ v: 1, ...ids, at: this.base.at, settings: this.base.settings(), bots: this.base.bots, boss, facts: this.base.facts(), kept: game });
+    // (Held, and no longer this tab's: taken over, ended or replaced by another tab. Nothing more is written; the match stops.)
+    if (this.held && !heldHere(loadKeptSolo(), ids.game)) {
+      this.over = true;
+      return this.base.lost?.();
+    }
+    if (saveKeptSolo({ v: 1, ...ids, at: this.base.at, settings: this.base.settings(), bots: this.base.bots, boss, facts: this.base.facts(), kept: game, tab: TAB })) this.held = true;
   }
 }
 
 // ---------------- The card's answers (components/GameInProgress.tsx; App.tsx registers Resume) ----------------
 
-let resumer: ((k: KeptSolo) => void) | null = null;
-/** The app's way back into a kept game (App.tsx registers it). */
-export function onResumeKept(fn: (k: KeptSolo) => void): () => void {
-  resumer = fn;
+/** The app's answers (App.tsx registers them): back into a kept game, and a line on home (a Resume or Forfeit refused). */
+type KeptAnswers = { resume: (k: KeptSolo) => void; note: (line: string) => void };
+let answers: KeptAnswers | null = null;
+export function onKeptAnswers(a: KeptAnswers): () => void {
+  answers = a;
   return () => {
-    if (resumer === fn) resumer = null;
+    if (answers === a) answers = null;
   };
 }
-/** Resume, from the card: back into the same battle exactly where it was kept. */
-export const resumeKeptSolo = (k: KeptSolo): void => resumer?.(k);
+/** Resume, from the card: back into the same battle exactly where it is kept now (App.tsx, account.ts takeKeptSolo). */
+export const resumeKeptSolo = (k: KeptSolo): void => answers?.resume(k);
+/** Why a Resume or Forfeit was refused ("That game has already ended.", "Played in another tab."), on home's error line. */
+export const keptNote = (line: string): void => answers?.note(line);
 
 /** Another solo game about to start with one kept: the question on screen and its answer (true: forfeit it and go on). */
 let asked: { kept: KeptSolo; answer: (go: boolean) => void } | null = null;

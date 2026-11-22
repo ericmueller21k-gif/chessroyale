@@ -1,8 +1,8 @@
 import { SOLO_ABANDON, bossDef } from "@chessroyale/core";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { forfeitKeptSolo } from "../account.ts";
+import { KEPT_ELSEWHERE, forfeitKeptSolo } from "../account.ts";
 import { useAccount } from "../screens/Profile.tsx";
-import { forfeitAsk, keptMoves, keptReal, onForfeitAsk, resumeKeptSolo, type KeptSolo } from "../solo-kept.ts";
+import { forfeitAsk, keptMoves, keptNote, keptReal, onForfeitAsk, resumeKeptSolo, type KeptSolo } from "../solo-kept.ts";
 import { BossPortrait } from "./BossPortrait.tsx";
 import { Confirm } from "./MatchMenu.tsx";
 
@@ -33,7 +33,13 @@ export function GameInProgress() {
           note={`Your game against ${bossName(k.boss)} (move ${keptMoves(k)}) ends. ${forfeitNote(k)}`}
           go="Forfeit"
           onCancel={() => ask.answer(false)}
-          onGo={() => void forfeitKeptSolo(k).then(() => ask.answer(true))}
+          onGo={() =>
+            // (Refused while another tab plays it: nothing starts; ended meanwhile (its result sent): the start goes on.)
+            void forfeitKeptSolo(k).then((why) => {
+              if (why === KEPT_ELSEWHERE) keptNote(why);
+              ask.answer(why !== KEPT_ELSEWHERE);
+            })
+          }
         />
       </div>
     );
@@ -64,7 +70,7 @@ function KeptCard({ kept: k }: { kept: KeptSolo }) {
           {forfeitNote(k)}
         </p>
         <div class="mm-confirm-actions">
-          <button type="button" class="mm-btn" onClick={() => void forfeitKeptSolo(k)}>
+          <button type="button" class="mm-btn" onClick={() => void forfeitKeptSolo(k).then((why) => why && keptNote(why))}>
             Forfeit
           </button>
           <button type="button" class="mm-btn gp-resume" ref={resume} onClick={() => resumeKeptSolo(k)}>
