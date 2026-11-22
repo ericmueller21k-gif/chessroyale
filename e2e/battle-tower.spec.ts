@@ -513,6 +513,48 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   await still(page, "shared-floor-babur-wrangler");
 });
 
+test("a floor of three (Eric, Nov 22: \"they only ult once each at most\"): Big Boy's one Big Bounce, then his meter stays empty and dimmed, saying so", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  // (?power=bounce: Big Boy, first in turn order, warned at his turn change on your 4th turn, the Bounce after your 4th move.)
+  await intoTower(page, "&power=bounce");
+  const made = await page.evaluate(async () => {
+    const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    const me = await (await fetch("/api/me", { credentials: "same-origin" })).json();
+    return { ok: run.ok, user: me.user.id as string };
+  });
+  expect(made.ok).toBe(true);
+  await localSql(page, "UPDATE tower_runs SET floor = 4, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["moo"], ["grex", "hollow"], ["tiger", "pig"], ["bigboy", "gingerbread", "clown"]], deck: [], decks: 1 }), made.user);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: "Continue: floor 4" }).click();
+  await floorThenMatch(page, 4, 3);
+  const caps = await page.evaluate(() => (window as any).match.boss.side.bosses.map((b: any) => `${b.id}:${b.powers.ultMax}`));
+  expect(caps).toEqual([`bigboy:${BATTLE_TOWER.ultsOnFloorOf[3]}`, `gingerbread:${BATTLE_TOWER.ultsOnFloorOf[3]}`, `clown:${BATTLE_TOWER.ultsOnFloorOf[3]}`]);
+  const big = () => page.evaluate(() => (window as any).match.boss.side.bosses.find((b: any) => b.id === "bigboy").powers);
+  const meter = page.locator('.tw-part[data-boss="bigboy"] .rage-meter');
+  // Your moves until his Bounce has come and is over (it lasts its own turn), then one more: his meter empty, dimmed, never filling.
+  let after = 0;
+  for (let n = 1; n <= 8 && after < 2; n++) {
+    await playAMove(page);
+    await expect.poll(async () => (await phase(page)) === "play" && (await moves(page)) === n, { timeout: 90_000 }).toBe(true);
+    const p = await big();
+    expect(p.ults).toBeLessThanOrEqual(1);
+    if (p.ults !== 1 || p.ultAt !== null) continue;
+    after++;
+    expect(p.warned).toBe(false);
+    await expect(meter).toHaveClass(/paused/);
+    await expect(meter).toHaveAttribute("aria-valuenow", "0");
+    await expect(meter).toHaveAttribute("aria-label", "Rage: no more ultimates on this floor");
+  }
+  expect(after, "his one Bounce came and two turns of yours after it").toBe(2);
+  // (His part tapped open, as a player would to look: the spent meter in view.)
+  const part = page.locator('.tw-part[data-boss="bigboy"]');
+  if ((await part.getAttribute("aria-expanded")) !== "true") await part.click();
+  await expect(part).toHaveAttribute("aria-expanded", "true");
+  await expect(meter).toBeVisible();
+  await page.waitForTimeout(400);
+  await still(page, "floor-of-three-one-ult");
+});
+
 test("a shared floor of Puddles and Babur (Eric, Nov 20: one boss adds pieces, the first in turn order): Babur's pump stays in his part, greyed and tagged OFF, never a balloon; Puddles, first, keeps his; every part's words inside its outline", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await intoTower(page);
