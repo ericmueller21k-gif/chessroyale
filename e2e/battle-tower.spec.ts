@@ -168,7 +168,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 10_000 });
   await expect(page.locator(".es-quests-none")).toHaveText("No quests moved this game.");
   await expect(won).toContainText("Next: floor 2");
-  const back = won.getByRole("button", { name: "Back to the tower" });
+  const back = won.getByRole("button", { name: "Back to the Battle Tower" });
   await expect(back).toBeEnabled({ timeout: 20_000 });
   await still(page, "result-won");
   await back.click();
@@ -234,10 +234,10 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
   await expect(page.locator(".es-head")).not.toContainText(String(BATTLE_TOWER.floors));
   await expect(lost).toContainText("Next: floor 3", { timeout: 20_000 });
-  await expect(lost.getByRole("button", { name: "Back to the tower" })).toBeEnabled({ timeout: 20_000 });
+  await expect(lost.getByRole("button", { name: "Back to the Battle Tower" })).toBeEnabled({ timeout: 20_000 });
   await lost.scrollIntoViewIfNeeded();
   await still(page, "result-lost");
-  await lost.getByRole("button", { name: "Back to the tower" }).click();
+  await lost.getByRole("button", { name: "Back to the Battle Tower" }).click();
   // Back in the floor room on your mark, a heart greyed, the elevator open: up to floor 3, its strip's heart greyed too.
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   await heartsAre(page.locator(".tw-room-lives .tw-hearts"), 1);
@@ -251,7 +251,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   // Floor 3 lost too: no life left, still climbing; floor 4's loss (the third) ends the run, its floors lost listed.
   await loseFloor(page, "counts as a loss: it costs a life (no lives left after).");
   await expect(page.getByTestId("es-line")).toHaveText("Floor 3 lost · no lives left", { timeout: 30_000 });
-  await page.locator('[data-tower-result="lost"]').getByRole("button", { name: "Back to the tower" }).click();
+  await page.locator('[data-tower-result="lost"]').getByRole("button", { name: "Back to the Battle Tower" }).click();
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   await heartsAre(page.locator(".tw-room-lives .tw-hearts"), 0);
   // Down to the lobby: the clerk's card shows the climb's lives and its floors lost (the recap); Continue goes on to floor 4.
@@ -268,10 +268,10 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   const out = page.locator('[data-tower-result="out"]');
   await expect(page.getByTestId("es-line")).toHaveText("Run over on floor 4", { timeout: 30_000 });
   await expect(out).toContainText("Lost floors 2, 3 and 4. Best solo: floor 1", { timeout: 20_000 });
-  await expect(out.getByRole("button", { name: "Back to the tower" })).toBeEnabled({ timeout: 20_000 });
+  await expect(out.getByRole("button", { name: "Back to the Battle Tower" })).toBeEnabled({ timeout: 20_000 });
   await out.scrollIntoViewIfNeeded();
   await still(page, "result-out-recap");
-  await out.getByRole("button", { name: "Back to the tower" }).click();
+  await out.getByRole("button", { name: "Back to the Battle Tower" }).click();
   // The run's over: the elevator shut (its Up greyed), down to the lobby, where the clerk offers Start again.
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("out");
   const shut = await tapRoom(page, "pass", "Elevator", "top");
@@ -304,7 +304,7 @@ test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, th
   const won = page.locator('[data-tower-result="won"]');
   await expect(page.getByTestId("es-line")).toHaveText("Floor 1 cleared!", { timeout: 120_000 });
   expect(await moves(page)).toBe(1);
-  await won.getByRole("button", { name: "Back to the tower" }).click();
+  await won.getByRole("button", { name: "Back to the Battle Tower" }).click();
   await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 60_000 }).toBe("won");
   const lift = await tapRoom(page, "pass", "Elevator", "top");
   await lift.getByRole("button", { name: "Up to floor 2" }).click();
