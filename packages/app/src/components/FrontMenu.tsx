@@ -31,7 +31,7 @@ export interface FrontNav {
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess";
+export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess" | "quests";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -67,7 +67,9 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
     <nav class="fd-side" aria-label="Menu">
       <Logo onClick={nav.home} />
       <div class="fd-menu">
-        <Item tip={tip} tour="play" label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
+        {/* (Home, the home screen (Eric, Nov 22: "instead of making it say play, we should just change it to ... home"; it was Play).
+            Not a walkthrough spot: the PLAY slide is home's PLAY button's.) */}
+        <Item tip={tip} label="Home" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
         <Item tip={tip} tour="chess-town" label="Chess Town" on={page === "town"} onClick={nav.chessTown} icon={<Pic ch={ARENA_TOWN_BADGE} scale={1} class="fd-menu-crest" />} />
         <Item tip={tip} tour="boss-battle" label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
         <Item
@@ -91,6 +93,7 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
           tour="quests"
           label="Daily Quests"
           title={questsOn === false ? "Sign in for quests" : tip ? "Daily Quests" : undefined}
+          on={page === "quests"}
           disabled={questsOn !== true}
           onClick={nav.quests}
           icon={
@@ -196,13 +199,17 @@ export function GameFrame({ children, nav }: { children: ComponentChildren; nav:
 /**
  * The front door's frame: the page's background and its center column. On a computer (1024 px and wider) with `nav`,
  * the side menu on the left and the live panel on the right; on a phone, just the center. (The queue is a state of
- * the home screen, in the same frame: see HomeScreen.)
+ * the home screen, in the same frame: see HomeScreen.) `layer`: a page over the center (Chess Town's on a computer, Nov 22:
+ * PageLayer.tsx), its side menu item lit in place of the page's.
  */
-export function FrontFrame({ children, page, nav }: { children: ComponentChildren; page?: FrontPage; nav?: FrontNav }) {
+export function FrontFrame({ children, page, nav, layer }: { children: ComponentChildren; page?: FrontPage; nav?: FrontNav; layer?: { page?: FrontPage; node: ComponentChildren } | null }) {
   return (
     <div class={`fd-root${nav ? " framed" : ""}${page ? ` fd-on-${page}` : ""}`}>
-      {nav && <SideMenu page={page} nav={nav} />}
-      <main class="fd-center">{children}</main>
+      {nav && <SideMenu page={layer ? layer.page : page} nav={nav} />}
+      <main class="fd-center">
+        {children}
+        {layer?.node}
+      </main>
       {/* (The global chat on every page with the column: it was home's and the town's only, so the queue, 1 v 1's search among them, had none. Nov 7.) */}
       {nav && <RightPanel onFriends={nav.friendsList} onSignIn={nav.signIn} slot={page === "town" ? "TOWN" : page === "autochess" ? "AUTO CHESS" : undefined} />}
       {/* A new invite: front-door pages only (never over a match, nor in the queue). */}

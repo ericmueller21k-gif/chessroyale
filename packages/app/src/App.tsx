@@ -14,13 +14,14 @@ import { useRecluseTalk } from "./recluse-talk.ts";
 import { ConfirmExit, MatchMenu, type MatchExit } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
 import type { SoloMatch } from "./solo.ts";
-import { HomeScreen } from "./screens/Home.tsx";
+import { FriendsLayer, HomeScreen } from "./screens/Home.tsx";
+import { QuestsLayer } from "./components/QuestsOverlay.tsx";
 import { QueueLine, QueueScreen } from "./screens/Queue.tsx";
 import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
-import { inventoryTakesPop } from "./components/InventoryLayer.tsx";
+import { PageLayer, layerTakesPop } from "./components/PageLayer.tsx";
 import { account, askAgeAgain, askAgeForGoogle, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult, setTestXp } from "./account.ts";
 import { leavesNote } from "./ranked.ts";
 import { isAdmin } from "./boss-brain.ts";
@@ -37,7 +38,7 @@ import { FloorPlay, askFloor, forgetPartyFloor, keepPartyFloor, loadKept, onEnte
 import { joinTowerParty, onEnterPartyFloor, towerParty, type PartyFloorEntry } from "./tower-party.ts";
 import type { TowerBack } from "./town/Town.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
-import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
+import { FrontFrame, GameFrame, type FrontNav, type FrontPage } from "./components/FrontMenu.tsx";
 import { showAwayNote } from "./components/AwayNote.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
@@ -387,6 +388,12 @@ export function App() {
   // the browser's back gesture took (the town's address), for a back gesture only.
   const [townAsk, setTownAsk] = useState<{ dest: string; go: () => void; stay?: () => void } | null>(null);
   const askLeave = (dest: string, go: () => void) => setTownAsk({ dest, go });
+  /**
+   * Chess Town on a computer (Eric, Nov 22: "you should be able to just click play with friends, daily quests, shop in crates, and
+   * profile without exiting out of Chesttown"): the side menu's page open over the town's middle column (PageLayer.tsx), the town under
+   * it as it was (your pawn, the chat, a party). `tab`: the shop's (from your profile's locker or chat packs); `you`: your profile's.
+   */
+  const [townLayer, setTownLayer] = useState<{ page: "friends" | "quests" | "shop" | "profile"; tab?: "locker" | "chat"; you?: ProfileTarget } | null>(null);
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -855,8 +862,8 @@ export function App() {
   backToTownRef.current = backToTown;
   useEffect(() => {
     const onPop = () => {
-      // (The inventory layer's own step (InventoryLayer.tsx): back closes it, and nothing under it moves.)
-      if (inventoryTakesPop()) return;
+      // (A page layer's own step (PageLayer.tsx: the inventory, the town's pages on a computer): back closes it, and nothing under it moves.)
+      if (layerTakesPop()) return;
       if (townSkip.current) return void (townSkip.current = false);
       // The phone's or the browser's back in Chess Town (not at a table's game): it has gone back already, so Stay puts the
       // town's address back and Leave goes home (the front door, as the town's back button does).
@@ -875,6 +882,10 @@ export function App() {
   useEffect(() => {
     if (!showTown) setTownAsk(null);
   }, [showTown]);
+  // (And its page layer, a game or a match too: the town is gone under it.)
+  useEffect(() => {
+    if (!showTown || match || duel) setTownLayer(null);
+  }, [showTown, !!match, !!duel]);
   // In the town, its address without the seat (it's been read).
   useEffect(() => {
     if (!showTown || duel || !new URLSearchParams(location.search).has("at")) return;
@@ -1827,15 +1838,26 @@ export function App() {
     };
     return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), quests: page("quests"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
   };
-  // The town's side menu (and its panel, and the global chat's sign-in): each page asks first. Chess Town itself doesn't.
+  // The town's side menu (and its panel, and the global chat's sign-in): each page that leaves asks first. Chess Town itself doesn't.
+  // Play with friends, Daily Quests, Shop & crates and Profile open over the town instead (townLayer; another of them switches it, Chess
+  // Town closes it): only a computer's town has the side menu.
+  const openTownLayer = (l: NonNullable<typeof townLayer>) => {
+    closeProfile();
+    setTownLayer(l);
+  };
+  const closeTownLayer = () => {
+    closeProfile();
+    setTownLayer(null);
+  };
   const townNav: FrontNav = {
     ...nav,
-    home: () => askLeave("Play", nav.home),
+    home: () => askLeave(TOWN_BACK_TO, nav.home),
+    chessTown: () => (townLayer ? closeTownLayer() : nav.chessTown()),
     soloBoss: () => askLeave("Boss Battle", nav.soloBoss),
-    friends: () => askLeave("Play with friends", nav.friends),
-    quests: () => askLeave("Daily Quests", nav.quests),
-    shop: () => askLeave("the Shop", nav.shop),
-    profile: () => askLeave("your profile", nav.profile),
+    friends: () => openTownLayer({ page: "friends" }),
+    quests: () => openTownLayer({ page: "quests" }),
+    shop: () => openTownLayer({ page: "shop" }),
+    profile: () => openTownLayer({ page: "profile", you: { you: true, name: account().profile?.user.name ?? "" } }),
     settings: () => askLeave("Settings", nav.settings),
     friendsList: () => askLeave("your friends", nav.friendsList),
     signIn: () => askLeave("Sign in", nav.signIn!),
@@ -2123,9 +2145,59 @@ export function App() {
       />
     );
   }
+  /** The side menu item lit while a town layer is open: its page's (none for someone else's profile shown in it). */
+  const townLayerPage = (page: NonNullable<typeof townLayer>["page"], other: ProfileTarget | null): FrontPage | undefined =>
+    other && !other.you ? undefined : ({ friends: "lobby", quests: "quests", shop: "shop", profile: "profile" } as const)[page];
+  /**
+   * The town layer's page: each page's own component, as the main menu opens it (Eric, Nov 22: "we should do the same thing for all these
+   * other stuff"). The shop and your profile in the page's own column; Daily Quests and Play with friends are home's cards, over the town
+   * dimmed under them (`see`). What leaves the town from inside it (a lobby made or joined, Settings, your friends) asks first, as the side
+   * menu does.
+   */
+  const townLayerNode = (l: NonNullable<typeof townLayer>) => {
+    const label = { friends: "Play with friends", quests: "Daily Quests", shop: "Shop & crates", profile: "Profile" }[l.page];
+    const page = profileOpen ? (
+      <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+    ) : l.page === "shop" ? (
+      <ShopScreen key={l.tab ?? "shop"} initial={l.tab} onBack={closeTownLayer} />
+    ) : l.page === "profile" ? (
+      <PlayerProfileScreen
+        target={l.you!}
+        onBack={closeTownLayer}
+        onLocker={() => openTownLayer({ page: "shop", tab: "locker" })}
+        onShop={() => openTownLayer({ page: "shop", tab: "chat" })}
+        onSettings={townNav.settings}
+        onFriends={townNav.friendsList}
+      />
+    ) : l.page === "quests" ? (
+      <QuestsLayer onClose={closeTownLayer} />
+    ) : (
+      <FriendsLayer
+        loading={loading}
+        onlineLocked={mustSignInToPlayOnline()}
+        // (A lobby made or joined leaves the town: asked first, then home and the lobby, as from home.)
+        leave={(go) => askLeave("Play with friends", () => {
+          nav.home();
+          leavingSearchFirst(go);
+        })}
+        onCreateLobby={(mode, made) => void createLobby(mode).then((code) => made?.(code ?? null))}
+        onJoinLobby={(code) => joinLobby(code, { typed: code !== inviteCode })}
+        onSignIn={townNav.signIn!}
+        onFriends={townNav.friendsList}
+        onClose={closeTownLayer}
+      />
+    );
+    const pop = !profileOpen && (l.page === "quests" || l.page === "friends");
+    return (
+      <PageLayer inColumn see={pop} label={label} testid="town-layer" onClose={closeTownLayer}>
+        {pop ? page : <div class="fd-center">{page}</div>}
+      </PageLayer>
+    );
+  };
   if (!match && showTown) {
-    // A player's profile from the town chat's menu: over the town, which stays as it was underneath (Back closes it).
-    const overlayT = profileOpen && (
+    // A player's profile from the town chat's menu: over the town, which stays as it was underneath (Back closes it). With a page layer
+    // open (a computer's), in the layer instead (your profile's "View public profile", a name in the chat beside it).
+    const overlayT = profileOpen && !townLayer && (
       <div class="fd-overlay">
         <FrontFrame>
           <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
@@ -2136,6 +2208,7 @@ export function App() {
       <>
         <TownPage
           nav={townNav}
+          layer={townLayer && { page: townLayerPage(townLayer.page, profileOpen), node: townLayerNode(townLayer) }}
           askLeave={askLeave}
           seat={townSeat}
           stand={townStand}

@@ -1,8 +1,8 @@
-import type { FunctionComponent } from "preact";
+import type { ComponentChildren, FunctionComponent } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { ItemLook } from "@chessroyale/core";
 import { account, onAccountChange } from "../account.ts";
-import { FrontFrame, type FrontNav } from "../components/FrontMenu.tsx";
+import { FrontFrame, type FrontNav, type FrontPage } from "../components/FrontMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import type { Stand } from "./world.ts";
 import { chunk } from "../stale.ts";
@@ -72,7 +72,7 @@ const ACCOUNT_WAIT_MS = 3000;
  * you and a bot sit down at a table, and the game opens; `seat`: back from that game, you sit at that table again, the
  * bot across.
  */
-export function TownPage({ nav, ...props }: Props & { nav: FrontNav }) {
+export function TownPage({ nav, layer, ...props }: Props & { nav: FrontNav; layer?: { page?: FrontPage; node: ComponentChildren } | null }) {
   const framed = useMedia(COMPUTER);
   const [Town, setTown] = useState<Screen | null>(null);
   useEffect(() => {
@@ -114,7 +114,8 @@ export function TownPage({ nav, ...props }: Props & { nav: FrontNav }) {
   }, []);
   const screen = Town ? <Town {...props} framed={framed} /> : <div class="screen" />;
   return framed ? (
-    <FrontFrame page="town" nav={nav}>
+    // (`layer`: a side menu page over the town's middle column, the town under it as it was: App.tsx townLayer, Nov 22.)
+    <FrontFrame page="town" nav={nav} layer={layer}>
       {screen}
     </FrontFrame>
   ) : (

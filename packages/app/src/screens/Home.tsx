@@ -317,6 +317,43 @@ function copyInviteLink(code: Promise<string>) {
   void later();
 }
 
+/** A friend code: the lobby made, its link copied as it opens. Asked for in this tap, as a phone's browser wants. */
+function makeAndCopy(mode: ModeChoiceId, create: (mode: ModeChoiceId, made?: (code: string | null) => void) => void) {
+  copyInviteLink(new Promise((resolve, reject) => create(mode, (code) => (code ? resolve(code) : reject(new Error("no lobby"))))));
+}
+
+/**
+ * Play with friends over Chess Town on a computer (App.tsx's town layer, Nov 22): home's own sheet, in the lobby mode home would make
+ * (the pick since the app opened, else 50 v 50's). Making or joining a lobby leaves the town, so each goes through `leave` (App.tsx:
+ * "Leave Chess Town?" first, then home, then the lobby).
+ */
+export function FriendsLayer({ loading, onlineLocked, leave, onCreateLobby, onJoinLobby, onSignIn, onFriends, onClose }: {
+  loading: boolean;
+  onlineLocked?: boolean;
+  leave: (go: () => void) => void;
+  onCreateLobby: (mode: ModeChoiceId, made?: (code: string | null) => void) => void;
+  onJoinLobby: (code: string) => void;
+  onSignIn: () => void;
+  onFriends: () => void;
+  onClose: () => void;
+}) {
+  useServerStatus();
+  const mode = lobbyModeOf(chosenHomeMode() ?? "crowd");
+  return (
+    <FriendsSheet
+      mode={mode}
+      loading={loading}
+      onlineLocked={onlineLocked}
+      resting={isPaused(mode) ? pausedLine(mode) : null}
+      onCreate={() => leave(() => makeAndCopy(mode, onCreateLobby))}
+      onJoin={(code) => leave(() => onJoinLobby(code))}
+      onSignIn={onSignIn}
+      onFriends={onFriends}
+      onClose={onClose}
+    />
+  );
+}
+
 /**
  * Play with friends: a lobby with a code (in the mode picked on the home screen), joining one, and practice
  * against bots on your own.
@@ -351,9 +388,10 @@ function FriendsSheet({
   const news = friendsBadge();
   // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
   useLayoutEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    addEventListener("keydown", key);
-    return () => removeEventListener("keydown", key);
+    // (Its Escape is its own, heard first: nothing under it (a page layer, a screen, the town) acts on it too.)
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), onClose());
+    addEventListener("keydown", key, true);
+    return () => removeEventListener("keydown", key, true);
   }, []);
   // (A friend code: a lobby made for you and your friends, its link copied to share: Eric, Oct 18.)
   const label = mode === "raid" ? "Create a Boss Battle" : mode === "classic" ? "Get a Classic friend code" : "Get friend code";
@@ -904,8 +942,7 @@ export function HomeScreen({
             // run the boss's brain: you're its host.)
             if (lobbyMode === "raid" && maiaAllowed()) prefetchMaia();
             if (lobbyMode === "raid") return onCreateLobby(lobbyMode);
-            // (A friend code: its link copied as the lobby opens. Asked for in this tap, as a phone's browser wants.)
-            copyInviteLink(new Promise((resolve, reject) => onCreateLobby(lobbyMode, (code) => (code ? resolve(code) : reject(new Error("no lobby"))))));
+            makeAndCopy(lobbyMode, onCreateLobby);
           }}
           onJoin={onJoinLobby}
           onSignIn={onSignIn}
