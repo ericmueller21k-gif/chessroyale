@@ -38,6 +38,13 @@ export function noteSoloBattle(match: object, town?: string): void {
   );
 }
 
+/** A solo boss battle resumed (step 2): its battle on the server as it began (null: none), so its token is timed from then. */
+export function resumeSoloBattle(match: object, battle: string | null): void {
+  solo.set(match, Promise.resolve(battle));
+}
+/** The id of this solo boss battle on the server (null: none, or not one). */
+export const soloBattleId = (match: object): Promise<string | null> => solo.get(match) ?? Promise.resolve(null);
+
 /**
  * How a finished boss battle went, for the town's chat (the server posts it only for a challenge from the town): won, lost,
  * drawn or surrendered (a resign: the server posts it only after enough moves), and your moves; null for a leave (no line).

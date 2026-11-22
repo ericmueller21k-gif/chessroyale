@@ -41,6 +41,7 @@ import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { openProfile } from "../profile-nav.ts";
 import { account, myPawnColor, onAccountChange, playerName } from "../account.ts";
+import { askForfeitFirst } from "../solo-kept.ts";
 import { TOWN_ASKED, testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic, townMusic } from "../music.ts";
@@ -597,7 +598,9 @@ export function TownScreen({
     return { floor: run.floor, mode: "fight", bosses: run.bosses, times: null, t0: null, board: null, kind: towerKind.current, lives: run.lives };
   };
   /** The clerk's Start or Continue (`kind`: your solo run, or your party copy played alone): you walk into the elevator, and up. */
-  const towerGo = (kind: RunKind = "solo") => {
+  const towerGo = async (kind: RunKind = "solo") => {
+    // (A solo boss battle kept on this device (step 2): a floor is another solo game, so "Forfeit your game in progress?" first.)
+    if (!(await askForfeitFirst(account().profile?.user.id))) return;
     towerKind.current = kind;
     shopCtl.current?.close?.();
     const steps = shopCtl.current?.walkTo?.({ c: 4, r: 1 }) ?? -1;

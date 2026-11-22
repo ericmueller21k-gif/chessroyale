@@ -2322,6 +2322,51 @@ p {
 .mm-confirm .mm-confirm-text {
   font-size: 15px;
 }
+/* "You have a game in progress" (components/GameInProgress.tsx, step 2): the confirm's card, centered, over every screen (the town's
+   layers included), the boss's face over his name and your move number, Forfeit and Resume side by side. */
+.gp-scrim {
+  z-index: 72;
+}
+.gp-card {
+  justify-items: center;
+  text-align: center;
+}
+.gp-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+.gp-boss {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.gp-face {
+  width: 56px;
+  height: 56px;
+  image-rendering: pixelated;
+}
+.gp-line {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.gp-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.3;
+}
+.gp-card .mm-confirm-actions {
+  width: 100%;
+}
+.mm-btn.gp-resume {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
 @media (prefers-reduced-motion: reduce) {
   .mm-scrim,
   .mm-panel,

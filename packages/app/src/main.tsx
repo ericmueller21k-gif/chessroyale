@@ -9,6 +9,7 @@ import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
 import { SiteGateNotice } from "./components/SiteGateNotice.tsx";
 import { SearchBar } from "./components/SearchBar.tsx";
+import { GameInProgress } from "./components/GameInProgress.tsx";
 import { startStatus } from "./status.ts";
 import { hapticsDebug } from "./haptics.ts";
 import { setUpInstall, sizeAppWindow } from "./install.ts";
@@ -81,7 +82,7 @@ hapticsDebug();
 watchShell();
 // (A banned account sees fair play's ban screen and nothing else, on every URL: no menus, no town, no solo, no chat. Otherwise the
 // feedback sheet sits over any screen, from the match menu or Settings, and the maintenance banner, at the top, with the 1 v 1
-// search's bar under it while you browse. A render error anywhere shows "Something went wrong" instead of a blank page.)
+// search's bar under it while you browse, and a solo boss battle kept on this device asks Resume or Forfeit. A render error anywhere shows "Something went wrong" instead of a blank page.)
 function Root() {
   if (useBanned()) return <BanScreen />;
   return (
@@ -91,6 +92,8 @@ function Root() {
       <MaintenanceBanner />
       <SiteGateNotice />
       <SearchBar />
+      {/* (A solo boss battle kept on this device: Resume or Forfeit, over any screen; step 2, Nov 22.) */}
+      <GameInProgress />
     </ErrorBoundary>
   );
 }

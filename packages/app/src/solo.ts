@@ -26,6 +26,7 @@ import { testParams, timingOnDevice } from "./test-switches.ts";
 import { gardenClock, setGardenSource } from "./garden-clock.ts";
 import { chunk } from "./stale.ts";
 import { type FloorPlay, type KeptGame, floorOutcome, leaveIsFree } from "./tower.ts";
+import type { SoloKeep } from "./solo-kept.ts";
 
 export const HUMAN = "you";
 /** A solo match's result, as its result screen shows it (and SoloMatch.decided, from the moment it's known). */
@@ -256,6 +257,9 @@ export class SoloMatch implements GameView {
 
   private emit() {
     this.noteEnded();
+    // (A solo boss battle kept on the device (step 2): decided or resigned, it's no longer a game to resume. Its result, if real, is
+    // kept by account.ts from this moment until the server has it.)
+    if (this.kept && this.decided) this.kept.end();
     this.listeners.forEach((l) => l());
   }
 
@@ -307,6 +311,13 @@ export class SoloMatch implements GameView {
       return;
     }
     if (!this.runner.stageComplete()) return;
+    // (Chandy's Dodge won (his second hit): its kill plays on its own timer (armDodge, about 7.5 s), never the round's: its end now, which
+    // ends the battle (the review of #881, N4). Only once Dodge is over: a round is never closed early.)
+    if (this.dodge && dodgeOver(this.runner.state.boss?.powers?.chandy?.dodge)) {
+      if (this.timer) clearTimeout(this.timer);
+      this.timer = null;
+      return this.dodgeStep();
+    }
     if (this.phase.kind === "reveal") this.skipReveal();
     if (this.stopped || this.decided || this.roundTimer === null || this.timer !== this.roundTimer) return;
     clearTimeout(this.roundTimer);
@@ -374,6 +385,15 @@ export class SoloMatch implements GameView {
 
   /** A Battle Tower floor: its run (the strip, the result's buttons) and the floor kept on this device after every step. */
   tower: FloorPlay | null = null;
+  /**
+   * A solo boss battle kept on this device after every step, as a floor is (step 2, Resume / Forfeit: solo-kept.ts; App.tsx sets it for
+   * Boss alone and a Solo raid, never a test game or the Hidden Boss).
+   */
+  kept: SoloKeep | null = null;
+  /** What keeps this game on the device after every step: a tower floor's, or a solo boss battle's. */
+  private get keeper(): Pick<SoloKeep, "keep" | "keepTurn"> | null {
+    return this.tower ?? this.kept;
+  }
 
   /**
    * The floor's game kept on the device as it stands now, so a reload rejoins it here: as each round begins (nextRound) and as each
@@ -381,10 +401,11 @@ export class SoloMatch implements GameView {
    * it to draw another (audit 2, finding 2). With it, the time you've used on this turn (turnUsedMs).
    */
   private keepFloor() {
-    if (!this.tower || this.stopped || !this.runner?.boss || this.runner.boss.result) return;
+    const keeper = this.keeper;
+    if (!keeper || this.stopped || !this.runner?.boss || this.runner.boss.result) return;
     this.watchAway();
     const turnMs = this.turnUsedMs();
-    this.tower.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}) });
+    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}) });
   }
 
   /** The step just played shows for `ms`, then the next round: the floor kept first, so a reload rejoins after the step (keepFloor). */
@@ -423,12 +444,13 @@ export class SoloMatch implements GameView {
   }
   /** The page hidden (or closed) on your turn: its clock stops, and the time used so far is kept with the floor. */
   private goneAway() {
-    if (!this.tower || this.stopped || this.phase.kind !== "play" || this.awayAt) return;
+    const keeper = this.keeper;
+    if (!keeper || this.stopped || this.phase.kind !== "play" || this.awayAt) return;
     this.awayAt = Date.now();
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.cancelStall();
-    this.tower.keepTurn(this.turnUsedMs());
+    keeper.keepTurn(this.turnUsedMs());
   }
   /** Back on the page: your turn's clock goes on from where it stood (its start and deadline moved on by the time away). */
   private cameBack() {
@@ -459,6 +481,8 @@ export class SoloMatch implements GameView {
       clock: gardenClock,
     });
     this.moves = [...game.moves];
+    // (A Solo raid resumed: its bots in their seats, so its "again" is a Solo raid's.)
+    if (this.raidBots) this.players = [{ id: HUMAN, name: this.playerName, isBot: false, connected: true }, ...this.runner.state.players.filter((p) => p.isBot).map((p): LobbyPlayer => ({ id: p.id, name: p.name, isBot: true, connected: true }))];
     // (The time you'd used on your turn as you went: given back as used, nothing for the time away: keepFloor.)
     this.resumeTurnMs = game.turnMs ?? 0;
     this.begun = this.runner.boss ? this.runner.boss.crowdMoves > 0 || game.intro : false;
@@ -1694,8 +1718,8 @@ export class SoloMatch implements GameView {
       this.stall = { plan, timer: null };
       this.armStall();
     }
-    // (A tower floor's turn that begins while you're away (his reply came with the page hidden): its clock waits for you.)
-    if (this.tower && typeof document !== "undefined" && document.visibilityState === "hidden") this.goneAway();
+    // (A tower floor's turn (or a kept solo battle's) that begins while you're away (his reply came with the page hidden): its clock waits for you.)
+    if (this.keeper && typeof document !== "undefined" && document.visibilityState === "hidden") this.goneAway();
   }
 
   /**
@@ -1815,6 +1839,9 @@ export class SoloMatch implements GameView {
     if (record) this.moves.push(darkOut && record.move === null && !record.abstained ? { ...record, darkOut: true } : record);
     // Crowd 50 v 50: your miss past CrowdMisses.allowed (the 4th in the game) removes you for being away, as resigning.
     if (report.away?.includes(HUMAN)) return this.removeAway();
+    // (A boss battle kept on the device (a floor, a solo battle): kept with your move in, so a reload before his reply never takes it
+    // back; his reply is then played on the rejoin, at its round's start.)
+    this.keepFloor();
     if (inFinal) return this.showFinalMove(report);
     if (this.alone && !mine.king && move !== null) {
       // Alone, your move is already on the board: no reveal, straight to the boss's reply. Only a Last Stand stops

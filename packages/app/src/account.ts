@@ -1,6 +1,7 @@
 import { ASK_AGE_LINE, CHAT_MOD, FRONT_DOOR, SOLO_ABANDON, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
 import { loadStep } from "./loadbar.ts";
+import { clearKeptSolo, keptReal, keptSoloFor, keptStale, loadKeptSolo, type KeptSolo } from "./solo-kept.ts";
 import { gateAnswered, noteSiteReached, noteSiteSignedOut, onSiteGate, siteSignedOut } from "./site-gate.ts";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
@@ -48,6 +49,8 @@ export interface Profile {
   chatOn?: boolean;
   /** Your XP (Nov 9): your level and its ring come from it (core's levelOf). Missing from an older server. */
   xp?: number;
+  /** Only when the read named the game this device keeps (`resume`, step 2): whether it's still your open solo game. */
+  soloOpen?: boolean;
 }
 
 /** A moderator's warning or chat ban, shown to you once (components/ChatNotice.tsx). */
@@ -87,6 +90,11 @@ export interface AccountState {
    * on "Loading…" for good). The app plays on without an account meanwhile (`config.accounts` false).
    */
   failed: AccountFailure | null;
+  /**
+   * The solo boss battle this device keeps for this account, still open on the server as the load checked it (step 2, Nov 22): its card
+   * offers Resume or Forfeit (components/GameInProgress.tsx). Null: none, another account's, stale, played in another tab, or answered.
+   */
+  soloKept: KeptSolo | null;
 }
 
 /**
@@ -112,7 +120,7 @@ export type AgeAnswer = "ok" | "under";
  */
 export type PendingSignIn = { kind: "email"; email: string; code: string } | { kind: "google"; next: string };
 
-let state: AccountState = { config: null, profile: null, age: null, ageNote: null, pending: null, signInNote: null, failed: null };
+let state: AccountState = { config: null, profile: null, age: null, ageNote: null, pending: null, signInNote: null, failed: null, soloKept: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<AccountState>) => {
   state = { ...state, ...patch };
@@ -242,6 +250,9 @@ export async function loadAccount(name?: string): Promise<void> {
   const q = new URLSearchParams();
   if (name && !storedYoung) q.set("name", name);
   if (!unsent && !soloLiveOnDevice()) q.set("settle", "1");
+  // (A solo boss battle this device keeps (step 2): named, so the settle leaves it be unless stale, and the answer says if it's open.)
+  const kept = loadKeptSolo();
+  if (kept && !keptStale(kept)) q.set("resume", kept.game);
   const me = profileFrom(meUrl(q));
   me.catch(() => undefined);
   try {
@@ -251,7 +262,8 @@ export async function loadAccount(name?: string): Promise<void> {
     if (young) rememberTooYoung();
     if (!config.accounts) return void (set({ failed: null }), loadStep("last"));
     loadStep("account");
-    set({ profile: await me, failed: null });
+    const { soloOpen, ...profile } = await me;
+    set({ profile, failed: null, soloKept: keptOnLoad(kept, profile.user.id, soloOpen) });
     loadStep("last");
     if (unsent) void sendUnsentResult(true);
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
@@ -265,6 +277,68 @@ export async function loadAccount(name?: string): Promise<void> {
   }
 }
 let lastName: string | undefined;
+
+/**
+ * The kept solo battle as the load found it (step 2): this account's, not stale, still open on the server (`soloOpen`), and not being
+ * played in another tab of this device right now (account.ts's live note, SOLO_ABANDON.liveMinutes): offered on its card. A stale one
+ * (the server records it as left) or this account's that isn't open (recorded, finished, or replaced by another device's start) is
+ * dropped. Another account's stays on the device, never offered.
+ */
+function keptOnLoad(kept: KeptSolo | null, user: string, open: boolean | undefined): KeptSolo | null {
+  if (!kept) return null;
+  if (keptStale(kept) || (kept.user === user && open === false)) {
+    clearKeptSolo(kept.game);
+    return null;
+  }
+  return kept.user === user && open === true && !soloLiveElsewhere(kept.game) ? kept : null;
+}
+
+/** The kept solo battle answered (Resume or Forfeit) or offered again (Boss Battle opened: `k`): its card shows while this is set. */
+export function offerKeptSolo(k: KeptSolo | null): void {
+  if (state.soloKept !== k) set({ soloKept: k });
+}
+
+/**
+ * Boss Battle opened with no match on (step 2): the kept game for this account offered again, as at the load (not stale, not being played
+ * in another tab). Resume checks it with the server.
+ */
+export function reofferKeptSolo(): void {
+  const k = keptSoloFor(state.profile?.user.id);
+  offerKeptSolo(k && !soloLiveElsewhere(k.game) ? k : null);
+}
+
+/**
+ * Resume's check (step 2): the kept game is still your open game on the server (a profile read naming it): another device's start since
+ * the load records or replaces it. No answer (offline): yes, played on here (its result goes when it can).
+ */
+export async function keptSoloOpen(k: KeptSolo): Promise<boolean> {
+  try {
+    const p = await api<Profile>(meUrl(new URLSearchParams({ resume: k.game })));
+    const { soloOpen, ...profile } = p;
+    set({ profile });
+    if (soloOpen === false) clearKeptSolo(k.game);
+    return soloOpen !== false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Forfeit (step 2): the kept game given up. Past SOLO_ABANDON.minMoves it's recorded as a loss now (POST /api/xp/solo/forfeit, with its
+ * facts in case its 10-move mark never landed); under it, just dropped, nothing recorded. Dropped on the device at once either way: a
+ * forfeit that gets no answer leaves a real game on the server, recorded as left at the next load or start.
+ */
+export async function forfeitKeptSolo(k: KeptSolo): Promise<void> {
+  clearKeptSolo(k.game);
+  if (state.soloKept?.game === k.game) set({ soloKept: null });
+  if (!keptReal(k)) return;
+  try {
+    await api("/api/xp/solo/forfeit", { method: "POST", body: JSON.stringify({ game: k.game, real: k.facts }) });
+    if (state.profile) set({ profile: await api<Profile>(meUrl()) });
+  } catch {
+    // (Recorded as left at the next load or start instead.)
+  }
+}
 
 /** Try again (Profile's and Settings' button, and back online after failing offline): the account's load once more. */
 export function retryAccount(): Promise<void> {
@@ -792,6 +866,16 @@ export function endSoloLive(game: string): void {
     if ((JSON.parse(localStorage.getItem(SOLO_LIVE_KEY) ?? "null") as { game?: string } | null)?.game === game) localStorage.removeItem(SOLO_LIVE_KEY);
   } catch {
     // No storage.
+  }
+}
+/** `game` is being played in another tab of this device (its live note, under SOLO_ABANDON.liveMinutes old; never this tab's own). */
+function soloLiveElsewhere(game: string, now = Date.now()): boolean {
+  if (liveHere === game) return false;
+  try {
+    const kept = JSON.parse(localStorage.getItem(SOLO_LIVE_KEY) ?? "null") as { game?: unknown; at?: unknown } | null;
+    return kept?.game === game && typeof kept.at === "number" && now - kept.at < SOLO_ABANDON.liveMinutes * 60_000;
+  } catch {
+    return false;
   }
 }
 /** A real solo game is being played on this device: in this tab, or in another whose last turn was under SOLO_ABANDON.liveMinutes ago. */
