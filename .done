@@ -1,0 +1,14 @@
+solo-resume-fixes-3: done. Branch claude/solo-resume; PR #885's third review fixed at its cause, all pushed:
+  d47bdac keep before show: a kept battle keeps in show() (every set and emit) when the kept game changes, and at each beat a timed
+  moment shows by the clock (100 ms ahead); KeptGame.moment for every timed moment (the Dodge, the Rush, Lights out, carried on by a
+  rejoin); the scattered keeps and their stopped checks gone (a stopped match's searches never sent, its timers cleared); EN1
+  (resumed extras until the first round), EN2 (resign keeps first); new rejoins: the dark's move due, a strike due.
+  c70441a tests: the walk (Boss alone and a Solo raid x Dodge, Rush, Lights out, with the King's call, a power-up, the bots' picks),
+  E1 flipped, EN1, EN2, the dark's move, the strike; DN4's words. 0a079f4 the guard around the server re-check; N2 named.
+  90f1e7a docs: LESSONS ("Three review rounds, one cause"), its story, bosses.md rule, accounts.md, the decision note.
+Local: typecheck clean; app+server unit 299 files, 4,305 passed; e2e phone xp + battle-tower 22 passed (11.0 min); @perf phone 11
+passed, 4 failed (two DOM-growth checks that fail the same at 6f5dfb7, and Chess Town's load time: not this round's). Measured: a Solo
+raid turn ~56 updates, 4 writes, 46 KB; at 6x CPU 0.3 ms a check, 1.4 ms a write.
+Changed checks (solo-resume.test.ts, none an eric.md guard): the two Dodge tests' dodgeMs/dodgeVote -> moment.ms/mine; the takeover
+test's keepTurn -> keep; 31 -> 42 tests. PR body: "Review fixes, round 3" appended in .pr-body.md (restored from cd57f419).
+Calls: the reveals keep 100 ms ahead (as at the reveal); the strike check only on a rejoin's first round; N2 left as known.
