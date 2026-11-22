@@ -57,6 +57,9 @@ describe("a cut player in a solo 50 v 50 (the rework, C3)", () => {
     const m = new SoloMatch([engine], "Ann", settings);
     m.start();
     await toYourCut(m);
+    // (Out, nothing is decided yet: your team can still win the game, so a page closed now is a game left. Unlike Classic's cut:
+    // solo-decided.test.ts.)
+    expect(m.decided).toBeNull();
     // (The break, then the rest at once: well inside a minute of the game's clock, never a turn to watch.)
     const kinds = await seen(m, 60_000);
     expect(m.phase.kind).toBe("results");

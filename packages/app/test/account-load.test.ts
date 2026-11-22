@@ -348,6 +348,31 @@ describe("the account's load and a solo game left (SOLO_ABANDON, Nov 22)", () =>
     expect(d.kept()).toBe(false);
   });
 
+  it("a new game's result taking the slot sends another game's kept one first, even one whose post may be on its way (the second delta review, N2): else it's overwritten, and that game has no result at all", async () => {
+    const NEXT = "0123456789abcdef09";
+    const next = { mode: "boss" as const, placement: 2, players: 1, evalBar: true };
+    const results = (d: { calls: string[] }) => d.calls.filter((c) => c.startsWith("/api/results"));
+    for (const how of ["decided", "posted"] as const) {
+      let d = device({});
+      await loadAccount();
+      // (Its post went just now and never landed: the load and a start sent nothing, naming its game instead.)
+      d = device(kept("u", 0));
+      if (how === "decided") keepSoloResult(NEXT, next);
+      else void recordSoloResult({ ...next, game: NEXT });
+      await vi.waitFor(() => expect(results(d)).toHaveLength(how === "decided" ? 1 : 2));
+      expect(results(d)[0], how).toBe(resent);
+      await new Promise((r) => setTimeout(r, 0));
+      // (Its answer leaves the new game's be: kept as it was decided, or taken off on its own post's answer.)
+      if (how === "decided") expect(JSON.parse(d.store.get("brc.soloUnsent")!)).toEqual({ user: "u", result: { ...next, game: NEXT } });
+      else await vi.waitFor(() => expect(d.kept()).toBe(false));
+    }
+    // (The same game's result again: nothing sent first.)
+    const d = device(kept("u", 0));
+    keepSoloResult(GAME, { mode: "boss", placement: 1, players: 1, evalBar: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(d.calls).toEqual([]);
+  });
+
   it("another account's kept result: dropped, never sent as this one's, so the next load settles again", async () => {
     const other = device(kept("someone else"));
     await loadAccount();

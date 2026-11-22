@@ -166,6 +166,29 @@ describe("a solo game's result, known as it's decided (SOLO_ABANDON)", () => {
     m.dispose();
   }, 60_000);
 
+  it("Classic, out at a cut: your place is your result from the cut screen on (a page closed on \"You're out\" keeps it), the same the result screen then shows", async () => {
+    // (One move a stage; you never pick, so your miss sinks you to the first cut.)
+    const m = new SoloMatch([quick], "Ann", { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, stageRounds: [] } as Settings);
+    const heard: [string, Results | null][] = [];
+    m.subscribe(() => heard.push([m.phase.kind, m.decided]));
+    m.start();
+    await until(m, () => m.phase.kind === "stageBreak" && m.phase.youOut, 500);
+    const cut = heard.findIndex(([k]) => k === "stageBreak");
+    expect(heard.slice(0, cut).every(([, d]) => d === null)).toBe(true);
+    const decided = m.decided;
+    expect(heard[cut]![1]).toBe(decided);
+    expect(decided).toMatchObject({ kind: "results", placement: m.you.placement, youWon: false });
+    expect(decided!.placement).toBeGreaterThan(m.totalPlayers - DEFAULT_SETTINGS.knockoutsPerStage[0]!);
+    // (The page going there changes nothing; "See how it ends": the rest played out, your place as it was.)
+    m.endOnHide();
+    expect(m.phase.kind).toBe("stageBreak");
+    m.continueFromBreak();
+    await until(m, () => m.phase.kind === "results", 500);
+    expect(m.phase).toMatchObject({ placement: decided!.placement, youWon: false });
+    expect(m.decided).toBe(m.phase);
+    m.dispose();
+  }, 60_000);
+
   type Inside = {
     runner: { state: Parameters<typeof finishBoss>[0]; isOver(): boolean; stageComplete(): boolean; afterFinalTurn(): string[]; finishFinal(): void; finalView(): unknown };
     createRunner(): void;
