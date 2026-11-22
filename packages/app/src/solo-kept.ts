@@ -1,6 +1,6 @@
 import { SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
 import type { SoloRealFacts } from "./account.ts";
-import type { KeptGame } from "./tower.ts";
+import { readKeptGame, type KeptGame } from "./tower.ts";
 
 /**
  * A solo boss battle kept on this device so it can be resumed after a reload (Eric, Nov 22, step 2: "You have a game in progress,
@@ -52,8 +52,8 @@ export function readKeptSolo(text: string | null): KeptSolo | null {
   const k = v as Partial<KeptSolo> | null;
   if (!k || typeof k !== "object" || k.v !== 1 || typeof k.user !== "string" || typeof k.game !== "string" || typeof k.boss !== "string") return null;
   if (typeof k.at !== "number" || !Number.isFinite(k.at) || !k.settings || typeof k.settings !== "object" || !k.facts || typeof k.facts !== "object") return null;
-  const g = k.kept as Partial<KeptGame> | undefined;
-  if (!g || typeof g !== "object" || !g.snapshot || typeof g.snapshot !== "object" || !g.snapshot.state || !Array.isArray(g.snapshot.boards) || !Array.isArray(g.moves)) return null;
+  const kept = readKeptGame(k.kept);
+  if (!kept) return null;
   return {
     v: 1,
     user: k.user,
@@ -64,7 +64,7 @@ export function readKeptSolo(text: string | null): KeptSolo | null {
     bots: k.bots === true,
     boss: k.boss,
     facts: k.facts,
-    kept: { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}) },
+    kept,
     ...(typeof k.tab === "string" ? { tab: k.tab } : {}),
   };
 }

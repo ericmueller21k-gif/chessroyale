@@ -4,6 +4,7 @@ import { legalMoves, type UciEngine } from "@chessroyale/chess";
 import { KEPT_ELSEWHERE, KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
+import { readKept } from "../src/tower.ts";
 
 /**
  * Step 2 of solo games left (Eric, Nov 22: "when you come back to Boss Battle with a game in progress: You have a game in progress,
@@ -21,6 +22,16 @@ const engine = {
   scoreMoves: async (_fen: string, moves: string[]) => moves.map((move) => ({ move, expected: 0.5 })),
   topMovesAt: async (fen: string) => legalMoves(fen).slice(0, 1).map((move) => ({ move, expected: 0.5 })),
   playAtElo: async (fen: string) => legalMoves(fen)[0]!,
+} as unknown as UciEngine;
+
+/** The same, its answers `slow` ms late (a phone's engine, or the server's recheck): a move scored live waits that long. */
+let slow = 0;
+const later = <T>(v: T): Promise<T> => (slow ? new Promise((r) => setTimeout(() => r(v), slow)) : Promise.resolve(v));
+const slowEngine = {
+  topMoves: async (fen: string, n: number) => later(legalMoves(fen).slice(0, n).map((move) => ({ move, expected: 0.5 }))),
+  scoreMoves: async (_fen: string, moves: string[]) => later(moves.map((move) => ({ move, expected: 0.5 }))),
+  topMovesAt: async (fen: string) => later(legalMoves(fen).slice(0, 1).map((move) => ({ move, expected: 0.5 }))),
+  playAtElo: async (fen: string) => later(legalMoves(fen)[0]!),
 } as unknown as UciEngine;
 
 const GAME = "0123456789abcdef01";
@@ -48,15 +59,15 @@ const pick = (m: SoloMatch) => {
 };
 
 /** A solo boss battle as the app starts it (App.tsx keepSolo): kept after every step once the server's ids are in. */
-function battle(settings: Settings, bots = false, at = Date.now()): SoloMatch {
-  const m = new SoloMatch([engine], "Ann", settings, false, bots);
+function battle(settings: Settings, bots = false, at = Date.now(), engines = [engine]): SoloMatch {
+  const m = new SoloMatch(engines, "Ann", settings, false, bots);
   m.kept = new SoloKeep({ at, bots, settings: () => m.settings, facts: () => FACTS, boss: () => m.runner?.boss?.id ?? null });
   m.kept.ready("u", GAME, "battle1");
   return m;
 }
 /** The kept game resumed as the app's Resume does (App.tsx resumeKept). */
-function resumed(k: KeptSolo): SoloMatch {
-  const r = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...k.settings }, false, k.bots);
+function resumed(k: KeptSolo, engines = [engine]): SoloMatch {
+  const r = new SoloMatch(engines, "Ann", { ...DEFAULT_SETTINGS, ...k.settings }, false, k.bots);
   r.kept = new SoloKeep({ at: k.at, bots: k.bots, settings: () => r.settings, facts: () => k.facts, boss: () => r.runner?.boss?.id ?? null });
   r.kept.ready(k.user, k.game, k.battle);
   r.resume(k.kept);
@@ -160,6 +171,45 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     expect(board(r).history.slice(0, h0 + 1)).toEqual(k.kept.snapshot.boards[0]!.history);
     expect(ownMoves(r.moves)).toBe(1);
     r.dispose();
+  }, 120_000);
+
+  // (The review of #885, I2: kept only after the judge's answer, so a reload while your move was scored took it back.)
+  it("kept with your move as it's accepted, before it's scored: a reload while the judge thinks plays that move on the rejoin", async () => {
+    slow = 0;
+    const m = battle({ ...ALONE, bossId: "gingerbread", bossPowerTest: undefined } as Settings, false, Date.now(), [slowEngine]);
+    m.start();
+    await until(m, () => yourTurn(m), "your first turn");
+    pick(m);
+    await until(m, () => yourTurn(m) && m.moves.length === 1, "your second turn");
+    const h1 = board(m).history.length;
+    const choices = m.runner.crowdAllowed() ?? legalMoves(board(m).fen);
+    // (A move outside the judge's top moves, cached at the turn's start: scored now, for 2 s.)
+    slow = 2_000;
+    const mine = choices.at(-1)!;
+    await step(1_500);
+    m.submit(mine);
+    await step(300);
+    expect(m.phase.kind).toBe("scoring");
+    const k = loadKeptSolo()!;
+    expect(k.kept.pending).toMatchObject({ move: mine });
+    expect(k.kept.pending!.thinkMs).toBeGreaterThanOrEqual(1_500);
+    m.dispose();
+    const r = resumed(k, [slowEngine]);
+    // (Once his brain is back, straight to its scoring, the judge slow again: another move tried meanwhile isn't taken.)
+    await until(r, () => r.phase.kind === "scoring", "the kept move scored, resumed");
+    expect((r.phase as { move: string | null }).move).toBe(mine);
+    r.submit(choices.at(-2)!);
+    slow = 0;
+    await until(r, () => yourTurn(r) && r.moves.length === 2, "your third turn, resumed");
+    expect(r.moves[1]!.move).toBe(mine);
+    expect(board(r).history.slice(0, h1 + 1)).toEqual([...board(m).history.slice(0, h1), board(r).history[h1]]);
+    expect(board(r).history.length).toBe(h1 + 2);
+    // (Kept again with nothing pending once it's scored.)
+    expect(loadKeptSolo()!.kept.pending).toBeUndefined();
+    r.dispose();
+    // A Battle Tower floor's kept game carries it too.
+    const floor = readKept(JSON.stringify({ v: 1, fight: "f", floor: 1, bosses: ["hopper"], settings: {}, beaten: [], game: k.kept }));
+    expect(floor!.game!.pending).toEqual(k.kept.pending);
   }, 120_000);
 
   it("a Solo raid (bots in the crowd): kept with the crowd's move in from its reveal; resumed the same, its bots back in their seats (its Again is a Solo raid's)", async () => {

@@ -400,14 +400,15 @@ export class SoloMatch implements GameView {
   /**
    * The floor's game kept on the device as it stands now, so a reload rejoins it here: as each round begins (nextRound) and as each
    * step of the bosses' turn has played (nextRoundIn: his move, each power's step), so a reload rejoins after his reply, never before
-   * it to draw another (audit 2, finding 2). With it, the time you've used on this turn (turnUsedMs).
+   * it to draw another (audit 2, finding 2). With it, the time you've used on this turn (turnUsedMs), and your move as it's accepted,
+   * before it's scored (`pending`: score).
    */
-  private keepFloor() {
+  private keepFloor(pending?: KeptGame["pending"]) {
     const keeper = this.keeper;
     if (!keeper || this.stopped || !this.runner?.boss || this.runner.boss.result) return;
     this.watchAway();
     const turnMs = this.turnUsedMs();
-    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}) });
+    keeper.keep({ snapshot: this.runner.snapshot(), moves: this.moves, intro: this.bossIntroDone, ...(turnMs > 0 ? { turnMs } : {}), ...(pending ? { pending } : {}) });
   }
 
   /** The step just played shows for `ms`, then the next round: the floor kept first, so a reload rejoins after the step (keepFloor). */
@@ -485,8 +486,10 @@ export class SoloMatch implements GameView {
     this.moves = [...game.moves];
     // (A Solo raid resumed: its bots in their seats, so its "again" is a Solo raid's.)
     if (this.raidBots) this.players = [{ id: HUMAN, name: this.playerName, isBot: false, connected: true }, ...this.runner.state.players.filter((p) => p.isBot).map((p): LobbyPlayer => ({ id: p.id, name: p.name, isBot: true, connected: true }))];
-    // (The time you'd used on your turn as you went: given back as used, nothing for the time away: keepFloor.)
-    this.resumeTurnMs = game.turnMs ?? 0;
+    // (The time you'd used on your turn as you went: given back as used, nothing for the time away: keepFloor. Your move kept as it was
+    // accepted, still being scored then: played as that turn's move, at its own time (I2).)
+    this.resumeTurnMs = game.pending ? game.pending.thinkMs : (game.turnMs ?? 0);
+    this.pendingMove = game.pending ?? null;
     this.begun = this.runner.boss ? this.runner.boss.crowdMoves > 0 || game.intro : false;
     this.bossIntroDone = game.intro;
     if (game.intro) this.startBrain(() => this.nextRound());
@@ -1628,8 +1631,14 @@ export class SoloMatch implements GameView {
     return v.playing ? `${v.won} of ${v.of} won` : "";
   }
 
+  /** A resumed game's move, accepted and still being scored as it was kept (KeptGame.pending): played as its turn begins (nextRound). */
+  private pendingMove: KeptGame["pending"] | null = null;
+
   private nextRound() {
     this.keepFloor();
+    // (Only the turn the game was kept on: its human turn comes next, with nothing played first.)
+    const pending = this.pendingMove;
+    this.pendingMove = null;
     if (this.runner.isOver()) return this.finish();
     // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
     if (this.runner.endGameIfOver()) return this.finish();
@@ -1701,8 +1710,9 @@ export class SoloMatch implements GameView {
     // (Wrangler's showdown may follow your move: this device scouts line-ups while you think.)
     this.scoutShowdown();
     if (!this.runner.boardOf(HUMAN)) return this.watchTurn();
-    // The move clock starts after a short settling-in countdown on the new board (alone, at once: nothing to settle).
-    const intro = this.alone ? 0 : this.settings.boardIntroSeconds * 1000;
+    // The move clock starts after a short settling-in countdown on the new board (alone, at once: nothing to settle; nor for a move kept
+    // as it was accepted, played at once: I2).
+    const intro = this.alone || pending ? 0 : this.settings.boardIntroSeconds * 1000;
     this.progress.start(this.runner.botThinkTimes(), intro);
     this.startLive(Date.now() + intro, this.runner.botThinkTimes());
     const board = this.runner.boardOf(HUMAN)!;
@@ -1712,7 +1722,14 @@ export class SoloMatch implements GameView {
     this.playStartedAt = Date.now() + intro - used;
     this.hint = null;
     const allowed = this.runner.allowedMsFor(HUMAN);
-    this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
+    const play: Phase = { kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() };
+    // (Resumed with your move kept as it was accepted (I2): it's this turn's move, scored at once; the turn never shows open for another.)
+    if (pending) {
+      this.phase = play;
+      if (pending.powerUp) this.hint = [];
+      return void this.score(pending.move, pending.darkOut);
+    }
+    this.set(play);
     this.timer = setTimeout(() => this.submit(null), intro + allowed - used + this.settings.lateGraceMs);
     // (Dash's clock tap or stall skit, each once a battle: his beats on this move's clock, if one comes on this move.)
     const plan = this.runner.stallPlan(HUMAN);
@@ -1823,6 +1840,9 @@ export class SoloMatch implements GameView {
       if (move) this.live.mine = { playerId: HUMAN, move, at: now };
       this.live.rushFrom = now;
     }
+    // (A boss battle kept on the device (a floor, a solo battle): kept with your move as it's accepted, before the judge's answer, so a
+    // reload while it's scored never takes it back; the rejoin scores it again (the review of #885, I2).)
+    this.keepFloor({ move, thinkMs, ...(usedPowerUp ? { powerUp: true } : {}), ...(darkOut ? { darkOut: true } : {}) });
     this.set({ kind: "scoring", board, move });
     const t = performance.now();
     // Score while the bots still thinking finish (they light up the leaderboard), then reveal.

@@ -200,6 +200,11 @@ export interface KeptGame {
    * and no time passes while you're away (the director's call on audit 2's finding 2). Unset: none used, or not your turn.
    */
   turnMs?: number;
+  /**
+   * Your move as it was accepted, kept before it's scored (the judge's await), so a reload while it's scored can't take it back: a rejoin
+   * plays it as that turn's move (the review of #885, I2). Its time (`thinkMs`), a power-up used on it, Hollow's dark ending the turn.
+   */
+  pending?: { move: string | null; thinkMs: number; powerUp?: true; darkOut?: true };
 }
 
 /**
@@ -285,6 +290,15 @@ export function deviceId(): string {
   return device;
 }
 
+/** A kept game (a floor's, a solo battle's: solo-kept.ts) read back, or null when it isn't one. */
+export function readKeptGame(v: unknown): KeptGame | null {
+  const g = v as Partial<KeptGame> | null | undefined;
+  if (!g || typeof g !== "object" || !g.snapshot || typeof g.snapshot !== "object" || !(g.snapshot as Partial<RunnerSnapshot>).state || !Array.isArray((g.snapshot as Partial<RunnerSnapshot>).boards) || !Array.isArray(g.moves)) return null;
+  const p = g.pending;
+  const pending = p && typeof p === "object" && (p.move === null || typeof p.move === "string") && typeof p.thinkMs === "number" && Number.isFinite(p.thinkMs) ? { move: p.move, thinkMs: Math.max(0, p.thinkMs), ...(p.powerUp ? { powerUp: true as const } : {}), ...(p.darkOut ? { darkOut: true as const } : {}) } : null;
+  return { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}), ...(pending ? { pending } : {}) };
+}
+
 /** A kept floor read back, or null when there's none or it isn't one (another version, a damaged entry). */
 export function readKept(text: string | null): KeptFloor | null {
   if (!text) return null;
@@ -298,8 +312,7 @@ export function readKept(text: string | null): KeptFloor | null {
   if (!k || typeof k !== "object" || k.v !== 1 || typeof k.fight !== "string" || !Number.isInteger(k.floor) || !Array.isArray(k.bosses) || !k.bosses.every((b) => typeof b === "string")) return null;
   if (!k.settings || typeof k.settings !== "object" || !Array.isArray(k.beaten)) return null;
   if (k.done !== undefined && !["won", "lost", "drawn", "left"].includes(k.done)) return null;
-  const g = k.game;
-  const game = g && typeof g === "object" && g.snapshot && typeof g.snapshot === "object" && (g.snapshot as Partial<RunnerSnapshot>).state && Array.isArray((g.snapshot as Partial<RunnerSnapshot>).boards) && Array.isArray(g.moves) ? { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}) } : undefined;
+  const game = readKeptGame(k.game);
   return {
     v: 1,
     fight: k.fight,
