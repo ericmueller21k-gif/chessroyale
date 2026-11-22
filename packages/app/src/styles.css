@@ -2343,10 +2343,10 @@ p {
   justify-items: center;
   gap: 6px;
 }
-.gp-face {
-  width: 56px;
-  height: 56px;
-  image-rendering: pixelated;
+/* (Over .boss-portrait's full width, which comes later in this file.) */
+.gp-boss .gp-face {
+  width: 80px;
+  height: auto;
 }
 .gp-line {
   font-size: 16px;

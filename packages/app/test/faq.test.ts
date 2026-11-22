@@ -713,9 +713,10 @@ describe("the FAQ: leaving or resigning", () => {
     expect(faqAnchors(faqPage())).toContain("leaving");
   });
 
-  it("says a solo game left after SOLO_ABANDON.minMoves of your moves counts as a loss (Nov 22)", () => {
-    expect(text()).toContain(`Leaving a solo game after ${SOLO_ABANDON.minMoves} moves counts as a loss too (closing the app, a reload).`);
-    expect(text({ ...FAQ_DEFAULTS, soloAbandon: { minMoves: 12 } })).toContain("Leaving a solo game after 12 moves counts as a loss too");
+  it("says a solo game left after SOLO_ABANDON.minMoves of your moves counts as a loss, unless you come back and resume it (Nov 22, step 2)", () => {
+    expect(text()).toContain(`Leaving a solo game after ${SOLO_ABANDON.minMoves} moves counts as a loss, unless you come back and resume it.`);
+    expect(text()).toContain(`"You have a game in progress" offers Resume or Forfeit (a loss; under ${SOLO_ABANDON.minMoves} moves, nothing counts).`);
+    expect(text({ ...FAQ_DEFAULTS, soloAbandon: { minMoves: 12 } })).toContain("Leaving a solo game after 12 moves counts as a loss, unless");
   });
 });
 
