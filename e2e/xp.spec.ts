@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { Chess } from "chess.js";
 import { SOLO_ABANDON } from "@chessroyale/core";
 import { test, bossAloneFromHome, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
 
@@ -433,4 +434,54 @@ test(`a solo battle left mid-game: the reload's card, "You have a game in progre
   await bossAloneNow(page, log);
   expect(await recent()).toHaveLength(1);
   expect(new Set(marks.map((m) => m.game)).size).toBe(1);
+});
+
+/**
+ * The quickest way to lose a battle by mate, from a real position (no test switch: a test game is never kept): a move that lets the boss
+ * mate at once if there's one; else your king out (toward the middle); else an f- or g-pawn opening him up; else any.
+ */
+function loseFast(fen: string, allowed: readonly string[] | null): string {
+  const c = new Chess(fen);
+  const legal = c.moves({ verbose: true }).filter((m) => !allowed || allowed.includes(m.lan));
+  const letsMate = (m: (typeof legal)[number]) => {
+    c.move({ from: m.from, to: m.to, promotion: m.promotion });
+    const mate = c.moves({ verbose: true }).some((r) => {
+      c.move({ from: r.from, to: r.to, promotion: r.promotion });
+      const over = c.isCheckmate();
+      c.undo();
+      return over;
+    });
+    c.undo();
+    return mate;
+  };
+  const toMiddle = (m: (typeof legal)[number]) => Math.abs(Number(m.to[1]) - 4.5) < Math.abs(Number(m.from[1]) - 4.5);
+  return (legal.find(letsMate) ?? legal.find((m) => m.piece === "k" && toMiddle(m)) ?? legal.find((m) => m.piece === "p" && "fg".includes(m.from[0]!)) ?? legal.find((m) => m.piece === "k") ?? legal[0]!).lan;
+}
+
+test("a solo battle played to its end (lost by mate, not resigned): nothing kept, and Play again asks nothing (the review of #885, I4)", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const log = pageLog(page);
+  await page.goto("/?debug&boss=gingerbread");
+  await bossAloneNow(page, log);
+  const kind = () => page.evaluate(() => (window as any).match?.phase?.kind ?? null);
+  // (Your king walked into his mate: each turn the quickest loss on offer, until the result screen.)
+  for (let i = 0; i < 120 && (await kind()) !== "results"; i++) {
+    await expect.poll(kind, { timeout: 60_000 }).toMatch(/^(play|results)$/);
+    const s = await page.evaluate(() => {
+      const m = (window as any).match;
+      return m.phase.kind === "play" ? { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null, n: m.moves.length as number } : null;
+    });
+    if (!s) continue;
+    await submitMove(page, loseFast(s.fen, s.allowed), s.fen);
+    await expect.poll(async () => (await kind()) === "results" || (await page.evaluate(() => (window as any).match.moves.length)) > s.n, { timeout: 30_000 }).toBe(true);
+  }
+  await expect(page.locator(".results h1")).toBeVisible({ timeout: 60_000 });
+  expect(await ownSoFar(page)).toBeGreaterThan(0);
+  // Nothing kept on the device: the game is over.
+  expect(await page.evaluate(() => localStorage.getItem("brc.soloKept"))).toBeNull();
+  // Play again: no "Forfeit your game in progress?", straight into a new battle.
+  await page.getByRole("button", { name: "Play again" }).click();
+  await expect.poll(kind, { timeout: 60_000 }).toBe("play");
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(page.getByTestId("game-in-progress")).toHaveCount(0);
 });

@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
 import { legalMoves, type UciEngine } from "@chessroyale/chess";
-import { account, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo } from "../src/account.ts";
+import { account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
-import { SoloKeep, askForfeitFirst, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
+import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
 
 /**
  * Step 2 of solo games left (Eric, Nov 22: "when you come back to Boss Battle with a game in progress: You have a game in progress,
@@ -187,6 +187,24 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     r.dispose();
   }, 120_000);
 
+  // (The review of #885, I4: only a resign's end (emit) cleared it; a battle played to its end (set) stayed kept, and the next start
+  // asked "Forfeit your game in progress?" about the game just finished.)
+  for (const bossId of ["gingerbread", "hollow", "hopper"]) {
+    it(`played to its end on its own (not a resign), against ${bossId}: the kept game is gone by the result screen`, async () => {
+      const m = battle({ ...ALONE, bossId, bossPowerTest: undefined } as Settings);
+      m.start();
+      for (let i = 0; i < 6000 && m.phase.kind !== "results"; i++) {
+        if (yourTurn(m)) pick(m);
+        await step();
+      }
+      expect(m.phase.kind).toBe("results");
+      expect(ownMoves(m.moves)).toBeGreaterThan(0);
+      const k = loadKeptSolo();
+      expect(k ? `kept at move ${keptMoves(k)}, ${m.runner.boss?.result}` : null).toBeNull();
+      m.dispose();
+    }, 120_000);
+  }
+
   it("never the Hidden Boss (his forms and phase 2 aren't in the snapshot): his battle isn't kept", async () => {
     const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "recluse", bossHidden: true, bossFixedElo: 1600 } as Settings, false, true);
     // (As App.tsx's keepSolo: the boss's id only when it isn't him.)
@@ -316,6 +334,37 @@ describe("the card's answers and the load (step 2)", () => {
     // (None kept: no question.)
     expect(await askForfeitFirst("u")).toBe(true);
     expect(forfeitAsk()).toBeNull();
+  });
+
+  it("its game ended, its result kept unsent (I4): no card at the load, dropped, and that result sent", async () => {
+    const d = device(kept());
+    store.set("brc.soloUnsent", JSON.stringify({ user: "u", result: { placement: 1, players: 1, mode: "boss", won: true, game: GAME } }));
+    await loadAccount();
+    expect(account().soloKept).toBeNull();
+    expect(d.held()).toBe(false);
+    await vi.waitFor(() => expect(d.calls.filter((c) => c.startsWith("POST"))).toEqual([`POST /api/results ${JSON.stringify({ placement: 1, players: 1, mode: "boss", won: true, game: GAME, resent: true })}`]));
+  });
+
+  it("its game ended after the card was offered (its result kept unsent): Forfeit posts no loss over it, sends the result; no ask, no Resume", async () => {
+    const d = device(kept());
+    await loadAccount();
+    const card = account().soloKept!;
+    expect(card.game).toBe(GAME);
+    const unsent = JSON.stringify({ user: "u", result: { placement: 1, players: 1, mode: "boss", won: true, game: GAME } });
+    store.set("brc.soloUnsent", unsent);
+    // (Resume's check: not open, without asking the server.)
+    expect(await keptSoloOpen(card)).toBe(false);
+    expect(d.held()).toBe(false);
+    // (Kept again, as a stale copy might be: neither a start's question nor a Forfeit counts it as a game in progress.)
+    store.set("brc.soloKept", JSON.stringify(card));
+    store.set("brc.soloUnsent", unsent);
+    expect(await askForfeitFirst("u")).toBe(true);
+    expect(forfeitAsk()).toBeNull();
+    store.set("brc.soloKept", JSON.stringify(card));
+    await forfeitKeptSolo(card);
+    expect(d.held()).toBe(false);
+    expect(d.calls.some((c) => c.startsWith("POST /api/xp/solo/forfeit"))).toBe(false);
+    await vi.waitFor(() => expect(d.calls.some((c) => c.startsWith("POST /api/results"))).toBe(true));
   });
 
   it("Resume checks it with the server first: still open, resumed; recorded or replaced since the load, dropped", async () => {

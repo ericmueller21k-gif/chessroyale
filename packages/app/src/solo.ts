@@ -257,9 +257,6 @@ export class SoloMatch implements GameView {
 
   private emit() {
     this.noteEnded();
-    // (A solo boss battle kept on the device (step 2): decided or resigned, it's no longer a game to resume. Its result, if real, is
-    // kept by account.ts from this moment until the server has it.)
-    if (this.kept && this.decided) this.kept.end();
     this.listeners.forEach((l) => l());
   }
 
@@ -279,9 +276,14 @@ export class SoloMatch implements GameView {
    * your own result as it will be, your place fixed; who wins isn't known yet: placedInClassic.)
    */
   private noteEnded() {
-    if (this.ended || !this.runner || this.phase.kind === "results") return;
-    const g = this.phase2;
-    if (g ? g.outcome.decided : (this.runner.isOver() && !this.phase2Due()) || this.placedInClassic()) this.ended = g ? this.phase2Results() : this.results();
+    if (!this.ended && this.runner && this.phase.kind !== "results") {
+      const g = this.phase2;
+      if (g ? g.outcome.decided : (this.runner.isOver() && !this.phase2Due()) || this.placedInClassic()) this.ended = g ? this.phase2Results() : this.results();
+    }
+    // (A solo boss battle kept on the device (step 2): decided, resigned or played to its end, it's no longer a game to resume. Here,
+    // where every update passes (set and emit), not only a resign's: a battle that ended on its own stayed kept, and the next start
+    // asked to forfeit the game just finished (the review of #885, I4). Its result, if real, is kept by account.ts until sent.)
+    if (this.decided) this.kept?.end();
   }
 
   /**

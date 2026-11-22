@@ -1,7 +1,7 @@
 import { ASK_AGE_LINE, CHAT_MOD, FRONT_DOOR, SOLO_ABANDON, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
 import { loadStep } from "./loadbar.ts";
-import { clearKeptSolo, keptReal, keptSoloFor, keptStale, loadKeptSolo, type KeptSolo } from "./solo-kept.ts";
+import { askForfeit, clearKeptSolo, keptReal, keptSoloFor, keptStale, loadKeptSolo, type KeptSolo } from "./solo-kept.ts";
 import { gateAnswered, noteSiteReached, noteSiteSignedOut, onSiteGate, siteSignedOut } from "./site-gate.ts";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
@@ -286,12 +286,36 @@ let lastName: string | undefined;
  */
 function keptOnLoad(kept: KeptSolo | null, user: string, open: boolean | undefined): KeptSolo | null {
   if (!kept) return null;
-  if (keptStale(kept) || (kept.user === user && open === false)) {
+  // (Its result kept unsent: the game has ended (I4), and the load sends that result.)
+  if (keptStale(kept) || (kept.user === user && open === false) || unsentGame() === kept.game) {
     clearKeptSolo(kept.game);
     return null;
   }
   return kept.user === user && open === true && !soloLiveElsewhere(kept.game) ? kept : null;
 }
+
+/**
+ * `k`'s game has ended: its result is kept on this device, unsent (the review of #885, I4: a battle played to its end once stayed kept,
+ * and a Forfeit then posted a loss over a win still to be sent). Never offered, resumed or forfeited: dropped, and its result sent (not
+ * over a post still on its way: sendUnsentResult's wait).
+ */
+function keptEnded(k: Pick<KeptSolo, "game">): boolean {
+  if (unsentGame() !== k.game) return false;
+  clearKeptSolo(k.game);
+  void sendUnsentResult(true);
+  return true;
+}
+/** The kept game for this account (keptSoloFor: not stale), unless its game has ended (keptEnded). */
+function keptNow(user: string | null | undefined): KeptSolo | null {
+  const k = keptSoloFor(user);
+  return k && !keptEnded(k) ? k : null;
+}
+
+/**
+ * Before another solo game starts on this device (any solo mode, a Battle Tower floor): the kept game for this account, if any and not
+ * ended, asks first, "Forfeit your game in progress?" (solo-kept.ts askForfeit). True: none, or Forfeit; false: Cancel.
+ */
+export const askForfeitFirst = (user: string | null | undefined): Promise<boolean> => askForfeit(keptNow(user));
 
 /** The kept solo battle answered (Resume or Forfeit) or offered again (Boss Battle opened: `k`): its card shows while this is set. */
 export function offerKeptSolo(k: KeptSolo | null): void {
@@ -303,7 +327,7 @@ export function offerKeptSolo(k: KeptSolo | null): void {
  * in another tab). Resume checks it with the server.
  */
 export function reofferKeptSolo(): void {
-  const k = keptSoloFor(state.profile?.user.id);
+  const k = keptNow(state.profile?.user.id);
   offerKeptSolo(k && !soloLiveElsewhere(k.game) ? k : null);
 }
 
@@ -312,6 +336,7 @@ export function reofferKeptSolo(): void {
  * the load records or replaces it. No answer (offline): yes, played on here (its result goes when it can).
  */
 export async function keptSoloOpen(k: KeptSolo): Promise<boolean> {
+  if (keptEnded(k)) return false;
   try {
     const p = await api<Profile>(meUrl(new URLSearchParams({ resume: k.game })));
     const { soloOpen, ...profile } = p;
@@ -329,8 +354,10 @@ export async function keptSoloOpen(k: KeptSolo): Promise<boolean> {
  * forfeit that gets no answer leaves a real game on the server, recorded as left at the next load or start.
  */
 export async function forfeitKeptSolo(k: KeptSolo): Promise<void> {
-  clearKeptSolo(k.game);
   if (state.soloKept?.game === k.game) set({ soloKept: null });
+  // (Its game has ended, its result still to send: that result goes, never a forfeit (I4).)
+  if (keptEnded(k)) return;
+  clearKeptSolo(k.game);
   if (!keptReal(k)) return;
   try {
     await api("/api/xp/solo/forfeit", { method: "POST", body: JSON.stringify({ game: k.game, real: k.facts }) });

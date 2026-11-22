@@ -175,12 +175,12 @@ export function onForfeitAsk(fn: () => void): () => void {
   return () => void askWatch.delete(fn);
 }
 /**
- * Before another solo game starts on this device (any solo mode, a Battle Tower floor): a kept game for this account (`user`) asks
- * first, "Forfeit your game in progress?", instead of the start recording it as left unasked (step 2). True: none kept, or Forfeit (the
- * card's forfeit done first); false: Cancel, nothing starts. A second ask replaces the first (answered false).
+ * Before another solo game starts on this device (any solo mode, a Battle Tower floor): the game kept for this account (account.ts
+ * askForfeitFirst: `kept`, null for none) asks first, "Forfeit your game in progress?", instead of the start recording it as left unasked
+ * (step 2). True: none kept, or Forfeit (the card's forfeit done first); false: Cancel, nothing starts. A second ask replaces the first
+ * (answered false).
  */
-export function askForfeitFirst(user: string | null | undefined): Promise<boolean> {
-  const kept = keptSoloFor(user);
+export function askForfeit(kept: KeptSolo | null): Promise<boolean> {
   if (!kept) return Promise.resolve(true);
   return new Promise((done) => {
     asked?.answer(false);
