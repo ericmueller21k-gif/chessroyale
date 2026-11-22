@@ -588,3 +588,33 @@ never answered), heard the second go again and said: "Yes let's add that one".
   mistaken for them in play; 2:10 is the length he approved, under the later 2:30 to 2:45.
 - Same day he asked for the runaway train (`song_aj.py`, version 4) again: sent, still no boss named.
 - Left without a theme: Smudgy, and the nine placeholder bosses.
+
+## Smudgy's theme (Nov 22): song AO, first go sent, no verdict yet
+
+Eric: "think like paint, paint strokes, and like paint splattering, maybe. Bit more like a whimsical, but somehow it
+needs to have like a vibe of like a calmness, but still somehow be, fast pace ... 170 or like 175 BPM. Maybe starts out
+20 seconds slow introduction and then gets into it. We could actually push it even harder, going like 220 or 230 for
+like a build up that has a part like that and then comes back to the normal beat ... the instruments that I've kind of
+avoided or said I don't like, so try to not use any of those." No plan this time: only that, so the recipe above.
+- **Calm and fast at once:** the kit and the drips race at 172 while the tune moves in long notes, a chord a bar.
+- **The paint is in the playing.** Strokes: a bowed violin's long pulls (the fiddle he liked), each ending in a flick
+  of three notes; the kit's cymbals are his brush swishing left and right on the 8ths. Splatter: plucks that die at
+  once (the koto, cut short) thrown wide in a long echo, and his splats, more of them through the rush. Drips: the fast
+  pattern is drops, coming back to one note.
+- **The idea that runs the song: colors blending, and his Repaint.** Each chord keeps three of the last one's four
+  notes (the roots fall by thirds), so after sixteen bars the song is a minor third up; a swipe of his brush marks it.
+  D, F, A flat, B, D: the fourth repaint is home, which is the loop. The slow middle is his Camouflage: the tune at half
+  speed on the soft piano over one bass note.
+- **The pace:** 86 for six bars (the same pulse at half pace), two bars running up to 172 (20.5 s in all); 172; eight
+  bars climbing to 226 over chords a whole step apart; sixteen bars at 226; then 172 again at once, on a splash (a
+  plain slow-down is on the not-liked list; a hush and a boom is on the liked one). 2:30.
+- **Voices, all from the liked list or his own asks:** violin, piano (bright, in octaves; the soft one in the calms),
+  an electric piano's chords, strings, a music box, an 808 in the fast parts. His sounds as the game makes them: swish,
+  swipe, splat, splash, drip, dab, one giggle each in the calm and after the splash (no breath in it).
+- **Kept off:** brass, flute, ocarina, accordion and sawtooth leads, thumb piano, a mallet lead, buzzy low plucks,
+  chimes left ringing, scale runs, a tune of 8ths on the grid.
+- Measured: lead -21, bass -21, kick -23, snare -26.5, the brush -36, pad -30.6 (dB RMS in the main parts); the
+  calms 4 dB under the main parts, the fast part 2 dB over; its spectrum within about 1.5 dB of Chub & Chirp's,
+  Chandy's and Babur's up to 4 kHz and 1 to 2.5 dB darker above (meant: calm). -16.0 LUFS, peak -1.6 dBFS.
+- Can't judge by ear, flagged to him: whether the violin reads as a violin and not a thin synth up high (bars 17 on);
+  whether the brush on the 8ths reads as a brush or as hiss; whether the splats are funny or in the way.
