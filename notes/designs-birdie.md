@@ -49,3 +49,16 @@ style sort of clip. So hold off on sending ... I don't want this to influence wh
 then we can inject these suggestions in it."
 For a second pass, only if the first doesn't land: the same train as his ride but drawn with more detail and depth, barreling
 toward the camera with a 3D feel; the track running toward us in perspective; a blue sky behind; a cinematic clip's look.
+
+## His home in Chess Town: the train station (Eric, Nov 23)
+- **Outside:** a little train station with a big nest sitting on top.
+- **Inside:** a normal, cozy train station:
+  - shrubbery filling in spots;
+  - airport-style seating;
+  - a little sit-down restaurant/bar area, "like a lobby in a way in the airport".
+- **Depth:** behind, in the background (not walkable), 2 or 3 tracks run back into the distance, with trains moving in and out, for a
+  3D feel.
+- **On the wall:** a big old-school split-flap board, like an airport's arrivals board, the analog flaps flipping. The art never draws
+  letters or numbers, so its flaps flip between pictures (a little train, a clock face, boss faces, a nest, an arrow) rather than text.
+  The game could later show real text on it in code if Eric wants.
+- His fight animations: later (Eric).
