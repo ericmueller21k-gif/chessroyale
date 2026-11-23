@@ -2321,6 +2321,7 @@ export const BOSS_POWERS = {
    *   jumps: Maia `armoredMaiaBoost` higher, held at Maia's top; already at Maia's top (Very hard), Stockfish at
    *   `armoredStockfishAbove` over the level Maia's top stands for (core levelForMaia); a battle he already plays on Stockfish, its
    *   strength `armoredMaiaBoost` higher (held at ENGINE_MAX_ELO). The judge and fair play don't read his strength: unchanged.
+   * - His train's ride across the board: BIRDIE_RIDE.
    */
   birdie: {
     trainFrom: 2,
@@ -2615,6 +2616,15 @@ export const MOO_CINEMATIC = {
 } as const;
 
 /**
+ * Birdie's train on a ride (packages/chess/src/bosses/birdie.ts, BIRDIE_BEATS.ride): `rideMs`, how long it takes to cross the board, from
+ * one edge to past the other. The smash as its nose reaches the piece, the pieces stepping aside, his return and the result's hold all
+ * follow it, solo and online. Eric, Nov 23: "His attack train move should slow the train a bit down when it moves across the board":
+ * 1300 -> 1950, about 1.5x as long (docs/decisions/2026-11-23-birdie-cadence-warning.md). His ride's run (`trainLong` in
+ * birdie-sounds.ts) is paced to it (its RIDE_PACE; a unit test keeps the two together).
+ */
+export const BIRDIE_RIDE = { rideMs: 1950 } as const;
+
+/**
  * Birdie's fall (Eric, Nov 23: "A cinematic like Moo's Full Moon: it takes the same space on screen as Moo's, about 6 to 7 s long. A cut
  * to a close-up: he falls out of his spot on the board… he tumbles through the air like a bird falling from a great height… the
  * background is blurred, with wind and speed lines… a train track comes into view below, and his own train barrels toward him…
@@ -2624,11 +2634,11 @@ export const MOO_CINEMATIC = {
  * long). Beats in order, ms:
  */
 export const BIRDIE_CINEMATIC = {
-  /** His `fall` where he stands: a jolt throws him up out of the train and he tumbles out of the frame (his animation's own 830 ms). */
+  /** His `fall` where he stands: a happy hop up out of the train, then he drops out of the frame (his animation's own 830 ms). */
   dropMs: 840,
   /** The scene fades in over the board and everything above it, as Moo's field does (a CSS fade). */
   fadeInMs: 400,
-  /** He tumbles through the air, the sky streaking past (the drawing's `fall`, 600 ms a loop). */
+  /** He free falls happily through the air (Eric, Nov 23), the sky streaking past (the drawing's `fall`, 600 ms a loop). */
   tumbleMs: 900,
   /**
    * His train comes up the track toward him (the drawing's `approach`, 390 ms a frame), its headlights brighter and brighter, to its last
@@ -2675,6 +2685,16 @@ export const BIRDIE_CINEMATIC = {
  *   once it's played, so a reload in his wait would skip to it): a reload until then carries the wait and the cutscene on.
  */
 export const BIRDIE_ULT = { theme: "birdie-ult", pieceAt: 300, introMs: 14815, lineAt: 1780, soloMoveLeadMs: 2500 } as const;
+
+/**
+ * How often Birdie's ordinary moves are heard (Eric, Nov 23: "the train sounds happen too often and the chirping in game for birdie, make
+ * it only like every 3-4 of his moves, you hear those"; docs/decisions/2026-11-23-birdie-cadence-warning.md). His move's whistle and the
+ * chirp over it sound on his first move, then this many of his moves apart, in turn (3, 4, 3, 4 ...: his 1st, 4th, 8th, 11th, 15th ...),
+ * counted by his move's number, so every device hears the same moves; his idle chirps on your turn only after a move of his that was
+ * heard. The other moves: only the board's own move sound. A capture or a check is heard every time (its toot-long and his chirp), and his
+ * entrance, his power, his ride and his fall are unchanged (kits.ts, birdieCue).
+ */
+export const BIRDIE_SOUND_EVERY: readonly number[] = [3, 4];
 
 /**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards

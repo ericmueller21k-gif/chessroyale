@@ -7,8 +7,8 @@ import { asAdmin, openBossRaid, pickMove, submitMove, test } from "./helpers.ts"
  * Birdie (id birdie), played alone as an admin (he's in the game for admins first), the state read from the game and what's on screen
  * read from the page every frame (docs/decisions/2026-11-23-birdie-rules.md, 2026-11-23-birdie-fall.md):
  * - The Train (?power=train: warned every turn from your second): the crossing lights on his line, the dock names your piece ("Move
- *   your knight!"); moving that piece saves it (no ride); leaving it, his train rides the line at the start of his turn and smashes
- *   it: the train on the board, the piece gone.
+ *   your knight!"), a see-through warning sign over it (Nov 23); moving that piece saves it (no ride, the sign gone with it); leaving
+ *   it, his train rides the line at the start of his turn and smashes it: the train on the board, the piece gone.
  * - The Fall (?power=fall: after your second move): his fall's cutscene (the fall, the approach to its hit, the reveal, the hold) over
  *   the board as he "thinks", then Armored Birdie in the boss bar (his powered twin's loops, `p_`) for the rest of the battle, and no
  *   train warns again.
@@ -32,6 +32,7 @@ async function record(page: Page) {
       const p = m?.boss?.powers;
       const bd = p?.birdie ?? null;
       const train = document.querySelector<HTMLElement>(".bd-train");
+      const sign = document.querySelector<HTMLElement>(".bd-sign");
       w.__bd.push({
         t: Date.now(),
         phase: m?.phase?.kind ?? null,
@@ -46,6 +47,15 @@ async function record(page: Page) {
         plies: (m?.phase?.boss ?? m?.boss)?.board?.history?.length ?? null,
         events: (p?.events ?? []).map((e: { kind: string }) => e.kind),
         crossing: !!document.querySelector(".fx-board.bd-crossing"),
+        // (The warning sign: its square, its opacity, the piece drawn on its square in this same frame (the board's, or his layer's during
+        // the ride) and its middle against that piece's, px.)
+        sign: sign ? (() => {
+          const sq = sign.dataset.square!;
+          const r = sign.getBoundingClientRect();
+          const el = document.querySelector(`.hb-board piece[data-square="${sq}"]`) ?? document.querySelector(`.bd-pieces piece[data-square="${sq}"]`);
+          const pc = el?.getBoundingClientRect();
+          return { sq, opacity: Number(getComputedStyle(sign).opacity), on: el?.className ?? null, off: pc ? Math.max(Math.abs(r.x + r.width / 2 - pc.x - pc.width / 2), Math.abs(r.y + r.height / 2 - pc.y - pc.height / 2), Math.abs(r.width - pc.width)) : null };
+        })() : null,
         train: train ? (() => {
           const r = train.getBoundingClientRect();
           return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) };
@@ -84,6 +94,7 @@ type Frame = {
   plies: number | null;
   events: string[];
   crossing: boolean;
+  sign: { sq: string; opacity: number; on: string | null; off: number | null } | null;
   train: { x: number; y: number; w: number } | null;
   aside: number;
   lineCount: number | null;
@@ -150,7 +161,7 @@ const moveOf = (fen: string, allowed: string[] | null, only?: { from?: string; n
   return pickMove(fen, { allowed: ok.length ? ok : legal, prefer: (m) => m.piece === "n" });
 };
 
-test("Birdie's train: the crossing on his line, the dock names your piece; moved, it's saved; left, his train rides the line and smashes it", { tag: "@phone-only" }, async ({ page }) => {
+test("Birdie's train: the crossing on his line, the dock names your piece, a sign over it; moved, it's saved; left, his train rides the line and smashes it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -202,6 +213,21 @@ test("Birdie's train: the crossing on his line, the dock names your piece; moved
   expect(whole, "the warned piece drawn whole over the crossing").toBeGreaterThan(0.9);
   // Never a crossing when no warning is for your turn.
   expect(rec.filter((r) => r.phase === "play" && !r.warn && !r.moments.length).every((r) => !r.crossing), "no crossing without a warning").toBe(true);
+  // The warning sign (Eric, Nov 23): on your marked piece's square whenever the crossing shows on your warned turn, on it to the pixel,
+  // see-through; never on a square without one of your pieces drawn on it this same frame (the board's, or his layer's during the ride),
+  // so gone the moment that piece moves; and gone after the move that saved it.
+  const lit = warned.filter((r) => r.crossing);
+  expect(lit.filter((r) => r.sign?.sq === r.warn!.square).length / lit.length, "the sign on the marked piece while its line is lit").toBeGreaterThan(0.95);
+  const signs = rec.filter((r) => r.sign);
+  expect(signs.every((r) => r.sign!.opacity >= 0.59 && r.sign!.opacity <= 0.81), `see-through: ${[...new Set(signs.map((r) => r.sign!.opacity.toFixed(2)))]}`).toBe(true);
+  expect(Math.max(...lit.map((r) => r.sign?.off ?? 0)), "the sign on its square (px)").toBeLessThanOrEqual(1.5);
+  const yours = (await page.evaluate(() => (window as any).match.boss.crowdSide)) === "w" ? "white" : "black";
+  const stray = signs.filter((r) => !r.sign!.on?.split(" ").includes(yours));
+  expect(stray.map((r) => `${r.sign!.sq} (${r.sign!.on}) at ${r.crowdMoves}`), "the sign only ever over a piece of yours").toEqual([]);
+  // (After the saving move, past its render's frame: no sign left on the square it left.)
+  const movedOn = rec.filter((r) => r.crowdMoves === saved!.at).slice(2);
+  expect(movedOn.length, "frames after the saved piece moved").toBeGreaterThan(5);
+  expect(movedOn.filter((r) => r.sign?.sq === saved!.square).length, "the sign gone once its piece moved").toBe(0);
 
   // Saved: no ride after that move.
   expect(rec.some((r) => r.ride?.at === saved!.at), "no ride for the piece you moved").toBe(false);
@@ -214,12 +240,14 @@ test("Birdie's train: the crossing on his line, the dock names your piece; moved
   expect(onBoard.length, "the train on the board").toBeGreaterThan(5);
   // (It moves: its place on screen changes through the ride.)
   expect(new Set(onBoard.map((r) => `${r.train!.x},${r.train!.y}`)).size).toBeGreaterThan(3);
-  // (Smooth, Nov 23: it moves on every frame of its whole ride (BIRDIE_BEATS.ride.rideMs, 1.3 s), never crossing in half that and
-  // standing still past the board's edge, as when his layer set its animation's delay again every frame: 38 frames still, measured.)
+  // (Smooth, Nov 23: it moves on every frame of its whole ride (BIRDIE_BEATS.ride.rideMs, 1.95 s since Eric's "slow the train a bit
+  // down", was 1.3 s), never crossing in half that and standing still past the board's edge, as when his layer set its animation's delay
+  // again every frame: 38 frames still, measured.)
   const rideRec = onBoard.filter((r) => r.ride?.at === left!.at);
   const still = rideRec.slice(1).filter((r, i) => r.train!.x === rideRec[i]!.train!.x && r.train!.y === rideRec[i]!.train!.y).length;
   expect(still, "frames the train stood still in its ride").toBeLessThanOrEqual(2);
-  expect(rideRec.at(-1)!.t - rideRec[0]!.t, "the train's ride on screen").toBeGreaterThan(1_000);
+  // (Old: over 1 s of a 1.3 s ride; now over 1.6 s of 1.95 s.)
+  expect(rideRec.at(-1)!.t - rideRec[0]!.t, "the train's ride on screen").toBeGreaterThan(1_600);
   // Every piece on the line drawn by his layer as the ride starts (the board has them off), none lost (Nov 23: his own were, read
   // from the drawn board).
   expect(onBoard[0]!.aside, `the line's pieces as the ride starts: ${onBoard[0]!.aside} of ${onBoard[0]!.lineCount}`).toBe(onBoard[0]!.lineCount);

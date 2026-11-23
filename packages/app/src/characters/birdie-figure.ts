@@ -84,7 +84,7 @@ const armoredBeat = (cue: string, then?: string): Anim =>
 const armoredLoop = (): Anim => lazyAnim(armoredIdle);
 
 /** His spot empty from the end of his `fall` (where he stands, from the moment's `fallAt`) to the cutscene's hit, when he's back as Armored Birdie. */
-// (Its cue silent, no sound in his kit: his cutscene's tumble whooshes as it starts, BirdieFall.tsx's PICTURE_SOUND; both at once doubled it, Nov 23.)
+// (Its cue silent, no sound in his kit: his cutscene's fall whooshes as it starts, BirdieFall.tsx's PICTURE_SOUND; both at once doubled it, Nov 23.)
 const away: Anim = lazyAnim(() => ({ loop: false, frames: [{ ms: Math.max(1, BIRDIE_BEATS.fall.hitAt - BIRDIE_BEATS.fall.fallAt - YOUNG.anims.fall!.frames.reduce((s, f) => s + f.ms, 0)), layers: [], cue: "away" }] }));
 
 /** His animations as young Birdie draws them (every one of the art's). */
