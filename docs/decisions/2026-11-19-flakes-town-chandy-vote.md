@@ -1,4 +1,0 @@
-# Two e2e flakes: Chandy's Dodge vote tap, the town's deploy test (Nov 19, 2026)
-
-- Chandy: the vote button never moves (sampled every frame). The tap timed out because the vote closed: the test waited a fixed 1.95 s after `toBeVisible`, and that check retries only every 100 to 1000 ms, so it can see the vote up to 1 s late. In a 3 s vote that left 0.2 to 0.85 s. The call: wait on the vote's own countdown (the HUD's "VOTE: TAP A SQUARE x.x s"). This is a test-only problem. A player's tap isn't affected.
-- Town: not reproduced locally in 40+ runs, including heavy CPU load. The cause isn't found and isn't fixed. The call: the poll's failure now names the stage the next worker stopped at (its states, the registration, who is in charge), and `register` is awaited, so the next CI failure points at the cause.

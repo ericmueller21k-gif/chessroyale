@@ -1,0 +1,38 @@
+13423 ms  sound birdieTrainMedium
+13516 ms  phase boss:0 
+14179 ms  sound birdieBrake
+14490 ms  sound birdieHop
+14822 ms  sound birdieHello
+18493 ms  phase play:0 
+23155 ms  sound birdieTsip
+28131 ms  you   b1a3
+28150 ms  sound move
+28155 ms  phase scoring:0 
+30243 ms  phase boss:thinking:1 b1a3
+31530 ms  sound birdieTrainMedium
+31531 ms  sound move
+31535 ms  phase boss:2 e7e5
+31623 ms  sound birdieTsip
+32474 ms  sound birdieBell
+32495 ms  sound birdieWhistle
+33511 ms  phase play:2 e7e5
+34421 ms  sound birdieAsk
+39608 ms  you   a3b5
+39622 ms  sound move
+39628 ms  phase scoring:2 e7e5
+42154 ms  phase boss:thinking:3 a3b5
+42322 ms  sound birdieTrainLong
+42421 ms  sound birdieToot
+42857 ms  sound birdieSmash
+44154 ms  sound birdieTrainMedium
+44571 ms  phase boss:thinking:4 d7d5
+44938 ms  sound birdieBrake
+45254 ms  sound birdieHop
+45587 ms  sound birdieHello
+46490 ms  sound birdieTrainMedium
+46490 ms  sound move
+46491 ms  phase boss:4 d7d5
+46587 ms  sound birdieCheer
+47439 ms  sound birdieBell
+47444 ms  sound birdieWhistle
+48471 ms  phase play:4 d7d5
