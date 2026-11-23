@@ -1,3 +1,7 @@
+// The e2e helpers every spec shares. Two rules for how a spec reaches its screens (the Nov 23 sweep's N5; .claude/LESSONS.md):
+// - A test of what comes after a battle (the result screen, XP, rewards, quests, what's kept) ends it with `endBattle`; only a test of
+//   playing a battle plays it to its end. Playing real moves to reach the end assumes how long the battle lasts.
+// - A move a spec just needs comes from `pickMove` (never a mate let in), played with `submitMove`.
 import { resolve } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { Chess, type Move } from "chess.js";
@@ -189,6 +193,30 @@ export async function submitMove(page: Page, move: string | null | undefined, fe
     },
     [move, fen ?? null] as const,
   );
+}
+
+/**
+ * Ends the current solo boss battle with `outcome`, through the same end a real one takes (the result screen, its XP, quests and rewards,
+ * a tower floor's write, the kept game cleared): the hook behind the admins' 🏆 "Win this match" (#846; SoloMatch.forceEnd, which adds a
+ * loss and a draw for tests only), then one move of yours (pickMove), on which it ends. Waits for the results. Needs `?debug` and the
+ * page made an admin (`asAdmin`) before it loads, as the 🏆 does; Boss alone, a solo raid or a solo tower floor, not online.
+ * **A test of what comes after a battle ends it with this; only a test of playing a battle plays it to its end** (the Nov 23 sweep's N5:
+ * specs that played real moves to reach a screen assumed how long the battle lasts, and any engine or boss change ended it a move early or
+ * late, "play" against "results").
+ */
+export async function endBattle(page: Page, outcome: "win" | "loss" | "draw") {
+  const kind = () => page.evaluate(() => (window as any).match?.phase?.kind ?? null);
+  await expect.poll(kind, { timeout: 60_000 }).toBe("play");
+  const result = { win: "crowd", loss: "boss", draw: "draw" }[outcome];
+  const s = await page.evaluate((r) => {
+    const m = (window as any).match;
+    if (!m?.winFormShown || m.phase.kind !== "play") return null;
+    m.forceEnd(r);
+    return { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null };
+  }, result);
+  if (!s) throw new Error("endBattle: no end hook here (a solo boss battle, ?debug, and asAdmin before the page loads)");
+  await submitMove(page, pickMove(s.fen, { allowed: s.allowed }), s.fen);
+  await expect.poll(kind, { timeout: 120_000 }).toBe("results");
 }
 
 /**

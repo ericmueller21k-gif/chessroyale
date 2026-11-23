@@ -516,5 +516,18 @@ describe("testing (admins, Nov 13): \"Win this form\" beats him on the crowd's n
     r.deal();
     await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: 1000 }]]));
     expect(r.stageComplete()).toBe(false);
+  });  it("e2e's end hook (bossForceEnd, Nov 23): a loss or a draw, the same way: nothing until the crowd's move lands, then that result", async () => {
+    for (const end of ["boss", "draw"] as const) {
+      const r = alone();
+      await untilTurn(r, 1);
+      r.bossForceEnd = end;
+      expect(r.stageComplete(), "before the move").toBe(false);
+      r.deal();
+      await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: 1000 }]]));
+      expect(r.stageComplete()).toBe(true);
+      expect(r.finishBossBattle()).toBe(end);
+      expect(r.boss!.result).toBe(end);
+      expect(r.bossTimedOut).toBe(false);
+    }
   });
 });

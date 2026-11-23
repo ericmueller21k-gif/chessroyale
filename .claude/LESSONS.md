@@ -374,6 +374,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     A spec's `yourMove` fails at once when the battle has ended, naming its end (`smudgy.spec.ts`'s `ended`), never after a 90 s wait.
   - A check on the boss select's stage figure waits for its paint (`figureDrawn`): it comes with the match's chunk, and a first tap can beat it.
 
+- **A battle a move longer or shorter than the test assumed** (Nov 23, the pipeline sweep's N5, `docs/decisions/2026-11-23-e2e-end-hook.md`):
+  - A test of what comes after a battle (the result screen, XP, rewards, quests, what's kept) ends it with the hook, `endBattle` in
+    `e2e/helpers.ts` (win, loss or draw, through the battle's real end); only a test of playing a battle plays it to its end. A spec that
+    plays real moves to reach a screen assumes how long the battle lasts, and any engine or boss change ends it a move early or late.
+  - A test of playing that needs the battle to last N moves plays strong moves (the engine's best, as xp.spec's `playOwnMoves`), not quiet ones.
+
 - **A trigger pulled into a Slam already on its way** (Nov 21, [story](../docs/history/lessons.md#a-trigger-pulled-into-a-slam-already-on-its-way-nov-21-2026)):
   - A test that pulls the test trigger (`triggerUltimate`) states that it took (`powers.ultNext`): it's refused while an ultimate is
     warned-and-coming or under way, and a later one from the meter then passes for it. The test sets its moment up only when nothing is

@@ -1329,6 +1329,18 @@ export class SoloMatch implements GameView {
     this.emit();
   }
 
+  /**
+   * Testing, e2e only (helpers.ts' endBattle; no button, nothing a player can reach): your next move ends the battle with `result`, the
+   * same end a mate takes. "crowd" is the 🏆's win (winForm); "boss" (a loss) and "draw" set the runner's bossForceEnd. Behind the 🏆's
+   * guard (winFormShown: an admin in a boss battle); not in the Hidden Boss's phase 2 or his phase change.
+   */
+  forceEnd(result: "crowd" | "boss" | "draw") {
+    if (result === "crowd") return this.winForm();
+    if (!this.winFormShown || this.stopped || this.phase.kind === "simul" || this.phase.kind === "phaseChange" || this.runner.boss?.result) return;
+    this.runner.bossForceEnd = result;
+    this.emit();
+  }
+
   /** Testing, admins in Boss alone: the "Engine move" button shows (see engineMoveAllowed). */
   get engineMoveShown(): boolean {
     return !!this.runner?.boss && engineMoveAllowed(this.settings.raid && !this.raidBots);
