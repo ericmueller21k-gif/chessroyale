@@ -1832,3 +1832,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~19:35: #911 (cadence, slower train 1950 ms, warning sign; director raised sign opacity to 60-80%) open e2f74b2e, CI bjd0jw78v,
   review session_01JuCWRs3Kat2uSdabVPNH2J → review/birdie-cadence-warning. Lobby wire session_01JuCWRvBucHcMNkQbNmJHmP (Opus high) →
   claude/birdie-lobby-4. main after #909/#910: run pending (b0rsw5zzy).
+- Nov 23 ~19:37: Eric: Birdie's fall too morbid → happy hop out + fun free fall, the hit the same. Art session_01JuCWRtXxZPkpJxXDuuj4Gw
+  (Haiku, brief birdie-art-13, asks Eric for ≤$4, stills/birdie-13). Wiring brief birdie-fall-fun-wire (Opus high) starts when an Opus
+  slot frees (#911 review); its step 2 waits for the director's message with the art commit. Watcher bz40q8v6h.
