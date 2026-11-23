@@ -734,3 +734,16 @@ the exact moment"; a line from him before it; once a fight. The full-screen anim
   both) came out 4.5 dB under his clip. He passed what he heard, so that level is now the piece's own (`ULT_UP`).
   **To set one piece against another, take both from the mix (`render()`), never from two saved files.**
 - Sent him a demo of the wiring as handed over (the chorus, the piece, the theme from its top on the drop).
+
+**Birdie's voice: the crossing's birds as his chirps (Nov 23).** Eric: "those bird sounds that you did from the clip
+... wire those in for Birdie as like what he says ... he chirps throughout the game basically, and also when like you
+go to challenge him to fight ... we'll use whatever chirping you already had created for that song ... 5 to 6 kind of
+variations of different chirps ... the director chat should know all the different places to wire in".
+- The phrases are one table now (`BIRDS` in song_aj.py; the crossing renders the same to the sample). Its four
+  (tsip, teeoo, trill, cheer), two more in the same voice (ask, scold), and "hello" (the crossing's first two
+  phrases as they come there) for the challenge. `python3 birdie_chirps.py <folder>` builds them: dry, mono,
+  44.1 kHz, one gain for the set.
+- `stills/trailer-v2`, commit `a5617d58`, `birdie-chirps/`: the seven as .wav and .mp3, a sheet, and a README with
+  his words, what each could be for, and the recipe (they are sliding sine whistles, so the characters lane can
+  build them in code as the other bosses' sounds are). Told the director.
+- Sent Eric the sheet. No word yet on which he likes.

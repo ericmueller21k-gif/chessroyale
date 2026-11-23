@@ -181,6 +181,34 @@ for _line, _beats in ((RIFF, 8), (RIFF_OUT, 8), (VERSE_1, 32), (UNDER_1, 32), (V
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
+# ---- the birds (the crossing's; and Birdie's own voice in the game: birdie_chirps.py builds these as sound files) ----
+# A phrase: its notes, each (seconds after the phrase starts, Hz it starts on, Hz it ends on, how long, how loud, and how
+# fast it trembles, 0 for a steady note). The first four are in the crossing; "ask" and "scold" are the same voice's,
+# made for the game.
+BIRDS = {
+    "tsip": ((0.0, 4600, 3300, 0.055, 0.8, 0), (0.11, 4600, 3300, 0.055, 1.0, 0), (0.22, 4600, 3300, 0.055, 0.9, 0), (0.36, 4600, 3300, 0.055, 0.7, 0)),
+    "teeoo": ((0.0, 3800, 3950, 0.14, 1.0, 0), (0.19, 3000, 2750, 0.2, 0.9, 25)),
+    "trill": ((0.0, 5200, 5000, 0.42, 0.8, 28),),
+    "cheer": ((0.0, 2800, 4200, 0.07, 1.0, 0), (0.12, 3000, 4500, 0.07, 1.0, 0)),
+    "ask": ((0.0, 2900, 3050, 0.12, 0.9, 0), (0.17, 3700, 4300, 0.16, 1.0, 0)),
+    "scold": ((0.0, 5000, 3900, 0.045, 1.0, 0), (0.075, 4400, 3500, 0.045, 0.9, 0), (0.15, 5000, 3900, 0.045, 1.0, 0), (0.225, 4400, 3500, 0.045, 0.9, 0),
+              (0.3, 5000, 3900, 0.045, 1.0, 0), (0.375, 4200, 3200, 0.07, 0.85, 0)),
+}
+
+
+def tweet_wave(f0, f1, secs, shake, sr):
+    """One note of a bird, its loudest point about 1: a clear whistle sliding from `f0` to `f1` Hz (evenly, as the
+    ear hears pitch), a little of its octave in it, swelling and dying with no edge; `shake` (Hz): its pitch and its
+    level tremble that fast."""
+    k = int(secs * sr)
+    t = np.arange(k) / sr
+    u = t / secs
+    f = f0 * (f1 / f0) ** u * (1 + (0.06 * np.sin(2 * np.pi * shake * t) if shake else 0))
+    ph = 2 * np.pi * np.cumsum(f) / sr
+    env = np.sin(np.pi * u) ** 1.3 * (0.6 + 0.4 * np.cos(2 * np.pi * shake * t) if shake else 1.0)
+    return (np.sin(ph) + 0.15 * np.sin(2 * ph)) * env
+
+
 def render(window=None, part="song") -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
     (a sample, to compare voices on). `part` "ult": the crossing by itself instead, with the song's own voices, levels
@@ -471,28 +499,11 @@ def render(window=None, part="song") -> np.ndarray:
         throb = 0.7 + 0.3 * np.cos(tau * t / (x.beat_s / 2))
         put("loco", b, (soft(k, 60) * np.cos(ph) + soft(k, 60) * np.sin(ph)) * throb * np.minimum(1, t / 0.6) * tail(k, 0.6) * vol)
 
-    def tweet(b, f0, f1, secs, vol, pan, late=0.0, shake=0.0):
-        """One note of a bird: a clear whistle sliding from `f0` to `f1` Hz; `shake`: trembling that fast (Hz)."""
-        k = int(secs * sr)
-        t = np.arange(k) / sr
-        u = t / secs
-        f = f0 * (f1 / f0) ** u * (1 + (0.06 * np.sin(tau * shake * t) if shake else 0))
-        ph = tau * np.cumsum(f) / sr
-        env = np.sin(np.pi * u) ** 1.3 * (0.6 + 0.4 * np.cos(tau * shake * t) if shake else 1.0)
-        put("birds", b, (np.sin(ph) + 0.15 * np.sin(2 * ph)) * env * vol, pan, late=late)
-
     def bird(b, kind, vol=0.03, pan=0.0):
-        """A bird's phrase. "tsip": four quick falling chirps; "teeoo": two clear notes, the second lower; "trill":
-        one note shaken fast; "cheer": two chirps up."""
-        if kind == "tsip":
-            for late, loud in ((0.0, 0.8), (0.11, 1.0), (0.22, 0.9), (0.36, 0.7)):
-                tweet(b, 4600, 3300, 0.055, vol * loud, pan, late)
-        elif kind == "teeoo":
-            tweet(b, 3800, 3950, 0.14, vol, pan), tweet(b, 3000, 2750, 0.2, vol * 0.9, pan, 0.19, shake=25)
-        elif kind == "trill":
-            tweet(b, 5200, 5000, 0.42, vol * 0.8, pan, shake=28)
-        else:
-            tweet(b, 2800, 4200, 0.07, vol, pan), tweet(b, 3000, 4500, 0.07, vol, pan, 0.12)
+        """A bird's phrase (BIRDS). "tsip": four quick falling chirps; "teeoo": two clear notes, the second lower;
+        "trill": one note shaken fast; "cheer": two chirps up."""
+        for late, f0, f1, secs, loud, shake in BIRDS[kind]:
+            put("birds", b, tweet_wave(f0, f1, secs, shake, sr) * vol * loud, pan, late=late)
 
     strung = {}
 
