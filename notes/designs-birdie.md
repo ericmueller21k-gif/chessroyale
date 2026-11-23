@@ -41,3 +41,11 @@ Eric, Nov 23: "Just approve whatever the spend is for this, for the API. It's fi
 ## Armored Birdie
 **Eric picked the sleek version (A)** (Nov 23: "I like the sleek version of Birdie better than the chunky one"): `scripts/boss-art/out/boss-birdie-armored-a/` on `claude/boss-art`.
 His power: the same idea, but stronger and without the train (he's done away with it). The details come later (Eric).
+
+## The cutscene: Eric's notes held for a second pass (Nov 23)
+Eric, while the first pass was being drawn: "The train ... it's like the same kind of one that he has, but ... more actually like drawn
+... it has a 3D like barreling effect, like the tracks, the blue sky in the background. ... It almost looks like it's like a cinematic
+style sort of clip. So hold off on sending ... I don't want this to influence what was already being done. But if it doesn't land,
+then we can inject these suggestions in it."
+For a second pass, only if the first doesn't land: the same train as his ride but drawn with more detail and depth, barreling
+toward the camera with a 3D feel; the track running toward us in perspective; a blue sky behind; a cinematic clip's look.
