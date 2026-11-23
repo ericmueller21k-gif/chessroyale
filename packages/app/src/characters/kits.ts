@@ -133,7 +133,8 @@ export interface BossKit extends BeatLines {
    * A cue's sound from the battle, when it isn't always the same one (Birdie's train run by how far his piece went, his chirp by the
    * move): read as the cue plays, from the shared match state alone, so every device hears the same; `yourTurn`: the crowd's turn with
    * its clock running (not as its move lands and is judged). Undefined (or it returns undefined): `sounds[cue]`; null: silent this
-   * time. Every sound it can return is in `sounds` too, so it's made ahead.
+   * time. Every sound it can return is in `sounds` too, so it's made ahead. Only BossCharacter reads it: a boss drawn through SpriteAnim
+   * (BossEffect.tsx: BossMoment, KingAttack) still plays `sounds[cue]`, so a Birdie moment drawn there would play his plain sounds.
    */
   cueSound?: (cue: string, boss: BossView, yourTurn: boolean) => SoundName | null | undefined;
   /** The part of a frame a portrait shows, and from which animation and frame. */
