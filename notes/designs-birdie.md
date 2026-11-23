@@ -91,3 +91,6 @@ Eric's wiring:
 ## The cutscene: Eric on the second pass (Nov 23)
 "there's two issues. The front of the train is too blocky now. It doesn't even look like a real, head of how a train looks. And it
 also should be actually looking like it hits him. It's to the side of him."
+
+**Approved (Eric, Nov 23): "looks good now"** — the third pass (`arena-birdie-fall` at fd5cad0ec on `claude/boss-art`, stills
+`stills/birdie-6`) is the cutscene's fall scene.
