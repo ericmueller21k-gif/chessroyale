@@ -43,8 +43,9 @@ type BirdieSettings = BossPowerSettings["birdie"];
  * - **trainSignal** (as the crowd's turn after his move begins): his `signal` (1500 ms), its `signal` cue (his wave's top) at
  *   `lightAt`: the crossing lights up on every square of the line, and stays through the crowd's turn.
  * - **trainSmash** (at the start of his turn, while he thinks): his `depart` (960 ms: he ducks in and the train pulls away, its `go`
- *   cue at 290), then from `rideAt` the train crosses the board along the line in `rideMs` (from one board's edge to past the other,
- *   `trackSquares` squares of travel: the board's eight, its own length and a square of run-in), the pieces on the line stepping
+ *   cue at 290), then from `rideAt` the train crosses the board along the line in `rideMs` (BOSS_POWERS.birdie.trainRideMs; from one
+ *   board's edge to past the other, `trackSquares` squares of travel: the board's eight, its own length and a square of run-in), the
+ *   pieces on the line stepping
  *   aside as it nears (`asideMs` before its nose and back after its tail), the warned piece smashed as its nose reaches it (the
  *   train's `smash`, 420 ms) or stepping aside too (spared); then his `entrance` (2140 ms) back to his spot from `backAt`.
  * - **trainWin**: the same ride, your king smashed; its banner first.
@@ -59,7 +60,8 @@ export const BIRDIE_BEATS = {
   ride: (() => {
     const departMs = 960;
     const rideAt = 720;
-    const rideMs = 1300;
+    // (Eric, Nov 23: "slow the train a bit down": BOSS_POWERS.birdie.trainRideMs, 1950, was 1300.)
+    const rideMs = BOSS_POWERS.birdie.trainRideMs;
     const entranceMs = 2140;
     const backAt = rideAt + rideMs;
     return { departMs, rideAt, rideMs, trackSquares: 11, asideMs: 160, smashMs: 420, entranceMs, backAt, total: backAt + entranceMs };

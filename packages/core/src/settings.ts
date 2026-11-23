@@ -2321,10 +2321,16 @@ export const BOSS_POWERS = {
    *   jumps: Maia `armoredMaiaBoost` higher, held at Maia's top; already at Maia's top (Very hard), Stockfish at
    *   `armoredStockfishAbove` over the level Maia's top stands for (core levelForMaia); a battle he already plays on Stockfish, its
    *   strength `armoredMaiaBoost` higher (held at ENGINE_MAX_ELO). The judge and fair play don't read his strength: unchanged.
+   * - `trainRideMs`: how long his train takes to cross the board on a ride, from one edge to past the other (BIRDIE_BEATS.ride.rideMs:
+   *   the smash as its nose reaches the piece, the pieces stepping aside, his return and the result's hold all follow it, solo and
+   *   online). Eric, Nov 23: "His attack train move should slow the train a bit down when it moves across the board": 1300 -> 1950,
+   *   about 1.5x as long. (His ride's run, `trainLong` in birdie-sounds.ts, is paced to it: its RIDE_PACE, a unit test keeps the two
+   *   together.)
    */
   birdie: {
     trainFrom: 2,
     trainEvery: 3,
+    trainRideMs: 1950,
     trainPawnLogit: 1,
     fallLost: 9,
     armoredTrainEvery: 3,
@@ -2675,6 +2681,16 @@ export const BIRDIE_CINEMATIC = {
  *   once it's played, so a reload in his wait would skip to it): a reload until then carries the wait and the cutscene on.
  */
 export const BIRDIE_ULT = { theme: "birdie-ult", pieceAt: 300, introMs: 14815, lineAt: 1780, soloMoveLeadMs: 2500 } as const;
+
+/**
+ * How often Birdie's ordinary moves are heard (Eric, Nov 23: "the train sounds happen too often and the chirping in game for birdie, make
+ * it only like every 3-4 of his moves, you hear those"; docs/decisions/2026-11-23-birdie-cadence-warning.md). His move's whistle and the
+ * chirp over it sound on his first move, then this many of his moves apart, in turn (3, 4, 3, 4 ...: his 1st, 4th, 8th, 11th, 15th ...),
+ * counted by his move's number, so every device hears the same moves; his idle chirps on your turn only after a move of his that was
+ * heard. The other moves: only the board's own move sound. A capture or a check is heard every time (its toot-long and his chirp), and his
+ * entrance, his power, his ride and his fall are unchanged (kits.ts, birdieCue).
+ */
+export const BIRDIE_SOUND_EVERY: readonly number[] = [3, 4];
 
 /**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards

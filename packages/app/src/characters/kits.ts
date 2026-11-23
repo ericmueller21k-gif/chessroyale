@@ -5,7 +5,7 @@
  * (`?wip=1&kit=<name>`: its kit in every boss's place): a boss becomes playable once it has both a character and its
  * powers (the power rules add it to boss.ts).
  */
-import { BOSS_ROSTER, type BossDef } from "@chessroyale/core";
+import { BIRDIE_SOUND_EVERY, BOSS_ROSTER, type BossDef } from "@chessroyale/core";
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines, Loop, Stage } from "./boss-beats.ts";
 import { BIGBOY_ATTACK, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT, BIGBOY_SPRITE } from "./bigboy.ts";
@@ -224,18 +224,36 @@ const BIRDIE_WHISTLE: Record<BirdieWhistle, SoundName> = {
 const BIRDIE_NOD: readonly SoundName[] = ["birdieCheer", "birdieTsip"];
 const BIRDIE_CHATTER: readonly SoundName[] = ["birdieTsip", "birdieAsk", "birdieTeeoo"];
 /**
+ * Whether Birdie's move number `n` is one of his heard moves (BIRDIE_SOUND_EVERY, Eric, Nov 23: "only like every 3-4 of his moves"): his
+ * first (n 1), then the gaps in turn (3, 4, 3, 4: 1, 4, 8, 11, 15 ...). The same on every device: from his move's number alone.
+ */
+export function birdieHeard(n: number, every: readonly number[] = BIRDIE_SOUND_EVERY): boolean {
+  const cycle = every.reduce((a, b) => a + b, 0);
+  if (cycle <= 0) return true;
+  const r = (((n - 1) % cycle) + cycle) % cycle;
+  let at = 0;
+  for (const gap of every) {
+    if (r === at) return true;
+    at += gap;
+  }
+  return false;
+}
+
+/**
  * Birdie's cues whose sound comes from the battle (BossKit.cueSound): his move's whistle (by how far his piece went, now and then the
- * peeps: birdieWhistle), his chirps in turn. His
- * chatter and his smug teeoo (his loops' cues) only on your turn: never as your move lands, when only the board's knock is heard (Eric,
- * Oct 10; boss-kits.test.ts).
+ * peeps: birdieWhistle) and the chirp over it, only on his heard moves (birdieHeard: every 3 or 4 of his moves; the others are silent but
+ * for the board's own move sound); his chirps in turn. His chatter and his smug teeoo (his loops' cues) only on your turn after a heard
+ * move of his, never as your move lands, when only the board's knock is heard (Eric, Oct 10; boss-kits.test.ts). A capture's and a
+ * check's sounds (`tootRun`, `trill`, `flash`) are his kit's, heard every time (Nov 23, director's call: they're events).
  */
 export function birdieCue(cue: string, boss: Pick<BossView, "board">, yourTurn = true): SoundName | null | undefined {
   const h = boss.board.history;
   const his = Math.floor(h.length / 2);
-  if (cue === "run") return BIRDIE_WHISTLE[birdieWhistle(h[h.length - 1], false, his)];
-  if (cue === "nod") return BIRDIE_NOD[his % BIRDIE_NOD.length];
-  if (cue === "chatter") return yourTurn ? BIRDIE_CHATTER[his % BIRDIE_CHATTER.length] : null;
-  if (cue === "coo") return yourTurn ? undefined : null;
+  const heard = birdieHeard(his);
+  if (cue === "run") return heard ? BIRDIE_WHISTLE[birdieWhistle(h[h.length - 1], false, his)] : null;
+  if (cue === "nod") return heard ? BIRDIE_NOD[his % BIRDIE_NOD.length] : null;
+  if (cue === "chatter") return yourTurn && heard ? BIRDIE_CHATTER[his % BIRDIE_CHATTER.length] : null;
+  if (cue === "coo") return yourTurn && heard ? undefined : null;
   if (cue === "gone" || cue === "away") return null;
   return undefined;
 }
