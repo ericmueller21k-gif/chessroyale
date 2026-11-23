@@ -22,3 +22,6 @@ Start: `git fetch origin main && git checkout -B claude/room-music-off origin/ma
    player-visible changes, changed checks old → new). `.done`, push, stop. Don't open PRs or wait on CI. Helpers reset, never revert.
    Commits end with only `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By line, no model names).
 Never write the Hidden Boss's name. American English.
+
+4. **(Added, relayed to the running session)** Eric (Nov 23): "can we shrink him a little bit? ... outside of the building, he looks massive.
+   So I think his town scaling needs to come down about 25%." → `feel.ts` `bossScale`: `birdie: 0.75`.
