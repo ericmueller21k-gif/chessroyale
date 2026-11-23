@@ -78,3 +78,68 @@ one. This is the one." The built file is that go, sample for sample.
   down or out.
 - It is the calmest of the boss themes on purpose (his words: "a vibe of like a calmness, but still ... fast pace"):
   its quiet middle (1:05 to 1:33) is about 3 dB under the rest.
+
+## Nov 23: Birdie's theme (`birdie`) and his ult's piece (`birdie-ult`)
+
+Birdie isn't in the roster yet, so `birdie` is my guess at his id (his art is `boss-birdie`): rename the entries and the
+files if it differs. Both are stereo 192 kbps `.mp3` and `.ogg`, with their entries in this folder's `themes.json`.
+
+### The theme
+
+`birdie-loop`: one loop of **136.296292 s** (2:16), no intro piece (`introSeconds` 0), pad 0.5 as the others, `bpm` 162
+(steady all through: a bar is 1.481481 s), -16.5 LUFS, peak -1.2 dBFS. Built by
+`python3 handoff.py --stereo --kbps 192 <folder> birdie` from `scripts/reel/music/song_aj.py` (the runaway train) on
+`claude/trailer-v2`. Eric, Nov 23: "Going back to the Train version 4 song, that's going to be Birdie's song", with one
+change, made here (the glockenspiel at 1:35 is out): "Other than that, I think the song's pretty much perfect." Checked:
+it differs from the version he had only where the glockenspiel was; the loop point is clean on the built file. It
+plays like any theme with no intro (Babur's, Chandy's).
+
+### The ult's piece: the crossing
+
+`birdie-ult-intro` (a 15.8 s file): the band drops to the song's own train beat, quiet, and over it a locomotive (its
+exhaust, wheels on the rail joints, steam), a train whistle (two long blasts, a short, a long one sinking away) and
+birds; its last two bars climb into a snare roll. It is not part of the theme's loop: it plays on a cue, once a fight
+(Eric: "I don't think we actually want it playing more than once during the boss fight").
+
+Its entry, `birdie-ult`, is shaped like the Hidden Boss's pieces: **intro** `birdie-ult-intro`, **`introSeconds`
+14.814813** (ten bars), **loop** `birdie-loop` (Birdie's theme again, from its top), marks `whistle` 1.481481 and
+`roll` 13.333333. -20.2 LUFS, peak -2.6 dBFS: built with the theme's own gain, so it sits about 5 dB under the
+theme's verse and chorus (it "quiets down") and its last two bars are back at the theme's level.
+
+### How Eric wants it wired (his words, Nov 23)
+
+- When it starts: "we'll start this clip after the player gets a capture on the piece, which then triggers the back
+  end to be like, okay, like enough material was captured. So then it will fade into this song".
+- Where it ends: "at the end of your standalone clip where it sort of like finishes up, that's the part where ... it
+  should line up ... right when ... the train kind of connects and the transformation happens".
+- Birdie waits: "Birdie doesn't play his move right away. He basically times his next move to the exact moment where
+  ... the end of that little ... clip ... right when the train light kind of hits and then he transforms. So we're
+  basically delaying ... your AI or your computer move on this turn for a few seconds".
+- Before it: "we can have him add a line to say".
+- The full-screen animation of the train hitting is being built in another session (his words: "another chat"); it is
+  shorter than the piece, so the piece starts first.
+
+### What that comes to, with these files
+
+1. **The drop is the impact.** This is `switchPlan` with a `dropAt`, as the Hidden Boss's boards split on one. Put
+   the drop at the moment the train hits and he transforms. The piece then starts at `dropAt - 14.814813` s, what is
+   playing fades from there, and the theme starts from its top exactly on the drop: its opening hits (the whole band,
+   four bars of stabs and drum breaks) are the impact. The piece has no hit of its own at its end, on purpose: the
+   theme's first bar is the hit. Their sum at the join is checked (peak -3.9 dBFS).
+2. **The order of events:** the capture that fills the ult; a drop time at least 14.815 s ahead (plus whatever loading
+   and the fade need); the music switches (the piece starts, a short fade from the theme: it opens on a burst of
+   steam at once); his line; the full-screen animation starts at `dropAt` less its own time to the impact frame (that
+   number comes from whoever builds it); the impact, the transformation and the theme's first hit together.
+3. **His move waits for the drop.** His move on that turn, and the animation, are scheduled to the drop, not played as
+   soon as the engine has the move: about 15 s from the capture to the impact. What his clock and the players' do
+   meanwhile is yours to decide.
+4. **Marks in the piece, for the visuals** (seconds from its start): 0.0 steam, the band drops, the first birds;
+   1.48 the whistle's first blast (long, long, short, and a long one from 6.5 that sinks away by 9.3); 13.33 the snare
+   roll starts; 14.815 the drop.
+5. **If it can start on a bar line of the theme**, the beat carries across (both are 162; the theme's bars are every
+   1.481481 s from its loop's start). Not needed: a plain short fade works, as the theme's own beat is going under it.
+6. **After the drop** the theme runs from its top as a normal loop. If the transformed Birdie should have other music
+   from there, change the entry's `loop`; nothing else moves.
+
+Eric heard the piece by itself (with a drum hit where the theme now comes in) and a demo of this wiring: the theme's
+chorus, the piece, and the theme from its top on the drop.
