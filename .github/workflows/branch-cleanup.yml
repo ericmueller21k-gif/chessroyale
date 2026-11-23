@@ -2,9 +2,12 @@
 # merged"). Runs every day (and by hand from the Actions tab, a dry run by default); a pull request that changes this file
 # gets a dry run, listing what it would delete (the session can't start a workflow by hand). Merged means: the branch's
 # tip is in main's history, or is exactly the head a merged pull request merged. Never touched: main, claude/director-notes,
-# stills/*, any branch with an open pull request, and any branch whose tip is under 2 days old (a helper's fresh branch).
+# any branch with an open pull request, and any branch whose tip is under 2 days old (a helper's fresh branch).
 # Also (Eric, Nov 19: "Yes, it can delete those"): review/* and audit/* branches, which never merge (a review's or an audit's report,
 # read by the director at the time), once their tip is over 3 days old.
+# And (Eric, Nov 23: "7 days after merge"): stills/* branches, the preview images a PR body links. One is deleted 7 days
+# after the last merged pull request whose body names it, unless an open pull request's body names it too. A stills branch
+# no pull request names (a mockup or a sheet sent only in chat) is deleted once its tip is over 30 days old.
 name: branch-cleanup
 on:
   schedule:
@@ -38,11 +41,30 @@ jobs:
           gh api --paginate "repos/$REPO/pulls?state=closed&per_page=100" \
             --jq '.[] | select(.merged_at) | "\(.head.ref) \(.head.sha)"' > merged-heads.txt
           gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].head.ref' > open-heads.txt
+          # The stills branches each pull request's body names: "<branch> <merged_at>" for merged ones, "<branch>" for open ones.
+          # (The name ends on a letter, digit, - or _, so a sentence's full stop after it isn't part of it.)
+          gh api --paginate "repos/$REPO/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at) | .merged_at as $m | [(.body // "") | scan("stills/[A-Za-z0-9._-]*[A-Za-z0-9_-]")] | unique[] | "\(.) \($m)"' > stills-merged.txt
+          gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" \
+            --jq '.[] | [(.body // "") | scan("stills/[A-Za-z0-9._-]*[A-Za-z0-9_-]")] | unique[]' > stills-open.txt
+          stills_old=$(( $(date +%s) - 7*24*3600 ))
+          stills_unlinked=$(( $(date +%s) - 30*24*3600 ))
           cutoff=$(( $(date +%s) - 2*24*3600 ))
           old=$(( $(date +%s) - 3*24*3600 ))
           : > delete.txt
           for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | sed 's#^origin/##'); do
-            case "$ref" in HEAD|origin|main|claude/director-notes|stills/*) continue;; esac
+            case "$ref" in HEAD|origin|main|claude/director-notes) continue;; esac
+            if [ "${ref#stills/}" != "$ref" ]; then
+              grep -qxF "$ref" stills-open.txt && continue
+              tip=$(git rev-parse "origin/$ref")
+              last=$(awk -v r="$ref" '$1 == r {print $2}' stills-merged.txt | sort | tail -1)
+              if [ -n "$last" ]; then
+                [ "$(date -d "$last" +%s)" -le "$stills_old" ] && echo "$tip $ref" >> delete.txt
+              elif [ "$(git log -1 --format=%ct "$tip")" -le "$stills_unlinked" ]; then
+                echo "$tip $ref" >> delete.txt
+              fi
+              continue
+            fi
             grep -qxF "$ref" open-heads.txt && continue
             tip=$(git rev-parse "origin/$ref")
             [ "$(git log -1 --format=%ct "$tip")" -gt "$cutoff" ] && continue

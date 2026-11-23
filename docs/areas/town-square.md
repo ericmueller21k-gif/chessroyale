@@ -1305,6 +1305,13 @@ packed into PNG pages (a worker encodes them; 5.8 MB) and kept in IndexedDB (`to
 same build and layout (`pictureKey`: version, the town chunk's hashed name, `render.ts` `pictureSig`) cuts them back out instead of painting:
 4x slowed, 18.5 s → 5.9 s. Anything odd paints as before and clears the entry. `?paintall` skips it. Hooks: `__townPaint().pictures`,
 `__townPictureSum()`. Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second visit…").
+**Painted on more cores (Nov 23; [decision](../decisions/2026-11-23-town-paint-workers.md)):** a first visit's pictures are painted ahead by a
+pool of workers (`town/paint-pool.ts`, `paint.worker.ts`; the cores less one, at most 3, `TOWN_PAINT_WORKERS`) with the main thread's own
+code (`town/paint-jobs.ts`), their art sent once as JSON (a character's idle frames and parts, a roof's geometry: `box-geom.ts`); the main
+thread puts each worker's pixels on its canvas as before and paints what no worker has. Every picture is the same (`test/town-paint-workers.test.ts`;
+the perf spec's third visit, painted without workers, hashes the same). The parts' lazy grids stay on the main thread. 4x slowed: about
+1.8x faster to the first frame. No workers, or any failure: the main thread paints, as before. `?paintworkers=N` (0: none) compares;
+`?paintslow=K` (tests) slows the workers as CDP slows the page. Hook: `__townPaint().pictures` (`workers`, `byWorkers`, `whileWaiting`).
 **The music is no step (Nov 14; [decision](../decisions/2026-11-14-town-load-fast.md)):** until Nov 14 every boss theme was fetched from the
 bar's start beside the painting, and "Loading music…" waited up to 3 s more once the town was built (Nov 12, [decision](../decisions/2026-11-12-music-mono-preload.md));
 at 44 MB (stereo 192 kbps) Eric found the town "taking forever". Now `preloadMusic` starts `MUSIC.townPreloadAfterMs` (2 s) after the first

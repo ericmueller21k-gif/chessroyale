@@ -27,7 +27,14 @@ export function paint(x0: number, y0: number, w: number, h: number, fn: (x: numb
     outline,
     get grid(): string[] {
       if (!grid) {
-        grid = Array.from({ length: h }, (_, j) => Array.from({ length: w }, (_, i) => fn(x0 + i, y0 + j) ?? ".").join(""));
+        // (Row by row, a key at a time: the same strings as mapping and joining arrays, in about a third of the time (Nov 23: the
+        // largest share of the loading screen's work left on the main thread once the paint workers took the rest).)
+        grid = new Array<string>(h);
+        for (let j = 0; j < h; j++) {
+          let row = "";
+          for (let i = 0; i < w; i++) row += fn(x0 + i, y0 + j) ?? ".";
+          grid[j] = row;
+        }
         fn = NONE; // (what it drew from can go)
       }
       return grid;

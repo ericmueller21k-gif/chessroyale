@@ -103,6 +103,20 @@ export const TOWN_ASKED = (() => {
     return { crowd: 0, fps: false, report: false, back2d: false, paintAll: false };
   }
 })();
+/**
+ * `?paintworkers=N` (Nov 23, anyone's, as `?paintall`): a first visit to Chess Town paints with N workers (0: on the main thread only, as
+ * before; town/paint-pool.ts), so a phone can compare. `?paintslow=K` (tests only: it counts where the switches do, Town.tsx): each
+ * worker's picture takes K times as long, as on a core K times slower (CDP's CPU slowing reaches the page's own thread, not its workers).
+ */
+export const TOWN_PAINT_ASKED = (() => {
+  try {
+    const q = new URLSearchParams(globalThis.location?.search ?? "");
+    const n = q.get("paintworkers");
+    return { workers: n !== null && /^\d+$/.test(n) ? Math.min(8, Number(n)) : null, slow: Math.max(1, Math.min(16, Number(q.get("paintslow")) || 1)) };
+  } catch {
+    return { workers: null as number | null, slow: 1 };
+  }
+})();
 let gameOnDevice = true;
 /** The game now is played on this device (a solo game), or online (false: the server's times, the default extra). */
 export function timingOnDevice(on: boolean): void {
