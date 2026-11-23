@@ -1,7 +1,9 @@
 /**
  * Copied as drawn from the art branch `claude/boss-art` (scripts/boss-art/out/birdie-train/birdie-train.ts at 31a1f329, Nov 23, 2026):
  * every animation as drawn. Changed: the import paths, and its parts and animations made on first use (lazyParts, lazyAnim). The run's
- * report: scripts/boss-art/out/birdie-train/summary.md on that branch.
+ * report: scripts/boss-art/out/birdie-train/summary.md on that branch. Nov 23 (Eric: "choppy ... it looks like it's like 5 frames"):
+ * the ride's loop is the same drawing sampled at 12 steps of 65 ms (the town's Birdie's Train: 10 of 65 ms) instead of 4 of 105 ms,
+ * its vent's glow and beams kept to their old beat (`glow`), its smoke drifting at its old speed (docs/decisions/2026-11-23-birdie-tail-smooth.md).
  */
 /**
  * Birdie's train on the board (the attack, Nov 23, Eric's design). Not a boss: board art, like Big Boy's tower. One
@@ -87,7 +89,8 @@ const body: Inside = (x, y) => {
 /** The wheels' middles along each side; they show past the body's sides, 2 pixels each side. */
 const WHEELS = [10, 18, 44, 52] as const;
 
-function trainPart(phase: number): Part {
+/** `phase`: the wheels' tread and rods (0-3); `glow`: the vent's glow (0 or 1). */
+function trainPart(phase: number, glow = phase % 2): Part {
   return paint((cv, F) => {
     // Yellow body: lit along the top and the back, darker along the bottom; the nose hood round, lit at its top left.
     F(body, (x, y) => {
@@ -115,7 +118,7 @@ function trainPart(phase: number): Part {
     F((x, y) => x === 17 && y >= 11 && y <= 21, () => "m");
     // The exhaust stack at the back of the roof, its vent glowing.
     F(E(10, 16, 2.6, 2.6), () => "j");
-    F(E(10, 16, 1.6, 1.6), () => (phase % 2 ? "q" : "r"));
+    F(E(10, 16, 1.6, 1.6), () => (glow ? "q" : "r"));
     F((x, y) => x === 9 && y === 14, () => "l");
     // The windshield: two panes on the slope, a post between, a glint across each.
     F((x, y) => x >= 42 && x <= 45 && y >= 9 && y <= 22 && !(x === 45 && (y === 9 || y === 22)), (x, y) => (y === 15 || y === 16 ? "n" : (x + y) % 5 === 0 ? "Z" : "z"));
@@ -185,7 +188,7 @@ function headPart(hd: number): Part {
 }
 
 const { parts: PARTS, add: addPart } = lazyParts();
-for (const p of [0, 1, 2, 3]) addPart(`train:${p}`, () => trainPart(p));
+for (const p of [0, 1, 2, 3]) for (const g of [0, 1]) addPart(`train:${p}:${g}`, () => trainPart(p, g));
 addPart("shadow", () => shadowPart());
 addPart("head", () => headPart(0));
 addPart("head:1", () => headPart(1));
@@ -225,13 +228,22 @@ function beams(long: number): Speck[] {
   return out;
 }
 
+/**
+ * The ride's loop: 12 frames of 65 ms (Nov 23; the art's 4 of 105 ms looked choppy). Each frame the wheels' tread steps a pixel (their
+ * 4 steps three times over); the vent's glow, the beams and his head's nod keep the art's beat (every other frame, about 130 ms, his nod
+ * a third of each 390 ms); the smoke drifts back two thirds of a step a frame (the art's step every 105 ms, now every 97), two cycles a loop.
+ */
+const RIDE_FRAMES = 12;
 const ride: Anim = lazyAnim(() => ({
   loop: true,
-  frames: [0, 1, 2, 3].map((p): Frame => ({
-    ms: 105,
-    layers: [at0("shadow", 2, 2), at0(`train:${p}`), at0(p === 2 ? "head:1" : "head")],
-    specks: [...smoke(p), ...beams(p % 2)],
-  })),
+  frames: Array.from({ length: RIDE_FRAMES }, (_, f): Frame => {
+    const g = Math.floor(f / 2) % 2;
+    return {
+      ms: 65,
+      layers: [at0("shadow", 2, 2), at0(`train:${f % 4}:${g}`), at0(Math.floor(f / 2) % 3 === 1 ? "head:1" : "head")],
+      specks: [...smoke(((f * 2) / 3) % 4), ...beams(g)],
+    };
+  }),
 }));
 
 // ---- The crossing warning (left square only, x 0..31).
