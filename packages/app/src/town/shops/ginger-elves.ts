@@ -7,7 +7,7 @@
  *
  * They climb the stairs on the same height curve as you (levels.ts `liftAt`). Before each bit of its way an elf looks along it
  * (`SHOP_FEEL.elves.look` squares ahead): anyone standing there (you, or the boss walking in) and it waits where it is, going on once
- * it's clear (Jefferson's crew's rule, Nov 4: "If you block it, it stops. If you move out of the way, it starts moving again"). The
+ * it's clear (Grex's crew's rule, Nov 4: "If you block it, it stops. If you move out of the way, it starts moving again"). The
  * pair wait together. A stop once begun is played out. Every number is in SHOP_FEEL.elves; each client runs them from its own room's
  * clock: no server state. Pure: tested in packages/app/test/shop-ginger.test.ts.
  */

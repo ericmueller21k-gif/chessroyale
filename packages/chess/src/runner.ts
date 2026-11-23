@@ -536,7 +536,7 @@ export class MatchRunner {
   }
 
   /**
-   * Boss battle, G-REX's fire: the tiles ablaze this crowd turn where a crowd piece left after the move burns (a piece his
+   * Boss battle, Grex's fire: the tiles ablaze this crowd turn where a crowd piece left after the move burns (a piece his
    * Roman candle only chars isn't counted: fireBurns).
    */
   fireBurn(): string[] {
@@ -782,7 +782,7 @@ export class MatchRunner {
     const id = this.state.boards[0];
     const crowdTurn = !!this.state.boss && id !== undefined && this.boards.get(id)?.fen === fen;
     const allowed = crowdTurn ? (this.crowdAllowed(id) ?? undefined) : undefined;
-    // (The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as gone, and the moves
+    // (The boss's rules for the judge, e.g. Grex's fire: a piece left on a tile ablaze counts as gone, and the moves
     // that save it are always looked at.)
     const side = crowdTurn ? this.sideBosses() : [];
     const escapes = sideMustScore(side, fen).filter((m) => !all.some((x) => x.move === m) && (!allowed || allowed.includes(m)));
@@ -915,7 +915,7 @@ export class MatchRunner {
     // Boss battle: only the moves allowed this turn (a power's limits; the move the God King took back is off the table).
     const allowed = this.crowdAllowed(boardId);
     const legal = allowed ?? legalMoves(board.fen);
-    // (The boss's rules for the judge, e.g. G-REX's fire: the bots see a piece left on a tile ablaze as gone.)
+    // (The boss's rules for the judge, e.g. Grex's fire: the bots see a piece left on a tile ablaze as gone.)
     const open = sideRanked(this.sideBosses(), allowed ? judgeCandidates({ allowed }, top) : [...top], board.fen);
     const best = open[0]?.expected ?? top[0]!.expected;
     const candidates = open.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
@@ -971,7 +971,7 @@ export class MatchRunner {
     const known = new Map(top.map((m) => [m.move, m.expected]));
     for (const m of open ?? []) known.set(m.move, m.expected);
     for (const m of offered) known.set(m.move, m.expected);
-    // (The boss's rules for the judge, e.g. G-REX's fire: every move that takes a piece off a tile ablaze is scored too.)
+    // (The boss's rules for the judge, e.g. Grex's fire: every move that takes a piece off a tile ablaze is scored too.)
     const escapes = sideMustScore(this.sideBosses(), board.fen).filter((m) => !allowed || allowed.includes(m));
     const missing = [...new Set([...Object.values(picks), ...escapes].flatMap((m) => (m && !known.has(m) ? [m] : [])))];
     const extra = [...(open ?? []), ...offered, ...(missing.length ? await engine.scoreMoves(board.fen, missing) : [])];
@@ -1004,7 +1004,7 @@ export class MatchRunner {
     const board = this.boards.get(boardId)!;
     const limited = this.withoutBarred(rawPicks, rawEvaluation, boardId);
     const picks = limited.picks;
-    // The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as already gone (every
+    // The boss's rules for the judge, e.g. Grex's fire: a piece left on a tile ablaze counts as already gone (every
     // path's numbers come in raw). Then the best move is the highest-scored of the judge's best and the picks (bestOf:
     // after any re-check, which weighed a pick above the first line against it like for like), on every path.
     const pickList = playerIds.map((id) => picks[id] ?? null);
@@ -1347,7 +1347,7 @@ export class MatchRunner {
       const board = this.boards.get(r.boardId)!;
       const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
       this.boards.set(r.boardId, playOnBoard(board, r.result.playedMove, moverExpected));
-      // Boss battle: the judged eval feeds the ultimate's meter, and the boss's own after-move effect (G-REX's fire
+      // Boss battle: the judged eval feeds the ultimate's meter, and the boss's own after-move effect (Grex's fire
       // burns what was left on its tiles; Folio's Revision reads the judge's numbers).
       if (this.state.boss?.powers) {
         // (Several bosses: every boss's meter reads the judged eval, set as his own hook runs: afterCrowdMove, so a move Revision
@@ -1620,7 +1620,7 @@ export class MatchRunner {
   }
 
   /**
-   * After the crowd's move: the boss's own effect, if it has one (G-REX's fire: what was left on a tile ablaze burns).
+   * After the crowd's move: the boss's own effect, if it has one (Grex's fire: what was left on a tile ablaze burns).
    * `judged`: the judge's numbers for it, when a scored round played it.
    */
   private afterCrowdMove(move: string | null, judged: JudgedMove | null = null) {

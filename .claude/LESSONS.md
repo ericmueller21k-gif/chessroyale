@@ -444,6 +444,6 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.
 
-- **A test never waits to catch a moment live** (Nov 22, main's run on d30c64b: a shared floor's test polled for Jefferson's turn and
+- **A test never waits to catch a moment live** (Nov 22, main's run on d30c64b: a shared floor's test polled for Grex's turn and
   it passed between two polls): a phase that can last under a second (a boss's quick turn, a reveal, a banner) is recorded every frame
   by an init script and read afterward; poll only for states that hold until the player acts.

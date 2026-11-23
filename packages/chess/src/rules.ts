@@ -380,7 +380,7 @@ export function materialSlips(fen: string, best: string, moves: readonly string[
   return out;
 }
 
-// ---------------- Positions that change outside the moves (G-REX's fire) ----------------
+// ---------------- Positions that change outside the moves (Grex's fire) ----------------
 
 /**
  * A board's position can change between moves: a piece the fire destroys. A base is the position after `ply` moves,

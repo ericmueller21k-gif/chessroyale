@@ -760,16 +760,16 @@ type CrewHook = {
 };
 const crew = (p: Page) => p.evaluate(() => (window as unknown as CrewHook).__shopCrew?.() ?? null);
 
-test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his warehouse: the racking, the board on its crates, the crew at work; the dealer keeps the shop in his corner, Jefferson's Boss Crate with Giraffe Gallop; the scissor lift waits while you stand in its way and goes on once you step aside", { tag: "@phone-only" }, async ({ page }) => {
+test("Grex's Fireworks (Nov 4): Go in (its card its name and Go in), his warehouse: the racking, the board on its crates, the crew at work; the dealer keeps the shop in his corner, Grex's Boss Crate with Giraffe Gallop; the scissor lift waits while you stand in its way and goes on once you step aside", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  // (Jefferson is live for everyone, so his warehouse is too: a player's town.)
+  // (Grex is live for everyone, so his warehouse is too: a player's town.)
   await page.goto("/town?sky=day");
   await townReady(page);
-  await goIn(page, "grex", "Jefferson's Fireworks");
+  await goIn(page, "grex", "Grex's Fireworks");
   await expect(room(page)).toHaveAttribute("data-room", "grex");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Jefferson's Fireworks");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Grex's Fireworks");
   // Bright concrete under the lamps: the chat's words dark.
   await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
   await expect.poll(async () => (await shopCam(page))?.zoom, { message: "zoomed out" }).toBe(1);
@@ -794,12 +794,12 @@ test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his wa
   await expect(room(page)).toHaveAttribute("data-you", /^(16|17),4$/);
   await still("dealer");
   await card.getByRole("button", { name: "Talk" }).click();
-  const crate = page.getByRole("dialog", { name: "Jefferson's Boss Crate", exact: true });
+  const crate = page.getByRole("dialog", { name: "Grex's Boss Crate", exact: true });
   await expect(crate).toBeVisible();
-  await expect(crate).toContainText("3 Jefferson tokens, or 1 Jefferson token + 1 crate key");
+  await expect(crate).toContainText("3 Grex tokens, or 1 Grex token + 1 crate key");
   await expect(crate).toContainText("Giraffe Gallop");
-  await expect(crate).toContainText("You have 0 Jefferson tokens and 0 crate keys.");
-  await expect(crate.getByRole("button", { name: "Buy with 3 Jefferson tokens" })).toBeDisabled();
+  await expect(crate).toContainText("You have 0 Grex tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Grex tokens" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
   // In the lift's way: stand on its row, a square past its next stop, and it waits for you (Eric, Nov 4: "If you block it, it stops");
@@ -967,7 +967,7 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   await tapTo([5, 7]);
 
   // In an elf's way: the red walker goes up and down column 6 by the sack, between (6, 11.3) and (6, 8.6). Stand on (6, 9) and he
-  // waits for you (Eric, Nov 4, of Jefferson's crew: "If you block it, it stops"); step aside and he goes on.
+  // waits for you (Eric, Nov 4, of Grex's crew: "If you block it, it stops"); step aside and he goes on.
   await tapTo([6, 9]);
   const red = async () => (await elvesOf(page))!.elves.find((e) => e.name === "red")!;
   await expect.poll(async () => (await red()).waiting, { message: "the red walker waits for you", timeout: 30_000 }).toBe(true);

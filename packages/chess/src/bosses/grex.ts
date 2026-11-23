@@ -1,5 +1,5 @@
 /**
- * G-REX, the Fire boss (BOSS_ROSTER "grex"): his rules. His passive, the sparkler, sets a tile on the crowd's half on
+ * Grex, the Fire boss (BOSS_ROSTER "grex"): his rules. His passive, the sparkler, sets a tile on the crowd's half on
  * fire: it burns in stages, one a crowd turn, and a crowd piece left on it after the crowd's move on the last stage
  * burns (never the king, nor a piece whose loss would leave a king in check: the tile fizzles). His ultimate, the Roman
  * candle, rains fireballs in waves, each wave's squares shown as growing shadows a few turns ahead; each lands as a fresh
@@ -30,7 +30,7 @@ import { VALUE, crowdHalf, from, logit, other, powerRoll, to, turnOf, warnThenUn
 export const GREX_FX = { spark: 2300, candle: 7100, fireball: 1700, fireproof: 2200 } as const;
 
 /**
- * G-REX's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
+ * Grex's fire after the crowd's move: a piece left on a tile ablaze burns (or the tile fizzles under the king) as the
  * boss's turn begins. The boss's move waits for it (at least this long after the crowd's move), solo and online.
  */
 export const FIRE_BURN_MS = 1500;
@@ -352,7 +352,7 @@ export function fireEscapes(fen: string, burn: readonly string[]): string[] {
   return legalMoves(fen).filter((m) => on.has(from(m)));
 }
 
-/** G-REX: a burning tile from his sparkler, and a barrage of fireballs from his Roman candle. */
+/** Grex: a burning tile from his sparkler, and a barrage of fireballs from his Roman candle. */
 export const GREX: BossRules = {
   id: "grex",
   // (A char mark whose piece is gone: another boss's power, or a capture a tracker missed.)

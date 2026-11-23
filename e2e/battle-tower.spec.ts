@@ -664,7 +664,7 @@ test("a shared floor's moments (Eric, Nov 21): every boss drawn through the God 
     };
     requestAnimationFrame(tick);
   }, desk);
-  // (Jefferson's Roman candle at once (?power=candle): on a computer he steps onto the board for it, on a phone to its corner.)
+  // (Grex's Roman candle at once (?power=candle): on a computer he steps onto the board for it, on a phone to its corner.)
   await intoTower(page, "&power=candle");
   const made = await page.evaluate(async () => {
     const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
@@ -676,7 +676,7 @@ test("a shared floor's moments (Eric, Nov 21): every boss drawn through the God 
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await clerk.getByRole("button", { name: "Continue: floor 2" }).click();
   await floorThenMatch(page, 2, 2);
-  // Your moves, the God King's move on the 2nd and his strike on the 3rd, until both have played and Jefferson's candle has.
+  // Your moves, the God King's move on the 2nd and his strike on the 3rd, until both have played and Grex's candle has.
   const seen = () => page.evaluate(() => (window as any).__seen as { king: number; moment: number; elsewhere: number });
   const king = page.getByRole("button", { name: /God King: tap to summon/ });
   for (let n = 1; n <= 6; n++) {
@@ -901,7 +901,7 @@ test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's th
       if (sq && document.querySelector(`.hb-board piece.black.rook[data-square="${sq}"]`)) w.__leaks.push(`${sq} on ${b.id}'s turn (${w.match?.phase?.kind})`);
     }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-square"] });
     // (Every frame of a boss's turn: whose, and what's drawn on the hidden square. A boss's turn can pass between two polls, so the
-    // test reads this record, never waits to catch the turn live: Nov 22, main's run on d30c64b missed Jefferson's.)
+    // test reads this record, never waits to catch the turn live: Nov 22, main's run on d30c64b missed Grex's.)
     w.__bossTurns = [] as string[];
     const tick = () => {
       const m = w.match;
@@ -916,7 +916,7 @@ test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's th
     };
     requestAnimationFrame(tick);
   });
-  // ?paint=1: his rook hidden on d7 from the start (camo.ts). Floor 2: Jefferson, then Smudgy (the deal set in the local database).
+  // ?paint=1: his rook hidden on d7 from the start (camo.ts). Floor 2: Grex, then Smudgy (the deal set in the local database).
   await intoTower(page, "&paint=1");
   const made = await page.evaluate(async () => {
     const run = await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
@@ -938,12 +938,12 @@ test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's th
       const role = el ? ["pawn", "rook"].find((r) => el.classList.contains(r)) ?? "other" : null;
       return { phase: m?.phase?.kind ?? null, focus: (b?.id ?? null) as string | null, square, drawn: el ? `${el.classList.contains("white") ? "w" : "b"} ${role}` : null };
     });
-  // Your turn with Jefferson next (the view's top level his): a pawn on d7.
+  // Your turn with Grex next (the view's top level his): a pawn on d7.
   let at = await look();
   await expect.poll(async () => ((at = await look()), at.phase === "play" && at.drawn !== null), { timeout: 20_000 }).toBe(true);
   expect(at).toMatchObject({ phase: "play", focus: "grex", square: "d7", drawn: "b pawn" });
   await still(page, "shared-smudgy-your-turn");
-  // Your move; then Jefferson's turn: the hidden square still a pawn while he plays.
+  // Your move; then Grex's turn: the hidden square still a pawn while he plays.
   await playAMove(page);
   const grexTurn = () => page.evaluate(() => ((window as any).__bossTurns as string[]).filter((t) => t.startsWith("grex ")));
   await expect.poll(async () => (await grexTurn()).length, { timeout: 60_000 }).toBeGreaterThan(0);

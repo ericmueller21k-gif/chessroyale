@@ -16,7 +16,7 @@ import { PIECE_WORD, SoundAt, onSquare, type BossUi, type Moment, type MomentPro
  *   meet in a ball of white light, and the elephant (a bishop drawn with its own piece art: the board's `elephants`)
  *   drops onto its square. No banner: the dock says "Alfil spent his move on the fusion."
  * - **The Mammoth Slam** (its own screen at the start of his turn): "MAMMOTH SLAM!", he leaps and crashes down, the
- *   board shakes, the crowd's pieces fly up off their squares, and a shadow (Jefferson's, reused as is) shows on each
+ *   board shakes, the crowd's pieces fly up off their squares, and a shadow (Grex's, reused as is) shows on each
  *   square one will land on, a size bigger each turn.
  * - **The landing** (as a crowd turn begins, or early, while he thinks): each piece drops out of the sky onto its own
  *   square, its shadow at its biggest until then, with a soft thump; one whose square was taken slides on to the square
@@ -269,7 +269,7 @@ function glowSquares(boss: BossView, moments: readonly Moment[], now: number, ap
 }
 
 /**
- * The shadows of the Slam's pieces as `now` (Jefferson's, as is): each square one will land on, its size by the turns
+ * The shadows of the Slam's pieces as `now` (Grex's, as is): each square one will land on, its size by the turns
  * left, from the Slam's `shadows` beat; during the landing, the biggest until its piece comes down.
  */
 function slamShadows(boss: BossView, moments: readonly Moment[], now: number, appearAt: (square: string) => number): BoardItem[] {

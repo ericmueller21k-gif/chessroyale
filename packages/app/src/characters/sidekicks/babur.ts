@@ -6,7 +6,7 @@
  * then a big happy squeeze pinches the balloon in where it's held and bulges it out above and below, then it springs back.
  * Soft round paws, no claws anywhere: it never pops.
  *
- * Rigging, as Jefferson's sidekick: every part is painted at its rest place in frame pixels (light from the top left),
+ * Rigging, as Grex's sidekick: every part is painted at its rest place in frame pixels (light from the top left),
  * cropped and cached by name; a pose moves parts by whole pixels, and the arms, legs, tail and balloon are painted from
  * a handful of numbers (points, a squeeze), so a new pose is numbers, not a redraw.
  */

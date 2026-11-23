@@ -1,6 +1,6 @@
 /**
  * The zebras' bakery (Eric's design, Nov 10, notes/zebra-eric.md): a bakery run like a mob, where the crew are really chess nerds.
- * Drawn by hand in code (Nov 10), built as Jefferson's warehouse is (out/house-shop-grex), with two rooms:
+ * Drawn by hand in code (Nov 10), built as Grex's warehouse is (out/house-shop-grex), with two rooms:
  *
  * - **HOUSE_ZEBRA**, the front in the town: a bakery under a zebra-striped awning, bread in the window, a blank sign board (the game
  *   writes the name), a chalk A-board on the pavement ("JUST BREAD. MOVE ALONG."), and in its idle two eyes peeking through the door's

@@ -42,7 +42,7 @@ export interface JudgeJob {
    */
   allowed?: string[];
   /**
-   * Boss battle, G-REX's fire: the tiles ablaze this turn (a crowd piece left on one burns after the move). The moves
+   * Boss battle, Grex's fire: the tiles ablaze this turn (a crowd piece left on one burns after the move). The moves
    * that save it are scored too, and the bots count a piece left there as gone; the scores themselves stay the
    * engine's (the lobby's runner takes the fire off them, once, for everyone).
    */
@@ -159,7 +159,7 @@ export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promi
 }
 
 /**
- * The moves a job scores whatever the engine's top moves are: G-REX's fire, the moves that take a piece off a tile ablaze;
+ * The moves a job scores whatever the engine's top moves are: Grex's fire, the moves that take a piece off a tile ablaze;
  * Chub & Chirp's Carrot Patch, the moves that pull a carrot (so saving the piece, or pulling one, is always on the table).
  */
 export function jobEscapes(job: Pick<JudgeJob, "fen" | "burn" | "race" | "allowed" | "barred">): string[] {
@@ -174,7 +174,7 @@ export function jobOffers(job: Pick<JudgeJob, "fen" | "race" | "allowed" | "barr
 }
 
 /**
- * Top moves as a job's bots see them: the Saw Swap's moves scored after it (`swap`: swapScores), G-REX's fire (a piece left on a tile
+ * Top moves as a job's bots see them: the Saw Swap's moves scored after it (`swap`: swapScores), Grex's fire (a piece left on a tile
  * ablaze is gone), the Carrot Patch's race counted; best first.
  */
 export function jobRanked(job: Pick<JudgeJob, "fen" | "burn" | "race">, top: readonly MoveScore[], swap?: readonly MoveScore[]): MoveScore[] {

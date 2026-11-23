@@ -394,7 +394,7 @@ export function judgeCandidates(job: MoveLimits, top: readonly MoveScore[], extr
 }
 
 /**
- * The moves the judge must score too this crowd turn, whatever the engine's top moves are (G-REX's fire: the ones that
+ * The moves the judge must score too this crowd turn, whatever the engine's top moves are (Grex's fire: the ones that
  * save a piece from a tile ablaze). None without a boss, or for a boss whose rules don't ask.
  */
 export function judgeMustScore(boss: BossState | null | undefined, fen: string): string[] {
@@ -414,7 +414,7 @@ export function judgeRanked(boss: BossState | null | undefined, top: readonly Mo
   return j ? j.rank(boss!, top, fen) : [...top];
 }
 
-/** A board's evaluation as the judge sees it under the boss's rules (G-REX's fire: a piece left to burn counts as gone). */
+/** A board's evaluation as the judge sees it under the boss's rules (Grex's fire: a piece left to burn counts as gone). */
 export function judgeEvaluation<E extends JudgedEvaluation>(boss: BossState | null | undefined, evaluation: E, fen: string): E {
   const j = boss ? bossRules(boss)?.judge : undefined;
   return j ? j.evaluation(boss!, evaluation, fen) : evaluation;

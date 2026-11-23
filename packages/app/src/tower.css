@@ -749,7 +749,7 @@
    sit in one place, main's for a floor of several (board-size.css keeps the room at 151 px: the board main's size). What's in the bar grows
    as a phone's does: his face in one 84 x 74 box for every boss (fit whole, as the bar fits it to 48 px wide elsewhere; the name column
    starts at one place), his name, LVL and meters a size up (the column at 1.2), the status a size up, and the props that size themselves to
-   the room (Hollow's bulbs, Jefferson's candles: drawn at 2x on a computer) at 1.5, 3x, whole pixels, never wider than the room. The props
+   the room (Hollow's bulbs, Grex's candles: drawn at 2x on a computer) at 1.5, 3x, whole pixels, never wider than the room. The props
    of bosses not in the tower's pool yet (Timber's workshop, Tick's tally, Don Dough's timers) and Babur's pump (by his figure, or the
    taller bar's own sums) keep their size. Boss battles outside the tower, and a phone: unchanged. ---- */
 @media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
@@ -859,7 +859,7 @@
 .tw-side-fig.tw-to-move {
   transform: translateX(18px);
 }
-/* A boss's own moment that draws him somewhere else (Eric, Nov 21: Jefferson "showing twice"): his figure, and only his (`.tw-casting`,
+/* A boss's own moment that draws him somewhere else (Eric, Nov 21: Grex "showing twice"): his figure, and only his (`.tw-casting`,
    TowerBar.tsx), steps out of his part or his place beside the board for it, as a lone boss's does (styles.css, `.pm-caster`): on a phone for
    every moment he casts at the board's corner, on a computer only while the moment draws him on the board (`.boss-moment`, the Full Moon).
    Hidden, not removed: his box keeps its size and place; every other boss stays drawn. */

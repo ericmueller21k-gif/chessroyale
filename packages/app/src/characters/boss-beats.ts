@@ -8,9 +8,9 @@ import { fenAtPly, inCheck, type Base } from "@chessroyale/chess";
 
 /**
  * The moments a boss reacts to. The last five are its powers (see power-art.ts): `power` its passive firing (a pie
- * thrown, a piece frozen, a tile set alight), `powerHit` the passive's payoff landing later (G-REX: a piece burnt up
+ * thrown, a piece frozen, a tile set alight), `powerHit` the passive's payoff landing later (Grex: a piece burnt up
  * on its tile), `ultimateWarn` the one-turn warning, `ultimate` the ultimate itself, `ultimateHit` its payoff landing
- * later (G-REX: the Roman candle's fireballs coming down). `bossBeat` doesn't produce those: the power rules say when
+ * later (Grex: the Roman candle's fireballs coming down). `bossBeat` doesn't produce those: the power rules say when
  * they happen; a kit names their animations and lines.
  */
 export type Beat =
@@ -116,7 +116,7 @@ export interface BeatState {
   stage: Stage;
   fen: string;
   history: readonly string[];
-  /** Where the position changed between moves (a piece G-REX's fire destroyed): replays play from there. */
+  /** Where the position changed between moves (a piece Grex's fire destroyed): replays play from there. */
   bases?: readonly Base[];
   crowdSide: "w" | "b";
   lastMove: { captured?: string } | null;

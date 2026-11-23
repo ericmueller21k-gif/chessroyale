@@ -58,7 +58,7 @@ describe("the kit's kingAttack", () => {
 
   it("each boss's mate on your king shows its own effects, never another boss's (Eric, Nov 11: Babur's mate showed Hollow's dark)", () => {
     const kits = Object.entries(BOSS_KITS).filter(([, k]) => k.kingAttack);
-    // Its hits: an effect no other boss's attack uses (Dash's were Jefferson's fireball pops until Nov 11).
+    // Its hits: an effect no other boss's attack uses (Dash's were Grex's fireball pops until Nov 11).
     const owner = new Map<string, string>();
     for (const [name, k] of kits)
       for (let i = 0; i < KING_ATTACK.lashes; i++) {
@@ -206,7 +206,7 @@ function reach(ka: KingAttackKit, f: Anim["frames"][number], keep: (k: string) =
   return most;
 }
 
-describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boingo pies, Big Boy bonks, Ginger jabs, Jefferson fires, Chub pelts carrots, Smudgy flicks paint (Eric, Oct 18-19)", () => {
+describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boingo pies, Big Boy bonks, Ginger jabs, Grex fires, Chub pelts carrots, Smudgy flicks paint (Eric, Oct 18-19)", () => {
   for (const a of ASSAULTS)
     describe(a.kit, () => {
       const kit = bossKit(a.kit)!;
@@ -413,7 +413,7 @@ describe("Dash's attack on a king (Nov 6)", () => {
     expect(hits.map((f) => f.cue)).toEqual(kingAttackHits().map((_, i) => (i % 2 ? "snap" : "whoosh")));
     expect([kit.sounds.whoosh, kit.sounds.snap, kit.sounds.zip, kit.sounds.skid]).toEqual(["dashWhoosh", "dashSnap", "dashZip", "dashSqueak"]);
     for (const f of anim.frames) if (f.cue) expect(kit.sounds[f.cue], f.cue).toBeTruthy();
-    // (His own claw marks, high then low, from his side: Jefferson's fireball pops until Nov 11.)
+    // (His own claw marks, high then low, from his side: Grex's fireball pops until Nov 11.)
     expect(ka.hit("e1", 0, "L", 7)).toEqual({ square: "e1", name: "clawHit", anim: "hitHL", since: 7 });
     for (const a of ["hitHL", "hitHR", "hitLL", "hitLR"]) expect(EFFECTS.clawHit.ch.anims[a]!.frames.some((f) => (f.specks?.length ?? 0) > 20), a).toBe(true);
     expect(kit.chance.kingAttack).toBe(1);
@@ -440,7 +440,7 @@ describe("Dash's attack on a king (Nov 6)", () => {
 /**
  * Where each attacker looks (Eric, Oct 18: Wrangler "looks like he's hitting him without looking"): in every hit frame,
  * the features of his face (the keys below, in his head part as drawn: flipped if its layer is) against the middle of
- * the whole head. A head turned to one side (Sawyer, Wrangler, Jefferson) or eyes glancing (Big Boy, Ginger) must point
+ * the whole head. A head turned to one side (Sawyer, Wrangler, Grex) or eyes glancing (Big Boy, Ginger) must point
  * the way his prop goes, toward the king (`facesLeft`: our left), by most of a pixel; a face drawn front on (Boingo,
  * Hollow, Alfil, as all their art) must be front on, so it can't be turned away either. Then, on the board, for a king
  * on every file: his drawing is mirrored exactly when that keeps his face and his prop toward the king.

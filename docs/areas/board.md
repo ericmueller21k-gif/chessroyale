@@ -203,7 +203,7 @@ game settings (`prefs.ts`). Your arrows' size: `USER_ARROW` (logic.ts); their co
 - Haptics: `packages/app/test/haptics.test.ts` (the way picked, patterns from `HAPTICS`, Vibration off, never throwing,
   an iPhone's ticks, an iPhone's press-down tick played at the lift (same finger, square, within holdMs) and Android's at once, the boss cues, once per key; `pickedUp`).
 - e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`. `e2e/perf.spec.ts`
-  checks the board isn't drawn every frame while Jefferson's Roman candle plays over it (`hbDraws`).
+  checks the board isn't drawn every frame while Grex's Roman candle plays over it (`hbDraws`).
   `e2e/castling.spec.ts` castles by tap-tap and drag, normal chess and Chess960 (both gestures).
 - Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] [moves] [power]` reports each boss effect's frames
   and long tasks (`fxBy`); `PERF_DIST`, `PERF_NO_BUILD` compare two builds.

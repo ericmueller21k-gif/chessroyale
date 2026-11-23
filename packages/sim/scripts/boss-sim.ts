@@ -409,7 +409,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // only these are power turns (powerTurn, Eric's (b)); the rest count.)
       const bigboy = { topples: [] as { at: number; by: "crowd" | "piece" | "self"; height: number; blocks: number }[], tallest: 0, toyTurns: 0, limitedTurns: 0 };
       const toppleSeen = new Set<string>();
-      // (Jefferson: what his fire did to the crowd's pieces: the sparkler's burns; the Roman candle's chars (Eric, Nov 20: a piece
+      // (Grex: what his fire did to the crowd's pieces: the sparkler's burns; the Roman candle's chars (Eric, Nov 20: a piece
       // its fire reaches is charred the first time) and its burns, and of those the material in pawns.)
       const grex = { sparkBurnt: 0, charred: 0, candleBurnt: 0, fizzled: 0, lost: 0 };
       const burnSeen = new Set<string>();

@@ -111,7 +111,7 @@ const SAMPLE_FILES = {
 } as const;
 
 /**
- * G-REX's Roman candle whistle is synthesised (characters/grex-sounds.ts: three variants, a little pitch either way,
+ * Grex's Roman candle whistle is synthesised (characters/grex-sounds.ts: three variants, a little pitch either way,
  * now and then a crackle). To use a recorded whistle instead, put the file in public/sounds/grex/ (credit it in
  * CREDITS.md) and set its path here, e.g. "/sounds/grex/whistle.mp3": every shot then plays it, with the same pitch
  * spread and crackles, at GREX_WHISTLE_FILE_LEVEL (trim it so the whole volley stays under a move's loudness).
@@ -894,7 +894,7 @@ export type SoundName =
   | "gingerSparkle"
   | "gingerThump"
   | "gingerGust"
-  // G-REX (a raid boss, the Fire boss): synthesised, see characters/grex-sounds.ts.
+  // Grex (a raid boss, the Fire boss): synthesised, see characters/grex-sounds.ts.
   | "grexCrackle"
   | "grexWhoosh"
   | "grexFizz"
@@ -1343,7 +1343,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gingerBurst: ginger("burst"),
   gingerWhoosh: ginger("whoosh"),
   gingerStab: ginger("stab"),
-  // (The elves' steps a little random in pitch, as Jefferson's crew's clops.)
+  // (The elves' steps a little random in pitch, as Grex's crew's clops.)
   gingerStep: (t) => buffer(gingerSound("step", ctx!.sampleRate), t, 0.9 + 0.2 * Math.random()),
   gingerHeave: ginger("heave"),
   gingerClack: ginger("clack"),
@@ -1667,7 +1667,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
 };
 
 /**
- * Synthesised sounds that can be made ahead (warmSounds), by name: Boingo's, Ginger's, Jefferson's (his three candle
+ * Synthesised sounds that can be made ahead (warmSounds), by name: Boingo's, Ginger's, Grex's (his three candle
  * whistles and the crackle took about 180 ms to make the first time a shot went up, on a computer: Oct 14), Hollow's
  * (his smash took 150 ms on a computer), Big Boy's, Sawyer's, Wrangler's, Alfil's, Chub & Chirp's. Each a list of its module and name (a few for one cue).
  */

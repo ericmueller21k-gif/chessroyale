@@ -11,7 +11,7 @@ describe("the boss template: who can be met", () => {
     expect(playableBosses([base, { ...base, id: "y", kit: null }, { ...base, id: "z", powers: null }]).map((b) => b.id)).toEqual(["x"]);
   });
 
-  it("today: Ginger (Freeze), Boingo the Clown, Jefferson (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce), Sawyer (saw cuts, the board saw), Wrangler (the lasso drag, the showdown), Alfil (Tusks, the Mammoth Slam), Chub & Chirp (Leapfrog, the Carrot Patch), Smudgy (Camouflage, Repaint), Moo & Moon (Moonbeam, the Full Moon), Puddles (Seeds, Watering), Babur (Balloons, Hoops) and Folio (Draft, Crease)", () => {
+  it("today: Ginger (Freeze), Boingo the Clown, Grex (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce), Sawyer (saw cuts, the board saw), Wrangler (the lasso drag, the showdown), Alfil (Tusks, the Mammoth Slam), Chub & Chirp (Leapfrog, the Carrot Patch), Smudgy (Camouflage, Repaint), Moo & Moon (Moonbeam, the Full Moon), Puddles (Seeds, Watering), Babur (Balloons, Hoops) and Folio (Draft, Crease)", () => {
     expect(playableBosses().map((b) => b.id).sort()).toEqual(["alfil", "bigboy", "clown", "folio", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy", "tiger"]);
     expect(BOSS_ROSTER.find((b) => b.id === "tiger")).toMatchObject({ name: "Babur", icon: "🐯", kit: "Tiger", offset: -250, powers: { passive: "balloons", ultimate: "hoops" } });
     expect(BOSS_ROSTER.find((b) => b.id === "gardener")).toMatchObject({ name: "Puddles", icon: "🦛", kit: "Gardener", offset: -250, powers: { passive: "seeds", ultimate: "water" } });
@@ -23,7 +23,7 @@ describe("the boss template: who can be met", () => {
     expect(BOSS_ROSTER.find((b) => b.id === "sawyer")).toMatchObject({ name: "Sawyer", icon: "🪚", kit: "Sawyer", powers: { passive: "cuts", ultimate: "boardsaw" } });
     expect(BOSS_ROSTER.find((b) => b.id === "bigboy")).toMatchObject({ name: "Big Boy", icon: "🍭", kit: "Big Boy", powers: { passive: "blocks", ultimate: "bounce" } });
     expect(BOSS_ROSTER.find((b) => b.id === "hollow")).toMatchObject({ name: "Hollow", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } });
-    expect(BOSS_ROSTER.find((b) => b.id === "grex")).toMatchObject({ name: "Jefferson", kit: "Jefferson", powers: { passive: "sparkler", ultimate: "candle" } });
+    expect(BOSS_ROSTER.find((b) => b.id === "grex")).toMatchObject({ name: "Grex", kit: "Jefferson", powers: { passive: "sparkler", ultimate: "candle" } });
     expect(BOSS_ROSTER.find((b) => b.id === "gingerbread")!.powers).toEqual({ passive: "freeze", ultimate: "blizzard" });
     expect(BOSS_ROSTER.find((b) => b.id === "clown")!.powers).toEqual({ passive: "pie", ultimate: "funhouse" });
   });
@@ -40,9 +40,9 @@ describe("the boss template: who can be met", () => {
     expect(isPlayable(crowdFinalBoss())).toBe(false);
   });
 
-  it("Jefferson was G-REX (Eric, Oct 10): his id stays grex, and a test link's ?boss=jefferson meets him too", () => {
+  it("Grex was G-REX (Eric, Oct 10): his id stays grex, and a test link's ?boss=jefferson meets him too", () => {
     for (const q of ["jefferson", "Jefferson", "grex"]) expect(bossIdFromLink(q)).toBe("grex");
-    expect(bossDef(bossIdFromLink("jefferson"))?.name).toBe("Jefferson");
+    expect(bossDef(bossIdFromLink("jefferson"))?.name).toBe("Grex");
     expect(bossIdFromLink("hollow")).toBe("hollow");
     expect(bossIdFromLink("1600")).toBe("1600");
     expect(bossIdFromLink(null)).toBeNull();

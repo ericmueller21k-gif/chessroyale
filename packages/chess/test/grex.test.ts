@@ -276,7 +276,7 @@ describe("the test trigger", () => {
 // White: Kg1, Nf3, pawns f2 g2 h2; Black: Kg8, pawns.
 const KN_FEN = "6k1/5ppp/8/8/8/5N2/5PPP/6K1 w - - 0 1";
 
-describe("G-REX's fire tiles", () => {
+describe("Grex's fire tiles", () => {
   it("the sparkler lands on the crowd's half, never on its king, empty or occupied; the same everywhere", () => {
     const seen = new Set<string>();
     for (let seed = 0; seed < 200; seed++) {
@@ -511,7 +511,7 @@ describe("the Roman candle", () => {
   });
 });
 
-describe("Jefferson's candle on his own half, and his fireproof laugh (Eric, Oct 11)", () => {
+describe("Grex's candle on his own half, and his fireproof laugh (Eric, Oct 11)", () => {
   it("a wave's own share falls on his half, the rest on the crowd's: never the crowd king's square, spread, the same from the seed", () => {
     for (let seed = 0; seed < 40; seed++) {
       const sq = chooseFireballs(RUY_FEN, "w", seed, 6, 4, [], 2);
@@ -557,7 +557,7 @@ describe("Jefferson's candle on his own half, and his fireproof laugh (Eric, Oct
   });
 });
 
-describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov 20)", () => {
+describe("Grex's Roman candle chars a piece first, then burns it (Eric, Nov 20)", () => {
   // (After the crowd's move h2-h3: the knight on f3 left on a tile of the candle's, ablaze on turn 4.)
   const AFTER = applyMove(KN_FEN, "h2h3");
   const onFire = (patch: Partial<BossState["powers"] & object> = {}, square = "f3", candle = true) =>
@@ -640,7 +640,7 @@ describe("Jefferson's Roman candle chars a piece first, then burns it (Eric, Nov
   it("the marks follow their pieces through every move, his and the crowd's, solo and online, and a rejoin keeps them", async () => {
     const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "gingerbread", lastStandFrom: 999 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(2), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
-    // Jefferson in Ginger's place, a tile of his candle's ablaze under the knight on f3.
+    // Grex in Ginger's place, a tile of his candle's ablaze under the knight on f3.
     const fen = runner.boards.get(0)!.fen;
     runner.state = { ...runner.state, boss: { ...runner.state.boss!, id: "grex", powers: { ...initPowers(7, fen, "w"), turn: 1, nextPassive: 99, fire: [{ square: "f3", lit: -1, candle: true }] } } };
     // (Only charred: the judge counts nothing lost.)
@@ -745,7 +745,7 @@ describe("the judge treats a piece left to burn as already gone", () => {
   it("in a match, the runner scores the escape as the best and the burn happens after the crowd's move", async () => {
     const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "gingerbread", lastStandFrom: 999 } as Settings;
     const runner = new MatchRunner({ settings, rng: mulberry32(2), engines: [fakeEngine()], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
-    // G-REX in Ginger's place, with a tile ablaze under the knight on f3.
+    // Grex in Ginger's place, with a tile ablaze under the knight on f3.
     const fen = runner.boards.get(0)!.fen;
     runner.state = { ...runner.state, boss: { ...runner.state.boss!, id: "grex", powers: { ...initPowers(7, fen, "w"), turn: 1, nextPassive: 99, fire: [{ square: "f3", lit: -1 }] } } };
     expect(ablaze(runner.boss)).toEqual(["f3"]);

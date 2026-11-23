@@ -1,5 +1,5 @@
 /**
- * Jefferson's warehouse crew, pure (Nov 4; docs/decisions/2026-11-04-jefferson-home.md): the two machines on their loops and the
+ * Grex's warehouse crew, pure (Nov 4; docs/decisions/2026-11-04-jefferson-home.md): the two machines on their loops and the
  * crew's walk over to the table in his intro. No DOM; tested in packages/app/test/shop-grex.test.ts. The room (ShopRoom.tsx) draws
  * them from their baked sheets (grex-crew-sheets.ts).
  *

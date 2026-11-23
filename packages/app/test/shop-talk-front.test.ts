@@ -102,7 +102,7 @@ describe("Shopkeepers talk from in front of their counter (Nov 21)", () => {
     expect(at("hollow")).toEqual(["5,5", "6,5"]);
     // (Ginger's elf: the counter's front, not the catwalk beside him.)
     expect(at("gingerbread")).toEqual(["9,7", "10,7"]);
-    // (Babur's Stripes beside the counter's east end; Jefferson's dealer with none; Chandy's frog behind his stand.)
+    // (Babur's Stripes beside the counter's east end; Grex's dealer with none; Chandy's frog behind his stand.)
     expect(at("tiger")).toEqual(["12,3", "13,3"]);
     expect(at("grex")).toEqual(["16,4", "17,4"]);
     expect(at("chandy")).toEqual(["9,4", "10,4"]);
