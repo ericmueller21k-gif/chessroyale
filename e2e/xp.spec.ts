@@ -418,16 +418,22 @@ test(`a solo battle left mid-game: the reload's card, "You have a game in progre
   expect(marks[0]).toMatchObject({ mode: "boss", players: 1, bossId: "gingerbread" });
   await yourTurn();
   const before = await position();
+  // (The reload's account load slowed, and Resume tapped the moment the card shows, as a fast player would: Nov 23, main's run
+  // 45088115360 had the card close and come back with nothing started.)
+  const slowMe = /\/api\/me\?/;
+  await page.route(slowMe, async (r) => (await new Promise((f) => setTimeout(f, 1_500)), r.continue()));
   await page.reload();
   await expect(card).toBeVisible({ timeout: 30_000 });
+  await page.unroute(slowMe);
   await expect(card).toContainText("Ginger · Move 12");
   await expect(card).toContainText("Forfeiting counts as a loss.");
-  expect(await recent()).toEqual([]);
-  // Resume: the same battle, the same board, your turn.
+  // Resume: the same battle, the same board, your turn; nothing recorded.
   await card.getByRole("button", { name: "Resume" }).click();
   await expect(card).toHaveCount(0);
   await yourTurn();
+  await expect(card).toHaveCount(0);
   expect(await position()).toEqual(before);
+  expect(await recent()).toEqual([]);
   // A reload again, and Forfeit: one loss on your profile, a boss battle lost, solo.
   await page.reload();
   await expect(card).toBeVisible({ timeout: 30_000 });
@@ -464,6 +470,32 @@ function loseFast(fen: string, allowed: readonly string[] | null): string {
   const toMiddle = (m: (typeof legal)[number]) => Math.abs(Number(m.to[1]) - 4.5) < Math.abs(Number(m.from[1]) - 4.5);
   return (legal.find(letsMate) ?? legal.find((m) => m.piece === "k" && toMiddle(m)) ?? legal.find((m) => m.piece === "p" && "fg".includes(m.from[0]!)) ?? legal.find((m) => m.piece === "k") ?? legal[0]!).lan;
 }
+
+test.describe(() => {
+  // (No service worker: it answers the game's files from its copy, so a failed load can't be staged through it.)
+  test.use({ serviceWorkers: "block" });
+  test("Resume whose game won't load: the page loads again and the tap goes on there, the same board, never the card again (main's run 45088115360, Nov 23)", { tag: "@phone-only" }, async ({ page }) => {
+    test.setTimeout(3 * 60_000);
+    const log = pageLog(page);
+    await page.goto("/?debug&boss=gingerbread");
+    await bossAloneNow(page, log);
+    await playOwnMoves(page, 2);
+    await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+    const before = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }));
+    // (The solo game's code fails to load until the page loads again: stale.ts's reload, as for a deploy's missing file.)
+    const loads = log.loads;
+    let failed = 0;
+    await page.route(/\/assets\/solo-[^/]*\.js$/, (r) => (log.loads - loads >= 2 ? r.continue() : (failed++, r.abort())));
+    await page.reload();
+    const card = page.getByTestId("game-in-progress");
+    await card.getByRole("button", { name: "Resume" }).click({ timeout: 30_000 });
+    await expect.poll(() => log.loads - loads, { timeout: 30_000 }).toBe(2);
+    expect(failed).toBeGreaterThan(0);
+    await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+    await expect(card).toHaveCount(0);
+    expect(await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }))).toEqual(before);
+  });
+});
 
 test("a solo battle played to its end (lost by mate, not resigned): nothing kept, and Play again asks nothing (the review of #885, I4)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
