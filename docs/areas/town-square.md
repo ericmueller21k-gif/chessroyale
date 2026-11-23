@@ -489,7 +489,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   page at K, to try sizes; read once as the page opens (`test-switches.ts`).
   **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
   ride listed in `RIDE_SOUND.rides` (its file `/sounds/rides/<id>.wav`) sounds as your own pawn moves on it, in the town and a shop's
-  room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower and the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) (`kind: "loop"`)
+  room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower, the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) and Birdie's Train (Nov 23; `synth`: no file, his own medium train run made in code, looped over its last four puffs, `BIRDIE_RIDE_LOOP`) (`kind: "loop"`)
   loop: a hard start and stop, no fades (Nov 16, Eric: "it should be a hard start and stop ... Like boingo";
   [2026-11-16-ride-sound-hard.md](../decisions/2026-11-16-ride-sound-hard.md)): full level and speed on your first moving frame; it
   counts as moving until `holdMs` (120) after your last moving frame, then stops. Each end takes 30 ms (`DECLICK_S`, the Sound
@@ -952,6 +952,7 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 - **Front** (`houses/birdie.ts`, the art as drawn, 144 × 250): a little train station, a big nest on its roof; Meadow Street 16-19 (the lamp at 20 moved to 21). Birdie roams out front (`BIRDIE_TOWN`); a tap plays his `hello`.
 - **Lobby** (`shops/birdie-art.ts`): the art's one 12 × 12 picture (`birdie-lobby-art.ts`) cut into the room's pieces at their feet, drawn back pixel for pixel (`shop-birdie.test.ts`); the bartender pigeon (`birdiebartender`) behind the bar's front run, his scoop dipping in the vat beside him and pouring into a counter feeder (both moved for it). The split-flap board is written by the game (`shops/flap-board.ts`, `RoomArt.flaps`, `SHOP_FEEL.flaps`): this town's buildings, never the walk-up; a row flips every 7 s, the page every 30 s, only the moving flaps drawn (`__shopFlaps()`).
 - **Challenge** (`shops/intros/birdie.ts`): the middle table and its stools (`ring-` floor) are the battle spot; his hello with his line, the board's pop, the default wipe (his toot). e2e `birdie-home.spec.ts`.
+- **His crate** (Nov 23, [decision](../decisions/2026-11-23-birdie-ride-crate.md)): the bartender's Talk opens Birdie's Boss Crate, his Train first, as every Shopkeeper's; the lobby has no crate drawn on the bar, so the card and its pop-up show the Crates tab's crate (`CardCrate`), in the same 90 × 81 box. e2e `shop.spec.ts`.
 
 ## Challenging a boss (Nov 2: Pokémon-gym style)
 

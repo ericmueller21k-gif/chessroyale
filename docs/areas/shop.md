@@ -75,8 +75,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   all Mythic, with a color, a purity and shine like every item: **Riding Chirp**, **Moon's Ride**, and (Nov 1) **Hollow's Bulb** (two
   colors: the glass and its glow), **Brush Ride**, **Alfil's Howdah**, **Balloon Pup**, **Big Boy's Buggy**, **Boingo's Pogo**, **Paper
   Crane**, **Candy Cane Sled**, **Giraffe Gallop**, **Puddles's Mower**, **Sawyer's Dozer**, **Rodeo Bull**, **Cheetah Shoes** (Dash's, in his crate since Nov 3:
-  twice as fast in the town), **The Log Roller** (Timber's) and **Pen Pony** (Wrangler's, Nov 4, in his crate from the start: a pen
-  knight saddled, the knight your pawn's color, only its blanket the item's color). Their names and lines are the drawings' own. **In no crate yet** (the
+  twice as fast in the town), **The Log Roller** (Timber's), **Pen Pony** (Wrangler's, Nov 4, in his crate from the start: a pen
+  knight saddled, the knight your pawn's color, only its blanket the item's color) and **Birdie's Train** (Nov 23, in his crate from the
+  start: his little diesel, long and low, its body the item's color, Yellow his train's own; its moving sound his own train run, made in
+  code: [2026-11-23-birdie-ride-crate.md](../decisions/2026-11-23-birdie-ride-crate.md)). Their names and lines are the drawings' own. **In no crate yet** (the
   crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
   **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
   `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Nov 1; Moon's Ride redrawn as a rounded star Nov 17, from `out/star-ride/`, its id kept; the same day its pawn sunk into a hollowed-out seat, cut 70, and the edge round the seat curved so nothing beside the pawn is cut straight; then the star drawn once, behind the pawn, which a ride's `pose.hide` clips below the seat's lip: nothing of a ride's drawing over the pawn, [2026-11-17-star-seat-one-layer.md](../decisions/2026-11-17-star-seat-one-layer.md)) into
@@ -98,7 +100,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
   (the town's cells for it; a test fails until it's run).
-- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Grex's with Giraffe Gallop, everyone's; Nov 5, Ginger's with the Candy Cane Sled, everyone's (its id `boss-gingerbread`: his boss id is also the Gingerbread Man skin's item id, and nothing confuses the two), and Folio's with the Paper Crane, everyone's; Nov 6, Smudgy's with the Brush Ride and Boingo's with Boingo's Pogo, everyone's; town-square.md, "Inside a shop"): the
+- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Grex's with Giraffe Gallop, everyone's; Nov 5, Ginger's with the Candy Cane Sled, everyone's (its id `boss-gingerbread`: his boss id is also the Gingerbread Man skin's item id, and nothing confuses the two), and Folio's with the Paper Crane, everyone's; Nov 6, Smudgy's with the Brush Ride and Boingo's with Boingo's Pogo, everyone's; Nov 23, Birdie's with Birdie's Train, admins first as he is, its card's picture the Crates tab's crate as his lobby draws none; town-square.md, "Inside a shop"): the
   Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
   tokens, or 1 token and 1 crate key) and what you have. Since round 2 (below) buying is real.
 - **Boss tokens, crate keys and buying a boss crate** (Nov 2, round 2; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md);
@@ -130,7 +132,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     token shows (`TokenArt.tsx`: 40 × 40 crisp; `animate` plays its idle, the result box's; a plain gold coin for a boss with none). Every
     live boss, Timber and Dash have one (Dash's is the art's `TOKEN_BLITZ`).
   - **The crates** (`BOSS_CRATES` in core's crates.ts, beside `CRATES` but never in it, so the Crates tab can't open one free; Timber's and
-    Dash's, Nov 3, listed to admins and whoever holds one while they're in the game for admins first, and not in the FAQ; Dash's ride
+    Dash's, Nov 3, and Birdie's, Nov 23, listed to admins and whoever holds one while they're in the game for admins first, and not in the FAQ; Dash's ride
     is Cheetah Shoes): Babur's
     and Puddles', each the boss's ride (the only Mythic, the only item behind Fischer Random: 2%) and the Beta Crate's 24 Common to
     Epic items in its boxes, at the existing crates' odds; rolled on the server as every crate.
