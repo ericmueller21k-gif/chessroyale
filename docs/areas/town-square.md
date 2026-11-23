@@ -489,7 +489,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   page at K, to try sizes; read once as the page opens (`test-switches.ts`).
   **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
   ride listed in `RIDE_SOUND.rides` (its file `/sounds/rides/<id>.wav`) sounds as your own pawn moves on it, in the town and a shop's
-  room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower, the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) and Birdie's Train (Nov 23; `synth`: no file, his own medium train run made in code, looped over its last four puffs, `BIRDIE_RIDE_LOOP`) (`kind: "loop"`)
+  room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower, the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) and Birdie's Train (Nov 23; `synth`: no file, his own medium train run made in code, looped over its last four puffs, `BIRDIE_RIDE_LOOP`; made as the town shows, before the audio too, never on a moving frame) (`kind: "loop"`)
   loop: a hard start and stop, no fades (Nov 16, Eric: "it should be a hard start and stop ... Like boingo";
   [2026-11-16-ride-sound-hard.md](../decisions/2026-11-16-ride-sound-hard.md)): full level and speed on your first moving frame; it
   counts as moving until `holdMs` (120) after your last moving frame, then stops. Each end takes 30 ms (`DECLICK_S`, the Sound

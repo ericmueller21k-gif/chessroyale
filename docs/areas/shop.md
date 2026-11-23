@@ -182,7 +182,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     3/5" (greyed until earned; a guest's adds "Sign in to earn it."), "You have 1. Open it!", "Opened. Its ride is in your locker.".
     Its page lists every ride it can give (each as likely), no purity; "▶ Open" (greyed unless yours is waiting) opens it with the
     usual strip, Fischer Random ("A HunChess ride") and the reveal ("Not tradeable", no purity, no "Open another").
-  - **The prize:** one ride, any of the game's rides, each as likely, in the **HunChess colorway** (`<ride>-hunchess`, its own item:
+  - **The prize:** one ride, any of the game's rides but an admins-first boss's (Nov 23, `welcomeRide`: Timber's, Dash's and Birdie's for
+    now, 15 rides at 6.67%; each back by itself when its boss goes live; holders keep theirs;
+    [2026-11-23-welcome-crate-admin-first.md](../decisions/2026-11-23-welcome-crate-admin-first.md)), each as likely, in the **HunChess colorway** (`<ride>-hunchess`, its own item:
     `HUNCHESS_RIDES` in crates.ts, made from every ride; "HunChess Balloon Pup"), rolled and stored by the server
     (`POST /api/locker/open {crate: "welcome-hunchess"}`: one transaction, opened once; again answers the same ride). Drawn from its
     ride's drawing, cells, size and pace (`components/rides/hunchess.tsx`: an SVG filter remapping each ride layer to black, gold and
