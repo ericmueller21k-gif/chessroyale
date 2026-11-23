@@ -1,1 +1,1 @@
-done
+done: the town checks as multiples of a reference job (first frame < 20, longest task < 2); trace and ideas in docs/decisions/2026-11-23-town-load-bound.md. The move-list fix is on claude/perf-movelist.

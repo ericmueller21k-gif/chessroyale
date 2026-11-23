@@ -16,9 +16,13 @@ is 0.5 s; the network is idle.
 
 **What changed.** The check times a fixed job in the same page under the same slowing (`townRefJob` in `e2e/perf.spec.ts`:
 picture-like pixel grids built as strings, read into pixels and put on canvases, about 1 s; the middle of three), and the load must
-stay under **20** of them. Measured: 14.4 to 17.2 at 4x (median 15.6), and 14.5 to 16.7 at 2x where the load took half as long,
-so it follows a change in the town, not the machine. 20 is the median and about a quarter. The loading screen's 3 s and the
-longest task's 2 s are still in milliseconds (they passed: 2.1 to 2.7 s and 1.5 to 1.95 s; the second is close).
+stay under **20** of them. Measured over 10 runs at 4x: 13.4 to 18.1 (median about 16; an admin's town runs a little higher),
+and 14.5 to 16.7 at 2x where the load took half as long, so it follows a change in the town, not the machine. 20 is the median and
+a quarter, about 10% over the highest run: a regression of a quarter shows, and a run that reads high once may be noise (re-run
+it, as CI's flake rule). The longest task the same way (the
+director, Nov 23): it was under 2 s, and measured 1.5 to 1.97 s here; now under **2** reference jobs (measured 1.3 to 1.83 at 4x
+and 2x, about 1.5 the middle: a third over it, as 2 s was over 1.5 s). The loading screen's 3 s stays in milliseconds (2.1 to
+2.8 s here).
 
 **Optimizations looked at (time-boxed, Eric's rule kept: everything painted on the loading screen).**
 - Identical frames in a loop (a third of the bosses' town frames) sharing one canvas: 2,787 → 2,620 pictures, but the time didn't

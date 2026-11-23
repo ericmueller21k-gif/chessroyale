@@ -549,6 +549,8 @@ function townRefJob(): number {
 }
 /** The town's first frame may take this many reference jobs (`townRefJob`): set Nov 23 from this machine's runs, a quarter over. */
 const TOWN_LOAD_REFS = 20;
+/** And its longest task (`townRefJob`s; Nov 23). */
+const TOWN_LONG_REFS = 2;
 
 // (Nov 13: the street town is everyone's: a player's (a guest's here) and an admin's, both with the loading screen; before, a player's was the
 // old Canvas 2D town, timed to its first frame under 2.5 s.)
@@ -597,7 +599,9 @@ for (const who of ["a player's town", "an admin's town"] as const)
     // on the same machine. Now a multiple of the reference job, set from those runs with a quarter's room:
     // docs/decisions/2026-11-23-town-load-bound.md.)
     expect(loaded / ref, "tap to the town's first frame, in reference jobs").toBeLessThan(TOWN_LOAD_REFS);
-    expect(long, "longest task (ms)").toBeLessThan(2000);
+    // (The longest task too, Nov 23: under 2 s until then, close to it on a slower machine (1.97 s). Measured 1.3 to 1.8 reference
+    // jobs at 4x and 2x slowing, about 1.5 the middle: 2 is about a third over it, as 2 s was over the 1.5 s it measured.)
+    expect(long / ref, "longest task, in reference jobs").toBeLessThan(TOWN_LONG_REFS);
   });
 
 test("Moo & Moon's Full Moon cinematic on a slow phone: the hop, the field, the close-up, the transformation and the hop back stay within budget, the first time they show (Nov 17)", { tag: "@perf" }, async ({ page }) => {
