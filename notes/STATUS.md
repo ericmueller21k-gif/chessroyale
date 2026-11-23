@@ -1806,3 +1806,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~17:00: #907 whistles open (f6f619c5), CI watcher bagzq0g1h; boss-lane quick review NOT yet started (Opus slots: music medium +
   tail high session_01JuCWRuZRPHWMgtg61MmXVy brief birdie-tail-train-smooth). Start the review when the music job ends.
   Birdie town scale 0.75 relayed into the music job.
+- Nov 23 ~17:30: #908 (room music off, Birdie token, town scale 0.75) merged 2361915, main GREEN. #907 (whistles) merged eba5084, main run
+  pending. Review nits queued: stale "run" comments (BossCharacter.tsx:400, birdie.ts:798, birdie-figure.ts:104); per-sound "heard" floor
+  (-9 for four, -11 only for peeps); birdieWhistle toot param unused in app; kit.sounds runShort/runLong names hold whistles.
+  Still running: tail+smooth session_01JuCWRuZRPHWMgtg61MmXVy; lobby round 4 art (waiting on Eric's spend OK).
