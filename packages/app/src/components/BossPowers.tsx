@@ -26,7 +26,7 @@ import { TIMBER_UI } from "./Timber.tsx";
 import { DASH_UI } from "./Dash.tsx";
 import { ZEBRA_UI } from "./Zebra.tsx";
 import { CHANDY_UI } from "./Chandy.tsx";
-import { BIRDIE_UI } from "./Birdie.tsx";
+import { BIRDIE_UI, birdieDecor } from "./Birdie.tsx";
 import { Cast, PowerBanner, kitLine, momentKey, rageWarn, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
@@ -396,7 +396,7 @@ export function battleDecor(
     const follow = <M extends { square: string; piece: string; n: number }>(m: M[] | undefined) => (m?.length ? followSplats(m, pending.move, pending.fen, b.crowdSide) : m);
     return { ...b, powers: { ...p, splats: follow(p.splats), charred: follow(p.charred) } };
   };
-  return joinDecor(boingoDecor(part("clown"), moments, now), grexDecor(part("grex"), burnt, since, now));
+  return joinDecor(boingoDecor(part("clown"), moments, now), grexDecor(part("grex"), burnt, since, now), birdieDecor(part("birdie"), moments, now));
 }
 
 /**

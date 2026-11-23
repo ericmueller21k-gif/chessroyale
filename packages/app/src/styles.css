@@ -28638,3 +28638,7 @@ body.dash-away .bc-bubble:not(.dash-say) {
   image-rendering: pixelated;
   pointer-events: none;
 }
+/* Your king smashed by his train (`trainWin`): gone from its square from the hit on, through the result (Birdie.tsx, birdieDecor). */
+piece.bd-smashed {
+  opacity: 0;
+}

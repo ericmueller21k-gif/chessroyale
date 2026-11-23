@@ -4,6 +4,7 @@ import { BIRDIE_CROSSING, BIRDIE_SMASH, BIRDIE_TRAIN } from "../characters/effec
 import { noteArmor } from "../characters/birdie-state.ts";
 import { rejoinedAt } from "../characters/moo-state.ts";
 import type { BossView } from "../game.ts";
+import type { PieceDecor } from "../board/types.ts";
 import { CRITICAL } from "../speech.tsx";
 import { onResetBeats } from "./boss-figure.ts";
 import { BirdieFall, prewarmBirdieFall } from "./BirdieFall.tsx";
@@ -90,26 +91,42 @@ export function birdieTurnMoments(boss: BossView, now = Date.now()): Moment[] {
 /** His train's ride among the moments now (a smash, a sparing, or your king), or null. */
 const rideOf = (moments: readonly Moment[]) => moments.find((m) => m.kind === "trainSmash" || m.kind === "trainWin") ?? null;
 
+/** The kings on `squares` (never taken off a drawn board: code reading it as chess would refuse a position without one). */
+const kingsOn = (fen: string, squares: readonly string[]) => squares.filter((sq) => pieceAt(fen, sq)?.type === "k");
+
 /**
  * The position the board shows during his train's ride (`fen`: the game's, the smash already made): the piece it smashes back on its
- * square until the ride begins; every piece on the line off the board while it rides (the layer draws them stepping aside, the smashed
- * one until the train reaches it); your king off its square from the train's hit on, for the rest of the battle, when it won. `still`:
- * the board doesn't animate those changes. Null: no ride now (the position as it is).
+ * square until the ride begins; every piece on the line but a king off the board while it rides (the layer draws them stepping aside,
+ * the smashed one until the train reaches it; a king stays, the train passing over it). `still`: the board doesn't animate those
+ * changes. Null: no ride now (the position as it is). Your king smashed is hidden by its decor (birdieDecor), never taken off.
  */
 export function birdieFen(boss: Pick<BossView, "id" | "crowdSide" | "crowdMoves" | "powers">, moments: readonly Moment[], now: number, fen: string): { fen: string; still: boolean } | null {
   if (boss.id !== "birdie") return null;
   const ride = boss.powers?.birdie?.ride ?? null;
   const m = rideOf(moments);
-  const won = !!ride?.king && ride.at === boss.crowdMoves;
-  if (!m || !m.squares?.length || !ride) {
-    // (The battle won by the train: the king stays smashed through the result.)
-    return won && !m ? { fen: withoutPiece(fen, ride!.square), still: true } : null;
-  }
+  if (!m || !m.squares?.length || !ride) return null;
   const t = now - m.at;
   const smashed = !ride.spared && !ride.king;
   if (t < B.ride.rideAt) return smashed ? { fen: withPiece(fen, ride.square, { color: boss.crowdSide, type: ride.piece }), still: true } : null;
-  if (t < B.ride.backAt) return { fen: m.squares.reduce((f, sq) => withoutPiece(f, sq), fen), still: true };
-  return won ? { fen: withoutPiece(fen, ride.square), still: true } : null;
+  if (t < B.ride.backAt) {
+    const kings = kingsOn(fen, m.squares);
+    return { fen: m.squares.filter((sq) => !kings.includes(sq)).reduce((f, sq) => withoutPiece(f, sq), fen), still: true };
+  }
+  return null;
+}
+
+/**
+ * Your king smashed by his train (`trainWin`): its board piece hidden from the train's hit on, through the result (the battle his), by
+ * a class on its element (`bd-smashed`), the position as it is. Undefined: nothing to hide.
+ */
+export function birdieDecor(boss: Pick<BossView, "id" | "crowdSide" | "crowdMoves" | "powers"> | null | undefined, moments: readonly Moment[], now: number): PieceDecor | undefined {
+  const ride = boss?.id === "birdie" ? boss.powers?.birdie?.ride : null;
+  if (!ride?.king || ride.at !== boss!.crowdMoves) return undefined;
+  const m = rideOf(moments);
+  const i = ride.squares.indexOf(ride.square);
+  if (m && now < m.at + B.ride.rideAt + trainReaches(Math.max(0, i))) return undefined;
+  const code = `${boss!.crowdSide}k`;
+  return { key: `bd-smashed:${ride.square}`, of: (square, c) => (square === ride.square && c === code ? { cls: "bd-smashed", kids: null } : null) };
 }
 
 // ---------------- The board layer ----------------
@@ -170,7 +187,8 @@ function birdieLayer({ boss, p, moments, now, orientation, board }: BoardLayerPr
       const pieces = ride.squares.flatMap((sq, i) => {
         const smashed = sq === bd.ride!.square && !bd.ride!.spared;
         const pc = smashed ? { color: boss.crowdSide, type: bd.ride!.piece } : pieceAt(before, sq);
-        if (!pc) return [];
+        // (A king stays on the board, the train passing over it: birdieFen.)
+        if (!pc || pc.type === "k") return [];
         if (smashed && now >= reach(i)) return [];
         const c = drawnAt(sq, orientation);
         const asideAt = reach(i) - B.ride.asideMs;
