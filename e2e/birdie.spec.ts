@@ -219,7 +219,7 @@ test("Birdie's train: the crossing on his line, the dock names your piece, a sig
   const lit = warned.filter((r) => r.crossing);
   expect(lit.filter((r) => r.sign?.sq === r.warn!.square).length / lit.length, "the sign on the marked piece while its line is lit").toBeGreaterThan(0.95);
   const signs = rec.filter((r) => r.sign);
-  expect(signs.every((r) => r.sign!.opacity >= 0.35 && r.sign!.opacity <= 0.51), `see-through: ${[...new Set(signs.map((r) => r.sign!.opacity.toFixed(2)))]}`).toBe(true);
+  expect(signs.every((r) => r.sign!.opacity >= 0.59 && r.sign!.opacity <= 0.81), `see-through: ${[...new Set(signs.map((r) => r.sign!.opacity.toFixed(2)))]}`).toBe(true);
   expect(Math.max(...lit.map((r) => r.sign?.off ?? 0)), "the sign on its square (px)").toBeLessThanOrEqual(1.5);
   const yours = (await page.evaluate(() => (window as any).match.boss.crowdSide)) === "w" ? "white" : "black";
   const stray = signs.filter((r) => !r.sign!.on?.split(" ").includes(yours));

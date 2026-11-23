@@ -28648,7 +28648,7 @@ piece.bd-smashed {
 }
 /* The warning sign on the marked piece (Birdie.tsx, WarnSign; Eric, Nov 23: "a yellow train warning ⚠️ like this that's glowing over
    the tile but also a see through, make it look clean"): a yellow warning triangle over the piece's square, in eighths of the board's own
-   size, see-through so the piece reads through it (36 to 50%), its glow pulsing slowly. Only its opacity animates (composited); the
+   size, see-through so the piece reads through it (60 to 80%: the director's, Nov 23, 36 to 50% read faint on the cream squares), its glow pulsing slowly. Only its opacity animates (composited); the
    glow (a drop shadow) is drawn once. Over the ride's pieces (8), under the train (9). Vector, so its edges stay clean at any size. */
 .bd-sign {
   position: absolute;
@@ -28658,7 +28658,7 @@ piece.bd-smashed {
   height: calc(var(--board-size, 100%) / 8);
   z-index: 8;
   pointer-events: none;
-  opacity: 0.43;
+  opacity: 0.7;
   animation: bd-sign 1.8s ease-in-out infinite;
 }
 .bd-sign > svg {
@@ -28688,9 +28688,9 @@ piece.bd-smashed {
 @keyframes bd-sign {
   0%,
   100% {
-    opacity: 0.36;
+    opacity: 0.6;
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.8;
   }
 }

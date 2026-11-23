@@ -1036,7 +1036,7 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   puffing runs kept for his entrance, his ride, the town's ride loop and his challenge's wipe; `hello` his entrance and his challenge (`SELECT_SOUND`). A
   kit's `cueSound(cue, boss, yourTurn)` picks a cue's sound from the battle (null: silent); his loops' chirps only on your turn after a
   heard move of his, never as your move lands. The warning sign on the marked piece (`WarnSign` in Birdie.tsx, `.bd-sign`: a yellow
-  triangle in SVG over its square, 36 to 50% opaque, its opacity pulsing, its glow drawn once; from the crossing's light until the drawn
+  triangle in SVG over its square, 60 to 80% opaque (36 to 50% read faint on the cream squares: the director, Nov 23), its opacity pulsing, its glow drawn once; from the crossing's light until the drawn
   board no longer has the piece there, or his train reaches it). Tests: `app/test/birdie-sounds.test.ts`. His train on your king ends the battle: the runner's
   `stageComplete`/`finishBossBattle` read `trainWon`, and the board holds `powerWinShowMs` for the ride before the result (solo
   `winShownAt`, the lobby's `winShown`). Tests: `chess/test/birdie.test.ts`, `server/test/birdie-lobby.test.ts`,
