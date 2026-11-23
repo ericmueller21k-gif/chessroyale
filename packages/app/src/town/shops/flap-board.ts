@@ -259,7 +259,9 @@ export class FlapBoard {
     const x = col * cw;
     const y = this.top + row * ch;
     const pad = Math.max(1, cw * 0.06);
-    g.clearRect(x, y, cw, ch);
+    // (Its cell dark between the flaps, over the art's pictured flaps under it.)
+    g.fillStyle = this.ink.split;
+    g.fillRect(x, y, cw, ch);
     // The flap: its upper half a shade lighter, a dark split across its middle.
     g.fillStyle = this.ink.flap;
     g.fillRect(x + pad, y + pad, cw - 2 * pad, ch - 2 * pad);

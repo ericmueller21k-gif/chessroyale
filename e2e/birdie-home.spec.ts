@@ -83,7 +83,7 @@ test("his challenge: his hello as he says his line at the middle table, the boar
   const card = await birdieCard(page);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   await page.getByRole("dialog", { name: "Challenge Birdie?" }).getByRole("button", { name: "Fight" }).click();
-  await expect(page.locator('canvas.boss-storm[data-boss="birdie"][data-covered="1"]')).toBeAttached({ timeout: 90_000 });
+  await expect(page.locator('canvas.boss-wipe[data-boss="birdie"][data-covered="1"]')).toBeAttached({ timeout: 90_000 });
   const steps = await page.evaluate(() => (window as unknown as Hooks).__birdieSteps ?? []);
   expect(steps).toEqual(expect.arrayContaining(["face", "line", "board", "table"]));
   expect(steps.indexOf("line")).toBeLessThan(steps.indexOf("board"));

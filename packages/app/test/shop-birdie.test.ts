@@ -41,7 +41,14 @@ function composed(): Uint8ClampedArray {
         if (X >= 0 && Y >= 0 && X < W && Y < H) out.set(f.data.subarray(s, s + 4), (Y * W + X) * 4);
       }
   };
-  for (const p of A.SHOP_BIRDIE_ROOM_LAYOUT) blit(A.SHOP_BIRDIE_ROOM_PIECES[p.name]!, (p.col + ((p.w ?? 1) - 1) / 2 + 0.5) * T, Y0 + (p.row + 0.5) * T, isFloor(p.name) ? (p.rot ?? 0) : 0);
+  // (The floor and the plans first, as ShopRoom lays them: a plan's foot its picture's bottom, on its squares' south edge.)
+  const plan = (p: (typeof A.SHOP_BIRDIE_ROOM_LAYOUT)[number]) => !isFloor(p.name) && (p.d ?? 1) > 1 && !A.SHOP_BIRDIE_UPRIGHT.includes(p.name);
+  for (const p of A.SHOP_BIRDIE_ROOM_LAYOUT.filter((q) => isFloor(q.name) || plan(q))) {
+    const ch = A.SHOP_BIRDIE_ROOM_PIECES[p.name]!;
+    if (plan(p)) blit(ch, p.col * T + ch.foot[0], Y0 + (p.row + 1) * T);
+    else blit(ch, (p.col + 0.5) * T, Y0 + (p.row + 0.5) * T, p.rot ?? 0);
+  }
+  for (const p of A.SHOP_BIRDIE_ROOM_LAYOUT.filter((q) => !isFloor(q.name) && !plan(q))) blit(A.SHOP_BIRDIE_ROOM_PIECES[p.name]!, (p.col + ((p.w ?? 1) - 1) / 2 + 0.5) * T, Y0 + (p.row + 0.5) * T);
   return out;
 }
 
@@ -71,8 +78,9 @@ describe("Birdie's Station: the lobby, the art's picture cut into the room's pie
     const art = renderFrame(SHOP_BIRDIE_INTERIOR_3, SHOP_BIRDIE_INTERIOR_3.anims.idle!.frames[0]!).data;
     const ours = composed();
     const W = SHOP_BIRDIE_INTERIOR_3.w;
-    // (The vat's old place and new, the run's middle feeder's old place and new, the board's flaps: x0, y0, x1, y1 in the art's pixels.)
-    const moved = [[222, 106, 260, 230], [259, 186, 296, 233], [100, 0, 258, 85]];
+    // (The vat's old place and new, the run's middle feeder's old place and new, the board's flaps, and the bar's arms' north ends, under
+    // the back wall's foot now they lie flat: x0, y0, x1, y1 in the art's pixels.)
+    const moved = [[222, 106, 260, 230], [259, 186, 296, 233], [100, 0, 258, 85], [185, 85, 335, 121]];
     let diff = 0;
     for (let y = 0; y < SHOP_BIRDIE_INTERIOR_3.h; y++)
       for (let x = 0; x < W; x++) {

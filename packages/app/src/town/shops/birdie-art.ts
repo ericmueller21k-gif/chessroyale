@@ -86,6 +86,11 @@ function piece(id: string, frames: readonly (readonly At[])[], fx: number, fy: n
   return { id: `shop-birdie-${id}`, name: id, w: x1 - x0, h: y1 - y0, foot: [fx - x0, fy - y0], palette: ART.palette, parts, anims: { idle: { loop: true, frames: out } } };
 }
 
+/** A plan lying flat (ShopRoom's `flats`): one square wide and `d` deep, its layers in its own pixels from its north-west corner. */
+function plan(id: string, layers: readonly At[], d: number): Character {
+  return { id: `shop-birdie-${id}`, name: id, w: T, h: d * T, foot: [T / 2, d * T], palette: ART.palette, parts, anims: { idle: { loop: true, frames: [{ ms: 1000, layers: layers.map((l): Layer => ({ part: l.part, x: l.x, y: l.y, flipX: l.flipX })) }] } } };
+}
+
 /** A floor tile from a part's 37 x 37 square at (sx, sy), mirrored or not. */
 function tile(id: string, part: string, sx: number, sy: number, flip = false): Character {
   const g = parts[part]!.grid;
@@ -161,13 +166,25 @@ SHOP_BIRDIE_LAYOUT.forEach((src, i) => {
   const def = SHOP_BIRDIE_PIECES[p.piece]!;
   const w = p.w ?? def.w;
   const d = p.d ?? def.d;
+  // (A feeder on an arm of the bar: on the row its picture's foot is on, as the arm lies flat: below.)
+  const onArm = p.piece === "feeder" && (p.col === 5 || p.col === 8) && p.row < 4;
   const z = p.piece === "vat" ? p.row + d : zOf(p);
-  const row = Math.max(0, Math.floor(z - 1 + 1e-6));
+  const armRow = (y: number) => Math.floor((y + dims("feeder")[1] - Y0) / T);
+  const row = onArm ? armRow(Y0 + p.row * T + def.oy + (p.dy ?? 0)) : Math.max(0, Math.floor(z - 1 + 1e-6));
   const x = p.col * T + def.ox + (p.dx ?? 0);
   const y = Y0 + p.row * T + def.oy + (p.dy ?? 0);
   const fx = (p.col + w / 2) * T;
   const fy = artY(row);
   const flip = !!p.flip;
+  if (p.piece === "counter-arm") {
+    // (The bar's arms, 3 squares deep: a counter's top seen from above, so they lie flat as plans (ShopRoom's `flats`), where the art has
+    // them (their top 31 px north of their squares, the counter's height): on rows 0 to 3, the picture's foot its south edge.)
+    const name = `counter-arm-${p.col === 8 ? "e" : "w"}`;
+    const top = Y0 + (p.row - 1) * T;
+    PIECES[name] = plan(name, [{ part: partAt(p.piece, p.col, flip, 0), x: x - p.col * T, y: y - top, flipX: flip }], 4);
+    ups.push({ z: p.row - 1, i, place: { name, col: p.col, row: p.row + d - 1, d: 4, solid: true } });
+    return;
+  }
   const frames = ANIMATED.has(p.piece) ? Array.from({ length: BEATS }, (_, f) => [{ part: partAt(p.piece, p.col, flip, f), x, y, flipX: flip }]) : [[{ part: partAt(p.piece, p.col, flip, 0), x, y, flipX: flip }]];
   // (The sconce's glow behind it, as the art lays it.)
   if (p.piece === "sconce") frames[0]!.unshift({ part: "sconce-glow", x: x - 5, y: y - 14, flipX: false });
@@ -204,8 +221,8 @@ LAYOUT.push(...ups.map((u) => u.place));
 /** Every piece's place: the floor tiles first, then the upright ones in the art's order. */
 export const SHOP_BIRDIE_ROOM_LAYOUT: readonly ShopPlace[] = LAYOUT;
 export const SHOP_BIRDIE_ROOM_PIECES: Readonly<Record<string, Character>> = PIECES;
-/** The deep pieces that stand up (the bar's arms, 3 squares deep), not laid flat as a plan. */
-export const SHOP_BIRDIE_UPRIGHT: readonly string[] = Object.keys(PIECES).filter((n) => n.startsWith("counter-arm"));
+/** No deep piece stands up: the bar's arms lie flat as plans. */
+export const SHOP_BIRDIE_UPRIGHT: readonly string[] = [];
 /** The battle spot's marks: the boss west of the west stool, you east of the east one (as every room's: the boss on the left). */
 export const SHOP_BIRDIE_MARKS = { boss: [TABLE_COL - 2, TABLE_ROW], you: [TABLE_COL + 2, TABLE_ROW] } as const;
 /** The Shopkeeper's squares (inside the U, behind the run), and where you talk to him: the floor past the run's stools. */
