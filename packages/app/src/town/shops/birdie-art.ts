@@ -24,7 +24,7 @@
  */
 import type { Character, Frame, Grid, Layer, Part } from "../../characters/sprite.ts";
 import { SIDEKICK_SHEETS } from "../sidekick-sheets.ts";
-import type { LightPool, LightSpot } from "../houses/kit.ts";
+import { crate, groundShadow, paint, type LightPool, type LightSpot, type Pt } from "../houses/kit.ts";
 import { SHOP_BIRDIE_BOARD_BOX, SHOP_BIRDIE_INTERIOR_3 as ART, SHOP_BIRDIE_LAYOUT, SHOP_BIRDIE_N, SHOP_BIRDIE_PIECES, SHOP_BIRDIE_WALL_H } from "./birdie-lobby-art.ts";
 import type { ShopPlace } from "./room.ts";
 import { FlapBoard, boardStops, type FlapInk } from "./flap-board.ts";
@@ -217,6 +217,83 @@ BIRD_SEATS.forEach((b, k) => {
 });
 ups.sort((a, b) => a.z - b.z || a.i - b.i);
 LAYOUT.push(...ups.map((u) => u.place));
+
+// ---- His Boss Crate on the bar (Nov 23), as every shop's stands on its counter (Babur's: babur-art.ts SHOP_BABUR_CRATE): the houses
+// kit's wooden crate in his colors (his cap's navy, his tie's burgundy, his cap band's gold), a gold diamond on its front (his cap's),
+// a little feather of his on the lid, and the same slow glint round its gold corners. ShopRoom stands it on the run (the `counter`
+// piece) at SHOP_BIRDIE_CRATE_AT, drawn just after it; the art has none, so it's the room's own.
+
+/** Where the crate stands on the run: its foot, in the `counter` piece's pixels (the run's top, right of the middle, before his talk squares). */
+export const SHOP_BIRDIE_CRATE_AT: Pt = [99, 32];
+const CRATE_PALETTE: Record<string, string> = {
+  k: "#1d1411", // outline (his)
+  N: "#0f1328", // the planks: his cap's navy, dark to light
+  O: "#1c2850",
+  P: "#2d3f7c",
+  Q: "#4a60a8",
+  A: "#6a1222", // the bands: his tie's burgundy, dark to light
+  B: "#a52238",
+  C: "#d64a5a",
+  J: "#6e4a0c", // gold: his cap band's (K, L), a shade and a light
+  K: "#a87414",
+  L: "#f2c14e",
+  M: "#ffe58a",
+  F: "#fffaf0", // the glint
+  c: "#7c624f", // his feather: his brown, dark to light, and its shaft
+  d: "#9c8069",
+  e: "#bfa58b",
+  i: "#e6c6ac",
+  "-": "#0d0e1280", // its shadow on the bar: core, rim
+  "+": "#0d0e1244",
+};
+const XW = 30;
+const XH = 27;
+export const SHOP_BIRDIE_CRATE: Character = (() => {
+  const box = crate(1, 8, 28, 18, "NOPQ");
+  const trim = paint(1, 8, 28, 18, (x, y) => {
+    const i = x - 1;
+    const j = y - 8;
+    const corner = (i < 4 || i > 23) && (j < 4 || j > 13);
+    if (corner) return (i < 4 ? i : 27 - i) + (j < 4 ? j : 17 - j) > 4 ? null : i < 4 && j < 4 ? "M" : i > 23 || j > 13 ? "K" : "L";
+    if ((i >= 7 && i <= 9) || (i >= 18 && i <= 20)) return j === 0 ? "C" : i === 7 || i === 18 ? "C" : i === 9 || i === 20 ? "A" : "B";
+    const diamond = ["..L..", ".LML.", "LMLLK", ".LKK.", "..K.."];
+    const s = diamond[j - 6]?.[i - 12];
+    return s && s !== "." ? s : null;
+  }, false);
+  // (His feather on the lid, lying from its quill at the left to its tip up at the right: lit above its shaft, shaded below, a notch
+  // in its vane.)
+  const [ax, ay, bx, by] = [8, 7.5, 22.5, 2];
+  const len = Math.hypot(bx - ax, by - ay);
+  const feather = paint(6, 0, 19, 9, (x, y) => {
+    const px = x + 0.5 - ax;
+    const py = y + 0.5 - ay;
+    const u = (px * (bx - ax) + py * (by - ay)) / (len * len);
+    const v = (px * (ay - by) + py * (bx - ax)) / len;
+    if (u < 0 || u > 1) return null;
+    if (u < 0.2) return Math.abs(v) < 0.6 ? "i" : null;
+    const half = 2.4 * Math.sin(Math.PI * Math.min(1, (u - 0.2) / 0.8)) ** 0.5;
+    if (Math.abs(v) > half) return null;
+    if (Math.abs(v) < 0.55) return "i";
+    if (v < 0 && u > 0.55 && u < 0.62) return null;
+    return v < 0 ? (u > 0.6 ? "e" : "d") : "c";
+  });
+  const glints: Pt[] = [[3, 9], [26, 9], [26, 24], [3, 24]];
+  const frames = glints.map(([gx, gy]) => {
+    const g = paint(gx - 1, gy - 1, 3, 3, (x, y) => (x === gx && y === gy ? "F" : x === gx || y === gy ? "M" : null), false);
+    return [groundShadow(XW / 2, XH - 2, 13, 2), box, trim, feather, g];
+  });
+  const parts: Record<string, Part> = {};
+  const out: Frame[] = frames.map((bits, f) => ({
+    ms: 450,
+    layers: bits.map((b, n): Layer => {
+      parts[`f${f}p${n}`] = b.part;
+      return { part: `f${f}p${n}`, x: b.at[0], y: b.at[1] };
+    }),
+  }));
+  return { id: "shop-birdie-crate", name: "Birdie's shop: crate", w: XW, h: XH, foot: [XW / 2, XH - 2], palette: CRATE_PALETTE, parts, anims: { idle: { loop: true, frames: out } } };
+})();
+PIECES.crate = SHOP_BIRDIE_CRATE;
+LAYOUT.push({ name: "crate", col: 5, row: 4, solid: false }); // on the run (see SHOP_BIRDIE_CRATE_AT): its place is the counter's
 
 /** Every piece's place: the floor tiles first, then the upright ones in the art's order. */
 export const SHOP_BIRDIE_ROOM_LAYOUT: readonly ShopPlace[] = LAYOUT;

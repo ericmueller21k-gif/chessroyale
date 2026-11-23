@@ -250,13 +250,13 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
   chandy: (light) =>
     chunk(import("./chandy-art.ts")).then((m) => ({ n: m.SHOP_CHANDY_N, layout: m.SHOP_CHANDY_LAYOUT, ...m.chandyLit(light), crateAt: m.SHOP_CHANDY_CRATE_AT, marks: m.SHOP_CHANDY_MARKS, outside: "#3d3220", wade: m.SHOP_CHANDY_WADE })),
   // (Birdie's Station, Nov 23: its lobby, a 12 x 12 box room built from the art's parts (birdie-art.ts); the split-flap board on its back
-  // wall written by the game, made as the room loads (flap-board.ts).)
+  // wall written by the game, made as the room loads (flap-board.ts); his Boss Crate on the bar's run, the room's own.)
   birdie: () =>
     chunk(import("./birdie-art.ts")).then((m) => ({
       n: m.SHOP_BIRDIE_ROOM_N,
       layout: m.SHOP_BIRDIE_ROOM_LAYOUT,
       pieces: m.SHOP_BIRDIE_ROOM_PIECES,
-      crateAt: [0, 0] as const,
+      crateAt: m.SHOP_BIRDIE_CRATE_AT,
       lights: m.SHOP_BIRDIE_ROOM_LIGHTS,
       pools: m.SHOP_BIRDIE_ROOM_POOLS,
       upright: m.SHOP_BIRDIE_UPRIGHT,
@@ -790,8 +790,9 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
 }
 
 /**
- * The crate's picture on its card and its bought pop-up: its room's own drawing of it (every shop's art has its crate, on the counter);
- * a room with none (Birdie's lobby, Nov 23) shows the crate as the Crates tab draws it, its boss's token on its corner, in the same box.
+ * The crate's picture on its card and its bought pop-up: its room's own drawing of it (every shop's art has its crate, on the counter;
+ * Birdie's since Nov 23, on his bar); a room with none would show the crate as the Crates tab draws it, its boss's token on its corner,
+ * in the same box.
  */
 function CardCrate({ frames, crate }: { frames: Frames | undefined; crate: BossCrateDef | undefined }) {
   if (frames) return <CratePic frames={frames} />;

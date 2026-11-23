@@ -48,7 +48,8 @@ function composed(): Uint8ClampedArray {
     if (plan(p)) blit(ch, p.col * T + ch.foot[0], Y0 + (p.row + 1) * T);
     else blit(ch, (p.col + 0.5) * T, Y0 + (p.row + 0.5) * T, p.rot ?? 0);
   }
-  for (const p of A.SHOP_BIRDIE_ROOM_LAYOUT.filter((q) => !isFloor(q.name) && !plan(q))) blit(A.SHOP_BIRDIE_ROOM_PIECES[p.name]!, (p.col + ((p.w ?? 1) - 1) / 2 + 0.5) * T, Y0 + (p.row + 0.5) * T);
+  // (His Boss Crate is the room's own, not the art's: left out here, checked on the run below.)
+  for (const p of A.SHOP_BIRDIE_ROOM_LAYOUT.filter((q) => !isFloor(q.name) && !plan(q) && q.name !== "crate")) blit(A.SHOP_BIRDIE_ROOM_PIECES[p.name]!, (p.col + ((p.w ?? 1) - 1) / 2 + 0.5) * T, Y0 + (p.row + 0.5) * T);
   return out;
 }
 
@@ -127,6 +128,30 @@ describe("Birdie's Station: the lobby, the art's picture cut into the room's pie
     expect(A.SHOP_BIRDIE_ROOM_LAYOUT.find((q) => q.name === "vat")!.row).toBeLessThan(A.SHOP_BIRDIE_BARTENDER_AT[1]);
     expect(A.SHOP_BIRDIE_ROOM_LAYOUT.find((q) => q.name === "counter")!.row).toBeGreaterThan(A.SHOP_BIRDIE_BARTENDER_AT[1]);
     expect(SHOP_BIRDIE_PIECES.vat).toBeTruthy();
+  });
+});
+
+describe("Birdie's Boss Crate on his bar (Nov 23), as every shop's on its counter", () => {
+  it("stands whole on the run's top, right of its middle before his talk squares, clear of the bell; Babur's size, a slow glint", () => {
+    const c = A.SHOP_BIRDIE_CRATE;
+    expect([c.w, c.h, ...c.foot]).toEqual([30, 27, 15, 25]);
+    expect(c.anims.idle!.frames.map((f) => f.ms)).toEqual([450, 450, 450, 450]);
+    expect(A.SHOP_BIRDIE_ROOM_LAYOUT.filter((p) => p.name === "crate")).toEqual([{ name: "crate", col: 5, row: 4, solid: false }]);
+    // (Where ShopRoom stands it: the run's foot plus SHOP_BIRDIE_CRATE_AT less the run's picture's foot; its box in the art's pixels.)
+    const run = A.SHOP_BIRDIE_ROOM_LAYOUT.find((p) => p.name === "counter")!;
+    const rp = A.SHOP_BIRDIE_ROOM_PIECES.counter!;
+    const runAt = { x: (run.col + ((run.w ?? 1) - 1) / 2 + 0.5) * T - rp.foot[0], y: Y0 + (run.row + 0.5) * T - rp.foot[1] };
+    const x0 = runAt.x + A.SHOP_BIRDIE_CRATE_AT[0] - c.foot[0], y1 = runAt.y + A.SHOP_BIRDIE_CRATE_AT[1];
+    // (On the run's top: its box's foot above the front lip (the run's picture's row 34), inside its left and right.)
+    expect(y1).toBeLessThanOrEqual(runAt.y + 34);
+    expect(x0).toBeGreaterThan(runAt.x);
+    expect(x0 + c.w).toBeLessThan(runAt.x + rp.w);
+    // (Before his talk squares, columns 6 and 7; the bell, at column 8, to its right.)
+    expect((x0 + c.w / 2) / T).toBeGreaterThan(6);
+    expect((x0 + c.w / 2) / T).toBeLessThan(8);
+    const bell = A.SHOP_BIRDIE_ROOM_LAYOUT.find((p) => p.name === "bell")!;
+    const bp = A.SHOP_BIRDIE_ROOM_PIECES.bell!;
+    expect(x0 + c.w).toBeLessThanOrEqual((bell.col + 0.5) * T - bp.foot[0]);
   });
 });
 
@@ -219,8 +244,8 @@ describe("Birdie's Boss Crate and his Train (Nov 23)", () => {
     expect(prizeRows(def)[0]).toMatchObject({ id: "birdie-train", name: "Birdie's Train", kind: "Mythic ride" });
     expect(priceLine(def)).toBe("3 Birdie tokens, or 1 Birdie token + 1 crate key");
     expect(holdLine(def, { tokens: 1, keys: 0 })).toBe("You have 1 Birdie token and 0 crate keys.");
-    // (His lobby has no crate drawing of its own: the card shows the Crates tab's, ShopRoom.tsx CardCrate. His lines are kept.)
-    expect(A.SHOP_BIRDIE_ROOM_PIECES.crate).toBeUndefined();
+    // (His crate on his bar is his lobby's own drawing, so the card shows it, as every shop's (below). His lines are kept.)
+    expect(A.SHOP_BIRDIE_ROOM_PIECES.crate).toBe(A.SHOP_BIRDIE_CRATE);
     expect(def.says).toHaveLength(3);
   });
 });

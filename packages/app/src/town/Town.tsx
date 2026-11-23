@@ -1663,6 +1663,8 @@ function startTown(
   // (pawn-color.ts); plain meanwhile. On your ride if you wear one (Oct 31): its frames with you on them composed once (rides.ts),
   // the last ones kept until they're ready.
   let youLook: string | null = null;
+  /** The town has drawn its first frame (the canvas's `data-ready`); declared before `dress`, which reads it. */
+  let ready = false;
   const dress = () => {
     const { on, color, side, key, wear } = yourLook();
     if (key === youLook) return;
@@ -1683,6 +1685,9 @@ function startTown(
       if (prev && (prev !== youShown || prev === youRide)) leaveRider(prev);
       // (Its frames on their way, the drawing's chunk first: you walk on foot meanwhile, in its box, under its tag.)
       r.youSoon = youRide;
+      // (A ride put on once the town has shown (the inventory over it, an account come late): its moving sound made now, off any
+      // frame, so your first step only starts it. Before then the town's first frame warms it: below.)
+      if (ready) warmRideSound(youRide?.id);
       // (Its frames already composed, as the town opens (readyYou): drawn from this frame on, not the next.)
       if (youRide?.ready && youShown !== youRide) {
         if (youShown) leaveRider(youShown);
@@ -1832,7 +1837,6 @@ function startTown(
   };
   /** When the last frame was drawn (its `now`). */
   let drawnAt = performance.now();
-  let ready = false;
   let youKey = "";
   /** The open card (also in the screen's state, which draws it), and its size once laid out (NaN: measure it). */
   let card: Card | null = null;

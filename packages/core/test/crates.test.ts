@@ -397,7 +397,10 @@ describe("boss crates", () => {
     // (Timber's, Dash's and Birdie's while they're admins first; each comes back by itself when its boss leaves BOSS_ADMIN_FIRST.)
     for (const boss of ["timber", "dash", "birdie"].filter((b) => BOSS_ADMIN_FIRST.includes(b))) expect(out).toContain(`${BOSS_CRATES.find((c) => c.boss === boss)!.ride}-hunchess`);
     expect(WELCOME_CRATE.items).toEqual(HUNCHESS_RIDES.map((d) => d.id).filter((id) => !out.includes(id)));
-    for (const k of [0, 0.5, 0.999]) expect(WELCOME_CRATE.items).toContain(rollWelcome(() => k, out.slice(0, 1)).def);
+    // (A holder's left-out ride as `won`: a roll at each listed ride's middle reaches every listed ride, so it drops none.)
+    const n = WELCOME_CRATE.items.length;
+    const rolled = WELCOME_CRATE.items.map((_, i) => rollWelcome(() => (i + 0.5) / n, out.slice(0, 1)).def);
+    expect(new Set(rolled)).toEqual(new Set(WELCOME_CRATE.items));
   });
 });
 

@@ -305,6 +305,26 @@ describe("a ride's moving sound", () => {
     }
   });
 
+  it("an AudioBuffer that can't be made (a browser with no constructor; the delta review's N2, Nov 23): no buffer and no throw, so the town's frame goes on", async () => {
+    vi.useRealTimers();
+    vi.resetModules();
+    const cold = await import("../src/ride-sound.ts");
+    vi.useFakeTimers({ now: 0 });
+    cold.rideSoundForTests(() => Date.now());
+    vi.stubGlobal("AudioBuffer", function NoConstructor() {
+      throw new TypeError("Illegal constructor");
+    });
+    try {
+      sound.noAudio = true;
+      expect(() => cold.warmRideSound("birdie-train")).not.toThrow();
+      expect(cold.rideSoundState().decoded).toEqual([]);
+    } finally {
+      sound.noAudio = false;
+      cold.rideSoundForTests(() => Date.now());
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("a frame loop that halts mid-walk (the town closing, a hidden tab): it stops all the same", () => {
     move("sawyer-dozer", 200);
     pass(RIDE_SOUND.holdMs + 20);
