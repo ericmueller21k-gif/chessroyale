@@ -3,8 +3,8 @@
 Branch `claude/birdie-cadence-warning`. Taken from the app (an admin's Boss alone vs Birdie, `?power=train`), headless Chromium:
 phone = iPhone 13 (390 x 664, 3x), computer = 1280 x 800.
 
-- `*/sign-screen.png`: the whole screen on your warned turn, the sign glowing over the marked piece (a pawn on b2, phone; on
-  the computer's run, a pawn too), the crossing on its line.
+- `*/sign-screen.png`: the whole screen on your warned turn, the sign glowing over the marked piece (the phone: a pawn on b2;
+  the computer: a knight on a3), the crossing on its line.
 - `*/sign-board.png`: the board alone. `*/sign-zoom.png`: the marked square and its neighbors, enlarged (the sign's edges).
 - `*/ride-1..8-<ms>.png`: 8 frames of his slower ride (1.95 s, was 1.3 s), ms after the train first showed; `*/ride-sheet.png`
   the 8 side by side. The sign stays on the piece left on the line until the train's nose reaches it, then the smash.
