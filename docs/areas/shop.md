@@ -130,7 +130,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   - **The token pictures** are the drawings from `claude/boss-art` (`scripts/boss-art/out/token-<name>/`), copied into
     `components/tokens/` (only their import lines changed, and the `!`s the app's typecheck asks for), one chunk loaded the first time a
     token shows (`TokenArt.tsx`: 40 × 40 crisp; `animate` plays its idle, the result box's; a plain gold coin for a boss with none). Every
-    live boss, Timber and Dash have one (Dash's is the art's `TOKEN_BLITZ`).
+    live boss, Timber, Dash and Birdie (Nov 23, from `claude/boss-art` at 0746234e) have one (Dash's is the art's `TOKEN_BLITZ`).
   - **The crates** (`BOSS_CRATES` in core's crates.ts, beside `CRATES` but never in it, so the Crates tab can't open one free; Timber's and
     Dash's, Nov 3, and Birdie's, Nov 23, listed to admins and whoever holds one while they're in the game for admins first, and not in the FAQ; Dash's ride
     is Cheetah Shoes): Babur's

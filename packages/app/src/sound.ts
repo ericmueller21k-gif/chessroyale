@@ -1094,10 +1094,14 @@ export type SoundName =
   | "birdieCheer"
   | "birdieAsk"
   | "birdieScold"
-  | "birdieTrainShort"
   | "birdieTrainMedium"
   | "birdieTrainLong"
   | "birdieTrainToot"
+  | "birdieWhistleToot"
+  | "birdieWhistleTootToot"
+  | "birdieWhistleLong"
+  | "birdieWhistleTootLong"
+  | "birdieWhistlePeepPeep"
   | "birdieToot"
   | "birdieWhistle"
   | "birdieBell"
@@ -1550,10 +1554,14 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   birdieCheer: birdieBoss("cheer"),
   birdieAsk: birdieBoss("ask"),
   birdieScold: birdieBoss("scold"),
-  birdieTrainShort: birdieBoss("trainShort"),
   birdieTrainMedium: birdieBoss("trainMedium"),
   birdieTrainLong: birdieBoss("trainLong"),
   birdieTrainToot: birdieBoss("trainToot"),
+  birdieWhistleToot: birdieBoss("whistleToot"),
+  birdieWhistleTootToot: birdieBoss("whistleTootToot"),
+  birdieWhistleLong: birdieBoss("whistleLong"),
+  birdieWhistleTootLong: birdieBoss("whistleTootLong"),
+  birdieWhistlePeepPeep: birdieBoss("whistlePeepPeep"),
   birdieToot: birdieBoss("toot"),
   birdieWhistle: birdieBoss("whistle"),
   birdieBell: birdieBoss("bell"),
@@ -1923,10 +1931,14 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   birdieCheer: [["birdie", "cheer"]],
   birdieAsk: [["birdie", "ask"]],
   birdieScold: [["birdie", "scold"]],
-  birdieTrainShort: [["birdie", "trainShort"]],
   birdieTrainMedium: [["birdie", "trainMedium"]],
   birdieTrainLong: [["birdie", "trainLong"]],
   birdieTrainToot: [["birdie", "trainToot"]],
+  birdieWhistleToot: [["birdie", "whistleToot"]],
+  birdieWhistleTootToot: [["birdie", "whistleTootToot"]],
+  birdieWhistleLong: [["birdie", "whistleLong"]],
+  birdieWhistleTootLong: [["birdie", "whistleTootLong"]],
+  birdieWhistlePeepPeep: [["birdie", "whistlePeepPeep"]],
   birdieToot: [["birdie", "toot"]],
   birdieWhistle: [["birdie", "whistle"]],
   birdieBell: [["birdie", "bell"]],

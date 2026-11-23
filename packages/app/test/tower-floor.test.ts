@@ -252,12 +252,14 @@ describe("the tower's clerk", () => {
  * battle plays one of its bosses' themes, picked once and kept, avoiding the last floors' ("it doesn't reuse the same one for, 5 or 6 rounds").
  */
 describe("the tower's music", () => {
-  it("the lobby and the floor room play `tower` (in themes.json, a loop from `pad`, 160 s)", async () => {
+  it("the lobby and the floor room's theme is `tower` (in themes.json, a loop from `pad`, 160 s); walking in, it doesn't play (Nov 23): the town's carries on", async () => {
     const { readFileSync } = await import("node:fs");
-    const { TOWER_FLOOR, homeTheme, roomDef, roomTheme } = await import("../src/town/shops/shops.ts");
+    const { TOWER_FLOOR, homeTheme, roomDef, roomMusicFor, roomTheme } = await import("../src/town/shops/shops.ts");
     const { musicPlan } = await import("../src/music.ts");
     const themes = JSON.parse(readFileSync(new URL("../public/music/themes.json", import.meta.url), "utf8"));
     expect([roomTheme(roomDef("tower")!), roomTheme(TOWER_FLOOR), homeTheme("tower")]).toEqual(["tower", "tower", "tower"]);
+    // (Eric, Nov 23: "walking into a building no longer triggers the boss's music": ROOM_BOSS_MUSIC off.)
+    expect([roomMusicFor(roomDef("tower")!), roomMusicFor(TOWER_FLOOR)]).toEqual([null, null]);
     expect(musicPlan(themes, "tower", 0)).toMatchObject({ intro: null, loop: { name: "tower-loop", offset: 0.5, loopStart: 0.5, loopEnd: 160.5 } });
   });
 

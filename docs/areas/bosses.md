@@ -46,7 +46,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   fetches every boss theme once").
   **In the boss's room, and a challenge's splash (Nov 11, Eric: "only play the music if you walk in on your own through the door,
   not via challenging the boss"; then: a challenge inside the boss's building starts the theme "the moment the boss's full-screen
-  splash starts"):** the theme loads as the door zooms (`roomMusicLoad`; the intro decoded first, then the loop). Walked in on your
+  splash starts"):** **Off since Nov 23** (Eric: "walking into a building no longer triggers the boss's music. I want that to stop."; `ROOM_BOSS_MUSIC: false` in settings.ts, `shops.ts` `roomMusicFor`; [decision](../decisions/2026-11-23-room-music-off.md)): walking into any building leaves the town's music playing (no boss theme, no fade); a challenge's splash and the battle still play the boss's theme. What follows is how it works with the setting back on. The theme loads as the door zooms (`roomMusicLoad`; the intro decoded first, then the loop). Walked in on your
   own, it plays, intro then loop, as the room shows (`roomMusic`); Rolling Dough's door between rooms carries on with no restart (Don's
   theme plays in both: you must walk in); leaving fades it out over 1.5 s and lets it go. A challenge from the town starts it as the
   boss's splash starts (`splashMusic` in Town.tsx `stormIn`; a room's theme already playing, Don's, carries straight through), the
@@ -1024,9 +1024,12 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   cutscene, Eric Nov 23), the train, crossing and smash in `characters/effects/birdie.ts` (the ride's loop 12 frames of 65 ms). His
   train on the board (2026-11-23-birdie-tail-smooth.md): moved by `translate` (composited), linear so the smash meets its nose; its
   and the stepping pieces' `animation-delay` fixed as each is first drawn (`Timed`), as his layer redraws every frame and a delay set
-  anew from each frame's `now` retimes the running animation (the train crossed at twice its speed, then stood still off the board); his sounds his own (`birdie-sounds.ts`; 2026-11-23-birdie-sounds.md): his voice seven chirps and his move
-  four train runs, synthesized from the music helper's recipes (`stills/trailer-v2`); a move's run picked by how far his piece goes
-  (`birdieRun`), the toot run on a capture or check, a chirp over its start; `hello` his entrance and his challenge (`SELECT_SOUND`). A
+  anew from each frame's `now` retimes the running animation (the train crossed at twice its speed, then stood still off the board); his
+  sounds his own (`birdie-sounds.ts`; 2026-11-23-birdie-sounds.md): his voice seven chirps and his move
+  five train whistles (2026-11-23-birdie-whistles.md), synthesized from the music helper's recipes (`stills/trailer-v2`); a move's
+  whistle picked by `birdieWhistle`: the double toot for most moves, one toot for one square, the long blast for five or more, toot-long
+  on a capture or check, the peep-peep about one move in five (from the move and his move's number), a chirp over its start; three
+  puffing runs kept for his entrance, his ride, the town's ride loop and his challenge's wipe; `hello` his entrance and his challenge (`SELECT_SOUND`). A
   kit's `cueSound(cue, boss, yourTurn)` picks a cue's sound from the battle (null: silent); his loops' chirps only on your turn, never
   as your move lands. Tests: `app/test/birdie-sounds.test.ts`. His train on your king ends the battle: the runner's
   `stageComplete`/`finishBossBattle` read `trainWon`, and the board holds `powerWinShowMs` for the ride before the result (solo

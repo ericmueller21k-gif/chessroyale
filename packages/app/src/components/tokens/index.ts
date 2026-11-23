@@ -3,6 +3,7 @@ import { TOKEN_ALFIL } from "./token-alfil.ts";
 import { TOKEN_BEAVER } from "./token-beaver.ts";
 import { TOKEN_BLITZ } from "./token-blitz.ts";
 import { TOKEN_BIGBOY } from "./token-bigboy.ts";
+import { TOKEN_BIRDIE } from "./token-birdie.ts";
 import { TOKEN_CLOWN } from "./token-clown.ts";
 import { TOKEN_FOLIO } from "./token-folio.ts";
 import { TOKEN_GARDENER } from "./token-gardener.ts";
@@ -39,4 +40,5 @@ export const TOKEN_ART: Readonly<Record<string, Character>> = {
   folio: TOKEN_FOLIO,
   timber: TOKEN_BEAVER,
   dash: TOKEN_BLITZ,
+  birdie: TOKEN_BIRDIE,
 };

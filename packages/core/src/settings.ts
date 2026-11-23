@@ -5361,6 +5361,13 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  *   out over `handoffMs` from there.
  */
 /**
+ * A building's own music (Eric, Nov 23: "walking into a building no longer triggers the boss's music. I want that to stop."). false:
+ * walking into any building leaves the town's music as it is (no boss theme, no fade); a challenge's splash and the battle still play
+ * the boss's theme. true brings back Nov 11's room music (the boss's theme as its room shows; app Town.tsx `roomMusicFor`).
+ */
+export const ROOM_BOSS_MUSIC: boolean = false;
+
+/**
  * Music's timings and level. `towerRecent`: a Battle Tower floor's battle plays one of its bosses' themes, avoiding the themes of this
  * many floors before it on this device (Eric, Nov 19: "it doesn't reuse the same one for, 5 or 6 rounds"; app tower.ts pickFloorTheme).
  */

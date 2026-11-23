@@ -8,7 +8,7 @@
  * and `buyBossCrate` is the purchase: the server takes the price and puts the crate in your inventory, in one transaction (since
  * Eric's Nov 2 fixes it isn't opened at once: you open it in the Crates tab, as any crate).
  */
-import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, BOSS_ROSTER, adminPlayable, bossCrateOf, itemDef, tierInfo, type BossCrateDef } from "@chessroyale/core";
+import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, BOSS_ROSTER, ROOM_BOSS_MUSIC, adminPlayable, bossCrateOf, itemDef, tierInfo, type BossCrateDef } from "@chessroyale/core";
 import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
 import type { SkyTone } from "../sky.ts";
@@ -258,6 +258,11 @@ export const roomDef = (id: HomeId, part: RoomPart = "front"): ShopDef | null =>
 
 /** The theme a room plays as it shows (themes.json): its own (`music`), or its home's; null: none. */
 export const roomTheme = (def: ShopDef): string | null => (def.music === undefined ? def.home : def.music);
+/**
+ * The theme a room plays as it shows (Town.tsx): none while ROOM_BOSS_MUSIC is off (Eric, Nov 23: "walking into a building no longer
+ * triggers the boss's music"), so the town's carries on inside; its own (roomTheme) when it's on.
+ */
+export const roomMusicFor = (def: ShopDef): string | null => (ROOM_BOSS_MUSIC ? roomTheme(def) : null);
 /** The theme to load as you go in at a home's door (its rooms' theme: the walk-up's is its top floor's, his room's). */
 export const homeTheme = (id: HomeId): string => (id === "recluse" ? RECLUSE_ROOMS.top.music! : id);
 /** The shop inside a home, or null: every other home has no "Go in" yet. */

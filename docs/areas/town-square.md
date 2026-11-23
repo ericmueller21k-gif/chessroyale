@@ -757,7 +757,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing; never over a name that already starts with the boss's name, "GINGER IGLOO", "HOLLOW PEAK", "CHANDY'S SWAMP": Eric, Nov 16),
   gold rules above and below, the home's name in Archivo Black (`town/AreaBanner.tsx`, `areaBannerOf`, from the homes' and rooms'
   data). Fades in 0.4 s, holds 1.8 s, fades out 0.6 s (`AREA_BANNER`; reduced motion: no fades); taps pass through it; sized from
-  the room's view (container units). **Room music:** the boss's theme loads as the door zooms and plays as the room shows; a
+  the room's view (container units). **Room music:** off since Nov 23 (Eric: "walking into a building no longer triggers the boss's music. I want that to stop."; `ROOM_BOSS_MUSIC: false`, `shops.ts` `roomMusicFor`; docs/decisions/2026-11-23-room-music-off.md): the town's music carries on inside every building. With it back on, the boss's theme loads as the door zooms and plays as the room shows; a
   challenge's starts as its splash starts, the splash held up to 2 s for it (`stormIn`; docs/areas/bosses.md "Music"). Tests: `e2e/zebra-home.spec.ts` (the banner's words, place, taps through it, gone by 4 s; none
   arriving by the challenge), `packages/app/test/music.test.ts` ("a boss's room").
   docs/decisions/2026-11-11-area-banner-room-music.md.
@@ -878,8 +878,9 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
   and the new `dimRGB`, the lights over it). The hall's street door and the landing's window darken the same way (`recluse-stairs-art.ts`
   `recluseStairsLit`), the sconces still lit. Only the window and floor tiles are drawn again, once per light; nothing per frame. The
   summoning's light draws over it as before. The dev preview takes `?sky=` too. Test: `test/recluse-building.test.ts` ("by the time of day").
-- **Music:** `recluse-house` (themes.json) plays in his room only (`ShopDef.music`; `roomTheme`); the hall and the landing have none.
-  It loads as you go in at the street door (`homeTheme`).
+- **Music:** `recluse-house` (themes.json) is his room's theme only (`ShopDef.music`; `roomTheme`); the hall and the landing have none.
+  Off since Nov 23 (`ROOM_BOSS_MUSIC: false`): the town's music carries on inside; with it on, the theme loads as you go in at the street
+  door (`homeTheme`) and plays in his room.
 - **Banners:** the hall "Hidden Boss's / The Walk-up", the landing "Second floor", his room "Top floor".
 - **See-through:** each room's front door (the street door, the stairs down, his room's door) and front band go see-through over you
   (`RoomArt.seeThru`, which a box room may list now too: you walk in, or come up, just behind them).
@@ -1334,7 +1335,7 @@ bosses' (fetched only). In memory: the theme while the town is open (~69 MB deco
 **When (Nov 16; [decision](../decisions/2026-11-16-town-solos.md)):** rolled each time it starts: with `earlyChance` (0.33) it starts
 partway in at one of `earlyEntries` (bar 77 or bar 61, fading in over `earlyFadeS`), its first solo 0:37 or 1:07 in (decoded at once);
 otherwise from its top, the first solo `firstPasses` (1) pass in, at 2:59. After each solo, 1 or 2 passes at random (`passesAfterSolo`).
-The `?townsolo` test switch makes every start the early one at bar 77 (log `music:town:entry:<s>`, then `music:town:solo:<id>`). A boss's room, a challenge's splash or a battle takes over; out of the room it comes back from its top. The town
+The `?townsolo` test switch makes every start the early one at bar 77 (log `music:town:entry:<s>`, then `music:town:solo:<id>`). A challenge's splash or a battle takes over (a boss's room too, only with `ROOM_BOSS_MUSIC` on: off since Nov 23, so it carries on inside every building); out of the room it comes back from its top. The town
 closing (Town.tsx's cleanup, the Hidden Boss's summoning) ends it and lets its pieces go. Tests: `packages/app/test/music.test.ts`
 ("the town's own theme", its "in memory" block), the e2e above (the theme first, its source started in the street).
 

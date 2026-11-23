@@ -5,21 +5,25 @@
  *   The birds of his ult's piece, built from the music helper's recipe (`stills/trailer-v2` `birdie-chirps/README.md`; `BIRDS` and
  *   `tweet_wave` in `scripts/reel/music/song_aj.py` on `claude/trailer-v2`): a phrase is a few notes, each one whistle sliding from
  *   `f0` to `f1` Hz, a little of its octave in it, swelling and dying with no edge; some tremble.
- * - **His train: four runs** (Eric, Nov 23: "the little train sound ... a couple different lengths"): the locomotive of the same piece
- *   (`birdie-train/README.md`; `chuff_wave`, `knock_wave`, `steam_wave`, `whistle_wave` there and `birdie_train.py`): exhaust puffs an
- *   8th of the song apart (162 bpm), rail joints, steam at a long run's stop, the whistle's toot over the toot run's start.
+ * - **His move: five whistles** (Eric, Nov 23: "more whistles than the other stuff ... like the double whistle, you know how the trains go
+ *   like toot toot?"): his train's steam whistle (`birdie-train/README.md`, `whistle_wave`): a toot, the double toot, a long blast, a toot
+ *   then a long one, and two peeps on a smaller, higher whistle. Picked per move by `birdieWhistle`.
+ * - **His train: three runs** (the locomotive of the same piece: `chuff_wave`, `knock_wave`, `steam_wave` there and `birdie_train.py`):
+ *   exhaust puffs an 8th of the song apart (162 bpm), rail joints, steam at a long run's stop, the whistle's toot over the toot run's
+ *   start. His entrance, his ride and its loop in the town (`BIRDIE_RIDE_LOOP`), his challenge's wipe; no longer his move.
  * - The rest are his first pack's: the conductor's whistle (his signal), the crossing's bell, the brakes, a little hop, the smash on a
  *   piece, his fall's whoosh and his armor's clank.
  *
  * Each is a pure function of the sample rate (its noise seeded), so every device makes the same sound and a test can measure it: every
- * one stays quieter than a piece's move (peak and loudness), and a chirp over a train run's start too (test/birdie-sounds.test.ts).
+ * one stays quieter than a piece's move (peak and loudness), and a chirp over a move's whistle too (test/birdie-sounds.test.ts).
  * Which cue plays which: kit.sounds and kit.cueSound in kits.ts (his animations' cues) and his board art's (characters/effects/birdie.ts).
  */
 import { bandpass, lowpass, noise, osc, render, sine, soft, soundCache, type Voice } from "./synth.ts";
 
 export type BirdieChirp = "hello" | "tsip" | "teeoo" | "trill" | "cheer" | "ask" | "scold";
-export type BirdieRun = "trainShort" | "trainMedium" | "trainLong" | "trainToot";
-export type BirdieSound = BirdieChirp | BirdieRun | "toot" | "whistle" | "bell" | "brake" | "hop" | "smash" | "whoosh" | "clank";
+export type BirdieRun = "trainMedium" | "trainLong" | "trainToot";
+export type BirdieWhistle = "whistleToot" | "whistleTootToot" | "whistleLong" | "whistleTootLong" | "whistlePeepPeep";
+export type BirdieSound = BirdieChirp | BirdieRun | BirdieWhistle | "toot" | "whistle" | "bell" | "brake" | "hop" | "smash" | "whoosh" | "clank";
 
 const TAU = 2 * Math.PI;
 
@@ -161,12 +165,17 @@ function steam(next: Voice, rate: number, secs: number): Float64Array {
 
 /** The whistle's chord in his song: B4, E5, G5. */
 const PIPES = [493.88, 659.26, 783.99] as const;
-/** The steam whistle (`whistle_wave`, no fall): three pipes, each with three overtones; it slides up 0.7 of a half step into its note, wavers, sags over its last fifth. */
-function whistleWave(rate: number, secs: number): Float64Array {
+/** The peeps' smaller whistle, a step up the chord: E5, G5, B5. */
+const PEEPS = [659.26, 783.99, 987.77] as const;
+/**
+ * The steam whistle (`whistle_wave`, no fall): three pipes, each with three overtones; it slides up 0.7 of a half step into its note over
+ * 50 ms, wavers (0.4% at 6.5 Hz, its level 8% at 11 Hz), sags 0.6 of one over its last fifth; in over 40 ms, let go over 120 ms.
+ */
+function whistleWave(rate: number, secs: number, pipes: readonly number[] = PIPES): Float64Array {
   const k = Math.floor(secs * rate);
   const last = (k - 1) / rate;
   const w = new Float64Array(k);
-  PIPES.forEach((hz, j) => {
+  pipes.forEach((hz, j) => {
     let ph = 0;
     for (let i = 0; i < k; i++) {
       const t = i / rate;
@@ -192,13 +201,12 @@ const STEAM = 0.32;
 const WHISTLE = 0.4;
 /** A run: each puff's level (one every STEP, the strong one first and every fourth), its rail joints (s), steam at its stop, a toot over its start (s). */
 const RUNS: Record<BirdieRun, { puffs: readonly number[]; joints: readonly number[]; steam: boolean; toot: number }> = {
-  trainShort: { puffs: [0.9, 1, 0.75], joints: [0.46], steam: false, toot: 0 },
   trainMedium: { puffs: [0.8, 1, 1, 0.9, 0.7], joints: [0.28, 0.65], steam: false, toot: 0 },
   trainLong: { puffs: [0.6, 0.8, 1, 1, 1, 0.9, 0.75, 0.6], joints: [0.28, 0.83, 1.2], steam: true, toot: 0 },
   trainToot: { puffs: [0.8, 1, 1, 0.9, 0.7], joints: [0.28, 0.65], steam: false, toot: 0.32 },
 };
 /** Each run's seed, so each is the same on every device. The toot run shares the medium run's: it is the medium run with the whistle over it. */
-const SEED: Record<BirdieRun, number> = { trainShort: 1621, trainMedium: 1622, trainLong: 1623, trainToot: 1622 };
+const SEED: Record<BirdieRun, number> = { trainMedium: 1622, trainLong: 1623, trainToot: 1622 };
 
 /** A run of his train (`birdie_train.py`'s `run`). */
 function train(name: BirdieRun, rate: number): Float32Array {
@@ -226,6 +234,28 @@ function train(name: BirdieRun, rate: number): Float32Array {
  */
 export const BIRDIE_RIDE_LOOP: { readonly run: BirdieRun; readonly start: number; readonly end: number } = { run: "trainMedium", start: STEP, end: 5 * STEP };
 
+// ---- His move's whistles.
+
+/** A blast: (seconds in, how long, how loud). */
+type Blast = readonly [at: number, secs: number, loud: number];
+/** Each whistle's blasts and its pipes (the recipe's table, `birdie_train.py`). */
+const WHISTLES: Record<BirdieWhistle, { blasts: readonly Blast[]; pipes: readonly number[] }> = {
+  whistleToot: { blasts: [[0, 0.28, 1]], pipes: PIPES },
+  whistleTootToot: { blasts: [[0, 0.24, 0.9], [0.34, 0.24, 1]], pipes: PIPES },
+  whistleLong: { blasts: [[0, 0.9, 1]], pipes: PIPES },
+  whistleTootLong: { blasts: [[0, 0.2, 0.9], [0.3, 0.75, 1]], pipes: PIPES },
+  whistlePeepPeep: { blasts: [[0, 0.16, 0.9], [0.24, 0.16, 1]], pipes: PEEPS },
+};
+
+/** One of his move's whistles: its blasts laid end to end, each the one whistle (`whistleWave`). */
+function whistle(name: BirdieWhistle, rate: number): Float32Array {
+  const { blasts, pipes } = WHISTLES[name];
+  const end = Math.max(...blasts.map(([at, secs]) => Math.round(at * rate) + Math.floor(secs * rate)));
+  const out = new Float32Array(end);
+  for (const [at, secs, loud] of blasts) lay(out, rate, at, whistleWave(rate, secs, pipes), loud);
+  return out;
+}
+
 // ---- The rest of his pack.
 
 /** Noise with its highs rolled off twice: a soft puff or breath, never a hiss. */
@@ -242,10 +272,14 @@ const SOUNDS = {
   cheer: (rate) => chirp("cheer", rate),
   ask: (rate) => chirp("ask", rate),
   scold: (rate) => chirp("scold", rate),
-  trainShort: (rate) => train("trainShort", rate),
   trainMedium: (rate) => train("trainMedium", rate),
   trainLong: (rate) => train("trainLong", rate),
   trainToot: (rate) => train("trainToot", rate),
+  whistleToot: (rate) => whistle("whistleToot", rate),
+  whistleTootToot: (rate) => whistle("whistleTootToot", rate),
+  whistleLong: (rate) => whistle("whistleLong", rate),
+  whistleTootLong: (rate) => whistle("whistleTootLong", rate),
+  whistlePeepPeep: (rate) => whistle("whistlePeepPeep", rate),
   // His train's whistle alone: the toot run's (as his train pulls away, and as it comes in his fall's cutscene).
   toot: (rate) => Float32Array.from(whistleWave(rate, 0.32)),
   // The conductor's whistle: a pea whistle's trill, rising at its start.
@@ -297,11 +331,12 @@ const SOUNDS = {
 
 /**
  * Each sound's level (its peak and loudness stay under a move's: test/birdie-sounds.test.ts). The chirps keep the recipe's levels against each
- * other (one gain for the seven); the train runs one gain for the four, set by loudness (short puffs of noise: quiet for their peaks),
- * under the chirps, so a chirp over a run's start reads.
+ * other (one gain for the seven); the train runs one gain for the three, set by loudness (short puffs of noise: quiet for their peaks),
+ * under the chirps; his move's whistles one gain for the five, under the chirps, so a chirp over a whistle's start reads.
  */
 const CHIRP = 0.16;
 const TRAIN = 0.36;
+const WHISTLE_SET = 0.12;
 const LEVEL: Record<BirdieSound, number> = {
   hello: CHIRP,
   tsip: CHIRP,
@@ -310,10 +345,14 @@ const LEVEL: Record<BirdieSound, number> = {
   cheer: CHIRP,
   ask: CHIRP,
   scold: CHIRP,
-  trainShort: TRAIN,
   trainMedium: TRAIN,
   trainLong: TRAIN,
   trainToot: TRAIN,
+  whistleToot: WHISTLE_SET,
+  whistleTootToot: WHISTLE_SET,
+  whistleLong: WHISTLE_SET,
+  whistleTootLong: WHISTLE_SET,
+  whistlePeepPeep: WHISTLE_SET,
   toot: 0.16,
   whistle: 0.09,
   bell: 0.1,
@@ -339,13 +378,18 @@ export function birdieSound(name: BirdieSound, rate: number): Float32Array {
 export const BIRDIE_SOUNDS = Object.keys(SOUNDS) as BirdieSound[];
 
 /**
- * Which run his train plays for a move of his (Eric, Nov 23: "the little train sound ... when he goes across the board ... a couple
- * different lengths"): by how far the piece goes, in squares (the longer of its files and ranks: a knight's is 2). One square: the
- * short run; two to four: the medium (most moves); five or more, right across the board: the long. A capture or a check: the toot run.
+ * Which whistle his train blows for a move of his (Eric, Nov 23: "more whistles than the other stuff ... like the double whistle, you know
+ * how the trains go like toot toot?"). A capture or a check: a toot, then a long one. Otherwise about one move in five (picked from the
+ * move and his move's number, so every device hears the same): the peep-peep, for variety. Else by how far the piece goes, in squares
+ * (the longer of its files and ranks: a knight's is 2): one square, one toot; five or more, right across the board, the long blast; two
+ * to four (most moves), the double toot.
  */
-export function birdieRun(uci: string | undefined, toot: boolean): BirdieRun {
-  if (toot) return "trainToot";
-  if (!uci || uci.length < 4) return "trainMedium";
+export function birdieWhistle(uci: string | undefined, toot: boolean, n = 0): BirdieWhistle {
+  if (toot) return "whistleTootLong";
+  if (!uci || uci.length < 4) return "whistleTootToot";
+  let h = 2166136261 ^ n;
+  for (let i = 0; i < uci.length; i++) h = Math.imul(h ^ uci.charCodeAt(i), 16777619);
+  if ((h >>> 0) % 5 === 0) return "whistlePeepPeep";
   const d = Math.max(Math.abs(uci.charCodeAt(0) - uci.charCodeAt(2)), Math.abs(uci.charCodeAt(1) - uci.charCodeAt(3)));
-  return d <= 1 ? "trainShort" : d >= 5 ? "trainLong" : "trainMedium";
+  return d <= 1 ? "whistleToot" : d >= 5 ? "whistleLong" : "whistleTootToot";
 }
