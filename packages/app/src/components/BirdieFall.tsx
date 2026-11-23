@@ -2,9 +2,9 @@
  * Birdie's fall (Eric, Nov 23; docs/decisions/2026-11-23-birdie-fall.md), his ultimate's moment while he thinks (components/Birdie.tsx,
  * `birdieFall`): built the way Moo's Full Moon cinematic is (MooCinematic.tsx). Its beats, all settings (BIRDIE_CINEMATIC in settings.ts;
  * BIRDIE_BEATS.fall adds them up, so the server and solo wait for all of it):
- * 1. His `fall` where he stands (his figure: Birdie.tsx plays it in place): a jolt throws him out of his train.
+ * 1. His `fall` where he stands (his figure: Birdie.tsx plays it in place): he hops happily out of his train and drops out of sight.
  * 2. The scene fades in over the board and everything above it (a phone: the whole width from the screen's top to the board's bottom;
- *    a computer: the board's column from the top): he tumbles through a blurred sky, speed lines streaming (the drawing's `fall`).
+ *    a computer: the board's column from the top): he free falls happily through a blurred sky, speed lines streaming (the drawing's `fall`).
  * 3. His train comes up the track toward him, closer and closer, its headlights brighter and brighter (the drawing's `approach`), the
  *    Hidden Boss's light growing from them (recluse-light.ts, as Moo's moon: Eric, "how we did the lights") to a white-out at the hit.
  * 4. Out of the white, Armored Birdie, the steam clearing off him (the drawing's `reveal`), standing a moment (`hold`); the scene fades

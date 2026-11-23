@@ -1197,7 +1197,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
       // His train's ride: he ducks in and it pulls away (his figure then empty while it crosses the board, then his entrance: Birdie.tsx).
       powerHit: "depart",
       ultimateWarn: "check",
-      // His fall: a jolt throws him out of his train, his cap flying (then the cutscene).
+      // His fall: he hops happily out of his train and drops out of the frame, grinning (then the cutscene).
       ultimate: "fall",
     },
     // His sounds (birdie-sounds.ts; docs/decisions/2026-11-23-birdie-sounds.md, 2026-11-23-birdie-whistles.md): his voice is his chirps,
@@ -1215,9 +1215,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
       tootRun: "birdieWhistleTootLong",
       trill: "birdieTrill",
       flash: "birdieTeeoo",
-      // Hurt, beaten, tumbling out in his fall: his scold; his cap landing, a tap.
+      // Hurt, beaten: his scold; his cap landing, a tap.
       oof: "birdieScold",
-      squawk: "birdieScold",
       plop: "birdieHop",
       // Smug, his teeoo; his chatter as he pops up from his peek (cueSound picks it); winning, his cheer.
       coo: "birdieTeeoo",

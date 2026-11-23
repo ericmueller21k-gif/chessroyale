@@ -2634,11 +2634,11 @@ export const BIRDIE_RIDE = { rideMs: 1950 } as const;
  * long). Beats in order, ms:
  */
 export const BIRDIE_CINEMATIC = {
-  /** His `fall` where he stands: a jolt throws him up out of the train and he tumbles out of the frame (his animation's own 830 ms). */
+  /** His `fall` where he stands: a happy hop up out of the train, then he drops out of the frame (his animation's own 830 ms). */
   dropMs: 840,
   /** The scene fades in over the board and everything above it, as Moo's field does (a CSS fade). */
   fadeInMs: 400,
-  /** He tumbles through the air, the sky streaking past (the drawing's `fall`, 600 ms a loop). */
+  /** He free falls happily through the air (Eric, Nov 23), the sky streaking past (the drawing's `fall`, 600 ms a loop). */
   tumbleMs: 900,
   /**
    * His train comes up the track toward him (the drawing's `approach`, 390 ms a frame), its headlights brighter and brighter, to its last

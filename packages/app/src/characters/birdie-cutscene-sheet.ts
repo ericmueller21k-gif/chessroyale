@@ -10,5 +10,5 @@ export const BIRDIE_CUTSCENE_SHEET = {
   reveal: { at: 14, ms: [200, 200, 200, 200, 200, 200], loop: false, cues: ["", "", "", "", "", ""] },
   hold: { at: 20, ms: [300, 300, 300], loop: true, cues: ["", "", ""] },
   },
-  hash: "4ba8f0520b0b9a02",
+  hash: "36ef6c6e77f5b68f",
 } as const;

@@ -8,6 +8,7 @@ import { BOSS_KITS, liveKit } from "../src/characters/kits.ts";
 import { animLength, cueAt } from "../src/characters/power-art.ts";
 import { BIRDIE_WORDS, birdieDecor, birdieFen, birdieTurnMoments, ridePieces } from "../src/components/Birdie.tsx";
 import { HEADLIGHTS_Y, cutscenePicture, headlightsAt, sceneOpacity, sheetColumn } from "../src/components/BirdieFall.tsx";
+import { birdieSound } from "../src/characters/birdie-sounds.ts";
 import { birdieMusic } from "../src/birdie-music.ts";
 import { noteRejoin } from "../src/characters/moo-state.ts";
 import type { Moment } from "../src/components/PowerParts.tsx";
@@ -31,6 +32,9 @@ describe("his beats are his art's", () => {
     expect(animLength(anim("depart")) + animLength(anim("gone")) + animLength(anim("entrance"))).toBe(BIRDIE_FX.trainSmash);
     // (His fall where he stands, then his spot empty until the cutscene's hit, when he's back as Armored Birdie.)
     expect(animLength(anim("fall"))).toBeLessThanOrEqual(BIRDIE_CINEMATIC.dropMs);
+    // (His fall's whoosh ends before the cutscene's own whoosh starts, at dropMs: both at once doubled it, Nov 23.)
+    const whooshMs = (birdieSound("whoosh", 44100).length / 44100) * 1000;
+    expect(cueAt(anim("fall"), "fall")! + whooshMs).toBeLessThanOrEqual(BIRDIE_CINEMATIC.dropMs);
     expect(animLength(anim("fall")) + animLength(anim("away"))).toBe(BIRDIE_BEATS.fall.hitAt - BIRDIE_BEATS.fall.fallAt);
   });
 
