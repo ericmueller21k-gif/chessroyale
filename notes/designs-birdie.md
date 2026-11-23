@@ -149,3 +149,7 @@ whatever. Nothing crazy."
   The locomotive of his ult piece. Peak -6 dBFS but quiet for it: level by loudness.
 - Plan: the same characters job as the chirps: every ordinary move of his plays one, picked by the move animation's length (the
   helper makes other lengths on request); toot on captures and checks. Code synthesis from the README if it matches by ear, else files.
+
+
+## His move's sound: whistles (Nov 23, replaces the puffing runs)
+Eric: "I was thinking more whistles than the other stuff. Or we want a couple different whistles. And like the double whistle, you know how the trains go like toot toot?" Five whistles (stills/trailer-v2 e5982a41 `birdie-train/README.md`). Director's mapping: toot-toot most moves; toot one square; long 5+ squares; toot-long capture/check; peep-peep ~1 in 5 for variety. No puffing under them. The ride loop keeps its puffing.
