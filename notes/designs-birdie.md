@@ -112,3 +112,17 @@ stools that you have drawn ... one on the left, one on the right, and in the cen
   table ... The room doesn't need to be that much bigger". So: shelves of seed jars, sacks and tins behind the bar; little bird feeders
   on the counter in place of drinks; a big heaped vat of birdseed with a scoop behind the counter; the bartender's idle scoops seed from
   the vat and pours it into a feeder. The room only a little bigger.
+
+## Eric's answers (Nov 23)
+- **Armored Birdie keeps the train** (correcting the earlier "no train after the fall"): "I thought I said it's just the same thing he does
+  before ... He still uses his same normal move after. He just does it every 3 to 4 turns. But then, because his main thing is just we turn
+  up the Maya to a much stronger level. And if somebody's already fighting on very hard difficulty for him, then ... he just turns up to play
+  maybe Stockfish slightly higher than what the Maya highest is." So after the fall: the train goes on (cadence every 3 to 4 crowd turns:
+  a setting), and his brain jumps much stronger (Maia at a much higher rating, capped at Maia's top); at Very hard (already Maia's top) he
+  switches to Stockfish set slightly above Maia's highest.
+- **His ride:** "pretty much going to be exactly what its train looks like, but probably a little lower quality to match ... the drawn ones,
+  but same color scheme" (a pawn ride in his train's look, at the rides' level of detail).
+- **The flip board:** real text, by the game in code (the art keeps no letters): arrival and departure times, destinations = the town's
+  buildings (the Colosseum, the bosses' homes and shops by name, the Battle Tower), never the Hidden Boss's; "make up however it normally
+  looks on a board for those numbers".
+- **His lines:** fine for now; Eric will look later.
