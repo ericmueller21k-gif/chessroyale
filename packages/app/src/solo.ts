@@ -1,4 +1,4 @@
-import { DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { BIRDIE_ULT, DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, birdieTurnMs, birdieTurnBeats, birdieImpactMs, powerWinShowMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
@@ -1446,7 +1446,13 @@ export class SoloMatch implements GameView {
       this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, thinking: true });
       await new Promise((r) => setTimeout(r, ms));
     };
-    await Promise.all([this.runner.playBoss(this.engines[0], beforeShow), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
+    // (Birdie's moments while he thinks: his reply asked for only near the hold's end, as a kept game holds it once played: a reload in his
+    // fall's wait or cutscene carries them on, never skips to his move. BIRDIE_ULT.soloMoveLeadMs.)
+    if (this.birdieAt) {
+      await new Promise((r) => setTimeout(r, Math.max(0, thinkEnd - BIRDIE_ULT.soloMoveLeadMs - Date.now())));
+      if (this.stopped) return;
+    }
+    await Promise.all([this.runner.playBoss(this.engines[0], beforeShow), new Promise((r) => setTimeout(r, Math.max(0, thinkEnd - Date.now())))]);
     if (this.stopped) return;
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
     // before your clock starts.

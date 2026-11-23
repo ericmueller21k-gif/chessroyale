@@ -2663,8 +2663,10 @@ export const BIRDIE_CINEMATIC = {
  * - `lineAt`: his line, as the piece's first whistle sounds (its `whistle` mark, 1.48 s in), long before the cutscene.
  * His reply waits for all of it (his thinking holds through the cutscene: birdieTurnMs), the crowd's clock stopped (it's his turn), the
  * same on every device, with or without the music. Once a battle (the fall is).
+ * - `soloMoveLeadMs`: solo asks its engine for his reply only this long before his thinking's hold ends (a kept game holds his move
+ *   once it's played, so a reload in his wait would skip to it): a reload until then carries the wait and the cutscene on.
  */
-export const BIRDIE_ULT = { theme: "birdie-ult", pieceAt: 300, introMs: 14815, lineAt: 1780 } as const;
+export const BIRDIE_ULT = { theme: "birdie-ult", pieceAt: 300, introMs: 14815, lineAt: 1780, soloMoveLeadMs: 2500 } as const;
 
 /**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards

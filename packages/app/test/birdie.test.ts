@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { BIRDIE_BEATS, BIRDIE_FX, lineSquares, pieceAt, trainReaches } from "@chessroyale/chess";
-import { BIRDIE_CINEMATIC } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BIRDIE_ULT } from "@chessroyale/core";
 import { BIRDIE_FIGURE } from "../src/characters/birdie-figure.ts";
 import { BIRDIE_CUTSCENE_SHEET } from "../src/characters/birdie-cutscene-sheet.ts";
 import { birdieArmoredNow, noteArmor, resetBirdie } from "../src/characters/birdie-state.ts";
 import { BOSS_KITS, liveKit } from "../src/characters/kits.ts";
 import { animLength, cueAt } from "../src/characters/power-art.ts";
-import { BIRDIE_WORDS, birdieDecor, birdieFen, ridePieces } from "../src/components/Birdie.tsx";
-import { cutscenePicture, sceneOpacity, sheetColumn } from "../src/components/BirdieFall.tsx";
+import { BIRDIE_WORDS, birdieDecor, birdieFen, birdieTurnMoments, ridePieces } from "../src/components/Birdie.tsx";
+import { HEADLIGHTS_Y, cutscenePicture, headlightsAt, sceneOpacity, sheetColumn } from "../src/components/BirdieFall.tsx";
+import { birdieMusic } from "../src/birdie-music.ts";
+import { noteRejoin } from "../src/characters/moo-state.ts";
 import type { Moment } from "../src/components/PowerParts.tsx";
 import { trainLine } from "../src/refused.ts";
 import { cutsceneHash } from "../../../scripts/bake-birdie-cutscene.ts";
@@ -72,6 +74,42 @@ describe("his fall's cutscene", () => {
     expect(birdieArmoredNow({ ...boss, powers: { birdie: { warn: null, ride: null, fell: null } } } as unknown as BossView, 9_999)).toBe(false);
     expect(liveKit(BOSS_KITS["Birdie"]!, boss, 6_000).loops?.idle).toBe("p_idle");
     resetBirdie();
+  });
+});
+
+describe("his fall timed to his ult's piece (Nov 23)", () => {
+  const fallen = (turnAt?: { turn: number; at: number; dropAt?: number }, startMove = 40) =>
+    ({ id: "birdie", startMove, crowdSide: "w", crowdMoves: 4, powers: { turn: 4, events: [{ kind: "birdieFall", turn: 4 }], birdie: { warn: null, ride: null, fell: 4, ...(turnAt ? { turnAt } : {}) } }, board: { history: ["e2e4", "e7e5"] } }) as unknown as BossView;
+
+  it("his music: his theme (the piece decoded ahead) until his fall; then the piece, its drop on the impact sent; after it (or joined later), the loop alone", () => {
+    expect(birdieMusic({ id: "birdie", powers: { turn: 2, birdie: { warn: null, ride: null, fell: null } } } as unknown as BossView)).toEqual({ theme: "birdie", next: BIRDIE_ULT.theme });
+    expect(birdieMusic(fallen({ turn: 4, at: 1000, dropAt: 1000 + BIRDIE_BEATS.fall.impactAt }))).toEqual({ theme: BIRDIE_ULT.theme, dropAt: 1000 + BIRDIE_BEATS.fall.impactAt });
+    // (A later turn, or no drop sent: long past, so switchPlan plays his theme's loop alone.)
+    expect(birdieMusic(fallen({ turn: 3, at: 1000, dropAt: 5000 }))).toEqual({ theme: BIRDIE_ULT.theme, dropAt: 0 });
+    expect(birdieMusic(fallen())).toEqual({ theme: BIRDIE_ULT.theme, dropAt: 0 });
+    expect(birdieMusic({ id: "moo", powers: null } as unknown as BossView)).toBeNull();
+  });
+
+  it("his moments from when his thinking began (turnAt): a reload in the wait or the cutscene carries on there, never from its start, never skipped", () => {
+    noteRejoin(50_000);
+    // (Rejoined 8 s into the wait, then 12 s in: in the cutscene.)
+    for (const [into, key] of [[8_000, 41], [12_000, 42]] as const) {
+      const m = birdieTurnMoments(fallen({ turn: 4, at: 50_000 - into }, key), 50_000);
+      expect(m.map((x) => x.kind)).toEqual(["birdieFall"]);
+      expect(m[0]!.at).toBe(50_000 - into);
+      expect(m[0]!.at + BIRDIE_BEATS.fall.impactAt - 50_000).toBe(BIRDIE_BEATS.fall.impactAt - into);
+    }
+    // (No turnAt, as from an older server: skipped on a rejoin, as before.)
+    expect(birdieTurnMoments(fallen(undefined, 43), 50_100)).toEqual([]);
+    noteRejoin(-Infinity);
+  });
+
+  it("the headlights' light follows the lamps the approved drawing draws, the train head-on down the middle of the track", () => {
+    const B = BIRDIE_BEATS.fall;
+    expect(headlightsAt(B.approachAt)).toEqual({ x: 100, y: HEADLIGHTS_Y[0] });
+    expect(headlightsAt(B.impactAt)).toEqual({ x: 100, y: HEADLIGHTS_Y.at(-1) });
+    expect(headlightsAt(B.hitAt).y).toBe(HEADLIGHTS_Y.at(-1));
+    expect(HEADLIGHTS_Y.length).toBe(BIRDIE_CUTSCENE_SHEET.anims.approach.ms.length);
   });
 });
 
