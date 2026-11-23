@@ -21,6 +21,7 @@ import * as folio from "../src/town/shops/folio-art.ts";
 import * as smudgy from "../src/town/shops/smudgy-art.ts";
 import * as boingo from "../src/town/shops/boingo-art.ts";
 import * as chandy from "../src/town/shops/chandy-art.ts";
+import * as birdie from "../src/town/shops/birdie-art.ts";
 import * as zebra from "../src/town/shops/zebra-art.ts";
 import * as tower from "../src/town/shops/tower-art.ts";
 
@@ -51,6 +52,7 @@ const ARTS: Record<string, Art> = {
   smudgy: { layout: smudgy.SHOP_SMUDGY_LAYOUT },
   clown: { layout: boingo.SHOP_BOINGO_LAYOUT, n: boingo.SHOP_BOINGO_N },
   chandy: { layout: chandy.SHOP_CHANDY_LAYOUT, n: chandy.SHOP_CHANDY_N },
+  birdie: { layout: birdie.SHOP_BIRDIE_ROOM_LAYOUT, n: birdie.SHOP_BIRDIE_ROOM_N },
   zebra: { layout: zebra.SHOP_ZEBRA_LAYOUT, floor: zebra.SHOP_ZEBRA_FLOOR, standing: zebra.SHOP_ZEBRA_GUARDS.map((g) => g.square) },
   tower: { layout: tower.SHOP_TOWER_LAYOUT, n: tower.SHOP_TOWER_N },
 };
@@ -106,6 +108,8 @@ describe("Shopkeepers talk from in front of their counter (Nov 21)", () => {
     expect(at("tiger")).toEqual(["12,3", "13,3"]);
     expect(at("grex")).toEqual(["16,4", "17,4"]);
     expect(at("chandy")).toEqual(["9,4", "10,4"]);
+    // (Birdie's bartender inside the U: past the run's stools, on row 6.)
+    expect(at("birdie")).toEqual(["6,6", "7,6"]);
     // (The clerk keeps his own: the counter's whole front.)
     expect(at("tower")).toEqual(["1,4", "2,4", "3,4"]);
   });

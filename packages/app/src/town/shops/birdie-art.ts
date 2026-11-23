@@ -27,6 +27,8 @@ import { SIDEKICK_SHEETS } from "../sidekick-sheets.ts";
 import type { LightPool, LightSpot } from "../houses/kit.ts";
 import { SHOP_BIRDIE_BOARD_BOX, SHOP_BIRDIE_INTERIOR_3 as ART, SHOP_BIRDIE_LAYOUT, SHOP_BIRDIE_N, SHOP_BIRDIE_PIECES, SHOP_BIRDIE_WALL_H } from "./birdie-lobby-art.ts";
 import type { ShopPlace } from "./room.ts";
+import { FlapBoard, boardStops, type FlapInk } from "./flap-board.ts";
+import { HOMES } from "../world.ts";
 
 const T = 37;
 /** The top of row 0's floor in the art's picture. */
@@ -265,3 +267,17 @@ export const SHOP_BIRDIE_TABLE: Character = (() => {
   }
   return piece("challenge-table", [layers], artX(TABLE_COL), artY(TABLE_ROW));
 })();
+
+// ---- The split-flap board (flap-board.ts): over the art's header strip and its flaps, written by the game.
+
+/** The art's board: its header strip's height (y 4 to 11) and the gap down to its flaps (y 14). */
+const HEADER = 8;
+const HEADER_GAP = 2;
+/** The board as the room shows it: made as the room loads (ShopRoom's `flaps`), its stops this town's buildings (never the walk-up). */
+export function birdieFlaps(now: number) {
+  const box = SHOP_BIRDIE_FLAPS.box;
+  const P = ART.palette;
+  const ink: FlapInk = { flap: P.c!, flapLit: P.C!, split: P.k!, letter: "#f4efe2", status: P.y!, header: P.y!, headerInk: P.k! };
+  const board = new FlapBoard({ w: box.w, header: HEADER, gap: HEADER_GAP, h: box.h }, ink, boardStops(HOMES.map((h) => h.id)), Math.floor(now) ^ 0x5eed, now);
+  return { piece: SHOP_BIRDIE_FLAPS.piece, x: box.x, y: box.y - HEADER - HEADER_GAP, w: box.w, h: HEADER + HEADER_GAP + box.h, board };
+}

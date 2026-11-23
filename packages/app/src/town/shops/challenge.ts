@@ -16,6 +16,7 @@ import type { HomeId } from "../world.ts";
 import { CREW_SHEETS } from "./grex-crew-sheets.ts";
 import type { ShopPlace } from "./room.ts";
 import { ZEBRA_BATTLE_START } from "./zebra-lines.ts";
+import { BIRDIE_LINES } from "../../characters/birdie-lines.ts";
 import { timelineAt, type Timeline, type TimelineNow } from "./timeline.ts";
 
 /** Grex's machine guys' step-off and the dozer's wake (their baked sheets' frames: times and cues), for his intro's cues. */
@@ -374,6 +375,16 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     layout: "across",
     custom: true,
     cues: { rise: "chandySurface", crate: "chandyCrate", storm: "chandySplash" },
+  },
+  // (Nov 23: his own, shops/intros/birdie.ts: the station's middle table and its stools are there from the walk in; his hello chirped as he
+  // says his line (Eric: his "hello" when you challenge him); the board pops onto the table; the default flash and wipe, his train's
+  // toot. His line is his entrance's first (characters/birdie-lines.ts), a placeholder for Eric.)
+  birdie: {
+    name: "Birdie",
+    line: BIRDIE_LINES.entrance![0]!,
+    layout: "across",
+    custom: true,
+    cues: { hello: "birdieHello", table: "pop", wipe: "birdieTrainToot" },
   },
   zebra: {
     name: "Don Dough",

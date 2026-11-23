@@ -123,6 +123,12 @@ export interface RoomArt {
   sign?: { readonly piece: string; readonly face: { readonly x: number; readonly y: number; readonly w: number; readonly h: number }; readonly lines: readonly string[]; readonly ink?: string; readonly body?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly ink: string } };
   claw?: { readonly at: { readonly col: number; readonly row: number; readonly w: number; readonly d: number }; readonly spot: Sq };
   /**
+   * A split-flap board the game writes (Birdie's Station, Nov 23: shops/flap-board.ts): its piece, where its canvas goes in that piece's
+   * pixels (from its header strip's top), and the board, made as the room loads; each frame it's moved on (drawing only the flaps that
+   * move) and its canvas drawn over the piece.
+   */
+  flaps?: { readonly piece: string; readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly board: { readonly canvas: HTMLCanvasElement; tick(now: number): boolean; text(): { title: string; rows: string[] } } };
+  /**
    * Its people (Rolling Dough's, Nov 11: the door guards, Don Dough and his crew), drawn from their art: each one's character and the
    * animations the room plays (drawn once as the room loads); who does what is its `scene`'s (shops/zebra-scene.ts).
    */
@@ -243,6 +249,20 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
   // hidden under the water: its marks are the art's, never drawn.)
   chandy: (light) =>
     chunk(import("./chandy-art.ts")).then((m) => ({ n: m.SHOP_CHANDY_N, layout: m.SHOP_CHANDY_LAYOUT, ...m.chandyLit(light), crateAt: m.SHOP_CHANDY_CRATE_AT, marks: m.SHOP_CHANDY_MARKS, outside: "#3d3220", wade: m.SHOP_CHANDY_WADE })),
+  // (Birdie's Station, Nov 23: its lobby, a 12 x 12 box room built from the art's parts (birdie-art.ts); the split-flap board on its back
+  // wall written by the game, made as the room loads (flap-board.ts).)
+  birdie: () =>
+    chunk(import("./birdie-art.ts")).then((m) => ({
+      n: m.SHOP_BIRDIE_ROOM_N,
+      layout: m.SHOP_BIRDIE_ROOM_LAYOUT,
+      pieces: m.SHOP_BIRDIE_ROOM_PIECES,
+      crateAt: [0, 0] as const,
+      lights: m.SHOP_BIRDIE_ROOM_LIGHTS,
+      pools: m.SHOP_BIRDIE_ROOM_POOLS,
+      upright: m.SHOP_BIRDIE_UPRIGHT,
+      marks: m.SHOP_BIRDIE_MARKS,
+      flaps: m.birdieFlaps(performance.now()),
+    })),
   // (The Battle Tower's lobby, Nov 19: a 10 x 10 box room seen whole, its side walls one surface each (its scene, shops/tower-scene.ts,
   // the room's `fx`: Town.tsx); the empty "Best floors" board's head written by the game.)
   tower: () =>
@@ -2615,6 +2635,14 @@ function startRoom(
       g.restore();
     } else g.drawImage(img, 0, 0, img.width, h, x, y, w, h * s);
     if (art.sign && u.name === art.sign.piece) signWords(x, y, s);
+    // (Birdie's split-flap board: moved on, its flaps drawn over the board, smoothed from its own finer pixels.)
+    if (art.flaps && u.name === art.flaps.piece) {
+      const fl = art.flaps;
+      fl.board.tick(now);
+      g.imageSmoothingEnabled = true;
+      g.drawImage(fl.board.canvas, x + fl.x * s, y + fl.y * s, fl.w * s, fl.h * s);
+      g.imageSmoothingEnabled = false;
+    }
     g.globalAlpha = 1;
   };
   /**
@@ -5098,6 +5126,8 @@ function startRoom(
   hooks.__shopBench = hookBench;
   hooks.__shopStill = hookStill;
   hooks.__shopBackDiff = hookBackDiff;
+  // (Birdie's split-flap board: what it says, as its flaps will stand.)
+  (window as unknown as { __shopFlaps?: () => { title: string; rows: string[] } | null }).__shopFlaps = () => art.flaps?.board.text() ?? null;
 
   run();
   draw(performance.now()); // the first frame, before the fade lifts

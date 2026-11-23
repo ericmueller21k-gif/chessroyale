@@ -51,7 +51,7 @@ export interface ShopDef {
    */
   talkAt?: readonly Sq[];
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper" | "zebrakeeper" | "swampkeeper" | "towerclerk";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper" | "zebrakeeper" | "swampkeeper" | "towerclerk" | "birdiebartender";
   at: readonly [number, number];
   /**
    * Drawn at the art's own size, this many of the room's pixels (37 a square) from its feet to the top of its idle, rather than the
@@ -142,6 +142,13 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // the middle of the stand on stilts at the back, drawn at his art's size (40 px). He has no name: "Shopkeeper". No roof but the
   // town's sky (`sky`); a swamp under the open sky: the day tone. His crate isn't sold yet (core has no Boss Crate of Chandy's: the item-builder's), so Talk has him say a line, as Rolling Dough's.
   chandy: { home: "chandy", boss: "Chandy", crate: null, says: ["Crates come in on the next boat. Gators don't rush.", "Watch your step. Some of these logs bite.", "Chandy? He's out there. You won't see him till he wants you to."], kid: "swampkeeper", at: [9.5, 2.3], tall: 40, keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: [], roof: "sky", chatTone: "day" },
+  // Birdie's Station (Nov 23; an admin's town only while he's in the game for admins first): its lobby, the bartender pigeon behind the
+  // U-shaped bar (his own sidekick drawing) its Shopkeeper, drawn at his art's size, just behind the bar's front run as the art's notes
+  // have him (shops/birdie-art.ts: his scoop dips in the vat beside him and pours into a feeder on the counter). He has no name:
+  // "Shopkeeper". You talk to him from the floor past the run's stools (`talkAt`). (His place, size and squares are the art's, written
+  // here so the town needn't load the room: test/shop-birdie.test.ts checks them against shops/birdie-art.ts.) His crate isn't sold yet, so Talk has him say a line,
+  // as Chandy's frog. A bright station lobby under a white ceiling: the day tone.
+  birdie: { home: "birdie", boss: "Birdie", crate: null, says: ["Seed's fresh. Scooped it myself.", "Next train's on the board. Grab a stool till then.", "Birdie? Never late. Not once."], kid: "birdiebartender", at: [257 / 37 - 0.5, 139 / 37 - 0.5], tall: 55, keeper: [{ c: 6, r: 3 }, { c: 7, r: 3 }], talkAt: [{ c: 6, r: 6 }, { c: 7, r: 6 }], prizes: [], roof: "store", chatTone: "day" },
   // The Battle Tower's lobby (Nov 19): its clerk, a penguin bellhop (nobody's kid), behind the counter at the back left, drawn at his art's
   // size (57 px: his face and bow tie clear the 30 px counter). His tag and card say "Clerk"; his card starts or continues your climb
   // (town/TowerDesk.tsx, the only way in: Eric, Nov 19). No crate. Its theme: the tower's own (`tower`, its home's: Nov 19), as in its floor

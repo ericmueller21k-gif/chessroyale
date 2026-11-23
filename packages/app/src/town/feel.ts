@@ -728,6 +728,12 @@ export const SHOP_FEEL = {
    */
   close: { h: 3.2, back: 2.4, th: 24, cy: 0.3 },
   /**
+   * Birdie's Station's split-flap board (Nov 23, shops/flap-board.ts): drawn at `scale` times the art's pixels; one row's status changes
+   * every `statusMs`, the whole board turns to the other page (departures, arrivals) every `pageMs`; a changing flap runs through at most
+   * `maxSteps` letters, one every `stepMs`, the flaps of a row starting `staggerMs` apart.
+   */
+  flaps: { scale: 4, statusMs: 7000, pageMs: 30000, maxSteps: 5, stepMs: 60, staggerMs: 22 },
+  /**
    * The zoom you start at inside a home (0 Close, 1 the town's zoomed-in camera). Eric, Nov 3: "When you walk into the house, the
    * zoom should be the further out of the two by default" (it was Close); `docs/decisions/2026-11-03-home-zoom-out.md`.
    */
