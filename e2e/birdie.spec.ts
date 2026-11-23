@@ -223,7 +223,11 @@ test("Birdie's fall: his cutscene plays as he thinks (the fall, the approach, th
   const landed = rec[fellAt]!.t;
   expect(drop! - landed).toBeGreaterThan(14_000);
   expect(drop! - landed).toBeLessThan(16_500);
-  expect(rec.filter((r) => r.cine && r.t < drop! - 3_000).length, "his wait before the cutscene").toBe(0);
+  // (He waits about 10 s first, his line said; the scene comes up its own time to the impact before the drop: BIRDIE_BEATS.fall.)
+  const scene = rec.find((r) => r.cine)!;
+  expect(scene.t - landed, "his wait before the cutscene").toBeGreaterThan(9_500);
+  expect(drop! - scene.t, "the scene's own time to the impact").toBeGreaterThan(4_000);
+  expect(drop! - scene.t).toBeLessThan(4_800);
   const reveal = rec.find((r) => r.cine === "reveal")!;
   expect(reveal.t).toBeGreaterThanOrEqual(drop!);
   expect(reveal.t - drop!).toBeLessThan(600);
