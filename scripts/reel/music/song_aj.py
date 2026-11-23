@@ -39,6 +39,13 @@ heard it, in his order:
     Bm7, C#7sus4 to C#7: first the lead and the synth trade, one running in 8ths while the other holds, a bar each;
     then the lead takes long notes, the synth runs over it, and a glockenspiel rings on top (12 s), the two closing
     in thirds.
+The fifth go (Eric, Nov 23): "that's going to be Birdie's song" (the dove who rides the train). One change to it: the
+glockenspiel over the duel's second half is out ("I had requested adding like a xylophone or something ... We just want
+to get rid of that. It's not fitting"); "Other than that, I think the song's pretty much perfect." And a piece of its
+own for his ult, kept out of the song so it plays once a fight ("when he triggers his ult, it'll seamlessly kind of go
+to that part ... and then it'll keep going ... keep it a separate thing ... a separate 15-second clip"): "it quiets
+down and you hear kind of like a locomotive sound, maybe even like a train horn, birds chirping, a bit of whatever the
+background beat of that song already is". That is `python3 song_aj.py <out.wav> ult` (the crossing, below).
 The plan's 64 bars are 1:35 at this pace. After the duel the song goes round its chorus once more (both leads
 together), the turnaround, and then the plan's breakdown: 92 bars, 2:16. That is under the 2:30 to 2:45 he asks of a
 theme (SOUNDS.md): the slow middle was what carried it there, and this version is one he asked to hear.
@@ -53,7 +60,7 @@ theme (SOUNDS.md): the slow middle was what carried it there, and this version i
                      the second synth's own tune over it, the two in thirds for its last five notes
   bars 53-56   1:17  Bm7, C#7#9: the lead's way down, the second synth over it
   bars 57-64   1:23  the duel: the lead and the synth trade, a bar each
-  bars 65-72   1:35  the duel again: the lead's long notes, the synth running over them, the glockenspiel on top
+  bars 65-72   1:35  the duel again: the lead's long notes, the synth running over them
   bars 73-80   1:47  the chorus once more, two leads
   bars 81-84   1:59  Bm7, C#7#9
   bars 85-92   2:04  the breakdown: stabs and fills on D5, C5, B5; the long B7#9, the roll, and bar 1
@@ -82,6 +89,7 @@ GRID = {
     "C#7#9": ("C#2", "C#3", "F4 B4 E5", "F3 B3 E4 G#4", "F4 G#4 B4 E5"), "D5": ("D2", "D3", "A4 D5", "", ""), "C5": ("C2", "C3", "G4 C5", "", ""),
     "B5": ("B1", "B2", "F#4 B4", "", ""), "B7#9": ("B1", "B2", "D#4 A4 D5", "", ""),
 }
+ULT_BARS = 10  # the crossing (his ult's piece): 14.8 s, and two bars more for its last hit to ring out
 VERSE_CH = "Em Em Cmaj7 Cmaj7 D D Bm7 Em"
 CHORUS_CH = "Dmaj7 E F#m7 F#m7 Dmaj7 E C#m7 F#m7"
 TURN_CH = "Bm7 Bm7 C#7#9 C#7#9"
@@ -144,7 +152,7 @@ TURN_ON = "D6:2 C#6:1 B5:1 | A5:1.5 B5:.5 D6:2 | F6:4 | G#6:2 F6:1 C#6:1"
 TURN_SYNTH = "F#6:.5 A6:.5 B6:.5 A6:.5 F#6:.5 D6:.5 F#6:.5 A6:.5 | F#6:1 D6:.5 F#6:.5 A6:.5 B6:.5 A6:.5 F#6:.5 | G#6:.5 B6:.5 G#6:.5 F6:.5 G#6:.5 B6:.5 C#7:1 | B6:2 G#6:1 F6:1"
 # The duel (bars 57-72; F#m7, Dmaj7, Bm7, C#7sus4 to C#7, two bars each, twice). First the two trade: one runs in
 # 8ths while the other holds, a bar each. Then the lead takes long notes and the synth runs over it; they close in
-# thirds. The glockenspiel's notes for that second time, a bar a line: six to the bar, off the beat.
+# thirds.
 LEAD_D1 = (
     "C#5:.5 F#5:.5 A5:.5 G#5:.5 A5:.5 C#6:.5 B5:.5 A5:.5 | G#5:3 F#5:.5 G#5:.5 | A5:.5 F#5:.5 D5:.5 F#5:.5 A5:.5 D6:.5 C#6:.5 A5:.5 | C#6:3 B5:.5 A5:.5 | "
     "B5:.5 D6:.5 F#6:.5 E6:.5 D6:.5 B5:.5 A5:.5 F#5:.5 | A5:3 B5:.5 C#6:.5 | C#6:.5 B5:.5 G#5:.5 F#5:.5 G#5:.5 B5:.5 C#6:.5 F#6:.5 | F6:4"
@@ -158,9 +166,6 @@ SYNTH_D2 = (
     "E6:.5 F#6:.5 A6:.5 F#6:.5 E6:.5 C#6:.5 E6:.5 F#6:.5 | A6:1 G#6:.5 F#6:.5 E6:.5 F#6:.5 A6:1 | F#6:.5 A6:.5 B6:.5 A6:.5 F#6:.5 E6:.5 F#6:.5 A6:.5 | B6:1 A6:.5 F#6:.5 A6:.5 B6:.5 A6:1 | "
     "A6:.5 B6:.5 C#7:.5 B6:.5 A6:.5 F#6:.5 A6:.5 B6:.5 | A6:1 B6:.5 A6:.5 F#6:.5 A6:.5 B6:1 | B6:2 B6:1 G#6:1 | G#6:1.5 B6:.5 G#6:2"
 )
-GLOCK = ("E7 C#7 A6 E7 C#7 F#6", "E7 C#7 A6 E7 C#7 A6", "D7 C#7 A6 D7 C#7 F#6", "D7 C#7 A6 D7 A6 F#6", "D7 B6 A6 D7 B6 F#6", "F#7 D7 B6 F#7 D7 B6",
-         "C#7 B6 G#6 C#7 B6 F#6", "C#7 B6 G#6 F6 G#6 C#7")
-GLOCK_AT = (0, 3, 6, 8, 11, 14)  # where they fall in the bar (16ths)
 # The breakdown's line on the lead: each chord's fifth, then down a half step onto its flat fifth.
 DREAD = "A5:4 G#5:4 G5:4 F#5:4 F#5:4 F5:4"
 # The stabs: where they fall in the bar (16ths), and the fills that take the rest of it (s: snare; h, m, l: toms).
@@ -169,19 +174,21 @@ FILLS = ("sshhmmll", "s.sshhml", "hhmmllss", "hmlshmls")
 for _line, _beats in ((RIFF, 8), (RIFF_OUT, 8), (VERSE_1, 32), (UNDER_1, 32), (VERSE_2, 32), (UNDER_2, 32), (LOW_2, 32), (CHORUS, 32), (CHORUS_UNDER, 32), (COUNTER, 32),
                       (TURN_ON, 16), (TURN_SYNTH, 16), (LEAD_D1, 32), (SYNTH_D1, 32), (LEAD_D2, 32), (SYNTH_D2, 32), (DREAD, 24)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
-assert all(len(bar.split()) == len(GLOCK_AT) for bar in GLOCK) and len(GLOCK) == 8
 
 
-def render(window=None) -> np.ndarray:
+def render(window=None, part="song") -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
-    (a sample, to compare voices on)."""
-    x = Ride(RIDE, BEATS, None, os=2, seed=331, tape_secs=TAPE)
+    (a sample, to compare voices on). `part` "ult": the crossing by itself instead, with the song's own voices, levels
+    and halls, so the two sit together."""
+    ult = part == "ult"
+    span = 4 * (ULT_BARS + 2) if ult else BEATS
+    x = Ride([(0, span, BPM, BPM, 1.0, 1.0, 0.0)], span, None, os=2, seed=331, tape_secs=span * 60 / BPM)
     x.window = window
     put, at = x.put, x.at
     rng = np.random.default_rng(109)
     sr = x.sr
     tau = 2 * np.pi
-    chord = lambda bar: GRID[CHORDS[bar - 1]]
+    chord = lambda bar: GRID["Em" if ult else CHORDS[bar - 1]]
 
     def tail(k, secs=0.01):
         return np.minimum(1, (k - 1 - np.arange(k)) / (secs * sr))
@@ -405,18 +412,81 @@ def render(window=None) -> np.ndarray:
             put("square", b, x.pulse(ms[(0, 1, 2, 3, 2, 1)[i % 6]], 0.19, 0.5, 0.03 * vol, attack=0.002, decay=0.04, sustain=0.6, release=0.01), 0.4 if i % 2 else -0.4)
 
     # ---- the train ----
-    def whistle(b, d, vol=0.045, names="D#5 F#5 A5", pan=0.15):
-        """The steam whistle: three pipes, a diminished chord; it slides up into its note and sags as the steam goes."""
+    def whistle(b, d, vol=0.045, names="D#5 F#5 A5", pan=0.15, fall=0.0):
+        """The steam whistle: three pipes, a diminished chord; it slides up into its note and sags as the steam goes.
+        `fall` (half steps): it sinks that far over its length and thins out, as a train's does going by."""
         at(b, d)
         k = x.k(d)
         t = np.arange(k) / sr
         u = t / t[-1]
         w = np.zeros(k)
         for j, m in enumerate(n(c) for c in names.split()):
-            f = x.hz(m) * 2 ** ((-0.7 * np.exp(-t / 0.05) - 0.6 * np.clip((u - 0.8) / 0.2, 0, 1) ** 2) / 12) * (1 + 0.004 * np.sin(tau * 6.5 * t + j))
+            f = x.hz(m) * 2 ** ((-0.7 * np.exp(-t / 0.05) - 0.6 * np.clip((u - 0.8) / 0.2, 0, 1) ** 2 - fall * u**1.5) / 12) * (1 + 0.004 * np.sin(tau * 6.5 * t + j))
             ph = tau * np.cumsum(f) / sr
             w += np.sin(ph) + 0.5 * np.sin(2 * ph + 1) + 0.33 * np.sin(3 * ph + 2) + 0.15 * np.sin(4 * ph)
-        put("fx", b, w / 3 * np.minimum(1, t / 0.04) * tail(k, 0.12) * (1 + 0.08 * np.sin(tau * 11 * t)) * vol, pan)
+        away = 1 - 0.65 * u**1.5 if fall else 1.0
+        put("fx", b, w / 3 * np.minimum(1, t / 0.04) * tail(k, 0.12) * (1 + 0.08 * np.sin(tau * 11 * t)) * away * vol, pan)
+
+    # ---- the crossing's own sounds: the engine heard for itself, and birds ----
+    def soft(k, cut_hz):
+        """Noise with its highs rolled off."""
+        size = max(2, int(sr / cut_hz / 2))
+        y = np.convolve(rng.uniform(-1, 1, k + 2 * size), np.ones(size) / size, "same")[size : size + k]
+        return y / (np.sqrt(np.mean(y**2)) + 1e-9) * 0.5
+
+    def chuff(b, vol=0.1, pan=0.0, strong=False):
+        """One beat of the engine's exhaust: a puff of steam up the chimney; the strong one deeper and longer."""
+        k = int((0.16 if strong else 0.11) * sr)
+        t = np.arange(k) / sr
+        w = soft(k, 1100 if strong else 1700) + 0.35 * hiss(k, 4500, 0.5)
+        put("loco", b, w * np.minimum(1, t / 0.012) * np.exp(-t / (0.055 if strong else 0.035)) * tail(k) * vol * (1.0 if strong else 0.6), pan)
+
+    def clack(b, vol=0.05, pan=0.3):
+        """Wheels over a rail joint: two knocks, close together."""
+        for late in (0.0, 0.085):
+            k = int(0.05 * sr)
+            t = np.arange(k) / sr
+            knock = np.sin(tau * 620 * t) * np.exp(-t / 0.008) + 0.6 * np.sin(tau * 170 * t) * np.exp(-t / 0.02) + 0.5 * hiss(k, 6000, 0.5) * np.exp(-t / 0.003)
+            put("loco", b, knock * tail(k) * vol, pan, late=late)
+
+    def steam(b, secs, vol=0.03, pan=-0.3):
+        """Steam let go: a hiss that opens and dies away."""
+        k = int(secs * sr)
+        t = np.arange(k) / sr
+        put("loco", b, hiss(k, 9000, 0.8) * np.minimum(1, t / 0.03) * np.exp(-t / (secs / 3)) * tail(k, 0.05) * vol, pan)
+
+    def engine(b, length, vol=0.028):
+        """The engine's weight on the rails: a low band of noise (round 110 Hz, where a phone still speaks),
+        throbbing on every 8th."""
+        at(b, length)
+        k = x.k(length)
+        t = np.arange(k) / sr
+        ph = tau * 110 * t
+        throb = 0.7 + 0.3 * np.cos(tau * t / (x.beat_s / 2))
+        put("loco", b, (soft(k, 60) * np.cos(ph) + soft(k, 60) * np.sin(ph)) * throb * np.minimum(1, t / 0.6) * tail(k, 0.6) * vol)
+
+    def tweet(b, f0, f1, secs, vol, pan, late=0.0, shake=0.0):
+        """One note of a bird: a clear whistle sliding from `f0` to `f1` Hz; `shake`: trembling that fast (Hz)."""
+        k = int(secs * sr)
+        t = np.arange(k) / sr
+        u = t / secs
+        f = f0 * (f1 / f0) ** u * (1 + (0.06 * np.sin(tau * shake * t) if shake else 0))
+        ph = tau * np.cumsum(f) / sr
+        env = np.sin(np.pi * u) ** 1.3 * (0.6 + 0.4 * np.cos(tau * shake * t) if shake else 1.0)
+        put("birds", b, (np.sin(ph) + 0.15 * np.sin(2 * ph)) * env * vol, pan, late=late)
+
+    def bird(b, kind, vol=0.03, pan=0.0):
+        """A bird's phrase. "tsip": four quick falling chirps; "teeoo": two clear notes, the second lower; "trill":
+        one note shaken fast; "cheer": two chirps up."""
+        if kind == "tsip":
+            for late, loud in ((0.0, 0.8), (0.11, 1.0), (0.22, 0.9), (0.36, 0.7)):
+                tweet(b, 4600, 3300, 0.055, vol * loud, pan, late)
+        elif kind == "teeoo":
+            tweet(b, 3800, 3950, 0.14, vol, pan), tweet(b, 3000, 2750, 0.2, vol * 0.9, pan, 0.19, shake=25)
+        elif kind == "trill":
+            tweet(b, 5200, 5000, 0.42, vol * 0.8, pan, shake=28)
+        else:
+            tweet(b, 2800, 4200, 0.07, vol, pan), tweet(b, 3000, 4500, 0.07, vol, pan, 0.12)
 
     strung = {}
 
@@ -445,15 +515,6 @@ def render(window=None) -> np.ndarray:
             for up, a in ((0, 1.0), (12, 0.8)):
                 w = string(m + up)[:k]
                 put("piano", b, w * np.minimum(1, (len(w) - np.arange(len(w))) / fade) * 0.2 * vol * a * (1.0 if d >= 0.75 else 0.85), pan)
-
-    def glock(b, m, vol=0.03, pan=0.35):
-        """The glockenspiel: a bright bar under a hard mallet, its overtones the note's own harmonics (so it sits in
-        the chord), gone in half a second."""
-        k = int(0.9 * sr)
-        t = np.arange(k) / sr
-        ph = tau * x.hz(m) * t
-        w = np.sin(ph + 1.3 * np.exp(-t / 0.05) * np.sin(4 * ph)) * np.exp(-t / 0.22) + 0.25 * np.sin(3 * ph) * np.exp(-t / 0.03)
-        put("bell", b, w * np.minimum(1, t / 0.0008) * tail(k, 0.1) * vol, pan)
 
     # ---- the sections ----
     def stabs(bar, name, hits, text, vol=1.0):
@@ -560,14 +621,11 @@ def render(window=None) -> np.ndarray:
 
     def duel(first):
         """Sixteen bars over the locomotive: the lead and the second synth trade, a bar each; then the lead's long
-        notes, the synth running over them and the glockenspiel on top, the two closing in thirds."""
+        notes and the synth running over them, the two closing in thirds."""
         for j in range(16):
             bar = first + j
             train(bar, 1.05, fills=FILLS[3] if j == 7 else "sshhmmll" if j == 15 else "sshm" if j % 4 == 3 else "", double=True, ride=True)
             pad(bar)
-            if j >= 8:
-                for i, name in zip(GLOCK_AT, GLOCK[j - 8].split()):
-                    glock(bar0(bar) + i / 4, n(name))
         crash(bar0(first), 0.065), crash(bar0(first + 8), 0.06)
         soar(bar0(first), LEAD_D1, 1.75), synth(bar0(first), SYNTH_D1, 1.15)
         soar(bar0(first + 8), LEAD_D2, 1.75), synth(bar0(first + 8), SYNTH_D2, 1.15)
@@ -587,25 +645,64 @@ def render(window=None) -> np.ndarray:
             tom(b + i / 4, "l", 0.3), kick(b + i / 4, 0.45)
         roll(b + 4, 4, 0.06, 0.3)
 
-    intro(1), riff(5)
-    verse(13, VERSE_1, UNDER_1), verse(21, VERSE_2, UNDER_2, LOW_2)
-    pre(29)
-    chorus(37), chorus(45, high=True, counter=True)
-    turn(53, TURN_SYNTH)
-    duel(57)
-    chorus(73, high=True, two=True)
-    turn(81)
-    breakdown(85)
+    def crossing(first):
+        """His ult's piece, ten bars (14.8 s) on the riff's E: the band falls away to the song's own locomotive (the
+        kit, the bass and the muted guitar) at well under half its level, and over it the engine itself: its exhaust on
+        every 8th (the strong puff on the beat), wheels over the rail joints, steam, a low weight under it all. The
+        whistle blows a crossing's signal (two long, a short, a long), the last one sinking away as a train's does
+        going by. Birds, as soon as it is quiet and all through. The last two bars come back up; a roll; and the kit's
+        hit on the bar after the tenth, which is where the song takes over again."""
+        for j in range(ULT_BARS):
+            bar = first + j
+            b = bar0(bar)
+            band = (0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.4, 0.5, 0.66)[j]
+            if j < ULT_BARS - 1:
+                train(bar, band, ride=True)
+            else:
+                rumble(bar, band), chug(bar, band)  # (the roll has the kit's place)
+            near = (0.6, 0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.2)[j]
+            for i in range(8):
+                chuff(b + i / 2, 0.11 * near, 0.25 * np.sin(0.9 * i + j), strong=i % 4 == 0)
+            clack(b + 1.5, 0.045 * near), clack(b + 3.5, 0.04 * near, -0.3)
+        engine(bar0(first), 4 * ULT_BARS)
+        steam(bar0(first), 0.9, 0.035)
+        whistle(bar0(first + 1), 3.0, 0.06, "B4 E5 G5")
+        whistle(bar0(first + 2) + 0.5, 3.0, 0.06, "B4 E5 G5")
+        whistle(bar0(first + 3) + 1, 0.75, 0.054, "B4 E5 G5")
+        whistle(bar0(first + 3) + 2.5, 5.5, 0.063, "B4 E5 G5", fall=1.2)
+        for bar, off, kind, loud, pan in ((0, 2.0, "tsip", 1.0, 0.5), (0, 3.4, "teeoo", 0.9, -0.5), (2, 3.6, "cheer", 0.6, 0.6), (4, 2.5, "teeoo", 0.8, -0.4),
+                                          (5, 1.0, "trill", 1.0, 0.5), (5, 3.0, "tsip", 1.0, -0.5), (6, 1.5, "teeoo", 1.0, 0.4), (6, 3.5, "cheer", 0.9, -0.2),
+                                          (7, 2.0, "trill", 0.9, -0.5), (8, 0.5, "teeoo", 0.9, 0.5), (8, 2.5, "tsip", 0.8, -0.4)):
+            bird(bar0(first + bar) + off, kind, 0.03 * loud, pan)
+        roll(bar0(first + ULT_BARS - 1), 4, 0.06, 0.3)
+        steam(bar0(first + ULT_BARS) - 1, 0.5, 0.03, 0.3)
+        b = bar0(first + ULT_BARS)  # (the hit is drums alone: whatever chord the song comes back on, it fits)
+        kick(b, 0.5), snare(b, 0.27), tom(b, "l", 0.3), crash(b, 0.07)
+
+    if ult:
+        crossing(1)
+    else:
+        intro(1), riff(5)
+        verse(13, VERSE_1, UNDER_1), verse(21, VERSE_2, UNDER_2, LOW_2)
+        pre(29)
+        chorus(37), chorus(45, high=True, counter=True)
+        turn(53, TURN_SYNTH)
+        duel(57)
+        chorus(73, high=True, two=True)
+        turn(81)
+        breakdown(85)
 
     # A hall for the leads, the brass, the flute, the pads, the piano and the whistle; none for the kit, the bass or
     # the guitar.
     def room(name, secs=1.2, wet=0.15):
-        bus = x.buses[name]
-        size = bus.shape[1]
+        size = x.N
         k = int(secs * sr)
         t = np.arange(k) / sr
         ir = np.zeros((2, size))
         ir[:, :k] = rng.normal(0, 1, (2, k)) * np.exp(-t / (secs / 6.9)) * np.minimum(1, t / 0.02)
+        if name not in x.buses:
+            return  # (its numbers are drawn all the same, so every hall after it is the one it always was)
+        bus = x.buses[name]
         ir /= np.sqrt(np.sum(ir**2, axis=1, keepdims=True))
         f = np.fft.rfftfreq(size, 1 / sr)
         x.buses[name] = bus + wet * np.fft.irfft(np.fft.rfft(bus, axis=1) * np.fft.rfft(ir, axis=1) / (1 + (f / 4500) ** 2) * (f > 150), n=size, axis=1)
@@ -613,16 +710,16 @@ def render(window=None) -> np.ndarray:
     x.beat_s = 60 / BPM
     x.echo("lead", 0.75, 0.12, 0.05), x.echo("lead2", 0.75, 0.12, 0.05), x.echo("flute", 0.75, 0.16, 0.07), x.echo("synth", 0.75, 0.14, 0.06)
     for name, secs, wet in (("lead", 1.3, 0.16), ("lead2", 1.3, 0.16), ("synth", 1.3, 0.16), ("brass", 1.0, 0.13), ("square", 1.0, 0.12), ("flute", 1.5, 0.25), ("pad", 2.0, 0.35),
-                            ("piano", 1.0, 0.12), ("bell", 1.6, 0.3), ("fx", 2.0, 0.35)):
+                            ("piano", 1.0, 0.12), ("bell", 1.6, 0.3), ("fx", 2.0, 0.35), ("birds", 1.6, 0.35), ("loco", 0.8, 0.1)):
         room(name, secs, wet)
-    levels = {"lead": 1.0, "lead2": 1.0, "synth": 1.9, "brass": 1.8, "square": 1.25, "flute": 2.2, "pad": 2.2, "piano": 0.6, "bell": 2.4, "fx": 1.6, "gtr": 1.0, "bass": 0.7,
+    levels = {"lead": 1.0, "lead2": 1.0, "synth": 1.9, "brass": 1.8, "square": 1.25, "flute": 2.2, "pad": 2.2, "piano": 0.6, "fx": 1.6, "loco": 2.2, "birds": 3.2, "gtr": 1.0, "bass": 0.7,
               "kick": 0.5, "snare": 1.0, "toms": 1.0, "hats": 5.2, "crash": 1.8}
     return x.play(x.mixdown(levels, lowpass=9000, room=0.03))
 
 
-def main(out: str) -> None:
-    write_wav(out, render())
+def main(out: str, part: str = "song") -> None:
+    write_wav(out, render(part=part))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:])

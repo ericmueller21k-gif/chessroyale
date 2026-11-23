@@ -687,3 +687,30 @@ the brush strokes like 6 seconds in ... I know we already have piano that's fine
 - Measured: the lead -22 dB RMS in the main parts (the violin was -21); the song 3 to 4 dB lower between 2 and
   8 kHz than with the violin, the same below; -16.0 LUFS, peak -1.2 dBFS.
 - Sent as a full song; the game still has the violin version (stills `e74fb337`) until he says which.
+
+## Birdie's song (Nov 23): the runaway train (song AJ) without its glockenspiel, and a piece for his ult
+
+Eric: "Going back to the Train version 4 song, that's going to be Birdie's song" (Birdie: a dove in a cap who rides
+a train; not in the roster yet, his art is on `stills/birdie-2`). Two things asked:
+- **One change to the song:** "at some point I had requested adding like a xylophone or something around like ...
+  140 something ... We just want to get rid of that. It's not fitting ... Other than that, I think the song's pretty
+  much perfect." The glockenspiel over bars 65 to 72 is out. Checked against the fourth go's render: the two differ
+  only in those bars and the bar its ring died in (elsewhere the difference is under -115 dB). Still 2:16.
+  A glockenspiel on top of two fast leads goes on the not-liked side; alone in a calm (Smudgy's) he liked it.
+- **A separate piece for his ult**, not part of the loop, so it plays once a fight ("keep it a separate thing ...
+  we'll transition into that part and we'll wire it in when needed"): "10 to 15 seconds where it quiets down and you
+  hear kind of like a locomotive sound, maybe even like a train horn, birds chirping, a bit of whatever the background
+  beat of that song already is". `python3 song_aj.py out.wav ult` (the `crossing`): ten bars at the song's 162 (14.8 s)
+  on the riff's E, and two bars more for its last hit to ring.
+  - The song's own locomotive (kit, bass, muted guitar) at a little over a third of its level; over it the engine
+    itself: exhaust on every 8th, wheels over the rail joints, steam, a low weight at 110 Hz.
+  - The whistle (the song's own, on the riff's chord) blows a crossing's signal: two long, a short, a long that sinks
+    away as a train's does going by (2 s to 9 s).
+  - Birds from the first second and all through: four kinds of phrase, left and right.
+  - The last two bars come back up into a snare roll and a hit of drums alone (no chord, so it fits wherever the song
+    comes back).
+  - Made in the song's mix with the song's mastering gain, so the two sit together as they will in the game: the
+    piece about 5 dB under the song's verse and chorus, its last two bars back at the song's level.
+- Sent: the song, the piece, and a demo (the chorus, the piece from a bar line, the song again on its hit). No verdict
+  on the piece yet. For the director when it is approved: the piece wants to start on one of the theme's bar lines
+  (a bar is 1.4815 s) and the theme to come back on its hit, 14.815 s in.
