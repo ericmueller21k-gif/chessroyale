@@ -604,7 +604,8 @@ for (const who of ["a player's town", "an admin's town"] as const)
     expect(long / ref, "longest task, in reference jobs").toBeLessThan(TOWN_LONG_REFS);
   });
 
-/** A second visit's first frame, with the first's pictures kept (keep-pictures.ts): this many reference jobs (Nov 23). */
+/** A second visit's first frame, with the first's pictures kept (keep-pictures.ts): this many reference jobs (Nov 23: measured 4.6 to 5.3
+ * over 4 runs, the first visit 14.8 to 15.8; the median and a quarter, as TOWN_LOAD_REFS). docs/decisions/2026-11-23-town-keep-pictures.md. */
 const TOWN_KEPT_REFS = 6;
 
 test("Chess Town on a slow phone: a second visit loads the first visit's kept pictures, exactly as painted, and draws much sooner (Nov 23)", { tag: "@perf" }, async ({ page }) => {

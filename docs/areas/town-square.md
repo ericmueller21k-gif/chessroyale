@@ -1300,6 +1300,11 @@ uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After 
 0 uploads, 0 resets. A building in and out uploads nothing of the town. The town's 2D pictures are made in memory (`paint.ts`
 `art2d`): uploading a GPU canvas waits for the GPU. Hooks: `__townPaint()`'s `loading`, `loadMs`, `loadPaintMs`, `atlas`. Tests:
 `packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…").
+**Kept between visits (Nov 23; [decision](../decisions/2026-11-23-town-keep-pictures.md)):** after a first visit's first frame its pictures are
+packed into PNG pages (a worker encodes them; 5.8 MB) and kept in IndexedDB (`town/keep-pictures.ts`, `TOWN_PICTURES`). A later visit on the
+same build and layout (`pictureKey`: version, the town chunk's hashed name, `render.ts` `pictureSig`) cuts them back out instead of painting:
+4x slowed, 18.5 s → 5.9 s. Anything odd paints as before and clears the entry. `?paintall` skips it. Hooks: `__townPaint().pictures`,
+`__townPictureSum()`. Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second visit…").
 **The music is no step (Nov 14; [decision](../decisions/2026-11-14-town-load-fast.md)):** until Nov 14 every boss theme was fetched from the
 bar's start beside the painting, and "Loading music…" waited up to 3 s more once the town was built (Nov 12, [decision](../decisions/2026-11-12-music-mono-preload.md));
 at 44 MB (stereo 192 kbps) Eric found the town "taking forever". Now `preloadMusic` starts `MUSIC.townPreloadAfterMs` (2 s) after the first
