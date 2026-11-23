@@ -92,14 +92,15 @@ const TIMING_ASKED = (() => {
 /**
  * `?crowd=N` and `?fps` as the page opened (the town reads them once, so a later replaceState that drops the query can't lose them).
  * (`?street=off`, the old town after the street town's WebGL failed, is gone since Nov 13: gl-fail.ts.) `?back=2d` (Nov 11, anyone's, as `?report`): rooms draw their back the 2D way, as before
- * shops/back-gl.ts, so a phone's `?report` can compare the two.
+ * shops/back-gl.ts, so a phone's `?report` can compare the two. `?paintall` (Nov 23, anyone's): the town paints every picture as a first
+ * visit does, neither loading the kept ones nor keeping its own (town/keep-pictures.ts), so a phone can compare the two.
  */
 export const TOWN_ASKED = (() => {
   try {
     const q = new URLSearchParams(globalThis.location?.search ?? "");
-    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), report: q.has("report"), back2d: q.get("back") === "2d" };
+    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), report: q.has("report"), back2d: q.get("back") === "2d", paintAll: q.has("paintall") };
   } catch {
-    return { crowd: 0, fps: false, report: false, back2d: false };
+    return { crowd: 0, fps: false, report: false, back2d: false, paintAll: false };
   }
 })();
 let gameOnDevice = true;
