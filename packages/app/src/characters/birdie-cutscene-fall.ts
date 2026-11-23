@@ -1,7 +1,10 @@
 /**
  * Birdie's ultimate, scene A: the fall. A full-bleed cinematic picture (200 x 260, every pixel filled), not arena art.
  *  - fall (loop, 5 x 120 ms): a blurred cartoon sky, banded blue-grey to haze, pale clouds far below; young Birdie
- *    tumbling backward through it, wings flung up, tie streaming, beak open, eye wide; his cap flying off above him;
+ *    free falling for fun through it like a happy skydiver: belly toward us, head three-quarter left, wings spread
+ *    wide, feet kicked out, tie streaming up over his shoulder, his eye a happy closed curve, his beak open in a whoop;
+ *    his cap floating just above him to the right, his lifted right wing tip reaching for it; a little bank, bob and
+ *    wing ride across the loop;
  *    vertical speed lines streaming up (a dash period of 5 steps, so the loop is seamless) and diagonal wind streaks.
  *  - approach (once, 9 x 390 ms, holds): the same sky and Birdie; the track rises out of the haze below, seen straight
  *    down its length by one camera (two rails a gauge apart running up the middle to one vanishing point at the centre
@@ -9,19 +12,19 @@
  *    comes straight at us along it: a streamlined "bulldog" nose (a curved body, ray-marched and shaded from its
  *    surface: the chin tucked under, the nose bulging round the headlights, curving back to the two-pane windscreen,
  *    the charcoal roof cap, the red stripe right round it, a raked silver pilot below), from two dots in the haze to
- *    the bottom half, its headlights (keys W and V) brighter each frame and lighting the rails ahead; Birdie drops
- *    straight down into its path, centred over the track, and in the last frame the nose is on him, the lamps
+ *    the bottom half, its headlights (keys W and V) brighter each frame and lighting the rails ahead; Birdie (still
+ *    gliding happily, the cap with him) drops straight down into its path, centred over the track, and in the last frame the nose is on him, the lamps
  *    flaring either side of him; the lines stream faster and the wind streaks thicken.
  * Layers: the sky (one part), the ground and track (one part per approach frame), the lines, the train (outlined),
- * then Birdie as parts (far wing, body, near wing, tie) and his cap, all outlined in k.
+ * then Birdie as parts (right wing, left wing, body, tie) and his cap, all outlined in k.
  *
- * Copied as drawn from the art branch `claude/boss-art` (scripts/boss-art/out/arena-birdie-fall/arena-birdie-fall.ts at fd5cad0ec, Nov 23, 2026: the
- * third pass, which Eric approved: "looks good now"): every animation as drawn. Changed: the import paths, and the whole drawing made
- * the first time it is read (`build`). Played by components/BirdieFall.tsx. The run's report: scripts/boss-art/out/arena-birdie-fall/summary.md
- * on that branch.
+ * Copied as drawn from the art branch `claude/boss-art` (scripts/boss-art/out/arena-birdie-fall-fun/arena-birdie-fall-fun.ts at 9256e0fb3, Nov 23,
+ * 2026: the fun pass, Eric's "free falling but looking like he's having fun"; docs/decisions/2026-11-23-birdie-fall-fun.md): every animation
+ * as drawn. Changed: the import paths, its id (the game's, `arena-birdie-fall`), and the whole drawing made the first time it is read
+ * (`build`). Played by components/BirdieFall.tsx. The run's report: scripts/boss-art/out/arena-birdie-fall-fun/summary.md on that branch.
  */
 import { canvas, toGrid } from "./paint.ts";
-import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
 
 /** The drawing as drawn, made the first time it is read (its parts and frames: about a second of work at import otherwise). */
 function build(): Character {
@@ -209,57 +212,82 @@ function build(): Character {
 
   const BR = 80; // half the size of each of his parts' boxes
 
-  /** His pose for a tumble phase (0..4 loops). */
+  /** His pose for a glide phase (0..4 loops): a little bank one way then the other, the wings riding the air, a bob. */
   function pose(ph: number) {
     const a = (TAU * ph) / 5;
     return {
-      turn: Math.round(38 + 14 * Math.sin(a)),
-      flap: Math.round(16 * Math.sin(a + 0.9)),
-      tie: Math.round(10 * Math.sin(a + 2)),
-      tiePh: ph,
+      tilt: Math.round(4 * Math.sin(a)),
+      flap: Math.round(7 * Math.sin(a + 1.2)),
+      bob: Math.round(2 * Math.sin(a + 0.6)),
+      tie: Math.round(12 * Math.sin(a + 2)),
+      kick: Math.sin(a + 0.4),
     };
   }
 
-  /** The body, head and tail, turned `turn` degrees clockwise (0: upright, facing left). */
-  function bodyFn(turn: number): Fn {
-    const tail: Pt[] = [[9, -1], [33, 5], [37, 9], [33, 13], [9, 9]];
-    const [ex, ey] = rot(-19.5, -13, turn);
+  /** Distance from (x, y) to the segment a-b. */
+  function segD(x: number, y: number, a: Pt, b: Pt): number {
+    const vx = b[0] - a[0];
+    const vy = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / (vx * vx + vy * vy)));
+    return Math.hypot(x - a[0] - t * vx, y - a[1] - t * vy);
+  }
+
+  /**
+   * The happy skydiver: belly toward us, head three-quarter to the left (his beak open in a whoop, his eye a happy
+   * closed curve), a short tail fanned below, his feet kicked out. Banked `tilt` degrees; `kick` (-1..1) swings his feet.
+   */
+  function bodyFn(tilt: number, kick: number): Fn {
+    const tail: Pt[] = [[-6, 12], [6, 12], [9.5, 24], [4, 26.5], [0, 24.5], [-4, 26.5], [-9.5, 24]];
+    const legL: [Pt, Pt] = [[-5, 14], [-11, 19.5 - 1.5 * kick]];
+    const legR: [Pt, Pt] = [[5, 14], [11.5, 18.5 + 1.5 * kick]];
     return (px, py) => {
       const X = px + 0.5;
       const Y = py + 0.5;
-      // The eye, upright on the screen: a pale ring, a small dark pupil (wide with fright), a glint at its top left.
-      const de = Math.hypot(X - ex, Y - ey);
-      if (de <= 2.6) return Math.floor(X) === Math.floor(ex - 1) && Math.floor(Y) === Math.floor(ey - 1) ? "w" : "x";
-      if (de <= 5.3) return "o";
-      const [lx, ly] = rot(X, Y, -turn);
-      const l = 0.6 - (0.4 * X) / 22 - (0.5 * Y) / 22;
-      // Open beak: two mandibles, the mouth between.
-      if (pip([[-25, -15], [-34, -13.4], [-25, -11]], lx, ly)) return ly < -13.4 + 0.5 ? "B" : "B";
-      if (pip([[-25, -11], [-31.5, -9.2], [-25, -8.6]], lx, ly)) return "R";
-      if (pip([[-25, -8.8], [-31, -8.6], [-25, -6.2]], lx, ly)) return "B";
-      const head = Math.hypot(lx + 16, ly + 11) <= 11.5;
-      const neck = ((lx + 10) / 8) ** 2 + ((ly + 3) / 8.5) ** 2 <= 1;
-      const body = ((lx - 2) / 17) ** 2 + ((ly - 2) / 13) ** 2 <= 1;
-      const fluff = ((lx - 2) / 19.5) ** 2 + ((ly - 2) / 15) ** 2 <= 1 && hash(Math.floor(lx), Math.floor(ly)) % 7 < 2 && lx > -6;
-      const tl = pip(tail, lx, ly);
+      const [lx, ly] = rot(X, Y, -tilt);
+      const l = 0.62 - (0.4 * X) / 20 - (0.5 * Y) / 22;
+      // The happy eye: a closed upward curve (his joy lid).
+      const de = Math.hypot(lx + 7, ly + 14.6);
+      if (Math.abs(de - 2.6) < 0.95 && ly < -14.2) return "x";
+      // The open beak: the upper mandible, the mouth (a tongue at its floor), the lower mandible dropped in a whoop.
+      // (Drawn tipped up 18 degrees about its base: a whoop at the sky.)
+      const [bx, by] = rot(lx + 12, ly + 13, -14);
+      if (pip([[1.5, -5.8], [-11, -3.4], [1.5, -1]], bx, by)) return segD(bx, by, [1.5, -5.8], [-9, -3.8]) < 0.8 ? "l" : "B";
+      if (pip([[0.5, 2.4], [-8, 4.6], [0.5, 5.8]], bx, by)) return segD(bx, by, [0.5, 2.6], [-7, 4.5]) < 0.7 ? "j" : "B";
+      if (pip([[1, -1.2], [-10, -3.2], [-7.6, 4.4], [0.5, 2.4]], bx, by)) return by > 1.2 && bx > -6 ? "U" : "R";
+      const head = Math.hypot(lx + 3, ly + 15) <= 10.5;
+      const neck = ((lx + 2) / 8.5) ** 2 + ((ly + 6) / 7) ** 2 <= 1;
+      const body = (lx / 14.5) ** 2 + ((ly - 3.5) / 13.8) ** 2 <= 1;
+      const fluff = (lx / 16.2) ** 2 + ((ly - 3.5) / 15.4) ** 2 <= 1 && hash(Math.floor(lx), Math.floor(ly)) % 7 < 2 && ly > -4;
       if (head) {
-        // The dark mark under his eye.
-        if (Math.abs(lx + 14) < 1 && ly > -9 && ly < -6) return "s";
-        const face = lx < -15 && ly > -12.5;
-        return face ? ramp("fgh", l + 0.15) : ramp("bcde", l);
+        // A rosy cheek under the eye, the dark sparrow mark behind it.
+        if (((lx + 5.2) / 2.3) ** 2 + ((ly + 10.6) / 1.2) ** 2 <= 1 && (Math.floor(X) + Math.floor(Y)) % 2 === 0) return "U";
+        if (lx > 0.5 && lx < 2.2 && ly > -12.5 && ly < -9) return "s";
+        const face = ((lx + 7) / 7.5) ** 2 + ((ly + 11) / 7.5) ** 2 <= 1 || ly > -8.5;
+        if (face) return ramp("fgh", l + 0.15);
+        // The brown crown, streaked darker.
+        const streak = (Math.floor(lx * 0.8 + ly * 0.4) % 3 === 0 && ly < -16) ? 0.25 : 0;
+        return ramp("bcde", l - 0.2 - streak);
       }
       if (body || neck || fluff) {
-        const breast = ((lx + 6) / 10.5) ** 2 + ((ly - 1) / 12) ** 2 <= 1 || ly > 11;
+        const breast = ((lx + 2) / 10) ** 2 + ((ly - 4) / 12.5) ** 2 <= 1 || (neck && ly < -2);
         if (breast) {
-          const fleck = ly > -2 && Math.floor(ly) % 3 === 0 && (Math.floor(lx) + Math.floor(ly)) % 4 === 0;
-          return ramp("fgh", l + 0.1 - (fleck ? 0.3 : 0));
+          const fleck = ly > 0 && Math.floor(ly) % 3 === 0 && (Math.floor(lx) + Math.floor(ly)) % 4 === 0;
+          return ramp("fgh", l + 0.28 - (fleck ? 0.3 : 0));
         }
-        return ramp("bcde", l - 0.05);
+        return ramp("bcde", l - 0.18);
       }
-      if (tl) {
-        if (lx > 33) return "e";
-        if (lx > 31) return "s";
-        return ramp("bc", l + 0.2);
+      // His feet kicked out: thin legs, a little three-toed foot at each end.
+      for (const [a, b] of [legL, legR]) {
+        if (segD(lx, ly, a, b) < 1.1) return lx < 0 ? "U" : "T";
+        const dir = b[0] < 0 ? -1 : 1;
+        for (const ang of [-40, 0, 40]) {
+          const [tx, ty] = rot(dir * 3, 0, dir * (ang + 20));
+          if (segD(lx, ly, b, [b[0] + tx, b[1] + ty]) < 0.95) return "U";
+        }
+      }
+      if (pip(tail, lx, ly)) {
+        if (ly > 23.5) return "s";
+        return ramp("bc", l + 0.25);
       }
       return null;
     };
@@ -315,10 +343,10 @@ function build(): Character {
     };
   }
 
-  /** His tie: the knot at his throat, the blade streaming up and out to the left, rippling. */
-  function tieFn(turn: number, sway: number, ph: number): Fn {
-    const [tx, ty] = rot(-10, 5, turn);
-    const deg = -158 + sway;
+  /** His tie: the knot at his throat, the blade streaming up over his shoulder in the wind, rippling. */
+  function tieFn(tilt: number, sway: number, ph: number): Fn {
+    const [tx, ty] = rot(-2.5, -3, tilt);
+    const deg = -30 + tilt + sway;
     const ux = Math.cos(rad(deg));
     const uy = Math.sin(rad(deg));
     const nx = -uy;
@@ -359,16 +387,16 @@ function build(): Character {
   /** He is painted this much bigger than his shapes' units (every pixel still sampled on its own). */
   const ZS = 1.32;
   const zoom = (fn: Fn, z = ZS): Fn => (px, py) => fn((px + 0.5) / z - 0.5, (py + 0.5) / z - 0.5);
+  /** His wings spread wide: the left one gliding level under his beak, the right one (a shade darker) lifted, its tip reaching for the cap. */
   function birdParts(ph: number) {
     const p = pose(ph);
-    const [nsx, nsy] = rot(2, -7, p.turn);
-    const [fsx, fsy] = rot(9, -9, p.turn);
-    const dt = p.turn - 38;
+    const [lsx, lsy] = rot(-9, -2, p.tilt);
+    const [rsx, rsy] = rot(9, -4, p.tilt);
     return {
-      far: add(`wf:${ph}`, () => box(-BR, -BR, 2 * BR, 2 * BR, zoom(wingFn(fsx, fsy, -4 + dt - p.flap * 0.8, 33, true)))),
-      body: add(`bd:${p.turn}`, () => box(-BR, -BR, 2 * BR, 2 * BR, zoom(bodyFn(p.turn)))),
-      near: add(`wn:${ph}`, () => box(-BR, -BR, 2 * BR, 2 * BR, zoom(wingFn(nsx, nsy, -66 + dt + p.flap, 37, false)))),
-      tie: add(`tie:${ph}`, () => box(-BR, -BR, 2 * BR, 2 * BR, zoom(tieFn(p.turn, p.tie, ph)))),
+      far: add(`wf:${ph}`, () => box(-BR, -BR, 2 * BR, 2 * BR, zoom(wingFn(rsx, rsy, -36 + p.tilt - p.flap, 36, true)))),
+      near: add(`wn:${ph}`, () => box(-BR, -BR, 2 * BR, 2 * BR, zoom(wingFn(lsx, lsy, -166 + p.tilt + p.flap, 37, false)))),
+      body: add(`bd:${ph}`, () => box(-BR, -BR, 2 * BR, 2 * BR, zoom(bodyFn(p.tilt, p.kick)))),
+      tie: add(`tie:${ph}`, () => box(-BR, -BR, 2 * BR, 2 * BR, zoom(tieFn(p.tilt, p.tie, ph)))),
     };
   }
   function capPart(deg: number): string {
@@ -380,7 +408,7 @@ function build(): Character {
   function birdie(ph: number, cx: number, cy: number, kx: number, ky: number, kd: number): Layer[] {
     const b = birdParts(ph);
     const at = (part: string): Layer => ({ part, x: cx - BR, y: cy - BR });
-    return [at(b.far), at(b.body), at(b.near), at(b.tie), { part: capPart(kd), x: Math.round(kx) - 24, y: Math.round(ky) - 24 }];
+    return [at(b.far), at(b.near), at(b.body), at(b.tie), { part: capPart(kd), x: Math.round(kx) - 24, y: Math.round(ky) - 24 }];
   }
 
   // ---------------------------------------------------------------- the ground, the track and the train
@@ -905,33 +933,23 @@ function build(): Character {
   const START: Pt = [102, 94];
   const END: Pt = [100, 133];
   /** The cap's place from his middle, and its turn, for a tumble phase. */
-  function capAt(ph: number, extra = 0): [number, number, number] {
+  /** The cap's place from his middle (just above him, up by his left wing tip, bobbing in the wind), and its turn. */
+  function capAt(ph: number): [number, number, number] {
     const a = (TAU * ph) / 5;
-    return [-30 + 2 * Math.cos(a) - 2.5 * extra, -58 - 2 * Math.sin(a) - 0.9 * extra, -24 + 14 * Math.sin(a) - 22 * extra];
+    return [40 + 1.5 * Math.cos(a), -52 - 2 * Math.sin(a + 0.3), 14 + 10 * Math.sin(a)];
   }
 
   add("lines:f0", () => linesPart(0, 6, false));
 
-  /** Loose feathers whirling up off him (step `i`, 5 steps loop), about his middle. */
-  function fluff(i: number, cx: number, cy: number): Speck[] {
-    const seeds: [number, number, number][] = [[-30, 6, 0], [34, 22, 2], [-12, 34, 4], [40, -26, 1]];
-    return seeds.flatMap(([dx, dy, o]): Speck[] => {
-      const st = (i + o) % 5;
-      const x = Math.round(cx + dx + (dx < 0 ? -st : st));
-      const y = Math.round(cy + dy - st * 5);
-      const flip = st % 2 === 0;
-      return flip ? [[x, y, "e"], [x + 1, y, "d"], [x + 2, y + 1, "c"]] : [[x, y + 1, "e"], [x + 1, y, "d"], [x + 2, y, "c"]];
-    });
-  }
   const fall: Anim = {
     loop: true,
     frames: Array.from({ length: 5 }, (_, i): Frame => {
       const [kx, ky, kd] = capAt(i);
       const lines = add(`lines:f${i}`, () => linesPart(i, 6, false));
+      const cy = START[1] + pose(i).bob;
       return {
         ms: 120,
-        layers: [{ part: "sky", x: 0, y: 0 }, { part: lines, x: 0, y: 0 }, ...birdie(i, START[0], START[1], START[0] + kx, START[1] + ky, kd)],
-        specks: fluff(i, START[0], START[1]),
+        layers: [{ part: "sky", x: 0, y: 0 }, { part: lines, x: 0, y: 0 }, ...birdie(i, START[0], cy, START[0] + kx, cy + ky, kd)],
       };
     }),
   };
@@ -941,8 +959,8 @@ function build(): Character {
     frames: Array.from({ length: 9 }, (_, j): Frame => {
       const t = Math.pow(j / 8, 1.2);
       const cx = Math.round(START[0] + (END[0] - START[0]) * t);
-      const cy = Math.round(START[1] + (END[1] - START[1]) * t);
-      const [kx, ky, kd] = capAt(j % 5, j);
+      const cy = Math.round(START[1] + (END[1] - START[1]) * t) + pose(j % 5).bob;
+      const [kx, ky, kd] = capAt(j % 5);
       const lines = j === 0 ? "lines:f0" : add(`lines:a${j}`, () => linesPart(j * 3.5, 6, j >= 4));
       return {
         ms: 390,
@@ -952,9 +970,8 @@ function build(): Character {
           { part: add(`ground:${j}`, () => groundPart(j)), x: 0, y: 0 },
           { part: lines, x: 0, y: 0 },
           { part: add(`train:${j}`, () => trainPart(j)), x: 0, y: 0 },
-          ...birdie(j % 5, cx, cy, Math.round(START[0] + kx), Math.round(START[1] + ky), kd),
+          ...birdie(j % 5, cx, cy, Math.round(cx + kx), Math.round(cy + ky), kd),
         ],
-        specks: fluff(j % 5, cx, cy),
       };
     }),
   };
