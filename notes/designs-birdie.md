@@ -94,3 +94,16 @@ also should be actually looking like it hits him. It's to the side of him."
 
 **Approved (Eric, Nov 23): "looks good now"** — the third pass (`arena-birdie-fall` at fd5cad0ec on `claude/boss-art`, stills
 `stills/birdie-6`) is the cutscene's fall scene.
+
+## The lobby: Eric on the first drawing (Nov 23)
+"the table and chairs are all out of place ... there should have been a separate area. Like the station should have been a little bigger.
+There should be like little birdies sitting at the bar stools, and it should be like a 3-sided ... bar ... and then in the back is a
+bartender guy who's also doubles as the shop guy. ... the guard crossings ... you have them exactly parallel, but they should actually be on
+different lines, just like on a real ... road ... kitty corner ... when I said the table and chairs, I just mean like just 2 of those bar
+stools that you have drawn ... one on the left, one on the right, and in the center ... a normal ... square [table] with the white top."
+- The room a little bigger, so the bar is its own area.
+- A 3-sided (U-shaped) bar counter, little birds perched on its stools; behind it a bartender who's also the shop clerk (his own sidekick
+  drawing). Director's call on the bartender: a friendly pigeon in a red vest and apron, drying a glass.
+- The challenge spot in the middle: a plain square table with a white top, one of the bar's stools on its left and one on its right.
+- The crossing gates staggered as on a real road (one before the tracks on one side, one after them on the other: kitty-corner), never
+  side by side on one line.
