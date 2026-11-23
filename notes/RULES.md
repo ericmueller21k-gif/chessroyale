@@ -154,3 +154,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - Arm a .done/.question watcher on a helper's branch the moment it starts (Nov 17: a finished helper sat unseen 5 h 20 min).
 - The fireworks giraffe boss (id `grex`) is **Grex** in all player text (Eric, Nov 23; was Jefferson). Code ids stay.
 - The town paints everything on its loading screen, never while you walk (Eric, Nov 11, restated Nov 23: 'load first in order to not have slow FPS'). A longer load for that is expected; optimize within it, never by moving painting to walk time.
+- Eric's personal photos and product photos never go on a branch (the repo is public); keep them in the scratchpad and pass them to art sessions another way (Nov 23: Birdie's photos were pushed to director-notes by mistake, removed).

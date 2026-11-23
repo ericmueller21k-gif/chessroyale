@@ -7,8 +7,8 @@ is in his 2 little feet perched up. He also has a tie, but other than that and t
 so actually let's do that something like this train. His idle is he's perched up in it, and then sometimes he crouches down
 showing just his cute little head looking around. I'll provide more info after seeing some examples of what the api comes up with."
 
-Eric's photos (on `claude/director-notes`): `notes/assets/birdie/eric-birdie-dove.jpg` (Birdie himself, a young mourning dove)
-and `notes/assets/birdie/eric-train.jpg` (the kind of toy train). This is Birdie as a young dove; the adult transformation
+Eric's photos (kept off the public repo: the director passes them to art sessions; `scripts/boss-art/refs/` is gitignored): `eric-birdie-dove.jpg` (Birdie himself, a young mourning dove)
+and `eric-train.jpg` (the kind of toy train). This is Birdie as a young dove; the adult transformation
 comes later, not now.
 
 Follow `notes/RULES.md` on art (the paid API draws it, never by hand; this session only writes briefs, runs the runner,
