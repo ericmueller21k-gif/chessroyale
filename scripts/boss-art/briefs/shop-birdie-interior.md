@@ -46,7 +46,8 @@ row 0      the back wall: wall-none at the corners (0 and 9); an open ARCH at co
            tracks seen through them); the split-flap BOARD across columns 3-6 (4 x 1)
 rows 2-3   airport seats: a block of seat rows at columns 1-3, facing north toward the board (row 2 behind, row 3 in front)
 row 3      the café COUNTER at columns 6-8 (3 x 1), facing south, with its STOOLS in front of it on row 4 (columns 6, 7, 8)
-rows 1-8   open floor; a clear way from the door straight up to the board's wall, columns 4-5 kept free
+rows 4-7   the BATTLE CROSSING (`ring-crossing`, a floor piece, 4 x 4 at columns 3-6): the match spot. A railroad crossing on the tiles, with its match table (2 x 1) at columns 4-5 on row 5, and two chairs from the café's own seating, one each side of the table at (4, 4) and (4, 6), facing each other across it
+rows 1-8   open floor; a clear way from the door to the café and the board, going round the crossing (the crossing itself is walkable floor)
 row 1      a potted PLANT at column 1 and column 8 (corners); a SHRUB at (1, 8) and (8, 8) (the front corners)
 row 9      the front: a low hem, and the way out at columns 4-5 (glass doors onto the street, the day bright through them)
 cols 0, 9  the side walls: one surface each (SHOP_BIRDIE_WALL_H tall), solid blanks in the layout
@@ -85,6 +86,12 @@ The lamps: a standing warm lamp at column 4 on row 2 and another at column 5 on 
   there), on a soft ground shadow.
 - **Potted plants (`plant`, 1 x 1):** a leafy potted plant in a terracotta pot, taller than the shrub.
 - **Standing lamp (`lamp`, 1 x 1):** a warm-wood pole and a cream shade, a soft pool of light.
+- **The battle crossing (`ring-crossing`, 4 x 4 floor, plus its pieces):** the match spot, the lobby's "battle circle". Name it
+  with the `ring` prefix so the game draws it on the floor. A railroad crossing painted on the tiles: a charcoal road strip
+  crossing two steel rails, the rails in pale grey with the wooden ties, a yellow and black edge, a red-and-white crossbuck sign
+  at each corner. At its west and east edges, a lamp post with a red light and a raised striped barrier arm (`crossing-post`,
+  1 x 1 upright, the arm up and out of the way). The table `match-table` (2 x 1) is a café table in warm wood with a cream top;
+  the two chairs `café-chair` (1 x 1 each, the café's own) face each other across it. Nothing else on the crossing.
 - **The front:** `hem` (37 x about 24: the front wall's low top, seen from inside, in charcoal with a yellow edge) and `entrance`
   (2 x 1, about 74 x 110): glass doors in warm-wood frames standing open, the bright day beyond. It must clearly read as the way
   out. `{ exit: true }`.

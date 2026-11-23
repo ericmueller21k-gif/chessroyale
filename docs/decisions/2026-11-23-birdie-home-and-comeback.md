@@ -81,7 +81,7 @@ The train's drawing is reused, and its parts become his armor, so the transforma
   considering), **never the king**. A line of pieces nobody wants to move hits nothing.
 - **Look:** mirror the Mega Man look, a bright bar of light that sweeps along the line, then the hit squares blink and clear.
   Reuse an existing effect (the gator's smash, the queen laser's hit) rather than a new one.
-- **Name:** the working name is **"Rail Burst"**, not the Mega Man name. The look is the only thing taken from the reference.
+- **Name:** **"Full Steam"** (Eric, Nov 23: "you can just pick the name"). Not the Mega Man name. The look is the only thing taken from the reference.
 
 ## Settings (`packages/core/src/settings.ts`, the tunables; numbers are first guesses)
 
@@ -91,14 +91,20 @@ The train's drawing is reused, and its parts become his armor, so the transforma
 - `birdieStrike.maxPieces`: 2.
 - `birdieStrike.topCandidates`: the number of the vote's top moves the line is chosen from (first guess 3).
 
-## Questions only Eric can answer
+## Answers (Eric, Nov 23)
 
-1. **The ult's scope:** is it only in the solo Battle Tower (my reading), with Birdie in Classic and Crowd at strong max
-   strength and no ult and no strike? Or should the strike also run in other modes after the ult (it can't, unless the ult
-   does)?
-2. **The battle spot:** is the "battle circle" the match spot on the floor (my reading), or the round clock on the front?
-3. **The strike's name:** "Rail Burst" is a working name. Eric to pick the final name.
-4. **The trigger's 40%:** a first guess; the playtest decides.
+1. **The ult's scope: confirmed.** Solo Battle Tower only. In the 2- and 3-boss modes he never triggers the ult, and he keeps
+   his normal move (the train) in every mode.
+2. **The battle spot: confirmed as the floor spot.** The "battle circle" is the match spot on the floor. In the lobby code
+   that's the floor piece whose name starts `ring` (the same family as `circle` and `emblem`, `packages/app/src/town/shops/room.ts`),
+   so the lobby's crossing is named `ring-crossing`. The clock on the station's front is not part of this; the station
+   doesn't change.
+3. **The strike's name: "Full Steam"** (Eric let me pick it).
+4. **The trigger at 40%: a first guess, the playtest decides.** What it means: Birdie's material share, meaning the chess
+   material he has left as a share of what he started with (pawn 1, knight and bishop 3, rook 5, queen 9; the king isn't
+   counted). Example: he starts with 39 points (the standard army), so 40% is about 16 points, e.g. two rooks, a knight and a
+   bishop. If the game's own piece values differ, the number moves with them. The ult fires once, the first time he drops
+   under the line.
 
 ## Art and spend
 
