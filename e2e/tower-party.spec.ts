@@ -196,7 +196,7 @@ test("a party of two @phone-only: the clerk's three ways, Invite friends, the fr
   expect((await copies(ann.page, [ann.id]))[0]).toMatchObject({ floor: 2, fight: null });
 });
 
-test("the clerk's card: its three ways and the open parties always there; Open your own party's line in the town's chat, whose Go to the tower brings a player to the clerk, who joins from the list; the friends pop-up", async ({ browser }) => {
+test("the clerk's card: its three ways and the open parties always there; Open your own party's line in the town's chat, whose Go to the tower brings a player to the clerk, who joins from the list; the friends pop-up", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(4 * 60_000);
   const ann = await player(browser, "Ann Open");
   const bo = await player(browser, "Bo Open");

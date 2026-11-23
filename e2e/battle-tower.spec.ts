@@ -103,7 +103,7 @@ async function floorThenMatch(page: Page, n: number, bosses: number) {
   await expect(page.locator(".tw-strip").first()).toContainText(`Floor ${n}`);
 }
 
-test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floor 2, a reload rejoins; a loss costs a life and the climb goes on, the third ends the run", async ({ page }) => {
+test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floor 2, a reload rejoins; a loss costs a life and the climb goes on, the third ends the run", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   await intoTower(page, "&win=1");
   // The clerk: Start (no run), "Start over" greyed under it.
@@ -284,7 +284,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(again.getByRole("button", { name: "Start", exact: true })).toBeEnabled({ timeout: 20_000 });
 });
 
-test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, the next move wins floor 1, then up to floor 2", async ({ page }) => {
+test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, the next move wins floor 1, then up to floor 2", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await asAdmin(page);
   // (Signed in, so the town's beats carry your pawn: the check after the floor.)
@@ -323,7 +323,7 @@ test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, th
   await expect(page.getByRole("button", { name: "Win this match (testing)" })).toBeEnabled();
 });
 
-test("the elevator tapped from across the lobby (Eric, Nov 20): its card at once, where you stand; Go up runs you to it and up", async ({ page }) => {
+test("the elevator tapped from across the lobby (Eric, Nov 20): its card at once, where you stand; Go up runs you to it and up", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await intoTower(page);
   // (A run to play: the clerk's Start makes one, as the server does; here asked straight, so the elevator's own Go up takes you.)
@@ -364,7 +364,7 @@ test("the elevator tapped from across the lobby (Eric, Nov 20): its card at once
   expect(walked[walked.length - 1], `walked ${walked.join(" ")}`).toMatch(/^[45],1$/);
 });
 
-test("no Last Stand on a floor; a free leave before your 2nd move goes down to the lobby, and the clerk says Continue after a reload", async ({ page }) => {
+test("no Last Stand on a floor; a free leave before your 2nd move goes down to the lobby, and the clerk says Continue after a reload", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await page.addInitScript(() => {
     const w = window as any;
@@ -402,7 +402,7 @@ test("no Last Stand on a floor; a free leave before your 2nd move goes down to t
   await expect(desk.getByRole("button", { name: "Continue: floor 1" })).toBeVisible();
 });
 
-test("a shared floor (audit 2, finding 1): every boss drawn from his own part: Sawyer's cut on Ginger's turn, its banner and words Sawyer's, the move list naming each boss", async ({ page }) => {
+test("a shared floor (audit 2, finding 1): every boss drawn from his own part: Sawyer's cut on Ginger's turn, its banner and words Sawyer's, the move list naming each boss", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   // (Every power banner as it's put on the page: who it names; and every boss's words: by whose part or figure they show.)
   await page.addInitScript(() => {
@@ -523,7 +523,7 @@ test("a shared floor of Babur and Wrangler (Eric, Nov 20): Babur's pump in his p
   await still(page, "shared-floor-babur-wrangler");
 });
 
-test("a floor of three (Eric, Nov 22: \"they only ult once each at most\"): Big Boy's one Big Bounce, then his meter stays empty and dimmed, saying so", async ({ page }) => {
+test("a floor of three (Eric, Nov 22: \"they only ult once each at most\"): Big Boy's one Big Bounce, then his meter stays empty and dimmed, saying so", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   // (?power=bounce: Big Boy, first in turn order, warned at his turn change on your 4th turn, the Bounce after your 4th move.)
   await intoTower(page, "&power=bounce");
@@ -856,7 +856,7 @@ test("the split bar as an accordion (Eric, Nov 21): the boss to move 75%, the ot
   await still(page, "accordion");
 });
 
-test("the split bar's slide on a slow phone (Eric, Nov 21's accordion): a part tapped open and folded back, its windows sliding 300 ms, stays within budget", { tag: "@perf" }, async ({ page }) => {
+test("the split bar's slide on a slow phone (Eric, Nov 21's accordion): a part tapped open and folded back, its windows sliding 300 ms, stays within budget", { tag: ["@perf", "@phone-only"] }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
@@ -889,7 +889,7 @@ test("the split bar's slide on a slow phone (Eric, Nov 21's accordion): a part t
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
 });
 
-test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's the giraffe's turn or your turn, not his turn\"): his hidden rook drawn a pawn whoever is to move @phone-only", async ({ page }) => {
+test("a shared floor with Smudgy (Eric, Nov 21: \"it shows the rook when it's the giraffe's turn or your turn, not his turn\"): his hidden rook drawn a pawn whoever is to move", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   // (On every change to the page: a black rook drawn on the square where his rook hides is a leak, noted with whose turn the view says.)
   await page.addInitScript(() => {
