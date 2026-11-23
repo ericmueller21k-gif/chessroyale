@@ -1868,13 +1868,17 @@ export class SoloMatch implements GameView {
         return this.startBrain((afterLoading) => this.bossIntro(afterLoading));
       }
       if (this.runner.stageComplete()) {
-        // (A power won it at the start of his turn, Birdie's train on your king: its ride plays as he "thinks", then the result. Once: a
-        // rejoin with the win kept skips the ride (its moments' rejoin rule) and goes on to the result after its hold.)
-        const winMs = this.winShownAt === null ? powerWinShowMs(this.bossSnapshot()) : 0;
+        // (A power won it at the start of his turn, Birdie's train on your king: its ride plays as he "thinks", then the result. Once.
+        // When it began is kept with the game (birdieAt, as bossTurn's: `moment`), so a reload in the hold carries the ride on from there
+        // and waits only what's left of it, never the whole hold again on a still board.)
+        const winMs = this.winShownAt === null ? powerWinShowMs(this.runner.bossView()!) : 0;
         if (winMs > 0) {
-          this.winShownAt = Date.now();
+          const into = Math.max(0, Math.min(winMs, r?.moment?.ms ?? 0));
+          const turn = this.runner.bossView()!.powers?.turn ?? -1;
+          this.winShownAt = Date.now() - into;
+          this.birdieAt = { turn, at: this.winShownAt };
           this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, thinking: true });
-          this.nextRoundIn(winMs);
+          this.nextRoundIn(winMs - into);
           return;
         }
         // (Who fought it beside you: a solo Crowd's finalists, phase 2's other players if it follows.)
