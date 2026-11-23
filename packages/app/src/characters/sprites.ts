@@ -36,5 +36,12 @@ const ART_FACING: Readonly<Record<string, ArtFacing>> = {
   recluse: "front",
 };
 
-/** The way a figure's art faces as drawn (by its character's id), or null: not known yet (its callers keep their own rule). */
-export const artFacing = (id: string): ArtFacing | null => SPRITES[id]?.facing ?? ART_FACING[id] ?? null;
+/**
+ * The way a figure's art faces as drawn (by its character's id), or null: not known yet (its callers keep their own rule). A boss's town
+ * figure (`<id>-town`: Birdie's, Chandy's, its idle alone) faces as its character does: Nov 23, Eric, "He's facing the wrong way in the
+ * building": `birdie-town` wasn't known, so the room and the town square took his left-facing art for a right-facing one.
+ */
+export const artFacing = (id: string): ArtFacing | null => {
+  const of = id.endsWith("-town") ? id.slice(0, -5) : id;
+  return SPRITES[of]?.facing ?? ART_FACING[of] ?? null;
+};

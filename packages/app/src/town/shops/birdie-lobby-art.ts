@@ -1,1303 +1,891 @@
 /**
- * (Copied from claude/boss-art, scripts/boss-art/out/shop-birdie-interior-3, Nov 23: the art as drawn; only its preview-only close-ups
- * left out. The game's room is shops/birdie-art.ts, built from these parts.)
+ * (Copied from claude/boss-art, scripts/boss-art/out/shop-birdie-interior-4 (1d94041d), Nov 23: the art as drawn; only its preview-only
+ * close-ups and review sheets left out. The game's room is shops/birdie-art.ts, built from these parts.)
  *
- * Inside Birdie's station, third pass: the lobby the player walks into from Birdie's train station.
+ * Inside Birdie's station, round 4: the lobby (12 x 12 squares of 37 px under an 83 px back wall: 444 x 527 px).
  *
- * A 12 x 12 room (columns 0-11 west to east, rows 0-11 north to south, the way in at the south), seen from round 1's
- * fixed camera: straight down on the floor, the back wall (row 0) standing up as a face WALL_H tall, the side walls
- * (cols 0 and 11) laid out as strips. One square is 37 px. Row r's floor starts at y = 83 + 37 r; the back wall's face
- * fills y 0-119 (its last 37 px are row 0's footprint, the wainscot). Pieces stand on their footprint's bottom edge.
- *
- * New this pass: shelves of seed behind the bar, stools on all three outer sides of the U with birds on them, feeders on
- * the counter in place of drinks, a seed vat inside the U beside the bartender's place, a small white-top challenge
- * table with a stool each side and feeders on and beside it, and a gravel railroad crossing in the front-left corner
- * with its two gates kitty-corner.
+ * Round 4 changes (Eric, Nov 23): the bar's two arms are raised counters like its front run (a charcoal side face with the red
+ * stripe facing the stools, the warm-wood top with a cream edge, a mitred corner where the side face meets the front face);
+ * stools along both arms' outsides; a bigger seed heap in the vat and on the counter; the railroad crossing moved from the
+ * front-left corner to the table's row (a gravel strip with rails on ties, cols 2-9 of row 7); two crossing gates kitty-corner
+ * across the table (col 4 row 6 arm east, col 8 row 8 arm west) with idle / lower / down; no feeders at the table; the table a
+ * square chess table (an 8 x 8 board of cream and warm wood, a charcoal and yellow rim) on one leg.
  */
-import { type Character, type Frame, type Grid, type Layer, type Part } from "../../characters/sprite.ts";
-import { canvas, ellipse, line, poly, toGrid, type Canvas } from "../../characters/paint.ts";
+import { type Anim, type Character, type Frame, type Layer, type Part } from "../../characters/sprite.ts";
+import { canvas, ellipse, poly, toGrid, type Canvas } from "../../characters/paint.ts";
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Geometry
-
-/** Squares per side. */
+/** The room is N x N squares. */
 export const SHOP_BIRDIE_N = 12;
 /** One square, in pixels. */
-const T = 37;
-/** The back wall's face height in pixels (row 0's footprint is its bottom 37 px). */
-export const SHOP_BIRDIE_WALL_H = 120;
-/** The top of row 0's footprint. */
-const Y0 = SHOP_BIRDIE_WALL_H - T;
-const RW = SHOP_BIRDIE_N * T; // 444
-const RH = Y0 + SHOP_BIRDIE_N * T; // 527
-const colX = (c: number) => c * T;
-const rowY = (r: number) => Y0 + r * T;
-/** The counter's height: its top surface is drawn this far above its footprint. */
-const COUNTER_H = 31;
+export const SHOP_BIRDIE_SQUARE = 37;
+/** The back wall's height above row 0, in pixels (row r's top is at WALL + r * SQUARE). */
+export const SHOP_BIRDIE_WALL = 83;
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Palette: Birdie's train (yellow, charcoal, red), warm wood, cream terrazzo, seed colors
+const S = SHOP_BIRDIE_SQUARE;
+const Y0 = SHOP_BIRDIE_WALL;
+const W = SHOP_BIRDIE_N * S; // 444
+const H = Y0 + SHOP_BIRDIE_N * S; // 527
+const colX = (c: number) => c * S;
+const rowY = (r: number) => Y0 + r * S;
 
+const LIT = "#ff4a38";
+const LIT_HI = "#ffd8c8";
 const PALETTE: Record<string, string> = {
-  k: "#1a1714", // outline, warm near-black
-  K: "#241f1b", // a sparrow's bib, deep shadow
-  // train yellow
-  y: "#f4c430",
-  Y: "#d9a21b",
-  u: "#ffe27a",
-  // charcoal
-  c: "#2b2d31",
-  C: "#3a3d44",
-  g: "#54575f",
-  // train red
-  r: "#c8372d",
-  R: "#8e1f1a",
-  // warm wood
-  w: "#a86a3c",
-  W: "#7a4a26",
-  o: "#c99866",
-  // cream and white
-  e: "#f3f1ec",
-  q: "#ffffff",
-  E: "#dcd6cc", // cream in shade
-  // terrazzo floor
-  f: "#efe7d9",
-  F: "#e4d8c4",
-  G: "#d4c6ae", // grout
-  "1": "#c9b494",
-  "2": "#b59f80",
-  "3": "#faf6ee",
-  "4": "#a9b9bf",
-  // greens and pots
-  v: "#4f7a3a",
-  V: "#6f9a4f",
-  n: "#2f4f25",
-  t: "#b5643a",
-  T: "#87452a",
-  // seed
-  s: "#e8c15a",
-  S: "#f2e3b8",
-  b: "#8a5a2e",
-  x: "#b5452e",
-  // warm light
-  l: "#ffe2a0",
-  L: "#ffb85c",
-  // steel, glass, sky
-  m: "#9aa3ad",
-  M: "#cdd5dc",
-  j: "#6d7580",
-  i: "#bfe3ef",
-  I: "#e8f7fb",
-  a: "#d8eef6",
-  A: "#a9d3e6",
-  // gravel
-  z: "#948b7e",
-  Z: "#6f675d",
-  p: "#b4ab9c",
-  // birds: dove gray-blue, sparrow brown
-  d: "#97a5ba",
-  D: "#6c7a91",
-  P: "#e9edf2",
-  B: "#a2703f",
-  N: "#5e3b1f",
+  k: "#1b1a1f", // outline
+  a: "#efe6d2", // floor-a
+  b: "#e3d5ba", // floor-b
+  c: "#cbb999", // floor speck
+  d: "#a08e72", // floor speck dark
+  e: "#fbf8f0", // floor speck light
+  w: "#f4ecdc", // wall
+  W: "#ddd0b4", // wall shade
+  m: "#30333b", // charcoal
+  M: "#22242a", // charcoal dark
+  n: "#4a505c", // charcoal light
+  X: "#16171b", // charcoal deepest (kick under the dark face)
+  r: "#cc362d", // red stripe
+  R: "#8a2420", // red dark
+  y: "#f2c14e", // yellow
+  Y: "#c48f25", // yellow dark
+  z: "#ffe697", // yellow light
+  o: "#9c5f33", // wood
+  O: "#6b3c1e", // wood dark
+  p: "#c27f48", // wood light
+  t: "#8d5a34", // bar top
+  u: "#a9703f", // bar top light grain
+  v: "#6c4225", // bar top dark grain
+  i: "#f6e5bd", // cream edge
+  s: "#c6ccd5", // steel
+  S: "#7e8692", // steel dark
+  g: "#8f8a83", // gravel
+  G: "#68645f", // gravel dark
+  h: "#b3aea6", // gravel light
+  l: "#9fd1ee", // sky
+  L: "#4f8fbf", // sea
+  f: "#78a956", // green
+  F: "#3d7538", // green dark
+  j: "#a2d06c", // green light
+  P: "#c3643a", // pot
+  Q: "#8b4024", // pot dark
+  B: "#8d95a1", // bird
+  C: "#c5cbd4", // bird light
+  D: "#5b626e", // bird dark
+  E: "#e8963a", // beak, feet
+  A: "#fff4c8", // lamp glow
+  H: "#b6def0", // glass
+  I: "#e8f6fb", // glass light
+  T: "#ffffff", // white
+  Z: "#7a4a22", // seed brown
+  "1": "#6e211c", // crossing light, left (off: dark red)
+  "2": "#6e211c", // crossing light, right (off)
+  "7": "#94352b", // crossing light's shine, left (off)
+  "8": "#94352b", // crossing light's shine, right (off)
 };
+const LEFT_ON = { "1": LIT, "7": LIT_HI };
+const RIGHT_ON = { "2": LIT, "8": LIT_HI };
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Helpers
-
-const parts: Record<string, Part> = {};
-const def = (name: string, grid: Grid, outline = true): string => {
-  parts[name] = { grid, outline };
-  return name;
-};
+// ---------------------------------------------------------------- helpers
 
 const put = (cv: Canvas, x: number, y: number, k: string) => {
   if (y >= 0 && y < cv.length && x >= 0 && x < cv[0]!.length) cv[y]![x] = k;
 };
-const rect = (cv: Canvas, x: number, y: number, w: number, h: number, k: string) => {
+const at = (cv: Canvas, x: number, y: number) => cv[y]?.[x] ?? ".";
+const box = (cv: Canvas, x: number, y: number, w: number, h: number, k: string) => {
   for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) put(cv, i, j, k);
 };
-const hline = (cv: Canvas, x0: number, x1: number, y: number, k: string) => rect(cv, x0, y, x1 - x0 + 1, 1, k);
-const vline = (cv: Canvas, x: number, y0: number, y1: number, k: string) => rect(cv, x, y0, 1, y1 - y0 + 1, k);
-
-/** A steady pseudo-random number in [0, 1) for a pixel and a seed. */
-function hash(x: number, y: number, s: number): number {
-  let n = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 982451653)) | 0;
+/** A steady pseudo-random number in [0, 1) for a pixel (speckles that never change between frames). */
+const rnd = (x: number, y: number, s = 0) => {
+  let n = Math.imul(x + 7919 * s + 1, 374761393) ^ Math.imul(y + 31 * s + 7, 668265263);
   n = Math.imul(n ^ (n >>> 13), 1274126177);
   n ^= n >>> 16;
   return (n >>> 0) / 4294967296;
-}
-
-/** Pastes typed rows onto a canvas (`.` stays). */
-function stamp(cv: Canvas, rows: Grid, x: number, y: number, flip = false) {
-  rows.forEach((row, j) => {
-    for (let i = 0; i < row.length; i++) {
-      const k = row[flip ? row.length - 1 - i : i]!;
-      if (k !== "." && k !== " ") put(cv, x + i, y + j, k);
-    }
-  });
-}
-
-/** Pastes typed rows with a 1-pixel `k` outline of their own (for small things inside a bigger part). */
-function stampOutlined(cv: Canvas, rows: Grid, x: number, y: number, flip = false) {
-  const w = Math.max(...rows.map((r) => r.length));
-  const at = (i: number, j: number) => {
-    const row = rows[j];
-    if (!row || i < 0 || i >= w) return false;
-    const k = row[flip ? w - 1 - i : i];
-    return k !== undefined && k !== "." && k !== " ";
-  };
-  for (let j = -1; j <= rows.length; j++)
-    for (let i = -1; i <= w; i++)
-      if (!at(i, j) && (at(i + 1, j) || at(i - 1, j) || at(i, j + 1) || at(i, j - 1))) put(cv, x + i, y + j, "k");
-  stamp(cv, rows.map((r) => r.padEnd(w, ".")), x, y, flip);
-}
-
-/** Scatters flecks over a rectangle: `keys` with their chances. */
-function fleck(cv: Canvas, x: number, y: number, w: number, h: number, seed: number, keys: readonly (readonly [string, number])[]) {
-  for (let j = y; j < y + h; j++)
-    for (let i = x; i < x + w; i++) {
-      let r = hash(i, j, seed);
-      for (const [k, p] of keys) {
-        if (r < p) {
-          put(cv, i, j, k);
-          // some flecks are little dashes
-          if (hash(i, j, seed + 7) < 0.35 && i + 1 < x + w) put(cv, i + 1, j, k);
-          break;
-        }
-        r -= p;
-      }
-    }
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Floor: terrazzo, cream and warm stone flecks, grout on all four sides (so turned tiles meet with no seam)
-
-function terrazzo(base: string, seed: number): Canvas {
-  const cv = canvas(T, T);
-  rect(cv, 0, 0, T, T, "G");
-  rect(cv, 1, 1, T - 2, T - 2, base);
-  fleck(cv, 2, 2, T - 4, T - 4, seed, [["1", 0.045], ["2", 0.018], ["3", 0.03], ["4", 0.006]]);
-  return cv;
-}
-def("floor-a", toGrid(terrazzo("f", 11)), false);
-def("floor-b", toGrid(terrazzo("F", 23)), false);
-/** The yellow safety line along the tile's west side (turn it for the others). */
-function safety(cv: Canvas, side: "w" | "s") {
-  if (side === "w") {
-    vline(cv, 2, 0, T - 1, "Y");
-    vline(cv, 3, 0, T - 1, "y");
-    vline(cv, 4, 0, T - 1, "y");
-    vline(cv, 5, 0, T - 1, "k");
-  } else {
-    hline(cv, 0, T - 1, T - 3, "Y");
-    hline(cv, 0, T - 1, T - 4, "y");
-    hline(cv, 0, T - 1, T - 5, "y");
-    hline(cv, 0, T - 1, T - 6, "k");
-  }
-}
-{
-  const a = terrazzo("f", 31);
-  safety(a, "w");
-  def("floor-edge", toGrid(a), false);
-  const b = terrazzo("F", 37);
-  safety(b, "s");
-  safety(b, "w");
-  // tidy the corner: the west line stops at the south line
-  rect(b, 2, T - 6, 4, 1, "y");
-  put(b, 5, T - 6, "y");
-  rect(b, 5, T - 6, 1, 1, "y");
-  def("floor-edge-corner", toGrid(b), false);
-}
-{
-  // the doormat at the way in: charcoal bristle with a yellow inset border (west half; mirrored for the east half)
-  const cv = terrazzo("f", 41);
-  rect(cv, 3, 3, T - 3, T - 6, "c");
-  hline(cv, 3, T - 1, 3, "k");
-  hline(cv, 3, T - 1, T - 4, "k");
-  vline(cv, 3, 3, T - 4, "k");
-  hline(cv, 5, T - 1, 5, "Y");
-  hline(cv, 5, T - 1, T - 6, "Y");
-  vline(cv, 5, 5, T - 6, "Y");
-  for (let j = 7; j < T - 7; j += 2) for (let i = 7; i < T; i += 3) put(cv, i + (j % 4 === 1 ? 1 : 0), j, "C");
-  def("floor-door", toGrid(cv), false);
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The side walls: one surface each, laid out flat like the floor (cream plaster, wood bands every 3 squares, the
-// charcoal wainscot with its red stripe along the floor's edge). East is the west one mirrored.
-
-const SIDE_H = SHOP_BIRDIE_N * T - T; // rows 1-11: 407 px
-function sideWall(): Canvas {
-  const cv = canvas(T, SIDE_H);
-  rect(cv, 0, 0, 26, SIDE_H, "e");
-  fleck(cv, 0, 0, 26, SIDE_H, 51, [["E", 0.05], ["1", 0.01]]);
-  vline(cv, 25, 0, SIDE_H - 1, "E");
-  vline(cv, 26, 0, SIDE_H - 1, "k");
-  vline(cv, 27, 0, SIDE_H - 1, "r");
-  vline(cv, 28, 0, SIDE_H - 1, "r");
-  vline(cv, 29, 0, SIDE_H - 1, "k");
-  rect(cv, 30, 0, 6, SIDE_H, "C");
-  vline(cv, 30, 0, SIDE_H - 1, "g");
-  vline(cv, 36, 0, SIDE_H - 1, "c");
-  for (let y = 18; y < SIDE_H; y += 18) hline(cv, 30, 35, y, "c");
-  for (let y = 51; y < SIDE_H; y += 111) {
-    hline(cv, 0, 25, y, "k");
-    hline(cv, 0, 25, y + 1, "o");
-    rect(cv, 0, y + 2, 26, 3, "w");
-    hline(cv, 0, 25, y + 5, "W");
-    hline(cv, 0, 25, y + 6, "k");
-  }
-  return cv;
-}
-export const SHOP_BIRDIE_SIDE_WALL_GRID: Grid = toGrid(sideWall());
-def("side-wall", SHOP_BIRDIE_SIDE_WALL_GRID, false);
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The back wall, one square wide a segment: wood cornice, cream plaster, a red stripe, the charcoal wainscot
-
-function wallSeg(seed: number, kind: "wall" | "pilaster" | "none"): Canvas {
-  const cv = canvas(T, SHOP_BIRDIE_WALL_H);
-  hline(cv, 0, T - 1, 0, "k");
-  rect(cv, 0, 1, T, 2, "w");
-  hline(cv, 0, T - 1, 1, "o");
-  hline(cv, 0, T - 1, 3, "W");
-  rect(cv, 0, 4, T, 73, "e");
-  fleck(cv, 0, 5, T, 71, seed, [["E", 0.05], ["1", 0.008]]);
-  hline(cv, 0, T - 1, 4, "E");
-  hline(cv, 0, T - 1, 77, "k");
-  rect(cv, 0, 78, T, 2, "r");
-  hline(cv, 0, T - 1, 80, "k");
-  rect(cv, 0, 81, T, 34, "C");
-  hline(cv, 0, T - 1, 81, "g");
-  for (let x = 0; x < T; x++) if ((x + seed * 0) % 18 === 8) vline(cv, x, 82, 114, "c");
-  rect(cv, 0, 115, T, 4, "c");
-  hline(cv, 0, T - 1, 115, "k");
-  hline(cv, 0, T - 1, 119, "k");
-  if (kind === "pilaster") {
-    rect(cv, 13, 2, 11, 2, "W");
-    rect(cv, 14, 4, 9, 111, "w");
-    vline(cv, 14, 4, 114, "o");
-    vline(cv, 22, 4, 114, "W");
-    vline(cv, 13, 4, 114, "k");
-    vline(cv, 23, 4, 114, "k");
-    hline(cv, 12, 24, 4, "k");
-    hline(cv, 12, 24, 5, "o");
-    hline(cv, 12, 24, 6, "k");
-  }
-  if (kind === "none") {
-    // the room's back corner: a soft shade down the plaster and the wainscot
-    vline(cv, 0, 4, 76, "E");
-    vline(cv, 1, 4, 76, "E");
-  }
-  return cv;
-}
-def("wall", toGrid(wallSeg(61, "wall")), false);
-def("wall-b", toGrid(wallSeg(67, "wall")), false);
-def("wall-pilaster", toGrid(wallSeg(71, "pilaster")), false);
-def("wall-none", toGrid(wallSeg(73, "none")), false);
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The arched windows onto the tracks: a wood arch, a yellow keystone, sky, a hedge, the rails; a train passes now and then
-
-const ARCH_W = 66;
-const ARCH_H = 72;
-/** `train`: the train's nose x inside the window (null: no train); `dir` 1 runs east, -1 west. */
-function arch(train: number | null, dir: 1 | -1): Canvas {
-  const cv = canvas(ARCH_W, ARCH_H);
-  const cx = 33;
-  const cy = 32;
-  const outer = (x: number, y: number) =>
-    x >= 0 && x < ARCH_W && y >= 0 && y < ARCH_H - 4 && (y >= cy || (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= 33 * 33);
-  const inner = (x: number, y: number) =>
-    x >= 6 && x < ARCH_W - 6 && y < ARCH_H - 6 && (y >= cy || (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= 27 * 27);
-  for (let y = 0; y < ARCH_H; y++)
-    for (let x = 0; x < ARCH_W; x++) {
-      if (!outer(x, y)) continue;
-      if (inner(x, y)) {
-        // the view: sky, hedge, ballast and rails
-        let k = y < 30 ? "a" : y < 43 ? "A" : y < 47 ? "V" : y < 49 ? "p" : "z";
-        if (y === 43 && hash(x, y, 3) < 0.5) k = "V";
-        if (y === 46 && hash(x, y, 5) < 0.4) k = "v";
-        if (y >= 50 && y <= 55 && x % 5 < 2) k = "W";
-        if (y === 51 || y === 55) k = "m";
-        if (y >= 57 && hash(x, y, 9) < 0.2) k = "Z";
-        cv[y]![x] = k;
-      } else {
-        const lit = !outer(x - 1, y) || !outer(x, y - 1);
-        const dark = !outer(x + 1, y) || inner(x - 1, y) || inner(x, y - 1);
-        cv[y]![x] = lit ? "o" : dark ? "W" : "w";
-      }
-    }
-  // the window's own edge
-  for (let y = 0; y < ARCH_H; y++)
-    for (let x = 0; x < ARCH_W; x++)
-      if (inner(x, y) && (!inner(x - 1, y) || !inner(x + 1, y) || !inner(x, y - 1))) cv[y]![x] = "k";
-  if (train !== null) {
-    // two yellow cars with a red stripe, clipped to the window
-    const car = (x0: number) => {
-      for (let y = 33; y <= 50; y++)
-        for (let x = x0; x < x0 + 30; x++) {
-          if (!inner(x, y) || cv[y]![x] === "k") continue;
-          const lx = x - x0;
-          const nose = dir === 1 ? lx >= 27 && y < 36 + (lx - 27) : lx <= 2 && y < 36 + (2 - lx);
-          if (nose) continue;
-          let k = y === 33 ? "Y" : y <= 41 ? "y" : y <= 43 ? "r" : y <= 46 ? "y" : y <= 48 ? "c" : "k";
-          if (y >= 35 && y <= 39 && lx % 7 >= 2 && lx % 7 <= 5) k = y === 35 ? "i" : "I";
-          if (y === 49 && (lx % 10 === 3 || lx % 10 === 6)) k = "g";
-          if (lx === 0 || lx === 29) k = y >= 47 ? "k" : "Y";
-          cv[y]![x] = k;
-        }
-    };
-    car(train);
-    car(train - dir * 32);
-    car(train - dir * 64);
-  }
-  // keystone
-  rect(cv, 28, 0, 10, 8, "k");
-  rect(cv, 29, 1, 8, 6, "y");
-  vline(cv, 36, 1, 6, "Y");
-  hline(cv, 29, 35, 1, "u");
-  // sill
-  hline(cv, 0, ARCH_W - 1, ARCH_H - 4, "k");
-  rect(cv, 0, ARCH_H - 3, ARCH_W, 2, "w");
-  hline(cv, 0, ARCH_W - 1, ARCH_H - 3, "o");
-  hline(cv, 0, ARCH_W - 1, ARCH_H - 1, "W");
-  return cv;
-}
-/** The train's nose per idle frame (null: none). West arch: an eastbound train; east arch: a westbound one, later. */
-const TRAIN_W = [null, -10, 22, 54, 86, 118, null, null] as const;
-const TRAIN_E = [18, -14, -46, -78, null, null, null, 50] as const;
-for (let f = 0; f < 8; f++) {
-  def(`arch-${f}`, toGrid(arch(TRAIN_W[f] ?? null, 1)));
-  def(`arch-east-${f}`, toGrid(arch(TRAIN_E[f] ?? null, -1)));
-}
-def("arch", parts["arch-0"]!.grid);
-def("arch-east", parts["arch-east-4"]!.grid);
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The split-flap board: pictures only, no letters or numbers. Three rows of seven picture flaps and a green status
-// flap; each row flips in turn.
-
-const ICONS: Record<string, Grid> = {
-  train: [".YYYYY.", "yyyyyyy", "yIyIyIy", "yyyyyyy", "rrrrrrr", "yyyyyyy", ".m...m."],
-  tree: ["...V...", "..VVV..", ".VVVVV.", "..VvV..", ".VVvVV.", "VVVVVvV", "...W..."],
-  sun: ["u..y..u", "..yyy..", ".yuuuy.", "yyuuuyy", ".yuuuy.", "..yyy..", "u..y..u"],
-  dove: ["..qq...", ".qkqY..", ".qqq...", "qqqqqq.", ".qqqqqq", "..qqq..", "..Y.Y.."],
-  cloud: [".......", "..MM...", ".MqqM..", "MqqqqMM", "MqqqqqM", ".MMMMM.", "......."],
-  plane: ["...m...", "...M...", "..mMm..", "mmMMMmm", "...M...", "..mMm..", "...m..."],
-  sack: ["..sxs..", ".osSso.", ".owwwo.", "owwwwwo", "owWwWwo", "owwwwwo", ".ooooo."],
-  feeder: ["..WWW..", ".WWWWW.", "..IsI..", "..IsI..", "..IxI..", ".wwwww.", "...W..."],
 };
-const ICON_ORDER = ["train", "tree", "sun", "sack", "dove", "plane", "cloud", "feeder"] as const;
-const BOARD_W = 140;
-const BOARD_H = 72;
-const FLAP_X = 6;
-const FLAP_Y = 14;
-/** The flap grid in the board's pixels. */
-export const SHOP_BIRDIE_BOARD_BOX = { x: FLAP_X, y: FLAP_Y, w: 128, h: 52 } as const;
+const stamp = (cv: Canvas, rows: readonly string[], x: number, y: number) =>
+  rows.forEach((row, j) => [...row].forEach((k, i) => k !== "." && put(cv, x + i, y + j, k)));
+const part = (cv: Canvas, outline = true): Part => ({ grid: toGrid(cv), outline });
 
-/** `offs`: each row's icon offset; `flipRow`: the row caught mid-flip (or -1). */
-function board(offs: readonly number[], flipRow: number, nextOffs: readonly number[]): Canvas {
-  const cv = canvas(BOARD_W, BOARD_H);
-  rect(cv, 0, 0, BOARD_W, BOARD_H, "w");
-  hline(cv, 0, BOARD_W - 1, 0, "o");
-  vline(cv, 0, 0, BOARD_H - 1, "o");
-  hline(cv, 0, BOARD_W - 1, BOARD_H - 1, "W");
-  vline(cv, BOARD_W - 1, 0, BOARD_H - 1, "W");
-  rect(cv, 3, 3, BOARD_W - 6, BOARD_H - 6, "k");
-  rect(cv, 4, 4, BOARD_W - 8, BOARD_H - 8, "c");
-  // header: a yellow strip with a little train, dashes and a clock face (no letters)
-  rect(cv, 5, 4, BOARD_W - 10, 8, "y");
-  hline(cv, 5, BOARD_W - 6, 4, "u");
-  hline(cv, 5, BOARD_W - 6, 11, "Y");
-  stamp(cv, ["rrrrr.", "rIrIrr", "rrrrrr", "k...k."], 8, 6);
-  for (let x = 22; x < BOARD_W - 22; x += 10) hline(cv, x, x + 5, 8, "Y");
-  stamp(cv, [".kkk.", "kqqqk", "kqkqk", "kqkkk", ".kkk."], BOARD_W - 14, 5);
-  for (let row = 0; row < 3; row++)
-    for (let col = 0; col < 8; col++) {
-      const x = FLAP_X + col * 16;
-      const y = FLAP_Y + row * 18;
-      rect(cv, x, y, 15, 16, "C");
-      hline(cv, x, x + 14, y, "g");
-      hline(cv, x, x + 14, y + 8, "c");
-      if (col === 7) {
-        rect(cv, x + 5, y + 3, 5, 10, "v");
-        vline(cv, x + 5, y + 3, y + 12, "V");
-        hline(cv, x + 5, x + 9, y + 8, "c");
+// ---------------------------------------------------------------- floor, walls
+
+/** The floor (cream checker, speckled), the side walls, the safety line and the front wall: one flat piece, W x H. */
+function floorPart(): Part {
+  const cv = canvas(W, H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const c = Math.floor(x / S);
+      const r = Math.floor((y - Y0) / S);
+      let k = (((c + r) % 2) + 2) % 2 === 0 ? "a" : "b";
+      const n = rnd(x, y, 1);
+      if (n < 0.028) k = "c";
+      else if (n < 0.038) k = "d";
+      else if (n < 0.06) k = "e";
+      cv[y]![x] = k;
+    }
+  // the side walls, seen from above: cream, a brown frame every few squares, a charcoal and red inner edge
+  for (const side of [0, 1])
+    for (let y = 0; y < H; y++)
+      for (let j = 0; j < 35; j++) {
+        const x = side ? W - 1 - j : j;
+        let k = j < 2 ? "W" : j < 28 ? "w" : j < 31 ? "m" : j < 33 ? "r" : "M";
+        if (j >= 2 && j < 28) {
+          const m = (y - 60) % 115;
+          if (m >= 0 && m < 4) k = m === 0 ? "p" : m === 3 ? "O" : "o";
+          else if (rnd(x, y, 2) < 0.03) k = "W";
+        }
+        cv[y]![x] = k;
+      }
+  // the safety line: yellow, edged dark, along both sides and the front
+  for (let y = 118; y < 489; y++) {
+    box(cv, 37, y, 1, 1, "m");
+    box(cv, 38, y, 3, 1, "y");
+    box(cv, 403, y, 3, 1, "y");
+    box(cv, 406, y, 1, 1, "m");
+  }
+  box(cv, 38, 486, 368, 3, "y");
+  box(cv, 37, 489, 370, 1, "m");
+  // the front wall
+  box(cv, 0, 494, W, 1, "r");
+  box(cv, 0, 495, W, 1, "R");
+  box(cv, 0, 496, W, 1, "n");
+  box(cv, 0, 497, W, H - 497, "m");
+  for (let x = 0; x < W; x += S) box(cv, x, 497, 1, H - 497, "M");
+  box(cv, 0, H - 1, W, 1, "M");
+  return part(cv, false);
+}
+
+/** The back wall: a wood cornice, the cream wall, a red stripe and the charcoal wainscot behind row 0. W x 119. */
+function backWallPart(): Part {
+  const cv = canvas(W, 119);
+  for (let y = 0; y < 119; y++)
+    for (let x = 0; x < W; x++) {
+      let k: string;
+      if (y === 0) k = "O";
+      else if (y === 1) k = "p";
+      else if (y < 4) k = "o";
+      else if (y < 73) k = rnd(x, y, 4) < 0.02 ? "W" : "w";
+      else if (y < 75) k = "i";
+      else if (y < 76) k = "O";
+      else if (y < 79) k = "r";
+      else if (y < 80) k = "R";
+      else if (y < 81) k = "n";
+      else if (y < 115) k = x % S === 0 ? "M" : x % S === 1 ? "n" : "m";
+      else k = "M";
+      cv[y]![x] = k;
+    }
+  box(cv, 0, 4, W, 1, "W");
+  return part(cv, false);
+}
+
+/** An arched window, 70 x 72: sky, sea, grass and the outside track; `train` puts a yellow train on it. */
+function windowPart(train: boolean): Part {
+  const cv = canvas(70, 72);
+  const inner = (x: number, y: number) =>
+    x >= 6 && x < 64 && y >= 6 && y < 66 && (y >= 35 || (x + 0.5 - 35) ** 2 + (y + 0.5 - 35) ** 2 <= 29 * 29);
+  for (let y = 0; y < 72; y++)
+    for (let x = 0; x < 70; x++) {
+      if (!(y >= 35 || (x + 0.5 - 35) ** 2 + (y + 0.5 - 35) ** 2 <= 35 * 35)) continue;
+      if (!inner(x, y)) {
+        cv[y]![x] = "o";
         continue;
       }
-      const name = ICON_ORDER[(offs[row]! + col * 3 + row * 5) % ICON_ORDER.length]!;
-      if (row === flipRow) {
-        // mid-flip: the new picture's top half shows, the old flap falls as a dark band with a lit edge
-        const next = ICON_ORDER[(nextOffs[row]! + col * 3 + row * 5) % ICON_ORDER.length]!;
-        stamp(cv, ICONS[next]!.slice(0, 4), x + 4, y + 4);
-        rect(cv, x, y + 8, 15, 8, "c");
-        hline(cv, x, x + 14, y + 8, "g");
-        hline(cv, x + 1, x + 13, y + 9, "C");
-        stamp(cv, ICONS[name]!.slice(5).map((r) => r.replace(/[^.]/g, "g")), x + 4, y + 11);
-      } else stamp(cv, ICONS[name]!, x + 4, y + 4);
-    }
-  return cv;
-}
-/** Idle frame f: row (f % 4) flips (a rest on the fourth beat); each row's pictures alternate between two sets. */
-function boardAt(f: number): Canvas {
-  const flipsBefore = (r: number, upTo: number) => {
-    let n = 0;
-    for (let g = 0; g < upTo; g++) if (g % 4 === r) n++;
-    return n;
-  };
-  const offs = [0, 1, 2].map((r) => (flipsBefore(r, f + (f % 4 === r ? 1 : 0)) % 2) * 3 + r * 2);
-  const prev = [0, 1, 2].map((r) => (flipsBefore(r, f) % 2) * 3 + r * 2);
-  const fr = f % 4 < 3 ? f % 4 : -1;
-  return fr < 0 ? board(offs, -1, offs) : board(prev, fr, offs);
-}
-for (let f = 0; f < 8; f++) def(`board-${f}`, toGrid(boardAt(f)));
-def("board", parts["board-3"]!.grid);
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Shelves behind the bar (2 x 1): warm wood, three shelves of seed jars, burlap sacks and tins. Pictures only.
-
-const jar = (a: string, b: string): Grid => [
-  ".yyyyy.",
-  ".YYYYY.",
-  "IIiiiii",
-  "Iiiiiii",
-  `I${a}${b}${a}${b}${a}i`,
-  `I${b}${a}S${a}${b}i`,
-  `I${a}b${a}${b}${a}i`,
-  `I${b}${a}${b}x${a}i`,
-  `I${a}${b}${a}${b}${a}i`,
-  ".iiiii.",
-];
-const SACK: Grid = [
-  "..sSsxs...",
-  "..oSsso...",
-  "..WWWWW...",
-  ".owwwwwo..",
-  "owwwowwwo.",
-  "owwwwwwwW.",
-  "owwowwwwW.",
-  "owwwwwowW.",
-  "owwwwwwwW.",
-  ".WWWWWWW..",
-];
-const tin = (a: string, b: string): Grid => [".MMMMM.", "jmmmmmj", `${a}${a}${a}${a}${a}${a}${b}`, `${a}uuuuu${b}`, `${a}u${b}${b}u${b}${b}`.slice(0, 7), `${a}uuuuu${b}`, `${a}${a}${a}${a}${a}${a}${b}`, `${a}${a}${a}${a}${a}${a}${b}`, ".jjjjj."];
-const SHELF_W = 72;
-const SHELF_H = 80;
-function shelves(): Canvas {
-  const cv = canvas(SHELF_W, SHELF_H);
-  rect(cv, 0, 0, SHELF_W, SHELF_H, "W");
-  for (let x = 3; x < SHELF_W - 3; x += 11) vline(cv, x, 4, 73, "N");
-  for (const x of [0, SHELF_W - 3]) {
-    rect(cv, x, 0, 3, SHELF_H, "w");
-    vline(cv, x, 0, SHELF_H - 1, "o");
-    vline(cv, x + 2, 0, SHELF_H - 1, "W");
-  }
-  const board = (y: number, h = 3) => {
-    rect(cv, 0, y, SHELF_W, h, "w");
-    hline(cv, 0, SHELF_W - 1, y, "o");
-    hline(cv, 0, SHELF_W - 1, y + h - 1, "W");
-    hline(cv, 3, SHELF_W - 4, y + h, "N");
-  };
-  board(0, 4);
-  board(27);
-  board(53);
-  rect(cv, 0, 74, SHELF_W, 6, "W");
-  hline(cv, 0, SHELF_W - 1, 74, "o");
-  rect(cv, 3, 76, SHELF_W - 6, 3, "c");
-  const on = (g: Grid, x: number, floorY: number) => stampOutlined(cv, g, x, floorY - g.length + 1);
-  // top shelf: jars and tins
-  on(jar("s", "S"), 5, 25);
-  on(jar("x", "s"), 15, 25);
-  on(tin("r", "R"), 25, 25);
-  on(jar("b", "s"), 35, 25);
-  on(jar("S", "s"), 46, 25);
-  on(tin("y", "Y"), 57, 25);
-  // middle: a sack, jars, tins
-  on(SACK, 4, 51);
-  on(jar("s", "x"), 17, 51);
-  on(tin("V", "v"), 27, 51);
-  on(tin("r", "R"), 37, 51);
-  on(SACK, 47, 51);
-  on(jar("s", "b"), 60, 51);
-  // bottom: sacks and a tin
-  on(SACK, 4, 72);
-  on(SACK, 16, 72);
-  on(tin("y", "Y"), 29, 72);
-  on(SACK, 39, 72);
-  on(jar("x", "S"), 53, 72);
-  return cv;
-}
-def("shelves", toGrid(shelves()));
-
-// a wall sconce: a cream bowl on a wood bracket, its glow fanning up the wall
-def("sconce", ["qeeeeeeeeeeE", ".EeeeeeeeeE.", "..EEEEEEEE..", ".....WW.....", "....WWWW...."]);
-{
-  const cv = canvas(22, 14);
-  poly(cv, [[6, 14], [16, 14], [22, 0], [0, 0]], "l");
-  def("sconce-glow", toGrid(cv), false);
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The seed vat (1 x 1): a galvanized tub with a rolled rim, heaped high with millet, sunflower and cracked corn; a scoop
-// standing in the heap
-
-const VAT_W = 34;
-const VAT_H = 46;
-function vat(): Canvas {
-  const cv = canvas(VAT_W, VAT_H);
-  // the tub, a little wider at the rim
-  for (let y = 22; y < VAT_H; y++) {
-    const inset = 2 + Math.floor((y - 22) / 10);
-    for (let x = inset; x < VAT_W - inset; x++) {
-      const t = (x - inset) / (VAT_W - 2 * inset);
-      cv[y]![x] = t < 0.18 ? "M" : t < 0.7 ? "m" : "j";
-    }
-  }
-  for (const y of [30, 40]) {
-    const inset = 2 + Math.floor((y - 22) / 10);
-    hline(cv, inset, VAT_W - inset - 1, y, "j");
-    hline(cv, inset, VAT_W - inset - 1, y - 1, "M");
-  }
-  for (let y = 23; y < VAT_H; y++) {
-    const inset = 2 + Math.floor((y - 22) / 10);
-    put(cv, inset, y, "k");
-    put(cv, VAT_W - inset - 1, y, "k");
-  }
-  hline(cv, 4, VAT_W - 5, VAT_H - 1, "k");
-  // rolled rim
-  ellipse(cv, 17, 22, 17, 4.5, "k");
-  ellipse(cv, 17, 22, 16, 3.6, "M");
-  ellipse(cv, 17, 22.6, 14.5, 2.6, "m");
-  // the heap of seed, rising well over the rim
-  const heap = (x: number, y: number) => y <= 23 && ((x + 0.5 - 17) / 14.5) ** 2 + ((y + 0.5 - 22) / 15) ** 2 <= 1;
-  for (let y = 0; y < 24; y++)
-    for (let x = 0; x < VAT_W; x++) {
-      if (!heap(x, y)) continue;
-      const lit = 0.5 - 0.4 * ((x - 17) / 14) - 0.5 * ((y - 15) / 10);
-      let k = lit > 0.85 ? "u" : lit > 0.45 ? "s" : "Y";
-      const h = hash(x, y, 77);
-      if (h < 0.1) k = "S";
-      else if (h < 0.17) k = "b";
-      else if (h < 0.22) k = "x";
-      else if (h < 0.26) k = "q";
+      let k = y < 44 ? "l" : y < 49 ? "L" : y < 55 ? "f" : "g";
+      if (y >= 55 && rnd(x, y, 5) < 0.2) k = "G";
+      if (y === 58 || y === 62) k = "S";
+      else if (y > 56 && y < 64 && x % 5 === 0) k = "O";
+      if (y === 49 && x % 3 === 0) k = "j";
       cv[y]![x] = k;
-      if (!heap(x, y - 1) || !heap(x - 1, y) || !heap(x + 1, y)) cv[y]![x] = "k";
     }
-  // the scoop: a steel bowl half in the heap, its wood handle standing up out of it
-  line(cv, 23, 13, 30, 1, "k");
-  line(cv, 24, 13, 31, 1, "k");
-  line(cv, 22, 12, 29, 0, "k");
-  line(cv, 23, 12, 30, 0, "w");
-  line(cv, 24, 12, 31, 0, "W");
-  stampOutlined(cv, ["MMMMMm", ".mmmj.", "..sS.."], 18, 12);
-  return cv;
-}
-def("vat", toGrid(vat()));
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The U-shaped bar: two arms (1 x 3) and the bottom run (4 x 1). Warm-wood top with a cream edge; the run's charcoal
-// front with a brass plate and a red stripe. Feeders and the bell stand on it as pieces of their own.
-
-function woodTop(cv: Canvas, x0: number, y0: number, w: number, h: number, seed: number) {
-  rect(cv, x0, y0, w, h, "w");
-  for (let y = y0; y < y0 + h; y++)
-    for (let x = x0; x < x0 + w; x++) {
-      const r = hash(x, y, seed);
-      if (r < 0.035) hline(cv, x, Math.min(x0 + w - 1, x + 2 + Math.floor(r * 100)), y, "W");
-      else if (r < 0.05) hline(cv, x, Math.min(x0 + w - 1, x + 1), y, "o");
+  // clouds
+  for (const [ex, ey, rx, ry] of [[22, 24, 7, 2.6], [46, 17, 5, 2], [50, 31, 4, 1.6]] as const) {
+    const c2 = canvas(70, 72);
+    ellipse(c2, ex, ey, rx, ry, "T");
+    c2.forEach((row, y) => row.forEach((k, x) => k === "T" && at(cv, x, y) === "l" && put(cv, x, y, "T")));
+  }
+  if (train) {
+    for (let x = 32; x < 64; x++)
+      for (let y = 40; y < 55; y++) {
+        if (!inner(x, y)) continue;
+        let k = y === 40 ? "z" : y < 51 ? "y" : y < 53 ? "r" : "m";
+        if (y >= 43 && y <= 46 && (x - 32) % 7 >= 2 && (x - 32) % 7 <= 5) k = "H";
+        if ((x - 32) % 15 === 14) k = "O";
+        put(cv, x, y, k);
+      }
+  }
+  // the frame: lit at the top left, an inner shadow line, a keystone, a sill
+  const src = cv.map((r) => [...r]);
+  for (let y = 0; y < 72; y++)
+    for (let x = 0; x < 70; x++) {
+      if (src[y]![x] !== "o") continue;
+      const nearIn = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inner(x + dx!, y + dy!));
+      if (nearIn) cv[y]![x] = "O";
+      else if ((at(src, x - 1, y) === "." || at(src, x, y - 1) === ".") && x < 40) cv[y]![x] = "p";
     }
+  box(cv, 31, 0, 8, 6, "y");
+  box(cv, 31, 5, 8, 1, "Y");
+  box(cv, 0, 66, 70, 6, "o");
+  box(cv, 0, 66, 70, 1, "p");
+  box(cv, 0, 71, 70, 1, "O");
+  return part(cv);
 }
-const ARM_W = 31;
-const ARM_H = 3 * T + 4;
-function arm(seed: number): Canvas {
-  const cv = canvas(ARM_W, ARM_H);
-  woodTop(cv, 0, 0, ARM_W, ARM_H, seed);
-  vline(cv, 0, 0, ARM_H - 1, "e");
-  vline(cv, ARM_W - 1, 0, ARM_H - 1, "e");
-  hline(cv, 0, ARM_W - 1, 0, "e");
-  vline(cv, 1, 1, ARM_H - 1, "o");
-  hline(cv, 1, ARM_W - 2, 1, "o");
-  return cv;
-}
-def("counter-arm", toGrid(arm(81)));
-def("counter-arm-east", toGrid(arm(83)));
 
-const RUN_W = 4 * T - 4; // the run's pixels between its own outline columns: 144 with them
-const RUN_H = COUNTER_H + T; // 68
-/** The brass plate on the run's front, in the counter piece's pixels. */
-export const SHOP_BIRDIE_COUNTER_SIGN = { x: 59, y: 40, w: 26, h: 7 } as const;
-function counterRun(): Canvas {
-  // Drawn with its own outline, open where the arms join it, so the U reads as one bar.
-  const W_ = RUN_W + 4; // 144: local 0 and 143 are the outline, lining up with the arms' outlines
-  const cv = canvas(W_, RUN_H);
-  woodTop(cv, 1, 0, W_ - 2, 35, 85);
-  // the outline
-  vline(cv, 0, 0, RUN_H - 1, "k");
-  vline(cv, W_ - 1, 0, RUN_H - 1, "k");
-  hline(cv, 0, W_ - 1, RUN_H - 1, "k");
-  hline(cv, 32, 111, 0, "k");
-  // cream edges: the U's inner lip, the outer sides, the front lip
-  hline(cv, 33, 110, 1, "e");
-  hline(cv, 33, 110, 2, "o");
-  vline(cv, 1, 0, 34, "e");
-  vline(cv, W_ - 2, 0, 34, "e");
-  vline(cv, 31, 0, 1, "e");
-  vline(cv, 112, 0, 1, "e");
-  hline(cv, 1, W_ - 2, 33, "e");
-  hline(cv, 1, W_ - 2, 34, "E");
-  hline(cv, 0, W_ - 1, 35, "k");
-  // the front
-  rect(cv, 1, 36, W_ - 2, 31, "C");
-  hline(cv, 1, W_ - 2, 36, "g");
-  for (const x of [48, 96]) vline(cv, x, 37, 58, "c");
-  const s = SHOP_BIRDIE_COUNTER_SIGN;
-  rect(cv, s.x - 1, s.y - 1, s.w + 2, s.h + 2, "k");
-  rect(cv, s.x, s.y, s.w, s.h, "y");
-  hline(cv, s.x, s.x + s.w - 1, s.y, "u");
-  hline(cv, s.x, s.x + s.w - 1, s.y + s.h - 1, "Y");
-  stamp(cv, ["..WW..", ".WWWWY", "WWWWW.", "..W.W."], s.x + 10, s.y + 1);
-  hline(cv, 1, W_ - 2, 53, "k");
-  rect(cv, 1, 54, W_ - 2, 2, "r");
-  hline(cv, 1, W_ - 2, 56, "R");
-  hline(cv, 1, W_ - 2, 57, "k");
-  rect(cv, 1, 58, W_ - 2, 9, "c");
-  hline(cv, 1, W_ - 2, 58, "C");
-  return cv;
-}
-def("counter", toGrid(counterRun()), false);
-
-// the brass service bell
-def("bell", ["...u...", "..uyy..", ".uyyyY.", ".yyyYY.", "YYYYYYY"]);
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Bird feeders: a little wood-roofed hopper with a glass tube of seed, a tray and a steel perch; the floor one smaller,
-// on a pole
-
-def("feeder", [
-  "....r....",
-  "...rrR...",
-  "..rrrrR..",
-  ".RRRRRRR.",
-  "..IsSsi..",
-  "..IxssI..",
-  "..IsSbi..",
-  "..IssxI..",
-  "..IbsSi..",
-  ".osssssW.",
-  "jjWWWWWjj",
-]);
-def("feeder-floor", [
-  "...r...",
-  "..rrR..",
-  ".RRRRR.",
-  ".IsSi..",
-  ".Ixsi..",
-  ".Isbi..",
-  "osssW..",
-  "jWWWWj.",
-  "..W....",
-  "..W....",
-  "..W....",
-  ".WWW...",
-]);
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Stools: a tall round stool, a yellow cushion on a wood seat, a charcoal post, a ring footrest
-
-const STOOL_W = 22;
-const STOOL_H = 26;
-function stool(): Canvas {
-  const cv = canvas(STOOL_W, STOOL_H);
-  rect(cv, 9, 7, 4, 17, "C");
-  vline(cv, 9, 7, 23, "g");
-  vline(cv, 12, 7, 23, "c");
-  ellipse(cv, 11, 23, 7, 2.6, "c");
-  hline(cv, 7, 14, 21, "C");
-  hline(cv, 5, 16, 15, "y");
-  hline(cv, 4, 17, 16, "Y");
-  hline(cv, 5, 16, 17, "W");
-  ellipse(cv, 11, 4.6, 11, 3.6, "W");
-  ellipse(cv, 11, 4.0, 11, 3.4, "w");
-  ellipse(cv, 11, 3.2, 10.5, 3.2, "y");
-  hline(cv, 4, 9, 1, "u");
-  hline(cv, 3, 5, 2, "u");
-  hline(cv, 14, 18, 5, "Y");
-  return cv;
-}
-def("stool", toGrid(stool()));
-
-// Birds on the stools: doves (gray-blue, pale collar) and sparrows (brown, black bib); four poses each, facing east
-const BIRDS: Record<string, Grid> = {
-  "dove-up": [".....dd..", "....ddkY.", ".....Pd..", ".dddddPd.", "DDDdddddd", ".DDDdeee.", "...DDdd..", "....r.r.."],
-  "dove-bob": [".........", ".....dd..", "....ddkY.", ".dddddPd.", "DDDdddddd", ".DDDdeee.", "...DDdd..", "....r.r.."],
-  "dove-sip": [".........", ".........", ".........", ".dddddd..", "DDDdddPdd", ".DDDdedkY", "...DDdd..", "....r.r.."],
-  "dove-tuck": [".........", ".DD......", "DDDD.dd..", ".DDDddkY.", "DDDddPdd.", ".DDDdeee.", "...DDdd..", "....r.r.."],
-  "sparrow-up": [".........", ".....NN..", "....NNkY.", "....BeK..", ".BNBBBKB.", "NBNBBeee.", ".NNBBee..", "....W.W.."],
-  "sparrow-bob": [".........", ".........", ".....NN..", "....NNkY.", ".BNBBeKB.", "NBNBBeee.", ".NNBBee..", "....W.W.."],
-  "sparrow-sip": [".........", ".........", ".........", ".BNBBN...", "NBNBBNNN.", ".NNBBekNY", "...BBeK..", "....W.W.."],
-  "sparrow-tuck": [".........", ".NN......", "NBNN.NN..", ".NBNNNkY.", "NBNBBeK..", "NBNBBeee.", ".NNBBee..", "....W.W.."],
+const ICONS: Record<string, readonly string[]> = {
+  tree: ["...f...", "..fjf..", ".fjfff.", "fffffFf", "..FfF..", "...O...", "...O..."],
+  sun: ["...y...", ".y.y.y.", "..yzy..", "yyzzzyy", "..yyy..", ".y.y.y.", "...y..."],
+  cake: [".......", "..iii..", ".iiiii.", "ppppppp", "ooooooo", "OOOOOOO", "......."],
+  star: ["...T...", "...T...", "TTTTTTT", ".TTTTT.", "..TTT..", ".TT.TT.", "T.....T"],
+  train: [".......", "yyyyyy.", "yHyHyyy", "yyyyyyy", "rrrrrrr", ".S..S..", "......."],
+  bird: [".......", "..CC...", ".CCkE..", "BBBB...", ".BBBB..", "..BB...", "......."],
+  ok: [".......", "......f", ".....ff", "f...ff.", "ff.ff..", ".fff...", "..f...."],
+  late: ["..rrr..", ".rrrrr.", "rrTrrrr", "rrTTTrr", "rrrrrrr", ".rrrrr.", "..rrr.."],
+  wave: [".......", ".......", "..L..L.", ".LLLLLL", "LLLLLLL", "LLLLLLL", "......."],
+  tent: ["...r...", "..rTr..", ".rTrTr.", "rTrTrTr", "TrTrTrT", "rT...Tr", "......."],
 };
-for (const [name, g] of Object.entries(BIRDS)) def(name, g);
 
-// ---------------------------------------------------------------------------------------------------------------------
-// The challenge table (`match-table`, 1 x 1): a small plain square table, a white top on a warm-wood base
-
-const TABLE_W = 30;
-const TABLE_H = 44;
-function table(): Canvas {
-  const cv = canvas(TABLE_W, TABLE_H);
-  rect(cv, 0, 0, TABLE_W, 28, "q");
-  vline(cv, TABLE_W - 1, 1, 27, "e");
-  hline(cv, 1, TABLE_W - 1, 27, "e");
-  hline(cv, 0, TABLE_W - 1, 28, "k");
-  rect(cv, 0, 29, TABLE_W, 2, "E");
-  rect(cv, 0, 31, TABLE_W, 4, "w");
-  hline(cv, 0, TABLE_W - 1, 31, "o");
-  hline(cv, 0, TABLE_W - 1, 34, "W");
-  for (const x of [1, TABLE_W - 4]) {
-    rect(cv, x, 35, 3, 9, "w");
-    vline(cv, x, 35, 43, "o");
-    vline(cv, x + 2, 35, 43, "W");
-  }
-  hline(cv, 4, TABLE_W - 5, 39, "W");
-  return cv;
-}
-def("match-table", toGrid(table()));
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The railroad crossing: a gravel road strip (2 squares wide, running north-south) with a yellow-and-black edge and a
-// painted red-and-white crossbuck at each end, and the track across it: steel rails on wood ties set in ballast
-
-function hazard(cv: Canvas, x0: number, y0: number, w: number, h: number) {
-  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) put(cv, x, y, (x + y) % 6 < 3 ? "y" : "c");
-}
-function gravel(cv: Canvas, seed: number, dark: boolean) {
-  rect(cv, 0, 0, 2 * T, T, dark ? "Z" : "z");
-  fleck(cv, 0, 0, 2 * T, T, seed, dark ? [["z", 0.18], ["c", 0.08], ["p", 0.04]] : [["p", 0.16], ["Z", 0.12], ["e", 0.02]]);
-}
-function edges(cv: Canvas, end: boolean) {
-  hazard(cv, 0, 0, 4, T);
-  hazard(cv, 2 * T - 4, 0, 4, T);
-  vline(cv, 4, 0, T - 1, "k");
-  vline(cv, 2 * T - 5, 0, T - 1, "k");
-  if (end) {
-    hazard(cv, 0, 0, 2 * T, 4);
-    hline(cv, 4, 2 * T - 5, 4, "k");
-  }
-}
-{
-  const cv = canvas(2 * T, T);
-  gravel(cv, 91, false);
-  // the painted crossbuck
-  for (let d = -2; d <= 2; d++) {
-    line(cv, 24, 12 + d, 50, 30 + d, d === -2 || d === 2 ? "k" : Math.abs(d) === 1 ? "r" : "q");
-    line(cv, 24, 30 + d, 50, 12 + d, d === -2 || d === 2 ? "k" : Math.abs(d) === 1 ? "r" : "q");
-  }
-  for (let d = -1; d <= 1; d++) {
-    line(cv, 24, 12 + d, 50, 30 + d, d === 0 ? "q" : "r");
-    line(cv, 24, 30 + d, 50, 12 + d, d === 0 ? "q" : "r");
-  }
-  edges(cv, true);
-  def("road", toGrid(cv), false);
-}
-{
-  const cv = canvas(2 * T, T);
-  gravel(cv, 97, true);
-  for (let x = 7; x < 2 * T - 6; x += 8) {
-    rect(cv, x, 4, 5, 29, "w");
-    vline(cv, x, 4, 32, "o");
-    vline(cv, x + 4, 4, 32, "W");
-    hline(cv, x, x + 4, 33, "k");
-  }
-  for (const y of [10, 24]) {
-    hline(cv, 5, 2 * T - 6, y, "M");
-    hline(cv, 5, 2 * T - 6, y + 1, "m");
-    hline(cv, 5, 2 * T - 6, y + 2, "j");
-    hline(cv, 5, 2 * T - 6, y + 3, "k");
-  }
-  edges(cv, false);
-  def("road-rails", toGrid(cv), false);
+/** The split-flap board, 140 x 74: a yellow header and four rows of picture flaps (no letters). `alt` turns the last row's flaps. */
+function boardPart(alt: boolean): Part {
+  const cv = canvas(140, 74);
+  box(cv, 0, 0, 140, 74, "o");
+  box(cv, 0, 0, 140, 1, "p");
+  box(cv, 0, 0, 1, 74, "p");
+  box(cv, 0, 73, 140, 1, "O");
+  box(cv, 3, 3, 134, 9, "y");
+  box(cv, 3, 3, 134, 1, "z");
+  box(cv, 3, 11, 134, 1, "Y");
+  ellipse(cv, 9, 7.5, 2.6, 2.6, "r");
+  box(cv, 129, 6, 3, 3, "T");
+  box(cv, 3, 12, 134, 59, "M");
+  const rows = [
+    ["train", "cake", "cake", "tree", "sun", ".", ".", "ok"],
+    ["bird", "tree", "tree", "wave", "sun", ".", ".", "ok"],
+    ["train", "tent", "star", "tent", ".", ".", ".", "ok"],
+    alt ? ["bird", "wave", "tree", "sun", "star", ".", ".", "ok"] : ["train", "wave", "wave", "tree", ".", ".", ".", "late"],
+  ];
+  rows.forEach((row, ri) =>
+    row.forEach((icon, ci) => {
+      const x = 6 + ci * 16;
+      const y = 15 + ri * 14;
+      box(cv, x, y, 14, 11, "m");
+      box(cv, x, y + 5, 14, 1, "M");
+      box(cv, x, y, 14, 1, "n");
+      if (icon !== ".") stamp(cv, ICONS[icon]!, x + 4, y + 2);
+    }),
+  );
+  return part(cv);
 }
 
-// The crossing gate (1 x 1, about 84 px tall): a crossbuck on a steel pole, a pair of red lights, the striped barrier
-// arm raised out of the way beside the pole
-const POST_W = 26;
-const POST_H = 84;
-function post(lit: 0 | 1 | -1): Canvas {
-  const cv = canvas(POST_W, POST_H);
-  rect(cv, 11, 12, 3, 68, "m");
-  vline(cv, 11, 12, 79, "M");
-  vline(cv, 13, 12, 79, "j");
-  rect(cv, 6, 79, 14, 5, "c");
-  hline(cv, 6, 19, 79, "g");
-  // crossbuck
-  for (let d = -2; d <= 2; d++) {
-    const k = Math.abs(d) === 2 ? "k" : Math.abs(d) === 1 ? "r" : "q";
-    line(cv, 1, 1 + d + 2, 24, 13 + d + 2, k);
-    line(cv, 1, 13 + d + 2, 24, 1 + d + 2, k);
-  }
-  for (let d = -1; d <= 1; d++) {
-    line(cv, 1, 3 + d, 24, 15 + d, d === 0 ? "q" : "r");
-    line(cv, 1, 15 + d, 24, 3 + d, d === 0 ? "q" : "r");
-  }
-  // the lights
-  rect(cv, 0, 30, POST_W, 10, "k");
-  rect(cv, 1, 31, POST_W - 2, 8, "c");
-  for (const [i, cx] of [[0, 6], [1, 19]] as const) {
-    ellipse(cv, cx + 0.5, 35, 3.6, 3.6, "k");
-    const on = lit === i;
-    ellipse(cv, cx + 0.5, 35, 2.6, 2.6, on ? "r" : "R");
-    if (on) {
-      put(cv, cx - 1, 34, "L");
-      put(cv, cx, 34, "u");
-      put(cv, cx, 33, "L");
+/** The shelves of seed jars, 76 x 80. */
+function shelvesPart(): Part {
+  const cv = canvas(76, 80);
+  box(cv, 0, 0, 76, 80, "o");
+  box(cv, 0, 0, 76, 1, "p");
+  box(cv, 0, 0, 1, 80, "p");
+  box(cv, 3, 3, 70, 74, "O");
+  const jars = ["y", "i", "Z", "y", "f", "i"];
+  [24, 49, 74].forEach((sy, si) => {
+    box(cv, 3, sy, 70, 3, "p");
+    box(cv, 3, sy + 2, 70, 1, "o");
+    for (let j = 0; j < 6; j++) {
+      const x = 5 + j * 11;
+      const body = jars[(j + si * 2) % 6]!;
+      const top = sy - 13;
+      box(cv, x, top, 9, 2, "r");
+      box(cv, x, top, 9, 1, "z");
+      box(cv, x, top + 2, 9, 11, body);
+      box(cv, x + 2, top + 6, 5, 4, "T");
+      box(cv, x + 1, top + 3, 1, 6, "e");
+      box(cv, x + 8, top + 2, 1, 11, body === "Z" ? "O" : "Y");
     }
-    hline(cv, cx - 3, cx + 3, 30, "g");
-  }
-  rect(cv, 9, 40, 7, 4, "c");
-  // the barrier arm, raised: red and white stripes, its counterweight at the foot
-  rect(cv, 20, 18, 3, 54, "q");
-  for (let y = 18; y < 72; y++) if (Math.floor((y - 18) / 5) % 2 === 0) hline(cv, 20, 22, y, "r");
-  vline(cv, 19, 18, 71, "k");
-  vline(cv, 23, 18, 71, "k");
-  hline(cv, 19, 23, 17, "k");
-  rect(cv, 17, 70, 8, 7, "k");
-  rect(cv, 18, 71, 6, 5, "C");
-  hline(cv, 18, 23, 71, "g");
-  return cv;
-}
-def("crossing-post", toGrid(post(-1)));
-def("crossing-post-l", toGrid(post(0)));
-def("crossing-post-r", toGrid(post(1)));
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Airport seats (3 x 1), the standing lamp, plants and shrubs (as round 1)
-
-const SEATS_W = 110;
-function seats(): Canvas {
-  const cv = canvas(SEATS_W, 40);
-  for (let s = 0; s < 3; s++) {
-    const x = 2 + s * 36;
-    rect(cv, x, 0, 34, 7, "y");
-    hline(cv, x, x + 33, 0, "u");
-    hline(cv, x, x + 33, 6, "Y");
-    rect(cv, x, 7, 34, 19, "C");
-    hline(cv, x + 3, x + 30, 15, "c");
-    vline(cv, x, 7, 25, "g");
-  }
-  for (const x of [0, 36, 72, 108]) rect(cv, x, 2, 2, 25, "c");
-  rect(cv, 2, 28, SEATS_W - 4, 3, "m");
-  hline(cv, 2, SEATS_W - 5, 28, "M");
-  hline(cv, 2, SEATS_W - 5, 30, "j");
-  for (const x of [14, 90]) {
-    rect(cv, x, 31, 4, 6, "c");
-    rect(cv, x - 4, 37, 12, 3, "c");
-  }
-  return cv;
-}
-def("seats", toGrid(seats()));
-{
-  const cv = canvas(18, 76);
-  poly(cv, [[4, 0], [14, 0], [18, 12], [0, 12]], "e");
-  for (let y = 0; y < 12; y++) put(cv, 4 + Math.floor(y / 3), y, "q");
-  for (let y = 2; y < 12; y++) put(cv, 13 + Math.floor(y / 3), y, "E");
-  hline(cv, 0, 17, 12, "u");
-  hline(cv, 2, 15, 13, "L");
-  rect(cv, 8, 14, 2, 58, "w");
-  vline(cv, 9, 14, 71, "W");
-  ellipse(cv, 9, 73, 7, 2.6, "W");
-  hline(cv, 4, 13, 71, "o");
-  def("lamp", toGrid(cv));
-}
-{
-  const cv = canvas(32, 50);
-  const blade = (bx: number, tx: number, ty: number, k: string) => poly(cv, [[bx - 2.5, 34], [bx + 2.5, 34], [tx, ty]], k);
-  blade(10, 3, 8, "v");
-  blade(22, 29, 6, "v");
-  blade(14, 9, 0, "V");
-  blade(18, 22, 1, "V");
-  blade(16, 16, 4, "n");
-  blade(12, 4, 20, "V");
-  blade(20, 28, 18, "n");
-  for (let y = 0; y < 34; y++) for (let x = 0; x < 32; x++) if (cv[y]![x] === "V" && hash(x, y, 5) < 0.12) cv[y]![x] = "v";
-  poly(cv, [[5, 33], [27, 33], [24, 50], [8, 50]], "t");
-  rect(cv, 4, 32, 24, 4, "t");
-  hline(cv, 4, 27, 32, "o");
-  hline(cv, 4, 27, 36, "T");
-  for (let y = 37; y < 50; y++) put(cv, 22 - Math.floor((y - 37) / 5), y, "T");
-  def("plant", toGrid(cv));
-}
-const bush = (cv: Canvas, cx: number, cy: number, rx: number, ry: number) => {
-  for (let y = 0; y < cv.length; y++)
-    for (let x = 0; x < cv[0]!.length; x++) {
-      if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 > 1) continue;
-      const l = 0.5 - 0.42 * ((x - cx) / rx) - 0.5 * ((y - cy) / ry) + (hash(x, y, 13) - 0.5) * 0.35;
-      cv[y]![x] = l > 0.75 ? "V" : l > 0.3 ? "v" : "n";
-    }
-};
-{
-  const cv = canvas(32, 36);
-  bush(cv, 16, 13, 15, 12);
-  rect(cv, 2, 22, 28, 14, "w");
-  hline(cv, 2, 29, 22, "o");
-  hline(cv, 2, 29, 28, "W");
-  vline(cv, 29, 22, 35, "W");
-  hline(cv, 2, 29, 35, "W");
-  def("shrub", toGrid(cv));
-}
-{
-  const cv = canvas(24, 38);
-  bush(cv, 12, 10, 11, 10);
-  rect(cv, 11, 20, 2, 4, "W");
-  poly(cv, [[3, 24], [21, 24], [18, 38], [6, 38]], "t");
-  hline(cv, 3, 20, 24, "o");
-  hline(cv, 3, 20, 26, "T");
-  def("shrub-b", toGrid(cv));
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The front: the hem (charcoal, a yellow edge) and the way out (glass doors standing open, the bright day beyond)
-
-PALETTE.h = "#fff8e2"; // the day through the doors
-PALETTE.H = "#efe2bd"; // the street's buildings in that light
-{
-  const cv = canvas(T, 24);
-  hline(cv, 0, T - 1, 0, "k");
-  rect(cv, 0, 1, T, 2, "y");
-  hline(cv, 0, T - 1, 1, "u");
-  hline(cv, 0, T - 1, 3, "Y");
-  hline(cv, 0, T - 1, 4, "k");
-  rect(cv, 0, 5, T, 19, "c");
-  hline(cv, 0, T - 1, 5, "C");
-  vline(cv, 18, 6, 23, "k");
-  def("hem", toGrid(cv), false);
-}
-const DOOR_W = 74;
-const DOOR_H = 110;
-function entrance(): Canvas {
-  const cv = canvas(DOOR_W, DOOR_H);
-  rect(cv, 0, 0, DOOR_W, DOOR_H, "w");
-  // the day: sky, the sun, the street's low buildings, the sunny pavement
-  rect(cv, 6, 10, DOOR_W - 12, DOOR_H - 10, "h");
-  rect(cv, 46, 16, 7, 7, "u");
-  hline(cv, 47, 51, 16, "q");
-  for (const [x, h] of [[14, 14], [24, 10], [32, 18], [42, 12], [52, 16]] as const) rect(cv, x, 62 - h, 8, h, "H");
-  rect(cv, 6, 62, DOOR_W - 12, 14, "u");
-  for (let y = 76; y < DOOR_H; y++) for (let x = 6; x < DOOR_W - 6; x++) cv[y]![x] = (x - 6) % 12 === 0 || (y - 76) % 10 === 0 ? "H" : "h";
-  // the doors, standing open against the jambs
-  for (const x0 of [6, DOOR_W - 16]) {
-    rect(cv, x0, 10, 10, DOOR_H - 12, "w");
-    rect(cv, x0 + 2, 13, 6, DOOR_H - 18, "i");
-    vline(cv, x0 + 3, 16, DOOR_H - 20, "I");
-    vline(cv, x0 + 1, 10, DOOR_H - 3, "W");
-    vline(cv, x0 + 9, 10, DOOR_H - 3, "k");
-  }
-  // frame: header with a yellow plate, jambs, threshold
-  rect(cv, 0, 0, DOOR_W, 10, "w");
-  hline(cv, 0, DOOR_W - 1, 0, "o");
-  hline(cv, 0, DOOR_W - 1, 9, "W");
-  rect(cv, 4, 6, DOOR_W - 8, 2, "k");
-  rect(cv, 29, 2, 16, 4, "y");
-  hline(cv, 29, 44, 2, "u");
-  vline(cv, 0, 0, DOOR_H - 1, "o");
-  vline(cv, 5, 10, DOOR_H - 1, "W");
-  vline(cv, DOOR_W - 6, 10, DOOR_H - 1, "o");
-  vline(cv, DOOR_W - 1, 0, DOOR_H - 1, "W");
-  rect(cv, 6, DOOR_H - 3, DOOR_W - 12, 3, "y");
-  hline(cv, 6, DOOR_W - 7, DOOR_H - 3, "u");
-  return cv;
-}
-def("entrance", toGrid(entrance()));
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The layout
-
-export interface ShopPlace {
-  piece: string;
-  col: number;
-  row: number;
-  /** Footprint in squares (default 1 x 1). */
-  w?: number;
-  d?: number;
-  /** Quarter turns clockwise (floor tiles, the road's south end). */
-  rot?: 0 | 1 | 2 | 3;
-  /** Mirrored east-west. */
-  flip?: boolean;
-  /** The way out. */
-  exit?: boolean;
-  /** Blocks walking (default true for furniture, false for floor and things standing on the counter or table). */
-  solid?: boolean;
-  /** Pixel nudge from the piece's usual spot (a feeder on a counter or table top, a sconce over the shelves). */
-  dx?: number;
-  dy?: number;
-  /** Draw order (back to front); default the footprint's south edge, row + d. */
-  z?: number;
-}
-
-/** Where a piece's picture sits, from its footprint's top-left corner (pixels). */
-const ART: Record<string, { ox: number; oy: number }> = {
-  wall: { ox: 0, oy: -Y0 },
-  "wall-b": { ox: 0, oy: -Y0 },
-  "wall-none": { ox: 0, oy: -Y0 },
-  "wall-pilaster": { ox: 0, oy: -Y0 },
-  arch: { ox: 4, oy: 6 - Y0 },
-  "arch-east": { ox: 4, oy: 6 - Y0 },
-  board: { ox: 4, oy: 6 - Y0 },
-  shelves: { ox: 1, oy: 8 - Y0 },
-  sconce: { ox: 12, oy: 30 - Y0 },
-  "counter-arm": { ox: 3, oy: -COUNTER_H },
-  counter: { ox: 2, oy: -COUNTER_H },
-  vat: { ox: 2, oy: T - 3 - VAT_H },
-  stool: { ox: 8, oy: 7 },
-  feeder: { ox: 14, oy: -16 },
-  "feeder-floor": { ox: 15, oy: T - 4 - 13 },
-  bell: { ox: 15, oy: -12 },
-  "match-table": { ox: 4, oy: -10 },
-  road: { ox: 0, oy: 0 },
-  "road-rails": { ox: 0, oy: 0 },
-  "crossing-post": { ox: 6, oy: T - 3 - POST_H },
-  seats: { ox: 0, oy: T - 2 - 40 },
-  lamp: { ox: 10, oy: T - 3 - 76 },
-  plant: { ox: 3, oy: T - 3 - 50 },
-  shrub: { ox: 3, oy: T - 2 - 36 },
-  "shrub-b": { ox: 7, oy: T - 3 - 38 },
-  hem: { ox: 0, oy: T - 24 },
-  entrance: { ox: 0, oy: T - DOOR_H },
-  "side-wall": { ox: 0, oy: 0 },
-};
-const FLOORISH = new Set(["floor-a", "floor-b", "floor-edge", "floor-edge-corner", "floor-door", "road", "road-rails", "side-wall"]);
-
-const L: ShopPlace[] = [];
-// side walls
-L.push({ piece: "side-wall", col: 0, row: 1, d: 11, solid: true }, { piece: "side-wall", col: 11, row: 1, d: 11, solid: true, flip: true });
-// floor: a checker of terrazzo, the yellow safety line one square in from the side walls and along the front
-for (let r = 1; r <= 11; r++)
-  for (let c = 1; c <= 10; c++) {
-    const base = (c + r) % 2 === 0 ? "floor-a" : "floor-b";
-    if (r === 10 && (c === 4 || c === 5)) L.push({ piece: "floor-door", col: c, row: r, flip: c === 5, solid: false });
-    else if (r === 10 && (c === 1 || c === 10)) L.push({ piece: "floor-edge-corner", col: c, row: r, flip: c === 10, solid: false });
-    else if (r === 10) L.push({ piece: "floor-edge", col: c, row: r, rot: 3, solid: false });
-    else if (r < 10 && (c === 1 || c === 10)) L.push({ piece: "floor-edge", col: c, row: r, flip: c === 10, solid: false });
-    else L.push({ piece: base, col: c, row: r, solid: false });
-  }
-// the railroad crossing in the front-left corner: the road at cols 2-3, rows 8-10, the track across it at row 9
-L.push(
-  { piece: "road", col: 2, row: 8, w: 2, solid: false },
-  { piece: "road-rails", col: 2, row: 9, w: 2, solid: false },
-  { piece: "road", col: 2, row: 10, w: 2, rot: 2, solid: false },
-);
-// the back wall
-for (let c = 0; c < 12; c++) L.push({ piece: c === 0 || c === 11 ? "wall-none" : c % 2 ? "wall" : "wall-b", col: c, row: 0, solid: true });
-L.push(
-  { piece: "sconce", col: 0, row: 0, solid: false, z: 0.5 },
-  { piece: "sconce", col: 11, row: 0, solid: false, z: 0.5 },
-  { piece: "arch", col: 1, row: 0, w: 2, solid: true, z: 0.5 },
-  { piece: "board", col: 3, row: 0, w: 4, solid: true, z: 0.5 },
-  { piece: "shelves", col: 7, row: 0, w: 2, solid: true, z: 0.5 },
-  { piece: "arch-east", col: 9, row: 0, w: 2, solid: true, z: 0.5 },
-);
-// the U-shaped bar, the seed vat inside it beside the bartender's clear place (cols 6-7, rows 2-3)
-L.push(
-  { piece: "vat", col: 6, row: 1 },
-  { piece: "counter-arm", col: 5, row: 1, d: 3 },
-  { piece: "counter-arm", col: 8, row: 1, d: 3, flip: true },
-  { piece: "feeder", col: 5, row: 1, solid: false, z: 4.1, dy: 4 },
-  { piece: "feeder", col: 5, row: 3, solid: false, z: 4.1, dy: -2 },
-  { piece: "feeder", col: 8, row: 1, solid: false, z: 4.1, dy: 4 },
-  { piece: "feeder", col: 8, row: 3, solid: false, z: 4.1, dy: -2 },
-  { piece: "counter", col: 5, row: 4, w: 4 },
-  { piece: "feeder", col: 5, row: 4, solid: false, z: 5.1, dx: -2 },
-  { piece: "feeder", col: 6, row: 4, solid: false, z: 5.1, dx: 4 },
-  { piece: "feeder", col: 7, row: 4, solid: false, z: 5.1, dx: -4 },
-  { piece: "bell", col: 8, row: 4, solid: false, z: 5.1, dx: -4 },
-);
-// stools on all three outer sides of the U
-const BAR_STOOLS: readonly (readonly [number, number])[] = [[4, 1], [4, 2], [4, 3], [5, 5], [6, 5], [7, 5], [8, 5], [9, 1], [9, 2], [9, 3]];
-for (const [c, r] of BAR_STOOLS) L.push({ piece: "stool", col: c, row: r });
-// the challenge spot: a small white-top table, a stool each side, two feeders on top and two on the floor beside it
-L.push(
-  { piece: "stool", col: 5, row: 7 },
-  { piece: "match-table", col: 6, row: 7 },
-  { piece: "stool", col: 7, row: 7 },
-  { piece: "feeder", col: 6, row: 7, dx: -7, dy: 17, solid: false, z: 8.1 },
-  { piece: "feeder", col: 6, row: 7, dx: 8, dy: 15, solid: false, z: 8.1 },
-  { piece: "feeder-floor", col: 5, row: 8, dx: 12, dy: -10, solid: false },
-  { piece: "feeder-floor", col: 7, row: 8, dx: -12, dy: -10, solid: false },
-);
-// the crossing's gates, kitty-corner: west of the road before the tracks (from the door), east of it after them
-L.push({ piece: "crossing-post", col: 1, row: 10 }, { piece: "crossing-post", col: 4, row: 8, flip: true });
-// seats, lamps, plants
-L.push(
-  { piece: "plant", col: 1, row: 1 },
-  { piece: "lamp", col: 3, row: 1 },
-  { piece: "seats", col: 1, row: 4, w: 3 },
-  { piece: "seats", col: 1, row: 5, w: 3 },
-  { piece: "lamp", col: 1, row: 7 },
-  { piece: "plant", col: 10, row: 5 },
-  { piece: "lamp", col: 10, row: 7 },
-  { piece: "shrub-b", col: 8, row: 10 },
-  { piece: "shrub", col: 10, row: 10 },
-);
-// the front
-for (const c of [1, 2, 3, 6, 7, 8, 9, 10]) L.push({ piece: "hem", col: c, row: 11, solid: true });
-L.push({ piece: "entrance", col: 4, row: 11, w: 2, exit: true, solid: false });
-export const SHOP_BIRDIE_LAYOUT: readonly ShopPlace[] = L;
-
-/** The bartender's clear place (2 x 2 at cols 6-7, rows 2-3); he stands at its top-left, facing south. */
-export const SHOP_BIRDIE_BARTENDER_SPOT = { col: 6, row: 2 } as const;
-
-// Birds on the stools: which stool, which bird, its facing and its own timing over the idle's 8 beats
-// (u: up, b: head bob, s: a sip, t: a wing tuck)
-const BIRD_SEATS: readonly { col: number; row: number; bird: "dove" | "sparrow"; west?: boolean; beat: string }[] = [
-  { col: 4, row: 1, bird: "dove", beat: "uubuuubu" },
-  { col: 4, row: 3, bird: "sparrow", beat: "uuuussuu" },
-  { col: 5, row: 5, bird: "dove", beat: "tttuuuuu" },
-  { col: 7, row: 5, bird: "sparrow", west: true, beat: "ubuubuuu" },
-  { col: 9, row: 1, bird: "sparrow", west: true, beat: "suuuuuus" },
-  { col: 9, row: 2, bird: "dove", west: true, beat: "uuuuubuu" },
-];
-const POSE: Record<string, string> = { u: "up", b: "bob", s: "sip", t: "tuck" };
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Pieces, lights and pools
-
-const FOOT: Record<string, readonly [number, number]> = {
-  arch: [2, 1], "arch-east": [2, 1], board: [4, 1], shelves: [2, 1], "counter-arm": [1, 3], counter: [4, 1],
-  road: [2, 1], "road-rails": [2, 1], seats: [3, 1], entrance: [2, 1], "side-wall": [1, 11],
-};
-const PIECE_NAMES = [
-  "floor-a", "floor-b", "floor-edge", "floor-edge-corner", "floor-door", "side-wall", "wall", "wall-b", "wall-pilaster", "wall-none",
-  "arch", "arch-east", "board", "shelves", "sconce", "counter-arm", "counter", "vat", "stool", "feeder", "feeder-floor", "bell",
-  "match-table", "road", "road-rails", "crossing-post", "seats", "lamp", "plant", "shrub", "shrub-b", "hem", "entrance",
-] as const;
-/** Each piece: its footprint in squares, its picture, and where the picture sits from the footprint's top-left. */
-export const SHOP_BIRDIE_PIECES: Readonly<Record<string, { w: number; d: number; grid: Grid; ox: number; oy: number }>> = Object.fromEntries(
-  PIECE_NAMES.map((n) => {
-    const [w, d] = FOOT[n] ?? [1, 1];
-    const a = ART[n] ?? { ox: 0, oy: 0 };
-    return [n, { w, d, grid: parts[n]!.grid, ox: a.ox, oy: a.oy }];
-  }),
-);
-
-const at = (p: ShopPlace) => {
-  const a = ART[p.piece] ?? { ox: 0, oy: 0 };
-  return { x: colX(p.col) + a.ox + (p.dx ?? 0), y: rowY(p.row) + a.oy + (p.dy ?? 0) };
-};
-const places = (n: string) => L.filter((p) => p.piece === n);
-
-export interface ShopLight {
-  piece: string;
-  x: number;
-  y: number;
-  r: number;
-  color: string;
-  soft?: boolean;
-  /** Blinking in turn with its pair (the crossing lights): on in the idle's even ("a") or odd ("b") beats. */
-  blink?: "a" | "b";
-}
-export const SHOP_BIRDIE_LIGHTS: readonly ShopLight[] = [
-  ...places("lamp").map((p) => ({ piece: "lamp", x: at(p).x + 9, y: at(p).y + 12, r: 44, color: "#ffe2a0" })),
-  ...places("sconce").map((p) => ({ piece: "sconce", x: at(p).x + 6, y: at(p).y, r: 26, color: "#ffe2a0" })),
-  ...places("bell").map((p) => ({ piece: "bell", x: at(p).x + 3, y: at(p).y + 2, r: 10, color: "#ffe27a", soft: true })),
-  ...places("entrance").map((p) => ({ piece: "entrance", x: at(p).x + 37, y: at(p).y + 50, r: 64, color: "#fff8e2" })),
-  ...places("arch").concat(places("arch-east")).map((p) => ({ piece: p.piece, x: at(p).x + 33, y: at(p).y + 36, r: 36, color: "#d8eef6", soft: true })),
-  ...places("crossing-post").flatMap((p, i) =>
-    [6, 19].map((lx, j) => ({
-      piece: "crossing-post",
-      x: at(p).x + (p.flip ? POST_W - 1 - lx : lx),
-      y: at(p).y + 35,
-      r: 9,
-      color: "#c8372d",
-      blink: ((i + j + (p.flip ? 1 : 0)) % 2 ? "b" : "a") as "a" | "b",
-    })),
-  ),
-];
-export interface ShopPool {
-  x: number;
-  y: number;
-  rx: number;
-  ry: number;
-  color: string;
-}
-export const SHOP_BIRDIE_POOLS: readonly ShopPool[] = [
-  ...places("lamp").map((p) => ({ x: colX(p.col) + 18, y: rowY(p.row) + 30, rx: 30, ry: 14, color: "#ffe2a0" })),
-  { x: colX(7), y: rowY(3), rx: 40, ry: 30, color: "#ffe2a0" },
-  { x: colX(6) + 18, y: rowY(7) + 18, rx: 44, ry: 26, color: "#ffe2a0" },
-  { x: colX(5), y: rowY(10) + 22, rx: 42, ry: 22, color: "#fff8e2" },
-];
-/** The fixed camera: the whole 12 x 12 room straight down, the back wall standing up WALL_H tall, 37 px a square. */
-export const SHOP_BIRDIE_CAM = { x: 0, y: 0, w: RW, h: RH, tile: T, wallH: SHOP_BIRDIE_WALL_H, floorY: Y0 } as const;
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Frames: the room as one picture
-
-function partFor(p: ShopPlace, f: number): string {
-  switch (p.piece) {
-    case "arch":
-      return `arch-${f}`;
-    case "arch-east":
-      return `arch-east-${f}`;
-    case "board":
-      return `board-${f}`;
-    case "counter-arm":
-      return p.col === 8 ? "counter-arm-east" : "counter-arm";
-    case "crossing-post":
-      // the two lights blink in turn, the far gate a beat behind the near one
-      return (f + (p.flip ? 1 : 0)) % 2 ? "crossing-post-r" : "crossing-post-l";
-    default:
-      return p.piece;
-  }
-}
-const zOf = (p: ShopPlace) => p.z ?? (p.row === 0 && p.piece.startsWith("wall") ? 0.1 : p.row + (p.d ?? 1));
-
-function roomLayers(f: number, keep: (piece: string) => boolean = () => true): Layer[] {
-  const back: Layer[] = [];
-  const items: { z: number; i: number; layers: Layer[] }[] = [];
-  L.forEach((p, i) => {
-    if (!keep(p.piece)) return;
-    const { x, y } = at(p);
-    const layer: Layer = { part: partFor(p, f), x, y, rot: p.rot, flipX: p.flip };
-    if (FLOORISH.has(p.piece)) return void back.push(layer);
-    const layers: Layer[] = [];
-    if (p.piece === "sconce") layers.push({ part: "sconce-glow", x: x - 5, y: y - 14 });
-    layers.push(layer);
-    items.push({ z: zOf(p), i, layers });
   });
-  if (keep("stool"))
-    BIRD_SEATS.forEach((b, i) => {
-      const x = colX(b.col) + ART.stool!.ox + 6;
-      const y = rowY(b.row) + ART.stool!.oy - 4;
-      items.push({ z: b.row + 1.05, i: 10000 + i, layers: [{ part: `${b.bird}-${POSE[b.beat[f]!]}`, x, y, flipX: b.west }] });
-    });
-  items.sort((a, b) => a.z - b.z || a.i - b.i);
-  return [...back, ...items.flatMap((it) => it.layers)];
+  return part(cv);
 }
 
-const IDLE_MS = 500;
-const idle: Frame[] = Array.from({ length: 8 }, (_, f) => ({ layers: roomLayers(f), ms: IDLE_MS }));
+/** A wall sconce, 16 x 20. */
+function sconcePart(): Part {
+  const cv = canvas(16, 20);
+  box(cv, 7, 0, 2, 5, "Y");
+  poly(cv, [[3, 5], [13, 5], [16, 14], [0, 14]], "i");
+  box(cv, 11, 6, 3, 8, "W");
+  box(cv, 0, 13, 16, 2, "A");
+  box(cv, 4, 5, 8, 1, "Y");
+  box(cv, 5, 15, 6, 3, "A");
+  return part(cv);
+}
 
-export const SHOP_BIRDIE_INTERIOR_3: Character = {
-  id: "shop-birdie-interior-3",
+// ---------------------------------------------------------------- furniture
+
+/** A floor lamp, 20 x 78. */
+function lampPart(): Part {
+  const cv = canvas(20, 78);
+  poly(cv, [[5, 0], [15, 0], [20, 12], [0, 12]], "i");
+  poly(cv, [[12, 0], [15, 0], [20, 12], [15, 12]], "W");
+  box(cv, 0, 11, 20, 1, "A");
+  box(cv, 0, 12, 20, 1, "Y");
+  box(cv, 9, 13, 2, 60, "O");
+  box(cv, 9, 13, 1, 60, "p");
+  ellipse(cv, 10, 75, 7, 2.6, "O");
+  box(cv, 5, 74, 4, 1, "o");
+  return part(cv);
+}
+
+/** A snake plant in a clay pot, 28 x 52. */
+function snakePlantPart(): Part {
+  const cv = canvas(28, 52);
+  const leaves: [number, number, number, string][] = [[4, 10, 9, "F"], [9, 2, 12, "f"], [14, 0, 14, "j"], [19, 6, 16, "f"], [24, 12, 18, "F"], [12, 8, 15, "F"]];
+  for (const [tx, ty, bx, k] of leaves) {
+    poly(cv, [[bx - 2.5, 40], [bx + 2.5, 40], [tx + 0.5, ty]], k);
+    if (k !== "j") for (let y = ty + 6; y < 38; y += 7) put(cv, Math.round(tx + ((bx - tx) * (y - ty)) / (40 - ty)), y, "j");
+  }
+  poly(cv, [[4, 36], [24, 36], [22, 52], [6, 52]], "P");
+  poly(cv, [[17, 36], [24, 36], [22, 52], [17, 52]], "Q");
+  box(cv, 3, 36, 22, 3, "P");
+  box(cv, 3, 36, 22, 1, "p");
+  box(cv, 18, 37, 7, 2, "Q");
+  return part(cv);
+}
+
+/** A round topiary in a pot, 30 x 48. */
+function topiaryPart(): Part {
+  const cv = canvas(30, 48);
+  ellipse(cv, 15, 15, 13.5, 13.5, "f");
+  ellipse(cv, 18, 18, 10, 10, "F");
+  ellipse(cv, 14, 14, 10, 10, "f");
+  ellipse(cv, 11, 10, 5, 4, "j");
+  for (let y = 2; y < 28; y++) for (let x = 2; x < 28; x++) if (at(cv, x, y) !== "." && rnd(x, y, 6) < 0.08) put(cv, x, y, "F");
+  box(cv, 14, 28, 3, 9, "O");
+  poly(cv, [[6, 36], [24, 36], [22, 48], [8, 48]], "P");
+  poly(cv, [[18, 36], [24, 36], [22, 48], [18, 48]], "Q");
+  box(cv, 5, 36, 20, 2, "p");
+  return part(cv);
+}
+
+/** A wide bush in a wooden planter, 38 x 40. */
+function planterPart(): Part {
+  const cv = canvas(38, 40);
+  ellipse(cv, 10, 16, 9, 9, "f");
+  ellipse(cv, 27, 16, 10, 9, "F");
+  ellipse(cv, 19, 12, 11, 10, "f");
+  ellipse(cv, 15, 8, 5, 3.5, "j");
+  for (let y = 0; y < 26; y++) for (let x = 0; x < 38; x++) if (at(cv, x, y) !== "." && rnd(x, y, 7) < 0.08) put(cv, x, y, "F");
+  box(cv, 1, 24, 36, 16, "o");
+  box(cv, 1, 24, 36, 2, "p");
+  box(cv, 1, 38, 36, 2, "O");
+  for (let x = 9; x < 36; x += 9) box(cv, x, 26, 1, 12, "O");
+  return part(cv);
+}
+
+/** A row of three airport seats, 110 x 38: yellow cushions on charcoal backs, a steel rail and legs. */
+function seatsPart(): Part {
+  const cv = canvas(110, 38);
+  for (let i = 0; i < 3; i++) {
+    const x = i * 37;
+    box(cv, x, 0, 35, 7, "y");
+    box(cv, x, 1, 35, 1, "z");
+    box(cv, x, 0, 1, 7, "z");
+    box(cv, x, 6, 35, 1, "Y");
+    box(cv, x, 7, 35, 20, "m");
+    box(cv, x, 7, 1, 20, "n");
+    box(cv, x, 7, 35, 1, "M");
+    box(cv, x, 26, 35, 1, "M");
+  }
+  box(cv, 0, 28, 110, 2, "s");
+  box(cv, 0, 29, 110, 1, "S");
+  for (const lx of [8, 54, 100]) {
+    box(cv, lx, 30, 2, 6, "S");
+    box(cv, lx - 2, 36, 6, 2, "m");
+  }
+  return part(cv);
+}
+
+/** A bar stool, 22 x 32: a yellow round seat, a charcoal pole, a foot ring, a round base. */
+function stoolPart(): Part {
+  const cv = canvas(22, 32);
+  ellipse(cv, 11, 29, 8, 2.7, "m");
+  box(cv, 5, 28, 6, 1, "n");
+  box(cv, 9, 8, 4, 20, "m");
+  box(cv, 9, 8, 1, 20, "n");
+  box(cv, 4, 18, 14, 2, "y");
+  box(cv, 4, 19, 14, 1, "Y");
+  ellipse(cv, 11, 4.5, 11, 4.5, "Y");
+  ellipse(cv, 11, 3.6, 11, 3.6, "y");
+  box(cv, 4, 1, 7, 1, "z");
+  box(cv, 2, 2, 4, 1, "z");
+  return part(cv);
+}
+
+/** A little grey station bird, 12 x 9, facing left (flip for right). */
+const BIRD = [
+  "..CCC.......",
+  ".CkCCC......",
+  "ECCCCC......",
+  "..CCBBBBB...",
+  "..BBBBBBBBB.",
+  ".BBBCCBBBDDD",
+  ".BBBBCCBBBD.",
+  "..BBBBBBBB..",
+  "....E..E....",
+];
+/** A little house-shaped bird feeder, 12 x 13 (stays on the bar). */
+const FEEDER = [
+  ".....rr.....",
+  "....rrrr....",
+  "...rrrrrr...",
+  "..rrrrrrRR..",
+  ".RRRRRRRRRR.",
+  "..iiiiiiii..",
+  "..iyyyyyyi..",
+  "..iyzyZyyi..",
+  "..iyyyyrZi..",
+  "..iiiiiiii..",
+  ".pppppppppp.",
+  ".oooooooooo.",
+  "..OOOOOOOO..",
+];
+
+/** A mound of seed (yellow, cream, brown, red), lit from the top left, w x h, its base the bottom row. */
+function heap(cv: Canvas, cx: number, base: number, rx: number, ry: number, seed: number) {
+  for (let y = Math.floor(base - ry); y <= base; y++)
+    for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+      const nx = (x + 0.5 - cx) / rx;
+      const ny = (y + 0.5 - (base + 0.5)) / ry;
+      if (nx * nx + ny * ny > 1) continue;
+      const n = rnd(x, y, seed);
+      const lit = -0.6 * nx - 0.8 * ny;
+      let k = lit > 0.55 ? "z" : lit < 0.2 ? "Y" : "y";
+      if (n < 0.14) k = "i";
+      else if (n < 0.27) k = "Z";
+      else if (n < 0.33) k = "r";
+      else if (n < 0.37) k = "o";
+      put(cv, x, y, k);
+    }
+}
+
+/** The seed vat, 42 x 40: a steel bucket heaped high with seed (twice round 3's heap), a scoop in it. */
+function vatPart(): Part {
+  const cv = canvas(42, 40);
+  poly(cv, [[5, 21], [37, 21], [34, 40], [8, 40]], "s");
+  poly(cv, [[29, 21], [37, 21], [34, 40], [28, 40]], "S");
+  box(cv, 10, 22, 2, 17, "T");
+  box(cv, 6, 27, 31, 2, "S");
+  box(cv, 7, 35, 29, 2, "S");
+  heap(cv, 21, 22, 20, 21, 8);
+  box(cv, 4, 21, 34, 2, "s");
+  box(cv, 4, 21, 34, 1, "T");
+  box(cv, 31, 21, 7, 2, "S");
+  // the scoop: a wooden handle out of the heap
+  for (let i = 0; i < 9; i++) box(cv, 30 + i, 9 - i, 2, 2, i < 2 ? "s" : "o");
+  box(cv, 28, 9, 5, 3, "s");
+  box(cv, 28, 9, 5, 1, "T");
+  return part(cv);
+}
+
+/** The pile of seed on the counter, 24 x 12 (twice round 3's). */
+function pilePart(): Part {
+  const cv = canvas(24, 12);
+  heap(cv, 12, 11, 12, 11, 9);
+  return part(cv);
+}
+
+// ---------------------------------------------------------------- the bar
+
+/** The bar's footprint: arms at cols 5 and 8 (rows 1-3), the front run on row 4 (cols 5-8). */
+const BAR_X = colX(5); // 185
+const BAR_W = 4 * S; // 148
+/** How far the counter's top is raised above its footprint (the front face's height). */
+const BAR_UP = 36;
+const BAR_Y = rowY(1) - BAR_UP; // 84: the arms' raised top starts here
+const BAR_H = rowY(5) - BAR_Y; // to the front face's foot (y 268)
+/** The width of the arms' side faces. */
+const SIDE = 14;
+
+/**
+ * The whole U-shaped counter, raised: a warm-wood top with a cream lip, a charcoal front face and the two arms' charcoal
+ * side faces (west lit, east in shade), each with the red stripe near the floor and a dark kick; the side faces meet the
+ * front face at mitred corners, the stripes meeting on the seam. 148 x 184.
+ */
+function barPart(): Part {
+  const cv = canvas(BAR_W, BAR_H);
+  const frontTop = BAR_H - BAR_UP; // 148: the front face's top row
+  const runTop = frontTop - S; // 111: the front run's raised top starts here
+  const faceKey = (d: number, side: "w" | "f" | "e") => {
+    const [kick, red] = side === "f" ? [0.2, 0.3] : [0.15, 0.37];
+    if (d < kick) return "M";
+    if (d < red) return side === "f" && d > 0.27 ? "R" : "r";
+    if (d > (side === "f" ? 0.92 : 0.86)) return "M";
+    return side === "w" ? "n" : "m";
+  };
+  for (let y = 0; y < BAR_H; y++)
+    for (let x = 0; x < BAR_W; x++) {
+      const dW = x < SIDE ? (x + 0.5) / SIDE : 9;
+      const dE = x >= BAR_W - SIDE ? (BAR_W - x - 0.5) / SIDE : 9;
+      const dF = y >= frontTop ? (BAR_H - y - 0.5) / BAR_UP : 9;
+      const d = Math.min(dW, dE, dF);
+      if (d < 9) {
+        cv[y]![x] = faceKey(d, d === dF ? "f" : d === dW ? "w" : "e");
+        continue;
+      }
+      const onArm = x < S || x >= BAR_W - S || y >= runTop;
+      if (!onArm) continue;
+      const n = rnd(x, y, 3);
+      let k = n < 0.12 ? "u" : n < 0.2 ? "v" : "t";
+      if ((x + Math.floor(y / 3)) % 11 === 0 && n < 0.5) k = "u";
+      cv[y]![x] = k;
+    }
+  // the top's lip: cream on the outer edges, a dark line on the inner edges (the counter's thickness)
+  for (let y = 0; y < frontTop; y++) {
+    box(cv, SIDE, y, 2, 1, "i");
+    box(cv, BAR_W - SIDE - 2, y, 2, 1, "i");
+    if (y < runTop) {
+      box(cv, S - 1, y, 1, 1, "O");
+      box(cv, BAR_W - S, y, 1, 1, "O");
+    }
+  }
+  box(cv, SIDE, frontTop - 2, BAR_W - 2 * SIDE, 2, "i");
+  box(cv, S, runTop, BAR_W - 2 * S, 1, "O");
+  box(cv, SIDE, 0, S - SIDE, 1, "i");
+  box(cv, BAR_W - S, 0, S - SIDE, 1, "i");
+  // the mitred corners: a 1 px seam where the side faces meet the front face
+  for (let i = 0; i < BAR_UP; i++) {
+    const x = Math.floor(((i + 0.5) / BAR_UP) * SIDE);
+    put(cv, x, BAR_H - 1 - i, at(cv, x, BAR_H - 1 - i) === "r" ? "r" : "X");
+    put(cv, BAR_W - 1 - x, BAR_H - 1 - i, at(cv, BAR_W - 1 - x, BAR_H - 1 - i) === "r" ? "r" : "X");
+  }
+  // the brass plaque on the front face, a bird on it (a picture, no letters)
+  const px = BAR_W / 2 - 14;
+  const py = frontTop + 7;
+  box(cv, px, py, 28, 9, "Y");
+  box(cv, px + 1, py + 1, 26, 7, "y");
+  box(cv, px + 1, py + 1, 26, 1, "z");
+  stamp(cv, ["..rr.", ".rrrR", "rrrr.", ".R.R."], px + 11, py + 3);
+  return part(cv);
+}
+
+// ---------------------------------------------------------------- the table on the crossing
+
+/** The chess table, 30 x 47: a square top with an 8 x 8 board (cream and warm wood) in a charcoal and yellow rim, on one leg. */
+function tablePart(): Part {
+  const cv = canvas(30, 47);
+  box(cv, 0, 0, 30, 30, "y");
+  box(cv, 0, 0, 30, 1, "z");
+  box(cv, 0, 0, 1, 30, "z");
+  box(cv, 29, 0, 1, 30, "Y");
+  box(cv, 0, 29, 30, 1, "Y");
+  box(cv, 1, 1, 28, 28, "m");
+  box(cv, 1, 1, 28, 1, "n");
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) box(cv, 3 + c * 3, 3 + r * 3, 3, 3, (r + c) % 2 === 0 ? "i" : "o");
+  box(cv, 1, 30, 28, 3, "O");
+  box(cv, 1, 30, 28, 1, "o");
+  box(cv, 11, 33, 8, 10, "o");
+  box(cv, 11, 33, 2, 10, "p");
+  box(cv, 17, 33, 2, 10, "O");
+  box(cv, 5, 43, 20, 4, "O");
+  box(cv, 5, 43, 20, 1, "o");
+  box(cv, 5, 43, 2, 3, "p");
+  return part(cv);
+}
+
+/** The crossing: a gravel strip with two steel rails on wooden ties, hazard-striped edges, cols 2-9 of row 7: 296 x 36. */
+const TRACK_X = colX(2);
+const TRACK_Y = rowY(7) + 1;
+function tracksPart(): Part {
+  const w = 8 * S;
+  const h = 36;
+  const cv = canvas(w, h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const n = rnd(x, y, 10);
+      cv[y]![x] = n < 0.2 ? "G" : n < 0.32 ? "h" : "g";
+    }
+  for (let x = 0; x < w; x++)
+    for (const y of [0, 1, h - 2, h - 1]) cv[y]![x] = Math.floor((x + y) / 4) % 2 ? "y" : "M";
+  for (let x = 5; x < w - 5; x += 10) {
+    box(cv, x, 5, 5, 26, "o");
+    box(cv, x, 5, 5, 1, "p");
+    box(cv, x + 4, 5, 1, 26, "O");
+    box(cv, x, 30, 5, 1, "O");
+  }
+  for (const ry of [10, 23]) {
+    box(cv, 0, ry, w, 1, "T");
+    box(cv, 0, ry + 1, w, 1, "s");
+    box(cv, 0, ry + 2, w, 1, "S");
+  }
+  return part(cv);
+}
+
+/** The doorway, 74 x 111: a wood frame, glass side lights, the lit town beyond. */
+function doorPart(): Part {
+  const cv = canvas(74, 111);
+  box(cv, 0, 0, 74, 111, "o");
+  box(cv, 0, 0, 74, 1, "p");
+  box(cv, 0, 0, 1, 111, "p");
+  box(cv, 73, 0, 1, 111, "O");
+  box(cv, 28, 3, 18, 5, "y");
+  box(cv, 28, 3, 18, 1, "z");
+  box(cv, 28, 7, 18, 1, "Y");
+  box(cv, 6, 10, 62, 1, "O");
+  for (const sx of [7, 60]) {
+    box(cv, sx, 11, 7, 100, "H");
+    box(cv, sx, 11, 2, 100, "I");
+  }
+  box(cv, 14, 11, 2, 100, "O");
+  box(cv, 58, 11, 2, 100, "O");
+  box(cv, 16, 11, 42, 100, "A");
+  for (const [bx, by, bw] of [[17, 50, 8], [25, 40, 9], [34, 56, 7], [41, 44, 10], [51, 52, 7]] as const) box(cv, bx, by, bw, 76 - by, "z");
+  box(cv, 16, 76, 42, 35, "y");
+  for (let y = 80; y < 111; y += 8) box(cv, 16, y, 42, 1, "z");
+  for (let x = 22; x < 58; x += 9) box(cv, x, 76, 1, 35, "z");
+  box(cv, 44, 11, 1, 11, "O");
+  box(cv, 40, 22, 10, 8, "z");
+  box(cv, 40, 22, 10, 1, "Y");
+  box(cv, 40, 29, 10, 1, "Y");
+  return part(cv);
+}
+
+// ---------------------------------------------------------------- the crossing gate
+
+/** The gate's striped post on its base, 10 x 66. */
+function postPart(): Part {
+  const cv = canvas(10, 66);
+  for (let y = 0; y < 62; y++) {
+    const white = Math.floor(y / 5) % 2 === 1;
+    box(cv, 3, y, 4, 1, white ? "T" : "r");
+    put(cv, 6, y, white ? "W" : "R");
+  }
+  box(cv, 0, 62, 10, 4, "m");
+  box(cv, 0, 62, 10, 1, "n");
+  return part(cv);
+}
+
+/** The crossbuck, 24 x 16: two white boards edged red. */
+function crossbuckPart(): Part {
+  const cv = canvas(24, 16);
+  const len = Math.hypot(23, 15);
+  for (let y = 0; y < 16; y++)
+    for (let x = 0; x < 24; x++) {
+      const d1 = Math.abs(15 * x - 23 * y) / len;
+      const d2 = Math.abs(15 * (23 - x) - 23 * y) / len;
+      const d = Math.min(d1, d2);
+      if (d <= 2.3) cv[y]![x] = d <= 1.0 ? "T" : "r";
+    }
+  box(cv, 11, 7, 2, 2, "m");
+  return part(cv);
+}
+
+/** The two red lights side by side on their bar, 24 x 9 (keys 1/7 the left, 2/8 the right: a frame's `pal` lights them). */
+function lightsPart(): Part {
+  const cv = canvas(24, 9);
+  box(cv, 2, 3, 20, 3, "m");
+  for (const [cx, key, hi] of [[5.5, "1", "7"], [18.5, "2", "8"]] as const) {
+    ellipse(cv, cx, 4.5, 4.5, 4.5, "M");
+    ellipse(cv, cx, 4.5, 2.8, 2.8, key);
+    put(cv, Math.floor(cx) - 1, 3, hi);
+    box(cv, Math.floor(cx) - 3, 0, 7, 1, "n");
+  }
+  return part(cv);
+}
+
+/** The arm's motor box on the post, 6 x 8. */
+function motorPart(): Part {
+  const cv = canvas(6, 8);
+  box(cv, 0, 0, 6, 8, "m");
+  box(cv, 0, 0, 6, 1, "n");
+  box(cv, 0, 0, 1, 8, "n");
+  return part(cv);
+}
+
+const ARM_LEN = 42;
+const PIV: [number, number] = [8.5, 49.5];
+/** The striped barrier arm at `deg` above level (90 up, 0 level), pointing east from its pivot (PIV), with its counterweight. 58 x 58. */
+function armPart(deg: number): Part {
+  const cv = canvas(58, 58);
+  const a = (deg * Math.PI) / 180;
+  const [ux, uy] = [Math.cos(a), -Math.sin(a)];
+  const [nx, ny] = [Math.sin(a), Math.cos(a)];
+  for (let y = 0; y < 58; y++)
+    for (let x = 0; x < 58; x++) {
+      const px = x + 0.5 - PIV[0];
+      const py = y + 0.5 - PIV[1];
+      const t = px * ux + py * uy;
+      const s = px * nx + py * ny;
+      if (t >= -8 && t <= 0 && Math.abs(s) <= 2.6) cv[y]![x] = s < -1.2 ? "n" : "m";
+      else if (t > 0 && t <= ARM_LEN && Math.abs(s) <= 1.6) {
+        const white = Math.floor(t / 6) % 2 === 1;
+        cv[y]![x] = s > 0.7 ? (white ? "W" : "R") : white ? "T" : "r";
+      }
+    }
+  ellipse(cv, PIV[0], PIV[1], 2.6, 2.6, "S");
+  put(cv, Math.floor(PIV[0]), Math.floor(PIV[1]), "m");
+  return part(cv);
+}
+const ARM_UP = "arm-90";
+const ARM_LOWER = ["arm-62", "arm-34", "arm-10", "arm-0"];
+const ARM_DOWN = "arm-0";
+
+// ---------------------------------------------------------------- parts
+
+const PARTS: Record<string, Part> = {
+  floor: floorPart(),
+  "back-wall": backWallPart(),
+  "window-sea": windowPart(false),
+  "window-train": windowPart(true),
+  "flap-board": boardPart(false),
+  "flap-board-b": boardPart(true),
+  shelves: shelvesPart(),
+  sconce: sconcePart(),
+  lamp: lampPart(),
+  "snake-plant": snakePlantPart(),
+  topiary: topiaryPart(),
+  planter: planterPart(),
+  "airport-seats": seatsPart(),
+  stool: stoolPart(),
+  bird: part(BIRD.map((r) => [...r])),
+  feeder: part(FEEDER.map((r) => [...r])),
+  vat: vatPart(),
+  "seed-pile": pilePart(),
+  bar: barPart(),
+  "chess-table": tablePart(),
+  "crossing-track": tracksPart(),
+  door: doorPart(),
+  "gate-post": postPart(),
+  "gate-crossbuck": crossbuckPart(),
+  "gate-lights": lightsPart(),
+  "gate-motor": motorPart(),
+  ...Object.fromEntries([90, 62, 34, 10, 0].map((d) => [`arm-${d}`, armPart(d)])),
+};
+const partW = (p: string) => Math.max(...PARTS[p]!.grid.map((r) => r.length));
+
+// ---------------------------------------------------------------- the gates
+
+export type GateDir = "east" | "west";
+/** The two crossing gates, kitty-corner across the table: each one's square, its post's foot (px) and where its arm points. */
+export const SHOP_BIRDIE_GATES: readonly { col: number; row: number; foot: readonly [number, number]; arm: GateDir }[] = [
+  { col: 4, row: 6, foot: [177, 339], arm: "east" }, // north of the tracks, just left of the bar's front-left corner
+  { col: 8, row: 8, foot: [305, 413], arm: "west" }, // south of the tracks, just right of the table's east stool
+];
+
+const L = (p: string, x: number, y: number, flipX = false): Layer => (flipX ? { part: p, x, y, flipX } : { part: p, x, y });
+
+/** One gate's layers, its post's foot at (fx, fy), its arm `arm` (a part), pointing `dir`. */
+function gateLayers(fx: number, fy: number, arm: string, dir: GateDir): Layer[] {
+  const raw: [string, number, number][] = [
+    ["gate-post", fx - 5, fy - 66],
+    ["gate-motor", fx + 2, fy - 31],
+    // the arm behind the lights and the crossbuck, so raised it never hides them
+    [arm, fx + 5 - Math.floor(PIV[0]), fy - 27 - Math.floor(PIV[1])],
+    ["gate-lights", fx - 12, fy - 54],
+    ["gate-crossbuck", fx - 12, fy - 72],
+  ];
+  return raw.map(([p, x, y]) => (dir === "east" ? L(p, x, y) : L(p, 2 * fx - x - partW(p), y, true)));
+}
+
+// ---------------------------------------------------------------- the room
+
+interface Scene {
+  /** 0 or 1: which birds have their heads down. */
+  bob: number;
+  board: string;
+  arm: string;
+}
+
+const WEST_STOOL_X = BAR_X - 20; // 165: the seat's rim tucked against the west side face
+const EAST_STOOL_X = BAR_X + BAR_W - 2; // 331: against the east side face
+const FRONT_STOOL_Y = BAR_Y + BAR_H + 3; // 271
+const TABLE_X = colX(6) + 4; // 226
+const TABLE_Y = rowY(7) - 13; // 329: its foot on the gravel at y 375
+
+function room(sc: Scene): Layer[] {
+  const birdOn = (sx: number, sy: number, i: number, flip: boolean) => L("bird", sx + 5, sy - 7 + ((i + sc.bob) % 2), flip);
+  const ls: Layer[] = [
+    L("floor", 0, 0),
+    L("back-wall", 0, 0),
+    L("window-sea", 39, 4),
+    L("window-train", 335, 4),
+    L(sc.board, 114, 4),
+    L("shelves", 257, 4),
+    L("sconce", 10, 16),
+    L("sconce", 418, 16),
+    L("crossing-track", TRACK_X, TRACK_Y),
+    L("snake-plant", 44, 104),
+    L("lamp", 121, 78),
+    L("vat", 224, 115),
+    L("bar", BAR_X, BAR_Y),
+    // the feeders stand on the raised tops of the arms and the front run; the seed pile on the front run
+    L("feeder", 204, 98),
+    L("feeder", 204, 160),
+    L("feeder", 301, 102),
+    L("feeder", 301, 164),
+    L("feeder", 204, 206),
+    L("seed-pile", 294, 207),
+  ];
+  // stools along the arms (cols 4 and 9, rows 1-3), against the side faces
+  for (let r = 1; r <= 3; r++) {
+    ls.push(L("stool", WEST_STOOL_X, rowY(r) + 3));
+    ls.push(L("stool", EAST_STOOL_X, rowY(r) + 3));
+  }
+  ls.push(birdOn(WEST_STOOL_X, rowY(1) + 3, 0, true), birdOn(WEST_STOOL_X, rowY(3) + 3, 1, false), birdOn(EAST_STOOL_X, rowY(2) + 3, 1, false));
+  ls.push(L("airport-seats", 40, 222), L("airport-seats", 40, 260));
+  // stools along the front run (row 5)
+  [5, 6, 7, 8].forEach((c) => ls.push(L("stool", colX(c) + 7, FRONT_STOOL_Y)));
+  ls.push(birdOn(colX(5) + 7, FRONT_STOOL_Y, 0, false), birdOn(colX(7) + 7, FRONT_STOOL_Y, 1, true));
+  ls.push(L("snake-plant", 374, 251));
+  const [wg, eg] = SHOP_BIRDIE_GATES;
+  ls.push(...gateLayers(wg!.foot[0], wg!.foot[1], sc.arm, wg!.arm));
+  // the table on the crossing, a stool each side facing each other
+  ls.push(L("stool", colX(5) + 7, rowY(7)), L("stool", colX(7) + 7, rowY(7)), L("chess-table", TABLE_X, TABLE_Y));
+  ls.push(L("lamp", 45, 298), L("lamp", 379, 298));
+  ls.push(...gateLayers(eg!.foot[0], eg!.foot[1], sc.arm, eg!.arm));
+  ls.push(L("topiary", 302, 443), L("planter", 368, 450), L("door", 148, 416));
+  return ls;
+}
+
+const IDLE: Frame[] = [0, 1, 2, 3].map((i) => ({
+  layers: room({ bob: i % 2, board: i < 2 ? "flap-board" : "flap-board-b", arm: ARM_UP }),
+  ms: 700,
+}));
+const LOWER: Frame[] = ARM_LOWER.map((arm, i) => ({
+  layers: room({ bob: 0, board: "flap-board", arm }),
+  ms: 160,
+  pal: i % 2 ? RIGHT_ON : LEFT_ON,
+  ...(i === 0 ? { cue: "crossing" } : {}),
+}));
+const DOWN: Frame[] = [LEFT_ON, RIGHT_ON].map((pal, i) => ({ layers: room({ bob: i, board: "flap-board", arm: ARM_DOWN }), ms: 500, pal }));
+
+const idleAnim: Anim = { frames: IDLE, loop: true };
+const still: Anim = { frames: [IDLE[0]!], loop: false };
+
+/** The whole lobby: its idle has both gates up and dark; `gates-lower` / `gates-down` play them for a battle's start. */
+export const SHOP_BIRDIE_INTERIOR_4: Character = {
+  id: "shop-birdie-interior-4",
   name: "Inside Birdie's station",
-  w: RW,
-  h: RH,
-  foot: [RW / 2, RH],
+  w: W,
+  h: H,
+  foot: [W / 2, H - 1],
   palette: PALETTE,
-  parts,
+  parts: PARTS,
   anims: {
-    idle: { frames: idle, loop: true },
-    // a room has no moods: every moment shows the lobby at rest
-    entrance: { frames: idle, loop: false },
-    thinking: { frames: idle, loop: true },
-    move: { frames: idle.slice(0, 2), loop: false },
-    capture: { frames: idle.slice(0, 2), loop: false },
-    hurt: { frames: idle.slice(0, 2), loop: false },
-    check: { frames: idle.slice(0, 2), loop: false },
-    smug: { frames: idle, loop: true },
-    rattled: { frames: idle, loop: true },
-    defeat: { frames: idle.slice(0, 2), loop: false },
-    victory: { frames: idle, loop: true },
+    idle: idleAnim,
+    "gates-lower": { frames: LOWER, loop: false },
+    "gates-down": { frames: DOWN, loop: true },
+    ...Object.fromEntries(["entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory"].map((n) => [n, n === "thinking" ? idleAnim : still])),
+  },
+};
+
+/**
+ * One crossing gate on its own (`crossing-post`, a 1 x 1 square's piece; place it by `foot`, the post's foot), drawn with its
+ * arm pointing east: flip it for SHOP_BIRDIE_GATES' west gate. idle: arm up, lights dark. lower: 4 frames, the arm swinging
+ * down to level, the lights flashing. down: arm level, the lights in turn, 500 ms each, looping.
+ */
+const GFX = 16;
+const GFY = 80;
+export const SHOP_BIRDIE_GATE: Character = {
+  id: "shop-birdie-gate",
+  name: "Crossing gate",
+  w: 76,
+  h: 82,
+  foot: [GFX, GFY],
+  palette: PALETTE,
+  parts: PARTS,
+  anims: {
+    idle: { frames: [{ layers: gateLayers(GFX, GFY, ARM_UP, "east"), ms: 1000 }], loop: true },
+    lower: { frames: ARM_LOWER.map((arm, i) => ({ layers: gateLayers(GFX, GFY, arm, "east"), ms: 160, pal: i % 2 ? RIGHT_ON : LEFT_ON })), loop: false },
+    down: { frames: [LEFT_ON, RIGHT_ON].map((pal) => ({ layers: gateLayers(GFX, GFY, ARM_DOWN, "east"), ms: 500, pal })), loop: true },
   },
 };
