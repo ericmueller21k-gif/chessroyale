@@ -56,6 +56,7 @@ import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type B
 import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
+import { Pictures, type Restored } from "./keep-pictures.ts";
 import { stepChar } from "./kit/bake.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type NoFigureId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
@@ -304,7 +305,23 @@ class FrameCache {
   }
   /** Frame `i` one ramp step darker. */
   dark(i: number): HTMLCanvasElement {
-    return (this.darker ??= new FrameCache(stepChar(this.ch, -1))).get(i);
+    return this.darkFc().get(i);
+  }
+  private darkFc(): FrameCache {
+    return (this.darker ??= new FrameCache(stepChar(this.ch, -1)));
+  }
+  /**
+   * (The loading screen on a later visit, keep-pictures.ts) Frame `i` (or a step darker) as the last visit painted it: `made()` is
+   * that picture, asked for only if the frame isn't here already.
+   */
+  kept(i: number, dark: boolean, made: () => HTMLCanvasElement): HTMLCanvasElement {
+    const fc = dark ? this.darkFc() : this;
+    let c = fc.frames[i];
+    if (!c) {
+      c = fc.frames[i] = made();
+      frameOf.set(c, { fc, i });
+    }
+    return c;
   }
 }
 
@@ -697,8 +714,15 @@ export class Renderer {
   /** Which of each world's-scale statue's pixels are drawn (taps read this, never the canvas: a read-back stalls). */
   private readonly statueMask: (Uint8Array | null)[] = STATUES.map(() => null);
   /** Statue i at the world's scale and its mask, made the first time it's drawn (Nov 10, phone load 3: not all as the town opens). */
-  private statueAt(i: number): HTMLCanvasElement {
+  private statueAt(i: number, made?: () => HTMLCanvasElement): HTMLCanvasElement {
     let c = this.statueImg[i];
+    if (!c && made) {
+      // (As the last visit painted it, keep-pictures.ts: its mask read from its pixels, whose alpha is kept exactly.)
+      c = this.statueImg[i] = made();
+      const a = art2d(c).getImageData(0, 0, c.width, c.height).data;
+      const m = (this.statueMask[i] = new Uint8Array(c.width * c.height));
+      for (let j = 0; j < m.length; j++) m[j] = a[j * 4 + 3]! > 0 ? 1 : 0;
+    }
     if (!c) {
       const m: Uint8Array[] = [];
       c = this.statueImg[i] = canvasOf(statueArt(STATUES[i]!.id, 1), m);
@@ -1769,8 +1793,9 @@ export class Renderer {
    * done (0 to 1). (Measured Nov 11: nothing else is painted as you then walk and turn; the figures, tags and boards are drawn as
    * before, on the atlas's spare pages.)
    */
-  warm(budgetMs: number, keep: (src: CanvasImageSource) => void): number {
-    const jobs = (this.warmJobs ??= this.warmPlan(keep));
+  warm(budgetMs: number, keep: (src: CanvasImageSource) => void, from: Restored | null = null): number {
+    this.pics ??= new Pictures(keep, from);
+    const jobs = this.plan().jobs;
     const t0 = performance.now();
     while (this.warmAt0 < jobs.length) {
       // (A job that can't be done yet (a sidekick's sheet still loading) waits for the next slice, up to `loadSheetWaitMs` all told.)
@@ -1779,6 +1804,7 @@ export class Renderer {
         done = jobs[this.warmAt0]!();
       } catch (e) {
         console.warn("town warm:", e); // (that one picture is made as it shows instead, as before)
+        this.warmClean = false;
       }
       if (done === false && t0 - (this.warmWait ||= t0) < TOWN_FEEL.loadSheetWaitMs) break;
       this.warmAt0++;
@@ -1786,45 +1812,86 @@ export class Renderer {
     }
     return jobs.length ? this.warmAt0 / jobs.length : 1;
   }
-  private warmJobs: (() => boolean | void)[] | null = null;
+  private warmJobs: { jobs: (() => boolean | void)[]; sig: string } | null = null;
   private warmAt0 = 0;
   private warmWait = 0;
-  /** The loading screen's jobs (`warm`): one picture (or one roof) each. */
-  private warmPlan(keep: (src: CanvasImageSource) => void): (() => boolean | void)[] {
+  /** The loading screen's pictures, painted or kept from the last visit (keep-pictures.ts; set by the first `warm`). */
+  pics: Pictures | null = null;
+  /** (`warm`) Whether every job ran without throwing: only then are its pictures kept for the next visit. */
+  warmClean = true;
+  /**
+   * What the loading screen's pictures are, as a string (keep-pictures.ts keys the kept pictures by it): each job's picture by its art's
+   * id, frame and shade, or its roof's art and painting. The same layout, the same string; an admin's town (more homes) another.
+   */
+  pictureSig(): string {
+    return this.plan().sig;
+  }
+  /**
+   * The loading screen's jobs (`warm`): one picture (or one roof) each. Each picture is painted, or on a later visit taken from the
+   * last visit's (`pics.from`, in the same order: keep-pictures.ts), and handed to `pics.add` (the painter's `keep`).
+   */
+  private plan(): { jobs: (() => boolean | void)[]; sig: string } {
+    if (this.warmJobs) return this.warmJobs;
     const jobs: (() => boolean | void)[] = [];
+    const sig: string[] = [];
+    const P = () => this.pics!;
+    const frame = (fc: FrameCache, k: number, dark: boolean) => {
+      sig.push(`${fc.ch.id}#${k}${dark ? "d" : ""}`);
+      jobs.push(() => {
+        const p = P();
+        p.add(p.from ? fc.kept(k, dark, () => p.next()) : dark ? fc.dark(k) : fc.get(k));
+      });
+    };
     const fcs = new Set<FrameCache>();
     const frames = (fc: FrameCache) => {
       if (fcs.has(fc)) return;
       fcs.add(fc);
-      for (let k = 0; k < fc.frames.length; k++) jobs.push(() => keep(fc.get(k)));
+      for (let k = 0; k < fc.frames.length; k++) frame(fc, k, false);
     };
-    const roof = (a: RoofArt) => {
-      for (const f of a.faces) {
-        keep(f.whole.cv);
-        for (const t of f.tris) keep(t.cv);
-      }
+    const roof = (b: BoxInst, q: number) => {
+      sig.push(`roof:${b.box.id}:${this.roofKey(b, q)}`);
+      jobs.push(() => {
+        const p = P();
+        let fresh = false;
+        const a = this.roofArt(b, q, (flat, qq) => {
+          fresh = true;
+          return p.from ? p.roof() : bakeRoof(b, b.box, flat ? 0 : qq);
+        });
+        for (const f of a.faces) {
+          p.add(f.whole.cv);
+          for (const t of f.tris) p.add(t.cv);
+        }
+        if (fresh) p.roofDone(a);
+      });
     };
     for (const b of this.boxes) {
-      for (const list of [0, 1]) for (const w of this.warmList(b, list)) jobs.push(() => keep(w.dark ? w.fc.dark(w.k) : w.fc.get(w.k)));
-      for (let q = 0; q < 4; q++) jobs.push(() => roof(this.roofArt(b, q)));
+      for (const list of [0, 1]) for (const w of this.warmList(b, list)) frame(w.fc, w.k, w.dark);
+      for (let q = 0; q < 4; q++) roof(b, q);
     }
     for (const fc of this.hedgeTops) frames(fc);
     for (const fc of this.propFrames) frames(fc);
     for (const fc of this.houseFrames) frames(fc);
     for (const fc of this.bossFrames) frames(fc);
-    for (let i = 0; i < STATUES.length; i++) jobs.push(() => keep(this.statueAt(i)));
-    // (The sidekicks' frames: cut from their sheets once they've loaded, as the town opens.)
+    for (let i = 0; i < STATUES.length; i++) {
+      sig.push(`statue:${STATUES[i]!.id}`);
+      jobs.push(() => {
+        const p = P();
+        p.add(this.statueAt(i, p.from ? () => p.next() : undefined));
+      });
+    }
+    // (The sidekicks' frames: cut from their sheets once they've loaded, as the town opens. Not kept between visits: the sheets are
+    // the site's own files, and cutting them is quick.)
     for (const sp of this.spriteArt.values())
       jobs.push(() => {
         sp.cut();
         if (!sp.ready) return sp.failed ? undefined : false;
-        for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) keep(c);
+        for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) P().keep(c);
       });
     // (Painted ahead by planBoxes from here on: nothing left to paint. Marked done so it doesn't walk them again.)
     jobs.push(() => {
       for (const at of this.warmAt) at.fill(-1);
     });
-    return jobs;
+    return (this.warmJobs = { jobs, sig: sig.join("|") });
   }
   /** The quarters in the order they're painted ahead (planBoxes). */
   private readonly warmQ = new Int32Array(4);
@@ -1876,23 +1943,27 @@ export class Renderer {
   private readonly ahead = new Int32Array(512);
   private readonly aheadD = new Float64Array(512);
   /** A box's roof painted for the camera facing north or east (box-draw.ts), made the first time it's asked for (shared by every box of that art facing that way). */
-  private roofArt(b: BoxInst, q: number): RoofArt {
+  private roofArt(b: BoxInst, q: number, make?: (flat: boolean, q: number) => RoofArt): RoofArt {
     const box = b.box;
     const had = this.instArt[q]![b.i];
     if (had) return had;
     let m = this.roofs.get(box);
     if (!m) this.roofs.set(box, (m = new Map()));
-    // (A flat roof is lit the same whichever way the camera faces: one painting serves all four. Round 4's flat fronts are most of them.)
-    const flat = geomOf(box).faces.every((f) => f.nz > 0.999);
-    const key = flat ? "flat" : `${b.facing}${q}`;
+    const key = this.roofKey(b, q);
     let a = m.get(key);
     if (!a) {
       const t0 = REC ? performance.now() : 0;
-      m.set(key, (a = bakeRoof(b, box, flat ? 0 : q)));
+      const flat = key === "flat";
+      m.set(key, (a = make ? make(flat, q) : bakeRoof(b, box, flat ? 0 : q)));
       if (REC) REC.paint(performance.now() - t0);
     }
     this.instArt[q]![b.i] = a;
     return a;
+  }
+  /** Which of its art's roof paintings box `b` shows facing quarter `q`. (A flat roof is lit the same whichever way the camera faces:
+   * one painting serves all four. Round 4's flat fronts are most of them.) */
+  private roofKey(b: BoxInst, q: number): string {
+    return geomOf(b.box).faces.every((f) => f.nz > 0.999) ? "flat" : `${b.facing}${q}`;
   }
   /** Each box's roof paintings as it last asked for them, by heading (no lookup a frame). */
   private readonly instArt: (RoofArt | undefined)[][] = [[], [], [], []];

@@ -68,10 +68,11 @@ import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
 import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sound.ts";
-import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
-import { painter2d, type Backend, type Painter } from "./paint.ts";
+import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, TOWN_PICTURES, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
-import { reportTownFallback } from "../problems.ts";
+import { APP_VERSION, reportTownFallback } from "../problems.ts";
+import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Shelf } from "./keep-pictures.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
@@ -2755,7 +2756,19 @@ function startTown(
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 } };
+  };
+  /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
+  const hookPictureSum = () => {
+    if (!testSwitchesAllowed() || !r.pics) return null;
+    let h = 0x811c9dc5;
+    for (const c of r.pics.list) {
+      const d = art2d(c).getImageData(0, 0, c.width, c.height).data;
+      h = Math.imul(h ^ c.width, 16777619);
+      h = Math.imul(h ^ c.height, 16777619);
+      for (let i = 0; i < d.length; i += 4) h = Math.imul(h ^ (d[i]! | (d[i + 1]! << 8) | (d[i + 2]! << 16) | (d[i + 3]! << 24)), 16777619);
+    }
+    return { n: r.pics.list.length, hash: (h >>> 0).toString(16) };
   };
   /** (Tests, the stills) What a tap at (x, y) in the box would do now: its key ("home:alfil", "sq:c,r", …), where you'd walk, its card's kind. */
   const hookPick = (x: number, y: number) => {
@@ -2763,7 +2776,7 @@ function startTown(
     const p = plan(pickTap(x, y));
     return p ? { key: p.key, dest: p.dest, card: p.card?.kind ?? null } : null;
   };
-  const hooks = window as unknown as { __townPick?: typeof hookPick; __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport };
+  const hooks = window as unknown as { __townPick?: typeof hookPick; __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport; __townPictureSum?: typeof hookPictureSum };
   hooks.__townAt = hookAt;
   hooks.__townPick = hookPick;
   hooks.__townGlide = hookGlide;
@@ -2789,6 +2802,7 @@ function startTown(
   hooks.__townYou = hookYou;
   hooks.__townHere = hookHere;
   hooks.__townReport = hookReport;
+  hooks.__townPictureSum = hookPictureSum;
 
   /**
    * The loading screen (Nov 11, Eric: "loads it all in at once and then it stays there if you go in and out of buildings"): every
@@ -2808,11 +2822,26 @@ function startTown(
     const tick = () => new Promise<void>((go) => requestAnimationFrame(() => go()));
     // (Whatever goes wrong here, the town opens: what wasn't made is made as it shows, as before.)
     try {
+      // The pictures as the last visit on this build painted them, if they're kept (keep-pictures.ts; Nov 23): then none is painted.
+      // (Not in the dev server, whose code changes under the same name; nor on a 2D painter, which never loads.)
+      const shelf = painter.keep && !import.meta.env.DEV && !testParams().has("paintall") ? idbShelf() : null;
+      const key = pictureKey(APP_VERSION, import.meta.url, r.pictureSig());
+      const from = await restore(shelf, key, domPageIO(art2d));
+      pictures.kept = !!from;
+      pictures.restoreMs = performance.now() - t0;
       for (let share = 0; share < 1 && alive; ) {
-        share = r.warm(f.loadSliceMs, keep);
+        share = r.warm(f.loadSliceMs, keep, from);
         onLoading(share * f.loadPaintShare, "pictures");
         await tick();
       }
+      from?.close();
+      // (Kept ones that didn't line up with this layout (never expected: the key has the layout): cleared, so the next visit paints.)
+      if (from && !r.pics?.matched()) {
+        console.warn("town: kept pictures didn't match; painting next time");
+        void shelf?.clear().catch(() => undefined);
+      }
+      // A first visit's pictures kept for the next, after the first frame (`keepPictures`).
+      if (!from && r.warmClean && alive) keepLater = () => keepPictures(shelf, key);
       loadPaintMs = performance.now() - t0;
       for (let share = 0; share < 1 && alive; ) {
         share = painter.kept?.(f.loadSliceMs) ?? 1;
@@ -2845,9 +2874,22 @@ function startTown(
       townMusic(true, testParams().has("townsolo"));
       void preloadMusic();
     }, MUSIC.townPreloadAfterMs);
+    if (keepLater) setTimeout(keepLater, TOWN_PICTURES.afterMs);
   };
   let loadMs = 0;
   let loadPaintMs = 0;
+  /** (Tests, `hookPaint`) The kept pictures: loaded from the last visit; how long reading them took (ms); what this visit kept (bytes;
+   * null: nothing; undefined: not yet) and how long that took. */
+  const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0 };
+  let keepLater: (() => void) | null = null;
+  /** This visit's pictures kept for the next (keep-pictures.ts `save`), in the background: a page at a time, encoded in a worker. */
+  const keepPictures = async (shelf: Shelf | null, key: string) => {
+    const t = performance.now();
+    const io = domSaveIO(art2d);
+    pictures.saved = alive && r.pics ? await save(shelf, key, r.pics, io) : null;
+    io?.done();
+    pictures.saveMs = performance.now() - t;
+  };
   // (The street town failed as it started (its painter is Canvas 2D then): the loading card stays up until the page reloads, or the
   // message has replaced it. No frames ever run on a 2D painter.)
   if (loading) void loadTown();
@@ -3053,6 +3095,7 @@ function startTown(
       delete hooks.__townYou;
       delete hooks.__townHere;
       delete hooks.__townReport;
+      delete hooks.__townPictureSum;
       delete hooks.__townPick;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
