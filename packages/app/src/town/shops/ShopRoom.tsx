@@ -2698,39 +2698,84 @@ function startRoom(
   };
   /**
    * A counter (RoomArt `counters`), its slices far to near: each `COUNTER_STEP` rows of its receding top, standing at its own depth with
-   * its top as far over its foot as the bottom card's is; where the camera sees past a side (nearer slices drawn further in than this
-   * one's edge), that edge's columns go down a card's height, as its side face. Then the bottom card, whole, at its south row.
+   * its top as far over its foot as the bottom card's is; where the camera sees past a side (the next, nearer slice's edge further in),
+   * that edge's columns up to the next slice's go down a card's height, as its side face. Then the bottom card, whole, at its south row.
+   * Its picture never changes, so as the back is (`still`), the second frame the view is the same its slices are drawn once into a
+   * canvas of its own, on the screen's pixels, and drawn from it while the view stays: one draw, not dozens. A view that moves draws
+   * them straight onto the room.
    */
-  const COUNTER_STEP = 3;
-  const cAt = { l: 0, r: 0 };
+  const COUNTER_STEP = 4;
+  const cX = new Float64Array(64);
+  const cY = new Float64Array(64);
+  const cS = new Float64Array(64);
+  const counterKept = new Map<Up, { cv: HTMLCanvasElement | null; key: Float64Array; prev: Float64Array; x: number; y: number; w: number; h: number }>();
   const drawCounter = (u: Up, img: HTMLCanvasElement, ch: Character) => {
+    let k = counterKept.get(u);
+    if (!k) counterKept.set(u, (k = { cv: null, key: new Float64Array(7).fill(NaN), prev: new Float64Array(7).fill(NaN), x: 0, y: 0, w: 0, h: 0 }));
+    if (k.cv && sameBg(bgNow, k.key)) {
+      if (k.w > 0) g.drawImage(k.cv, 0, 0, k.w, k.h, k.x, k.y, k.w / DPR, k.h / DPR);
+      return;
+    }
     const rec = (u.deep! - 1) * SQ;
     const card = img.height - rec;
     const [fx, fy] = ch.foot;
     const iw = img.width;
-    // (The bottom card's edges on screen: a nearer slice's.)
-    if (!P(u.c, u.r)) return;
-    const sR = pt.k / SQ;
-    cAt.l = pt.x - fx * sR;
-    cAt.r = cAt.l + iw * sR;
-    for (let a = 0; a <= rec; a += COUNTER_STEP) {
-      const last = a + COUNTER_STEP > rec;
-      const top = last ? rec : a;
-      if (!P(u.c, u.r - (rec - top) / SQ) || pt.depth <= S.nearGone) continue;
+    // (Each slice's place first, the bottom card's last: its top row's left end on screen and its scale; NaN: not drawn.)
+    const n = Math.min(cX.length, Math.ceil(rec / COUNTER_STEP) + 1);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const a = Math.min(rec, i * COUNTER_STEP);
+      const ok = P(u.c, u.r - (rec - a) / SQ) && pt.depth > S.nearGone;
       const s = pt.k / SQ;
-      const x = pt.x - fx * s;
-      const y = pt.y + (rec - fy) * s;
-      if (last) {
-        g.drawImage(img, 0, rec, iw, card, x, y, iw * s, card * s);
+      cS[i] = ok ? s : NaN;
+      cX[i] = pt.x - fx * s;
+      cY[i] = pt.y + (rec - fy) * s;
+      if (!ok) continue;
+      x0 = Math.min(x0, cX[i]!);
+      y0 = Math.min(y0, cY[i]!);
+      x1 = Math.max(x1, cX[i]! + iw * s);
+      y1 = Math.max(y1, cY[i]! + card * s);
+    }
+    const rest = sameBg(bgNow, k.prev);
+    k.prev.set(bgNow);
+    let c: CanvasRenderingContext2D = g;
+    if (rest) {
+      // (The view rests: its own canvas, the part on screen, on whole device pixels.)
+      const X0 = Math.floor(Math.max(0, x0) * DPR);
+      const Y0 = Math.floor(Math.max(0, y0) * DPR);
+      const w = Math.max(0, Math.ceil(Math.min(W, x1) * DPR) - X0);
+      const h = Math.max(0, Math.ceil(Math.min(H, y1) * DPR) - Y0);
+      if (!k.cv) k.cv = document.createElement("canvas");
+      if (k.cv.width < w || k.cv.height < h) ((k.cv.width = Math.max(k.cv.width, w)), (k.cv.height = Math.max(k.cv.height, h)));
+      Object.assign(k, { x: X0 / DPR, y: Y0 / DPR, w, h });
+      k.key.set(bgNow);
+      c = k.cv.getContext("2d")!;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, k.cv.width, k.cv.height);
+      c.setTransform(DPR, 0, 0, DPR, -X0, -Y0);
+      c.imageSmoothingEnabled = false;
+      if (w === 0 || h === 0) return;
+    }
+    for (let i = 0; i < n; i++) {
+      const s = cS[i]!;
+      if (Number.isNaN(s)) continue;
+      const a = Math.min(rec, i * COUNTER_STEP);
+      const x = cX[i]!;
+      const y = cY[i]!;
+      if (i === n - 1) {
+        c.drawImage(img, 0, rec, iw, card, x, y, iw * s, card * s);
         break;
       }
-      const n = Math.min(COUNTER_STEP + 1, rec - a);
-      g.drawImage(img, 0, a, iw, n, x, y, iw * s, n * s);
-      const wl = Math.min(iw, Math.ceil((cAt.l - x) / s) + 1);
-      if (wl > 1) g.drawImage(img, 0, a, wl, card, x, y, wl * s, card * s);
-      const wr = Math.min(iw, Math.ceil((x + iw * s - cAt.r) / s) + 1);
-      if (wr > 1) g.drawImage(img, iw - wr, a, wr, card, x + (iw - wr) * s, y, wr * s, card * s);
+      const h = Math.min(COUNTER_STEP + 1, rec - a);
+      c.drawImage(img, 0, a, iw, h, x, y, iw * s, h * s);
+      const ns = cS[i + 1]!;
+      if (Number.isNaN(ns)) continue;
+      const wl = Math.min(iw, Math.ceil((cX[i + 1]! - x) / s) + 1);
+      if (wl > 1) c.drawImage(img, 0, a, wl, card, x, y, wl * s, card * s);
+      const wr = Math.min(iw, Math.ceil((x + iw * s - (cX[i + 1]! + iw * ns)) / s) + 1);
+      if (wr > 1) c.drawImage(img, iw - wr, a, wr, card, x + (iw - wr) * s, y, wr * s, card * s);
     }
+    if (rest) g.drawImage(k.cv!, 0, 0, k.w, k.h, k.x, k.y, k.w / DPR, k.h / DPR);
   };
   /** A piece's play for the challenge now (`plays`: its `lower`, then its `down`, from you both on your marks), or null: its idle. */
   const playing = (name: string, now: number): { name: string; t: number } | null => {
