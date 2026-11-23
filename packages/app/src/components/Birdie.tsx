@@ -18,8 +18,9 @@ import { InPlace, PIECE_WORD, type BoardLayerProps, type BossUi, type Moment, ty
  * battle's shared view and each moment's start, so everyone online sees the same thing. Nothing he draws moves the board, the dock or
  * the bar (Eric's rule: nothing shifts).
  * - **The warning** (`trainSignal`, as your turn after his move begins): he steps up and waves his wing like a conductor; at its
- *   `signal` cue the crossing lights on every square of the line (its bell), its lamps flashing through your turn. The dock says what to
- *   do through your turn ("Move your knight!": refused.ts, trainLine).
+ *   `signal` cue the crossing lights on every square of the line (its bell), its lamps flashing through your turn, and a warning sign
+ *   glows over the marked piece (WarnSign) until it moves or his train reaches it. The dock says what to do through your turn ("Move your
+ *   knight!": refused.ts, trainLine).
  * - **His train** (`trainSmash`, at the start of his turn as your move lands, while he thinks): he ducks into his cab and it pulls away
  *   (his `depart`, in his spot), then the train rides the line across the board from his side, every piece on the line stepping aside as
  *   it comes and back after its tail, and the piece you left there is smashed as the train's nose reaches it (the smash); spared (the
@@ -170,17 +171,43 @@ function Timed({ tag: Tag, at, style, children, ...rest }: { tag: "span" | "piec
   );
 }
 
+/**
+ * The warning sign on the marked piece (Eric, Nov 23: "mark the piece required to move with a yellow train warning ⚠️ like this that's
+ * glowing over the tile but also a see through, make it look clean. This way the player knows which piece is in danger";
+ * docs/decisions/2026-11-23-birdie-cadence-warning.md): a yellow warning triangle with its "!" over the piece's square, as the board is
+ * seen (a flipped board too), see-through so the piece reads through it, glowing in a slow pulse (styles.css `.bd-sign`: opacity alone,
+ * composited; no frame loop of its own). `at`: when it lit (the crossing's `signal` cue), its pulse's beat kept from then by a copy drawn
+ * anew; 0: not known here (lit before this screen), its pulse from its first drawing.
+ */
+function WarnSign({ square, orientation, at }: { square: string; orientation: Orientation; at: number }) {
+  const [drawn] = useState(Date.now);
+  const c = drawnAt(square, orientation);
+  return (
+    <span class="bd-sign" data-square={square} style={{ "--sq-x": String(c.col), "--sq-y": String(c.row), animationDelay: `${at ? at - drawn : 0}ms` }}>
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path class="bd-sign-edge" d={SIGN} />
+        <path class="bd-sign-face" d={SIGN} />
+        <rect class="bd-sign-mark" x="44.5" y="35" width="11" height="28" rx="5.5" />
+        <circle class="bd-sign-mark" cx="50" cy="73.5" r="6" />
+      </svg>
+    </span>
+  );
+}
+/** The sign's triangle (its corners rounded by its strokes' round joins). */
+const SIGN = "M50 11 L91 84 L9 84 Z";
+
 /** The crossing on each square of the warned line: lit at the warning's `signal` cue on this screen, else already flashing. */
 function crossingItems(squares: readonly string[], since: number, until: (i: number) => number, now: number): BoardItem[] {
   return squares.flatMap((square, i) => (now < until(i) ? [{ square, name: "birdieCrossing", ...(since ? { since } : { anim: "crossing", since: 0 }), quiet: i > 0 }] : []));
 }
 
 /**
- * His layer over the board: the crossing on the warned line through your turn (and his, until his train passes each square); while
+ * His layer over the board: the crossing on the warned line through your turn (and his, until his train passes each square), and the
+ * warning sign on the marked piece while it's there (the drawn board: gone the moment it moves) and until the train reaches it; while
  * his train rides, the train (its art from above, two squares long, nose first along the line from his side, clipped at the board's
  * edge), every piece on the line stepping aside as it comes, and the smash on the piece it reaches.
  */
-function birdieLayer({ boss, p, moments, now, orientation }: BoardLayerProps): { under?: preact.ComponentChildren; over: preact.ComponentChildren } {
+function birdieLayer({ boss, p, board, moments, now, orientation }: BoardLayerProps): { under?: preact.ComponentChildren; over: preact.ComponentChildren } {
   const bd = p.birdie;
   const signal = moments.find((m) => m.kind === "trainSignal");
   const ride = rideOf(moments);
@@ -188,16 +215,24 @@ function birdieLayer({ boss, p, moments, now, orientation }: BoardLayerProps): {
   const items: BoardItem[] = [];
   const smash: BoardItem[] = [];
   const over: preact.JSX.Element[] = [];
+  // (The sign over the marked piece: its square and when it lit; drawn over the line's pieces, under the train.)
+  let sign: { square: string; at: number } | null = null;
   if (bd?.warn && bd.warn.turn === p.turn && !ride) {
     const lit = signal ? signal.at + B.signal.lightAt : 0;
-    if (!signal || now >= lit) items.push(...crossingItems(bd.warn.squares, lit, () => Infinity, now));
+    if (!signal || now >= lit) {
+      items.push(...crossingItems(bd.warn.squares, lit, () => Infinity, now));
+      const on = pieceAt(board, bd.warn.square);
+      if (on?.color === boss.crowdSide && on.type === bd.warn.piece) sign = { square: bd.warn.square, at: lit };
+    }
   }
   if (ride?.squares?.length && bd?.ride) {
     const t = now - ride.at;
     const rideAt = ride.at + B.ride.rideAt;
     const reach = (i: number) => rideAt + trainReaches(i);
-    // (The crossing until the train's nose reaches each square.)
+    // (The crossing until the train's nose reaches each square; the sign on the piece left there until it reaches it.)
     if (t < B.ride.backAt) items.push(...crossingItems(ride.squares, 0, reach, now));
+    const marked = ride.squares.indexOf(bd.ride.square);
+    if (t < B.ride.backAt && marked >= 0 && now < reach(marked)) sign = { square: bd.ride.square, at: 0 };
     if (t >= B.ride.rideAt && t < B.ride.backAt) {
       const first = drawnAt(ride.squares[0]!, orientation);
       const second = drawnAt(ride.squares[1]!, orientation);
@@ -253,6 +288,7 @@ function birdieLayer({ boss, p, moments, now, orientation }: BoardLayerProps): {
       if (i >= 0 && t >= B.ride.rideAt) smash.push({ square: bd.ride.square, name: "birdieSmash", since: reach(i) });
     }
   }
+  if (sign) over.push(<WarnSign key="sign" square={sign.square} orientation={orientation} at={sign.at} />);
   return {
     under: items.length > 0 && <BoardEffects items={items} orientation={orientation} class="bd-crossing" />,
     over: (
