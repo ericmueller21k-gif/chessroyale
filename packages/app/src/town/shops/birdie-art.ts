@@ -22,6 +22,7 @@
  *   top hides him from its far edge down (his head, bow tie and the top of his vest over it); the vat moved down from the back of the U to
  *   just west of him behind the run (VAT_NUDGE), its heaped top over the counter, where his scoop dips; and the run's feeder (the art's,
  *   at its west corner) moved to the run's far edge under the pour (POUR_FEEDER).
+ * - The east crossing gate stands a square east of the art's (GATE_SHIFT), clear of your mark.
  * - The chess table is the town's table (park.ts PARK_TABLE's geometry: its leg in his wood, and the art's two stools as drawn either side),
  *   its top the renderer's flat slab and board in the art's table's colors (SHOP_BIRDIE_TABLE_PALETTE: the yellow rim, the charcoal frame,
  *   cream and wood squares), as every boss's battle table, so it lies flat in the room's camera; standing at its row's middle as every
@@ -61,9 +62,17 @@ const L0 = IDLE[0]!.layers;
 
 /** His feet in the art's pixels: the run's far edge (y 195) 22 px over them, so it hides him from his vest's top down. */
 const BARTENDER_FOOT = [257, 217] as const;
-/** The vat: moved down from the U's back (its art place, x 224, y 115) to just west of him behind the run, its heap where his scoop dips. */
-const VAT_AT = { col: 6, row: 2 } as const;
-const VAT_NUDGE = { dx: 0, dy: 54 } as const;
+/**
+ * The vat: moved down from the U's back (its art place, x 224, y 115) to just west of him behind the run, its heap where his scoop dips,
+ * level with his head, so it shows over the run's far edge as he does; standing on his row, its foot under its bottom as his is.
+ */
+const VAT_AT = { col: 6, row: 3 } as const;
+const VAT_NUDGE = { dx: 0, dy: 47 } as const;
+/**
+ * The gates as the art places them (SHOP_BIRDIE_GATES), but the east one a square further east (col 9, row 8): at the art's col 8 it
+ * stands just in front of your mark (8, 7), its crossbuck over you through the challenge.
+ */
+const GATE_SHIFT = [0, 1] as const;
 /** The run's feeder, moved from its west corner to the run's far edge under his pour (26 px right of his feet, 28 up: the art's notes). */
 const POUR_FEEDER = { col: 7, row: 4, x: 277, y: 187 } as const;
 
@@ -236,13 +245,17 @@ L0.forEach((l, i) => {
 
 // -- The gates (SHOP_BIRDIE_GATES: their squares): idle as the art's room stands, and their `lower` and `down` (SHOP_BIRDIE_GATE_PLAYS).
 const GATE_NAMES = ["gate-w", "gate-e"] as const;
+/** Where each gate stands in the room (the art's squares, the east one moved: GATE_SHIFT). */
+export const SHOP_BIRDIE_GATE_AT = SHOP_BIRDIE_GATES.map((g, i) => ({ col: g.col + GATE_SHIFT[i]!, row: g.row }));
 gateRuns.forEach((idx, g) => {
-  const at = SHOP_BIRDIE_GATES[g]!;
+  const at = SHOP_BIRDIE_GATE_AT[g]!;
+  const dx = GATE_SHIFT[g]! * T;
   const name = GATE_NAMES[g]!;
   const fx = artX(at.col);
   const fy = artY(at.row);
-  const of = (fs: readonly Frame[]): Beat[] => fs.map((f) => ({ layers: idx.map((i) => f.layers[i]!), ms: f.ms, ...(f.pal ? { pal: f.pal } : {}) }));
-  PIECES[name] = piece(name, beatsOf(idx), fx, fy);
+  const move = (l: Layer): At => ({ ...l, x: l.x + dx });
+  const of = (fs: readonly Frame[]): Beat[] => fs.map((f) => ({ layers: idx.map((i) => move(f.layers[i]!)), ms: f.ms, ...(f.pal ? { pal: f.pal } : {}) }));
+  PIECES[name] = piece(name, beatsOf(idx, move), fx, fy);
   PIECES[`${name}-lower`] = piece(`${name}-lower`, of(LOWER), fx, fy);
   PIECES[`${name}-down`] = piece(`${name}-down`, of(DOWN), fx, fy);
   ups.push({ row: at.row, i: idx[0]!, place: { name, col: at.col, row: at.row, solid: true } });

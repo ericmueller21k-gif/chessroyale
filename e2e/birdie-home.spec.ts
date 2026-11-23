@@ -5,7 +5,8 @@ import { asAdmin, tapInTown, test, townReady } from "./helpers.ts";
  * Birdie's Station (Nov 23; docs/areas/town-square.md, "Birdie's Station"), on a phone and a computer, as an admin (Birdie is in the game
  * for admins first): his card out front, its Challenge alone open and his hello as you tap him; in through the doors to the lobby, the
  * bartender pigeon the Shopkeeper; the split-flap board written by the game (the town's buildings, never the Hidden Boss's), its flaps
- * turning now and then. Then his challenge at the middle table: his hello as he says his line, the board's pop, his wipe.
+ * turning now and then. Then his challenge at the middle table: his hello as he says his line, the board's pop, his wipe; his crossing gates
+ * idle as you walk in, then lowering and flashing from the marks (round 4, Nov 23).
  * Test hooks: the room's canvas (`data-room`, `data-ready`), `__shopAt`, `__shopFlaps()`, `__shopIntro()`, `__soundLog`.
  */
 test.use({ actionTimeout: 15_000 });
@@ -14,8 +15,9 @@ type Hooks = {
   __soundLog?: string[];
   __shopAt?: (k: string, s?: [number, number]) => { x: number; y: number } | null;
   __shopFlaps?: () => { title: string; rows: string[] } | null;
-  __shopIntro?: () => { step: string } | null;
+  __shopIntro?: () => { step: string; plays: Record<string, string> | null } | null;
   __birdieSteps?: string[];
+  __birdieGates?: string[];
 };
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 const sounds = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__soundLog ?? []);
@@ -71,9 +73,12 @@ test("his challenge: his hello as he says his line at the middle table, the boar
     const w = window as unknown as Hooks;
     w.__soundLog = [];
     w.__birdieSteps = [];
+    w.__birdieGates = [];
     const tick = () => {
       const s = w.__shopIntro?.();
       if (s && w.__birdieSteps!.at(-1) !== s.step) w.__birdieSteps!.push(s.step);
+      const g = s?.plays ? `${s.step}:${Object.values(s.plays).join(",")}` : null;
+      if (g && w.__birdieGates!.at(-1) !== g) w.__birdieGates!.push(g);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -87,6 +92,11 @@ test("his challenge: his hello as he says his line at the middle table, the boar
   const steps = await page.evaluate(() => (window as unknown as Hooks).__birdieSteps ?? []);
   expect(steps).toEqual(expect.arrayContaining(["face", "line", "board", "table"]));
   expect(steps.indexOf("line")).toBeLessThan(steps.indexOf("board"));
+  // (His crossing gates: up as you both walk in; from the marks both lower, then come down flashing through the intro.)
+  const gates = await page.evaluate(() => (window as unknown as Hooks).__birdieGates ?? []);
+  expect(gates[0]).toBe("walk:idle,idle");
+  expect(gates).toContain("face:lower,lower");
+  expect(gates.some((g) => g.startsWith("table:") && g.endsWith(":down,down"))).toBe(true);
   const log = await sounds(page);
   // (His hello twice: the tap on him out front, and his line at the table; then the board's pop.)
   expect(log.filter((l) => l.startsWith("birdieHello:")).length).toBeGreaterThanOrEqual(2);

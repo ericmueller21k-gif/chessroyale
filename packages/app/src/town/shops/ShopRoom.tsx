@@ -4937,6 +4937,8 @@ function startRoom(
       looks: bossLooks,
       mirrored: bossMirrored,
       line: !!introNow?.line && bossHead.on,
+      // (Birdie's crossing gates: what each plays now, "idle", "lower" or "down": `plays`.)
+      plays: art.plays ? Object.fromEntries(Object.entries(art.plays).map(([n, pl]) => [n, playing(n, now)?.name === pl.lower ? "lower" : playing(n, now) ? "down" : "idle"])) : null,
       // (Ginger's own: his move, the blast, the icicle, the table, the crack, the door, the carriers, the board, the light, the pieces.)
       ice: iceNow
         ? {

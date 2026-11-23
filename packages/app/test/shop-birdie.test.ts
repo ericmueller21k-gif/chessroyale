@@ -80,10 +80,10 @@ describe("Birdie's Station: the lobby, the art's picture cut into the room's pie
     const art = renderFrame(SHOP_BIRDIE_INTERIOR_4, SHOP_BIRDIE_INTERIOR_4.anims.idle!.frames[0]!).data;
     const ours = composed();
     const W = SHOP_BIRDIE_INTERIOR_4.w;
-    // (The vat's old place and new; the stools' rims tucked against the bar's arms, which the art drew over the arms and the room draws under
+    // (The vat's old place and new; the east gate's old place and new (a square east, clear of your mark); the stools' rims tucked against the bar's arms, which the art drew over the arms and the room draws under
     // the arm's next row, nearer; the run's feeder's old place and new; the table, the town's at its row's middle: x0, y0, x1, y1 in the
     // art's pixels.)
-    const moved = [[220, 110, 270, 215], [183, 115, 190, 235], [329, 115, 336, 235], [200, 200, 222, 222], [270, 180, 292, 203], [185, 320, 297, 382]];
+    const moved = [[220, 110, 270, 215], [183, 115, 190, 235], [329, 115, 336, 235], [200, 200, 222, 222], [270, 180, 292, 203], [185, 320, 297, 382], [248, 335, 396, 416]];
     let diff = 0;
     for (let y = 0; y < SHOP_BIRDIE_INTERIOR_4.h; y++)
       for (let x = 0; x < W; x++) {
@@ -178,7 +178,10 @@ describe("Birdie's Station: the lobby, the art's picture cut into the room's pie
   });
   it("its crossing gates stand at the art's two marks: idle up and dark; `lower` swings the arm down, `down` flashes the lights", () => {
     const gates = A.SHOP_BIRDIE_ROOM_LAYOUT.filter((p) => p.name.startsWith("gate-"));
-    expect(gates.map((p) => [p.name, p.col, p.row])).toEqual(SHOP_BIRDIE_GATES.map((g, i) => [i ? "gate-e" : "gate-w", g.col, g.row]));
+    // (The art's squares, the east one a square further east, clear of your mark.)
+    expect(gates.map((p) => [p.name, p.col, p.row])).toEqual(SHOP_BIRDIE_GATES.map((g, i) => [i ? "gate-e" : "gate-w", g.col + i, g.row]));
+    const marks = marksOf(A.SHOP_BIRDIE_ROOM_LAYOUT, "across", A.SHOP_BIRDIE_MARKS)!;
+    for (const g of gates) expect([g.col, g.row]).not.toEqual([marks.youSq.c, marks.youSq.r + 1]);
     for (const g of gates) {
       const play = A.SHOP_BIRDIE_GATE_PLAYS[g.name]!;
       const idle = A.SHOP_BIRDIE_ROOM_PIECES[g.name]!.anims.idle!.frames;
