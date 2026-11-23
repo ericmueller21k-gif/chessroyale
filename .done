@@ -1,4 +1,0 @@
-Done (Nov 23): Chess Town first visit paints on more cores. Branch claude/town-paint-workers; PR body in .pr-body.md.
-First visit 4x: 21.5 s -> 11.8 s median (tap to first frame); second visit unchanged; fps unchanged.
-Checks: typecheck, all app/core unit tests (4,768), e2e/perf.spec.ts town tests x3, town-street loading screen.
-Perf bound changed: TOWN_LOAD_REFS 20 -> 12.
