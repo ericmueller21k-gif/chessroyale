@@ -121,6 +121,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     main", Nov 10, audit F1): fix it at its cause from its trace, never with a longer wait or a retry. A PR isn't held
     up by one. The summary's title says which red it is (Nov 12, audit Q3): "red: flaky only (N)" (fix the flakes) or
     "red: N failed" (a real failure: find its cause or revert). A red run with no failed test (GitHub dropped shards): "Re-run failed jobs" once.
+  - **A test of what comes after a battle ends it with the hook** (Nov 23, `docs/decisions/2026-11-23-e2e-end-hook.md`): `endBattle(page,
+    "win" | "loss" | "draw")` in `e2e/helpers.ts` (the admins' 🏆 path, `asAdmin` first), through the battle's real end; only a test of
+    playing a battle plays it to its end. A spec that played moves to reach a screen assumed how long the battle lasts ("play" vs "results").
   - **Left out: `@perf`** (`e2e/perf.spec.ts`, frame budgets on a 4x-slowed phone), because they measure the machine.
     Run them locally under the e2e lock, or from Actions → e2e → Run workflow with "perf" ticked (a `perf` job, phone,
     1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict). Nov 23: the long battle's and Grex's
