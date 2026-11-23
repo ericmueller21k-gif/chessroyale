@@ -397,7 +397,8 @@ function Character({ boss, stage, place, muteFall, children }: { boss: BossView;
         box.current?.setAttribute("data-frame", String(s.frame));
         box.current?.setAttribute("data-cue", frame.cue ?? "");
         box.current?.setAttribute("data-look", look);
-        const sound = frame.cue ? kit.sounds[frame.cue] : undefined;
+        // (A cue whose sound comes from the battle: Birdie's train run by how far his piece went, BossKit.cueSound.)
+        const sound = frame.cue ? (kit.cueSound?.(frame.cue, nowRef.current.boss) ?? kit.sounds[frame.cue]) : undefined;
         if (sound && !played.has(s.tag)) {
           played.add(s.tag);
           play(sound);

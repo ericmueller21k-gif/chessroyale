@@ -73,13 +73,13 @@ const armoredIdle = (): Anim => {
   const a = ARMORED.anims.idle!;
   return { loop: true, frames: a.frames.map((f) => moved(f, ARMORED_DX, ARMORED_DY, A)) };
 };
-/** A one-shot of his: a breath of his idle (its first breath and back), `cue` on its first frame. */
-const armoredBeat = (cue: string): Anim =>
+/** A one-shot of his: a breath of his idle (its first breath and back), `cue` on its first frame, `then` on its second (320 ms in). */
+const armoredBeat = (cue: string, then?: string): Anim =>
   lazyAnim(() => {
     const idle = armoredIdle().frames;
     const rest = idle[0]!;
     const breath = idle.find((f) => f !== rest && f.layers.some((l, i) => l.y !== rest.layers[i]?.y)) ?? rest;
-    return { loop: false, frames: [{ ...breath, ms: 320, cue }, { ...rest, ms: 320 }] };
+    return { loop: false, frames: [{ ...breath, ms: 320, cue }, { ...rest, ms: 320, ...(then ? { cue: then } : {}) }] };
   });
 const armoredLoop = (): Anim => lazyAnim(armoredIdle);
 
@@ -98,7 +98,8 @@ export const BIRDIE_FIGURE: Character = {
     ...Object.fromEntries(YOUNG_ANIMS.map((n) => [n, young(n)])),
     gone,
     away,
-    // Armored Birdie (his fall on): his idle, and a breath of it for each one-shot, each with its cue.
+    // Armored Birdie (his fall on): his idle, and a breath of it for each one-shot, each with its cue: his armor's clank as he comes
+    // back; his moves as young Birdie's (his train's run, a chirp over its start), his hurt his scold.
     p_idle: armoredLoop(),
     p_thinking: armoredLoop(),
     p_smug: armoredLoop(),
@@ -106,10 +107,10 @@ export const BIRDIE_FIGURE: Character = {
     p_victory: armoredLoop(),
     p_defeat: armoredLoop(),
     p_entrance: armoredBeat("armor"),
-    p_move: armoredBeat("armor"),
-    p_capture: armoredBeat("armor"),
-    p_hurt: armoredBeat("armor"),
-    p_check: armoredBeat("armor"),
+    p_move: armoredBeat("run", "nod"),
+    p_capture: armoredBeat("tootRun", "trill"),
+    p_hurt: armoredBeat("oof"),
+    p_check: armoredBeat("tootRun", "flash"),
   },
 };
 

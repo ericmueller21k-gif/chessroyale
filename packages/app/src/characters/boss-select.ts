@@ -47,8 +47,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   zebra: "zebraPop",
   // Chandy: his rifle's pulse shot (his own: chandy-sounds.ts).
   chandy: "chandyShot",
-  // Birdie: his toy train's toot (his own: birdie-sounds.ts).
-  birdie: "birdieToot",
+  // Birdie: his "hello", the chirps he greets a challenger with (Eric, Nov 23; his own: birdie-sounds.ts).
+  birdie: "birdieHello",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };

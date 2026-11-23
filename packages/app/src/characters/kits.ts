@@ -42,6 +42,7 @@ import { CHANDY_LINES } from "./chandy-lines.ts";
 import { BIRDIE_FIGURE } from "./birdie-figure.ts";
 import { BIRDIE_LINES } from "./birdie-lines.ts";
 import { birdieArmoredNow } from "./birdie-state.ts";
+import { birdieRun, type BirdieRun } from "./birdie-sounds.ts";
 import { ZEBRA_CHANCE, ZEBRA_LINES } from "./zebra-lines.ts";
 import { DASH_ATTACK, DASH_FIGURE as DASH } from "./dash-figure.ts";
 import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
@@ -128,6 +129,12 @@ export interface BossKit extends BeatLines {
   lineOf?: (beat: Beat, boss: BossView) => string | undefined;
   /** Frame cues to sounds. */
   sounds: Record<string, SoundName>;
+  /**
+   * A cue's sound from the battle, when it isn't always the same one (Birdie's train run by how far his piece went, his chirp by the
+   * move): read as the cue plays, from the shared match state alone, so every device hears the same. Undefined (or it returns
+   * undefined): `sounds[cue]`. Every sound it can return is in `sounds` too, so it's made ahead.
+   */
+  cueSound?: (cue: string, boss: BossView) => SoundName | undefined;
   /** The part of a frame a portrait shows, and from which animation and frame. */
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
   /**
@@ -202,6 +209,21 @@ export interface BossKit extends BeatLines {
   suit?: boolean;
 }
 
+
+/** Birdie's train runs by name (birdie-sounds.ts). */
+const BIRDIE_RUN: Record<BirdieRun, SoundName> = { trainShort: "birdieTrainShort", trainMedium: "birdieTrainMedium", trainLong: "birdieTrainLong", trainToot: "birdieTrainToot" };
+/** His chirp over a move's run, and his chatter at rest, taken in turn by his move's number (the same on every device). */
+const BIRDIE_NOD: readonly SoundName[] = ["birdieCheer", "birdieTsip"];
+const BIRDIE_CHATTER: readonly SoundName[] = ["birdieTsip", "birdieAsk", "birdieTeeoo"];
+/** Birdie's cues whose sound comes from the battle (BossKit.cueSound): his move's run by how far his piece went, his chirps in turn. */
+export function birdieCue(cue: string, boss: Pick<BossView, "board">): SoundName | undefined {
+  const h = boss.board.history;
+  const his = Math.floor(h.length / 2);
+  if (cue === "run") return BIRDIE_RUN[birdieRun(h[h.length - 1], false)];
+  if (cue === "nod") return BIRDIE_NOD[his % BIRDIE_NOD.length];
+  if (cue === "chatter") return BIRDIE_CHATTER[his % BIRDIE_CHATTER.length];
+  return undefined;
+}
 /**
  * Folio in a phone's boss bar (its kit's `bar`): its drawing without the halo, its frame 5 px narrower on the left, so it stops at a 320 px
  * screen's edge (the only pixels it loses are its victory's tiny crane's as it flies off past that edge).
@@ -1145,27 +1167,42 @@ export const BOSS_KITS: Record<string, BossKit> = {
       // His fall: a jolt throws him out of his train, his cap flying (then the cutscene).
       ultimate: "fall",
     },
+    // His sounds (birdie-sounds.ts; docs/decisions/2026-11-23-birdie-sounds.md): his voice is his chirps, his moves his train's runs.
     sounds: {
-      roll: "birdieRoll",
+      // His entrance (the battle's start, and his train back from a ride): it rolls in and brakes, he pops up and tips his cap: "hello".
+      roll: "birdieTrainMedium",
       brake: "birdieBrake",
       pop: "birdieHop",
-      tip: "birdieCoo",
-      flutter: "birdieFlutter",
-      toot: "birdieToot",
-      oof: "birdieOof",
-      flash: "birdieToot",
-      coo: "birdieCoo",
+      tip: "birdieHello",
+      // His moves: his train's run as his piece sets off (by how far it goes: cueSound), a chirp over its start as he nods; a capture or a
+      // check, the toot run, then his trill or his teeoo.
+      run: "birdieTrainMedium",
+      nod: "birdieCheer",
+      tootRun: "birdieTrainToot",
+      trill: "birdieTrill",
+      flash: "birdieTeeoo",
+      // Hurt, beaten, tumbling out in his fall: his scold; his cap landing, a tap.
+      oof: "birdieScold",
+      squawk: "birdieScold",
       plop: "birdieHop",
+      // Smug, his teeoo; his chatter as he pops up from his peek (cueSound picks it); winning, his cheer.
+      coo: "birdieTeeoo",
+      chatter: "birdieTsip",
+      cheer: "birdieCheer",
+      // His powers: the conductor's whistle, the train's whistle as it pulls away, its run while it rides, his fall's wind, his armor.
       signal: "birdieWhistle",
       go: "birdieToot",
+      gone: "birdieTrainMedium",
       fall: "birdieWhoosh",
-      armor: "birdieClank",
-      // (His nod and his point at the board: a light tap and a coo; his spot emptied as his train rides off, its roll; as he falls, the wind.)
-      nod: "birdieHop",
-      point: "birdieCoo",
-      gone: "birdieRoll",
       away: "birdieWhoosh",
+      armor: "birdieClank",
+      // (cueSound's other picks, here so they're made ahead with the rest.)
+      runShort: "birdieTrainShort",
+      runLong: "birdieTrainLong",
+      tsip: "birdieTsip",
+      ask: "birdieAsk",
     },
+    cueSound: birdieCue,
     lines: BIRDIE_LINES,
     chance: { entrance: 1, capture: 0.3, hurt: 0.4, check: 0.5, rattled: 0.3, power: 0.6, powerHit: 0.5, ultimate: 1, victory: 1, defeat: 1 },
     portrait: { x: 10, y: 12, w: 36, h: 36, anim: "idle", frame: 0 },

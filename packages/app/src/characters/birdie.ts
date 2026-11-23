@@ -657,7 +657,8 @@ const idle: Anim = lazyAnim(() => ({
     F(300, { dy: DOWN, dx: IN + 1, look: "right", head: [0, -1] }),
     F(260, { dy: DOWN, dx: IN }),
     F(90, { dy: 9, dx: 2 }),
-    F(110, { dy: -1 }),
+    // (His chatter as he pops back up: a chirp of his, kit.cueSound.)
+    F(110, { dy: -1 }, { cue: "chatter" }),
     F(260),
     F(420, { breath: 1 }),
     F(260, { head: [-1, 0] }),
@@ -794,24 +795,26 @@ const thinking: Anim = lazyAnim(() => ({
 const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
-    F(90, { head: [-1, 1] }),
+    // (His train's run as his piece sets off, by how far it goes; a chirp over its start as he nods: kit.cueSound.)
+    F(90, { head: [-1, 1] }, { cue: "run" }),
     F(110, { head: [-2, 2], lid: "half" }, { cue: "nod" }),
     F(90, { head: [0, 0] }),
     F(90, { wing: 140, wingLen: 15, lean: [-1, 0], head: [-1, 0] }),
-    F(300, { wing: 165, wingLen: 22, lean: [-1, 0], head: [-2, 1] }, { cue: "point" }),
+    F(300, { wing: 165, wingLen: 22, lean: [-1, 0], head: [-2, 1] }),
     F(100, { wing: 140, wingLen: 15, lean: [-1, 0], head: [-1, 0] }),
     F(160),
   ],
 }));
 
-/** Capture: a happy little flutter, both wings beating, hopping on the lip, eyes smiling, a puff of steam from the roof. */
+/** Capture: a happy little flutter, both wings beating, hopping on the lip, eyes smiling, a puff of steam from the roof, his trill. */
 const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
-    F(80, { breath: 1, lid: "joy" }),
+    // (His train's toot run as his piece takes; his trill over it on the fourth beat of his wings.)
+    F(80, { breath: 1, lid: "joy" }, { cue: "tootRun" }),
     ...Array.from({ length: 8 }, (_, i) => {
       const up = i % 2 === 0;
-      return F(85, { wing: up ? 280 : 12, far: up ? 302 : 2, wingLen: 21, dy: up ? -2 : 0, lid: "joy", head: [0, up ? -1 : 0], beak: i === 2 || i === 4 }, { cue: i === 0 ? "flutter" : i === 3 ? "toot" : undefined, specks: i >= 3 ? steam(i - 3) : [] });
+      return F(85, { wing: up ? 280 : 12, far: up ? 302 : 2, wingLen: 21, dy: up ? -2 : 0, lid: "joy", head: [0, up ? -1 : 0], beak: i === 2 || i === 4 }, { cue: i === 3 ? "trill" : undefined, specks: i >= 3 ? steam(i - 3) : [] });
     }),
     F(110, { lid: "joy" }, { specks: steam(5) }),
     F(180),
@@ -837,8 +840,9 @@ const POINT: BirdiePose = { lean: [-3, 1], head: [-3, 1], wing: 168, wingLen: 23
 const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
-    F(100, { lean: [-1, 0], head: [-1, 0], wing: 140, wingLen: 15 }),
-    F(130, { ...POINT, beak: true }, { cue: "point" }),
+    // (His train's toot run as his piece gives check; his smug teeoo at the headlights' flash.)
+    F(100, { lean: [-1, 0], head: [-1, 0], wing: 140, wingLen: 15 }, { cue: "tootRun" }),
+    F(130, { ...POINT, beak: true }),
     F(140, { ...POINT, beak: true }, { cue: "flash", pal: BRIGHT, specks: flash(2) }),
     F(120, POINT, { specks: flash(1) }),
     F(280, POINT),
@@ -898,13 +902,13 @@ const defeat: Anim = lazyAnim(() => ({
   ],
 }));
 
-/** Victory (loop): flapping and bouncing on the lip, eyes smiling, the headlights blinking, a toot of steam. */
+/** Victory (loop): flapping and bouncing on the lip, eyes smiling, the headlights blinking, a puff of steam, his cheer. */
 const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const up = i % 2 === 0;
     return F(110, { wing: up ? 278 : 12, far: up ? 300 : 2, wingLen: 22, dy: up ? -3 : 0, lid: "joy", head: [0, up ? -1 : 0], beak: i % 4 === 0 }, {
-      cue: i === 0 ? "toot" : undefined,
+      cue: i === 0 ? "cheer" : undefined,
       pal: i % 4 < 2 ? BRIGHT : undefined,
       specks: [...(i % 4 < 2 ? flash(i % 4 === 0 ? 2 : 1) : []), ...(i < 5 ? steam(i) : [])],
     });
@@ -951,7 +955,7 @@ const fall: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(130, { dy: -3, lean: [1, 0], lid: "wide", ruffle: true, capOff: true, capFree: [CAP_AT[0] + 1, CAP_AT[1] - 5, 20] }, { cue: "fall", shake: [2, 1] }),
-    F(100, { dy: -3, lid: "wide", ruffle: true, capOff: true, tumble: { q: 1, at: [7, -8] }, capFree: [CAP_AT[0] + 8, CAP_AT[1] - 7, 70] }, { specks: feathers(0) }),
+    F(100, { dy: -3, lid: "wide", ruffle: true, capOff: true, tumble: { q: 1, at: [7, -8] }, capFree: [CAP_AT[0] + 8, CAP_AT[1] - 7, 70] }, { cue: "squawk", specks: feathers(0) }),
     F(100, { dy: -3, lid: "wide", ruffle: true, capOff: true, tumble: { q: 2, at: [11, -7] }, capFree: [CAP_AT[0] + 18, CAP_AT[1] - 9, 140] }, { specks: feathers(1) }),
     F(90, { dy: -3, lid: "shut", ruffle: true, capOff: true, tumble: { q: 3, at: [14, 4] }, capFree: [CAP_AT[0] + 30, CAP_AT[1] - 11, 210] }, { specks: feathers(2) }),
     F(90, { dy: -3, lid: "wide", ruffle: true, capOff: true, tumble: { q: 0, at: [15, 20] }, capFree: [CAP_AT[0] + 42, CAP_AT[1] - 13, 280] }, { specks: feathers(3) }),
