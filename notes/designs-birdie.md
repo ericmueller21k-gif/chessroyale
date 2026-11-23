@@ -126,3 +126,16 @@ stools that you have drawn ... one on the left, one on the right, and in the cen
   buildings (the Colosseum, the bosses' homes and shops by name, the Battle Tower), never the Hidden Boss's; "make up however it normally
   looks on a board for those numbers".
 - **His lines:** fine for now; Eric will look later.
+
+## His voice: chirps (Eric via the music helper, Nov 23)
+Eric: "those bird sounds that you did from the clip ... we want to wire those in for Birdie as like what he says ... he chirps
+throughout the game basically, and also when like you go to challenge him to fight ... we'll use whatever chirping you already had
+created for that song ... 5 to 6 kind of variations of different chirps ... the director chat should know all the different places to
+wire in that sort of thing."
+- Files: `stills/trailer-v2` at a5617d58, `birdie-chirps/` (7 sounds, wav + mp3, mono 44.1 kHz, README with the synthesis recipe).
+  hello 0.91 s (the challenge, his entrance; Eric's ask), tsip 0.41 (idle, a move), teeoo 0.39 (idle, smug), trill 0.42 (a capture),
+  cheer 0.19 (a move, a nod), ask 0.33 (thinking), scold 0.45 (hurt, rattled). Same bird as his ult piece. Peak -6 dBFS, dry.
+- Plan: a characters job after #896 merges: his sound pack's voice moments take the chirps (where every boss makes a sound: entrance,
+  his moves, captures, hurt, thinking, idle chatter, the fall, win/lose), and the town challenge plays `hello`. Prefer code synthesis
+  in `birdie-sounds.ts` from the README's recipe (like the other bosses, no files) if it matches by ear; else ship the mp3s. Eric hasn't
+  picked favorites yet: wire all; the music helper relays any he drops.
