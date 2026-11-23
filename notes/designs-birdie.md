@@ -22,3 +22,16 @@ around. First drawings: `notes/briefs/birdie-art-1.md` (two variants, stills on 
 
 ## Spend
 Eric, Nov 23: "Just approve whatever the spend is for this, for the API. It's fine. It never runs as much as we think anyway."
+
+## Young Birdie's main power: the train (Eric, Nov 23)
+- At the end of his turn, he finds a rank or file where **exactly one of the crowd's pieces** stands (any piece, the king too in
+  this case). One, because two would be too strong (Eric).
+- He **signals that line**: a railroad-crossing warning that flashes on it for a moment, train-themed.
+- If the crowd **doesn't move that piece** on their turn, then whatever else happens that turn, he **rides his train across the
+  line** (the same train he rides) and smashes the piece. Reuse the gator's smash (his queen laser's hit on a piece).
+- His own pieces on that line **quickly move out of the way** as the train comes, rather than the train passing through them.
+- Director's calls (to confirm): any move of the marked piece saves it (Eric's "if you don't move that piece"); only the marked
+  piece is hit.
+
+## Armored Birdie
+The same idea, but stronger and without the train (he's done away with it). The details come later (Eric).
