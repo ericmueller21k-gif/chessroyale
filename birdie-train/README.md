@@ -1,4 +1,37 @@
-# The train's sound for Birdie's ordinary move: four short runs
+# The train's sound for Birdie's ordinary move: five whistles (and four short runs)
+
+**Read this part first: it replaces the plan below it.** Eric heard the four runs of puffing and said (Nov 23): "I
+was thinking more whistles than the other stuff. Or we want a couple different whistles. And like the double whistle,
+you know how the trains go like toot toot?" So the sound of Birdie's ordinary move is a **whistle**, a few different
+ones, the double toot among them. The runs further down are the "other stuff": use one quietly under a whistle if it
+helps a long move, or leave them out.
+
+| File | What it is | Length | It could be (yours to decide) |
+|---|---|---|---|
+| `birdie-whistle-toot-toot` | **the double toot** he asked for: two short blasts | 0.58 s | most moves |
+| `birdie-whistle-toot` | one short blast | 0.28 s | a short move |
+| `birdie-whistle-long` | one long blast, sagging as it ends | 0.90 s | a move right across the board |
+| `birdie-whistle-toot-long` | a short blast, then a long one | 1.05 s | a capture, a check |
+| `birdie-whistle-peep-peep` | two quick peeps on a smaller, higher whistle | 0.40 s | variety, a small move |
+
+`birdie-whistle-sheet.mp3` plays them in this order: toot, toot-toot, long, toot-long, peep-peep. Eric was sent it; he
+has not said which he likes beyond asking for the double toot.
+
+They are the whistle of his theme and of his ult's piece (three pipes: B, E and G, 494, 659 and 784 Hz; the peeps a
+step up the chord: E, G and B, 659, 784 and 988 Hz), so they are in tune with his music. Each as `.wav` and `.mp3`
+(mono, 44.1 kHz; the mp3 112 kbps), dry, one gain for the set (the loudest peaks at -6 dBFS; the level in the game is
+yours). Nothing in them is over 4 kHz, so the game's low-pass on effects doesn't touch them.
+
+To build them in code: the whistle is three sines together, each with its octave at 0.5, its twelfth at 0.33 and its
+double octave at 0.15; it slides up 0.7 of a half step into its note over 50 ms, wavers a hair (0.4% at 6.5 Hz, its
+level 8% at 11 Hz), sags 0.6 of a half step over its last fifth, comes in over 40 ms and lets go over 120 ms. The
+blasts, (seconds in, how long, how loud): toot (0, 0.28, 1); toot-toot (0, 0.24, 0.9) (0.34, 0.24, 1); long (0, 0.9,
+1); toot-long (0, 0.2, 0.9) (0.3, 0.75, 1); peep-peep (0, 0.16, 0.9) (0.24, 0.16, 1). The exact function is
+`whistle_wave` in `scripts/reel/music/song_aj.py`; `birdie_train.py` beside it builds all of these.
+
+---
+
+## The four short runs (the first plan: now the "other stuff")
 
 Eric (Nov 23), to the music helper: "also with the train sound from the same clip ... let it know that I want ...
 the train sound made during Birdie's when he does his normal move throughout the game when he goes across the board.
