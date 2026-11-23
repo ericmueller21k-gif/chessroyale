@@ -123,7 +123,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     "red: N failed" (a real failure: find its cause or revert). A red run with no failed test (GitHub dropped shards): "Re-run failed jobs" once.
   - **Left out: `@perf`** (`e2e/perf.spec.ts`, frame budgets on a 4x-slowed phone), because they measure the machine.
     Run them locally under the e2e lock, or from Actions → e2e → Run workflow with "perf" ticked (a `perf` job, phone,
-    1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict).
+    1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict). Nov 23: the long battle's and G-REX's
+    "nothing grows" count the boss battle's move list apart (`counts()` in `e2e/perf-probe.js`: `list`, `rows`, `cap`), which
+    fills its phone panel once, then stays; the town's 8 s first frame is open (`docs/decisions/2026-11-23-perf-main-fails.md`).
   - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
     `~/.cache/ms-playwright`, keyed by Playwright's version).
   - **Concurrency:** a new push to a PR (or a label added to it) cancels that PR's run still going; pushes to `main`
