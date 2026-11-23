@@ -41,7 +41,7 @@ import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { openProfile } from "../profile-nav.ts";
 import { account, askForfeitFirst, myPawnColor, onAccountChange, playerName } from "../account.ts";
-import { TOWN_ASKED, testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { TOWN_ASKED, TOWN_PAINT_ASKED, testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic, townMusic } from "../music.ts";
 import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
@@ -2832,8 +2832,8 @@ function startTown(
       pictures.restoreMs = performance.now() - t0;
       // A first visit paints on the device's other cores too (paint-pool.ts; Nov 23): workers paint the pictures ahead, the main thread
       // puts them on their canvases and paints what's left. (`?paintworkers=N` sets how many, 0 none; `?paintslow=K`, tests: slower cores.)
-      const n = TOWN_ASKED.paintWorkers ?? workerCount(navigator.hardwareConcurrency);
-      pool = from ? null : domPaintPool(r.paintSpecs(), n, testSwitchesAllowed() ? TOWN_ASKED.paintSlow : 1);
+      const n = TOWN_PAINT_ASKED.workers ?? workerCount(navigator.hardwareConcurrency);
+      pool = from ? null : domPaintPool(r.paintSpecs(), n, testSwitchesAllowed() ? TOWN_PAINT_ASKED.slow : 1);
       pictures.workers = pool?.workers ?? 0;
       for (let share = 0; share < 1 && alive; ) {
         share = r.warm(f.loadSliceMs, keep, from, pool);
