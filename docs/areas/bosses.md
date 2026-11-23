@@ -817,7 +817,11 @@ below):
   and `--board-px`; the column's own 28 px gap and the board's slack go), Boss alone's pawn and the God King below it; a
   raid's scoreboard stays on the left, what the column held under the list (an online raid's chat, the scoreboard from
   900 to 1099 px) starts 12 px under the shorter list and keeps its left edge (Oct 28). Boss alone has no scoreboard
-  anywhere. Tests: `e2e/board-layout.spec.ts`, `packages/app/test/move-list.test.ts`.
+  anywhere. The phone's small panel draws only the newest rows its box holds and 8 spare (measured as it's drawn, the last
+  measure kept for the next turn's copy), never the whole battle's: the sheet and a computer's column still list every move
+  (Nov 23, docs/decisions/2026-11-23-perf-main-fails.md: every row kept was about 14 elements, drawn anew each turn; about
+  1,750 at 120 plies). Tests: `e2e/board-layout.spec.ts`, `packages/app/test/move-list.test.ts`, `e2e/perf.spec.ts` (the
+  long battle's and G-REX's rows within the panel's `cap`).
 - **Your pawn on the board screen** (Eric, Oct 28; docs/decisions/2026-10-28-your-pawn-on-board.md;
   `YourPawn` in `components/BossDock.tsx`): in **Boss alone** only (a raid, Boss Arena, 1 v 1 not yet), your own pawn as
   your profile wears it (`Avatar`, the crowd's color, as the list's rows draw it), about the God King's size, on his line.
