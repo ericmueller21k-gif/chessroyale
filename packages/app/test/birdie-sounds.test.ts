@@ -97,6 +97,10 @@ describe("Birdie's sounds", () => {
     expect(birdieCue("nod", at("e2e4", "e7e5"))).not.toBe(birdieCue("nod", at("e2e4", "e7e5", "g1f3", "b8c6")));
     expect(birdieCue("chatter", at("e2e4", "e7e5"))).toBeTruthy();
     expect(birdieCue("tootRun", at("e2e4", "e7e5"))).toBeUndefined();
+    // (His chatter and his smug teeoo only on your turn: as your move lands and is judged, only the board's knock.)
+    expect(birdieCue("chatter", at("e2e4", "e7e5"), false)).toBeNull();
+    expect(birdieCue("coo", at("e2e4", "e7e5"), false)).toBeNull();
+    expect(birdieCue("coo", at("e2e4", "e7e5"), true)).toBeUndefined();
     const sounds = new Set(Object.values(kit.sounds));
     for (let n = 0; n < 6; n++)
       for (const [cue, last] of [["run", "a1a2"], ["run", "a1a4"], ["run", "a1a8"], ["nod", "a1a2"], ["chatter", "a1a2"]] as const) {
@@ -106,9 +110,11 @@ describe("Birdie's sounds", () => {
   });
 
   it("every cue of his figure has a sound of his; every sound of his is used; the challenge is his hello", () => {
-    // (His spot empty while his train rides and while he falls: silent, the train's run and the cutscene's whoosh already playing.)
-    const SILENT = ["gone", "away"];
-    for (const [name, a] of Object.entries(BIRDIE_FIGURE.anims)) for (const f of a.frames) if (f.cue) expect(!!kit.sounds[f.cue], `${name}: ${f.cue}`).toBe(!SILENT.includes(f.cue));
+    for (const [name, a] of Object.entries(BIRDIE_FIGURE.anims)) for (const f of a.frames) if (f.cue) expect(kit.sounds[f.cue], `${name}: ${f.cue}`).toBeTruthy();
+    // (His spot empty while his train rides and while he falls: silent, the train's long run and the cutscene's whoosh already playing;
+    // both whooshes at once doubled it.)
+    const board = { board: { history: ["e2e4", "e7e5"] } } as Parameters<typeof birdieCue>[1];
+    for (const cue of ["gone", "away"]) expect(birdieCue(cue, board), cue).toBeNull();
     const used = new Set<string>([...Object.values(kit.sounds), SELECT_SOUND.birdie!, "birdieBell", "birdieSmash"]);
     for (const n of BIRDIE_SOUNDS) expect(used.has(own(n)), n).toBe(true);
     expect(SELECT_SOUND.birdie).toBe("birdieHello");

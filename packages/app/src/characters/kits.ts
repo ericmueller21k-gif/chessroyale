@@ -131,10 +131,11 @@ export interface BossKit extends BeatLines {
   sounds: Record<string, SoundName>;
   /**
    * A cue's sound from the battle, when it isn't always the same one (Birdie's train run by how far his piece went, his chirp by the
-   * move): read as the cue plays, from the shared match state alone, so every device hears the same. Undefined (or it returns
-   * undefined): `sounds[cue]`. Every sound it can return is in `sounds` too, so it's made ahead.
+   * move): read as the cue plays, from the shared match state alone, so every device hears the same; `yourTurn`: the crowd's turn with
+   * its clock running (not as its move lands and is judged). Undefined (or it returns undefined): `sounds[cue]`; null: silent this
+   * time. Every sound it can return is in `sounds` too, so it's made ahead.
    */
-  cueSound?: (cue: string, boss: BossView) => SoundName | undefined;
+  cueSound?: (cue: string, boss: BossView, yourTurn: boolean) => SoundName | null | undefined;
   /** The part of a frame a portrait shows, and from which animation and frame. */
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
   /**
@@ -215,13 +216,19 @@ const BIRDIE_RUN: Record<BirdieRun, SoundName> = { trainShort: "birdieTrainShort
 /** His chirp over a move's run, and his chatter at rest, taken in turn by his move's number (the same on every device). */
 const BIRDIE_NOD: readonly SoundName[] = ["birdieCheer", "birdieTsip"];
 const BIRDIE_CHATTER: readonly SoundName[] = ["birdieTsip", "birdieAsk", "birdieTeeoo"];
-/** Birdie's cues whose sound comes from the battle (BossKit.cueSound): his move's run by how far his piece went, his chirps in turn. */
-export function birdieCue(cue: string, boss: Pick<BossView, "board">): SoundName | undefined {
+/**
+ * Birdie's cues whose sound comes from the battle (BossKit.cueSound): his move's run by how far his piece went, his chirps in turn. His
+ * chatter and his smug teeoo (his loops' cues) only on your turn: never as your move lands, when only the board's knock is heard (Eric,
+ * Oct 10; boss-kits.test.ts).
+ */
+export function birdieCue(cue: string, boss: Pick<BossView, "board">, yourTurn = true): SoundName | null | undefined {
   const h = boss.board.history;
   const his = Math.floor(h.length / 2);
   if (cue === "run") return BIRDIE_RUN[birdieRun(h[h.length - 1], false)];
   if (cue === "nod") return BIRDIE_NOD[his % BIRDIE_NOD.length];
-  if (cue === "chatter") return BIRDIE_CHATTER[his % BIRDIE_CHATTER.length];
+  if (cue === "chatter") return yourTurn ? BIRDIE_CHATTER[his % BIRDIE_CHATTER.length] : null;
+  if (cue === "coo") return yourTurn ? undefined : null;
+  if (cue === "gone" || cue === "away") return null;
   return undefined;
 }
 /**
@@ -1194,6 +1201,10 @@ export const BOSS_KITS: Record<string, BossKit> = {
       pull: "birdieTrainLong",
       go: "birdieToot",
       fall: "birdieWhoosh",
+      // (His spot empty while his train rides and while he falls: silent (cueSound), the train's run and the cutscene's whoosh already
+      // playing; named here as what's heard then.)
+      gone: "birdieTrainLong",
+      away: "birdieWhoosh",
       armor: "birdieClank",
       // (cueSound's other picks, here so they're made ahead with the rest.)
       runShort: "birdieTrainShort",
