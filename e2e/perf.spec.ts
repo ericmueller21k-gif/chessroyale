@@ -115,10 +115,13 @@ test("a long boss battle on a slow phone: nothing grows, and late frames stay wi
 
   const report = { early, after: samples.map((s) => ({ dom: s.dom, anims: s.anims, raf: s.rafPerFrame, timers: s.timeouts + s.intervals, idle: s.idle })), late, drag, turn };
   await test.info().attach("perf", { body: JSON.stringify(report, null, 1), contentType: "application/json" });
-  console.log(`late (120 plies): idle ${f(late.idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom}, rAF/frame ${early.rafPerFrame} → ${late.rafPerFrame}`);
-  // Nothing grows with the moves (a little slack for a banner or a bubble at the moment of counting).
+  console.log(`late (120 plies): idle ${f(late.idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom} (the move list ${early.list} → ${late.list}, ${late.rows} rows of ${late.cap}), rAF/frame ${early.rafPerFrame} → ${late.rafPerFrame}`);
+  // Nothing grows with the moves (a little slack for a banner or a bubble at the moment of counting). The move list fills its
+  // panel once, to the rows its box holds (and a few spare), then stays: counted apart (Nov 23; until then it kept every move's
+  // row, about 1,750 elements at 120 plies).
   for (const s of [...samples, late]) {
-    expect(s.dom, "DOM elements").toBeLessThanOrEqual(early.dom + 40);
+    expect(s.dom - s.list, "DOM elements (but the move list's)").toBeLessThanOrEqual(early.dom - early.list + 40);
+    expect(s.rows, "the move list's rows").toBeLessThanOrEqual(s.cap!);
     expect(s.anims, "running animations").toBeLessThanOrEqual(early.anims + 3);
     expect(s.rafPerFrame, "rAF callbacks per frame").toBeLessThanOrEqual(early.rafPerFrame + 3);
     expect(s.timeouts + s.intervals, "pending timers").toBeLessThanOrEqual(early.timeouts + early.intervals + 3);
@@ -227,9 +230,11 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
   const turn = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
-  console.log(`G-REX, 9 fire tiles and shadows, 120 plies: idle ${f(idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom}, anims ${early.anims} → ${late.anims}`);
-  // The tiles' own elements and animations only (a few each), nothing per redraw.
-  expect(late.dom, "DOM elements").toBeLessThanOrEqual(early.dom + 40 + squares.length * 6);
+  console.log(`G-REX, 9 fire tiles and shadows, 120 plies: idle ${f(idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom} (the move list ${early.list} → ${late.list}, ${late.rows} rows of ${late.cap}), anims ${early.anims} → ${late.anims}`);
+  // The tiles' own elements and animations only (a few each), nothing per redraw. (The move list apart: it fills its panel
+  // once, then stays, as in the long battle above.)
+  expect(late.dom - late.list, "DOM elements (but the move list's)").toBeLessThanOrEqual(early.dom - early.list + 40 + squares.length * 6);
+  expect(late.rows, "the move list's rows").toBeLessThanOrEqual(late.cap!);
   for (const [what, s] of [["idle", idle], ["drag", drag], ["boss turn", turn]] as const) {
     expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
