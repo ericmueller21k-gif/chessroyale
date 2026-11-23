@@ -1843,3 +1843,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   fall art (Haiku, waiting on Eric's spend OK).
 - Nov 23 ~20:25: main 3a512cc (#911 cadence/slower train/sign) GREEN, live. #912 (happy fall) review I1 (whoosh overlap) → fix session
   session_01JuCWRtstcgQeduRmoRMKHi on its branch. Lobby wire still running.
+- Nov 23 ~20:15: lobby round 4 wired (claude/birdie-lobby-4, stills/birdie-lobby-4). Director's whole-room check: all 8 notes hold; arms
+  show as 3 stepped slabs (per-row pieces) → fix round session_01JuCWRsAYfrQZPLubrUFC1j (one deep piece per arm). Then PR + boss-lane
+  review. #912 (happy fall + whoosh fix) CI running (b81chlef5).
