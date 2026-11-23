@@ -39,4 +39,5 @@ Eric, Nov 23: "Just approve whatever the spend is for this, for the API. It's fi
   several lines qualify, the seed picks one (all devices agree).
 
 ## Armored Birdie
-The same idea, but stronger and without the train (he's done away with it). The details come later (Eric).
+**Eric picked the sleek version (A)** (Nov 23: "I like the sleek version of Birdie better than the chunky one"): `scripts/boss-art/out/boss-birdie-armored-a/` on `claude/boss-art`.
+His power: the same idea, but stronger and without the train (he's done away with it). The details come later (Eric).
