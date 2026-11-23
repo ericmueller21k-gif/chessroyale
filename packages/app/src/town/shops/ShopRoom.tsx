@@ -49,8 +49,8 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, opaqueNear, atDoor, doorGoal, doorOf, type DoorTo, onDoorPic, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, passAt, type RoomPart, tapTarget, findPath, stepRound, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, gotLine, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CrateOpening } from "../../screens/Crates.tsx";
-import type { BossCrateDef } from "@chessroyale/core";
+import { BossCrateArt, CrateOpening } from "../../screens/Crates.tsx";
+import { bossCrateOf, type BossCrateDef } from "@chessroyale/core";
 import { ZEBRA_BACK_LINES, pickLine } from "./zebra-lines.ts";
 import { BackScene, FrontScene, SetupScene, WalkOut, ZEBRA_BACK_SET, ZEBRA_BACK_SET_SQUARES, ZEBRA_GUARDS, type BeatStep, type CarriedNow, type SceneClips, type SceneFig, type SceneSay, type SetupItem } from "./zebra-scene.ts";
 import { iceAt, introCam, isIce, type IceNow } from "./challenge.ts";
@@ -717,7 +717,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
           <>
             <h2>{def.crate}</h2>
             <div class="shop-crate-top">
-              <CratePic frames={room.frames["crate"]!} />
+              <CardCrate frames={room.frames["crate"]} crate={bossCrateOf(def.home)} />
               <div class="shop-prizes">
                 <p class="shop-label">Prizes</p>
                 <ul>
@@ -757,7 +757,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
         <div class="shop-bought-veil">
           <div class="town-card shop-bought" role="dialog" aria-label={gotLine(got.name)}>
             <h2>{gotLine(got.name)}</h2>
-            <CratePic frames={room.frames["crate"]!} />
+            <CardCrate frames={room.frames["crate"]} crate={got} />
             <p class="shop-bought-line">It's in your inventory.</p>
             <button
               type="button"
@@ -786,6 +786,19 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The crate's picture on its card and its bought pop-up: its room's own drawing of it (every shop's art has its crate, on the counter);
+ * a room with none (Birdie's lobby, Nov 23) shows the crate as the Crates tab draws it, its boss's token on its corner, in the same box.
+ */
+function CardCrate({ frames, crate }: { frames: Frames | undefined; crate: BossCrateDef | undefined }) {
+  if (frames) return <CratePic frames={frames} />;
+  return (
+    <span class="shop-crate-pic shop-crate-drawn" aria-hidden="true">
+      {crate && <BossCrateArt crate={crate} />}
+    </span>
   );
 }
 

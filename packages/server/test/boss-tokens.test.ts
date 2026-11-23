@@ -97,6 +97,8 @@ describe("the drop rule", () => {
     expect(live).toContain("tiger");
     expect(live).not.toContain("recluse");
     expect(live).not.toContain("timber");
+    // (Birdie, Nov 23: in the game for admins first, so his tokens drop for nobody until he's live.)
+    expect(live).not.toContain("birdie");
     const { sql, id } = await account();
     // The boss pick is the second roll, spread evenly over the list.
     expect(await countBossBattle(sql, id, T0, { battle: "AAAAA", rng: rolls(0.5, 0) })).toBe(live[0]);
@@ -223,10 +225,27 @@ describe("buying a boss's crate", () => {
       ["folio", "folio-crane"],
       ["smudgy", "smudgy-brush"],
       ["clown", "boingo-pogo"],
+      ["birdie", "birdie-train"],
     ]);
     for (const c of BOSS_CRATES) expect(c.items).toContain(c.ride);
     const { sql, id } = await account();
     expect(await openCrate(sql, id, babur.id, {}, T0)).toEqual({ ok: false, message: "No such crate." });
+  });
+
+  it("Birdie's crate (Nov 23; he's in the game for admins first): an admin's granted tokens buy it into the inventory, and it opens to an item of its own", async () => {
+    const birdie = bossCrateOf("birdie")!;
+    expect([birdie.id, birdie.name, birdie.ride]).toEqual(["boss-birdie", "Birdie's Boss Crate", "birdie-train"]);
+    const { sql, db, id } = await account();
+    expect(await grantTestItems(sql, id, { boss: "birdie", tokens: 3 })).toEqual({ ok: true });
+    const r = await buyBossCrate(sql, id, birdie.id, "tokens", T0);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect([r.crate, held(db, id), r.locker.tokens]).toEqual(["boss-birdie", ["boss-birdie"], {}]);
+    const o = await openBossCrate(sql, id, birdie.id, T0 + MIN);
+    expect(o.ok).toBe(true);
+    if (!o.ok) return;
+    expect(birdie.items).toContain(o.item.def);
+    expect([held(db, id), items(db, id).map((i) => i.crate)]).toEqual([[], ["boss-birdie"]]);
   });
 
   it("with 3 tokens: the crate goes into your inventory unopened (Eric, Nov 2), and the tokens are spent", async () => {

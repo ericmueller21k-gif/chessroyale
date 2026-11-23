@@ -402,8 +402,8 @@ const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
  * with Hollow's Bulb), Wrangler's (Nov 4, with Pen Pony; `pig`, his home's id), Grex's (Nov 4, with Giraffe Gallop; `grex`,
  * his home's id) and Ginger's (Nov 5, with the Candy Cane Sled; `gingerbread`, his home's id and his boss id: its crate's id is
  * `boss-gingerbread`, never the Gingerbread Man skin's `gingerbread`) and Folio's (Nov 5, with the Paper Crane). Timber's
- * and Dash's (Nov 3) are shown and sold to admins only while they're in the game for admins first (BOSS_ADMIN_FIRST): only an admin
- * holds their tokens.
+ * and Dash's (Nov 3), and Birdie's (Nov 23, with Birdie's Train), are shown and sold to admins only while they're in the game for admins
+ * first (BOSS_ADMIN_FIRST): only an admin holds their tokens.
  */
 export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("tiger", "Babur's Boss Crate", "balloon-pup"),
@@ -419,6 +419,7 @@ export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("folio", "Folio's Boss Crate", "folio-crane"),
   bossCrate("smudgy", "Smudgy's Boss Crate", "smudgy-brush"),
   bossCrate("clown", "Boingo's Boss Crate", "boingo-pogo"),
+  bossCrate("birdie", "Birdie's Boss Crate", "birdie-train"),
 ];
 
 export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);
