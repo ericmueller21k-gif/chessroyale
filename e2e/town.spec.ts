@@ -314,9 +314,16 @@ async function tapPoint(p: Page, kind: "boss" | "home", id = "tiger") {
 async function toBabur(p: Page, id = "tiger", home = "Babur's Circus") {
   if (await tapPoint(p, "home", id)) return;
   // (A home without its chip on the edge just now, as Folio's on a phone: the camera glides there, as the chip would.)
-  const chip = p.getByRole("button", { name: `Go to ${home}` });
-  if (await chip.count()) await chip.dispatchEvent("click");
-  else await p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
+  // (Found and clicked in one step, Nov 23: counting the chip and then clicking it raced its slide off the edge as the camera moved,
+  // and the click waited 15 s for a chip that was gone: the flaky town.spec:1244 on a computer.)
+  await p.evaluate(
+    ([name, i]) => {
+      const chip = document.querySelector<HTMLElement>(`[aria-label="${name}"]`);
+      if (chip) chip.click();
+      else (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i);
+    },
+    [`Go to ${home}`, id] as const,
+  );
   expect(await townTapPoint(p, "home", id, 20_000), `${home} comes into view (the glide landed)`).not.toBeNull();
 }
 /**
