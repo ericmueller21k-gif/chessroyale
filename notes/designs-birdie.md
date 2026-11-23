@@ -107,3 +107,8 @@ stools that you have drawn ... one on the left, one on the right, and in the cen
 - The challenge spot in the middle: a plain square table with a white top, one of the bar's stools on its left and one on its right.
 - The crossing gates staggered as on a real road (one before the tracks on one side, one after them on the other: kitty-corner), never
   side by side on one line.
+- Eric, more (Nov 23): "the bar should be like fill it up, put some stuff on the back ... put some bird feeders on the table, and there
+  should be a big ... vat of birdseed that the bartender ... scoops it up and then he pours it ... onto the birdseed feeders around the
+  table ... The room doesn't need to be that much bigger". So: shelves of seed jars, sacks and tins behind the bar; little bird feeders
+  on the counter in place of drinks; a big heaped vat of birdseed with a scoop behind the counter; the bartender's idle scoops seed from
+  the vat and pours it into a feeder. The room only a little bigger.
