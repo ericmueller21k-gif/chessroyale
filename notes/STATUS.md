@@ -1839,3 +1839,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   own moves by side or reword "1st"; (2) sign pulse phase jumps once at the ride start (at → 0): keep first `at`; (3) idle chirps after a
   capture/check on a silent number stay muted (design call); (4) sign e2e one orientation only.
   Fall wiring session (Opus high) started.
+- Nov 23 ~20:05: main cd3c9c9 (#909/#910) GREEN. #911 merged 3a512cc, main run pending. Running: lobby wire, fall wire (Opus high x2),
+  fall art (Haiku, waiting on Eric's spend OK).
