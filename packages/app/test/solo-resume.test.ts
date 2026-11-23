@@ -1,10 +1,11 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_ADMIN_FIRST, DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
-import { MatchRunner, dodgeArena, dodgeTimeline, legalMoves, lightsOutTimeline, rushTimeline, type UciEngine } from "@chessroyale/chess";
+import { MatchRunner, START_FEN, chooseRush, dodgeArena, dodgeTimeline, legalMoves, lightsOutTimeline, rushBeats, rushTimeline, type UciEngine } from "@chessroyale/chess";
 import { KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
 import { readKept } from "../src/tower.ts";
+import { rushShownFen, rushStage } from "../src/components/DashRush.tsx";
 
 /**
  * Step 2 of solo games left (Eric, Nov 22: "when you come back to Boss Battle with a game in progress: You have a game in progress,
@@ -349,6 +350,73 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
     }
   }, 120_000);
 
+  // (The third review's delta 3 of #885, F1: the Rush was kept only as his sweep began, so a crash or a second window's Resume after the
+  // sweep had shown played it all again. Its cause: what the screen shows by the clock was written twice, in the screen and in
+  // SoloMatch.moment(). Now each timeline exports its beats once (rushBeats: from the sweep the screen draws, rushRuns), and every one is
+  // kept as it shows. The review's case (review-885-delta-3.test.ts), flipped, and the same midway through the sweep.)
+  for (const when of ["after his sweep", "midway through his sweep"] as const)
+    it(`Dash's Scramble Rush, the page gone with no hide event ${when} (a crash, another window's Resume): the rejoin's board is the one shown, no piece swept again`, async () => {
+      const admins = BOSS_ADMIN_FIRST as string[];
+      const was = admins.indexOf("dash");
+      if (was >= 0) admins.splice(was, 1);
+      try {
+        const m = battle({ ...ALONE, bossId: "dash", bossPowerTest: "rush", bossNoStrikes: true } as Settings);
+        m.start();
+        const rushOf = (x: SoloMatch) => (x.phase as { rush?: { at: number } }).rush ?? null;
+        for (let i = 0; i < 6000 && !rushOf(m); i++) {
+          if (yourTurn(m)) pick(m);
+          await step();
+        }
+        const view = rushOf(m)!;
+        expect(view, "the Rush on").not.toBeNull();
+        const swept = m.runner.state.boss!.powers!.dash!.rush!;
+        const fen = board(m).fen;
+        const tl = rushTimeline();
+        const beats = rushBeats(swept);
+        // (Its sweep's beats: each piece gone from its square and on its new one. Midway: just past one, the next well ahead, so the
+        // kept time is that one's, not the next's kept a little ahead of it.)
+        const sweep = beats.filter((b) => b > tl.scatterAt && b < tl.scatterUntil);
+        expect(sweep.length).toBeGreaterThan(swept.moves.length);
+        const mid = sweep.findIndex((b, i) => i >= 2 && i < sweep.length - 2 && sweep[i + 1]! - b > 250);
+        const shownAt = when === "after his sweep" ? tl.scatterUntil + 500 : sweep[mid]! + 120;
+        await step(view.at + shownAt - Date.now());
+        const shown = Date.now() - view.at;
+        expect(shown).toBeLessThan(tl.placeAt - 200);
+        // Kept at or after the last beat this page has shown (the sweep's end once it's over).
+        const k = loadKeptSolo()!;
+        expect(k.kept.moment!.ms).toBeGreaterThanOrEqual(beats.filter((b) => b <= shown).at(-1)!);
+        m.dispose();
+        const r = resumed(k);
+        await until(r, () => !!rushOf(r), "the rejoin's Rush");
+        const into = Date.now() - rushOf(r)!.at;
+        // The same sweep, its board as this page showed it: every swept piece gone or landed as it was shown, none taken back to sweep again.
+        expect(JSON.stringify(r.runner.state.boss!.powers!.dash!.rush)).toBe(JSON.stringify(swept));
+        expect(rushShownFen(fen, swept, into)).toBe(rushShownFen(fen, swept, shown));
+        if (when === "after his sweep") expect(into).toBeGreaterThanOrEqual(tl.scatterUntil);
+        else expect(into).toBeGreaterThanOrEqual(sweep[mid]!);
+        expect(into).toBeLessThan(shown + 300);
+        r.dispose();
+      } finally {
+        if (was >= 0) admins.splice(was, 0, "dash");
+      }
+    }, 120_000);
+
+  // (The Rush's beats are where its screen changes: its board and stage, every ms of it, change only at a beat, and each beat changes
+  // one, so the list is the screen's, not a copy of it.)
+  it("Dash's Scramble Rush: its screen's board and stage change only at its beats (rushBeats), and at every one", () => {
+    const tl = rushTimeline();
+    const swept = { at: 3, moves: chooseRush(START_FEN, "w", 7, 3) };
+    expect(swept.moves.length).toBe(6);
+    const beats = rushBeats(swept);
+    const shows = (t: number) => `${rushShownFen(START_FEN, swept, t)} ${rushStage({}, { at: 0 }, t)}`;
+    const changes: number[] = [];
+    for (let t = 1; t <= tl.total; t++) if (shows(t) !== shows(t - 1)) changes.push(t);
+    expect(changes.filter((t) => !beats.includes(t))).toEqual([]);
+    // (But his sweep's start and end: his copies come and go there, the pieces as they were.)
+    expect(beats.filter((b) => !changes.includes(b) && b !== tl.scatterAt && b !== tl.scatterUntil)).toEqual([]);
+    expect(changes.length).toBeGreaterThanOrEqual(2 * swept.moves.length);
+  });
+
   // Keep before show (the third review of #885). Every finding of the first two (I2, I3, D1, D2, D4, D5; then E1, and the Rush and Lights
   // out seen in passing) was one bug: the battle showed something before the kept game held it, so a reload, a crash or another tab
   // resumed from before it was seen. The rule, walked: every timed power and moment, in Boss alone and a Solo raid, checked at every update
@@ -372,12 +440,12 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
             if (p.kind !== "boss") return null;
             return p.dodge ? { kind: "dodge", ...p.dodge } : p.rush ? { kind: "rush", ...p.rush } : p.lights ? { kind: "lights", ...p.lights } : null;
           };
-          // (What each screen shows by the clock alone, with no update: the Dodge's lines and teleports, the Rush's sweep, each Lights out
-          // round's targets: ms from the moment's start.)
-          const beats = (v: Moment): number[] => {
-            if (v.kind === "dodge") return [dodgeTimeline().volley.at, ...dodgeTimeline().rounds.flatMap((r) => [r.voteAt, ...r.teleports])];
-            if (v.kind === "rush") return [rushTimeline().scatterAt, rushTimeline().placeAt];
-            return lightsOutTimeline(v.rounds, m.settings.lateGraceMs).rounds.map((r) => r.at);
+          // (What each screen shows by the clock alone, with no update, ms from the moment's start: its timeline's beats, the list its
+          // screen draws by: the Dodge's lines and teleports, each piece of the Rush's sweep and its end, Lights out's drop and rounds.)
+          const beats = (v: Moment): readonly number[] => {
+            if (v.kind === "dodge") return dodgeTimeline().beats;
+            if (v.kind === "rush") return rushBeats(m.runner.state.boss!.powers!.dash!.rush!);
+            return lightsOutTimeline(v.rounds, m.settings.lateGraceMs).beats;
           };
           const check = (tick: boolean) => {
             const k = loadKeptSolo();

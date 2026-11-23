@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { boardPieces, rushFen, rushJudge, rushMovesLeft, rushSquares, rushTimeline, withPieces, type DashView } from "@chessroyale/chess";
+import { boardPieces, rushFen, rushJudge, rushMovesLeft, rushRuns, rushSquares, rushTimeline, withPieces, type DashView, type RushRun } from "@chessroyale/chess";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { hash } from "../characters/boss-beats.ts";
 import { DASH_FIGURE, DASH_RUN } from "../characters/dash-figure.ts";
@@ -18,7 +18,8 @@ import { InPlace } from "./PowerParts.tsx";
  * - "1.00" ticking down to "0.00" over five seconds (a second that lasts five), in his banner's colors over the board; inside it
  *   five copies of him run across the whole board along rows and diagonals, crossing, each with his trail (two afterimages and
  *   a streak), several passes each. A swept piece is gone as a copy runs over its square and on its new square as one passes
- *   there: no piece slides (`rushRuns`, `rushShownFen`).
+ *   there: no piece slides (`rushShownFen`, from `rushRuns` in dash.ts, whose times are the Rush's beats, `rushBeats`: what this
+ *   shows by the clock is written there once, and a kept solo battle keeps as each shows).
  * - His line ("Hope I wasn't too quick for you."), then the God King's ("Put the pieces back…"), alive or fallen.
  * - Ten seconds, the same banner at the board's top (taps go through it): drag or tap the swept pieces (orange edges) to any free
  *   square, each at most dashScramble.movesPerPiece times (Eric, Nov 6; a try after that: the piece shakes, "No more tries" fades
@@ -33,71 +34,7 @@ const S = BOSS_POWERS.dashScramble;
 const PIECE_NAMES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 const pieceClass = (code: string) => `${code[0] === "w" ? "white" : "black"} ${PIECE_NAMES[code[1]!]}`;
 
-// ---------------- His copies' runs ----------------
-
-/** One copy's pass across the board: from square `a` to square `b`, `start` to `start + ms` (ms from the Rush's start). */
-export interface RushRun {
-  copy: number;
-  start: number;
-  ms: number;
-  a: string;
-  b: string;
-}
-
-const COPIES = 5;
-const RUN_MS = 900;
-const SLOT_MS = 1100;
-const STAGGER_MS = 80;
-const sq = (f: number, r: number) => `${"abcdefgh"[f]}${r + 1}`;
-const steps = (a: string, b: string) => Math.max(Math.abs(a.charCodeAt(0) - b.charCodeAt(0)), Math.abs(Number(a[1]) - Number(b[1])));
-
-/** A line across the whole board through `s`: its rank, or one of its diagonals (one at least four squares long), either way. */
-function lineThrough(s: string, kind: number, reverse: boolean): [string, string] {
-  const f = s.charCodeAt(0) - 97;
-  const r = Number(s[1]) - 1;
-  const diag = (df: number): [string, string] | null => {
-    // (Down-left to up-right, or up-left to down-right.)
-    const back = df > 0 ? Math.min(f, r) : Math.min(f, 7 - r);
-    const on = df > 0 ? Math.min(7 - f, 7 - r) : Math.min(7 - f, r);
-    return back + on >= 3 ? [sq(f - back, df > 0 ? r - back : r + back), sq(f + on, df > 0 ? r + on : r - on)] : null;
-  };
-  const line = (kind % 3 === 1 ? diag(1) : kind % 3 === 2 ? diag(-1) : null) ?? diag(kind % 2 ? -1 : 1) ?? [sq(0, r), sq(7, r)];
-  return reverse ? [line[1], line[0]] : line;
-}
-
-/**
- * The copies' passes (three slots, five copies each, a little apart) and when each swept piece goes (`gone`, by its square
- * before the sweep: a copy over it) and lands (`land`: a copy over its new square, in a later slot). The scoops go first, then
- * the drops; any slot left over is a pass through a square of the seed's. The same on every screen (from the sweep itself).
- */
-export function rushRuns(rush: Pick<Rush, "at" | "moves">, s: Pick<typeof S, "scatterAt"> = S): { runs: RushRun[]; gone: Record<string, number>; land: Record<string, number> } {
-  const seed = hash(`${rush.at}:${rush.moves.map((m) => m.from + m.to).join()}`);
-  const pending = [...rush.moves.map((m, i) => ({ drop: false, i, square: m.from })), ...rush.moves.map((m, i) => ({ drop: true, i, square: m.to }))];
-  const scoopSlot: Record<number, number> = {};
-  const runs: RushRun[] = [];
-  const gone: Record<string, number> = {};
-  const land: Record<string, number> = {};
-  for (let slot = 0; slot < 3; slot++)
-    for (let copy = 0; copy < COPIES; copy++) {
-      const k = slot * COPIES + copy;
-      const start = s.scatterAt + slot * SLOT_MS + copy * STAGGER_MS;
-      const ti = pending.findIndex((t) => !t.drop || (scoopSlot[t.i] !== undefined && scoopSlot[t.i]! < slot));
-      const task = ti >= 0 ? pending.splice(ti, 1)[0]! : null;
-      const through = task ? task.square : sq((seed >>> (k % 24)) % 8, (seed >>> ((k * 3) % 24)) % 8);
-      const [a, b] = lineThrough(through, (seed >>> k) + k, ((seed >>> (k + 3)) & 1) === 1);
-      runs.push({ copy, start, ms: RUN_MS, a, b });
-      if (!task) continue;
-      const at = start + (RUN_MS * steps(a, through)) / Math.max(1, steps(a, b));
-      if (task.drop) land[rush.moves[task.i]!.from] = at;
-      else {
-        gone[rush.moves[task.i]!.from] = at;
-        scoopSlot[task.i] = slot;
-      }
-    }
-  return { runs, gone, land };
-}
-
-/** The board during the sweep (`t` ms into the Rush): each swept piece on its square until a copy runs over it, on its new square once one has passed there. */
+/** The board during the sweep (`t` ms into the Rush): each swept piece on its square until a copy runs over it, on its new square once one has passed there (rushRuns: rushBeats). */
 export function rushShownFen(fen: string, rush: Pick<Rush, "at" | "moves">, t: number): string {
   const { gone, land } = rushRuns(rush);
   const pieces = boardPieces(fen);

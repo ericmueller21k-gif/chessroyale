@@ -723,7 +723,13 @@ export function dodgeTimeline(s: ChandySettings = BOSS_POWERS.chandy) {
     rounds.push({ openAt, voteAt, teleports: (s.dodgeTeleports[k] ?? []).map((ms) => voteAt + ms), voteEnd, closeAt, blastAt, hitAt, end });
     openAt = end;
   }
-  return { slideAt: s.dodgeScopeMs, volley, rounds, killMs: s.dodgeKillMs + s.dodgeShatterMs, total: rounds.at(-1)?.end ?? 0 };
+  // Its beats: each time its screen first shows something by the clock alone, with no update (in order). Written once, here, from the
+  // times the screen draws by (Chandy.tsx, dodgeView), and read by a kept solo battle (SoloMatch.moment: kept as each shows) and its
+  // test: the volley's lines, then each round as it opens (the round before over), its lines and each teleport. (The scope-in and the
+  // volley's beams show nothing a rejoin could use twice; a round's beams and its hit play out its result, kept by the update that
+  // closes it.)
+  const beats = [volley.at, ...rounds.flatMap((r) => [r.openAt, r.voteAt, ...r.teleports])];
+  return { slideAt: s.dodgeScopeMs, volley, rounds, beats, killMs: s.dodgeKillMs + s.dodgeShatterMs, total: rounds.at(-1)?.end ?? 0 };
 }
 
 /** A Dodge's hits so far. */
