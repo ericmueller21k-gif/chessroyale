@@ -1803,3 +1803,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (Opus medium, claude/room-music-off); lobby round 4 art session_01JuCWRsFDxdUe2CD1PziUyR (Haiku, brief birdie-art-12, runner brief
   shop-birdie-interior-4 written by director, stills/birdie-12). After art: Opus wiring job (new room into birdie-art.ts, gates lower + lights
   flash at battle start, chess table as the challenge spot).
+- Nov 23 ~17:00: #907 whistles open (f6f619c5), CI watcher bagzq0g1h; boss-lane quick review NOT yet started (Opus slots: music medium +
+  tail high session_01JuCWRuZRPHWMgtg61MmXVy brief birdie-tail-train-smooth). Start the review when the music job ends.
+  Birdie town scale 0.75 relayed into the music job.
