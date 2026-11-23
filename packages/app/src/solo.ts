@@ -956,9 +956,10 @@ export class SoloMatch implements GameView {
     // (Maia failed to load: why, for the admin reading it, e.g. "load timed out" or the worker's error.)
     if (note) return `${brainWords(note)}${this.maia?.status === "failed" ? ` · ${this.maia.error ?? "no reason"}` : ""}`;
     const plan = this.runner.humanBrain ?? this.brainPlan;
-    // (The Hidden Boss's child: the rating his next move is played at, rising with the game.)
-    const child = this.runner.childRatingNow();
-    const hb = plan && child !== null ? { ...plan, rating: child } : plan;
+    // (The rating his next move is played at (runner.brainNow): the Hidden Boss's child's, rising with the game; Armored Birdie's.)
+    const now = this.runner.brainNow(plan?.rating ?? null);
+    const hb = plan && now.rating !== null ? { ...plan, rating: now.rating } : null;
+    if (plan && !hb) return `Stockfish ${now.elo} (past Maia's top: his rules')`;
     if (!hb) return this.brainDropped ? "Stockfish (Maia closed: Stockfish didn't start again beside it)" : "Stockfish";
     const share = hb.stockfishShare ? ` · ${Math.round(hb.stockfishShare * 100)}% Stockfish` : "";
     const status = this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? `failed: Stockfish (${this.maia.error ?? "no reason"})` : this.gateEnd === "timeout" ? `loading (waited ${Math.round(BOSS_BRAIN.loadGateMs / 1000)} s)` : "loading";

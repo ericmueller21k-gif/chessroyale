@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BIRDIE_CINEMATIC, BIRDIE_ULT, BOSS_POWERS, mulberry32 } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BIRDIE_ULT, BOSS_DIFFICULTY, BOSS_POWERS, ENGINE_MAX_ELO, levelForMaia, maiaTopRating, mulberry32 } from "@chessroyale/core";
 import {
   BIRDIE_BEATS,
   BIRDIE_FX,
   MatchRunner,
   POWER_FX,
   applyMove,
+  armoredBrain,
   birdieImpactMs,
   birdieTurnBeats,
   birdieTurnLayout,
@@ -40,7 +41,7 @@ import { KIT_OPENING, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 /**
  * Birdie's rules (docs/decisions/2026-11-23-birdie-rules.md; bosses/birdie.ts): the Train (its lines, its pick, its timing and cooldown,
  * a saved piece, a smash, the king, a sparing, the judge's view, fair play) and the Fall (the material that brings it, once a battle, the
- * admins' trigger, Armored Birdie without the train), and his moments' lengths.
+ * admins' trigger, Armored Birdie: the train every armoredTrainEvery turns and his brain much stronger), and his moments' lengths.
  */
 
 const fenOf = (r: MatchRunner) => r.boards.get(r.state.boards[0]!)!.fen;
@@ -260,7 +261,7 @@ describe("the Train in a battle", () => {
 });
 
 describe("the Fall", () => {
-  it("comes at the start of his turn once he has lost fallLost points, once a battle; then no more train", async () => {
+  it("comes at the start of his turn once he has lost fallLost points, once a battle; then the train goes on, armoredTrainEvery apart", async () => {
     const r = battle(9);
     await untilTurn(r, 2);
     // His queen and rook gone (14 points), the crowd to move: as its move lands, he falls.
@@ -279,12 +280,22 @@ describe("the Fall", () => {
     r.deal();
     expect(rageOf(r.boss!)).toBe(0);
     expect(ragePaused(r.boss!)).toBe(true);
-    // (No warning ever again.)
-    for (let i = 0; i < 6 && !r.stageComplete(); i++) {
+    // (Eric, Nov 23: Armored Birdie keeps the train: warnings go on, armoredTrainEvery crowd turns apart once one is set after his fall.)
+    const warned: number[] = [];
+    for (let i = 0; i < 30 && !r.stageComplete() && warned.length < 2; i++) {
       if (r.bossToMove()) await r.playBoss();
-      else await crowdMove(r);
-      expect(birdieOf(r)!.warn).toBeNull();
+      else {
+        r.deal();
+        const w = birdieOf(r)!.warn;
+        if (w && w.turn === r.boss!.crowdMoves + 1) {
+          warned.push(w.turn);
+          expect(birdieOf(r)!.next).toBe(w.turn + BOSS_POWERS.birdie.armoredTrainEvery);
+        }
+        // (The crowd saves its warned piece, so the battle goes on.)
+        await crowdMove(r, (_f, allowed) => (w && allowed.filter((m) => m.startsWith(w.square)).sort()[0]) || [...allowed].sort()[0]!);
+      }
     }
+    expect(warned.length, "the train warns again after his fall").toBeGreaterThan(0);
   });
 
   it("the admins' trigger brings it at the start of his next turn, without the material", async () => {
@@ -297,6 +308,43 @@ describe("the Fall", () => {
     });
     expect(birdieOf(r)!.fell).toBeTruthy();
     expect(r.boss!.powers!.ultNext).toBeUndefined();
+  });
+
+  it("Armored Birdie's brain (Eric, Nov 23): Maia armoredMaiaBoost higher up to its top; at its top (Very hard) Stockfish just above it", () => {
+    const s = BOSS_POWERS.birdie;
+    const top = maiaTopRating();
+    for (const d of BOSS_DIFFICULTY) {
+      const after = armoredBrain({ rating: d.maia, elo: 1500 });
+      if (d.maia >= top) expect(after, d.label).toEqual({ rating: null, elo: levelForMaia(top) + s.armoredStockfishAbove });
+      else {
+        const rating = Math.min(top, d.maia + s.armoredMaiaBoost);
+        // (Stockfish's stand-in while Maia isn't there: the same jump on the game's scale.)
+        expect(after, d.label).toEqual({ rating, elo: 1500 + levelForMaia(rating) - levelForMaia(d.maia) });
+        expect(after.elo, d.label).toBeGreaterThan(1500);
+      }
+    }
+    expect(armoredBrain({ rating: 2050, elo: 1500 }).rating).toBe(2450);
+    expect(armoredBrain({ rating: 2300, elo: 1500 }).rating).toBe(top);
+    expect(armoredBrain({ rating: 2500, elo: 1500 })).toEqual({ rating: null, elo: 2750 });
+    // (A battle on Stockfish already: more Elo, held at the engine's top.)
+    expect(armoredBrain({ rating: null, elo: 2000 })).toEqual({ rating: null, elo: 2000 + s.armoredMaiaBoost });
+    expect(armoredBrain({ rating: null, elo: 3100 })).toEqual({ rating: null, elo: ENGINE_MAX_ELO });
+  });
+
+  it("the runner's brain for his move (solo and the lobby ask it): the battle's until his fall, Armored Birdie's after, at each difficulty", async () => {
+    const r = battle(9);
+    await untilTurn(r, 2);
+    const elo = r.boss!.elo;
+    for (const d of BOSS_DIFFICULTY) expect(r.brainNow(d.maia), d.label).toEqual({ rating: d.maia, elo });
+    expect(r.brainNow(null)).toEqual({ rating: null, elo });
+    let cut = fenOf(r);
+    for (const sq of ["d8", "a8"]) if (pieceAt(cut, sq)?.color === "b") cut = withoutPiece(cut, sq);
+    setBoard(r, cut);
+    await crowdMove(r);
+    expect(birdieOf(r)!.fell).toBeTruthy();
+    for (const d of BOSS_DIFFICULTY) expect(r.brainNow(d.maia), d.label).toEqual(armoredBrain({ rating: d.maia, elo }));
+    expect(r.brainNow(BOSS_DIFFICULTY.at(-1)!.maia).rating, "Very hard: Stockfish").toBeNull();
+    expect(r.brainNow(null)).toEqual(armoredBrain({ rating: null, elo }));
   });
 
   it("his meter is the material he has lost against fallLost", () => {

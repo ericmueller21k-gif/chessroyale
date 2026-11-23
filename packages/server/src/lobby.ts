@@ -2128,7 +2128,8 @@ export class LobbyCore {
     const kind = this.r.bossKind;
     if (!kind || !CHECKED_BOSS_KINDS.has(kind)) return void (this.r.bossCheck = undefined);
     const b = this.r.bossBrain;
-    const brain = !!b && b.brain !== "stockfish" && (kind === "elo" || kind === "stumble");
+    // (A battle's Maia that plays this move on Stockfish (runner.brainNow: Armored Birdie at Maia's top): no Maia move to check.)
+    const brain = !!b && b.brain !== "stockfish" && (kind === "elo" || kind === "stumble") && this.runner!.brainNow(b.rating).rating !== null;
     // (The bridge band's share of his moves, drawn here, not on the devices (D1): Stockfish's, with no brain sent to anyone.)
     const share = brain && (b!.stockfishShare ?? 0) > 0 && this.jrng() < b!.stockfishShare!;
     // (Maia's move only with the host's Maia loaded: else no brain to anyone, and both play the seeded Stockfish move the host would
@@ -2457,13 +2458,15 @@ export class LobbyCore {
     // alike (D6). The strike's goes to the host alone, for its note.)
     const mine = c && (kind === "elo" || kind === "stumble") ? c.maia : !checker;
     const b = this.r.bossBrain && !funhouse && !pick && kind !== "extra" && kind !== "best" && mine && !only ? this.r.bossBrain : null;
-    // (The Hidden Boss's child: Maia at his rating now, Stockfish at the strength it stands for: runner.childRatingNow, bossEloNow.)
-    const brain = b ? { brain: b.brain, rating: runner.childRatingNow() ?? b.rating } : null;
+    // (His brain for this move, the same as solo's (runner.brainNow): the Hidden Boss's child's rating now and the strength it stands
+    // for; Armored Birdie's much stronger one, Stockfish at Maia's top.)
+    const now = runner.brainNow(this.r.bossBrain?.rating ?? null);
+    const brain = b && now.rating !== null ? { brain: b.brain, rating: now.rating } : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
       fen,
-      elo: runner.bossEloNow(),
+      elo: now.elo,
       nodes: this.settings.bossNodes,
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : this.r.bossKind === "best" ? { best: true } : {}),
       ...(funhouse ? { funhouse: true } : {}),

@@ -281,7 +281,7 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // file where exactly one of your pieces stands (the first after your first move, then every 3 of your turns), and the piece left
   // there by your next move is smashed by his train at the start of his turn (your king: the battle is his); and the Fall, once a
   // battle, when he has lost 9 points of material: he falls off his train, it hits him in a cutscene and he's Armored Birdie for the
-  // rest of the battle (no more train; his armored power is Eric's to design). Admins first: BOSS_ADMIN_FIRST in settings.ts (the
+  // rest of the battle (the train goes on, and his brain plays much stronger: BOSS_POWERS.birdie's armored numbers). Admins first: BOSS_ADMIN_FIRST in settings.ts (the
   // test links `?boss=birdie`, `&power=train`, `&power=fall`).
   { id: "birdie", name: "Birdie", icon: "🐦", kit: "Birdie", offset: -250, powers: { passive: "train", ultimate: "fall" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
@@ -871,7 +871,8 @@ export interface SuperFreezeState {
  *   the train rides it), the crowd's piece on it (`square`, `piece` its kind). Cleared as that turn's move lands. Null: none.
  * - `ride`: his train's last ride, at the start of his turn after crowd move `at`: the piece on `square` (`piece`) smashed, or spared
  *   (`spared`: the smash wasn't legal), or the king (`king`: the battle his).
- * - `fell`: he fell after crowd move `at` (at the start of his turn): Armored Birdie for the rest of the battle, no train.
+ * - `fell`: he fell after crowd move `at` (at the start of his turn): Armored Birdie for the rest of the battle (the train every
+ *   armoredTrainEvery turns, his brain stronger).
  */
 export interface BirdieState {
   next: number;

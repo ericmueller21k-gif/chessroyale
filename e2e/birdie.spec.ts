@@ -226,7 +226,7 @@ test("Birdie's train: the crossing on his line, the dock names your piece; moved
   expect(errors).toEqual([]);
 });
 
-test("Birdie's fall: his cutscene plays as he thinks (the fall, the approach, the reveal, the hold), then Armored Birdie in the bar, and no train warns again", async ({ page }) => {
+test("Birdie's fall: his cutscene plays as he thinks (the fall, the approach, the reveal, the hold), then Armored Birdie in the bar, and his train warns again", async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -235,9 +235,11 @@ test("Birdie's fall: his cutscene plays as he thinks (the fall, the approach, th
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     const rec = await recorded(page);
-    // (Two of your turns after the cutscene, Armored Birdie at rest in them.)
+    // (Two of your turns after the cutscene, Armored Birdie at rest in them, and his train's next warning, on a turn after his fall.)
     const end = rec.findLastIndex((r) => r.cine);
-    if (end >= 0 && rec.some((r) => r.fell !== null) && new Set(rec.slice(end).filter((r) => r.phase === "play").map((r) => r.fen)).size >= 2) break;
+    const fell = rec.find((r) => r.fell !== null)?.fell ?? null;
+    const again = fell !== null && rec.some((r) => r.phase === "play" && r.warn && r.warn.turn > fell && r.crossing);
+    if (end >= 0 && again && new Set(rec.slice(end).filter((r) => r.phase === "play").map((r) => r.fen)).size >= 2) break;
     if ((await phase(page)) === "results") break;
     const s = await yourTurn(page);
     if (s && !played.has(s.fen)) {
@@ -280,10 +282,10 @@ test("Birdie's fall: his cutscene plays as he thinks (the fall, the approach, th
   expect(yours.length).toBeGreaterThan(30);
   expect(yours.every((r) => r.bar!.startsWith("p_")), `Armored Birdie after: ${[...new Set(yours.map((r) => r.bar))]}`).toBe(true);
   expect(new Set(yours.map((r) => r.bar)).has("p_idle"), "at rest in p_idle").toBe(true);
-  // No train once he's fallen: no warning, no crossing, no ride after the fall.
-  const fallen = rec.slice(fellAt);
-  expect(fallen.every((r) => !r.warn && !r.crossing), "no train warns again").toBe(true);
-  const rideBefore = rec[fellAt - 1]!.ride?.at ?? null;
-  expect(fallen.every((r) => (r.ride?.at ?? null) === rideBefore || (r.ride?.at ?? 0) <= rec[fellAt]!.fell!), "no ride after").toBe(true);
+  // Armored Birdie keeps the train (Eric, Nov 23): a warning on a turn after his fall, its crossing on the board, the dock naming it.
+  const warnedAfter = rec.slice(fellAt).filter((r) => r.phase === "play" && r.warn && r.warn.turn > rec[fellAt]!.fell!);
+  expect(warnedAfter.length, "his train warns again after his fall").toBeGreaterThan(0);
+  expect(warnedAfter.some((r) => r.crossing), "its crossing on the board").toBe(true);
+  expect(warnedAfter.some((r) => r.through === `Move your ${NAMES[r.warn!.piece]}!`), "the dock names your piece").toBe(true);
   expect(errors).toEqual([]);
 });

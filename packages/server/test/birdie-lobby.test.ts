@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
-import { BIRDIE_BEATS, birdieImpactMs, birdieTurnMs, legalMoves, lineSquares, powerWinShowMs, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { BIRDIE_BEATS, armoredBrain, birdieImpactMs, birdieTurnMs, legalMoves, lineSquares, powerWinShowMs, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 /**
@@ -151,5 +151,15 @@ describe("Birdie online", () => {
     expect(move!.at - held!.at).toBeGreaterThanOrEqual(birdieTurnMs(view));
     // (Every message of his thinking carried the same start: a device back from a reload carries his fall on from it.)
     for (const x of l.log.filter((y) => y.at >= held!.at && y.at < move!.at && y.msg.t === "boss")) expect((x.msg as Extract<Msg, { t: "boss" }>).boss?.powers?.birdie?.turnAt).toEqual(sent);
+    // (Armored Birdie, Eric's Nov 23: his move after the fall asked for with his much stronger brain, the same as solo's: armoredBrain.)
+    const asked = l.log.filter((x) => x.id === "p1" && x.msg.t === "bossRequest").map((x) => ({ at: x.at, req: x.msg as Extract<Msg, { t: "bossRequest" }> }));
+    const before = asked.filter((x) => x.at < held!.at).at(-1)!.req;
+    const after = asked.find((x) => x.at >= held!.at)!.req;
+    // (The battle's brain, Maia at its rating; sent with a move only with the host's Maia loaded (N1), else Stockfish at `elo`, its stand-in.)
+    const battle = (l.core as unknown as { r: { bossBrain?: { rating: number } | null } }).r.bossBrain ?? null;
+    const expected = armoredBrain({ rating: battle?.rating ?? null, elo: before.elo });
+    expect(after.elo).toBe(expected.elo);
+    expect(after.elo).toBeGreaterThan(before.elo);
+    if (after.brain) expect(after.brain.rating).toBe(expected.rating);
   });
 });

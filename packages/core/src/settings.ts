@@ -2315,13 +2315,21 @@ export const BOSS_POWERS = {
    *   (the fire's way, firePawnLogit), your king as the battle lost.
    * - The Fall, once a battle: at the start of his turn once he has lost `fallLost` points of material since the battle began
    *   (P1 N3 B3 R5 Q9: the most he has been down), his fall and its cutscene (BIRDIE_CINEMATIC), then Armored Birdie for the rest of
-   *   the battle: no more train (his armored power: Eric's to design, Nov 23).
+   *   the battle.
+   * - Armored Birdie (Eric, Nov 23: "He still uses his same normal move after. He just does it every 3 to 4 turns ... we turn up the
+   *   Maya to a much stronger level"): the train goes on, `armoredTrainEvery` crowd turns from one warning to the next; and his brain
+   *   jumps: Maia `armoredMaiaBoost` higher, held at Maia's top; already at Maia's top (Very hard), Stockfish at
+   *   `armoredStockfishAbove` over the level Maia's top stands for (core levelForMaia); a battle he already plays on Stockfish, its
+   *   strength `armoredMaiaBoost` higher (held at ENGINE_MAX_ELO). The judge and fair play don't read his strength: unchanged.
    */
   birdie: {
     trainFrom: 2,
     trainEvery: 3,
     trainPawnLogit: 1,
     fallLost: 9,
+    armoredTrainEvery: 3,
+    armoredMaiaBoost: 400,
+    armoredStockfishAbove: 100,
   },
 } as const;
 

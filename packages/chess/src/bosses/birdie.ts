@@ -24,14 +24,16 @@
  *   been down, as the rage meter counts it), or the admins' trigger, or the test switch (?power=fall: after the crowd's second
  *   move): his `fall`, then the cutscene (`birdieFall`, played while he thinks; his move waits for it), and he's Armored Birdie for
  *   the rest of the battle. After a train ridden on the same turn: the train first.
- * - Armored Birdie no longer uses the train: no more warnings. His armored power is Eric's to design (Nov 23: "the same idea, but
- *   stronger, later"): it goes in `armoredTurn` (a clean place for it: nothing yet).
+ * - Armored Birdie (Eric, Nov 23: "He still uses his same normal move after. He just does it every 3 to 4 turns"): the train goes on,
+ *   the same rule, `armoredTrainEvery` crowd turns apart; and his brain plays much stronger (`brainNow`, armoredBrain): Maia
+ *   `armoredMaiaBoost` higher up to its top, at its top Stockfish just above it. The same on every device: the runner asks it for
+ *   every move of his, solo and online.
  */
-import { BIRDIE_CINEMATIC, BIRDIE_ULT, BOSS_POWERS, type BalloonShape, type BirdieState, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BIRDIE_ULT, BOSS_POWERS, ENGINE_MAX_ELO, levelForMaia, maiaTopRating, type BalloonShape, type BirdieState, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
 import { boardEnd, type BoardState } from "../boards.ts";
 import { applyMove, keptEnPassant, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "../rules.ts";
 import { stockfishRefuses, type MoveScore } from "../uci.ts";
-import { VALUE, from, logit, materialOf, other, powerRoll, turnOf, ultCapped, unleashed, type Battle, type BossRules, type JudgedEvaluation, type Side } from "./base.ts";
+import { VALUE, from, logit, materialOf, other, powerRoll, turnOf, ultCapped, unleashed, type Battle, type BossRules, type BrainNow, type JudgedEvaluation, type Side } from "./base.ts";
 
 type BirdieSettings = BossPowerSettings["birdie"];
 
@@ -298,7 +300,7 @@ export const trainSquare = (boss: Pick<BossState, "id" | "powers" | "crowdMoves"
 /** His train smashed the crowd's king: the battle is his, whatever the board says. */
 export const trainWon = (boss: Pick<BossState, "powers"> | null | undefined): boolean => !!boss?.powers?.birdie?.ride?.king;
 
-/** He has fallen: Armored Birdie (no more train). */
+/** He has fallen: Armored Birdie (the train every armoredTrainEvery turns, his brain stronger). */
 export const birdieArmored = (p: Pick<BossPowerState, "birdie"> | null | undefined): boolean => !!p?.birdie?.fell;
 
 /** What the screens get of his state (NetBossPowers' `birdie`). */
@@ -345,15 +347,11 @@ export const BIRDIE: BossRules = {
     const bd = next.birdie;
     if (bd?.warn && bd.warn.turn !== t.turn) next.birdie = { ...bd, warn: null };
   },
-  // The Train's warning, as a crowd turn begins: when one is due (trainFrom, then trainEvery turns apart; the test switch: every turn),
-  // on a line the seed picks (chooseLine); none fits: next turn. Never once he's armored.
+  // The Train's warning, as a crowd turn begins: when one is due (trainFrom, then trainEvery turns apart, armoredTrainEvery once he's
+  // Armored Birdie; the test switch: every turn), on a line the seed picks (chooseLine); none fits: next turn.
   passive(next, t) {
     const s = t.s.birdie;
     const bd = next.birdie ?? fresh(s);
-    if (bd.fell) {
-      armoredTurn(next, t.turn);
-      return;
-    }
     const test = t.test === "train";
     if (t.turn < s.trainFrom || (t.turn < bd.next && !test)) {
       if (!next.birdie) next.birdie = bd;
@@ -364,7 +362,8 @@ export const BIRDIE: BossRules = {
       next.birdie = { ...bd, next: t.turn + 1 };
       return;
     }
-    next.birdie = { ...bd, warn: { turn: t.turn, ...pick }, next: t.turn + (test ? 1 : Math.max(1, Math.round(s.trainEvery))) };
+    const every = bd.fell ? s.armoredTrainEvery : s.trainEvery;
+    next.birdie = { ...bd, warn: { turn: t.turn, ...pick }, next: t.turn + (test ? 1 : Math.max(1, Math.round(every))) };
     t.events.push({ kind: "trainSignal", turn: t.turn, square: pick.square, squares: [...pick.squares], ...(pick.piece !== "k" ? { shape: pick.piece as BalloonShape } : {}) });
   },
   // (The turn the move cap ends, bossMaxMoves: no train rides after it, so no warning for it either, and the judge, the dock and the
@@ -377,6 +376,8 @@ export const BIRDIE: BossRules = {
     const events = p.events.filter((e) => !(e.kind === "trainSignal" && e.turn === w.turn));
     b.state = { ...b.state, boss: { ...boss, powers: { ...p, birdie: { ...p.birdie!, warn: null }, events } } };
   },
+  // (Armored Birdie: his brain much stronger for every move of his from his fall on.)
+  brainNow: (boss, plan, s) => (birdieArmored(boss.powers) ? armoredBrain(plan, s.birdie) : plan),
   // A warned turn: the judge's best moves change (the train), so it doesn't count for fair play, and the Last Stand sits out.
   powerTurn: (boss) => !!warnOn(boss.powers, turnOf(boss)),
   judge: {
@@ -411,10 +412,19 @@ export const BIRDIE: BossRules = {
 };
 
 /**
- * Armored Birdie's own power (Eric, Nov 23: "the same idea, but stronger and without the train … The details come later"): the place
- * it goes, as each crowd turn begins once he has fallen. Nothing yet.
+ * Armored Birdie's brain (Eric, Nov 23: "we turn up the Maya to a much stronger level. And if somebody's already fighting on very hard
+ * ... he just turns up to play maybe Stockfish slightly higher than what the Maya highest is"), from the battle's for this move
+ * (`rating`: Maia's, null: Stockfish at `elo`): Maia armoredMaiaBoost higher, held at its top (Stockfish's stand-in, while Maia isn't
+ * there, as much stronger as that jump is on the game's scale, levelForMaia); already at Maia's top, Stockfish at armoredStockfishAbove
+ * over the level Maia's top stands for; on Stockfish already, armoredMaiaBoost more Elo. Held at ENGINE_MAX_ELO, never weaker. Pure.
  */
-function armoredTurn(_next: BossPowerState, _turn: number): void {}
+export function armoredBrain(plan: BrainNow, s: Pick<BirdieSettings, "armoredMaiaBoost" | "armoredStockfishAbove"> = BOSS_POWERS.birdie): BrainNow {
+  const top = maiaTopRating();
+  if (plan.rating === null) return { rating: null, elo: Math.min(ENGINE_MAX_ELO, plan.elo + s.armoredMaiaBoost) };
+  if (plan.rating >= top) return { rating: null, elo: Math.max(plan.elo, Math.min(ENGINE_MAX_ELO, levelForMaia(top) + s.armoredStockfishAbove)) };
+  const rating = Math.min(top, plan.rating + s.armoredMaiaBoost);
+  return { rating, elo: Math.min(ENGINE_MAX_ELO, plan.elo + Math.max(0, levelForMaia(rating) - levelForMaia(plan.rating))) };
+}
 
 // ---------------- His part in the match runner ----------------
 
