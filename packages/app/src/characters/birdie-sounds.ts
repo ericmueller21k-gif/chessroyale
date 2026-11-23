@@ -292,7 +292,7 @@ const SOUNDS = {
  * other (one gain for the seven); the train runs one gain for the four, set by loudness (short puffs of noise: quiet for their peaks),
  * under the chirps, so a chirp over a run's start reads.
  */
-const CHIRP = 0.17;
+const CHIRP = 0.16;
 const TRAIN = 0.36;
 const LEVEL: Record<BirdieSound, number> = {
   hello: CHIRP,
