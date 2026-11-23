@@ -2624,7 +2624,7 @@ export const MOO_CINEMATIC = {
  * long). Beats in order, ms:
  */
 export const BIRDIE_CINEMATIC = {
-  /** His `fall` where he stands: a jolt throws him up out of the train and he tumbles out of the frame (his animation's own 830 ms). */
+  /** His `fall` where he stands: a happy hop up out of the train, then he drops out of the frame (his animation's own 830 ms). */
   dropMs: 840,
   /** The scene fades in over the board and everything above it, as Moo's field does (a CSS fade). */
   fadeInMs: 400,

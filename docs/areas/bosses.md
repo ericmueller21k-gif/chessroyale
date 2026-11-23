@@ -1019,7 +1019,8 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   the board during the ride: `birdieFen` takes the line's pieces off and `ridePieces` draws them from the rules' position, never the
   drawn board; your smashed king hidden by `birdieDecor`, never taken off the drawn board) and `components/BirdieFall.tsx` (his
   cutscene, Moo's Full Moon's parts; timed to his ult's piece, `BIRDIE_ULT` and `BIRDIE_BEATS.fall`, his music in `src/birdie-music.ts`,
-  the lobby's and solo's `turnAt` so a reload carries his fall on). His art: `characters/birdie*.ts` (young and Armored Birdie in one figure, `birdie-figure.ts`;
+  the lobby's and solo's `turnAt` so a reload carries his fall on; his `fall` where he stands, a happy hop out of the cab, wings up and
+  grinning, then a drop out of the frame: Eric, Nov 23, 2026-11-23-birdie-fall-fun.md). His art: `characters/birdie*.ts` (young and Armored Birdie in one figure, `birdie-figure.ts`;
   the cutscene baked into `birdie-cutscene.png` by `scripts/bake-birdie-cutscene.ts`; Armored Birdie has no tail, in the bar and the
   cutscene, Eric Nov 23), the train, crossing and smash in `characters/effects/birdie.ts` (the ride's loop 12 frames of 65 ms). His
   train on the board (2026-11-23-birdie-tail-smooth.md): moved by `translate` (composited), linear so the smash meets its nose; its

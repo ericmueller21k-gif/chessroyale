@@ -951,19 +951,26 @@ const depart: Anim = lazyAnim(() => ({
   ],
 }));
 
-/** Fall (about 1 s, the ultimate begins): a jolt, then he tumbles backward out of the cab and out of the frame downward, his cap flying off. */
+/**
+ * Fall (about 0.8 s, the ultimate begins; Eric, Nov 23: "a hop out of it and then him free falling but looking like he's having fun"):
+ * a little crouch, a hop up and out of the cab with his wings opening (his victory's smiling eyes and raised wings), over the roof
+ * behind it, then he drops out of the frame downward, grinning, wings up, his cap lifting in the wind. No jolt, no feathers.
+ */
+const HOP: BirdiePose = { lid: "joy", beak: true, wingLen: 22 };
+/** Falling: wings up (alternating a little), grinning, his cap lifted and knocked back by the wind; `at` where he is. */
+const whee = (at: Pt, i: number): BirdiePose => ({ ...HOP, dy: -3, wing: i % 2 ? 262 : 276, far: i % 2 ? 288 : 300, head: [0, -1], capTilt: 14, capLift: [1, -2], tumble: { q: 0, at } });
 const fall: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
-    F(130, { dy: -3, lean: [1, 0], lid: "wide", ruffle: true, capOff: true, capFree: [CAP_AT[0] + 1, CAP_AT[1] - 5, 20] }, { cue: "fall", shake: [2, 1] }),
-    F(100, { dy: -3, lid: "wide", ruffle: true, capOff: true, tumble: { q: 1, at: [7, -8] }, capFree: [CAP_AT[0] + 8, CAP_AT[1] - 7, 70] }, { cue: "squawk", specks: feathers(0) }),
-    F(100, { dy: -3, lid: "wide", ruffle: true, capOff: true, tumble: { q: 2, at: [11, -7] }, capFree: [CAP_AT[0] + 18, CAP_AT[1] - 9, 140] }, { specks: feathers(1) }),
-    F(90, { dy: -3, lid: "shut", ruffle: true, capOff: true, tumble: { q: 3, at: [14, 4] }, capFree: [CAP_AT[0] + 30, CAP_AT[1] - 11, 210] }, { specks: feathers(2) }),
-    F(90, { dy: -3, lid: "wide", ruffle: true, capOff: true, tumble: { q: 0, at: [15, 20] }, capFree: [CAP_AT[0] + 42, CAP_AT[1] - 13, 280] }, { specks: feathers(3) }),
-    F(80, { dy: -3, lid: "wide", ruffle: true, capOff: true, tumble: { q: 1, at: [16, 38] }, capFree: [CAP_AT[0] + 54, CAP_AT[1] - 15, 340] }, { specks: feathers(4) }),
-    F(80, { dy: -3, lid: "wide", capOff: true, tumble: { q: 2, at: [17, 54] } }, { specks: feathers(5) }),
-    F(80, { hidden: true }),
-    { ms: 80, layers: [] },
+    F(120, { dy: 4, dx: 1, head: [0, 1], lid: "joy", capTilt: -6 }, { cue: "pop" }),
+    F(90, { ...HOP, dy: -5, wing: 284, far: 304, wingLen: 18, head: [0, -1] }, { cue: "cheer" }),
+    F(100, { ...HOP, dy: -3, wing: 276, far: 300, head: [0, -1], tumble: { q: 0, at: [4, -10] } }),
+    F(100, { ...HOP, dy: -3, wing: 270, far: 296, head: [0, -1], capTilt: 8, tumble: { q: 0, at: [6, -12] } }),
+    F(100, whee([8, -4], 0), { cue: "fall" }),
+    F(90, whee([10, 12], 1)),
+    F(80, whee([11, 30], 0)),
+    F(80, whee([11, 48], 1)),
+    { ms: 70, layers: [] },
   ],
 }));
 
