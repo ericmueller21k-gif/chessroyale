@@ -23,7 +23,7 @@ import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from 
 import { ShopScreen } from "./screens/Shop.tsx";
 import { PageLayer, layerTakesPop } from "./components/PageLayer.tsx";
 import { KEPT_ELSEWHERE, KEPT_ENDED, account, askAgeAgain, askAgeForGoogle, askForfeitFirst, keptSoloOpen, leftSoloLive, loadAccount, mustSignInToPlayOnline, offerKeptSolo, playerName, recordSoloResult, reofferKeptSolo, setTestXp, takeKeptSolo } from "./account.ts";
-import { SoloKeep, clearKeptSolo, onKeptAnswers, type KeptSolo } from "./solo-kept.ts";
+import { SoloKeep, clearKeptSolo, noteResuming, onKeptAnswers, takeCarriedResume, type KeptSolo } from "./solo-kept.ts";
 import { leavesNote } from "./ranked.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo, difficultyMaia } from "./boss-difficulty.ts";
@@ -1492,20 +1492,31 @@ export function App() {
    * snapshot, your moves, the time used on your turn), with the same game on the server (its 10-move mark as it was) and the same boss
    * battle (its token timed from its start). The kept game as it is at the tap, never the card's copy, claimed for this tab (account.ts
    * takeKeptSolo: another tab may have played on, ended or taken it since the card came: the review of #885, I1), then checked with the
-   * server: a game recorded or replaced since isn't resumed.
+   * server: a game recorded or replaced since isn't resumed. A tap starts the game or says why (Nov 23): a load that fails says so, and
+   * one the page reloads for (stale.ts: a chunk missing) goes on in the page it loads (solo-kept.ts noteResuming), never the card again.
    */
+  const resuming = useRef(false);
   const resumeKept = async (card: KeptSolo) => {
+    // (One resume at a time: a second tap meanwhile is the same Resume.)
+    if (resuming.current) return;
     offerKeptSolo(null);
+    // (Never over a match: the card is taken off as one starts, below.)
     if (match) return;
     if (isPaused("solo")) return setError(pausedLine("solo"));
     const k = takeKeptSolo(card);
     if (typeof k === "string") return setError(k);
     unlockAudio();
+    resuming.current = true;
+    noteResuming(k.game);
     setLoading(true);
-    const [open, engines, soloCode] = await Promise.all([keptSoloOpen(k), enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
+    const loaded = await Promise.all([keptSoloOpen(k), enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]).catch(() => null);
+    resuming.current = false;
+    noteResuming(null);
     setLoading(false);
+    // (A piece that wouldn't load (the game's code, the openings, an engine): said, never a silent home.)
+    const [open, engines, soloCode] = loaded ?? [true];
     if (!open) return setError(KEPT_ENDED);
-    if (!soloCode) return setError("Couldn't load the game. Check your connection and try again.");
+    if (!soloCode || !engines) return setError("Couldn't load the game. Check your connection and try again.");
     const m = new soloCode.SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...k.settings }, false, k.bots);
     resumeSoloBattle(m, k.battle);
     resumeSoloGame(m, k.game, soloWatch(m));
@@ -1530,6 +1541,10 @@ export function App() {
     setError(KEPT_ELSEWHERE);
   };
   useEffect(() => onKeptAnswers({ resume: (k) => void resumeKept(k), note: setError }));
+  // (The page loaded again while a Resume was loading, stale.ts: that tap goes on as its card comes, before it's drawn, never asked twice.)
+  useLayoutEffect(() => {
+    if (soloKept && !match && takeCarriedResume(soloKept.game)) void resumeKept(soloKept);
+  }, [soloKept]);
   // (The kept battle's card (step 2): never over a match; offered again as Boss Battle opens with no match on.)
   useEffect(() => {
     if (match && soloKept) offerKeptSolo(null);
