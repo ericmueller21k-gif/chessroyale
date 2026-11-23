@@ -1,0 +1,88 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: HunChess
+        - generic [ref=e8]:
+          - button "Chat" [ref=e9] [cursor=pointer]:
+            - img [ref=e10]
+          - button "Quests" [ref=e12] [cursor=pointer]:
+            - img [ref=e13]
+          - button "Shop & crates" [ref=e17] [cursor=pointer]:
+            - img [ref=e18]
+          - button "Friends" [ref=e21] [cursor=pointer]:
+            - img [ref=e22]
+          - button "Settings" [ref=e27] [cursor=pointer]:
+            - img [ref=e28]
+      - status "4 online, 0 matches running, 0 in queue" [ref=e31]:
+        - generic [ref=e33]:
+          - strong [ref=e34]: 4 online
+          - text: · 0 matches running · 0 in queue
+      - generic [ref=e35]:
+        - region "You" [ref=e36]:
+          - generic [ref=e37]:
+            - button "Open your inventory" [ref=e38] [cursor=pointer]:
+              - generic [ref=e41]:
+                - img [ref=e42]
+                - img [ref=e43]
+            - generic [ref=e44]:
+              - generic [ref=e45]:
+                - button "Edit icon" [ref=e46] [cursor=pointer]:
+                  - generic [ref=e47]: ♟
+                - generic: LVL 1
+                - img
+              - button "View your profile" [ref=e49] [cursor=pointer]:
+                - generic [ref=e50]: Player
+                - generic [ref=e51]: Unranked
+          - button "View profile" [ref=e52] [cursor=pointer]:
+            - generic [ref=e53]: View profile
+            - img [ref=e54]
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - heading "RANKED" [level=2] [ref=e58]
+            - radiogroup "RANKED" [ref=e59]:
+              - radio "50 v 50 Crowd chess" [ref=e60] [cursor=pointer]:
+                - text: 50 v 50
+                - text: Crowd chess
+              - radio "1 v 1 Classic chess" [ref=e61] [cursor=pointer]:
+                - text: 1 v 1
+                - text: Classic chess
+              - radio "Squads 8 squads of 4" [ref=e62] [cursor=pointer]:
+                - text: Squads
+                - text: 8 squads of 4
+          - radiogroup "Matchmaking" [ref=e64]:
+            - radio "Solo queue join a lobby" [disabled] [ref=e65]:
+              - text: Solo queue
+              - text: join a lobby
+            - radio "Party up to 7 friends" [disabled] [ref=e66]:
+              - text: Party
+              - text: up to 7 friends
+            - radio "Bots 99 bots, now" [disabled] [ref=e67]:
+              - text: Bots
+              - text: 99 bots, now
+          - generic [ref=e68]:
+            - generic [ref=e70]: Tap a game mode to get started
+            - button "PLAY" [disabled] [ref=e71]
+          - button "Chess Town" [ref=e72] [cursor=pointer]:
+            - generic [ref=e74]: Chess Town
+          - generic [ref=e75]:
+            - button "Boss Battle Any boss, up to 3" [ref=e76] [cursor=pointer]:
+              - img [ref=e80]
+              - generic [ref=e81]:
+                - strong [ref=e82]: Boss Battle
+                - generic [ref=e83]: Any boss, up to 3
+            - button "Auto chess Build an army" [ref=e84] [cursor=pointer]:
+              - generic [ref=e87]:
+                - strong [ref=e88]: Auto chess
+                - generic [ref=e89]: Build an army
+  - alertdialog "You have a game in progress" [ref=e91]:
+    - paragraph [ref=e92]: You have a game in progress
+    - generic [ref=e95]: Ginger · Move 12
+    - paragraph [ref=e96]: Forfeiting counts as a loss.
+    - generic [ref=e97]:
+      - button "Forfeit" [ref=e98] [cursor=pointer]
+      - button "Resume" [active] [ref=e99] [cursor=pointer]
+```
