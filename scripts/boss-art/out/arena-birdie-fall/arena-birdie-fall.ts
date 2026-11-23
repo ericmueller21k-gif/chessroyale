@@ -3,10 +3,13 @@
  *  - fall (loop, 5 x 120 ms): a blurred cartoon sky, banded blue-grey to haze, pale clouds far below; young Birdie
  *    tumbling backward through it, wings flung up, tie streaming, beak open, eye wide; his cap flying off above him;
  *    vertical speed lines streaming up (a dash period of 5 steps, so the loop is seamless) and diagonal wind streaks.
- *  - approach (once, 9 x 390 ms, holds): the same sky and Birdie; the track rises out of the haze below (two rails to a
- *    far point at the upper right, sleepers, ballast), his yellow toy diesel comes up it nose first, from a dot in the
- *    haze to the bottom third, its headlights (keys W, the near lamp, and V, the far one) brighter each frame; Birdie
- *    sinks toward it; the lines stream faster and the wind streaks thicken.
+ *  - approach (once, 9 x 390 ms, holds): the same sky and Birdie; the track rises out of the haze below, drawn through
+ *    one camera (two rails a gauge apart running to one vanishing point on the horizon at the right, sleepers evenly
+ *    spaced so they close up with distance, gravel between), and his yellow diesel comes up it nose first: a long
+ *    locomotive (pilot, short nose with the headlights, raised cab with its windscreen, a long vented hood behind,
+ *    walkway handrails, the charcoal roof, the red stripe, big wheel trucks on the rails), from two dots in the haze
+ *    to the bottom third, its headlights (keys W, the near lamp, and V, the far one) brighter each frame and lighting
+ *    the rails ahead; Birdie sinks toward it; the lines stream faster and the wind streaks thicken.
  * Layers: the sky (one part), the ground and track (one part per approach frame), the lines, the train (outlined),
  * then Birdie as parts (far wing, body, near wing, tie) and his cap, all outlined in k.
  */
@@ -373,33 +376,58 @@ function birdie(ph: number, cx: number, cy: number, kx: number, ky: number, kd: 
 
 // ---------------------------------------------------------------- the ground, the track and the train
 
-/** The track's far point (x) and the near rails' spread: a rail is x = VX + σ (DXC ± GAUGE), σ = (y - horizon) / 110. */
-const VX = 172;
-const DXC = -80;
-const GAUGE = 60;
-/** The train's body recedes toward a point to the right of the track's (a slight turn, so we see its side). */
-const QX = VX + 34;
+/**
+ * One camera for the track and the train, in metres: X across the track (its middle 0, + toward the camera's side), Y up
+ * (the rails' tops 0), Z along the track away from us. The camera sits at (CX, CH, 0) looking straight down the track,
+ * so the rails run to one vanishing point (OX on the horizon); the horizon slides up as he falls.
+ */
+const OX = 184;
+const FL = 120;
+const CX = 9.6;
+const CH = 8;
+/** The track: the rails' middles at ±GAUGE, their heads RAIL each side of that, RAILH tall; sleepers every SLEEP, SLW
+ * wide, SLL each side of the middle; the ballast BAL each side, its top at BALY. */
+const GAUGE = 0.8;
+const RAIL = 0.085;
+const RAILH = 0.17;
+const SLEEP = 0.72;
+const SLW = 0.3;
+const SLL = 2.2;
+const BAL = 2.7;
+const BALY = -0.35;
+/** The train's nose: from Z_FAR (two dots in the haze) to Z_NEAR (the bottom third). */
+const Z_FAR = 70;
+const Z_NEAR = 8.8;
+/** The headlights on the nose's front: at X ±LAMP_X (W the near one, at +), LAMP_Y up, LAMP_R round. */
+const LAMP_X = 0.82;
+const LAMP_Y = 2.12;
+const LAMP_R = 0.36;
 
 interface Approach {
+  j: number;
   hz: number;
-  s: number;
+  /** The nose's distance. */
+  zt: number;
+  /** How bright the lamps are, 0..1. */
   L: number;
+  /** The haze: distances look this much farther (the early frames are all haze). */
+  fog: number;
 }
 function approachAt(j: number): Approach {
   const t = j / 8;
-  return { hz: Math.round(218 - 98 * Math.pow(t, 1.15)), s: 0.14 + 0.86 * Math.pow(t, 1.9), L: t };
+  return {
+    j,
+    hz: Math.round(218 - 98 * Math.pow(t, 1.15)),
+    zt: Z_NEAR * Math.pow(Z_FAR / Z_NEAR, 1 - Math.pow(t, 1.1)),
+    L: t,
+    fog: 1 + 2.5 * Math.pow(1 - t, 1.5),
+  };
 }
-const trainAt = (a: Approach): Pt => [VX + DXC * a.s, a.hz + 110 * a.s];
+const proj = (a: Approach, X: number, Y: number, Z: number): Pt => [OX + (FL * (X - CX)) / Z, a.hz + (FL * (CH - Y)) / Z];
 
-/** Where the headlights are, in frame pixels: the near (W) and far (V) lamp's middles and radii. */
-const LAMP_W: readonly [number, number, number] = [-38, -31, 9.5];
-const LAMP_V: readonly [number, number, number] = [38, -31, 8.5];
-
+/** The ground and the track for an approach frame: every pixel below the horizon, cast back onto the ground. */
 function groundPart(j: number): Part {
   const a = approachAt(j);
-  const [tcx, tby] = trainAt(a);
-  const sleepers = Array.from({ length: 60 }, (_, k) => 1 / (0.52 + 0.13 * k));
-  const lamps = [LAMP_W, LAMP_V].map(([u, , r]) => [tcx + u * a.s, r * a.s] as const);
   return box(
     0,
     0,
@@ -407,156 +435,353 @@ function groundPart(j: number): Part {
     FH,
     (x, y) => {
       if (y < a.hz) return null;
-      const sg0 = (y + 0.5 - a.hz) / 110;
-      // The haze: in the first frames even the nearest ground is far and pale.
-      const fog = Math.min(1, 0.22 + 0.2 * j);
-      const sg = sg0 * fog;
-      const X = x + 0.5;
-      // The ground, haze at the horizon, a little darker nearer.
-      let k: string;
-      if (sg < 0.04) k = "8";
-      else if (sg < 0.07) k = (x + y) % 2 ? "8" : "7";
-      else if (sg < 0.2) k = "7";
-      else if (sg < 0.26) k = (x + y) % 2 ? "7" : "0";
-      else if (sg < 0.55) k = "0";
-      else if (sg < 0.62) k = (x + y) % 2 ? "0" : "G";
-      else k = "G";
-      // Faint field bands in the haze.
-      if (sg > 0.1 && Math.floor(1 / sg) % 3 === 0 && (x + y) % 3 === 0) k = k === "7" ? "8" : k === "0" ? "7" : k === "G" ? "0" : k;
-      const mid = VX + sg0 * DXC;
-      const far = sg < 0.1;
-      // Ballast under the track.
-      const ball = Math.abs(X - mid) < GAUGE * 1.5 * sg0;
-      if (ball) {
-        if (far) k = "7";
-        else if (sg < 0.25) k = (x + y) % 2 ? "0" : "7";
+      const sx = x + 0.5;
+      const dy = Math.max(0.3, y + 0.5 - a.hz);
+      const chk = (x + y) % 2 === 0;
+      const toX = (Z: number) => CX + ((sx - OX) * Z) / FL;
+      // The land: haze at the horizon, a little darker nearer, faint field bands.
+      const zg = (FL * (CH - BALY)) / dy;
+      const fz = zg * a.fog;
+      let k = fz > 75 ? "8" : fz > 55 ? (chk ? "8" : "7") : fz > 30 ? "7" : fz > 22 ? (chk ? "7" : "0") : fz > 11 ? "0" : fz > 8 ? (chk ? "0" : "G") : "G";
+      if (fz > 11 && fz < 75 && Math.floor(Math.log(zg) * 7) % 4 === 0 && (x + y) % 3 === 0) k = k === "7" ? "8" : k === "0" ? "7" : k;
+      // What the headlights can light here, and where it is.
+      let lit: "rail" | "sleeper" | "ballast" | null = null;
+      let zq = zg;
+      let xq = toX(zg);
+      // The ballast under the track: gravel near, a darker band receding into the haze.
+      if (Math.abs(xq) < BAL) {
+        if (fz > 65) k = chk ? "8" : "7";
+        else if (fz > 38) k = "0";
+        else if (fz > 22) k = chk ? "0" : "c";
         else {
           const hh = hash(x, y);
-          k = hh < 14 ? "d" : hh < 30 ? "c" : hh < 40 ? "e" : hh < 50 ? "l" : sg > 0.5 ? "G" : "0";
+          k = hh < 16 ? "d" : hh < 34 ? "c" : hh < 44 ? "e" : hh < 54 ? "l" : hh < 70 ? "b" : "0";
         }
+        lit = "ballast";
       }
-      // Sleepers.
-      let onSleeper = false;
-      if (sg >= 0.16)
-        for (const sk of sleepers) {
-          const yk = a.hz + 110 * sk;
-          const th = Math.max(0.5, 3.4 * sk);
-          if (Math.abs(y + 0.5 - yk) <= th && Math.abs(X - (VX + sk * DXC)) <= GAUGE * 1.28 * sk) {
-            const top = y + 0.5 - yk < -th + 1.2;
-            k = sg < 0.3 ? "G" : top ? "c" : y + 0.5 - yk > th - 1.2 ? "a" : "b";
-            onSleeper = true;
+      // The sleepers, row by row (a row of the picture is one distance down the track): evenly spaced on the ground, so
+      // closer together and thinner with distance; left out where they'd be under 2.4 pixels apart (the haze takes over).
+      const KS = FL * (CH + RAILH);
+      const zs = KS / dy;
+      const sp = (KS * SLEEP) / (zs * zs);
+      if (sp >= 2.4 && zs * a.fog < 46) {
+        const za = KS / (dy + 0.5);
+        const zb = dy > 0.5 ? KS / (dy - 0.5) : 1e9;
+        const n0 = Math.round(zs / SLEEP);
+        let hit: string | null = null;
+        for (let n = n0 - 1; n <= n0 + 1 && !hit; n++) {
+          const s0 = n * SLEEP - SLW / 2;
+          const s1 = n * SLEEP + SLW / 2;
+          const ov = Math.min(zb, s1) - Math.max(za, s0);
+          if (ov > 0.5 * Math.min(zb - za, SLW) && Math.abs(toX(n * SLEEP)) <= SLL) {
+            hit = zb > s1 && zb - za < SLW * 0.6 ? "edge" : "top";
+            zq = n * SLEEP;
           }
         }
-      // The rails.
-      for (const side of [-1, 1]) {
-        const rc = VX + sg0 * (DXC + side * GAUGE);
-        const rw = Math.max(0.5, 2.6 * sg0);
-        const rel = (X - rc) / rw;
-        if (Math.abs(rel) <= 1) {
-          if (far) k = sg < 0.05 ? "7" : "6";
-          else if (sg < 0.25) k = "l";
-          else k = rel < -0.35 ? "J" : rel < 0.45 ? "l" : "j";
-          // Rivets on the near rails.
-          if (sg > 0.75 && rel > -0.35 && rel < 0.45 && (y % 7 === 0)) k = "j";
-        } else if (onSleeper && sg > 0.45 && Math.abs(rel) <= 1.9) k = Math.abs(rel) > 1.55 && y % 2 === 0 ? "J" : "j";
-        else if (sg > 0.4 && rel > 1 && rel <= 1.6 && !onSleeper) k = "m";
-      }
-      // The headlights' light thrown ahead of the train on the track: brighter each frame.
-      if (y > tby && a.L > 0.2)
-        for (const [lx, lr] of lamps) {
-          const dy = (y + 0.5 - tby) / (a.s * 34 * (0.6 + a.L));
-          const dx = (X - lx) / (lr * (2.2 + dy * 1.5));
-          const d = dx * dx + dy * dy;
-          if (d > 1) continue;
-          const lit = k === "J" || k === "l" ? (d < 0.5 ? "w" : "Y") : onSleeper && (k === "c" || k === "b") ? "Y" : null;
-          const dens = a.L * (1 - d);
-          if (lit && (dens > 0.55 || (dens > 0.3 && (x + y) % 2 === 0) || (dens > 0.12 && (x + 2 * y) % 4 === 0))) k = lit;
+        // The sleeper's near face, under its top.
+        for (let n = n0; n <= n0 + 2 && !hit; n++) {
+          const zf = n * SLEEP - SLW / 2;
+          const yh = CH - (dy * zf) / FL;
+          if (yh >= BALY && yh <= -RAILH && Math.abs(toX(zf)) <= SLL) {
+            hit = "front";
+            zq = zf;
+          }
         }
+        if (hit) {
+          const sfz = zq * a.fog;
+          k = sfz < 18 ? (hit === "front" ? "a" : hit === "edge" ? "d" : "c") : sfz < 30 ? (hit === "front" ? "a" : "b") : chk ? "b" : "0";
+          lit = "sleeper";
+          xq = toX(zq);
+        }
+      }
+      // The rails: a head (lit at its left) and the web's side under it, toward us; faint lines in the haze.
+      const zr = (FL * CH) / dy;
+      const zr2 = (FL * (CH + RAILH)) / dy;
+      const rfz = zr * a.fog;
+      if (rfz < 95)
+        for (const xr of [-GAUGE, GAUGE]) {
+          let lo = OX + (FL * (xr - RAIL - CX)) / zr;
+          let hi = OX + (FL * (xr + RAIL - CX)) / zr;
+          const web = OX + (FL * (xr + RAIL - CX)) / zr2;
+          if (hi - lo < 1) {
+            const m = (lo + hi) / 2;
+            lo = m - 0.5;
+            hi = m + 0.5;
+          }
+          if (sx >= lo && sx < hi) {
+            if (rfz > 60) k = "7";
+            else if (rfz > 36) k = "6";
+            else if (rfz > 20) k = "l";
+            else {
+              k = sx - lo < (hi - lo) * 0.55 ? "J" : "l";
+              // Rivets along the near rails' heads.
+              const ra = (FL * CH) / (dy + 0.5);
+              const rb = (FL * CH) / (dy - 0.5);
+              if (hi - lo >= 2.4 && Math.floor(rb / 0.45) !== Math.floor(ra / 0.45) && Math.abs(sx - (lo + hi) / 2) < 0.75) k = "j";
+            }
+            lit = "rail";
+            zq = zr;
+            xq = xr;
+          } else if (sx >= hi && sx < web && rfz < 36) k = rfz > 20 ? "j" : lit === "sleeper" ? "m" : "j";
+        }
+      // The headlights' light thrown ahead of the train onto the track: brighter each frame.
+      if (a.L > 0.2 && lit) {
+        const dz = a.zt - zq;
+        const reach = 1.5 + 5 * a.L;
+        if (dz > 0 && dz < reach)
+          for (const lx of [-LAMP_X, LAMP_X]) {
+            const u = (xq - lx) / (0.5 + 0.3 * dz);
+            const d = u * u + (dz / reach) ** 2;
+            if (d >= 1) continue;
+            const dens = a.L * (1 - d);
+            if (lit === "rail") k = dens > 0.45 ? "w" : dens > 0.22 ? "Y" : k;
+            else if (lit === "sleeper" && Math.abs(u) < 0.7 && (dens > 0.6 || (dens > 0.4 && chk))) k = k === "a" ? "d" : "Y";
+            else if (lit === "ballast" && dens > 0.65 && (x + 2 * y) % 4 === 0) k = "e";
+          }
+      }
       return k;
     },
     false,
   );
 }
 
-/** The train: front three-quarter, nose toward us. Scale `s`, the front's bottom middle at (cx, by), lamps lit `L`. */
+/**
+ * The locomotive as boxes in its own metres (z from the nose's front back along the track), each painting its faces:
+ * f its front (toward us), t its top, r its right side (toward the camera), l, b. Light from the top left: tops
+ * brightest, fronts lit, the right sides in shade.
+ */
+type Face = "f" | "t" | "r" | "l" | "b";
+interface Solid {
+  x: readonly [number, number];
+  y: readonly [number, number];
+  z: readonly [number, number];
+  paint: (f: Face, X: number, Y: number, z: number, px: number, sy: number) => string;
+  /** A hit counts only where this holds (round wheels, the nose's round corners). */
+  keep?: (X: number, Y: number, z: number) => boolean;
+}
+/** Within `hw` of `c`, but never under a pixel thick (px: pixels per metre there). */
+const near = (v: number, c: number, hw: number, px: number) => Math.abs(v - c) * px < Math.max(0.5, hw * px);
+type Paint = Solid["paint"];
+
+/** The hood's side vents, its roof fans, the two trucks' middles. */
+const VENTS: readonly [number, number][] = [[5.0, 6.6], [7.2, 8.8], [9.4, 11.0], [11.6, 13.2], [13.8, 15.6]];
+const FANS = [12.2, 14.2, 16.1];
+const TRUCKS = [2.7, 14.3];
+
+const SOLIDS: Solid[] = [];
+const solid = (x: Solid["x"], y: Solid["y"], z: Solid["z"], paint: Paint, keep?: Solid["keep"]) => SOLIDS.push({ x, y, z, paint, keep });
+
+// The pilot (cowcatcher): silver slats, stepped back toward the bottom; the coupler.
+const slats: Paint = (f, X) => (f === "t" ? "J" : f === "r" ? "j" : Math.floor((X + 1.6) / 0.27) % 2 ? "l" : "j");
+solid([-1.6, 1.6], [0.55, 0.95], [-0.38, 0.5], (f, X, Y, z, px, sy) => (f === "f" && near(Y, 0.91, 0.04, px) ? "J" : slats(f, X, Y, z, px, sy)));
+solid([-1.4, 1.4], [0.14, 0.55], [-0.2, 0.5], slats);
+solid([-0.2, 0.2], [0.5, 0.74], [-0.6, -0.38], (f) => (f === "t" ? "J" : f === "f" ? "l" : "j"));
+// The underframe, dark.
+solid([-1.0, 1.0], [0.7, 0.96], [0.4, 17.2], () => "m");
+// The fuel tank between the trucks.
+solid([-1.3, 1.3], [0.42, 0.96], [5.4, 11.6], (f, X, Y, z, px) => (f === "t" ? "l" : f === "f" ? "j" : near(Y, 0.9, 0.04, px) ? "l" : Y < 0.52 ? "m" : "j"));
+// The trucks: big wheels on the rails (round, a hub, a lit rim at the top left), a silver side frame across them.
+for (const zc of TRUCKS) {
+  for (const wz of [zc - 1.15, zc, zc + 1.15])
+    for (const xs of [[0.72, 1.04], [-1.04, -0.72]] as const)
+      solid(
+        xs,
+        [0, 1.0],
+        [wz - 0.5, wz + 0.5],
+        (f, X, Y, z) => {
+          if (f !== "r" && f !== "l") return "m";
+          const d = Math.hypot(z - wz, Y - 0.5) / 0.5;
+          if (d > 0.8) return "m";
+          if (d < 0.26) return "l";
+          if (d > 0.56 && Y > 0.45 && z < wz + 0.15) return "l";
+          return "j";
+        },
+        (X, Y, z) => Math.hypot(z - wz, Y - 0.5) <= 0.5,
+      );
+  solid([-1.22, 1.22], [0.62, 0.92], [zc - 1.75, zc + 1.75], (f, X, Y, z, px) => (f === "t" ? "J" : f === "f" ? "j" : near(Y, 0.89, 0.04, px) ? "J" : Y < 0.68 ? "j" : "l"));
+}
+// The deck (the walkway along the hood), yellow, the thin red stripe right round it.
+solid([-1.9, 1.9], [0.95, 1.36], [0, 17.4], (f, X, Y, z, px) => {
+  if (f === "t") return "u";
+  if (near(Y, 1.17, 0.06, px)) return "q";
+  if (f === "f") return Y > 1.17 ? "y" : "v";
+  return Y > 1.17 ? "v" : "u";
+});
+// The short nose: round top corners, the headlights (drawn after) and a grille between them.
+solid(
+  [-1.45, 1.45],
+  [1.36, 2.95],
+  [0, 0.95],
+  (f, X, Y, z, px, sy) => {
+    if (f === "t") return "Y";
+    if (f === "r") return Y > 2.75 ? "y" : "v";
+    if (Math.abs(X) < 0.3 && Y > 1.6 && Y < 2.62) return sy % 2 ? "u" : "v";
+    if (X < -1.18 || Y > 2.8) return "Y";
+    if (X > 1.2) return "v";
+    return "y";
+  },
+  (X, Y) => !(Y > 2.5 && Math.abs(X) > 1.0) || (Math.abs(X) - 1.0) ** 2 + (Y - 2.5) ** 2 <= 0.2,
+);
+// The raised cab: the windscreen at its front, a side window, its charcoal roof.
+const glass = (u: number, v: number) => ((((u + v * 0.9) % 1) + 1) % 1 < 0.17 ? "Z" : "z");
+solid([-1.9, 1.9], [1.36, 4.2], [0.95, 4.25], (f, X, Y, z, px) => {
+  if (f === "f") {
+    if (Y >= 3.0 && Y <= 3.9 && Math.abs(X) >= 0.17 && Math.abs(X) <= 1.62) return glass(X, Y - 3);
+    return X < -1.7 ? "Y" : Y < 1.55 ? "v" : "y";
+  }
+  if (f === "r") {
+    if (Y >= 3.0 && Y <= 3.9 && z >= 1.3 && z <= 2.9) return glass(-z, Y - 3);
+    if (near(z, 3.3, 0.03, px) && Y < 3.9) return "u";
+    return Y < 1.55 ? "u" : "v";
+  }
+  return "y";
+});
+solid([-1.98, 1.98], [4.2, 4.45], [0.86, 4.33], (f, X, Y, z) => (f === "t" ? (X < -1.55 || z < 1.2 ? "N" : "n") : "m"));
+// The long hood behind the cab: side vents (louvres), its dark roof with fans and a stack.
+solid([-1.5, 1.5], [1.36, 3.5], [4.25, 17.0], (f, X, Y, z, px, sy) => {
+  if (f === "t") {
+    for (const c of FANS) {
+      const d = Math.hypot(X, z - c);
+      if (d <= 0.62) return d > 0.46 ? "m" : d < 0.16 ? "l" : "j";
+    }
+    return X < -1.15 ? "N" : X > 1.3 ? "m" : "n";
+  }
+  if (f === "r") {
+    if (Y > 3.3) return "y";
+    for (const [z0, z1] of VENTS) {
+      if (z >= z0 && z <= z1 && Y >= 2.05 && Y <= 3.1) return sy % 2 ? "m" : "u";
+      if (near(z, z1 + 0.3, 0.03, px) && Y < 3.25) return "u";
+    }
+    return Y < 1.55 ? "u" : "v";
+  }
+  return "v";
+});
+solid([-0.22, 0.22], [3.5, 3.85], [5.4, 5.9], (f) => (f === "t" ? "m" : "j"));
+
+/** Where a ray from the camera (dx, dy per metre along Z) first meets a solid placed with its nose at zt. */
+function hitSolid(s: Solid, dx: number, dy: number, zt: number): { t: number; face: Face } | null {
+  let tn = zt + s.z[0];
+  let tf = zt + s.z[1];
+  let face: Face = "f";
+  const slab = (o: number, d: number, lo: number, hi: number, fLo: Face, fHi: Face): boolean => {
+    if (Math.abs(d) < 1e-9) return o >= lo && o <= hi;
+    let a = (lo - o) / d;
+    let b = (hi - o) / d;
+    let fa = fLo;
+    if (a > b) {
+      [a, b] = [b, a];
+      fa = fHi;
+    }
+    if (a > tn) {
+      tn = a;
+      face = fa;
+    }
+    tf = Math.min(tf, b);
+    return true;
+  };
+  if (!slab(CX, dx, s.x[0], s.x[1], "l", "r")) return null;
+  if (!slab(CH, dy, s.y[0], s.y[1], "b", "t")) return null;
+  if (tn > tf || tn <= 0) return null;
+  return { t: tn, face };
+}
+
+/** The train in an approach frame: every pixel cast against the solids, edges inked where one solid stands before another, then the handrails and the headlights. */
 function trainPart(j: number): Part {
   const a = approachAt(j);
-  const { s, L, hz } = a;
-  const [cx, by] = trainAt(a);
-  const F = (u: number, v: number): Pt => [cx + u * s, by + v * s];
-  const fb = 0.7;
-  const B = (p: Pt): Pt => [QX + (p[0] - QX) * fb, hz + (p[1] - hz) * fb];
-  const HW = 66;
-  const sideQ: Pt[] = [F(HW, -74), F(HW, -5), B(F(HW, -5)), B(F(HW, -74))];
-  const roofQ: Pt[] = [F(-56, -79), F(56, -79), F(HW, -74), B(F(HW, -74)), B(F(56, -79)), B(F(-56, -79))];
-  const rr = (u: number, v: number, x0: number, x1: number, y0: number, y1: number, rt: number, rb: number) => {
-    if (u < x0 || u > x1 || v < y0 || v > y1) return false;
-    const r = v < (y0 + y1) / 2 ? rt : rb;
-    if (r <= 0) return true;
-    const cxr = u < x0 + r ? x0 + r : u > x1 - r ? x1 - r : u;
-    const cyr = v < (y0 + y1) / 2 ? (v < y0 + r ? y0 + r : v) : v > y1 - r ? y1 - r : v;
-    return Math.hypot(u - cxr, v - cyr) <= r;
+  const zt = a.zt;
+  const sig = FL / zt;
+  const cv = canvas(FW, FH);
+  const depth = Array.from({ length: FH }, () => Array<number>(FW).fill(Infinity));
+  const who = Array.from({ length: FH }, () => Array<number>(FW).fill(-1));
+  const ends = [proj(a, -2, 0, zt - 0.7), proj(a, -2, 4.5, zt - 0.7), proj(a, 2, 4.5, zt + 17.5), proj(a, 2, 0, zt - 0.7)];
+  const x0 = Math.max(0, Math.floor(Math.min(...ends.map((p) => p[0]))) - 1);
+  const x1 = Math.min(FW - 1, Math.ceil(Math.max(...ends.map((p) => p[0]))) + 1);
+  const y0 = Math.max(0, Math.floor(Math.min(...ends.map((p) => p[1]))) - 1);
+  const y1 = Math.min(FH - 1, Math.ceil(Math.max(...ends.map((p) => p[1]))) + 1);
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const dx = (x + 0.5 - OX) / FL;
+      const dy = -(y + 0.5 - a.hz) / FL;
+      let best = Infinity;
+      let key: string | null = null;
+      for (let i = 0; i < SOLIDS.length; i++) {
+        const s = SOLIDS[i]!;
+        const h = hitSolid(s, dx, dy, zt);
+        if (!h || h.t >= best) continue;
+        const X = CX + dx * h.t;
+        const Y = CH + dy * h.t;
+        const z = h.t - zt;
+        if (s.keep && !s.keep(X, Y, z)) continue;
+        best = h.t;
+        key = s.paint(h.face, X, Y, z, FL / h.t, y);
+        who[y]![x] = i;
+      }
+      if (key) {
+        cv[y]![x] = key;
+        depth[y]![x] = best;
+      }
+    }
+  // Ink where a nearer solid stands in front of a farther one (the cab's back edge on the hood, the roof's lip).
+  if (sig >= 3) {
+    const ink: [number, number][] = [];
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const w = who[y]![x]!;
+        if (w < 0) continue;
+        for (const [ex, ey] of N4S) {
+          const o = who[y + ey]?.[x + ex];
+          if (o === undefined || o < 0 || o === w) continue;
+          if (depth[y + ey]![x + ex]! < depth[y]![x]! - 0.35) {
+            ink.push([x, y]);
+            break;
+          }
+        }
+      }
+    for (const [x, y] of ink) cv[y]![x] = "k";
+  }
+  // The handrails: posts and a rail along the walkway, drawn where nothing nearer hides them.
+  const line = (p: readonly [number, number, number], q: readonly [number, number, number], key: string) => {
+    const [ax, ay] = proj(a, p[0], p[1], zt + p[2]);
+    const [bx, by] = proj(a, q[0], q[1], zt + q[2]);
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(bx - ax), Math.abs(by - ay))));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const px = Math.floor(ax + (bx - ax) * t);
+      const py = Math.floor(ay + (by - ay) * t);
+      if (px < 0 || py < 0 || px >= FW || py >= FH) continue;
+      const iz = 1 / (zt + p[2]) + (1 / (zt + q[2]) - 1 / (zt + p[2])) * t;
+      if (1 / iz <= depth[py]![px]! + 0.2) cv[py]![px] = key;
+    }
   };
-  const lamp = (u: number, v: number, X: number, Y: number, spec: readonly [number, number, number], key: string): string | null => {
-    const [lu, lv, r] = spec;
-    const [px, py] = F(lu, lv);
-    const R = r * s;
-    const d = Math.hypot(X - px, Y - py);
-    if (R < 1.6) return Math.floor(X) === Math.floor(px) && Math.floor(Y) === Math.floor(py) ? (L > 0.5 ? "w" : key) : null;
-    const core = R * (0.08 + 0.6 * L);
-    if (d <= core) return "w";
-    if (d <= R) return key;
-    if (d <= R + Math.max(1, 1.5 * s)) return d < R + 1 && (X - px) + (Y - py) < 0 ? "J" : "j";
-    return null;
-  };
-  return box(0, 0, FW, FH, (x, y) => {
-    const X = x + 0.5;
-    const Y = y + 0.5;
-    const u = (X - cx) / s;
-    const v = (Y - by) / s;
-    let k: string | null = null;
-    // The side going back (its far end toward QX), with the stripe and a row of windows.
-    if (pip(sideQ, X, Y)) {
-      const xF = sideQ[0]![0];
-      const xB = sideQ[3]![0];
-      const t = Math.max(0, Math.min(1, (X - xF) / (xB - xF)));
-      const top = sideQ[0]![1] + (sideQ[3]![1] - sideQ[0]![1]) * t;
-      const bot = sideQ[1]![1] + (sideQ[2]![1] - sideQ[1]![1]) * t;
-      const hh = (Y - top) / (bot - top);
-      k = hh < 0.06 ? "m" : hh > 0.86 ? "u" : hh < 0.4 ? "v" : "v";
-      if (Math.abs(hh - 0.74) < 0.035 + 0.5 / Math.max(1, bot - top)) k = "q";
-      if (hh > 0.14 && hh < 0.32 && t > 0.12 && Math.floor(t * 9) % 2 === 1) k = hh < 0.19 ? "Z" : "z";
-      if (hh > 0.93) k = "j";
+  if (sig >= 2.4) {
+    const RX = 1.84;
+    const RY = 2.4;
+    line([RX, RY, 0.1], [RX, RY, 0.95], "J");
+    line([RX, RY, 4.4], [RX, RY, 17.3], "J");
+    for (const z of [0.1, 4.4, 5.95, 7.5, 9.05, 10.6, 12.15, 13.7, 15.25, 16.8]) line([RX, 1.38, z], [RX, RY, z], "l");
+    line([-RX, 1.38, 0.1], [-RX, RY, 0.1], "l");
+  }
+  // The headlights: round, W the near lamp and V the far one; the hot core w grows each frame; a silver rim.
+  for (const [lx, key] of [[LAMP_X, "W"], [-LAMP_X, "V"]] as const) {
+    const [cx, cy] = proj(a, lx, LAMP_Y, zt);
+    const R = LAMP_R * sig;
+    if (R < 1.3) {
+      cv[Math.floor(cy)]![Math.floor(cx)] = a.L > 0.45 ? "w" : key;
+      continue;
     }
-    if (pip(roofQ, X, Y)) k = (Math.floor((X - Y * 0.6) / Math.max(2, 6 * s)) % 3 === 0) ? "N" : "n";
-    // The cab front, its sloped windshield.
-    if (rr(u, v, -58, 58, -79, -48, 9, 0)) {
-      k = v < -74 ? (v < -77.5 ? "N" : "n") : u < -50 ? "Y" : u > 48 ? "v" : "y";
-      if (pip([[-51, -52], [-44, -71], [-4, -71], [-4, -52]], u, v) || pip([[4, -52], [4, -71], [44, -71], [51, -52]], u, v))
-        k = ((((u - v * 0.7) % 26) + 26) % 26) < 4 ? "Z" : "z";
-    }
-    // The trucks, the wheels, the pilot.
-    if (Math.abs(u) >= 44 && Math.abs(u) <= 70 && v >= -14 && v <= 0) {
-      k = v < -12 ? "l" : "j";
-      if (((Math.abs(u) - 57) / 10) ** 2 + ((v + 4.5) / 5) ** 2 <= 1) k = v < -6 ? "l" : "m";
-    }
-    if (v >= -16 && v <= -1 && Math.abs(u) <= 52 - (v + 16) * 0.6) k = v < -14.5 ? "J" : Math.floor(v) % 3 === 0 ? "j" : "l";
-    // The rounded nose.
-    if (rr(u, v, -HW, HW, -50, -13, 18, 3)) {
-      k = "y";
-      if (u > 50 || (u > 40 && v > -24)) k = "v";
-      if (v < -45 || u < -58) k = "Y";
-      if (v > -16.5) k = "u";
-      // The thin red stripe sweeping down to the middle of the nose.
-      if (Math.abs(v - (-17.5 - 6 * (Math.abs(u) / HW))) <= Math.max(1.2, 0.8 / s)) k = "q";
-    }
-    const lw = lamp(u, v, X, Y, LAMP_W, "W");
-    if (lw) k = lw;
-    const lv = lamp(u, v, X, Y, LAMP_V, "V");
-    if (lv) k = lv;
-    return k;
-  });
+    const core = R * (0.12 + 0.58 * a.L);
+    const rim = R >= 2.2 ? 1 : 0;
+    for (let y = Math.floor(cy - R - 2); y <= cy + R + 2; y++)
+      for (let x = Math.floor(cx - R - 2); x <= cx + R + 2; x++) {
+        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        if (d <= core) cv[y]![x] = "w";
+        else if (d <= R) cv[y]![x] = key;
+        else if (d <= R + rim) cv[y]![x] = x + 0.5 - cx + (y + 0.5 - cy) < 0 ? "J" : "j";
+      }
+  }
+  return { grid: toGrid(cv), outline: true };
 }
+const N4S = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
 // ---------------------------------------------------------------- frames
 
