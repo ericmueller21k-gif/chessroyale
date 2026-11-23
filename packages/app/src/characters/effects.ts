@@ -29,6 +29,7 @@ import { CLAW_HIT } from "./effects/dash.ts";
 import { ZEBRA_DOUGH } from "./zebra-dough.ts";
 import { GOLD_FX } from "./zebra-gold.ts";
 import { CHANDY_FX } from "./effects/chandy.ts";
+import { BIRDIE_CROSSING, BIRDIE_SMASH } from "./effects/birdie.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -124,4 +125,7 @@ export const EFFECT_SPRITES = {
   chandyDodgeRow: CHANDY_FX.DODGE_ROW,
   chandyDodgeCol: CHANDY_FX.DODGE_COL,
   chandyDodgeKing: CHANDY_FX.DODGE_KING,
+  // Birdie's (effects/birdie.ts): the crossing on his warned line, and his train's smash.
+  birdieCrossing: BIRDIE_CROSSING,
+  birdieSmash: BIRDIE_SMASH,
 } as const satisfies Record<string, Character>;

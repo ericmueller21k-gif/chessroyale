@@ -6,6 +6,7 @@ import { growingRun, resetGrowing } from "./RecluseChild.ts";
 import { figure, onResetBeats, setFigureRun, suit } from "./boss-figure.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
+import { resetBirdie } from "../characters/birdie-state.ts";
 import { type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import type { Facing } from "../characters/sprite-kit.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
@@ -71,6 +72,7 @@ onResetBeats(() => {
   played.clear();
   inPlace.run = null;
   resetMoo();
+  resetBirdie();
   resetGarden();
   resetTiger();
   resetGrowing();

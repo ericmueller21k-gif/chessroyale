@@ -23,6 +23,7 @@ import * as fxBigboy from "../src/characters/effects/bigboy.ts";
 import * as fxBigboyTower from "../src/characters/effects/bigboy-tower.ts";
 import * as fxBoingo from "../src/characters/effects/boingo.ts";
 import * as fxChandy from "../src/characters/effects/chandy.ts";
+import * as fxBirdie from "../src/characters/effects/birdie.ts";
 import * as fxGingerSuper from "../src/characters/effects/ginger-superice.ts";
 import * as fxDash from "../src/characters/effects/dash.ts";
 import * as fxFolio from "../src/characters/effects/folio.ts";
@@ -62,6 +63,7 @@ const PACKS: Record<string, { prefix: string; module: string }> = {
   dash: { prefix: "dash", module: "dash" },
   zebra: { prefix: "zebra", module: "zebra" },
   chandy: { prefix: "chandy", module: "chandy" },
+  birdie: { prefix: "birdie", module: "birdie" },
   recluse: { prefix: "recluse", module: "recluse" },
 };
 
@@ -71,6 +73,7 @@ const FX_FILES: Record<string, readonly object[]> = {
   bigboy: [fxBigboy, fxBigboyTower],
   clown: [fxBoingo],
   chandy: [fxChandy],
+  birdie: [fxBirdie],
   dash: [fxDash],
   folio: [fxFolio],
   gardener: [fxGardener],
