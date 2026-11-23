@@ -1,6 +1,6 @@
 import { DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, birdieTurnMs, powerWinShowMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -43,7 +43,7 @@ const BOSS_KILL_MS = 3800;
 const REVEAL_LEAD_MS = 100;
 /** What a kept game holds beside the snapshot, your moves and the intro (KeptGame). */
 type Extras = Pick<KeptGame, "turnMs" | "powerUp" | "pending" | "moment">;
-const landedMs = (snap: BossView) => landedEarlyMs(snap) + fullMoonMs(snap) + gingerTurnMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap) + chandyTurnMs(snap) + bigboyTurnMs(snap) + sawyerTurnMs(snap);
+const landedMs = (snap: BossView) => landedEarlyMs(snap) + fullMoonMs(snap) + gingerTurnMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap) + chandyTurnMs(snap) + bigboyTurnMs(snap) + sawyerTurnMs(snap) + birdieTurnMs(snap);
 /**
  * The opening library (packages/chess/data/openings.json: 350 kB of the first load's main chunk until Nov 6): its own chunk now,
  * loaded on first use. Home asks for it once the page is idle (App.tsx), and a solo match waits for it before it starts
@@ -1805,6 +1805,8 @@ export class SoloMatch implements GameView {
    * the turn's time and power-up, the timed moment on), and every keep until then keeps them as they were (EN1).
    */
   private resumed: Extras | null = null;
+  /** When a power's win at the start of his turn began to show (powerWinShowMs: Birdie's train on your king); null: not yet. */
+  private winShownAt: number | null = null;
 
   private nextRound() {
     try {
@@ -1837,6 +1839,15 @@ export class SoloMatch implements GameView {
         return this.startBrain((afterLoading) => this.bossIntro(afterLoading));
       }
       if (this.runner.stageComplete()) {
+        // (A power won it at the start of his turn, Birdie's train on your king: its ride plays as he "thinks", then the result. Once: a
+        // rejoin with the win kept skips the ride (its moments' rejoin rule) and goes on to the result after its hold.)
+        const winMs = this.winShownAt === null ? powerWinShowMs(this.bossSnapshot()) : 0;
+        if (winMs > 0) {
+          this.winShownAt = Date.now();
+          this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, thinking: true });
+          this.nextRoundIn(winMs);
+          return;
+        }
         // (Who fought it beside you: a solo Crowd's finalists, phase 2's other players if it follows.)
         const mates = this.runner.alive().filter((p) => p.id !== HUMAN);
         this.runner.finishBossBattle();

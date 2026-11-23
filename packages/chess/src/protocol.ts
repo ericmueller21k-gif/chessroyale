@@ -14,6 +14,7 @@ import type { WorkshopView } from "./bosses/timber.ts";
 import type { DashView } from "./bosses/dash.ts";
 import type { ZebraView } from "./bosses/zebra.ts";
 import type { ChandyView } from "./bosses/chandy.ts";
+import type { BirdieView } from "./bosses/birdie.ts";
 import type { Phase2Result } from "./bosses/recluse-phase2.ts";
 import type { MoveScore } from "./uci.ts";
 /**
@@ -183,6 +184,12 @@ export interface ScoreJob {
    * (`swapped`); the bots pick with them counted; the lobby's runner scores those moves on them, once, for everyone.
    */
   swap?: Record<string, string>;
+  /**
+   * Boss battle, Birdie's train (missing otherwise and from older servers; an older app ignores it, and a piece left there is scored
+   * as plain chess has it): the warned square, whose crowd piece left there after the move is smashed (its king: the battle lost).
+   * The moves that save it are scored too, and the bots count it as gone (trainRanked); the lobby's runner does the scoring.
+   */
+  train?: string;
   /** Picks that can decide the cut (players near the cut line): re-checked first (recheckCut* in settings). */
   priority?: string[];
 }
@@ -536,6 +543,12 @@ export interface NetBossPowers {
   zebra?: ZebraView | null;
   /** Chandy: his locks (each with its turns left), the rifle's upgrades and unlocked moves, his move meter, this turn's effects, the queen lock's aim and shot, Dodge (online, what has been seen of it: dodgeSeen). */
   chandy?: ChandyView | null;
+  /**
+   * Birdie (missing for other bosses and from older servers; an older app ignores it): his train's warning this crowd turn (the line,
+   * its squares in riding order, the crowd's piece on it), its last ride (the piece smashed, spared, or your king: the battle his) and
+   * the crowd move after which he fell (Armored Birdie from then).
+   */
+  birdie?: BirdieView | null;
   /**
    * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
    * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully
@@ -895,6 +908,8 @@ export type ServerMessage = { now: number } & (
         race?: CarrotRace;
         /** Boss battle, Sawyer's Saw Swap: the moves that set it off, each with the board after it (the bots pick with them counted). */
         swap?: Record<string, string>;
+        /** Boss battle, Birdie's train: the warned square (the bots count a piece left there as gone; trainRanked). */
+        train?: string;
         /** Many judges: the bots pick from this seed and these rules (judgeBotPicks), so the scoring job agrees. */
         seed?: number;
         rules?: JudgeRules;

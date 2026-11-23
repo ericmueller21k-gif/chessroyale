@@ -2305,6 +2305,24 @@ export const BOSS_POWERS = {
     dodgeBotHit: 0.6,
     dodgeAfterMoves: 1,
   },
+  /**
+   * Birdie (Eric, Nov 23; packages/chess/src/bosses/birdie.ts; docs/decisions/2026-11-23-birdie-rules.md):
+   * - The Train: as crowd turn `trainFrom` begins (2: at the end of his reply to your first move) he warns a rank or file where
+   *   exactly one of your pieces stands (any piece, your king too; one your move can save: it has a move, and the smash would be
+   *   legal now); then `trainEvery` crowd turns from one warning to the next (Eric: "a 3 (6 total turn) turn cooldown"). No line
+   *   fits: it waits a turn. Your next move moves that piece, or at the start of his turn his train rides the line and smashes it
+   *   (your king: the battle is his). The judge counts a piece left there as gone: its value at `trainPawnLogit` log-odds a pawn
+   *   (the fire's way, firePawnLogit), your king as the battle lost.
+   * - The Fall, once a battle: at the start of his turn once he has lost `fallLost` points of material since the battle began
+   *   (P1 N3 B3 R5 Q9: the most he has been down), his fall and its cutscene (BIRDIE_CINEMATIC), then Armored Birdie for the rest of
+   *   the battle: no more train (his armored power: Eric's to design, Nov 23).
+   */
+  birdie: {
+    trainFrom: 2,
+    trainEvery: 3,
+    trainPawnLogit: 1,
+    fallLost: 9,
+  },
 } as const;
 
 /**
@@ -2317,7 +2335,9 @@ export const BOSS_POWERS = {
 // stays locked: he's `adminOnly` in the roster, met only from his room and the Crowd's final.)
 // (Nov 16: "chandy": his home, Chandy's Swamp, came first, in an admin's town only, as Timber's and Dash's did; then his rules
 // (docs/decisions/2026-11-16-chandy-rules.md): in the roster now, an admin's in every mode until Eric says go.)
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy"];
+// (Nov 23: "birdie": his rules, art and the fall's cutscene wiring, his armored power and the cutscene's art still to come: an admin's
+// in every mode until Eric says go, as Chandy.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy", "birdie"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
@@ -2583,6 +2603,37 @@ export const MOO_CINEMATIC = {
    * is skipped and he's drawn powered at once: started then, his move would cut it off (review of #776, #2). How soon after the
    * device rejoins a Full Moon counts as resent.
    */
+  rejoinMs: 1500,
+} as const;
+
+/**
+ * Birdie's fall (Eric, Nov 23: "A cinematic like Moo's Full Moon: it takes the same space on screen as Moo's, about 6 to 7 s long. A cut
+ * to a close-up: he falls out of his spot on the board… he tumbles through the air like a bird falling from a great height… the
+ * background is blurred, with wind and speed lines… a train track comes into view below, and his own train barrels toward him…
+ * its headlights get brighter and brighter as it nears… It hits him, and he transforms"; components/BirdieFall.tsx;
+ * docs/decisions/2026-11-23-birdie-fall.md). It plays at the start of his turn, while he thinks (no clock runs for the crowd), so its
+ * whole length is his fall's (BIRDIE_BEATS.fall in packages/chess/src/bosses/birdie.ts adds the beats up: the server and solo wait that
+ * long). Beats in order, ms:
+ */
+export const BIRDIE_CINEMATIC = {
+  /** His `fall` where he stands: a jolt throws him up out of the train and he tumbles out of the frame (his animation's own 830 ms). */
+  dropMs: 840,
+  /** The scene fades in over the board and everything above it, as Moo's field does (a CSS fade). */
+  fadeInMs: 400,
+  /** He tumbles through the air, the sky streaking past (speed lines, wind); the track comes into view below toward its end. */
+  tumbleMs: 2000,
+  /**
+   * His train barrels up the track toward him, closer and closer, its headlights brighter and brighter (the Hidden Boss's light, as
+   * Moo's moon: components/recluse-light.ts): glowing from the train's start, the light whole at its end (the hit).
+   */
+  trainMs: 1800,
+  /** The light from the hit dies back and Armored Birdie stands in it (his armored idle). */
+  revealMs: 1400,
+  /** The scene fades out (a CSS fade); he's in his spot as Armored Birdie. */
+  fadeOutMs: 400,
+  /** His thinking lasts this much past the cutscene's end (as MOO_CINEMATIC.tailPadMs). */
+  tailPadMs: 200,
+  /** Seen first with his thinking already under way (a reload, a late join): skipped, drawn armored at once (MOO_CINEMATIC.rejoinMs). */
   rejoinMs: 1500,
 } as const;
 

@@ -139,6 +139,8 @@ import {
   chandyBattle,
   CHANDY_FX,
   dodgeWon,
+  trainSquare,
+  trainWon,
   type DarkTryResult,
   moveLoss,
   pigBattle,
@@ -1406,7 +1408,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b)) || (this.bossForceWin && this.bossToMove());
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b) || trainWon(b)) || (this.bossForceWin && this.bossToMove());
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1983,6 +1985,11 @@ export class MatchRunner {
     return smudgyBattle.apply(this.battle, pick, gain);
   }
 
+  /** Birdie's train: the square it warned this crowd turn, whose piece left there is smashed (the score jobs' `train`), or null. */
+  trainJob(): string | null {
+    return this.sideBosses().reduce<string | null>((sq, x) => sq ?? trainSquare(x), null);
+  }
+
   /** The Carrot Patch's race as the crowd's judge weighs its move now (the score jobs' `race`), or null. */
   raceJob(): CarrotRace | null {
     const b = this.state.boss;
@@ -2154,8 +2161,8 @@ export class MatchRunner {
     const b = this.state.boss!;
     const timeout = this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
-    // (Hollow's last bulb out, Boss alone, and a Dodge hit: his, whatever the board says.)
-    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || this.sideBosses().some((x) => blackedOut(x) || dodgeWon(x)) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    // (Hollow's last bulb out, Boss alone, a Dodge hit and Birdie's train on your king: his, whatever the board says.)
+    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || this.sideBosses().some((x) => blackedOut(x) || dodgeWon(x) || trainWon(x)) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     // (The Hidden Boss's child beaten: the fight goes on, a new match against his adult form (nextBossForm). Nobody is placed.)
     if (b.form === "child" && result === "crowd") {
       this.state = { ...this.state, boss: { ...b, result } };

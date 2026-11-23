@@ -1,4 +1,4 @@
-import { BOSS_POWERS, MOO_CINEMATIC, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BOSS_POWERS, MOO_CINEMATIC, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
 import { gameEnd, sideToMove, type Base, type Capture } from "./rules.ts";
 import { GINGER_FX, SUPER_FREEZE_BEATS } from "./bosses/ginger.ts";
 import { BOINGO_FX } from "./bosses/boingo.ts";
@@ -19,6 +19,7 @@ import { TIMBER_FX } from "./bosses/timber.ts";
 import { DASH_FX } from "./bosses/dash.ts";
 import { ZEBRA_FX } from "./bosses/zebra.ts";
 import { CHANDY_FIRE_AT, CHANDY_FX } from "./bosses/chandy.ts";
+import { BIRDIE_FX } from "./bosses/birdie.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -73,7 +74,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, rushWarn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX, ...ZEBRA_FX, ...CHANDY_FX } as const;
+export const POWER_FX = { warn: 1700, rushWarn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX, ...ZEBRA_FX, ...CHANDY_FX, ...BIRDIE_FX } as const;
 
 /** What a moment's length reads of its event: its kind, Hollow's first cover, the hippo gardener's watering's outcomes. */
 type FxEvent = { kind: keyof typeof POWER_FX; first?: boolean; growth?: readonly { kind: string }[] };
@@ -153,6 +154,9 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   shields: [[0, CHANDY_FIRE_AT]],
   rapidFire: [[0, CHANDY_FIRE_AT]],
   queenAim: [[0, CHANDY_FIRE_AT]],
+  // (Birdie's END OF THE LINE!, Nov 23: his train on your king, off the board before it leaves. His warning, his train on any other
+  // piece and his fall have none: the crossing, the ride and the cutscene say it.)
+  trainWin: [[0, 1500]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */
@@ -382,6 +386,34 @@ export const sawSwapLeadMs = (boss: QueenSlainView): number => (sawSwapNow(boss)
  * same in solo and on the server.
  */
 export const sawyerTurnMs = (boss: QueenSlainView): number => (sawSwapNow(boss) ? sawSwapLeadMs(boss) + powerFxMs({ kind: "sawSwap" }) + MOO_CINEMATIC.tailPadMs : 0);
+
+/** Birdie's train or his fall came at the start of his turn (as the crowd's move just played landed: among this turn's events). */
+const BIRDIE_TURN = ["trainSmash", "trainWin", "birdieFall"] as const;
+const birdieTurnEvents = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined) =>
+  (boss?.powers?.events ?? []).filter((e): e is { kind: (typeof BIRDIE_TURN)[number] } => (BIRDIE_TURN as readonly string[]).includes(e.kind));
+
+/**
+ * How long after his thinking screen comes Birdie's train (or his fall) starts: when the crowd's move that brought it also took his
+ * queen, after QUEEN SLAIN! and its beat (as Moo's Full Moon: fullMoonLeadMs), else at once.
+ */
+export const birdieLeadMs = (boss: QueenSlainView): number => (birdieTurnEvents(boss).length && queenSlain(boss) ? bossBannerMs() + 500 : 0);
+
+/**
+ * Birdie's moments at the start of his turn (Nov 23): his train's ride (a smash, a sparing, or your king) and his fall's cutscene, in
+ * that order, play while he thinks, so his thinking lasts at least as long (the ms; 0: none): QUEEN SLAIN! first if his queen just fell
+ * (birdieLeadMs), the moments (a banner's hold included) and a margin after them (BIRDIE_CINEMATIC.tailPadMs). The same in solo and on
+ * the server.
+ */
+export const birdieTurnMs = (boss: QueenSlainView): number => {
+  const ev = birdieTurnEvents(boss);
+  return ev.length ? birdieLeadMs(boss) + powerMomentMs(ev) + BIRDIE_CINEMATIC.tailPadMs : 0;
+};
+
+/**
+ * A power won the battle at the start of his turn (Birdie's train on your king: `trainWin` among this turn's events): the board holds
+ * this long, its moments playing as he thinks, before the result (solo and online); 0: none.
+ */
+export const powerWinShowMs = (boss: QueenSlainView): number => (boss.powers?.events?.some((e) => e.kind === "trainWin") ? birdieTurnMs(boss) : 0);
 
 /**
  * Alfil's Slam: its pieces came down early after the crowd's move just played (he had a mate in one only while they

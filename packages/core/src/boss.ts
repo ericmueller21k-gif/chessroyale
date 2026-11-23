@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap" | "pawnbounce";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze" | "sawswap" | "pawnbounce" | "train" | "fall";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -100,8 +100,10 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * once-a-battle Saw Swap (not on his BOSS_ROSTER line either), starts the battle a few moves in with a check of his king on his half
  * ready for the crowd's next move (SAW_SWAP_TEST_MOVES; it fires as that check lands). Chub & Chirp's ?power=pawnbounce, their
  * once-a-battle Pawn Bounce (not on their BOSS_ROSTER line either), changes nothing: it comes on the crowd's first double push anyway.
+ * Birdie's ?power=train brings his train's warning as every crowd turn begins from the second (no cooldown); ?power=fall brings his
+ * fall at the start of his turn after the crowd's second move (the warning's train first, if it rides then).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce", "train", "fall"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
  * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
@@ -274,6 +276,14 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // vote on where he stands, one hit and the battle is his. His offset from the raid sim (reports/chandy-sim.md). Admins first:
   // BOSS_ADMIN_FIRST in settings.ts (the test links `?boss=chandy`, `&power=lockon`, `&power=dodge`, `&power=scatter` …).
   { id: "chandy", name: "Chandy", icon: "🦎", kit: "Chandy", offset: -250, powers: { passive: "lockon", ultimate: "dodge" } },
+  // Birdie, Eric's own young mourning dove riding a yellow toy diesel train, a conductor's cap and a tie (Eric's design, Nov 23; his
+  // rules: bosses/birdie.ts; docs/decisions/2026-11-23-birdie-rules.md): the Train, a warning at the end of his reply on a rank or
+  // file where exactly one of your pieces stands (the first after your first move, then every 3 of your turns), and the piece left
+  // there by your next move is smashed by his train at the start of his turn (your king: the battle is his); and the Fall, once a
+  // battle, when he has lost 9 points of material: he falls off his train, it hits him in a cutscene and he's Armored Birdie for the
+  // rest of the battle (no more train; his armored power is Eric's to design). Admins first: BOSS_ADMIN_FIRST in settings.ts (the
+  // test links `?boss=birdie`, `&power=train`, `&power=fall`).
+  { id: "birdie", name: "Birdie", icon: "🐦", kit: "Birdie", offset: -250, powers: { passive: "train", ultimate: "fall" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -818,6 +828,8 @@ export interface BossPowerState {
   zebra?: ZebraState | null;
   /** Chandy's powers (his locks, the rifle's upgrades, his move meter and the move it fired, Dodge). */
   chandy?: ChandyState | null;
+  /** Birdie's powers (the Train's warning and its last ride, his fall into Armored Birdie). */
+  birdie?: BirdieState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -849,6 +861,23 @@ export interface SuperFreezeState {
    * there (his move may take one) that leave the crowd a legal move (the farthest from `target` let go first).
    */
   hit: { at: number; target: string; squares: string[]; held?: string[] } | null;
+}
+
+/**
+ * Birdie's powers in a battle (id birdie; Eric, Nov 23; the chess package's bosses/birdie.ts).
+ * - `next`: the first crowd turn whose start may bring the Train's next warning (BOSS_POWERS.birdie.trainFrom, then trainEvery
+ *   turns after the last warning). A turn with no line that qualifies moves it on a turn.
+ * - `warn`: the warning on crowd turn `turn`: the line (`line`, a file letter or a rank digit; `squares`, its squares in the order
+ *   the train rides it), the crowd's piece on it (`square`, `piece` its kind). Cleared as that turn's move lands. Null: none.
+ * - `ride`: his train's last ride, at the start of his turn after crowd move `at`: the piece on `square` (`piece`) smashed, or spared
+ *   (`spared`: the smash wasn't legal), or the king (`king`: the battle his).
+ * - `fell`: he fell after crowd move `at` (at the start of his turn): Armored Birdie for the rest of the battle, no train.
+ */
+export interface BirdieState {
+  next: number;
+  warn: { turn: number; line: string; squares: string[]; square: string; piece: string } | null;
+  ride?: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true } | null;
+  fell?: { at: number } | null;
 }
 
 export interface MooState {
@@ -1799,7 +1828,15 @@ export type PowerEventKind =
   | "queenAim"
   | "queenShot"
   | "dodge"
-  | "dodgeWin";
+  | "dodgeWin"
+  // Birdie (Nov 23): his train's warning on a line (as the crowd's turn after his move begins: `square` the piece, `squares` the line
+  // in the order the train rides it); the train, at the start of his turn when the crowd's move left the piece there (`trainSmash`:
+  // `fizzled` [the square] when it spared it, the smash not legal); his train on your king (`trainWin`: the battle his); and his fall
+  // (`birdieFall`, at the start of his turn: the cutscene, then Armored Birdie).
+  | "trainSignal"
+  | "trainSmash"
+  | "trainWin"
+  | "birdieFall";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

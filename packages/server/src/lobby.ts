@@ -29,6 +29,8 @@ import {
   popOffMs,
   folioTurnMs,
   sawyerTurnMs,
+  birdieTurnMs,
+  powerWinShowMs,
   landsAfterHisMove,
   PASS_WAIT,
   powerMomentMs,
@@ -480,6 +482,11 @@ export interface LobbyRecord {
    * (the runner's bossForceWin, which lives on the runner, not in its state: kept here so a restored lobby still has it).
    */
   winForm?: true;
+  /**
+   * A power won the battle at the start of his turn (Birdie's train on your king): its ride has been shown (powerWinShowMs, as he
+   * "thinks"), so the next round's step finishes the battle.
+   */
+  winShown?: true;
   /**
    * The Hidden Boss's phase 2 online (Nov 13: his room's fight and the Crowd's boss final; bosses/recluse.ts): from his adult form's
    * fall to the results, everything the server runs of it (the four boards, their clocks, his moves and the bots').
@@ -2375,7 +2382,7 @@ export class LobbyCore {
     const burnt = fireShows(b);
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn, Ginger's Super Freeze and Sawyer's Saw Swap.)
-    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view);
+    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view) + birdieTurnMs(view);
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 
@@ -2984,6 +2991,14 @@ export class LobbyCore {
         return this.setTimer("nextRound", until);
       }
       if (runner.stageComplete()) {
+        // (A power won it at the start of his turn, Birdie's train on your king: its ride plays as he "thinks", then the results, as solo.)
+        const winMs = this.r.winShown ? 0 : powerWinShowMs(runner.bossView()!);
+        if (winMs > 0) {
+          this.r.winShown = true;
+          this.r.phase = "boss";
+          this.broadcast(this.bossMessage(0, { thinking: true }));
+          return this.setTimer("nextRound", this.io.now() + winMs);
+        }
         // (Who fought him: the Hidden Boss's phase 2 boards, if it follows. Everyone's out once the battle's finished.)
         const mates = runner.alive().map((p) => ({ id: p.id, name: this.nameOf(p.id) }));
         runner.finishBossBattle();
@@ -3092,6 +3107,7 @@ export class LobbyCore {
               ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
               ...(runner.raceJob() ? { race: runner.raceJob()! } : {}),
               ...(Object.keys(swap).length ? { swap } : {}),
+              ...(runner.trainJob() ? { train: runner.trainJob()! } : {}),
             }
           : undefined;
       this.send(this.r.hostId, { t: "prefetch", fens, ...(plan ? { plan } : {}) }, false);
@@ -3398,6 +3414,7 @@ export class LobbyCore {
       ...(this.runner!.fireBurn().length ? { burn: this.runner!.fireBurn() } : {}),
       ...(this.runner!.raceJob() ? { race: this.runner!.raceJob()! } : {}),
       ...(Object.keys(this.runner!.judgeAfter(boardId)).length ? { swap: this.runner!.judgeAfter(boardId) } : {}),
+      ...(this.runner!.trainJob() ? { train: this.runner!.trainJob()! } : {}),
     }));
     // Close calls that can decide the cut are re-checked first.
     const bubble = this.cutPriority();
@@ -3767,6 +3784,7 @@ export class LobbyCore {
           ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
           ...(runner.raceJob() ? { race: runner.raceJob()! } : {}),
           ...(Object.keys(runner.judgeAfter(firstBoard)).length ? { swap: runner.judgeAfter(firstBoard) } : {}),
+          ...(runner.trainJob() ? { train: runner.trainJob()! } : {}),
           seed: seedFor(key, firstBoard),
           rules: this.judgeRules(),
         }
@@ -3802,6 +3820,7 @@ export class LobbyCore {
         ...(sj.burn ? { burn: sj.burn } : {}),
         ...(sj.race ? { race: sj.race } : {}),
         ...(sj.swap ? { swap: sj.swap } : {}),
+        ...(sj.train ? { train: sj.train } : {}),
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);
