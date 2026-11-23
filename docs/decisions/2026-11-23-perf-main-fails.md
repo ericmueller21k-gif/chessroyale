@@ -13,8 +13,8 @@ boss turn p95 83 → 17 ms (18% → 4% dropped), G-REX 292 → 433 elements, ani
 
 **Changed checks.** "Nothing grows" counted every element against the first move's +40, which a move list can't meet: it fills
 its panel once (here 14 rows, about 200 elements), then stays. The two specs now count the list apart: the rest within +40 as
-before, and the list's rows within the panel's `cap` (what its box holds + 8). Before Nov 23 the old count was never met since
-Oct 25.
+before, and the list's rows within the panel's `cap` (what its box holds + 8). (Not bisected: by the count, 4 moves' rows alone
+are past +40, so the old count can't have passed since the list came on Oct 25; no `perf` run on Actions to check.)
 
 **Chess Town, 16 to 18 s to the first frame (limit 8 s): real but not new; left open (`.question`).** Bisected: 17.2 s at
 `d077aaeae` (Nov 13, the PR that set the 8 s bound), 16.2 s Nov 16, 16.8 s Nov 18, 16.3 to 18.9 s now; 2,777 pictures each time.

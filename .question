@@ -1,0 +1,24 @@
+# Chess Town's first frame on a slowed phone: real, not a regression, and the fix is a change to what loads
+
+The move-list half of the brief (the long battle and G-REX) is fixed and ready: `.pr-body.md`. The town's two checks are still red.
+
+**Diagnosis.** Tap → first frame 16.3 to 18.9 s (iPhone 13, CPU 4x slowed; the loading card shows at about 2.4 s). Bisected on main:
+17.2 s at `d077aaeae` (Nov 13, the PR that set the 8 s bound), 16.2 s Nov 16, 16.8 s Nov 18; 2,777 pictures every time. The Nov 14
+note measured 19.8 s too. So the 8 s bound was never met on a slowed phone: the loading screen (Nov 11, Eric: "even if it takes 3
+or 5 seconds… loads it all in at once") paints every picture before the first frame. Of about 14 s loading, 13.4 s is that painting
+(`render.ts` `warm`), 0.5 s uploading, the network idle. By kind (slowed): bosses' town frames 2.8 s (439), street houses' sides
+and fronts 2.7 s plus darker copies 1.0 s, homes' fronts 0.9 s plus 0.4 s darker, roofs 2.3 s (the Colosseum's ring 0.7 s), the
+rest small. The darker copies are a palette step, not a tint, so the GPU can't make them for free.
+
+**Options (pick one):**
+1. **First view first** (the real fix, a redesign of what loads; about a day, Opus high): paint before the first frame only what
+   the start view needs (boxes within reach, the faced quarter's roofs, the bosses and homes in view), show the town, then paint the
+   rest in each frame's spare time (planBoxes' paint-ahead already does this with a budget). Likely 3 to 5 s on a slowed phone.
+   Costs: Eric's "all at once, then it stays" holds only after the first seconds, and a fast look round in those seconds could
+   drop frames. Needs a frame check of the first 10 s.
+2. **Less work, same design** (half a day): share identical pictures (about 15%, Nov 11's note), paint each boss's frames only
+   for the bosses near the start, and the darker copies as they're first needed. Maybe 13 → 8 to 9 s; probably still over 8 s.
+3. **Keep it; fix the bound:** set it from what's measured (say 22 s, slowed) so it catches a regression, and ask Eric for a real
+   phone's time (the slowed phone here may be slower than his iPhone).
+
+My pick: 3 now (the bound was never right) and 1 as its own job if Eric's real phone takes more than his "3 or 5 seconds".
