@@ -163,6 +163,18 @@ describe("the judge sees the train", () => {
     expect(judged.bestMove).toBe("b1c3");
     expect(judged.expectedAfter.a2a3).toBeLessThan(0.6);
   });
+
+  it("a lost position (every move 0) with your king warned: a king move ranks first and is the judge's best, never one that leaves him", () => {
+    // Every top move expected 0; a2a3 sorts before e1d1 by name, but leaves the king on the line (the battle).
+    const top = [
+      { move: "a2a3", expected: 0 },
+      { move: "e1d1", expected: 0 },
+      { move: "h2h3", expected: 0 },
+    ];
+    expect(trainRanked(top, fen, "e1", "w")[0]!.move).toBe("e1d1");
+    const judged = trainJudged({ bestMove: "a2a3", bestExpected: 0, expectedAfter: { a2a3: 0, e1d1: 0, h2h3: 0 } }, fen, "e1", "w");
+    expect(judged.bestMove).toBe("e1d1");
+  });
 });
 
 describe("the Train in a battle", () => {

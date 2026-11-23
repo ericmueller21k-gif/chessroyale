@@ -242,22 +242,36 @@ export function trainExpected(expected: number, lost: number, s: Pick<BirdieSett
   return 1 / (1 + Math.exp(-(logit(expected) - lost * s.trainPawnLogit)));
 }
 
-/** Top moves as the train's judge ranks them (for bots and hints): expected less what each leaves to the train, best first. */
+/**
+ * Top moves as the train's judge ranks them (for bots and hints): expected less what each leaves to the train, best first; a tie goes
+ * to the move that leaves the train less (in a lost position every move scores 0, and your king left on the line must never rank level
+ * with saving it), then by move.
+ */
 export function trainRanked(top: readonly MoveScore[], fen: string, square: string | null | undefined, crowd: Side): MoveScore[] {
   if (!square) return [...top];
-  return top.map((m) => ({ ...m, expected: trainExpected(m.expected, trainLoss(fen, m.move, square, crowd)) })).sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1));
+  return top
+    .map((m) => ({ m, loss: trainLoss(fen, m.move, square, crowd) }))
+    .map(({ m, loss }) => ({ m: { ...m, expected: trainExpected(m.expected, loss) }, loss }))
+    .sort((a, b) => b.m.expected - a.m.expected || a.loss - b.loss || (a.m.move < b.m.move ? -1 : 1))
+    .map(({ m }) => m);
 }
 
 /**
  * A board's evaluation as the train's judge sees it (this turn's warned square): every move's expected score less what it leaves to
- * the train, the best move the best of those (ties keep the judge's best, then by move). Unchanged without a warning. Pure.
+ * the train, the best move the best of those (a tie goes to the move that leaves the train less, so the best move is never your king
+ * left on the line when an escape scores the same; then the judge's best, then by move). Unchanged without a warning. Pure.
  */
 export function trainJudged<E extends JudgedEvaluation>(evaluation: E, fen: string, square: string | null | undefined, crowd: Side): E {
   if (!square) return evaluation;
-  const expectedAfter = Object.fromEntries(Object.entries(evaluation.expectedAfter).map(([m, e]) => [m, trainExpected(e, trainLoss(fen, m, square, crowd))]));
+  const loss = (m: string) => trainLoss(fen, m, square, crowd);
+  const expectedAfter = Object.fromEntries(Object.entries(evaluation.expectedAfter).map(([m, e]) => [m, trainExpected(e, loss(m))]));
   let bestMove = evaluation.bestMove;
-  let bestExpected = expectedAfter[bestMove] ?? trainExpected(evaluation.bestExpected, trainLoss(fen, bestMove, square, crowd));
-  for (const [m, e] of Object.entries(expectedAfter).sort((a, b) => (a[0] < b[0] ? -1 : 1))) if (e > bestExpected) [bestMove, bestExpected] = [m, e];
+  let bestExpected = expectedAfter[bestMove] ?? trainExpected(evaluation.bestExpected, loss(bestMove));
+  let bestLoss = loss(bestMove);
+  for (const [m, e] of Object.entries(expectedAfter).sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    if (e < bestExpected || (e === bestExpected && loss(m) >= bestLoss)) continue;
+    [bestMove, bestExpected, bestLoss] = [m, e, loss(m)];
+  }
   return { ...evaluation, bestMove, bestExpected, expectedAfter };
 }
 
