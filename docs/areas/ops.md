@@ -123,9 +123,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     "red: N failed" (a real failure: find its cause or revert). A red run with no failed test (GitHub dropped shards): "Re-run failed jobs" once.
   - **Left out: `@perf`** (`e2e/perf.spec.ts`, frame budgets on a 4x-slowed phone), because they measure the machine.
     Run them locally under the e2e lock, or from Actions → e2e → Run workflow with "perf" ticked (a `perf` job, phone,
-    1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict). Chess Town's load is checked as a multiple
-    of a fixed reference job timed in the same page (`townRefJob`, under 20 of them), not in seconds, since Nov 23: the ratio
-    held at 4x and 2x slowing (`docs/decisions/2026-11-23-town-load-bound.md`).
+    1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict). Nov 23: the long battle's and Grex's
+    "nothing grows" count the boss battle's move list apart (`counts()` in `e2e/perf-probe.js`: `list`, `rows`, `cap`), which
+    fills its phone panel once, then stays (`docs/decisions/2026-11-23-perf-main-fails.md`). Chess Town's load is checked as a
+    multiple of a fixed reference job timed in the same page (`townRefJob`, under 20 of them), not in seconds, since Nov 23: the
+    ratio held at 4x and 2x slowing (`docs/decisions/2026-11-23-town-load-bound.md`).
   - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
     `~/.cache/ms-playwright`, keyed by Playwright's version).
   - **Concurrency:** a new push to a PR (or a label added to it) cancels that PR's run still going; pushes to `main`
