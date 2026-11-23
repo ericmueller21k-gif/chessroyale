@@ -1,0 +1,1142 @@
+import type { BossPowerState } from "./boss.ts";
+import { randomInt, shuffle, weightedIndex, type Rng } from "./rng.ts";
+import { round2, type GroupResult } from "./scoring.ts";
+import { CROWD_BEST, DEFAULT_SETTINGS, moveClockAt, roundsInStage, type CrowdBotSpread, type Settings } from "./settings.ts";
+
+/**
+ * Match structure from buildspec.md: knockout stages scored on move quality,
+ * then a duel. Boards are referred to by id only; their positions live in the
+ * chess layer, which reports each board's expected score and game-over state.
+ */
+
+export interface StagePlan {
+  index: number;
+  players: number;
+  boards: number;
+  knockouts: number;
+}
+
+/** Players, boards and knockouts per stage, e.g. 32/8/8, 24/6/8, 16/4/8, 8/2/4, 4/1/2, then the duel. */
+export function stagePlan(settings: Settings = DEFAULT_SETTINGS): StagePlan[] {
+  let players = settings.lobbySize;
+  return settings.knockoutsPerStage.map((knockouts, index) => {
+    const plan = { index, players, boards: Math.ceil(players / settings.groupSize), knockouts };
+    players -= knockouts;
+    return plan;
+  });
+}
+
+export interface PlayerState {
+  id: string;
+  name: string;
+  isBot: boolean;
+  /** Bot skill temperature (lower is stronger). */
+  skill: number | null;
+  alive: boolean;
+  /** Score in the current stage (or running total when scores carry over). */
+  stageScore: number;
+  /** Thinking time in the current stage, for tie-breaks. */
+  stageThinkMs: number;
+  /** Rounds played in the current stage (for the average). */
+  stageRounds: number;
+  /** Time left in the bank (ms). */
+  bankMs: number;
+  /** Unused power-ups. */
+  powerUps: number;
+  powerUpsUsed: number;
+  /** Thinking time over the whole match and the moves it covers (for the average-time stat). */
+  thinkMsTotal: number;
+  movesTimed: number;
+  /** Practice mode: unlimited power-ups (shown on the leaderboard). */
+  practice: boolean;
+  /** Color played this stage (null when colors aren't fixed, e.g. the last stages on one board). */
+  colour: Side | null;
+  /** The final and the boss battle: the counted loss of each move (a miss counts as finalMissLoss). */
+  finalLosses: number[];
+  /** Raw losses per stage (before the opening allowance), for the results screen, ratings and the last cut's tie-break. */
+  lossesByStage: number[][];
+  /**
+   * The match's losses as they count for points (the opening allowance taken off), summed: matchLoss ranks by these.
+   * Missing (a match started before the allowance), the raw ones count.
+   */
+  countedLossSum?: number;
+  /** The raw losses summed (kept as moves come, so ranking never re-adds a long match; missing: from lossesByStage). */
+  rawLossSum?: number;
+  lastBoard: number | null;
+  lastGroupmates: string[];
+  /** Stage in which the player was knocked out (null while alive). */
+  outInStage: number | null;
+  /** Final placement, 1 = winner (set when knocked out or after the duel). */
+  placement: number | null;
+  /** Moves missed over the match (each counts as finalMissLoss in matchLoss). */
+  misses?: number;
+  /**
+   * The 50 v 50 rework: a person left this seat for good mid-match (resigned, gone too long, removed for being away), after
+   * this move of the game (the board's move number). Out then, or, a bot having taken the seat, the bot plays on under it.
+   * Either way the seat is never the best player (bestPlayer's `left`): its record isn't one player's whole match.
+   */
+  leftAt?: number;
+  /** Crowd 50 v 50 (CrowdScoring): strong moves in a row now, and the streak bonus earned over the match. */
+  streak?: number;
+  streakPoints?: number;
+}
+
+export type Side = "w" | "b";
+
+/**
+ * The 2v2 final on the last board: seeds 1 and 4 against 2 and 3, teammates
+ * alternating their side's moves. Placement is by each player's own move quality.
+ */
+export interface FinalState {
+  /** Who moves, turn by turn (cycled): seed 1, seed 2, seed 4, seed 3. */
+  order: string[];
+  /** teams[0] plays the side to move when the final starts. */
+  teams: [string[], string[]];
+  /** Moves made so far. */
+  turn: number;
+  /**
+   * classic: a fixed number of moves each (finalMovesPerPlayer). team (Crowd 50 v 50): teamFinalSizes per
+   * side, the weakest on each side going out after every step, the last step playing to the end. duel: 1v1 to the end.
+   */
+  format?: "classic" | "team" | "duel";
+  /** Team final: index into teamFinalSizes, and the turn the current order started on. */
+  step?: number;
+  stepStart?: number;
+  /** Team final: who went out, and after which turn. */
+  out?: { id: string; turn: number }[];
+}
+
+/** A boss form other than his usual one (BossState.form): the Hidden Boss's child. */
+export type BossForm = "child";
+
+/** Boss battle: the crowd (playing White) against Stockfish at `elo`. */
+export interface BossState {
+  elo: number;
+  /** The side the crowd plays. */
+  crowdSide: Side;
+  /** The battle starts from this many moves (plies) into the game just played. */
+  startPly?: number;
+  /**
+   * The move number the game had reached when the battle began (50 v 50). The board goes back to an earlier
+   * position, but the clock doesn't: the battle's moves count on from here (see moveClockAt).
+   */
+  clockFromMove?: number;
+  /** Crowd moves made, and since the boss last struck. */
+  crowdMoves: number;
+  sinceKill: number;
+  /** Who the boss struck down, after which crowd move. */
+  kills: { id: string; atMove: number }[];
+  /** How the battle ended (set at the end): the crowd won, the boss won, or a draw. */
+  result?: "crowd" | "boss" | "draw";
+  /** The King: charges left, and the crowd moves he played. */
+  kingCharges?: number;
+  kingMoves?: number[];
+  /** The King struck the boss: its next move is a weaker one; and the crowd moves he struck during (1-based, like kingMoves). */
+  staggerNext?: boolean;
+  kingStrikes?: number[];
+  /** Strikes stop with this many left (boss raid: half the group; 50 v 50: bossMinSurvivors). */
+  minSurvivors?: number;
+  /**
+   * The God King's Last Stand (once per game): the crowd's disastrous move he took back, during which crowd move
+   * (1-based, like kingMoves), what it gave away, the bar it crossed and the charges he fell with (they became
+   * the crowd's power-ups). Set, he has fallen: no charges, no menu. For the results card: the position (`fen`,
+   * before the move), the judge's best move there, the crowd's chances (expected score, 0-1) after the best move
+   * and after the blunder, the boss's best reply and a forced mate it allowed (the boss's moves to mate).
+   */
+  lastStand?: {
+    atMove: number;
+    move: string;
+    loss: number;
+    bar: number;
+    charges: number;
+    fen?: string;
+    bestMove?: string;
+    before?: number;
+    after?: number;
+    reply?: string;
+    mateIn?: number;
+  };
+  /** The re-pick after his Last Stand: this move (the one he took back) can't be picked. Cleared once it's played. */
+  barred?: string;
+  /** Which boss this is (a BOSS_ROSTER id), and its powers as they stand. */
+  id?: string;
+  /**
+   * The boss's form, when it isn't his usual one: "child", the Hidden Boss's first (RECLUSE_CHILD: no powers, his strength
+   * growing with the game). Beaten, the runner starts a new match against his usual form (`nextBossForm`).
+   */
+  form?: BossForm;
+  /** The strength it was set at before its own offset (a raid's tier): what a profile's "bosses beaten" counts. */
+  tier?: number;
+  powers?: BossPowerState;
+}
+
+/** A boss's own part on a side of several (MatchState.bosses): the rest of BossState is the battle's, shared. */
+export type BossOwn = Pick<BossState, "id" | "elo" | "tier" | "form" | "powers">;
+/** The fields of a boss's own part (BossOwn). */
+export const BOSS_OWN_FIELDS = ["id", "elo", "tier", "form", "powers"] as const satisfies readonly (keyof BossState)[];
+
+/** The King's charges: the ten's leftover power-ups, one charge per kingPowerUpsPerCharge (rounded), 1 to kingChargesMax. */
+export function kingCharges(powerUpsLeft: number, s: Pick<Settings, "kingPowerUpsPerCharge" | "kingChargesMax">): number {
+  return Math.max(1, Math.min(s.kingChargesMax, Math.round(powerUpsLeft / s.kingPowerUpsPerCharge)));
+}
+
+export interface MatchState {
+  stage: number;
+  round: number;
+  players: PlayerState[];
+  /** Ids of the boards in play this stage. */
+  boards: number[];
+  /** Set once the knockout stages are over. */
+  final?: FinalState;
+  /** Set once the knockout stages are over in a boss battle. */
+  boss?: BossState;
+  /**
+   * Several bosses on one side (the Battle Tower: 2 or 3), each one's own part (`BossOwn`: his id, strength and powers), in
+   * the order dealt. `boss` is always one of them in full with the battle's shared fields (the crowd's moves, the God King,
+   * the result): the boss in focus (`focus`), whose entry here is refreshed only as the focus moves, so the side is read
+   * through the runner (`sideBosses`). Unset: one boss, as every battle before the tower.
+   */
+  bosses?: BossOwn[];
+  /** Several bosses: the boss in focus (an index into `bosses`): the boss to move, or the one whose crowd turn this is. */
+  focus?: number;
+  /** Several bosses: who made the side's last move (an index into `bosses`; the last of them before any). */
+  moved?: number;
+  /**
+   * Several bosses: who made each of the side's moves, by the board's ply (an index into `bosses`), noted as each boss's turn ends (the
+   * plies since, the crowd's among them: read for the side's plies only). For the move list's faces (audit 2, finding 1).
+   */
+  movers?: number[];
+  /**
+   * Knockouts cuts left over because players tied with the last one through (they all went through): owed by the cuts
+   * still to come, spread evenly over them, in each pool (a team in Crowd 50 v 50, else "all"). See cutPlan.
+   */
+  cutCarry?: Partial<Record<CutPool, number>>;
+}
+
+/** Who a cut is among: a team in Crowd 50 v 50 (the same number go from each), else everyone. */
+export type CutPool = Side | "all";
+
+export function createMatch(
+  entrants: readonly { id: string; name: string; isBot: boolean; skill?: number | null; practice?: boolean }[],
+  boards: readonly number[],
+  settings: Settings = DEFAULT_SETTINGS,
+): MatchState {
+  return {
+    stage: 0,
+    round: 0,
+    boards: [...boards],
+    players: entrants.map((e) => ({
+      id: e.id,
+      name: e.name,
+      isBot: e.isBot,
+      skill: e.skill ?? null,
+      alive: true,
+      stageScore: 0,
+      stageThinkMs: 0,
+      stageRounds: 0,
+      bankMs: settings.timeBankSeconds * 1000,
+      powerUps: settings.powerUpsAtStart,
+      powerUpsUsed: 0,
+      thinkMsTotal: 0,
+      movesTimed: 0,
+      practice: e.practice ?? false,
+      colour: null,
+      finalLosses: [],
+      lossesByStage: [[]],
+      lastBoard: null,
+      lastGroupmates: [],
+      outInStage: null,
+      placement: null,
+    })),
+  };
+}
+
+export const alivePlayers = (state: MatchState) => state.players.filter((p) => p.alive);
+
+/**
+ * Splits the alive players into groups, one per board. While there are 4 or
+ * more boards nobody gets the same board twice in a row; repeat groupmates are
+ * avoided where possible. When players have a color for the stage and
+ * `boardSide` says which side is to move on each board, players only go to
+ * boards where their color is to move.
+ */
+export function assignGroups(
+  rng: Rng,
+  state: MatchState,
+  settings: Settings = DEFAULT_SETTINGS,
+  iterations = 4000,
+  boardSide?: ReadonlyMap<number, Side>,
+): Map<number, string[]> {
+  const players = alivePlayers(state);
+  const strictBoards = state.boards.length >= 4;
+  const groups = new Map<number, string[]>();
+  const parts: [PlayerState[], number[]][] = [];
+  const sides: Side[] = ["w", "b"];
+  const byColour = (side: Side) => players.filter((p) => p.colour === side);
+  const boardsOf = (side: Side) => state.boards.filter((b) => boardSide?.get(b) === side);
+  // Colors fit when every player has one and each color has a board where it's to move. Group sizes then
+  // follow the numbers (an odd number of boards makes them 7-10 instead of 8).
+  const colourFits =
+    boardSide !== undefined &&
+    players.every((p) => p.colour !== null) &&
+    sides.every((side) => byColour(side).length === 0 || boardsOf(side).length > 0);
+  if (colourFits) for (const side of sides) parts.push([byColour(side), boardsOf(side)]);
+  else parts.push([players, [...state.boards]]);
+  for (const [ps, bs] of parts) {
+    for (const [b, ids] of groupSubset(rng, ps, bs, strictBoards, settings, iterations)) groups.set(b, ids);
+  }
+  return groups;
+}
+
+/** Local search: start from a random split, then swap players between groups whenever that doesn't make things worse. */
+function groupSubset(
+  rng: Rng,
+  players: readonly PlayerState[],
+  boardIds: readonly number[],
+  strictBoards: boolean,
+  settings: Settings,
+  iterations: number,
+): Map<number, string[]> {
+  const boards = shuffle(rng, boardIds);
+  const n = players.length;
+  // slot[i] = index of the board (in `boards`) player i sits at.
+  const order = shuffle(rng, players.map((_, i) => i));
+  const slot = new Array<number>(n);
+  // Deal round-robin, so group sizes differ by at most one; swaps keep the sizes.
+  order.forEach((pi, k) => (slot[pi] = k % boards.length));
+  void settings;
+  const mates = players.map((p) => new Set(p.lastGroupmates));
+
+  const playerCost = (i: number, b: number): number => {
+    let c = strictBoards && players[i]!.lastBoard === boards[b] ? 1000 : 0;
+    for (let j = 0; j < n; j++) if (j !== i && slot[j] === b && mates[i]!.has(players[j]!.id)) c += 1;
+    return c;
+  };
+  let total = 0;
+  for (let i = 0; i < n; i++) total += playerCost(i, slot[i]!);
+
+  for (let it = 0; it < iterations && total > 0; it++) {
+    const i = Math.floor(rng() * n);
+    const j = Math.floor(rng() * n);
+    const bi = slot[i]!;
+    const bj = slot[j]!;
+    if (bi === bj) continue;
+    const before = playerCost(i, bi) + playerCost(j, bj);
+    slot[i] = bj;
+    slot[j] = bi;
+    const after = playerCost(i, bj) + playerCost(j, bi);
+    if (after > before) {
+      slot[i] = bi;
+      slot[j] = bj;
+    } else {
+      // Pair costs count twice (both directions), so recompute exactly.
+      total = 0;
+      for (let k = 0; k < n; k++) total += playerCost(k, slot[k]!);
+    }
+  }
+
+  const groups = new Map<number, string[]>(boards.map((b) => [b, []]));
+  players.forEach((p, i) => groups.get(boards[slot[i]!]!)!.push(p.id));
+  return groups;
+}
+
+/**
+ * Colors for a new stage: `whites` players play White and the rest Black.
+ * Players swap color from the last stage where the numbers allow; the rest
+ * are chosen at random. Pass whites = null to clear colors (one board left).
+ */
+export function assignColours(state: MatchState, rng: Rng, whites: number | null): MatchState {
+  const alive = alivePlayers(state);
+  if (whites === null) return { ...state, players: state.players.map((p) => (p.alive ? { ...p, colour: null } : p)) };
+  // Preference order for White: last stage's Black players first, then no color, then last stage's White.
+  const rank = (p: PlayerState) => (p.colour === "b" ? 0 : p.colour === null ? 1 : 2);
+  const order = shuffle(rng, alive).sort((a, b) => rank(a) - rank(b));
+  const white = new Set(order.slice(0, whites).map((p) => p.id));
+  return {
+    ...state,
+    players: state.players.map((p) => (p.alive ? { ...p, colour: white.has(p.id) ? "w" : "b" } : p)),
+  };
+}
+
+/**
+ * Sides for a 50 v 50's parties (docs/decisions/2026-11-16-crowd-party.md): each party whole on one side, with at most `whites`
+ * players on White and `blacks` on Black among them. A side per party (in `sizes`' order), drawn at random among the ways that fit,
+ * or null when none does. Subset sums over at most 100 seats: tiny.
+ */
+export function packParties(sizes: readonly number[], whites: number, blacks: number, rng: Rng): Side[] | null {
+  const total = sizes.reduce((a, b) => a + b, 0);
+  if (total > whites + blacks || sizes.some((s) => s < 0)) return null;
+  // (A random order, so which parties land together on White is drawn; then the White total, drawn among those that fit.)
+  const order = shuffle(rng, sizes.map((_, i) => i));
+  // can[k][s]: the first k parties of `order` can put exactly s players on White.
+  const can: boolean[][] = [Array.from({ length: whites + 1 }, (_, s) => s === 0)];
+  order.forEach((i, k) => {
+    const prev = can[k]!;
+    can.push(prev.map((ok, s) => ok || (s >= sizes[i]! && prev[s - sizes[i]!]!)));
+  });
+  const fits = can[order.length]!.flatMap((ok, s) => (ok && total - s <= blacks ? [s] : []));
+  if (!fits.length) return null;
+  let s = fits[Math.floor(rng() * fits.length)]!;
+  const sides: Side[] = sizes.map(() => "b");
+  for (let k = order.length; k > 0; k--) {
+    const i = order[k - 1]!;
+    // (Taken on White when the sum couldn't be made without it.)
+    if (!can[k - 1]![s]) {
+      sides[i] = "w";
+      s -= sizes[i]!;
+    }
+  }
+  return sides;
+}
+
+/**
+ * A 50 v 50's sides with parties (`together`: the players of each party, by id): `whites` players on White, each party whole on
+ * one side (packParties), everyone else drawn at random into the seats left. Parties that can't all fit whole (never, as the lobby
+ * takes a party only while they do): the usual draw, assignColours.
+ */
+export function assignTeams(state: MatchState, rng: Rng, whites: number, together: readonly (readonly string[])[]): MatchState {
+  const alive = alivePlayers(state);
+  const ids = new Set(alive.map((p) => p.id));
+  // (Each player in one party at most, and only those still in the match.)
+  const seen = new Set<string>();
+  const parties: string[][] = [];
+  for (const g of together) {
+    const party = g.filter((id) => ids.has(id) && !seen.has(id));
+    party.forEach((id) => seen.add(id));
+    if (party.length) parties.push(party);
+  }
+  const sides = packParties(
+    parties.map((g) => g.length),
+    whites,
+    alive.length - whites,
+    rng,
+  );
+  if (!sides) return assignColours(state, rng, whites);
+  const white = new Set(parties.flatMap((g, i) => (sides[i] === "w" ? g : [])));
+  const rest = shuffle(
+    rng,
+    alive.filter((p) => !seen.has(p.id)),
+  );
+  for (const p of rest.slice(0, Math.max(0, whites - white.size))) white.add(p.id);
+  return {
+    ...state,
+    players: state.players.map((p) => (p.alive ? { ...p, colour: white.has(p.id) ? "w" : "b" } : p)),
+  };
+}
+
+export interface RoundPlayerOutcome {
+  playerId: string;
+  roundScore: number;
+  /** The raw loss (null: a miss). */
+  loss: number | null;
+  /** The loss as it counts for points (the opening allowance taken off), when it differs from the raw loss. */
+  counted?: number;
+  thinkMs: number;
+  usedPowerUp?: boolean;
+  /** Called the King instead of picking: counts as the round's average loss for the boss's strikes, and isn't a miss. */
+  abstained?: boolean;
+  neutralLoss?: number;
+  /** Crowd 50 v 50: the player's streak after this move, and its bonus (already in roundScore). */
+  streak?: number;
+  streakBonus?: number;
+}
+
+/**
+ * How long this player may think about the next move: the bank plus the increment, capped by the move clock on that
+ * move number (see moveClockAt). An empty bank still leaves the increment.
+ */
+export function allowedMs(p: Pick<PlayerState, "bankMs">, settings: Settings = DEFAULT_SETTINGS, move = 1): number {
+  return Math.min(moveClockAt(settings, move) * 1000, p.bankMs + settings.timeIncrementSeconds * 1000);
+}
+
+/**
+ * A time control chosen before the first move (Crowd 50 v 50's clock vote): every player's bank starts at its
+ * timeBankSeconds (the match was made with the default bank). Once a move has been played, banks are never reset: the
+ * state comes back as it was.
+ */
+export function startBanks(state: MatchState, settings: Pick<Settings, "timeBankSeconds">): MatchState {
+  // (The round count starts again at 0 each stage: before move 1 is stage 0, round 0.)
+  if (state.stage > 0 || state.round > 0) return state;
+  return { ...state, players: state.players.map((p) => ({ ...p, bankMs: settings.timeBankSeconds * 1000 })) };
+}
+
+/** What the standings rank by: the stage score (move quality only; time and power-ups don't count). */
+export const standingPoints = (p: Pick<PlayerState, "stageScore">, _settings: Settings = DEFAULT_SETTINGS) => p.stageScore;
+
+/** Adds a round's results to the players and remembers boards and groupmates for the next rotation. */
+export function applyRound(
+  state: MatchState,
+  groups: Map<number, string[]>,
+  outcomes: readonly RoundPlayerOutcome[],
+  settings: Settings = DEFAULT_SETTINGS,
+): MatchState {
+  const byPlayer = new Map(outcomes.map((o) => [o.playerId, o]));
+  const boardOf = new Map<string, number>();
+  for (const [b, ids] of groups) for (const id of ids) boardOf.set(id, b);
+  const players = state.players.map((p) => {
+    const o = byPlayer.get(p.id);
+    if (!p.alive || !o) return p;
+    const board = boardOf.get(p.id) ?? null;
+    const lossesByStage = p.lossesByStage.map((l) => [...l]);
+    if (o.loss !== null) lossesByStage[state.stage]!.push(o.loss);
+    const counted = o.counted ?? o.loss;
+    const finalLosses = state.final || state.boss ? [...p.finalLosses, o.abstained ? (o.neutralLoss ?? 0) : (counted ?? settings.finalMissLoss)] : p.finalLosses;
+    const think = Math.max(0, Math.min(o.thinkMs, allowedMs(p, settings)));
+    const usedPowerUp = !!o.usedPowerUp && (p.practice || p.powerUps > 0);
+    return {
+      ...p,
+      stageScore: p.stageScore + o.roundScore,
+      finalLosses,
+      stageThinkMs: p.stageThinkMs + think,
+      stageRounds: p.stageRounds + 1,
+      bankMs: Math.max(0, p.bankMs + settings.timeIncrementSeconds * 1000 - think),
+      powerUps: usedPowerUp && !p.practice ? p.powerUps - 1 : p.powerUps,
+      powerUpsUsed: p.powerUpsUsed + (usedPowerUp ? 1 : 0),
+      thinkMsTotal: p.thinkMsTotal + think,
+      movesTimed: p.movesTimed + 1,
+      misses: (p.misses ?? 0) + (o.loss === null && !o.abstained ? 1 : 0),
+      ...(o.streak !== undefined ? { streak: o.streak } : {}),
+      ...(o.streakBonus ? { streakPoints: (p.streakPoints ?? 0) + o.streakBonus } : {}),
+      lossesByStage,
+      countedLossSum: countedSum(p) + (counted ?? 0),
+      rawLossSum: rawSum(p) + (o.loss ?? 0),
+      lastBoard: board,
+      lastGroupmates: board === null ? [] : groups.get(board)!.filter((id) => id !== p.id),
+    };
+  });
+  return {
+    ...state,
+    players,
+    round: state.round + 1,
+    final: state.final && { ...state.final, turn: state.final.turn + 1 },
+    boss: state.boss && { ...state.boss, crowdMoves: state.boss.crowdMoves + 1, sinceKill: state.boss.sinceKill + 1 },
+  };
+}
+
+/** The match's raw losses, summed. */
+const rawSum = (p: Pick<PlayerState, "lossesByStage" | "rawLossSum">) => p.rawLossSum ?? p.lossesByStage.reduce((s, l) => s + l.reduce((a, x) => a + x, 0), 0);
+
+/** The match's losses as they count for points, summed (the raw ones for a match started before the opening allowance). */
+const countedSum = (p: Pick<PlayerState, "lossesByStage" | "countedLossSum" | "rawLossSum">) => p.countedLossSum ?? rawSum(p);
+
+/**
+ * A player's average counted loss per move over the whole match (the opening allowance taken off), a missed move
+ * counting as finalMissLoss (lower is better; Infinity before any move). It's the steady measure the late game ranks
+ * by, so one blunder (or one brilliant move) can't decide alone.
+ */
+export function matchLoss(p: Pick<PlayerState, "lossesByStage" | "misses" | "countedLossSum" | "rawLossSum">, settings: Settings = DEFAULT_SETTINGS): number {
+  const misses = p.misses ?? 0;
+  const n = p.lossesByStage.reduce((s, l) => s + l.length, 0) + misses;
+  return n ? (countedSum(p) + misses * settings.finalMissLoss) / n : Infinity;
+}
+
+/**
+ * Everything a player gave away over the match before the opening allowance: every raw loss, a miss counting as
+ * finalMissLoss. The last cut before a fixed-size ending breaks an exact tie with it (fewer first).
+ */
+export function rawLossTotal(p: Pick<PlayerState, "lossesByStage" | "misses" | "rawLossSum">, settings: Settings = DEFAULT_SETTINGS): number {
+  return rawSum(p) + (p.misses ?? 0) * settings.finalMissLoss;
+}
+
+/** Converts a scored group into per-player outcomes, given each player's thinking time. */
+export function outcomesFromGroup(
+  result: GroupResult,
+  thinkMs: Readonly<Record<string, number>>,
+  usedPowerUp: ReadonlySet<string> = new Set(),
+): RoundPlayerOutcome[] {
+  return result.players.map((p) => ({
+    playerId: p.playerId,
+    roundScore: p.roundScore,
+    loss: p.loss,
+    ...(p.counted !== undefined ? { counted: p.counted } : {}),
+    thinkMs: thinkMs[p.playerId] ?? 0,
+    usedPowerUp: usedPowerUp.has(p.playerId),
+    ...(p.abstained ? { abstained: true, neutralLoss: result.averageLoss ?? 0 } : {}),
+    ...(p.streak !== undefined ? { streak: p.streak } : {}),
+    ...(p.streakBonus ? { streakBonus: p.streakBonus } : {}),
+  }));
+}
+
+/** Thinking time over what the score covers: the whole match when scores carry over (Crowd), else the stage. */
+const scoreThinkMs = (p: Pick<PlayerState, "stageThinkMs" | "thinkMsTotal">, settings: Pick<Settings, "scoresBetweenStages">) =>
+  settings.scoresBetweenStages === "carry" ? p.thinkMsTotal : p.stageThinkMs;
+
+/**
+ * Alive players ordered best first: stage score; for an exact tie, less raw loss over the match (before the opening
+ * allowance), then less thinking time, then a coin flip. Only the last cut before a fixed-size ending goes by anything
+ * but the score (see cutPlan): elsewhere these only order the list. (Testing, `peopleFirst`: people above bots.)
+ */
+export function standings(state: MatchState, rng: Rng, settings: Settings = DEFAULT_SETTINGS): PlayerState[] {
+  const tiebreak = new Map(alivePlayers(state).map((p) => [p.id, rng()]));
+  return alivePlayers(state).sort(
+    (a, b) =>
+      (settings.peopleFirst ? Number(a.isBot) - Number(b.isBot) : 0) ||
+      standingPoints(b, settings) - standingPoints(a, settings) ||
+      rawLossTotal(a, settings) - rawLossTotal(b, settings) ||
+      scoreThinkMs(a, settings) - scoreThinkMs(b, settings) ||
+      tiebreak.get(a.id)! - tiebreak.get(b.id)!,
+  );
+}
+
+/** Two scores tie exactly (sums of the same round scores can differ in the last bits). */
+export const sameScore = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+
+/** The cut pool a player is in. */
+const poolOf = (p: Pick<PlayerState, "colour">, teams: boolean): CutPool => (teams ? (p.colour ?? "w") : "all");
+
+/** The cuts a match has: the 50 v 50 rework's schedule (`crowdCuts`), else one per `knockoutsPerStage` entry. */
+export const cutsInMatch = (settings: Pick<Settings, "knockoutsPerStage"> & Partial<Pick<Settings, "crowdCuts">>) =>
+  settings.crowdCuts?.length ? settings.crowdCuts.length : settings.knockoutsPerStage.length;
+
+/** True when this stage's cut is the last before a fixed-size ending (the final, the boss battle, the duel; the rework's 1 v 1). */
+export const isLastCut = (state: Pick<MatchState, "stage">, settings: Pick<Settings, "knockoutsPerStage"> & Partial<Pick<Settings, "crowdCuts">>) =>
+  state.stage >= cutsInMatch(settings) - 1;
+
+/**
+ * Who a stage's cut takes, from `ranked` (best first, as `standings`):
+ * - Each pool owes its share of the stage's knockouts (half each in Crowd 50 v 50) plus its part of what earlier cuts
+ *   left over (`cutCarry`), spread evenly over the cuts still to come (rounded up), so no one cut takes them all at once
+ *   (Eric's bar: a player who goes out should think "yeah, I messed up", not lose to a pile-up of owed places).
+ *   The 50 v 50 rework (`crowdCuts`) counts from each cut's `keep` instead: its share is the last cut's keep less this one's,
+ *   what's left over is whoever is still in above the last cut's keep, and a cut never takes a side below its keep (seats
+ *   left empty by players who left count toward it). With nobody gone that's the same as the knockouts; after the last cut
+ *   (the 1 v 1) nobody is cut.
+ * - It takes the bottom of the pool, except that everyone tied exactly with the last player through goes through too:
+ *   nobody goes out on thinking time or a coin flip. In Crowd 50 v 50 so does anyone within the bubble grace of that
+ *   player (CrowdScoring.cutGrace). What that leaves over is owed by the cuts after it.
+ * - The last cut before a fixed-size ending takes exactly what's owed, so the ending has its size: an exact tie at
+ *   its line goes to less raw loss over the match, then less thinking time (the order of `ranked`).
+ * Returns the ids going out (in ranked order) and what each pool still owes the cuts to come.
+ */
+export function cutPlan(state: MatchState, ranked: readonly PlayerState[], settings: Settings = DEFAULT_SETTINGS): { out: string[]; carry: Partial<Record<CutPool, number>> } {
+  const k = settings.knockoutsPerStage[state.stage] ?? 0;
+  const teams = isTeamMatch(settings);
+  const exact = isLastCut(state, settings);
+  const out = new Set<string>();
+  const carry: Partial<Record<CutPool, number>> = {};
+  const cuts = settings.crowdCuts?.length ? settings.crowdCuts : null;
+  if (cuts && state.stage >= cuts.length) return { out: [], carry };
+  // Cuts left, this one included: what earlier cuts left over is spread evenly over them (all of it at the last).
+  const remaining = Math.max(1, cutsInMatch(settings) - state.stage);
+  for (const pool of teams ? (["w", "b"] as const) : (["all"] as const)) {
+    const members = ranked.filter((p) => poolOf(p, teams) === pool);
+    const keep = cuts ? cuts[state.stage]!.keep * (teams ? 1 : 2) : 0;
+    const before = cuts ? (state.stage ? cuts[state.stage - 1]!.keep * (teams ? 1 : 2) : Infinity) : 0;
+    // (The rework: what earlier cuts left over is whoever is in above the last cut's keep; this cut's own share is the rest
+    // down to its keep.)
+    const carried = cuts ? Math.max(0, members.length - before) : (state.cutCarry?.[pool] ?? 0);
+    const dueNow = Math.ceil(carried / remaining);
+    const owed = cuts ? Math.max(0, members.length - keep) - carried + dueNow : (teams ? Math.floor(k / 2) : k) + dueNow;
+    // (At least one stays in every pool.)
+    const n = Math.max(0, Math.min(owed, members.length - 1));
+    const bottom = members.slice(members.length - n);
+    const line = members[members.length - n - 1];
+    const grace = settings.crowdScoring?.cutGrace ?? 0;
+    const going = exact || !line ? bottom : bottom.filter((p) => !sameScore(standingPoints(p, settings), standingPoints(line, settings)) && standingPoints(line, settings) - standingPoints(p, settings) > grace + 1e-9);
+    for (const p of going) out.add(p.id);
+    const left = cuts ? members.length - going.length - keep : carried - dueNow + (owed - going.length);
+    if (left > 0) carry[pool] = left;
+  }
+  return { out: ranked.filter((p) => out.has(p.id)).map((p) => p.id), carry };
+}
+
+/** How many a cut would take now (it doesn't depend on the coin flip). */
+export const cutCount = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) => cutPlan(state, standings(state, () => 0.5, settings), settings).out.length;
+
+export interface StageEnd {
+  state: MatchState;
+  knockedOut: PlayerState[];
+}
+
+/**
+ * Ends the current stage: the lowest scorers are knocked out and placed (cutPlan: ties at the line go through),
+ * scores reset (or carry over: with `crowdCarry`, each survivor keeps that share, to 2 decimals as every 50 v 50 score is;
+ * streaks untouched), and the board list is shrunk by the caller via `keepBoards`. The 50 v 50 rework (`crowdCuts`) never
+ * sets up a final: after its last cut the 1 v 1 is an ordinary stage, one player a side.
+ */
+export function endStage(
+  state: MatchState,
+  rng: Rng,
+  keepBoards: readonly number[],
+  settings: Settings = DEFAULT_SETTINGS,
+): StageEnd {
+  const ranked = standings(state, rng, settings);
+  const teams = isTeamMatch(settings);
+  const plan = cutPlan(state, ranked, settings);
+  const out = new Set(plan.out);
+  // Placements for this stage's knockouts: they take the last places, best of them first (the last-ranked gets the worst).
+  const outRanked = ranked.filter((p) => out.has(p.id));
+  const placement = new Map(outRanked.map((p, i) => [p.id, ranked.length - outRanked.length + i + 1]));
+  const players = state.players.map((p) => {
+    if (!p.alive) return p;
+    if (out.has(p.id)) return { ...p, alive: false, outInStage: state.stage, placement: placement.get(p.id)! };
+    return {
+      ...p,
+      stageScore: settings.scoresBetweenStages === "reset" ? 0 : settings.crowdCarry === undefined ? p.stageScore : round2(p.stageScore * settings.crowdCarry),
+      stageThinkMs: 0,
+      stageRounds: 0,
+      powerUps: Math.min(settings.powerUpsMax, p.powerUps + settings.powerUpsPerStage),
+      lossesByStage: [...p.lossesByStage, []],
+    };
+  });
+  const next: MatchState = { stage: state.stage + 1, round: 0, players, boards: [...keepBoards], ...(Object.keys(plan.carry).length ? { cutCarry: plan.carry } : {}) };
+  if (next.stage >= settings.knockoutsPerStage.length && !settings.crowdCuts?.length) {
+    // Seeds from this stage's standings: 1 & 4 against 2 & 3, alternating 1, 2, 4, 3.
+    const seeds = ranked.filter((p) => !out.has(p.id)).map((p) => p.id);
+    const colourOf = new Map(ranked.map((p) => [p.id, p.colour]));
+    const whites = seeds.filter((id) => colourOf.get(id) === "w");
+    const blacks = seeds.filter((id) => colourOf.get(id) === "b");
+    const [w1, w2] = whites;
+    const [b1, b2] = blacks;
+    if (teams && settings.finalFormat === "boss") {
+      // The boss battle is set up by the runner (it needs a fresh board and the boss's strength).
+    } else if (teams && settings.finalFormat === "duel" && w1 && b1) {
+      next.final = { order: [w1, b1], teams: [[w1], [b1]], turn: 0, format: "duel" };
+    } else if (teams && settings.finalFormat === "team" && whites.length && whites.length === blacks.length) {
+      // Each team's survivors, best first, teammates taking turns for their side.
+      next.final = { order: interleave(whites, blacks), teams: [whites, blacks], turn: 0, format: "team", step: 0, stepStart: 0, out: [] };
+    } else if (teams && w1 && w2 && b1 && b2) {
+      // Each team's top two play the final for their side (the runner puts the side to move first).
+      next.final = { order: [w1, b1, w2, b2], teams: [[w1, w2], [b1, b2]], turn: 0, format: "classic" };
+    } else if (seeds.length === 4) {
+      const [s1, s2, s3, s4] = seeds as [string, string, string, string];
+      next.final = { order: [s1, s2, s4, s3], teams: [[s1, s4], [s2, s3]], turn: 0, format: "classic" };
+    }
+  }
+  return {
+    state: next,
+    knockedOut: ranked.filter((p) => out.has(p.id)).map((p) => ({ ...p, placement: placement.get(p.id)! })),
+  };
+}
+
+/** Crowd 50 v 50: players keep one color (their team) all match. */
+export const isTeamMatch = (settings: Pick<Settings, "mode" | "crowdTeams">) => settings.mode === "crowd" && settings.crowdTeams;
+
+/** True once the knockout stages are over and the 2v2 final is on. Never in the 50 v 50 rework (`crowdCuts`): it has no final. */
+export const isFinal = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
+  !settings.crowdCuts?.length && state.stage >= settings.knockoutsPerStage.length;
+
+/**
+ * The stage's rounds are played: its cut is due. Never in the 50 v 50 rework's 1 v 1, after its last cut (`crowdCuts`): it plays
+ * to the game's end (the runner's endGameIfOver), with no more cuts or breaks, whatever a test's `?rounds=` makes its length.
+ */
+export const stageComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
+  !(settings.crowdCuts?.length && state.stage >= settings.crowdCuts.length) && state.round >= roundsInStage(settings, state.stage);
+
+/** Turn order: a[0], b[0], a[1], b[1], ... */
+export function interleave(a: readonly string[], b: readonly string[]): string[] {
+  return Array.from({ length: Math.max(a.length, b.length) }, (_, i) => [a[i], b[i]]).flat().filter((x): x is string => !!x);
+}
+
+/** The finalist to move now. */
+export const finalMover = (f: FinalState) => f.order[(f.turn - (f.stepStart ?? 0)) % f.order.length]!;
+
+/** Plays to the end of the game (team final and duel), with finalMaxTurns as a safety cap. */
+export const finalToTheEnd = (f: FinalState) => f.format === "team" || f.format === "duel";
+
+/**
+ * The final ends once everyone has made their moves (or the game ends: the
+ * caller checks the board). A team final or duel plays to the end, up to the cap.
+ */
+export const finalComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) => {
+  const f = state.final;
+  if (!f) return false;
+  if (finalToTheEnd(f)) return f.turn >= settings.finalMaxTurns;
+  return f.turn >= f.order.length * settings.finalMovesPerPlayer;
+};
+
+/** Team final: turns left until the next step's cut (null on the last step, which plays to the end). */
+export function teamFinalCutIn(f: FinalState, settings: Settings = DEFAULT_SETTINGS): number | null {
+  if (f.format !== "team" || (f.step ?? 0) >= settings.teamFinalSizes.length - 1) return null;
+  return Math.max(0, f.order.length * settings.teamFinalMovesPerStep - (f.turn - (f.stepStart ?? 0)));
+}
+
+/**
+ * Team final: when a step's moves are done, the weakest player on each side
+ * (by matchLoss) goes out, and the rest carry on with a shorter turn order.
+ * Those out are placed just below the players still in. Returns who went out.
+ */
+export function teamFinalStep(state: MatchState, rng: Rng, settings: Settings = DEFAULT_SETTINGS): { state: MatchState; out: string[] } {
+  const f = state.final;
+  if (!f || teamFinalCutIn(f, settings) !== 0) return { state, out: [] };
+  const coin = new Map(f.order.map((id) => [id, rng()]));
+  const byId = new Map(state.players.map((p) => [p.id, p]));
+  // Each step must leave its size: an exact tie goes against more raw loss over the match, then more thinking time (as the
+  // last cut's), and only then a coin flip.
+  const worse = (a: string, b: string) => {
+    const pa = byId.get(a)!;
+    const pb = byId.get(b)!;
+    return (
+      matchLoss(pb, settings) - matchLoss(pa, settings) ||
+      rawLossTotal(pb, settings) - rawLossTotal(pa, settings) ||
+      pb.thinkMsTotal - pa.thinkMsTotal ||
+      coin.get(a)! - coin.get(b)!
+    );
+  };
+  const nextSize = settings.teamFinalSizes[(f.step ?? 0) + 1] ?? 1;
+  const goes = f.teams.flatMap((t) => [...t].sort(worse).slice(0, Math.max(0, t.length - nextSize)));
+  const out = new Set(goes);
+  const teams: [string[], string[]] = [f.teams[0].filter((id) => !out.has(id)), f.teams[1].filter((id) => !out.has(id))];
+  // They take the places just below everyone still in, the better of them first.
+  const aliveAfter = state.players.filter((p) => p.alive && !out.has(p.id)).length;
+  const placed = [...goes].sort((a, b) => worse(b, a));
+  const placement = new Map(placed.map((id, i) => [id, aliveAfter + i + 1]));
+  // teams[0] moved on even turns from the final's start, so the side to move now leads the new order.
+  const first = f.turn % 2 === 0 ? 0 : 1;
+  const order = first === 0 ? interleave(teams[0], teams[1]) : interleave(teams[1], teams[0]);
+  return {
+    out: goes,
+    state: {
+      ...state,
+      players: state.players.map((p) => (out.has(p.id) ? { ...p, alive: false, outInStage: state.stage, placement: placement.get(p.id)! } : p)),
+      final: { ...f, teams, order, step: (f.step ?? 0) + 1, stepStart: f.turn, out: [...(f.out ?? []), ...goes.map((id) => ({ id, turn: f.turn }))] },
+    },
+  };
+}
+
+/** A finalist's average loss per move in the final (lower is better). */
+export const finalAverage = (p: Pick<PlayerState, "finalLosses">) =>
+  p.finalLosses.length ? p.finalLosses.reduce((s, x) => s + x, 0) / p.finalLosses.length : Infinity;
+
+/**
+ * Places the finalists 1st to 4th by average loss in the final; a tie goes to
+ * the team that won the game (`winningTeam`, 0 or 1, if it ended), then less
+ * thinking time, then a coin flip.
+ */
+export function finishFinal(state: MatchState, rng: Rng, winningTeam: 0 | 1 | null = null, settings: Settings = DEFAULT_SETTINGS): MatchState {
+  const f = state.final!;
+  const team = (id: string) => (f.teams[0].includes(id) ? 0 : 1);
+  const coin = new Map(f.order.map((id) => [id, rng()]));
+  // Team final: by matchLoss (the whole game counts). Duel: the winner of the game first. Classic: by the final's moves.
+  const quality = (p: PlayerState) => (finalToTheEnd(f) ? matchLoss(p, settings) : finalAverage(p));
+  const duelWin = (p: PlayerState) => (f.format === "duel" && winningTeam !== null ? (team(p.id) === winningTeam ? 0 : 1) : 0);
+  const ranked = state.players
+    .filter((p) => p.alive)
+    .sort(
+      (a, b) =>
+        duelWin(a) - duelWin(b) ||
+        quality(a) - quality(b) ||
+        (winningTeam === null ? 0 : (team(a.id) === winningTeam ? 0 : 1) - (team(b.id) === winningTeam ? 0 : 1)) ||
+        a.stageThinkMs - b.stageThinkMs ||
+        coin.get(a.id)! - coin.get(b.id)!,
+    );
+  const place = new Map(ranked.map((p, i) => [p.id, i + 1]));
+  return {
+    ...state,
+    players: state.players.map((p) =>
+      p.alive ? { ...p, alive: false, placement: place.get(p.id)!, outInStage: place.get(p.id) === 1 ? null : state.stage } : p,
+    ),
+  };
+}
+
+// ---- Boss battle ----
+
+/**
+ * The boss strikes after every bossKillEvery crowd moves, while more than bossMinSurvivors are left, and only when one
+ * player is clearly the worst (strikeVictim): a tie waits, the boss striking after the next crowd move instead. Not
+ * between the God King's Last Stand and the re-pick: the move he took back isn't a crowd move (so it doesn't bring the
+ * strike closer), and the strike waits until the re-pick is played (then it weighs both rounds' picks).
+ */
+export const bossKillDue = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
+  !!state.boss &&
+  !settings.bossNoStrikes &&
+  !state.boss.barred &&
+  state.boss.sinceKill >= settings.bossKillEvery &&
+  alivePlayers(state).length > (state.boss.minSurvivors ?? settings.bossMinSurvivors) &&
+  strikeVictim(state, settings) !== null;
+
+/** The rounds the boss's next strike weighs: its crowd moves since the last, plus the round of a move the God King took back. */
+function strikeRounds(boss: BossState): number {
+  const stood = !!boss.lastStand && boss.lastStand.atMove > (boss.kills.at(-1)?.atMove ?? 0);
+  return Math.max(1, boss.sinceKill) + (stood ? 1 : 0);
+}
+
+/** Counted points a player gave away over the last `k` crowd moves (a miss counting as finalMissLoss). */
+const recentLoss = (p: Pick<PlayerState, "finalLosses">, k: number) => p.finalLosses.slice(-k).reduce((s, x) => s + x, 0);
+
+/**
+ * Who the boss would strike now: the player with the worst moves since its last strike (most counted points lost over
+ * those moves, the opening allowance taken off), a tie going against the weaker player over the match (matchLoss).
+ * Null when two or more are tied exactly on both: nobody is struck on a coin flip
+ * (docs/decisions/2026-10-15-opening-allowance-and-ties.md).
+ */
+export function strikeVictim(state: MatchState, settings: Settings = DEFAULT_SETTINGS): string | null {
+  const boss = state.boss;
+  if (!boss) return null;
+  const k = strikeRounds(boss);
+  const order = alivePlayers(state)
+    .map((p) => ({ id: p.id, recent: recentLoss(p, k), match: matchLoss(p, settings) }))
+    .sort((a, b) => b.recent - a.recent || b.match - a.match);
+  const [worst, next] = order;
+  if (!worst) return null;
+  if (next && sameScore(worst.recent, next.recent) && (worst.match === next.match || sameScore(worst.match, next.match))) return null;
+  return worst.id;
+}
+
+/**
+ * The boss strikes down the player with the worst moves since its last strike (strikeVictim). They take the last place
+ * still open. No victim (a tie, or no boss): nothing changes.
+ */
+export function bossKill(state: MatchState, rng: Rng, settings: Settings = DEFAULT_SETTINGS): { state: MatchState; victim: string | null } {
+  const boss = state.boss;
+  if (!boss) return { state, victim: null };
+  const alive = alivePlayers(state);
+  // (The same draws from the match's random source as before ties waited, so a match's later draws stay as they were.)
+  for (const _ of alive) rng();
+  const id = strikeVictim(state, settings);
+  const victim = id === null ? undefined : alive.find((p) => p.id === id);
+  if (!victim) return { state, victim: null };
+  const place = alive.length;
+  return {
+    victim: victim.id,
+    state: {
+      ...state,
+      players: state.players.map((p) => (p.id === victim.id ? { ...p, alive: false, outInStage: state.stage, placement: place } : p)),
+      boss: { ...boss, sinceKill: 0, kills: [...boss.kills, { id: victim.id, atMove: boss.crowdMoves }] },
+    },
+  };
+}
+
+/** Ends the boss battle: the survivors placed by matchLoss (they all share the result on their records). */
+export function finishBoss(state: MatchState, rng: Rng, result: "crowd" | "boss" | "draw", settings: Settings = DEFAULT_SETTINGS): MatchState {
+  const coin = new Map(state.players.map((p) => [p.id, rng()]));
+  const ranked = alivePlayers(state).sort((a, b) => matchLoss(a, settings) - matchLoss(b, settings) || coin.get(a.id)! - coin.get(b.id)!);
+  const place = new Map(ranked.map((p, i) => [p.id, i + 1]));
+  return {
+    ...state,
+    boss: state.boss && { ...state.boss, result },
+    players: state.players.map((p) => (p.alive ? { ...p, alive: false, placement: place.get(p.id)!, outInStage: place.get(p.id) === 1 ? null : state.stage } : p)),
+  };
+}
+
+// ---- The 50 v 50 rework's end (crowdCuts: one game to its end, cuts to a 1 v 1) ----
+
+/**
+ * The move limit (`crowdMoveLimit`) is reached once Black's move that-many has been played: the position's own move number
+ * (a FEN's fullmove, as the board numbers it) is past it. No limit: never.
+ */
+export const crowdLimitReached = (settings: Pick<Settings, "crowdMoveLimit">, fullmove: number) =>
+  settings.crowdMoveLimit !== undefined && fullmove > settings.crowdMoveLimit;
+
+/**
+ * The judge's verdict at the move limit (Eric's default for his question 1, Nov 16): the side at `crowdLimitWin` expected
+ * score or more wins (75%: 9 in 10 games that reach move 60 are clearly won by then, reports/crowd-rework.md); otherwise a
+ * draw (null). `expected` is the side to move's expected score, as the board keeps it.
+ */
+export function crowdLimitVerdict(expected: number, toMove: Side, settings: Pick<Settings, "crowdLimitWin">): Side | null {
+  const win = settings.crowdLimitWin ?? 1;
+  if (expected >= win - 1e-9) return toMove;
+  if (1 - expected >= win - 1e-9) return toMove === "w" ? "b" : "w";
+  return null;
+}
+
+/**
+ * Ends a 50 v 50 rework game (mate, a draw by the rules, the move limit's verdict, or a game over before the 1 v 1): everyone
+ * still in takes the first places (the design's rule 5), the winning side's first, then the losing side's (`winner` null, a
+ * draw: both sides together), each by their score (to 2 decimals, as the screens show it; Eric's default for his question 4:
+ * the winning side's survivors first); an exact tie goes to fewer counted points given away a move over the match
+ * (matchLoss), then less raw loss, then less thinking time, then a coin. So in the 1 v 1 the winner is 1st and, drawn, the
+ * better whole-match score. Those cut are already placed below them, each cut's below the next's (endStage).
+ */
+export function finishGame(state: MatchState, rng: Rng, winner: Side | null, settings: Settings = DEFAULT_SETTINGS): MatchState {
+  const coin = new Map(state.players.map((p) => [p.id, rng()]));
+  const side = (p: PlayerState) => (winner === null || p.colour === winner ? 0 : 1);
+  const score = (a: PlayerState, b: PlayerState) => {
+    const x = standingPoints(a, settings);
+    const y = standingPoints(b, settings);
+    return sameScore(x, y) ? 0 : y - x;
+  };
+  const ranked = alivePlayers(state).sort(
+    (a, b) =>
+      side(a) - side(b) ||
+      score(a, b) ||
+      matchLoss(a, settings) - matchLoss(b, settings) ||
+      rawLossTotal(a, settings) - rawLossTotal(b, settings) ||
+      scoreThinkMs(a, settings) - scoreThinkMs(b, settings) ||
+      coin.get(a.id)! - coin.get(b.id)!,
+  );
+  const place = new Map(ranked.map((p, i) => [p.id, i + 1]));
+  return {
+    ...state,
+    players: state.players.map((p) => (p.alive ? { ...p, alive: false, placement: place.get(p.id)!, outInStage: place.get(p.id) === 1 ? null : state.stage } : p)),
+  };
+}
+
+/** The cuts a 50 v 50 rework match made (its stage, at most the schedule's length). */
+export const cutsMade = (state: Pick<MatchState, "stage">, settings: Pick<Settings, "knockoutsPerStage"> & Partial<Pick<Settings, "crowdCuts">>) =>
+  Math.min(state.stage, cutsInMatch(settings));
+
+/**
+ * The best player (the design's rule 5): the fewest counted points given away a move over the match (matchLoss: the opening
+ * allowance taken off, a miss counting as finalMissLoss), among those who survived at least `CROWD_BEST.cutsShare` of the
+ * cuts made (rounded up: half), each player counted as surviving the cuts before the stage they went out in. Those who
+ * left the match (`left`: resigned, removed for being away) never are: it's a title for playing, not for leaving. An exact
+ * tie goes to the better place. Null before anyone has moved.
+ */
+export function bestPlayer(state: MatchState, settings: Settings = DEFAULT_SETTINGS, left: ReadonlySet<string> = new Set()): string | null {
+  const made = cutsMade(state, settings);
+  const need = Math.ceil(made * CROWD_BEST.cutsShare - 1e-9);
+  const survived = (p: PlayerState) => (p.alive || p.outInStage === null ? made : Math.min(made, p.outInStage));
+  const loss = (p: PlayerState) => matchLoss(p, settings);
+  const ok = state.players.filter((p) => !left.has(p.id) && survived(p) >= need && Number.isFinite(loss(p)));
+  const place = (p: PlayerState) => p.placement ?? 0;
+  const best = [...ok].sort((a, b) => (sameScore(loss(a), loss(b)) ? 0 : loss(a) - loss(b)) || place(a) - place(b) || (a.id < b.id ? -1 : 1))[0];
+  return best?.id ?? null;
+}
+
+/**
+ * The podium's titles (the design's rules 5 and 6), once everyone is placed: the winner, 1st place of a won game (a drawn
+ * game has none), and the best player (bestPlayer; one player can be both).
+ */
+export function crowdPodium(state: MatchState, winner: Side | null, settings: Settings = DEFAULT_SETTINGS, left: ReadonlySet<string> = new Set()): { winner?: string; best: string | null } {
+  const first = winner === null ? undefined : state.players.find((p) => p.placement === 1);
+  return { ...(first ? { winner: first.id } : {}), best: bestPlayer(state, settings, left) };
+}
+
+// ---- Boards ----
+
+export interface BoardStatus {
+  id: number;
+  /** Side to move's expected score. */
+  expected: number;
+  gameOver: boolean;
+}
+
+/**
+ * Why a board left play: its game ended mid-stage ("game_over"), or it was the
+ * last board and had to be replaced with a fresh opening ("replaced").
+ */
+export type RetireReason = "game_over" | "replaced";
+
+/**
+ * When fewer boards are needed, keep the most balanced: finished games go
+ * first, then the most lopsided (expected score furthest from 0.50).
+ */
+export function keepBoards(boards: readonly BoardStatus[], count: number): number[] {
+  return [...boards]
+    .sort((a, b) => Number(a.gameOver) - Number(b.gameOver) || Math.abs(a.expected - 0.5) - Math.abs(b.expected - 0.5) || a.id - b.id)
+    .slice(0, count)
+    .map((b) => b.id);
+}
+
+// ---- Bots ----
+
+export interface Candidate {
+  move: string;
+  loss: number;
+}
+
+/**
+ * A bot with skill T picks among the candidates with probability proportional
+ * to exp(-loss / T); with a small chance it plays a random legal move instead.
+ */
+export function botPick(
+  rng: Rng,
+  candidates: readonly Candidate[],
+  skill: number,
+  legalMoves: readonly string[],
+  settings: Settings = DEFAULT_SETTINGS,
+): string {
+  if (legalMoves.length && rng() < settings.botRandomMoveChance) return legalMoves[randomInt(rng, 0, legalMoves.length - 1)]!;
+  if (!candidates.length) return legalMoves[randomInt(rng, 0, legalMoves.length - 1)]!;
+  const weights = candidates.map((c) => Math.exp(-c.loss / Math.max(skill, 1e-6)));
+  return candidates[weightedIndex(rng, weights)]!.move;
+}
+
+/**
+ * Crowd 50 v 50: one team turn's shared lean (CROWD_BOTS), the same for every bot of the team that turn. Drawn from the
+ * turn's random source before any bot picks, in a fixed number of draws (two, then one per candidate in the order
+ * given), so every device that has the same candidates and seed draws the same lean.
+ */
+export interface BotLean {
+  /** How closely appeal follows the engine this turn (the loss's weight). */
+  focus: number;
+  /** Each line's shared appeal this turn (added to its log-weight); a line not listed has none. */
+  taste: Record<string, number>;
+}
+
+export function botLean(rng: Rng, candidates: readonly Candidate[], spread: CrowdBotSpread): BotLean {
+  const [f0, f1] = spread.focus;
+  const focus = Math.exp(Math.log(f0) + rng() * (Math.log(f1) - Math.log(f0)));
+  const strength = spread.lean[0] + rng() * (spread.lean[1] - spread.lean[0]);
+  const taste: Record<string, number> = {};
+  for (const c of candidates) {
+    // (A normal draw, Box-Muller.)
+    const z = Math.sqrt(-2 * Math.log(Math.max(rng(), 1e-12))) * Math.cos(2 * Math.PI * rng());
+    taste[c.move] = strength * z;
+  }
+  return { focus, taste };
+}
+
+/**
+ * A Crowd 50 v 50 bot's pick (CROWD_BOTS): a good line (one of the first `moves` giving away under `blunderLoss`) by
+ * exp(-focus x loss / T + taste), any other by `blunderWeight` x exp(-loss / T); now and then a random legal move
+ * (`botRandomMoveChance`), as botPick.
+ */
+export function botPickSpread(
+  rng: Rng,
+  candidates: readonly Candidate[],
+  skill: number,
+  legalMoves: readonly string[],
+  spread: CrowdBotSpread,
+  lean: BotLean,
+  settings: Settings = DEFAULT_SETTINGS,
+): string {
+  if (legalMoves.length && rng() < settings.botRandomMoveChance) return legalMoves[randomInt(rng, 0, legalMoves.length - 1)]!;
+  if (!candidates.length) return legalMoves[randomInt(rng, 0, legalMoves.length - 1)]!;
+  const t = Math.max(skill, 1e-6);
+  const good = new Set(
+    [...candidates]
+      .sort((a, b) => a.loss - b.loss)
+      .filter((c) => c.loss < spread.blunderLoss)
+      .slice(0, spread.moves)
+      .map((c) => c.move),
+  );
+  // (The taste centered over the good lines: it moves the bots between good lines, never toward or away from the
+  // blunders as a whole, so a turn with one good line keeps the blunders as rare as ever.)
+  let mean = 0;
+  for (const m of good) mean += lean.taste[m] ?? 0;
+  mean /= Math.max(good.size, 1);
+  const weights = candidates.map((c) =>
+    good.has(c.move) ? Math.exp(-(lean.focus * c.loss) / t + (lean.taste[c.move] ?? 0) - mean) : spread.blunderWeight * Math.exp(-c.loss / t),
+  );
+  return candidates[weightedIndex(rng, weights)]!.move;
+}
+
+/**
+ * A bot's move, using a power-up when it has one and the position is sharp
+ * (the second-best candidate loses at least `botPowerUpLoss`): then it plays the best move. With Crowd 50 v 50's
+ * `crowdBots` and the turn's `lean`: a bot uses one there only with CROWD_BOTS' `powerUpChance`, and otherwise picks by
+ * botPickSpread.
+ */
+export function botChoose(
+  rng: Rng,
+  candidates: readonly Candidate[],
+  bot: { skill: number | null; powerUps: number },
+  legalMoves: readonly string[],
+  settings: Settings = DEFAULT_SETTINGS,
+  lean?: BotLean,
+): { move: string; usedPowerUp: boolean } {
+  const sorted = [...candidates].sort((a, b) => a.loss - b.loss);
+  const spread = lean ? settings.crowdBots : undefined;
+  if (bot.powerUps > 0 && sorted.length > 1 && sorted[1]!.loss >= settings.botPowerUpLoss && (!spread || rng() < spread.powerUpChance)) {
+    return { move: sorted[0]!.move, usedPowerUp: true };
+  }
+  if (spread && lean) return { move: botPickSpread(rng, candidates, bot.skill ?? 5, legalMoves, spread, lean, settings), usedPowerUp: false };
+  return { move: botPick(rng, candidates, bot.skill ?? 5, legalMoves, settings), usedPowerUp: false };
+}
+
+/** The turn's lean for a team of bots under `settings` (Crowd 50 v 50's crowdBots), or none (bots pick as botPick). */
+export function botLeanFor(rng: Rng, candidates: readonly Candidate[], settings: Pick<Settings, "crowdBots">): BotLean | undefined {
+  return settings.crowdBots ? botLean(rng, candidates, settings.crowdBots) : undefined;
+}
+
+/**
+ * A bot's thinking time: somewhere in botThinkSeconds, but within 85% of the move clock on that move, so on a short
+ * clock (Bullet's 10 s) bots spread out over it instead of piling up on the buzzer.
+ */
+export function botThinkMs(rng: Rng, settings: Settings = DEFAULT_SETTINGS, move = 1): number {
+  const [lo, top] = settings.botThinkSeconds;
+  const hi = Math.max(lo, Math.min(top, 0.85 * moveClockAt(settings, move)));
+  return Math.round((lo + rng() * (hi - lo)) * 1000);
+}

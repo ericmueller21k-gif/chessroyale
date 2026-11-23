@@ -1,0 +1,931 @@
+{
+  "about": [
+    "Which e2e specs a pull request runs (e2e/ci-select.mjs; docs/areas/ops.md, 'CI e2e'). Paths are globs from the repo's root: * within a folder, ** across folders.",
+    "Each changed path, in this order: a 'full' path runs the whole suite; otherwise every area whose paths match adds its specs; otherwise a 'none' path adds nothing; any other path runs the whole suite (fail-safe).",
+    "A changed spec always runs itself. The 'smoke' specs run on every pull request. 'leftOut' specs never run on a pull request (the @perf specs). A push to main always runs everything.",
+    "A pull request that adds a file under packages/ (or a spec) that no entry here matches fails `check` in its first minute (node e2e/ci-select.mjs unmapped): add it to its area (or a new one), to 'none', or, for shared code, to 'full'."
+  ],
+  "smoke": [
+    "e2e/boss-smoke.spec.ts",
+    "e2e/front-door.spec.ts",
+    "e2e/boss-character.spec.ts",
+    "e2e/lobby-chat.spec.ts"
+  ],
+  "leftOut": ["e2e/perf.spec.ts"],
+  "traced": {
+    "about": "Shared modules whose change is followed through the code instead of running everything (e2e/ci-select.mjs, traceChanges): the top-level declarations the diff changes (comments and types don't run), what in the module uses them, then the files that import the module (or its package's entry) and name one of them; each of those counts as a changed path here (its area's specs, a spec itself; a shared foundation or a path no area has runs everything). A user that is itself traced is followed the same way. Every module in packages/core/src but index.ts is traced without being listed here (ci-select.mjs, TRACED_BY_DEFAULT, Nov 10); `modules` lists the others. A new module is followed from everything it exports. A change it can't place (the module removed, code outside any declaration, a file it can't read as code) leaves the module in `full`: every spec. docs/areas/ops.md, 'CI e2e'; docs/decisions/2026-11-01-ci-selection.md.",
+    "modules": [
+      "packages/server/src/accounts.ts",
+      "packages/server/src/api.ts",
+      "packages/server/src/account-data.ts",
+      "packages/server/src/locker.ts",
+      "packages/server/src/boss-tokens.ts",
+      "packages/server/src/ranked.ts",
+      "e2e/helpers.ts",
+      "packages/app/src/net.ts",
+      "packages/app/src/solo.ts",
+      "packages/app/src/boss-side.ts",
+      "packages/app/src/main.tsx",
+      "packages/app/src/board/OwnBoard.tsx",
+      "packages/app/src/account.ts",
+      "packages/app/src/game.ts",
+      "packages/app/src/prefs.ts",
+      "packages/app/src/test-switches.ts",
+      "packages/app/src/screens/Hud.tsx",
+      "packages/app/src/components/EvalBar.tsx"
+    ],
+    "hubs": ["packages/app/src/App.tsx"],
+    "hubsAbout": "A traced change that reaches a hub runs everything: App.tsx makes the matches and the account and hands them to every screen, so what it imports reaches every area, not only home's (a change to App.tsx's own code still runs home's specs, as before)."
+  },
+  "full": [
+    "package.json",
+    "package-lock.json",
+    "packages/server/src/e2e-sql.ts",
+    "packages/*/package.json",
+    "tsconfig.base.json",
+    "e2e/tsconfig.json",
+    "packages/*/tsconfig.json",
+    "playwright.config.ts",
+    "e2e/dev-proxy-retry.mjs",
+    "wrangler.jsonc",
+    "e2e/helpers.ts",
+    "packages/core/src/**",
+    "packages/chess/src/runner.ts",
+    "packages/chess/src/runner-tools.ts",
+    "packages/app/src/lazy.tsx",
+    "packages/app/src/lazy-game.ts",
+    "packages/app/src/shell.ts",
+    "packages/app/src/loadbar.ts",
+    "packages/app/src/screens/game-screens.ts",
+    "packages/chess/src/protocol.ts",
+    "packages/chess/src/index.ts",
+    "packages/chess/src/rules.ts",
+    "packages/chess/src/judge.ts",
+    "packages/chess/src/uci.ts",
+    "packages/chess/src/bots.ts",
+    "packages/chess/src/boards.ts",
+    "packages/chess/src/openings.ts",
+    "packages/chess/src/chess960.ts",
+    "packages/chess/data/openings.json",
+    "packages/server/src/index.ts",
+    "packages/server/src/api.ts",
+    "packages/server/src/lobby.ts",
+    "packages/server/src/lobby-do.ts",
+    "packages/server/src/lobby-options.ts",
+    "packages/server/src/accounts.ts",
+    "packages/server/src/account-data.ts",
+    "packages/server/src/access.ts",
+    "packages/server/src/admin.ts",
+    "packages/server/src/*-schema.ts",
+    "packages/server/src/fairplay*.ts",
+    "packages/server/src/ban-*.ts",
+    "packages/server/src/locker.ts",
+    "packages/server/src/boss-tokens.ts",
+    "packages/server/src/ranked.ts",
+    "packages/server/src/ledger.ts",
+    "packages/app/index.html",
+    "packages/app/vite.config.ts",
+    "packages/app/sw-template.js",
+    "packages/app/public/fonts/**",
+    "packages/app/src/main.tsx",
+    "packages/app/src/ban.ts",
+    "packages/app/src/board/**",
+    "packages/app/src/components/Board.tsx",
+    "packages/app/src/board-view.ts",
+    "packages/app/src/game.ts",
+    "packages/app/src/solo.ts",
+    "packages/app/src/boss-side.ts",
+    "packages/app/src/net.ts",
+    "packages/app/src/engine.ts",
+    "packages/app/src/account.ts",
+    "packages/app/src/site-gate.ts",
+    "packages/app/src/components/SiteGateNotice.tsx",
+    "packages/app/src/prefs.ts",
+    "packages/app/src/hooks.ts",
+    "packages/app/src/test-switches.ts",
+    "packages/app/src/screens/Play.tsx",
+    "packages/app/src/screens/Hud.tsx",
+    "packages/app/src/components/BoardClock.tsx",
+    "packages/app/src/components/Countdown.tsx",
+    "packages/app/src/components/EvalBar.tsx",
+    "packages/app/src/components/HistoryNav.tsx",
+    "packages/app/src/components/LiveNumber.tsx",
+    "packages/app/src/components/MuteButton.tsx",
+    "packages/app/src/components/PowerUpButton.tsx",
+    "packages/app/src/components/TinyBoard.tsx",
+    "packages/app/src/clock-text.ts",
+    "packages/app/src/hints.ts",
+    "packages/app/src/progress.ts",
+    "packages/app/src/refused.ts",
+    "public/**", "packages/app/src/components/EndScreen.tsx", "packages/app/src/end-screen.css", "packages/app/src/town/shops/ShopRoom.tsx", "packages/app/src/town/shops/room.ts"],
+  "none": [
+    "**/*.md",
+    "docs/**",
+    ".claude/**",
+    ".github/workflows/branch-cleanup.yml",
+    "reports/**",
+    "scripts/**",
+    "engine/**",
+    "packages/*/test/**",
+    "packages/sim/**",
+    "packages/chess/scripts/**",
+    "packages/chess/data/sources/**",
+    "packages/chess/src/node.ts",
+    "packages/server/src/test-accounts.ts",
+    "packages/app/scripts/**",
+    "packages/app/stockfish-source/**",
+    "packages/app/public/licenses/**",
+    "packages/app/god-king-preview.html",
+    "packages/app/hidden-room-preview.html",
+    "packages/app/items-preview.html",
+    "packages/app/rides-measure.html",
+    "packages/app/chandy-preview.html",
+    "packages/app/src/dev/**",
+    "packages/maia-worker/LICENSE",
+    "packages/maia-worker/licenses/**",
+    "packages/maia-worker/scripts/convert.py",
+    "packages/maia-worker/scripts/requirements.txt",
+    ".github/workflows/check.yml",
+    ".github/workflows/engine-container.yml",
+    ".gitignore",
+    ".gitattributes",
+    "packages/app/.gitignore",
+    "vitest.config.ts",
+    "e2e/areas.json",
+    "e2e/ci-timings.json",
+    "e2e/ci-select.d.mts",
+    "e2e/perf-probe.js",
+    "e2e/perf-probe.d.ts",
+    "packages/app/src/characters/tower-banter.ts"
+  ],
+  "areas": {
+    "XP and levels (Nov 9): the XP box on every result screen, the level on home and the profiles; the server's grant": {
+      "paths": ["packages/server/src/xp.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/PageLayer.tsx"],
+      "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/quests.spec.ts", "e2e/tower-party.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
+    },
+    "A solo boss battle kept on the device (Nov 22, step 2): the reload's card, Resume or Forfeit, and another start asking first": {
+      "paths": ["packages/app/src/solo-kept.ts", "packages/app/src/components/GameInProgress.tsx"],
+      "specs": ["e2e/xp.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/battle-tower.spec.ts"]
+    },
+    "The Battle Tower's saving (Nov 19, PR 9): the server's climbs and bests, its routes (/api/tower), the sign-in merge, the download and deleting": {
+      "paths": ["packages/server/src/tower.ts"],
+      "specs": ["e2e/account-delete.spec.ts", "e2e/battle-tower.spec.ts", "e2e/tower-party.spec.ts"]
+    },
+    "The Battle Tower's solo play (Nov 19, PR 10; PR 11b: no screen in the flow, Tower.tsx kept unused): a floor's battle (the split bar, the run's strip, the stacked figures), its result, the floor kept on the device and rejoined; the town's tower (its clerk's card, the elevator, the floor room's walk-in)": {
+      "paths": ["packages/app/src/tower.ts", "packages/app/src/tower.css", "packages/app/src/screens/Tower.tsx", "packages/app/src/screens/TowerBar.tsx", "packages/app/src/screens/TowerResult.tsx", "packages/app/src/town/TowerDesk.tsx", "packages/app/src/components/TowerHearts.tsx", "packages/app/src/town/shops/tower-*.ts", "packages/app/src/town/houses/tower.ts"],
+      "specs": ["e2e/battle-tower.spec.ts", "e2e/town-street.spec.ts", "e2e/tower-party.spec.ts"]
+    },
+    "The Battle Tower's party (Nov 20, PR 12): the clerk's three ways (Solo, Invite friends, Open party), the party's seats, plan, READY and START, the town chat's party line and its Join, everyone walking into the floor room, a party floor's match and result, a copy played on alone": {
+      "paths": ["packages/app/src/tower-party.ts", "packages/app/src/tower-plan.ts"],
+      "specs": ["e2e/tower-party.spec.ts", "e2e/battle-tower.spec.ts"]
+    },
+    "Quests (Nov 9, XP phase 3): dealt, counted and paid by the server, the overlay on home and its entry in the top bar, a quest's line in the result's toast": {
+      "paths": ["packages/server/src/quests.ts", "packages/app/src/quests.ts", "packages/app/src/components/QuestsOverlay.tsx"],
+      "specs": ["e2e/quests.spec.ts", "e2e/home-layout.spec.ts", "e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts"]
+    },
+    "CI's e2e plan, shards and summary (the smoke set proves a shard still plans, runs and reports; ci-select's unit tests run in check; main runs everything)": {
+      "paths": [".github/workflows/e2e.yml", "e2e/ci-*.mjs", "e2e/ci-summary.ts"],
+      "specs": ["e2e/boss-smoke.spec.ts", "e2e/front-door.spec.ts", "e2e/boss-character.spec.ts", "e2e/lobby-chat.spec.ts"]
+    },
+    "bosses: the rules they all share (powers, timing, the brain)": {
+      "paths": [
+        "packages/chess/src/boss-powers.ts",
+        "packages/chess/src/board-layer.ts",
+        "packages/chess/src/boss-timing.ts",
+        "packages/chess/src/boss-brain.ts",
+        "packages/chess/src/bosses/base.ts",
+        "packages/chess/src/bosses/index.ts",
+        "packages/chess/src/bosses/grid.ts",
+        "packages/server/src/bosses/base.ts"
+      ],
+      "specs": [
+        "e2e/alfil.spec.ts",
+        "e2e/banner-time.spec.ts",
+        "e2e/bigboy.spec.ts",
+        "e2e/boss-character.spec.ts",
+        "e2e/boss-dock.spec.ts",
+        "e2e/boss-powers.spec.ts",
+        "e2e/boss-select.spec.ts",
+        "e2e/boss-speech.spec.ts",
+        "e2e/formats.spec.ts",
+        "e2e/grex.spec.ts",
+        "e2e/hollow.spec.ts",
+        "e2e/hopper.spec.ts",
+        "e2e/king-attack.spec.ts",
+        "e2e/king-save-altered.spec.ts",
+        "e2e/maia.spec.ts",
+        "e2e/pig.spec.ts",
+        "e2e/recluse.spec.ts",
+        "e2e/sawyer.spec.ts"
+      ]
+    },
+    "bosses: the art, sounds and moments they all share": {
+      "paths": [
+        "packages/app/src/characters/index.ts",
+        "packages/app/src/characters/side-size.ts",
+        "packages/app/src/characters/kits.ts",
+        "packages/app/src/characters/power-art.ts",
+        "packages/app/src/characters/effects.ts",
+        "packages/app/src/characters/effects/common.ts",
+        "packages/app/src/characters/boss-beats.ts",
+        "packages/app/src/characters/boss-sounds.ts",
+        "packages/app/src/characters/attack-frame.ts",
+        "packages/app/src/characters/sprite.ts",
+        "packages/app/src/characters/sprite-kit.ts",
+        "packages/app/src/characters/sprites.ts",
+        "packages/app/src/characters/synth.ts",
+        "packages/app/src/characters/paint.ts",
+        "packages/app/src/characters/black-knight.ts",
+        "packages/app/src/characters/pawn-golem.ts",
+        "packages/app/src/components/BossCharacter.tsx",
+        "packages/app/src/components/boss-figure.ts",
+        "packages/app/src/components/BossPortrait.tsx",
+        "packages/app/src/characters/portraits.ts",
+        "packages/app/src/characters/portraits.gen.ts",
+        "packages/app/src/components/BossEffect.tsx",
+        "packages/app/src/components/PowerParts.tsx",
+        "packages/app/src/components/KingAttack.tsx",
+        "packages/app/src/components/WipPreview.tsx",
+        "packages/app/src/speech.tsx",
+        "packages/app/src/paced-line.ts"
+      ],
+      "specs": [
+        "e2e/boss-bar-same.spec.ts",
+        "e2e/boss-bubble.spec.ts",
+        "e2e/boss-bubble-header.spec.ts",
+        "e2e/boss-character.spec.ts",
+        "e2e/boss-powers.spec.ts",
+        "e2e/boss-select.spec.ts",
+        "e2e/boss-side.spec.ts",
+        "e2e/side-same-size.spec.ts",
+        "e2e/boss-speech.spec.ts",
+        "e2e/king-attack.spec.ts"
+      ]
+    },
+    "the boss battle's screen and dock": {
+      "paths": [
+        "packages/app/src/screens/Boss.tsx",
+        "packages/app/src/components/BossDock.tsx",
+        "packages/app/src/components/BossPowers.tsx",
+        "packages/app/src/boss-history.ts",
+        "packages/app/src/battle-banners.ts",
+        "packages/app/src/components/MovePanel.tsx",
+        "packages/app/src/move-list.ts"
+      ],
+      "specs": [
+        "e2e/banner-time.spec.ts",
+        "e2e/board-layout.spec.ts",
+        "e2e/boss-bar.spec.ts",
+        "e2e/boss-bar-same.spec.ts",
+        "e2e/boss-character.spec.ts",
+        "e2e/boss-dock.spec.ts",
+        "e2e/boss-powers.spec.ts",
+        "e2e/boss-side.spec.ts",
+        "e2e/side-same-size.spec.ts",
+        "e2e/recluse.spec.ts"
+      ]
+    },
+    "the Boss raid screen (the select)": {
+      "paths": [
+        "packages/app/src/components/BossSelect.tsx",
+        "packages/app/src/components/BossStage.tsx",
+        "packages/app/src/components/BossDifficulty.tsx",
+        "packages/app/src/characters/boss-select.ts",
+        "packages/app/src/boss-difficulty.ts",
+        "packages/app/src/power-words.ts"
+      ],
+      "specs": ["e2e/alfil.spec.ts", "e2e/boss-select.spec.ts", "e2e/home-ranked.spec.ts", "e2e/boss-party.spec.ts", "e2e/hopper.spec.ts"]
+    },
+    "Boss Battle's party (docs/decisions/2026-10-30-boss-party.md)": {
+      "paths": [
+        "packages/server/src/boss-party.ts",
+        "packages/server/src/squads-party.ts",
+        "packages/app/src/components/BossParty.tsx"
+      ],
+      "specs": ["e2e/boss-party.spec.ts", "e2e/boss-select.spec.ts", "e2e/squads.spec.ts"]
+    },
+    "the God King": {
+      "paths": [
+        "packages/app/src/components/GodKing.tsx",
+        "packages/app/src/components/LastStand.tsx",
+        "packages/app/src/components/FightBanner.tsx",
+        "packages/app/src/godKing.ts",
+        "packages/app/src/characters/god-king*.ts",
+        "packages/app/public/sounds/god-king/**"
+      ],
+      "specs": [
+        "e2e/boss-powers.spec.ts",
+        "e2e/boss-speech.spec.ts",
+        "e2e/formats.spec.ts",
+        "e2e/king-attack.spec.ts",
+        "e2e/king-save-altered.spec.ts",
+        "e2e/recluse.spec.ts"
+      ]
+    },
+    "Alfil": {
+      "paths": [
+        "packages/chess/src/bosses/alfil.ts",
+        "packages/app/src/characters/alfil*.ts",
+        "packages/app/src/characters/effects/alfil.ts",
+        "packages/app/src/components/Alfil.tsx",
+        "packages/app/src/board/pieces/alfil/**"
+      ],
+      "specs": ["e2e/alfil.spec.ts"]
+    },
+    "Big Boy": {
+      "paths": [
+        "packages/chess/src/bosses/bigboy.ts",
+        "packages/app/src/characters/bigboy*.ts",
+        "packages/app/src/characters/effects/bigboy.ts",
+        "packages/app/src/characters/effects/bigboy-tower.ts",
+        "packages/app/src/components/BigBoy.tsx"
+      ],
+      "specs": ["e2e/bigboy.spec.ts", "e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Boingo the Clown": {
+      "paths": [
+        "packages/chess/src/bosses/boingo.ts",
+        "packages/app/src/characters/clown*.ts",
+        "packages/app/src/characters/effects/boingo.ts",
+        "packages/app/src/components/Boingo.tsx"
+      ],
+      "specs": ["e2e/boss-character.spec.ts", "e2e/boss-powers.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Ginger (the gingerbread man)": {
+      "paths": [
+        "packages/chess/src/bosses/ginger.ts",
+        "packages/app/src/characters/gingerbread*.ts",
+        "packages/app/src/characters/effects/ginger.ts",
+        "packages/app/src/characters/effects/ginger-superice.ts",
+        "packages/app/src/characters/ginger-super.ts",
+        "packages/app/src/components/Ginger.tsx",
+        "e2e/ginger.spec.ts"
+      ],
+      "specs": ["e2e/boss-dock.spec.ts", "e2e/boss-powers.spec.ts", "e2e/ginger.spec.ts", "e2e/king-attack.spec.ts", "e2e/maia.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts"]
+    },
+    "Grex (grex)": {
+      "paths": [
+        "packages/chess/src/bosses/grex.ts",
+        "packages/app/src/characters/grex*.ts",
+        "packages/app/src/characters/effects/grex.ts",
+        "packages/app/src/components/Grex.tsx"
+      ],
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/grex.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Hollow": {
+      "paths": [
+        "packages/chess/src/bosses/hollow.ts",
+        "packages/server/src/bosses/hollow.ts",
+        "packages/app/src/characters/hollow*.ts",
+        "packages/app/src/characters/lights.ts",
+        "packages/app/src/characters/effects/hollow.ts",
+        "packages/app/src/components/Hollow.tsx",
+        "packages/app/src/components/LightsOut.tsx"
+      ],
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/hollow.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Chub & Chirp (hopper)": {
+      "paths": [
+        "packages/chess/src/bosses/hopper.ts",
+        "packages/chess/src/bosses/carrots.ts",
+        "packages/app/src/characters/hopper*.ts",
+        "packages/app/src/characters/effects/hopper.ts",
+        "packages/app/src/components/Hopper.tsx",
+        "packages/app/src/carrot-race.ts"
+      ],
+      "specs": ["e2e/hopper.spec.ts"]
+    },
+    "The hippo gardener (gardener)": {
+      "paths": [
+        "packages/chess/src/bosses/gardener.ts",
+        "packages/app/src/characters/gardener*.ts",
+        "packages/app/src/characters/effects/gardener.ts",
+        "packages/app/src/components/Gardener.tsx",
+        "packages/app/src/garden-*.ts"
+      ],
+      "specs": ["e2e/gardener.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Dash (dash)": {
+      "paths": [
+        "packages/chess/src/bosses/dash.ts",
+        "packages/app/src/characters/dash*.ts",
+        "packages/app/src/characters/effects/dash.ts",
+        "packages/app/src/characters/boss-blitz.ts",
+        "packages/app/src/characters/sidekicks/blitz.ts",
+        "packages/app/src/components/Dash.tsx",
+        "packages/app/src/components/DashRush.tsx",
+        "packages/app/src/components/DashStall.tsx",
+        "packages/server/src/bosses/dash.ts"
+      ],
+      "specs": ["e2e/dash.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Don Dough (zebra)": {
+      "paths": [
+        "packages/chess/src/bosses/zebra.ts",
+        "packages/app/src/characters/zebra*.ts",
+        "packages/app/src/characters/effects/zebra.ts",
+        "packages/app/src/components/Zebra.tsx",
+        "packages/app/src/board/pieces/zebra/*.svg"
+      ],
+      "specs": ["e2e/zebra.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Chandy (chandy)": {
+      "paths": [
+        "packages/chess/src/bosses/chandy.ts",
+        "packages/server/src/bosses/chandy.ts",
+        "packages/app/src/characters/chandy*.ts",
+        "packages/app/src/characters/effects/chandy.ts",
+        "packages/app/src/components/Chandy*.tsx",
+        "packages/app/public/music/chandy-loop.mp3"
+      ],
+      "specs": ["e2e/chandy.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/boss-side.spec.ts"]
+    },
+    "Birdie (birdie)": {
+      "paths": [
+        "packages/chess/src/bosses/birdie.ts",
+        "packages/app/src/characters/birdie*.ts",
+        "packages/app/src/characters/birdie-cutscene.png",
+        "packages/app/src/characters/effects/birdie.ts",
+        "packages/app/src/components/Birdie*.tsx",
+        "scripts/bake-birdie-cutscene.ts", "packages/app/src/birdie-music.ts"
+      ],
+      "specs": ["e2e/birdie.spec.ts", "e2e/boss-smoke.spec.ts"]
+    },
+    "Timber (timber)": {
+      "paths": [
+        "packages/chess/src/bosses/timber.ts",
+        "packages/app/src/characters/timber*.ts",
+        "packages/app/src/characters/sidekicks/timber.ts",
+        "packages/app/src/characters/effects/timber.ts",
+        "packages/app/src/components/Timber.tsx"
+      ],
+      "specs": ["e2e/timber.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Folio (folio)": {
+      "paths": [
+        "packages/chess/src/bosses/folio.ts",
+        "packages/app/src/characters/folio*.ts",
+        "packages/app/src/characters/effects/folio.ts",
+        "packages/app/src/components/Folio.tsx"
+      ],
+      "specs": ["e2e/folio.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "The circus tiger (tiger)": {
+      "paths": [
+        "packages/chess/src/bosses/tiger.ts",
+        "packages/app/src/characters/tiger*.ts",
+        "packages/app/src/characters/effects/tiger.ts",
+        "packages/app/src/components/Tiger.tsx",
+        "packages/app/src/tiger-show.ts",
+        "scripts/frames-tiger.mjs"
+      ],
+      "specs": ["e2e/tiger.spec.ts", "e2e/king-attack.spec.ts", "e2e/king-save-altered.spec.ts", "e2e/side-same-size.spec.ts"]
+    },
+    "Smudgy (smudgy)": {
+      "paths": [
+        "packages/chess/src/bosses/smudgy.ts",
+        "packages/app/src/characters/smudgy*.ts",
+        "packages/app/src/characters/effects/smudgy.ts",
+        "packages/app/src/components/Smudgy.tsx",
+        "packages/app/src/camo.ts"
+      ],
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts", "e2e/smudgy.spec.ts"]
+    },
+    "Moo & Moon (moo)": {
+      "paths": [
+        "packages/chess/src/bosses/moo.ts",
+        "packages/app/src/characters/moo*.ts",
+        "packages/app/src/characters/stance.ts",
+        "packages/app/src/characters/effects/moo.ts",
+        "packages/app/src/components/Moo.tsx",
+        "packages/app/src/components/MooCinematic.tsx",
+        "packages/app/src/characters/moo-cinematic.png",
+        "packages/app/src/characters/moo-field-layers.png",
+        "packages/app/src/speech-icons.ts"
+      ],
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts", "e2e/moo.spec.ts"]
+    },
+    "Wrangler (pig)": {
+      "paths": [
+        "packages/chess/src/bosses/pig.ts",
+        "packages/app/src/characters/pig*.ts",
+        "packages/app/src/characters/effects/pig.ts",
+        "packages/app/src/components/Pig.tsx"
+      ],
+      "specs": ["e2e/king-attack.spec.ts", "e2e/pig.spec.ts", "e2e/test-switches.spec.ts"]
+    },
+    "the Hidden Boss (recluse)": {
+      "paths": [
+        "packages/chess/src/bosses/recluse*.ts",
+        "packages/app/src/recluse-phase2.ts",
+        "packages/app/src/recluse-talk.ts",
+        "packages/app/src/recluse-cutscene.ts",
+        "packages/app/src/components/RecluseCutscene.tsx",
+        "packages/app/src/components/RecluseTransform.tsx",
+        "packages/app/src/components/RecluseHearts.tsx",
+        "packages/app/src/components/recluse-light*.ts",
+        "packages/app/src/characters/recluse*.ts",
+        "packages/app/src/characters/effects/recluse.ts",
+        "packages/app/src/components/Recluse.tsx",
+        "packages/app/src/components/RecluseChild.ts",
+        "packages/app/src/screens/Recluse2.tsx",
+        "packages/app/src/recluse-online.ts",
+        "packages/server/src/bosses/recluse.ts"
+      ],
+      "specs": ["e2e/formats.spec.ts", "e2e/hidden-boss-room.spec.ts", "e2e/recluse.spec.ts"]
+    },
+    "Sawyer": {
+      "paths": [
+        "packages/chess/src/bosses/sawyer.ts",
+        "packages/app/src/characters/sawyer*.ts",
+        "packages/app/src/characters/effects/sawyer.ts",
+        "packages/app/src/components/Sawyer.tsx"
+      ],
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts", "e2e/sawyer.spec.ts"]
+    },
+    "the engine's brains (Maia, the judges)": {
+      "paths": [
+        "packages/chess/src/human-uci.ts",
+        "packages/maia-worker/src/**",
+        "packages/maia-worker/model/**",
+        "packages/maia-worker/scripts/*.mjs",
+        "packages/maia-worker/scripts/*.d.mts",
+        "packages/app/src/maia.ts",
+        "packages/app/src/maia-gate.ts",
+        "packages/app/src/boss-brain.ts",
+        "packages/app/src/components/BrainLoading.tsx",
+        "packages/server/src/engine.ts",
+        "packages/server/src/engine-calls.ts",
+        "packages/server/src/judges.ts"
+      ],
+      "specs": ["e2e/boss-character.spec.ts", "e2e/boss-dock.spec.ts", "e2e/judges.spec.ts", "e2e/maia.spec.ts", "e2e/town.spec.ts"]
+    },
+    "Crowd: the votes, the board's crowd and the match screen": {
+      "paths": [
+        "packages/app/src/screens/Crowd.tsx",
+        "packages/app/src/components/Podium.tsx",
+        "packages/app/src/screens/Vote.tsx",
+        "packages/app/src/screens/Reveal.tsx",
+        "packages/app/src/components/CrowdGhosts.tsx",
+        "packages/app/src/components/Gavel.tsx",
+        "packages/app/src/components/ShadeMoves.tsx",
+        "packages/app/src/components/Breakdown.tsx",
+        "packages/app/src/components/VoteHint.tsx",
+        "packages/app/src/pick-rows.ts",
+        "packages/app/src/looks.ts",
+        "packages/app/src/components/StreakFire.tsx"
+      ],
+      "specs": [
+        "e2e/crowd.spec.ts",
+        "e2e/crowd-play.spec.ts",
+        "e2e/crowd-scoring.spec.ts",
+        "e2e/match-screen.spec.ts",
+        "e2e/opening-vote.spec.ts",
+        "e2e/opening-animations.spec.ts",
+        "e2e/panel.spec.ts",
+        "e2e/vote-hint.spec.ts",
+        "e2e/votes.spec.ts"
+      ]
+    },
+    "Classic and its screens (openings, the cut, watching, the final)": {
+      "paths": [
+        "packages/app/src/screens/OpeningGrid.tsx",
+        "packages/app/src/screens/StageBreak.tsx",
+        "packages/app/src/screens/Spectate.tsx",
+        "packages/app/src/screens/Final.tsx",
+        "packages/app/src/components/MiniBoard.tsx",
+        "packages/app/src/components/RaceTower.tsx",
+        "packages/app/src/components/LeaderboardSheet.tsx"
+      ],
+      "specs": ["e2e/castling.spec.ts", "e2e/formats.spec.ts", "e2e/multiplayer.spec.ts", "e2e/recluse.spec.ts", "e2e/solo.spec.ts"]
+    },
+    "results, resign and leaving a match": {
+      "paths": [
+        "packages/app/src/screens/Results.tsx",
+        "packages/app/src/components/ResultDuo.tsx",
+        "packages/app/src/match-exit.ts",
+        "packages/app/src/components/MatchMenu.tsx"
+      ],
+      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-play.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
+    },
+    "home and the front door": {
+      "paths": [
+        "packages/app/src/App.tsx",
+        "packages/app/src/screens/Home.tsx",
+        "packages/app/src/components/BotLevelBox.tsx",
+        "packages/app/src/components/Walkthrough.tsx",
+        "packages/app/src/tutorial.ts",
+        "packages/app/src/components/FrontDoor.tsx",
+        "packages/app/src/components/FrontMenu.tsx",
+        "packages/app/src/home-art/**"
+      ],
+      "specs": ["e2e/age-gate.spec.ts", "e2e/boss-select.spec.ts", "e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/kill-switches.spec.ts", "e2e/landing.spec.ts", "e2e/legal.spec.ts", "e2e/live-window.spec.ts", "e2e/matchmaking.spec.ts", "e2e/profile.spec.ts", "e2e/town-desktop.spec.ts", "e2e/walkthrough.spec.ts", "e2e/home-card.spec.ts", "e2e/search-home.spec.ts"]
+    },
+    "the stylesheet (one file for every screen: the specs that measure layouts)": {
+      "paths": ["packages/app/src/styles.css"],
+      "specs": [
+        "e2e/board-layout.spec.ts",
+        "e2e/desktop-board.spec.ts",
+        "e2e/boss-bar.spec.ts",
+        "e2e/boss-bar-same.spec.ts",
+        "e2e/boss-dock.spec.ts",
+        "e2e/boss-select.spec.ts",
+        "e2e/boss-side.spec.ts",
+        "e2e/side-same-size.spec.ts",
+        "e2e/chat.spec.ts",
+        "e2e/eval-bar.spec.ts",
+        "e2e/home-layout.spec.ts",
+        "e2e/match-screen.spec.ts",
+        "e2e/panel.spec.ts"
+      ]
+    },
+    "a computer's board size, every game screen (board-size.css)": {
+      "paths": ["packages/app/src/board-size.css", "packages/app/src/game-frame.css"],
+      "specs": [
+        "e2e/desktop-board.spec.ts",
+        "e2e/board-layout.spec.ts",
+        "e2e/boss-bar.spec.ts",
+        "e2e/boss-side.spec.ts",
+        "e2e/side-same-size.spec.ts",
+        "e2e/eval-bar.spec.ts",
+        "e2e/match-screen.spec.ts",
+        "e2e/recluse.spec.ts",
+        "e2e/tiger.spec.ts"
+      ]
+    },
+    "the queue and lobbies": {
+      "paths": [
+        "packages/app/src/screens/Queue.tsx",
+        "packages/app/src/screens/CrowdParty.tsx",
+        "packages/app/src/screens/Lobby.tsx",
+        "packages/app/src/components/LobbyChat.tsx",
+        "packages/server/src/matchmaker.ts",
+        "packages/server/src/queue.ts",
+        "packages/server/src/codes.ts"
+      ],
+      "specs": [
+        "e2e/busy.spec.ts",
+        "e2e/lobby-close.spec.ts",
+        "e2e/matchmaking.spec.ts",
+        "e2e/multiplayer.spec.ts",
+        "e2e/ranked-1v1.spec.ts",
+        "e2e/squads.spec.ts", "e2e/search-home.spec.ts",
+        "e2e/friends.spec.ts"
+      ]
+    },
+    "live counts and the live window": {
+      "paths": [
+        "packages/app/src/live.ts",
+        "packages/app/src/bot-replays.ts",
+        "packages/app/src/components/LiveWindow.tsx",
+        "packages/app/public/replays/**",
+        "packages/server/src/live.ts",
+        "packages/server/src/live-hub.ts",
+        "packages/server/src/presence.ts"
+      ],
+      "specs": ["e2e/friends.spec.ts", "e2e/global-chat.spec.ts", "e2e/home-layout.spec.ts", "e2e/live-window.spec.ts"]
+    },
+    "the town square (/town)": {
+      "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts", "packages/app/src/characters/sidekicks/**", "packages/app/src/characters/ginger-intro.ts", "packages/app/src/characters/dash-intro.ts"],
+      "specs": ["e2e/town.spec.ts", "e2e/town-street.spec.ts", "e2e/town-rows.spec.ts", "e2e/town-fixed.spec.ts", "e2e/town-controls.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/colosseum.spec.ts", "e2e/shop.spec.ts", "e2e/boss-challenge.spec.ts", "e2e/town-afk.spec.ts", "e2e/town-leave.spec.ts"]
+    },
+    "away in the town (the zzz, out to home after 10 minutes, the server's town presence)": {
+      "paths": ["e2e/town-afk.spec.ts", "packages/server/src/town-here.ts", "packages/server/src/town-here-api.ts", "packages/app/src/components/AwayNote.tsx"],
+      "specs": ["e2e/town-afk.spec.ts"]
+    },
+    "Rolling Dough, Don Dough's bakery (Nov 11: the front room, the back room and the door between them, the guards, the chatter, the talk beat)": {
+      "paths": ["e2e/zebra-home.spec.ts", "packages/app/src/town/shops/zebra-*.ts", "packages/app/src/town/shops/bakery-kit.ts", "packages/app/src/town/shops/intros/zebra.ts", "packages/app/src/town/houses/zebra.ts", "packages/app/src/characters/zebra-sounds.ts", "packages/app/src/characters/sidekicks/zebrakeeper.ts"],
+      "specs": ["e2e/zebra-home.spec.ts"]
+    },
+    "Chandy's Swamp (Nov 16: the swamp on Meadow Street, its room under the sky, wading, the frog's stand, his rise and rising wipe)": {
+      "paths": ["e2e/chandy-home.spec.ts", "packages/app/src/town/shops/chandy-*.ts", "packages/app/src/town/shops/intros/chandy.ts", "packages/app/src/town/houses/chandy.ts", "packages/app/src/characters/sidekicks/swampkeeper.ts"],
+      "specs": ["e2e/chandy-home.spec.ts"]
+    },
+    "Birdie's Station (Nov 23: the station on Meadow Street, its lobby, the bartender's pour, the split-flap board, his challenge at the middle table; his crate's card, its test in shop.spec.ts)": {
+      "paths": ["e2e/birdie-home.spec.ts", "packages/app/src/town/shops/birdie-*.ts", "packages/app/src/town/shops/flap-board.ts", "packages/app/src/town/shops/intros/birdie.ts", "packages/app/src/town/houses/birdie.ts", "packages/app/src/characters/sidekicks/birdiebartender.ts", "packages/app/src/town/sidekicks/birdiebartender.png", "packages/app/src/components/rides/birdie-train.tsx"],
+      "specs": ["e2e/birdie-home.spec.ts", "e2e/shop.spec.ts"]
+    },
+    "the Hidden Boss's walk-up (Nov 13: the building in the town, the hall, the landing and his room, the stairs between them)": {
+      "paths": ["packages/app/src/town/houses/recluse.ts", "packages/app/src/town/shops/recluse-*.ts"],
+      "specs": ["e2e/town-street.spec.ts", "e2e/hidden-boss-room.spec.ts"]
+    },
+    "the Hidden Boss's room challenge (Nov 13: four at most in his room, the request's count, the locked door, the summoning, his fight of four, the admin's test bots and online trophy)": {
+      "paths": ["e2e/hidden-boss-room.spec.ts", "packages/server/src/hidden-room.ts", "packages/server/src/hidden-room-api.ts", "packages/app/src/town/hidden-net.ts", "packages/app/src/town/HiddenRoom.tsx", "packages/app/src/town/LeaveTown.tsx"],
+      "specs": ["e2e/hidden-boss-room.spec.ts", "e2e/town-leave.spec.ts", "e2e/town-street.spec.ts"]
+    },
+    "Boingo's claw machine in his Funhouse (the play on the server, the cabinet in the room)": {
+      "paths": ["packages/server/src/claw.ts", "packages/app/src/town/shops/boingo-art.ts", "packages/app/src/town/shops/claw-cabinet.ts", "packages/app/src/town/kit/models/claw-cabinet.ts"],
+      "specs": ["e2e/claw.spec.ts", "e2e/shop.spec.ts"]
+    },
+    "a boss challenged from the town (Pokémon-gym style: the walk in, the intro, the storm, the battle, back to town; the server's chat lines)": {
+      "paths": ["e2e/boss-challenge.spec.ts", "packages/server/src/town-chat.ts", "packages/server/src/town-chat-api.ts", "packages/app/src/boss-tokens.ts", "packages/app/src/match-exit.ts", "packages/app/src/screens/Results.tsx"],
+      "specs": ["e2e/boss-challenge.spec.ts"]
+    },
+    "the Colosseum (/colosseum, the first look)": {
+      "paths": ["packages/app/src/colosseum/**", "packages/server/src/ranged.ts"],
+      "specs": ["e2e/colosseum.spec.ts"]
+    },
+    "Auto chess, the demo": {
+      "paths": [
+        "packages/app/src/autochess/**",
+        "e2e/autochess-helpers.ts",
+        "packages/app/src/screens/AutoChess.tsx",
+        "packages/app/src/components/AcStarArt.tsx",
+        "packages/app/src/components/FloatGold.tsx",
+        "packages/chess/src/hunchess/**"
+      ],
+      "specs": ["e2e/autochess.spec.ts", "e2e/autochess-board.spec.ts", "e2e/home-layout.spec.ts"]
+    },
+    "Settings, light and dark, install": {
+      "paths": [
+        "packages/app/src/screens/Settings.tsx",
+        "packages/app/src/theme.ts",
+        "packages/app/src/install.ts",
+        "packages/app/src/components/InstallCard.tsx",
+        "packages/app/public/icons/**",
+        "packages/app/public/manifest.webmanifest"
+      ],
+      "specs": [
+        "e2e/board-colors.spec.ts",
+        "e2e/eval-bar.spec.ts",
+        "e2e/faq.spec.ts",
+        "e2e/home-layout.spec.ts",
+        "e2e/install.spec.ts",
+        "e2e/legal.spec.ts",
+        "e2e/piece-sounds.spec.ts"
+      ]
+    },
+    "boss music (Nov 11): each boss's theme from the battle's start to its result, the Music switch; the town's own theme (Nov 15)": {
+      "paths": ["packages/app/src/music.ts", "packages/app/public/music/**"],
+      "specs": ["e2e/grex.spec.ts", "e2e/match-menu.spec.ts", "e2e/town-street.spec.ts", "e2e/zebra-home.spec.ts"]
+    },
+    "ride sounds (Nov 14): your ride's moving loop in the town and its rooms": {
+      "paths": ["packages/app/src/ride-sound.ts", "packages/app/public/sounds/rides/**"],
+      "specs": ["e2e/town.spec.ts", "e2e/shop.spec.ts"]
+    },
+    "sounds": {
+      "paths": [
+        "packages/app/src/sound.ts",
+        "packages/app/src/sound-worker.ts",
+        "packages/app/src/piece-sounds.ts",
+        "packages/app/src/move-sound.ts",
+        "packages/app/public/sounds/**"
+      ],
+      "specs": ["e2e/piece-sounds.spec.ts", "e2e/sound.spec.ts"]
+    },
+    "the FAQ and the legal pages": {
+      "paths": ["packages/app/src/faq/**", "packages/app/src/screens/Faq.tsx", "packages/app/src/screens/Legal.tsx", "packages/app/src/screens/legal-page.ts"],
+      "specs": ["e2e/faq.spec.ts", "e2e/landing.spec.ts", "e2e/legal.spec.ts"]
+    },
+    "the landing page, sign-in and the age gate": {
+      "paths": ["packages/app/src/screens/Landing.tsx", "packages/app/src/components/SignIn.tsx", "packages/app/public/media/**"],
+      "specs": ["e2e/account.spec.ts", "e2e/age-gate.spec.ts", "e2e/landing.spec.ts"]
+    },
+    "accounts' data (export, delete)": {
+      "paths": ["packages/app/src/components/AccountData.tsx"],
+      "specs": ["e2e/account-delete.spec.ts", "e2e/account.spec.ts"]
+    },
+    "profiles and names": {
+      "paths": [
+        "packages/app/src/screens/Profile.tsx",
+        "packages/app/src/screens/PlayerProfile.tsx",
+        "packages/app/src/components/AccountTrouble.tsx",
+        "packages/app/src/item-details.ts",
+        "packages/app/src/screens/PublicProfile.tsx",
+        "packages/app/src/profile-nav.ts",
+        "packages/app/src/public-profile.ts",
+        "packages/app/src/public-profile.css",
+        "packages/app/src/components/PlayerName.tsx",
+        "packages/app/src/components/ProfileParts.tsx",
+        "packages/app/src/components/ChatPicks.tsx",
+        "e2e/public-profile-data.ts"
+      ],
+      "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/fairplay.spec.ts", "e2e/friends.spec.ts", "e2e/profile.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts"]
+    },
+    "friends": {
+      "paths": [
+        "packages/app/src/friends.ts",
+        "packages/app/src/components/Friends.tsx",
+        "packages/app/src/screens/Friends.tsx",
+        "packages/server/src/friends.ts",
+        "packages/server/src/friends-api.ts",
+        "packages/server/src/friend-bots.ts",
+        "packages/server/src/friend-bot-schedule.ts"
+      ],
+      "specs": ["e2e/friends.spec.ts", "e2e/profile.spec.ts"]
+    },
+    "the shop, crates and icons": {
+      "paths": [
+        "packages/app/src/screens/Shop.tsx",
+        "packages/app/src/screens/Crates.tsx",
+        "packages/app/src/welcome-rows.ts",
+        "packages/app/src/components/blotches.ts",
+        "packages/app/src/components/GamblingWarning.tsx",
+        "packages/app/src/components/Cosmetics.tsx",
+        "packages/app/src/components/Items.tsx",
+        "packages/app/src/components/item-paint.tsx",
+        "packages/app/src/components/rides/**",
+        "packages/app/src/components/PixelIcon.tsx",
+        "packages/app/src/icon-pixels.ts",
+        "packages/app/src/boss-tokens.ts",
+        "packages/app/src/components/TokenArt.tsx",
+        "packages/app/src/components/Coin.tsx",
+        "packages/app/src/coin/**",
+        "packages/app/src/components/TokenBox.tsx",
+        "packages/app/src/components/tokens/**",
+        "packages/app/src/components/WelcomeNotice.tsx",
+        "packages/server/src/welcome.ts",
+        "packages/app/src/claw/**"
+      ],
+      "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts", "e2e/shop.spec.ts", "e2e/welcome-crate.spec.ts", "e2e/claw.spec.ts", "e2e/xp-rewards.spec.ts"]
+    },
+    "chat": {
+      "paths": [
+        "packages/app/src/chat.ts",
+        "packages/app/src/chat-mod.ts",
+        "packages/app/src/global-chat.ts",
+        "packages/app/src/components/QuickChat.tsx",
+        "packages/app/src/components/MiniTower.tsx",
+        "packages/app/src/components/ChatNotice.tsx",
+        "packages/app/src/components/GlobalChat.tsx", "packages/app/src/components/ChatSheet.tsx", "packages/app/src/components/ChatOptIn.tsx", "packages/app/src/chat-emoji.tsx", "packages/app/src/chat-on.ts",
+        "packages/server/src/chat-mod.ts",
+        "packages/server/src/global-chat.ts",
+        "packages/server/src/global-chat-api.ts",
+        "packages/server/src/text-filter.ts",
+        "packages/server/src/town-chat.ts",
+        "packages/server/src/town-chat-api.ts"
+      ],
+      "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/global-chat.spec.ts", "e2e/panel.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts"]
+    },
+    "Squads": {
+      "paths": [
+        "packages/chess/src/squads/**",
+        "packages/app/src/squads.ts",
+        "packages/app/src/squads-view.ts",
+        "packages/app/src/screens/Squads.tsx",
+        "packages/app/src/screens/squads-exit.ts",
+        "packages/app/src/screens/SquadsMatch.tsx",
+        "packages/app/src/screens/SquadsParty.tsx",
+        "packages/app/src/components/SquadsBlocks.tsx",
+        "packages/app/src/components/SquadsParts.tsx",
+        "packages/app/src/components/MercenaryShop.tsx",
+        "packages/app/src/components/MoveReplay.tsx",
+        "packages/app/src/move-replay.ts",
+        "packages/server/src/squads-*.ts",
+        "e2e/squads-client.ts"
+      ],
+      "specs": [
+        "e2e/squads.spec.ts",
+        "e2e/squads-clocks.spec.ts",
+        "e2e/squads-mercenary.spec.ts",
+        "e2e/squads-play.spec.ts",
+        "e2e/squads-replay.spec.ts",
+        "e2e/squads-test-tools.spec.ts",
+        "e2e/squads-three-boards.spec.ts",
+        "e2e/squads-v2.spec.ts",
+        "e2e/squads-watch.spec.ts",
+        "e2e/vote-hint.spec.ts", "e2e/search-home.spec.ts"
+      ]
+    },
+    "Ranked 1 v 1": {
+      "paths": [
+        "packages/chess/src/duel/**",
+        "packages/app/src/duel.ts",
+        "packages/app/src/ranked.ts",
+        "packages/app/src/screens/Duel.tsx",
+        "packages/app/src/components/SearchBar.tsx",
+        "packages/app/src/search.ts",
+        "packages/app/src/components/DuelRankPill.tsx",
+        "packages/app/src/components/DuelStage.tsx",
+        "packages/app/src/components/DuelVote.tsx",
+        "packages/app/src/components/RankEmblem.tsx",
+        "packages/app/src/emblems/**",
+        "packages/app/src/characters/rank-set.ts",
+        "scripts/bake-emblems.ts",
+        "packages/server/src/duel-do.ts",
+        "packages/server/src/duel-room.ts"
+      ],
+      "specs": ["e2e/board-tools.spec.ts", "e2e/home-ranked.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/ranked-1v1-browse.spec.ts", "e2e/ranked-tiers.spec.ts", "e2e/town.spec.ts", "e2e/vote-hint.spec.ts", "e2e/search-home.spec.ts"]
+    },
+    "errors, reports, kill switches and capacity": {
+      "paths": [
+        "packages/app/src/problems.ts",
+        "packages/app/src/status.ts",
+        "packages/app/src/components/Problems.tsx",
+        "packages/app/src/components/MaintenanceBanner.tsx",
+        "packages/server/src/problems.ts",
+        "packages/server/src/kill-switches.ts",
+        "packages/server/src/limits.ts",
+        "packages/server/src/health.ts",
+        "packages/server/src/ops.ts",
+        "packages/server/src/ops-admin.ts",
+        "packages/server/src/alerts.ts"
+      ],
+      "specs": ["e2e/busy.spec.ts", "e2e/kill-switches.spec.ts", "e2e/problems.spec.ts"]
+    },
+    "fair play on the device": {
+      "paths": ["packages/app/src/components/FairPlay.tsx", "packages/app/src/lookaway.ts"],
+      "specs": ["e2e/fairplay.spec.ts", "e2e/multiplayer.spec.ts"]
+    }
+  }
+}

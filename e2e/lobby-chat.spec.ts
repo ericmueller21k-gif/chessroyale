@@ -1,0 +1,290 @@
+import { expect, type Locator, type Page } from "@playwright/test";
+import { asSignedIn, createLobbyFromHome, named, pickMode, soloFromHome, test } from "./helpers.ts";
+
+/**
+ * Quick chat in the lobby, before the match (DECISIONS.md, "Lobby chat"): one channel for everyone waiting, the same
+ * lines and checks as in the match, a hello from the bots as they sit down, and the lines carry on into the match.
+ * The queue's count, grid and Cancel are never covered, and nothing moves as lines arrive.
+ */
+
+const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
+type Box = { x: number; y: number; width: number; height: number };
+type QueueBoxes = { count: Box; seats: Box; cancel: Box; chat: Box };
+/** Where a locator is on the page (scroll included), for the private lobby's chat and Start (the queue's pieces are measured in-page). */
+const box = async (l: Locator): Promise<Box> => {
+  const b = (await l.boundingBox())!;
+  const scrollY = await l.page().evaluate(() => window.scrollY);
+  return { x: Math.round(b.x), y: Math.round(b.y + scrollY), width: Math.round(b.width), height: Math.round(b.height) };
+};
+const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+/**
+ * Put on the page before it opens: `queueBoxes()`, where the queue's own pieces are (the lobby chat must cover none of
+ * them, and move none of them), measured inside the page in one go (a phone's chat is under Cancel, a scroll away on a
+ * short screen: scrolling moves nothing); and `watchFill()`, which watches the queue every frame until the lobby moves
+ * on. The full lobby shows only FRONT_DOOR.fillShowMs (1.8 s) before the votes, and the bots' hello comes within it:
+ * checks from the test, a round trip each, landed after the votes had begun on a slow runner (main and two PRs, Nov 15:
+ * the phase already "vote", the hello's queue gone, a box gone). From inside the page it's what the player sees: the
+ * first frame with every seat filled and a bot's hello showing, and the queue then; or the lobby moving on first.
+ */
+const QUEUE_WATCH = () => {
+  const w = window as any;
+  const box = (sel: string): Box => {
+    const e = document.querySelector(sel);
+    if (!e) throw new Error(`${sel} isn't on the page`);
+    const b = e.getBoundingClientRect();
+    return { x: Math.round(b.x), y: Math.round(b.y + window.scrollY), width: Math.round(b.width), height: Math.round(b.height) };
+  };
+  w.queueBoxes = (): QueueBoxes => ({ count: box(".fd-queue-count"), seats: box(".fd-seats"), cancel: box(".fd-cancel"), chat: box(".lchat") });
+  w.watchFill = () => {
+    w.filled = new Promise((done) => {
+      const tick = () => {
+        const phase = w.match?.phase.kind ?? "none";
+        const full = document.querySelector(".fd-count-n")?.textContent === "100";
+        const hello = [...document.querySelectorAll('.qchat-lobby .qline[data-from^="bot"]')].some((e) => e.checkVisibility());
+        if (phase !== "lobby") return done({ phase, full, hello });
+        if (!full || !hello) return requestAnimationFrame(tick);
+        try {
+          done({ phase, full, hello, boxes: w.queueBoxes() });
+        } catch (e) {
+          done({ phase, full, hello, error: String(e) });
+        }
+      };
+      tick();
+    });
+  };
+};
+const queueBoxes = (p: Page): Promise<QueueBoxes> => p.evaluate(() => (window as any).queueBoxes());
+const run = Date.now().toString(36).slice(-5);
+
+test("two players in a Default queue chat before the match starts: each sees the other's lines, the bots say hello, and the lines carry into the match", { tag: "@phone-only" }, async ({ browser }) => {
+  test.setTimeout(3 * 60_000);
+  const opts = test.info().project.use;
+  // (The repeat's number too: `--repeat-each` runs share `run`, and two repeats in one queue saw 3 or 4 players.)
+  const pool = `lchat-${test.info().project.name[0]}${run}${test.info().repeatEachIndex}`;
+  const ann = await (await browser.newContext({ ...opts })).newPage();
+  const bo = await (await browser.newContext({ ...opts })).newPage();
+  await named(ann, "Ann Lobby");
+  await named(bo, "Bo Lobby");
+  // (CPU_THROTTLE=4: both pages on a slowed CPU, to prove a race on a slow runner. Not set in CI.)
+  if (process.env.CPU_THROTTLE) for (const p of [ann, bo]) await (await p.context().newCDPSession(p)).send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.CPU_THROTTLE) });
+  await ann.addInitScript(QUEUE_WATCH);
+  for (const p of [ann, bo]) await p.goto(`/?debug&pool=${pool}`);
+  // Both PLAY at once: the same queue (8 s locally before the bots fill in).
+  for (const p of [ann, bo]) await pickMode(p);
+  await Promise.all([ann, bo].map((p) => p.getByRole("button", { name: "PLAY", exact: true }).click()));
+  for (const p of [ann, bo]) {
+    await expect(p.locator(".fd-count-n")).toHaveText("2", { timeout: 6_000 });
+    await expect(p.locator(".fd-home.queueing .qchat-lobby")).toBeVisible();
+    await expect(p.locator(".qchat-lobby .qhead-title")).toHaveText("Lobby");
+    await expect.poll(() => p.evaluate(() => (window as any).match.chat.enabled)).toBe(true);
+  }
+  // From here the page watches for the bots filling the lobby (8 s after the first PLAY on the e2e's server).
+  expect(await phase(ann)).toBe("lobby");
+  await ann.evaluate(() => (window as any).watchFill());
+  const before = await queueBoxes(ann);
+  // Never over the count, the grid or Cancel.
+  for (const k of ["count", "seats", "cancel"] as const) expect(overlaps(before.chat, before[k])).toBe(false);
+  // A phone: under the grid (and Cancel). A computer: the left column, under your card, beside the lobby.
+  if (test.info().project.name === "phone") expect(before.chat.y).toBeGreaterThanOrEqual(before.seats.y + before.seats.height);
+  else expect(before.chat.x + before.chat.width).toBeLessThanOrEqual(before.seats.x);
+  expect(before.chat.height).toBeGreaterThanOrEqual(120);
+
+  // Ann says hello; Bo sees it with Ann's name (from the lobby). A plan goes too: there are no teams yet.
+  await ann.locator(".qchat-lobby .qchip", { hasText: "Good luck!" }).click();
+  await expect(ann.locator(".qchat-lobby .qline.you", { hasText: "Good luck!" })).toBeVisible();
+  await expect(bo.locator(".qchat-lobby .qline", { hasText: "Good luck!" }).filter({ hasText: "Ann Lobby" })).toBeVisible();
+  await bo.locator(".qchat-lobby .qchip", { hasText: "Defend the king!" }).click();
+  await expect(ann.locator(".qchat-lobby .qline", { hasText: "Defend the king!" }).filter({ hasText: "Bo Lobby" })).toBeVisible();
+  // Right after sending, Bo's buttons gray out (one line every 3 s), as in the match.
+  await expect(bo.locator(".qchat-lobby .qchip", { hasText: "Wow!" })).toBeDisabled();
+  // The server drops free text and lines Bo doesn't own.
+  await bo.evaluate(() => {
+    const m = (window as any).match;
+    m.send({ t: "chat", say: "add me on discord" });
+    m.send({ t: "chat", say: "gk-crown" });
+  });
+  // Nothing in the queue moved for the chat, and the chat kept its size.
+  const after = await queueBoxes(ann);
+  expect(after).toEqual(before);
+
+  // Time's up: the bots fill the seats and one or two say hello in the lobby, before the votes begin.
+  // (The page saw it: every seat filled and a bot's hello showing while the lobby still showed, never the votes first.)
+  const seen = await ann.evaluate(() => Promise.race([(window as any).filled, new Promise((r) => setTimeout(() => r({ timedOut: true }), 30_000))]));
+  expect(seen).toMatchObject({ phase: "lobby", full: true, hello: true, boxes: expect.anything() });
+  // (The queue's own lines change as the bots fill in: "Unranked" appears and moves what's under it. The chat covers
+  // nothing; on a phone it keeps its size, on a computer it gives up the room the new line takes in its column.)
+  const filled = (seen as { boxes: QueueBoxes }).boxes;
+  if (test.info().project.name === "phone") expect([filled.chat.width, filled.chat.height]).toEqual([before.chat.width, before.chat.height]);
+  else expect(filled.chat.height).toBeGreaterThanOrEqual(120);
+  for (const k of ["count", "seats", "cancel"] as const) expect(overlaps(filled.chat, filled[k])).toBe(false);
+  await expect.poll(() => phase(ann), { timeout: 20_000 }).toMatch(/vote|opening|play|watching/);
+  // In the match the lobby's lines are still there (marked as the lobby's); nothing else of Bo's went through.
+  const lines = await ann.evaluate(() => (window as any).match.chat.lines().map((l: any) => ({ say: l.say, lobby: !!l.lobby, from: l.from })));
+  const people = lines.filter((l: any) => /^p\d/.test(l.from));
+  expect(people.map((l: any) => [l.say, l.lobby])).toEqual([
+    ["good-luck", true],
+    ["defend-king", true],
+  ]);
+  expect(lines.filter((l: any) => l.lobby && !/^p\d/.test(l.from)).length).toBeGreaterThanOrEqual(1);
+  // On the match's screen, once its panel shows: the lobby's line, tagged "lobby" where tags show (a computer).
+  await expect.poll(() => phase(ann), { timeout: 60_000 }).toMatch(/play|watching/);
+  if (test.info().project.name === "desktop") {
+    await expect(ann.locator(".qchat-side .qline.lobby", { hasText: "Good luck!" }).locator(".qline-to")).toHaveText("lobby");
+  } else {
+    // (Nov 1: on a phone the chat is a tab over the scoreboard; the lobby's lines are there once it's open.)
+    await ann.getByRole("button", { name: "Chat", exact: true }).click();
+    await expect(ann.locator(".under-board .qchat-tab .qline", { hasText: "Defend the king!" })).toBeVisible();
+  }
+  expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+});
+
+/** Stills for Eric (not a check): a folder for the typed chat's screens. */
+const TYPED_STILLS = process.env.TYPED_STILLS;
+
+test("typed chat (Nov 7) in the queue's lobby chat and the match: signed-in players with chat on type (the field and our emoji in the quick lines' place); a player without chat on keeps the chips and never gets typed lines; the filter's reason shows", async ({ browser }) => {
+  test.setTimeout(4 * 60_000);
+  const opts = test.info().project.use;
+  const phone = test.info().project.name === "phone";
+  const pool = `ltyped-${test.info().project.name[0]}${run}`;
+  const open = async (name: string, typer: boolean) => {
+    const p = await (await browser.newContext({ ...opts, ...(phone ? {} : { viewport: { width: 1440, height: 900 } }) })).newPage();
+    await named(p, name);
+    await p.goto(`/?debug&pool=${pool}`);
+    await expect(p.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    if (typer) {
+      await asSignedIn(p);
+      expect((await p.request.patch("/api/me", { data: { chatOn: true } })).status()).toBe(200);
+      await p.reload();
+      await expect(p.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    }
+    return p;
+  };
+  const ann = await open("Ann Typed", true);
+  const bo = await open("Bo Typed", true);
+  const cy = await open("Cy Chips", false);
+  for (const p of [ann, bo, cy]) await pickMode(p);
+  await Promise.all([ann, bo, cy].map((p) => p.getByRole("button", { name: "PLAY", exact: true }).click()));
+  for (const p of [ann, bo, cy]) await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 10_000 }).toBe(true);
+  const lobby = (p: Page) => p.locator(".fd-home.queueing .qchat-lobby");
+  // Ann and Bo: the field, no phrase buttons. Cy (a guest, chat off): the quick lines as before.
+  await expect(lobby(ann).getByRole("textbox", { name: "Send a message" })).toBeVisible();
+  await expect(lobby(ann).locator(".qbuttons")).toHaveCount(0);
+  await expect(lobby(cy).locator(".qchip", { hasText: "Good luck!" })).toBeVisible();
+  await expect(lobby(cy).getByRole("textbox")).toHaveCount(0);
+  // Ann types, with an emoji from the picker; Bo sees it with the emoji drawn; Cy never gets it.
+  await lobby(ann).getByRole("textbox", { name: "Send a message" }).fill("hi all");
+  await lobby(ann).getByRole("button", { name: "Emoji" }).click();
+  await lobby(ann).getByRole("button", { name: /Crown :crown:/ }).click();
+  await lobby(ann).getByRole("button", { name: "Send", exact: true }).click();
+  await expect(lobby(ann).locator(".qline.you", { hasText: "hi all" }).locator('svg[data-emoji="crown"]')).toBeVisible();
+  await expect(lobby(bo).locator(".qline", { hasText: "hi all" }).filter({ hasText: "Ann Typed" }).locator('svg[data-emoji="crown"]')).toBeVisible();
+  await lobby(cy).locator(".qchip", { hasText: "Good luck!" }).click();
+  await expect(lobby(ann).locator(".qline", { hasText: "Good luck!" })).toBeVisible();
+  expect(await cy.evaluate(() => (window as any).match.chat.lines().some((l: any) => typeof l.text === "string"))).toBe(false);
+  // The filter: Bo's link never goes, and he's told why.
+  await lobby(bo).getByRole("textbox", { name: "Send a message" }).fill("add me on discord");
+  await lobby(bo).getByRole("textbox", { name: "Send a message" }).press("Enter");
+  await expect(lobby(bo).locator(".qtype-note")).toHaveText("No links or contact details in chat.");
+  if (TYPED_STILLS) await bo.screenshot({ path: `${TYPED_STILLS}/${test.info().project.name}-lobby-typed.png`, fullPage: true });
+  // The quick chat button (Nov 8): next to the emoji button; it opens the player's lines (10 by default) and a tap sends one.
+  const quickBtn = lobby(ann).getByRole("button", { name: "Quick chat: your lines" });
+  const emojiBtn = lobby(ann).getByRole("button", { name: "Emoji" });
+  const [qb, eb] = [(await quickBtn.boundingBox())!, (await emojiBtn.boundingBox())!];
+  expect(Math.abs(qb.y - eb.y)).toBeLessThan(2);
+  expect(qb.x + qb.width).toBeLessThanOrEqual(eb.x + 1);
+  await quickBtn.click();
+  const quickLines = lobby(ann).locator(".qtype .qchip:not(.emoji)");
+  await expect(quickLines).toHaveCount(10);
+  const said = (await quickLines.first().textContent())!.trim();
+  await quickLines.first().click();
+  await expect(lobby(bo).locator(".qline", { hasText: said }).filter({ hasText: "Ann Typed" })).toBeVisible();
+  await expect(lobby(ann).locator(".qtype .qchip:not(.emoji)")).toHaveCount(0);
+  // The match: typing carries on in its chat (a phone's Chat tab: T opens the field over the feed's foot; a computer's panel beside the board).
+  await expect.poll(() => phase(ann), { timeout: 90_000 }).toMatch(/play|watching/);
+  if (phone) {
+    await ann.getByRole("button", { name: "Chat", exact: true }).click();
+    await ann.getByRole("button", { name: "Type a message", exact: true }).click();
+    const field = ann.locator(".qchat-tab .qpop").getByRole("textbox", { name: "Send a message" });
+    await expect(field).toBeFocused();
+    await field.fill("gg team :knight:");
+    if (TYPED_STILLS) {
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Quick chat: your lines" }).click();
+      await ann.screenshot({ path: `${TYPED_STILLS}/phone-quickchat-open.png` });
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Quick chat: your lines" }).click();
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Emoji" }).click();
+      await ann.screenshot({ path: `${TYPED_STILLS}/phone-emoji-picker.png` });
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Emoji" }).click();
+    }
+    await field.press("Enter");
+    await expect(ann.locator(".qchat-tab .qline.you", { hasText: "gg team" }).locator('svg[data-emoji="knight"]')).toBeVisible();
+    await expect(ann.locator(".qchat-tab .qpop")).toHaveCount(0);
+    if (TYPED_STILLS) await ann.screenshot({ path: `${TYPED_STILLS}/phone-match-typed.png` });
+  } else {
+    const side = ann.locator(".qchat-side");
+    await side.getByRole("textbox", { name: "Send a message" }).fill("gg team :knight:");
+    await side.getByRole("textbox", { name: "Send a message" }).press("Enter");
+    await expect(side.locator(".qline.you", { hasText: "gg team" }).locator('svg[data-emoji="knight"]')).toBeVisible();
+    if (TYPED_STILLS) await ann.screenshot({ path: `${TYPED_STILLS}/computer-match-typed.png` });
+  }
+  expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+  for (const p of [ann, bo, cy]) await p.context().close();
+});
+
+test("Solo's queue: the bots say hello, your line shows, and a 50 v 50's chat carries on into the match, with teams", { tag: "@phone-only" }, async ({ page }) => {
+  await named(page, "Solo Sam");
+  // Solo's queue is up about 3.1 s (MATCHMAKING.soloFillMs + soloHoldMs, all in the page). On a busy runner one or two of the
+  // test's steps outlasted it: the chat was gone before it was looked at, or the tap waited on a button already gone until the
+  // 5-minute timeout (the flaky ".fd-home.queueing .qchat-lobby: visible" and "Test timeout", Nov 2). So the page watches the
+  // queue itself as it happens (a MutationObserver: no round trips): the chat as it shows, a tap on its "Have fun!" right then,
+  // your line, and the first bot's hello, each with the match's phase at that moment. The checks are the same.
+  await page.addInitScript(() => {
+    const seen: { chat: string | null; mine: string | null; hello: { from: string; phase: string } | null } = { chat: null, mine: null, hello: null };
+    (window as any).__queueSeen = seen;
+    const phase = () => (window as any).match?.phase?.kind ?? "none";
+    let tapped = false;
+    const look = () => {
+      const chat = document.querySelector(".fd-home.queueing .qchat-lobby");
+      if (!chat) return;
+      if (seen.chat === null) seen.chat = phase();
+      const fun = [...chat.querySelectorAll<HTMLButtonElement>(".qchip")].find((b) => b.textContent?.includes("Have fun!"));
+      if (!tapped && fun && !fun.disabled) {
+        tapped = true;
+        fun.click();
+      }
+      if (seen.mine === null && [...chat.querySelectorAll(".qline.you")].some((l) => l.textContent?.includes("Have fun!"))) seen.mine = phase();
+      const bot = chat.querySelector('.qline[data-from^="bot"]');
+      if (!seen.hello && bot) seen.hello = { from: bot.getAttribute("data-from")!, phase: phase() };
+    };
+    addEventListener("DOMContentLoaded", () => new MutationObserver(look).observe(document.body, { childList: true, subtree: true, attributes: true }));
+  });
+  await page.goto("/?debug");
+  await soloFromHome(page);
+  // The match (a 50 v 50, Eric, Nov 1: "have it in the bot-only game and have the bots just chatting still"): the chat
+  // carries on, now with teams.
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("vote");
+  const seen = await page.evaluate(() => (window as any).__queueSeen as { chat: string | null; mine: string | null; hello: { from: string; phase: string } | null });
+  // The queue's chat showed (the seats filling), your line showed, and a bot (one already in its seat) said hello while the
+  // seats filled (botLobbyChance is 1: always one or two), all before the match.
+  expect(seen.chat, "the queue's chat").toBe("lobby");
+  expect(seen.mine, "your line, in the queue").toBe("lobby");
+  expect(seen.hello?.phase, "a bot's hello, in the queue").toBe("lobby");
+  expect(await page.evaluate((id) => (window as any).match.players.some((p: any) => p.id === id && p.isBot), seen.hello!.from)).toBe(true);
+  expect(await page.evaluate(() => [(window as any).match.chat.enabled, (window as any).match.chat.hasTeams()])).toEqual([true, true]);
+});
+
+test("a private lobby: chat while you wait for the host", { tag: "@phone-only" }, async ({ page }) => {
+  await named(page, "Host Hal");
+  await page.goto("/?debug");
+  await createLobbyFromHome(page);
+  await expect(page.getByRole("heading", { name: /^Lobby [A-Z0-9]{5}$/ })).toBeVisible();
+  const chat = page.locator(".lobby-chat-box .qchat-lobby");
+  await expect(chat).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as any).match.chat.enabled)).toBe(true);
+  await chat.locator(".qrow.emoji .qchip, .qgroup-lines.emoji .qchip").first().click();
+  await expect(chat.locator(".qline.you.emoji")).toBeVisible();
+  // It doesn't crowd out the start button.
+  const start = page.getByRole("button", { name: /^Start with/ });
+  await expect(start).toBeVisible();
+  expect(overlaps(await box(chat), await box(start))).toBe(false);
+});
+

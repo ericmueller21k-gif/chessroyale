@@ -1,0 +1,3 @@
+# Quest progress shown on home (Nov 10, 2026)
+
+Eric: back on home after a game, "it makes the pop-up come back ... a little animation to move it towards the goal", and a finish that is "more than just fill up the bar". Calls: home compares the counts with the last ones this device saw (per account, in local storage), so no server or protocol change; it opens for anyone who has quests (not only signed in, as the day's first showing is), because a game is what moved them. The rows slide one at a time, finish with CSS only (glow, pop, burst) and play `questSound("tick" | "done")`, placeholders until Eric's pack. Reduced motion shows the new counts at once. Timings: `QUESTS.show`.

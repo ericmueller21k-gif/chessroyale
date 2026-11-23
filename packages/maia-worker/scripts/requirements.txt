@@ -1,0 +1,6 @@
+# The conversion's Python packages (convert.py), as used for the committed model (Python 3.11, CPU only).
+torch==2.14.1
+onnx==1.23.2
+onnxruntime==1.23.2
+numpy==2.4.6
+chess==1.11.2

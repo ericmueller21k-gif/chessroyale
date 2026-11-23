@@ -1,0 +1,8 @@
+{
+  "name": "@chessroyale/sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Milestone 2: simulated 32-bot matches and the playtest report.",
+  "dependencies": { "@chessroyale/core": "*", "@chessroyale/chess": "*" }
+}

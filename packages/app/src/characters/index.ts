@@ -1,0 +1,36 @@
+import { ALFIL } from "./alfil.ts";
+import { BIGBOY } from "./bigboy.ts";
+import { BLACK_KNIGHT } from "./black-knight.ts";
+import { CLOWN } from "./clown.ts";
+import { GINGERBREAD } from "./gingerbread.ts";
+import { GOD_KING } from "./god-king.ts";
+import { GREX } from "./grex.ts";
+import { HOLLOW } from "./hollow.ts";
+import { HOPPER } from "./hopper.ts";
+import { PAWN_GOLEM } from "./pawn-golem.ts";
+import { SAWYER } from "./sawyer.ts";
+import { SMUDGY } from "./smudgy.ts";
+import { MOO } from "./moo.ts";
+import { GARDENER } from "./gardener.ts";
+import { TIGER_FIGURE } from "./tiger-figure.ts";
+import { FOLIO } from "./folio.ts";
+import { TIMBER_FIGURE as TIMBER } from "./timber-figure.ts";
+import { DASH_FIGURE as DASH } from "./dash-figure.ts";
+import { BOSS_ZEBRA as ZEBRA } from "./zebra.ts";
+import { CHANDY } from "./chandy.ts";
+import { BIRDIE_FIGURE as BIRDIE } from "./birdie-figure.ts";
+import { PIG } from "./pig.ts";
+import { RECLUSE } from "./recluse.ts";
+import type { Character } from "./sprite.ts";
+
+export type { Character } from "./sprite.ts";
+
+/**
+ * Every character drawn so far: the bosses, and the God King (the crowd's champion). (The Hidden Boss's bust, his phone
+ * crop, is cut at its foot on purpose, so it isn't here: recluse.test.ts checks it.)
+ */
+export const CHARACTERS: readonly Character[] = [BLACK_KNIGHT, PAWN_GOLEM, CLOWN, GINGERBREAD, GREX, HOLLOW, BIGBOY, SAWYER, PIG, RECLUSE, ALFIL, HOPPER, SMUDGY, MOO, GARDENER, TIGER_FIGURE, FOLIO, TIMBER, DASH, ZEBRA, CHANDY, BIRDIE, GOD_KING];
+
+// The bosses' powers: the moments their characters play and the effect sprites for the board (see power-art.ts).
+export { EFFECT_NAMES, EFFECTS, POWER_ANIMS, POWER_MOMENTS, animLength, cueAt, type BossPowerMoments, type Effect, type EffectName, type PowerAnim, type PowerMoment } from "./power-art.ts";
+export { EFFECT_SPRITES, BOARD_CELL, SQUARE } from "./effects.ts";

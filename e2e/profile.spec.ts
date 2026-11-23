@@ -1,0 +1,500 @@
+import { devices, expect, type Page } from "@playwright/test";
+import { ITEM_DEFS, rankView } from "@chessroyale/core";
+import { asServerAdmin, giveCrates, giveItems, named, soloFromHome, switchesOff, test, openBossRaid, wearItem } from "./helpers.ts";
+
+const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
+
+test("your profile: tap your pawn; the same structure as anyone's, with your own actions", async ({ page }) => {
+  await named(page, "Eric");
+  // A player (this server has TEST_SWITCHES on, which gives home an admin's test level and lets `?rank=` count: the app is
+  // told otherwise, as hunchess.com tells a player), so home shows the rank line a player sees.
+  await switchesOff(page);
+  await page.goto("/");
+  // (Once this device's account exists.)
+  await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
+  // Something to show: a result with a rating, recorded the way a solo match records it.
+  await page.evaluate(() =>
+    fetch("/api/results", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "crowd", placement: 3, players: 100, team: "w", rating: 1612, brilliant: 1, bestMove: "Nxe5", cuts: 11, cutsSurvived: 11 }),
+    }),
+  );
+  // Something to wear: a crate item, worn in its slot. (Crates need a key since Nov 9: one crate and one key to open.)
+  await giveCrates(page, "winter-1", 1);
+  await page.evaluate(async () => {
+    const post = (path: string, body: object) =>
+      fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    await post("/api/locker/open", { crate: "winter-1" });
+    const { items } = await fetch("/api/locker").then((r) => r.json());
+    for (const slot of ["head", "face", "skin", "weapon"]) if ((await post("/api/locker/equip", { slot, item: items[0].id })).ok) break;
+  });
+  await page.reload();
+  // A solo game counts in your stats, never your ranking: that takes a match with 30% real players. Home's line is your
+  // 1 v 1 rank (Oct 28): none played yet.
+  await expect(page.locator(".fd-hero-sub")).toHaveText("Unranked");
+  // A rating, as a ranked match would leave it, and a 1 v 1 rank (an e2e can't seat 30 people nor play hundreds of ranked
+  // games, so from here the server's answers carry them; the server's side is in its unit tests, live.test.ts and
+  // ranked-store.test.ts).
+  const rank = rankView({ games: 40, ladder: 1245 });
+  const ranked = { rating: 1612, ranked1v1: { rank, games: 40, wins: 22, losses: 17, draws: 1, peak: rank, streak: 2, recent: [] } };
+  for (const url of [/\/api\/me(\?|$)/, /\/api\/profile\/[\w-]+$/]) {
+    await page.route(url, async (route) => {
+      const res = await route.fetch();
+      await route.fulfill({ response: res, json: { ...(await res.json()), ...ranked } });
+    });
+  }
+  await page.reload();
+  // Home names your 1 v 1 rank under your name, the tier in its color; no rating rank's name (retired Oct 28).
+  await expect(page.locator(".fd-hero-sub")).toHaveText("Paragon 5 · 45 RP");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 5");
+  // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Eric" })).toBeVisible();
+  await expect(page.getByText("Online now")).toBeVisible();
+  // The card: the 1 v 1 rank's pill, then the rating's number alone.
+  await expect(page.locator(".fd-pills .fd-card-rank")).toHaveText("Paragon 5 · 45 RP");
+  await expect(page.locator(".fd-pills")).toContainText("Rating 1612");
+  await expect(page.locator(".fd-pills")).not.toContainText(/Weighty|Novice|Expert/);
+  // No coins pill in that row (Eric, Nov 17: "a random coin thing in the profile… just remove that"): the shop shows them.
+  await expect(page.locator(".fd-pills")).not.toContainText(/coins/);
+  await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open locker" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);
+  // Wearing shows the item itself (its drawing, in its color), not a color swatch.
+  await expect(page.locator(".fd-item .fd-thumb .item-art svg")).toHaveCount(1);
+  // Stats: Crowd and Boss raid tabs, real numbers.
+  const tiles = page.locator(".fd-stat");
+  await expect(tiles.filter({ hasText: "games" })).toContainText("1");
+  await expect(tiles.filter({ hasText: "best finish" })).toContainText("3rd");
+  await expect(tiles.filter({ hasText: "cuts survived" })).toContainText("100%");
+  await page.getByRole("tab", { name: "Boss Battle" }).click();
+  await expect(tiles.filter({ hasText: "battles" })).toContainText("0");
+  await expect(page.getByText("BOSS TIERS BEATEN · 0 / 10")).toBeVisible();
+  await expect(page.locator(".fd-match")).toContainText("Best move Nxe5");
+  // Rename.
+  await page.getByRole("button", { name: "Edit name & icon" }).click();
+  await page.getByLabel("Your name").fill("Hunter");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByRole("heading", { name: "Hunter" })).toBeVisible();
+  // Settings from here, and back home.
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.locator(".fd-hero-name")).toHaveText("Hunter");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+});
+
+test("an admin's locker has one of every item, each tagged Admin, worn like any item and never deleted; a player's only theirs", { tag: "@phone-only" }, async ({ page }) => {
+  await named(page, "Eric");
+  const crate = page.locator(".locker-grid").first();
+  // A player: only what they own (nothing yet). (The God King's effects are hidden from the locker: GOD_KING_SHOP, Nov 8.)
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect(page.getByText("No crate items here yet. Open a crate!")).toBeVisible();
+  await expect(page.locator(".locker-item")).toHaveCount(0);
+  await expect(page.locator(".locker-admin")).toHaveCount(0);
+  // (The Outfit slot is secret, Nov 10: no tab without an outfit; the tabs as before.)
+  await expect(page.getByRole("tab", { name: "Outfit" })).toHaveCount(0);
+  await expect(page.locator(".locker-tabs.with-outfit")).toHaveCount(0);
+  // An admin (ADMIN_EMAILS, docs/decisions/2026-10-31-admin-owns-all.md): one of every crate item and God King effect.
+  const id = await asServerAdmin(page);
+  await page.reload();
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect(crate.locator(".locker-item")).toHaveCount(ITEM_DEFS.length);
+  await expect(crate.locator(".locker-admin")).toHaveCount(ITEM_DEFS.length);
+  // (The "From the shop" God King effects are hidden, GOD_KING_SHOP: the admin's are not shown, and their data stays.)
+  await expect(page.getByText("From the shop")).toHaveCount(0);
+  // Worn like any item, and others see it.
+  const crown = crate.getByRole("button", { name: /^Fire & Ice Crown, / });
+  await crown.click();
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  await expect.poll(async () => ((await (await page.request.get(`/api/profile/${id}`)).json()) as { look: { head?: { def: string } } }).look.head?.def).toBe("fire-ice-crown");
+  // Never deleted: holding (or right-clicking) an admin copy opens nothing, and letting go after a hold isn't a tap.
+  await crown.click({ button: "right" });
+  await page.waitForTimeout(700);
+  await expect(page.locator(".locker-dialog")).toHaveCount(0);
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  await crown.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  await expect(page.locator(".locker-dialog")).toHaveCount(0);
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  // An outfit (Nov 10; an admin owns a copy, so its tab shows): the Banana Suit over the rest; the crown stays worn underneath, greyed (shown, not hidden), goggles not;
+  // the preview is the suit; off again, the crown is back.
+  await expect(page.getByRole("tab", { name: "Outfit" })).toBeVisible();
+  const banana = crate.getByRole("button", { name: /^Banana Suit, / });
+  await banana.click();
+  await expect(banana.locator(".locker-worn")).toHaveText("Worn");
+  await expect(page.locator(".locker-avatar .avatar.riding")).toHaveAttribute("data-ride", "banana-suit");
+  await expect(crown.locator(".locker-covered")).toHaveText("Hidden by your outfit");
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  await expect(crate.getByRole("button", { name: /^Ski Goggles, / }).locator(".locker-covered")).toHaveCount(0);
+  await banana.click();
+  await expect(page.locator(".locker-covered")).toHaveCount(0);
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+});
+
+test("home → queue → match, then tap a name for that player's profile (phone and computer)", async ({ browser }) => {
+  test.setTimeout(4 * 60_000);
+  test.skip(test.info().project.name !== "desktop", "one run plays both a phone and a computer");
+  const desk = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  const phone = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined } as any)).newPage();
+  await named(desk, "Desky");
+  await named(phone, "Phoney");
+  // A boss raid's queue: no teams, so each sees the other on the leaderboard.
+  for (const p of [desk, phone]) {
+    // (A queue of its own, so other tests' players don't land in it.)
+    await p.goto("/?debug&pool=profile");
+    await openBossRaid(p);
+  }
+  // Both join back to back: here bots fill the raid 8 s after its first join (MATCH_FILL_SECONDS), and a page load in
+  // between can outlast that.
+  for (const p of [desk, phone]) {
+    await p.getByRole("button", { name: /^Join a Boss Battle/ }).click();
+    await expect(p.locator(".fd-seats")).toBeVisible();
+  }
+  await expect(desk.locator(".fd-seats .fd-seat")).toHaveCount(50);
+  await expect(desk.locator(".fd-seat:not(.empty)")).toHaveCount(2);
+  // (A Default raid: bots fill the crowd when its minute is up.)
+  await expect(desk.locator(".fd-queue-line")).toContainText("then bots fill the rest");
+  // A pawn in the queue opens that player's profile too.
+  await desk.getByRole("button", { name: "Phoney's profile" }).click();
+  await expect(desk.locator(".fd-overlay").getByRole("heading", { name: "Phoney" })).toBeVisible();
+  await desk.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
+  // Into the raid (8 s locally, then the boss's intro).
+  for (const p of [desk, phone]) await expect.poll(() => phase(p), { timeout: 60_000 }).toMatch(/boss|play/);
+  // Computer: the leaderboard beside the board; tap the other player's name.
+  await desk.locator(".tower-side").getByRole("button", { name: "Phoney's profile" }).click();
+  const sheet = desk.locator(".fd-overlay");
+  await expect(sheet.getByRole("heading", { name: "Phoney" })).toBeVisible();
+  // (Oct 28: another player's page is the public profile: Block and Report are in its ••• menu.)
+  await expect(sheet.getByRole("button", { name: "More options" })).toBeEnabled();
+  await expect(sheet.getByRole("button", { name: "Add Friend" })).toBeEnabled();
+  // (Mid-match there's no game of yours to invite them to: Challenge is greyed, not gone.)
+  await expect(sheet.getByRole("button", { name: "Challenge" })).toBeDisabled();
+  await expect(sheet.getByRole("button", { name: "Edit name & icon" })).toHaveCount(0);
+  await expect(sheet).not.toContainText(/@|Google|email/i);
+  await sheet.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+  // Phone: open the leaderboard, tap the other player's name.
+  await expect.poll(() => phase(phone), { timeout: 30_000 }).toBe("play");
+  // (A boss screen's scoreboard on a phone: the panel beside the God King, opened full size by a tap, since Oct 25.)
+  await phone.locator(".dk-panel .bp-tower").click();
+  await phone.getByRole("dialog", { name: "Leaderboard" }).getByRole("button", { name: "Desky's profile" }).click();
+  await expect(phone.locator(".fd-overlay").getByRole("heading", { name: "Desky" })).toBeVisible();
+  await expect(phone.locator(".fd-overlay")).toContainText("Online now");
+  // Report them (from the ••• menu): a reason, then the thanks. The report is about this match: a second one in it isn't counted again.
+  await phone.locator(".fd-overlay").getByRole("button", { name: "More options" }).click();
+  await phone.getByRole("menuitem", { name: "Report", exact: true }).click();
+  for (const reason of ["Cheating", "Offensive name or icon", "Something else"]) await expect(phone.getByRole("button", { name: reason, exact: true })).toBeVisible();
+  await phone.getByRole("button", { name: "Cheating", exact: true }).click();
+  await expect(phone.getByText("Thanks, we'll look into it.")).toBeVisible();
+  await phone.getByRole("dialog", { name: "Report Desky" }).getByRole("button", { name: "Close" }).click();
+  await phone.locator(".fd-overlay").getByRole("button", { name: "More options" }).click();
+  await phone.getByRole("menuitem", { name: "Report", exact: true }).click();
+  await phone.getByRole("button", { name: "Something else", exact: true }).click();
+  await expect(phone.getByText("You've already reported this player in this match.")).toBeVisible();
+});
+
+test("in a match: a bot's name opens a bot's card, yours opens your profile", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await named(page, "Solo");
+  await page.goto("/?debug&pace=quick&mode=crowd&augments=0");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|watching/);
+  const board = test.info().project.name === "desktop" ? page.locator(".tower-side") : page.getByRole("dialog", { name: "Leaderboard" });
+  if (test.info().project.name !== "desktop") await page.locator(".mini-tower-title").click();
+  await board.locator(".tower-row:not(.you) .player-name").first().click();
+  await expect(page.locator(".fd-overlay")).toContainText("Bots fill the empty seats in a match");
+  await page.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
+  await board.getByRole("button", { name: "Your profile", exact: true }).click();
+  await expect(page.locator(".fd-overlay").getByRole("heading", { name: "Solo" })).toBeVisible();
+  await expect(page.locator(".fd-overlay").getByRole("button", { name: "Edit name & icon" })).toBeVisible();
+});
+
+test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride it, in its idle, in boxes that don't move or grow; your profile's pawn rides it and Wearing lists it; off again, the pawn alone", async ({ page }) => {
+  await named(page, "Rider");
+  await page.goto("/");
+  await expect(page.locator(".fd-hero-name")).toHaveText("Rider");
+  // (No crate holds a ride yet; only admins have them. Given straight, as admins will own them.)
+  await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+  await page.reload();
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  await page.getByRole("button", { name: "Open locker" }).click();
+  const previews = page.locator(".locker-preview .locker-avatar");
+  // (One pawn in the preview since Nov 7, in your default color; it was two, white and black.)
+  await expect(previews).toHaveCount(1);
+  const boxes = () => page.locator(".locker-preview, .locker-preview .locker-avatar, .locker-tabs").evaluateAll((els) => els.map((e) => [...Object.values(e.getBoundingClientRect().toJSON())].map((v) => Math.round(Number(v) * 10) / 10)));
+  const before = await boxes();
+  await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Ride", exact: true }).click();
+  const tile = page.getByRole("button", { name: /^Riding Chirp, Cobalt, purity 60\.0%/ });
+  // Its tile: the ride with a pawn on it, drawn (not a stand-in).
+  await expect(tile.locator(".item-art svg path")).not.toHaveCount(0);
+  await tile.click();
+  await expect(tile).toContainText("Worn");
+  const riding = page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]');
+  await expect(riding).toHaveCount(1);
+  // The pawn rides it inside the same box: nothing moved or grew (Eric's "nothing shifts").
+  expect(await boxes()).toEqual(before);
+  for (const r of await riding.all()) {
+    const a = (await r.boundingBox())!;
+    const box = (await r.locator("xpath=..").boundingBox())!;
+    expect([a.x, a.y, a.width, a.height]).toEqual([box.x, box.y, box.width, box.height]);
+  }
+  // Its idle plays: the drawing changes over a couple of seconds.
+  const pic = () => riding.first().innerHTML();
+  const first = await pic();
+  await expect.poll(pic, { timeout: 5_000 }).not.toBe(first);
+  // Your profile: your pawn rides it, and Wearing lists it with its slot. (The locker's Back goes home.)
+  await page.getByRole("button", { name: "Back", exact: true }).first().click();
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  await expect(page.locator('.fd-card .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(1);
+  await expect(page.locator(".fd-item").filter({ hasText: "Riding Chirp" })).toContainText("Ride · Cobalt · 60% pure");
+  // Off again: the pawn alone, in the same boxes.
+  await page.getByRole("button", { name: "Open locker" }).click();
+  await page.getByRole("tab", { name: "Ride", exact: true }).click();
+  await page.getByRole("button", { name: /^Riding Chirp, Cobalt/ }).click();
+  await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
+  await expect(page.locator(".locker-preview .avatar")).toHaveCount(1);
+  expect(await boxes()).toEqual(before);
+});
+
+test("a shiny ride's shine stays inside its own shapes (Eric, Nov 15: the pogo's slid across the preview as a rectangle): every shine's clip is its own region's, and no two clips on the page share an id with different shapes", async ({ page }) => {
+  await named(page, "Shiny");
+  await page.goto("/shop");
+  // (Purity 98%: shiny. Boingo's Pogo has a region named "seat", the name that gave the rider cut's id; a shiny crown rides on it.)
+  const [pogo, crown] = await giveItems(page, [
+    { def: "boingo-pogo", color: "red", blemish: 2 },
+    { def: "fire-ice-crown", color: "opal", blemish: 2 },
+  ]);
+  await wearItem(page, "ride", pogo!);
+  await wearItem(page, "head", crown!);
+  await page.reload();
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await page.getByRole("tab", { name: "Ride", exact: true }).click();
+  await expect(page.locator('.locker-preview .avatar.riding[data-ride="boingo-pogo"][data-drawn="1"]')).toHaveCount(1);
+  await expect(page.locator(".locker-grid .item-art[data-drawn=\"1\"]").first()).toBeVisible();
+  const clips = await page.evaluate(() => {
+    // A shine's clip group is its Region's: the clipPath drawn beside it is the one its `url(#…)` must find on the page.
+    const shines = [...document.querySelectorAll(".item-shine")].map((s) => {
+      const g = s.parentElement!;
+      const id = g.getAttribute("clip-path")!.match(/^url\(#(.+)\)$/)![1]!;
+      return { id, own: document.getElementById(id) === g.parentElement!.querySelector(":scope > clipPath") };
+    });
+    const shapes = new Map<string, Set<string>>();
+    for (const c of document.querySelectorAll("clipPath")) shapes.set(c.id, (shapes.get(c.id) ?? new Set()).add(c.innerHTML));
+    return { shines, clashes: [...shapes].filter(([, s]) => s.size > 1).map(([id]) => id) };
+  });
+  // (The preview's pogo and crown, and the Ride tab's pogo tile: each region of each.)
+  expect(clips.shines.length).toBeGreaterThan(5);
+  expect(clips.shines.filter((s) => !s.own).map((s) => s.id), "shines whose clip is another shape's").toEqual([]);
+  expect(clips.clashes, "clip ids drawn with two different shapes").toEqual([]);
+});
+
+test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its idle playing, in the same boxes (nothing grows or moves); off again, the pawn alone", async ({ page }) => {
+  await named(page, "Rider");
+  await page.goto("/");
+  await expect(page.locator(".fd-hero-name")).toHaveText("Rider");
+  const [ride] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+  await page.reload();
+  await expect(page.locator(".fd-hero-name")).toHaveText("Rider");
+  // (The boxes the pawn is in: the card, the pawn, its box, and your ring; whatever it wears, they are these.)
+  const boxes = () =>
+    page.locator(".fd-hero, .fd-hero .fd-pawn-hero, .fd-hero .fd-pawn-box, .fd-ring, .fd-ring .fd-pawn-box, .fd-play-col").evaluateAll((els) => els.map((e) => Object.values(e.getBoundingClientRect().toJSON()).map((v) => Math.round(Number(v) * 10) / 10)));
+  await expect(page.locator(".fd-hero .avatar")).toHaveCount(1);
+  await expect(page.locator(".avatar.riding")).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
+  const before = await boxes();
+  await wearItem(page, "ride", ride!);
+  await page.reload();
+  await expect(page.locator(".fd-hero .avatar.riding[data-ride=\"riding-chirp\"]")).toHaveCount(1);
+  // A computer's side menu's Profile item rides too (its top right ring went, Nov 7). A phone has no pawn up top since Nov 11
+  // (its profile is the card's "View profile"): nothing of yours rides in the top bar.
+  if (await page.locator(".fd-side .fd-menu-icon:visible").count()) await expect(page.locator(".fd-side .fd-menu-icon:visible .avatar.riding")).toHaveCount(1);
+  else await expect(page.locator(".fd-top .avatar")).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
+  expect(await boxes(), "nothing grew or moved when the pawn mounted").toEqual(before);
+  // The ride fills the pawn's own box and its idle plays.
+  const riding = page.locator(".fd-hero .avatar.riding");
+  const a = (await riding.boundingBox())!;
+  const box = (await riding.locator("xpath=..").boundingBox())!;
+  expect([a.x, a.y, a.width, a.height]).toEqual([box.x, box.y, box.width, box.height]);
+  const pic = () => riding.innerHTML();
+  const first = await pic();
+  await expect.poll(pic, { timeout: 5_000 }).not.toBe(first);
+  // At a size (Nov 1): every ride at 0.75 (RIDES.defaultScale, Eric: "0.75 is good"); an admin's `?rideScale=1` tries it as
+  // drawn, the ride bigger under the same pawn, in the same boxes.
+  expect(await riding.getAttribute("data-scale")).toBe("0.75");
+  await page.goto("/?rideScale=1");
+  await expect(page.locator('.fd-hero .avatar.riding[data-scale="1"]')).toHaveCount(1);
+  await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-scale="1"]')).toHaveCount((await page.locator(".fd-side .fd-menu-icon:visible").count()) ? 1 : 0);
+  await page.evaluate(() => document.fonts.ready);
+  expect(await boxes(), "nothing grew or moved at a bigger ride").toEqual(before);
+  // Off again: the pawn alone, in the same boxes.
+  await wearItem(page, "ride", null);
+  await page.reload();
+  await expect(page.locator(".fd-hero .avatar")).toHaveCount(1);
+  await expect(page.locator(".avatar.riding")).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
+  expect(await boxes()).toEqual(before);
+});
+
+/** Holds a ride's drawing's chunk (Nov 1, rides lazy: each its own, `/assets/<ride>-<hash>.js`) until the answer is called. */
+async function holdDrawing(page: Page, ride: string): Promise<() => void> {
+  let open!: () => void;
+  const held = new Promise<void>((r) => (open = r));
+  await page.route(new RegExp(`/assets/${ride}-[\\w-]{8}\\.js$`), async (route) => {
+    await held;
+    await route.continue();
+  });
+  return open;
+}
+
+test.describe("rides lazy", () => {
+  // (No service worker: it would serve the ride's chunk from its cache, past the hold.)
+  test.use({ serviceWorkers: "block" });
+  test("rides lazy (Nov 1): each ride's drawing loads on its own; until it comes, home's pawn and ring, your profile's pawn and the locker's tile keep their boxes, the pawn sitting where it will ride; the ride appears under it and nothing moves", async ({ page }) => {
+    // (Still: no hop on home, the idle on its first frame, so every box can be read twice.)
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await named(page, "Rider");
+    await page.goto("/");
+    await expect(page.locator(".fd-hero-name")).toHaveText("Rider");
+    const [chirp] = await giveItems(page, [
+      { def: "riding-chirp", color: "cobalt", blemish: 40 },
+      { def: "moon-ride", color: "pearl", blemish: 40 },
+    ]);
+    await wearItem(page, "ride", chirp!);
+    /** The boxes (each element's, rounded to a tenth of a pixel) and, in each, where the pawn sits (its top left and width). */
+    const boxes = (sel: string) =>
+      page.locator(sel).evaluateAll((els) =>
+        els.map((e) => {
+          const r = (b: DOMRect) => [b.x, b.y, b.width, b.height].map((v) => Math.round(v * 10) / 10);
+          const pawn = e.querySelector(".ride-pawn");
+          return [...r(e.getBoundingClientRect()), ...(pawn ? r(pawn.getBoundingClientRect()).slice(0, 3) : [])];
+        }),
+      );
+    /** The same once they've stopped moving (an overlay slides in as it opens). */
+    const settled = async (sel: string) => {
+      let prev = await boxes(sel);
+      for (let i = 0; i < 40; i++) {
+        await page.waitForTimeout(100);
+        const now = await boxes(sel);
+        if (now.length && JSON.stringify(now) === JSON.stringify(prev)) return now;
+        prev = now;
+      }
+      throw new Error(`${sel}: never settled`);
+    };
+    // Home: your worn ride's drawing is asked for as the app starts; held back, the big pawn and your ring sit where they'll ride.
+    let open = await holdDrawing(page, "riding-chirp");
+    await page.reload();
+    const home = ".fd-hero, .fd-hero .fd-pawn-box, .fd-hero .avatar.riding, .fd-ring:visible .fd-pawn-box, .fd-ring:visible .avatar.riding, .fd-side .fd-menu-icon:visible .avatar.riding";
+    await expect(page.locator('.fd-hero .avatar.riding[data-ride="riding-chirp"][data-drawn="0"]')).toHaveCount(1);
+    // (A computer's side menu's Profile item since Nov 7; a phone has no pawn up top since Nov 11: no ride to count.)
+    const ringRides = (await page.locator(".fd-side .fd-menu-icon:visible").count()) ? 1 : 0;
+    await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-drawn="0"]')).toHaveCount(ringRides);
+    await page.evaluate(() => document.fonts.ready);
+    const homeBefore = await settled(home);
+    open();
+    await expect(page.locator('.fd-hero .avatar.riding[data-drawn="1"]')).toHaveCount(1);
+    await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-drawn="1"]')).toHaveCount(ringRides);
+    expect(await boxes(home), "home: nothing moved when the ride came").toEqual(homeBefore);
+    // Your profile's pawn, the same.
+    open = await holdDrawing(page, "riding-chirp");
+    await page.reload();
+    await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+    // (The profile itself first: until its data comes the page shows "Loading…" in a different layout, so a slow
+    // server measured that one and then the loaded page, 255 px apart (CI, Nov 1). The ride is held either way.)
+    await expect(page.locator(".fd-card .fd-seen")).toBeVisible();
+    const card = ".fd-card .avatar.riding";
+    await expect(page.locator(`${card}[data-drawn="0"]`)).toHaveCount(1);
+    const cardBefore = await settled(`.fd-card .fd-pawn-box, ${card}`);
+    open();
+    await expect(page.locator(`${card}[data-drawn="1"]`)).toHaveCount(1);
+    expect(await boxes(`.fd-card .fd-pawn-box, ${card}`), "your profile: nothing moved").toEqual(cardBefore);
+    // The locker's Ride tab: Moon's Ride's tile (its drawing not loaded on this page yet).
+    open = await holdDrawing(page, "moon-ride");
+    await page.getByRole("button", { name: "Open locker" }).click();
+    await page.getByRole("tab", { name: "Ride", exact: true }).click();
+    const tile = page.getByRole("button", { name: /^Moon's Ride, / });
+    await expect(tile.locator('.item-art[data-drawn="0"]')).toHaveCount(1);
+    const tileBoxes = () => tile.locator("xpath=.").evaluateAll((els) => els.map((e) => [e, e.querySelector(".item-art")!, e.querySelector(".ride-pawn")!].map((x) => Object.values(x.getBoundingClientRect().toJSON()).map((v) => Math.round(Number(v) * 10) / 10))));
+    await settled(".locker-grid");
+    const tileBefore = await tileBoxes();
+    open();
+    await expect(tile.locator('.item-art[data-drawn="1"]')).toHaveCount(1);
+    expect(await tileBoxes(), "the locker's tile: nothing moved").toEqual(tileBefore);
+  });
+});
+
+test("rides for an admin (Oct 31; admins own one of every item): the Ride tab has every ride's admin copy (Nov 1: every boss's); wearing Riding Chirp's, the preview rides it, and in the town square your pawn rides it, in its color", { tag: "@phone-only" }, async ({ page }) => {
+  await named(page, "Eric");
+  // (Once this page's account exists, as a player: no ride.)
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect(page.getByText("No crate items here yet. Open a crate!")).toBeVisible();
+  await asServerAdmin(page);
+  await page.reload();
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await page.getByRole("tab", { name: "Ride", exact: true }).click();
+  const grid = page.locator(".locker-grid").first();
+  const rides = ITEM_DEFS.filter((d) => d.slot === "ride").length;
+  // (18 rides (Nov 23: Birdie's Train), and since Nov 6 each one's HunChess colorway, the Welcome Crate's: an admin owns one of every
+  // item, an admins-first boss's colorway too.)
+  expect(rides).toBe(36);
+  await expect(grid.locator(".locker-item")).toHaveCount(rides);
+  await expect(grid.locator(".locker-admin")).toHaveCount(rides);
+  const chirp = grid.getByRole("button", { name: /^Riding Chirp, / });
+  await chirp.click();
+  await expect(chirp.locator(".locker-worn")).toHaveText("Worn");
+  await expect(page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(1);
+  // In the town square, as the town reads anyone's look: your pawn on the admin copy's ride, in its red.
+  await page.goto("/town?sky=day");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townRide?: () => { you: { ride: string | null; color: string | null; ready: boolean } } | null }).__townRide?.()?.you ?? null), { timeout: 20_000 }).toEqual(
+    expect.objectContaining({ ride: "riding-chirp", color: "red", ready: true }),
+  );
+});
+
+test.describe("your account not loading (Nov 20)", () => {
+  // (No service worker: page.route sees every request the page makes.)
+  test.use({ serviceWorkers: "block" });
+  test("Profile never sits on \"Loading…\": the server failing, it says so, and Try again loads it; signed out of the site's gate (a 302 to its login), \"Sign in again\" there and in one notice over the app", async ({ page }) => {
+    // The server failing your profile (twice: the load's own second try too).
+    let failing = true;
+    await page.route("**/api/me*", (route) => (failing ? route.fulfill({ status: 503, json: { message: "down" } }) : route.fallback()));
+    await page.goto("/profile");
+    const card = page.locator(".fd-card");
+    await expect(card.getByText("HunChess couldn't load your account just now. Please try again.")).toBeVisible({ timeout: 5_000 });
+    await expect(card.getByText("Loading…")).toHaveCount(0);
+    // (Not the gate: no notice, no "Sign in again".)
+    await expect(page.locator(".site-gate")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Sign in again" })).toHaveCount(0);
+    failing = false;
+    await card.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible({ timeout: 10_000 });
+
+    // Signed out of the site's gate: every /api/* request answered with a redirect to its login, on another origin.
+    await page.unroute("**/api/me*");
+    await page.route("**/api/**", (route) =>
+      route.fulfill({ status: 302, headers: { location: "https://hunchess-test.cloudflareaccess.com/cdn-cgi/access/login/hunchess.com" } }),
+    );
+    await page.reload();
+    await expect(card.getByText("You've been signed out of the site, so your account, friends and chat can't load.")).toBeVisible({ timeout: 5_000 });
+    await expect(card.getByText("Loading…")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Sign in again" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Try again" })).toBeVisible();
+    // The same, once, over the whole app (it stays on any screen): its own "Sign in again".
+    const notice = page.locator(".site-gate");
+    await expect(notice).toHaveCount(1);
+    await expect(notice.getByRole("button", { name: "Sign in again" })).toBeVisible();
+    // "Sign in again" loads the page again from the network (where the gate shows its login).
+    const reloaded = page.waitForEvent("load");
+    await notice.getByRole("button", { name: "Sign in again" }).click();
+    await reloaded;
+    await expect(notice).toHaveCount(1, { timeout: 5_000 });
+  });
+});

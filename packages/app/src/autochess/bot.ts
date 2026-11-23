@@ -1,0 +1,422 @@
+import { AUTOCHESS, mulberry32, shuffle, weightedIndex, type AutoChessSettings, type Rng } from "@chessroyale/core";
+import { adjustBlock, adjustMove, adjustTargets, startAdjust, startMove, startStars, starTargets } from "./adjust.ts";
+import { boardCount, buyBlock, buyOffer, emptyArmy, heldBlock, heldStars, holdBlock, holdOffer, placeHeld, priceOf, starUp, starUpTarget, starsAt, type StarTarget } from "./army.ts";
+import { incomeFor } from "./economy.ts";
+import { addXp, buyXp, xpBlock, type Level } from "./level.ts";
+import { newShop, refillSlot, replaceTaken, rerollPrice, rerollShop, type Shop } from "./shop.ts";
+import { type Army, type Color, type Held, type Kind, type Offer, type StarCount } from "./types.ts";
+
+/**
+ * The bot (v6): it plays the same shop you do. Its own offers (the odds of its own level, its own seeded rolls) each name a piece and a
+ * square on its half; it picks among what it sees by simple weights, rerolling now and then when it has gold to spare, locks in
+ * at a seeded time (only while lock-in is on: not since v7), and in the move step plays the engine's best legal move with a random
+ * piece of its own (v7; the v6 adjust step, behind `adjustMode`, moves greedily with the engine). What it held from an earlier round goes down first,
+ * free; it buys XP now and then (when that gives it a level), and when its board is full (its level's limit) it holds a good piece
+ * on its bench for the next round. It sells nothing. Everything random comes from the round's seed.
+ *
+ * **Stars** (v8, Eric Oct 22: the bot "buys star-ups as a player would (nearly always, with 5 gold"; 1 gold since the TFT-style economy), stars its bench too"): any of its offers that is a star-up it can pay for
+ * (`starUpTarget`: a piece of its own that can star up, on the board or held) it buys, `bot.starUpChance` of the time, before anything else and whatever its board's room
+ * (a merge adds no piece). In the move step (the "stars" mode) it moves each of its starred pieces: a 2-star the best of its legal moves by the engine, a 3-star the best of
+ * a sample of the empty squares of its half (`botStarMoves`).
+ */
+
+/**
+ * What it likes among the offers it sees: minor pieces and rooks over pawns (a shop is mostly pawns, so a pawn is the filler),
+ * and later rooks and a queen. Weights by kind: [early, late]. (Not pawns first: Eric, Oct 19, it looked like pawn spam.)
+ */
+const WEIGHTS: Record<Kind, readonly [number, number]> = { p: [1, 1], n: [4, 3], b: [4, 3], r: [3, 4], q: [0, 3] };
+/** After this many rounds it buys the late mix. */
+const LATE_ROUND = 6;
+
+/** The star-ups in a shop that the bot can pay for with `budget`, best first: the one that gives the most stars, then of the dearest piece, then in slot order. */
+export function botStarUps(shop: Shop, army: Army, budget: number, cfg: AutoChessSettings = AUTOCHESS): { offer: Offer; slot: number; target: StarTarget }[] {
+  const ups: { offer: Offer; slot: number; target: StarTarget }[] = [];
+  shop.slots.forEach((offer, slot) => {
+    const target = starUpTarget(army, offer, cfg);
+    if (target && budget >= cfg.starUpCost) ups.push({ offer, slot, target });
+  });
+  return ups.sort((a, b) => b.target.becomes - a.target.becomes || priceOf(b.offer.kind, cfg) - priceOf(a.offer.kind, cfg));
+}
+
+/**
+ * What the bot reads of you at a round's start (from round 2; Eric, Nov 10): your gold then, what you banked from the last round (the gold
+ * you carried over), and both sides' HP. Never this round's buys: they're hidden until the reveal.
+ */
+export interface BotRead {
+  /** Your gold at the round's start (the result line's total). */
+  gold: number;
+  /** What you carried over from the last round, unspent. */
+  banked: number;
+  /** Your HP and the bot's, at the round's start. */
+  hp: number;
+  ownHp: number;
+}
+
+/**
+ * The gold the bot banks for interest this round, of its `gold` (whole `interest.per`s, never past the interest's top, always leaving `saveKeep`
+ * to spend), and whether it is saving because you are (`lean`: then it buys only what it needs, no rerolls, XP or holds). With `read` (`bot.follow`):
+ * you saving, it banks to your steps (the tens you kept beyond this round's income), `follow.chance` of the time; you spending down, late in the
+ * match or with either side low, it banks nothing. Without (round 1): the old coin flip, `saveChance`. One draw of `rng`, as before, whenever it
+ * has the gold to bank (so the draws after it stay where they were).
+ */
+export function botBank(gold: number, round: number, rng: Rng, cfg: AutoChessSettings = AUTOCHESS, read?: BotRead): { bank: number; lean: boolean } {
+  const { per } = cfg.interest;
+  const keep = cfg.bot.saveKeep;
+  if (gold < per + keep) return { bank: 0, lean: false };
+  const roll = rng();
+  const room = Math.min(Math.floor((gold - keep) / per), cfg.interest.max / cfg.interest.gold);
+  if (!read) return { bank: roll < cfg.bot.saveChance ? room * per : 0, lean: false };
+  const f = cfg.bot.follow;
+  if (round >= f.lateRound || Math.min(read.hp, read.ownHp) <= f.lowHp) return { bank: 0, lean: false };
+  const saving = read.banked >= f.banked || read.gold >= f.gold;
+  const steps = Math.min(cfg.interest.max / cfg.interest.gold, Math.floor(Math.max(read.banked, read.gold - incomeFor(round, cfg)) / per));
+  const bank = saving && roll < f.chance ? Math.min(room, steps) * per : 0;
+  return { bank, lean: bank > 0 };
+}
+
+/** What the bot does: buys a piece onto its board, holds one on its bench, places a held one (free), rerolls its shop, or buys XP. */
+export type BotAct = "buy" | "hold" | "place" | "reroll" | "xp" | "starup";
+
+/** One thing the bot does: a piece (and its price, 0 for a held piece placed) on a square, a reroll of its shop, or XP. */
+export interface BotBuy {
+  type: BotAct;
+  kind: Kind | "reroll" | "xp";
+  price: number;
+  square: string | null;
+  /** A star-up: the stars the piece has now and where it stands (the board's square, or the bench's slot kept for it). A placed held piece: its stars, if it has any. */
+  stars?: StarCount;
+  where?: "board" | "bench";
+}
+
+/**
+ * What the bot does with `gold` in `round`, in order: it places what it held (where the squares and its board's room allow), then
+ * buys from its own shop (a piece on a square of its half: it picks among what is on offer by its weights, and a bought slot rolls
+ * a new offer), now and then rerolling when it has gold to spare (more often when the shop shows nothing but pawns). It buys XP now
+ * and then, when that would give it a level (room for another piece) or it is rich; with its board full (its level's number of pieces)
+ * it may hold a good piece on its bench instead (not a pawn). It banks gold for interest by `botBank`: from round 2 when you do (`read`), to your
+ * steps, buying only what it needs. `army`: its army when it is done, bench included; `level`: its level and XP after what it bought (`from`: what it had).
+ */
+export function botBuys(
+  start: Army,
+  gold: number,
+  round: number,
+  rng: Rng,
+  cfg: AutoChessSettings = AUTOCHESS,
+  from: Level = { level: cfg.levels.start, xp: 0 },
+  read?: BotRead,
+): { buys: BotBuy[]; army: Army; level: Level } {
+  const { bank, lean } = botBank(gold, round, rng, cfg, read);
+  let budget = gold - bank;
+  const t = Math.min(1, (round - 1) / (LATE_ROUND - 1));
+  const seed = (rng() * 2 ** 32) >>> 0;
+  let army = start;
+  let level = from;
+  const out: BotBuy[] = [];
+  let xpBuys = 0;
+  /** XP, when it is worth it (it gives a level, or the bot is rich), the bot can pay, and it hasn't bought its share: `chance` of the time. */
+  const tryXp = (chance: number) => {
+    const worth = addXp(level, cfg.levels.buyXp, cfg).level > level.level || budget >= cfg.bot.xpRichGold;
+    if (lean || xpBuys >= cfg.bot.maxXpBuys || xpBlock(level, budget, cfg) || !worth || rng() >= chance) return false;
+    const next = buyXp(level, budget, cfg);
+    level = { level: next.level, xp: next.xp };
+    budget = next.gold;
+    out.push({ type: "xp", kind: "xp", price: cfg.levels.buyXpCost, square: null });
+    xpBuys++;
+    return true;
+  };
+  // What it held goes down first, for nothing, wherever its square is free and the board has room.
+  for (let i = 0; i < army.bench.length; ) {
+    const held = army.bench[i]!;
+    if (heldBlock(army, i, cfg, level.level)) i++;
+    else {
+      out.push({ type: "place", kind: held.kind, price: 0, square: held.square, ...(held.stars ? { stars: held.stars } : {}) });
+      army = placeHeld(army, i);
+    }
+  }
+  // A level first, now and then, when there is gold for it and more besides.
+  if (budget >= cfg.bot.xpGold) tryXp(cfg.bot.xpChance);
+  let shop = newShop(seed, army, cfg, level.level);
+  let rerolls = 0;
+  let holds = 0;
+  for (let looks = 0; looks < 60; looks++) {
+    // A star-up first (v8): nearly always, for `starUpCost`; it adds no piece, so a full board or bench doesn't stop it. The one that gives the most stars, then the dearest piece.
+    const ups = botStarUps(shop, army, budget, cfg);
+    if (ups.length && rng() < cfg.bot.starUpChance) {
+      const { offer, slot, target } = ups[0]!;
+      out.push({ type: "starup", kind: offer.kind, price: cfg.starUpCost, square: offer.square, stars: target.becomes, where: target.where });
+      budget -= cfg.starUpCost;
+      army = starUp(army, target);
+      shop = replaceTaken(refillSlot(shop, slot, seed, army, cfg, level.level), seed, army, cfg, level.level).shop;
+      continue;
+    }
+    // (A full board only holds, a full bench only buys; neither: done.)
+    const boardRoom = boardCount(army) < level.level;
+    const holding = !boardRoom;
+    // A full board: a level makes room, when it comes to that; else a good piece goes to the bench.
+    if (holding && tryXp(cfg.bot.xpChanceFull)) continue;
+    if (holding && (lean || army.bench.length >= cfg.benchSlots || holds >= cfg.bot.maxHolds)) break;
+    const options = shop.slots
+      .map((offer, slot) => ({ offer, slot }))
+      .filter(({ offer }) => {
+        // (A star-up isn't a piece to buy or hold: it was weighed above.)
+        if (starUpTarget(army, offer, cfg)) return false;
+        if (holding ? offer.kind === "p" || holdBlock(army, budget, offer, cfg) : buyBlock(army, budget, offer, cfg, level.level)) return false;
+        return !(offer.kind === "q" && budget < priceOf("q", cfg) + cfg.bot.queenChange);
+      });
+    const bare = options.every((o) => o.offer.kind === "p");
+    // Gold to spare: a reroll (at the same climbing price as yours, `rerollPrice`) leaves enough for a knight and the bot has the gold it likes to keep.
+    const price = rerollPrice(rerolls, cfg);
+    const spare = !lean && rerolls < cfg.bot.maxRerolls && budget >= cfg.bot.rerollGold && budget - price >= priceOf("n", cfg);
+    if (spare && rng() < (bare && boardRoom ? cfg.bot.rerollChanceBare : cfg.bot.rerollChance)) {
+      shop = rerollShop(shop, seed, army, cfg, level.level);
+      rerolls++;
+      budget -= price;
+      out.push({ type: "reroll", kind: "reroll", price, square: null });
+      continue;
+    }
+    if (!options.length) break;
+    // (A held piece is a choice, not the rule: it keeps its gold, now and then, for the interest.)
+    if (holding && rng() >= cfg.bot.holdChance) break;
+    const pick = options[weightedIndex(rng, options.map(({ offer }) => WEIGHTS[offer.kind][0] + (WEIGHTS[offer.kind][1] - WEIGHTS[offer.kind][0]) * t))]!;
+    const cost = priceOf(pick.offer.kind, cfg);
+    out.push({ type: holding ? "hold" : "buy", kind: pick.offer.kind, price: cost, square: pick.offer.square });
+    budget -= cost;
+    if (holding) {
+      army = holdOffer(army, pick.offer);
+      holds++;
+      shop = refillSlot(shop, pick.slot, seed, army, cfg, level.level);
+    } else {
+      army = buyOffer(army, pick.offer);
+      shop = replaceTaken(refillSlot(shop, pick.slot, seed, army, cfg, level.level), seed, army, cfg, level.level).shop;
+    }
+  }
+  return { buys: out, army, level: { level: level.level, xp: level.xp } };
+}
+
+/** One thing the bot does while buying, `at` seconds into the step: a piece appears on a square, is held, the shop is rerolled, or XP is bought. */
+export interface BotEvent {
+  at: number;
+  type: BotAct;
+  kind: Kind | "reroll" | "xp";
+  /** Where the piece lands (a held one: where it will land): null for a reroll or XP. */
+  square: string | null;
+  /** Its price (the bot's gold drops by it at that moment). */
+  price: number;
+  /** A star-up: the stars the piece has after it, and where it stands; a placed held piece: its stars, if any. */
+  stars?: StarCount;
+  where?: "board" | "bench";
+}
+
+/**
+ * The bot's whole buy-and-place step: what it does (and when: seconds into the step, spread over the part of it that isn't
+ * locked, in the order it did them), and when it locks in (`lockAt`, seconds into the step; null: never). Its army when it is
+ * done is `army`, the bench it carries into the next round included, and its level and XP after what it bought is `level`.
+ * `bench`: what it held coming in; `from`: its level and XP coming in; `read`: what it reads of you (from round 2), for its saving.
+ */
+export function botPlan(
+  color: Color,
+  king: string,
+  gold: number,
+  round: number,
+  rng: Rng,
+  cfg: AutoChessSettings = AUTOCHESS,
+  bench: Held[] = [],
+  from: Level = { level: cfg.levels.start, xp: 0 },
+  read?: BotRead,
+): { events: BotEvent[]; army: Army; level: Level; spent: number; lockAt: number | null } {
+  // (Its lock-in time comes from a draw of its own, so changing how it buys never moves it: the e2e tests pick seeds by it.)
+  const lockRng = mulberry32((rng() * 2 ** 32) >>> 0);
+  const { buys, army, level } = botBuys(emptyArmy(color, king, bench), gold, round, rng, cfg, from, read);
+  const open = cfg.buySeconds - cfg.lockSeconds - 1;
+  // It locks in (its board freezes) at a seeded time in the open part of the step, or now and then never; its last piece goes down a moment before.
+  const never = lockRng() < cfg.bot.neverLockChance;
+  // (With lock-in off, since v7, it never locks: no bonus for anyone, and it places over the whole open part of the step.)
+  const lockAt = !cfg.lockIn || never ? null : open * (cfg.bot.lockFrom + (cfg.bot.lockTo - cfg.bot.lockFrom) * lockRng());
+  const span = lockAt === null ? open : lockAt - 0.2;
+  // Its pieces go down evenly from a second in until `placeBy` of the way through (so there is something on its board to reveal early
+  // and the circles show up over the first part of the step); a reroll or XP comes a moment before the piece it was for.
+  const pieces = buys.filter((b) => b.type !== "reroll" && b.type !== "xp").length;
+  const first = Math.min(1, span / 4);
+  const last = Math.max(first, span * cfg.bot.placeBy);
+  let slot = 0;
+  const events: BotEvent[] = buys.map((buy) => {
+    const piece = buy.type !== "reroll" && buy.type !== "xp";
+    const base = first + ((last - first) * (slot + 0.5)) / Math.max(1, pieces);
+    if (piece) slot++;
+    const at = piece ? base : base - 0.3 - rng() * 0.2;
+    return {
+      at: Math.min(span, Math.max(0.5, at + (rng() - 0.5) * 0.04 * span)),
+      type: buy.type,
+      kind: buy.kind,
+      square: buy.square,
+      price: buy.price,
+      ...(buy.stars ? { stars: buy.stars } : {}),
+      ...(buy.where ? { where: buy.where } : {}),
+    };
+  });
+  events.sort((a, b) => a.at - b.at);
+  // (Two rerolls in a row come at a jittered time each, so they can swap places: the prices climb in the order they show, as yours do. The same prices, the same gold.)
+  let rerolled = 0;
+  for (const e of events) if (e.type === "reroll") e.price = rerollPrice(rerolled++, cfg);
+  return { events, army, level, spent: events.reduce((sum, e) => sum + e.price, 0), lockAt };
+}
+
+/** What the bot has done by `seconds` into the step: the pieces on the board (and the stars of the starred ones), the gold it has spent and the XP it has bought (times). */
+export function botAt(events: readonly BotEvent[], seconds: number): { squares: Record<string, Kind>; stars: Record<string, StarCount>; spent: number; xpBuys: number } {
+  const squares: Record<string, Kind> = {};
+  const stars: Record<string, StarCount> = {};
+  let spent = 0;
+  let xpBuys = 0;
+  for (const e of events) {
+    if (e.at > seconds) break;
+    // (A held piece isn't on the board: you see where pieces stand, not what is on its bench.)
+    if ((e.type === "buy" || e.type === "place") && e.square && e.kind !== "reroll" && e.kind !== "xp") {
+      squares[e.square] = e.kind;
+      if (e.stars) stars[e.square] = e.stars;
+    }
+    if (e.type === "starup" && e.where === "board" && e.square && e.stars) stars[e.square] = e.stars;
+    spent += e.price;
+    if (e.type === "xp") xpBuys++;
+  }
+  return { squares, stars, spent, xpBuys };
+}
+
+/**
+ * What the bot holds on its bench `seconds` into the step: what it came in with (`start`), less the held pieces it has placed by then
+ * (it places them first, for nothing), plus the pieces it has bought to hold. Both benches are always visible, real pieces and the
+ * square each keeps (Eric, Oct 21: "intentional"); the screen draws theirs 2 s behind, as it draws their circles.
+ */
+export function botBenchAt(events: readonly BotEvent[], start: readonly Held[], seconds: number): Held[] {
+  const bench = [...start];
+  for (const e of events) {
+    if (e.at > seconds) break;
+    if (e.kind === "reroll" || e.kind === "xp" || !e.square) continue;
+    if (e.type === "hold") bench.push({ kind: e.kind, square: e.square });
+    else if (e.type === "place") {
+      const i = bench.findIndex((o) => o.kind === e.kind && o.square === e.square && heldStars(o) === (e.stars ?? 1));
+      if (i >= 0) bench.splice(i, 1);
+    } else if (e.type === "starup" && e.where === "bench" && e.stars) {
+      // (A held piece gains a star where it is: the first of that kind and square that can.)
+      const i = bench.findIndex((o) => o.kind === e.kind && o.square === e.square && heldStars(o) === e.stars! - 1);
+      if (i >= 0) bench[i] = { ...bench[i]!, stars: e.stars };
+    }
+  }
+  return bench;
+}
+
+/**
+ * The bot's adjust step: its one change (one of its pieces to any legal empty square of its half), picked greedily with `evaluate`
+ * (its chance of winning, 0 to 1, from a small engine search of the position the fight would start from): it tries a few changes
+ * (a few random squares for each of some pieces) and keeps the best only if it beats standing still. A small search by design: it shouldn't be unbeatable. `stop` ends it early (the
+ * step is over); what it has done by then stands. `onChange`: told of the army after the change it keeps (so a slow engine
+ * loses it nothing). This is the v6 teleport step (`adjustMode` "teleport"), whatever mode the settings are in.
+ */
+export async function botAdjust(
+  army: Army,
+  evaluate: (army: Army) => Promise<number>,
+  rng: Rng,
+  stop: () => boolean,
+  settings: AutoChessSettings = AUTOCHESS,
+  onChange?: (army: Army) => void,
+): Promise<Army> {
+  const cfg: AutoChessSettings = { ...settings, adjustMode: "teleport" };
+  let state = startAdjust(army);
+  const best = await evaluate(state.army);
+  let tries = 0;
+  let pick: { from: string; to: string; score: number } | null = null;
+  search: for (const from of shuffle(rng, Object.keys(army.board))) {
+    for (const to of shuffle(rng, adjustTargets(state.army, from)).slice(0, cfg.bot.adjustDestinations)) {
+      if (stop() || tries >= cfg.bot.adjustTries) break search;
+      if (adjustBlock(state, from, to, cfg)) continue;
+      tries++;
+      const score = await evaluate(adjustMove(state, from, to).army);
+      if (score > (pick?.score ?? best + cfg.bot.adjustMargin)) pick = { from, to, score };
+    }
+  }
+  if (pick && !stop() && !adjustBlock(state, pick.from, pick.to, cfg)) {
+    state = adjustMove(state, pick.from, pick.to);
+    onChange?.(state.army);
+  }
+  return state.army;
+}
+
+/**
+ * The bot's move step (v7, Eric Oct 21: "the bot gets the same"): one piece of its own is picked at random (seeded by the round: the
+ * same pick `startMove` makes for the same seed; never the king, one with a legal move that stays on its half), and it plays the
+ * best legal move with it by `evaluate` (its chance of winning, 0 to 1, from a small engine search of the position the fight would
+ * start from), or skips if no move beats standing still by `adjustMargin` (a player may skip too). It tries up to `adjustTries`
+ * of that piece's moves. `opponent`: your army as it stood when the buying ended. `stop` ends it early (the step is over); what it
+ * has done by then stands. `onChange`: told of the army after the move it keeps. Null pick (no piece can move): nothing happens.
+ */
+export async function botMove(
+  army: Army,
+  opponent: Army,
+  seed: number,
+  evaluate: (army: Army) => Promise<number>,
+  stop: () => boolean,
+  cfg: AutoChessSettings = AUTOCHESS,
+  onChange?: (army: Army) => void,
+): Promise<Army> {
+  const state = startMove(army, opponent, seed, cfg);
+  const piece = state.pick;
+  if (!piece) return army;
+  const best = await evaluate(army);
+  let pick: { to: string; score: number } | null = null;
+  let tries = 0;
+  for (const to of shuffle(mulberry32(seed ^ 0x51ed270b), piece.targets)) {
+    if (stop() || tries >= cfg.bot.adjustTries) break;
+    if (adjustBlock(state, piece.square, to, cfg)) continue;
+    tries++;
+    const score = await evaluate(adjustMove(state, piece.square, to).army);
+    if (score > (pick?.score ?? best + cfg.bot.adjustMargin)) pick = { to, score };
+  }
+  if (!pick || stop() || adjustBlock(state, piece.square, pick.to, cfg)) return army;
+  const moved = adjustMove(state, piece.square, pick.to).army;
+  onChange?.(moved);
+  return moved;
+}
+
+/**
+ * The bot's move step in the stars mode (v8, Eric Oct 22): it moves each of its starred pieces on the board, one move each, the 3-stars first and then the 2-stars (each
+ * in square order), by `evaluate` as `botMove` does: a 2-star takes the best of its legal moves, a 3-star the best of a sample of the empty squares of its half (shuffled by
+ * `seed`, as the teleport step's search is), each only if it beats standing still by `adjustMargin`. A move is judged in the position the earlier ones made. The search is as
+ * small as ever: `adjustTries` evaluations in all, shared evenly by its starred pieces (at least one each), and one for the start. `stop` ends it early (the step is over);
+ * what it has done by then stands. `onChange`: told of the army after each move it keeps. `opponent`: your army as it stood when the buying ended.
+ */
+export async function botStarMoves(
+  army: Army,
+  opponent: Army,
+  seed: number,
+  evaluate: (army: Army) => Promise<number>,
+  stop: () => boolean,
+  cfg: AutoChessSettings = AUTOCHESS,
+  onChange?: (army: Army) => void,
+): Promise<Army> {
+  let state = startStars(army, opponent);
+  const starred = Object.keys(army.stars ?? {})
+    .filter((sq) => army.board[sq])
+    .sort((a, b) => starsAt(army, b) - starsAt(army, a) || (a < b ? -1 : 1));
+  if (!starred.length) return army;
+  const share = Math.max(1, Math.floor(cfg.bot.adjustTries / starred.length));
+  let best = await evaluate(army);
+  for (const from of starred) {
+    if (stop()) break;
+    // (Each piece's squares are shuffled by its own draw, so the sample doesn't depend on the order of the others.)
+    const to = shuffle(mulberry32((seed ^ Math.imul(from.charCodeAt(0) * 8 + Number(from[1]), 0x9e3779b1)) >>> 0), starTargets(state, from, cfg));
+    let pick: { to: string; score: number } | null = null;
+    let tries = 0;
+    for (const square of to) {
+      if (stop() || tries >= share) break;
+      if (adjustBlock(state, from, square, cfg)) continue;
+      tries++;
+      const score = await evaluate(adjustMove(state, from, square).army);
+      if (score > (pick?.score ?? best + cfg.bot.adjustMargin)) pick = { to: square, score };
+    }
+    if (pick && !stop() && !adjustBlock(state, from, pick.to, cfg)) {
+      state = adjustMove(state, from, pick.to);
+      best = pick.score;
+      onChange?.(state.army);
+    }
+  }
+  return state.army;
+}

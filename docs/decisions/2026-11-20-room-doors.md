@@ -1,0 +1,6 @@
+# Inside rooms: tap a door from anywhere, its card, then run to it (Nov 20, 2026)
+
+Eric, Nov 20: "where you tap the door, it says like go in. Right now you have to tap the floor in front of it, but you should be able to tap on the door, like no matter where you're standing, and then hit go in, and then it would just run you to the door." Then: "I'm referring to the rooms on the inside, not the outside of the building."
+
+- **What changed:** inside every room, a tap on a door's picture (the way out, a door to another room: the Battle Tower's elevator and way down, Rolling Dough's back door, the walk-up's stairs) opens that door's card at once, over the door, wherever you stand; its button (Go out, Go up, Go in…) runs you to the square just inside the door at your usual pace, then does what it says. The card that opens as you arrive is unchanged, and a tap on the floor just inside a door still walks you there first.
+- **Calls made:** the picture counts where it's drawn, plus 10 px (`SHOP_FEEL.doorPad`), a small one a finger's 44 px across at least (`doorMinPx`): a tap on the floor through a gap in a door's box still walks. A tap elsewhere or an arrow key on the way cancels the run (nothing happens at the door). The street's buildings are as they were.

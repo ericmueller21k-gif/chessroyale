@@ -1,0 +1,22 @@
+{
+  "depth": 16,
+  "nodes": 30000,
+  "all": {
+    "positions": 300,
+    "sameMove": 45.3,
+    "within30cp": 74.7,
+    "meanLossCp": 29
+  },
+  "openings": {
+    "positions": 150,
+    "sameMove": 48.7,
+    "within30cp": 72,
+    "meanLossCp": 36
+  },
+  "sparse": {
+    "positions": 150,
+    "sameMove": 42,
+    "within30cp": 77.3,
+    "meanLossCp": 23
+  }
+}

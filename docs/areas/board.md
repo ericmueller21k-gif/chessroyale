@@ -1,0 +1,230 @@
+# The board
+
+Lane: the director (every screen draws it; a boss's powers draw over it). How each mode uses it: [crowd.md](crowd.md),
+[squads.md](squads.md), [bosses.md](bosses.md).
+
+## How it works today
+
+- **Our own board** (Oct 12, 2026), on every screen that draws one: Crowd, raids, Boss alone, Squads, replays, votes,
+  the finals, the God King's moments, Classic, the mini boards and the live window (the tiny boards are an SVG of their
+  own). It replaced chessground, which is GPL-3 and doesn't fit a game whose source stays closed: Eric played both side
+  by side and couldn't tell them apart. If it ever has to go back, `DECISIONS.md` ("Our own board, the only board")
+  says how.
+- **What every screen gets** (`components/Board.tsx`): the position, either way up, Boingo's quarter turns
+  (`turn`, board-view.ts), the last move and (switched off, as always: `BOARD.checkHighlight`) the check glow, the
+  selected square, the move dots and capture rings, tap-tap and drag (touch and mouse), view-only (`small`) and
+  whose-turn locking (`interactive`, `moves`), the promotion picker, arrows with labels (power-up hints, the Last
+  Stand's, Squads' picks and blocks), square marks (`marks`), Hollow's dark (`dark`, `onDarkTry`), a move tried that
+  chess allows but `moves` doesn't (`onRefused`: a boss power stops it, so the screen can say why; `refusedMove` in
+  logic.ts, worked out only when the board has an `onRefused`; Oct 17), a knock for every move that appears (`components/Board.tsx` plays it), and
+  what a screen draws on its pieces as part of each (`decor`, a `PieceDecor`: for the piece on a square a class and what goes inside its element, so it slides, is dragged and
+  follows like the piece: Auto chess's stars and their outline, Oct 22; not on a piece fading away), and premoves for a
+  screen that opts in (`premove`: below).
+- **Arrows, highlights and premoves** (chess.com's, Oct 28; docs/decisions/2026-10-28-arrows-and-premoves.md; Eric: "we
+  want it to look and feel like the chess.com"):
+  - **Your arrows and squares** (a mouse; every board drawn big, any screen, interactive or not: replays and the history
+    view included): right-drag from one square to another for an arrow, as many as you like (the same arrow again takes it
+    away); plain yellow-orange, Ctrl (or ⌘) red, Alt blue, Shift green; a knight's move is an L (its longer leg first).
+    Right-click a square to color it: plain red, Ctrl yellow, Alt blue, Shift green; again, off. A left-click anywhere on
+    the board clears them all (a move made with the mouse starts with one). Yours only, on this device, never sent. Your
+    squares are drawn under the screen's highlights (`<square class="uh uh-red">`, first in the board), your arrows over
+    the pieces and under the screen's arrows (`svg.hb-user-arrows`, before `svg.hb-shapes`), each arrow see-through at
+    0.8 as chess.com's. The browser's menu never opens over the board or what a screen draws on it (`contextmenu` turned
+    down on `.board-wrap`, every board). On Green, Shift's green is deeper; on Gold, Ctrl's yellow square and the plain
+    arrow are deeper oranges (each read on that scheme's squares).
+  - **Premoves** (`premove={{ key, side }}`, each screen opts in): while `side` isn't to move, move its pieces ahead by
+    drag or tap-tap, anywhere their own pattern reaches (a slider through pieces, a pawn's diagonal with nothing there yet,
+    your own piece's square; castling while the FEN's rights hold: `premoveDests`, chessground's). Each shows on its new
+    square (`premovePieces`) with its from and to squares in the premove red (`square.premove`). A computer (a mouse)
+    lines up several, each from where the earlier ones leave the pieces; a phone holds one (a new one takes its place).
+    When the board is `interactive` with `side` to move, the first plays at once through `onMove(uci, { premove: true })`,
+    a normal move from then on; one the game doesn't allow then (illegal, a power's limit, Smudgy's painted piece, Hollow's
+    dark) is cancelled with every one after it, the pieces back at once, and a power's refusal goes to `onRefused` as a
+    move you tried would (`premoveQueueTurn`). Cancel: a right-click anywhere on the board, or on a phone a tap anywhere
+    (but the second tap of a new premove). A pawn premoved to its last rank gets the promotion picker then.
+  - **Kept by the game** (`board/yours.ts`): your premoves, arrows and squares live under the board's `premove.key` (a
+    game, a board and your side: `seatKey`), so they stay through every screen of that game that passes it (a raid's
+    turn, the boss's, the reveal); a board without one keeps its own, dropped as it goes. `watch: true` only shows them (a
+    crowd's reveal, which a tap skips).
+  - **Switches:** Settings → Board, "Premoves" and "Arrows and highlights" (on; per device, `prefs.ts`; the second greyed
+    on a device without a mouse). Switching Premoves off cancels every premove waiting.
+  - **Which screens premove:** 1 v 1 (ranked, the bot game, the town's bots: `Duel.tsx`, in play); a crowd's pick in a
+    raid, Boss alone, a solo raid and the Crowd (`Play.tsx` plays them; made on `Boss.tsx` while the boss thinks and
+    moves, on the Crowd's `WatchScreen` while the other team chooses, shown on `CrowdReveal`). Not Classic's rounds (you
+    move every round, then on another board), a final, Squads or the Hidden Boss's four boards. Not while the opening
+    plays out: one made then waits for the first real turn (`interactive` is off until then).
+  - **Fair play:** online, a crowd match tells the server its first premove ahead (`premove`), and a pick that plays it says
+    so; the server marks it only when it had it before any browser could know the position (its premove seal) and the
+    pick came within `FAIRPLAY.signals.premoveMs`, and fair play leaves only its time out of timing; any other is timed as
+    before ([fairplay.md](fairplay.md)). 1 v 1 sends
+    nothing new: no timing signal there, and its clock charges each move what the server measures (a premove: a round trip).
+- **Board colors** (Settings → Board, Oct 18; docs/decisions/2026-10-18-board-colors.md): Classic (the board as it always
+  was), Green or Gold for the dark squares, picked per device (`brc.boardColors`; `boardColors()` in `prefs.ts`, never
+  sent anywhere, other players see their own). `<html data-board-colors>` carries it (set at start-up, `main.tsx`, and by
+  every pick), and `styles.css`, "Board colors", turns it into `--sq-*` variables: the squares (`--sq-dark` is the
+  `.hb-board`'s ground, `--sq-light` its `::before` layer, masked to the 32 light squares: both plain CSS colors, so a
+  pick shows at once on every board with nothing redrawn), the last move, the picked square, the move dots and capture
+  rings, and the coordinates' two inks. **Every board that goes through `OwnBoard` follows it** (Crowd, raids, Boss alone,
+  Squads, Classic, 1 v 1, votes, replays, history, the finals, the God King's moments, the mini boards, the home's live
+  window); the Settings choice's three previews (`.bcol-opt`, each carrying its own `data-board-colors`) are drawn from the
+  same variables. Not covered: `TinyBoard`'s pixel boards (Classic's boards strip, Squads' thumbnails), which have
+  always been their own muted blue-gray. **A new thing drawn over the squares is checked on all three** (in light and dark
+  themes: the board's squares don't change with the theme, only what's around it); one that can't read on a scheme gets
+  its own rule under that scheme (Alfil's gold glow is blue on Gold).
+- **How it behaves** (`board/OwnBoard.tsx`, its pure logic in `board/logic.ts`):
+  - **Feel:** a move slides 220 ms on a cubic ease in and out (`SLIDE_MS`); a captured piece fades as the taker slides
+    on; a press becomes a drag at 3 px (`DRAG_DISTANCE_PX`), and after a dragged move the next drag starts at once;
+    a dragged piece's center follows the finger; a drop lands at once; a drop where it can't go goes straight back
+    (a legal one a power stops, by a drop or a tap-tap, tells the screen: `onRefused`).
+    A tap-tap move is made as the second press goes down. A touch on a piece, near one or with one selected doesn't
+    scroll the page; one on an empty stretch with nothing selected still can.
+  - **A move you make** stays on the board until the game next tells the board anything (as the old board's did): a
+    screen that keeps the position (the Crowd, where everyone's picks show as ghosts) sees the piece go back; one that
+    plays it keeps it.
+  - **Pieces keep their identity** between positions (`follow`): a move slides the piece that moved (castling's rook
+    too); a promoted pawn fades and its new piece appears; a new way up or turn of the board, or `animate={false}`,
+    puts every piece straight on its square.
+  - **Its size:** a whole multiple of 8 device pixels (crisp squares), up to 8 device pixels smaller than the wrap,
+    measured without transforms (a board in a turning or jolting row keeps its size) and written on the wrap as
+    `--board-width` (read as `--board-size`, styles.css): **everything drawn over the squares sizes and places itself
+    in eighths of `--board-size`**, never in % of the wrap.
+  - **How big a screen makes it on a computer** (Eric, Oct 29: "the way that they do the large chessboard" on chess.com;
+    docs/decisions/2026-10-29-desktop-board-size.md; `packages/app/src/board-size.css`, loaded after styles.css): every game
+    screen with a chessboard sizes it by the **window's height less the room the screen needs above and below it**
+    (`--bd-room`: a boss battle 123 px (Nov 1: no title line), a crowd's screens and 1 v 1 170, Squads 230, its relay 250),
+    never wider than its column; the screen grows to hold it (`--scr`), at least its old width, never past the window. So it grows and shrinks
+    live with the window and with nothing else (every screen of a game has the same room). Where the window is too narrow
+    (a scoreboard's 340 px and the column beside the board: 280 px where the width is the limit, 340 where the height is; Nov 1,
+    round 2, `--side-w`), the board is width-bound instead, never overlapping them. Boss alone's empty left column is 196 px, 240
+    Nov 14: on a computer's boss battle with chat, the chat box sits under the moves panel: the same left edge and width, 12 px under
+    it, and its foot stops 200 px above the board's bottom line (`--gk-zone`: the room the God King and your pawn stand in).
+    Guard: `e2e/desktop-board.spec.ts`, "a computer's boss battle with chat". Decision: `docs/decisions/2026-11-14-desktop-side-column.md`.
+    Nov 14, round 2: the moves panel's top is the board's top (flush; no 36 px gap), and the ⚡ / fish / gear row moved up into the
+    boss bar's row, level with the banner, above the board's top line (`.gm-tools` in game-frame.css; the bar is in the board's
+    column, so the row never shares its width). Guard: the "the moves' top = the board's top" check in `e2e/desktop-board.spec.ts`.
+    without the eval bar (room for the boss and his words; Babur's is 153 px + his share of the height, for his pump). A computer is a window
+    900 × 600 and up **with a mouse** (`pointer: fine`; the side menu beside the screen, from Nov 1, `game-frame.css`, takes its width
+    (`--win-w`): 60 px from 900 to 1099, 80 below 1800, 232 from there): phones and tablets, a tablet on its side included, keep their
+    sizes to the pixel. Auto chess has its own board and frame: not changed. Tests: `e2e/desktop-board.spec.ts`.
+  - **When it draws** (Oct 14, 2026; DECISIONS.md, "The board draws its pieces only when they change"): the board is
+    two parts. `OwnBoard` is the wrap, what the screen draws over the board (`children`, under the `BoardTurn`
+    context) and the promotion picker; it's drawn again whenever the screen is (a boss screen draws every frame while an
+    effect plays). Its drawing layer (`BoardLayer`: the squares and highlights, the pieces, the arrows, the coordinates,
+    taps and drags) is drawn again only when what it shows changes: `boardInputs` (logic.ts) lists those, as plain
+    values (the position, the way up and turn, the last move, the moves allowed, the arrows, the marks, the dark,
+    `interactive`, `small`, `animate`, the `decor`'s `key`: the text of everything its `of` depends on); lists and objects count by what's in them, so a screen building fresh ones each
+    time changes nothing. Or by itself: a tap, a drag, a slide or a fade ending (its own timer), a move you made. A move
+    you made still goes back as before: the first time the screen hands the board anything new (`arrows` by identity
+    too), it's let go and the layer draws again. The layer counts its drawings on `.hb-board` (`hbDraws`, read by
+    `e2e/perf.spec.ts`).
+  - **Its elements and stacking:** `<piece class="white pawn">` (z-index 2; sliding `anim` 8; `dragging` 11; a
+    captured one `fading` 1), `<square>` highlights (`last-move`, `selected`, `move-dest`, `oc`, and each `marks` class), arrows in `svg.hb-shapes`
+    (see-through, z-index 2) and their labels (`svg.hb-labels`, 9), the coordinates (`.hb-coords`) under the pieces.
+    Your own (above): `square.uh` with `uh-red`, `-yellow`, `-blue`, `-green` (first, under the rest), `square.premove`,
+    `svg.hb-user-arrows` (z-index 2, before `svg.hb-shapes`).
+    The board's own boxes: `.board.hb` (with `orientation-white`/`-black`), `.hb-container` (exactly the board),
+    `.hb-board` (the squares). Nothing in it makes a stacking layer of its own.
+- **Haptics** (Eric, Nov 9; docs/decisions/2026-11-09-haptics.md; `packages/app/src/haptics.ts`): a tap that picks up one of
+  your pieces ticks (`select`, 10 ms), and a move you make ticks (`move`, 15 ms): a tap on its square, a dragged piece let
+  go on one, a promotion picked, a premove placed, a try into Hollow's dark. Not a press held `HAPTICS.holdMs` (350 ms) or
+  longer, not a drag's start, not a drag let go back on its square or off the board, not a move a power refuses, not the
+  opponent's or a replay's, not a premove playing by itself (`pickedUp` in logic.ts decides the tap; OwnBoard calls
+  `haptic`). Every board through `OwnBoard`. Settings → Sound, "Vibration" (on; per device, `prefs.ts`; greyed with "Not
+  available on this device." where there's no way: a computer, an old iPhone; greyed with "Not available on iPhone." on an
+  iPhone or iPad since Nov 11, as iOS 27's Safari gives web pages no tick: `vibrationGreyed` in haptics.ts). An iPhone has no
+  Vibration API: its ticks
+  are the hidden-switch trick, inside the tap only. A touch's press-down isn't a gesture there, so a tick a press-down
+  makes (a tap-tap move, a premove or a Hollow try placed by tap) plays as that finger lifts on the same square, within
+  `holdMs` (`hapticAtPress` / `hapticAtLift`; docs/decisions/2026-11-11-ios-move-tick.md); Android ticks at once. An
+  iPhone tick asked for in a pointer event plays in the tap's `touchend` (or `click`); the switch stays rendered,
+  invisible. `?haptics=debug` shows an on-screen log of each tick tried (`?haptics=off` ends it). The
+  iPhone's Settings → Sounds & Haptics → System Haptics must be on.
+- **Chess960's castling** (DECISIONS.md, "Chess960's rules"), only for a Chess960 position (its FEN names castling
+  rooks by file): the move is written as the king taking its own rook (e1h1), so the king dragged or tapped onto its
+  rook castles; the king dragged onto the square it castles to (g1 or c1, as in normal chess) castles too wherever that
+  can't mean anything else (the king isn't there already, its rook isn't standing there, no ordinary king move goes
+  there). The dots show both. `destsFor` adds those squares and `gestureMoves` turns a gesture into its move
+  (`board/logic.ts`); a normal FEN gets exactly what it always did. Both pieces slide (`follow`), swaps included, and
+  the sound is castling's (`move-sound.ts`).
+- **Four boards in one square** (the Hidden Boss's phase 2, `screens/Recluse2.tsx`): each board is an ordinary board in
+  a cell of the square (`.rc-stage`; its board-wrap forced to the cell's width, since `.board-area .board-wrap` sizes
+  boards to the screen). The phase change grows four full boards out of quarters with a transform and a clip only, so
+  each board keeps the size it measured; the shuffle is the board's own slide from one FEN to the next.
+- **The pieces** are the cburnett set (Colin M.L. Burnett) from Wikimedia Commons under the BSD license
+  (`board/pieces/`: the files, `LICENSE.txt`, `SOURCES.md`), drawn by `board/pieces.css` on the board, on anything
+  else drawn with them (a layer marked `.hb-pieces`: ghosts, the bounce, the split, the Last Stand's piece, the God
+  King's targets, avatars; it also gives their pieces the board's base: a square each, z-index 2, never taking a tap)
+  and in the promotion picker. The black pieces' details are toned to the light gray the game always showed.
+- **What overlays may rely on** (`board/dom.ts`): `BOARD_SQUARES` / `boardSquares(el)` for the squares' box (the God
+  King's strike, Lights out's taps), `boardPieces(wrap)` for the piece elements and their real squares (Sawyer's split
+  pawns).
+
+## Where the code is
+
+| What | Where |
+| --- | --- |
+| The board, and the knock for each move | `packages/app/src/components/Board.tsx`, `board/OwnBoard.tsx` |
+| Its logic (squares, the size, taps and drags, which piece slides where, the dots, arrows) | `packages/app/src/board/logic.ts`; props `board/types.ts` |
+| The pieces, and the base for anything drawn with them | `packages/app/src/board/pieces/` (files, license, sources), `board/pieces.css` |
+| How big each game screen makes it on a computer (by the window's height) | `packages/app/src/board-size.css` |
+| Its styles | `styles.css`, "The board" (after `.board-wrap`) |
+| Its colors (Classic, Green, Gold) and the Settings choice | `styles.css`, "Board colors" (before `.hb-board`); `prefs.ts` (`boardColors`, `setBoardColors`, `applyBoardColors`); `screens/Settings.tsx` (`BoardColorsChoice`) |
+| A turned board's squares and coordinates | `packages/app/src/board-view.ts` |
+| What overlays look up | `packages/app/src/board/dom.ts` |
+| Your arrows, squares and premoves: the logic | `board/logic.ts` ("Your own arrows and highlights", "Premoves"); kept by key in `board/yours.ts`; the switches in `prefs.ts` and `screens/Settings.tsx`; colors in `styles.css`, "Your arrows, highlights and premoves" |
+
+## Settings
+
+`BOARD` (`checkHighlight`) and `HAPTICS` (every pattern, `holdMs`) in settings.ts. The board colors, Premoves, Arrows and
+highlights and Vibration are per-device prefs, not
+game settings (`prefs.ts`). Your arrows' size: `USER_ARROW` (logic.ts); their colors and the premove red: `--ua-*`,
+`--uh-*`, `--sq-premove` (styles.css). Fair play's premove window: `FAIRPLAY.signals.premoveMs`.
+
+## Tests and tools
+
+- Unit: `packages/app/test/board-logic.test.ts` (when it draws again: the same board from fresh lists and handlers
+  doesn't, every input it shows does; every square's place at every orientation and turn, against
+  `squareXY`; the square under a point; the board's size; the 3 px drag threshold; taps, tap-tap, drags, drops and
+  what each lets go of; the move dots, a power's moves and Hollow's dark; which piece slides where, a capture's fade,
+  castling, a promotion; Chess960's castling: the dots, both gestures, a swap, the king or rook already on its square,
+  a screen's limited moves, tap and drag, both pieces sliding, normal castling untouched; arrows), `board-view.test.ts`,
+  `pieces.test.ts` (the pieces' files, sources and license), `refused.test.ts` (a legal move a power refuses: found
+  for a capture or a promotion, never for an allowed one or a turn nothing limits; the dock's words for it).
+- Board colors: `packages/app/test/board-colors.test.ts` (Classic by default, remembered, unknown values ignored, on `<html>`,
+  nothing sent); `e2e/board-colors.spec.ts` (pick Green: a match's dark squares are green, computed and painted; a reload keeps
+  it; Classic gives today's colors back).
+- Arrows, highlights and premoves: `packages/app/test/board-tools.test.ts` (colors by the key held, drawing and taking
+  away, the knight's L, premove destinations, the pieces with premoves made, the queue playing, a premove made illegal
+  cancelling it and those after, a power's refusal, the phone's one, kept by key); `e2e/board-tools.spec.ts` (a 1 v 1
+  game: on a computer arrows in four colors, squares, a left-click clearing them, the browser's menu never opening, two
+  premoves playing out, one a reply makes illegal cancelled, a right-click cancelling; on a phone a premove by tap-tap
+  and by a finger's drag, played, and one cancelled by a tap; haptics: a tap-select ticks `select`, a tap-move `move`, a
+  held press nothing, a held drag only `move`, Vibration off nothing).
+- Haptics: `packages/app/test/haptics.test.ts` (the way picked, patterns from `HAPTICS`, Vibration off, never throwing,
+  an iPhone's ticks, an iPhone's press-down tick played at the lift (same finger, square, within holdMs) and Android's at once, the boss cues, once per key; `pickedUp`).
+- e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`. `e2e/perf.spec.ts`
+  checks the board isn't drawn every frame while Grex's Roman candle plays over it (`hbDraws`).
+  `e2e/castling.spec.ts` castles by tap-tap and drag, normal chess and Chess960 (both gestures).
+- Perf: `npm run perf:boss -- <dir> <boss id> [phone|desktop|both] [moves] [power]` reports each boss effect's frames
+  and long tasks (`fxBy`); `PERF_DIST`, `PERF_NO_BUILD` compare two builds.
+- Frames: every `npm run frames:*` script.
+
+## Rules for this area (from `.claude/LESSONS.md`)
+
+- **The rendering rule:** the board's pieces are drawn only when the position, the way up or turn, the size or the
+  highlights change, never once a frame. Anything that animates over the board does it in its own layer: a child of
+  `Board` (it may take `now` and draw every frame), one of `BoardEffects`' shared canvas (bosses.md), or a CSS
+  animation or transform. Never animate by handing the board a new value each frame (a `fen`, `lastMove`, `marks`,
+  `arrows` or `animate` that changes every frame redraws every piece every frame). A new prop the board draws from goes
+  in `boardInputs` (and its test in `board-logic.test.ts`), or the board won't show it changing.
+
+- Anything drawn over the squares sizes and places itself in eighths of `--board-size`, never % of the wrap.
+- Board coordinates sit inside their edge squares, either way up and turned; `expectCoordsInSquares` measures them.
+- The line above the board keeps one height through a match: Classic's opening name is one line, cut with "…" when
+  long (`.opening-title`), since a wrapped name moved the board down a line as a round changed boards
+  (`docs/decisions/2026-10-15-flaky-e2e-batch.md`; `crowd.spec.ts` checks the library's longest name).
+- Anything that draws what a player sees on a screen's first frame is set up in a layout effect (the board's size is).
+- Never change what the board draws (its way up, its size) while a transform is on it or an ancestor: animate, then
+  change it once the transform is gone. (The board measures its size without transforms, but the rule stands.)
+- Watch any board, move or animation change frame by frame with real taps, the plain move included
+  (`npm run frames:boss`).

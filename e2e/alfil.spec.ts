@@ -1,0 +1,399 @@
+import { expect, type Page } from "@playwright/test";
+import { Chess } from "chess.js";
+import { BOSS_POWERS } from "@chessroyale/core";
+import { fusionOptions } from "@chessroyale/chess";
+import { BOARD_SEL, asAdmin, engineTop, test, bossAloneFromHome, watchFor } from "./helpers.ts";
+
+/**
+ * Alfil, the woolly mammoth (live since Oct 17), played alone with real taps on a phone and a computer: his tile and
+ * stage, his powers' rules (the battle's state, window.match) and what the board shows for them (his art: the glow,
+ * the fusion's flash, the elephant piece, the Slam's pieces flying up, the shadows growing, the landing; the dock).
+ * - Tusks (?power=tusks: his cast from his first turn): two of his pawns marked before his move, glowing; his next turn
+ *   is the fusion: they rise, a white flash, the elephant (a bishop drawn as an elephant) on one of their squares, the
+ *   pawns gone, no move after it, and the dock says so.
+ * - The Mammoth Slam (?power=slam: warned as turn 2 begins, at the start of his turn after your move): the board
+ *   shakes, up to three of your pieces fly up off the board, their shadows' sizes 1, 2, 3 over your next turns, back
+ *   down as the turn after begins. (A Slam that lifts nothing, every lift past its cap, keeps the meter and comes again
+ *   on his next turn: the test plays on until one lifts.)
+ */
+const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
+const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
+const fenNow = (p: Page) => p.evaluate(() => (window as any).match.phase.board.fen as string);
+
+async function squareAt(page: Page, square: string) {
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
+  const flip = (await page.evaluate(() => (window as any).match.boss?.crowdSide)) === "b";
+  const f = square.charCodeAt(0) - 97;
+  const r = Number(square[1]) - 1;
+  return { x: board.x + ((flip ? 7 - f : f) + 0.5) * (board.width / 8), y: board.y + ((flip ? r : 7 - r) + 0.5) * (board.height / 8) };
+}
+const tap = async (page: Page, square: string) => {
+  const q = await squareAt(page, square);
+  await page.mouse.click(q.x, q.y);
+};
+async function yourMove(page: Page) {
+  await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
+  await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
+}
+async function play(page: Page, move: string) {
+  await yourMove(page);
+  for (let i = 0; i < 5 && (await phase(page)) === "play"; i++) {
+    await tap(page, move.slice(0, 2));
+    await tap(page, move.slice(2, 4));
+    await page.waitForTimeout(300);
+  }
+  await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+}
+/** A good move now (the engine's, as the judge ranks them; never a promotion) that keeps the battle going and isn't one of `avoid`. */
+async function goodMove(page: Page, avoid: (fen: string, move: string) => boolean = () => false): Promise<string> {
+  await yourMove(page);
+  const { fen, top } = await engineTop(page);
+  const goesOn = (mv: string) => {
+    const after = new Chess(fen);
+    after.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] ?? "q" });
+    return !after.isGameOver();
+  };
+  const legal = new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
+  return [...top.map((m) => m.move), ...legal].find((m) => !m.slice(4) && goesOn(m) && !avoid(fen, m))!;
+}
+/** The pieces drawn on the board now, by color and kind (what the app shows: ghosts and fading pieces aside). */
+const drawn = (page: Page, color: "white" | "black", kind: string) => page.locator(`${BOARD_SEL.piece}.${color}.${kind}:not(.ghost):not(.fading)`).count();
+/** The pieces a position has, by color and kind. */
+const counted = (fen: string, color: "w" | "b", type: string) => new Chess(fen).board().flat().filter((p) => p && p.color === color && p.type === type).length;
+
+test("Alfil's Tusks (the test switch): two of his pawns marked before his move, then the elephant on one of their squares as his move", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=alfil&power=tusks&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const boss = await page.evaluate(() => (window as any).match.boss);
+  expect(boss.name).toBe("Alfil");
+  expect(boss.powers.passive).toBe("tusks");
+  const his = boss.crowdSide === "w" ? "b" : "w";
+  /** Your move gives check (his turn must answer it: no cast, no fusion then). */
+  const checks = (fen: string, m: string) => {
+    const after = new Chess(fen);
+    after.move({ from: m.slice(0, 2), to: m.slice(2, 4) });
+    return after.inCheck();
+  };
+  // Your first move (no check); his turn begins with the cast ("TUSKS!", his two pawns glowing from its beat), then his
+  // move.
+  const castSeen = await watchFor(page, { banner: { selector: ".fight-banner", text: /TUSKS!/ }, glow: { selector: ".al-glow" } });
+  await play(page, await goodMove(page, checks));
+  await yourMove(page);
+  const cast = await powers(page);
+  expect(await castSeen.seen()).toEqual({ banner: true, glow: true });
+  // They glow through your turn, each glow exactly on its pawn's square.
+  await expect(page.locator(".al-glow")).toHaveCount(2);
+  for (const sq of cast.tusks.pawns as string[]) {
+    const g = (await page.locator(`.al-glow[data-square="${sq}"]`).boundingBox())!;
+    const c = await squareAt(page, sq);
+    expect(Math.abs(g.x + g.width / 2 - c.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(g.y + g.height / 2 - c.y)).toBeLessThanOrEqual(1);
+  }
+  expect(cast.tusks.pawns).toHaveLength(2);
+  const fen1 = await fenNow(page);
+  for (const sq of cast.tusks.pawns) expect(new Chess(fen1).get(sq as never)).toMatchObject({ color: his, type: "p" });
+  // Your move is quiet: it takes nothing (no counter here, and his pieces as they were), gives no check (in check, the
+  // fusion waits a turn) and leaves the fusion a square (fusionOptions: the rules' own list); his next turn is the fusion,
+  // unless passing would lose him real material (the pass guard: he moves instead, the marks staying, and it's due again
+  // on his next turn), so another quiet move then, a few at most.
+  let marked: string[] = cast.tusks.pawns;
+  let bishops = 0;
+  let pawns = 0;
+  let plies = 0;
+  const loud = (fen: string, m: string) => {
+    const after = new Chess(fen);
+    return !!after.move({ from: m.slice(0, 2), to: m.slice(2, 4) }).captured || after.inCheck() || !fusionOptions(after.fen(), marked, his).length;
+  };
+  // The fusion, as his move: the pawns rise, the white flash, the elephant drops in, and the dock says he spent his move.
+  const fuseSeen = await watchFor(page, {
+    rise: { selector: '.al-layer[data-fuse="rise"] piece.al-glowing' },
+    flash: { selector: ".al-flash" },
+    drop: { selector: ".al-layer piece.elephant" },
+    dock: { selector: ".dock-line", text: /Alfil spent his move on the fusion\./ },
+  });
+  let fused = cast;
+  for (let tries = 0; tries < 4 && fused.tusks; tries++) {
+    marked = fused.tusks.pawns;
+    const fen = await fenNow(page);
+    bishops = counted(fen, his, "b");
+    pawns = counted(fen, his, "p");
+    plies = await page.evaluate(() => (window as any).match.phase.board.history.length as number);
+    await play(page, await goodMove(page, loud));
+    await yourMove(page);
+    fused = await powers(page);
+  }
+  expect(await fuseSeen.seen()).toEqual({ rise: true, flash: true, drop: true, dock: true });
+  const fen2 = await fenNow(page);
+  expect(fused.tusks).toBeNull();
+  expect([...fused.fusion.from].sort()).toEqual([...marked].sort());
+  // The elephant (uncountered, with a square allowed, it comes): a bishop of his on one of the two squares, and that
+  // was his move: no move of his on the board since
+  // yours, none shown, exactly two pawns fewer and a bishop more.
+  expect(fused.fusion.why).toBeUndefined();
+  expect(fused.fusion.from).toContain(fused.fusion.to);
+  expect(fused.elephants).toEqual([fused.fusion.to]);
+  expect(new Chess(fen2).get(fused.fusion.to as never)).toMatchObject({ color: his, type: "b" });
+  expect(await page.evaluate(() => (window as any).match.phase.board.history.length)).toBe(plies + 1);
+  expect(await page.evaluate(() => (window as any).match.boss.lastMove)).toBeNull();
+  expect(counted(fen2, his, "b")).toBe(bishops + 1);
+  expect(counted(fen2, his, "p")).toBe(pawns - 2);
+  // The board draws the elephant on its square, with its own art (and no glow left).
+  const eleph = page.locator(`${BOARD_SEL.piece}.elephant`);
+  await expect(eleph).toHaveCount(1);
+  await expect(eleph).toHaveAttribute("data-square", fused.fusion.to);
+  // (Its own drawing, inlined by the build: the elephant's head, a path no other piece has.)
+  expect(await eleph.evaluate((e) => getComputedStyle(e).backgroundImage)).toContain("M%2030.5,27");
+  await expect(page.locator(".al-glow")).toHaveCount(0);
+  // The board draws the position: his bishops and pawns as the state has them.
+  await expect.poll(() => drawn(page, his === "b" ? "black" : "white", "bishop")).toBe(counted(fen2, his, "b"));
+  await expect.poll(() => drawn(page, his === "b" ? "black" : "white", "pawn")).toBe(counted(fen2, his, "p"));
+  expect(errors).toEqual([]);
+});
+
+test("Alfil's Mammoth Slam (the test switch): your pieces up for three turns, their shadows growing, then back down", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(8 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=alfil&power=slam&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const crowd: "w" | "b" = await page.evaluate(() => (window as any).match.boss.crowdSide);
+  const you = crowd === "w" ? "white" : "black";
+  await play(page, await goodMove(page));
+  await yourMove(page);
+  expect((await powers(page)).warned).toBe(true);
+  let p: any = null;
+  let at = 0;
+  let before = new Chess();
+  let slamSeen: Awaited<ReturnType<typeof watchFor>> | null = null;
+  for (let tries = 1; tries <= 4 && !p?.ults; tries++) {
+    if (tries > 1) {
+      // (The last lifted nothing, every lift past the cap: the meter kept, nothing up; it comes again on his next turn.)
+      expect(p.warned).toBe(true);
+      expect(p.airborne).toEqual([]);
+    }
+    const mine = await goodMove(page);
+    before = new Chess(await fenNow(page));
+    before.move({ from: mine.slice(0, 2), to: mine.slice(2, 4) });
+    at = await page.evaluate(() => (window as any).match.boss.crowdMoves + 1);
+    slamSeen = await watchFor(page, {
+      banner: { selector: ".fight-banner", text: /MAMMOTH SLAM!/ },
+      shake: { selector: ".board-area.pw-crash" },
+      fly: { selector: '.al-layer[data-slam="fly"] piece.al-piece' },
+      shadow: { selector: '.pw-shadow[data-size="1"]' },
+    });
+    await play(page, mine);
+    // At the start of his turn, before his move: the Slam (this device's engines pick the lift), then his move.
+    await yourMove(page);
+    p = await powers(page);
+  }
+  expect(p.ults).toBe(1);
+  expect(p.slam.at).toBe(at);
+  expect(p.slam.lands).toBe(at + 1 + BOSS_POWERS.slamTurns);
+  expect(p.slam.pieces.length).toBeGreaterThan(0);
+  expect(p.slam.pieces.length).toBeLessThanOrEqual(BOSS_POWERS.slamPawns + BOSS_POWERS.slamMinors);
+  for (const x of p.slam.pieces) {
+    expect(["p", "n", "b"]).toContain(x.piece);
+    expect(before.get(x.square as never)).toMatchObject({ color: crowd, type: x.piece });
+  }
+  expect(p.airborne.map((x: { square: string }) => x.square)).toEqual(p.slam.pieces.map((x: { square: string }) => x.square));
+  const up: { piece: string; square: string }[] = p.slam.pieces;
+  expect(up.length).toBeGreaterThan(0);
+  // He crashed down (the board shook), the pieces flew up off their squares, and their shadows showed.
+  expect(await slamSeen!.seen()).toEqual({ banner: true, shake: true, fly: true, shadow: true });
+  const landSeen: Awaited<ReturnType<typeof watchFor>>[] = [];
+  // Three of your turns with them up: off the board (drawn and in the state), their shadows' sizes 1, 2, 3.
+  const total = (fen: string) => (["p", "n", "b"] as const).reduce((t, k) => t + counted(fen, crowd, k), 0);
+  for (let i = 0; i < BOSS_POWERS.slamTurns; i++) {
+    await yourMove(page);
+    const v = await powers(page);
+    // (Down early: he had a mate in one only because they were up. Then they're back now.)
+    if (v.landed?.early) break;
+    expect(v.airborne.map((x: { stage: number }) => x.stage)).toEqual(up.map(() => i + 1));
+    expect(v.airborne.map((x: { left: number }) => x.left)).toEqual(up.map(() => BOSS_POWERS.slamTurns - i));
+    expect(v.paused).toBe(true);
+    // The shadow on each one's square, growing a size a turn.
+    await expect(page.locator(".pw-shadow")).toHaveCount(up.length);
+    for (const x of up) await expect(page.locator(`.pw-shadow[data-square="${x.square}"]`)).toHaveAttribute("data-size", String(i + 1));
+    landSeen.push(await watchFor(page, { drop: { selector: '.al-layer[data-land="on"] piece.al-piece' }, dock: { selector: ".dock-line", text: /Your pieces? (is|are) back\./ } }));
+    const fen = await fenNow(page);
+    for (const k of ["pawn", "knight", "bishop"] as const) await expect.poll(() => drawn(page, you, k)).toBe(counted(fen, crowd, k[0] === "k" ? "n" : k[0]!));
+    await play(page, await goodMove(page));
+  }
+  // Back down as your next turn begins: each on its own square, or the nearest one allowed.
+  await yourMove(page);
+  const down = await powers(page);
+  const fen = await fenNow(page);
+  expect(down.airborne).toEqual([]);
+  // They dropped back out of the sky (the dock said so), and no shadow is left.
+  const seenLanding = await Promise.all(landSeen.map((w) => w.seen()));
+  expect(seenLanding.some((x) => x.drop && x.dock)).toBe(true);
+  await expect(page.locator(".pw-shadow")).toHaveCount(0);
+  expect(down.landed.pieces.map((x: { from: string }) => x.from).sort()).toEqual(up.map((x) => x.square).sort());
+  for (const x of down.landed.pieces as { piece: string; from: string; to: string }[]) {
+    const now = new Chess(fen).get(x.to as never);
+    // (Unless his move since took it.)
+    if (now) expect(now).toMatchObject({ color: crowd, type: x.piece });
+  }
+  expect(total(fen)).toBeGreaterThan(0);
+  for (const k of ["pawn", "knight", "bishop"] as const) await expect.poll(() => drawn(page, you, k)).toBe(counted(fen, crowd, k[0] === "k" ? "n" : k[0]!));
+  expect(errors).toEqual([]);
+});
+
+test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN SLAIN! once each, the slam's own banner in its place", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(10 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (The admin's test trigger, not the power switch: it brings the Slam at the start of his turn after the next move of
+  // yours, so it can come right after his capture or yours.)
+  await asAdmin(page);
+  await page.goto("/?debug&clock=60&boss=alfil&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  // Every banner that comes on the page, each appearance once (a banner put on again is another one).
+  await page.evaluate(() => {
+    const w = window as any;
+    const shown: string[] = (w.__banners = []);
+    const seen = new WeakSet<Element>();
+    const look = () => {
+      for (const el of document.querySelectorAll(".fight-banner")) {
+        if (seen.has(el)) continue;
+        seen.add(el);
+        shown.push(el.querySelector(".fb-text")?.textContent ?? "");
+      }
+    };
+    new MutationObserver(look).observe(document.body, { subtree: true, childList: true });
+    look();
+  });
+  const count = (text: string) => page.evaluate((t) => ((window as any).__banners as string[]).filter((x) => x === t).length, text);
+  const state = () =>
+    page.evaluate(() => {
+      const m = (window as any).match;
+      return {
+        fen: m.phase.board.fen as string,
+        ply: m.boss.board.history.length as number,
+        captured: (m.boss.lastMove?.captured ?? null) as string | null,
+        allowed: (m.boss.powers?.allowed ?? null) as string[] | null,
+      };
+    });
+  // Your queen onto a square one of his lesser pieces attacks: he takes it (the Big Boy test's way).
+  const hangs = (fen: string, m: { from: string; to: string; color: string }) => {
+    const c = new Chess(fen);
+    c.move({ from: m.from, to: m.to });
+    return c.attackers(m.to as never, m.color === "w" ? "b" : "w").some((sq) => {
+      const t = c.get(sq)?.type;
+      return !!t && t !== "q" && t !== "k";
+    });
+  };
+  let tookAt = -1;
+  let took = 0;
+  let slew = 0;
+  // (The Slams' banners when the trigger went in: his meter can bring a Slam of its own before he takes your queen, Nov 19
+  // (the trades' material fills it), so the loop waits for the one after the trigger, not the first.)
+  let slamsAtTrigger: number | null = null;
+  // (A Slam of his meter's warned (RAGE!) or under way: the trigger is refused while one is (it never overlaps another), so
+  // a take of your queen then can't test this. Nov 20: the queen offered on RAGE!'s turn, the Slam came at the start of his
+  // turn and his move took it; the trigger did nothing, and the battle ended before another Slam. So while one is, the
+  // queen is not offered and kept out of reach.)
+  const slamPending = async () => {
+    const p = await page.evaluate(() => (window as any).match.boss?.powers ?? null);
+    return !!p && (p.warned || p.ultAt !== null);
+  };
+  /** Your move leaves your queen where one of his pieces attacks it. */
+  const queenAttacked = (fen: string, mv: string) => {
+    const c = new Chess(fen);
+    const me = c.turn();
+    c.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] ?? "q" });
+    const at = c.findPiece({ type: "q", color: me });
+    return at.some((sq) => c.attackers(sq, me === "w" ? "b" : "w").length > 0);
+  };
+  // (Until the Slam has landed, however many moves that takes: a time cap, not a move cap, so the test checks the banners
+  // and not whether he took your queen soon enough. Nov 5: 14 moves ran out before it on CI.)
+  const cap = Date.now() + 7 * 60_000;
+  while (Date.now() < cap) {
+    // (Your turn, or the battle over: then nothing more to play, and the checks below say what's missing.)
+    await expect.poll(async () => (await phase(page)) === "play" || (await page.evaluate(() => !!(window as any).match.boss?.result)), { timeout: 90_000 }).toBe(true);
+    if (await page.evaluate(() => !!(window as any).match.boss?.result)) break;
+    await yourMove(page);
+    // (His turn is over: the triggered Slam came and his move after it.)
+    if (slamsAtTrigger !== null && (await count("MAMMOTH SLAM!")) > slamsAtTrigger) break;
+    const s = await state();
+    // His last move took your queen (counted once for that move): the Slam comes at the start of his next turn.
+    if (s.captured === "q" && s.ply !== tookAt) {
+      tookAt = s.ply;
+      took++;
+      if (slamsAtTrigger === null) {
+        slamsAtTrigger = await count("MAMMOTH SLAM!");
+        await page.evaluate(() => (window as any).match.triggerUltimate());
+        // (It took: no Slam of his was under way, so the next Slam is the trigger's, not one his meter brings later.)
+        expect(await page.evaluate(() => !!(window as any).match.boss?.powers?.ultNext), "the trigger took as he took your queen").toBe(true);
+      }
+    }
+    const legal = new Chess(s.fen).moves({ verbose: true }).filter((m) => !m.promotion && (!s.allowed || s.allowed.includes(m.from + m.to)));
+    const takeQueen = legal.find((m) => m.captured === "q");
+    if (takeQueen) {
+      // Your queen takes his: the trade.
+      slew++;
+      await play(page, takeQueen.from + takeQueen.to);
+      continue;
+    }
+    if (await slamPending()) {
+      await play(page, (await goodMove(page, queenAttacked)) ?? (await goodMove(page)));
+      continue;
+    }
+    const hang = legal.find((m) => m.piece === "q" && !m.captured && hangs(s.fen, m));
+    await play(page, hang ? hang.from + hang.to : await goodMove(page));
+  }
+  const order = await page.evaluate(() => (window as any).__banners as string[]);
+  console.log(`alfil slam after queens: his takes of yours ${took}, yours of his ${slew}; banners in order: ${order.join(" | ")}`);
+  expect(took, "he took your queen (the test's setup)").toBeGreaterThan(0);
+  expect(await count("MAMMOTH SLAM!"), "the triggered Slam landed within the time cap: its own banner, once").toBe((slamsAtTrigger ?? 0) + 1);
+  expect(await count("QUEEN DOWN!"), "his take of your queen: its banner, once").toBe(took);
+  expect(await count("QUEEN SLAIN!"), "your take of his queen: its banner, once").toBe(slew);
+  expect(errors).toEqual([]);
+});
+
+test("Alfil's tile and stage, and his figure by the board: whole on a phone (320 px, his wide box) and a computer (1280 px)", async ({ page }, info) => {
+  const phone = info.project.name === "phone";
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  if (phone) await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/?debug&mode=raid");
+  const tile = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: "Alfil", exact: true });
+  await expect(tile.locator("canvas.bs-art")).toBeVisible();
+  await tile.click();
+  await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "alfil");
+  await expect(page.locator(".bs-name")).toHaveText("Alfil");
+  await page.waitForTimeout(500);
+  const stage = (await page.locator(".bs-spot:not(.bs-mine)").boundingBox())!;
+  const fig = (await page.locator(".bs-sprite").boundingBox())!;
+  expect(fig.x).toBeGreaterThanOrEqual(stage.x - 1);
+  expect(fig.x + fig.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
+  // (Full size: drawn at the stage's one pixel size, 0.8 of a frame pixel per cqi, as every boss up to 70 px tall.)
+  // (Nov 11, Eric: bosses bigger on this stage: STAGE_SCALE, capped by the stage's room. At least the old full size, never past the stage.)
+  expect(fig.width).toBeGreaterThanOrEqual((81 * 0.8 * stage.width) / 100 - 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  // In his battle: on a phone in the bar's wide box at its left, whole on the screen (his hops too: their room is in his
+  // frame), never over the board; on a computer by the board's bottom-left corner.
+  await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+  await page.getByRole("dialog", { name: "Boss alone" }).getByRole("button", { name: /Alfil/ }).click();
+  await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
+  const char = page.locator(phone ? ".boss-char.place-bar" : ".boss-char.place-side");
+  await expect(char).toBeVisible();
+  if (phone) expect((await char.boundingBox())!.width).toBe(58);
+  const sprite = (await char.locator("canvas").boundingBox())!;
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
+  const vw = page.viewportSize()!.width;
+  expect(sprite.x).toBeGreaterThanOrEqual(0);
+  expect(sprite.x + sprite.width).toBeLessThanOrEqual(vw);
+  expect(sprite.y).toBeGreaterThanOrEqual(0);
+  if (phone) expect((await char.boundingBox())!.y + (await char.boundingBox())!.height).toBeLessThanOrEqual(board.y);
+  else expect((await char.boundingBox())!.x + (await char.boundingBox())!.width).toBeLessThanOrEqual(board.x);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: info.outputPath(`alfil-${info.project.name}.png`) });
+  expect(errors).toEqual([]);
+});
