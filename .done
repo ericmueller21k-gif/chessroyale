@@ -1,0 +1,5 @@
+Birdie fix round (#896) done: I1 (judge tie-break by train loss), N1 (no warning on the cap's turn), N2 (lobby win hold sends turnAt),
+N3 (solo win hold kept and shortened on reload), the town-street music list deduped (the solo-a "double fetch" was the poll waiting on
+the solo's planned decode, not a bug), the crossing measured under the pieces and guarded by a pixel check (still on stills/birdie-build:
+birdie/phone-warning-r2.png). Typecheck, chess/server/app unit suites (5983 tests, boss kit included), e2e birdie + town-street (phone)
+pass locally. PR body: .pr-body.md ("Review fixes").
