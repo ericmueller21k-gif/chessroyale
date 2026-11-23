@@ -3,7 +3,7 @@
 ## Young Birdie (the boss you meet)
 Eric's own young mourning dove, riding a yellow toy diesel train. A real bird's look, a warm face, a conductor's cap and a tie,
 nothing else. Idle: perched up in the train on his two little feet; sometimes he crouches down so only his head peeks out, looking
-around. First drawings: `notes/briefs/birdie-art-1.md` (two variants, stills on `stills/birdie-1`).
+around. First drawings: `notes/briefs/birdie-art-1.md` (two variants, stills on `stills/birdie-1`). **Eric picked B** (Nov 23: "i like them both, this one is a bit better tho").
 
 ## His ultimate: the fall and Armored Birdie (Eric, Nov 23; replaces "a transformation into an adult dove")
 - **Trigger:** once he has lost a certain amount of material (the amount is to be decided). If he never loses that much, it never
