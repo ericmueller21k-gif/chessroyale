@@ -1797,3 +1797,9 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~12:50 UTC: main dd3f2d3 (#905 ride + crate) full run GREEN; live. Waiting: token art session_01JuCWRscXNSWpYz8rAnLci7 blocked on Eric's $1 yes in its own window (stills/birdie-11). #906 (claude/birdie-crate-bar, crate on bar + nits, token NOT wired) open draft, CI running; review session_01JuCWRvEC2FnujGTuhDfC8N → review/birdie-crate-bar. Token wiring after art lands: copy out/token-birdie/token-birdie.ts to components/tokens + map birdie in index.ts.
 
 - Queue (from review/birdie-crate-bar nits, Nov 23): ride-sound.ts probe AudioBuffer before samples() (old Safari double synth); e2e for the dress()-time warm (put train on with the town open); shop.spec Birdie crate picture check should test a non-blank pixel; CardCrate fallback now unused by every room.
+
+- Nov 23 ~16:55 UTC: #906 merged (110dc3a), main run pending (watcher b4d4piyno). Token drawn (stills/birdie-11, $0.69) → wired in room-music-off job.
+  Running: whistles session_01JuCWRtaiVhx3rxR2PcyMyb (Opus high, claude/birdie-whistles); room music off + token session_01JuCWRrJoyDL859uV1esgS1
+  (Opus medium, claude/room-music-off); lobby round 4 art session_01JuCWRsFDxdUe2CD1PziUyR (Haiku, brief birdie-art-12, runner brief
+  shop-birdie-interior-4 written by director, stills/birdie-12). After art: Opus wiring job (new room into birdie-art.ts, gates lower + lights
+  flash at battle start, chess table as the challenge spot).

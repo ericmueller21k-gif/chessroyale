@@ -161,3 +161,10 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - Watchers name the branch they check (`origin/<branch>:.done`), never FETCH_HEAD: several watchers fetching at once overwrite FETCH_HEAD and one reads another branch's .done (Nov 23: a watcher fired early).
 - Every brief that starts a branch gives the exact command: `git fetch origin main && git checkout -B <branch> origin/main` (Nov 23: a Haiku helper branched from a weeks-old main and its work had to be redone).
 - Before merging any PR, read `git diff --stat origin/main...origin/<branch>` and check it matches what the PR says it changes (Nov 23: #891's branch carried a commit that took the move-list fix back out; merging it silently undid #890 on main, and CI couldn't see it because @perf isn't in CI). A helper that moves work to another branch resets its own branch, never reverts.
+
+- **Room art: Eric's words and pictures go to the runner as they are (Nov 23, after Birdie's lobby round 3 went wrong in the game).** The
+  director writes the runner's brief itself from Eric's words verbatim (no art session rewrites it), gives his screenshots (his marks on
+  them) as reference pictures, and gives the standard piece's picture whenever he says "like every other boss" (e.g. the town chess table).
+  Before any room still goes to Eric, the director checks the WHOLE room in the game (not a zoomed piece) against every one of his notes,
+  one line each. The three misses: the bar's arms drawn flat (nobody checked the whole room), feeders around the table (Eric's "feeders on
+  the table" read as the challenge table, not the bar), the table's chessboard (the standard table not given as a reference).
