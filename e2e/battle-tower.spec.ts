@@ -460,10 +460,11 @@ test("a shared floor (audit 2, finding 1): every boss drawn from his own part: S
   const words: string[] = await page.evaluate(() => (window as any).__words);
   expect(words.filter((l) => his.includes(l.split("|")[1]!)).length).toBeGreaterThan(0);
   expect(words.filter((l) => his.includes(l.split("|")[1]!) && l.split("|")[0] !== "sawyer")).toEqual([]);
-  // The move list: each of the side's moves by the boss who made it, in turn (Ginger, Sawyer, Ginger…).
+  // The move list: each of the side's moves by the boss who made it, in turn (Ginger, Sawyer, Ginger…), the newest Sawyer's (she's
+  // to move). (Counted from the newest: a phone's panel draws only the newest rows that fit it.)
   const said = await page.locator(".mv-row.mv-boss").evaluateAll((rows) => rows.map((r) => r.getAttribute("aria-label")!.replace(/^\S+ /, "").split(":")[0]));
   expect(said.length).toBeGreaterThan(1);
-  said.forEach((name, i) => expect(name, `the side's move ${i + 1}`).toBe(i % 2 ? "Sawyer" : "Ginger"));
+  said.forEach((name, i) => expect(name, `the side's move ${i + 1} of the ${said.length} shown`).toBe((said.length - 1 - i) % 2 ? "Ginger" : "Sawyer"));
   // (The still for Eric: his cut on her turn.)
   await still(page, "shared-floor");
 });

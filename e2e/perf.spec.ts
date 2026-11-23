@@ -94,6 +94,13 @@ test("a long boss battle on a slow phone: nothing grows, and late frames stay wi
     { history, fen },
   );
   const late = await settle();
+  // The phone's move panel, 120 plies in: only the newest rows that fit its box (and a few more), never the whole game.
+  const panel = await page.evaluate(() => {
+    const box = document.querySelector(".bp .mv-box") as HTMLElement | null;
+    return { fit: box ? Math.ceil(box.clientHeight / 24) : 0, rows: box?.querySelectorAll(".mv-row").length ?? -1 };
+  });
+  expect(panel.rows, `the panel's rows (${panel.fit} fit)`).toBeGreaterThanOrEqual(panel.fit);
+  expect(panel.rows, `the panel's rows (${panel.fit} fit)`).toBeLessThanOrEqual(panel.fit + 4);
   // A piece dragged round the board for two seconds (and put back), the frames measured.
   const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
   const piece = new Chess(fen).moves({ verbose: true })[0]!.from;
@@ -115,10 +122,11 @@ test("a long boss battle on a slow phone: nothing grows, and late frames stay wi
 
   const report = { early, after: samples.map((s) => ({ dom: s.dom, anims: s.anims, raf: s.rafPerFrame, timers: s.timeouts + s.intervals, idle: s.idle })), late, drag, turn };
   await test.info().attach("perf", { body: JSON.stringify(report, null, 1), contentType: "application/json" });
-  console.log(`late (120 plies): idle ${f(late.idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom}, rAF/frame ${early.rafPerFrame} → ${late.rafPerFrame}`);
-  // Nothing grows with the moves (a little slack for a banner or a bubble at the moment of counting).
+  console.log(`late (120 plies): idle ${f(late.idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom} (the move list ${early.list} → ${late.list}, ${panel.rows} rows), rAF/frame ${early.rafPerFrame} → ${late.rafPerFrame}`);
+  // Nothing grows with the moves (a little slack for a banner or a bubble at the moment of counting). The move list fills its
+  // panel as the match starts, from no rows to those that fit (about 10 elements a row): it's counted on its own, above.
   for (const s of [...samples, late]) {
-    expect(s.dom, "DOM elements").toBeLessThanOrEqual(early.dom + 40);
+    expect(s.dom - s.list, "DOM elements (but the move list's)").toBeLessThanOrEqual(early.dom - early.list + 40);
     expect(s.anims, "running animations").toBeLessThanOrEqual(early.anims + 3);
     expect(s.rafPerFrame, "rAF callbacks per frame").toBeLessThanOrEqual(early.rafPerFrame + 3);
     expect(s.timeouts + s.intervals, "pending timers").toBeLessThanOrEqual(early.timeouts + early.intervals + 3);

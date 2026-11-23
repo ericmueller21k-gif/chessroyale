@@ -77,11 +77,15 @@ export function instrument() {
   raf(loop);
 }
 
-/** The page's counts now (run in the page): DOM elements, running animations, pending timers, canvases. */
+/**
+ * The page's counts now (run in the page): DOM elements, running animations, pending timers, canvases; and the move lists' own
+ * elements (`list`), which fill a phone's panel as a match starts (MovePanel.tsx draws only the rows that fit it).
+ */
 export function counts() {
   const P = window.__perf;
   return {
     dom: document.getElementsByTagName("*").length,
+    list: document.querySelectorAll(".mv-list *").length,
     anims: document.getAnimations().length,
     timeouts: P.timeouts.size,
     intervals: P.intervals.size,

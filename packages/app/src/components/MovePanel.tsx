@@ -179,12 +179,12 @@ const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck, face }: Ro
 }, sameRow);
 
 /**
- * How many rows a phone's small panel draws: the newest that fit its box, and a few more. It never scrolls, so the rows above
+ * How many rows a phone's small panel draws: the newest that fit its box, and two more. It never scrolls, so the rows above
  * them would never be seen (the sheet has them all). Measured from the box (`fitRows`) and kept across the panel's mounts (each
  * turn mounts it anew), so a long match never draws its whole list on a phone (Nov 23: 120 moves were 1,700 elements).
  */
 let panelFit = 12;
-const FIT_SPARE = 4;
+const FIT_SPARE = 2;
 function fitRows(box: HTMLElement): number {
   const row = box.querySelector(".mv-row")?.getBoundingClientRect().height || 24;
   return Math.ceil(box.clientHeight / Math.max(12, row)) + FIT_SPARE;
