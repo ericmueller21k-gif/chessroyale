@@ -1413,7 +1413,8 @@ const tagOverHead = (p: Page, id: string, name: string) =>
   );
 
 test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(150_000);
+  // (Five town loads since Nov 23: Birdie's Train's sound too.)
+  test.setTimeout(180_000);
   const errors = watchErrors(page);
   await page.goto("/");
   // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
