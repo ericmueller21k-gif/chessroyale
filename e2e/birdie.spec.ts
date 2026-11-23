@@ -214,6 +214,12 @@ test("Birdie's train: the crossing on his line, the dock names your piece; moved
   expect(onBoard.length, "the train on the board").toBeGreaterThan(5);
   // (It moves: its place on screen changes through the ride.)
   expect(new Set(onBoard.map((r) => `${r.train!.x},${r.train!.y}`)).size).toBeGreaterThan(3);
+  // (Smooth, Nov 23: it moves on every frame of its whole ride (BIRDIE_BEATS.ride.rideMs, 1.3 s), never crossing in half that and
+  // standing still past the board's edge, as when his layer set its animation's delay again every frame: 38 frames still, measured.)
+  const rideRec = onBoard.filter((r) => r.ride?.at === left!.at);
+  const still = rideRec.slice(1).filter((r, i) => r.train!.x === rideRec[i]!.train!.x && r.train!.y === rideRec[i]!.train!.y).length;
+  expect(still, "frames the train stood still in its ride").toBeLessThanOrEqual(2);
+  expect(rideRec.at(-1)!.t - rideRec[0]!.t, "the train's ride on screen").toBeGreaterThan(1_000);
   // Every piece on the line drawn by his layer as the ride starts (the board has them off), none lost (Nov 23: his own were, read
   // from the drawn board).
   expect(onBoard[0]!.aside, `the line's pieces as the ride starts: ${onBoard[0]!.aside} of ${onBoard[0]!.lineCount}`).toBe(onBoard[0]!.lineCount);

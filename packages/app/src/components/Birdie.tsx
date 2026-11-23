@@ -1,5 +1,7 @@
 import { BIRDIE_BEATS, bannerLeadMs, birdieLeadMs, pieceAt, powerFxMs, trainReaches, withPiece, withoutPiece } from "@chessroyale/chess";
 import { BIRDIE_CINEMATIC } from "@chessroyale/core";
+import type { ComponentChildren } from "preact";
+import { useState } from "preact/hooks";
 import { BIRDIE_CROSSING, BIRDIE_SMASH, BIRDIE_TRAIN } from "../characters/effects/birdie.ts";
 import { noteArmor } from "../characters/birdie-state.ts";
 import { rejoinedAt } from "../characters/moo-state.ts";
@@ -153,6 +155,21 @@ export function ridePieces(fen: string, crowd: "w" | "b", ride: { square: string
 
 const COLOUR = { w: "white", b: "black" } as const;
 
+/**
+ * An element whose CSS animation starts at `at` (Date.now's clock): its delay is `at` less the moment the element was first drawn, kept
+ * from then on. His layer is drawn again every frame, and a delay set anew from each frame's `now` retimes the running animation (Nov 23,
+ * measured: the train crossed in half its time, in jumps twice as big, then stood off the board; the pieces stepped aside as fast). A copy
+ * drawn anew (a screen rebuilt) takes its own first moment.
+ */
+function Timed({ tag: Tag, at, style, children, ...rest }: { tag: "span" | "piece"; at: number; style: Record<string, string>; class: string; children?: ComponentChildren; "data-turn"?: number; "data-square"?: string }) {
+  const [drawn] = useState(Date.now);
+  return (
+    <Tag {...rest} style={{ ...style, animationDelay: `${at - drawn}ms` }}>
+      {children}
+    </Tag>
+  );
+}
+
 /** The crossing on each square of the warned line: lit at the warning's `signal` cue on this screen, else already flashing. */
 function crossingItems(squares: readonly string[], since: number, until: (i: number) => number, now: number): BoardItem[] {
   return squares.flatMap((square, i) => (now < until(i) ? [{ square, name: "birdieCrossing", ...(since ? { since } : { anim: "crossing", since: 0 }), quiet: i > 0 }] : []));
@@ -193,13 +210,16 @@ function birdieLayer({ boss, p, moments, now, orientation }: BoardLayerProps): {
       const to = at(-1 + B.ride.trackSquares - 1);
       over.push(
         <div key="track" class="bd-track" data-line={bd.ride.line}>
-          <span
+          <Timed
+            key={ride.key}
+            tag="span"
             class="bd-train"
             data-turn={turn}
-            style={{ "--x0": String(from.x), "--y0": String(from.y), "--x1": String(to.x), "--y1": String(to.y), "--turn": `${turn}deg`, animationDuration: `${B.ride.rideMs}ms`, animationDelay: `${rideAt - now}ms` }}
+            at={rideAt}
+            style={{ "--x0": String(from.x), "--y0": String(from.y), "--x1": String(to.x), "--y1": String(to.y), "--turn": `${turn}deg`, animationDuration: `${B.ride.rideMs}ms` }}
           >
             <SpriteAnim ch={BIRDIE_TRAIN} anim="ride" since={rideAt} id={`${ride.key}:train`} />
-          </span>
+          </Timed>
         </div>,
       );
       // Every piece on the line, stepping aside as the train comes and back after it (the smashed one until it's reached).
@@ -211,11 +231,13 @@ function birdieLayer({ boss, p, moments, now, orientation }: BoardLayerProps): {
         const off = u.x !== 0 ? { x: 0, y: -0.42 } : { x: -0.42, y: 0 };
         const stays = Math.round((3 / B.ride.trackSquares) * B.ride.rideMs);
         return (
-          <piece
-            key={sq}
+          <Timed
+            key={`${ride.key}:${sq}`}
+            tag="piece"
             class={`${COLOUR[pc.color]} ${PIECE_WORD[pc.type]}${smashed ? "" : " bd-aside"}`}
             data-square={sq}
-            style={{ left: `${(c.col * 100) / 8}%`, top: `${(c.row * 100) / 8}%`, ...(smashed ? {} : { "--ax": String(off.x), "--ay": String(off.y), animationDuration: `${stays + 2 * B.ride.asideMs}ms`, animationDelay: `${asideAt - now}ms` }) }}
+            at={asideAt}
+            style={{ left: `${(c.col * 100) / 8}%`, top: `${(c.row * 100) / 8}%`, ...(smashed ? {} : { "--ax": String(off.x), "--ay": String(off.y), animationDuration: `${stays + 2 * B.ride.asideMs}ms` }) }}
           />
         );
       });

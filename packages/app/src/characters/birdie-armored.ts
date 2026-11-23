@@ -291,24 +291,6 @@ function pauldron(cx: number, cy: number, rx: number, ry: number, lamp: Pt, far:
 add("pauldronF", () => pauldron(23, 31, 5.6, 4.4, LAMP_F, true));
 add("pauldronN", () => pauldron(50.5, 31, 6.6, 4.8, LAMP_N, false));
 
-/** His long tapered tail hanging behind him, seen between his legs: grey-brown, a dark band and a pale tip. */
-add(
-  "tail",
-  () => painted(38, 50, 32, 25, (F) => {
-    // Sweeping back (to our right) and down behind his near leg, tapering to a point.
-    const inside = inPoly([[39, 52], [46, 51], [55, 59], [64, 66.5], [67.5, 70.5], [62, 69.5], [53, 65], [43, 59]]);
-    const ux = 0.75;
-    const uy = 0.66;
-    F(inside, (x, y) => {
-      const along = (x + 0.5 - 40) * ux + (y + 0.5 - 52) * uy;
-      if (along > 29) return "e";
-      if (along > 27.5) return "s";
-      const across = (x + 0.5 - 40) * uy - (y + 0.5 - 52) * ux;
-      return Math.floor(along) % 4 === 0 && across < 1 ? "a" : ramp("bcd", 0.5 + 0.15 * across);
-    });
-  }),
-);
-
 /** His shadow on the ground. */
 add(
   "shadow",
@@ -338,7 +320,6 @@ function layers(p: ArmorPose = {}): Layer[] {
   const L = (name: string, dy = 0, dx = 0): Layer => ({ part: name, x: AT[name]![0] + dx, y: AT[name]![1] + dy });
   return [
     L("shadow"),
-    L("tail"),
     L("wingF", up),
     L("pauldronF", up),
     L("legF"),

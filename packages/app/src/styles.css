@@ -28559,23 +28559,27 @@ body.dash-away .bc-bubble:not(.dash-say) {
   pointer-events: none;
 }
 /* The train from above, two squares long and one wide, its middle moving from (x0, y0) to (x1, y1) (shares of the board) over the ride,
-   turned to the line's way (its art's nose to our right). */
+   turned to the line's way (its art's nose to our right). Centered by its margins; moved by `translate` alone, which the browser moves
+   every display frame off the page's thread (Nov 23: `left`/`top`, laid out on the page's thread every frame). Linear: the smash lands as
+   its nose reaches each square (trainReaches). */
 .bd-train {
   position: absolute;
   width: calc(var(--board-size, 100%) / 4);
   height: calc(var(--board-size, 100%) / 8);
   left: calc(var(--board-size, 100%) * var(--x0));
   top: calc(var(--board-size, 100%) * var(--y0));
-  translate: -50% -50%;
+  margin: calc(var(--board-size, 100%) / -16) 0 0 calc(var(--board-size, 100%) / -8);
   rotate: var(--turn, 0deg);
   animation-name: bd-ride;
   animation-timing-function: linear;
   animation-fill-mode: both;
 }
 @keyframes bd-ride {
+  from {
+    translate: 0 0;
+  }
   to {
-    left: calc(var(--board-size, 100%) * var(--x1));
-    top: calc(var(--board-size, 100%) * var(--y1));
+    translate: calc(var(--board-size, 100%) * (var(--x1) - var(--x0))) calc(var(--board-size, 100%) * (var(--y1) - var(--y0)));
   }
 }
 .bd-train canvas {
