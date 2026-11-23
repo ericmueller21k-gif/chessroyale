@@ -1,10 +1,10 @@
 /**
  * Copied as drawn from `claude/boss-art` (scripts/boss-art/out/sidekick-grex-dealer/sidekick-grex-dealer.ts at 0e4f6482, Nov 4, 2026; Eric approved the build Nov 4).
- * Changed: the import paths. The file is `dealer.ts` (the baked sheet's key, scripts/bake-sidekicks.ts); he keeps Jefferson's shop
- * (shops/shops.ts) and is not a town bot (Sparky stays Jefferson's kid in the town). Drawn at his art's size (DEALER_TALL), not the kids'. The notes: scripts/boss-art/out/shop-grex-nov4.md and intro-grex-nov4.md on that branch.
+ * Changed: the import paths. The file is `dealer.ts` (the baked sheet's key, scripts/bake-sidekicks.ts); he keeps Grex's shop
+ * (shops/shops.ts) and is not a town bot (Sparky stays Grex's kid in the town). Drawn at his art's size (DEALER_TALL), not the kids'. The notes: scripts/boss-art/out/shop-grex-nov4.md and intro-grex-nov4.md on that branch.
  */
 /**
- * The shady dealer (id "sidekick-grex-dealer"), who keeps Jefferson's shop: "literally just a guy in the corner" (Eric, Nov 4).
+ * The shady dealer (id "sidekick-grex-dealer"), who keeps Grex's shop: "literally just a guy in the corner" (Eric, Nov 4).
  * A crew giraffe (out/npc-grex/giraffe-rig.ts) in a long tan trench coat, its collar popped up round his neck, belted, dark
  * sunglasses and a toothpick in the corner of his mouth, his hooves in his coat pockets. Giraffe-sized: drawn 1:1 at the room's
  * scale (37 px a square), about 79 px from hooves to ossicones, taller than the other shops' kids (draw him at his art's size,
@@ -63,7 +63,7 @@ const wave: Anim = lazyAnim(() => ({
 
 export const sidekickGrexDealer: Character = {
   id: "sidekick-grex-dealer",
-  name: "Jefferson's dealer",
+  name: "Grex's dealer",
   w: W,
   h: H,
   foot: FOOT,

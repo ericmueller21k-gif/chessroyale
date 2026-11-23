@@ -8,7 +8,7 @@
  * 2. INTRO_ZEBRA_PUFF (32 x 24, foot [3, 13]: the foot is the muzzle; put it on BOSS_ZEBRA_MUZZLE's point): the flour-and-
  *    crumb burst out of the roll's end, `puff` once, 6 x 70 ms (cue `pop` f0). Drawn facing right; mirror it with him.
  * 3. INTRO_ZEBRA_STORM (128 x 128, tiles both ways) and INTRO_ZEBRA_FRONT (48 x 128, tiles top to bottom): his battle splash,
- *    "loaves of bread as the splash screen", played as Alfil's sandstorm, Jefferson's fireworks and Ginger's blizzard are: the
+ *    "loaves of bread as the splash screen", played as Alfil's sandstorm, Grex's fireworks and Ginger's blizzard are: the
  *    tile at 3x behind its front, sweeping in from the left. A warm flour-dusted haze in soft diagonal bands, French rolls,
  *    baguettes and round boules tumbling, flour drifting; its front a rolling wall of flour with crumbs flung ahead.
  *    6 x 70 ms, looping; cues `whoosh` f0 (the front), `tumble` f0 (the storm). No flashing: the haze never changes brightness.

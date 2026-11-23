@@ -351,7 +351,7 @@ export interface BossRules {
    * as the previous turn left it, before anything wears off.
    */
   ultimateRunning?(p: BossPowerState, turn: number, s: BossPowerSettings): boolean;
-  /** Every turn after the ultimate's step (G-REX's barrage). */
+  /** Every turn after the ultimate's step (Grex's barrage). */
   everyTurn?(next: BossPowerState, t: TurnContext): void;
   /** The passive's step. */
   passive(next: BossPowerState, t: TurnContext): void;
@@ -381,21 +381,21 @@ export interface BossRules {
   /** The squares that show ice (`crowdAllowed`: the dispatcher's). */
   iced?(boss: BossState, fen: string, crowdAllowed: (boss: BossState, fen: string) => string[] | null): string[];
   /**
-   * The judge's view of a crowd turn under its rules (G-REX's fire): moves it must score too, the top moves as it ranks
+   * The judge's view of a crowd turn under its rules (Grex's fire): moves it must score too, the top moves as it ranks
    * them, and a board's evaluation as it sees it. Without it, the engine's numbers stand as they are.
    */
   judge?: {
     mustScore(boss: BossState, fen: string): string[];
     /**
      * Of those, the moves the bots may pick too (scored before they pick, beside the engine's top moves): Chub & Chirp's
-     * race, the moves that pull a carrot. Without it, the bots pick from the top moves only (G-REX's fire).
+     * race, the moves that pull a carrot. Without it, the bots pick from the top moves only (Grex's fire).
      */
     offer?(boss: BossState, fen: string): string[];
     rank(boss: BossState, top: readonly MoveScore[], fen: string): MoveScore[];
     evaluation<E extends JudgedEvaluation>(boss: BossState, evaluation: E, fen: string): E;
   };
   /**
-   * In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). `judged`: the
+   * In the match: what happens after any crowd move (Grex's fire burns what was left on a tile ablaze). `judged`: the
    * judge's numbers for it (a scored round's; none for a move a power played for the crowd), which Folio's Revision reads.
    */
   afterCrowdMove?(b: Battle, move: string | null, judged?: JudgedMove | null): void;
@@ -597,7 +597,7 @@ export interface Battle {
   bossToMove(): boolean;
   crowdAllowed(boardId?: number): string[] | null;
   boardOf(playerId: string): BoardState | null;
-  /** What happens after any crowd move (G-REX's fire). */
+  /** What happens after any crowd move (Grex's fire). */
   afterCrowdMove(move: string | null): void;
   /**
    * The boss's turn is over without a move on the board (Alfil's fusion is his move): the crowd's turn is set up as

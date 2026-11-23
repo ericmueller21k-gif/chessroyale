@@ -11,7 +11,7 @@ import { Cast, Flight, onSquare, stageSince, type BossUi, type Moment, type Mome
 import { CRITICAL } from "../speech.tsx";
 
 /**
- * G-REX's fire on screen (the characters' sprites): the tiles in their stages on one canvas, each with a small
+ * Grex's fire on screen (the characters' sprites): the tiles in their stages on one canvas, each with a small
  * countdown (the crowd moves left before it burns: 3, 2, 1, and 0 as it burns), the sparkler, the Roman candle and its
  * fireballs (moments), the fireballs' shadows growing on the squares they'll hit (one canvas under the pieces), a piece
  * burning after the crowd's move (FireBurn), and the row of the candle's shots still up in his boss card (CandlePips,
@@ -19,7 +19,7 @@ import { CRITICAL } from "../speech.tsx";
  */
 
 /**
- * G-REX's sparkler: the banner, then his throw from the board's corner (his `ignite`, the sparkler leaving at its
+ * Grex's sparkler: the banner, then his throw from the board's corner (his `ignite`, the sparkler leaving at its
  * `throw` cue), the sparkler's flight (`sparkFly`), the tile catching (`fireTile` ignite, then its first stage).
  */
 export const SPARK = { flyAt: 1450, landAt: 1850 } as const;
@@ -88,7 +88,7 @@ export const fireCountdown = (stage: number, stages = BOSS_POWERS.fireStages) =>
 
 /**
  * A shadow growing on a square, a size a turn (1 to 3) until what casts it comes down on the crowd turn `lands`: grown
- * as first seen at its size. Jefferson's fireballs', and Alfil's Slam's pieces' (reused as is).
+ * as first seen at its size. Grex's fireballs', and Alfil's Slam's pieces' (reused as is).
  */
 export function fireShadowItem(square: string, lands: number, stage: number, now: number): BoardItem {
   const size = Math.min(3, Math.max(1, stage));
@@ -270,7 +270,7 @@ function fireballMoment({ moment, now, orientation, cast }: MomentProps) {
 }
 
 /**
- * Jefferson laughs it off (Eric, Oct 11): the first time in a match one of his own pieces sits on fire from his Roman
+ * Grex laughs it off (Eric, Oct 11): the first time in a match one of his own pieces sits on fire from his Roman
  * candle (his pieces never burn), one of these, picked from the battle's seed (the moment's `pick`). Once a match.
  */
 export const FIREPROOF_LINES = ["Ha! My pieces don't burn. Perks!", "Fireproof! Did I forget to say?", "Hot? Not for my team. Ha!", "Mine are fire-rated. Yours? Ha!"];

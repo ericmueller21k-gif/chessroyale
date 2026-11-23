@@ -91,8 +91,8 @@ describe("town square: the bots (Oct 27)", () => {
     // id is the art's, "sidekick-beaver". Tick, Dash's tortoise, baked too since Nov 3: blitz.ts, the art's name from before Eric
     // renamed the cheetah; he walks in an admin's town and keeps Dash's shop since round 2. Hollow's dog, Nov 3: hollowdog.ts, the
     // art's id "sidekick-hollow-dog"; he keeps Hollow's shop and isn't a town bot. Wrangler's rooster, Nov 4: rooster.ts, the art's id
-    // "sidekick-pig-rooster"; he keeps Wrangler's shop and isn't a town bot either. Jefferson's dealer, Nov 4: dealer.ts, the art's id
-    // "sidekick-grex-dealer"; he keeps Jefferson's shop, not a town bot. Ginger's shopkeeper elf, Nov 5: elf.ts, the art's id
+    // "sidekick-pig-rooster"; he keeps Wrangler's shop and isn't a town bot either. Grex's dealer, Nov 4: dealer.ts, the art's id
+    // "sidekick-grex-dealer"; he keeps Grex's shop, not a town bot. Ginger's shopkeeper elf, Nov 5: elf.ts, the art's id
     // "sidekick-ginger-elf"; he keeps Ginger's shop, not a town bot: Crumb stays Ginger's kid in the town. Folio's paper turtle, Nov 5:
     // folioturtle.ts, the art's id "sidekick-folio-turtle"; it keeps Folio's shop, not a town bot: Pleat, the frog, stays Folio's kid.
     // Smudgy's keeper (smudgykeeper.ts) and Boingo's clown attendant (funkeeper.ts), Nov 6: shopkeepers, not town bots. Rolling
@@ -156,7 +156,7 @@ describe("town square: the bots (Oct 27)", () => {
     expect(sidekickText(named("Bun & Bug"))).toBe("Chub & Chirp's sidekick");
     expect(sidekickText(named("Twinkle"))).toBe("Moo & Moon's sidekick");
     expect(sidekickText(named("Drizzle"))).toBe("Puddles' sidekick");
-    expect(sidekickText(named("Sparky"))).toBe("Jefferson's sidekick");
+    expect(sidekickText(named("Sparky"))).toBe("Grex's sidekick");
     expect(sidekickText(named("Tempo Tess"))).toBeNull();
     expect(botLabel(named("Glim"))).toBe("Glim (bot)");
     expect(ratingText(named("Glim"))).toBe("Rating 2500");

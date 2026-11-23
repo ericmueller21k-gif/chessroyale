@@ -202,7 +202,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     `model.ts`; the model uses about 70 MB of it). Its load errors come whole, on one line (`errorText`), and a phone's
     admins' line wraps (a computer's pill stays one line, the whole text on hover).
 - **Judging with a power.** When a boss power limits the crowd's moves, the best move is the best of the allowed ones
-  (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); Jefferson's fire counts a piece left to burn as
+  (`judgeTop`, `judgeCandidates`, `allowedSearch` in `boss-powers.ts`); Grex's fire counts a piece left to burn as
   gone (`fireJudged`). Shared with the `god-king` lane by agreement.
 - **Brilliant moves** never come from a power-up move.
 - **Chess960 (Fischer Random)** (DECISIONS.md, "Chess960's rules", Oct 14): the rules foundation for the hidden boss's

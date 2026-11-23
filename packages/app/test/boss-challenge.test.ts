@@ -73,7 +73,7 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson, Ginger, Dash, Folio, Smudgy and Don Dough their own, Babur, Puddles and Boingo the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Grex, Ginger, Dash, Folio, Smudgy and Don Dough their own, Babur, Puddles and Boingo the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
     expect(withIntro).toEqual(["alfil", "bigboy", "chandy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "smudgy", "tiger", "timber", "zebra"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
@@ -88,9 +88,9 @@ describe("the challenge's flow", () => {
     expect(introOf("hollow")).toMatchObject({ custom: true, name: "Hollow", line: "Did you leave a light on?", layout: "across", seated: true, cues: { table: "pop", blackout: "hollowBlackout" } });
     // (Wrangler, Nov 4: his own, the lasso; his line a placeholder until Eric's Gemini lines; you both walk on to where you stand clear.)
     expect(introOf("pig")).toMatchObject({ custom: true, name: "Wrangler", line: "Saddle up, partner. The board's comin' to us.", layout: "across", seated: true });
-    // (Jefferson, Nov 4: his own, the crew; his call one of four at random, placeholders until Eric's Gemini lines; you both stand on
+    // (Grex, Nov 4: his own, the crew; his call one of four at random, placeholders until Eric's Gemini lines; you both stand on
     // the marks: he stands, you on your lift.)
-    expect(introOf("grex")).toMatchObject({ custom: true, name: "Jefferson", line: "Boys! We got a challenger!", layout: "across" });
+    expect(introOf("grex")).toMatchObject({ custom: true, name: "Grex", line: "Boys! We got a challenger!", layout: "across" });
     expect(introOf("grex")!.seated).toBeUndefined();
     // (Ginger, Nov 5: his own, the icicle; his line a placeholder until Eric's Gemini lines; you both stand on the marks, no stools.)
     expect(introOf("gingerbread")).toMatchObject({ custom: true, name: "Ginger", line: "Cold enough for you?", layout: "across", crewLine: "Coming, boss!" });

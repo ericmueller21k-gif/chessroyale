@@ -5,7 +5,7 @@ import { bossAloneFromHome } from "./helpers.ts";
 /**
  * A boss battle's result page (Eric, round 2, after his screenshot of the boss's picture over "You resigned"):
  * - the title is never behind the boss's picture: the flag, the title, the picture, then "Timber won.", for every boss (the tall
- *   ones too: Jefferson, Big Boy, Ginger here);
+ *   ones too: Grex, Big Boy, Ginger here);
  * - the review is one board, stepped with ◀ ▶ (and ← → on a computer), starting on move 1, and the board never moves;
  * - alone (a boss battle with nobody else), the review has no "Everyone's average loss" and no "found" count;
  * - a computer's result page has no gear (its side bar has Settings); a phone keeps it.
@@ -41,7 +41,7 @@ async function playAndResign(page: Page, boss: string, moves: number) {
   await expect(page.locator(".results h1")).toHaveText("You resigned");
 }
 
-test("a boss's picture never covers the title: the flag, the title, the picture, then the result line (Ginger, Jefferson, Big Boy)", async ({ page }) => {
+test("a boss's picture never covers the title: the flag, the title, the picture, then the result line (Ginger, Grex, Big Boy)", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   for (const boss of ["gingerbread", "grex", "bigboy"]) {
     await playAndResign(page, boss, 0);

@@ -396,7 +396,7 @@ const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
 
 /**
  * Every boss's crate (only those whose home has a shop so far: Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's (Nov 3,
- * with Hollow's Bulb), Wrangler's (Nov 4, with Pen Pony; `pig`, his home's id), Jefferson's (Nov 4, with Giraffe Gallop; `grex`,
+ * with Hollow's Bulb), Wrangler's (Nov 4, with Pen Pony; `pig`, his home's id), Grex's (Nov 4, with Giraffe Gallop; `grex`,
  * his home's id) and Ginger's (Nov 5, with the Candy Cane Sled; `gingerbread`, his home's id and his boss id: its crate's id is
  * `boss-gingerbread`, never the Gingerbread Man skin's `gingerbread`) and Folio's (Nov 5, with the Paper Crane). Timber's
  * and Dash's (Nov 3) are shown and sold to admins only while they're in the game for admins first (BOSS_ADMIN_FIRST): only an admin
@@ -411,7 +411,7 @@ export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("dash", "Dash's Boss Crate", "cheetah-shoes"),
   bossCrate("hollow", "Hollow's Boss Crate", "hollow-bulb"),
   bossCrate("pig", "Wrangler's Boss Crate", "pen-pony"),
-  bossCrate("grex", "Jefferson's Boss Crate", "jefferson-giraffe"),
+  bossCrate("grex", "Grex's Boss Crate", "jefferson-giraffe"),
   bossCrate("gingerbread", "Ginger's Boss Crate", "ginger-sled"),
   bossCrate("folio", "Folio's Boss Crate", "folio-crane"),
   bossCrate("smudgy", "Smudgy's Boss Crate", "smudgy-brush"),

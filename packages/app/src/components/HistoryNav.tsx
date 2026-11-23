@@ -25,7 +25,7 @@ export function useHistoryView(history: readonly string[], bases?: readonly Base
   return {
     browsing: ply !== null,
     ply: at,
-    // (With its bases: a piece G-REX's fire destroyed stays gone; a board that started from an opening starts there.)
+    // (With its bases: a piece Grex's fire destroyed stays gone; a board that started from an opening starts there.)
     fen: ply === null ? null : ply === 0 ? baseAt(0, bases).fen : fenAtPly(history, ply, bases),
     lastMove: ply === null ? null : (history[ply - 1] ?? null),
     go,

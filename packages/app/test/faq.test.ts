@@ -355,7 +355,7 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(longer).toContain("On its fourth, the ice is gone");
     expect(section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, rageStrike: 30 } })).toContain("30 each time the God King strikes the boss");
     expect(section("god-king")).toContain(`${BOSS_POWERS.rageStrike} on its rage meter`);
-    // Jefferson's candle: a share on his own half (Oct 11).
+    // Grex's candle: a share on his own half (Oct 11).
     expect(t).toContain(`About ${Math.round(BOSS_POWERS.candleOwnShare * 100)}% of each wave falls on his own half`);
     expect(section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, candleOwnShare: 0.25 } })).toContain("About 25% of each wave");
   });

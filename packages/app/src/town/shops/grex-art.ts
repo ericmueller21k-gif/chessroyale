@@ -5,7 +5,7 @@
  * on that branch. Its shared kit (colors, lettering, cartons, pallets, crates) is shops/warehouse-kit.ts, copied beside it.
  */
 /**
- * Inside Jefferson's Fireworks: Jefferson's shop (house-shop-grex), a shady firework warehouse run by giraffes (Eric's
+ * Inside Grex's Fireworks: Grex's shop (house-shop-grex), a shady firework warehouse run by giraffes (Eric's
  * design, Nov 4). A room of 20 x 20 squares seen as the town square is seen (the camera looks north, things stand upright at
  * their foot, 37 px a square), with a floor mask (SHOP_GREX_FLOOR, as Hollow's cave): the walkable floor is 16 x 16 (columns
  * 2-17, rows 3-18), square, and everything round it is stock. Drawn by hand (Nov 4, weekly plan usage), built exactly as
@@ -20,7 +20,7 @@
  * a gold star) on the west and yours (the steel plate of a floor lift, hazard-edged) on the east, and the board already
  * standing there on a wobbly stack of wooden crates (giraffes like it high). The shop is "literally just a guy in the corner":
  * the shady dealer (sidekick-grex-dealer) in the north-east corner of the floor, by a steel column with a little white sign
- * taped to it that says SHOP in marker, and Jefferson's Boss Crate on the floor beside him (a firework crate, its fuse sparking).
+ * taped to it that says SHOP in marker, and Grex's Boss Crate on the floor beside him (a firework crate, its fuse sparking).
  *
  * Footing: a piece's foot is the middle of its square (a wide piece's: the middle of its width, on the middle of its row).
  * Floor tiles are flat, top-down, 37 x 37, foot at their middle; the battle spot's tiles are each drawn where they lie.
@@ -54,7 +54,7 @@ function toChar(p: Piece): Character {
       return { part: n, x: b.at[0], y: b.at[1] };
     }),
   }));
-  return { id: `shop-grex-${p.name}`, name: `Jefferson's warehouse: ${p.name}`, w: p.w, h: p.h, foot: p.foot, palette: PALETTE, parts, anims: { idle: { loop: true, frames } } };
+  return { id: `shop-grex-${p.name}`, name: `Grex's warehouse: ${p.name}`, w: p.w, h: p.h, foot: p.foot, palette: PALETTE, parts, anims: { idle: { loop: true, frames } } };
 }
 function def(name: string, sq: readonly [number, number], w: number, h: number, foot: Pt, frames: Bit[][], ms = 1000): Character {
   PIECES[name] = { name, sq, w, h, foot, frames, ms };
@@ -529,7 +529,7 @@ export const SHOP_GREX_BOARD_STAND = (() => {
 export const SHOP_GREX_BOARD_AT = { col: 9, row: 10, footDy: 19 } as const;
 
 /**
- * Jefferson's Boss Crate: a stout wooden firework crate, a red band with a gold star stencilled on its front, its lid nailed
+ * Grex's Boss Crate: a stout wooden firework crate, a red band with a gold star stencilled on its front, its lid nailed
  * down, a fat fuse coming out of the top and curling over (idle: the fuse's tip sparks, 6 frames x 110 ms, spitting specks).
  */
 const XW = 36;
@@ -671,7 +671,7 @@ for (let row = 2; row < 19; row++) {
 
 // -- On the floor.
 at("board-stand", SHOP_GREX_BOARD_AT.col, SHOP_GREX_BOARD_AT.row, true); // the board on its crates, in the battle spot
-at("crate", SHOP_GREX_CRATE_AT.col, SHOP_GREX_CRATE_AT.row, true); // Jefferson's Boss Crate, by the dealer
+at("crate", SHOP_GREX_CRATE_AT.col, SHOP_GREX_CRATE_AT.row, true); // Grex's Boss Crate, by the dealer
 at("pallet-stack-b", 12, 4, true); // the clipboard guy checks this one
 at("pallet-seat", 4, 17, true); // the dozer's pallet
 at("pallet-stack", 3, 18, true);

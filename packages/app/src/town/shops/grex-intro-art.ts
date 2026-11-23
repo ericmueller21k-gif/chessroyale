@@ -3,7 +3,7 @@
  * Changed: the import paths. It also re-exports his moves (characters/grex-intro.ts BOSS_GREX_INTRO), so his intro is one chunk. The notes: scripts/boss-art/out/shop-grex-nov4.md and intro-grex-nov4.md on that branch.
  */
 /**
- * Jefferson's battle intro props (Eric's design, Nov 4), drawn by hand (weekly plan usage). The boss is on the left and you
+ * Grex's battle intro props (Eric's design, Nov 4), drawn by hand (weekly plan usage). The boss is on the left and you
  * on the right; the board already stands in the middle of his warehouse on its wobbly stack of crates.
  *
  * 1. INTRO_GREX_TABLE: the crate stack (the room's `board-stand` without its slab and board: the renderer draws those, at
@@ -70,7 +70,7 @@ const stackBit = (sway: number): Bit => {
 const shadowT = () => groundShadow(TCX, TF + 1, 24, 4);
 export const INTRO_GREX_TABLE: Character = {
   id: "intro-grex-table",
-  name: "Jefferson's crate-stack table",
+  name: "Grex's crate-stack table",
   w: TW,
   h: TH,
   foot: [TCX, TF],
@@ -313,7 +313,7 @@ const stormFrames: Frame[] = Array.from({ length: 6 }, (_, f) => {
 });
 export const INTRO_GREX_STORM: Character = {
   id: "intro-grex-storm",
-  name: "Jefferson's wipe (tile)",
+  name: "Grex's wipe (tile)",
   w: ST,
   h: ST,
   foot: [ST / 2, ST - 1],
@@ -359,7 +359,7 @@ const frontFrames: Frame[] = Array.from({ length: 6 }, (_, f) => {
 });
 export const INTRO_GREX_FRONT: Character = {
   id: "intro-grex-front",
-  name: "Jefferson's wipe (its leading edge)",
+  name: "Grex's wipe (its leading edge)",
   w: FW,
   h: ST,
   foot: [0, ST - 1],

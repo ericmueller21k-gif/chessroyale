@@ -49,7 +49,7 @@ export function useReplay(
       const out = [{ fen, lastMove: null as string | null }];
       board.history.forEach((m, i) => {
         fen = applyMove(fen, m);
-        // (A piece G-REX's fire destroyed after this move: gone from here on.)
+        // (A piece Grex's fire destroyed after this move: gone from here on.)
         const base = baseAt(i + 1, board.bases);
         if (base.ply === i + 1) fen = base.fen;
         out.push({ fen, lastMove: m });

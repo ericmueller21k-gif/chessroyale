@@ -3,7 +3,7 @@
  * Changed: the import paths. The notes: scripts/boss-art/out/shop-grex-nov4.md and intro-grex-nov4.md on that branch.
  */
 /**
- * Jefferson's warehouse kit (Nov 4, drawn by hand on the weekly plan usage): the colors, the box lettering and the stock,
+ * Grex's warehouse kit (Nov 4, drawn by hand on the weekly plan usage): the colors, the box lettering and the stock,
  * shared by the room (house-shop-grex.ts), the crew's pallet (npc-grex/npc-grex.ts) and the intro's crate-stack table
  * (house-intro-grex/house-intro-grex.ts). Copy it next to them in the game (town/shops/), as hunchess-bucket.ts was.
  *

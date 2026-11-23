@@ -249,13 +249,13 @@ export const COLISEUM_PLACE: Place = { id: "coliseum", name: "The Colosseum", co
  * The homes (sixteen since Nov 3), spread evenly round the middle (the Colosseum and its park) over the 46 x 46 world that wraps: every
  * home's nearest neighbor is 8 to 10 squares away, as on slice 3's smaller map, and no home's roaming ground reaches the
  * park or the Colosseum (docs/decisions/2026-10-26-town-square-slice-6.md has the map). Pairs that play off each other
- * stand side by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and
+ * stand side by side: Ginger Igloo and Grex's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and
  * night). Names: "Ginger Igloo", "Hollow Peak" and "Moo & Moon Meadow" are Eric's; the rest the director's.
  */
 export const ALL_HOMES: readonly Home[] = (
   [
     { id: "gingerbread", boss: "Ginger", name: "Ginger Igloo", color: "#3fae4f", cx: 39, cy: 11 },
-    { id: "grex", boss: "Jefferson", name: "Jefferson's Fireworks", color: "#e5566a", cx: 39, cy: 3 },
+    { id: "grex", boss: "Grex", name: "Grex's Fireworks", color: "#e5566a", cx: 39, cy: 3 },
     { id: "tiger", boss: "Babur", name: "Babur's Circus", color: "#2f7fe0", cx: 28, cy: 4 },
     { id: "bigboy", boss: "Big Boy", name: "Big Boy's Crib", color: "#23a8a8", cx: 43, cy: 31 },
     { id: "hollow", boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", cx: 0, cy: 43 },
@@ -669,7 +669,7 @@ export class Walker {
     out.last = n === this.queue.length + 1;
     return n;
   }
-  /** Drops the rest of its path: it stops once the step it's on ends (Jefferson's crew in the way, Nov 4). */
+  /** Drops the rest of its path: it stops once the step it's on ends (Grex's crew in the way, Nov 4). */
   halt(): void {
     this.queue = [];
     if (this.step) this.step.held = false;

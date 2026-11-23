@@ -12,7 +12,7 @@ import { BOARD_SEL, asAdmin, bossAloneFromHome, settled, submitMove, test } from
  * effect"; docs/decisions/2026-11-04-bigger-side-figures.md). Was (Oct 28, Folio "behind the board when idling"): clear of it, his
  * drawing's right edge short of the board's left edge. With no eval bar, as every player's board is: the drawn pixels of its idle (not
  * its frame, which has room around the drawing). The bosses whose drawings reach furthest toward the board: Folio's wing, Wrangler's
- * lasso, Hollow, Sawyer, Smudgy and Jefferson.
+ * lasso, Hollow, Sawyer, Smudgy and Grex.
  */
 
 const WIDE = ["folio", "pig", "hollow", "sawyer", "smudgy", "grex"];

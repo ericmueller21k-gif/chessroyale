@@ -18,7 +18,7 @@ export interface BoardState {
   generation: number;
   /** Side to move's expected score after each ply (index = moves played), as searched when the move was played. */
   evals?: number[];
-  /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
+  /** Positions changed between moves (a piece Grex's fire destroyed): the moves after each are played from it. */
   bases?: Base[];
   /**
    * Every capture on this board, recorded as its move was played (playOnBoard; a Revision removes the ones it crosses out).
@@ -77,7 +77,7 @@ export function boardEnd(board: BoardState): GameEnd {
   return gameEndWith(board.history, board.bases);
 }
 
-/** A piece destroyed between moves (G-REX's fire): the square emptied, and the moves from here on played from it. */
+/** A piece destroyed between moves (Grex's fire): the square emptied, and the moves from here on played from it. */
 export function burnOnBoard(board: BoardState, square: string): BoardState {
   const fen = withoutPiece(board.fen, square);
   const ply = board.history.length;

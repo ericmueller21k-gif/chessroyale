@@ -377,7 +377,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // each step turns it as its moment reaches its spin).
   const view = intro ? angleView(0, boss.crowdSide) : angleView(fun.angle, boss.crowdSide);
   const orientation = view.orientation;
-  // G-REX's fire after the crowd's move (while the boss thinks): a piece left on a tile ablaze burns, shown on the
+  // Grex's fire after the crowd's move (while the boss thinks): a piece left on a tile ablaze burns, shown on the
   // board until its flare; a tile under the king fizzles. The God King's warning the first time a piece steps onto one.
   const burnt = thinking && !intro && !victim ? (boss.powers?.burnt ?? []).filter((b) => b.turn === boss.crowdMoves) : [];
   const burnAt = burnStart(burnt.length ? `${boss.id}:${boss.crowdMoves}:${boss.board.ply}` : "");
@@ -428,7 +428,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const burnNames = burning.length > 2 ? `${burning.length} pieces` : burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
   const fizzled = burnt.some((b) => b.fizzled);
   const burnLine = burnt.length && now < burnAt + BURN.ms ? (burning.length ? `${burnNames.charAt(0).toUpperCase()}${burnNames.slice(1)} burnt!` : fizzled ? "Your king is fireproof." : null) : null;
-  // G-REX slams the Roman candle down on the board: it jolts.
+  // Grex slams the Roman candle down on the board: it jolts.
   const slam = moment?.kind === "candle" && now >= moment.at + CANDLE.slamAt && now < moment.at + CANDLE.slamAt + CANDLE.slamMs;
   // The screen draws every frame for its effects; the parts that don't move with them (the header, the boss by the
   // board, the chat) only as the match changes and five times a second, as on your move's screen (useStillKey).

@@ -102,9 +102,9 @@ export interface RoomArt {
   floor?: readonly string[];
   /** The board on its stand (Wrangler's barn: the `board-stand` piece's square), which his intro ropes and drags to the table's place. */
   stand?: { readonly col: number; readonly row: number };
-  /** Its foot this many room pixels south of its row's middle (Jefferson's: on the marks' line), as the art places it. */
+  /** Its foot this many room pixels south of its row's middle (Grex's: on the marks' line), as the art places it. */
   standDy?: number;
-  /** Jefferson's crew (his warehouse): the machines' loops, the idle crew's places, the pallet's floor and shelf spots. */
+  /** Grex's crew (his warehouse): the machines' loops, the idle crew's places, the pallet's floor and shelf spots. */
   crew?: CrewPlaces;
   /** A second walking level (Ginger's igloo: the catwalk and its two staircases; levels.ts). */
   levels?: LevelsArt;
@@ -164,7 +164,7 @@ interface ElvesArt {
 type ElfName = "red" | "green" | "blue" | "box" | "pad";
 /** An elf's frames, each drawn once into a canvas, by animation, with each frame's time. */
 type ElfFrames = Record<string, { frames: HTMLCanvasElement[]; ms: number[]; loop: boolean }>;
-/** Jefferson's warehouse's crew, as its art places them (shops/grex-art.ts). */
+/** Grex's warehouse's crew, as its art places them (shops/grex-art.ts). */
 interface CrewPlaces {
   liftPath: readonly Waypoint[];
   forkPath: readonly Waypoint[];
@@ -333,7 +333,7 @@ export interface LoadedRoom {
   frames: Record<string, Frames>;
   /** The kid's sheet (its picture loaded). */
   kid: { sheet: SidekickSheet; img: HTMLImageElement };
-  /** Jefferson's crew's baked sheets (their pictures loaded), or null: another room. */
+  /** Grex's crew's baked sheets (their pictures loaded), or null: another room. */
   crew: Readonly<Record<CrewName, HTMLImageElement>> | null;
   /** Ginger's elves' frames (drawn as the room loads, behind the fade: about 40 ms on a computer for their 99), or null: another room. */
   elves: Readonly<Record<ElfName, ElfFrames>> | null;
@@ -403,7 +403,7 @@ export function loadRoomWith(key: string, def: ShopDef, artOf: () => Promise<Roo
     img.onerror = () => no(new Error(`the ${def.kid} sheet didn't load`));
     img.src = SHEET_URL[def.kid]!;
   });
-  // (Jefferson's warehouse: his crew's nine sheets too.)
+  // (Grex's warehouse: his crew's nine sheets too.)
   const crew = home === "grex" ? Promise.all((Object.keys(CREW_SHEETS) as CrewName[]).map((k) => picture(CREW_URL[k]!, `the ${k} sheet`).then((img) => [k, img] as const))).then((l) => Object.fromEntries(l) as Record<CrewName, HTMLImageElement>) : Promise.resolve(null);
   p = Promise.all([artOf(), kid, crew]).then(async ([art, , crewImgs]) => {
     const frames: Record<string, Frames> = {};
@@ -722,7 +722,7 @@ function toneOf(c: HTMLCanvasElement | undefined): string {
   return k ? `rgb(${Math.round(r / k)},${Math.round(gg / k)},${Math.round(b / k)})` : "#1e1c25";
 }
 
-/** The most of Jefferson's crew drawn in a frame (seven giraffes, two machines, the pallet). */
+/** The most of Grex's crew drawn in a frame (seven giraffes, two machines, the pallet). */
 const CREW_MAX = 12;
 
 /** The pawn's base's foot down its box (render.ts's PAWN_FOOT: the path's bottom at y 39.5, and half its outline). */
@@ -781,7 +781,7 @@ function startRoom(
   const room: Room = makeRoom(art.layout, def.keeper, art.n ?? 20, art.floor, def.talk, lv, def.talkAt ?? null, !!def.talkNear);
   // (Rolling Dough's people stand on their squares: the guards by the door. Nobody walks through them.)
   for (const q of art.standing ?? []) room.blocked[q.r * room.n + q.c] = 1;
-  // (Jefferson's idle crew stand on their squares: nobody walks through them. His machines and the floor pallet block where they are
+  // (Grex's idle crew stand on their squares: nobody walks through them. His machines and the floor pallet block where they are
   // now: crewTakes.)
   if (art.crew) for (const k of ["leaner-a", "leaner-b", "crew-c", "crew-d"] as const) room.blocked[art.crew.places[k].at[1] * room.n + art.crew.places[k].at[0]] = 1;
   const n = room.n;
@@ -811,7 +811,7 @@ function startRoom(
   const marks = found && ci?.def.seated ? seatedMarks(found) : found;
   /** Its channel line this time (Hollow's: one of four, at random), or null. */
   const chant = ci ? chantOf(ci.def) : null;
-  /** Its line this time (Jefferson's: one of his four calls, at random). */
+  /** Its line this time (Grex's: one of his four calls, at random). */
   const introLine = ci ? lineOf(ci.def) : "";
   /** Hollow's dark (his intro's art and timing), or null: any other room or boss. */
   const dk = ci?.dark ?? null;
@@ -984,7 +984,7 @@ function startRoom(
    * A cave (a room with a floor's shape): its rock's tone, the average of its flat rock tile (`floor-rock`), filling the ground past
    * its squares; null in a box room.
    */
-  // (Jefferson's warehouse has a floor's shape too, its racking all round, but it's a box room: no rock, nothing in front of you.)
+  // (Grex's warehouse has a floor's shape too, its racking all round, but it's a box room: no rock, nothing in front of you.)
   const cave = art.floor && frames["floor-rock"] ? toneOf(frames["floor-rock"].frames[0]) : null;
   // ---- The upright things, far to near; and the deep pieces drawn as plans, which lie flat on their squares.
   const ups: Up[] = [];
@@ -1008,7 +1008,7 @@ function startRoom(
       ups.push({ name: p.name, col: p.col, i: 0, c: counter.col + ((counter.w ?? 1) - 1) / 2, r: counter.row, z: counter.row + 0.01, ox: art.crateAt[0] - cp.foot[0], oy: art.crateAt[1] - cp.foot[1], flip: false, cut: 0 });
       continue;
     }
-    // (Jefferson's board on its crates stands with its foot `standDy` south of its row's middle, on the marks' line.)
+    // (Grex's board on its crates stands with its foot `standDy` south of its row's middle, on the marks' line.)
     const dr = p.name === "board-stand" && art.standDy ? art.standDy / SQ : 0;
     ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row + dr, z: p.row + dr, ox: 0, oy: 0, flip: !!p.flip, cut: 0, t0: p.t0 });
   }
@@ -1068,7 +1068,7 @@ function startRoom(
   // (Not a plan's standing strip: its lights are its whole picture's.)
   const whole = ups.filter((u) => !u.cut);
   // (Ginger's igloo: its pools of light along the walls' feet don't change, so they're baked into the floor's picture once, as the
-  // battle spot's shine is: two dozen glows a frame were the most of the room's cost over Jefferson's warehouse on a phone. Every other
+  // battle spot's shine is: two dozen glows a frame were the most of the room's cost over Grex's warehouse on a phone. Every other
   // room draws them each frame, as before: Hollow's go dark in his intro.)
   const bakePools = !!art.icePool;
   const poolsAt = bakePools ? [] : lightsAt(art.pools, whole);
@@ -1902,12 +1902,12 @@ function startRoom(
   const dest = { c: 0, r: 0, on: false };
   const pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   const sheet = loaded.kid.sheet;
-  // (Drawn at the art's own size when the shop says so: Jefferson's dealer, `tall` room pixels from his feet to his top.)
+  // (Drawn at the art's own size when the shop says so: Grex's dealer, `tall` room pixels from his feet to his top.)
   const kidSquares = (def.tall ? def.tall / SQ : f.sidekickSquares) / (sheet.foot[1] / sheet.h - sheet.top.idle / sheet.h);
   let kidT = 0;
   const kidEnds = sheet.ms.idle.map((ms) => (kidT += Math.max(16, ms)));
 
-  // ---- Jefferson's crew (his warehouse, Nov 4; shops/grex-crew.ts): the scissor lift and the forklift on their loops (they wait for
+  // ---- Grex's crew (his warehouse, Nov 4; shops/grex-crew.ts): the scissor lift and the forklift on their loops (they wait for
   // anyone in their way), the idle crew at their places; in his intro they stop work and come round the table to watch. Drawn from
   // their baked sheets (grex-crew-sheets.ts), 1:1 at the room's scale, each by its row among the pieces.
   const cw = art.crew ?? null;
@@ -2474,7 +2474,7 @@ function startRoom(
   const drawUp = (u: Up, now: number) => {
     // (Wrangler's intro: from the yank, the board on its stand is his bale, drawn as it's dragged: drawRopeCenter.)
     if (introNow?.rope?.bale && u.name === "board-stand") return;
-    // (Jefferson's challenge: his intro's crate stack stands in its place from the walk in, the same picture: drawCrewCenter.)
+    // (Grex's challenge: his intro's crate stack stands in its place from the walk in, the same picture: drawCrewCenter.)
     if (cw && ci?.crew && u.name === "board-stand") return;
     // (An intro as data that stands in for a room's piece (Smudgy's covered table, from the walk in): drawCast draws it there.)
     if (ca?.data.stands?.includes(u.name)) return;
@@ -2496,7 +2496,7 @@ function startRoom(
     const w = img.width * s;
     if (x > W || x + w < 0 || y > H || y + h * s < 0) return;
     // (A cave: nearer the camera than you and over you, see-through: SHOP_FEEL.seeThrough.)
-    // (Jefferson's warehouse too: its tall roll-up door, nearer the camera than you just inside it.)
+    // (Grex's warehouse too: its tall roll-up door, nearer the camera than you just inside it.)
     // (Ginger's igloo too: its near walls, the tunnel's and its doorway's arch, nearer the camera than you; there only over your
     // figure's middle, so the candy wall beside a stair's foot, a row nearer, isn't ghosted for covering your edge.)
     // (Rolling Dough's two rooms: only their doors and near walls, `seeThru`. The walk-up's box rooms, Nov 13: their front doors and near
@@ -2585,7 +2585,7 @@ function startRoom(
     kidBox.on = false;
     // (Rolling Dough's back room: no Shopkeeper; Don Dough is one of its people.)
     if (def.hideKid) return;
-    // (Jefferson's challenge: his dealer is one of the crew, who come over to watch: drawCrewFig.)
+    // (Grex's challenge: his dealer is one of the crew, who come over to watch: drawCrewFig.)
     if (cw && ci) return;
     if (!P(def.at[0], def.at[1])) return;
     const s = (kidSquares * pt.k) / sheet.h;
@@ -2681,7 +2681,7 @@ function startRoom(
     seen.anim = "";
     if (fx?.hideYou?.()) return;
     you.pose(now, pose);
-    // (Jefferson's intro: your lift under you, you standing on its plate, lifted with it.)
+    // (Grex's intro: your lift under you, you standing on its plate, lifted with it.)
     if (cw && introNow?.crew) drawLift();
     if (!P(pose.x + youOx(now), pose.y + youOy(now))) return;
     if (cw && introNow?.crew) pt.y -= (plateUp() * pt.k) / SQ;
@@ -2890,7 +2890,7 @@ function startRoom(
     Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
   };
   /**
-   * Jefferson in his intro: his own move's frame (BOSS_GREX_INTRO: his call, his wave over, his brag), as drawn (not mirrored: he faces
+   * Grex in his intro: his own move's frame (BOSS_GREX_INTRO: his call, his wave over, his brag), as drawn (not mirrored: he faces
    * you, east), at his town size, his feet where he stands.
    */
   const drawCrewBoss = (now: number, mv: { anim: "call" | "waveOver" | "brag"; frame: number }) => {
@@ -3418,7 +3418,7 @@ function startRoom(
     if (z.pop >= 0) put(D.pop.frames[z.pop]!, D.pop.ch, x, y, s);
   };
   /**
-   * Jefferson's table (his intro, from the walk in): the crate stack where the room's board stand stood (the same picture, its foot on
+   * Grex's table (his intro, from the walk in): the crate stack where the room's board stand stood (the same picture, its foot on
    * the marks' line), its slight wobble or its bigger one, and on it the slab and board (`paintTable`), `top` px over its foot (32 higher
    * than a park table's), riding on the top crate (its sway).
    */
@@ -3448,13 +3448,13 @@ function startRoom(
     paintTable(g, v, at.c - camX, camY - at.r, ci!.table.palette, marks.layout);
     g.restore();
   };
-  /** Your lift's plate now (px over the floor, Jefferson's intro: INTRO_GREX_LIFT_H), 0 otherwise. */
+  /** Your lift's plate now (px over the floor, Grex's intro: INTRO_GREX_LIFT_H), 0 otherwise. */
   const plateUp = (): number => {
     const n = introNow?.crew;
     if (!n || !ci?.crew) return 0;
     return ci.crew.lift.h[n.lift.anim]?.[n.lift.frame] ?? 0;
   };
-  /** Your lift at your mark (its plate the mark's; Jefferson's intro), drawn just before you on it. */
+  /** Your lift at your mark (its plate the mark's; Grex's intro), drawn just before you on it. */
   const drawLift = () => {
     const n = introNow?.crew;
     const L = ci?.crew?.lift;
@@ -4153,7 +4153,7 @@ function startRoom(
         }
       }
     }
-    // (Jefferson's crew, each by his row.)
+    // (Grex's crew, each by his row.)
     collectCrew(now);
     collectElves();
     collectPeople(now);
@@ -4307,7 +4307,7 @@ function startRoom(
     // (Don Dough's walk-out: at the challenge's pace, as a challenge walks you.)
     if (!ci) you.stepMs = walkOut ? C.walkStepMs : f.youStepMs / rideSpeed(riding()?.id);
     keysWalk();
-    // (Jefferson's crew: one in your way (a machine, the pallet on the floor) and you stop where you are; tap again to go round.)
+    // (Grex's crew: one in your way (a machine, the pallet on the floor) and you stop where you are; tap again to go round.)
     if (cw && !ci) {
       const nx = you.peek();
       if (nx && crewTakes(nx.c, nx.r)) you.halt();
@@ -4507,7 +4507,7 @@ function startRoom(
     }
     const p = plan(xy.x, xy.y);
     if (!p?.dest) return;
-    // (Round Jefferson's machines where they are now; round Ginger's elves, or wait where you are while they're in the way.)
+    // (Round Grex's machines where they are now; round Ginger's elves, or wait where you are while they're in the way.)
     const path = EA ? wayRoundElves(you.here(), p.dest) : findWay(you.here(), p.dest);
     waitFor = null;
     if (!path) {
@@ -4663,7 +4663,7 @@ function startRoom(
             buckets: introNow.rope.buckets?.anim ?? null,
           }
         : null,
-      // (Jefferson's own: his move, the line he called this time, the crew (stopped, walking, each one where and doing what), your
+      // (Grex's own: his move, the line he called this time, the crew (stopped, walking, each one where and doing what), your
       // lift and its plate's height, the table's wobble, where it stands.)
       lineText: introNow?.line && bossHead.on ? introLine : null,
       crew: introNow?.crew
@@ -4715,7 +4715,7 @@ function startRoom(
       return { name, anim, frame: Math.round(fg.sx / fg.w), at: [Math.round(fg.c * 100) / 100, Math.round(fg.r * 100) / 100], flip: fg.flip, up: fg.up };
     });
   /**
-   * (Tests) Jefferson's machines and crew in his shop: each machine's foot, animation, whether it's waiting for someone in its way, the
+   * (Tests) Grex's machines and crew in his shop: each machine's foot, animation, whether it's waiting for someone in its way, the
    * squares it takes; the pallet; every figure drawn.
    */
   const hookCrew = () => {

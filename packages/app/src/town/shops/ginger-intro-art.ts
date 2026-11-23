@@ -17,7 +17,7 @@
  * 6. INTRO_GINGER_LIGHT: the small white magic light his cast makes on the board, out of which the pieces appear (`appear`,
  *    `shine`, `fade`: the code draws the real pieces as it fades).
  * 7. INTRO_GINGER_STORM (128 x 128, tiles both ways) and INTRO_GINGER_FRONT (48 x 128): the wipe, a blizzard of snowflakes with
- *    candy canes of every color tumbling in it, played as Alfil's sandstorm and Jefferson's fireworks are.
+ *    candy canes of every color tumbling in it, played as Alfil's sandstorm and Grex's fireworks are.
  * 8. Where things go (squares, and px over the floor): INTRO_GINGER_BLAST_TO, INTRO_GINGER_BOARD_ROUTE, INTRO_GINGER_ELF_SPOTS.
  */
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";

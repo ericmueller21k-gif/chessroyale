@@ -40,7 +40,7 @@ const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 
 /** Every power moment's view, by kind (the rage warning and each boss's). */
 const VIEWS: Partial<Record<PowerEventKind, { ui: MomentUi; boss: string; name: string }>> = {};
-for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"], [HOPPER_UI, "Chub & Chirp"], [SMUDGY_UI, "Smudgy"], [MOO_UI, "Moo & Moon"], [GARDENER_UI, "Puddles"], [TIGER_UI, "Babur"], [FOLIO_UI, "Folio"], [TIMBER_UI, "Timber"], [DASH_UI, "Dash"], [ZEBRA_UI, "Don Dough"], [CHANDY_UI, "Chandy"]] as const) {
+for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Grex"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"], [HOPPER_UI, "Chub & Chirp"], [SMUDGY_UI, "Smudgy"], [MOO_UI, "Moo & Moon"], [GARDENER_UI, "Puddles"], [TIGER_UI, "Babur"], [FOLIO_UI, "Folio"], [TIMBER_UI, "Timber"], [DASH_UI, "Dash"], [ZEBRA_UI, "Don Dough"], [CHANDY_UI, "Chandy"]] as const) {
   for (const [kind, m] of Object.entries(ui.moments)) VIEWS[kind as PowerEventKind] = { ui: m as MomentUi, boss: ui.id, name };
 }
 VIEWS.warn = { ui: WARN, boss: "bigboy", name: "Big Boy" };

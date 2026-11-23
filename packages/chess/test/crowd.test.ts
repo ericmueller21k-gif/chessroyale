@@ -105,7 +105,7 @@ describe("Crowd mode", () => {
 
   it("boss raid: humans only, the boss from the first move (here on the old named opening: raidOpening), strikes down to half, the King's strike staggers the boss", async () => {
     // (The fake engine's numbers are random, so its "blunders" would call for the God King's Last Stand, which has its own tests.)
-    // (Jefferson: the boss this seed met before Sawyer joined the draw; a boss who plays from the named opening.)
+    // (Grex: the boss this seed met before Sawyer joined the draw; a boss who plays from the named opening.)
     const settings: Settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossMaxMoves: 12, lastStandFrom: 999, bossId: "grex" } as Settings;
     const lib: Opening[] = [{ ...library[0]!, moves: sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1"]), expected: { 10: 0.52 } }];
     const runner = new MatchRunner({

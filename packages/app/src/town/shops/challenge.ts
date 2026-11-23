@@ -8,7 +8,7 @@
  *
  * An intro as data (shops/timeline.ts: Alfil's, Big Boy's, Timber's and Smudgy's, shops/intros/<boss>.ts) has its beats there; the
  * timing here (introBeats, introAt, introCues) is the default's and the intros still on their own state machines (Hollow's, Wrangler's,
- * Jefferson's, Ginger's, Dash's, Folio's).
+ * Grex's, Ginger's, Dash's, Folio's).
  *
  * A boss without an intro here is challenged as before (the Boss raid screen, its tile picked).
  */
@@ -18,7 +18,7 @@ import type { ShopPlace } from "./room.ts";
 import { ZEBRA_BATTLE_START } from "./zebra-lines.ts";
 import { timelineAt, type Timeline, type TimelineNow } from "./timeline.ts";
 
-/** Jefferson's machine guys' step-off and the dozer's wake (their baked sheets' frames: times and cues), for his intro's cues. */
+/** Grex's machine guys' step-off and the dozer's wake (their baked sheets' frames: times and cues), for his intro's cues. */
 const CREW_SHEET_CUES = { stepOff: CREW_SHEETS.lift.anims.stepOff, wake: CREW_SHEETS["crew-d"].anims.wake };
 
 /**
@@ -36,7 +36,7 @@ export interface BossIntro {
   /** Said out loud in a speech bubble by its head (not the chat log: Eric, Nov 2) as you face each other. */
   line: string;
   /**
-   * Its line picked at random each time from these (Jefferson's calls to his crew, Nov 4: `lineOf`), `line` the first; none: `line`
+   * Its line picked at random each time from these (Grex's calls to his crew, Nov 4: `lineOf`), `line` the first; none: `line`
    * every time.
    */
   lines?: readonly string[];
@@ -325,7 +325,7 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     },
   },
   grex: {
-    name: "Jefferson",
+    name: "Grex",
     line: "Boys! We got a challenger!",
     lines: ["Boys! We got a challenger!", "Take five, everybody. We're playing chess.", "Who wants a fifteen-minute break?", "Forks down, boys. Somebody wants a game."],
     layout: "across",
@@ -525,7 +525,7 @@ export const CHALLENGE_FEEL = {
    */
   rope: { spinMs: 1000, flyMs: 440, flyArc: 1.1, yankLeadMs: 100, slideMs: 1600, bend: [5, 9], freeAfterMs: 200, reelMs: 200, offMs: 400, offArc: 0.8, tumbleMs: 760, tumbleSouth: 0.4, reelAt: 0.67 },
   /**
-   * Jefferson's own (Nov 4; Eric's design: "he hollers for his crew. The crew stop what they're doing and come over… they stand round
+   * Grex's own (Nov 4; Eric's design: "he hollers for his crew. The crew stop what they're doing and come over… they stand round
    * the table behind, watching… The floor tile at your mark rises on its piston and lifts you level with the board"; the art's
    * timeline, intro-grex-nov4.md). After his line (the shared `lineMs`) he hollers (his `call`); `stopMs` into it the crew stop (the
    * machines park where they are, the guys step off, the dozer wakes); he waves them over (his `waveOver`, `waves` loops); `setOffMs`
@@ -939,11 +939,11 @@ export function ropeAnims(w: { mover: ArtLike; rope: ArtLike; table: ArtLike; bu
     release: w.release,
   };
 }
-/** Jefferson's moves (characters/grex-intro.ts BOSS_GREX_INTRO): his call to his crew, waving them over, his brag. */
+/** Grex's moves (characters/grex-intro.ts BOSS_GREX_INTRO): his call to his crew, waving them over, his brag. */
 export const CREW_MOVES = ["call", "waveOver", "brag"] as const;
 export type CrewMove = (typeof CREW_MOVES)[number];
 /**
- * Jefferson's crew (Nov 4; CHALLENGE_FEEL.crew): each frame's ms and cue (the art's) for his moves, your lift's rise (INTRO_GREX_LIFT)
+ * Grex's crew (Nov 4; CHALLENGE_FEEL.crew): each frame's ms and cue (the art's) for his moves, your lift's rise (INTRO_GREX_LIFT)
  * and the crate-stack table's wobbles (INTRO_GREX_TABLE: `tableIdle`, and its bigger `creak` as your lift clunks home).
  */
 export interface CrewAnims {
@@ -953,7 +953,7 @@ export interface CrewAnims {
   tableIdle: readonly number[];
   cues: { readonly [k in CrewMove | "rise" | "creak" | "tableIdle"]: readonly (string | undefined)[] };
 }
-/** Jefferson's CrewAnims from his art (shops/grex-intro-art.ts): his moves, your lift, the table. */
+/** Grex's CrewAnims from his art (shops/grex-intro-art.ts): his moves, your lift, the table. */
 export function crewAnims(w: { mover: ArtLike; lift: ArtLike; table: ArtLike }): CrewAnims {
   const fr = (ch: ArtLike, a: string) => ch.anims[a]!.frames;
   const of = <T>(get: (m: CrewMove) => T) => Object.fromEntries(CREW_MOVES.map((m) => [m, get(m)])) as Record<CrewMove, T>;
@@ -1101,7 +1101,7 @@ export function folioAnims(w: { mover: ArtLike; stool: ArtLike; table: ArtLike; 
 }
 /**
  * A boss's own art's animations, for an intro still on its own state machine: the dark (Hollow's), the lasso (Wrangler's), the crew
- * (Jefferson's), the icicle (Ginger's), the dashes (Dash's) or the folding (Folio's). (Alfil's, Big Boy's, Timber's and Smudgy's are
+ * (Grex's), the icicle (Ginger's), the dashes (Dash's) or the folding (Folio's). (Alfil's, Big Boy's, Timber's and Smudgy's are
  * data: shops/timeline.ts.)
  */
 export type IntroAnims = DarkAnims | RopeAnims | CrewAnims | IceAnims | BlitzAnims | FolioAnims;
@@ -1117,7 +1117,7 @@ export const isCrew = (a: IntroAnims): a is CrewAnims => "creak" in a && "tableI
  * "black", "dim" (the dim light, his settle) and "iris" (the pool closing on the board). Wrangler's own (the lasso): after the line,
  * "spin", "throw", "catch" (the loop flying to the bale and cinching), "drag" (the yank and the bale's slide), "land" (it lands; the
  * loop flicked free, the line reeled in), "cross" (the cross throw), "haul" (the double yank), "stools" (the buckets tumbling in and
- * landing, the ropes reeled in) and "brag", then the attack. Jefferson's own (the crew): after the line, "call" (he hollers; the crew
+ * landing, the ropes reeled in) and "brag", then the attack. Grex's own (the crew): after the line, "call" (he hollers; the crew
  * stop in it), "wave" (he waves them over), "walk" (they walk round to their spots), "lift" (your lift rises), "creak" (the crates
  * wobble as it locks) and "brag", then the attack.
  */
@@ -1255,7 +1255,7 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     return out;
   }
   if (a && isCrew(a)) {
-    // Jefferson's own: his line; his call (the crew stop `stopMs` into it); his wave over; the crew walking round to their spots
+    // Grex's own: his line; his call (the crew stop `stopMs` into it); his wave over; the crew walking round to their spots
     // (they set off `setOffMs` after the stop; your lift rises `walkMs` after that); your lift rising; the crates' creak as it locks;
     // his brag; the attack. (No pause after the line: the art's 2.6 s.)
     const K = feel.crew;
@@ -1363,7 +1363,7 @@ export interface IntroNow {
   dark: DarkNow | null;
   /** Wrangler's own intro (the lasso): what he, his ropes, the bale and the buckets do now; null for every other intro. */
   rope: RopeNow | null;
-  /** Jefferson's own intro (the crew): what he, his crew, your lift and the table do now; null for every other intro. */
+  /** Grex's own intro (the crew): what he, his crew, your lift and the table do now; null for every other intro. */
   crew: CrewNow | null;
   /** Ginger's own intro (the icicle): what he, his props and the board carriers do now; null for every other intro. */
   ice: IceNow | null;
@@ -1780,7 +1780,7 @@ export function folioCues(a: FolioAnims, feel: Pick<typeof CHALLENGE_FEEL, "face
   return out.sort((x, y) => x.at - y.at);
 }
 /**
- * Jefferson's intro `t` ms in (CHALLENGE_FEEL.crew): his move, the crew's clock (the room walks each of them), your lift and the table.
+ * Grex's intro `t` ms in (CHALLENGE_FEEL.crew): his move, the crew's clock (the room walks each of them), your lift and the table.
  * He and you stand on your marks from the start to the end (he stands; you on your lift).
  */
 export interface CrewNow {
@@ -1797,7 +1797,7 @@ export interface CrewNow {
   /** The crate-stack table: its slight wobble, or its bigger one as your lift clunks home. */
   table: { anim: "idle" | "creak"; frame: number };
 }
-/** When things happen in Jefferson's intro (ms in): the crew stop, they set off, your lift starts rising, it locks. */
+/** When things happen in Grex's intro (ms in): the crew stop, they set off, your lift starts rising, it locks. */
 export function crewTimes(beats: readonly IntroBeat[], a: CrewAnims, feel: Pick<typeof CHALLENGE_FEEL, "crew"> = CHALLENGE_FEEL) {
   const K = feel.crew;
   const stop = stepAt(beats, "call") + K.stopMs;
@@ -1805,7 +1805,7 @@ export function crewTimes(beats: readonly IntroBeat[], a: CrewAnims, feel: Pick<
   const lift = stepAt(beats, "lift");
   return { stop, setOff, lift, locked: lift + sum(a.rise) };
 }
-/** Jefferson's intro `t` ms in (his beats, `introBeats`): see CrewNow. */
+/** Grex's intro `t` ms in (his beats, `introBeats`): see CrewNow. */
 export function crewAt(beats: readonly IntroBeat[], a: CrewAnims, t: number, feel: Pick<typeof CHALLENGE_FEEL, "crew"> = CHALLENGE_FEEL): CrewNow {
   const at = (s: IntroStep) => stepAt(beats, s);
   const T = crewTimes(beats, a, feel);
@@ -2012,7 +2012,7 @@ const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
  * you back in its own beats (shops/intros/common.ts hopBack).
  */
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
-  // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; Jefferson's: no stools; nothing to hop back from.)
+  // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; Grex's: no stools; nothing to hop back from.)
   // (Dash's: you both walk on to where you stand clear of the stools, and nobody steps after they land.)
   if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a) || isBlitz(a))) return Infinity;
   // (Folio's: you both step back a pace after its line, before the stools fold up: introAt eases it, no hop.)
@@ -2042,7 +2042,7 @@ export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: nu
     return { ...base, table: t >= stepAt(beats, "carry"), stools: false };
   }
   if (a && isCrew(a)) {
-    // (Jefferson's: the board on its crates is there from the start; no stools: he stands, you on your lift.)
+    // (Grex's: the board on its crates is there from the start; no stools: he stands, you on your lift.)
     return { ...base, crew: crewAt(beats, a, t), table: true, stools: false };
   }
   if (a && isRope(a)) {
@@ -2125,7 +2125,7 @@ export function ropeCues(beats: readonly IntroBeat[], a: RopeAnims, feel: Pick<t
 }
 
 /**
- * Jefferson's cues, and when (his intro's beats; CHALLENGE_FEEL.crew): his moves' own on their frames (his two hollers, his whoosh each
+ * Grex's cues, and when (his intro's beats; CHALLENGE_FEEL.crew): his moves' own on their frames (his two hollers, his whoosh each
  * wave, his brag's laugh, fizz and stomp); the crew stopping: the machine guys' steps as they climb off (their `stepOff`'s, both
  * machines' as one: they step off together), the dozer's snort as he wakes; your lift's hiss and its clunk as it locks; the crates'
  * creak on each wobble (`creakSoft`: their slight one, all through) and the louder one as your lift clunks home. (The crew's steps as

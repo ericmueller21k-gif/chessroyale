@@ -173,7 +173,7 @@ const frame = (ms: number, specks: Speck[] = []): Frame => ({ layers, ms, specks
 
 export const TOKEN_GREX: Character = {
   id: "token-grex",
-  name: "Jefferson token",
+  name: "Grex token",
   w: 40,
   h: 40,
   foot: [20, 39],

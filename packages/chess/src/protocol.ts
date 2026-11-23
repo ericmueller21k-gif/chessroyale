@@ -50,7 +50,7 @@ export interface NetBoard {
   recentFrom: string;
   /** Every move from the starting position, to step back through the game. */
   history: string[];
-  /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
+  /** Positions changed between moves (a piece Grex's fire destroyed): the moves after each are played from it. */
   bases?: Base[];
   /**
    * Every capture on this board as it was played (BoardState.captures): what the queen banners read. Optional: a server
@@ -162,7 +162,7 @@ export interface ScoreJob {
   /** Boss battle, a power limits the crowd's moves: the moves allowed (the best and the bots' picks come from these). */
   allowed?: string[];
   /**
-   * Boss battle, G-REX's fire: the tiles ablaze this turn. A crowd piece left on one after the move burns: the moves
+   * Boss battle, Grex's fire: the tiles ablaze this turn. A crowd piece left on one after the move burns: the moves
    * that save it are scored too, and the bots count a piece left there as gone (the lobby's runner does the scoring).
    */
   burn?: string[];
@@ -330,7 +330,7 @@ export interface NetBossPowers {
   events: PowerEvent[];
   /** The crowd's turn: the moves it may play (null: any legal move). */
   allowed: string[] | null;
-  /** G-REX's fire tiles (missing from older servers): each square, the crowd turn it landed, its stage (1-3) now. */
+  /** Grex's fire tiles (missing from older servers): each square, the crowd turn it landed, its stage (1-3) now. */
   fire?: { square: string; lit: number; stage: number }[];
   /** What the fire did after the crowd's last move: pieces destroyed, tiles that fizzled under the king. */
   burnt?: BurnEvent[];
@@ -829,7 +829,7 @@ export type ServerMessage = { now: number } & (
         barred?: string;
         /** Boss battle, a power limits the crowd's moves: the bots pick from these. */
         allowed?: string[];
-        /** Boss battle, G-REX's fire: the tiles ablaze (the bots count a piece left there as gone). */
+        /** Boss battle, Grex's fire: the tiles ablaze (the bots count a piece left there as gone). */
         burn?: string[];
         /** Boss battle, Chub & Chirp's Carrot Patch: the race (the bots pick with it counted). */
         race?: CarrotRace;

@@ -995,7 +995,7 @@ The meter fills to ${p.rageFull}${p.rageOverTime ? `:\n\n- ${p.ragePerMove} for 
 - ${num(p.ragePerMaterial)} for every point of material the boss loses (a pawn is 1, a knight or bishop 3, a rook 5, a queen 9)${queen ? ": taking his queen fills it on its own" : `: taking his queen fills ${pct((9 * p.ragePerMaterial) / p.rageFull, 0)} of it`},
 - ${p.rageStrike} each time the God King strikes the boss ([his strike](#king-charges)).
 
-Each boss's meter fills at its own speed (everything above times it): ${speeds}. The ones whose ultimates last longer fill faster, so each gets about two in a typical battle (Jefferson about one and a half: his barrage lasts longest). These rates are estimates, and may be tuned as real battles come in.
+Each boss's meter fills at its own speed (everything above times it): ${speeds}. The ones whose ultimates last longer fill faster, so each gets about two in a typical battle (Grex about one and a half: his barrage lasts longest). These rates are estimates, and may be tuned as real battles come in.
 ${
   p.rageOverTime
     ? `
@@ -1077,7 +1077,7 @@ ${rows}
 
 **Worked example.** On move ${first}, from a level position, the crowd hangs its queen: that gives away 50 to 70 points, well over ${num(lastStandBar(0.5, from, 1, S), 1)}, so he saves it${from > 0 ? ` (the same queen hung on move ${from} would stand)` : ""}. Later, with the crowd down to ${pct(weak, 0)}, a move that throws away ${num(lastStandBar(weak, from, 1, S), 1)} points (half of what was left) calls him too. A sacrifice the engine likes gives nothing away, so it never calls him: he judges the chances, not the material.
 
-**What you see:** a warning, everything freezes, he dives onto the piece's square with his cut-in, the piece slides back, he takes the blow (the boss drops in and attacks him: Hollow lashes him with his string of lights, Alfil jabs him with his ankus, Sawyer saws at him, Wrangler cracks his lasso at him, Boingo pies him, Big Boy bonks him with his lollipop, Ginger jabs him with his candy cane and Jefferson fires his Roman candle at him), staggers, falls and fades. Then the crowd picks again. He's gone for the rest of the battle, and the charges he fell with go to the crowd: everyone still in gets ${n(S.lastStandPowerUps, "power-up")} for each (a power-up shows the engine's top 3 moves). He never steps in when only one move was possible.
+**What you see:** a warning, everything freezes, he dives onto the piece's square with his cut-in, the piece slides back, he takes the blow (the boss drops in and attacks him: Hollow lashes him with his string of lights, Alfil jabs him with his ankus, Sawyer saws at him, Wrangler cracks his lasso at him, Boingo pies him, Big Boy bonks him with his lollipop, Ginger jabs him with his candy cane and Grex fires his Roman candle at him), staggers, falls and fades. Then the crowd picks again. He's gone for the rest of the battle, and the charges he fell with go to the crowd: everyone still in gets ${n(S.lastStandPowerUps, "power-up")} for each (a power-up shows the engine's top 3 moves). He never steps in when only one move was possible.
 
 He also sits out while a boss's power has changed the board (hoops, blocks, plants, frozen or hidden squares…): your move stands, nothing is spent, and once the board is back to normal he's ready again.
 `,

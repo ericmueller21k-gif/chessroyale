@@ -216,7 +216,7 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's, Jefferson's, Ginger's, Folio's, Smudgy's, Boingo's, Rolling Dough's and the Walk-up's (the Hidden Boss's, Nov 13) homes have an inside", () => {
+  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's, Grex's, Ginger's, Folio's, Smudgy's, Boingo's, Rolling Dough's and the Walk-up's (the Hidden Boss's, Nov 13) homes have an inside", () => {
     expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "chandy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "recluse", "smudgy", "tiger", "timber", "zebra"]);
   });
 
@@ -267,9 +267,9 @@ describe("the shops", () => {
     expect(prizeRows(w)[0]).toMatchObject({ id: "pen-pony", name: "Pen Pony", kind: "Mythic ride" });
     expect([w.kid, w.roof, w.chatTone]).toEqual(["rooster", "barn", "day"]);
     const j = shopOf("grex")!;
-    expect(j.crate).toBe("Jefferson's Boss Crate");
-    expect(priceLine(j)).toBe("3 Jefferson tokens, or 1 Jefferson token + 1 crate key");
-    expect(holdLine(j, { tokens: 0, keys: 0 })).toBe("You have 0 Jefferson tokens and 0 crate keys.");
+    expect(j.crate).toBe("Grex's Boss Crate");
+    expect(priceLine(j)).toBe("3 Grex tokens, or 1 Grex token + 1 crate key");
+    expect(holdLine(j, { tokens: 0, keys: 0 })).toBe("You have 0 Grex tokens and 0 crate keys.");
     expect(prizeRows(j)[0]).toMatchObject({ id: "jefferson-giraffe", name: "Giraffe Gallop", kind: "Mythic ride" });
     expect([j.kid, j.roof, j.chatTone]).toEqual(["dealer", "warehouse", "day"]);
     const gi = shopOf("gingerbread")!;

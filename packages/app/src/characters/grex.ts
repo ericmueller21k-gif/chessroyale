@@ -1,5 +1,5 @@
 /**
- * Jefferson (id "grex"; G-REX until Oct 10), the Fire boss: a cocky giraffe with a mischievous look and a fiery glint
+ * Grex (id "grex"; G-REX until Oct 10), the Fire boss: a cocky giraffe with a mischievous look and a fiery glint
  * in his eyes, flames on his horn tips, down his mane and on the end of his tail, a cheeky grin, a sparkler in each
  * hand and a wide fighting stance, after Eric's reference picture, redrawn. Yellow with orange-brown spots, light from
  * the top left.
@@ -1153,7 +1153,7 @@ export const GREX_PORTRAIT = { x: OX + 4, y: OY - 31, w: 40, h: 36 } as const;
  * `ultimateHit` the fireballs coming down.
  */
 export const GREX_LINES: Partial<Record<Beat, readonly string[]>> = {
-  entrance: ["Jefferson in the house!", "Feel the heat!", "Rawr! I mean… hi.", "Hot stuff coming through!"],
+  entrance: ["Grex in the house!", "Feel the heat!", "Rawr! I mean… hi.", "Hot stuff coming through!"],
   move: ["Sizzlin'!", "Too hot to handle?", "Smokin'!", "Watch and learn."],
   capture: ["Toast!", "Extra crispy!", "Burnt to a crisp!", "Well done. Very well done."],
   check: ["Check! Feeling warm?", "Your king's toast!", "Hot seat, your majesty!", "Check! Getting hot?"],
@@ -1289,14 +1289,14 @@ let attack: Anim | undefined;
 let still: Anim | undefined;
 
 /**
- * Jefferson for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame
+ * Grex for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame
  * `ATTACK_REACH` wider on the right (the fireballs' flight). Its animations are built the first time they're read
  * (his battle's warm-up, KingAttack.tsx). Its `idle`, one still, is for the preview.
  */
 export const GREX_ATTACK: Character = {
   ...GREX,
   id: "grex-attack",
-  name: "Jefferson (his attack)",
+  name: "Grex (his attack)",
   w: AW,
   h: AH,
   anims: {

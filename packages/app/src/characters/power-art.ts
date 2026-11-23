@@ -137,7 +137,7 @@
  *     ultimateWarn "check"      His trumpet, for the warning.
  *     ultimate     "mammothSlam" He leaps (`leap`, the big trumpet) and crashes down (`slam`: the board shakes); at `fly`
  *                               your three pieces fly up off their squares; at `shadows` each square they'll land on
- *                               shows Jefferson's `fireShadow` (reused as is), a size bigger each turn until they land.
+ *                               shows Grex's `fireShadow` (reused as is), a size bigger each turn until they land.
  *     ultimateHit  "idle"       They land (he stays where he is): each drops out of the sky onto its own square, the
  *                               shadow at its biggest until then, a soft thump each (a piece whose square was taken
  *                               slides on to the nearest one allowed). Lines: `kit.lines.ultimateHit`.
@@ -213,7 +213,7 @@
  *   pieceBurn      square  p, n, b, r, q: the piece of that kind burning up (flames engulf it, `poof`: take the
  *                          real piece off, its charred shape crumbles to ash and embers, ends empty); burn: the same
  *                          without a shape.
- *   sparkFly       square  fly (loop). G-REX's sparkler tumbling end over end; move it, no need to turn it.
+ *   sparkFly       square  fly (loop). Grex's sparkler tumbling end over end; move it, no need to turn it.
  *   candleShot     square  fly (loop), pop (ends empty). A Roman candle rocket pointing up; move it up.
  *   fireballFall   square  fall (loop), land (ends on fireTile's stage1 look). Move the falling one down onto
  *                          the square, land it there, then carry on with fireTile stage1.
@@ -256,7 +256,7 @@
  *                          its chest, from the left or right edge: a white star with rainbow rays, candy-colored stars.
  *   frostHit       square  hit<H|L><L|R> (ends empty, about 200 ms): a jab of Ginger's frosted cane on a king, high or
  *                          low, from the left or right edge: a white puff and ice shards; it never covers the king.
- *   popHit         square  hit<H|L><L|R> (ends empty, about 200 ms): a fireball of Jefferson's Roman candle popping on a
+ *   popHit         square  hit<H|L><L|R> (ends empty, about 200 ms): a fireball of Grex's Roman candle popping on a
  *                          king, high or low, from the left or right: a white flash and eight sparks bursting out.
  *   clawHit        square  hit<H|L><L|R> (ends empty, about 200 ms): a swipe of Dash's claws on a king, high or low, from
  *                          the left or right edge: three streaks raking down, white-hot, then his teal.
@@ -298,7 +298,7 @@
  *                          (Babur's attack on a king).
  *
  * Play them with <BossEffect> (components/BossEffect.tsx), which plays their sounds from the frames' cues, once,
- * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (G-REX's
+ * through the mute switch; or render frames yourself with `renderFrame`. For many square effects at once (Grex's
  * burning tiles, a piece burning on one, fireballs landing), use <BoardEffects>: one canvas over the whole board, one
  * shared loop, only the squares that changed redrawn, so a dozen fires cost what one does. Move flying ones
  * (sparkFly, candleShot, fireballFall's fall) with a CSS transform, never by redrawing.
@@ -380,7 +380,7 @@ export interface PowerMoment {
 
 /**
  * A boss's power moments. `powerHit` and `ultimateHit` are for powers whose payoff lands later than the moment they
- * fire (G-REX's tile burning a piece; his fireballs coming down).
+ * fire (Grex's tile burning a piece; his fireballs coming down).
  */
 export interface BossPowerMoments {
   power: PowerMoment;
@@ -843,7 +843,7 @@ export function frostItem(square: string, i: number, from: "L" | "R", since: num
   return { square, name: "frostHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
-/** Jefferson's i-th fireball popping on the king's square (at its head, then its chest, in turn), from his side. */
+/** Grex's i-th fireball popping on the king's square (at its head, then its chest, in turn), from his side. */
 export function popItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "popHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }

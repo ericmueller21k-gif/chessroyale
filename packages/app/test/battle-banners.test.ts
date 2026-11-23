@@ -134,7 +134,7 @@ describe("QUEEN DOWN! and QUEEN SLAIN!: one for each queen capture, on its own s
   });
 
   it("only real captures (Eric, Nov 5): a power that changes the board around a queen gives none; a real capture during or right after one gives exactly one", () => {
-    // G-REX's fire burns your queen; a Slam lifts it; a plant eats it: the board changes, nothing is captured.
+    // Grex's fire burns your queen; a Slam lifts it; a plant eats it: the board changes, nothing is captured.
     const burnt = burnOnBoard(freestyleBoard(0, QUEENS_B), "d1");
     expect(burnt.captures).toBeUndefined();
     expect(dueQueenBanner(view(burnt), "move")).toBeNull();
@@ -150,7 +150,7 @@ describe("QUEEN DOWN! and QUEEN SLAIN!: one for each queen capture, on its own s
     const real = play(burnOnBoard(freestyleBoard(0, "3qk3/8/8/8/8/8/P7/3QK3 b - - 0 1"), "a2"), "d8d1");
     expect(real.captures).toEqual([{ ply: 1, side: "b", from: "d8", to: "d1", piece: "q", color: "w" }]);
     expect(screens([{ board: real, screen: "move", ms: LONG }])).toEqual(["QUEEN DOWN!"]);
-    // A burn after the capture (G-REX's fire as your move lands) hides nothing: the record stands.
+    // A burn after the capture (Grex's fire as your move lands) hides nothing: the record stands.
     const slain = burnOnBoard(play(freestyleBoard(0, "3qk3/7p/8/8/8/8/8/3QK3 w - - 0 1"), "d1d8"), "h7");
     expect(screens([{ board: slain, screen: "thinking", ms: LONG }])).toEqual(["QUEEN SLAIN!"]);
     // (The boss's clock reads the same record: he waits for QUEEN SLAIN! only for a real capture.)

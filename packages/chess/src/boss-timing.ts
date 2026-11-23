@@ -70,7 +70,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * banner, the sweep across the board and the God King's line (each thaw after it: its banner and the ice melting
  * away); the funhouse (a screen of its own, after the move he
  * plays for the crowd): the clown pogos onto the board, it turns upside down, he speaks and the move lands (each later
- * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
+ * step, `spin`: its banner, then the board turns again); the Roman candle: Grex drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
 export const POWER_FX = { warn: 1700, rushWarn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX, ...ZEBRA_FX, ...CHANDY_FX } as const;
@@ -286,7 +286,7 @@ export function queenSlain(boss: QueenSlainView): boolean {
 
 /**
  * The boss thinks for at least this long; longer when the crowd has just taken its queen (queenSlain: your banner
- * plays first, and a beat after it), when G-REX's fire has just burnt (`burnt`: it plays first), or when something of
+ * plays first, and a beat after it), when Grex's fire has just burnt (`burnt`: it plays first), or when something of
  * the boss's own played after the crowd's move (`afterMs`: Alfil's pieces coming down early, landedEarly).
  */
 export function bossThinkMs(boss: QueenSlainView, burnt = false, afterMs = 0): number {
@@ -464,7 +464,7 @@ export const lastStandAttackHits = (): number[] => kingAttackHits().map((t) => L
 /**
  * The bosses whose character has a `kingAttack` (the app's BOSS_KITS: a unit test keeps the two the same), by
  * BOSS_ROSTER id, in the kits' order. Hollow first (Eric, Oct 10: to try it before the others get theirs); Alfil's ankus
- * jabs (Oct 17); Boingo's pies, Sawyer's saw and Wrangler's lasso (Eric, Oct 18); Ginger's cane, Jefferson's Roman
+ * jabs (Oct 17); Boingo's pies, Sawyer's saw and Wrangler's lasso (Eric, Oct 18); Ginger's cane, Grex's Roman
  * candle and Big Boy's lollipop (Eric, Oct 18); Chub & Chirp's carrots (Oct 18); Smudgy's paint (Oct 19); Moo & Moon's moonbeams (Oct 20); Puddles' hose (Oct 23); Babur's balloons (Oct 24); Folio's ink (Oct 27); Timber's hammer and plank (Nov 2); Dash's claws (Nov 6); Don Dough's bread rifle (Nov 11): every playable boss but the Hidden Boss.
  */
 export const KING_ATTACKERS: readonly string[] = ["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber", "dash", "zebra"];

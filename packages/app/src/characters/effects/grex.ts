@@ -1,10 +1,10 @@
-/** G-REX's effects: his fire tiles, a piece burning, the sparkler, the Roman candle's rockets and fireballs, their shadows. See ../effects.ts. */
+/** Grex's effects: his fire tiles, a piece burning, the sparkler, the Roman candle's rockets and fireballs, their shadows. See ../effects.ts. */
 import { canvas, ellipse, flame, line, poly, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { hitAnims, SQUARE, type Pt } from "./common.ts";
 import { lazyAnim } from "../sprite.ts";
 
-// ---- G-REX's fire: a tile that burns up in three stages, a piece burnt to ash, his thrown sparkler, the Roman
+// ---- Grex's fire: a tile that burns up in three stages, a piece burnt to ash, his thrown sparkler, the Roman
 // candle's rockets, the fireballs that fall from them, and the count of shots still up there.
 
 const FIRE_PALETTE = {
@@ -356,7 +356,7 @@ export const PIECE_BURN: Character = {
   anims: { burn: lazyAnim(() => burnUp()), ...Object.fromEntries(PIECES.map((pc) => [pc, burnUp(pc)])) },
 };
 
-// ---- G-REX's sparkler, thrown, tumbling end over end to its square.
+// ---- Grex's sparkler, thrown, tumbling end over end to its square.
 
 const sparklerPart = (dir: Pt): Part => {
   const cv = canvas(13, 13);
@@ -598,7 +598,7 @@ function popSpecks(y: number, step: 0 | 1 | 2): Speck[] {
 }
 
 /**
- * A fireball of Jefferson's Roman candle popping on a king (his attack on a king): `hit<H|L><L|R>`, at its head or its
+ * A fireball of Grex's Roman candle popping on a king (his attack on a king): `hit<H|L><L|R>`, at its head or its
  * chest, from the left or right: a white flash, eight sparks bursting out, then falling and cooling. About 200 ms; ends
  * empty. Over the piece (or the God King standing there).
  */

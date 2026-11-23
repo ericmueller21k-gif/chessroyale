@@ -1,6 +1,6 @@
 /**
  * Dash's effect sprites for the board: one, the marks of a swipe of his claws on a king (his attack on a king: the God King's Last
- * Stand, the crowd's king at its mate). Until Nov 11 his swipes showed Jefferson's fireball pops (`popHit`), another boss's effect
+ * Stand, the crowd's king at its mate). Until Nov 11 his swipes showed Grex's fireball pops (`popHit`), another boss's effect
  * (docs/decisions/2026-11-11-mate-effects-iphone-vibration.md). Drawn by code like Don Dough's flour (effects/zebra.ts), in his own colors (his
  * jacket's teal, boss-blitz.ts): three claw streaks raking down across the square, white-hot, then teal, then gone. See ../effects.ts.
  */

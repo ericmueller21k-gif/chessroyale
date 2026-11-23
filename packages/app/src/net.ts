@@ -1309,7 +1309,7 @@ export class NetMatch implements GameView {
       // (Boss battle: only the moves allowed this turn; the move the God King took back is off the table.)
       const all = await this.top.get(engines[0]!, plan.fen);
       const limits = { ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}) };
-      // (G-REX's fire: the bots count a piece left on a tile ablaze as gone. The Carrot Patch: the race counted.)
+      // (Grex's fire: the bots count a piece left on a tile ablaze as gone. The Carrot Patch: the race counted.)
       const base = judgeCandidates(limits, all, (await allowedSearch(engines[0]!, { ...limits, fen: plan.fen }, all)) ?? []);
       const offers = jobOffers({ fen: plan.fen, race: plan.race, ...limits }).filter((mv) => !base.some((t) => t.move === mv));
       const top = jobRanked({ fen: plan.fen, burn: plan.burn, race: plan.race }, [...base, ...(offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : [])]);
@@ -1352,7 +1352,7 @@ export class NetMatch implements GameView {
           // (The Carrot Patch's pulls: scored first, the bots' to pick too.)
           const offers = jobOffers({ fen: job.fen, race: job.race, ...limits }).filter((mv) => !top.some((t) => t.move === mv));
           const offered = offers.length ? await engine.scoreMoves(job.fen, offers) : [];
-          // (G-REX's fire: the bots count a piece left on a tile ablaze as gone; the Carrot Patch: the race counted. The
+          // (Grex's fire: the bots count a piece left on a tile ablaze as gone; the Carrot Patch: the race counted. The
           // scores stay the engine's.)
           const ranked = jobRanked(job, [...top, ...offered]);
           const candidates = ranked.map((mv) => ({ move: mv.move, loss: Math.max(0, (ranked[0]!.expected - mv.expected) * 100) }));
@@ -1378,7 +1378,7 @@ export class NetMatch implements GameView {
           const expectedAfter: Record<string, number> = Object.fromEntries(top.map((mv) => [mv.move, mv.expected]));
           for (const mv of open) expectedAfter[mv.move] = mv.expected;
           for (const mv of offered) expectedAfter[mv.move] = mv.expected;
-          // (G-REX's fire: every move that saves a piece from a tile ablaze is scored too; the Carrot Patch: every move
+          // (Grex's fire: every move that saves a piece from a tile ablaze is scored too; the Carrot Patch: every move
           // that pulls a carrot.)
           const escapes = jobEscapes({ fen: job.fen, burn: job.burn, race: job.race, allowed: job.allowed, barred: job.barred });
           const missing = [...new Set([...Object.values(job.humanPicks), ...Object.values(botPicks), ...escapes])].filter(

@@ -4,7 +4,7 @@ import { engineTop, test, watchFor, bossAloneFromHome, submitMove } from "./help
 import { MUSIC } from "@chessroyale/core";
 
 /**
- * Jefferson (id "grex"; G-REX until Oct 10), the Fire boss, played through alone on a phone and a computer: his sparkler's tile burning in stages with its
+ * Grex (id "grex"; G-REX until Oct 10), the Fire boss, played through alone on a phone and a computer: his sparkler's tile burning in stages with its
  * countdown, a piece left on a tile ablaze burning, the God King's warning, and the Roman candle (?power=candle: warned
  * as the second turn begins, fired on the third): its 24 shots falling 1, 2, 3, 4, 4, 4, 3, 2, 1 from 3 crowd moves
  * on, each wave's squares shadowed 3 turns ahead. And the admins' test trigger.
@@ -14,7 +14,7 @@ const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers
 const banner = (p: Page, text: string) => p.locator(".fight-banner.power-cut", { hasText: text });
 
 /**
- * Waits for your move, then plays one: G-REX's fire first (`leave`: keep a pawn on a tile ablaze, to watch it burn;
+ * Waits for your move, then plays one: Grex's fire first (`leave`: keep a pawn on a tile ablaze, to watch it burn;
  * `step`: onto a burning tile when one's in reach), else the engine's best allowed move. Returns the move and the
  * squares where a pawn was left to burn.
  */
@@ -67,15 +67,15 @@ async function play(page: Page, opts: { leave?: boolean; step?: boolean } = {}) 
 const shadowsShown = (page: Page) =>
   page.evaluate(() => Object.fromEntries([...document.querySelectorAll<HTMLElement>(".power-board .pw-shadow")].map((e) => [e.dataset.square!, Number(e.dataset.size)])));
 
-test("Jefferson (he was G-REX): a test link's ?boss=jefferson meets him, by his new name", { tag: "@phone-only" }, async ({ page }) => {
+test("Grex (he was G-REX): a test link's ?boss=jefferson meets him, by his new name", { tag: "@phone-only" }, async ({ page }) => {
   await page.goto("/?debug&clock=40&boss=jefferson");
   await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".boss-intro-name")).toHaveText("Jefferson");
-  expect(await page.evaluate(() => { const b = (window as any).match.boss; return [b.id, b.name]; })).toEqual(["grex", "Jefferson"]);
+  await expect(page.locator(".boss-intro-name")).toHaveText("Grex");
+  expect(await page.evaluate(() => { const b = (window as any).match.boss; return [b.id, b.name]; })).toEqual(["grex", "Grex"]);
 });
 
-test("Jefferson's music: fetched when his battle is picked (not at app start), started as the battle starts, Music off and on in the match's options, faded out at the result; Settings has the switch", { tag: "@phone-only" }, async ({ page }) => {
+test("Grex's music: fetched when his battle is picked (not at app start), started as the battle starts, Music off and on in the match's options, faded out at the result; Settings has the switch", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   // (docs/decisions/2026-11-11-boss-music.md. ?win=1: your first move, Qxf7, mates him.)
   // (The sound log, noting the match's phase as the music starts.)
@@ -145,20 +145,20 @@ test("Jefferson's music: fetched when his battle is picked (not at app start), s
   await expect(page.getByRole("switch", { name: /^Music/ })).not.toBeChecked();
 });
 
-test("Jefferson: his tiles burn in stages counting down, a piece left on one burns, and the Roman candle's 24 shots fall where their shadows said", { tag: "@phone-only" }, async ({ page }) => {
+test("Grex: his tiles burn in stages counting down, a piece left on one burns, and the Roman candle's 24 shots fall where their shadows said", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(9 * 60_000);
   // (?laststand=0: leaving a piece to burn on purpose isn't taken back by the God King.)
   await page.goto("/?debug&clock=40&bossMoves=16&boss=grex&power=candle&laststand=0");
   await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-  expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Jefferson");
+  expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Grex");
   await expect(page.locator(".rage-meter")).toBeVisible();
 
   await play(page);
   // As the second turn begins: SPARKLER! (a tile on your half, at its first stage, counting 3), then RAGE!.
   await expect(banner(page, "SPARKLER!")).toBeVisible({ timeout: 30_000 });
-  // (His name on the banner is Jefferson, never his old G-REX.)
-  await expect(banner(page, "SPARKLER!").locator(".kc-label")).toHaveText("Jefferson");
+  // (His name on the banner is Grex, never his old Grex.)
+  await expect(banner(page, "SPARKLER!").locator(".kc-label")).toHaveText("Grex");
   await expect(banner(page, "RAGE!")).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   const p2 = await powers(page);
@@ -170,7 +170,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
 
   // Step onto it if a piece can (the God King's warning, once a match).
   await play(page, { step: true });
-  // The Roman candle: its banner, G-REX on the middle of the board, the row of pips in his boss card filling as he fires.
+  // The Roman candle: its banner, Grex on the middle of the board, the row of pips in his boss card filling as he fires.
   await expect(banner(page, "ROMAN CANDLE!")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".pm-rex")).toBeVisible({ timeout: 5_000 });
   await expect(page.locator(".pw-pips")).toBeVisible({ timeout: 8_000 });

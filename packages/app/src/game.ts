@@ -25,7 +25,7 @@ export interface BoardView {
   recentFrom: string;
   /** Every move from the starting position, to step back through the game. */
   history: string[];
-  /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
+  /** Positions changed between moves (a piece Grex's fire destroyed): the moves after each are played from it. */
   bases?: Base[];
   /** Every capture on this board as it was played (NetBoard.captures): what the queen banners read. */
   captures?: Capture[];

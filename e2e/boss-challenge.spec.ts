@@ -768,7 +768,7 @@ test("challenging Wrangler in the town: his own intro (in to where you stand, hi
   expect(errors).toEqual([]);
 });
 
-test("challenging Jefferson in the town: his own intro (in to your marks, one of his calls, he hollers, the crew stop and come round the table to watch, your lift raises you level with the board, his brag, his attack, his wipe of sparklers and fireworks), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
+test("challenging Grex in the town: his own intro (in to your marks, one of his calls, he hollers, the crew stop and come round the table to watch, your lift raises you level with the board, his brag, his attack, his wipe of sparklers and fireworks), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -779,15 +779,15 @@ test("challenging Jefferson in the town: his own intro (in to your marks, one of
   type Crew = { move: string | null; stopped: number; walk: number; lift: string; plate: number; table: string; tableAt: [number, number]; figs: Fig[] };
   const crewOf = (i: Intro | null) => (i as unknown as { crew: Crew | null } | null)?.crew ?? null;
   const lineOf = (i: Intro | null) => (i as unknown as { lineText: string | null } | null)?.lineText ?? null;
-  // (Jefferson is live for everyone: a player's town. Nov 4: his own intro, Eric's design.)
+  // (Grex is live for everyone: a player's town. Nov 4: his own intro, Eric's design.)
   await page.goto("/town?sky=day");
   await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  const { confirm, stood } = await toConfirm(page, "grex", "Jefferson");
+  const { confirm, stood } = await toConfirm(page, "grex", "Grex");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In at the warehouse's door, to the marks: his red plate west of the board on its crates, your lift's plate east; you stand there
   // through it all (he stands: no stool).
   await expect(room(page)).toHaveAttribute("data-room", "grex", { timeout: 20_000 });
-  await expect(page.getByRole("heading", { name: "Jefferson's Fireworks" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Grex's Fireworks" })).toBeVisible();
   const step = async () => (await intro(page))?.step ?? "";
   const marks = [11, 10.5, 8, 10.5];
   const where = (i: Intro) => [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);

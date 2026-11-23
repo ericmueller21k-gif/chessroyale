@@ -103,7 +103,7 @@ export function squaresOf(p: ShopPlace): Sq[] {
 /**
  * A room from its layout and its Shopkeeper's squares; `mask` (a room that isn't a box: Hollow's cave, the art's `SHOP_HOLLOW_FLOOR`,
  * `n` rows of `n`, `.` floor and `#` rock) blocks every rock square too, besides the edge and the solid pieces. `talk`: the pieces
- * whose squares mean "talk" as the counter's do (a shop with no counter: Jefferson's crate and his bare corner, Nov 4).
+ * whose squares mean "talk" as the counter's do (a shop with no counter: Grex's crate and his bare corner, Nov 4).
  */
 export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[], talk: readonly string[] = [], levels: Levels | null = null, talkAt: readonly Sq[] | null = null, talkNear = false): Room {
   const blocked = new Uint8Array(n * n);

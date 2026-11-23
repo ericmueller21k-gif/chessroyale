@@ -346,7 +346,7 @@ describe("boss powers online", () => {
     expect(L.last("p1", "round")!.boss!.powers!.allowed!.length).toBeGreaterThan(0);
   });
 
-  it("G-REX: everyone sees the same fire; on a tile's last turn the job names it, a piece left there burns, and the boss waits for it", () => {
+  it("Grex: everyone sees the same fire; on a tile's last turn the job names it, a piece left there burns, and the boss waits for it", () => {
     const L = raid({ bossId: "grex", bossUnfinished: true });
     const runner = (L.core as unknown as { runner: MatchRunner }).runner;
     expect(runner.boss!.id).toBe("grex");

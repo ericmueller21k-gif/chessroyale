@@ -290,7 +290,7 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
       if (kit.ch.id === "pig") prewarmPig(kit.ch.name);
       // (Ginger's ice: its crack, thin ice and thaw; Boingo's freeze, a piece his pie splatted twice, shows it too.)
       if (kit.ch.id === "gingerbread" || kit.ch.id === "clown") prewarmGinger();
-      // (Jefferson's Roman candle: him, its shots and fireballs.)
+      // (Grex's Roman candle: him, its shots and fireballs.)
       if (kit.ch.id === "grex") prewarmGrex(kit.ch.name);
       // (Alfil's cast, fusion and Slam, and the shadows his pieces cast while they're up.)
       if (kit.ch.id === "alfil") prewarmAlfil(kit.ch.name);
