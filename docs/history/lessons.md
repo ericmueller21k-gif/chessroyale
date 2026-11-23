@@ -1224,3 +1224,18 @@ two rejoins that had never been reached (the dark's move due, a strike due after
 been. One test walks every timed power and moment in Boss alone and a Solo raid and checks the kept game at every update and every
 beat. docs/decisions/2026-11-22-solo-resume.md.
 
+
+## A move list that drew every move on a phone (Nov 23, 2026)
+
+**What happened:** two `@perf` checks on main failed their element counts: Grex's barrage late in a long game, 1,987 elements against
+391, and the long boss battle, 248 against 232. CI leaves `@perf` out, so nothing went red; Eric saw the numbers: "if those pieces
+are showing 1987 we gotta fix this".
+
+**Why:** nothing leaked. A census by selector after each turn showed only move-list rows growing: the phone's panel (five rows in
+view) never scrolls, but drew every move of the battle, about 14 elements a row, ten of them a bare pawn avatar's two empty SVG layers.
+120 moves were about 1,700 elements, drawn again each turn as the panel mounted.
+
+**The fix:** the panel draws the newest rows that fit its box and two more; a bare avatar skips its empty layers. Grex's barrage:
+252 → 296; 120 plies in the long battle: 1,943 → about 257, and its idle frames went from p95 33 to 50 ms (8 to 29% dropped) to 16.7
+ms (0 to 1%). docs/decisions/2026-11-23-move-panel-draws-what-fits.md.
+

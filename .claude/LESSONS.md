@@ -144,6 +144,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A rule made for one kind of room (a cave's see-through) is opted into by what it's for, not by a field another room also
     has. Walk round every piece in a new room mid-walk, not only at rest.
 
+- **A move list that drew every move on a phone** (Nov 23, [story](../docs/history/lessons.md#a-move-list-that-drew-every-move-on-a-phone-nov-23-2026)):
+  - A box that never scrolls draws only what it can show (and a little spare): rows out of view still cost their elements on every
+    redraw and every remount. Count what a long match leaves on the page by selector, not just the total.
+  - A component's optional layers that hold nothing aren't drawn: an empty SVG is five elements, times every place it appears.
 - **Lag that grows with the match** (Oct 9, [story](../docs/history/lessons.md#lag-that-grows-with-the-match-oct-9-2026)):
   - Anything a screen reads while rendering must be cheap and must not depend on how long the match is. A getter that
     looks like a field gets read dozens of times a frame, so it must never rebuild anything.

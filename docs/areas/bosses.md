@@ -811,7 +811,10 @@ below):
   `move-list.ts`): one row per move of the battle (who moved, the move number, the piece and its square, a capture, a
   raid's picks, the time it took as this device saw it), from the match's own history. A phone upright: the panel left of
   the God King, "Players" / "Moves" (and "Chat" with chat on) with other players, the moves alone in Boss alone; a tap
-  opens it full size over the board (✕, Escape, a tap outside close it). A computer (`.mv-side`, 900 px and up): right of
+  opens it full size over the board (✕, Escape, a tap outside close it). The phone's panel never scrolls, so it **draws only
+  the newest rows that fit its box and two more** (`fitRows`, measured with a ResizeObserver and kept across its mounts;
+  an even number left out, so the stripes stay); the sheet and a computer's column draw every row (Nov 23: 120 moves were
+  1,700 elements on a phone; docs/decisions/2026-11-23-move-panel-draws-what-fits.md). A computer (`.mv-side`, 900 px and up): right of
   the board, its top level with the board's, **half the height it had** (`--mv-h`: half of the board's less 146 px, at
   least 120 px; it grows with the board, 367 px tall by an 880 px board since Oct 29), the column's width, **13 to 15 px off the board** (it's shifted in with a `translate` from `--gk-column`
   and `--board-px`; the column's own 28 px gap and the board's slack go), Boss alone's pawn and the God King below it; a
