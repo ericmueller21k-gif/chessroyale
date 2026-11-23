@@ -364,6 +364,12 @@ describe("his moments' lengths", () => {
     const reach = Array.from({ length: 8 }, (_, i) => trainReaches(i));
     expect(reach.every((t, i) => i === 0 || t > reach[i - 1]!)).toBe(true);
     expect(reach[7]!).toBeLessThan(BIRDIE_BEATS.ride.rideMs);
+    // (His train slower, Eric Nov 23: "slow the train a bit down": its crossing the setting's, about 1.5x the first 1300 ms; his return and
+    // the whole ride after it.)
+    expect(BIRDIE_BEATS.ride.rideMs).toBe(BOSS_POWERS.birdie.trainRideMs);
+    expect(BIRDIE_BEATS.ride.rideMs / 1300).toBeCloseTo(1.5, 1);
+    expect(BIRDIE_BEATS.ride.backAt).toBe(BIRDIE_BEATS.ride.rideAt + BIRDIE_BEATS.ride.rideMs);
+    expect(BIRDIE_BEATS.ride.total).toBe(BIRDIE_BEATS.ride.backAt + BIRDIE_BEATS.ride.entranceMs);
     // (The cutscene, Moo's length (Eric: "about 6 to 7 s"), after his wait for his ult's piece: its drop on the train's impact.)
     const c = BIRDIE_CINEMATIC;
     const f = BIRDIE_BEATS.fall;
