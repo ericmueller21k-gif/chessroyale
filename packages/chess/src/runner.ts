@@ -1409,7 +1409,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b) || trainWon(b)) || (this.bossForceWin && this.bossToMove());
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b) || trainWon(b)) || ((this.bossForceWin || this.bossForceEnd !== null) && this.bossToMove());
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -2160,10 +2160,10 @@ export class MatchRunner {
    */
   finishBossBattle(): "crowd" | "boss" | "draw" {
     const b = this.state.boss!;
-    const timeout = this.bossOutOfTime() && !this.finalGameOver();
+    const timeout = !this.bossForceEnd && this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
     // (Hollow's last bulb out, Boss alone, a Dodge hit and Birdie's train on your king: his, whatever the board says.)
-    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || this.sideBosses().some((x) => blackedOut(x) || dodgeWon(x) || trainWon(x)) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    const result = this.bossForceWin ? "crowd" : this.bossForceEnd ? this.bossForceEnd : timeout || this.bossCarrotWin || this.sideBosses().some((x) => blackedOut(x) || dodgeWon(x) || trainWon(x)) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     // (The Hidden Boss's child beaten: the fight goes on, a new match against his adult form (nextBossForm). Nobody is placed.)
     if (b.form === "child" && result === "crowd") {
       this.state = { ...this.state, boss: { ...b, result } };
@@ -2181,6 +2181,12 @@ export class MatchRunner {
    * press in his room's fight from the town sets it (LobbyCore.winFormTrigger, which keeps it in the lobby's record).
    */
   bossForceWin = false;
+
+  /**
+   * Testing (e2e only: SoloMatch.forceEnd, helpers.ts' endBattle, behind the 🏆's guard; no button): the battle ends as the crowd's next
+   * move lands, as bossForceWin's does, but lost ("boss") or drawn. Kept on the runner, never in the match state; the server never sets it.
+   */
+  bossForceEnd: "boss" | "draw" | null = null;
 
   /**
    * The form a boss battle against `id` starts in: the Hidden Boss's child (RECLUSE_CHILD), where the settings ask for it
@@ -2249,6 +2255,7 @@ export class MatchRunner {
     this.state = { ...startBanks(this.state, this.settings), boss: next };
     this.bossLast = null;
     this.bossForceWin = false;
+    this.bossForceEnd = null;
     this.bossTimedOut = false;
     this.brainNote = null;
     this.preparePowers();
