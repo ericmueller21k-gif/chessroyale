@@ -22,7 +22,7 @@ const PAIR_SEEDS = Number(process.env.KIT_PAIR_SEEDS ?? 1);
  * break (it.fails): once the rule is built, or the pair joins BATTLE_TOWER.apart, the check goes red until its entry here goes.
  */
 export const PAIR_BREAKS: Readonly<Record<string, { seeds: readonly number[]; rule: string }>> = {
-  // (None now: the kit's two, Smudgy + Alfil and Alfil + Jefferson, joined BATTLE_TOWER.apart on Nov 19.)
+  // (None now: the kit's two, Smudgy + Alfil and Alfil + Grex, joined BATTLE_TOWER.apart on Nov 19.)
 };
 
 /** The tower's bosses: every one with powers but the Hidden Boss. */

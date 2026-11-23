@@ -20,7 +20,7 @@ const minOnScreen = (text: string) => text.length * SPEECH.typeMs + Math.min(SPE
 const BOSSES = [
   { id: "gingerbread", name: "Ginger", banner: "FREEZE!" },
   { id: "clown", name: "Boingo", banner: "PIE!" },
-  { id: "grex", name: "Jefferson", banner: "SPARKLER!" },
+  { id: "grex", name: "Grex", banner: "SPARKLER!" },
   { id: "hollow", name: "Hollow", banner: "DARKNESS!" },
   { id: "bigboy", name: "Big Boy", banner: "TOY BLOCK!" },
   // (Sawyer's saw cut, his passive on turn 3 of every battle (BOSS_POWERS.sawFirst). Not his split pawn: it waits for
@@ -127,7 +127,7 @@ for (const boss of BOSSES) {
     await page.goto(`/?debug&clock=60&boss=${boss.id}`);
     await bossAloneFromHome(page);
     await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
-    // Best moves until the moment comes (Ginger, Boingo, Jefferson and Big Boy as your second turn begins, Sawyer's saw
+    // Best moves until the moment comes (Ginger, Boingo, Grex and Big Boy as your second turn begins, Sawyer's saw
     // cut as your third does; Hollow after his first move).
     for (let i = 0; i < 4 && !(await speech()).banners[boss.banner]; i++) {
       await playBest(page);

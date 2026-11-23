@@ -5,7 +5,7 @@
  * room of 20 x 20 squares seen as the town square is seen (the camera looks north, things stand upright at their foot, 37 px a
  * square), with a floor mask (SHOP_GINGER_FLOOR, as Hollow's cave): a round floor 10 squares across, centred on the grid, packed
  * snow, and a short entry tunnel from the front. Curved ice-block walls stand round it (the dome's inside). Drawn by hand (Nov 5,
- * weekly plan usage), built as Jefferson's warehouse is (out/house-shop-grex).
+ * weekly plan usage), built as Grex's warehouse is (out/house-shop-grex).
  *
  * The back wall, left and right of the shopkeeper, is lined with candy dispensers like Eric's photo, curving with the wall: a
  * lower row of gravity-bin dispensers (clear bins, striped lids, handles, chutes, candy of every color) and an upper row of tall

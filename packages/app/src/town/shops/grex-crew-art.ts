@@ -3,8 +3,8 @@
  * Changed: the import paths. The notes: scripts/boss-art/out/shop-grex-nov4.md and intro-grex-nov4.md on that branch.
  */
 /**
- * Jefferson's warehouse crew (Eric's design, Nov 4; drawn by hand on the weekly plan usage): giraffes who run his shady
- * firework warehouse (out/house-shop-grex). All one giraffe (giraffe-rig.ts), dressed each his own way; only Jefferson looks
+ * Grex's warehouse crew (Eric's design, Nov 4; drawn by hand on the weekly plan usage): giraffes who run his shady
+ * firework warehouse (out/house-shop-grex). All one giraffe (giraffe-rig.ts), dressed each his own way; only Grex looks
  * unique. Room scale, 1:1 (37 px a square). Facing our right; mirror any of them to face left.
  *
  * - `npc-grex-lift-guy`: the lift guy (a yellow hard hat with his ossicones through it, a lime hi-vis vest).

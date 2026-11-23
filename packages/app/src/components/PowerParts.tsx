@@ -40,7 +40,7 @@ export interface Moment {
   size?: number;
   /** Big Boy's tower: its height after this block (`stack`), or as it fell (`topple`). */
   height?: number;
-  /** Jefferson's fireproof laugh: which of his lines (from the seed). */
+  /** Grex's fireproof laugh: which of his lines (from the seed). */
   pick?: number;
   /** Wrangler's drag standing in for his showdown (none could be lined up). */
   ult?: true;

@@ -14,7 +14,7 @@ import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
  *   line said; the result only after the whole attack;
  * - in the God King's Last Stand (?laststand=1): the blow meant for the piece is Hollow's attack on the God King (his
  *   gold hits, none of the red slashes), and the Last Stand carries on as before (he falls; you pick again).
- * - in the Last Stand against Sawyer, Wrangler, Boingo, Big Boy, Ginger and Jefferson (Oct 18): each one's assault, a
+ * - in the Last Stand against Sawyer, Wrangler, Boingo, Big Boy, Ginger and Grex (Oct 18): each one's assault, a
  *   hit on every beat.
  * The beats are KING_ATTACK's and LAST_STAND's (packages/chess/src/boss-timing.ts).
  */
@@ -148,7 +148,7 @@ test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls
 });
 
 /**
- * Sawyer's saw, Wrangler's lasso, Boingo's pies, Big Boy's lollipop, Ginger's cane, Jefferson's Roman candle, Chub & Chirp's pitch, Smudgy's brush, Moo & Moon's moonbeams, Puddles' hose, Babur's balloons, Folio's ink and Timber's
+ * Sawyer's saw, Wrangler's lasso, Boingo's pies, Big Boy's lollipop, Ginger's cane, Grex's Roman candle, Chub & Chirp's pitch, Smudgy's brush, Moo & Moon's moonbeams, Puddles' hose, Babur's balloons, Folio's ink and Timber's
  * hammer and plank on the God King in his Last Stand (Eric, Oct 18: "a relentless assault"), with real taps on a phone and a computer, watched every frame: the boss drops in beside him as the piece
  * slides back, on the side toward the board's middle (his drawing mirrored to face him), a hit on every beat with its
  * gold "−N", his own sounds, his figure wholly on screen; then the Last Stand ends as always. No page errors.
@@ -159,7 +159,7 @@ const ASSAULTS = [
   { id: "clown", name: "Boingo", facesLeft: false, sounds: ["clownSplat", "clownSqueak"] },
   { id: "bigboy", name: "Big Boy", facesLeft: true, sounds: ["bigboyBonk", "bigboySwish"] },
   { id: "gingerbread", name: "Ginger", facesLeft: false, sounds: ["gingerCrackle", "gingerCrunch"] },
-  { id: "grex", name: "Jefferson", facesLeft: false, sounds: ["grexPop", "grexSparkle"] },
+  { id: "grex", name: "Grex", facesLeft: false, sounds: ["grexPop", "grexSparkle"] },
   { id: "hopper", name: "Chub & Chirp", facesLeft: true, sounds: ["hopperToss", "hopperBonk"] },
   { id: "smudgy", name: "Smudgy", facesLeft: true, sounds: ["smudgySwish", "smudgySplash"] },
   { id: "moo", name: "Moo & Moon", facesLeft: true, sounds: ["mooBeam", "mooZap"] },

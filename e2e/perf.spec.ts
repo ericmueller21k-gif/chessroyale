@@ -134,7 +134,7 @@ test("a long boss battle on a slow phone: nothing grows, and late frames stay wi
   }
 });
 
-test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays within budget", { tag: "@perf" }, async ({ page }) => {
+test("Grex's fire on a slow phone: a barrage of tiles late in a long game stays within budget", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
@@ -172,7 +172,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
       draws = await page.evaluate(() => ((window as any).__launchBoard?.hbDraws ?? 0) - (window as any).__launchDraws);
     }
   }
-  console.log(`G-REX's Roman candle launch (slowed phone): ${f(launch!)}, the board drawn ${draws} times`);
+  console.log(`Grex's Roman candle launch (slowed phone): ${f(launch!)}, the board drawn ${draws} times`);
   // The screen draws every frame while the candle plays over the board; the board's pieces only when they change
   // (docs/areas/board.md): a few times at most, not once a frame (Oct 14: it was every frame).
   expect(draws, "the board's pieces drawn during the launch").toBeLessThan(10);
@@ -230,7 +230,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
   await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|results/);
   const turn = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
-  console.log(`G-REX, 9 fire tiles and shadows, 120 plies: idle ${f(idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom} (the move list ${early.list} → ${late.list}, ${late.rows} rows of ${late.cap}), anims ${early.anims} → ${late.anims}`);
+  console.log(`Grex, 9 fire tiles and shadows, 120 plies: idle ${f(idle)}; drag ${f(drag)}; boss turn ${f(turn)}; DOM ${early.dom} → ${late.dom} (the move list ${early.list} → ${late.list}, ${late.rows} rows of ${late.cap}), anims ${early.anims} → ${late.anims}`);
   // The tiles' own elements and animations only (a few each), nothing per redraw. (The move list apart: it fills its panel
   // once, then stays, as in the long battle above.)
   expect(late.dom - late.list, "DOM elements (but the move list's)").toBeLessThanOrEqual(early.dom - early.list + 40 + squares.length * 6);
@@ -608,6 +608,48 @@ for (const who of ["a player's town", "an admin's town"] as const)
     // jobs at 4x and 2x slowing, about 1.5 the middle: 2 is about a third over it, as 2 s was over the 1.5 s it measured.)
     expect(long / ref, "longest task, in reference jobs").toBeLessThan(TOWN_LONG_REFS);
   });
+
+/** A second visit's first frame, with the first's pictures kept (keep-pictures.ts): this many reference jobs (Nov 23: measured 4.6 to 5.3
+ * over 4 runs, the first visit 14.8 to 15.8; the median and a quarter, as TOWN_LOAD_REFS). docs/decisions/2026-11-23-town-keep-pictures.md. */
+const TOWN_KEPT_REFS = 6;
+
+test("Chess Town on a slow phone: a second visit loads the first visit's kept pictures, exactly as painted, and draws much sooner (Nov 23)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  const cdp = await page.context().newCDPSession(page);
+  type Pics = { kept: boolean; saved: number | null | undefined; saveMs: number; restoreMs: number; count: number };
+  const pics = () => page.evaluate(() => (window as unknown as { __townPaint?: () => { pictures: Pics } | null }).__townPaint?.()?.pictures ?? null);
+  const sum = () => page.evaluate(() => (window as unknown as { __townPictureSum: () => { n: number; hash: string } }).__townPictureSum());
+  const visit = async () => {
+    await page.goto("/?sky=day");
+    const town = page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first();
+    await town.waitFor({ timeout: 60_000 });
+    await page.waitForTimeout(3000);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    const ref = await page.evaluate(townRefJob);
+    await page.evaluate(() => addEventListener("pointerup", () => ((window as unknown as { __tap: number }).__tap = performance.now()), { capture: true, once: true }));
+    await town.click();
+    const canvas = page.locator("canvas.town-canvas");
+    await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
+    const loaded = await page.evaluate(() => performance.now() - (window as unknown as { __tap: number }).__tap);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    return { ref, loaded };
+  };
+  // The first visit paints, then keeps its pictures after its first frame.
+  const one = await visit();
+  expect((await pics())?.kept, "the first visit paints").toBe(false);
+  await expect.poll(async () => (await pics())?.saved, { timeout: 60_000 }).not.toBeUndefined();
+  const saved = (await pics())!;
+  expect(saved.saved, "the first visit's pictures kept (bytes)").toBeGreaterThan(0);
+  const first = await sum();
+  // The second loads them: none painted, every picture's pixels the first's.
+  const two = await visit();
+  const p2 = (await pics())!;
+  expect(p2.kept, "the second visit loads the kept pictures").toBe(true);
+  expect(await sum(), "every kept picture's pixels, as the first visit painted them").toEqual(first);
+  console.log(`Chess Town kept pictures (slowed phone): first visit ${Math.round(one.loaded)} ms (${(one.loaded / one.ref).toFixed(1)} x ${Math.round(one.ref)} ms), second ${Math.round(two.loaded)} ms (${(two.loaded / two.ref).toFixed(1)} x ${Math.round(two.ref)} ms; reading and decoding ${Math.round(p2.restoreMs)} ms); ${first.n} pictures kept in ${(saved.saved! / 1048576).toFixed(1)} MB, ${Math.round(saved.saveMs)} ms`);
+  expect(two.loaded / two.ref, "a second visit's tap to its first frame, in reference jobs").toBeLessThan(TOWN_KEPT_REFS);
+});
 
 test("Moo & Moon's Full Moon cinematic on a slow phone: the hop, the field, the close-up, the transformation and the hop back stay within budget, the first time they show (Nov 17)", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");

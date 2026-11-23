@@ -7,7 +7,7 @@ import { asAdmin, bossAloneFromHome, test } from "./helpers.ts";
  * One size for every boss-battle figure on a computer (Eric, Nov 7: "how are the king and the pawn so different sized … shrink the ones
  * that are currently larger … about a 15% shrink"; docs/decisions/2026-11-07-one-side-size.md). At each window size every boss is drawn
  * at the same screen px a sprite px (Babur too, his pump in front of him), and your pawn and the God King are as tall in every fight.
- * Bosses: Babur (his pump), Big Boy, the Hidden Boss (the tallest), Jefferson (tall) and Dash. A number check: the figures' boxes.
+ * Bosses: Babur (his pump), Big Boy, the Hidden Boss (the tallest), Grex (tall) and Dash. A number check: the figures' boxes.
  */
 const BOSSES = ["tiger", "bigboy", "recluse", "grex", "dash"];
 const SIZES = [[1100, 800], [1280, 800], [1440, 900], [1920, 1080]] as const;

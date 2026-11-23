@@ -4,7 +4,7 @@ import { bossBeat } from "../src/characters/boss-beats.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 
 /**
- * After G-REX's fire destroys a piece, moves that were only legal without it are in the game's history: anything that
+ * After Grex's fire destroys a piece, moves that were only legal without it are in the game's history: anything that
  * replays the game must start from where the position changed (its bases), or the replay throws.
  */
 describe("replays after a piece burnt", () => {

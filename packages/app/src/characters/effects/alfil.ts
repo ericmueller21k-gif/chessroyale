@@ -1,7 +1,7 @@
 /**
  * Alfil's effect sprites for the board: one, the jab of his ankus landing on a king (his attack on a king: the God
  * King's Last Stand, the crowd's king at its mate). Everything else of his on the board is drawn from the board's own
- * pieces (the glow, the fusion's flash, the flying pieces), or reused as is (the Slam's shadows: Jefferson's
+ * pieces (the glow, the fusion's flash, the flying pieces), or reused as is (the Slam's shadows: Grex's
  * `fireShadow`).
  */
 import type { Anim, Character, Speck } from "../sprite.ts";

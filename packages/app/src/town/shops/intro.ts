@@ -82,7 +82,7 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   hollow: () => chunk(import("./hollow-intro-art.ts")).then((m) => ({ dark: m })),
   // (Wrangler's: his moves, the lasso's loop, the bale (his table: the barn's board stand), the buckets, his wipe; one chunk.)
   pig: () => chunk(import("./pig-intro-art.ts")).then((m) => ({ rope: m, table: m.INTRO_PIG_TABLE, palette: m.INTRO_PIG_TABLE_PALETTE, storm: m.INTRO_PIG_STORM, front: m.INTRO_PIG_FRONT })),
-  // (Jefferson's: his moves, the crate-stack table (the warehouse's board stand without its slab and board), your lift, his wipe; one
+  // (Grex's: his moves, the crate-stack table (the warehouse's board stand without its slab and board), your lift, his wipe; one
   // chunk. His crew are the room's: their baked sheets.)
   grex: () => chunk(import("./grex-intro-art.ts")).then((m) => ({ crew: m, table: m.INTRO_GREX_TABLE, palette: m.INTRO_GREX_TABLE_PALETTE, storm: m.INTRO_GREX_STORM, front: m.INTRO_GREX_FRONT })),
   // (Ginger's: his moves, the blast, the icicle (his table), the crack and the puff, the light, the board and its two carriers, his
@@ -153,7 +153,7 @@ export interface LoadedIntro {
   dark: DarkArt | null;
   /** Wrangler's lasso (null: another's): his moves' frames, his ropes, the bale, the buckets; see RopeArt. */
   rope: RopeArt | null;
-  /** Jefferson's crew (null: another's): his moves' frames, the crate-stack table, your lift; see CrewArt. */
+  /** Grex's crew (null: another's): his moves' frames, the crate-stack table, your lift; see CrewArt. */
   crew: CrewArt | null;
   /** Ginger's icicle (null: another's): his moves' frames, his props', the carriers', where things go; see IceArt. */
   ice: IceArt | null;
@@ -223,7 +223,7 @@ export interface IceArt {
 }
 
 /**
- * Jefferson's intro, ready (shops/grex-intro-art.ts; ShopRoom draws it): his moves' frames (BOSS_GREX_INTRO, at his town figure's
+ * Grex's intro, ready (shops/grex-intro-art.ts; ShopRoom draws it): his moves' frames (BOSS_GREX_INTRO, at his town figure's
  * pixels, as drawn: not mirrored); the crate-stack table's frames (INTRO_GREX_TABLE: its slab and board drawn on it `top` px over its
  * foot, shifted by `sway` a frame, as the top crate wobbles); your lift's (INTRO_GREX_LIFT: the plate `h` px up a frame). At the
  * room's scale but his.

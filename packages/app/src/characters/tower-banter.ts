@@ -19,7 +19,7 @@
 export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   gingerbread: {
     clown: ["Boingo, stop bouncing. You're shaking my icing.", "Honk all you like. I'm still cold.", "Cold? Ha. Try bouncing on ice, clown."],
-    grex: ["Jefferson, put those sparklers out. It's cold in here.", "Too hot to handle? Try cold for once.", "Fire is cute. Frost is forever, Jefferson."],
+    grex: ["Grex, put those sparklers out. It's cold in here.", "Too hot to handle? Try cold for once.", "Fire is cute. Frost is forever, Grex."],
     hollow: ["Hollow, your dark is cold too. Not very cozy.", "Lights out? I've got my own frost to see by."],
     bigboy: ["Big Boy, put the lollipop down. You'll get brain freeze.", "Mine? Try taking a bite of me first, big guy."],
     sawyer: ["Sawyer, you'd cut me into cookies. Rude.", "Hard hat in the cold? Bold. Stay warm, raccoon."],
@@ -34,7 +34,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   },
   clown: {
     gingerbread: ["Ginger, your cane is cute. Can you juggle it?", "Cool as ice? Lighten up, cookie! Honk!", "Ginger! Let's see you bounce like me!"],
-    grex: ["Jefferson, your sparklers are fine. My pie is better.", "Fire show? Cute. Watch a real clown work!"],
+    grex: ["Grex, your sparklers are fine. My pie is better.", "Fire show? Cute. Watch a real clown work!"],
     hollow: ["Hollow, your lights are spooky for a party.", "Nobody laughs at the dark. Bring a joke next time!"],
     bigboy: ["Big Boy! Want a pie? It's a clown's best trick!", "Nice lollipop, kid. Mine's got a bigger honk."],
     sawyer: ["Sawyer, put that saw away! You'll pop my pogo!", "Hard hat? Cute. Make me laugh, raccoon!"],
@@ -65,7 +65,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   hollow: {
     gingerbread: ["Ginger, your cane will break in the dark.", "Cold cookie. The dark is colder. Hush."],
     clown: ["Boingo, the lights are out. Stop honking.", "Clown, I'll take your smile for a little while."],
-    grex: ["Jefferson, your fire is pretty. Shh, let it fade.", "Too much light, Jefferson. Turn it down."],
+    grex: ["Grex, your fire is pretty. Shh, let it fade.", "Too much light, Grex. Turn it down."],
     bigboy: ["Big Boy, the dark's no place for a baby.", "Lollipops glow. Careful, I might steal one."],
     sawyer: ["Sawyer, you can't saw through the dark.", "Hard hat in the dark? Nobody sees it. Hush."],
     pig: ["Wrangler, the dark has no rope to catch.", "Showdown in the dark, pig. Come find me."],
@@ -80,7 +80,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   bigboy: {
     gingerbread: ["Ginger! Cookie! Mine!", "Cold cookie? Big boy wants it warm!"],
     clown: ["Clown, bounce for Big Boy! Bounce!", "Pie! Mine! Big boy wants the pie!"],
-    grex: ["Jefferson! Fire is hot! Big boy don't like hot!", "Sparkler! Mine! Give it!"],
+    grex: ["Grex! Fire is hot! Big boy don't like hot!", "Sparkler! Mine! Give it!"],
     hollow: ["Hollow scary! Big boy not scared!", "Lights? Mine! Big boy wants lights!"],
     sawyer: ["Sawyer, saw is loud! Big boy covers ears!", "Hard hat! Mine! Big boy wants hat!"],
     pig: ["Pig, rope! Big boy wants rope!", "Yeehaw! Big boy yeehaw too!"],
@@ -95,7 +95,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   sawyer: {
     gingerbread: ["Ginger, your cane's a fine board. Too brittle, though.", "Cookie, I'll saw you in two. Measure twice."],
     clown: ["Clown, your pogo's wobbling. Hold still for a cut.", "Honk? I'd rather cut a pogo than hear that."],
-    grex: ["Jefferson, your sparks are fine. Keep them off my sawdust.", "Fire in the sawdust, Jefferson? Hard hats on!"],
+    grex: ["Grex, your sparks are fine. Keep them off my sawdust.", "Fire in the sawdust, Grex? Hard hats on!"],
     hollow: ["Hollow, nobody can saw through a dark board.", "Hollow, I'll saw a light through your dark. Hard hat on!"],
     bigboy: ["Big Boy, stay back from the saw. It's sharp!", "Lollipop cut in two? Sawyer's own invention."],
     pig: ["Wrangler, you rope well. Can you rope a saw?", "Cowboy pig, I'll cut that lasso loose."],
@@ -110,7 +110,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   pig: {
     gingerbread: ["Ginger, your cane's a fine lasso target. Catch that!", "Cookie, you're cold! Come sit by my campfire."],
     clown: ["Clown, that pogo's a fine bronco. Ride it!", "Honk, honk, varmint. Rope that horn."],
-    grex: ["Jefferson, your sparklers scare my herd. Settle down!", "Giraffe, your fire's a stampede waiting to happen."],
+    grex: ["Grex, your sparklers scare my herd. Settle down!", "Giraffe, your fire's a stampede waiting to happen."],
     hollow: ["Hollow, I'll rope you up and drag you out!", "Dark trail, dark cowboy. Hold on to your hat."],
     bigboy: ["Big Boy, round up that lollipop. Don't drop it!", "Little varmint! Mind the lasso, partner."],
     sawyer: ["Sawyer, your saw sounds like a hay baler!", "Raccoon, quit eyeing my feed. It's not easy pickin's.", "Sawyer, frontier pals, hard hats and hay. Hard to beat."],
@@ -125,7 +125,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   alfil: {
     gingerbread: ["Ginger, a cookie in the cold. Hard to chew.", "Freeze all you like. I've walked through real ice."],
     clown: ["Clown, nobody bounces like a mammoth. Try it.", "Pogo, huh? Tusks are better for that."],
-    grex: ["Jefferson, fire on the tusks? Hot stuff!", "Giraffe, you're fine. I'm still the big guy."],
+    grex: ["Grex, fire on the tusks? Hot stuff!", "Giraffe, you're fine. I'm still the big guy."],
     hollow: ["Hollow, the dark doesn't scare a mammoth.", "Dark, cold, old. Hollow, we're a lot alike."],
     bigboy: ["Big Boy, little guy. Stay behind my trunk.", "Lollipops for mammoths? Big Boy, I'm impressed."],
     sawyer: ["Sawyer, a saw can't cut through tusks. Try.", "Hard hat? Nice. Still no match for old tusks."],
@@ -140,7 +140,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   hopper: {
     gingerbread: ["Ginger, you're cold! Hop over and warm up!", "Cookie with a cane. Chirp, want to try?"],
     clown: ["Boingo, bouncing? We hop better, pal!", "Chirp can do ten hops. Clown can do two!"],
-    grex: ["Jefferson, you're hot! Ouch. Stay on your side!", "Sparklers near carrots? Watch the fire, friend."],
+    grex: ["Grex, you're hot! Ouch. Stay on your side!", "Sparklers near carrots? Watch the fire, friend."],
     hollow: ["Hollow, your dark is spooky. We hop away!", "Chirp hates the dark. Chub hugs the light."],
     bigboy: ["Big Boy, want a ride? Chirp's got room!", "Lollipop! Chub wants one! Trade a carrot?"],
     sawyer: ["Sawyer, hop clear of that saw, Chub!", "Chirp, the saw sounds loud. Stay small!"],
@@ -155,7 +155,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   smudgy: {
     gingerbread: ["Ginger, your icing needs a splash of color!", "Cold cookie. Warm it up with some paint, Ginger."],
     clown: ["Boingo, your pie's a paint now! Let me help.", "Honk? I paint that. Stay still, clown."],
-    grex: ["Jefferson, your fire's too bright. It needs a dim coat.", "Sparklers, paint, sparks. We're all artists."],
+    grex: ["Grex, your fire's too bright. It needs a dim coat.", "Sparklers, paint, sparks. We're all artists."],
     hollow: ["Hollow, your darkness is a masterpiece. Mostly.", "Dark paint? I've got a black I like. Thanks."],
     bigboy: ["Big Boy, your lollipop's a fine swirl. Nice!", "Big Boy, step back from the wet paint!"],
     sawyer: ["Sawyer, your saw has no color. Let me fix that.", "Raccoon, your mask needs paint. Hold still."],
@@ -170,7 +170,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   moo: {
     gingerbread: ["Ginger, you're cold! Moo, bring a blanket! (Moo!)", "Ginger, your icing looks like snow. I love snow."],
     clown: ["Boingo! Moo says hi. (Moo! Moo!)", "Boingo, nice pogo. Moo can't bounce, sorry."],
-    grex: ["Jefferson, your sparklers are pretty! (Moo!)", "Fire near the farm? Moo's not happy. (Moo?)"],
+    grex: ["Grex, your sparklers are pretty! (Moo!)", "Fire near the farm? Moo's not happy. (Moo?)"],
     hollow: ["Hollow, I'm shining. Can you see me?", "Hollow, Moo is scared of the dark. (Moo!)"],
     bigboy: ["Big Boy! Moo wants to play. (Moo!)", "Big Boy, your lollipop's the brightest thing I've seen."],
     sawyer: ["Sawyer, put that saw down. Moo's still in the barn.", "Sawyer, the moon's watching your cuts. Be careful."],
@@ -185,7 +185,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   gardener: {
     gingerbread: ["Ginger, your cane could be a stake for my beans.", "Cold cookie. Plants won't grow in your freezer."],
     clown: ["Clown, your pogo's a flowerpot now. Sorry!", "Honk? Plants like quiet, Boingo."],
-    grex: ["Jefferson, your sparklers scorch my roses!", "Fire near seeds? Not while Puddles is here."],
+    grex: ["Grex, your sparklers scorch my roses!", "Fire near seeds? Not while Puddles is here."],
     hollow: ["Hollow, nothing grows in the dark. Sad.", "Hollow, bring a little light. The seeds need it."],
     bigboy: ["Big Boy, don't eat the seeds! They're sleepy.", "Lollipop plant? Interesting. Let's grow one."],
     sawyer: ["Sawyer, your saw stunts the plants. Careful!", "Cut the weeds, not the beds, Sawyer."],
@@ -200,7 +200,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   tiger: {
     gingerbread: ["Ginger, cold cookie. Stay out of my hoops, please.", "Frost? Go freeze your own balloons, Ginger."],
     clown: ["Boingo, honk less. I'm trying to nap.", "Clown, you're a circus act. I'm just a tiger.", "Boingo, your pogo is loud. My hoops are quieter, clown."],
-    grex: ["Jefferson, your fire is loud. I'm bored already.", "Sparklers? I'd rather make a poodle out of a balloon."],
+    grex: ["Grex, your fire is loud. I'm bored already.", "Sparklers? I'd rather make a poodle out of a balloon."],
     hollow: ["Hollow, your dark is too dramatic. Try a nap.", "Lights out? I'd like that, honestly. Quiet."],
     bigboy: ["Big Boy, don't pop my balloon! Oh, wait, that's mine.", "Lollipop? I'd rather make a balloon dog."],
     sawyer: ["Sawyer, your saw is loud. Please stop, I'm napping.", "Hard hat? The only hat I want is my top hat."],
@@ -215,7 +215,7 @@ export const TOWER_BANTER: Record<string, Record<string, readonly string[]>> = {
   folio: {
     gingerbread: ["Ginger, your icing is lovely. Keep the frost on.", "Cold, but kind. I like you, Ginger."],
     clown: ["Boingo, your pogo is bright. Keep bouncing.", "Clown, I'll be honest: the pie was good."],
-    grex: ["Jefferson, your sparklers are beautiful. Be careful.", "Fire is brave, Jefferson. Keep it out of my folds."],
+    grex: ["Grex, your sparklers are beautiful. Be careful.", "Fire is brave, Grex. Keep it out of my folds."],
     hollow: ["Hollow, your dark is still lovely. Honest.", "Hollow, I'd write about you. Maybe later."],
     bigboy: ["Big Boy, your lollipop is a fine swirl.", "Big Boy, your shirt is great. Clean, too."],
     sawyer: ["Sawyer, your saw is very sharp. Please be careful.", "Sawyer, you cut well. My folds approve."],

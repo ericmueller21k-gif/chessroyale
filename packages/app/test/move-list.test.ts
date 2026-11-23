@@ -38,7 +38,7 @@ describe("the move list's rows from the match's history", () => {
     expect(back).toHaveLength(12);
     expect(back[11]).toMatchObject({ piece: "p", to: "a6" });
     expect(back[3]).toBe(kept);
-    // (A base: a piece destroyed between moves, e.g. G-REX's fire on b1 before White's 3rd move: Nc3 can't happen.)
+    // (A base: a piece destroyed between moves, e.g. Grex's fire on b1 before White's 3rd move: Nc3 can't happen.)
     const base = { ply: 4, fen: fenAtPly(GAME, 4).replace("RNB", "R1B") };
     const burnt = plyRows(cache, "b", ["e2e4", "d7d5", "e4d5", "d8d5", "g1f3"], [base]);
     expect(burnt).toHaveLength(5);

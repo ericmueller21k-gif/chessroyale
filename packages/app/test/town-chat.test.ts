@@ -407,7 +407,7 @@ describe("the log", () => {
   it("shows on a message, fades after fadeAfterMs with nothing new, and the next message brings it back", () => {
     const { log, close } = make();
     expect(log.shown).toBe(false);
-    log.say("Jefferson", "first", "boss");
+    log.say("Grex", "first", "boss");
     expect(log.shown).toBe(true);
     vi.advanceTimersByTime(CHAT.fadeAfterMs - 1);
     expect(log.shown).toBe(true);

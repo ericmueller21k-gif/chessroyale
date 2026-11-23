@@ -14,7 +14,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   to move, each with its own powers and meter, stronger every floor: Maia from 600, +20 a floor to floor 5, +30 to 10, +40 to 30,
   then +4 a floor (held about 1630 to 1710 to floor 50; a lone boss +100); from floor 51 Stockfish from 1750, +31 a floor, its best
   on floor 99 (Eric, Nov 20).
-- Every boss's moves are in, a few with a one-line rule; Hollow and Smudgy never share a floor, and for now neither do Smudgy + Alfil, Alfil + Jefferson and Dash + Smudgy (Nov 19); the Hidden Boss isn't in the tower.
+- Every boss's moves are in, a few with a one-line rule; Hollow and Smudgy never share a floor, and for now neither do Smudgy + Alfil, Alfil + Grex and Dash + Smudgy (Nov 19); the Hidden Boss isn't in the tower.
 - You play White (random sides later). Two lives (Nov 20, below): a floor lost, drawn or left counts and costs one, the climb going on; the
   third loss ends the run. Every floor is one snug room in HunChess's colors (the town's
   challenge room as the model: `town/shops/challenge.ts`), its number big on both side walls; you walk in to the board and the
@@ -39,7 +39,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 ## Several bosses in the runner (built, PR 6)
 
 - **The side:** `settings.bossIds` (2-3 ids, the order they take turns) starts a raid with them all, from the starting position; never
-  two `BATTLE_TOWER.apart` keeps apart (Hollow and Smudgy; Smudgy + Alfil, Alfil + Jefferson, Dash + Smudgy for now: `docs/decisions/2026-11-19-tower-apart-pairs.md`). `MatchState.bosses` holds each one's own part (`BossOwn`: id, strength,
+  two `BATTLE_TOWER.apart` keeps apart (Hollow and Smudgy; Smudgy + Alfil, Alfil + Grex, Dash + Smudgy for now: `docs/decisions/2026-11-19-tower-apart-pairs.md`). `MatchState.bosses` holds each one's own part (`BossOwn`: id, strength,
   powers); `state.boss` is always the boss in focus in full, with the battle's shared fields, so every boss's code runs as alone.
   `state.moved`: who made the side's last move.
 - **The focus:** the bosses to move: the boss whose move comes out of turn (`BossRules.outOfTurn`: Wrangler's duel reply, Folio's
@@ -172,7 +172,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   moment names its boss (`PowerEvent.boss`, the view only), so its banner, caster and words are his and his bubble shows by his part of
   the bar (`speakerOf`: a line keyed by his id); `refusedLine` asks every boss on the side; the move list's faces by ply
   (`side.movers`, from `MatchState.movers`) and "Ginger is thinking…" name the boss. One boss: unchanged.
-- **Hidden information on a shared floor (Eric, Nov 21: Smudgy's rook showed on Jefferson's turn):** what a boss hides is read from his
+- **Hidden information on a shared floor (Eric, Nov 21: Smudgy's rook showed on Grex's turn):** what a boss hides is read from his
   own part whoever is in focus: Smudgy's mask (`camo.ts` `camoOf`, for every screen, solo and online) and the home page's live window
   (`lobby.ts` `hiddenRook`, the side's bosses); the reveal after your move draws every part's board layer (`Crowd.tsx`), so Hollow's dark
   stays on its squares while another boss is next. Checks: app `camo.test.ts`, `tower-side.test.ts`, server `smudgy-lobby.test.ts`,
@@ -209,7 +209,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   floor's moments"), `test/tower-side.test.ts` (every boss's box). Left: a computer's cast animation in place on the side figure.
 - **The split bar as an accordion (Eric, Nov 21:** "maybe it's like 75% for the one that's active ... if you want to see what that boss
   is ... you just tap on theirs and then it expands their container"): `TowerBar.tsx`, `tower.css`. Each boss's card is the lone bar's own
-  markup (figure or portrait, his figure drawn from his live look as the lone bar's is: Moo's Full Moon gold, Nov 22, name, LVL, meters, the status, his bar prop: Jefferson's candles, Hollow's bulbs, Timber's workshop, Dash's
+  markup (figure or portrait, his figure drawn from his live look as the lone bar's is: Moo's Full Moon gold, Nov 22, name, LVL, meters, the status, his bar prop: Grex's candles, Hollow's bulbs, Timber's workshop, Dash's
   tally, Don Dough's timers, Babur's pump), laid out once at the open width; each part (`.tw-part`) is a window (`.tw-window`, overflow
   hidden) onto its card's left side. The open part (`.tw-part-open`, `aria-expanded`: the boss to move, or one tapped open until the turn
   changes or it's tapped again) takes `OPEN_SHARE` (75%) of the room inside the outlines, the folded ones the rest; the windows slide
@@ -220,7 +220,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   bar (61 on main) and a lone floor's alike (its padding the card's plus the outline), the 28 px the floor's title line had; the board
   keeps main's size and a floor of several's place at every window (a lone floor's board is now there too, 10 px lower than main's). What's
   in it grows: his face in one 84 x 74 box for every boss (fit whole), his name, LVL and meters at 1.2, the status 13 px, Hollow's bulbs and
-  Jefferson's candles at 1.5 (3x pixels, never wider than the room); Timber's workshop, Tick's tally and Don Dough's timers (not in the
+  Grex's candles at 1.5 (3x pixels, never wider than the room); Timber's workshop, Tick's tally and Don Dough's timers (not in the
   tower's pool yet) and Babur's pump (by his figure, or a taller bar of its own) keep their size. Short computer windows (under 600 px)
   keep 61 px. Eric's named exception to "nothing shifts": this bar's parts. Checks: `e2e/battle-tower.spec.ts` ("the split
   bar as an accordion", on a computer also the floor's title over the Moves box, nothing between the bar and the board, both bars 89 px and the board in one

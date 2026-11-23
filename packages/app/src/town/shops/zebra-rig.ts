@@ -1,6 +1,6 @@
 /**
  * The bakery's zebras (Eric's design, Nov 10; drawn by hand on the weekly plan usage): one zebra, dressed six ways (the
- * kingpin and his five crew). They stand as the giraffes do (the dealer, Jefferson's crew: out/npc-grex/giraffe-rig.ts):
+ * kingpin and his five crew). They stand as the giraffes do (the dealer, Grex's crew: out/npc-grex/giraffe-rig.ts):
  * upright on two legs like a person, hooves for hands, three-quarters facing our right, light from the top left, the same
  * outline, shading and pixel scale (room scale 1:1, 37 px a square). A zebra's head is a horse's: a long muzzle with a dark
  * nose, upright ears, a short standing mane; a shorter, thicker neck than a giraffe's, so a zebra stands about 69 px from

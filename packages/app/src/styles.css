@@ -15611,7 +15611,7 @@ img.qicon {
   background: #fdeedb;
   box-shadow: inset 0 -1px 0 #dfbb9c;
 }
-/* Jefferson's charred piece (Nov 20; Eric: "it just becomes charred, and then if it does it twice, then it disintegrates"): his
+/* Grex's charred piece (Nov 20; Eric: "it just becomes charred, and then if it does it twice, then it disintegrates"): his
    Roman candle's fire reached it once. A tone on the piece itself (a board decor, so it slides with it): toned down to
    charcoal, and embers glowing round its edge, so a dark piece shows it too (a lighter grey read as just a grey piece). */
 .hb piece.pw-charred {
@@ -15879,7 +15879,7 @@ img.qicon {
   border-color: rgba(255, 255, 255, 0.25);
   opacity: 0.7;
 }
-/* Jefferson's piece standing in his candle's fire, unharmed, as he laughs it off: a cool glint over its square. */
+/* Grex's piece standing in his candle's fire, unharmed, as he laughs it off: a cool glint over its square. */
 .pw-fireproof {
   position: absolute;
   left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
@@ -15909,10 +15909,10 @@ img.qicon {
     opacity: 0;
   }
 }
-/* ---------------- G-REX's fire (BossPowers.tsx, the characters' sprites) ---------------- */
+/* ---------------- Grex's fire (BossPowers.tsx, the characters' sprites) ---------------- */
 
 /* The fire tiles (and a piece burning on one, a fireball landing): one canvas over the whole board. */
-/* G-REX's fire on one canvas: exactly the board's squares (eighths of --board-size), so a tile sits on its square. */
+/* Grex's fire on one canvas: exactly the board's squares (eighths of --board-size), so a tile sits on its square. */
 .pw-fire-board {
   position: absolute;
   top: 0;

@@ -350,7 +350,7 @@ export const RAGE_DRAIN = { holdMs: 400, ms: 900 } as const;
 /** What each battle's meter last showed on this device, and its slide down while one runs (from `start`, page time). */
 const meterShown = new Map<string, { pct: number; drain: { from: number; start: number } | null }>();
 
-/** Several bosses' marks on the pieces at once (Boingo's splats, Jefferson's char): each one's class and drawing. */
+/** Several bosses' marks on the pieces at once (Boingo's splats, Grex's char): each one's class and drawing. */
 export function joinDecor(...all: (PieceDecor | undefined)[]): PieceDecor | undefined {
   const on = all.filter((d): d is PieceDecor => !!d);
   if (on.length < 2) return on[0];
@@ -364,8 +364,8 @@ export function joinDecor(...all: (PieceDecor | undefined)[]): PieceDecor | unde
 }
 
 /**
- * The marks a boss battle draws on the crowd's pieces (Boingo's splats, Jefferson's char), for every screen that draws its board
- * (your move's, the boss's, the crowd's): one function, so no screen misses one (Nov 20: Jefferson's char was drawn only on the
+ * The marks a boss battle draws on the crowd's pieces (Boingo's splats, Grex's char), for every screen that draws its board
+ * (your move's, the boss's, the crowd's): one function, so no screen misses one (Nov 20: Grex's char was drawn only on the
  * boss's screen at first, and went as your move began). `moments`, `now`: the boss's screen's (the pie's hit); `burnt`, `since`:
  * the fire after the crowd's move, as that screen shows it (a charred piece burning keeps its look until it comes off, one just
  * charred takes it as its flames die). `pending`: your move already on the board while it's scored (the position after it), the
@@ -400,7 +400,7 @@ export function battleDecor(
 }
 
 /**
- * Jefferson's char marks as they stood after the crowd's last move, before its fire (the state's are after it): a mark the fire
+ * Grex's char marks as they stood after the crowd's last move, before its fire (the state's are after it): a mark the fire
  * added or added to is one less (gone at none), and a charred piece the fire burnt has its mark back.
  */
 export function backBeforeFire(b: BossView): BossView {

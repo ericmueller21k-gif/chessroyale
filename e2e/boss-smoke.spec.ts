@@ -115,7 +115,7 @@ PLAYABLE.forEach((def, i) => {
     expect(await page.evaluate(() => (window as any).match.boss.id)).toBe(def.id);
     // Play on until both have shown: his passive first (switched on early), then his ultimate by the admins' trigger (it
     // comes as the next turn begins, or at the start of his turn). An ultimate under way can hold a passive back (his
-    // barrage, Jefferson's sparkler), so the trigger waits for the passive, or for four moves of yours.
+    // barrage, Grex's sparkler), so the trigger waits for the passive, or for four moves of yours.
     const trigger = page.locator(".ult-test");
     const passiveSeen = (s: { kinds: string[] }) => s.kinds.some((k) => passive!.includes(k as PowerEventKind));
     let pressed = false;

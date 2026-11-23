@@ -81,7 +81,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   its gate facing south onto its apron (`APRON`: columns 17 to 28, rows 25 to 27, paved, kept open for people to gather),
   then a walk of 4 rows (`WALK_ROWS`, the promenade paved across it), the park south of that (`PARK`, below; it stands back
   from the Colosseum since Oct 26: `docs/decisions/2026-10-26-town-square-park-stands-back.md`), and your start (`START`,
-  22, 17) in the park on its promenade, between its two rows of tables nearest the Colosseum, facing it. Ginger Igloo and Jefferson's Fireworks stand side by side, and so do Hollow Peak and Moo &
+  22, 17) in the park on its promenade, between its two rows of tables nearest the Colosseum, facing it. Ginger Igloo and Grex's Fireworks stand side by side, and so do Hollow Peak and Moo &
   Moon Meadow. Folio's Folded House (Oct 27, the 14th: `docs/decisions/2026-10-27-folio-wired.md`) stands east of the
   Colosseum (35, 30 since Oct 28; it was 33, 30, only 3 squares from the Colosseum's ground: `docs/decisions/2026-10-28-town-chat-v2.md`),
   the one gap on the ring round the middle where its nearest neighbors (Big Boy's Crib 8.1, Sawyer's Woodshed 8.6, Smudgy's
@@ -512,7 +512,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   Gambit Gus 2100. The bosses' fourteen **sidekicks** (little kid versions of the bosses, Eric's approved art) take the other
   rungs, an easier boss's kid lower: Squirt (Boingo's) 700, Tex (Wrangler's) 800, Dabble (Smudgy's) 1000, Blocky (Big
   Boy's) 1100, Bun & Bug (Chub & Chirp's) 1300, Pleat (Folio's) 1400, Twinkle (Moo & Moon's) 1600, Drizzle (Puddles')
-  1700, Chip (Sawyer's) 1900, Stripes (Babur's) 2000, Woolly (Alfil's) 2200, Crumb (Ginger's) 2300, Sparky (Jefferson's)
+  1700, Chip (Sawyer's) 1900, Stripes (Babur's) 2000, Woolly (Alfil's) 2200, Crumb (Ginger's) 2300, Sparky (Grex's)
   2400, and **Glim (Hollow's) 2500**, the top, stronger than Hollow (Eric's twist). Names at most 10 characters. Each bot
   has a look (`Look`, one field): a pawn's (side, tint and the crate items worn) or a sprite's (`{ sprite }`: a sidekick's
   baked sheet), and a sidekick its boss (`boss`). Shown everywhere as "<name> (bot)" (`botLabel`: their tags, cards and
@@ -655,7 +655,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   Shopkeeper (his feet, his shadows, his tag and card) onto the counter's plank top, his place its middle on the counter's own row,
   drawn just after the counter; every other shop has no lift and is as it was. "Shopkeeper", no name, Talk. "Wrangler's Boss Crate"
   with Pen Pony. His home's card: its name and "Go in" (it has no line). docs/decisions/2026-11-04-wrangler-home.md.
-- **Jefferson's warehouse (Nov 4).** Jefferson is live, so his warehouse is in everyone's town. Its art (`shops/grex-art.ts`, the art
+- **Grex's warehouse (Nov 4).** Grex is live, so his warehouse is in everyone's town. Its art (`shops/grex-art.ts`, the art
   branch's `house-shop-grex` at 0e4f6482, with its shared `shops/warehouse-kit.ts`) is a shady firework warehouse with a floor's shape
   as Hollow's cave (`SHOP_GREX_FLOOR`: 16 × 16, columns 2-17, rows 3-18, racking all round, blocked) but no rock (`cave` stays null: it's
   a box room otherwise; its tall roll-up door goes see-through over you as a cave's rock does). Blue and orange pallet racking loaded with
@@ -664,9 +664,9 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   wobbly stack of crates at (9-10, 10), its foot 19 px south on the marks' line (`RoomArt.standDy`). Its roof: dark steel trusses
   (`roof: "warehouse"`); outside the door the night lot (dark asphalt); the chat's day tone. **The Shopkeeper:** "literally just a guy in
   the corner" (Eric): the shady dealer giraffe (`characters/sidekicks/dealer.ts`, baked as the others; not a town bot: Sparky stays
-  Jefferson's kid) in the north-east corner by the taped SHOP sign, on (16, 3) and (17, 3), facing west (`ShopDef.flip`), drawn at his
+  Grex's kid) in the north-east corner by the taped SHOP sign, on (16, 3) and (17, 3), facing west (`ShopDef.flip`), drawn at his
   art's size (`ShopDef.tall`, 79 of the room's pixels, not the kids' `sidekickSquares`). No counter: a tap on his Boss Crate (on the floor
-  at (15, 3)) or the bare corner behind him means talk too (`ShopDef.talk`, `makeRoom`'s `talk`). "Jefferson's Boss Crate" with Giraffe
+  at (15, 3)) or the bare corner behind him means talk too (`ShopDef.talk`, `makeRoom`'s `talk`). "Grex's Boss Crate" with Giraffe
   Gallop. **The crew** (`shops/grex-crew.ts`, drawn from baked sheets: `scripts/bake-grex-crew.ts` → `shops/grex-crew/*.png` and
   `grex-crew-sheets.ts`, a test checks each sheet's hash against the art): two sparkler leaners under the NO SMOKING sign, the clipboard
   guy at his pallet and the dozer asleep on his, standing where the art puts them (nobody walks through them); the scissor lift
@@ -740,7 +740,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   fades to the front room's pad (`SHOP_ZEBRA_PAD`), the goons carry the set-up in from behind the door (`SetupScene`), five watch, `intros/zebra.ts` plays: his line, his `breadPop`, Beanie's line over him (`crewLine`), his bread splash as the wipe (`zebra-intro-art.ts`, sounds `zebraWhoosh`, `zebraTumble`). Hook `__shopZebra()`; tests `shop-zebra.test.ts`, `e2e/zebra-home.spec.ts`; docs/decisions/2026-11-11-zebra-home.md.
   Its floor tiles' names start `floor-` (`floor-back-*`, `floor-rug-*`, `floor-mat-*`: room.ts `isFloor`), so they're baked into the
   floor; a tile named otherwise stands up as a piece every frame (Nov 11: the back room's 196, ghosted as you walked behind them).
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Jefferson's Fireworks (`grex`, Nov 4, everyone's town: above, "Jefferson's warehouse") and Ginger Igloo (`gingerbread`, Nov 5, everyone's town: above, "Ginger's igloo") and Folio's Folded House (`folio`, Nov 5, everyone's town: above, "Folio's sanctuary") and Boingo's Funhouse (`clown`, Nov 6, everyone's town: above): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Grex's Fireworks (`grex`, Nov 4, everyone's town: above, "Grex's warehouse") and Ginger Igloo (`gingerbread`, Nov 5, everyone's town: above, "Ginger's igloo") and Folio's Folded House (`folio`, Nov 5, everyone's town: above, "Folio's sanctuary") and Boingo's Funhouse (`clown`, Nov 6, everyone's town: above): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -793,7 +793,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   of those squares. A card you close stays closed until you move on. **Talk squares** (Nov 21, Eric: "I do want it to be the same for
   the other clerks. Like, you have to actually be near them"): `Room.talkAt`, a shop's own (`talkAt` in shops.ts: Don Dough's table
   foot, the walk-up's doors, the Battle Tower clerk's counter front), else `room.ts frontOf`: under each of the keeper's columns, the
-  first floor square south of the counter (or of the keeper, when no counter is in that column: Babur's, Jefferson's, Chandy's stand);
+  first floor square south of the counter (or of the keeper, when no counter is in that column: Babur's, Grex's, Chandy's stand);
   never a catwalk square. No more talking range (`SHOP_FEEL.talkRange` is gone). Every shop's squares are checked walkable and
   reachable from the door: `packages/app/test/shop-talk-front.test.ts`.
   [2026-11-21-shopkeepers-talk-in-front.md](../decisions/2026-11-21-shopkeepers-talk-in-front.md).
@@ -976,7 +976,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   he faces you mirrored only walking in and in his attack. Every beat is `CHALLENGE_FEEL.rope` or the art's frames (`ropeAt`,
   `ropeTimes`, `ropeCues`); about 12.3 s from the marks to the wipe. The ropes' lines are the code's (`INTRO_PIG_ROPE_INK`), drawn over
   the room. Four new sounds (`pigSlide`, `pigClatter`, `pigJingle`, `pigPop`), every cue his own.
-- **Jefferson's challenge (Nov 4, his own; Eric's design, intro-grex-nov4.md):** you both walk on to the marks (his red plate west, your
+- **Grex's challenge (Nov 4, his own; Eric's design, intro-grex-nov4.md):** you both walk on to the marks (his red plate west, your
   lift's plate east) and stand there throughout: he stands (no stool), there's no hop back. His call, one of four at random (`lines`,
   `lineOf`; placeholders until Eric's Gemini lines): "Boys! We got a challenger!", "Take five, everybody. We're playing chess.", "Who
   wants a fifteen-minute break?", "Forks down, boys. Somebody wants a game." in the big bubble. He hollers (his `call`); in it the crew
@@ -1051,7 +1051,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   as before (11 to 13 px), just over his head; it stays in the view. Decision: [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
-  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Jefferson (his own, Nov 4, everyone's: below), Ginger (his own, Nov 5, everyone's: above), Folio (its own, Nov 5, everyone's: above; its transition the crumple), Dash (his own, Nov 5, in an admin's town only: above; no God
+  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Grex (his own, Nov 4, everyone's: below), Ginger (his own, Nov 5, everyone's: above), Folio (its own, Nov 5, everyone's: above; its transition the crumple), Dash (his own, Nov 5, in an admin's town only: above; no God
   King attack was drawn for him, so he stands in his idle through the swing's beat, turned to you by his intro's `facesLeft`), Babur
   and Puddles (the default intro). Every
   other boss's card works as before (its confirm, Leave, the Boss
@@ -1300,6 +1300,11 @@ uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After 
 0 uploads, 0 resets. A building in and out uploads nothing of the town. The town's 2D pictures are made in memory (`paint.ts`
 `art2d`): uploading a GPU canvas waits for the GPU. Hooks: `__townPaint()`'s `loading`, `loadMs`, `loadPaintMs`, `atlas`. Tests:
 `packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…").
+**Kept between visits (Nov 23; [decision](../decisions/2026-11-23-town-keep-pictures.md)):** after a first visit's first frame its pictures are
+packed into PNG pages (a worker encodes them; 5.8 MB) and kept in IndexedDB (`town/keep-pictures.ts`, `TOWN_PICTURES`). A later visit on the
+same build and layout (`pictureKey`: version, the town chunk's hashed name, `render.ts` `pictureSig`) cuts them back out instead of painting:
+4x slowed, 18.5 s → 5.9 s. Anything odd paints as before and clears the entry. `?paintall` skips it. Hooks: `__townPaint().pictures`,
+`__townPictureSum()`. Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second visit…").
 **The music is no step (Nov 14; [decision](../decisions/2026-11-14-town-load-fast.md)):** until Nov 14 every boss theme was fetched from the
 bar's start beside the painting, and "Loading music…" waited up to 3 s more once the town was built (Nov 12, [decision](../decisions/2026-11-12-music-mono-preload.md));
 at 44 MB (stereo 192 kbps) Eric found the town "taking forever". Now `preloadMusic` starts `MUSIC.townPreloadAfterMs` (2 s) after the first

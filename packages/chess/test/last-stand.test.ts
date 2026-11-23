@@ -48,7 +48,7 @@ function judge(script: { best?: string; bestExpected: number; blunder: string; b
  * has its own tests below ("not on the crowd's first five moves").
  */
 function raid(engine: EngineLike, patch: Partial<Settings> = {}, players = 1) {
-  // (G-REX: the boss this seed met before Big Boy joined the draw.)
+  // (Grex: the boss this seed met before Big Boy joined the draw.)
   const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "grex", lastStandFromMove: 0, ...patch } as Settings;
   return new MatchRunner({
     settings,
@@ -273,7 +273,7 @@ describe("the God King's Last Stand: the rule", () => {
     expect(k.boards[0]!.king).toBe(true);
     expect(k.boards[0]!.lastStand).toBeUndefined();
     await runner.playBoss();
-    // (On a plain board: G-REX's first fire tile, lit as crowd move 2 begins, is put out. The Last Stand sits out on a
+    // (On a plain board: Grex's first fire tile, lit as crowd move 2 begins, is put out. The Last Stand sits out on a
     // board a boss has changed: king-save-altered.test.ts.)
     expect(runner.boss!.powers!.fire?.length).toBe(1);
     runner.state = { ...runner.state, boss: { ...runner.boss!, powers: { ...runner.boss!.powers!, fire: [] } } };
@@ -452,7 +452,7 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
   for (const [name, moves, san, piece] of cases) {
     it(`${name}: ${san} calls for the Last Stand on the battle's 6th move`, async () => {
       const runner = new MatchRunner({
-        // (G-REX: the boss this seed met before Big Boy joined the draw.)
+        // (Grex: the boss this seed met before Big Boy joined the draw.)
         settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 3190, bossId: "grex" } as Settings,
         rng: mulberry32(1),
         engines: [engine],

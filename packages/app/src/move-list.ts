@@ -86,7 +86,7 @@ export const newPlyCache = (): PlyCache => ({ key: "", rows: [] });
 
 /**
  * Every move of the history as a row, working out only the plies the cache doesn't have yet. `key` names the board (its
- * id and generation): a new one starts again. Bases (a position changed between moves: G-REX's fire, a slam) start the
+ * id and generation): a new one starts again. Bases (a position changed between moves: Grex's fire, a slam) start the
  * move at their ply from their position; a base the cache didn't know about redoes the rows from its ply on.
  */
 export function plyRows(cache: PlyCache, key: string, history: readonly string[], bases?: readonly Base[] | null): PlyRow[] {

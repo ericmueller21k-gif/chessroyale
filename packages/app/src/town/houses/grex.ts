@@ -1,7 +1,7 @@
 /**
- * Jefferson's fireworks stand: the giraffe's home on the town square (he once thought he was a dinosaur, and loves
+ * Grex's fireworks stand: the giraffe's home on the town square (he once thought he was a dinosaur, and loves
  * lighting things). A striped wooden stand under a tall pointed roof (he's tall) with a scalloped valance; a blank
- * header board under it (the game writes "Jefferson's Fireworks" there); rockets and Roman candles in racks behind the
+ * header board under it (the game writes "Grex's Fireworks" there); rockets and Roman candles in racks behind the
  * counter; two "boom" stars painted on it; posts painted like his own spotted coat; crates of rockets and candles at its
  * foot. No explosions and no fire on the building. His colors (characters/grex.ts). Light from the top left, as the
  * bosses'. `idle`: one candle's short fuse fizzes with a small spark (four frames).
@@ -210,7 +210,7 @@ const fuse = paint(118, FOOT - 33, 4, 6, (x, y) => (FUSE.some(([px, py]) => px =
 
 const shadow = groundShadow(CX, FOOT - 1.5, 68, 4.5);
 
-// ---- The header board under the roof: blank; the game writes "Jefferson's Fireworks" on it.
+// ---- The header board under the roof: blank; the game writes "Grex's Fireworks" on it.
 
 const BOARD: Pt = [CX - 36, EAVE + 2];
 const BW = 72;
@@ -264,7 +264,7 @@ const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_GREX: Character = {
   id: "house-grex",
-  name: "Jefferson's Fireworks",
+  name: "Grex's Fireworks",
   w: W,
   h: H,
   foot: [CX, FOOT],
@@ -273,7 +273,7 @@ export const HOUSE_GREX: Character = {
   anims: { idle },
 };
 
-/** Where the header board's blank face is (frame pixels), for the game to write "Jefferson's Fireworks" on. */
+/** Where the header board's blank face is (frame pixels), for the game to write "Grex's Fireworks" on. */
 export const HOUSE_GREX_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
 
 /** Its lights at dusk and night (Oct 27): the stand's dark inside glows warm behind the rockets on their rack. */

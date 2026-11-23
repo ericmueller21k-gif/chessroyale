@@ -140,7 +140,7 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   // and says nothing.
   foeIntro: KING_VS_RECLUSE.intro,
   foeBlocked: KING_VS_RECLUSE.blocked,
-  // G-REX: the first time a piece of ours steps onto a burning tile (once a match).
+  // Grex: the first time a piece of ours steps onto a burning tile (once a match).
   fireTile: [
     "Careful on that tile, don't stand there too long!",
     "That square's burning! Don't linger.",

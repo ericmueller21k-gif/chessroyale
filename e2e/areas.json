@@ -363,7 +363,7 @@
       ],
       "specs": ["e2e/boss-dock.spec.ts", "e2e/boss-powers.spec.ts", "e2e/ginger.spec.ts", "e2e/king-attack.spec.ts", "e2e/maia.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts"]
     },
-    "Jefferson (grex)": {
+    "Grex (grex)": {
       "paths": [
         "packages/chess/src/bosses/grex.ts",
         "packages/app/src/characters/grex*.ts",

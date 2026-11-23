@@ -104,7 +104,7 @@ export function squaresOf(p: ShopPlace): Sq[] {
 /**
  * A room from its layout and its Shopkeeper's squares; `mask` (a room that isn't a box: Hollow's cave, the art's `SHOP_HOLLOW_FLOOR`,
  * `n` rows of `n`, `.` floor and `#` rock) blocks every rock square too, besides the edge and the solid pieces. `talk`: the pieces
- * whose squares mean "talk" as the counter's do (a shop with no counter: Jefferson's crate and his bare corner, Nov 4).
+ * whose squares mean "talk" as the counter's do (a shop with no counter: Grex's crate and his bare corner, Nov 4).
  */
 export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[], talk: readonly string[] = [], levels: Levels | null = null, talkAt: readonly Sq[] | null = null, talkNear = false): Room {
   const blocked = new Uint8Array(n * n);
@@ -152,7 +152,7 @@ export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n 
  * Where you talk to a Shopkeeper (Eric, Nov 21: the Battle Tower clerk's feel for every Shopkeeper, "you have to actually be near them"):
  * under each of its columns, the first floor square south of it, past the counter when the counter is in that column (Hollow's dog has
  * floor between him and his counter: you stand at its front, not behind it). A keeper beside his counter (Babur's) or with none
- * (Jefferson's dealer): the square right in front of him. Never up on a catwalk (Ginger's).
+ * (Grex's dealer): the square right in front of him. Never up on a catwalk (Ginger's).
  */
 function frontOf(n: number, blocked: Uint8Array, levels: Levels | null, keeper: readonly Sq[], counter: readonly Sq[]): Sq[] {
   const out: Sq[] = [];

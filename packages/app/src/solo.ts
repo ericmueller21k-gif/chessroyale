@@ -1432,7 +1432,7 @@ export class SoloMatch implements GameView {
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     // (Alone, it has been "thinking" since your move went in: scoring your move counts toward it.)
-    // (G-REX's fire has just burnt something, or Alfil's pieces came down early, or Moo's Full Moon came, or Folio folded a
+    // (Grex's fire has just burnt something, or Alfil's pieces came down early, or Moo's Full Moon came, or Folio folded a
     // piece or wrote its Revision: it plays out before the boss's move.)
     const burnt = fireShows(snap);
     const landed = landedMs(snap);
