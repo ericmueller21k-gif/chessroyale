@@ -18,10 +18,11 @@
  * Layers: the sky (one part), the ground and track (one part per approach frame), the lines, the train (outlined),
  * then Birdie as parts (right wing, left wing, body, tie) and his cap, all outlined in k.
  *
- * Copied as drawn from the art branch `claude/boss-art` (scripts/boss-art/out/arena-birdie-fall-fun/arena-birdie-fall-fun.ts at 9256e0fb3, Nov 23,
- * 2026: the fun pass, Eric's "free falling but looking like he's having fun"; docs/decisions/2026-11-23-birdie-fall-fun.md): every animation
+ * Copied as drawn from the art branch `claude/boss-art` (scripts/boss-art/out/arena-birdie-fall-beak/arena-birdie-fall-beak.ts at 7f944063f, Nov 23,
+ * 2026: the fun pass, Eric's "free falling but looking like he's having fun", docs/decisions/2026-11-23-birdie-fall-fun.md; then its beak
+ * redrawn as a normal open beak with the sky seen through it, no red mouth, docs/decisions/2026-11-23-birdie-fall-beak.md): every animation
  * as drawn. Changed: the import paths, its id (the game's, `arena-birdie-fall`), and the whole drawing made the first time it is read
- * (`build`). Played by components/BirdieFall.tsx. The run's report: scripts/boss-art/out/arena-birdie-fall-fun/summary.md on that branch.
+ * (`build`). Played by components/BirdieFall.tsx. The run's report: scripts/boss-art/out/arena-birdie-fall-beak/summary.md on that branch.
  */
 import { canvas, toGrid } from "./paint.ts";
 import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part } from "./sprite.ts";
@@ -248,12 +249,17 @@ function build(): Character {
       // The happy eye: a closed upward curve (his joy lid).
       const de = Math.hypot(lx + 7, ly + 14.6);
       if (Math.abs(de - 2.6) < 0.95 && ly < -14.2) return "x";
-      // The open beak: the upper mandible, the mouth (a tongue at its floor), the lower mandible dropped in a whoop.
+      // The open beak: the upper mandible and the lower one dropped in a whoop, the sky seen between them.
       // (Drawn tipped up 18 degrees about its base: a whoop at the sky.)
       const [bx, by] = rot(lx + 12, ly + 13, -14);
-      if (pip([[1.5, -5.8], [-11, -3.4], [1.5, -1]], bx, by)) return segD(bx, by, [1.5, -5.8], [-9, -3.8]) < 0.8 ? "l" : "B";
-      if (pip([[0.5, 2.4], [-8, 4.6], [0.5, 5.8]], bx, by)) return segD(bx, by, [0.5, 2.6], [-7, 4.5]) < 0.7 ? "j" : "B";
-      if (pip([[1, -1.2], [-10, -3.2], [-7.6, 4.4], [0.5, 2.4]], bx, by)) return by > 1.2 && bx > -6 ? "U" : "R";
+      // Each half a little curved: the upper's ridge arched to a slightly dipped tip, the lower's chin rounded.
+      const UPPER: Pt[] = [[1.5, -6.2], [-3.5, -5.5], [-8, -4.4], [-11.2, -3], [-8.5, -2.6], [1.5, -1]];
+      const LOWER: Pt[] = [[0.5, 1.6], [-8.6, 3], [-6.5, 4.6], [-2, 5.4], [0.5, 5.5]];
+      if (pip(UPPER, bx, by)) return segD(bx, by, [1.5, -5.7], [-7.5, -4.1]) < 0.8 ? "l" : "B";
+      if (pip(LOWER, bx, by)) return segD(bx, by, [0.5, 4.9], [-5, 4.5]) < 0.7 ? "j" : "B";
+      // Between the halves: nothing (a gap the sky shows through; the part's own outline rings each half), but for the
+      // gape's corner, which the face fills.
+      if (pip([[1, -1.2], [-12, -3.4], [-10, 3.2], [0.5, 1.6]], bx, by) && bx < -1.2) return null;
       const head = Math.hypot(lx + 3, ly + 15) <= 10.5;
       const neck = ((lx + 2) / 8.5) ** 2 + ((ly + 6) / 7) ** 2 <= 1;
       const body = (lx / 14.5) ** 2 + ((ly - 3.5) / 13.8) ** 2 <= 1;
