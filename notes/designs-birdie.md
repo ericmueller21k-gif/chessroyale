@@ -69,3 +69,21 @@ not look like an actual train. I think the scaling is off too. Like the track ..
 ... But I think the rain and stuff is kind of cool. I like it."
 Keep: the sky, the rain, the wind lines, Birdie's tumble, the timing. Fix: the train's length and look, and the track's scale and
 perspective. The Armored Birdie reveal stays as it is.
+
+## His music and the ultimate's timing (Eric via the music helper, Nov 23)
+Files: branch `stills/trailer-v2`, commit `6981fcee`, folder `boss-music-stereo-192/` (stereo 192 kbps; re-encode to 128 kbps as
+every theme, lined up at pad, 30 s and the loop point; README section "Nov 23: Birdie's theme and his ult's piece"):
+- `birdie-loop`: his theme, the runaway-train song, key `birdie`, one loop of 136.296292 s, no intro, pad 0.5, 162 bpm.
+- `birdie-ult-intro`: his ultimate's piece ("the crossing", 15.8 s), key `birdie-ult` shaped like the Hidden Boss's pieces: intro
+  `birdie-ult-intro`, `introSeconds` 14.814813, loop `birdie-loop` (from its top); marks `whistle` 1.481481, `roll` 13.333333.
+Eric's wiring:
+- **Start:** right after the crowd's capture that puts his lost material over the threshold, the music fades into the piece.
+- **The drop is the impact:** the piece's end (14.815 s in, where his theme starts from its top) lands exactly when the train hits him
+  and he transforms. So switch the battle's theme to `birdie-ult` with `switchPlan`'s `dropAt` at the impact, the piece starting at
+  dropAt - 14.814813 s.
+- **His move waits:** Birdie doesn't play his reply at once. It's timed to the drop (about 15 s from the capture to the impact);
+  meanwhile he says a line before it. The cutscene starts at dropAt minus its own time to the impact frame.
+- **Once a fight.** After the drop his theme loops as normal.
+- Marks for visuals (s into the piece): 0.0 steam, band drops, first birds; 1.48 first whistle (long, long, short, then a long one from
+  6.5 sinking away by 9.3); 13.33 snare roll; 14.815 the drop.
+- Director's call on the clocks: the wait is his turn, so the crowd's clock doesn't run; he's untimed as usual.
