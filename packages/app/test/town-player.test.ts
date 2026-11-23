@@ -12,7 +12,7 @@ const { STRIPS } = await import("../src/town/strips.ts");
 const { HOMES, PROPS, START, plotAt, stepsFrom, walkable } = await import("../src/town/world.ts");
 
 const lotId = (id: string) => (id === "dash" ? "blitz" : id);
-/** The admin-first bosses whose home has its lot in the plan (Birdie's home isn't built yet, Nov 23: in the game before his town lot). */
+/** The admin-first bosses whose home has its lot in the plan (all of them since Birdie's Station, Nov 23). */
 const HOMED = BOSS_ADMIN_FIRST.filter((id) => PLAN_HOMES.some((l) => l.id === lotId(id)));
 
 describe("a player's town: the street town without the admin-first homes (Nov 13)", () => {

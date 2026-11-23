@@ -947,6 +947,12 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 - **Room** (`shops/chandy-art.ts`): roof `sky` (the town's sky as it loads, `LIT_ROOMS`), water floor, the battle spot hidden as `ring-` water tiles; `RoomArt.wade` hides feet under the surface with a ripple and spray (one canvas, no loop), on foot and on every ride alike: one fixed depth cuts a ride's foot too (Eric, Nov 16; `__shopRide().wading`). The frog keeps the stand (`swampkeeper`).
 - **Rise** (`shops/intros/chandy.ts`): the post, then the platform (`Prop.wet`, `flat`) lifting you both through the timeline's `lift` (no wading once lifted), the crates, his point and fire, his `rise` storm (water from the foot). His rules are in (docs/decisions/2026-11-16-chandy-rules.md): Challenge alone plays the rise into his battle. e2e `chandy-home.spec.ts`; unit `shop-chandy.test.ts`.
 
+## Birdie's Station (Nov 23; an admin's town only, as Birdie is admins first; [decision](../decisions/2026-11-23-birdie-home.md))
+
+- **Front** (`houses/birdie.ts`, the art as drawn, 144 × 250): a little train station, a big nest on its roof; Meadow Street 16-19 (the lamp at 20 moved to 21). Birdie roams out front (`BIRDIE_TOWN`); a tap plays his `hello`.
+- **Lobby** (`shops/birdie-art.ts`): the art's one 12 × 12 picture (`birdie-lobby-art.ts`) cut into the room's pieces at their feet, drawn back pixel for pixel (`shop-birdie.test.ts`); the bartender pigeon (`birdiebartender`) behind the bar's front run, his scoop dipping in the vat beside him and pouring into a counter feeder (both moved for it). The split-flap board is written by the game (`shops/flap-board.ts`, `RoomArt.flaps`, `SHOP_FEEL.flaps`): this town's buildings, never the walk-up; a row flips every 7 s, the page every 30 s, only the moving flaps drawn (`__shopFlaps()`).
+- **Challenge** (`shops/intros/birdie.ts`): the middle table and its stools (`ring-` floor) are the battle spot; his hello with his line, the board's pop, the default wipe (his toot). e2e `birdie-home.spec.ts`.
+
 ## Challenging a boss (Nov 2: Pokémon-gym style)
 
 Eric, Nov 2: challenge a boss in the town and it walks into its home with you; you each walk to your start mark on its battle
