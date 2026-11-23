@@ -53,9 +53,16 @@ def options(args: list) -> list:
 SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow"), ("folio", "song_o", 54, "Folio"), ("zebra", "song_n", 16, "Don Dough"),
          ("sawyer", "song_p", 32, "Sawyer"), ("timber", "song_q", 32, "Timber"), ("moo", "song_r", 16, "Moo & Moon"), ("clown", "song_s", 0, "Boingo the Clown"),
          ("gingerbread", "song_t", 0, "Ginger"), ("alfil", "song_u", 0, "Alfil"), ("dash", "song_y", 0, "Dash"), ("gardener", "song_z", 0, "Puddles"), ("pig", "song_ac", 0, "Wrangler"),
-         ("tiger", "song_af", 0, "Babur"), ("chandy", "song_ag", 0, "Chandy"), ("hopper", "song_x", 0, "Chub & Chirp"), ("smudgy", "song_ao", 0, "Smudgy"),
+         ("tiger", "song_af", 0, "Babur"), ("chandy", "song_ag", 0, "Chandy"), ("hopper", "song_x", 0, "Chub & Chirp"), ("smudgy", "song_ao", 0, "Smudgy"), ("birdie", "song_aj", 0, "Birdie"),
          # (Not a boss: the battle tower's own music, a place's theme as the town's is. Its id is a guess until the tower has one.)
          ("tower", "song_an", 0, "The battle tower")]
+
+
+# A piece played once on a cue, leading into a theme's loop from its top (the Hidden Boss's are built by phases_v.py):
+# its key, the theme whose loop follows it (it takes that theme's gain, so the two sit as they were mixed), the song's
+# module and the part of it to render, how many beats long it is (the loop comes in on the beat after), its marks
+# (beats in), and what it is.
+LEADS = [("birdie-ult", "birdie", "song_aj", "ult-in", 40, {"whistle": 4, "roll": 36}, "Birdie's ult (the crossing), then his theme from its top")]
 
 
 def render(module: str, intro_beats: float, part: str) -> np.ndarray:
@@ -168,6 +175,34 @@ def main(out: str, *only: str) -> None:
             "peakDb": round(float(20 * np.log10(peak)), 1),
         }
         print(boss, manifest["themes"][boss])
+        for key, theme, lead_module, lead_part, lead_beats, marks, lead_name in LEADS:
+            if theme != boss:
+                continue
+            n_lead = int(round(lead_beats * beat_s * synth.SR))
+            piece = fold(importlib.import_module(lead_module).render(part=lead_part))[:, : n_lead + int(1.0 * synth.SR)] * g
+            piece[:, -int(0.3 * synth.SR) :] *= np.linspace(1, 0, int(0.3 * synth.SR))
+            # Its tail rings over the loop's first hit: together they stay under the ceiling, or the tail comes down.
+            tail = piece.shape[1] - n_lead
+            over = float(np.max(np.abs(ceiling(piece[:, n_lead:]) + ceiling(loop[:, :tail] * g)))) / HEADROOM
+            if over > 1:
+                piece[:, n_lead:] /= over
+            wav = f"{out}/{key}-intro.wav"
+            save(wav, ceiling(piece[:1] if MONO else piece))
+            for ext, codec in (("ogg", ["-c:a", "libvorbis", "-q:a", "3"]), ("mp3", MP3)):
+                subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", wav, *codec, f"{out}/{key}-intro.{ext}"], check=True)
+            manifest["themes"][key] = {
+                "boss": lead_name,
+                "source": f"scripts/reel/music/{lead_module}.py ({lead_part})",
+                "intro": f"{key}-intro",
+                "loop": files["loop"],
+                "introSeconds": round(n_lead / synth.SR, 6),
+                "loopSeconds": round(n_loop / synth.SR, 6),
+                "bpm": bpm,
+                "lufs": round(master.lufs(wav), 1),
+                "peakDb": round(float(20 * np.log10(np.max(np.abs(ceiling(piece))))), 1),
+                "marks": {name: round(b * beat_s, 6) for name, b in marks.items()},
+            }
+            print(key, manifest["themes"][key], "| its tail turned down by", round(20 * np.log10(max(1.0, over)), 1), "dB")
     subprocess.run(["rm", "-f", f"{out}/_once.wav"])
     with open(f"{out}/themes.json", "w") as f:
         json.dump(manifest, f, indent=2)

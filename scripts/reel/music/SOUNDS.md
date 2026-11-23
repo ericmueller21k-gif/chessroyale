@@ -714,3 +714,23 @@ a train; not in the roster yet, his art is on `stills/birdie-2`). Two things ask
 - Sent: the song, the piece, and a demo (the chorus, the piece from a bar line, the song again on its hit). No verdict
   on the piece yet. For the director when it is approved: the piece wants to start on one of the theme's bar lines
   (a bar is 1.4815 s) and the theme to come back on its hit, 14.815 s in.
+
+**Handed over, with how it is to be wired (Nov 23).** Eric, of the piece and the song: "We give him this"; and how
+the ult runs: the piece starts "after the player gets a capture ... which then triggers the back end ... enough
+material was captured. So then it will fade into this song"; its end lines up "right when ... the train kind of
+connects and the transformation happens"; "Birdie doesn't play his move right away. He ... times his next move to
+the exact moment"; a line from him before it; once a fight. The full-screen animation is another session's.
+- `handoff.py` builds the theme as `birdie` (a guess at his id) and, new, a piece that leads into a theme (`LEADS`):
+  `birdie-ult` = the crossing without its own last hit (`ult-in`), then the theme's loop from its top. That is the
+  shape of the Hidden Boss's pieces, so the game's `switchPlan` with a `dropAt` runs it as it stands: the drop is the
+  train's impact, the piece starts 14.815 s before it, and the theme's opening hits are the impact.
+- `stills/trailer-v2`, commit `6981fcee`, `boss-music-stereo-192/`: `birdie-loop` (136.296 s, -16.5 LUFS) and
+  `birdie-ult-intro` (15.8 s; `introSeconds` 14.814813; marks `whistle`, `roll`), with his words and the wiring in
+  the README. Sent the director the same. Checked: the theme is the version he had; the loop point is clean; the
+  piece's tail over the theme's first hit peaks at -3.9 dBFS.
+- **A mistake caught on the way, and its lesson.** The clip he first heard was 3.9 dB louder against the song than
+  the mix made it: `write_wav` turns a render down when it peaks over 0.98 (the song did, the short quiet clip
+  didn't), and the song's mastering gain was then put on both. Found when the game's build (which uses one gain for
+  both) came out 4.5 dB under his clip. He passed what he heard, so that level is now the piece's own (`ULT_UP`).
+  **To set one piece against another, take both from the mix (`render()`), never from two saved files.**
+- Sent him a demo of the wiring as handed over (the chorus, the piece, the theme from its top on the drop).

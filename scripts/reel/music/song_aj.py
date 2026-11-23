@@ -45,7 +45,8 @@ to get rid of that. It's not fitting"); "Other than that, I think the song's pre
 own for his ult, kept out of the song so it plays once a fight ("when he triggers his ult, it'll seamlessly kind of go
 to that part ... and then it'll keep going ... keep it a separate thing ... a separate 15-second clip"): "it quiets
 down and you hear kind of like a locomotive sound, maybe even like a train horn, birds chirping, a bit of whatever the
-background beat of that song already is". That is `python3 song_aj.py <out.wav> ult` (the crossing, below).
+background beat of that song already is". That is `python3 song_aj.py <out.wav> ult` (the crossing, below). In the game
+it leads into the song's first bar (`ult-in`, built by handoff.py): the song's own opening hit is the piece's last.
 The plan's 64 bars are 1:35 at this pace. After the duel the song goes round its chorus once more (both leads
 together), the turnaround, and then the plan's breakdown: 92 bars, 2:16. That is under the 2:30 to 2:45 he asks of a
 theme (SOUNDS.md): the slow middle was what carried it there, and this version is one he asked to hear.
@@ -90,6 +91,10 @@ GRID = {
     "B5": ("B1", "B2", "F#4 B4", "", ""), "B7#9": ("B1", "B2", "D#4 A4 D5", "", ""),
 }
 ULT_BARS = 10  # the crossing (his ult's piece): 14.8 s, and two bars more for its last hit to ring out
+# The crossing against the song: this much up from the song's own bus levels (3.9 dB), which puts it about 5 dB under the
+# verse and chorus. It is the level Eric heard and passed it at (Nov 23): his clip was saved alone, and `write_wav`
+# turns a loud render down (the song's) but not a quiet one (the clip's), so the clip came out that much up.
+ULT_UP = 1.574
 VERSE_CH = "Em Em Cmaj7 Cmaj7 D D Bm7 Em"
 CHORUS_CH = "Dmaj7 E F#m7 F#m7 Dmaj7 E C#m7 F#m7"
 TURN_CH = "Bm7 Bm7 C#7#9 C#7#9"
@@ -179,8 +184,9 @@ for _line, _beats in ((RIFF, 8), (RIFF_OUT, 8), (VERSE_1, 32), (UNDER_1, 32), (V
 def render(window=None, part="song") -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
     (a sample, to compare voices on). `part` "ult": the crossing by itself instead, with the song's own voices, levels
-    and halls, so the two sit together."""
-    ult = part == "ult"
+    and halls, so the two sit together; "ult-in": the crossing without its last hit, for the game, where the song's
+    own first bar comes in on that beat and is the hit."""
+    ult = part in ("ult", "ult-in")
     span = 4 * (ULT_BARS + 2) if ult else BEATS
     x = Ride([(0, span, BPM, BPM, 1.0, 1.0, 0.0)], span, None, os=2, seed=331, tape_secs=span * 60 / BPM)
     x.window = window
@@ -676,8 +682,9 @@ def render(window=None, part="song") -> np.ndarray:
             bird(bar0(first + bar) + off, kind, 0.03 * loud, pan)
         roll(bar0(first + ULT_BARS - 1), 4, 0.06, 0.3)
         steam(bar0(first + ULT_BARS) - 1, 0.5, 0.03, 0.3)
-        b = bar0(first + ULT_BARS)  # (the hit is drums alone: whatever chord the song comes back on, it fits)
-        kick(b, 0.5), snare(b, 0.27), tom(b, "l", 0.3), crash(b, 0.07)
+        if part == "ult":
+            b = bar0(first + ULT_BARS)  # (the hit is drums alone: whatever chord the song comes back on, it fits)
+            kick(b, 0.5), snare(b, 0.27), tom(b, "l", 0.3), crash(b, 0.07)
 
     if ult:
         crossing(1)
@@ -714,7 +721,8 @@ def render(window=None, part="song") -> np.ndarray:
         room(name, secs, wet)
     levels = {"lead": 1.0, "lead2": 1.0, "synth": 1.9, "brass": 1.8, "square": 1.25, "flute": 2.2, "pad": 2.2, "piano": 0.6, "fx": 1.6, "loco": 2.2, "birds": 3.2, "gtr": 1.0, "bass": 0.7,
               "kick": 0.5, "snare": 1.0, "toms": 1.0, "hats": 5.2, "crash": 1.8}
-    return x.play(x.mixdown(levels, lowpass=9000, room=0.03))
+    mix = x.play(x.mixdown(levels, lowpass=9000, room=0.03))
+    return mix * ULT_UP if ult else mix
 
 
 def main(out: str, part: str = "song") -> None:
