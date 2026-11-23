@@ -62,3 +62,10 @@ toward the camera with a 3D feel; the track running toward us in perspective; a 
   letters or numbers, so its flaps flip between pictures (a little train, a clock face, boss faces, a nest, an arrow) rather than text.
   The game could later show real text on it in code if Eric wants.
 - His fight animations: later (Eric).
+
+## The cutscene: Eric on the first pass (Nov 23)
+"I actually like the sky in this one. I think that's totally fine. ... the train is way too short. It looks like a limo. It does
+not look like an actual train. I think the scaling is off too. Like the track ... the ratios are wrong. Look at the still images.
+... But I think the rain and stuff is kind of cool. I like it."
+Keep: the sky, the rain, the wind lines, Birdie's tumble, the timing. Fix: the train's length and look, and the track's scale and
+perspective. The Armored Birdie reveal stays as it is.
