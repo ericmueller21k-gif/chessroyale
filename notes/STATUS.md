@@ -1824,3 +1824,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~19:00: #910 (squads replay end fix, cause of main red) open 43d3af26, CI bklpdn07k. Then merge #909. THEN start brief
   birdie-cadence-warning (Opus xhigh): Eric's sounds every 3-4 moves, slower power train (~1.5x), yellow ⚠️ sign on the marked piece.
   Lobby round 4 art running (Eric said "Yes ok to spend"; screenshot force-added 6f6f5ff5), watcher bado6wxq2.
+- Nov 23 ~19:05: #910 merged 45e0422, #909 merged cd3c9c9 (main run watcher b0rsw5zzy). Running: cadence-warning
+  session_01JuCWRru2X1GoUsqTgFasSM (Opus xhigh: no other Opus until it's done). Lobby round 4 art (Haiku) watcher bado6wxq2.
