@@ -171,3 +171,6 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - **`scripts/boss-art/refs/` is in `.gitignore` (Nov 23):** a reference picture the director pushes for an art session must be added with
   `git add -f`, and checked with `git ls-tree origin/claude/boss-art` before the session starts (Eric's marked screenshot for lobby round 4
   silently didn't push, and the session stopped waiting for it).
+- **The art runner can read only its own drawing (`scripts/boss-art/out/<id>/<id>.ts`) and `packages/app/src/characters/**` (Nov 23):** a
+  pass that starts from an earlier drawing gets that drawing copied in as its own starting file (id renamed) before the run. Lobby round 4
+  couldn't read round 3 (it lives under `town/shops`) and redrew the room by eye.
