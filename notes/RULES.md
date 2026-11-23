@@ -155,3 +155,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - The fireworks giraffe boss (id `grex`) is **Grex** in all player text (Eric, Nov 23; was Jefferson). Code ids stay.
 - The town paints everything on its loading screen, never while you walk (Eric, Nov 11, restated Nov 23: 'load first in order to not have slow FPS'). A longer load for that is expected; optimize within it, never by moving painting to walk time.
 - Eric's personal photos and product photos never go on a branch (the repo is public); keep them in the scratchpad and pass them to art sessions another way (Nov 23: Birdie's photos were pushed to director-notes by mistake, removed).
+- Watchers name the branch they check (`origin/<branch>:.done`), never FETCH_HEAD: several watchers fetching at once overwrite FETCH_HEAD and one reads another branch's .done (Nov 23: a watcher fired early).
