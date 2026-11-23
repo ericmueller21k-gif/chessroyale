@@ -179,8 +179,21 @@ const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck, face }: Ro
 }, sameRow);
 
 /**
+ * How many rows a phone's small panel draws: the newest that fit its box, and a few more. It never scrolls, so the rows above
+ * them would never be seen (the sheet has them all). Measured from the box (`fitRows`) and kept across the panel's mounts (each
+ * turn mounts it anew), so a long match never draws its whole list on a phone (Nov 23: 120 moves were 1,700 elements).
+ */
+let panelFit = 12;
+const FIT_SPARE = 4;
+function fitRows(box: HTMLElement): number {
+  const row = box.querySelector(".mv-row")?.getBoundingClientRect().height || 24;
+  return Math.ceil(box.clientHeight / Math.max(12, row)) + FIT_SPARE;
+}
+
+/**
  * The list itself, in a box that scrolls (`scroll`: the computer's column and the sheet; a phone's small panel shows the
- * newest rows that fit and never scrolls). `hushLast`: the newest move isn't named yet (Smudgy's reveal under the paint).
+ * newest rows that fit and never scrolls, and draws only those: `panelFit`). `hushLast`: the newest move isn't named yet
+ * (Smudgy's reveal under the paint).
  */
 export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { match: GameView; hushLast?: boolean; scroll?: boolean; onOpen?: () => void }) {
   const boss = match.boss;
@@ -189,11 +202,23 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
   const data = boss ? shownRows(match, boss) : null;
   const n = data?.rows.length ?? 0;
   const face = useLiveFace(boss ?? { name: "", icon: "" });
+  const [fit, setFit] = useState(panelFit);
+  // (The panel's box measured as it's laid out, and again whenever it changes size: a phone turned, the dock's strip grown.)
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (scroll || !el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setFit((panelFit = fitRows(el))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scroll]);
+  // (An even number left out, so each row keeps its stripe: `.mv-row:nth-child(even)`. The opening's row stays, above them.)
+  const over = scroll ? 0 : Math.max(0, n - fit);
+  const skip = over - (over % 2);
   // Kept at the newest row, unless the reader scrolled up.
   useLayoutEffect(() => {
     const el = box.current;
     if (el && stuck.current) el.scrollTop = el.scrollHeight;
-  }, [n]);
+  }, [n, skip]);
   if (!boss || !data) return null;
   // (Phase 2: the board is yours, the team White: your moves read "You", with your pawn.)
   const simul = !!yourSimulBoard(match);
@@ -225,8 +250,8 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
               </span>
             </li>
           )}
-          {data.rows.map((s, i) => (
-            <MoveRow key={s.row.ply} s={s} boss={who} alone={alone} hush={hushLast && i === data.rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} face={face} />
+          {data.rows.slice(skip).map((s, i) => (
+            <MoveRow key={s.row.ply} s={s} boss={who} alone={alone} hush={hushLast && skip + i === data.rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} face={face} />
           ))}
           {!data.rows.length && <li class="mv-empty">No moves yet.</li>}
         </ol>

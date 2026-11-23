@@ -1401,16 +1401,19 @@ export function Avatar({ look: equipped, side = "w", ride = false, outlined = fa
         }
       />
     );
-  const layer = (back: boolean) => (
-    <svg class={`avatar-items ${back ? "back" : "front"}`} viewBox="0 0 100 100">
-      <defs>
-        <clipPath id="avatar-cap">
-          <rect x="-12" y="-9" width="124" height="112" />
-        </clipPath>
-      </defs>
-      {items(back)}
-    </svg>
-  );
+  // (A layer with nothing worn in it isn't drawn: a bare pawn is its piece alone, not two empty pictures round it. Nov 23: a
+  // long match's move list carried ten empty elements a row.)
+  const layer = (back: boolean) =>
+    worn.some(({ it }) => behindPiece(it.def) === back) && (
+      <svg class={`avatar-items ${back ? "back" : "front"}`} viewBox="0 0 100 100">
+        <defs>
+          <clipPath id="avatar-cap">
+            <rect x="-12" y="-9" width="124" height="112" />
+          </clipPath>
+        </defs>
+        {items(back)}
+      </svg>
+    );
   return (
     <span class="avatar hb-pieces" aria-hidden="true">
       {layer(true)}
