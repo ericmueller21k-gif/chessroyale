@@ -1810,3 +1810,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   pending. Review nits queued: stale "run" comments (BossCharacter.tsx:400, birdie.ts:798, birdie-figure.ts:104); per-sound "heard" floor
   (-9 for four, -11 only for peeps); birdieWhistle toot param unused in app; kit.sounds runShort/runLong names hold whistles.
   Still running: tail+smooth session_01JuCWRuZRPHWMgtg61MmXVy; lobby round 4 art (waiting on Eric's spend OK).
+- Nov 23 ~18:05: main eba5084 RED: squads-replay.spec.ts:125 [phone] passed only on retry (.rp-over still up at 2.5 s, line 207; unrelated
+  to #907). Fix-forward session_01JuCWRvfubi6njxC5xSxTcE (Opus high) brief squads-replay-125-flake → claude/squads-replay-125. No other merge
+  before it. Watcher bi2h6dw15 (flake / tail / lobby4: first one done).
