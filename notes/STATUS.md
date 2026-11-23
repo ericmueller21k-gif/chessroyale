@@ -1817,3 +1817,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   session_01JuCWRtRgmZYShMxYQ3n8Ku → review/birdie-tail-smooth. Merge only after main is green (flake fix).
   Queue: other bosses set animationDelay from each frame's `now` (Timber, Gardener, Tiger, PowerParts Flight, Grex shots): measure each
   per display frame as #909 did; fix with the same `Timed` pattern where the layer redraws mid-animation (one job, Opus high).
+- #909 review clean (review/birdie-tail-smooth). Its nits go into the queued animationDelay job: (1) e2e birdie.spec:222 duration check
+  should measure to the last MOVING frame; (2) Timed ignores a later `at` change: key by `${ride.key}:${rideAt}`; (3) styles.css ~28582
+  `--board-size` fallback inside translate resolves against the train's box: px-only fallback or a comment; (4) move `Timed` into
+  PowerParts.tsx and use it for Timber, Gardener, Tiger, Flight, Grex shots.
