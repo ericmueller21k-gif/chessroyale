@@ -552,8 +552,17 @@ function townRefJob(): number {
   };
   return [once(), once(), once()].sort((a, b) => a - b)[1]!;
 }
-/** The town's first frame may take this many reference jobs (`townRefJob`): set Nov 23 from this machine's runs, a quarter over. */
-const TOWN_LOAD_REFS = 20;
+/**
+ * The town's first frame may take this many reference jobs (`townRefJob`): set Nov 23 from this machine's runs, a quarter over (20,
+ * when its runs read 13.4 to 18.1). Since the paint workers (Nov 23, town/paint-pool.ts): 12, the median of a first visit's runs (8.9 to
+ * 11.0 over 3 runs of both towns, median 9.6) and a quarter. docs/decisions/2026-11-23-town-paint-workers.md.
+ */
+const TOWN_LOAD_REFS = 12;
+/**
+ * (`?paintslow=4`, Nov 23) The paint workers slowed as the page is: CDP's CPU slowing reaches the page's own thread, not its workers, so
+ * each worker's picture is made to take 4 times as long (test-switches.ts TOWN_PAINT_ASKED), as on a phone's slower cores.
+ */
+const TOWN_SLOW = "/?sky=day&paintslow=4";
 /** And its longest task (`townRefJob`s; Nov 23). */
 const TOWN_LONG_REFS = 2;
 
@@ -569,7 +578,7 @@ for (const who of ["a player's town", "an admin's town"] as const)
       w.__long = [];
       new PerformanceObserver((l) => l.getEntries().forEach((e) => w.__long.push({ s: e.startTime, d: e.duration }))).observe({ type: "longtask", buffered: true });
     });
-    await page.goto("/?sky=day");
+    await page.goto(TOWN_SLOW);
     const town = page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first();
     await town.waitFor({ timeout: 60_000 });
     await page.waitForTimeout(3000);
@@ -595,7 +604,11 @@ for (const who of ["a player's town", "an admin's town"] as const)
       const w = window as unknown as { __long: { s: number; d: number }[]; __tap: number };
       return Math.max(0, ...w.__long.filter((e) => e.s >= w.__tap - 5).map((e) => e.d));
     });
-    console.log(`${who} (slowed phone): loading screen ${Math.round(shown)} ms after the tap, the town's first frame ${Math.round(loaded)} ms (${(loaded / ref).toFixed(1)} x the reference job's ${Math.round(ref)} ms), longest task ${Math.round(long)} ms`);
+    // (A first visit paints on the phone's other cores too, Nov 23: town/paint-pool.ts.)
+    const paint = await page.evaluate(() => (window as unknown as { __townPaint: () => { pictures: { workers: number; byWorkers: number; whileWaiting: number; count: number } } }).__townPaint().pictures);
+    console.log(`${who} (slowed phone): loading screen ${Math.round(shown)} ms after the tap, the town's first frame ${Math.round(loaded)} ms (${(loaded / ref).toFixed(1)} x the reference job's ${Math.round(ref)} ms), longest task ${Math.round(long)} ms; ${paint.workers} paint workers made ${paint.byWorkers} of ${paint.count} pictures (${paint.whileWaiting} more painted here while waiting)`);
+    expect(paint.workers, "paint workers that ran to the end").toBeGreaterThan(0);
+    expect(paint.byWorkers, "pictures the workers painted").toBeGreaterThan(paint.count / 2);
     // (Nov 10, headless Chromium: about 2.1 s and 1.4 s for the street town; before phone load 3, 5.8 s and 4.6 s. The old town, a player's
     // until Nov 13: about 1.7 s to its first frame.)
     expect(shown, "tap to the loading screen (ms)").toBeLessThan(3000);
@@ -617,11 +630,11 @@ test("Chess Town on a slow phone: a second visit loads the first visit's kept pi
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   const cdp = await page.context().newCDPSession(page);
-  type Pics = { kept: boolean; saved: number | null | undefined; saveMs: number; restoreMs: number; count: number };
+  type Pics = { kept: boolean; saved: number | null | undefined; saveMs: number; restoreMs: number; count: number; workers: number };
   const pics = () => page.evaluate(() => (window as unknown as { __townPaint?: () => { pictures: Pics } | null }).__townPaint?.()?.pictures ?? null);
   const sum = () => page.evaluate(() => (window as unknown as { __townPictureSum: () => { n: number; hash: string } }).__townPictureSum());
-  const visit = async () => {
-    await page.goto("/?sky=day");
+  const visit = async (q = "") => {
+    await page.goto(TOWN_SLOW + q);
     const town = page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first();
     await town.waitFor({ timeout: 60_000 });
     await page.waitForTimeout(3000);
@@ -633,7 +646,7 @@ test("Chess Town on a slow phone: a second visit loads the first visit's kept pi
     await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
     const loaded = await page.evaluate(() => performance.now() - (window as unknown as { __tap: number }).__tap);
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
-    return { ref, loaded };
+    return { ref, loaded, workers: (await pics())?.workers ?? 0 };
   };
   // The first visit paints, then keeps its pictures after its first frame.
   const one = await visit();
@@ -647,6 +660,12 @@ test("Chess Town on a slow phone: a second visit loads the first visit's kept pi
   const p2 = (await pics())!;
   expect(p2.kept, "the second visit loads the kept pictures").toBe(true);
   expect(await sum(), "every kept picture's pixels, as the first visit painted them").toEqual(first);
+  // The first visit's pictures (painted by the paint workers, Nov 23) are the main thread's, every pixel: painted again without workers.
+  expect(one.workers, "the first visit's paint workers").toBeGreaterThan(0);
+  const three = await visit("&paintall&paintworkers=0");
+  const p3 = (await pics())!;
+  expect(p3.kept || p3.workers, "painted on the main thread alone").toBeFalsy();
+  expect(await sum(), "every picture the paint workers made, as the main thread paints it").toEqual(first);
   console.log(`Chess Town kept pictures (slowed phone): first visit ${Math.round(one.loaded)} ms (${(one.loaded / one.ref).toFixed(1)} x ${Math.round(one.ref)} ms), second ${Math.round(two.loaded)} ms (${(two.loaded / two.ref).toFixed(1)} x ${Math.round(two.ref)} ms; reading and decoding ${Math.round(p2.restoreMs)} ms); ${first.n} pictures kept in ${(saved.saved! / 1048576).toFixed(1)} MB, ${Math.round(saved.saveMs)} ms`);
   expect(two.loaded / two.ref, "a second visit's tap to its first frame, in reference jobs").toBeLessThan(TOWN_KEPT_REFS);
 });
