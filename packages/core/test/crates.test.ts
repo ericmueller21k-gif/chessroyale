@@ -29,15 +29,21 @@ import {
   hiddenByOutfit,
   ownsOutfit,
   BOSS_CRATES,
+  BOSS_CRATE_POOL,
   MYTHIC_CRATE_ITEMS,
   OUTFIT,
+  BOSS_ADMIN_FIRST,
+  HUNCHESS_RIDES,
+  WELCOME_CRATE,
+  hunchessBase,
+  rollWelcome,
   type CrateDef,
   type ItemLook,
 } from "../src/index.ts";
 
 /** Items in no crate yet (Oct 31: the rides; admins have them, and their crate comes later). One by one, never a whole slot. */
 // (Every ride, Nov 1: admins only until their crate comes.)
-const NO_CRATE_YET = ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller", "pen-pony"];
+const NO_CRATE_YET = ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller", "pen-pony", "birdie-train"];
 
 const crate = crateDef("winter-1")!;
 const beta = crateDef("beta-001")!;
@@ -369,6 +375,32 @@ describe("face items over or under a hat", () => {
   });
 });
 
+describe("boss crates", () => {
+  it("every one the same template (Nov 23, Birdie's too): the Beta strip and its 80/20 Fischer Random, the Beta pool and its boss's ride, the only Mythic, at one chance", () => {
+    const ride = itemChance(BOSS_CRATES[0]!, BOSS_CRATES[0]!.ride);
+    for (const c of BOSS_CRATES) {
+      expect([c.id, c.look, c.strip, c.fischer], c.id).toEqual([`boss-${c.boss}`, "beta", beta.strip, [{ tier: "legendary", weight: 80 }, { tier: "mythic", weight: 20 }]]);
+      expect(c.items, c.id).toEqual([...BOSS_CRATE_POOL, c.ride]);
+      expect(c.items.filter((id) => itemDef(id)!.tier === "mythic"), c.id).toEqual([c.ride]);
+      expect(itemChance(c, c.ride), c.id).toBeCloseTo(ride, 12);
+      expect(ITEM_DEFS.reduce((t, d) => t + itemChance(c, d.id), 0), c.id).toBeCloseTo(1);
+    }
+    // (No Legendary in the pool: the ride is the only item behind Fischer Random, so it is all of its 2%; shop.md, "The crates".)
+    expect(fischerOdds(BOSS_CRATES[0]!)).toEqual([{ item: BOSS_CRATES[0]!.ride, weight: 100 }]);
+    expect(ride).toBeCloseTo(0.02, 12);
+    expect(BOSS_CRATES.find((c) => c.boss === "birdie")).toMatchObject({ name: "Birdie's Boss Crate", ride: "birdie-train", blurb: "Birdie's Train, and the Beta Crate's hats, shades and gear" });
+  });
+
+  it("no Welcome Crate ride belongs to an admins-first boss (Nov 23): every other ride's HunChess colorway is in, and a holder's left-out ride leaves out nothing", () => {
+    const bossOf = (def: string) => BOSS_CRATES.find((c) => c.ride === hunchessBase(def))?.boss;
+    const out = HUNCHESS_RIDES.filter((d) => BOSS_ADMIN_FIRST.includes(bossOf(d.id) ?? "")).map((d) => d.id);
+    // (Timber's, Dash's and Birdie's while they're admins first; each comes back by itself when its boss leaves BOSS_ADMIN_FIRST.)
+    for (const boss of ["timber", "dash", "birdie"].filter((b) => BOSS_ADMIN_FIRST.includes(b))) expect(out).toContain(`${BOSS_CRATES.find((c) => c.boss === boss)!.ride}-hunchess`);
+    expect(WELCOME_CRATE.items).toEqual(HUNCHESS_RIDES.map((d) => d.id).filter((id) => !out.includes(id)));
+    for (const k of [0, 0.5, 0.999]) expect(WELCOME_CRATE.items).toContain(rollWelcome(() => k, out.slice(0, 1)).def);
+  });
+});
+
 describe("rides (Oct 31)", () => {
   it("a slot of their own, one ride at a time, Mythic, in no crate yet (admins only until its crate comes)", () => {
     expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride", "outfit"]);
@@ -394,6 +426,7 @@ describe("rides (Oct 31)", () => {
       ["cheetah-shoes", "Cheetah Shoes", "mythic"],
       ["log-roller", "The Log Roller", "mythic"],
       ["pen-pony", "Pen Pony", "mythic"],
+      ["birdie-train", "Birdie's Train", "mythic"],
     ]);
     for (const d of rides) {
       expect(CRATES.some((c) => c.items.includes(d.id)), d.id).toBe(false);

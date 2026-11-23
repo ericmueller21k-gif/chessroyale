@@ -218,6 +218,14 @@ function train(name: BirdieRun, rate: number): Float32Array {
   return out;
 }
 
+/**
+ * Birdie's Train's moving sound (the ride, Nov 23: ride-sound.ts, RIDE_SOUND's `synth`): his medium run, looped from its second puff
+ * to where a sixth would start (STEP to 5 STEPs, an 8th of his song each): three weak puffs and a strong one, the rail joints between,
+ * at his song's pace. Nothing sounds at either end (the first puff is over by STEP; the last is over before 5 STEPs, where the run is
+ * silence), so it loops with no seam.
+ */
+export const BIRDIE_RIDE_LOOP: { readonly run: BirdieRun; readonly start: number; readonly end: number } = { run: "trainMedium", start: STEP, end: 5 * STEP };
+
 // ---- The rest of his pack.
 
 /** Noise with its highs rolled off twice: a soft puff or breath, never a hiss. */

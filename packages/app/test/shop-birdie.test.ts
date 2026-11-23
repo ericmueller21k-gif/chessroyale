@@ -4,12 +4,12 @@
  * data, and the split-flap board's words and flips. Pure: the art, the room (room.ts), the timeline, the board's text (flap-board.ts).
  */
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER } from "@chessroyale/core";
+import { BOSS_CRATES, BOSS_ROSTER, adminFirst, bossCrateOf, itemDef } from "@chessroyale/core";
 import { renderFrame, type Character } from "../src/characters/sprite.ts";
 import { SIDEKICK_BIRDIE_BARTENDER } from "../src/characters/sidekicks/birdiebartender.ts";
 import { SHOP_BIRDIE_INTERIOR_3, SHOP_BIRDIE_PIECES } from "../src/town/shops/birdie-lobby-art.ts";
 import * as A from "../src/town/shops/birdie-art.ts";
-import { SHOPS } from "../src/town/shops/shops.ts";
+import { SHOPS, holdLine, priceLine, prizeRows } from "../src/town/shops/shops.ts";
 import { isFloor, makeRoom, stepsFrom, walkable } from "../src/town/shops/room.ts";
 import { introOf, marksOf } from "../src/town/shops/challenge.ts";
 import { BIRDIE_INTRO } from "../src/town/shops/intros/birdie.ts";
@@ -205,5 +205,22 @@ describe("the split-flap board (flap-board.ts)", () => {
       if (a === z) expect(s).toEqual([]);
       else expect(s.at(-1)).toBe(z);
     }
+  });
+});
+
+describe("Birdie's Boss Crate and his Train (Nov 23)", () => {
+  it("the bartender sells it as every Shopkeeper does: his Train first (a Mythic ride), the boss crates' price; admins first, as he is", () => {
+    const crate = bossCrateOf("birdie")!;
+    expect(BOSS_CRATES).toContain(crate);
+    expect([crate.id, crate.name, crate.ride, def.crate]).toEqual(["boss-birdie", "Birdie's Boss Crate", "birdie-train", "Birdie's Boss Crate"]);
+    expect(adminFirst({ id: crate.boss })).toBe(true);
+    expect(itemDef("birdie-train")).toMatchObject({ name: "Birdie's Train", tier: "mythic", slot: "ride" });
+    expect(def.prizes).toEqual(["birdie-train"]);
+    expect(prizeRows(def)[0]).toMatchObject({ id: "birdie-train", name: "Birdie's Train", kind: "Mythic ride" });
+    expect(priceLine(def)).toBe("3 Birdie tokens, or 1 Birdie token + 1 crate key");
+    expect(holdLine(def, { tokens: 1, keys: 0 })).toBe("You have 1 Birdie token and 0 crate keys.");
+    // (His lobby has no crate drawing of its own: the card shows the Crates tab's, ShopRoom.tsx CardCrate. His lines are kept.)
+    expect(A.SHOP_BIRDIE_ROOM_PIECES.crate).toBeUndefined();
+    expect(def.says).toHaveLength(3);
   });
 });

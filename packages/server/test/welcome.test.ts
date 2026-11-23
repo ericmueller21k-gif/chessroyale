@@ -196,14 +196,14 @@ describe("earning it", () => {
 });
 
 describe("opening it", () => {
-  it("once, to one HunChess ride from the full list, stored; a second open gives nothing new", async () => {
+  it("once, to one HunChess ride from its list, stored; a second open gives nothing new", async () => {
     const { sql, db, id } = await account();
     expect(await openWelcomeCrate(sql, id, T0)).toEqual({ ok: false, message: "You have no Welcome Crate to open." });
     await play(sql, id, 5);
     const first = await openWelcomeCrate(sql, id, T0 + 1);
     if (!first.ok) throw new Error(first.message);
     expect(first.again).toBe(false);
-    expect(HUNCHESS_RIDES.map((d) => d.id)).toContain(first.item.def);
+    expect(WELCOME_CRATE.items).toContain(first.item.def);
     expect(isHunchess(first.item.def)).toBe(true);
     expect(first.item.blemish).toBe(0);
     const again = await openWelcomeCrate(sql, id, T0 + 2);
@@ -243,15 +243,16 @@ describe("opening it", () => {
 
   it("every ride can come out, each as likely (the roll is the server's: openWelcomeCrate takes no test switch)", async () => {
     const seen = new Map<string, number>();
-    for (let i = 0; i < HUNCHESS_RIDES.length; i++) {
+    // (Its list: every ride's colorway but an admins-first boss's, Nov 23; core crates.test.ts.)
+    for (let i = 0; i < WELCOME_CRATE.items.length; i++) {
       const { sql, id } = await account();
       await play(sql, id, 5);
       // (Randomness landing on each ride in turn.)
-      const k = (i + 0.5) / HUNCHESS_RIDES.length;
+      const k = (i + 0.5) / WELCOME_CRATE.items.length;
       const r = await openWelcomeCrate(sql, id, T0, () => k);
       if (r.ok) seen.set(r.item.def, (seen.get(r.item.def) ?? 0) + 1);
     }
-    expect([...seen.keys()].sort()).toEqual(HUNCHESS_RIDES.map((d) => d.id).sort());
+    expect([...seen.keys()].sort()).toEqual([...WELCOME_CRATE.items].sort());
   });
 });
 
@@ -267,7 +268,8 @@ describe("the prize: a HunChess colorway of every ride, never tradeable, no puri
       expect(h.name).toBe(`HunChess ${r.name}`);
       expect(isHunchess(r.id)).toBe(false);
     }
-    expect(WELCOME_CRATE.items).toEqual(HUNCHESS_RIDES.map((d) => d.id));
+    // (Its list is these less an admins-first boss's rides, Nov 23: the exact list in core crates.test.ts.)
+    expect(HUNCHESS_RIDES.map((d) => d.id)).toEqual(expect.arrayContaining([...WELCOME_CRATE.items]));
     expect(WELCOME_TEXT).toMatchObject({ name: "HunChess Welcome Crate", thanks: "Thank you for being an early tester!", notTradeable: "Not tradeable" });
     expect(WELCOME_TEXT.progress(3)).toBe("Finish 5 games to earn your Welcome Crate: 3/5");
   });

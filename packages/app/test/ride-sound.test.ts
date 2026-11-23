@@ -64,7 +64,15 @@ const ctx = {
     return 10 + Date.now() / 1000;
   },
   state: "running" as AudioContextState,
+  sampleRate: 24000,
   sources: [] as FakeSource[],
+  buffers: [] as { length: number; data: Float32Array }[],
+  /** (A synth loop's buffer: Birdie's Train.) */
+  createBuffer(_ch: number, length: number, rate: number) {
+    const b = { length, rate, data: new Float32Array(length), getChannelData: () => b.data };
+    this.buffers.push(b);
+    return b;
+  },
   gains: [] as FakeGain[],
   createGain() {
     const g = new FakeGain();
@@ -77,17 +85,18 @@ const ctx = {
     return s;
   },
 };
-const sound = vi.hoisted(() => ({ muted: false, hidden: false, mute: [] as (() => void)[], rebuilt: [] as (() => void)[], asked: [] as string[] }));
+const sound = vi.hoisted(() => ({ muted: false, hidden: false, noAudio: false, mute: [] as (() => void)[], rebuilt: [] as (() => void)[], asked: [] as string[] }));
 vi.mock("../src/sound.ts", () => ({
   isMuted: () => sound.muted,
   isPageHidden: () => sound.hidden,
-  gameBus: (unsoftened?: boolean) => ({ ctx, out: unsoftened ? BRIGHT : OUT }),
+  gameBus: (unsoftened?: boolean) => (sound.noAudio ? null : { ctx, out: unsoftened ? BRIGHT : OUT }),
   loadAudioFile: (url: string) => (sound.asked.push(url), Promise.resolve({ url })),
   onMuteChange: (fn: () => void) => (sound.mute.push(fn), () => undefined),
   onAudioRebuilt: (fn: () => void) => (sound.rebuilt.push(fn), () => undefined),
 }));
 
 const { rideMoving, rideStep, rideHop, rideSoundId, rideSoundState, rideSoundForTests, warmRideSound, RIDE_LOOP, DECLICK_S } = await import("../src/ride-sound.ts");
+const { BIRDIE_RIDE_LOOP, birdieSound } = await import("../src/characters/birdie-sounds.ts");
 const { Walker } = await import("../src/town/world.ts");
 const { RIDE_CELLS } = await import("../src/town/ride-cells.ts");
 const { TOWN_FEEL } = await import("../src/town/feel.ts");
@@ -228,6 +237,74 @@ describe("a ride's moving sound", () => {
     expect(playing()).toHaveLength(1);
     expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", live: 1 });
   });
+  it("Birdie's Train (Nov 23): his own train run made in code on its first move, no file fetched; it loops seamless where his sounds say", () => {
+    const asked = sound.asked.length;
+    rideMoving("birdie-train");
+    expect(sound.asked.length, "no file").toBe(asked);
+    const [src] = playing();
+    expect(playing()).toHaveLength(1);
+    expect([src!.loop, src!.loopStart, src!.loopEnd, src!.started![1], src!.playbackRate.value]).toEqual([true, BIRDIE_RIDE_LOOP.start, BIRDIE_RIDE_LOOP.end, BIRDIE_RIDE_LOOP.start, 1]);
+    expect(ctx.gains.at(-1)!.to).toBe(OUT);
+    // (The buffer: the medium run's samples at the context's rate, room to the loop's end, silent at both ends of the loop.)
+    const buf = ctx.buffers.at(-1)!;
+    const run = birdieSound(BIRDIE_RIDE_LOOP.run, ctx.sampleRate);
+    expect(src!.buffer).toBe(buf);
+    expect(buf.length).toBeGreaterThan(BIRDIE_RIDE_LOOP.end * ctx.sampleRate);
+    expect(Array.from(buf.data.subarray(0, run.length))).toEqual(Array.from(run));
+    const near = (t: number) => Math.max(...Array.from(buf.data.subarray(Math.round(t * ctx.sampleRate) - 48, Math.round(t * ctx.sampleRate) + 1), Math.abs));
+    expect(near(BIRDIE_RIDE_LOOP.start), "silent into the loop's start").toBeLessThan(1e-3);
+    expect(near(BIRDIE_RIDE_LOOP.end), "silent into its end").toBeLessThan(1e-3);
+    // (Made once: moving again, and a warm, reuse it.)
+    pass(RIDE_SOUND.holdMs + 20);
+    warmRideSound("birdie-train");
+    move("birdie-train", 50);
+    expect(ctx.buffers.filter((b) => b.length === buf.length)).toHaveLength(1);
+    expect(rideSoundState()).toMatchObject({ ride: "birdie-train", live: 1, decoded: expect.arrayContaining(["birdie-train"]) });
+  });
+
+  it("Birdie's Train warmed before the audio is made (a cold visit; the review's N1, Nov 23): made then, on a buffer of its own at SYNTH_RATE, so the first move only starts it", async () => {
+    // (A fresh copy of the module, nothing made yet; Web Audio's own AudioBuffer, faked.)
+    vi.useRealTimers();
+    vi.resetModules();
+    const cold = await import("../src/ride-sound.ts");
+    vi.useFakeTimers({ now: 0 });
+    cold.rideSoundForTests(() => Date.now());
+    class FakeAudioBuffer {
+      length: number;
+      sampleRate: number;
+      data: Float32Array;
+      constructor(o: { numberOfChannels: number; length: number; sampleRate: number }) {
+        [this.length, this.sampleRate, this.data] = [o.length, o.sampleRate, new Float32Array(o.length)];
+      }
+      getChannelData() {
+        return this.data;
+      }
+    }
+    vi.stubGlobal("AudioBuffer", FakeAudioBuffer);
+    try {
+      sound.noAudio = true;
+      cold.warmRideSound("birdie-train");
+      sound.noAudio = false;
+      expect(cold.rideSoundState().decoded).toEqual(["birdie-train"]);
+      const made = ctx.buffers.length;
+      cold.rideMoving("birdie-train");
+      expect(ctx.buffers.length, "nothing made on the moving frame").toBe(made);
+      const [src] = playing();
+      const buf = src!.buffer as FakeAudioBuffer;
+      expect(buf).toBeInstanceOf(FakeAudioBuffer);
+      expect(buf.sampleRate).toBe(cold.SYNTH_RATE);
+      expect(buf.length).toBeGreaterThan(BIRDIE_RIDE_LOOP.end * cold.SYNTH_RATE);
+      const run = birdieSound(BIRDIE_RIDE_LOOP.run, cold.SYNTH_RATE);
+      expect(Array.from(buf.data.subarray(0, run.length))).toEqual(Array.from(run));
+      expect([src!.loop, src!.loopStart, src!.loopEnd]).toEqual([true, BIRDIE_RIDE_LOOP.start, BIRDIE_RIDE_LOOP.end]);
+      expect(cold.rideSoundState()).toMatchObject({ ride: "birdie-train", live: 1 });
+    } finally {
+      sound.noAudio = false;
+      cold.rideSoundForTests(() => Date.now());
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("a frame loop that halts mid-walk (the town closing, a hidden tab): it stops all the same", () => {
     move("sawyer-dozer", 200);
     pass(RIDE_SOUND.holdMs + 20);

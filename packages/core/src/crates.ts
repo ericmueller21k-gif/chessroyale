@@ -177,6 +177,9 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
   { id: "log-roller", name: "The Log Roller", tier: "mythic", slot: "ride", description: "Timber's favorite commute. Keep your feet moving and never, ever look down." },
   // (Nov 4: Wrangler's, one of the pen knights in his barn, saddled; in his crate from the start. Its line is the drawing's.)
   { id: "pen-pony", name: "Pen Pony", tier: "mythic", slot: "ride", description: "One of Wrangler's pen knights, saddled up. It won't go straight, but it hops like nobody's business." },
+  // (Nov 23: Birdie's, his little yellow diesel, long and low, its body the item's color (Yellow is his train's); in his crate from the
+  // start. Its line is the drawing's.)
+  { id: "birdie-train", name: "Birdie's Train", tier: "mythic", slot: "ride", description: "A little yellow diesel that always runs on time. The tracks are imaginary; the punctuality is not." },
   // Outfits (Nov 10): worn over everything else, a secret slot (the locker shows it only to someone who owns one). The Banana
   // Suit is the Mythic Crate's secret item (MYTHIC_CRATE_ITEMS); no crate rolls it yet.
   { id: "banana-suit", name: "Banana Suit", tier: "mythic", slot: "outfit", description: "Fully committed to the bit. Opponents keep slipping up." },
@@ -399,8 +402,8 @@ const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
  * with Hollow's Bulb), Wrangler's (Nov 4, with Pen Pony; `pig`, his home's id), Grex's (Nov 4, with Giraffe Gallop; `grex`,
  * his home's id) and Ginger's (Nov 5, with the Candy Cane Sled; `gingerbread`, his home's id and his boss id: its crate's id is
  * `boss-gingerbread`, never the Gingerbread Man skin's `gingerbread`) and Folio's (Nov 5, with the Paper Crane). Timber's
- * and Dash's (Nov 3) are shown and sold to admins only while they're in the game for admins first (BOSS_ADMIN_FIRST): only an admin
- * holds their tokens.
+ * and Dash's (Nov 3), and Birdie's (Nov 23, with Birdie's Train), are shown and sold to admins only while they're in the game for admins
+ * first (BOSS_ADMIN_FIRST): only an admin holds their tokens.
  */
 export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("tiger", "Babur's Boss Crate", "balloon-pup"),
@@ -416,6 +419,7 @@ export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("folio", "Folio's Boss Crate", "folio-crane"),
   bossCrate("smudgy", "Smudgy's Boss Crate", "smudgy-brush"),
   bossCrate("clown", "Boingo's Boss Crate", "boingo-pogo"),
+  bossCrate("birdie", "Birdie's Boss Crate", "birdie-train"),
 ];
 
 export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);

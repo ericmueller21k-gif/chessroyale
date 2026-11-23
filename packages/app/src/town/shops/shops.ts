@@ -146,9 +146,11 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // U-shaped bar (his own sidekick drawing) its Shopkeeper, drawn at his art's size, just behind the bar's front run as the art's notes
   // have him (shops/birdie-art.ts: his scoop dips in the vat beside him and pours into a feeder on the counter). He has no name:
   // "Shopkeeper". You talk to him from the floor past the run's stools (`talkAt`). (His place, size and squares are the art's, written
-  // here so the town needn't load the room: test/shop-birdie.test.ts checks them against shops/birdie-art.ts.) His crate isn't sold yet, so Talk has him say a line,
-  // as Chandy's frog. A bright station lobby under a white ceiling: the day tone.
-  birdie: { home: "birdie", boss: "Birdie", crate: null, says: ["Seed's fresh. Scooped it myself.", "Next train's on the board. Grab a stool till then.", "Birdie? Never late. Not once."], kid: "birdiebartender", at: [257 / 37 - 0.5, 139 / 37 - 0.5], tall: 55, keeper: [{ c: 6, r: 3 }, { c: 7, r: 3 }], talkAt: [{ c: 6, r: 6 }, { c: 7, r: 6 }], prizes: [], roof: "store", chatTone: "day" },
+  // here so the town needn't load the room: test/shop-birdie.test.ts checks them against shops/birdie-art.ts.) Since Nov 23 he sells
+  // Birdie's Boss Crate, his Train first in it (his ride): Talk opens it, as every Shopkeeper's. (His lobby's art has no crate of its own on
+  // the bar: the card shows the Crates tab's, ShopRoom.tsx CardCrate.) His lines from before his crate are kept, unused while Talk opens
+  // it (`says`: a shop with no crate's). A bright station lobby under a white ceiling: the day tone.
+  birdie: { home: "birdie", boss: "Birdie", crate: "Birdie's Boss Crate", says: ["Seed's fresh. Scooped it myself.", "Next train's on the board. Grab a stool till then.", "Birdie? Never late. Not once."], kid: "birdiebartender", at: [257 / 37 - 0.5, 139 / 37 - 0.5], tall: 55, keeper: [{ c: 6, r: 3 }, { c: 7, r: 3 }], talkAt: [{ c: 6, r: 6 }, { c: 7, r: 6 }], prizes: ["birdie-train"], roof: "store", chatTone: "day" },
   // The Battle Tower's lobby (Nov 19): its clerk, a penguin bellhop (nobody's kid), behind the counter at the back left, drawn at his art's
   // size (57 px: his face and bow tie clear the 30 px counter). His tag and card say "Clerk"; his card starts or continues your climb
   // (town/TowerDesk.tsx, the only way in: Eric, Nov 19). No crate. Its theme: the tower's own (`tower`, its home's: Nov 19), as in its floor

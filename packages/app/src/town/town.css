@@ -696,6 +696,13 @@ button.town-pic.player {
   height: 81px;
   image-rendering: pixelated;
 }
+/* (A room with no crate drawing of its own, Birdie's lobby: the Crates tab's crate in the same box, in its middle.) */
+.shop-crate-pic.shop-crate-drawn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  image-rendering: auto;
+}
 .shop-label {
   margin: 0 0 3px;
   font: 600 11px Archivo, sans-serif;
@@ -769,6 +776,9 @@ button.town-pic.player {
 .shop-bought .shop-crate-pic {
   display: block;
   margin: 0 auto;
+}
+.shop-bought .shop-crate-pic.shop-crate-drawn {
+  display: flex;
 }
 .shop-bought-line {
   margin: 6px 0 4px;

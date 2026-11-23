@@ -1,4 +1,5 @@
-import { FISCHER, HUNCHESS_RIDES, isHunchess, itemDef, type CrateDef, type CrateRoll } from "./crates.ts";
+import { adminFirst } from "./boss.ts";
+import { BOSS_CRATES, FISCHER, HUNCHESS_RIDES, isHunchess, itemDef, type CrateDef, type CrateRoll, type ItemDef } from "./crates.ts";
 import type { Rng } from "./rng.ts";
 import { WELCOME_GIFT } from "./settings.ts";
 
@@ -11,7 +12,7 @@ import { WELCOME_GIFT } from "./settings.ts";
  *     by the server (server/welcome.ts: a stored row keyed by the account and the milestone, checked and set in one statement), at
  *     WELCOME_GIFT.milestones finished games. Never in CRATES (the Crates tab can't open one free) nor BOSS_CRATES.
  *   - Its prize: one of every ride's HunChess colorway (HUNCHESS_RIDES in crates.ts), each as likely, rolled by the server; the second
- *     never gives the ride the first gave (while another is left).
+ *     never gives the ride the first gave (while another is left). Not an admins-first boss's ride (`welcomeRide`, Nov 23).
  *   - Never tradeable, never listable (`tradeable`, every path that would move an item between accounts asks it), and no purity
  *     is shown for the crate or its rides.
  */
@@ -36,8 +37,17 @@ export const WELCOME_TEXT = {
 } as const;
 
 /**
- * The crate, as a crate (so the Crates tab's page and opening draw it): every ride's HunChess colorway behind Fischer Random, the
- * only thing on its strip, each ride as likely. Rolled with `rollWelcome`, never `rollCrate`'s colors and purity.
+ * Whether a HunChess colorway is in the Welcome Crate: every one but an admins-first boss's ride's (Nov 23,
+ * docs/decisions/2026-11-23-welcome-crate-admin-first.md: Eric's rule, a boss in the game for admins first is "met only by an admin
+ * until Eric says go", and every player opens this crate). Its boss is the boss whose crate holds the ride (BOSS_CRATES), so each comes
+ * back by itself when its boss leaves BOSS_ADMIN_FIRST. A ride in no boss's crate is always in. Holders keep theirs (the colorway stays
+ * an item: admins own one of every item), and an opened crate answers its stored ride.
+ */
+export const welcomeRide = (d: ItemDef): boolean => !adminFirst({ id: BOSS_CRATES.find((c) => c.ride === d.hunchess)?.boss ?? "" });
+
+/**
+ * The crate, as a crate (so the Crates tab's page and opening draw it): every Welcome Crate ride's HunChess colorway (`welcomeRide`)
+ * behind Fischer Random, the only thing on its strip, each ride as likely. Rolled with `rollWelcome`, never `rollCrate`'s colors and purity.
  */
 export const WELCOME_CRATE: CrateDef = {
   id: WELCOME_CRATE_ID,
@@ -45,7 +55,7 @@ export const WELCOME_CRATE: CrateDef = {
   blurb: WELCOME_TEXT.thanks,
   look: "hunchess",
   strip: [{ tier: FISCHER, weight: 100 }],
-  items: HUNCHESS_RIDES.map((d) => d.id),
+  items: HUNCHESS_RIDES.filter(welcomeRide).map((d) => d.id),
   fischer: [{ tier: "mythic", weight: 100 }],
 };
 
@@ -56,9 +66,9 @@ export const WELCOME_CRATE: CrateDef = {
 export const HUNCHESS_FINISH = { color: "yellow", color2: "midnight", blemish: 0 } as const;
 
 /**
- * Opens a Welcome Crate: one ride from every ride's HunChess colorway, each as likely (two draws of `rng`: the ride, its seed), leaving
- * out `won` (the rides an earlier Welcome Crate gave: Eric, the second holds a different one) while any other is left. The server's
- * randomness only (server/welcome.ts).
+ * Opens a Welcome Crate: one ride from its list (WELCOME_CRATE.items), each as likely (two draws of `rng`: the ride, its seed), leaving
+ * out `won` (the rides an earlier Welcome Crate gave: Eric, the second holds a different one; one no longer listed leaves out nothing)
+ * while any other is left. The server's randomness only (server/welcome.ts).
  */
 export function rollWelcome(rng: Rng, won: readonly string[] = []): CrateRoll {
   const left = WELCOME_CRATE.items.filter((d) => !won.includes(d));
