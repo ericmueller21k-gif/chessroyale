@@ -168,3 +168,6 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
   Before any room still goes to Eric, the director checks the WHOLE room in the game (not a zoomed piece) against every one of his notes,
   one line each. The three misses: the bar's arms drawn flat (nobody checked the whole room), feeders around the table (Eric's "feeders on
   the table" read as the challenge table, not the bar), the table's chessboard (the standard table not given as a reference).
+- **`scripts/boss-art/refs/` is in `.gitignore` (Nov 23):** a reference picture the director pushes for an art session must be added with
+  `git add -f`, and checked with `git ls-tree origin/claude/boss-art` before the session starts (Eric's marked screenshot for lobby round 4
+  silently didn't push, and the session stopped waiting for it).
