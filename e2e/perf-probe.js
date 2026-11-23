@@ -77,20 +77,11 @@ export function instrument() {
   raf(loop);
 }
 
-/**
- * The page's counts now (run in the page): DOM elements, running animations, pending timers, canvases. And the boss
- * battle's move list apart (`list`: its elements, `rows`: its rows), which fills as the battle goes; a phone's small panel
- * to the rows its box holds and a few spare (`cap`, MovePanel.tsx), never one per move of the battle (Nov 23).
- */
+/** The page's counts now (run in the page): DOM elements, running animations, pending timers, canvases. */
 export function counts() {
   const P = window.__perf;
-  const lists = [...document.querySelectorAll(".mv-list")];
-  const panel = document.querySelector(".bp-body .mv-box");
   return {
     dom: document.getElementsByTagName("*").length,
-    list: lists.reduce((n, l) => n + l.getElementsByTagName("*").length, 0),
-    rows: lists.reduce((n, l) => n + l.querySelectorAll(".mv-row").length, 0),
-    cap: panel ? Math.ceil(panel.clientHeight / 24) + 8 : null,
     anims: document.getAnimations().length,
     timeouts: P.timeouts.size,
     intervals: P.intervals.size,
