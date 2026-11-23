@@ -2628,7 +2628,7 @@ export const BIRDIE_CINEMATIC = {
   dropMs: 840,
   /** The scene fades in over the board and everything above it, as Moo's field does (a CSS fade). */
   fadeInMs: 400,
-  /** He tumbles through the air, the sky streaking past (the drawing's `fall`, 600 ms a loop). */
+  /** He free falls happily through the air (Eric, Nov 23), the sky streaking past (the drawing's `fall`, 600 ms a loop). */
   tumbleMs: 900,
   /**
    * His train comes up the track toward him (the drawing's `approach`, 390 ms a frame), its headlights brighter and brighter, to its last
