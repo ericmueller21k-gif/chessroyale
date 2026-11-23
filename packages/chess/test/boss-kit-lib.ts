@@ -742,7 +742,11 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null, watch?:
     // (Hollow alone, the 3rd or 7th bulb out: the dark's move is the crowd's. The driver never tries the dark, so only a
     // battle set up with it comes here.)
     const first = r.boss!.crowdMoves === 0 ? KIT_FIRST_MOVE[k.test]?.moves[k.side] : undefined;
-    const move = r.darkForcedDue() ? await r.playDarkForced(engines[0]) : first && allowed.includes(first) ? first : crowdPick(fen, allowed, rng);
+    // (Birdie's train warned for your king: the crowd moves it, as a crowd reading the dock does ("Move your king!"); left there it ends
+    // the battle at his turn's start, before the kit has a battle to check: birdie.test.ts plays that end. Every other boss: as ever.)
+    const train = r.trainJob();
+    const kingOut = train && pieceAt(fen, train)?.type === "k" ? allowed.filter((m) => m.startsWith(train)) : [];
+    const move = r.darkForcedDue() ? await r.playDarkForced(engines[0]) : first && allowed.includes(first) ? first : crowdPick(fen, kingOut.length ? kingOut : allowed, rng);
     const report = await r.score(new Map([[r.alive()[0]!.id, { move, thinkMs: 1000 }]]));
     note("crowd");
     c.round(r, report, allowed, `the crowd's move ${move}`);

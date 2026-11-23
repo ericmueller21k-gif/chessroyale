@@ -164,8 +164,8 @@ describe("the Carrot Patch: its trigger, once a battle", () => {
     expect(plain.carrotDue()).toBe(false);
   });
 
-  it("only Chub & Chirp's ultimate is once a battle", () => {
-    expect(BOSS_ROSTER.filter((d) => bossRules({ id: d.id })?.ultimateOnce).map((d) => d.id)).toEqual(["hopper"]);
+  it("only Chub & Chirp's ultimate and Birdie's fall are once a battle", () => {
+    expect(BOSS_ROSTER.filter((d) => bossRules({ id: d.id })?.ultimateOnce).map((d) => d.id)).toEqual(["hopper", "birdie"]);
   });
 
   it("the admins' trigger: the cast at the start of his next turn, without the warning; once it's come, the trigger refuses and the meter is off", async () => {

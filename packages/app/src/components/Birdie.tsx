@@ -131,6 +131,22 @@ export function birdieDecor(boss: Pick<BossView, "id" | "crowdSide" | "crowdMove
 
 // ---------------- The board layer ----------------
 
+/**
+ * The pieces his layer draws on the line while his train rides (`at`: the ride's start on this screen), each with its square's place
+ * along the line: every piece on it but a king (the board leaves them off: birdieFen; a king stays on the board, the train passing
+ * over it), read from the rules' position (`fen`: the boss's board, never the drawn one, which has them off), the smashed one until
+ * the train reaches it.
+ */
+export function ridePieces(fen: string, crowd: "w" | "b", ride: { square: string; piece: string; spared?: true }, squares: readonly string[], at: number, now: number): { square: string; i: number; color: "w" | "b"; type: string; smashed: boolean }[] {
+  return squares.flatMap((square, i) => {
+    const smashed = square === ride.square && !ride.spared;
+    const pc = smashed ? { color: crowd, type: ride.piece } : pieceAt(fen, square);
+    if (!pc || pc.type === "k") return [];
+    if (smashed && now >= at + trainReaches(i)) return [];
+    return [{ square, i, color: pc.color as "w" | "b", type: pc.type, smashed }];
+  });
+}
+
 const COLOUR = { w: "white", b: "black" } as const;
 
 /** The crossing on each square of the warned line: lit at the warning's `signal` cue on this screen, else already flashing. */
@@ -143,7 +159,7 @@ function crossingItems(squares: readonly string[], since: number, until: (i: num
  * his train rides, the train (its art from above, two squares long, nose first along the line from his side, clipped at the board's
  * edge), every piece on the line stepping aside as it comes, and the smash on the piece it reaches.
  */
-function birdieLayer({ boss, p, moments, now, orientation, board }: BoardLayerProps): { under?: preact.ComponentChildren; over: preact.ComponentChildren } {
+function birdieLayer({ boss, p, moments, now, orientation }: BoardLayerProps): { under?: preact.ComponentChildren; over: preact.ComponentChildren } {
   const bd = p.birdie;
   const signal = moments.find((m) => m.kind === "trainSignal");
   const ride = rideOf(moments);
@@ -183,26 +199,21 @@ function birdieLayer({ boss, p, moments, now, orientation, board }: BoardLayerPr
         </div>,
       );
       // Every piece on the line, stepping aside as the train comes and back after it (the smashed one until it's reached).
-      const before = board;
-      const pieces = ride.squares.flatMap((sq, i) => {
-        const smashed = sq === bd.ride!.square && !bd.ride!.spared;
-        const pc = smashed ? { color: boss.crowdSide, type: bd.ride!.piece } : pieceAt(before, sq);
-        // (A king stays on the board, the train passing over it: birdieFen.)
-        if (!pc || pc.type === "k") return [];
-        if (smashed && now >= reach(i)) return [];
+      const pieces = ridePieces(boss.board.fen, boss.crowdSide, bd.ride, ride.squares, rideAt, now).map(({ square: sq, i, color, type, smashed }) => {
+        const pc = { color, type };
         const c = drawnAt(sq, orientation);
         const asideAt = reach(i) - B.ride.asideMs;
         // (Aside across the line: off a rank upward, off a file to the left, as seen.)
         const off = u.x !== 0 ? { x: 0, y: -0.42 } : { x: -0.42, y: 0 };
         const stays = Math.round((3 / B.ride.trackSquares) * B.ride.rideMs);
-        return [
+        return (
           <piece
             key={sq}
             class={`${COLOUR[pc.color]} ${PIECE_WORD[pc.type]}${smashed ? "" : " bd-aside"}`}
             data-square={sq}
             style={{ left: `${(c.col * 100) / 8}%`, top: `${(c.row * 100) / 8}%`, ...(smashed ? {} : { "--ax": String(off.x), "--ay": String(off.y), animationDuration: `${stays + 2 * B.ride.asideMs}ms`, animationDelay: `${asideAt - now}ms` }) }}
-          />,
-        ];
+          />
+        );
       });
       over.push(
         <div key="pieces" class="hb-pieces bd-pieces">

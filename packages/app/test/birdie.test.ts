@@ -6,7 +6,7 @@ import { BIRDIE_CUTSCENE_SHEET } from "../src/characters/birdie-cutscene-sheet.t
 import { birdieArmoredNow, noteArmor, resetBirdie } from "../src/characters/birdie-state.ts";
 import { BOSS_KITS, liveKit } from "../src/characters/kits.ts";
 import { animLength, cueAt } from "../src/characters/power-art.ts";
-import { BIRDIE_WORDS, birdieDecor, birdieFen } from "../src/components/Birdie.tsx";
+import { BIRDIE_WORDS, birdieDecor, birdieFen, ridePieces } from "../src/components/Birdie.tsx";
 import { cutscenePicture, sceneOpacity, sheetColumn } from "../src/components/BirdieFall.tsx";
 import type { Moment } from "../src/components/PowerParts.tsx";
 import { trainLine } from "../src/refused.ts";
@@ -90,6 +90,21 @@ describe("the board during his train's ride", () => {
     expect(riding.still).toBe(true);
     expect(birdieFen(boss, [m], 1000 + BIRDIE_BEATS.ride.backAt, after)).toBeNull();
     expect(birdieFen(boss, [], 0, after)).toBeNull();
+  });
+
+  it("his layer draws the line's pieces from the rules' position (the drawn board has them off), the smashed one until it's reached", () => {
+    const rideAt = 1000 + BIRDIE_BEATS.ride.rideAt;
+    const drawn = birdieFen(boss, [m], rideAt + 10, after)!.fen;
+    // (Off the drawn board, so read from it his rook would be lost: the layer reads the boss's board.)
+    expect(ridePieces(drawn, crowd, ride, ride.squares, rideAt, rideAt + 10).map((x) => x.square)).toEqual(["b1"]);
+    expect(ridePieces(after, crowd, ride, ride.squares, rideAt, rideAt + 10)).toEqual([
+      { square: "b8", i: 0, color: "b", type: "r", smashed: false },
+      { square: "b1", i: 7, color: "w", type: "n", smashed: true },
+    ]);
+    expect(ridePieces(after, crowd, ride, ride.squares, rideAt, rideAt + trainReaches(7)).map((x) => x.square)).toEqual(["b8"]);
+    // (Spared: on the board as it is; a king: never in the layer.)
+    expect(ridePieces(after, crowd, { ...ride, spared: true }, ride.squares, rideAt, rideAt).map((x) => x.square)).toEqual(["b8"]);
+    expect(ridePieces("1k6/8/8/8/8/8/8/1K6 b - - 0 1", crowd, { square: "b1", piece: "k" }, ride.squares, rideAt, rideAt)).toEqual([]);
   });
 
   it("your king, smashed: hidden from the train's hit on (the battle his), never taken off the drawn board", () => {

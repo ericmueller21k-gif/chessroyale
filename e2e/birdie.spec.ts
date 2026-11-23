@@ -46,6 +46,17 @@ async function record(page: Page) {
           const r = train.getBoundingClientRect();
           return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) };
         })() : null,
+        // (The line's pieces his layer draws while the train rides, and how many it should: every piece on the line in the rules'
+        // position but a king, and the smashed one.)
+        aside: document.querySelectorAll(".bd-pieces piece").length,
+        lineCount: (() => {
+          const r = bd?.ride;
+          const fen = m?.boss?.board?.fen as string | undefined;
+          if (!r || !fen) return null;
+          const rows = fen.split(" ")[0]!.split("/").map((row) => row.replace(/\d/g, (d) => ".".repeat(Number(d))));
+          const at = (sq: string) => rows[8 - Number(sq[1])]![sq.charCodeAt(0) - 97]!;
+          return (r.squares as string[]).filter((sq) => at(sq) !== "." && at(sq).toLowerCase() !== "k").length + (r.spared || r.king ? 0 : 1);
+        })(),
         through: document.querySelector(".boss-dock .through-note")?.textContent?.trim() ?? null,
         cine: document.querySelector<HTMLElement>(".bd-cine")?.dataset.pic ?? null,
         bar: document.querySelector(".boss-char.place-bar")?.getAttribute("data-anim") ?? null,
@@ -68,6 +79,8 @@ type Frame = {
   events: string[];
   crossing: boolean;
   train: { x: number; y: number; w: number } | null;
+  aside: number;
+  lineCount: number | null;
   through: string | null;
   cine: string | null;
   bar: string | null;
@@ -157,6 +170,9 @@ test("Birdie's train: the crossing on his line, the dock names your piece; moved
   expect(onBoard.length, "the train on the board").toBeGreaterThan(5);
   // (It moves: its place on screen changes through the ride.)
   expect(new Set(onBoard.map((r) => `${r.train!.x},${r.train!.y}`)).size).toBeGreaterThan(3);
+  // Every piece on the line drawn by his layer as the ride starts (the board has them off), none lost (Nov 23: his own were, read
+  // from the drawn board).
+  expect(onBoard[0]!.aside, `the line's pieces as the ride starts: ${onBoard[0]!.aside} of ${onBoard[0]!.lineCount}`).toBe(onBoard[0]!.lineCount);
   const crowd = (await page.evaluate(() => (window as any).match.boss.crowdSide)) as "w" | "b";
   const after = new Chess(ride[0]!.fen!).get(left!.square as any);
   expect(!!after && after.color === crowd && after.type === left!.piece, `your ${NAMES[left!.piece]} gone from ${left!.square}`).toBe(false);
