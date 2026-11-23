@@ -342,7 +342,9 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A gesture is judged on the input's own times (`e.timeStamp`), at every step: a frame's check on `performance.now()` can run before
     a release that already happened. Check what the tool really sends before blaming it (Playwright's tap sends start and end together).
   - A hook that subscribes in `useEffect` misses a change between its render and the effect: compare with what the render read and
-    draw it then (`useServerStatus`, `useAccount`).
+    draw it then (`useServerStatus`, `useAccount`). The same goes for a timer that redraws at a moment: pick the moment at drawing time
+    and clamp its delay to 0, never "the next one after now" inside the effect, which can be past the last on a busy device (Squads'
+    move replay stayed up until the next lobby message, Nov 23: `docs/decisions/2026-11-23-squads-replay-end.md`).
   - CI's trace is of the retry (`--trace on-first-retry`): for a retry-pass it shows the run that passed. The failure's own record is
     its error-context page snapshot; read that first.
 
