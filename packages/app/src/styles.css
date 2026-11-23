@@ -28646,3 +28646,51 @@ body.dash-away .bc-bubble:not(.dash-say) {
 piece.bd-smashed {
   opacity: 0;
 }
+/* The warning sign on the marked piece (Birdie.tsx, WarnSign; Eric, Nov 23: "a yellow train warning ⚠️ like this that's glowing over
+   the tile but also a see through, make it look clean"): a yellow warning triangle over the piece's square, in eighths of the board's own
+   size, see-through so the piece reads through it (60 to 80%: the director's, Nov 23, 36 to 50% read faint on the cream squares), its glow pulsing slowly. Only its opacity animates (composited); the
+   glow (a drop shadow) is drawn once. Over the ride's pieces (8), under the train (9). Vector, so its edges stay clean at any size. */
+.bd-sign {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
+  z-index: 8;
+  pointer-events: none;
+  opacity: 0.7;
+  animation: bd-sign 1.8s ease-in-out infinite;
+}
+.bd-sign > svg {
+  position: absolute;
+  left: 8%;
+  top: 6%;
+  width: 84%;
+  height: 84%;
+  overflow: visible;
+  filter: drop-shadow(0 0 calc(var(--board-size, 360px) / 80) #ffd400) drop-shadow(0 0 calc(var(--board-size, 360px) / 32) rgba(255, 190, 0, 0.95));
+}
+.bd-sign-edge {
+  fill: #261d05;
+  stroke: #261d05;
+  stroke-width: 18;
+  stroke-linejoin: round;
+}
+.bd-sign-face {
+  fill: #ffcc12;
+  stroke: #ffcc12;
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+.bd-sign-mark {
+  fill: #261d05;
+}
+@keyframes bd-sign {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}

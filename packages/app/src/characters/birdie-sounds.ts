@@ -9,8 +9,9 @@
  *   like toot toot?"): his train's steam whistle (`birdie-train/README.md`, `whistle_wave`): a toot, the double toot, a long blast, a toot
  *   then a long one, and two peeps on a smaller, higher whistle. Picked per move by `birdieWhistle`.
  * - **His train: three runs** (the locomotive of the same piece: `chuff_wave`, `knock_wave`, `steam_wave` there and `birdie_train.py`):
- *   exhaust puffs an 8th of the song apart (162 bpm), rail joints, steam at a long run's stop, the whistle's toot over the toot run's
- *   start. His entrance, his ride and its loop in the town (`BIRDIE_RIDE_LOOP`), his challenge's wipe; no longer his move.
+ *   exhaust puffs an 8th of the song apart (162 bpm; his ride's long run a dotted 8th, as his train rides slower: RIDE_PACE), rail
+ *   joints, steam at a long run's stop, the whistle's toot over the toot run's start. His entrance, his ride and its loop in the town
+ *   (`BIRDIE_RIDE_LOOP`), his challenge's wipe; no longer his move.
  * - The rest are his first pack's: the conductor's whistle (his signal), the crossing's bell, the brakes, a little hop, the smash on a
  *   piece, his fall's whoosh and his armor's clank.
  *
@@ -199,10 +200,20 @@ const WEAK = 0.6;
 const KNOCK = 0.41;
 const STEAM = 0.32;
 const WHISTLE = 0.4;
-/** A run: each puff's level (one every STEP, the strong one first and every fourth), its rail joints (s), steam at its stop, a toot over its start (s). */
-const RUNS: Record<BirdieRun, { puffs: readonly number[]; joints: readonly number[]; steam: boolean; toot: number }> = {
+/**
+ * His ride's run (`trainLong`, from his `depart`'s `pull` cue to the train's tail past the board) paced to his slower ride (Eric, Nov 23:
+ * "slow the train a bit down": BIRDIE_RIDE.rideMs 1300 -> 1950): its puffs and joints this much further apart, so it still
+ * ends with its steam as the train leaves the board (test/birdie-sounds.test.ts keeps the two together; this file stays free of the
+ * settings, as the sound worker loads it).
+ */
+export const RIDE_PACE = 1.5;
+/**
+ * A run: each puff's level (one every STEP times its `pace`, the strong one first and every fourth), its rail joints (s, at pace 1),
+ * steam at its stop, a toot over its start (s).
+ */
+const RUNS: Record<BirdieRun, { puffs: readonly number[]; joints: readonly number[]; steam: boolean; toot: number; pace?: number }> = {
   trainMedium: { puffs: [0.8, 1, 1, 0.9, 0.7], joints: [0.28, 0.65], steam: false, toot: 0 },
-  trainLong: { puffs: [0.6, 0.8, 1, 1, 1, 0.9, 0.75, 0.6], joints: [0.28, 0.83, 1.2], steam: true, toot: 0 },
+  trainLong: { puffs: [0.6, 0.8, 1, 1, 1, 0.9, 0.75, 0.6], joints: [0.28, 0.83, 1.2], steam: true, toot: 0, pace: RIDE_PACE },
   trainToot: { puffs: [0.8, 1, 1, 0.9, 0.7], joints: [0.28, 0.65], steam: false, toot: 0.32 },
 };
 /** Each run's seed, so each is the same on every device. The toot run shares the medium run's: it is the medium run with the whistle over it. */
@@ -211,14 +222,15 @@ const SEED: Record<BirdieRun, number> = { trainMedium: 1622, trainLong: 1623, tr
 /** A run of his train (`birdie_train.py`'s `run`). */
 function train(name: BirdieRun, rate: number): Float32Array {
   const r = RUNS[name];
+  const pace = r.pace ?? 1;
   const next = noise(SEED[name]);
   const parts: [number, ArrayLike<number>, number][] = [];
   r.puffs.forEach((loud, i) => {
     const strong = i % 4 === 0;
-    parts.push([i * STEP, puff(next, rate, strong), loud * (strong ? 1 : WEAK)]);
+    parts.push([i * STEP * pace, puff(next, rate, strong), loud * (strong ? 1 : WEAK)]);
   });
-  for (const at of r.joints) for (const late of [0, 0.085]) parts.push([at + late, knock(next, rate), KNOCK]);
-  if (r.steam) parts.push([r.puffs.length * STEP - 0.05, steam(next, rate, 0.35), STEAM]);
+  for (const at of r.joints) for (const late of [0, 0.085]) parts.push([at * pace + late, knock(next, rate), KNOCK]);
+  if (r.steam) parts.push([r.puffs.length * STEP * pace - 0.05, steam(next, rate, 0.35), STEAM]);
   if (r.toot) parts.push([0, whistleWave(rate, r.toot), WHISTLE]);
   const end = Math.max(...parts.map(([at, w]) => Math.round(at * rate) + w.length));
   const out = new Float32Array(end);
