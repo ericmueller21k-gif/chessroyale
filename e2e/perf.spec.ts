@@ -553,11 +553,11 @@ function townRefJob(): number {
   return [once(), once(), once()].sort((a, b) => a - b)[1]!;
 }
 /**
- * The town's first frame may take this many reference jobs (`townRefJob`): set Nov 23 from this machine's runs, a quarter over (20
- * then); since the paint workers (Nov 23, town/paint-pool.ts) a first visit's, the median of its runs and a quarter:
- * docs/decisions/2026-11-23-town-paint-workers.md.
+ * The town's first frame may take this many reference jobs (`townRefJob`): set Nov 23 from this machine's runs, a quarter over (20,
+ * when its runs read 13.4 to 18.1). Since the paint workers (Nov 23, town/paint-pool.ts): 12, the median of a first visit's runs (8.9 to
+ * 11.0 over 3 runs of both towns, median 9.6) and a quarter. docs/decisions/2026-11-23-town-paint-workers.md.
  */
-const TOWN_LOAD_REFS = 20;
+const TOWN_LOAD_REFS = 12;
 /**
  * (`?paintslow=4`, Nov 23) The paint workers slowed as the page is: CDP's CPU slowing reaches the page's own thread, not its workers, so
  * each worker's picture is made to take 4 times as long (test-switches.ts TOWN_PAINT_ASKED), as on a phone's slower cores.
