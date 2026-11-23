@@ -191,6 +191,23 @@ describe("the Train in a battle", () => {
     expect(birdieOf(r)!.next).toBe(2 + BOSS_POWERS.birdie.trainEvery);
   });
 
+  it("no warning on the turn the move cap ends (no train rides after it): the judge and the dock agree with the ride", async () => {
+    const capped = (maxMoves: number) => {
+      const settings = kitSettings({ boss: "birdie", test: "train", maxMoves });
+      return new MatchRunner({ settings, rng: mulberry32(3), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
+    };
+    const open = capped(3);
+    await untilTurn(open, 2);
+    expect(birdieOf(open)!.warn?.turn).toBe(2);
+    const last = capped(2);
+    await untilTurn(last, 2);
+    expect(last.boss!.crowdMoves + 1).toBe(2);
+    expect(birdieOf(last)!.warn).toBeNull();
+    expect(last.boss!.powers!.events.some((e) => e.kind === "trainSignal")).toBe(false);
+    expect(trainSquare(last.boss!)).toBeNull();
+    expect(powerTurn(last.boss!, fenOf(last))).toBe(false);
+  });
+
   it("a move of the warned piece saves it: no train", async () => {
     const r = battle(3);
     await untilTurn(r, 2);

@@ -367,6 +367,16 @@ export const BIRDIE: BossRules = {
     next.birdie = { ...bd, warn: { turn: t.turn, ...pick }, next: t.turn + (test ? 1 : Math.max(1, Math.round(s.trainEvery))) };
     t.events.push({ kind: "trainSignal", turn: t.turn, square: pick.square, squares: [...pick.squares], ...(pick.piece !== "k" ? { shape: pick.piece as BalloonShape } : {}) });
   },
+  // (The turn the move cap ends, bossMaxMoves: no train rides after it, so no warning for it either, and the judge, the dock and the
+  // ride agree. The cadence can drift onto it when no line fits for a turn.)
+  turnBegun(b) {
+    const boss = b.state.boss!;
+    const p = boss.powers;
+    const w = p?.birdie?.warn;
+    if (!p || !w || w.turn < b.settings.bossMaxMoves) return;
+    const events = p.events.filter((e) => !(e.kind === "trainSignal" && e.turn === w.turn));
+    b.state = { ...b.state, boss: { ...boss, powers: { ...p, birdie: { ...p.birdie!, warn: null }, events } } };
+  },
   // A warned turn: the judge's best moves change (the train), so it doesn't count for fair play, and the Last Stand sits out.
   powerTurn: (boss) => !!warnOn(boss.powers, turnOf(boss)),
   judge: {
