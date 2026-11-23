@@ -1775,3 +1775,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~08:20 UTC: sweep N5 -> #900 (endBattle hook; only xp's played-to-end test moved; the other 6 listed flakes test real play or were already fixed by #859/#882/d1044c33: the audit's list was partly stale, note for the next sweep: check a flake's cause is still open before queueing it). CI b01vi7b3z. Helper archived. Birdie sounds running (watcher bq4gpv0gq). Lobby redraw still pending.
 - Nov 23 ~08:25 UTC: Birdie f27f737 LIVE (admins first); main full run GREEN.
 - Nov 23 ~08:45 UTC: #900 end hook MERGED (b31a625); deploy + main watcher. Running: Birdie sounds (bq4gpv0gq), lobby redraw. Sweep left: N4 tower specs phone-only (Opus high) - next free slot.
+- Nov 23 ~08:50 UTC: sweep N4 -> Haiku session_01JuCWRsRYKnAnafCPU2RCR3 (claude/tower-phone-only, brief tower-phone-only.md; @phone-only tags exist already).
