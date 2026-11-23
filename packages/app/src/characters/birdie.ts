@@ -943,7 +943,8 @@ const depart: Anim = lazyAnim(() => ({
   frames: [
     F(90, { dy: 6, dx: 1, lid: "half" }),
     F(90, { dy: 13, dx: 3 }),
-    F(110, { hidden: true }),
+    // (His train's long run from here, as it pulls away and rides the board to its end, BIRDIE_BEATS.ride; its whistle at `go`.)
+    F(110, { hidden: true }, { cue: "pull" }),
     F(130, { hidden: true, train: [2, 0], wheel: 1 }, { cue: "go", shake: [0, 1], specks: steam(0, [2, 0]) }),
     ...AWAY.map((x, i) => F(i < 2 ? 90 : 70, { hidden: true, train: [x, 0], wheel: i + 2 }, { specks: [...steam(i + 1, [Math.round(x / 3), 0]), ...(i >= 2 ? speed(67 + x, i) : [])] })),
     { ms: 80, layers: [] },

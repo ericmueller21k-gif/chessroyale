@@ -1189,16 +1189,14 @@ export const BOSS_KITS: Record<string, BossKit> = {
       coo: "birdieTeeoo",
       chatter: "birdieTsip",
       cheer: "birdieCheer",
-      // His powers: the conductor's whistle, the train's whistle as it pulls away, its run while it rides, his fall's wind, his armor.
+      // His powers: the conductor's whistle; his train's long run as it pulls away and rides the board, its whistle; his fall's wind, his armor.
       signal: "birdieWhistle",
+      pull: "birdieTrainLong",
       go: "birdieToot",
-      gone: "birdieTrainMedium",
       fall: "birdieWhoosh",
-      away: "birdieWhoosh",
       armor: "birdieClank",
       // (cueSound's other picks, here so they're made ahead with the rest.)
       runShort: "birdieTrainShort",
-      runLong: "birdieTrainLong",
       tsip: "birdieTsip",
       ask: "birdieAsk",
     },

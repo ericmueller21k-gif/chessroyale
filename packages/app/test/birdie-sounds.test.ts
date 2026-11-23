@@ -106,7 +106,9 @@ describe("Birdie's sounds", () => {
   });
 
   it("every cue of his figure has a sound of his; every sound of his is used; the challenge is his hello", () => {
-    for (const [name, a] of Object.entries(BIRDIE_FIGURE.anims)) for (const f of a.frames) if (f.cue) expect(kit.sounds[f.cue], `${name}: ${f.cue}`).toBeTruthy();
+    // (His spot empty while his train rides and while he falls: silent, the train's run and the cutscene's whoosh already playing.)
+    const SILENT = ["gone", "away"];
+    for (const [name, a] of Object.entries(BIRDIE_FIGURE.anims)) for (const f of a.frames) if (f.cue) expect(!!kit.sounds[f.cue], `${name}: ${f.cue}`).toBe(!SILENT.includes(f.cue));
     const used = new Set<string>([...Object.values(kit.sounds), SELECT_SOUND.birdie!, "birdieBell", "birdieSmash"]);
     for (const n of BIRDIE_SOUNDS) expect(used.has(own(n)), n).toBe(true);
     expect(SELECT_SOUND.birdie).toBe("birdieHello");
