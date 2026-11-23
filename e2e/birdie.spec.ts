@@ -40,6 +40,9 @@ async function record(page: Page) {
         warn: bd?.warn ?? null,
         ride: bd?.ride ?? null,
         fell: bd?.fell ?? null,
+        // (His fall's impact, his music's drop, on this device's clock (BirdieView.turnAt), and the moves played so far.)
+        drop: (m?.phase?.boss ?? m?.boss)?.powers?.birdie?.turnAt?.dropAt ?? null,
+        plies: (m?.phase?.boss ?? m?.boss)?.board?.history?.length ?? null,
         events: (p?.events ?? []).map((e: { kind: string }) => e.kind),
         crossing: !!document.querySelector(".fx-board.bd-crossing"),
         train: train ? (() => {
@@ -76,6 +79,8 @@ type Frame = {
   warn: { turn: number; line: string; square: string; piece: string } | null;
   ride: { at: number; line: string; square: string; piece: string; spared?: true; king?: true } | null;
   fell: number | null;
+  drop: number | null;
+  plies: number | null;
   events: string[];
   crossing: boolean;
   train: { x: number; y: number; w: number } | null;
@@ -211,6 +216,20 @@ test("Birdie's fall: his cutscene plays as he thinks (the fall, the approach, th
   const order = pics.filter((p, i) => p !== pics[i - 1]);
   expect(order, "the fall, the approach, the reveal, the hold").toEqual(["fall", "approach", "reveal", "hold"]);
   expect(rec.filter((r) => r.cine).every((r) => r.phase !== "play"), "the game paused under it").toBe(true);
+  // Timed to his ult's piece (Nov 23): the train's impact on its drop, about 15 s after your move landed; the cutscene's reveal a beat
+  // after it; his reply at the drop, never before it (it waits for the cutscene's end).
+  const drop = rec.find((r) => r.drop !== null)?.drop ?? null;
+  expect(drop, "the drop sent with his fall").not.toBeNull();
+  const landed = rec[fellAt]!.t;
+  expect(drop! - landed).toBeGreaterThan(14_000);
+  expect(drop! - landed).toBeLessThan(16_500);
+  expect(rec.filter((r) => r.cine && r.t < drop! - 3_000).length, "his wait before the cutscene").toBe(0);
+  const reveal = rec.find((r) => r.cine === "reveal")!;
+  expect(reveal.t).toBeGreaterThanOrEqual(drop!);
+  expect(reveal.t - drop!).toBeLessThan(600);
+  const reply = rec.findIndex((r, i) => i > fellAt && r.plies !== null && r.plies > rec[fellAt]!.plies!);
+  expect(reply, "his reply").toBeGreaterThan(fellAt);
+  expect(rec[reply]!.t, "his reply comes at the drop, not before").toBeGreaterThanOrEqual(drop!);
   // Before his fall, young Birdie in the bar; from the cutscene's end, Armored Birdie (his powered twin's loops) on your turns.
   expect(rec.slice(0, fellAt).every((r) => !r.bar?.startsWith("p_")), "young Birdie before").toBe(true);
   const end = rec.findLastIndex((r) => r.cine);
