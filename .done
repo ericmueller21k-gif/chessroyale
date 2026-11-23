@@ -1,5 +1,0 @@
-resume-race: done. Branch claude/resume-race (4 commits on origin/main 9e0dce2).
-Cause: Resume's chunk load failed, stale.ts reloaded the page, the card came back with the tap lost (staged locally: main gives the CI screen exactly).
-Fix: the tap is carried across that reload (solo-kept.ts noteResuming / takeCarriedResume); a rejected load says "Couldn't load the game."; a second tap is the same Resume.
-Tests: app unit tests all pass (incl. new stale.test.ts cases); typecheck clean; xp.spec + battle-tower.spec on phone 23 passed locally; the new e2e fails on main's app, passes here.
-Lane: targeted. PR body: .pr-body.md. Follow-up: startSolo/startTowerFloor's unguarded loads.
