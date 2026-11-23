@@ -2305,6 +2305,32 @@ export const BOSS_POWERS = {
     dodgeBotHit: 0.6,
     dodgeAfterMoves: 1,
   },
+  /**
+   * Birdie (Eric, Nov 23; packages/chess/src/bosses/birdie.ts; docs/decisions/2026-11-23-birdie-rules.md):
+   * - The Train: as crowd turn `trainFrom` begins (2: at the end of his reply to your first move) he warns a rank or file where
+   *   exactly one of your pieces stands (any piece, your king too; one your move can save: it has a move, and the smash would be
+   *   legal now); then `trainEvery` crowd turns from one warning to the next (Eric: "a 3 (6 total turn) turn cooldown"). No line
+   *   fits: it waits a turn. Your next move moves that piece, or at the start of his turn his train rides the line and smashes it
+   *   (your king: the battle is his). The judge counts a piece left there as gone: its value at `trainPawnLogit` log-odds a pawn
+   *   (the fire's way, firePawnLogit), your king as the battle lost.
+   * - The Fall, once a battle: at the start of his turn once he has lost `fallLost` points of material since the battle began
+   *   (P1 N3 B3 R5 Q9: the most he has been down), his fall and its cutscene (BIRDIE_CINEMATIC), then Armored Birdie for the rest of
+   *   the battle.
+   * - Armored Birdie (Eric, Nov 23: "He still uses his same normal move after. He just does it every 3 to 4 turns ... we turn up the
+   *   Maya to a much stronger level"): the train goes on, `armoredTrainEvery` crowd turns from one warning to the next; and his brain
+   *   jumps: Maia `armoredMaiaBoost` higher, held at Maia's top; already at Maia's top (Very hard), Stockfish at
+   *   `armoredStockfishAbove` over the level Maia's top stands for (core levelForMaia); a battle he already plays on Stockfish, its
+   *   strength `armoredMaiaBoost` higher (held at ENGINE_MAX_ELO). The judge and fair play don't read his strength: unchanged.
+   */
+  birdie: {
+    trainFrom: 2,
+    trainEvery: 3,
+    trainPawnLogit: 1,
+    fallLost: 9,
+    armoredTrainEvery: 3,
+    armoredMaiaBoost: 400,
+    armoredStockfishAbove: 100,
+  },
 } as const;
 
 /**
@@ -2317,7 +2343,9 @@ export const BOSS_POWERS = {
 // stays locked: he's `adminOnly` in the roster, met only from his room and the Crowd's final.)
 // (Nov 16: "chandy": his home, Chandy's Swamp, came first, in an admin's town only, as Timber's and Dash's did; then his rules
 // (docs/decisions/2026-11-16-chandy-rules.md): in the roster now, an admin's in every mode until Eric says go.)
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy"];
+// (Nov 23: "birdie": his rules, art and the fall's cutscene wiring, his armored power and the cutscene's art still to come: an admin's
+// in every mode until Eric says go, as Chandy.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy", "birdie"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
@@ -2585,6 +2613,68 @@ export const MOO_CINEMATIC = {
    */
   rejoinMs: 1500,
 } as const;
+
+/**
+ * Birdie's fall (Eric, Nov 23: "A cinematic like Moo's Full Moon: it takes the same space on screen as Moo's, about 6 to 7 s long. A cut
+ * to a close-up: he falls out of his spot on the board… he tumbles through the air like a bird falling from a great height… the
+ * background is blurred, with wind and speed lines… a train track comes into view below, and his own train barrels toward him…
+ * its headlights get brighter and brighter as it nears… It hits him, and he transforms"; components/BirdieFall.tsx;
+ * docs/decisions/2026-11-23-birdie-fall.md). It plays at the start of his turn, while he thinks (no clock runs for the crowd), so its
+ * whole length is his fall's (BIRDIE_BEATS.fall in packages/chess/src/bosses/birdie.ts adds the beats up: the server and solo wait that
+ * long). Beats in order, ms:
+ */
+export const BIRDIE_CINEMATIC = {
+  /** His `fall` where he stands: a jolt throws him up out of the train and he tumbles out of the frame (his animation's own 830 ms). */
+  dropMs: 840,
+  /** The scene fades in over the board and everything above it, as Moo's field does (a CSS fade). */
+  fadeInMs: 400,
+  /** He tumbles through the air, the sky streaking past (the drawing's `fall`, 600 ms a loop). */
+  tumbleMs: 900,
+  /**
+   * His train comes up the track toward him (the drawing's `approach`, 390 ms a frame), its headlights brighter and brighter, to its last
+   * frame (the hit, its `hit` cue at 3120 ms) and `hitHoldMs` of it; the light whole then.
+   */
+  approachMs: 3120,
+  hitHoldMs: 200,
+  /**
+   * The headlights' light (the Hidden Boss's, components/recluse-light.ts, as Moo's moon's: Eric, "how we did the lights"): glowing from
+   * `glowMs` before the hit, its rays over the whole screen from `radiateMs` before it, the white from `whiteMs` before it, whole at the
+   * hit; held `lightHoldMs`, then dying back over `lightMs` as Armored Birdie stands in the steam.
+   */
+  glowMs: 2100,
+  radiateMs: 1100,
+  whiteMs: 450,
+  lightHoldMs: 120,
+  lightMs: 800,
+  /** Armored Birdie's reveal (the drawing's `reveal`: the steam clearing off him, 1200 ms), then `holdMs` of him standing (`hold`). */
+  revealMs: 1200,
+  holdMs: 500,
+  /** The scene fades out (a CSS fade); he's in his spot as Armored Birdie. */
+  fadeOutMs: 400,
+  /** His thinking lasts this much past the cutscene's end (as MOO_CINEMATIC.tailPadMs). */
+  tailPadMs: 200,
+  /** Seen first with his thinking already under way (a reload, a late join): skipped, drawn armored at once (MOO_CINEMATIC.rejoinMs). */
+  rejoinMs: 1500,
+} as const;
+
+/**
+ * His ultimate's music and its timing (Eric, Nov 23, via the music helper: "Birdie doesn't play his move right away. He basically times his
+ * next move to the exact moment where ... the end of that little ... clip ... right when the train light kind of hits and then he
+ * transforms"; docs/decisions/2026-11-23-birdie-ult-timing.md; public/music/README.md, "Birdie's theme and his ult's piece"). His fall's
+ * moment starts as the crowd's move that filled his meter lands (after QUEEN SLAIN! if it took his queen: birdieLeadMs); from it, ms:
+ * - `pieceAt`: his ult's piece (themes.json's `theme`, "the crossing") starts, the battle's theme fading into it (MUSIC_SWITCH): a beat
+ *   after the moment starts, so a device starting it at once is never late for it.
+ * - `introMs`: the piece's length to its drop (themes.json's `introSeconds`, 14.814813 s: a test keeps the two the same). The drop, his
+ *   theme from its top, lands on the train's impact (the cutscene's last `approach` frame, its `hit` cue), so the impact is at
+ *   pieceAt + introMs (BIRDIE_BEATS.fall.impactAt), and his cutscene starts that long before it (its fall in his spot, the fade-in, the
+ *   tumble and the approach: BIRDIE_CINEMATIC). The impact, his transformation and his theme's first hit land together.
+ * - `lineAt`: his line, as the piece's first whistle sounds (its `whistle` mark, 1.48 s in), long before the cutscene.
+ * His reply waits for all of it (his thinking holds through the cutscene: birdieTurnMs), the crowd's clock stopped (it's his turn), the
+ * same on every device, with or without the music. Once a battle (the fall is).
+ * - `soloMoveLeadMs`: solo asks its engine for his reply only this long before his thinking's hold ends (a kept game holds his move
+ *   once it's played, so a reload in his wait would skip to it): a reload until then carries the wait and the cutscene on.
+ */
+export const BIRDIE_ULT = { theme: "birdie-ult", pieceAt: 300, introMs: 14815, lineAt: 1780, soloMoveLeadMs: 2500 } as const;
 
 /**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards
@@ -5323,6 +5413,8 @@ export const MUSIC_SWITCH: Readonly<Record<string, { readonly fadeMs: number; re
   [RECLUSE_MUSIC.adult]: { fadeMs: 1500, after: true },
   [RECLUSE_MUSIC.beaten]: { fadeMs: 300, after: false },
   [RECLUSE_MUSIC.transform]: { fadeMs: 500, after: false },
+  // (Birdie's ult's piece, Nov 23: it opens on a burst of steam at once, his theme fading under it.)
+  [BIRDIE_ULT.theme]: { fadeMs: 400, after: false },
 };
 
 /**

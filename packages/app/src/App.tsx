@@ -59,6 +59,7 @@ import { chosenBotLevel } from "./components/BotLevelBox.tsx";
 import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
 import { bossMusic, recluseMusic, themeKnown, type MusicBattle } from "./music.ts";
+import { birdieMusic } from "./birdie-music.ts";
 import { breadcrumbs, noteWhere } from "./problems.ts";
 import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
@@ -2868,6 +2869,12 @@ function musicBattle(match: AnyMatch | null): MusicBattle | null {
     return r && { key: match, boss: boss.id, live, ...r, ...(ahead ? { ahead: [RECLUSE_MUSIC.beaten, RECLUSE_MUSIC.transform] } : {}) };
   }
   if (boss.result) return null;
+  // (Birdie: his theme, then from his fall his ult's piece, its drop on his train's impact, his theme from its top after: birdieMusic. A
+  // Battle Tower floor keeps its one theme.)
+  if (boss.id === "birdie" && !match.tower) {
+    const r = birdieMusic(boss);
+    return r && { key: match, boss: boss.id, live, ...r };
+  }
   // (A Battle Tower floor: one of its bosses' themes, picked as it starts and kept for the whole match, whoever is to move; Nov 19.)
   if (match.tower) {
     const theme = match.tower.music(themeKnown());

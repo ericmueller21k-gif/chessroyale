@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER, DEFAULT_SETTINGS, mulberry32, type BossPowerState, type BossState } from "@chessroyale/core";
-import { FOLIO_FRESH, MatchRunner, applyMove, boardAltered, bossRules, legalMoves, pieceAt, type BossRules, type EngineLike } from "../src/index.ts";
+import { FOLIO_FRESH, MatchRunner, applyMove, boardAltered, bossRules, legalMoves, lineSquares, pieceAt, type BossRules, type EngineLike } from "../src/index.ts";
 import { KIT_OPENING, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -209,6 +209,12 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
       "the queen lock's aim": () => ({ chandy: { ...CHANDY_FRESH, aim: { square: "d1", turn: 1 } } }),
     },
     off: () => ({ chandy: { ...CHANDY_FRESH, locks: [{ square: "e4", piece: "p", at: 0 }] } }),
+  },
+  // (Birdie's warned turn: a piece of yours left on his line is smashed as his turn begins, a board his train changes: the save sits it
+  // out. With no warning, plain chess: his ride and his fall leave nothing on your next turn's board.)
+  birdie: {
+    on: { "a piece of yours warned for his train": (f) => ({ birdie: { next: 99, warn: { turn: 1, line: crowdPiece(f)[0]!, squares: lineSquares(crowdPiece(f)[0]!, "w"), square: crowdPiece(f), piece: "n" } } }) },
+    off: () => ({ birdie: { next: 99, warn: null, ride: { at: 0, line: "a", squares: lineSquares("a", "w"), square: "a2", piece: "p" }, fell: { at: 0 } } }),
   },
 };
 

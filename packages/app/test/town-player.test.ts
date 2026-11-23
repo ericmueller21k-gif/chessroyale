@@ -12,18 +12,20 @@ const { STRIPS } = await import("../src/town/strips.ts");
 const { HOMES, PROPS, START, plotAt, stepsFrom, walkable } = await import("../src/town/world.ts");
 
 const lotId = (id: string) => (id === "dash" ? "blitz" : id);
+/** The admin-first bosses whose home has its lot in the plan (Birdie's home isn't built yet, Nov 23: in the game before his town lot). */
+const HOMED = BOSS_ADMIN_FIRST.filter((id) => PLAN_HOMES.some((l) => l.id === lotId(id)));
 
 describe("a player's town: the street town without the admin-first homes (Nov 13)", () => {
   it("has every home but the admin-first ones, each on its lot", () => {
     expect(BOSS_ADMIN_FIRST.length).toBeGreaterThan(0);
     for (const id of BOSS_ADMIN_FIRST) expect(HOMES.some((h) => h.id === id), id).toBe(false);
-    expect(HOMES.length).toBe(PLAN_HOMES.length - BOSS_ADMIN_FIRST.length);
+    expect(HOMES.length).toBe(PLAN_HOMES.length - HOMED.length);
     expect(STREET_HOMES.map((l) => l.id).sort()).toEqual(HOMES.map((h) => lotId(h.id)).sort());
   });
 
   it("their lots are the row's look-alike fronts: no home's box, plot, strip or lot there, and a front stands over each", () => {
     const boxes = streetBoxes(PROPS);
-    for (const id of BOSS_ADMIN_FIRST) {
+    for (const id of HOMED) {
       const plan = PLAN_HOMES.find((l) => l.id === lotId(id))!;
       expect(boxes.some((b) => b.home === id), `${id}'s box`).toBe(false);
       expect(STRIPS.some((s) => s.home === lotId(id) || s.home === id), `${id}'s strip`).toBe(false);

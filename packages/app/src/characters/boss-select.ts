@@ -47,6 +47,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   zebra: "zebraPop",
   // Chandy: his rifle's pulse shot (his own: chandy-sounds.ts).
   chandy: "chandyShot",
+  // Birdie: his toy train's toot (his own: birdie-sounds.ts).
+  birdie: "birdieToot",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -94,6 +96,8 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   zebra: ["Nothing here but a bakery.", "You want a game? Sit down, kid.", "Pop! Ha! Relax, it's just a roll."],
   // Chandy (placeholders for Eric, Nov 16): his select and challenge lines.
   chandy: ["You're already in my sights.", "Hold still. This won't take long.", "One shot. That's all I need."],
+  // (Placeholders for Eric.)
+  birdie: ["All aboard!", "Next stop: checkmate!", "Tickets, please!"],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };
@@ -197,6 +201,8 @@ export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
   zebra: { neck: [40, 56], span: 58, at: 0.5 },
   // (His head, lens and war paint in the tile, the slung rifle over his shoulder.)
   chandy: { neck: [62, 72], span: 60, at: 0.56 },
+  // (His cap and face in the tile, his train's roof under him.)
+  birdie: { neck: [30, 45], span: 58, at: 0.5 },
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 
@@ -231,6 +237,8 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   zebra: "#d9667a",
   // (A deep berry, across the wheel from his green and away from his rifle's cyan.)
   chandy: "#8a3a52",
+  // (His cap's blue: apart from his brown and the train's yellow.)
+  birdie: "#4a60a8",
 };
 
 /**
@@ -258,6 +266,7 @@ export const GOODBYE_LINES: Readonly<Record<string, string>> = {
   zebra: "Good game, kid. Come back for fresh bread anytime.",
   // (A placeholder for Eric, Nov 16.)
   chandy: "Good game. I'll keep you in my sights.",
+  birdie: "Good game! Next train leaves soon.",
   recluse: "Good game. Come back and bring a better opening.",
 };
 
@@ -288,6 +297,8 @@ export const SAY_AT: Readonly<Record<string, { x: number; y: number }>> = {
   dash: { x: 0.36, y: 0.26 },
   timber: { x: 0.42, y: 0.44 },
   chandy: { x: 0.5, y: 0.47 },
+  // (Birdie, Nov 23: his beak, left of his head, estimated from his art.)
+  birdie: { x: 0.25, y: 0.42 },
 };
 
 /** A boss not in SAY_AT: a face about a third of the way down, in the middle. */

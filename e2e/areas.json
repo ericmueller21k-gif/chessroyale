@@ -440,6 +440,17 @@
       ],
       "specs": ["e2e/chandy.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/boss-side.spec.ts"]
     },
+    "Birdie (birdie)": {
+      "paths": [
+        "packages/chess/src/bosses/birdie.ts",
+        "packages/app/src/characters/birdie*.ts",
+        "packages/app/src/characters/birdie-cutscene.png",
+        "packages/app/src/characters/effects/birdie.ts",
+        "packages/app/src/components/Birdie*.tsx",
+        "scripts/bake-birdie-cutscene.ts", "packages/app/src/birdie-music.ts"
+      ],
+      "specs": ["e2e/birdie.spec.ts", "e2e/boss-smoke.spec.ts"]
+    },
     "Timber (timber)": {
       "paths": [
         "packages/chess/src/bosses/timber.ts",

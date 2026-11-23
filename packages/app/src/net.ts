@@ -50,6 +50,8 @@ import {
   swapIn,
   swapMap,
   swapScores,
+  trainEscapes,
+  trainRanked,
   jobEscapes,
   sideToMove,
   judgeCandidates,
@@ -519,8 +521,15 @@ export class NetMatch implements GameView {
    * of #863, finding 2). Any other position, or no look: the top moves as they are.
    */
   private async withSwap(engine: UciEngine, fen: string, top: MoveScore[]): Promise<MoveScore[]> {
-    const look = this.boss?.board.fen === fen ? this.boss.powers?.swap : undefined;
-    return look ? swapIn(top, await swapScores((f) => this.top.get(engine, f), look)) : top;
+    const here = this.boss?.board.fen === fen;
+    const look = here ? this.boss!.powers?.swap : undefined;
+    const swapped = look ? swapIn(top, await swapScores((f) => this.top.get(engine, f), look)) : top;
+    // (Birdie's train warned this turn: a piece left on its square counts as gone, as the judge has it, so a hint never leaves it.)
+    const train = here ? this.boss!.powers?.birdie?.warn?.square : undefined;
+    if (!train) return swapped;
+    const escapes = trainEscapes(fen, train).filter((m) => !swapped.some((x) => x.move === m));
+    const all = escapes.length ? [...swapped, ...(await engine.scoreMoves(fen, escapes))] : swapped;
+    return trainRanked(all, fen, train, sideToMove(fen));
   }
   get inviteUrl() {
     return `${location.origin}/lobby/${this.code}`;
@@ -669,6 +678,9 @@ export class NetMatch implements GameView {
       resetBattleBanners();
       clearPremoves(this);
     }
+    // (Birdie's moments' start, on the lobby's clock: onto this device's, BirdieView.turnAt.)
+    const bd = next.powers?.birdie;
+    if (bd?.turnAt) next = { ...next, powers: { ...next.powers!, birdie: { ...bd, turnAt: { turn: bd.turnAt.turn, at: this.local(bd.turnAt.at), ...(bd.turnAt.dropAt !== undefined ? { dropAt: this.local(bd.turnAt.dropAt) } : {}) } } } };
     return (this.boss = { ...next, board: this.toView(next.board) });
   }
 
@@ -1317,7 +1329,7 @@ export class NetMatch implements GameView {
         // Many judges: the bots pick from the lobby's seed, exactly as the scoring job will (it checks this plan).
         const top = await this.top.get(engines[0]!, plan.fen);
         const bots = plan.bots.map((b) => ({ skill: b.skill, powerUps: b.powerUps ?? 0 }));
-        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}), ...(plan.burn ? { burn: plan.burn } : {}), ...(plan.race ? { race: plan.race } : {}), ...(plan.swap ? { swap: plan.swap } : {}) } as unknown as JudgeJob;
+        const job = { fen: plan.fen, picks: [], bots, seed: plan.seed, rules: plan.rules, ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}), ...(plan.burn ? { burn: plan.burn } : {}), ...(plan.race ? { race: plan.race } : {}), ...(plan.swap ? { swap: plan.swap } : {}), ...(plan.train ? { train: plan.train } : {}) } as unknown as JudgeJob;
         // (A boss power left none of the top moves open: the bots pick from a search over the allowed ones, as the job will.
         // The Carrot Patch's pulls: scored first, the bots' to pick too, as the job's. Sawyer's Saw Swap: its moves scored after it.)
         const open = await allowedSearch(engines[0]!, job, top);
@@ -1333,9 +1345,9 @@ export class NetMatch implements GameView {
       const limits = { ...(plan.barred ? { barred: plan.barred } : {}), ...(plan.allowed ? { allowed: plan.allowed } : {}) };
       // (Grex's fire: the bots count a piece left on a tile ablaze as gone. The Carrot Patch: the race counted.)
       const base = judgeCandidates(limits, all, (await allowedSearch(engines[0]!, { ...limits, fen: plan.fen }, all)) ?? []);
-      const offers = jobOffers({ fen: plan.fen, race: plan.race, ...limits }).filter((mv) => !base.some((t) => t.move === mv));
+      const offers = jobOffers({ fen: plan.fen, race: plan.race, train: plan.train, ...limits }).filter((mv) => !base.some((t) => t.move === mv));
       const swap = await swapScores((f) => this.top.get(engines[0]!, f), plan.swap);
-      const top = jobRanked({ fen: plan.fen, burn: plan.burn, race: plan.race }, [...base, ...(offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : [])], swap);
+      const top = jobRanked({ fen: plan.fen, burn: plan.burn, race: plan.race, train: plan.train }, [...base, ...(offers.length ? await engines[0]!.scoreMoves(plan.fen, offers) : [])], swap);
       const best = top[0]?.expected ?? 0.5;
       const candidates = top.map((mv) => ({ move: mv.move, loss: Math.max(0, (best - mv.expected) * 100) }));
       const legal = plan.allowed ?? legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
@@ -1373,7 +1385,7 @@ export class NetMatch implements GameView {
           const top = judgeCandidates(limits, all, open);
           const best = top[0]!.expected;
           // (The Carrot Patch's pulls: scored first, the bots' to pick too.)
-          const offers = jobOffers({ fen: job.fen, race: job.race, ...limits }).filter((mv) => !top.some((t) => t.move === mv));
+          const offers = jobOffers({ fen: job.fen, race: job.race, train: job.train, ...limits }).filter((mv) => !top.some((t) => t.move === mv));
           const offered = offers.length ? await engine.scoreMoves(job.fen, offers) : [];
           // (Sawyer's Saw Swap: each board after it searched (prefetched), the moves that set it off scored there.)
           const swap = await swapScores((f) => this.top.get(engine, f), job.swap);
@@ -1405,7 +1417,7 @@ export class NetMatch implements GameView {
           for (const mv of offered) expectedAfter[mv.move] = mv.expected;
           // (Grex's fire: every move that saves a piece from a tile ablaze is scored too; the Carrot Patch: every move
           // that pulls a carrot.)
-          const escapes = jobEscapes({ fen: job.fen, burn: job.burn, race: job.race, allowed: job.allowed, barred: job.barred });
+          const escapes = jobEscapes({ fen: job.fen, burn: job.burn, race: job.race, train: job.train, allowed: job.allowed, barred: job.barred });
           const missing = [...new Set([...Object.values(job.humanPicks), ...Object.values(botPicks), ...escapes])].filter(
             (mv): mv is string => !!mv && expectedAfter[mv] === undefined,
           );

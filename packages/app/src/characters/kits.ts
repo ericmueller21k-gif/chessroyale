@@ -39,6 +39,9 @@ import { BOSS_ZEBRA as ZEBRA, BOSS_ZEBRA_PORTRAIT } from "./zebra.ts";
 import { ZEBRA_ATTACK } from "./zebra-figure.ts";
 import { CHANDY, CHANDY_BAR, CHANDY_PORTRAIT, CHANDY_SOUNDS, CHANDY_SPRITE } from "./chandy.ts";
 import { CHANDY_LINES } from "./chandy-lines.ts";
+import { BIRDIE_FIGURE } from "./birdie-figure.ts";
+import { BIRDIE_LINES } from "./birdie-lines.ts";
+import { birdieArmoredNow } from "./birdie-state.ts";
 import { ZEBRA_CHANCE, ZEBRA_LINES } from "./zebra-lines.ts";
 import { DASH_ATTACK, DASH_FIGURE as DASH } from "./dash-figure.ts";
 import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
@@ -1122,6 +1125,51 @@ export const BOSS_KITS: Record<string, BossKit> = {
     chance: { entrance: 1, capture: 0.3, rattled: 0.3, victory: 1, defeat: 1, ultimateWarn: 1 },
     portrait: { ...CHANDY_PORTRAIT, anim: "idle", frame: 0 },
     stageOf: (boss) => boss.powers?.chandy?.upgrades ?? 0,
+  },
+  // Birdie (docs/decisions/2026-11-23-birdie-art.md, his rules 2026-11-23-birdie-rules.md): Eric's young mourning dove on his toy diesel;
+  // from his fall on, Armored Birdie (`powered`: every animation its `p_` twin, his armored idle, from the cutscene's hit: birdie-state.ts).
+  // His sounds are his own (birdie-sounds.ts); his lines are placeholders for Eric.
+  Birdie: {
+    // (His phone bar's fit, young Birdie and Armored Birdie both: npx tsx scripts/bar-fit.ts.)
+    barScale: 1.08,
+    barShift: 6,
+    barName: 7,
+    ch: BIRDIE_FIGURE,
+    anims: {
+      strike: "capture",
+      // The Train's warning: he waves his wing like a conductor; at `signal` the crossing lights on the line.
+      power: "signal",
+      // His train's ride: he ducks in and it pulls away (his figure then empty while it crosses the board, then his entrance: Birdie.tsx).
+      powerHit: "depart",
+      ultimateWarn: "check",
+      // His fall: a jolt throws him out of his train, his cap flying (then the cutscene).
+      ultimate: "fall",
+    },
+    sounds: {
+      roll: "birdieRoll",
+      brake: "birdieBrake",
+      pop: "birdieHop",
+      tip: "birdieCoo",
+      flutter: "birdieFlutter",
+      toot: "birdieToot",
+      oof: "birdieOof",
+      flash: "birdieToot",
+      coo: "birdieCoo",
+      plop: "birdieHop",
+      signal: "birdieWhistle",
+      go: "birdieToot",
+      fall: "birdieWhoosh",
+      armor: "birdieClank",
+      // (His nod and his point at the board: a light tap and a coo; his spot emptied as his train rides off, its roll; as he falls, the wind.)
+      nod: "birdieHop",
+      point: "birdieCoo",
+      gone: "birdieRoll",
+      away: "birdieWhoosh",
+    },
+    lines: BIRDIE_LINES,
+    chance: { entrance: 1, capture: 0.3, hurt: 0.4, check: 0.5, rattled: 0.3, power: 0.6, powerHit: 0.5, ultimate: 1, victory: 1, defeat: 1 },
+    portrait: { x: 10, y: 12, w: 36, h: 36, anim: "idle", frame: 0 },
+    powered: { on: birdieArmoredNow, idle: "p_idle" },
   },
 };
 

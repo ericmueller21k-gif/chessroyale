@@ -245,6 +245,12 @@ export function ticksAt(since: number, now: number, everyMs: number): { ticks: n
 // ---------------- The base boss ----------------
 
 /** What a boss's hooks get as a crowd turn begins (prepareTurn). Events go in `events`, in the order they happen. */
+/** The brain for one move of the boss's: Maia at `rating` (null: Stockfish), Stockfish at `elo` (Maia's stand-in too). */
+export interface BrainNow {
+  rating: number | null;
+  elo: number;
+}
+
 export interface TurnContext {
   /** The crowd turn being set up. */
   turn: number;
@@ -478,6 +484,12 @@ export interface BossRules {
    * play it alike. The King's strike still staggers it.
    */
   bestReply?(boss: BossState, board: BoardState): boolean;
+  /**
+   * The brain for his move now, from the battle's (`plan`: Maia's rating for this move, null: Stockfish; Stockfish's strength `elo`,
+   * also Maia's stand-in while it isn't there): Armored Birdie's much stronger after his fall. The runner asks it for every move of his
+   * (MatchRunner.brainNow), solo and the lobby's request alike. Left out: the battle's.
+   */
+  brainNow?(boss: BossState, plan: BrainNow, s: BossPowerSettings): BrainNow;
   /**
    * Several bosses on one side: his move now (`board`: the bosses to move) comes out of turn, before the boss whose turn it is
    * (Wrangler's reply to the showdown's duel; Folio's move again after Revision crossed out its own); the order then goes on

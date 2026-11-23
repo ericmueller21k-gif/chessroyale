@@ -6,6 +6,7 @@ import { growingRun, resetGrowing } from "./RecluseChild.ts";
 import { figure, onResetBeats, setFigureRun, suit } from "./boss-figure.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
+import { resetBirdie } from "../characters/birdie-state.ts";
 import { type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import type { Facing } from "../characters/sprite-kit.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
@@ -25,6 +26,7 @@ import { prewarmHopper } from "./Hopper.tsx";
 import { prewarmSmudgy } from "./Smudgy.tsx";
 import { prewarmMoo } from "./Moo.tsx";
 import { prewarmChandy } from "./Chandy.tsx";
+import { prewarmBirdie } from "./Birdie.tsx";
 import { ChandyLook } from "./ChandyWeapon.tsx";
 import { prewarmGardener, resetGarden } from "./Gardener.tsx";
 import { prewarmTiger } from "./Tiger.tsx";
@@ -71,6 +73,7 @@ onResetBeats(() => {
   played.clear();
   inPlace.run = null;
   resetMoo();
+  resetBirdie();
   resetGarden();
   resetTiger();
   resetGrowing();
@@ -321,6 +324,8 @@ function Character({ boss, stage, place, muteFall, children }: { boss: BossView;
       if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
       // (Chandy's Dodge clones, the rifle's stages, his figure at each (his phone bar's too, "chandy-bar"), his board art.)
       if (kit.ch.id === "chandy" || kit.ch.id === "chandy-bar") prewarmChandy();
+      // (Birdie's train, its crossing and smash, and his fall's cutscene picture.)
+      if (kit.ch.id === "birdie") prewarmBirdie();
       // (Its attack on a king too: the God King's Last Stand, or its mate.)
       prewarmKingAttack(kit.ch.name);
     });

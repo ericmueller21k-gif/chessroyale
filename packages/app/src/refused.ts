@@ -100,5 +100,15 @@ export const SAW_SWAP_LINE = "Swapped out of check.";
 export const swapLine = (boss: { crowdMoves?: number; powers?: { sawSwap?: { at: number } | null } | null } | null | undefined): string | null =>
   boss?.powers?.sawSwap && boss.powers.sawSwap.at === boss.crowdMoves ? SAW_SWAP_LINE : null;
 
+/**
+ * Birdie's train warned a line this turn (Nov 23): the dock's words through your turn, in place of "Your move." (its crossing on the line
+ * shows where), the piece on it named. Short enough to be whole in the dock at 320 px. Null: no warning now.
+ */
+export const trainLine = (boss: { id?: string; powers?: { turn?: number; birdie?: { warn: { turn: number; piece: string } | null } | null } | null } | null | undefined): string | null => {
+  const w = boss?.powers?.birdie?.warn;
+  return w && w.turn === boss?.powers?.turn ? `Move your ${PIECE_NAMES[w.piece] ?? "piece"}!` : null;
+};
+const PIECE_NAMES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
+
 /** The boss's last move went through a power (his only move): the dock's words, or null. */
 export const throughLine = (boss: BossLike | null | undefined): string | null => (boss?.lastMove?.through ? THROUGH[boss.lastMove.through] : null);

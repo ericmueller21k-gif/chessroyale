@@ -121,6 +121,7 @@ import {
   bossPowers,
   fireBurns,
   bossRules,
+  type BrainNow,
   fireShadows,
   fireStage,
   judgeEvaluation,
@@ -139,6 +140,8 @@ import {
   chandyBattle,
   CHANDY_FX,
   dodgeWon,
+  trainSquare,
+  trainWon,
   type DarkTryResult,
   moveLoss,
   pigBattle,
@@ -1406,7 +1409,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b)) || (this.bossForceWin && this.bossToMove());
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b) || trainWon(b)) || (this.bossForceWin && this.bossToMove());
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1476,10 +1479,10 @@ export class MatchRunner {
     const paint = this.settings.bossPaintTest ? smudgyBattle.paintStep(this.battle, this.bossAllowed() ?? legalMoves(fen)) : undefined;
     // (Test switch ?power=lockon: Chandy takes a piece as soon as he can, so his first lock comes early.)
     const grab = chandyBattle.testMove(this.battle, this.bossAllowed()) ?? undefined;
-    // (The Hidden Boss's child: Maia at his rating now, and Stockfish at the strength that rating stands for while Maia isn't there.)
-    const child = this.childRatingNow();
-    const brain = this.humanBrain && child !== null ? { ...this.humanBrain, rating: child } : this.humanBrain;
-    const elo = this.bossEloNow();
+    // (His brain for this move (brainNow): the Hidden Boss's child's rating now, Armored Birdie's stronger one, or Stockfish.)
+    const now = this.brainNow(this.humanBrain?.rating ?? null);
+    const brain = this.humanBrain && now.rating !== null ? { ...this.humanBrain, rating: now.rating } : null;
+    const elo = now.elo;
     // (Alfil's Slam's pieces land as the crowd's turn after this move begins: his move is judged with them down.)
     const look = this.bossAhead();
     this.landingCheck = null;
@@ -1983,6 +1986,11 @@ export class MatchRunner {
     return smudgyBattle.apply(this.battle, pick, gain);
   }
 
+  /** Birdie's train: the square it warned this crowd turn, whose piece left there is smashed (the score jobs' `train`), or null. */
+  trainJob(): string | null {
+    return this.sideBosses().reduce<string | null>((sq, x) => sq ?? trainSquare(x), null);
+  }
+
   /** The Carrot Patch's race as the crowd's judge weighs its move now (the score jobs' `race`), or null. */
   raceJob(): CarrotRace | null {
     const b = this.state.boss;
@@ -2154,8 +2162,8 @@ export class MatchRunner {
     const b = this.state.boss!;
     const timeout = this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
-    // (Hollow's last bulb out, Boss alone, and a Dodge hit: his, whatever the board says.)
-    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || this.sideBosses().some((x) => blackedOut(x) || dodgeWon(x)) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    // (Hollow's last bulb out, Boss alone, a Dodge hit and Birdie's train on your king: his, whatever the board says.)
+    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || this.sideBosses().some((x) => blackedOut(x) || dodgeWon(x) || trainWon(x)) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     // (The Hidden Boss's child beaten: the fight goes on, a new match against his adult form (nextBossForm). Nobody is placed.)
     if (b.form === "child" && result === "crowd") {
       this.state = { ...this.state, boss: { ...b, result } };
@@ -2204,6 +2212,20 @@ export class MatchRunner {
   bossEloNow(): number {
     const child = this.childRatingNow();
     return child !== null ? levelForMaia(child) : this.state.boss!.elo;
+  }
+
+  /**
+   * The brain for the boss's move now, from the battle's Maia rating (`rating`; null: none, Stockfish): the Hidden Boss's child at his
+   * rating now (Stockfish at the strength it stands for: bossEloNow), then his own rules' (BossRules.brainNow: Armored Birdie's, much
+   * stronger after his fall). `rating` null in the answer: Stockfish at `elo` for this move. Solo's playBoss and the lobby's request
+   * (the host's, a checker's) ask it alike, so every device plays the same brain.
+   */
+  brainNow(rating: number | null): BrainNow {
+    const b = this.state.boss;
+    if (!b) return { rating, elo: 0 };
+    const child = this.childRatingNow(b);
+    const plan: BrainNow = { rating: rating !== null && child !== null ? child : rating, elo: this.bossEloNow() };
+    return bossRules(b)?.brainNow?.(b, plan, BOSS_POWERS) ?? plan;
   }
 
   /**

@@ -664,6 +664,10 @@ export const EFFECTS: Record<EffectName, Effect> = {
   chandyDodgeRow: { ch: EFFECT_SPRITES.chandyDodgeRow, covers: "square", start: "travel", loop: "hold", end: "fade", sounds: CHANDY_DODGE_SOUNDS },
   chandyDodgeCol: { ch: EFFECT_SPRITES.chandyDodgeCol, covers: "square", start: "travel", loop: "hold", end: "fade", sounds: CHANDY_DODGE_SOUNDS },
   chandyDodgeKing: { ch: EFFECT_SPRITES.chandyDodgeKing, covers: "square", start: "crack", end: "shatter11", sounds: CHANDY_DODGE_SOUNDS },
+  // Birdie's (effects/birdie.ts; his own sounds, birdie-sounds.ts): the crossing lights with a ding and flashes while the warning stands;
+  // the smash on the piece his train reaches.
+  birdieCrossing: { ch: EFFECT_SPRITES.birdieCrossing, covers: "square", start: "on", loop: "crossing", end: "off", sounds: { ding: "birdieBell" } },
+  birdieSmash: { ch: EFFECT_SPRITES.birdieSmash, covers: "square", start: "smash", sounds: { smash: "birdieSmash" } },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------

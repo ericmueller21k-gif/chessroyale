@@ -29,6 +29,9 @@ import {
   popOffMs,
   folioTurnMs,
   sawyerTurnMs,
+  birdieTurnMs,
+  birdieImpactMs,
+  powerWinShowMs,
   landsAfterHisMove,
   PASS_WAIT,
   powerMomentMs,
@@ -445,6 +448,8 @@ export interface LobbyRecord {
   /** Times each device missed its window for a checked boss move this battle (BOSS_CHECK.missStrikes of them: a strike). */
   bossMisses?: Record<string, number>;
   bossMinAt?: number;
+  /** When Birdie's moments at the start of his turn began (his thinking's start, server time), for that crowd turn (BirdieView.turnAt). */
+  birdieAt?: { turn: number; at: number };
   bossIntroDone?: boolean;
   /**
    * The boss's brain for this battle, decided as it begins (bossBrainFor; BOSS_BRAIN): Maia (with its rating, and the
@@ -480,6 +485,11 @@ export interface LobbyRecord {
    * (the runner's bossForceWin, which lives on the runner, not in its state: kept here so a restored lobby still has it).
    */
   winForm?: true;
+  /**
+   * A power won the battle at the start of his turn (Birdie's train on your king): its ride has been shown (powerWinShowMs, as he
+   * "thinks"), so the next round's step finishes the battle.
+   */
+  winShown?: true;
   /**
    * The Hidden Boss's phase 2 online (Nov 13: his room's fight and the Crowd's boss final; bosses/recluse.ts): from his adult form's
    * fall to the results, everything the server runs of it (the four boards, their clocks, his moves and the bots').
@@ -2068,11 +2078,20 @@ export class LobbyCore {
    * device back from a reload, `last`, gets no more than everyone had then.)
    */
   private bossViewSent(justKilled: string | null = null): NetBoss {
-    const view = this.runner!.bossView(justKilled)!;
+    const view = this.withBirdieAt(this.runner!.bossView(justKilled)!);
     const d = view.powers?.chandy?.dodge;
     if (!d || dodgeOver(d)) return view;
     const l = this.r.dodge;
     return { ...view, powers: { ...view.powers!, chandy: { ...view.powers!.chandy!, dodge: dodgeSeen(d, l ? this.io.now() - l.at : -1) } } };
+  }
+
+  /** Birdie's view with when his moments at the start of this turn began (BirdieView.turnAt), while it's that turn. */
+  private withBirdieAt(view: NetBoss): NetBoss {
+    const at = this.r.birdieAt;
+    const bd = view.powers?.birdie;
+    if (!at || !bd || view.powers!.turn !== at.turn) return view;
+    const impact = birdieImpactMs(view);
+    return { ...view, powers: { ...view.powers!, birdie: { ...bd, turnAt: { ...at, ...(impact !== null ? { dropAt: at.at + impact } : {}) } } } };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -2109,7 +2128,8 @@ export class LobbyCore {
     const kind = this.r.bossKind;
     if (!kind || !CHECKED_BOSS_KINDS.has(kind)) return void (this.r.bossCheck = undefined);
     const b = this.r.bossBrain;
-    const brain = !!b && b.brain !== "stockfish" && (kind === "elo" || kind === "stumble");
+    // (A battle's Maia that plays this move on Stockfish (runner.brainNow: Armored Birdie at Maia's top): no Maia move to check.)
+    const brain = !!b && b.brain !== "stockfish" && (kind === "elo" || kind === "stumble") && this.runner!.brainNow(b.rating).rating !== null;
     // (The bridge band's share of his moves, drawn here, not on the devices (D1): Stockfish's, with no brain sent to anyone.)
     const share = brain && (b!.stockfishShare ?? 0) > 0 && this.jrng() < b!.stockfishShare!;
     // (Maia's move only with the host's Maia loaded: else no brain to anyone, and both play the seeded Stockfish move the host would
@@ -2375,7 +2395,11 @@ export class LobbyCore {
     const burnt = fireShows(b);
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn, Ginger's Super Freeze and Sawyer's Saw Swap.)
-    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view);
+    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view) + birdieTurnMs(view);
+    // (Birdie's moments begin with this thinking: when, kept for every message of it, so a device rejoining carries them on. A second
+    // thinking of the same turn, if any, keeps the first's.)
+    const turn = view.powers?.turn ?? -1;
+    if (birdieTurnMs(view) && this.r.birdieAt?.turn !== turn) this.r.birdieAt = { turn, at: this.io.now() };
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 
@@ -2434,13 +2458,15 @@ export class LobbyCore {
     // alike (D6). The strike's goes to the host alone, for its note.)
     const mine = c && (kind === "elo" || kind === "stumble") ? c.maia : !checker;
     const b = this.r.bossBrain && !funhouse && !pick && kind !== "extra" && kind !== "best" && mine && !only ? this.r.bossBrain : null;
-    // (The Hidden Boss's child: Maia at his rating now, Stockfish at the strength it stands for: runner.childRatingNow, bossEloNow.)
-    const brain = b ? { brain: b.brain, rating: runner.childRatingNow() ?? b.rating } : null;
+    // (His brain for this move, the same as solo's (runner.brainNow): the Hidden Boss's child's rating now and the strength it stands
+    // for; Armored Birdie's much stronger one, Stockfish at Maia's top.)
+    const now = runner.brainNow(this.r.bossBrain?.rating ?? null);
+    const brain = b && now.rating !== null ? { brain: b.brain, rating: now.rating } : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
       fen,
-      elo: runner.bossEloNow(),
+      elo: now.elo,
       nodes: this.settings.bossNodes,
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : this.r.bossKind === "best" ? { best: true } : {}),
       ...(funhouse ? { funhouse: true } : {}),
@@ -2984,6 +3010,17 @@ export class LobbyCore {
         return this.setTimer("nextRound", until);
       }
       if (runner.stageComplete()) {
+        // (A power won it at the start of his turn, Birdie's train on your king: its ride plays as he "thinks", then the results, as solo.)
+        const winView = runner.bossView()!;
+        const winMs = this.r.winShown ? 0 : powerWinShowMs(winView);
+        if (winMs > 0) {
+          this.r.winShown = true;
+          this.r.phase = "boss";
+          // (When the ride began, sent with it (BirdieView.turnAt), as thinkMinAt does: a device rejoining in the hold carries it on.)
+          if (winView.powers?.birdie) this.r.birdieAt = { turn: winView.powers.turn, at: this.io.now() };
+          this.broadcast(this.bossMessage(0, { thinking: true }));
+          return this.setTimer("nextRound", this.io.now() + winMs);
+        }
         // (Who fought him: the Hidden Boss's phase 2 boards, if it follows. Everyone's out once the battle's finished.)
         const mates = runner.alive().map((p) => ({ id: p.id, name: this.nameOf(p.id) }));
         runner.finishBossBattle();
@@ -3092,6 +3129,7 @@ export class LobbyCore {
               ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
               ...(runner.raceJob() ? { race: runner.raceJob()! } : {}),
               ...(Object.keys(swap).length ? { swap } : {}),
+              ...(runner.trainJob() ? { train: runner.trainJob()! } : {}),
             }
           : undefined;
       this.send(this.r.hostId, { t: "prefetch", fens, ...(plan ? { plan } : {}) }, false);
@@ -3398,6 +3436,7 @@ export class LobbyCore {
       ...(this.runner!.fireBurn().length ? { burn: this.runner!.fireBurn() } : {}),
       ...(this.runner!.raceJob() ? { race: this.runner!.raceJob()! } : {}),
       ...(Object.keys(this.runner!.judgeAfter(boardId)).length ? { swap: this.runner!.judgeAfter(boardId) } : {}),
+      ...(this.runner!.trainJob() ? { train: this.runner!.trainJob()! } : {}),
     }));
     // Close calls that can decide the cut are re-checked first.
     const bubble = this.cutPriority();
@@ -3767,6 +3806,7 @@ export class LobbyCore {
           ...(runner.fireBurn().length ? { burn: runner.fireBurn() } : {}),
           ...(runner.raceJob() ? { race: runner.raceJob()! } : {}),
           ...(Object.keys(runner.judgeAfter(firstBoard)).length ? { swap: runner.judgeAfter(firstBoard) } : {}),
+          ...(runner.trainJob() ? { train: runner.trainJob()! } : {}),
           seed: seedFor(key, firstBoard),
           rules: this.judgeRules(),
         }
@@ -3802,6 +3842,7 @@ export class LobbyCore {
         ...(sj.burn ? { burn: sj.burn } : {}),
         ...(sj.race ? { race: sj.race } : {}),
         ...(sj.swap ? { swap: sj.swap } : {}),
+        ...(sj.train ? { train: sj.train } : {}),
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);

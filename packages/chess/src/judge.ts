@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS, botChoose, botLeanFor, mulberry32, type CrowdBotSprea
 import { applyMove, legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { applyRecheck, recheckAnchor, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
-import { allowedSearch, fireEscapes, fireRanked, jobAllows, judgeCandidates, judgeTop, racePulls, raceRanked, swapIn, swapScores, type CarrotRace } from "./boss-powers.ts";
+import { allowedSearch, fireEscapes, fireRanked, jobAllows, judgeCandidates, judgeTop, racePulls, raceRanked, swapIn, swapScores, trainEscapes, trainRanked, type CarrotRace } from "./boss-powers.ts";
 
 /** The lobby's rules for the bots' picks (so every judge picks for them exactly as the lobby would). */
 export interface JudgeRules {
@@ -60,6 +60,12 @@ export interface JudgeJob {
    * runner scores those moves on them, once, for everyone.
    */
   swap?: Record<string, string>;
+  /**
+   * Boss battle, Birdie's train (an older app ignores it, and a piece left there is scored as plain chess has it): the warned square,
+   * whose crowd piece left there after the move is smashed (its king: the battle lost). The moves that save it are scored too and
+   * offered to the bots, and the bots count a piece left there as gone (trainRanked); the lobby's runner does the scoring.
+   */
+  train?: string;
   /** No engine server: the device re-checks close calls itself, with these settings, `priority` moves first. */
   recheck?: RecheckSettings;
   priority?: string[];
@@ -160,25 +166,29 @@ export async function runQuickJob(engine: EngineLike, job: JudgeJob, top?: Promi
 
 /**
  * The moves a job scores whatever the engine's top moves are: Grex's fire, the moves that take a piece off a tile ablaze;
- * Chub & Chirp's Carrot Patch, the moves that pull a carrot (so saving the piece, or pulling one, is always on the table).
+ * Chub & Chirp's Carrot Patch, the moves that pull a carrot; Birdie's train, the moves of its warned piece (so saving the piece, or
+ * pulling one, is always on the table).
  */
-export function jobEscapes(job: Pick<JudgeJob, "fen" | "burn" | "race" | "allowed" | "barred">): string[] {
+export function jobEscapes(job: Pick<JudgeJob, "fen" | "burn" | "race" | "train" | "allowed" | "barred">): string[] {
   const fire = job.burn?.length ? fireEscapes(job.fen, job.burn) : [];
   const race = job.race ? racePulls(job.fen, job.race) : [];
-  return [...new Set([...fire, ...race])].filter((m) => jobAllows(job, m));
+  return [...new Set([...fire, ...race, ...trainEscapes(job.fen, job.train)])].filter((m) => jobAllows(job, m));
 }
 
-/** The moves a job's bots may pick besides the engine's top moves (scored first): the Carrot Patch's pulls. */
-export function jobOffers(job: Pick<JudgeJob, "fen" | "race" | "allowed" | "barred">): string[] {
-  return job.race ? racePulls(job.fen, job.race).filter((m) => jobAllows(job, m)) : [];
+/** The moves a job's bots may pick besides the engine's top moves (scored first): the Carrot Patch's pulls; the train's warned piece's moves. */
+export function jobOffers(job: Pick<JudgeJob, "fen" | "race" | "train" | "allowed" | "barred">): string[] {
+  const race = job.race ? racePulls(job.fen, job.race) : [];
+  const train = trainEscapes(job.fen, job.train);
+  return [...new Set([...race, ...train])].filter((m) => jobAllows(job, m));
 }
 
 /**
  * Top moves as a job's bots see them: the Saw Swap's moves scored after it (`swap`: swapScores), Grex's fire (a piece left on a tile
- * ablaze is gone), the Carrot Patch's race counted; best first.
+ * ablaze is gone), Birdie's train (a piece left on its warned square is gone, its king the battle), the Carrot Patch's race counted;
+ * best first.
  */
-export function jobRanked(job: Pick<JudgeJob, "fen" | "burn" | "race">, top: readonly MoveScore[], swap?: readonly MoveScore[]): MoveScore[] {
-  const fire = fireRanked(swapIn(top, swap), job.fen, job.burn ?? [], sideToMove(job.fen));
+export function jobRanked(job: Pick<JudgeJob, "fen" | "burn" | "race" | "train">, top: readonly MoveScore[], swap?: readonly MoveScore[]): MoveScore[] {
+  const fire = trainRanked(fireRanked(swapIn(top, swap), job.fen, job.burn ?? [], sideToMove(job.fen)), job.fen, job.train, sideToMove(job.fen));
   return job.race ? raceRanked(fire, job.fen, job.race) : fire;
 }
 

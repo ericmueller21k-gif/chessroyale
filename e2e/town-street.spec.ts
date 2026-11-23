@@ -491,9 +491,14 @@ test.describe(() => {
     const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }>; town: { loop: string; solos: { file: string }[] } };
     const town = [themes.town.loop, ...themes.town.solos.map((s) => s.file)].map((n) => `/music/${n}.mp3`);
     const hidden: string[] = Object.values(RECLUSE_MUSIC);
-    const names = Object.entries(themes.themes)
-      .filter(([k]) => !hidden.includes(k))
-      .flatMap(([, t]) => (t.intro ? [t.intro, t.loop] : [t.loop]));
+    // (Each file once: a loop shared by two themes, Birdie's theme and his ult's, is fetched once.)
+    const names = [
+      ...new Set(
+        Object.entries(themes.themes)
+          .filter(([k]) => !hidden.includes(k))
+          .flatMap(([, t]) => (t.intro ? [t.intro, t.loop] : [t.loop])),
+      ),
+    ];
     const sizes = names.map((n) => statSync(`${dir}/${n}.mp3`).size);
     // (Every decode's size: a theme's would be its file's.)
     await page.addInitScript(() => {

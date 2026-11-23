@@ -31,6 +31,7 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   clockslap: ["slap"],
   dough: ["doughDrop"],
   lockon: ["lockOn"],
+  train: ["trainSignal"],
 };
 
 // (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)
@@ -75,19 +76,20 @@ const seen = (page: Page) => page.evaluate(() => (window as any).__smoke as { ki
 
 /**
  * Your move: a knight to an empty square when it may (the battle lasts), else the first move allowed. Once a position
- * (`done`: the positions already played from). Returns the position played from, or null.
+ * (`done`: the positions already played from). Returns the position played from, or null. A piece Birdie's train is warned
+ * for moves first (his test switch warns every turn: a king left on the line would end the battle before his ultimate).
  */
 async function playOne(page: Page, done: Set<string>, first: string[] = []): Promise<string | null> {
   const s = await page.evaluate(() => {
     const m = (window as any).match;
-    return m.phase.kind === "play" && Date.now() >= m.phase.startsAt + 300 ? { fen: m.phase.board.fen as string, allowed: (m.boss?.powers?.allowed ?? null) as string[] | null } : null;
+    return m.phase.kind === "play" && Date.now() >= m.phase.startsAt + 300 ? { fen: m.phase.board.fen as string, allowed: (m.boss?.powers?.allowed ?? null) as string[] | null, warned: (m.boss?.powers?.birdie?.warn?.square ?? null) as string | null } : null;
   });
   if (!s || done.has(s.fen)) return null;
   const chess = new Chess(s.fen);
-  const legal = chess.moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), knight: m.piece === "n" && !m.captured }));
+  const legal = chess.moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), knight: m.piece === "n" && !m.captured, warned: m.from === s.warned }));
   const ok = legal.filter((m) => !s.allowed || s.allowed.includes(m.uci)).sort((a, b) => (a.uci < b.uci ? -1 : 1));
   const planned = first.length && ok.some((m) => m.uci === first[0]) ? first.shift() : undefined;
-  await submitMove(page, planned ?? (ok.find((m) => m.knight) ?? ok[0])?.uci, s.fen);
+  await submitMove(page, planned ?? (ok.find((m) => m.warned) ?? ok.find((m) => m.knight) ?? ok[0])?.uci, s.fen);
   done.add(s.fen);
   return s.fen;
 }

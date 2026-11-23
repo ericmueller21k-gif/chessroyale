@@ -39,6 +39,7 @@ import {
   type BossAsks,
   type BossLastMove,
   type BossRules,
+  type BrainNow,
   type JudgedEvaluation,
   type JudgedMove,
   type RageRates,
@@ -54,7 +55,7 @@ export { bossPowers, heldBy, materialOf, moveLoss, moveSquares, powerRoll, rageN
 export { PASS_WAIT, passAnswer, passLoses, passScores, type PassScore } from "./bosses/base.ts";
 // The board layer (every boss's marks at once: board-layer.ts).
 export * from "./board-layer.ts";
-export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, JudgedMove, RageRates, StopFields, TurnContext };
+export type { Battle, BossAsks, BossLastMove, BossRules, BrainNow, JudgedEvaluation, JudgedMove, RageRates, StopFields, TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";
 export * from "./bosses/grex.ts";
@@ -76,6 +77,7 @@ export * from "./bosses/timber.ts";
 export * from "./bosses/dash.ts";
 export * from "./bosses/zebra.ts";
 export * from "./bosses/chandy.ts";
+export * from "./bosses/birdie.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */

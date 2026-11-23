@@ -31,6 +31,8 @@ const ART_FACING: Readonly<Record<string, ArtFacing>> = {
   timber: "left",
   dash: "left",
   zebra: "right",
+  // (Birdie, Nov 23: his train's nose and his face to our left.)
+  birdie: "left",
   recluse: "front",
 };
 
