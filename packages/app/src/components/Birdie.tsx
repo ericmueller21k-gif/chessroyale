@@ -187,14 +187,14 @@ function WarnSign({ square, orientation, at }: { square: string; orientation: Or
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <path class="bd-sign-edge" d={SIGN} />
         <path class="bd-sign-face" d={SIGN} />
-        <rect class="bd-sign-mark" x="45" y="33" width="10" height="30" rx="5" />
-        <circle class="bd-sign-mark" cx="50" cy="74" r="5.5" />
+        <rect class="bd-sign-mark" x="44.5" y="35" width="11" height="28" rx="5.5" />
+        <circle class="bd-sign-mark" cx="50" cy="73.5" r="6" />
       </svg>
     </span>
   );
 }
 /** The sign's triangle (its corners rounded by its strokes' round joins). */
-const SIGN = "M50 9 L93 85 L7 85 Z";
+const SIGN = "M50 11 L91 84 L9 84 Z";
 
 /** The crossing on each square of the warned line: lit at the warning's `signal` cue on this screen, else already flashing. */
 function crossingItems(squares: readonly string[], since: number, until: (i: number) => number, now: number): BoardItem[] {

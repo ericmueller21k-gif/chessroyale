@@ -202,7 +202,7 @@ const STEAM = 0.32;
 const WHISTLE = 0.4;
 /**
  * His ride's run (`trainLong`, from his `depart`'s `pull` cue to the train's tail past the board) paced to his slower ride (Eric, Nov 23:
- * "slow the train a bit down": BOSS_POWERS.birdie.trainRideMs 1300 -> 1950): its puffs and joints this much further apart, so it still
+ * "slow the train a bit down": BIRDIE_RIDE.rideMs 1300 -> 1950): its puffs and joints this much further apart, so it still
  * ends with its steam as the train leaves the board (test/birdie-sounds.test.ts keeps the two together; this file stays free of the
  * settings, as the sound worker loads it).
  */

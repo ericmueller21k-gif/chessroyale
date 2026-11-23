@@ -194,7 +194,7 @@ describe("Birdie's sounds", () => {
   });
 
   it("his ride's run lasts his (slower) ride: from its pull as he departs to the train's tail past the board, its steam as it leaves", () => {
-    // (Nov 23: the ride 1.5x as long, BOSS_POWERS.birdie.trainRideMs; the run paced to it, RIDE_PACE. Either changed alone, this fails.)
+    // (Nov 23: the ride 1.5x as long, BIRDIE_RIDE.rideMs; the run paced to it, RIDE_PACE. Either changed alone, this fails.)
     expect(kit.sounds.pull).toBe("birdieTrainLong");
     const pull = cueAt(BIRDIE_FIGURE.anims.depart!, "pull");
     const leaves = BIRDIE_BEATS.ride.rideAt + BIRDIE_BEATS.ride.rideMs;

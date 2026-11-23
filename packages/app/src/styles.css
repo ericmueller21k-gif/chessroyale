@@ -28668,12 +28668,12 @@ piece.bd-smashed {
   width: 84%;
   height: 84%;
   overflow: visible;
-  filter: drop-shadow(0 0 calc(var(--board-size, 360px) / 90) #ffd400) drop-shadow(0 0 calc(var(--board-size, 360px) / 45) rgba(255, 196, 0, 0.8));
+  filter: drop-shadow(0 0 calc(var(--board-size, 360px) / 80) #ffd400) drop-shadow(0 0 calc(var(--board-size, 360px) / 32) rgba(255, 190, 0, 0.95));
 }
 .bd-sign-edge {
   fill: #261d05;
   stroke: #261d05;
-  stroke-width: 14;
+  stroke-width: 18;
   stroke-linejoin: round;
 }
 .bd-sign-face {

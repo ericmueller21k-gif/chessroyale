@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BIRDIE_CINEMATIC, BIRDIE_ULT, BOSS_DIFFICULTY, BOSS_POWERS, ENGINE_MAX_ELO, levelForMaia, maiaTopRating, mulberry32 } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BIRDIE_RIDE, BIRDIE_ULT, BOSS_DIFFICULTY, BOSS_POWERS, ENGINE_MAX_ELO, levelForMaia, maiaTopRating, mulberry32 } from "@chessroyale/core";
 import {
   BIRDIE_BEATS,
   BIRDIE_FX,
@@ -366,7 +366,7 @@ describe("his moments' lengths", () => {
     expect(reach[7]!).toBeLessThan(BIRDIE_BEATS.ride.rideMs);
     // (His train slower, Eric Nov 23: "slow the train a bit down": its crossing the setting's, about 1.5x the first 1300 ms; his return and
     // the whole ride after it.)
-    expect(BIRDIE_BEATS.ride.rideMs).toBe(BOSS_POWERS.birdie.trainRideMs);
+    expect(BIRDIE_BEATS.ride.rideMs).toBe(BIRDIE_RIDE.rideMs);
     expect(BIRDIE_BEATS.ride.rideMs / 1300).toBeCloseTo(1.5, 1);
     expect(BIRDIE_BEATS.ride.backAt).toBe(BIRDIE_BEATS.ride.rideAt + BIRDIE_BEATS.ride.rideMs);
     expect(BIRDIE_BEATS.ride.total).toBe(BIRDIE_BEATS.ride.backAt + BIRDIE_BEATS.ride.entranceMs);

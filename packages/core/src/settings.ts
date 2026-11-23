@@ -2321,16 +2321,11 @@ export const BOSS_POWERS = {
    *   jumps: Maia `armoredMaiaBoost` higher, held at Maia's top; already at Maia's top (Very hard), Stockfish at
    *   `armoredStockfishAbove` over the level Maia's top stands for (core levelForMaia); a battle he already plays on Stockfish, its
    *   strength `armoredMaiaBoost` higher (held at ENGINE_MAX_ELO). The judge and fair play don't read his strength: unchanged.
-   * - `trainRideMs`: how long his train takes to cross the board on a ride, from one edge to past the other (BIRDIE_BEATS.ride.rideMs:
-   *   the smash as its nose reaches the piece, the pieces stepping aside, his return and the result's hold all follow it, solo and
-   *   online). Eric, Nov 23: "His attack train move should slow the train a bit down when it moves across the board": 1300 -> 1950,
-   *   about 1.5x as long. (His ride's run, `trainLong` in birdie-sounds.ts, is paced to it: its RIDE_PACE, a unit test keeps the two
-   *   together.)
+   * - His train's ride across the board: BIRDIE_RIDE.
    */
   birdie: {
     trainFrom: 2,
     trainEvery: 3,
-    trainRideMs: 1950,
     trainPawnLogit: 1,
     fallLost: 9,
     armoredTrainEvery: 3,
@@ -2619,6 +2614,15 @@ export const MOO_CINEMATIC = {
    */
   rejoinMs: 1500,
 } as const;
+
+/**
+ * Birdie's train on a ride (packages/chess/src/bosses/birdie.ts, BIRDIE_BEATS.ride): `rideMs`, how long it takes to cross the board, from
+ * one edge to past the other. The smash as its nose reaches the piece, the pieces stepping aside, his return and the result's hold all
+ * follow it, solo and online. Eric, Nov 23: "His attack train move should slow the train a bit down when it moves across the board":
+ * 1300 -> 1950, about 1.5x as long (docs/decisions/2026-11-23-birdie-cadence-warning.md). His ride's run (`trainLong` in
+ * birdie-sounds.ts) is paced to it (its RIDE_PACE; a unit test keeps the two together).
+ */
+export const BIRDIE_RIDE = { rideMs: 1950 } as const;
 
 /**
  * Birdie's fall (Eric, Nov 23: "A cinematic like Moo's Full Moon: it takes the same space on screen as Moo's, about 6 to 7 s long. A cut
