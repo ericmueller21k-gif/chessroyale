@@ -1,7 +1,7 @@
 # Boss art (rider views): birdie-train-ride
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 8 turns, 4 renders.
-- Spend: **$0.80** of the $3 cap (18 input, 53,487 cache-write, 253,736 cache-read, 24,021 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 8 turns, 5 renders.
+- Spend: **$0.67** of the $3 cap (18 input, 49,342 cache-write, 235,342 cache-read, 18,772 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/birdie-train-ride/birdie-train-ride.tsx.
 - The side view: unchanged, and the front and back views are drawn.
@@ -9,23 +9,34 @@
 
 ## Its notes
 
-I added the front and back views to Birdie's Train. The side view's code is untouched: the new code sits after it, and the only other changes are an extra type in the import line and the new `views` field. I checked the renders in red, yellow, emerald, cobalt and midnight at 4x and at town size. No warnings came up, and I didn't add a trail mark.
+I've added the front and back views to Birdie's Train. The side view is untouched: all the new code comes after it, plus a `views` field. Both views have the side's 12 idle frames (150 ms each) and 10 move frames (65 ms each), the same pawn height (pawnY −3, cut 70) and pawnX about 0. In the move, dx stays 0. I checked them at 4x and at town size, with white and black pawns and in every color.
 
-**Back (going up the screen):**
-- **What it shows:** the yellow back wall of the cab (painted region "cab") with a white highlight along its top edge. The red stripe carries on across the back, with a small red tail lamp each side that has a soft glow. The two rear posts ("backpost") hold up the dark arched roof with its lighter top line. Below are the dark footplate, a grey coupler, and the grey trucks with their wheels seen edge-on.
-- **Inside the cab, behind the pawn:** a dark floor, the inside of the cab's front wall in a darker shade of the body color ("farwall", the same as the side's far wall), the front posts ("frontpost", slightly darker), and faint windshield glass with two glints.
-- **The pawn** is seen from behind, centered, with the same height and cut as the side (pawnY -10, cut 66). Its lower part is hidden by the back wall.
+**Back view (walking up):**
+- The cab's rounded back wall, painted in the item's color (Region name "body", the same as on the side).
+- The red stripe across it, a red tail lamp in each corner and a grey buffer plate at the bottom.
+- The dark roof edge with its highlight line. Above it, the roof's top runs away from us with the open hatch in it, as the camera looks down.
+- The pawn from behind sits in the hatch, visible down to the near rim. Behind it, the windshield's back edge shows round its shoulders.
+- The exhaust stack is on the roof's back corner on our right. Two grey end-on wheels sit under a grey truck beam.
 
-**Front (going down the screen):**
-- **What it shows:** the rounded yellow nose ("hood") in front of the cab's front face ("cab"), which shows at both sides and as a sill above the nose. A big headlight sits high on the nose with a smaller one below it. The red stripe comes in from both sides and sweeps down into a smile shape under the lower lamp. There's also the short dark stack, the windshield posts ("frontpost") with faint glass and glints, the rear posts behind the pawn ("backpost", darker), the roof, a grey cowcatcher, and the trucks.
-- **The pawn** sits behind the windshield with its head and shoulders clear above the sill. The stack covers part of its neck.
+**Front view (walking down):**
+- The rounded nose, painted in the item's color (Region "body"), with a highlight along its top.
+- Two round headlights with lenses and glows. The red stripe sweeps down across the front in a curve, like a smile, and a few grille slats sit under it.
+- The dark roof front, and the sloped windshield standing on it.
+- The pawn sits behind the windshield: its head and collar are fully above the glass, and its body shows faintly through it.
+- Over the pawn's shoulders you can see the back half of the roof and the hatch. The stack peeks up at the far corner, on our left (the mirror of the back view's right).
 
-**Both views, beat by beat:**
-- **Idle (12 frames × 150 ms):** the side's bob and rock, with the rock shown as a 0.6° roll side to side, and the pawn rolls with the body. The lamps' glow brightens and dims slowly: the headlights at the front, the tail lamps at the back. In frames 6–11 a puff rises from the stack and drifts to our right, so at the front it stays clear of the face. At the back it rises behind the pawn and peeks out to the right of its head.
-- **Move (10 frames × 65 ms, dx 0):** the same timing and the same two wheel turns as the side. On each wheel, small tread marks roll past and a crank-pin knob on the outside rises and falls. The side's lean becomes a roll of about ±1.3°, with the same small rail bob. The lamps brighten and dim once per square. A puff rises from the stack in frames 0–4, and none is left behind. A faint ground shadow shrinks a little as the body rises.
+**Idle (both views):** the side's gentle rock on the springs, seen end-on as a small sideways roll with a slight bob. The headlights (front) and tail-lamp glows (back) slowly brighten and dim in the side's rhythm. In frames 6–11, a puff rises from the stack and fades.
+
+**Move (both views):**
+- The body sways side to side (±1.2°) and lifts a touch twice per square.
+- The ground shadow shrinks and fades a little as it rises.
+- The wheels turn: tread marks run down the tyre faces in the front view and up in the back view. They follow the side's ease-in/ease-out wheel angle, moving three marks' spacing per square, so the last frame leads straight into the first.
+- The lamps brighten as it gets going and dim as it stops.
+- In frames 0–4, a puff from the stack as it sets off. It travels with the train, so nothing is left behind.
 
 **Choices you might want to change:**
-- **The headlights are stacked**, one above the other, because that's how the side's upper and lower lamps line up. With the stripe they read as a small face. Two lamps side by side is the other option.
-- **The puff still comes from the hood stack**, as on the side, not from the roof. At the front it drifts to one side so it doesn't cover the face, and at the back it is mostly hidden behind the pawn.
-- **The ground shadow is new.** The brief asked for it, but the side view has none, so it only shows from the front and back. It's faint.
-- **Colors:** the tail lamps are fixed red, so on a red ride they only stand out by their outlines. As on the side, the stripe almost disappears on a red ride.
+- The stack is on one back corner, not centered, so it doesn't cover the pawn from behind.
+- In the front view the pawn's body is seen faintly through the glass, so the pawn reads clearly but shows a little less than on the side.
+- The tread marks are small, so at town size the wheel motion reads mostly as the sway and bounce.
+- On the Red color, the red stripe merges into the body, as it does on the side.
+- A leftover duplicate buffer path is drawn under the back wall, where it's hidden; deleting it won't change the picture.

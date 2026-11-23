@@ -1,22 +1,25 @@
-import { Region, LINE, lw, darken, type RiderDraft, type RiderProps, type Paint, type RiderViewDraft, type TrailProps } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, type RiderDraft, type RiderProps, type Paint } from "../../item-kit.tsx";
 
 // Fixed colors: Birdie's train.
-const ROOF = "#34303f";
-const ROOF_HI = "#5a546b";
-const STRIPE = "#d8343a";
-const TRUCK = "#8c929c";
-const WHEEL = "#5b606b";
-const HUB = "#c9ced6";
-const LENS = "#fff7cf";
+const ROOF = "#2f2b38";
+const ROOF_HI = "#57516a";
+const STRIPE = "#e0353b";
+const TRUCK = "#9097a1";
+const TRUCK_DK = "#666c76";
+const WHEEL = "#4d525c";
+const HUB = "#cfd4dc";
+const LENS = "#fff8d2";
 const GLOW = "#ffe97a";
+const GLASS = "#bfe6f5";
 const PUFF = "#f6f6f4";
 
 const IDLE_N = 12;
 const MOVE_N = 10;
-const R_WHEEL = 8.5;
 // The pivot the body rocks round (the rails, between the trucks).
-const PIV: [number, number] = [56, 86];
-const PAWN_BASE: [number, number] = [36, 78];
+const PIV: [number, number] = [54, 90];
+// The pawn's base on the ride at rest (its square's base y 88, lifted by PAWN_Y).
+const PAWN_Y = -3;
+const PAWN_BASE: [number, number] = [50, 88 + PAWN_Y];
 
 /** Where the move is at frame f (0..1 of the square): a soft start and a soft stop. */
 const moveS = (f: number) => {
@@ -24,14 +27,14 @@ const moveS = (f: number) => {
   return t - (0.4 * Math.sin(2 * Math.PI * t)) / (2 * Math.PI);
 };
 
-/** The body's bob (dy) and tilt (deg) per frame. */
+/** The body's bob (dy, down positive) and tilt (deg) per frame. */
 function bodyRock(anim: "idle" | "move", f: number): { bob: number; tilt: number } {
   if (anim === "idle") {
     const a = (f / IDLE_N) * 2 * Math.PI;
-    return { bob: 0.7 * (1 - Math.cos(a)) * 0.5 + 0.35 * (1 - Math.cos(2 * a)) * 0.5, tilt: 0.6 * Math.sin(a) };
+    return { bob: 0.6 * (1 - Math.cos(a)) * 0.5, tilt: 0.5 * Math.sin(a) };
   }
   const t = f / MOVE_N;
-  return { bob: -0.7 * Math.abs(Math.sin(3 * Math.PI * t)), tilt: -1.6 * Math.sin(2 * Math.PI * t) };
+  return { bob: -0.6 * Math.abs(Math.sin(2 * Math.PI * t)), tilt: -1.2 * Math.sin(2 * Math.PI * t) };
 }
 
 function pose(anim: "idle" | "move", f: number) {
@@ -44,61 +47,57 @@ function pose(anim: "idle" | "move", f: number) {
   return {
     dx: anim === "move" ? 100 * moveS(f) : 0,
     dy: 0,
-    pawnX: -14 + (x2 - PAWN_BASE[0]),
-    pawnY: -10 + (y2 - PAWN_BASE[1]) + bob,
+    pawnX: x2 - PAWN_BASE[0],
+    pawnY: PAWN_Y + (y2 - PAWN_BASE[1]) + bob,
     pawnTilt: tilt,
-    cut: 66,
+    cut: 70,
   };
 }
 
+/** Wheel turn: 4 spokes, so three quarter turns a square keeps the loop seamless and the spokes readable. */
 function wheelAngle(anim: "idle" | "move", f: number) {
-  if (anim === "idle") return -40;
-  // Two whole turns a square (about the wheel's own roll), so the next move picks up where this one ends.
-  return -40 + 720 * moveS(f);
+  if (anim === "idle") return 20;
+  return 20 + 270 * moveS(f);
 }
 
 function Wheel({ cx, cy, a }: { cx: number; cy: number; a: number }) {
   const r = (a * Math.PI) / 180;
-  const cw = (a + 180) * (Math.PI / 180);
-  const px = cx + 4 * Math.cos(r);
-  const py = cy + 4 * Math.sin(r);
-  const wx = cx + 3.6 * Math.cos(cw);
-  const wy = cy + 3.6 * Math.sin(cw);
+  const sp = [0, 1].map((k) => {
+    const t = r + (k * Math.PI) / 2;
+    const ddx = 4.6 * Math.cos(t);
+    const ddy = 4.6 * Math.sin(t);
+    return `M${(cx - ddx).toFixed(2)} ${(cy - ddy).toFixed(2)} L${(cx + ddx).toFixed(2)} ${(cy + ddy).toFixed(2)}`;
+  });
   return (
     <g>
-      <circle cx={cx} cy={cy} r={R_WHEEL} fill={WHEEL} {...LINE} {...lw(2.4)} />
-      <circle cx={cx} cy={cy} r={5.8} fill="#80858f" />
-      {/* counterweight */}
-      <circle cx={wx} cy={wy} r={2.8} fill="#41454e" />
-      <circle cx={cx} cy={cy} r={1.6} fill={HUB} {...LINE} {...lw(1)} />
-      <circle cx={px} cy={py} r={1.8} fill={HUB} {...LINE} {...lw(1)} />
+      <circle cx={cx} cy={cy} r={6.6} fill={WHEEL} {...LINE} {...lw(2.4)} />
+      {sp.map((d) => (
+        <path d={d} stroke={HUB} stroke-linecap="round" {...lw(1.6)} />
+      ))}
+      <circle cx={cx} cy={cy} r={1.8} fill={HUB} {...LINE} {...lw(1)} />
     </g>
   );
 }
 
 function Truck({ x1, x2, a }: { x1: number; x2: number; a: number }) {
-  const cy = 89;
-  const r = (a * Math.PI) / 180;
-  const ddx = 4 * Math.cos(r);
-  const ddy = 4 * Math.sin(r);
+  const m = (x1 + x2) / 2;
   return (
     <g>
-      <path d={`M${x1 - 10} 81 L${x2 + 10} 81 Q${x2 + 12} 81 ${x2 + 12} 84 L${x2 + 12} 87 Q${x2 + 12} 90 ${x2 + 9} 90 L${x1 - 9} 90 Q${x1 - 12} 90 ${x1 - 12} 87 L${x1 - 12} 84 Q${x1 - 12} 81 ${x1 - 10} 81 Z`} fill={TRUCK} {...LINE} {...lw(2.4)} />
-      <path d={`M${(x1 + x2) / 2 - 3} 82 L${(x1 + x2) / 2 + 3} 82 L${(x1 + x2) / 2 + 3} 88 L${(x1 + x2) / 2 - 3} 88 Z`} fill="#6e737d" {...LINE} {...lw(1.4)} />
-      <Wheel cx={x1} cy={cy} a={a} />
-      <Wheel cx={x2} cy={cy} a={a} />
-      {/* side rod */}
-      <path d={`M${x1 + ddx} ${cy + ddy} L${x2 + ddx} ${cy + ddy}`} stroke="#1d1d1f" stroke-linecap="round" {...lw(4)} />
-      <path d={`M${x1 + ddx} ${cy + ddy} L${x2 + ddx} ${cy + ddy}`} stroke={HUB} stroke-linecap="round" {...lw(1.8)} />
+      <Wheel cx={x1} cy={89} a={a} />
+      <Wheel cx={x2} cy={89} a={a} />
+      {/* the truck's side frame over the wheels' middles */}
+      <path d={`M${x1 - 4} 82 L${x2 + 4} 82 Q${x2 + 7} 82 ${x2 + 7} 85 L${x2 + 4} 87 L${x1 - 4} 87 L${x1 - 7} 85 Q${x1 - 7} 82 ${x1 - 4} 82 Z`} fill={TRUCK} {...LINE} {...lw(2.2)} />
+      <path d={`M${m - 3} 83 L${m + 3} 83 L${m + 3} 86 L${m - 3} 86 Z`} fill={TRUCK_DK} />
+      <circle cx={x1} cy={89} r={1.8} fill={HUB} {...LINE} {...lw(1)} />
+      <circle cx={x2} cy={89} r={1.8} fill={HUB} {...LINE} {...lw(1)} />
     </g>
   );
 }
 
 function Puff({ x, y, k, n }: { x: number; y: number; k: number; n: number }) {
-  // k: 0..n-1, rising and fading
   const t = k / Math.max(1, n - 1);
-  const s = 4.2 + t * 4;
-  const op = 1 - t * 0.8;
+  const s = 3 + t * 3.2;
+  const op = 1 - t * 0.85;
   return (
     <g opacity={op}>
       <circle cx={x - s * 0.6} cy={y + s * 0.2} r={s * 0.75} fill={PUFF} {...LINE} {...lw(1.4)} />
@@ -111,47 +110,49 @@ function Puff({ x, y, k, n }: { x: number; y: number; k: number; n: number }) {
   );
 }
 
-const CAB_WALL = "M7 55 L66 55 L66 79 L10 79 Q3 79 3 72 L3 59 Q3 55 7 55 Z";
-const HOOD = "M66 42 L88 42 Q111 42 111 65 L111 79 L66 79 Z";
-const BACK_POST = "M6 5 L12 5 L12 56 L6 56 Z";
-const FRONT_POST = "M58 5 L64 5 L72 43 L66 43 Z";
-const FAR_WALL = "M9 50 L61 50 L61 57 L9 57 Z";
-const ROOF_D = "M-3 7 Q-3 0 3 -1 Q36 -6 69 -1 Q75 0 75 7 Z";
-const STRIPE_D = "M3 64 L91 64 Q106 64 109.5 76 L110 79 L104.5 79 Q101.5 69 90 69 L3 69 Z";
+// The long low body, nose to our right.
+const BODY = "M-2 50 L90 50 Q112 50 114 70 L114 76 Q114 80 110 80 L-2 80 Q-6 80 -6 76 L-6 54 Q-6 50 -2 50 Z";
+// The flat dark roof, front and back of the open cab (the hatch, x 28-72).
+const ROOF_BACK = "M-5 51 L-5 47.5 Q-5 44 -1 44 L29 44 L29 51 Z";
+const ROOF_FRONT = "M71 51 L71 44 L88 44 Q99 44 104 51 Z";
+// The roof's far rim across the hatch, seen behind the pawn.
+const ROOF_FAR = "M27 43 L73 43 L73 48 L27 48 Z";
+// Thin red stripe along the body, sweeping up round the nose.
+const STRIPE_D = "M-6 64 L96 64 Q104 64 108 59 Q110 56 112.5 60 Q108 68 97 68 L-6 68 Z";
 
 function Body({ p, anim, f }: { p: Paint; anim: "idle" | "move"; f: number }) {
-  const glow = anim === "idle" ? 0.35 + 0.25 * Math.sin((f / IDLE_N) * 2 * Math.PI) : 0.55;
+  const glow = anim === "idle" ? 0.4 + 0.3 * Math.sin((f / IDLE_N) * 2 * Math.PI) : 0.75;
   return (
     <g>
-      {/* footplate */}
-      <path d="M1 77 L113 77 L113 83 L1 83 Z" fill="#3b3f48" {...LINE} {...lw(2.4)} />
-      {/* cowcatcher */}
-      <path d="M107 81 L116 81 L111 89 L104 89 Z" fill={TRUCK} {...LINE} {...lw(2)} />
-      {/* exhaust stack */}
-      <path d="M75 43 L75 34 L82 34 L82 43 Z" fill={ROOF} {...LINE} {...lw(2.4)} />
-      <path d="M73.5 34 L83.5 34 L83.5 31 L73.5 31 Z" fill={ROOF} {...LINE} {...lw(2.4)} />
-      <Region p={p} name="hood" d={[HOOD]} />
-      <Region p={p} name="cab" d={[CAB_WALL]} />
-      <Region p={p} name="backpost" d={[BACK_POST]} line={2.4} />
-      <Region p={p} name="frontpost" d={[FRONT_POST]} line={2.4} />
-      {/* glass in the windshield, seen edge-on */}
-      <path d="M64.5 8 L70.5 40" stroke="#bfe6f5" stroke-linecap="round" {...lw(1.2)} opacity="0.9" />
-      {/* hood side doors */}
-      <path d="M80 49 L80 60 M92 49 L92 60" stroke="#1d1d1f" stroke-linecap="round" opacity="0.3" {...lw(1.6)} />
-      {/* highlights */}
-      <path d="M8 58.5 L62 58.5" stroke="#fff" stroke-linecap="round" opacity="0.5" {...lw(2)} />
-      <path d="M70 45.5 L87 45.5 Q100 46 104 52" fill="none" stroke="#fff" stroke-linecap="round" opacity="0.55" {...lw(2)} />
+      {/* rear buffer */}
+      <path d="M-9 70 L-5 70 L-5 77 L-9 77 Z" fill={TRUCK_DK} {...LINE} {...lw(2)} />
+      {/* exhaust stack at the back of the roof */}
+      <path d="M6 45 L6 38 L13 38 L13 45 Z" fill={ROOF} {...LINE} {...lw(2.2)} />
+      <path d="M4.5 38 L14.5 38 L14.5 35 L4.5 35 Z" fill={ROOF} {...LINE} {...lw(2.2)} />
+      <Region p={p} name="body" d={[BODY]} />
+      {/* the open cab's near rim */}
+      <path d="M29 50.5 L71 50.5" stroke="#1d1d1f" stroke-linecap="round" {...lw(3.4)} />
+      {/* highlight along the top */}
+      <path d="M-1 55 L24 55 M32 55 L86 55" stroke="#fff" stroke-linecap="round" opacity="0.5" {...lw(2.2)} />
+      {/* door seam and grille */}
+      <path d="M24 56 L24 77" stroke="#1d1d1f" stroke-linecap="round" opacity="0.28" {...lw(1.6)} />
+      <path d="M87 71.5 L87 77 M91.5 71.5 L91.5 77 M96 71.5 L96 77 M100.5 71.5 L100.5 77" stroke="#1d1d1f" stroke-linecap="round" opacity="0.5" {...lw(1.8)} />
       {/* red stripe */}
       <path d={STRIPE_D} fill={STRIPE} {...LINE} {...lw(1.6)} />
-      {/* headlights: glow, lens */}
-      <circle cx={103} cy={48} r={8.5} fill={GLOW} opacity={glow * 0.6} />
-      <circle cx={111} cy={71} r={7} fill={GLOW} opacity={glow * 0.6} />
-      <circle cx={103} cy={48} r={4.4} fill={LENS} {...LINE} {...lw(2.2)} />
-      <circle cx={111} cy={71} r={3.5} fill={LENS} {...LINE} {...lw(2)} />
-      <circle cx={101.7} cy={46.7} r={1.3} fill="#fff" />
-      {/* roof */}
-      <path d={ROOF_D} fill={ROOF} {...LINE} />
-      <path d="M3 2.5 Q36 -2 69 2.5" fill="none" stroke={ROOF_HI} stroke-linecap="round" {...lw(1.8)} />
+      {/* headlight on the nose: glow, lens */}
+      <circle cx={106} cy={60} r={9} fill={GLOW} opacity={glow * 0.6} />
+      <circle cx={106} cy={60} r={4.3} fill={LENS} {...LINE} {...lw(2)} />
+      <circle cx={104.8} cy={58.8} r={1.2} fill="#fff" />
+      {/* tail lamp */}
+      <circle cx={-2.5} cy={58.5} r={2.3} fill="#ff4a40" {...LINE} {...lw(1.4)} />
+      {/* the dark roof */}
+      <path d={ROOF_BACK} fill={ROOF} {...LINE} {...lw(2.6)} />
+      <path d={ROOF_FRONT} fill={ROOF} {...LINE} {...lw(2.6)} />
+      <path d="M-1 46.5 L26 46.5 M74 46.5 L88 46.5" stroke={ROOF_HI} stroke-linecap="round" {...lw(1.6)} />
+      {/* the sloped windshield at the front of the cab */}
+      <path d="M65 45 L60 31 L66 31 L76 45 Z" fill={GLASS} opacity={0.55} />
+      <path d="M65 45 L60 31 L66 31 L76 45 Z" fill="none" {...LINE} {...lw(2.4)} />
+      <path d="M63.5 34.5 L66.5 41" stroke="#fff" stroke-linecap="round" opacity="0.85" {...lw(1.4)} />
     </g>
   );
 }
@@ -161,10 +162,11 @@ function rockT(anim: "idle" | "move", f: number) {
   return `translate(0 ${bob.toFixed(2)}) rotate(${tilt.toFixed(2)} ${PIV[0]} ${PIV[1]})`;
 }
 
-function SideBack({ p, anim, f }: RiderProps) {
+function SideBack({ anim, f }: RiderProps) {
   return (
     <g transform={rockT(anim, f)}>
-      <Region p={p} name="farwall" d={[FAR_WALL]} fill={darken(p.hex, 0.3)} line={2.4} />
+      <path d={ROOF_FAR} fill={ROOF} {...LINE} {...lw(2.4)} />
+      <path d="M28 47 L72 47 L72 52 L28 52 Z" fill="#1d1d1f" />
     </g>
   );
 }
@@ -174,15 +176,16 @@ function SideFront({ p, anim, f }: RiderProps) {
   let puff: [number, number, number, number] | null = null;
   if (anim === "idle" && f >= 6) {
     const k = f - 6;
-    puff = [79 - k * 0.8, 26 - k * 3.6, k, 6];
+    puff = [9.5 - k * 0.6, 30 - k * 3, k, 6];
   }
   if (anim === "move" && f <= 4) {
-    puff = [79 - f * 3.5, 26 - f * 3.6, f, 5];
+    puff = [9.5 - f * 2.2, 30 - f * 3, f, 5];
   }
   return (
     <g>
-      <Truck x1={19} x2={38} a={a} />
-      <Truck x1={77} x2={96} a={a} />
+      <ellipse cx={54} cy={96} rx={58} ry={2.6} fill="#000" opacity={0.15} />
+      <Truck x1={10} x2={27} a={a} />
+      <Truck x1={78} x2={95} a={a} />
       <g transform={rockT(anim, f)}>
         <Body p={p} anim={anim} f={f} />
         {puff && <Puff x={puff[0]} y={puff[1]} k={puff[2]} n={puff[3]} />}
@@ -193,261 +196,256 @@ function SideFront({ p, anim, f }: RiderProps) {
 
 // ---------- Front and back views (end-on) ----------
 
-// The pivot the body sways round, end-on (between the rails).
-const E_PIV: [number, number] = [50, 88];
+/** End-on views sway round the rails' middle under the pawn. */
+const VPIV: [number, number] = [50, 90];
 
-/** End-on: the side's bob, and its rock turned into a small side-to-side roll. */
-function endRock(anim: "idle" | "move", f: number) {
+function viewPose(anim: "idle" | "move", f: number) {
   const { bob, tilt } = bodyRock(anim, f);
-  return { bob, roll: anim === "move" ? tilt * 0.8 : tilt };
+  const th = (tilt * Math.PI) / 180;
+  return {
+    dx: 0,
+    dy: 0,
+    pawnX: 5 * Math.sin(th),
+    pawnY: PAWN_Y + (5 - 5 * Math.cos(th)) + bob,
+    pawnTilt: tilt,
+    cut: 70,
+  };
 }
 
-function endPose(anim: "idle" | "move", f: number) {
-  const { bob, roll } = endRock(anim, f);
-  const th = (roll * Math.PI) / 180;
-  // the pawn's base (50, 78) turned round the pivot with the body
-  const x2 = E_PIV[0] + 10 * Math.sin(th);
-  const y2 = E_PIV[1] - 10 * Math.cos(th);
-  return { dx: 0, dy: 0, pawnX: x2 - 50, pawnY: -10 + (y2 - 78) + bob, pawnTilt: roll, cut: 66 };
+function viewT(anim: "idle" | "move", f: number) {
+  const { bob, tilt } = bodyRock(anim, f);
+  return `translate(0 ${bob.toFixed(2)}) rotate(${tilt.toFixed(2)} ${VPIV[0]} ${VPIV[1]})`;
 }
 
-function endT(anim: "idle" | "move", f: number) {
-  const { bob, roll } = endRock(anim, f);
-  return `translate(0 ${bob.toFixed(2)}) rotate(${roll.toFixed(2)} ${E_PIV[0]} ${E_PIV[1]})`;
+/** Lamp glow: the side's slow idle pulse; on the move it brightens as it gets going and dims as it stops. */
+function viewGlow(anim: "idle" | "move", f: number) {
+  if (anim === "idle") return 0.4 + 0.3 * Math.sin((f / IDLE_N) * 2 * Math.PI);
+  return 0.4 + 0.5 * Math.sin(Math.PI * (f / MOVE_N));
 }
 
-function lampGlow(anim: "idle" | "move", f: number) {
-  return anim === "idle" ? 0.35 + 0.25 * Math.sin((f / IDLE_N) * 2 * Math.PI) : 0.5 + 0.3 * Math.sin((f / MOVE_N) * 2 * Math.PI);
-}
-
-/** The ground shadow: shrinks a little as the body rises. */
-function Shadow({ anim, f }: { anim: "idle" | "move"; f: number }) {
-  const { bob } = endRock(anim, f);
-  const k = 1 + bob * 0.06;
-  return <ellipse cx={50} cy={97} rx={37 * k} ry={3.4 * k} fill="#000" opacity={0.2} />;
-}
-
-/** A wheel seen edge-on: its tread ticks roll past, the crank pin on its outer face rises and falls. */
-function EndWheel({ x, a, out }: { x: number; a: number; out: number }) {
-  const ticks = [0, 90, 180, 270]
-    .map((k) => ((a + k) * Math.PI) / 180)
-    .filter((t) => Math.cos(t) > 0.15)
-    .map((t) => 89 + 7 * Math.sin(t));
-  const r = (a * Math.PI) / 180;
-  const py = 89 + 4 * Math.sin(r);
-  return (
-    <g>
-      <rect x={x - 3.8} y={80.5} width={7.6} height={17} rx={3.2} fill={WHEEL} {...LINE} {...lw(2.4)} />
-      {ticks.map((y) => (
-        <path d={`M${x - 2} ${y.toFixed(2)} L${x + 2} ${y.toFixed(2)}`} stroke="#9aa0aa" stroke-linecap="round" {...lw(1.4)} />
-      ))}
-      <circle cx={x + out * 4.4} cy={py} r={1.9} fill={HUB} {...LINE} {...lw(1)} />
-    </g>
-  );
-}
-
-function EndTrucks({ anim, f }: { anim: "idle" | "move"; f: number }) {
-  const a = wheelAngle(anim, f);
-  return (
-    <g>
-      <path d="M24 82 L76 82 Q79 82 79 85 L79 87 Q79 90 76 90 L24 90 Q21 90 21 87 L21 85 Q21 82 24 82 Z" fill={TRUCK} {...LINE} {...lw(2.4)} />
-      <path d="M30 83.5 L36 83.5 L36 88.5 L30 88.5 Z M64 83.5 L70 83.5 L70 88.5 L64 88.5 Z" fill="#6e737d" {...LINE} {...lw(1.4)} />
-      <EndWheel x={17} a={a} out={-1} />
-      <EndWheel x={83} a={a} out={1} />
-    </g>
-  );
-}
-
-const E_ROOF = "M11 7 Q11 0 17 -1 Q50 -8 83 -1 Q89 0 89 7 Z";
-const E_FOOT = "M13 77 L87 77 L87 83 L13 83 Z";
-
-function Roof() {
-  return (
-    <g>
-      <path d={E_ROOF} fill={ROOF} {...LINE} />
-      <path d="M17 2.5 Q50 -3.5 83 2.5" fill="none" stroke={ROOF_HI} stroke-linecap="round" {...lw(1.8)} />
-    </g>
-  );
-}
-
-/** The puff from the stack, seen end-on: it rises and drifts off to one side. */
-function endPuff(anim: "idle" | "move", f: number, x0: number, y0: number): [number, number, number, number] | null {
-  if (anim === "idle" && f >= 6) {
-    const k = f - 6;
-    return [x0 + k * 2.6, y0 - k * 3.4, k, 6];
-  }
-  if (anim === "move" && f <= 4) return [x0 + f * 3.6, y0 - f * 3.6, f, 5];
+/** The stack's puff: k-th step of n, or null. */
+function viewPuff(anim: "idle" | "move", f: number): [number, number] | null {
+  if (anim === "idle" && f >= 6) return [f - 6, 6];
+  if (anim === "move" && f <= 4) return [f, 5];
   return null;
 }
 
-// --- back view: the cab's back wall, the pawn seen from behind in the open cab ---
-const B_WALL = "M22 55 L78 55 Q82 55 82 59 L82 72 Q82 79 75 79 L25 79 Q18 79 18 72 L18 59 Q18 55 22 55 Z";
-const B_POSTS = ["M18 5 L24 5 L24 56 L18 56 Z", "M76 5 L82 5 L82 56 L76 56 Z"];
-const B_FPOSTS = ["M22 6 L27 6 L27 42 L22 42 Z", "M73 6 L78 6 L78 42 L73 42 Z"];
-const B_FAR = "M24 41 L76 41 L76 50 L24 50 Z";
-
-function BackBack({ p, anim, f }: RiderProps) {
-  const puff = endPuff(anim, f, 57, 29);
+/** A wheel seen end-on: a dark tyre with tread marks running down (toward us) or up (away). */
+function EndWheel({ cx, a, dir }: { cx: number; a: number; dir: 1 | -1 }) {
+  const u = ((((a - 20) / 90) % 1) + 1) % 1;
+  const marks: number[] = [];
+  for (let k = -2; k < 6; k++) {
+    const y = 85 + (k + dir * u) * 3.2;
+    if (y > 87.6 && y < 94.4) marks.push(y);
+  }
   return (
     <g>
-      <Shadow anim={anim} f={f} />
-      <g transform={endT(anim, f)}>
-        {/* the cab floor, seen from above */}
-        <path d="M21 49 L79 49 L79 57 L21 57 Z" fill="#2a2730" {...LINE} {...lw(2)} />
-        {/* the windshield beyond, and the cab's front wall inside */}
-        <path d="M27 7 L73 7 L73 42 L27 42 Z" fill="#bfe6f5" opacity={0.18} />
-        <path d="M31 11 L36 8 M66 38 L71 34" stroke="#fff" stroke-linecap="round" opacity={0.6} {...lw(1.4)} />
-        <Region p={p} name="farwall" d={[B_FAR]} fill={darken(p.hex, 0.3)} line={2.4} />
-        <Region p={p} name="frontpost" d={B_FPOSTS} fill={darken(p.hex, 0.12)} line={2.2} />
-        {puff && <Puff x={puff[0]} y={puff[1]} k={puff[2]} n={puff[3]} />}
-      </g>
+      <rect x={cx - 3.4} y={82.4} width={6.8} height={13.2} rx={2.8} fill={WHEEL} {...LINE} {...lw(2.2)} />
+      {marks.map((y) => (
+        <path d={`M${(cx - 1.6).toFixed(2)} ${y.toFixed(2)} L${(cx + 1.6).toFixed(2)} ${y.toFixed(2)}`} stroke={HUB} stroke-linecap="round" opacity="0.9" {...lw(1.6)} />
+      ))}
+    </g>
+  );
+}
+
+function EndTrucks({ a, dir }: { a: number; dir: 1 | -1 }) {
+  return (
+    <g>
+      <EndWheel cx={28} a={a} dir={dir} />
+      <EndWheel cx={72} a={a} dir={dir} />
+      <path d="M23 81 L77 81 Q80 81 80 84 L78 87 L22 87 L20 84 Q20 81 23 81 Z" fill={TRUCK} {...LINE} {...lw(2.2)} />
+      <path d="M45 82.5 L55 82.5 L55 85.5 L45 85.5 Z" fill={TRUCK_DK} />
+      <circle cx={28} cy={84} r={1.8} fill={HUB} {...LINE} {...lw(1)} />
+      <circle cx={72} cy={84} r={1.8} fill={HUB} {...LINE} {...lw(1)} />
+    </g>
+  );
+}
+
+function EndShadow({ anim, f }: { anim: "idle" | "move"; f: number }) {
+  const { bob } = bodyRock(anim, f);
+  return <ellipse cx={50} cy={96} rx={37 + bob * 4} ry={2.6 + bob * 0.4} fill="#000" opacity={0.15 + bob * 0.06} />;
+}
+
+// From behind: the cab's back wall, rounded at the top corners.
+const BACK_WALL = "M25 50 L75 50 Q83 50 83 58 L83 77 Q83 81 79 81 L21 81 Q17 81 17 77 L17 58 Q17 50 25 50 Z";
+// From the front: the rounded nose, its hood curving over.
+const NOSE = "M29 49 L71 49 Q83 49 83 61 L83 77 Q83 81 79 81 L21 81 Q17 81 17 77 L17 61 Q17 49 29 49 Z";
+
+function BackBack({ anim, f }: RiderProps) {
+  return (
+    <g transform={viewT(anim, f)}>
+      {/* the roof's top running away from us, past the pawn */}
+      <path d="M23 40.5 L77 40.5 Q80 40.5 81 44 L82 49 L18 49 L19 44 Q20 40.5 23 40.5 Z" fill={ROOF} {...LINE} {...lw(2.4)} />
+      {/* the open hatch */}
+      <path d="M29 42.5 L71 42.5 L71 48 L29 48 Z" fill="#1d1d1f" />
+      {/* the windshield at the cab's far end, seen from behind */}
+      <path d="M30 43 L34 31 L66 31 L70 43 Z" fill={GLASS} opacity={0.55} />
+      <path d="M30 43 L34 31 L66 31 L70 43 Z" fill="none" {...LINE} {...lw(2.4)} />
     </g>
   );
 }
 
 function BackFront({ p, anim, f }: RiderProps) {
-  const g = lampGlow(anim, f);
+  const a = wheelAngle(anim, f);
+  const glow = viewGlow(anim, f);
+  const puff = viewPuff(anim, f);
   return (
     <g>
-      <EndTrucks anim={anim} f={f} />
-      <g transform={endT(anim, f)}>
-        <path d={E_FOOT} fill="#3b3f48" {...LINE} {...lw(2.4)} />
-        {/* coupler */}
-        <path d="M45 80 L55 80 L55 87 L45 87 Z" fill={TRUCK} {...LINE} {...lw(2)} />
-        <Region p={p} name="cab" d={[B_WALL]} />
-        <Region p={p} name="backpost" d={B_POSTS} line={2.4} />
-        {/* highlights: the wall's top edge */}
-        <path d="M26 58.5 L74 58.5" stroke="#fff" stroke-linecap="round" opacity="0.5" {...lw(2)} />
-        {/* red stripe round the back */}
-        <path d="M18 64 L82 64 L82 69 L18 69 Z" fill={STRIPE} {...LINE} {...lw(1.6)} />
-        {/* tail lamps */}
-        <circle cx={27} cy={73.5} r={5.5} fill="#ff6b5e" opacity={g * 0.55} />
-        <circle cx={73} cy={73.5} r={5.5} fill="#ff6b5e" opacity={g * 0.55} />
-        <circle cx={27} cy={73.5} r={2.8} fill="#ff3b36" {...LINE} {...lw(1.8)} />
-        <circle cx={73} cy={73.5} r={2.8} fill="#ff3b36" {...LINE} {...lw(1.8)} />
-        <circle cx={26.2} cy={72.7} r={0.9} fill="#ffd0c8" />
-        <circle cx={72.2} cy={72.7} r={0.9} fill="#ffd0c8" />
-        <Roof />
+      <EndShadow anim={anim} f={f} />
+      <EndTrucks a={a} dir={-1} />
+      <g transform={viewT(anim, f)}>
+        {/* rear buffer */}
+        <path d="M41 74 L59 74 L59 80.5 L41 80.5 Z" fill={TRUCK_DK} {...LINE} {...lw(2)} />
+        <Region p={p} name="body" d={[BACK_WALL]} />
+        <path d="M23 54.5 L77 54.5" stroke="#fff" stroke-linecap="round" opacity="0.5" {...lw(2.2)} />
+        {/* back door seams */}
+        <path d="M41 56 L41 63 M59 56 L59 63" stroke="#1d1d1f" stroke-linecap="round" opacity="0.28" {...lw(1.6)} />
+        <path d="M17.6 64 L82.4 64 L82.4 68 L17.6 68 Z" fill={STRIPE} {...LINE} {...lw(1.6)} />
+        <path d="M41 74 L59 74 L59 79 L41 79 Z" fill={TRUCK_DK} {...LINE} {...lw(2)} />
+        <path d="M43 76.5 L57 76.5" stroke={HUB} stroke-linecap="round" opacity="0.7" {...lw(1.2)} />
+        {/* tail lamps, glowing with the headlights */}
+        <circle cx={24} cy={58.5} r={5} fill="#ff4a40" opacity={glow * 0.35} />
+        <circle cx={76} cy={58.5} r={5} fill="#ff4a40" opacity={glow * 0.35} />
+        <circle cx={24} cy={58.5} r={2.6} fill="#ff4a40" {...LINE} {...lw(1.4)} />
+        <circle cx={76} cy={58.5} r={2.6} fill="#ff4a40" {...LINE} {...lw(1.4)} />
+        <circle cx={23.2} cy={57.7} r={0.8} fill="#fff" opacity="0.8" />
+        <circle cx={75.2} cy={57.7} r={0.8} fill="#fff" opacity="0.8" />
+        {/* the near roof: the hatch's near rim and the roof's back edge */}
+        <path d="M17 52 L17 49.5 Q17 47 20 47 L80 47 Q83 47 83 49.5 L83 52 Z" fill={ROOF} {...LINE} {...lw(2.6)} />
+        <path d="M29 47.2 L71 47.2" stroke="#1d1d1f" stroke-linecap="round" {...lw(3.4)} />
+        <path d="M21 50 L79 50" stroke={ROOF_HI} stroke-linecap="round" {...lw(1.6)} />
+        {/* exhaust stack at the back corner */}
+        <path d="M73 48 L73 41 L79 41 L79 48 Z" fill={ROOF} {...LINE} {...lw(2.2)} />
+        <path d="M71.5 41 L80.5 41 L80.5 38 L71.5 38 Z" fill={ROOF} {...LINE} {...lw(2.2)} />
+        {puff && <Puff x={76 + puff[0] * 0.5} y={33 - puff[0] * 3} k={puff[0]} n={puff[1]} />}
       </g>
     </g>
   );
 }
 
-// --- front view: the nose with its lamps, the pawn behind the windshield ---
-const F_CAB = "M18 41 L82 41 L82 72 Q82 79 75 79 L25 79 Q18 79 18 72 Z";
-const F_POSTS = ["M18 5 L25 5 L25 42 L18 42 Z", "M75 5 L82 5 L82 42 L75 42 Z"];
-const F_BPOSTS = ["M25 4 L29 4 L29 44 L25 44 Z", "M71 4 L75 4 L75 44 L71 44 Z"];
-const F_HOOD = "M24 79 L24 52 Q24 44 32 44 L68 44 Q76 44 76 52 L76 79 Z";
-const F_STRIPE = "M18 63 L26 63 Q34 63 40 69.5 Q44 73.5 50 73.5 Q56 73.5 60 69.5 Q66 63 74 63 L82 63 L82 68 L75 68 Q69 68 64 74 Q59 79 50 79 Q41 79 36 74 Q31 68 25 68 L18 68 Z";
-
-function FrontBack({ p, anim, f }: RiderProps) {
+function FrontBack({ anim, f }: RiderProps) {
+  const puff = viewPuff(anim, f);
   return (
-    <g>
-      <Shadow anim={anim} f={f} />
-      <g transform={endT(anim, f)}>
-        <Region p={p} name="backpost" d={F_BPOSTS} fill={darken(p.hex, 0.25)} line={2} />
-      </g>
+    <g transform={viewT(anim, f)}>
+      {/* the roof's back half, running away behind the pawn */}
+      <path d="M24 37 L76 37 Q79 37 80 40 L81 45 L19 45 L20 40 Q21 37 24 37 Z" fill={ROOF} {...LINE} {...lw(2.4)} />
+      <path d="M29 39.5 L71 39.5 L71 45 L29 45 Z" fill="#1d1d1f" />
+      {/* the exhaust stack at the far corner */}
+      <path d="M22 40 L22 34 L28 34 L28 40 Z" fill={ROOF} {...LINE} {...lw(2.2)} />
+      <path d="M20.5 34 L29.5 34 L29.5 31 L20.5 31 Z" fill={ROOF} {...LINE} {...lw(2.2)} />
+      {puff && <Puff x={25 - puff[0] * 0.5} y={26 - puff[0] * 3} k={puff[0]} n={puff[1]} />}
     </g>
   );
 }
 
 function FrontFront({ p, anim, f }: RiderProps) {
-  const g = lampGlow(anim, f);
-  const puff = endPuff(anim, f, 59, 31);
+  const a = wheelAngle(anim, f);
+  const glow = viewGlow(anim, f);
   return (
     <g>
-      <EndTrucks anim={anim} f={f} />
-      <g transform={endT(anim, f)}>
-        <path d={E_FOOT} fill="#3b3f48" {...LINE} {...lw(2.4)} />
-        {/* cowcatcher */}
-        <path d="M31 81 L69 81 L65 91 L35 91 Z" fill={TRUCK} {...LINE} {...lw(2)} />
-        <path d="M40 82.5 L40.5 89.5 M50 82.5 L50 89.5 M60 82.5 L59.5 89.5" stroke="#1d1d1f" stroke-linecap="round" opacity="0.45" {...lw(1.4)} />
-        <Region p={p} name="cab" d={[F_CAB]} />
-        {/* windshield glass */}
-        <path d="M25 6 L75 6 L75 41 L25 41 Z" fill="#bfe6f5" opacity={0.14} />
-        <path d="M28.5 13 L34 7.5 M66 39 L72 33" stroke="#fff" stroke-linecap="round" opacity={0.7} {...lw(1.4)} />
-        <Region p={p} name="frontpost" d={F_POSTS} line={2.4} />
-        {/* exhaust stack on the hood */}
-        <path d="M46.5 45 L46.5 36 L53.5 36 L53.5 45 Z" fill={ROOF} {...LINE} {...lw(2.4)} />
-        <path d="M45 36 L55 36 L55 33 L45 33 Z" fill={ROOF} {...LINE} {...lw(2.4)} />
-        <Region p={p} name="hood" d={[F_HOOD]} />
-        {/* highlights */}
-        <path d="M30 48 L58 48" stroke="#fff" stroke-linecap="round" opacity="0.55" {...lw(2)} />
-        <path d="M20.5 45 L20.5 60" stroke="#fff" stroke-linecap="round" opacity="0.4" {...lw(1.6)} />
-        {/* red stripe sweeping down the nose */}
-        <path d={F_STRIPE} fill={STRIPE} {...LINE} {...lw(1.6)} />
-        {/* headlights: glow, lens */}
-        <circle cx={50} cy={55} r={10} fill={GLOW} opacity={g * 0.6} />
-        <circle cx={50} cy={66} r={7.5} fill={GLOW} opacity={g * 0.6} />
-        <circle cx={50} cy={55} r={5.2} fill={LENS} {...LINE} {...lw(2.2)} />
-        <circle cx={50} cy={66} r={3.6} fill={LENS} {...LINE} {...lw(2)} />
-        <circle cx={48.4} cy={53.4} r={1.5} fill="#fff" />
-        <Roof />
-        {puff && <Puff x={puff[0]} y={puff[1]} k={puff[2]} n={puff[3]} />}
+      <EndShadow anim={anim} f={f} />
+      <EndTrucks a={a} dir={1} />
+      <g transform={viewT(anim, f)}>
+        <Region p={p} name="body" d={[NOSE]} />
+        <path d="M26 54 Q50 51.5 74 54" fill="none" stroke="#fff" stroke-linecap="round" opacity="0.5" {...lw(2.2)} />
+        {/* the red stripe sweeping down the front */}
+        <path d="M17.4 64 Q50 77 82.6 64 L82.6 68 Q50 81 17.4 68 Z" fill={STRIPE} {...LINE} {...lw(1.6)} />
+        {/* grille */}
+        <path d="M44 76.5 L44 79 M48 77 L48 79.5 M52 77 L52 79.5 M56 76.5 L56 79" stroke="#1d1d1f" stroke-linecap="round" opacity="0.5" {...lw(1.6)} />
+        {/* two headlights */}
+        <circle cx={30} cy={60} r={8.5} fill={GLOW} opacity={glow * 0.6} />
+        <circle cx={70} cy={60} r={8.5} fill={GLOW} opacity={glow * 0.6} />
+        <circle cx={30} cy={60} r={4.3} fill={LENS} {...LINE} {...lw(2)} />
+        <circle cx={70} cy={60} r={4.3} fill={LENS} {...LINE} {...lw(2)} />
+        <circle cx={28.8} cy={58.8} r={1.2} fill="#fff" />
+        <circle cx={68.8} cy={58.8} r={1.2} fill="#fff" />
+        {/* the roof's front over the nose, the hatch's near rim */}
+        <path d="M18 51.5 L18 49 Q18 46 22 46 L78 46 Q82 46 82 49 L82 51.5 Z" fill={ROOF} {...LINE} {...lw(2.6)} />
+        <path d="M22 49.4 L78 49.4" stroke={ROOF_HI} stroke-linecap="round" {...lw(1.6)} />
+        {/* the sloped windshield in front of the pawn */}
+        <path d="M30 47 L33 37.5 L67 37.5 L70 47 Z" fill={GLASS} opacity={0.4} />
+        <path d="M30 47 L33 37.5 L67 37.5 L70 47 Z" fill="none" {...LINE} {...lw(2.4)} />
+        <path d="M35.5 40 L34 45" stroke="#fff" stroke-linecap="round" opacity="0.85" {...lw(1.4)} />
+        <path d="M65 40 L64.4 42" stroke="#fff" stroke-linecap="round" opacity="0.6" {...lw(1.2)} />
       </g>
     </g>
   );
 }
 
-const E_FRAME: [number, number, number, number] = [6, -10, 88, 110];
+const endFrame: [number, number, number, number] = [12, 4, 76, 94];
 
-const frontView: RiderViewDraft = {
-  frame: E_FRAME,
-  idle: { ms: Array(IDLE_N).fill(150) },
-  move: { ms: Array(MOVE_N).fill(65) },
-  pose: endPose,
-  Back: FrontBack,
-  Front: FrontFront,
-};
+// ---------- Trail: a pair of rail ties left on the ground ----------
+const TIE = "#4a3f38";
+const TIE_HI = "#8a7a6c";
 
-const backView: RiderViewDraft = {
-  frame: E_FRAME,
-  idle: { ms: Array(IDLE_N).fill(150) },
-  move: { ms: Array(MOVE_N).fill(65) },
-  pose: endPose,
-  Back: BackBack,
-  Front: BackFront,
-};
+function TieBar({ x, y, w, h, across }: { x: number; y: number; w: number; h: number; across: boolean }) {
+  // across: the bar runs left-right (going up/down); else up-down (going right/left). Its lit edge is on top / left.
+  return (
+    <g>
+      <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={1.2} fill={TIE} {...LINE} {...lw(1.3)} />
+      {across ? (
+        <path d={`M${x - w / 2 + 1.6} ${y - h / 2 + 1.2} L${x + w / 2 - 1.6} ${y - h / 2 + 1.2}`} stroke={TIE_HI} stroke-linecap="round" {...lw(1.3)} />
+      ) : (
+        <path d={`M${x - w / 2 + 1.2} ${y - h / 2 + 1.6} L${x - w / 2 + 1.2} ${y + h / 2 - 1.6}`} stroke={TIE_HI} stroke-linecap="round" {...lw(1.3)} />
+      )}
+    </g>
+  );
+}
+
+function TrailMark({ f, view }: { f: number; view: "side" | "front" | "back" }) {
+  const s = [1, 0.88, 0.76][f] ?? 0.76;
+  const op = [1, 0.55, 0.2][f] ?? 0.2;
+  const side = view === "side";
+  return (
+    <g opacity={op} transform={`scale(${s})`}>
+      {side ? (
+        <>
+          <TieBar x={-7.5} y={0} w={5.5} h={12} across={false} />
+          <TieBar x={7.5} y={0} w={5.5} h={12} across={false} />
+        </>
+      ) : (
+        <>
+          <TieBar x={0} y={-3.6} w={26} h={4.6} across />
+          <TieBar x={0} y={3.6} w={26} h={4.6} across />
+        </>
+      )}
+    </g>
+  );
+}
 
 export const birdieTrainRide: RiderDraft = {
   id: "birdie-train-ride",
   name: "Birdie's Train",
   tier: "legendary",
-  description: "A little yellow diesel that runs on time, mostly. The whistle is sold separately, thank goodness.",
-  frame: [-4, -10, 122, 110],
+  description: "A little yellow diesel that always runs on time. The tracks are imaginary; the punctuality is not.",
+  frame: [-10, 8, 126, 90],
   idle: { ms: Array(IDLE_N).fill(150) },
   move: { ms: Array(MOVE_N).fill(65) },
   pose,
+  trail: {
+    ms: [150, 150, 150],
+    w: 30,
+    h: 14,
+    Mark: ({ f, view }) => <TrailMark f={f} view={view} />,
+  },
   Back: SideBack,
   Front: SideFront,
-  views: { front: frontView, back: backView },
-  trail: { ms: [150, 150, 150], w: 30, h: 24, Mark: TieMark },
+  views: {
+    front: {
+      frame: endFrame,
+      idle: { ms: Array(IDLE_N).fill(150) },
+      move: { ms: Array(MOVE_N).fill(65) },
+      pose: viewPose,
+      Back: FrontBack,
+      Front: FrontFront,
+    },
+    back: {
+      frame: endFrame,
+      idle: { ms: Array(IDLE_N).fill(150) },
+      move: { ms: Array(MOVE_N).fill(65) },
+      pose: viewPose,
+      Back: BackBack,
+      Front: BackFront,
+    },
+  },
 };
-
-// ---------- Trail mark: a pair of rail ties left on the square ----------
-const TIE = "#4a3f3a";
-const TIE_HI = "#8a7b70";
-
-function TieMark({ f, view }: TrailProps) {
-  const op = [1, 0.6, 0.28][f] ?? 0;
-  const s = [1, 0.92, 0.84][f] ?? 0.8;
-  // Side: ties stand across the path (upright on screen, flattened); up/down: they lie sideways-on.
-  const across = view === "side";
-  const tw = across ? 5.5 : 26;
-  const th = across ? 19 : 5;
-  const bars = across ? [[-7, 0], [7, 0]] : [[0, -5], [0, 5]];
-  return (
-    <g opacity={op} transform={`scale(${s})`}>
-      {bars.map(([cx, cy]) => (
-        <g>
-          <rect x={cx - tw / 2} y={cy - th / 2} width={tw} height={th} rx={1.2} fill={TIE} {...LINE} {...lw(1.2)} />
-          {across ? (
-            <path d={`M${cx - tw / 2 + 1.3} ${cy - th / 2 + 1.6} L${cx - tw / 2 + 1.3} ${cy + th / 2 - 1.6}`} stroke={TIE_HI} stroke-linecap="round" {...lw(1.3)} />
-          ) : (
-            <path d={`M${cx - tw / 2 + 1.6} ${cy - th / 2 + 1.3} L${cx + tw / 2 - 1.6} ${cy - th / 2 + 1.3}`} stroke={TIE_HI} stroke-linecap="round" {...lw(1.3)} />
-          )}
-        </g>
-      ))}
-    </g>
-  );
-}
