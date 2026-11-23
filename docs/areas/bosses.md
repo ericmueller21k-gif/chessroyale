@@ -46,7 +46,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   fetches every boss theme once").
   **In the boss's room, and a challenge's splash (Nov 11, Eric: "only play the music if you walk in on your own through the door,
   not via challenging the boss"; then: a challenge inside the boss's building starts the theme "the moment the boss's full-screen
-  splash starts"):** the theme loads as the door zooms (`roomMusicLoad`; the intro decoded first, then the loop). Walked in on your
+  splash starts"):** **Off since Nov 23** (Eric: "walking into a building no longer triggers the boss's music. I want that to stop."; `ROOM_BOSS_MUSIC: false` in settings.ts, `shops.ts` `roomMusicFor`; [decision](../decisions/2026-11-23-room-music-off.md)): walking into any building leaves the town's music playing (no boss theme, no fade); a challenge's splash and the battle still play the boss's theme. What follows is how it works with the setting back on. The theme loads as the door zooms (`roomMusicLoad`; the intro decoded first, then the loop). Walked in on your
   own, it plays, intro then loop, as the room shows (`roomMusic`); Rolling Dough's door between rooms carries on with no restart (Don's
   theme plays in both: you must walk in); leaving fades it out over 1.5 s and lets it go. A challenge from the town starts it as the
   boss's splash starts (`splashMusic` in Town.tsx `stormIn`; a room's theme already playing, Don's, carries straight through), the

@@ -11,7 +11,7 @@ vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 const { ALL_HOMES, HOMES, createTown, hasFigure } = await import("../src/town/world.ts");
 const { adminFirst, BOSS_ROSTER, isPlayable, menuBosses } = await import("@chessroyale/core");
 const { findPath, isFloor, makeRoom, onPass, passArrive, passAt, tapTarget, inTalkRange, walkable } = await import("../src/town/shops/room.ts");
-const { RECLUSE_ROOMS, canChallengeInside, roomDef, roomTheme, homeTheme, shopOf } = await import("../src/town/shops/shops.ts");
+const { RECLUSE_ROOMS, canChallengeInside, roomDef, roomMusicFor, roomTheme, homeTheme, shopOf } = await import("../src/town/shops/shops.ts");
 const S = await import("../src/town/shops/recluse-stairs-art.ts");
 const TOP = await import("../src/town/shops/recluse-art.ts");
 const { HOUSES } = await import("../src/town/houses/index.ts");
@@ -127,7 +127,7 @@ describe("its three rooms and the stairs (Nov 13)", () => {
     expect(canChallengeInside("zebra")).toBe(true);
   });
 
-  it("his theme plays in his room alone (recluse-house, in themes.json), not in the hall or on the landing; the banners' rooms", () => {
+  it("his room's theme is his alone (recluse-house, in themes.json), not the hall's or the landing's; walking in, none plays (Nov 23): the town's carries on; the banners' rooms", () => {
     const themes = JSON.parse(readFileSync(new URL("../public/music/themes.json", import.meta.url), "utf8")) as { themes: Record<string, unknown> };
     expect(roomTheme(defs.top)).toBe("recluse-house");
     expect(themes.themes["recluse-house"]).toBeTruthy();
@@ -137,6 +137,8 @@ describe("its three rooms and the stairs (Nov 13)", () => {
     // (Every other home's room plays its own, as before.)
     expect(roomTheme(roomDef("zebra")!)).toBe("zebra");
     expect(roomTheme(roomDef("zebra", "back")!)).toBe("zebra");
+    // (Eric, Nov 23: "walking into a building no longer triggers the boss's music": ROOM_BOSS_MUSIC off, every room plays none.)
+    expect([defs.front, defs.landing, defs.top, roomDef("zebra")!].map(roomMusicFor)).toEqual([null, null, null, null]);
     expect([roomDef("recluse"), roomDef("recluse", "landing"), roomDef("recluse", "top")]).toEqual([defs.front, defs.landing, defs.top]);
   });
 });
