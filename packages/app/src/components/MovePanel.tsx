@@ -178,27 +178,14 @@ const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck, face }: Ro
   );
 }, sameRow);
 
-/** A row's height (styles.css, `.mv-row`). */
-const ROW_H = 24;
-/** Rows a phone's small panel draws beyond those that fit its box (a margin for a box that grows a little). */
-const ROWS_SPARE = 8;
-/** How many rows a phone's small panel draws: the last measure, so a copy drawn anew (each turn) has it from its first frame. */
-let panelRows = 6 + ROWS_SPARE;
-const rowsFor = (el: HTMLElement) => Math.ceil(el.clientHeight / ROW_H) + ROWS_SPARE;
-
 /**
  * The list itself, in a box that scrolls (`scroll`: the computer's column and the sheet; a phone's small panel shows the
  * newest rows that fit and never scrolls). `hushLast`: the newest move isn't named yet (Smudgy's reveal under the paint).
- *
- * The small panel draws only the newest rows that fit (and a few spare), never the whole battle's (Nov 23,
- * docs/decisions/2026-11-23-perf-main-fails.md): every row kept off screen was about 14 elements, drawn anew each turn, so
- * a long battle's panel grew to some 1,700 of them.
  */
 export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { match: GameView; hushLast?: boolean; scroll?: boolean; onOpen?: () => void }) {
   const boss = match.boss;
   const box = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
-  const [fit, setFit] = useState(panelRows);
   const data = boss ? shownRows(match, boss) : null;
   const n = data?.rows.length ?? 0;
   const face = useLiveFace(boss ?? { name: "", icon: "" });
@@ -206,22 +193,8 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
   useLayoutEffect(() => {
     const el = box.current;
     if (el && stuck.current) el.scrollTop = el.scrollHeight;
-  }, [n, fit]);
-  // (The small panel: how many rows its box holds, measured as it's drawn and when it changes size.)
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (scroll || !el) return;
-    const measure = () => {
-      if (el.clientHeight > 0) panelRows = rowsFor(el);
-      setFit(panelRows);
-    };
-    measure();
-    const watch = new ResizeObserver(measure);
-    watch.observe(el);
-    return () => watch.disconnect();
-  }, [scroll, !boss]);
+  }, [n]);
   if (!boss || !data) return null;
-  const rows = scroll ? data.rows : data.rows.slice(-fit);
   // (Phase 2: the board is yours, the team White: your moves read "You", with your pawn.)
   const simul = !!yourSimulBoard(match);
   const alone = simul || bossAlone(match);
@@ -244,7 +217,7 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
         <p class="mv-empty">Lights out: the moves come back after.</p>
       ) : (
         <ol class="mv-list" aria-label="Moves">
-          {data.opening > 0 && rows.length === data.rows.length && (
+          {data.opening > 0 && (
             <li class="mv-row mv-opening">
               <span class="mv-open-words">
                 {boss.openingName ? `${boss.openingName} · ` : "Opening · "}
@@ -252,10 +225,10 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
               </span>
             </li>
           )}
-          {rows.map((s, i) => (
-            <MoveRow key={s.row.ply} s={s} boss={who} alone={alone} hush={hushLast && i === rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} face={face} />
+          {data.rows.map((s, i) => (
+            <MoveRow key={s.row.ply} s={s} boss={who} alone={alone} hush={hushLast && i === data.rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} face={face} />
           ))}
-          {!rows.length && <li class="mv-empty">No moves yet.</li>}
+          {!data.rows.length && <li class="mv-empty">No moves yet.</li>}
         </ol>
       )}
     </div>
