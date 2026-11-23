@@ -173,7 +173,7 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
 /** Your square when the page opens: the street town's start (its plan's). */
 export const START: Sq = STREET_START;
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra" | "recluse" | "chandy" | "tower";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra" | "recluse" | "chandy" | "birdie" | "tower";
 /**
  * The homes whose boss isn't out in the town: Rolling Dough (Nov 11, Eric's design: Don Dough is the kingpin "in the back room (not
  * out in the town)"; you meet him in his bakery's back room). They're last in ALL_HOMES, so the town's bosses keep the homes' order.
@@ -288,6 +288,10 @@ export const ALL_HOMES: readonly Home[] = (
     // Street between Wrangler's Stall and Moo & Moon Meadow (street-plan.json). He roams out front as any boss; before the homes whose boss isn't out (their figures keep the homes' order). Its ring his green. In an
     // admin's town only while he's in the game for admins first (core's BOSS_ADMIN_FIRST). docs/decisions/2026-11-16-chandy-home.md.)
     { id: "chandy", boss: "Chandy", name: "Chandy's Swamp", color: "#4f8a3c", cx: 28, cy: 9 },
+    // (Nov 23: Birdie's Station, the young mourning dove's: a little train station, a big nest on its roof. The street town: its lot on
+    // Meadow Street between Wrangler's Stall and Chandy's Swamp (street-plan.json). He roams out front as any boss. Its ring his train's
+    // yellow. In an admin's town only while he's in the game for admins first (core's BOSS_ADMIN_FIRST). docs/decisions/2026-11-23-birdie-home.md.)
+    { id: "birdie", boss: "Birdie", name: "Birdie's Station", color: "#e0a81c", cx: 17, cy: 9 },
     // (Nov 11: Rolling Dough, Don Dough's bakery, Big Boy's size (Eric: "the total size will be like the other ones"). Today's town:
     // (9, 1), in the north-west between Puddles' Garden, Moo & Moon Meadow (across the wrap) and Chub & Chirp's, 7.1 to 7.6 squares
     // from each, the best open ground left, as Dash's. The street town: its lot on South Street between Puddles' Garden and Smudgy's

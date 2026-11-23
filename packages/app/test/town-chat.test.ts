@@ -587,7 +587,8 @@ describe("the chatter table (placeholders until real players chat)", () => {
   // (Every home whose boss is out in the town, an admin's town's too: Timber's and Dash's, Nov 3. Not Rolling Dough's, Nov 11: Don
   // Dough stays in his back room, and his crew in the bakery.)
   // (Nor Chandy's, Nov 16: his home came before his rules and his kid; his chatter comes with his kid.)
-  const talkers = ALL_HOMES.filter(hasTownBoss).filter((h) => h.id !== "chandy");
+  // (Nor Birdie's, Nov 23: his lines are Eric's to look at later; his chatter comes with them.)
+  const talkers = ALL_HOMES.filter(hasTownBoss).filter((h) => h.id !== "chandy" && h.id !== "birdie");
   const all = talkers.map((h) => ({ home: h, v: CHATTER[h.id]! }));
 
   it("has every boss with a home in the town: two lines each, and a kid with one or two", () => {

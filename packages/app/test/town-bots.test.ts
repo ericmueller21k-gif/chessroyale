@@ -97,10 +97,11 @@ describe("town square: the bots (Oct 27)", () => {
     // folioturtle.ts, the art's id "sidekick-folio-turtle"; it keeps Folio's shop, not a town bot: Pleat, the frog, stays Folio's kid.
     // Smudgy's keeper (smudgykeeper.ts) and Boingo's clown attendant (funkeeper.ts), Nov 6: shopkeepers, not town bots. Rolling
     // Dough's counter zebra (zebrakeeper.ts, Nov 11): its Shopkeeper, not a town bot. Chandy's Swamp's bullfrog (swampkeeper.ts, Nov 16):
-    // its Shopkeeper, not a town bot. The Battle Tower's clerk (towerclerk.ts, Nov 19): nobody's kid, not a town bot.)
+    // its Shopkeeper, not a town bot. The Battle Tower's clerk (towerclerk.ts, Nov 19): nobody's kid, not a town bot. Birdie's
+    // Station's bartender pigeon (birdiebartender.ts, Nov 23): its Shopkeeper, not a town bot.)
     const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
-    expect(files).toHaveLength(26);
-    const artId: Record<string, string> = { timber: "sidekick-beaver", hollowdog: "sidekick-hollow-dog", rooster: "sidekick-pig-rooster", dealer: "sidekick-grex-dealer", elf: "sidekick-ginger-elf", folioturtle: "sidekick-folio-turtle", smudgykeeper: "sidekick-smudgy-keeper", zebrakeeper: "sidekick-zebra-keeper", swampkeeper: "sidekick-swamp-keeper", towerclerk: "sidekick-tower-clerk" };
+    expect(files).toHaveLength(27);
+    const artId: Record<string, string> = { timber: "sidekick-beaver", hollowdog: "sidekick-hollow-dog", rooster: "sidekick-pig-rooster", dealer: "sidekick-grex-dealer", elf: "sidekick-ginger-elf", folioturtle: "sidekick-folio-turtle", smudgykeeper: "sidekick-smudgy-keeper", zebrakeeper: "sidekick-zebra-keeper", swampkeeper: "sidekick-swamp-keeper", towerclerk: "sidekick-tower-clerk", birdiebartender: "sidekick-birdie-bartender" };
     for (const file of files) {
       const name = file.replace(/\.ts$/, "") as keyof typeof SIDEKICK_SHEETS;
       const mod = (await import(`../src/characters/sidekicks/${file}`)) as Record<string, unknown>;

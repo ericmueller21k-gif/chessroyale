@@ -1,4 +1,6 @@
 /**
+ * (Copied from claude/boss-art, scripts/boss-art/out/sidekick-birdie-bartender, Nov 23, as drawn: Birdie's Station's Shopkeeper.)
+ *
  * Birdie's bartender (id "sidekick-birdie-bartender", "Bartender"): the friendly grey pigeon who runs the little bar in
  * Birdie's station lobby (and keeps the shop). Third pass: no glass, no towel; he works a short metal scoop with a
  * wooden handle, dipping it into the big vat of birdseed beside him and tipping the seed into a feeder on the counter.
@@ -596,5 +598,7 @@ export const SIDEKICK_BIRDIE_BARTENDER: Character = {
   palette: PALETTE,
   halo: "#2a2e38",
   parts: PARTS,
-  anims: { idle, wave, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory },
+  // (In the game, Nov 23: the town's bake wants a walk and a sit (scripts/bake-sidekicks.ts); he never walks or sits (he keeps the bar,
+  // not a town bot), so both are his idle's first frame, held.)
+  anims: { idle, walk: { loop: true, frames: [idle.frames[0]!] }, sit: { loop: true, frames: [idle.frames[0]!] }, wave, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory },
 };
