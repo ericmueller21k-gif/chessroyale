@@ -30,8 +30,13 @@ Eric, Nov 23: "Just approve whatever the spend is for this, for the API. It's fi
 - If the crowd **doesn't move that piece** on their turn, then whatever else happens that turn, he **rides his train across the
   line** (the same train he rides) and smashes the piece. Reuse the gator's smash (his queen laser's hit on a piece).
 - His own pieces on that line **quickly move out of the way** as the train comes, rather than the train passing through them.
-- Director's calls (to confirm): any move of the marked piece saves it (Eric's "if you don't move that piece"); only the marked
-  piece is hit.
+- **The king** (Eric, Nov 23): if the marked piece is your king and you don't move it, the train smashing it **loses the battle**.
+- **When** (Eric, Nov 23: "It's at most every 3 of YOUR turns, actually we should have it always trigger after your first move since
+  there should be a row to trigger it on, then it's on a 3 (6 total turn) turn cooldown"): the first warning comes at the end of his
+  reply to your first move, so you must answer it on your second move. Then a cooldown of 3 of your turns (6 plies) before the next.
+  If no line has exactly one of your pieces when it's due, it waits until one does. Tunable in settings.
+- Director's calls: any move of the marked piece saves it (Eric's "if you don't move that piece"); only the marked piece is hit; if
+  several lines qualify, the seed picks one (all devices agree).
 
 ## Armored Birdie
 The same idea, but stronger and without the train (he's done away with it). The details come later (Eric).
