@@ -1021,7 +1021,11 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   cutscene, Moo's Full Moon's parts; timed to his ult's piece, `BIRDIE_ULT` and `BIRDIE_BEATS.fall`, his music in `src/birdie-music.ts`,
   the lobby's and solo's `turnAt` so a reload carries his fall on). His art: `characters/birdie*.ts` (young and Armored Birdie in one figure, `birdie-figure.ts`;
   the cutscene baked into `birdie-cutscene.png` by `scripts/bake-birdie-cutscene.ts`), the train, crossing and smash in
-  `characters/effects/birdie.ts`; his sounds his own (`birdie-sounds.ts`). His train on your king ends the battle: the runner's
+  `characters/effects/birdie.ts`; his sounds his own (`birdie-sounds.ts`; 2026-11-23-birdie-sounds.md): his voice seven chirps and his move
+  four train runs, synthesized from the music helper's recipes (`stills/trailer-v2`); a move's run picked by how far his piece goes
+  (`birdieRun`), the toot run on a capture or check, a chirp over its start; `hello` his entrance and his challenge (`SELECT_SOUND`). A
+  kit's `cueSound(cue, boss, yourTurn)` picks a cue's sound from the battle (null: silent); his loops' chirps only on your turn, never
+  as your move lands. Tests: `app/test/birdie-sounds.test.ts`. His train on your king ends the battle: the runner's
   `stageComplete`/`finishBossBattle` read `trainWon`, and the board holds `powerWinShowMs` for the ride before the result (solo
   `winShownAt`, the lobby's `winShown`). Tests: `chess/test/birdie.test.ts`, `server/test/birdie-lobby.test.ts`,
   `app/test/birdie.test.ts`, `e2e/birdie.spec.ts`.

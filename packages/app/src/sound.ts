@@ -1087,15 +1087,22 @@ export type SoundName =
   | "chandyCrate"
   | "chandySplash"
   // Birdie, Eric's young mourning dove on his toy diesel (a raid boss): synthesized, see characters/birdie-sounds.ts.
-  | "birdieCoo"
+  | "birdieHello"
+  | "birdieTsip"
+  | "birdieTeeoo"
+  | "birdieTrill"
+  | "birdieCheer"
+  | "birdieAsk"
+  | "birdieScold"
+  | "birdieTrainShort"
+  | "birdieTrainMedium"
+  | "birdieTrainLong"
+  | "birdieTrainToot"
   | "birdieToot"
   | "birdieWhistle"
   | "birdieBell"
-  | "birdieRoll"
   | "birdieBrake"
-  | "birdieFlutter"
   | "birdieHop"
-  | "birdieOof"
   | "birdieSmash"
   | "birdieWhoosh"
   | "birdieClank"
@@ -1536,15 +1543,22 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   chandyAlarm: chandyBoss("alarm"),
   chandyBlast: chandyBoss("blast"),
   chandyUpgrade: chandyBoss("upgrade"),
-  birdieCoo: birdieBoss("coo"),
+  birdieHello: birdieBoss("hello"),
+  birdieTsip: birdieBoss("tsip"),
+  birdieTeeoo: birdieBoss("teeoo"),
+  birdieTrill: birdieBoss("trill"),
+  birdieCheer: birdieBoss("cheer"),
+  birdieAsk: birdieBoss("ask"),
+  birdieScold: birdieBoss("scold"),
+  birdieTrainShort: birdieBoss("trainShort"),
+  birdieTrainMedium: birdieBoss("trainMedium"),
+  birdieTrainLong: birdieBoss("trainLong"),
+  birdieTrainToot: birdieBoss("trainToot"),
   birdieToot: birdieBoss("toot"),
   birdieWhistle: birdieBoss("whistle"),
   birdieBell: birdieBoss("bell"),
-  birdieRoll: birdieBoss("roll"),
   birdieBrake: birdieBoss("brake"),
-  birdieFlutter: birdieBoss("flutter"),
   birdieHop: birdieBoss("hop"),
-  birdieOof: birdieBoss("oof"),
   birdieSmash: birdieBoss("smash"),
   birdieWhoosh: birdieBoss("whoosh"),
   birdieClank: birdieBoss("clank"),
@@ -1902,15 +1916,22 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   chandyAlarm: [["chandy", "alarm"]],
   chandyBlast: [["chandy", "blast"]],
   chandyUpgrade: [["chandy", "upgrade"]],
-  birdieCoo: [["birdie", "coo"]],
+  birdieHello: [["birdie", "hello"]],
+  birdieTsip: [["birdie", "tsip"]],
+  birdieTeeoo: [["birdie", "teeoo"]],
+  birdieTrill: [["birdie", "trill"]],
+  birdieCheer: [["birdie", "cheer"]],
+  birdieAsk: [["birdie", "ask"]],
+  birdieScold: [["birdie", "scold"]],
+  birdieTrainShort: [["birdie", "trainShort"]],
+  birdieTrainMedium: [["birdie", "trainMedium"]],
+  birdieTrainLong: [["birdie", "trainLong"]],
+  birdieTrainToot: [["birdie", "trainToot"]],
   birdieToot: [["birdie", "toot"]],
   birdieWhistle: [["birdie", "whistle"]],
   birdieBell: [["birdie", "bell"]],
-  birdieRoll: [["birdie", "roll"]],
   birdieBrake: [["birdie", "brake"]],
-  birdieFlutter: [["birdie", "flutter"]],
   birdieHop: [["birdie", "hop"]],
-  birdieOof: [["birdie", "oof"]],
   birdieSmash: [["birdie", "smash"]],
   birdieWhoosh: [["birdie", "whoosh"]],
   birdieClank: [["birdie", "clank"]],

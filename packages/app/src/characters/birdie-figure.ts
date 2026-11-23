@@ -73,23 +73,25 @@ const armoredIdle = (): Anim => {
   const a = ARMORED.anims.idle!;
   return { loop: true, frames: a.frames.map((f) => moved(f, ARMORED_DX, ARMORED_DY, A)) };
 };
-/** A one-shot of his: a breath of his idle (its first breath and back), `cue` on its first frame. */
-const armoredBeat = (cue: string): Anim =>
+/** A one-shot of his: a breath of his idle (its first breath and back), `cue` on its first frame, `then` on its second (320 ms in). */
+const armoredBeat = (cue: string, then?: string): Anim =>
   lazyAnim(() => {
     const idle = armoredIdle().frames;
     const rest = idle[0]!;
     const breath = idle.find((f) => f !== rest && f.layers.some((l, i) => l.y !== rest.layers[i]?.y)) ?? rest;
-    return { loop: false, frames: [{ ...breath, ms: 320, cue }, { ...rest, ms: 320 }] };
+    return { loop: false, frames: [{ ...breath, ms: 320, cue }, { ...rest, ms: 320, ...(then ? { cue: then } : {}) }] };
   });
 const armoredLoop = (): Anim => lazyAnim(armoredIdle);
 
 /** His spot empty from the end of his `fall` (where he stands, from the moment's `fallAt`) to the cutscene's hit, when he's back as Armored Birdie. */
+// (Its cue silent, no sound in his kit: his cutscene's tumble whooshes as it starts, BirdieFall.tsx's PICTURE_SOUND; both at once doubled it, Nov 23.)
 const away: Anim = lazyAnim(() => ({ loop: false, frames: [{ ms: Math.max(1, BIRDIE_BEATS.fall.hitAt - BIRDIE_BEATS.fall.fallAt - YOUNG.anims.fall!.frames.reduce((s, f) => s + f.ms, 0)), layers: [], cue: "away" }] }));
 
 /** His animations as young Birdie draws them (every one of the art's). */
 const YOUNG_ANIMS = ["idle", "entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "signal", "depart", "fall"] as const;
 
 /** His spot empty while his train rides (his `depart` is over, and his `entrance` brings him back). */
+// (Its cue silent, no sound in his kit: his depart's `pull` starts the train's long run, which rides on through it.)
 const gone: Anim = lazyAnim(() => ({ loop: false, frames: [{ ms: BIRDIE_BEATS.ride.backAt - BIRDIE_BEATS.ride.departMs, layers: [], cue: "gone" }] }));
 
 export const BIRDIE_FIGURE: Character = {
@@ -98,7 +100,8 @@ export const BIRDIE_FIGURE: Character = {
     ...Object.fromEntries(YOUNG_ANIMS.map((n) => [n, young(n)])),
     gone,
     away,
-    // Armored Birdie (his fall on): his idle, and a breath of it for each one-shot, each with its cue.
+    // Armored Birdie (his fall on): his idle, and a breath of it for each one-shot, each with its cue: his armor's clank as he comes
+    // back; his moves as young Birdie's (his train's run, a chirp over its start), his hurt his scold.
     p_idle: armoredLoop(),
     p_thinking: armoredLoop(),
     p_smug: armoredLoop(),
@@ -106,10 +109,10 @@ export const BIRDIE_FIGURE: Character = {
     p_victory: armoredLoop(),
     p_defeat: armoredLoop(),
     p_entrance: armoredBeat("armor"),
-    p_move: armoredBeat("armor"),
-    p_capture: armoredBeat("armor"),
-    p_hurt: armoredBeat("armor"),
-    p_check: armoredBeat("armor"),
+    p_move: armoredBeat("run", "nod"),
+    p_capture: armoredBeat("tootRun", "trill"),
+    p_hurt: armoredBeat("oof"),
+    p_check: armoredBeat("tootRun", "flash"),
   },
 };
 

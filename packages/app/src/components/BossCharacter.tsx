@@ -245,13 +245,13 @@ export function BossCharacter({ match, place }: { match: GameView; place: "bar" 
   // (Chandy: a tap on him opens his weapon screen, his figure's only tap; ChandyWeapon.tsx.)
   const look = boss?.id === "chandy" && place !== "results" ? <ChandyLook match={match} place={place} /> : null;
   return boss && bossKitOf(boss) ? (
-    <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} muteFall={mute}>
+    <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} muteFall={mute} yourTurn={p.kind === "play"}>
       {look}
     </Character>
   ) : null;
 }
 
-function Character({ boss, stage, place, muteFall, children }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results"; muteFall?: boolean; children?: ComponentChildren }) {
+function Character({ boss, stage, place, muteFall, yourTurn = false, children }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results"; muteFall?: boolean; yourTurn?: boolean; children?: ComponentChildren }) {
   // (A form of its own: the Hidden Boss's child, his growing figure; his age followed by a figure run, RecluseChild.ts.)
   const full = bossKitOf(boss);
   useLayoutEffect(() => {
@@ -334,8 +334,8 @@ function Character({ boss, stage, place, muteFall, children }: { boss: BossView;
   const lookRef = useRef<() => string>(() => "");
   lookRef.current = () => (kit?.lookOf ? kit.lookOf(boss) : undefined) ?? "";
   // What the figure is drawn from each frame: the boss's state and the stage (Moo's Full Moon: powered up; read as it's drawn).
-  const nowRef = useRef({ boss, stage });
-  nowRef.current = { boss, stage };
+  const nowRef = useRef({ boss, stage, yourTurn });
+  nowRef.current = { boss, stage, yourTurn };
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
@@ -397,7 +397,9 @@ function Character({ boss, stage, place, muteFall, children }: { boss: BossView;
         box.current?.setAttribute("data-frame", String(s.frame));
         box.current?.setAttribute("data-cue", frame.cue ?? "");
         box.current?.setAttribute("data-look", look);
-        const sound = frame.cue ? kit.sounds[frame.cue] : undefined;
+        // (A cue whose sound comes from the battle: Birdie's train run by how far his piece went, BossKit.cueSound.)
+        const pick = frame.cue ? kit.cueSound?.(frame.cue, nowRef.current.boss, nowRef.current.yourTurn) : undefined;
+        const sound = frame.cue && pick !== null ? (pick ?? kit.sounds[frame.cue]) : undefined;
         if (sound && !played.has(s.tag)) {
           played.add(s.tag);
           play(sound);
