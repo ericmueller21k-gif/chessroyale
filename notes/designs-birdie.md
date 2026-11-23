@@ -139,3 +139,13 @@ wire in that sort of thing."
   his moves, captures, hurt, thinking, idle chatter, the fall, win/lose), and the town challenge plays `hello`. Prefer code synthesis
   in `birdie-sounds.ts` from the README's recipe (like the other bosses, no files) if it matches by ear; else ship the mp3s. Eric hasn't
   picked favorites yet: wire all; the music helper relays any he drops.
+
+## His move's train sound (Eric via the music helper, Nov 23)
+Eric: "the train sound made during Birdie's when he does his normal move throughout the game when he goes across the board. We should
+be adding the little train sound appropriately. And we can have a couple versions of that too, like just a couple different lengths or
+whatever. Nothing crazy."
+- Files: `stills/trailer-v2` at 6817770f, `birdie-train/` (wav + mp3, README): short 0.59 s (3 puffs, 1 rail joint), medium 0.90
+  (most moves), long 1.78 (right across the board, steam at the stop), toot 0.90 (medium + whistle: a capture, a check, now and then).
+  The locomotive of his ult piece. Peak -6 dBFS but quiet for it: level by loudness.
+- Plan: the same characters job as the chirps: every ordinary move of his plays one, picked by the move animation's length (the
+  helper makes other lengths on request); toot on captures and checks. Code synthesis from the README if it matches by ear, else files.
