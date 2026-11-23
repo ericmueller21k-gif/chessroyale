@@ -31,6 +31,8 @@
  *                                           its bulkhead (Nov 13, the Hidden Boss's)
  *   tower      Battle Tower                 slate glass curtain walls, gold corners, up to where its front melts into the sky (no roof
  *                                           is ever seen: Nov 19, the art's)
+ *   birdie     Birdie's Station             warm wooden boards under a low charcoal roof, a window down each side, the big nest of
+ *                                           twigs on its ridge (Nov 23)
  *   chandy     Chandy's Swamp               no building: cypresses and brush ringing it (leafy walls on its sides and back, their
  *                                           crowns on top) and the swamp's water filling its middle (Nov 16)
  */
@@ -38,13 +40,14 @@ import type { Character } from "../characters/sprite.ts";
 import type { LightSpot } from "./houses/kit.ts";
 import { HOUSES } from "./houses/index.ts";
 import { HOUSE_CHANDY_DOOR } from "./houses/chandy.ts";
+import { HOUSE_BIRDIE_DOOR } from "./houses/birdie.ts";
 import { HOUSE_TOWER_DOOR } from "./houses/tower.ts";
 import {
   BASE, blockF, domeRoof, flatRoof, gableRoof, hipRoof, hipWideRoof, quadF, sideArt, SQ, vaultRoof,
   type Face, type SideSpec, type TownBox,
 } from "./town-kit.ts";
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra" | "recluse" | "chandy" | "tower";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra" | "recluse" | "chandy" | "birdie" | "tower";
 
 /** A home's box: its sides (null: its roof runs to the ground there), roof, palette, and where its door is on its front. */
 interface HomeSpec {
@@ -183,6 +186,15 @@ export const HOME_SPECS: Record<HomeId, HomeSpec> = {
   },
   // (Chandy's Swamp, Nov 16: no building. Its sides and back are the trees and brush ringing it, under its front cypresses' crowns (118 px),
   // their crowns along the top; inside, the water, low (6 px over the sidewalk). Its door is its boardwalk (houses/chandy.ts).)
+  // (Birdie's Station, Nov 23: its walls x 10 to 133, 103 px over its foot (244), the red stripe and fascia to 107; a low roof, its ridge
+  // 130 over the foot from x 26 to 118; the nest on the ridge, x 3 to 141, up to about 174 (houses/birdie.ts's notes). The nest's twigs
+  // in the hedge's keys (r s S), the roof's shingles in its ramp.)
+  birdie: {
+    body: [10, 133], eave: [105, 105], door: HOUSE_BIRDIE_DOOR,
+    side: { mat: "plank", rows: [{ y: 30, h: 18 }], every: 34, trim: [0], plinth: 8 },
+    roof: [...hipWideRoof(6, 137, 105, 26, 118, 130, 0.5, "shingle"), ...blockF(8, 136, 0.08, 0.62, 118, 168, "hedge")],
+    pal: { ...ramp("#7a4a26", "#a8683a", "#c98a52"), ...roofRamp("#25272c", "#34373e", "#4a4e57"), r: "#c9a46a", s: "#7a5530", S: "#5a3c20", g: "#f6e7c4", G: "#c9b48a" },
+  },
   chandy: {
     body: [4, 140], eave: [118, 118], door: HOUSE_CHANDY_DOOR,
     side: { mat: "foliage", corner: false },

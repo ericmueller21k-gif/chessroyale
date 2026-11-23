@@ -4,7 +4,7 @@ import { BIRDIE_SOUNDS, birdieRun, birdieSound, type BirdieSound } from "../src/
 import { BOSS_KITS, birdieCue } from "../src/characters/kits.ts";
 import { SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { cueAt } from "../src/characters/power-art.ts";
-import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
+import { MOVE_MEAN_DB, MOVE_PEAK, soundCache } from "../src/characters/synth.ts";
 
 /**
  * Birdie's voice and his train (Eric, Nov 23; docs/decisions/2026-11-23-birdie-sounds.md): seven chirps and four train runs built in
@@ -51,7 +51,12 @@ describe("Birdie's sounds", () => {
         if (/^(hello|tsip|teeoo|trill|cheer|ask|scold|train)/.test(name)) expect(db(s), name).toBeGreaterThan(MOVE_MEAN_DB - 9);
         expect(s.length / rate, name).toBeLessThan(1.9);
       }
-    expect(birdieSound("trainLong", 48000)).toEqual(birdieSound("trainLong", 48000));
+    // (Made twice from its seed, the cache cleared between: the same samples, so every device hears the same run.)
+    const first = birdieSound("trainLong", 48000).slice();
+    soundCache("birdie").clear();
+    const again = birdieSound("trainLong", 48000);
+    expect(again).not.toBe(first);
+    expect(again).toEqual(first);
   });
 
   it("a chirp over a run's start, as his moves play them, is still under a move, and reads over the run", () => {

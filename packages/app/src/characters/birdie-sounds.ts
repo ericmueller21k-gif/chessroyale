@@ -12,7 +12,7 @@
  *   piece, his fall's whoosh and his armor's clank.
  *
  * Each is a pure function of the sample rate (its noise seeded), so every device makes the same sound and a test can measure it: every
- * one stays quieter than a piece's move (peak and loudness), and a chirp over a train run's start too (birdie.test.ts).
+ * one stays quieter than a piece's move (peak and loudness), and a chirp over a train run's start too (test/birdie-sounds.test.ts).
  * Which cue plays which: kit.sounds and kit.cueSound in kits.ts (his animations' cues) and his board art's (characters/effects/birdie.ts).
  */
 import { bandpass, lowpass, noise, osc, render, sine, soft, soundCache, type Voice } from "./synth.ts";
@@ -197,7 +197,7 @@ const RUNS: Record<BirdieRun, { puffs: readonly number[]; joints: readonly numbe
   trainLong: { puffs: [0.6, 0.8, 1, 1, 1, 0.9, 0.75, 0.6], joints: [0.28, 0.83, 1.2], steam: true, toot: 0 },
   trainToot: { puffs: [0.8, 1, 1, 0.9, 0.7], joints: [0.28, 0.65], steam: false, toot: 0.32 },
 };
-/** Each run's own seed, so each is the same on every device. */
+/** Each run's seed, so each is the same on every device. The toot run shares the medium run's: it is the medium run with the whistle over it. */
 const SEED: Record<BirdieRun, number> = { trainShort: 1621, trainMedium: 1622, trainLong: 1623, trainToot: 1622 };
 
 /** A run of his train (`birdie_train.py`'s `run`). */
@@ -288,7 +288,7 @@ const SOUNDS = {
 } satisfies Record<BirdieSound, (rate: number) => Float32Array>;
 
 /**
- * Each sound's level (its peak and loudness stay under a move's: birdie.test.ts). The chirps keep the recipe's levels against each
+ * Each sound's level (its peak and loudness stay under a move's: test/birdie-sounds.test.ts). The chirps keep the recipe's levels against each
  * other (one gain for the seven); the train runs one gain for the four, set by loudness (short puffs of noise: quiet for their peaks),
  * under the chirps, so a chirp over a run's start reads.
  */

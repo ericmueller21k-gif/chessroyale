@@ -29,6 +29,7 @@ import { FOLIO } from "../characters/folio.ts";
 import { BOSS_BEAVER } from "../characters/timber.ts";
 import { BOSS_BLITZ } from "../characters/boss-blitz.ts";
 import { CHANDY_TOWN } from "../characters/chandy-figure.ts";
+import { BIRDIE_TOWN } from "../characters/birdie-figure.ts";
 import { NPC_ZEBRA_GUARD_A } from "./shops/zebra-crew.ts";
 import { N, colI, rowI, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rel, rimYAt, setHeading, setView, stepCams, tableLift, toCam, wrapF, wrapFX, wrapFY, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
@@ -87,6 +88,8 @@ export const BOSS_ART: Record<TownBossId, Character> = {
   dash: BOSS_BLITZ,
   // (Chandy at rest, his rifle slung, without the room his board figure keeps for it held out: chandy-figure.ts.)
   chandy: CHANDY_TOWN,
+  // (Young Birdie on his toy diesel, as drawn: birdie-figure.ts.)
+  birdie: BIRDIE_TOWN,
 };
 /** A home whose boss is inside: its stand-in's sprite out front (world.ts STAND_IN). Rolling Dough's guard (Nov 11): the front room's
  * flat-cap door guard, his roll at port arms; Don's size, as drawn. */
@@ -124,6 +127,8 @@ export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: num
   recluse: [32, 34, 44],
   // (His snout and eye strap.)
   chandy: [36, 26, 44],
+  // (His head, cap and beak.)
+  birdie: [30, 6, 34],
   // (The Battle Tower has nobody out front: its chip shows its glass door under the sunburst, in its own picture.)
   tower: [46, 500, 52],
 };

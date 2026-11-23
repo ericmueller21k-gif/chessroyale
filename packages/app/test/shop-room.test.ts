@@ -211,8 +211,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's, Grex's, Ginger's, Folio's, Smudgy's, Boingo's, Rolling Dough's, the Walk-up's (the Hidden Boss's, Nov 13) and the Battle Tower's (Nov 19) homes have an inside", () => {
-    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "chandy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "recluse", "smudgy", "tiger", "timber", "tower", "zebra"]);
+  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's, Grex's, Ginger's, Folio's, Smudgy's, Boingo's, Rolling Dough's, the Walk-up's (the Hidden Boss's, Nov 13), the Battle Tower's (Nov 19) and Birdie's Station's (Nov 23) homes have an inside", () => {
+    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "birdie", "chandy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "recluse", "smudgy", "tiger", "timber", "tower", "zebra"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {

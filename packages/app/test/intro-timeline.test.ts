@@ -25,6 +25,7 @@ type Log = { boss: string; length: number; attack: number | null; beats: [string
 const logOf = (id: string): Log => JSON.parse(readFileSync(new URL(`./intro-logs/${id}.json`, import.meta.url), "utf8"));
 const { ZEBRA_INTRO } = await import("../src/town/shops/intros/zebra.ts");
 const { CHANDY_INTRO } = await import("../src/town/shops/intros/chandy.ts");
+const { BIRDIE_INTRO } = await import("../src/town/shops/intros/birdie.ts");
 const ROOMS: Record<string, { layout: readonly ShopPlace[]; marks: { boss: readonly [number, number]; you: readonly [number, number] } | null; data: IntroData }> = {
   alfil: { layout: SHOP_ALFIL_LAYOUT, marks: null, data: ALFIL_INTRO },
   bigboy: { layout: SHOP_BIGBOY_LAYOUT, marks: SHOP_BIGBOY_MARKS, data: BIGBOY_INTRO },
@@ -113,9 +114,10 @@ describe("intros as data: each moved intro plays as it did on main (its beat log
     const homes = Object.keys(files).map((f) => f.replace(/^.*\/|\.ts$/g, "")).sort();
     // (Don Dough's, Nov 11, and Chandy's, Nov 16, are new as data: no log from main to match. shop-zebra.test.ts and shop-chandy.test.ts
     // play them.)
-    expect(homes).toEqual([...Object.keys(ROOMS), "zebra", "chandy"].sort());
+    // (Birdie's, Nov 23, too: shop-birdie.test.ts plays it.)
+    expect(homes).toEqual([...Object.keys(ROOMS), "zebra", "chandy", "birdie"].sort());
     for (const h of homes) {
-      expect(files[`../src/town/shops/intros/${h}.ts`], h).toBe(ROOMS[h]?.data ?? (h === "chandy" ? CHANDY_INTRO : ZEBRA_INTRO));
+      expect(files[`../src/town/shops/intros/${h}.ts`], h).toBe(ROOMS[h]?.data ?? (h === "chandy" ? CHANDY_INTRO : h === "birdie" ? BIRDIE_INTRO : ZEBRA_INTRO));
       expect(introOf(h as HomeId)?.custom, h).toBe(true);
     }
   });

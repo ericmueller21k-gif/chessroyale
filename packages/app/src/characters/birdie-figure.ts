@@ -116,5 +116,11 @@ export const BIRDIE_FIGURE: Character = {
   },
 };
 
+/**
+ * Birdie in the town (his station's out front, Nov 23): young Birdie as drawn (birdie.ts), in his own frame, without the room the board
+ * figure keeps over him for Armored Birdie. The town draws a boss's `idle` only.
+ */
+export const BIRDIE_TOWN: Character = { ...YOUNG, id: "birdie-town", anims: { idle: YOUNG.anims.idle! } };
+
 /** Armored Birdie alone (his own frame, his own names): the fall's cutscene and the stills draw him. */
 export const BIRDIE_ARMORED = ARMORED;
