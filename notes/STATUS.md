@@ -1821,3 +1821,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   should measure to the last MOVING frame; (2) Timed ignores a later `at` change: key by `${ride.key}:${rideAt}`; (3) styles.css ~28582
   `--board-size` fallback inside translate resolves against the train's box: px-only fallback or a comment; (4) move `Timed` into
   PowerParts.tsx and use it for Timber, Gardener, Tiger, Flight, Grex shots.
+- Nov 23 ~19:00: #910 (squads replay end fix, cause of main red) open 43d3af26, CI bklpdn07k. Then merge #909. THEN start brief
+  birdie-cadence-warning (Opus xhigh): Eric's sounds every 3-4 moves, slower power train (~1.5x), yellow ⚠️ sign on the marked piece.
+  Lobby round 4 art running (Eric said "Yes ok to spend"; screenshot force-added 6f6f5ff5), watcher bado6wxq2.
