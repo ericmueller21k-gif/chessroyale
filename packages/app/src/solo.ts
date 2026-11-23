@@ -1,6 +1,6 @@
 import { DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, birdieTurnMs, powerWinShowMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, birdieTurnMs, birdieTurnBeats, birdieImpactMs, powerWinShowMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -518,6 +518,9 @@ export class SoloMatch implements GameView {
       const l = this.lights;
       return { at: l.at, mine: { endedAt: l.endedAt, taps: l.taps, tapAt: l.tapAt }, reveals: this.lightsTimeline().beats };
     }
+    // (Birdie's moments while he thinks: his train's ride, his fall's wait, its cutscene; birdieTurnBeats, the beats his screen shows.)
+    const b = this.birdieAt;
+    if (b && this.phase.kind === "boss" && this.phase.thinking && this.phase.boss.powers?.turn === b.turn) return { at: b.at, reveals: birdieTurnBeats(this.phase.boss) };
     return null;
   }
   /**
@@ -1389,7 +1392,7 @@ export class SoloMatch implements GameView {
   }
   private bossSnapshot(justKilled: string | null = null): BossView {
     const v = this.runner.bossView(justKilled)!;
-    const boss = { ...v, board: v.board };
+    const boss = this.withBirdieAt({ ...v, board: v.board });
     trackCamo(boss);
     return boss;
   }
@@ -1403,9 +1406,29 @@ export class SoloMatch implements GameView {
     return !!this.runner.boss && this.runner.alive().length === 1;
   }
 
-  /** The boss's turn: it thinks (for a moment at least), then its move shows before the crowd picks again. */
-  private async bossTurn() {
+  /**
+   * Birdie's moments at the start of his turn (his train's ride, his fall timed to his music): when they began here, for crowd turn `turn`,
+   * kept with the game while he thinks (`moment`) and shown in his view (BirdieView.turnAt), so a reload carries them on (as online).
+   */
+  private birdieAt: { turn: number; at: number } | null = null;
+  private withBirdieAt(boss: BossView): BossView {
+    const at = this.birdieAt;
+    const bd = boss.powers?.birdie;
+    if (!at || !bd || boss.powers!.turn !== at.turn) return boss;
+    const impact = birdieImpactMs(boss);
+    return { ...boss, powers: { ...boss.powers!, birdie: { ...bd, turnAt: { ...at, ...(impact !== null ? { dropAt: at.at + impact } : {}) } } } };
+  }
+
+  /**
+   * The boss's turn: it thinks (for a moment at least), then its move shows before the crowd picks again. `kept`: resumed while Birdie's
+   * moments at its start played (KeptGame.moment): on from the time kept, his thinking that much shorter, never from their start again.
+   */
+  private async bossTurn(kept?: KeptGame["moment"]) {
     this.begun = true;
+    const v0 = this.runner.bossView();
+    const birdieMs = v0 ? birdieTurnMs(v0) : 0;
+    const into = birdieMs ? Math.max(0, Math.min(birdieMs, kept?.ms ?? 0)) : 0;
+    this.birdieAt = birdieMs ? { turn: v0!.powers?.turn ?? -1, at: Date.now() - into } : null;
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     // (Alone, it has been "thinking" since your move went in: scoring your move counts toward it.)
@@ -1413,7 +1436,7 @@ export class SoloMatch implements GameView {
     // piece or wrote its Revision: it plays out before the boss's move.)
     const burnt = fireShows(snap);
     const landed = landedMs(snap);
-    const minThink = bossThinkMs(snap, burnt, landed) - (this.alone && !burnt && !landed ? Date.now() - this.movedAt : 0);
+    const minThink = bossThinkMs(snap, burnt, landed) - (this.alone && !burnt && !landed ? Date.now() - this.movedAt : 0) - into;
     const thinkEnd = Date.now() + Math.max(0, minThink);
     // (Chandy's first capture: once the thinking's moments are done, the crosshair locks onto the piece he's about to take, then his
     // move shows; as the server holds the host's move.)
@@ -1887,7 +1910,7 @@ export class SoloMatch implements GameView {
         // (Rejoined during Lights out (its test is in the state from its start): on from the time kept, never started again.)
         if (this.lightsOutOn()) return void this.lightsOutTurn(r?.moment ?? { ms: 0 });
       }
-      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.runner.queenLockDue() ? this.queenLockTurn() : this.bossTurn());
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.runner.queenLockDue() ? this.queenLockTurn() : this.bossTurn(r?.moment));
       // (Dash's Scramble Rush, as your turn begins: the turn waits for it; Chandy's Dodge too.)
       if (this.runner.rushDue()) return void this.rushTurn(r?.moment);
       if (this.runner.dodgeDue()) return void this.dodgeTurn(r?.moment);

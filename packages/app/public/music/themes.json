@@ -265,6 +265,32 @@
       "bpm": 96,
       "lufs": -16.1,
       "peakDb": -1.3
+    },
+    "birdie": {
+      "boss": "Birdie",
+      "source": "scripts/reel/music/song_aj.py",
+      "intro": null,
+      "loop": "birdie-loop",
+      "introSeconds": 0.0,
+      "loopSeconds": 136.296292,
+      "bpm": 162,
+      "lufs": -16.5,
+      "peakDb": -1.2
+    },
+    "birdie-ult": {
+      "boss": "Birdie's ult (the crossing), then his theme from its top",
+      "source": "scripts/reel/music/song_aj.py (ult-in)",
+      "intro": "birdie-ult-intro",
+      "loop": "birdie-loop",
+      "introSeconds": 14.814813,
+      "loopSeconds": 136.296292,
+      "bpm": 162,
+      "lufs": -20.2,
+      "peakDb": -2.6,
+      "marks": {
+        "whistle": 1.481481,
+        "roll": 13.333333
+      }
     }
   },
   "town": {

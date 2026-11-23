@@ -2650,6 +2650,23 @@ export const BIRDIE_CINEMATIC = {
 } as const;
 
 /**
+ * His ultimate's music and its timing (Eric, Nov 23, via the music helper: "Birdie doesn't play his move right away. He basically times his
+ * next move to the exact moment where ... the end of that little ... clip ... right when the train light kind of hits and then he
+ * transforms"; docs/decisions/2026-11-23-birdie-ult-timing.md; public/music/README.md, "Birdie's theme and his ult's piece"). His fall's
+ * moment starts as the crowd's move that filled his meter lands (after QUEEN SLAIN! if it took his queen: birdieLeadMs); from it, ms:
+ * - `pieceAt`: his ult's piece (themes.json's `theme`, "the crossing") starts, the battle's theme fading into it (MUSIC_SWITCH): a beat
+ *   after the moment starts, so a device starting it at once is never late for it.
+ * - `introMs`: the piece's length to its drop (themes.json's `introSeconds`, 14.814813 s: a test keeps the two the same). The drop, his
+ *   theme from its top, lands on the train's impact (the cutscene's last `approach` frame, its `hit` cue), so the impact is at
+ *   pieceAt + introMs (BIRDIE_BEATS.fall.impactAt), and his cutscene starts that long before it (its fall in his spot, the fade-in, the
+ *   tumble and the approach: BIRDIE_CINEMATIC). The impact, his transformation and his theme's first hit land together.
+ * - `lineAt`: his line, as the piece's first whistle sounds (its `whistle` mark, 1.48 s in), long before the cutscene.
+ * His reply waits for all of it (his thinking holds through the cutscene: birdieTurnMs), the crowd's clock stopped (it's his turn), the
+ * same on every device, with or without the music. Once a battle (the fall is).
+ */
+export const BIRDIE_ULT = { theme: "birdie-ult", pieceAt: 300, introMs: 14815, lineAt: 1780 } as const;
+
+/**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards
  * (packages/server/src/bosses/recluse.ts). His moves come from the engine server alone, never a player's device and never a quick
  * move (Eric, Nov 13: "we can't have him breaking"; docs/decisions/2026-11-13-recluse-server-only.md). The bots' from the host's
@@ -5354,6 +5371,8 @@ export const MUSIC_SWITCH: Readonly<Record<string, { readonly fadeMs: number; re
   [RECLUSE_MUSIC.adult]: { fadeMs: 1500, after: true },
   [RECLUSE_MUSIC.beaten]: { fadeMs: 300, after: false },
   [RECLUSE_MUSIC.transform]: { fadeMs: 500, after: false },
+  // (Birdie's ult's piece, Nov 23: it opens on a burst of steam at once, his theme fading under it.)
+  [BIRDIE_ULT.theme]: { fadeMs: 400, after: false },
 };
 
 /**

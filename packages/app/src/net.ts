@@ -678,6 +678,9 @@ export class NetMatch implements GameView {
       resetBattleBanners();
       clearPremoves(this);
     }
+    // (Birdie's moments' start, on the lobby's clock: onto this device's, BirdieView.turnAt.)
+    const bd = next.powers?.birdie;
+    if (bd?.turnAt) next = { ...next, powers: { ...next.powers!, birdie: { ...bd, turnAt: { turn: bd.turnAt.turn, at: this.local(bd.turnAt.at), ...(bd.turnAt.dropAt !== undefined ? { dropAt: this.local(bd.turnAt.dropAt) } : {}) } } } };
     return (this.boss = { ...next, board: this.toView(next.board) });
   }
 

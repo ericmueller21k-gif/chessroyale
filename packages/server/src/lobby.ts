@@ -30,6 +30,7 @@ import {
   folioTurnMs,
   sawyerTurnMs,
   birdieTurnMs,
+  birdieImpactMs,
   powerWinShowMs,
   landsAfterHisMove,
   PASS_WAIT,
@@ -447,6 +448,8 @@ export interface LobbyRecord {
   /** Times each device missed its window for a checked boss move this battle (BOSS_CHECK.missStrikes of them: a strike). */
   bossMisses?: Record<string, number>;
   bossMinAt?: number;
+  /** When Birdie's moments at the start of his turn began (his thinking's start, server time), for that crowd turn (BirdieView.turnAt). */
+  birdieAt?: { turn: number; at: number };
   bossIntroDone?: boolean;
   /**
    * The boss's brain for this battle, decided as it begins (bossBrainFor; BOSS_BRAIN): Maia (with its rating, and the
@@ -2075,11 +2078,20 @@ export class LobbyCore {
    * device back from a reload, `last`, gets no more than everyone had then.)
    */
   private bossViewSent(justKilled: string | null = null): NetBoss {
-    const view = this.runner!.bossView(justKilled)!;
+    const view = this.withBirdieAt(this.runner!.bossView(justKilled)!);
     const d = view.powers?.chandy?.dodge;
     if (!d || dodgeOver(d)) return view;
     const l = this.r.dodge;
     return { ...view, powers: { ...view.powers!, chandy: { ...view.powers!.chandy!, dodge: dodgeSeen(d, l ? this.io.now() - l.at : -1) } } };
+  }
+
+  /** Birdie's view with when his moments at the start of this turn began (BirdieView.turnAt), while it's that turn. */
+  private withBirdieAt(view: NetBoss): NetBoss {
+    const at = this.r.birdieAt;
+    const bd = view.powers?.birdie;
+    if (!at || !bd || view.powers!.turn !== at.turn) return view;
+    const impact = birdieImpactMs(view);
+    return { ...view, powers: { ...view.powers!, birdie: { ...bd, turnAt: { ...at, ...(impact !== null ? { dropAt: at.at + impact } : {}) } } } };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -2383,6 +2395,10 @@ export class LobbyCore {
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn, Ginger's Super Freeze and Sawyer's Saw Swap.)
     const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view) + birdieTurnMs(view);
+    // (Birdie's moments begin with this thinking: when, kept for every message of it, so a device rejoining carries them on. A second
+    // thinking of the same turn, if any, keeps the first's.)
+    const turn = view.powers?.turn ?? -1;
+    if (birdieTurnMs(view) && this.r.birdieAt?.turn !== turn) this.r.birdieAt = { turn, at: this.io.now() };
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 

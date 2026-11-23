@@ -29,7 +29,7 @@ describe("his beats are his art's", () => {
     expect(animLength(anim("depart")) + animLength(anim("gone")) + animLength(anim("entrance"))).toBe(BIRDIE_FX.trainSmash);
     // (His fall where he stands, then his spot empty until the cutscene's hit, when he's back as Armored Birdie.)
     expect(animLength(anim("fall"))).toBeLessThanOrEqual(BIRDIE_CINEMATIC.dropMs);
-    expect(animLength(anim("fall")) + animLength(anim("away"))).toBe(BIRDIE_BEATS.fall.hitAt);
+    expect(animLength(anim("fall")) + animLength(anim("away"))).toBe(BIRDIE_BEATS.fall.hitAt - BIRDIE_BEATS.fall.fallAt);
   });
 
   it("Armored Birdie has a twin for every moment and loop the kit names", () => {

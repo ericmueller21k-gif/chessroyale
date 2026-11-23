@@ -19,7 +19,7 @@ import { TIMBER_FX } from "./bosses/timber.ts";
 import { DASH_FX } from "./bosses/dash.ts";
 import { ZEBRA_FX } from "./bosses/zebra.ts";
 import { CHANDY_FIRE_AT, CHANDY_FX } from "./bosses/chandy.ts";
-import { BIRDIE_FX } from "./bosses/birdie.ts";
+import { BIRDIE_BEATS, BIRDIE_FX } from "./bosses/birdie.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -408,6 +408,41 @@ export const birdieTurnMs = (boss: QueenSlainView): number => {
   const ev = birdieTurnEvents(boss);
   return ev.length ? birdieLeadMs(boss) + powerMomentMs(ev) + BIRDIE_CINEMATIC.tailPadMs : 0;
 };
+
+/**
+ * Birdie's moments at the start of his turn laid out as his screen plays them (Birdie.tsx's birdieTurnMoments: QUEEN SLAIN! first, his
+ * ride, then his fall, each after its banner's lead): each one's kind and start, ms from his thinking's start. None: [].
+ */
+export function birdieTurnLayout(boss: QueenSlainView): { kind: string; at: number }[] {
+  const turn = (boss.powers as { turn?: number } | null | undefined)?.turn;
+  const ev = birdieTurnEvents(boss).filter((e) => (e as { turn?: number }).turn === turn);
+  let t = birdieLeadMs(boss);
+  return [...ev]
+    .sort((a, b) => Number(a.kind === "birdieFall") - Number(b.kind === "birdieFall"))
+    .map((e) => {
+      const lead = bannerLeadMs(e.kind);
+      const at = t + lead;
+      t = at + powerFxMs(e) - lead;
+      return { kind: e.kind, at };
+    });
+}
+
+/** When his fall's train hits him this turn (his music's drop: BIRDIE_ULT), ms from his thinking's start; null: no fall this turn. */
+export function birdieImpactMs(boss: QueenSlainView): number | null {
+  const fall = birdieTurnLayout(boss).find((m) => m.kind === "birdieFall");
+  return fall ? fall.at + BIRDIE_BEATS.fall.impactAt : null;
+}
+
+/**
+ * The beats of Birdie's moments at the start of his turn that his screen shows by the clock alone (ms from his thinking's start): each
+ * moment's start, his ride's crossing and return, his fall's line, its drop in his spot, its scene, its approach, the impact (his music's
+ * drop), the hit, his stand and its end. Solo keeps by these (SoloMatch.moment: a reload carries on from the last one shown). None: [].
+ */
+export function birdieTurnBeats(boss: QueenSlainView): number[] {
+  const f = BIRDIE_BEATS.fall;
+  const r = BIRDIE_BEATS.ride;
+  return birdieTurnLayout(boss).flatMap((m) => [0, ...(m.kind === "birdieFall" ? [f.lineAt, f.fallAt, f.cutAt, f.approachAt, f.impactAt, f.hitAt, f.holdAt, f.total] : [r.rideAt, r.backAt, r.total])].map((x) => m.at + x));
+}
 
 /**
  * A power won the battle at the start of his turn (Birdie's train on your king: `trainWin` among this turn's events): the board holds

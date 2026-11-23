@@ -1,11 +1,15 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BIRDIE_CINEMATIC, BOSS_POWERS, mulberry32 } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BIRDIE_ULT, BOSS_POWERS, mulberry32 } from "@chessroyale/core";
 import {
   BIRDIE_BEATS,
   BIRDIE_FX,
   MatchRunner,
   POWER_FX,
   applyMove,
+  birdieImpactMs,
+  birdieTurnBeats,
+  birdieTurnLayout,
   birdieTurnMs,
   bossRules,
   chooseLine,
@@ -283,10 +287,48 @@ describe("his moments' lengths", () => {
     const reach = Array.from({ length: 8 }, (_, i) => trainReaches(i));
     expect(reach.every((t, i) => i === 0 || t > reach[i - 1]!)).toBe(true);
     expect(reach[7]!).toBeLessThan(BIRDIE_BEATS.ride.rideMs);
+    // (The cutscene, Moo's length (Eric: "about 6 to 7 s"), after his wait for his ult's piece: its drop on the train's impact.)
     const c = BIRDIE_CINEMATIC;
-    expect(BIRDIE_BEATS.fall.total).toBe(c.dropMs + c.fadeInMs + c.tumbleMs + c.approachMs + c.hitHoldMs + c.revealMs + c.holdMs + c.fadeOutMs);
-    expect(BIRDIE_BEATS.fall.total - c.dropMs).toBeGreaterThanOrEqual(6000);
-    expect(BIRDIE_BEATS.fall.total - c.dropMs).toBeLessThanOrEqual(7000);
+    const f = BIRDIE_BEATS.fall;
+    expect(f.total - f.fallAt).toBe(c.dropMs + c.fadeInMs + c.tumbleMs + c.approachMs + c.hitHoldMs + c.revealMs + c.holdMs + c.fadeOutMs);
+    expect(f.total - f.fallAt - c.dropMs).toBeGreaterThanOrEqual(6000);
+    expect(f.total - f.fallAt - c.dropMs).toBeLessThanOrEqual(7000);
+  });
+
+  it("his fall waits for his ult's piece: the train's impact on its drop, about 15 s in, his line before the cutscene (Eric, Nov 23)", () => {
+    const f = BIRDIE_BEATS.fall;
+    const c = BIRDIE_CINEMATIC;
+    // (The piece starts BIRDIE_ULT.pieceAt into the moment; its drop, introMs later, is the impact: the approach's last frame.)
+    expect(f.impactAt).toBe(BIRDIE_ULT.pieceAt + BIRDIE_ULT.introMs);
+    expect(f.impactAt).toBe(f.approachAt + c.approachMs);
+    expect(f.impactAt).toBeGreaterThanOrEqual(14815);
+    expect(f.impactAt).toBeLessThan(16000);
+    expect(f.hitAt - f.impactAt).toBe(c.hitHoldMs);
+    expect(f.lineAt).toBeGreaterThan(BIRDIE_ULT.pieceAt);
+    expect(f.lineAt).toBeLessThan(f.fallAt - 3000);
+    expect(f.fallAt).toBeGreaterThan(0);
+    // (The piece's length to its drop, as themes.json has it: the same within a millisecond.)
+    const themes = JSON.parse(readFileSync(new URL("../../app/public/music/themes.json", import.meta.url), "utf8"));
+    const ult = themes.themes[BIRDIE_ULT.theme];
+    expect(Math.abs(ult.introSeconds * 1000 - BIRDIE_ULT.introMs)).toBeLessThan(1);
+    expect(ult.loop).toBe(themes.themes.birdie.loop);
+    expect(themes.themes.birdie.intro).toBeNull();
+  });
+
+  it("the turn's layout: the ride first, then his fall, after QUEEN SLAIN!; the impact from the thinking's start; the beats in order", () => {
+    const view = (events: { kind: string; turn: number }[]) => ({ crowdSide: "w" as const, crowdMoves: 2, powers: { turn: 2, events }, board: { history: ["e2e4", "e7e5", "g1f3", "b8c6"] } });
+    expect(birdieImpactMs(view([]))).toBeNull();
+    expect(birdieImpactMs(view([{ kind: "trainSmash", turn: 2 }]))).toBeNull();
+    expect(birdieImpactMs(view([{ kind: "birdieFall", turn: 2 }]))).toBe(BIRDIE_BEATS.fall.impactAt);
+    const both = view([{ kind: "birdieFall", turn: 2 }, { kind: "trainSmash", turn: 2 }]);
+    expect(birdieTurnLayout(both).map((m) => m.kind)).toEqual(["trainSmash", "birdieFall"]);
+    expect(birdieImpactMs(both)).toBe(POWER_FX.trainSmash + BIRDIE_BEATS.fall.impactAt);
+    // (Another turn's events: not this turn's.)
+    expect(birdieImpactMs(view([{ kind: "birdieFall", turn: 1 }]))).toBeNull();
+    const beats = birdieTurnBeats(both);
+    expect(beats).toEqual([...beats].sort((a, b) => a - b));
+    expect(beats.at(-1)).toBe(POWER_FX.trainSmash + POWER_FX.birdieFall);
+    expect(beats).toContain(POWER_FX.trainSmash + BIRDIE_BEATS.fall.impactAt);
   });
 
   it("his thinking waits for the ride and the fall (in that order), and a win by the train holds the board for its ride", () => {

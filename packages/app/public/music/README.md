@@ -57,3 +57,14 @@ just before `pad + loopSeconds`). Keyed `smudgy` (the roster id). Eric, Nov 22, 
 opening (the first 20 s) is part of the loop, so every pass replays it; its quiet middle (1:05 to 1:33) sits about 3 dB under the rest, the
 calmest boss theme on purpose. Its splats, brush swishes, drips and giggles echo `smudgy-sounds.ts`; if a playtest mistakes them for the
 fight's sounds, the music helper turns them down.
+
+## Nov 23: Birdie's theme and his ult's piece
+
+`birdie-loop` (his theme, the runaway-train song: one seamless loop, no intro, 136.296292 s, 162 bpm) and `birdie-ult-intro` (his
+ultimate's piece, "the crossing": 15.8 s), from `boss-music-stereo-192/` on branch `stills/trailer-v2` (commit `6981fcee`, song
+`song_aj.py`), re-encoded from their 192 kbps handoff to 128 kbps as above (same length, lined up with it at `pad`, 30 s and just before
+`pad + loopSeconds`; the piece at its start, `pad` and its drop). Keyed `birdie` (the roster id: his theme from the battle's start) and
+`birdie-ult` (shaped like the Hidden Boss's pieces: intro `birdie-ult-intro`, `introSeconds` 14.814813, loop `birdie-loop` from its top;
+keep its `marks`). His fall switches the battle to `birdie-ult` with the drop on the train's impact (`switchPlan`'s `dropAt`; `BIRDIE_ULT`
+in settings.ts, whose `introMs` a test keeps equal to `introSeconds`): the piece plays once a battle, then his theme loops as normal.
+Eric, Nov 23: "Going back to the Train version 4 song, that's going to be Birdie's song."

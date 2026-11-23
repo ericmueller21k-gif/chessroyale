@@ -23,8 +23,9 @@ import { InPlace, PIECE_WORD, type BoardLayerProps, type BossUi, type Moment, ty
  *   it comes and back after its tail, and the piece you left there is smashed as the train's nose reaches it (the smash); spared (the
  *   smash wasn't legal), it steps aside too. He rolls back into his spot (his `entrance`).
  * - **Your king** (`trainWin`): END OF THE LINE!, then the same ride, your king smashed: the battle is his.
- * - **His fall** (`birdieFall`, at the start of his turn, after the train if it rode): his `fall` in his spot, then the cutscene
- *   (BirdieFall.tsx), and he's Armored Birdie from its hit (the kit's powered twin).
+ * - **His fall** (`birdieFall`, at the start of his turn, after the train if it rode), timed to his ult's piece (BIRDIE_ULT: the music
+ *   switches as it starts, birdie-music.ts): he waits in his spot and says his line, then his `fall` in his spot, the cutscene
+ *   (BirdieFall.tsx) with the train's impact on the piece's drop, and he's Armored Birdie from its hit (the kit's powered twin).
  */
 
 const B = BIRDIE_BEATS;
@@ -56,9 +57,11 @@ onResetBeats(() => turnSeen.clear());
 /**
  * His moments in his turn, while he thinks (as your move lands: his train's ride, a smash, a sparing or your king, then his fall), from
  * this turn's events, in that order, from when this device first saw them, after QUEEN SLAIN! if your move took his queen (birdieLeadMs,
- * as his thinking waits: birdieTurnMs). His fall's hit is noted for his armored look (birdie-state.ts). First seen just as this device
- * rejoined (a reload, a late join: his thinking already under way): skipped, the board as it is and his look armored at once (Moo's Full
- * Moon's rule, BIRDIE_CINEMATIC.rejoinMs: his move would cut them off).
+ * as his thinking waits: birdieTurnMs), from when this turn's moments began (`turnAt`: the lobby's thinking start as this device
+ * received it, or solo's, kept with the game), so a reload or a late join in his fall's wait or its cutscene carries on where it was, his
+ * music's drop with it (Nov 23). His fall's hit is noted for his armored look (birdie-state.ts). With no `turnAt` (an older server), from
+ * when this device first saw them, and first seen just as it rejoined: skipped, the board as it is and his look armored at once (Moo's
+ * Full Moon's rule, BIRDIE_CINEMATIC.rejoinMs).
  */
 export function birdieTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
@@ -68,7 +71,8 @@ export function birdieTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   const seenKey = `${boss.id}:${boss.startMove}:${p.turn}`;
   let first = turnSeen.get(seenKey);
   if (first === undefined) {
-    first = now - rejoinedAt() < BIRDIE_CINEMATIC.rejoinMs ? -Infinity : now + birdieLeadMs(boss);
+    const began = p.birdie?.turnAt?.turn === p.turn ? p.birdie.turnAt.at : undefined;
+    first = began !== undefined ? began + birdieLeadMs(boss) : now - rejoinedAt() < BIRDIE_CINEMATIC.rejoinMs ? -Infinity : now + birdieLeadMs(boss);
     turnSeen.set(seenKey, first);
     if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
   }
@@ -258,11 +262,14 @@ function rideView({ moment, banner }: MomentProps) {
   );
 }
 
-/** His fall: his `fall` in his spot, his spot empty through the cutscene (BirdieFall.tsx), Armored Birdie back in it from the hit. */
+/**
+ * His fall: he waits in his spot (his line at `lineAt`), then from `fallAt` his `fall` in his spot, his spot empty through the cutscene
+ * (BirdieFall.tsx), Armored Birdie back in it from the hit.
+ */
 function fallView({ moment }: MomentProps) {
   return (
     <div class="power-moment pm-stay pm-birdie-fall">
-      <InPlace runKey={moment.key} anims={["fall", "away"]} since={moment.at} />
+      <InPlace runKey={moment.key} anims={["fall", "away"]} since={moment.at + B.fall.fallAt} />
       <BirdieFall at={moment.at} />
     </div>
   );
@@ -276,7 +283,7 @@ const MOMENTS: Record<"trainSignal" | "trainSmash" | "trainWin" | "birdieFall", 
   trainSignal: { order: 0, kit: "power", lineAt: B.signal.lightAt, dock: (m) => BIRDIE_WORDS.move(m.shape), view: signalView },
   trainSmash: { order: 0, kit: "powerHit", dock: (m) => (m.fizzled?.length ? BIRDIE_WORDS.spared(m.shape) : BIRDIE_WORDS.smashed(m.shape)), view: rideView },
   trainWin: { order: 0, kit: "powerHit", priority: () => CRITICAL, view: rideView },
-  birdieFall: { order: 1, kit: "ultimate", priority: () => CRITICAL, view: fallView },
+  birdieFall: { order: 1, kit: "ultimate", lineAt: B.fall.lineAt, priority: () => CRITICAL, view: fallView },
 };
 
 // ---------------- Drawn ahead ----------------

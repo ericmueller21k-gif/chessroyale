@@ -27,7 +27,7 @@
  * - Armored Birdie no longer uses the train: no more warnings. His armored power is Eric's to design (Nov 23: "the same idea, but
  *   stronger, later"): it goes in `armoredTurn` (a clean place for it: nothing yet).
  */
-import { BIRDIE_CINEMATIC, BOSS_POWERS, type BalloonShape, type BirdieState, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BIRDIE_ULT, BOSS_POWERS, type BalloonShape, type BirdieState, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
 import { boardEnd, type BoardState } from "../boards.ts";
 import { applyMove, keptEnPassant, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "../rules.ts";
 import { stockfishRefuses, type MoveScore } from "../uci.ts";
@@ -46,9 +46,11 @@ type BirdieSettings = BossPowerSettings["birdie"];
  *   aside as it nears (`asideMs` before its nose and back after its tail), the warned piece smashed as its nose reaches it (the
  *   train's `smash`, 420 ms) or stepping aside too (spared); then his `entrance` (2140 ms) back to his spot from `backAt`.
  * - **trainWin**: the same ride, your king smashed; its banner first.
- * - **birdieFall**: his `fall` where he stands (BIRDIE_CINEMATIC.dropMs), then the cutscene's beats (BIRDIE_CINEMATIC): the scene fades in
- *   (`cutAt`), he tumbles (`tumbleAt`), his train comes up the track (`approachAt`) and hits him (`hitAt`, the light whole: he's Armored
- *   Birdie from then, `armorAt`), his reveal, he stands (`holdAt`), the scene fades out (`fadeOutAt`); `total`, the whole of it.
+ * - **birdieFall**: timed to his ult's piece (BIRDIE_ULT, Nov 23): he waits in his spot, his line at `lineAt`; from `fallAt` his `fall`
+ *   where he stands (BIRDIE_CINEMATIC.dropMs), then the cutscene's beats (BIRDIE_CINEMATIC): the scene fades in (`cutAt`), he tumbles
+ *   (`tumbleAt`), his train comes up the track (`approachAt`) and hits him on the piece's drop (`impactAt`, its last frame), the light
+ *   whole a beat later (`hitAt`: he's Armored Birdie from then, `armorAt`), his reveal, he stands (`holdAt`), the scene fades out
+ *   (`fadeOutAt`); `total`, the whole of it.
  */
 export const BIRDIE_BEATS = {
   signal: { lightAt: 500, total: 1500 },
@@ -62,13 +64,16 @@ export const BIRDIE_BEATS = {
   })(),
   fall: (() => {
     const c = BIRDIE_CINEMATIC;
-    const cutAt = c.dropMs;
+    // (The impact, the drop of his ult's piece: BIRDIE_ULT. The cutscene starts its own time to the impact before it.)
+    const impactAt = BIRDIE_ULT.pieceAt + BIRDIE_ULT.introMs;
+    const fallAt = impactAt - (c.dropMs + c.fadeInMs + c.tumbleMs + c.approachMs);
+    const cutAt = fallAt + c.dropMs;
     const tumbleAt = cutAt + c.fadeInMs;
     const approachAt = tumbleAt + c.tumbleMs;
     const hitAt = approachAt + c.approachMs + c.hitHoldMs;
     const holdAt = hitAt + c.revealMs;
     const fadeOutAt = holdAt + c.holdMs;
-    return { cutAt, tumbleAt, approachAt, hitAt, armorAt: hitAt, holdAt, fadeOutAt, total: fadeOutAt + c.fadeOutMs };
+    return { lineAt: BIRDIE_ULT.lineAt, fallAt, cutAt, tumbleAt, approachAt, impactAt, hitAt, armorAt: hitAt, holdAt, fadeOutAt, total: fadeOutAt + c.fadeOutMs };
   })(),
 } as const;
 
@@ -290,6 +295,13 @@ export interface BirdieView {
   ride: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true } | null;
   /** He fell after crowd move `fell` (Armored Birdie from then); null: not yet. */
   fell: number | null;
+  /**
+   * When his moments at the start of crowd turn `turn`'s reply began (his train's ride, his fall: his thinking's start), sent while that
+   * thinking is on, so a device rejoining in the middle carries them on (Birdie.tsx, birdieTurnMoments): the lobby's clock as sent (net.ts
+   * maps it onto the device's), solo's own; `dropAt`, his fall's impact on the same clock (at + birdieImpactMs: his music's drop), if he
+   * falls this turn. Not part of the rules (the rules' view never has it). Missing: none, or an older server.
+   */
+  turnAt?: { turn: number; at: number; dropAt?: number };
 }
 
 const setBirdie = (b: Battle, change: (bd: BirdieState) => BirdieState, events: readonly PowerEvent[] = [], more: Partial<BossPowerState> = {}): void => {
