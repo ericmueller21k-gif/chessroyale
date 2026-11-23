@@ -1835,3 +1835,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~19:37: Eric: Birdie's fall too morbid → happy hop out + fun free fall, the hit the same. Art session_01JuCWRtXxZPkpJxXDuuj4Gw
   (Haiku, brief birdie-art-13, asks Eric for ≤$4, stills/birdie-13). Wiring brief birdie-fall-fun-wire (Opus high) starts when an Opus
   slot frees (#911 review); its step 2 waits for the director's message with the art commit. Watcher bz40q8v6h.
+- #911 review clean (review/birdie-cadence-warning). Nits queued: (1) Birdie as White: his 1st move silent (his = floor(plies/2)); count his
+  own moves by side or reword "1st"; (2) sign pulse phase jumps once at the ride start (at → 0): keep first `at`; (3) idle chirps after a
+  capture/check on a silent number stay muted (design call); (4) sign e2e one orientation only.
+  Fall wiring session (Opus high) started.
