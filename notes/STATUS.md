@@ -1787,3 +1787,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~10:25 UTC: main f429337 (#903) full run GREEN (no flakes); live. Running: town home job only.
 - Nov 23 ~10:45 UTC: town home -> #904 (d6c50cd; station Meadow St 16-19, lobby 12x12, bartender Shopkeeper, challenge table, flip board in code, #901 nits), phone stills sent to Eric; CI (full suite: ShopRoom shared). Helper archived. Lobby idle draw 7-8 ms at 4x (others 0.5): ok, noted. Next after merge: ride + Birdie crate (item-builder, full lane).
 - Nov 23 ~11:00 UTC: #904 Birdie's Station MERGED (9ce30ff); deploy + main watcher b3v8dr04p. Ride + Birdie Boss Crate: item-builder Opus xhigh ALONE session_01JuCWRu4jEZKU5Zn7Zyya3Z (claude/birdie-ride-crate, brief birdie-ride-crate.md; full lane: full-e2e label + independent review after), watcher for .done/.question.
+- Nov 23 ~11:20 UTC: main 9ce30ff (#904 Birdie's Station) full run GREEN; live.
