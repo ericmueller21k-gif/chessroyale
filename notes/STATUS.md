@@ -1849,3 +1849,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~20:35: #912 merged f7cc0fa (main run bfr8xdzao). Eric: fall beak "shouldn't be red ... see through it like a normal open beak",
   "Yes ok to spend" → art session_01JuCWRtGbafNdASdgF8Svsi (brief birdie-art-14, cap $3, stills/birdie-14). Then a small wiring job:
   copy arena-birdie-fall-beak into birdie-cutscene-fall.ts, re-bake, hash (Opus medium).
+- #913 (lobby round 4) review clean (review/birdie-lobby-4). Nits queued (future rooms using `counters`): player/stool beside an arm's outer
+  side draws over its near end (z = north row); upTop/lightsAt/ceiling panels don't know counters; counter branch skips ghost/emissive/cull;
+  partial-fade moving vs resting differ; per-counter canvas memory. Look at walking down each arm's outside in frames:boss.
