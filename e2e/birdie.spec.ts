@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import sharp from "sharp";
 import { asAdmin, openBossRaid, pickMove, submitMove, test } from "./helpers.ts";
 
 /**
@@ -103,6 +104,35 @@ async function battle(page: Page, power: string) {
   expect(await page.evaluate(() => (window as any).match.boss.id)).toBe("birdie");
 }
 
+/**
+ * The warned piece drawn whole over the crossing (the review of #896: the crossing is the board's layer, under the pieces): its square
+ * as shown, the crossing hidden, then the piece hidden too. Where the piece is drawn (the second and third differ), the first must show
+ * it as the second (anti-aliased edges aside; measured Nov 23: 0.97 of it the same, 0.55 with the crossing over it).
+ */
+async function pieceOverCrossing(page: Page, square: string): Promise<number> {
+  const piece = page.locator(`.hb-board piece[data-square="${square}"]`);
+  const box = (await piece.boundingBox())!;
+  const shot = async () => sharp(await page.screenshot({ clip: box, animations: "disabled" })).raw().toBuffer();
+  const hide = (sel: string, v: string) => page.evaluate(([q, vis]) => document.querySelectorAll<HTMLElement>(q!).forEach((e) => (e.style.visibility = vis!)), [sel, v]);
+  const both = await shot();
+  await hide(".fx-board.bd-crossing", "hidden");
+  const alone = await shot();
+  await hide(`.hb-board piece[data-square="${square}"]`, "hidden");
+  const bare = await shot();
+  await hide(".fx-board.bd-crossing", "");
+  await hide(`.hb-board piece[data-square="${square}"]`, "");
+  let drawn = 0;
+  let same = 0;
+  const near = (a: Buffer, b: Buffer, i: number, d: number) => Math.abs(a[i]! - b[i]!) + Math.abs(a[i + 1]! - b[i + 1]!) + Math.abs(a[i + 2]! - b[i + 2]!) <= d;
+  for (let i = 0; i < alone.length; i += 3) {
+    if (near(alone, bare, i, 90)) continue;
+    drawn++;
+    if (near(both, alone, i, 24)) same++;
+  }
+  expect(drawn, "the piece drawn on its square").toBeGreaterThan(50);
+  return same / drawn;
+}
+
 /** Your turn now: the position, the moves allowed, his warning if it's for this turn, and the crowd moves made so far. */
 const yourTurn = (page: Page) =>
   page.evaluate(() => {
@@ -130,6 +160,7 @@ test("Birdie's train: the crossing on his line, the dock names your piece; moved
   let saved: { at: number; square: string; piece: string } | null = null;
   let left: { at: number; square: string; piece: string } | null = null;
   const played = new Set<string>();
+  let whole: number | null = null;
   const smashed = (f: Frame[]) => !!left && f.some((r) => r.ride?.at === left!.at && !r.ride.spared);
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
@@ -140,6 +171,12 @@ test("Birdie's train: the crossing on his line, the dock names your piece; moved
     if (s && !played.has(s.fen)) {
       played.add(s.fen);
       let move: string;
+      // (The first warning: once its crossing shows, your piece drawn whole over it.)
+      if (s.warn && whole === null) {
+        await expect(page.locator(".fx-board.bd-crossing")).toBeVisible({ timeout: 5_000 });
+        await page.waitForTimeout(800);
+        whole = await pieceOverCrossing(page, s.warn.square);
+      }
       if (s.warn && (!saved || s.warn.piece === "k")) {
         move = moveOf(s.fen, s.allowed, { from: s.warn.square });
         if (!saved && move.startsWith(s.warn.square)) saved = { at: s.crowdMoves + 1, square: s.warn.square, piece: s.warn.piece };
@@ -161,6 +198,8 @@ test("Birdie's train: the crossing on his line, the dock names your piece; moved
   expect(warned.length).toBeGreaterThan(10);
   expect(warned.filter((r) => r.crossing).length / warned.length, "the crossing on his line through your turn").toBeGreaterThan(0.9);
   expect(warned.some((r) => r.through === `Move your ${NAMES[r.warn!.piece]}!`), `the dock names your piece: ${[...new Set(warned.map((r) => r.through))]}`).toBe(true);
+  // (Your warned piece over the crossing, never under it: the crossing is the board's layer, as Grex's shadows.)
+  expect(whole, "the warned piece drawn whole over the crossing").toBeGreaterThan(0.9);
   // Never a crossing when no warning is for your turn.
   expect(rec.filter((r) => r.phase === "play" && !r.warn && !r.moments.length).every((r) => !r.crossing), "no crossing without a warning").toBe(true);
 
