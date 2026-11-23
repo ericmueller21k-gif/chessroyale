@@ -955,6 +955,7 @@ const depart: Anim = lazyAnim(() => ({
  * Fall (about 0.8 s, the ultimate begins; Eric, Nov 23: "a hop out of it and then him free falling but looking like he's having fun"):
  * a little crouch, a hop up and out of the cab with his wings opening (his victory's smiling eyes and raised wings), over the roof
  * behind it, then he drops out of the frame downward, grinning, wings up, his cap lifting in the wind. No jolt, no feathers.
+ * His whoosh (`fall`) starts as he leaves the cab, so it ends before the cutscene's own whoosh at `dropMs` (both at once doubled it).
  */
 const HOP: BirdiePose = { lid: "joy", beak: true, wingLen: 22 };
 /** Falling: wings up (alternating a little), grinning, his cap lifted and knocked back by the wind; `at` where he is. */
@@ -964,13 +965,15 @@ const fall: Anim = lazyAnim(() => ({
   frames: [
     F(120, { dy: 4, dx: 1, head: [0, 1], lid: "joy", capTilt: -6 }, { cue: "pop" }),
     F(90, { ...HOP, dy: -5, wing: 284, far: 304, wingLen: 18, head: [0, -1] }, { cue: "cheer" }),
-    F(100, { ...HOP, dy: -3, wing: 276, far: 300, head: [0, -1], tumble: { q: 0, at: [4, -10] } }),
+    F(100, { ...HOP, dy: -3, wing: 276, far: 300, head: [0, -1], tumble: { q: 0, at: [4, -10] } }, { cue: "fall" }),
     F(100, { ...HOP, dy: -3, wing: 270, far: 296, head: [0, -1], capTilt: 8, tumble: { q: 0, at: [6, -12] } }),
-    F(100, whee([8, -4], 0), { cue: "fall" }),
+    F(100, whee([8, -4], 0)),
     F(90, whee([10, 12], 1)),
     F(80, whee([11, 30], 0)),
     F(80, whee([11, 48], 1)),
-    { ms: 70, layers: [] },
+    // (Him gone below, the cab a beat longer, then his spot empty: no pop with him half in view.)
+    F(40, { hidden: true }),
+    { ms: 30, layers: [] },
   ],
 }));
 

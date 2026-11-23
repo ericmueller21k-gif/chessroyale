@@ -932,7 +932,6 @@ function build(): Character {
 
   const START: Pt = [102, 94];
   const END: Pt = [100, 133];
-  /** The cap's place from his middle, and its turn, for a tumble phase. */
   /** The cap's place from his middle (just above him, up by his left wing tip, bobbing in the wind), and its turn. */
   function capAt(ph: number): [number, number, number] {
     const a = (TAU * ph) / 5;
