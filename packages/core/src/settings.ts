@@ -4241,6 +4241,20 @@ export const TOWN_PICTURES = {
 } as const;
 
 /**
+ * Chess Town's first visit paints on more cores (Nov 23, Eric: "It sounds like we can use more cores"; the app's town/paint-pool.ts).
+ * The loading screen's pictures are pure pixel math (each frame's palette keys read into RGBA, each roof face baked), so it runs in a
+ * few workers while the main thread puts the pixels on canvases and paints what's left itself. `max` workers at most (the device's cores
+ * less one, and at least one); each is handed `batch` pictures at a time, `ahead` batches queued so it never waits. `on: false` paints
+ * on the main thread only, as before. docs/decisions/2026-11-23-town-paint-workers.md.
+ */
+export const TOWN_PAINT_WORKERS = {
+  on: true,
+  max: 3,
+  batch: 4,
+  ahead: 2,
+} as const;
+
+/**
  * The street town's WebGL failures (Oct 30; Nov 13: never today's town; the app's town/gl-fail.ts; docs/areas/ops.md, "Health"):
  * each page says so once, through the error reporting (the app's problems.ts, `reportTownFallback`), as this kind with its reason
  * as the message. The health view counts them by reason, apart from the errors. `no-webgl2`: no WebGL 2 in the browser, so "Chess

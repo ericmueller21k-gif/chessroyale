@@ -12,7 +12,7 @@
  */
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import { faceStep, geomOf, worldNormal, type BoxInst, type FaceGeom } from "./boxes.ts";
-import { rampsOf, type Ramps } from "./kit/bake.ts";
+import { rampsOf, type Cut, type Ramps } from "./kit/bake.ts";
 import { faceCuts, packFaces, type FaceArt, type Piece } from "./kit/draw.ts";
 import { roofTile, type TownBox } from "./town-kit.ts";
 
@@ -52,23 +52,26 @@ export const tileTexel = (fg: FaceGeom, tile: Tile) => (X: number, Y: number): s
 };
 
 /**
- * Box `b`'s roof (its art `box`), painted for the camera facing quarter `q` (0 north, 1 east, 2 south, 3 west): every face, whole and
- * in triangles, packed into sheets.
+ * Box `b`'s roof (its art `box`) for the camera facing quarter `q` (0 north, 1 east, 2 south, 3 west), as pixels: every face, whole
+ * and in triangles. Pure (no canvas): run on the main thread or in a paint worker (paint-jobs.ts), the same code either way.
  */
-export function bakeRoof(b: BoxInst, box: TownBox, q: number): RoofArt {
+export function roofCuts(b: BoxInst, box: TownBox, q: number): Cut[][] {
   // (The camera's quarter: 0 north, 1 east, 2 south, 3 west; its heading's cosine and sine.)
   const hc = [1, 0, -1, 0][q & 3]!;
   const hs = [0, 1, 0, -1][q & 3]!;
   const g = geomOf(box);
   const n = { x: 0, y: 0 };
-  // (Every face's pieces packed together into a sheet or two: WebGL's atlas holds a few big pictures, not hundreds of small ones.)
-  return {
-    faces: packFaces(
-      g.faces.map((fg) => {
-        worldNormal(b, fg.nx, fg.ny, n);
-        const tile = tileOf(box, fg.tex, b.tile);
-        return faceCuts(fg, tileTexel(fg, tile), tile.ramps, faceStep(n.x, n.y, fg.nz, hc, hs), { soft: fg.soft, rim: fg.rim ? RIM_KEY : undefined });
-      }),
-    ),
-  };
+  return g.faces.map((fg) => {
+    worldNormal(b, fg.nx, fg.ny, n);
+    const tile = tileOf(box, fg.tex, b.tile);
+    return faceCuts(fg, tileTexel(fg, tile), tile.ramps, faceStep(n.x, n.y, fg.nz, hc, hs), { soft: fg.soft, rim: fg.rim ? RIM_KEY : undefined });
+  });
+}
+
+/**
+ * Box `b`'s roof (its art `box`), painted for the camera facing quarter `q`: its pixels (`roofCuts`, or the same already worked out by
+ * a paint worker) packed into sheets (so WebGL's atlas holds a few big pictures, not hundreds of small ones).
+ */
+export function bakeRoof(b: BoxInst, box: TownBox, q: number, cuts: Cut[][] = roofCuts(b, box, q)): RoofArt {
+  return { faces: packFaces(cuts) };
 }

@@ -94,13 +94,18 @@ const TIMING_ASKED = (() => {
  * (`?street=off`, the old town after the street town's WebGL failed, is gone since Nov 13: gl-fail.ts.) `?back=2d` (Nov 11, anyone's, as `?report`): rooms draw their back the 2D way, as before
  * shops/back-gl.ts, so a phone's `?report` can compare the two. `?paintall` (Nov 23, anyone's): the town paints every picture as a first
  * visit does, neither loading the kept ones nor keeping its own (town/keep-pictures.ts), so a phone can compare the two.
+ * `?paintworkers=N` (Nov 23, anyone's, as `?paintall`): a first visit paints with N workers (0: on the main thread only, as before;
+ * town/paint-pool.ts), so a phone can compare. `?paintslow=K` (tests only, where the switches count): each worker's picture takes K
+ * times as long, as on a core K times slower (CDP's CPU slowing reaches the page's thread, not its workers).
  */
 export const TOWN_ASKED = (() => {
   try {
     const q = new URLSearchParams(globalThis.location?.search ?? "");
-    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), report: q.has("report"), back2d: q.get("back") === "2d", paintAll: q.has("paintall") };
+    const pw = q.get("paintworkers");
+    const paintWorkers = pw !== null && /^\d+$/.test(pw) ? Math.min(8, Number(pw)) : null;
+    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), report: q.has("report"), back2d: q.get("back") === "2d", paintAll: q.has("paintall"), paintWorkers, paintSlow: Math.max(1, Math.min(16, Number(q.get("paintslow")) || 1)) };
   } catch {
-    return { crowd: 0, fps: false, report: false, back2d: false, paintAll: false };
+    return { crowd: 0, fps: false, report: false, back2d: false, paintAll: false, paintWorkers: null as number | null, paintSlow: 1 };
   }
 })();
 let gameOnDevice = true;

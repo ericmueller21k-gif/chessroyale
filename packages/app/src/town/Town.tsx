@@ -73,6 +73,7 @@ import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { APP_VERSION, reportTownFallback } from "../problems.ts";
 import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Shelf } from "./keep-pictures.ts";
+import { domPaintPool, workerCount, type PaintPool } from "./paint-pool.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
@@ -2829,11 +2830,19 @@ function startTown(
       const from = await restore(shelf, key, domPageIO(art2d));
       pictures.kept = !!from;
       pictures.restoreMs = performance.now() - t0;
+      // A first visit paints on the device's other cores too (paint-pool.ts; Nov 23): workers paint the pictures ahead, the main thread
+      // puts them on their canvases and paints what's left. (`?paintworkers=N` sets how many, 0 none; `?paintslow=K`, tests: slower cores.)
+      const n = TOWN_ASKED.paintWorkers ?? workerCount(navigator.hardwareConcurrency);
+      pool = from ? null : domPaintPool(r.paintSpecs(), n, testSwitchesAllowed() ? TOWN_ASKED.paintSlow : 1);
+      pictures.workers = pool?.workers ?? 0;
       for (let share = 0; share < 1 && alive; ) {
-        share = r.warm(f.loadSliceMs, keep, from);
+        share = r.warm(f.loadSliceMs, keep, from, pool);
         onLoading(share * f.loadPaintShare, "pictures");
         await tick();
       }
+      if (pool) Object.assign(pictures, { byWorkers: pool.made.workers, whileWaiting: pool.made.here, workers: pool.workers });
+      pool?.close();
+      pool = null;
       from?.close();
       // (Kept ones that didn't line up with this layout (never expected: the key has the layout): cleared, so the next visit paints.)
       if (from && !r.pics?.matched()) {
@@ -2851,6 +2860,7 @@ function startTown(
     } catch (e) {
       console.warn("town load:", e);
     }
+    pool?.close();
     if (!alive) return;
     loadMs = performance.now() - t0;
     loading = false;
@@ -2880,7 +2890,9 @@ function startTown(
   let loadPaintMs = 0;
   /** (Tests, `hookPaint`) The kept pictures: loaded from the last visit; how long reading them took (ms); what this visit kept (bytes;
    * null: nothing; undefined: not yet) and how long that took. */
-  const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0 };
+  const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number; workers: number; byWorkers: number; whileWaiting: number } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0, workers: 0, byWorkers: 0, whileWaiting: 0 };
+  /** (`loadTown`) The first visit's paint workers while its loading screen runs. */
+  let pool: PaintPool | null = null;
   let keepLater: (() => void) | null = null;
   /** This visit's pictures kept for the next (keep-pictures.ts `save`), in the background: a page at a time, encoded in a worker. */
   const keepPictures = async (shelf: Shelf | null, key: string) => {

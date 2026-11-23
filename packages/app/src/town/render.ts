@@ -57,6 +57,9 @@ import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { Pictures, type Restored } from "./keep-pictures.ts";
+import { framePixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
+import type { PaintPool } from "./paint-pool.ts";
+import type { Cut } from "./kit/bake.ts";
 import { stepChar } from "./kit/bake.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type NoFigureId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
@@ -289,11 +292,12 @@ class FrameCache {
     while (i < this.ends.length - 1 && t >= this.ends[i]!) i++;
     return this.get(i);
   }
-  get(i: number): HTMLCanvasElement {
+  /** Frame `i`, painted the first time it's asked for (from `px`, its pixels as a paint worker made them, if given: paint-pool.ts). */
+  get(i: number, px?: Pixels | null): HTMLCanvasElement {
     let c = this.frames[i];
     if (c) return c;
     const t0 = REC ? performance.now() : 0;
-    const { w, h, data } = renderFrame(this.ch, this.ch.anims.idle!.frames[i]!);
+    const { w, h, data } = px ?? framePixels(this.ch, i);
     c = document.createElement("canvas");
     c.width = w;
     c.height = h;
@@ -304,8 +308,8 @@ class FrameCache {
     return c;
   }
   /** Frame `i` one ramp step darker. */
-  dark(i: number): HTMLCanvasElement {
-    return this.darkFc().get(i);
+  dark(i: number, px?: Pixels | null): HTMLCanvasElement {
+    return this.darkFc().get(i, px);
   }
   private darkFc(): FrameCache {
     return (this.darker ??= new FrameCache(stepChar(this.ch, -1)));
@@ -1793,18 +1797,28 @@ export class Renderer {
    * done (0 to 1). (Measured Nov 11: nothing else is painted as you then walk and turn; the figures, tags and boards are drawn as
    * before, on the atlas's spare pages.)
    */
-  warm(budgetMs: number, keep: (src: CanvasImageSource) => void, from: Restored | null = null): number {
-    this.pics ??= new Pictures(keep, from);
+  warm(budgetMs: number, keep: (src: CanvasImageSource) => void, from: Restored | null = null, pool: PaintPool | null = null): number {
+    if (!this.pics) {
+      this.pics = new Pictures(keep, from);
+      // (A first visit's pictures painted ahead on the device's other cores, as the pool has them: paint-pool.ts. Not with kept ones.)
+      this.pool = from ? null : pool;
+    }
     const jobs = this.plan().jobs;
     const t0 = performance.now();
     while (this.warmAt0 < jobs.length) {
       // (A job that can't be done yet (a sidekick's sheet still loading) waits for the next slice, up to `loadSheetWaitMs` all told.)
-      let done: boolean | void = true;
+      let done: boolean | "wait" | void = true;
       try {
         done = jobs[this.warmAt0]!();
       } catch (e) {
         console.warn("town warm:", e); // (that one picture is made as it shows instead, as before)
         this.warmClean = false;
+      }
+      // (Its picture is being painted by a worker: meanwhile this thread paints the last pictures no worker has taken, then asks again;
+      // with none left, it waits for the next slice.)
+      if (done === "wait") {
+        if (!this.pool!.steal() || performance.now() - t0 > budgetMs) break;
+        continue;
       }
       if (done === false && t0 - (this.warmWait ||= t0) < TOWN_FEEL.loadSheetWaitMs) break;
       this.warmAt0++;
@@ -1812,7 +1826,9 @@ export class Renderer {
     }
     return jobs.length ? this.warmAt0 / jobs.length : 1;
   }
-  private warmJobs: { jobs: (() => boolean | void)[]; sig: string } | null = null;
+  /** (`warm`) The first visit's paint workers (paint-pool.ts), while the loading screen runs. */
+  private pool: PaintPool | null = null;
+  private warmJobs: { jobs: (() => boolean | "wait" | void)[]; sig: string; specs: PaintSpec[] } | null = null;
   private warmAt0 = 0;
   private warmWait = 0;
   /** The loading screen's pictures, painted or kept from the last visit (keep-pictures.ts; set by the first `warm`). */
@@ -1826,20 +1842,48 @@ export class Renderer {
   pictureSig(): string {
     return this.plan().sig;
   }
+  /** The loading screen's pictures painted fresh, in the order its jobs come to them: what paint workers can paint ahead (paint-pool.ts). */
+  paintSpecs(): readonly PaintSpec[] {
+    return this.plan().specs;
+  }
   /**
    * The loading screen's jobs (`warm`): one picture (or one roof) each. Each picture is painted, or on a later visit taken from the
    * last visit's (`pics.from`, in the same order: keep-pictures.ts), and handed to `pics.add` (the painter's `keep`).
    */
-  private plan(): { jobs: (() => boolean | void)[]; sig: string } {
+  private plan(): { jobs: (() => boolean | "wait" | void)[]; sig: string; specs: PaintSpec[] } {
     if (this.warmJobs) return this.warmJobs;
-    const jobs: (() => boolean | void)[] = [];
+    const jobs: (() => boolean | "wait" | void)[] = [];
     const sig: string[] = [];
     const P = () => this.pics!;
+    // (Each picture painted fresh, the first time a job comes to it, for the paint workers to paint ahead (paint-pool.ts): its index there.)
+    const specs: PaintSpec[] = [];
+    const framesOf = new Map<FrameCache, Set<number>>();
+    const frameSpec = (fc: FrameCache, k: number, dark: boolean): number => {
+      let m = framesOf.get(fc);
+      if (!m) framesOf.set(fc, (m = new Set()));
+      const key = dark ? -1 - k : k;
+      if (m.has(key)) return -1;
+      m.add(key);
+      return specs.push({ kind: "frame", ch: fc.ch, k, dark }) - 1;
+    };
+    const roofsOf = new Map<TownBox, Set<string>>();
+    const roofSpec = (b: BoxInst, q: number): number => {
+      let m = roofsOf.get(b.box);
+      if (!m) roofsOf.set(b.box, (m = new Set()));
+      const key = this.roofKey(b, q);
+      if (m.has(key)) return -1;
+      m.add(key);
+      return specs.push({ kind: "roof", b, q: key === "flat" ? 0 : q }) - 1;
+    };
     const frame = (fc: FrameCache, k: number, dark: boolean) => {
       sig.push(`${fc.ch.id}#${k}${dark ? "d" : ""}`);
+      const si = frameSpec(fc, k, dark);
       jobs.push(() => {
         const p = P();
-        p.add(p.from ? fc.kept(k, dark, () => p.next()) : dark ? fc.dark(k) : fc.get(k));
+        if (p.from) return p.add(fc.kept(k, dark, () => p.next()));
+        const px = si < 0 || !this.pool ? null : this.pool.take(si);
+        if (px === "wait") return "wait";
+        p.add(dark ? fc.dark(k, px as Pixels | null) : fc.get(k, px as Pixels | null));
       });
     };
     const fcs = new Set<FrameCache>();
@@ -1850,12 +1894,15 @@ export class Renderer {
     };
     const roof = (b: BoxInst, q: number) => {
       sig.push(`roof:${b.box.id}:${this.roofKey(b, q)}`);
+      const si = roofSpec(b, q);
       jobs.push(() => {
         const p = P();
+        const cuts = si < 0 || p.from || !this.pool ? null : this.pool.take(si);
+        if (cuts === "wait") return "wait";
         let fresh = false;
         const a = this.roofArt(b, q, (flat, qq) => {
           fresh = true;
-          return p.from ? p.roof() : bakeRoof(b, b.box, flat ? 0 : qq);
+          return p.from ? p.roof() : bakeRoof(b, b.box, flat ? 0 : qq, (cuts as Cut[][] | null) ?? undefined);
         });
         for (const f of a.faces) {
           p.add(f.whole.cv);
@@ -1891,7 +1938,7 @@ export class Renderer {
     jobs.push(() => {
       for (const at of this.warmAt) at.fill(-1);
     });
-    return (this.warmJobs = { jobs, sig: sig.join("|") });
+    return (this.warmJobs = { jobs, sig: sig.join("|"), specs });
   }
   /** The quarters in the order they're painted ahead (planBoxes). */
   private readonly warmQ = new Int32Array(4);
