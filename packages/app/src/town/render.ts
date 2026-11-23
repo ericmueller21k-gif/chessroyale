@@ -1805,6 +1805,8 @@ export class Renderer {
     }
     const jobs = this.plan().jobs;
     const t0 = performance.now();
+    // (The workers' next pictures first, so they're busy while this thread runs the jobs and waits for its next slice.)
+    this.pool?.pump(budgetMs / 2);
     while (this.warmAt0 < jobs.length) {
       // (A job that can't be done yet (a sidekick's sheet still loading) waits for the next slice, up to `loadSheetWaitMs` all told.)
       let done: boolean | "wait" | void = true;
@@ -1814,10 +1816,11 @@ export class Renderer {
         console.warn("town warm:", e); // (that one picture is made as it shows instead, as before)
         this.warmClean = false;
       }
-      // (Its picture is being painted by a worker: meanwhile this thread paints the last pictures no worker has taken, then asks again;
-      // with none left, it waits for the next slice.)
+      // (Its picture is being painted by a worker: meanwhile this thread hands the workers more or, with them all busy, paints the last
+      // pictures no worker has taken, then asks again; with nothing to do, it waits for the next slice.)
       if (done === "wait") {
-        if (!this.pool!.steal() || performance.now() - t0 > budgetMs) break;
+        const left = budgetMs - (performance.now() - t0);
+        if (left <= 0 || !(this.pool!.pump(left) || this.pool!.steal())) break;
         continue;
       }
       if (done === false && t0 - (this.warmWait ||= t0) < TOWN_FEEL.loadSheetWaitMs) break;

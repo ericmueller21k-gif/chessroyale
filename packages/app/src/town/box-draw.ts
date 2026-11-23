@@ -11,7 +11,8 @@
  * Painting a box is a few milliseconds: render.ts does it ahead, a little a frame, nearest first (`TOWN_FEEL.boxBakeMs`).
  */
 import { frameKeys, type Character } from "../characters/sprite.ts";
-import { faceStep, geomOf, worldNormal, type BoxInst, type FaceGeom } from "./boxes.ts";
+import { faceStep, geomOf, worldNormal, type FaceGeom, type RoofBox, type RoofInst } from "./box-geom.ts";
+import type { BoxInst } from "./boxes.ts";
 import { rampsOf, type Cut, type Ramps } from "./kit/bake.ts";
 import { faceCuts, packFaces, type FaceArt, type Piece } from "./kit/draw.ts";
 import { roofTile, type TownBox } from "./town-kit.ts";
@@ -34,7 +35,7 @@ export interface Tile {
   ramps: Ramps;
 }
 const tiles = new Map<string, Tile>();
-export function tileOf(box: TownBox, tex: FaceGeom["tex"], own: Character | null): Tile {
+export function tileOf(box: RoofBox, tex: FaceGeom["tex"], own: Character | null): Tile {
   const key = own ? `own:${own.id}` : `${box.id}:${tex}`;
   let t = tiles.get(key);
   if (!t) {
@@ -55,7 +56,7 @@ export const tileTexel = (fg: FaceGeom, tile: Tile) => (X: number, Y: number): s
  * Box `b`'s roof (its art `box`) for the camera facing quarter `q` (0 north, 1 east, 2 south, 3 west), as pixels: every face, whole
  * and in triangles. Pure (no canvas): run on the main thread or in a paint worker (paint-jobs.ts), the same code either way.
  */
-export function roofCuts(b: BoxInst, box: TownBox, q: number): Cut[][] {
+export function roofCuts(b: RoofInst, box: RoofBox, q: number): Cut[][] {
   // (The camera's quarter: 0 north, 1 east, 2 south, 3 west; its heading's cosine and sine.)
   const hc = [1, 0, -1, 0][q & 3]!;
   const hs = [0, 1, 0, -1][q & 3]!;

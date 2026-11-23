@@ -4251,7 +4251,7 @@ export const TOWN_PAINT_WORKERS = {
   on: true,
   max: 3,
   batch: 4,
-  ahead: 2,
+  ahead: 6,
 } as const;
 
 /**

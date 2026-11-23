@@ -2,24 +2,20 @@
  * Chess Town's first visit paints on more cores (Nov 23, Eric: "It sounds like we can use more cores"). The loading screen's pictures
  * (render.ts `plan`) are pure pixel work (paint-jobs.ts), so a few workers (paint.worker.ts) paint them ahead, in the loading screen's
  * order, while the main thread runs the loading screen's jobs as before: a picture a worker has painted is put on its canvas from the
- * worker's pixels; one no worker has yet is painted here, as before; one a worker is on now waits, and the main thread paints the last
- * pictures no worker has taken meanwhile (`steal`), so every core works. Each picture is the same either way: the same code makes its
+ * worker's pixels; one no worker has yet is painted here, as before; one a worker is on now waits: meanwhile the main thread hands the
+ * workers more (`pump`) and, with them all busy, paints the last pictures no worker has taken (`steal`), so every core works. Each picture is the same either way: the same code makes its
  * pixels, and the main thread puts them on the same canvas.
  *
  * It never breaks the town: no workers in the browser, a worker that fails to load or errors, or a picture that can't be sent (its art
- * not copyable) paints on the main thread as before, silently. docs/decisions/2026-11-23-town-paint-workers.md.
+ * not JSON) paints on the main thread as before, silently. The art goes to the workers as JSON: what the paint code reads of it (keys,
+ * colors, grids, numbers) is the same after (test/town-paint-workers.test.ts paints every picture of the town both ways). docs/decisions/2026-11-23-town-paint-workers.md.
  */
 import { TOWN_PAINT_WORKERS } from "@chessroyale/core";
-import { paintSpec, type PaintSpec, type Painted } from "./paint-jobs.ts";
-
-/** A picture for a worker: its index in the loading screen's list and what it's painted from (`ref`: sent once, by number). */
-export type Job = { i: number; kind: "frame"; ref: number; k: number; dark: boolean } | { i: number; kind: "roof"; ref: number; q: number };
-/** A worker's answer: the picture's pixels, or why it couldn't. */
-export type Reply = { i: number; out: Painted } | { i: number; error: string };
+import { paintCopy, paintSpec, roofCopy, type Batch, type Job, type PaintSpec, type Painted, type Reply } from "./paint-jobs.ts";
 
 /** A worker as the pool uses it (a Web Worker in the browser; tests pass their own). */
 export interface PaintWorker {
-  postMessage(m: unknown, transfer?: Transferable[]): void;
+  postMessage(m: Batch): void;
   terminate(): void;
   onmessage: ((e: MessageEvent<Reply>) => void) | null;
   onerror: ((e: unknown) => void) | null;
@@ -43,7 +39,9 @@ export class PaintPool {
   private head = 0;
   private tail: number;
   private dead = false;
+  /** Each piece of art's number, and it as JSON (made once, whichever worker needs it). */
   private readonly ids = new Map<object, number>();
+  private readonly json: (string | null)[] = [];
   private readonly ws: { w: PaintWorker; has: Set<number>; out: number }[];
   /** (Tests, the decision's numbers) Pictures painted by the workers and by the main thread while it waited. */
   readonly made = { workers: 0, here: 0 };
@@ -61,7 +59,7 @@ export class PaintPool {
       s.w.onmessage = (e) => this.got(s, e.data);
       s.w.onerror = s.w.onmessageerror = () => this.fail();
     }
-    for (const s of this.ws) this.feed(s);
+    for (const s of this.ws) this.send(s);
   }
   /** How many workers paint (0 once they've stopped). */
   get workers(): number {
@@ -100,41 +98,75 @@ export class PaintPool {
     this.dead = true;
     for (const s of this.ws) s.w.terminate();
     this.out = [];
+    this.json.length = 0;
   }
 
-  private refOf(o: object): number {
+  /** Art's number (-1: it doesn't go into JSON, so its pictures are painted here). */
+  private refOf(sp: PaintSpec): number {
+    const o = sp.kind === "frame" ? sp.ch : sp.b;
     let id = this.ids.get(o);
-    if (id === undefined) this.ids.set(o, (id = this.ids.size));
-    return id;
+    if (id === undefined) {
+      this.ids.set(o, (id = this.ids.size));
+      let js: string | null = null;
+      try {
+        js = JSON.stringify(sp.kind === "frame" ? paintCopy(sp.ch) : roofCopy(sp.b));
+      } catch {
+        // (A loop, or a value JSON can't hold.)
+      }
+      this.json[id] = js;
+    }
+    return this.json[id] === null ? -1 : id;
   }
-  /** Hands worker `s` the next pictures, `TOWN_PAINT_WORKERS.batch` a message, until it has `ahead` batches. */
-  private feed(s: (typeof this.ws)[number]): void {
+  /**
+   * (The main thread, as each loading screen slice starts and while it waits) Hands the workers their next pictures, the emptiest first,
+   * until each has `ahead` batches or `budgetMs` is spent. (Their art goes as JSON, so a picture's parts are worked out here as it's
+   * sent: houses/kit.ts `paint`'s lazy grids can't go to a worker.) Whether any was sent.
+   */
+  pump(budgetMs: number): boolean {
     const { batch, ahead } = TOWN_PAINT_WORKERS;
-    while (!this.dead && s.out < batch * ahead) {
+    const t0 = performance.now();
+    let any = false;
+    for (;;) {
+      let s: (typeof this.ws)[number] | null = null;
+      for (const x of this.ws) if (x.out < batch * ahead && (!s || x.out < s.out)) s = x;
+      if (!s || this.dead || !this.send(s)) return any;
+      any = true;
+      if (performance.now() - t0 > budgetMs) return any;
+    }
+  }
+  /** Hands worker `s` its next `TOWN_PAINT_WORKERS.batch` pictures (false: none left). */
+  private send(s: (typeof this.ws)[number]): boolean {
+    const { batch } = TOWN_PAINT_WORKERS;
+    for (;;) {
+      if (this.dead) return false;
       const jobs: Job[] = [];
-      const defs: [number, unknown][] = [];
+      const defs: [number, string][] = [];
       const fresh = new Set<number>();
       while (jobs.length < batch) {
         while (this.head < this.tail && this.state[this.head] !== QUEUED) this.head++;
         if (this.head >= this.tail) break;
         const i = this.head++;
         const sp = this.specs[i]!;
-        const o = sp.kind === "frame" ? sp.ch : sp.b;
-        const ref = this.refOf(o);
-        if (!s.has.has(ref) && !fresh.has(ref)) fresh.add(ref), defs.push([ref, o]);
+        const ref = this.refOf(sp);
+        if (ref < 0) {
+          this.state[i] = HERE;
+          continue;
+        }
+        if (!s.has.has(ref) && !fresh.has(ref)) fresh.add(ref), defs.push([ref, this.json[ref]!]);
         jobs.push(sp.kind === "frame" ? { i, kind: "frame", ref, k: sp.k, dark: sp.dark } : { i, kind: "roof", ref, q: sp.q });
       }
-      if (!jobs.length) return;
+      if (!jobs.length) return false;
       try {
         s.w.postMessage({ defs, jobs, slow: this.slow });
       } catch {
-        // (Something in its art can't be copied to a worker: these are painted here, in their turn.)
+        // (Never expected: it's all strings and numbers. These are painted here, in their turn.)
         for (const j of jobs) this.state[j.i] = HERE;
         continue;
       }
       for (const ref of fresh) s.has.add(ref);
       for (const j of jobs) this.state[j.i] = SENT;
       s.out += jobs.length;
+      return true;
     }
   }
   private got(s: (typeof this.ws)[number], r: Reply): void {
@@ -146,7 +178,8 @@ export class PaintPool {
       this.state[r.i] = DONE;
       this.made.workers++;
     }
-    this.feed(s);
+    // (About to run dry between two slices: its next batch now.)
+    if (s.out < TOWN_PAINT_WORKERS.batch) this.send(s);
   }
   /** A worker failed (it didn't load, or broke): every worker stops, and what they hadn't sent back is painted here, as before. */
   private fail(): void {
