@@ -2367,7 +2367,7 @@ export class LobbyCore {
   /**
    * The soonest the boss's thinking may end (undefined: as soon as the host answers). You just took his queen: your
    * banner plays first (queenSlain: in the thinking straight after your move only, so Big Boy's bounce waits for it and
-   * his move after the bounce doesn't). G-REX's fire has just burnt something: that plays first too.
+   * his move after the bounce doesn't). Grex's fire has just burnt something: that plays first too.
    */
   private thinkMinAt(): number | undefined {
     const view = this.runner!.bossView()!;

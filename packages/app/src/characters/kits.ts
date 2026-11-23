@@ -140,7 +140,7 @@ export interface BossKit extends BeatLines {
    * Undefined: the bubble's place is the box's (one size).
    */
   heads?: Readonly<Record<string, number>>;
-  /** Taller than the boss bar's usual box (Jefferson's long neck): on a phone the bar grows to hold him. */
+  /** Taller than the boss bar's usual box (Grex's long neck): on a phone the bar grows to hold him. */
   tall?: boolean;
   /** Wider than the boss bar's usual box (Sawyer's saw and tail): on a phone his box is wider, so neither the screen's
    * edge nor the boss's name cuts into him. */
@@ -977,7 +977,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // His attack on a king (Eric, Nov 6: "when you blunder, all bosses are supposed to jump on the board and attack"): he dashes
     // in from his side with his trail, swipes his claws at it ten times, high and low (a whoosh and a snap in turn), and dashes
     // off (dash-figure.ts: DASH_ATTACK). Facing our left; 48 frame pixels a square (he's lanky), a square off.
-    // His claw marks on its square each swipe (clawItem; until Nov 11 Jefferson's fireball pops, popItem: docs/decisions/2026-11-11-mate-effects-iphone-vibration.md).
+    // His claw marks on its square each swipe (clawItem; until Nov 11 Grex's fireball pops, popItem: docs/decisions/2026-11-11-mate-effects-iphone-vibration.md).
     kingAttack: { ch: DASH_ATTACK, anim: "kingAttack", perSquare: 48, stand: 1, facesLeft: true, hit: clawItem },
   },
   // Don Dough, the zebra kingpin (Eric's design, Nov 10-11; his art approved Nov 11): docs/decisions/2026-11-11-don-dough.md. His art is

@@ -3,7 +3,7 @@
  * Changed: the import paths. The notes: scripts/boss-art/out/shop-grex-nov4.md and intro-grex-nov4.md on that branch.
  */
 /**
- * Jefferson's battle intro moves (BOSS_GREX_INTRO, id `grex-intro`; Eric's design, Nov 4): in his warehouse he hollers for
+ * Grex's battle intro moves (BOSS_GREX_INTRO, id `grex-intro`; Eric's design, Nov 4): in his warehouse he hollers for
  * his crew (a hoof cupped by his mouth), waves them over to the table, and brags. Drawn by hand (Nov 4, weekly plan usage).
  *
  * His drawing is the game's (packages/app/src/characters/grex.ts, GREX): this file adds nothing to it. Every pose is built with

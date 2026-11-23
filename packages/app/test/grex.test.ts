@@ -20,7 +20,7 @@ const anim = (name: string): Anim => grex.ch.anims[name]!;
 /** The pixels of a frame drawn in a palette key. */
 const pixels = (ch: Character, a: Anim, i: number, keys: string) => frameKeys(ch, a.frames[i]!).flatMap((row, y) => row.flatMap((k, x) => (k && keys.includes(k) ? [[x, y] as const] : [])));
 
-describe("Jefferson (id grex), the Fire boss", () => {
+describe("Grex (id grex), the Fire boss", () => {
   it("has a kit with an animation for every moment, his powers' included, and a sound for every cue", () => {
     expect(grex).not.toBeNull();
     expect(grex.ch.name).toBe("Jefferson");
@@ -366,10 +366,10 @@ describe("the fire on screen", () => {
   });
 });
 
-describe("his name is Jefferson (Eric, Oct 10: he was G-REX; his id, files and settings keep grex)", () => {
-  it("the roster, his kit and his character all name him Jefferson", () => {
+describe("his name is Grex (Eric, Oct 10: he was G-REX; his id, files and settings keep grex)", () => {
+  it("the roster, his kit and his character all name him Grex", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "grex")!;
-    expect(def.name).toBe("Jefferson");
+    expect(def.name).toBe("Grex");
     expect(BOSS_KITS[def.kit!]).toBe(grex);
     expect(grex.ch.id).toBe("grex");
   });
@@ -404,7 +404,7 @@ describe("his name is Jefferson (Eric, Oct 10: he was G-REX; his id, files and s
   });
 });
 
-describe("Jefferson laughs it off (Oct 11): his pieces don't burn", () => {
+describe("Grex laughs it off (Oct 11): his pieces don't burn", () => {
   it("has 3 or 4 short lines about it, never instructions, one picked from the battle's seed, the same on every screen", async () => {
     const { FIREPROOF_LINES, fireproofLine } = await import("../src/components/Grex.tsx");
     const { powerLine } = await import("../src/components/BossPowers.tsx");

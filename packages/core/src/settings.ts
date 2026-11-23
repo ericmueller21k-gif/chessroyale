@@ -1294,7 +1294,7 @@ export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined }
  * meter fills at `rageScale[n - 1]` of its speed on a floor of n bosses (first guesses; the tower's sim tunes them), and the
  * bosses in `apart` are never on one floor: Hollow and Smudgy (both hide what is on a square; Eric, Nov 18), and, for now, the pairs
  * the kit found colliding (Eric, Nov 19: "if two boss things collide badly just for now make note of which combination to not use"):
- * Smudgy and Alfil (Repaint while the Slam holds pieces up), Alfil and Jefferson (the Slam lifts a piece blocking a boss pawn's
+ * Smudgy and Alfil (Repaint while the Slam holds pieces up), Alfil and Grex (the Slam lifts a piece blocking a boss pawn's
  * promotion), Dash and Smudgy (Dash's extra move ignores the side's stops and can slide the hidden rook).
  * docs/decisions/2026-11-19-tower-apart-pairs.md.
  */
@@ -1460,7 +1460,7 @@ export const BOSS_POWERS = {
    * effect pauses the meter for its length (the blizzard 3 turns, the funhouse 12, the Roman candle about 13, Lights
    * out 2, the Big Bounce 1, the board saw 5), so a longer one fills faster to fit two in a typical battle. Ginger a
    * little faster (Eric, Oct 11: his ultimate's weak; about twice a game), and 1.2 since his blizzard lasts three turns
-   * (Oct 12, by estimate: the second still comes about turn 30). Jefferson's candle burns for about a third of a
+   * (Oct 12, by estimate: the second still comes about turn 30). Grex's candle burns for about a third of a
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game. Babur (tiger) 1.3 (Oct 24, was 1.6: Eric, "he's ulting so much… 2 to 4 times per game"; his
    * hoops now come after his move): the raid sim's 10 s crowd, 2.55 casts a battle of 44 moves, 3.45 per 60 moves (1.1 gave
@@ -1523,7 +1523,7 @@ export const BOSS_POWERS = {
   /** ...and never one that gives away more than this in log-odds (a lost cause stays a fight). */
   funhouseMaxLogit: 1.6,
   /**
-   * G-REX's fire tiles: a tile burns in fireStages stages, one a crowd turn (a singe, more burn, ablaze); after the
+   * Grex's fire tiles: a tile burns in fireStages stages, one a crowd turn (a singe, more burn, ablaze); after the
    * crowd's move on its last stage, a crowd piece still on it is destroyed (never the king: it fizzles). Then
    * fireGap turns with no fire before he throws the next sparkler.
    */

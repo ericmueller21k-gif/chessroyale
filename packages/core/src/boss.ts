@@ -170,7 +170,7 @@ export const TIGER_NAME = "Babur";
 export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "gingerbread", name: "Ginger", icon: "🍪", kit: "Ginger", offset: -100, powers: { passive: "freeze", ultimate: "blizzard" } },
   { id: "clown", name: "Boingo the Clown", icon: "🤡", kit: "Boingo the Clown", offset: -100, powers: { passive: "pie", ultimate: "funhouse" } },
-  { id: "grex", name: "Jefferson", icon: "🦖", kit: "Jefferson", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
+  { id: "grex", name: "Grex", icon: "🦖", kit: "Jefferson", offset: -100, powers: { passive: "sparkler", ultimate: "candle" } },
   { id: "hollow", name: "Hollow", icon: "🌑", kit: "Hollow", offset: -100, powers: { passive: "dark", ultimate: "lightsout" } },
   // Big Boy eats one of the crowd's center pawns before move 1 (his snack), so he plays further under the lobby's
   // strength than the others (DECISIONS.md: "Big Boy, built": the boss sim's numbers).
@@ -338,7 +338,7 @@ export const bossDef = (id: string | null | undefined): BossDef | null => (id ? 
 
 /**
  * Other names a test link may use for a boss (?boss=jefferson), each to its roster id. A boss renamed on screen keeps
- * its id everywhere else (Jefferson, Oct 10: he was G-REX, and his id stays "grex").
+ * its id everywhere else (Grex, Oct 10: he was G-REX, and his id stays "grex").
  */
 export const BOSS_ALIASES: Readonly<Record<string, string>> = { jefferson: "grex" };
 /** A test link's ?boss= as a roster id (an alias becomes its boss's id); anything else as it is. */
@@ -546,7 +546,7 @@ export interface SplatMark {
   n: number;
 }
 /**
- * A char mark of Jefferson's Roman candle on one of the crowd's pieces (Eric, Nov 20): the same shape as a splat mark (it follows
+ * A char mark of Grex's Roman candle on one of the crowd's pieces (Eric, Nov 20): the same shape as a splat mark (it follows
  * its piece through every move): its square, its kind and how many times the candle's fire has reached it; at
  * BOSS_POWERS.candleHitsToBurn the fire burns it.
  */
@@ -633,7 +633,7 @@ export interface BossPowerState {
    */
   noAdd?: boolean;
   /**
-   * G-REX's fire tiles, each with the crowd turn it landed (stage 1 that turn, ablaze fireStages - 1 turns later;
+   * Grex's fire tiles, each with the crowd turn it landed (stage 1 that turn, ablaze fireStages - 1 turns later;
    * after the crowd's move on that turn, a crowd piece still on it burns, the king never).
    */
   fire?: FireTile[];
@@ -649,14 +649,14 @@ export interface BossPowerState {
   /** The first crowd turn a crowd piece stepped onto a burning tile (the God King's warning, once a match). */
   stepped?: number;
   /**
-   * Jefferson's charred pieces (Eric, Nov 20; docs/decisions/2026-11-20-grex-char.md): the crowd's pieces his Roman candle's
+   * Grex's charred pieces (Eric, Nov 20; docs/decisions/2026-11-20-grex-char.md): the crowd's pieces his Roman candle's
    * fire has reached and left standing, by square (each follows its piece through every move, for the rest of the match;
    * gone once it's taken or burns), its kind and the times it was reached; the candle's fire burns one reached
    * candleHitsToBurn - 1 times already.
    */
   charred?: CharMark[];
   /**
-   * Jefferson's laugh (once a match): the crowd turn one of his own pieces first sat on fire from his Roman candle, and
+   * Grex's laugh (once a match): the crowd turn one of his own pieces first sat on fire from his Roman candle, and
    * the line he says, picked from the seed (`pick`, 0-4095: the app takes it modulo its lines).
    */
   fireproof?: { turn: number; square: string; pick: number };
@@ -1816,7 +1816,7 @@ export interface PowerEvent {
   /** Big Boy's tower: how many blocks it has after this one (`stack`). */
   height?: number;
   /**
-   * Which of the boss's lines (0-4095 from the seed; the app takes it modulo its lines): Jefferson's fireproof laugh,
+   * Which of the boss's lines (0-4095 from the seed; the app takes it modulo its lines): Grex's fireproof laugh,
    * Boingo's joke as his funhouse plays the crowd's move.
    */
   pick?: number;

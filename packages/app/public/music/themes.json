@@ -3,7 +3,7 @@
   "note": "Play <intro> once at t0. Start <loop> at t0 + introSeconds from offset pad, looping between pad and pad + loopSeconds.",
   "themes": {
     "grex": {
-      "boss": "Jefferson",
+      "boss": "Grex",
       "source": "scripts/reel/music/song_m.py",
       "intro": "grex-intro",
       "loop": "grex-loop",

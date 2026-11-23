@@ -4,10 +4,10 @@
  */
 /**
  * The warehouse crew's giraffe (Nov 4, drawn by hand on the weekly plan usage): one giraffe, dressed seven ways (the shady
- * dealer, the lift guy, the forklift guy, the two wall leaners, the clipboard guy, the dozer). Jefferson alone looks his own
+ * dealer, the lift guy, the forklift guy, the two wall leaners, the clipboard guy, the dozer). Grex alone looks his own
  * way (his big head, his flames, his bright yellow): the crew are plainer, a muted tan with brown patches, a normal giraffe's
  * small head on a long neck, short ossicones with dark knobs, standing on two legs as he does. About 79 px from hooves to
- * ossicones at the room's scale (37 px a square, drawn 1:1): taller than the other shops' kids, a little under Jefferson
+ * ossicones at the room's scale (37 px a square, drawn 1:1): taller than the other shops' kids, a little under Grex
  * (about 84 px to his flames). Three-quarters, facing our right (mirror them to face left), light from the top left.
  *
  * Frame: 64 x 104, the foot (the ground between the hooves) at [30, 100]. Rigging: each part is painted from a pose (a
@@ -24,7 +24,7 @@ export const GROUND = 100;
 export const FOOT: Pt = [30, GROUND];
 
 export const CREW_PALETTE: Record<string, string> = {
-  k: "#1e0e05", // outline (Jefferson's)
+  k: "#1e0e05", // outline (Grex's)
   d: "#a8742c", // a crew giraffe's tan: dark, mid, light, lit
   c: "#c99642",
   C: "#e0b562",

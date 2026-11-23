@@ -14,7 +14,7 @@
  *   sawyer     Sawyer's Woodshed            logs (its front is a log cabin; the mockup guessed planks), a shingle gable
  *   gingerbread Ginger Igloo                a gingerbread dome iced on top, gumdrops in the crumb (the front is gingerbread;
  *                                           the mockup guessed ice)
- *   grex       Jefferson's Fireworks        orange-and-yellow striped booth walls, a striped canvas pyramid top (the mockup
+ *   grex       Grex's Fireworks        orange-and-yellow striped booth walls, a striped canvas pyramid top (the mockup
  *                                           guessed brick; the front is a painted booth)
  *   clown      Boingo's Funhouse            pink plaster, a striped barrel-vault roof, its blue corner towers carried back
  *   tiger      Babur's Circus               red-and-white canvas walls, a striped tent roof narrowing to its pole

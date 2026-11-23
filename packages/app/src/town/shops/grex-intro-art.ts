@@ -3,7 +3,7 @@
  * Changed: the import paths. It also re-exports his moves (characters/grex-intro.ts BOSS_GREX_INTRO), so his intro is one chunk. The notes: scripts/boss-art/out/shop-grex-nov4.md and intro-grex-nov4.md on that branch.
  */
 /**
- * Jefferson's battle intro props (Eric's design, Nov 4), drawn by hand (weekly plan usage). The boss is on the left and you
+ * Grex's battle intro props (Eric's design, Nov 4), drawn by hand (weekly plan usage). The boss is on the left and you
  * on the right; the board already stands in the middle of his warehouse on its wobbly stack of crates.
  *
  * 1. INTRO_GREX_TABLE: the crate stack (the room's `board-stand` without its slab and board: the renderer draws those, at

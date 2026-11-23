@@ -72,7 +72,7 @@ export const townSound = (id: string, n: number): SoundName | undefined => {
 export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   gingerbread: ["Ginger is here!", "You'll crumble!", "Fresh out of the freezer!", "Cool as ice."],
   clown: ["Honk honk! Showtime!", "Step right up!", "Who ordered a clown?"],
-  grex: ["Jefferson in the house!", "Feel the heat!", "Rawr! I mean… hi.", "Hot stuff coming through!"],
+  grex: ["Grex in the house!", "Feel the heat!", "Rawr! I mean… hi.", "Hot stuff coming through!"],
   hollow: ["Hollow is here.", "Did you leave a light on?", "I was always here.", "Hush now."],
   bigboy: ["Big boy here!", "Wanna play?", "Mine! All mine!"],
   sawyer: ["Measure twice, cut once.", "Hard hat zone!", "Let's get sawing."],

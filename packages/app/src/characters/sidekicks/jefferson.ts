@@ -1,9 +1,9 @@
 /**
- * Jefferson's sidekick (id "sidekick-jefferson"): a baby giraffe, a town bot that wanders the square and plays
+ * Grex's sidekick (id "sidekick-jefferson"): a baby giraffe, a town bot that wanders the square and plays
  * chess at the park's tables. No powers, never fights: a curious kid who copies the big guy, so it carries ONE small
  * sparkler in one hoof, held up proudly.
  *
- * Softer and rounder than Jefferson: paler yellow, a few round pale-orange spots, a big round head with big shiny
+ * Softer and rounder than Grex: paler yellow, a few round pale-orange spots, a big round head with big shiny
  * eyes, short stubby ossicones with no flames, a plain brown tuft down its neck and on its tail, a round little body
  * and knobbly legs. Three-quarters, facing our right, light from the top left.
  *
@@ -765,7 +765,7 @@ const victory: Anim = lazyAnim(() => ({
   }),
 }));
 
-export const sidekickJefferson: Character = {
+export const sidekickGrex: Character = {
   id: "sidekick-jefferson",
   name: "Jefferson's sidekick",
   w: W,

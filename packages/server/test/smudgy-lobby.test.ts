@@ -116,7 +116,7 @@ describe("Smudgy online", () => {
   });
 
   it("a shared floor (Eric, Nov 21): the live window draws his hidden rook a pawn while another boss is in focus", () => {
-    // (?paint=1's start: his rook hidden on d7. Jefferson first in turn order, so he's in focus as the crowd's turn begins.)
+    // (?paint=1's start: his rook hidden on d7. Grex first in turn order, so he's in focus as the crowd's turn begins.)
     const L = smudgy({ bossId: "grex", bossIds: ["grex", "smudgy"], bossPaintTest: 1 });
     const round = L.toRound();
     expect(L.runner().boss!.id).toBe("grex");

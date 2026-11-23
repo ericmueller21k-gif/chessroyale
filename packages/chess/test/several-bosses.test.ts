@@ -40,7 +40,7 @@ describe("several bosses: the deal", () => {
     expect(legalMoves(r.boards.get(0)!.fen).length).toBe(20);
   });
 
-  it("never a pair BATTLE_TOWER.apart keeps apart (Hollow with Smudgy; Nov 19: Smudgy with Alfil, Alfil with Jefferson, Dash with Smudgy), never an unknown boss or the same boss twice", () => {
+  it("never a pair BATTLE_TOWER.apart keeps apart (Hollow with Smudgy; Nov 19: Smudgy with Alfil, Alfil with Grex, Dash with Smudgy), never an unknown boss or the same boss twice", () => {
     expect(BATTLE_TOWER.apart).toEqual([["hollow", "smudgy"], ["smudgy", "alfil"], ["alfil", "grex"], ["dash", "smudgy"]]);
     expect(() => runner(["hollow", "gingerbread", "smudgy"])).toThrow(/never share a floor/);
     expect(() => runner(["alfil", "smudgy"])).toThrow(/never share a floor/);

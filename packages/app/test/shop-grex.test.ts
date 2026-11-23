@@ -33,7 +33,7 @@ import { sidekickGrexDealer } from "../src/characters/sidekicks/dealer.ts";
 import { crewHash } from "../../../scripts/bake-grex-crew.ts";
 
 /**
- * Jefferson's warehouse and his challenge intro (Nov 4; docs/decisions/2026-11-04-jefferson-home.md): the art's room in the game with
+ * Grex's warehouse and his challenge intro (Nov 4; docs/decisions/2026-11-04-jefferson-home.md): the art's room in the game with
  * its floor's shape, the dealer in his corner, his crate with Giraffe Gallop; the crew's baked sheets, the machines' loops (they wait for
  * anyone in their way and go on once it's clear); his intro's beats (the call, the crew walking over, your lift), its cues, the crew's
  * spots round the table.
@@ -43,7 +43,7 @@ const room = makeRoom(SHOP_GREX_LAYOUT, def.keeper, 20, SHOP_GREX_FLOOR, def.tal
 const at = (c: number, r: number) => room.blocked[r * room.n + c] === 1;
 const solidAt = (c: number, r: number) => SHOP_GREX_LAYOUT.some((p) => p.solid && !isFloor(p.name) && squaresOf(p).some((s) => s.c === c && s.r === r));
 
-describe("Jefferson's warehouse", () => {
+describe("Grex's warehouse", () => {
   it("its floor is 16 x 16 (columns 2-17, rows 3-18) and the door's two squares; everything round it is racking or wall, blocked", () => {
     expect(SHOP_GREX_FLOOR).toHaveLength(20);
     for (let r = 0; r < 20; r++)
@@ -103,12 +103,12 @@ describe("the dealer keeps the shop, in his corner", () => {
     expect(sidekickGrexDealer.id).toBe(s.id);
   });
 
-  it("he isn't a town bot: Sparky stays Jefferson's kid in the town", () => {
+  it("he isn't a town bot: Sparky stays Grex's kid in the town", () => {
     expect(BOTS.filter((b) => b.boss === "grex").map((b) => b.name)).toEqual(["Sparky"]);
   });
 
   it("on his squares (16, 3) and (17, 3), drawn at his art's size (79 px), facing west, by the taped SHOP sign; no name, the day tone", () => {
-    expect(def).toMatchObject({ home: "grex", boss: "Jefferson", kid: "dealer", at: [16.8, 3.2], tall: 79, flip: true, roof: "warehouse", chatTone: "day" });
+    expect(def).toMatchObject({ home: "grex", boss: "Grex", kid: "dealer", at: [16.8, 3.2], tall: 79, flip: true, roof: "warehouse", chatTone: "day" });
     expect(def.keeper).toEqual(SHOP_GREX_KEEPER.keeper);
     expect(def.at).toEqual(SHOP_GREX_KEEPER.at);
     // (His drawn height: 79 of the room's pixels, as the art draws him; the kids' is SHOP's sidekickSquares.)
@@ -119,17 +119,17 @@ describe("the dealer keeps the shop, in his corner", () => {
   });
 });
 
-describe("Jefferson's Boss Crate and Giraffe Gallop", () => {
-  it("in BOSS_CRATES with his ride, Giraffe Gallop, first; sold to everyone (Jefferson is live); its words as the others'", () => {
+describe("Grex's Boss Crate and Giraffe Gallop", () => {
+  it("in BOSS_CRATES with his ride, Giraffe Gallop, first; sold to everyone (Grex is live); its words as the others'", () => {
     const crate = bossCrateOf("grex")!;
     expect(BOSS_CRATES).toContain(crate);
-    expect([crate.id, crate.name, crate.ride]).toEqual(["boss-grex", "Jefferson's Boss Crate", "jefferson-giraffe"]);
+    expect([crate.id, crate.name, crate.ride]).toEqual(["boss-grex", "Grex's Boss Crate", "jefferson-giraffe"]);
     expect(crate.items).toContain("jefferson-giraffe");
     expect(adminFirst(bossDef("grex")!)).toBe(false);
     expect(itemDef("jefferson-giraffe")).toMatchObject({ name: "Giraffe Gallop", tier: "mythic", slot: "ride" });
     expect(shopOf("grex")!.crate).toBe(crate.name);
-    expect(priceLine(def)).toBe("3 Jefferson tokens, or 1 Jefferson token + 1 crate key");
-    expect(holdLine(def, { tokens: 1, keys: 1 })).toBe("You have 1 Jefferson token and 1 crate key.");
+    expect(priceLine(def)).toBe("3 Grex tokens, or 1 Grex token + 1 crate key");
+    expect(holdLine(def, { tokens: 1, keys: 1 })).toBe("You have 1 Grex token and 1 crate key.");
     expect(prizeRows(def)[0]).toMatchObject({ id: "jefferson-giraffe", name: "Giraffe Gallop", kind: "Mythic ride" });
   });
 });
@@ -274,7 +274,7 @@ describe("his challenge intro (Nov 4: Eric's design)", () => {
   const intro = introOf("grex")!;
 
   it("his own intro, across, on the marks: one of his four calls at random (placeholders until Eric's Gemini lines)", () => {
-    expect(intro).toMatchObject({ name: "Jefferson", layout: "across", custom: true });
+    expect(intro).toMatchObject({ name: "Grex", layout: "across", custom: true });
     expect(intro.lines).toEqual(["Boys! We got a challenger!", "Take five, everybody. We're playing chess.", "Who wants a fifteen-minute break?", "Forks down, boys. Somebody wants a game."]);
     expect(intro.line).toBe(intro.lines![0]);
     expect(intro.lines!.map((_, i) => lineOf(intro, () => (i + 0.5) / 4))).toEqual(intro.lines);

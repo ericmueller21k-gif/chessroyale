@@ -203,7 +203,7 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await expect(main.getByRole("button", { name: /^People only/ })).toHaveText(/^People onlyRandom boss · no bots · starts at 50, or 10 after \d+ s$/);
 
   // Play with friends: the raid is made for the boss picked (the lobby's bossPicked).
-  await tile(page, "Jefferson").click();
+  await tile(page, "Grex").click();
   await main.getByRole("button", { name: /^Play with friends/ }).click();
   const made = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/api/lobby?"));
   await page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Create a Boss Battle" }).click();
@@ -214,7 +214,7 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   // Raid with bots: you and 49 bots against the boss picked.
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
   await openBossRaid(page);
-  await expect(tile(page, "Jefferson")).toHaveAttribute("aria-checked", "true");
+  await expect(tile(page, "Grex")).toHaveAttribute("aria-checked", "true");
   await tile(page, "Sawyer").click();
   // (The stage shows no number (Eric, Oct 25), and the difficulty's name under the boss (Medium). A Solo raid's strength is the usual one, a
   // step above your rating plus Sawyer's offset: 1350 unrated, as it was; its brain plays it with the bots as a crowd.)
@@ -313,7 +313,7 @@ for (const admin of [false, true]) {
       await openSoloBoss(page);
       // (Counted from the roster, as the boss rows below are: each new boss is admins-first, so the admin count grows with it.)
       await expect(page.locator(".bs-tile")).toHaveCount(playableBosses().length + (admin ? adminFirstBosses().length : 0) + 2);
-      await tile(page, "Jefferson").click();
+      await tile(page, "Grex").click();
       // (After its drop, which squashes it a little wider for a moment.)
       await page.waitForTimeout(500);
       expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), `${at}: no page scroll`).toBeLessThanOrEqual(0);
@@ -348,12 +348,12 @@ const tileLines = (p: Page) => p.locator(".bs-tile").evaluateAll((es) => [...new
 const tileAt = (ps: { x: number; y: number }[]) => ps.map((p) => document.elementFromPoint(p.x, p.y)?.closest(".bs-tile")?.getAttribute("aria-label") ?? null);
 
 // The computer's stage grows into the room the grid and START leave (Nov 12, Eric: "3X the pawn and boss size even 4"). Today's computer
-// figures on main (Nov 12, the same at 1536 x 864 and 1920 x 1080): the pawn's box 145 px tall; the boss's painted figure 178 (Jefferson),
+// figures on main (Nov 12, the same at 1536 x 864 and 1920 x 1080): the pawn's box 145 px tall; the boss's painted figure 178 (Grex),
 // 182 (Big Boy), 180 (Alfil), 167 (Chub & Chirp). The room now gives about 1.15x at 1536 x 864 (the grid takes the top of that window) and
 // about 1.96x at 1920 x 1080 (the stage's 920 px column is the width's limit). 2.5x and more needs a shorter grid or a wider stage: Eric's
 // call (docs/decisions/2026-11-12-select-desktop-big.md). The floors below are what the room gives, measured.
 const TODAY_PAWN = 145;
-const TODAY_BOSS: Record<string, number> = { Jefferson: 178, "Big Boy": 182, Alfil: 180, "Chub & Chirp": 167 };
+const TODAY_BOSS: Record<string, number> = { Grex: 178, "Big Boy": 182, Alfil: 180, "Chub & Chirp": 167 };
 /** The boss's painted figure on the stage: its top and foot, from the canvas's own pixels (as the never-scroll test reads its head). */
 /** Whether the picked boss's figure has paint yet (it comes with the match's screens, loaded as the screen opens: #759). */
 const figureDrawn = (p: Page) =>
@@ -620,7 +620,7 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
     if (h! >= 740) expect(first.y + first.height, `${w}x${h}: the first way to play whole in the window (${rows} rows)`).toBeLessThanOrEqual(h! + extra);
     else expect((await page.locator(".bs-name").boundingBox())!.y + 48, `${w}x${h}: the boss's name in the window (${rows} rows)`).toBeLessThanOrEqual(h! + extra);
     // Every boss whole inside the stage's width (Wrangler's lasso out to one side, the tallest the Hidden Boss).
-    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Moo & Moon", "Puddles", "Babur", "Folio", "Locked boss"]) {
+    for (const name of ["Ginger", "Boingo the Clown", "Grex", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Moo & Moon", "Puddles", "Babur", "Folio", "Locked boss"]) {
       await tile(page, name).click();
       // (After its drop, which squashes it a little wider for a moment.)
       await page.waitForTimeout(500);
