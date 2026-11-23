@@ -4386,7 +4386,8 @@ export const RIDES = {
  * to test it"; docs/decisions/2026-11-14-ride-sounds.md). Your own pawn's ride only, only while it moves, and only a ride listed in
  * `rides` (its file is `/sounds/rides/<id>.wav`); standing, nothing. On the game's sounds (the Sound switch, a hidden page). App:
  * `ride-sound.ts`. A ride's `kind`:
- * - `loop` (the dozer): one loop while you move (its file: one loop of exactly 1 s with 0.1 s of itself either side), at `rate` (its
+ * - `loop` (the dozer): one loop while you move (its file: one loop of exactly 1 s with 0.1 s of itself either side; or `synth`, made in
+ *   code: Birdie's Train, his own train run, its loop where birdie-sounds.ts says), at `rate` (its
  *   speed and pitch). A hard start and stop (Eric, Nov 16: "forget the fade in and out, it should be a hard start and stop when you
  *   start moving and stop. Like boingo"; docs/decisions/2026-11-16-ride-sound-hard.md): full level and speed on your first moving
  *   frame, out once you stop. `level`: its gain on the game's sounds (each loop is -20 dB RMS, so well under a move's knock).
@@ -4410,11 +4411,16 @@ export const RIDE_SOUND = {
     "ginger-sled": { kind: "loop", rate: 1, bright: true },
     /** Its loop's 4 boings (its "little tune": low, mid, low, high), cut as in the sample Eric picked (Nov 15: "Yeah, I like A"). */
     "boingo-pogo": { kind: "steps", level: 0.3, boings: [0, 0.245, 0.49, 0.735], lengthS: 0.245, on: "takeoff" },
+    /** Birdie's Train (Nov 23): his own train run, made in code as his sounds are (birdie-sounds.ts BIRDIE_RIDE_LOOP), no file. */
+    "birdie-train": { kind: "loop", rate: 1, synth: "birdie" },
   } as Readonly<Record<string, RideLoopSound | RideStepSound>>,
 } as const;
 /** A ride whose sound loops while it moves (RIDE_SOUND). */
-/** `bright`: played round the game sounds' 6 kHz softening (sound.ts `gameBus(true)`), for a sound whose highs are the point (a bell). */
-export type RideLoopSound = { readonly kind: "loop"; readonly rate: number; readonly bright?: boolean };
+/**
+ * `bright`: played round the game sounds' 6 kHz softening (sound.ts `gameBus(true)`), for a sound whose highs are the point (a bell).
+ * `synth`: made in code, not a file: a boss's own synthesized sound (`birdie`: his train run, looped where birdie-sounds.ts says).
+ */
+export type RideLoopSound = { readonly kind: "loop"; readonly rate: number; readonly bright?: boolean; readonly synth?: "birdie" };
 /** A ride with a one-shot on every step (RIDE_SOUND). */
 export type RideStepSound = { readonly kind: "steps"; readonly level: number; readonly boings: readonly number[]; readonly lengthS: number; readonly on: "takeoff" | "landing" };
 

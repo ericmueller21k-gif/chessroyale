@@ -177,6 +177,9 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
   { id: "log-roller", name: "The Log Roller", tier: "mythic", slot: "ride", description: "Timber's favorite commute. Keep your feet moving and never, ever look down." },
   // (Nov 4: Wrangler's, one of the pen knights in his barn, saddled; in his crate from the start. Its line is the drawing's.)
   { id: "pen-pony", name: "Pen Pony", tier: "mythic", slot: "ride", description: "One of Wrangler's pen knights, saddled up. It won't go straight, but it hops like nobody's business." },
+  // (Nov 23: Birdie's, his little yellow diesel, long and low, its body the item's color (Yellow is his train's); in his crate from the
+  // start. Its line is the drawing's.)
+  { id: "birdie-train", name: "Birdie's Train", tier: "mythic", slot: "ride", description: "A little yellow diesel that always runs on time. The tracks are imaginary; the punctuality is not." },
   // Outfits (Nov 10): worn over everything else, a secret slot (the locker shows it only to someone who owns one). The Banana
   // Suit is the Mythic Crate's secret item (MYTHIC_CRATE_ITEMS); no crate rolls it yet.
   { id: "banana-suit", name: "Banana Suit", tier: "mythic", slot: "outfit", description: "Fully committed to the bit. Opponents keep slipping up." },

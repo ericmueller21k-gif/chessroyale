@@ -10,6 +10,8 @@
  * overlap freely. No fade, no timer: standing, no steps, so nothing.
  *
  * A `loop` ride (the dozer): one loop at a time (`/sounds/rides/<id>.wav`: one loop of exactly 1 s with 0.1 s of itself either side).
+ * A `synth` loop (Birdie's Train, Nov 23) has no file: its samples are made in code as its boss's sounds are (`SYNTHS`), the first time
+ * it's asked for once the audio is made, and it loops where they say.
  * A hard start and stop, no fades (Eric, Nov 16: "it should be a hard start and stop when you start moving and stop. Like boingo";
  * docs/decisions/2026-11-16-ride-sound-hard.md): full level and speed on your first moving frame, out once you stop.
  *
@@ -22,9 +24,19 @@
 import { RIDE_SOUND, hunchessBase, type RideLoopSound, type RideStepSound } from "@chessroyale/core";
 import { gameBus, isMuted, isPageHidden, loadAudioFile, onAudioRebuilt, onMuteChange } from "./sound.ts";
 import { RIDE_CELLS } from "./town/ride-cells.ts";
+import { BIRDIE_RIDE_LOOP, birdieSound } from "./characters/birdie-sounds.ts";
 
 /** Where the loop runs in each file (s): the README's shape for every ride's loop. */
 export const RIDE_LOOP = { start: 0.1, end: 1.1 } as const;
+/**
+ * The loops made in code (RIDE_SOUND's `synth`), never a file: each its samples at a sample rate and where it loops (s). Birdie's Train:
+ * his own medium train run (birdie-sounds.ts; Eric, Nov 18: a boss's sounds are his own).
+ */
+export const SYNTHS: Readonly<Record<NonNullable<RideLoopSound["synth"]>, { samples: (rate: number) => Float32Array; loop: { start: number; end: number } }>> = {
+  birdie: { samples: (rate) => birdieSound(BIRDIE_RIDE_LOOP.run, rate), loop: BIRDIE_RIDE_LOOP },
+};
+/** Where a loop ride's loop runs (s): its synth's, or every file's. */
+const loopOf = (s: RideLoopSound) => (s.synth ? SYNTHS[s.synth].loop : RIDE_LOOP);
 export const rideSoundFile = (id: string) => `/sounds/rides/${id}.wav`;
 /** A loop's start and stop (s): its level up from 0 or down to it this fast, so neither clicks; the Sound switch's too. */
 export const DECLICK_S = 0.03;
@@ -50,15 +62,33 @@ let clock = () => performance.now();
  */
 export const rideSoundId = (id: string | null | undefined): string | null => (id ? (hunchessBase(id) ?? id) : null);
 
-/** Fetches and decodes a ride's loop once (the town warms yours after its first frame; a first move asks for it too). */
+/**
+ * Fetches and decodes a ride's loop once (the town warms yours after its first frame; a first move asks for it too). A `synth` loop is
+ * made at once instead, on the audio's context (not yet made: the first move makes it).
+ */
 export function warmRideSound(item: string | null | undefined) {
   const id = rideSoundId(item);
-  if (!id || !RIDE_SOUND.rides[id] || buffers.has(id) || asking.has(id)) return;
+  const s = id ? RIDE_SOUND.rides[id] : undefined;
+  if (!id || !s || buffers.has(id) || asking.has(id)) return;
+  if (s.kind === "loop" && s.synth) {
+    const ctx = gameBus()?.ctx;
+    if (ctx) buffers.set(id, synthBuffer(ctx, s.synth));
+    return;
+  }
   asking.add(id);
   void loadAudioFile(rideSoundFile(id)).then((b) => {
     asking.delete(id);
     if (b) buffers.set(id, b);
   });
+}
+
+/** A synth loop's samples on a buffer, with room to its loop's end (a run may stop short of it: silence after). */
+function synthBuffer(ctx: BaseAudioContext, name: NonNullable<RideLoopSound["synth"]>): AudioBuffer {
+  const { samples, loop } = SYNTHS[name];
+  const x = samples(ctx.sampleRate);
+  const buf = ctx.createBuffer(1, Math.max(x.length, Math.ceil(loop.end * ctx.sampleRate) + 1), ctx.sampleRate);
+  buf.getChannelData(0).set(x);
+  return buf;
 }
 
 /** A frame loop: you moved this frame, on this ride (its id; null: on foot). Call it only on the frames you move. */
@@ -146,8 +176,11 @@ function start(id: string, s: RideLoopSound) {
   if (isMuted() || isPageHidden()) return;
   const bus = gameBus(s.bright);
   if (!bus || bus.ctx.state !== "running") return;
+  // (A synth loop is made here if it hadn't been, and plays on this frame; a file's plays once it has come.)
+  if (!buffers.has(id)) warmRideSound(id);
   const buf = buffers.get(id);
-  if (!buf) return warmRideSound(id);
+  if (!buf) return;
+  const loop = loopOf(s);
   listen();
   // (Another ride's, or the old context's: that one goes, this one starts.)
   if (voice) stop(voice);
@@ -156,14 +189,14 @@ function start(id: string, s: RideLoopSound) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.loop = true;
-  src.loopStart = RIDE_LOOP.start;
-  src.loopEnd = RIDE_LOOP.end;
+  src.loopStart = loop.start;
+  src.loopEnd = loop.end;
   src.playbackRate.value = s.rate;
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0, now);
   gain.gain.linearRampToValueAtTime(RIDE_SOUND.level, now + DECLICK_S);
   src.connect(gain).connect(bus.out);
-  src.start(now, RIDE_LOOP.start);
+  src.start(now, loop.start);
   live++;
   voice = { id, ctx, src, gain };
   log(`ride:start:${id}`);
