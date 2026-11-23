@@ -3008,10 +3008,13 @@ export class LobbyCore {
       }
       if (runner.stageComplete()) {
         // (A power won it at the start of his turn, Birdie's train on your king: its ride plays as he "thinks", then the results, as solo.)
-        const winMs = this.r.winShown ? 0 : powerWinShowMs(runner.bossView()!);
+        const winView = runner.bossView()!;
+        const winMs = this.r.winShown ? 0 : powerWinShowMs(winView);
         if (winMs > 0) {
           this.r.winShown = true;
           this.r.phase = "boss";
+          // (When the ride began, sent with it (BirdieView.turnAt), as thinkMinAt does: a device rejoining in the hold carries it on.)
+          if (winView.powers?.birdie) this.r.birdieAt = { turn: winView.powers.turn, at: this.io.now() };
           this.broadcast(this.bossMessage(0, { thinking: true }));
           return this.setTimer("nextRound", this.io.now() + winMs);
         }

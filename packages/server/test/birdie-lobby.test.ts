@@ -100,6 +100,9 @@ describe("Birdie online", () => {
     expect(held).toBeTruthy();
     expect(l.log.some((x) => x.msg.t === "results")).toBe(false);
     const at = held!.at;
+    // (When the ride began, sent with it (turnAt), so a device rejoining in the hold carries it on rather than replaying it.)
+    const heldBoss = (held!.msg as Extract<Msg, { t: "boss" }>).boss!;
+    expect(heldBoss.powers?.birdie?.turnAt).toMatchObject({ turn: heldBoss.powers!.turn, at });
     const ms = powerWinShowMs((held!.msg as Extract<Msg, { t: "boss" }>).boss!);
     expect(ms).toBeGreaterThan(0);
     l.advance(ms - 100);
