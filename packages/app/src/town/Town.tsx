@@ -49,7 +49,7 @@ import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.
 import { N, colI, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { HIDDEN_ROOM_FEEL, SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
 import { ZEBRA_OUTSIDE_LINES, pickLine } from "./shops/zebra-lines.ts";
-import { canChallengeInside, homeTheme, roomTheme, shopOf } from "./shops/shops.ts";
+import { canChallengeInside, homeTheme, roomMusicFor, shopOf } from "./shops/shops.ts";
 import type { RoomPart } from "./shops/room.ts";
 import type { LoadedRoom, RoomFx, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
 import { CHALLENGE_FEEL, introOf, nextFlow, type ChallengeEvent, type ChallengeFlow } from "./shops/challenge.ts";
@@ -68,7 +68,7 @@ import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
 import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sound.ts";
-import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, TOWN_PICTURES, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_PICTURES, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { APP_VERSION, reportTownFallback } from "../problems.ts";
@@ -401,11 +401,11 @@ export function TownScreen({
     // (The room's pictures painted a slice a frame while the town zooms, the rest once it's black: shops/load-slice.ts.)
     roomLoadSlice(F.loadSliceMs);
     if (challenge) step("atDoor");
-    // (The boss's theme loads as the door zooms: walked in on your own, it plays as the room shows; by a challenge, not until its
-    // splash. Eric, Nov 11.)
+    // (The boss's theme loads as the door zooms: walked in on your own, it plays as the room shows (only with ROOM_BOSS_MUSIC on, off
+    // since Eric, Nov 23); by a challenge, not until its splash. Eric, Nov 11.)
     byDoor.current = !challenge;
     // (A challenge's too: its splash starts the theme, Eric, Nov 11; loaded now it's ready by then.)
-    roomMusicLoad(homeTheme(id));
+    if (challenge || ROOM_BOSS_MUSIC) roomMusicLoad(homeTheme(id));
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
     const load = chunk(import("./shops/ShopRoom.tsx")).then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
     const scene = roomFxOf(id, "front");
@@ -661,8 +661,8 @@ export function TownScreen({
   const towerBack = async (b: TowerBack) => {
     doorBusy.current = true;
     opening.current = { home: "tower", challenge: false };
-    // (The tower's theme, as at its door: loading now, playing as its room shows, Nov 19.)
-    roomMusicLoad(homeTheme("tower"));
+    // (The tower's theme, as at its door: loading now, playing as its room shows, Nov 19; only with ROOM_BOSS_MUSIC on, Nov 23.)
+    if (ROOM_BOSS_MUSIC) roomMusicLoad(homeTheme("tower"));
     const back = "play" in b ? await towerBackSolo(b.play) : "party" in b ? await towerBackParty(b.party) : { lobby: true, error: null, floor: 1, mode: "out" as const, lives: 0 };
     const { lobby, floor } = back;
     floorS.current = lobby ? null : { floor, mode: back.mode, bosses: [], times: null, t0: null, board: null, lives: back.lives, ...("party" in b ? { mates: partyMates() } : {}) };
@@ -678,7 +678,7 @@ export function TownScreen({
     ctl.current?.pause();
     setShopOut(SHOP_FEEL.startZoom === 1);
     setInside({ ...got, intro: null, fx, n: 1, ...(lobby ? { arrived: "top" as const } : { at: FLOOR_YOU.sq }) });
-    roomMusic(roomTheme(got.room.def));
+    roomMusic(roomMusicFor(got.room.def));
   };
   /**
    * A solo floor's (or a party copy's played alone) result sent: into the floor room, the elevator open while the climb goes on (a win, or
@@ -773,7 +773,7 @@ export function TownScreen({
     if (at?.room.def.home === "tower" && at.room.def.part === "top") floorShown();
     if (byDoor.current && at) {
       byDoor.current = false;
-      roomMusic(roomTheme(at.room.def));
+      roomMusic(roomMusicFor(at.room.def));
       setBanner({ ...areaBannerOf(at.room.def, HOMES.find((h) => h.id === at.room.def.home)?.name ?? ""), n: ++bannerN.current });
     }
     fadeTo(0, SHOP_FEEL.fadeMs);
