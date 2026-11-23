@@ -1,7 +1,7 @@
 # Boss art: arena-birdie-fall
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 16 turns, 10 renders.
-- Spend: **$2.68** of the $6 cap (36 input, 176,124 cache-write, 1,301,343 cache-read, 77,056 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 25 turns, 15 renders.
+- Spend: **$1.76** of the $6 cap (52 input, 97,298 cache-write, 1,620,568 cache-read, 47,665 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/arena-birdie-fall/arena-birdie-fall.ts.
 - Previews: the final preview failed: /home/user/chessroyale/scripts/preview-characters.ts:303
@@ -16,37 +16,32 @@ Node.js v22.23.5
 
 ## Its notes
 
-Only the train and track in `approach` changed. `fall` was rendered after the edit and is unchanged: sky, rain and wind lines, Birdie's tumble, the cap, the ids, the cues and the size are as before. I couldn't check the scale-4 close-ups the brief asked for: every render came out at 1x whatever scale I asked for. So the rivets, the red stripe, the handrails and the lamp rims weren't checked pixel by pixel; their sizes come from the geometry. At 1x it reads as a long yellow locomotive coming up a track.
+Third pass on Birdie's fall. I only changed the locomotive's front, the camera so the shot is head-on, and Birdie's path in `approach`. The sky, rain and wind lines, his tumble, the cap, the colours, the frame counts, the ids and the cues are as before. `fall` re-rendered the same as the second pass, and frame 0 of `approach` still matches frame 0 of `fall` (the far ground and a tiny train below y 218, as before).
 
-The animations:
-- `fall`: 5 frames x 120 ms, loops. Unchanged.
-- `approach`: 9 frames x 390 ms, plays once and holds the last frame. Cue "approach" on frame 0, "hit" on frame 8. Frame 0 matches `fall` frame 0 except for a tiny train in the haze showing two lamp dots at about (175, 224) and (173, 224), as in the first pass.
-  - Frames 1-3: the rails and the gravel bed fade in out of the haze, and the train grows.
-  - Frames 4-6: sleepers appear, closing up with distance, and the hood and its vents read.
-  - Frames 7-8: the engine fills the bottom third (about x 22-150, y 145-235). The cab roof is just under Birdie and the hood runs under his tail toward the vanishing point. The lamps are at full brightness and pale light runs along the rails ahead.
+**Checks:** I rendered `fall` and `approach` whole. Scale 4 doesn't render bigger: a single frame still came back at 1x. To check the nose, headlights, pilot and frame-0 lamp dots up close, I used a temporary 3x zoom animation, then deleted it.
 
-The train is built as 3D blocks seen through one camera:
-- A slatted pilot with a coupler, and a short nose with the lamps and a grille between them.
-- A raised cab with a two-pane windscreen, a side window and a charcoal roof.
-- Behind it a long, lower hood with five louvred side vents, roof fans and a stack.
-- A walkway deck the whole length, with the thin red stripe right round it, plus handrails and posts.
-- A fuel tank, and two trucks with three big wheels a side sitting on the rails.
-- It is 17.4 m long and 4.45 m tall, about 4 times as long as it is tall.
-- A dark outline is drawn where one block stands in front of another.
+**The new nose (a curved, streamlined "bulldog" front):** it's one curved shape, not boxes, shaded from its real surface so it reads as rounded, light from the top left. The chin tucks under, the nose bulges forward and curves back to a near-flat top, then the windscreen slopes back. The whole front rounds back toward the sides, and the roof has rounded shoulders.
+- Keys: yellow `u v y Y` in bands. `Y` is the highlight band across the top of the nose and the lit left shoulder; `u` is under the chin and on the shaded right.
+- Windscreen: two panes in `z`/`Z` with a glint and a dark `m` frame, the centre post in body yellow. A charcoal roof cap (`m n N`) sits above it.
+- The red stripe `q` (`T` where it's in shade) runs right round the nose at one height, so it curves with the body.
+- The pilot (cowcatcher) is a raked, rounded silver apron (`j l J`, slats, a `J` top edge, `m` bottom edge) with a small coupler.
+- Headlights: `W` (right) and `V` (left), still `#fff3b8` and round, with a silver rim. The hot core `w` grows each frame, from a single pixel in frame 0 to 70% of the lamp in frame 8, and the pale light spills further down the rails in front each frame. They sit 0.98 m either side of the middle and 1.72 m up.
+- Outlined in `k` as before, with ink where the nose stands in front of the pilot.
 
-Palette keys for the train:
-- Yellow `u v y Y`, with `u` as the shadow.
-- Roof `m n N`, stripe `q`, silver parts `j l J`, windows `z Z`.
-- `W` is the near (right) headlight and `V` the far (left) one, both `#fff3b8` and round. Each has a core of `w` that grows from 12% to 70% of the lamp, and a thin silver rim. The light on the rails uses `w` and `Y`, not `W` or `V`.
+**Timings (unchanged):** `fall` is 5 × 120 ms, looping. `approach` is 9 × 390 ms, plays once and holds its last frame. Cues: "approach" on frame 0, "hit" on frame 8.
 
-The track:
-- The two rails are 1.6 m apart, centred at X = +/-0.8, exactly under the wheels. Each has a lit head and a dark side, and the nearest show rivets.
-- Sleepers are 4.4 m long and 0.72 m apart. They are only drawn where they come out at least 2.4 px apart, so far off they blend into the haze instead of flickering.
-- The vanishing point is at x 184 on the horizon. The horizon rises from y 218 in frame 0 to y 120 in frame 8, as before.
+**Track and camera:**
+- The camera now sits on the track's middle line (`CX` 0), 2.5 m up (`CH`). The vanishing point moved from x 184 to x 100, the centre of the horizon.
+- The horizon still rises from y 218 in frame 0 to y 120 in frame 8.
+- The rails run up the middle: at the bottom of frame 8 they're about x 54 and x 146, and they converge on x 100.
+- The train comes straight down the rails, centred, from about 70 m away (two lamp dots, x 98 and 101, in the haze) to 2.95 m. In frame 8 its front spans about x 34–166 and y 78–225, inside the safe area.
 
-Things you might want to change:
-- The last frame is smaller than the brief's x 26-190, y 173-238. The far end can't reach x 190 with the vanishing point at x 184, and a longer engine would only add a few pixels. `Z_NEAR` (8.8) sets how close it gets (smaller is bigger), `CX` (9.6) how far to the side the camera sits (more shows more of the side), and `OX` (184) where the vanishing point is.
-- The last frame shows little track ahead of the train. Most of the nearest rail is in the bottom 20 rows that a computer cuts off. Raising `Z_NEAR` a little shows more track but makes the train smaller.
-- `Z_FAR` (70) sets how far off it starts. The deck and hood blocks (17.0-17.4 m) set the hood length, and `VENTS` sets the vent spacing.
-- The light reaches 1.5 + 5 x brightness metres ahead of the train.
-- The rain and wind lines move at the same speed as before.
+**Birdie's column and middle, frames 0–8:** x 102, 102, 102, 101, 101, 101, 101, 100, 100; y 94, 97, 101, 106, 111, 116, 122, 127, 133. In frame 8 his centre (x 100) and the nose's centre (x 100) are on the same column. He covers the nose's middle, with the windscreen visible above him and the two lamps blazing either side of him at lamp height.
+
+**Choices you might want to change:**
+- **How close the train gets:** `Z_NEAR` 2.95 m, which is about two-thirds of the frame's width. The growth from frame 7 to 8 is a big jump (true perspective at close range).
+- **Camera height:** `CH` 2.5 m, so we look slightly up at the cab and the roof's top isn't seen, only its charcoal cap.
+- **Nose and hood size:** about 1.1 m of nose before the windscreen; the hood behind is unchanged.
+- **Headlights:** in frame 7 the right lamp is hidden behind Birdie's tail. `LAMP_X`, `LAMP_Y` and the lamp size (`LAMP_R` 0.25) are one-number tweaks.
+- **Wheels:** head-on and close, the pilot hides the wheels, so the train reads as sitting on the rails through its pilot rather than showing its wheels.
+- **The lines:** speed and wind line speeds are unchanged.

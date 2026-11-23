@@ -3,13 +3,15 @@
  *  - fall (loop, 5 x 120 ms): a blurred cartoon sky, banded blue-grey to haze, pale clouds far below; young Birdie
  *    tumbling backward through it, wings flung up, tie streaming, beak open, eye wide; his cap flying off above him;
  *    vertical speed lines streaming up (a dash period of 5 steps, so the loop is seamless) and diagonal wind streaks.
- *  - approach (once, 9 x 390 ms, holds): the same sky and Birdie; the track rises out of the haze below, drawn through
- *    one camera (two rails a gauge apart running to one vanishing point on the horizon at the right, sleepers evenly
- *    spaced so they close up with distance, gravel between), and his yellow diesel comes up it nose first: a long
- *    locomotive (pilot, short nose with the headlights, raised cab with its windscreen, a long vented hood behind,
- *    walkway handrails, the charcoal roof, the red stripe, big wheel trucks on the rails), from two dots in the haze
- *    to the bottom third, its headlights (keys W, the near lamp, and V, the far one) brighter each frame and lighting
- *    the rails ahead; Birdie sinks toward it; the lines stream faster and the wind streaks thicken.
+ *  - approach (once, 9 x 390 ms, holds): the same sky and Birdie; the track rises out of the haze below, seen straight
+ *    down its length by one camera (two rails a gauge apart running up the middle to one vanishing point at the centre
+ *    of the horizon, sleepers evenly spaced so they close up with distance, gravel between), and his yellow diesel
+ *    comes straight at us along it: a streamlined "bulldog" nose (a curved body, ray-marched and shaded from its
+ *    surface: the chin tucked under, the nose bulging round the headlights, curving back to the two-pane windscreen,
+ *    the charcoal roof cap, the red stripe right round it, a raked silver pilot below), from two dots in the haze to
+ *    the bottom half, its headlights (keys W and V) brighter each frame and lighting the rails ahead; Birdie drops
+ *    straight down into its path, centred over the track, and in the last frame the nose is on him, the lamps
+ *    flaring either side of him; the lines stream faster and the wind streaks thicken.
  * Layers: the sky (one part), the ground and track (one part per approach frame), the lines, the train (outlined),
  * then Birdie as parts (far wing, body, near wing, tie) and his cap, all outlined in k.
  */
@@ -381,10 +383,10 @@ function birdie(ph: number, cx: number, cy: number, kx: number, ky: number, kd: 
  * (the rails' tops 0), Z along the track away from us. The camera sits at (CX, CH, 0) looking straight down the track,
  * so the rails run to one vanishing point (OX on the horizon); the horizon slides up as he falls.
  */
-const OX = 184;
+const OX = 100;
 const FL = 120;
-const CX = 9.6;
-const CH = 8;
+const CX = 0;
+const CH = 2.5;
 /** The track: the rails' middles at ±GAUGE, their heads RAIL each side of that, RAILH tall; sleepers every SLEEP, SLW
  * wide, SLL each side of the middle; the ballast BAL each side, its top at BALY. */
 const GAUGE = 0.8;
@@ -397,11 +399,11 @@ const BAL = 2.7;
 const BALY = -0.35;
 /** The train's nose: from Z_FAR (two dots in the haze) to Z_NEAR (the bottom third). */
 const Z_FAR = 70;
-const Z_NEAR = 8.8;
-/** The headlights on the nose's front: at X ±LAMP_X (W the near one, at +), LAMP_Y up, LAMP_R round. */
-const LAMP_X = 0.82;
-const LAMP_Y = 2.12;
-const LAMP_R = 0.36;
+const Z_NEAR = 2.95;
+/** The headlights set into the nose: at X ±LAMP_X (W at +, V at -), LAMP_Y up, LAMP_R round. */
+const LAMP_X = 0.98;
+const LAMP_Y = 1.72;
+const LAMP_R = 0.25;
 
 interface Approach {
   j: number;
@@ -571,11 +573,8 @@ const TRUCKS = [2.7, 14.3];
 const SOLIDS: Solid[] = [];
 const solid = (x: Solid["x"], y: Solid["y"], z: Solid["z"], paint: Paint, keep?: Solid["keep"]) => SOLIDS.push({ x, y, z, paint, keep });
 
-// The pilot (cowcatcher): silver slats, stepped back toward the bottom; the coupler.
-const slats: Paint = (f, X) => (f === "t" ? "J" : f === "r" ? "j" : Math.floor((X + 1.6) / 0.27) % 2 ? "l" : "j");
-solid([-1.6, 1.6], [0.55, 0.95], [-0.38, 0.5], (f, X, Y, z, px, sy) => (f === "f" && near(Y, 0.91, 0.04, px) ? "J" : slats(f, X, Y, z, px, sy)));
-solid([-1.4, 1.4], [0.14, 0.55], [-0.2, 0.5], slats);
-solid([-0.2, 0.2], [0.5, 0.74], [-0.6, -0.38], (f) => (f === "t" ? "J" : f === "f" ? "l" : "j"));
+// The coupler, poking out of the pilot.
+solid([-0.13, 0.13], [0.5, 0.68], [-0.72, -0.2], (f) => (f === "t" ? "l" : "j"));
 // The underframe, dark.
 solid([-1.0, 1.0], [0.7, 0.96], [0.4, 17.2], () => "m");
 // The fuel tank between the trucks.
@@ -596,47 +595,135 @@ for (const zc of TRUCKS) {
           if (d > 0.56 && Y > 0.45 && z < wz + 0.15) return "l";
           return "j";
         },
-        (X, Y, z) => Math.hypot(z - wz, Y - 0.5) <= 0.5,
+        // Round from the side; from the front (its leading face) a wheel is a dark block standing on the rail.
+        (X, Y, z) => Math.hypot(z - wz, Y - 0.5) <= 0.5 || Math.abs(z - (wz - 0.5)) < 0.01,
       );
   solid([-1.22, 1.22], [0.62, 0.92], [zc - 1.75, zc + 1.75], (f, X, Y, z, px) => (f === "t" ? "J" : f === "f" ? "j" : near(Y, 0.89, 0.04, px) ? "J" : Y < 0.68 ? "j" : "l"));
 }
 // The deck (the walkway along the hood), yellow, the thin red stripe right round it.
-solid([-1.9, 1.9], [0.95, 1.36], [0, 17.4], (f, X, Y, z, px) => {
+solid([-1.9, 1.9], [0.95, 1.36], [4.3, 17.4], (f, X, Y, z, px) => {
   if (f === "t") return "u";
   if (near(Y, 1.17, 0.06, px)) return "q";
   if (f === "f") return Y > 1.17 ? "y" : "v";
   return Y > 1.17 ? "v" : "u";
 });
-// The short nose: round top corners, the headlights (drawn after) and a grille between them.
-solid(
-  [-1.45, 1.45],
-  [1.36, 2.95],
-  [0, 0.95],
-  (f, X, Y, z, px, sy) => {
-    if (f === "t") return "Y";
-    if (f === "r") return Y > 2.75 ? "y" : "v";
-    if (Math.abs(X) < 0.3 && Y > 1.6 && Y < 2.62) return sy % 2 ? "u" : "v";
-    if (X < -1.18 || Y > 2.8) return "Y";
-    if (X > 1.2) return "v";
-    return "y";
-  },
-  (X, Y) => !(Y > 2.5 && Math.abs(X) > 1.0) || (Math.abs(X) - 1.0) ** 2 + (Y - 2.5) ** 2 <= 0.2,
-);
-// The raised cab: the windscreen at its front, a side window, its charcoal roof.
+/**
+ * The streamlined "bulldog" nose and cab, one curved body (not boxes): z = 0 is the nose's most forward point. In side
+ * view the chin tucks under, the nose bulges forward round the headlights and curves back up to a near-flat top, the
+ * windscreen slopes back above it, then the roof's curve; in plan the whole front is rounded back toward its sides; in
+ * cross-section the roof has round shoulders. Shaded from its true surface normal, light from the top left.
+ */
+const NW = 1.9; // half its width
+const NB = 0.85; // its bottom (the chin)
+const NT = 4.45; // its roof
+const NR = 0.62; // the roof's shoulder radius
+const NBACK = 4.3; // where it meets the hood
+const NOSE_Y = 1.72; // the nose's most forward height
+const SCREEN = [3.12, 4.04] as const; // the windscreen's band
+const LV = (() => {
+  const v = [-0.5, 0.8, -0.55];
+  const m = Math.hypot(v[0]!, v[1]!, v[2]!);
+  return v.map((c) => c / m) as [number, number, number];
+})();
+function roofY(ax: number): number {
+  const c = NW - NR;
+  return ax <= c ? NT : NT - NR + Math.sqrt(Math.max(0, NR * NR - (ax - c) ** 2));
+}
+/** How far back the front surface is at height Y on the middle line. */
+function prof(Y: number): number {
+  if (Y < NOSE_Y) {
+    const u = Math.min(1, (NOSE_Y - Y) / (NOSE_Y - NB));
+    return 0.3 * (1 - Math.sqrt(1 - 0.96 * u * u));
+  }
+  if (Y < SCREEN[0]) {
+    const u = (Y - NOSE_Y) / (SCREEN[0] - NOSE_Y);
+    return 1.6 * (1 - Math.sqrt(1 - 0.94 * u * u));
+  }
+  const z0 = 1.6 * (1 - Math.sqrt(0.06));
+  if (Y < SCREEN[1]) return z0 + (Y - SCREEN[0]) * 0.72;
+  const z1 = z0 + (SCREEN[1] - SCREEN[0]) * 0.72;
+  const u = Math.min(1, (Y - SCREEN[1]) / (NT - SCREEN[1]));
+  return z1 + 0.55 * (1 - Math.sqrt(1 - 0.98 * u * u));
+}
+/** The front surface: the profile, rounded back toward the sides (more on the nose than on the cab). */
+function zf(ax: number, Y: number): number {
+  const r = Math.min(1, ax / NW);
+  const p = Y < 2.8 ? 1.0 : Y > 3.4 ? 0.6 : 1.0 - (0.4 * (Y - 2.8)) / 0.6;
+  return prof(Y) + p * (0.35 * r * r + 0.65 * (1 - Math.sqrt(1 - 0.95 * r ** 4)));
+}
+function noseIn(X: number, Y: number, z: number): boolean {
+  const ax = Math.abs(X);
+  if (ax > NW || Y < NB || z > NBACK || Y > roofY(ax)) return false;
+  return z >= zf(ax, Y);
+}
+/** The pilot (cowcatcher): a raked, rounded apron under the nose, narrower at the bottom. */
+const PB = 0.38;
+const pilotHW = (Y: number) => 1.2 + ((Y - PB) / (NB - PB)) * 0.4;
+const pilotZ = (ax: number, Y: number) => -0.42 + (Y - PB) * 0.7 + 0.5 * (ax / pilotHW(Y)) ** 2;
+function pilotIn(X: number, Y: number, z: number): boolean {
+  if (Y < PB || Y > NB || z > 1.0) return false;
+  const ax = Math.abs(X);
+  if (ax > pilotHW(Y)) return false;
+  return z >= pilotZ(ax, Y);
+}
+const norm = (v: [number, number, number]): [number, number, number] => {
+  const m = Math.hypot(...v) || 1;
+  return [v[0] / m, v[1] / m, v[2] / m];
+};
+const dot = (a: readonly number[], b: readonly number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+/** The outward normal of the nose where a ray met it. */
+function noseNormal(X: number, Y: number, z: number): [number, number, number] {
+  const ax = Math.abs(X);
+  const sg = X < 0 ? -1 : 1;
+  const dRoof = roofY(ax) - Y;
+  const dFront = z - zf(ax, Y);
+  if (dRoof < dFront) {
+    const c = NW - NR;
+    return ax <= c ? [0, 1, 0] : norm([(ax - c) * sg, Y - (NT - NR), 0]);
+  }
+  const e = 0.012;
+  const gx = (zf(ax + e, Y) - zf(Math.max(0, ax - e), Y)) / (ax + e - Math.max(0, ax - e));
+  const gy = (zf(ax, Y + e) - zf(ax, Y - e)) / (2 * e);
+  return norm([gx * sg, gy, -1]);
+}
+const yellow = (lum: number) => (lum >= 0.7 ? "Y" : lum >= 0.42 ? "y" : lum >= 0.16 ? "v" : "u");
 const glass = (u: number, v: number) => ((((u + v * 0.9) % 1) + 1) % 1 < 0.17 ? "Z" : "z");
-solid([-1.9, 1.9], [1.36, 4.2], [0.95, 4.25], (f, X, Y, z, px) => {
-  if (f === "f") {
-    if (Y >= 3.0 && Y <= 3.9 && Math.abs(X) >= 0.17 && Math.abs(X) <= 1.62) return glass(X, Y - 3);
-    return X < -1.7 ? "Y" : Y < 1.55 ? "v" : "y";
-  }
-  if (f === "r") {
-    if (Y >= 3.0 && Y <= 3.9 && z >= 1.3 && z <= 2.9) return glass(-z, Y - 3);
-    if (near(z, 3.3, 0.03, px) && Y < 3.9) return "u";
-    return Y < 1.55 ? "u" : "v";
-  }
-  return "y";
-});
-solid([-1.98, 1.98], [4.2, 4.45], [0.86, 4.33], (f, X, Y, z) => (f === "t" ? (X < -1.55 || z < 1.2 ? "N" : "n") : "m"));
+/** The windscreen's two panes (|X|, Y): rounded at their outer top corners. */
+function inPane(ax: number, Y: number, grow: number): boolean {
+  const x0 = 0.15 - grow;
+  const x1 = 1.42 + grow;
+  const y0 = SCREEN[0] + 0.1 - grow;
+  const y1 = SCREEN[1] - 0.1 + grow;
+  if (ax < x0 || ax > x1 || Y < y0 || Y > y1) return false;
+  const rc = 0.34 + grow;
+  if (ax > x1 - rc && Y > y1 - rc && Math.hypot(ax - (x1 - rc), Y - (y1 - rc)) > rc) return false;
+  const rb = 0.14 + grow;
+  if (ax > x1 - rb && Y < y0 + rb && Math.hypot(ax - (x1 - rb), Y - (y0 + rb)) > rb) return false;
+  return true;
+}
+function paintNose(X: number, Y: number, z: number, px: number): string {
+  const ax = Math.abs(X);
+  const n = noseNormal(X, Y, z);
+  const lum = dot(n, LV);
+  const hair = 1 / px;
+  // The roof: charcoal, lit at its left shoulder.
+  if (Y > SCREEN[1] + 0.1) return lum > 0.72 ? "N" : lum > 0.4 ? "n" : "m";
+  // The windscreen: two panes, a dark frame round each, the body-coloured post between.
+  if (inPane(ax, Y, 0)) return glass(X * 1.4, Y - SCREEN[0]);
+  if (inPane(ax, Y, Math.max(0.07, hair))) return "m";
+  // The red stripe, right round the nose at one height (it curves on the screen with the body).
+  if (Y >= 1.24 && Y <= 1.24 + Math.max(0.2, 2 * hair)) return lum < 0.1 ? "T" : "q";
+  // A thin pale line along the stripe's top edge where the light catches it.
+  return yellow(lum);
+}
+function paintPilot(X: number, Y: number, z: number, px: number): string {
+  const ax = Math.abs(X);
+  if (Y > NB - Math.max(0.06, 1 / px)) return X < 0.4 ? "J" : "l";
+  if (Y < PB + Math.max(0.06, 1 / px)) return "m";
+  const slat = Math.floor((X + 3) / 0.15) % 2 === 0;
+  if (ax / pilotHW(Y) > 0.7 && X > 0) return slat ? "j" : "m";
+  return slat ? (X < -0.5 ? "J" : "l") : ax / pilotHW(Y) > 0.7 ? "m" : "j";
+}
 // The long hood behind the cab: side vents (louvres), its dark roof with fans and a stack.
 solid([-1.5, 1.5], [1.36, 3.5], [4.25, 17.0], (f, X, Y, z, px, sy) => {
   if (f === "t") {
@@ -716,6 +803,31 @@ function trainPart(j: number): Part {
         key = s.paint(h.face, X, Y, z, FL / h.t, y);
         who[y]![x] = i;
       }
+      // The curved nose and the pilot: marched along the ray, the first touch refined.
+      const at = (t: number) => [CX + dx * t, CH + dy * t, t - zt] as const;
+      const which = (t: number) => {
+        const [X, Y, z] = at(t);
+        return noseIn(X, Y, z) ? 1 : pilotIn(X, Y, z) ? 2 : 0;
+      };
+      const tEnd = Math.min(best, zt + NBACK + 0.05);
+      const STEP = 0.025;
+      for (let t = zt - 0.65; t < tEnd; t += STEP) {
+        const w = which(t);
+        if (!w) continue;
+        let lo = t - STEP;
+        let hi = t;
+        for (let r = 0; r < 7; r++) {
+          const m = (lo + hi) / 2;
+          if (which(m)) hi = m;
+          else lo = m;
+        }
+        const [X, Y, z] = at(hi);
+        const k2 = which(hi) || w;
+        best = hi;
+        key = k2 === 1 ? paintNose(X, Y, z, FL / hi) : paintPilot(X, Y, z, FL / hi);
+        who[y]![x] = 100 + k2;
+        break;
+      }
       if (key) {
         cv[y]![x] = key;
         depth[y]![x] = best;
@@ -756,14 +868,12 @@ function trainPart(j: number): Part {
   if (sig >= 2.4) {
     const RX = 1.84;
     const RY = 2.4;
-    line([RX, RY, 0.1], [RX, RY, 0.95], "J");
     line([RX, RY, 4.4], [RX, RY, 17.3], "J");
-    for (const z of [0.1, 4.4, 5.95, 7.5, 9.05, 10.6, 12.15, 13.7, 15.25, 16.8]) line([RX, 1.38, z], [RX, RY, z], "l");
-    line([-RX, 1.38, 0.1], [-RX, RY, 0.1], "l");
+    for (const z of [4.4, 5.95, 7.5, 9.05, 10.6, 12.15, 13.7, 15.25, 16.8]) line([RX, 1.38, z], [RX, RY, z], "l");
   }
   // The headlights: round, W the near lamp and V the far one; the hot core w grows each frame; a silver rim.
   for (const [lx, key] of [[LAMP_X, "W"], [-LAMP_X, "V"]] as const) {
-    const [cx, cy] = proj(a, lx, LAMP_Y, zt);
+    const [cx, cy] = proj(a, lx, LAMP_Y, zt + zf(Math.abs(lx), LAMP_Y));
     const R = LAMP_R * sig;
     if (R < 1.3) {
       cv[Math.floor(cy)]![Math.floor(cx)] = a.L > 0.45 ? "w" : key;
@@ -786,7 +896,7 @@ const N4S = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 // ---------------------------------------------------------------- frames
 
 const START: Pt = [102, 94];
-const END: Pt = [94, 112];
+const END: Pt = [100, 133];
 /** The cap's place from his middle, and its turn, for a tumble phase. */
 function capAt(ph: number, extra = 0): [number, number, number] {
   const a = (TAU * ph) / 5;
