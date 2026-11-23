@@ -209,6 +209,70 @@ def tweet_wave(f0, f1, secs, shake, sr):
     return (np.sin(ph) + 0.15 * np.sin(2 * ph)) * env
 
 
+# ---- the engine (the crossing's; and the train's own sound in the game: birdie_train.py builds these as sound files).
+# Each is a wave at its own level about 1, made at a sample rate from a source of random numbers. ----
+def hiss_noise(rng, sr, k, rate, hp=0.0):
+    """Noise as bright as `rate` (each random level held that long), its lows thinned by `hp` (0 to 1)."""
+    hold = max(1, int(sr / rate))
+    r = rng.uniform(-1, 1, k // hold + 2)
+    if hp:
+        r = r[1:] - hp * r[:-1]
+    return np.repeat(r, hold)[:k]
+
+
+def soft_noise(rng, sr, k, cut_hz):
+    """Noise with its highs rolled off above about `cut_hz` (a running mean)."""
+    size = max(2, int(sr / cut_hz / 2))
+    y = np.convolve(rng.uniform(-1, 1, k + 2 * size), np.ones(size) / size, "same")[size : size + k]
+    return y / (np.sqrt(np.mean(y**2)) + 1e-9) * 0.5
+
+
+def fade_end(k, sr, secs=0.01):
+    return np.minimum(1, (k - 1 - np.arange(k)) / (secs * sr))
+
+
+def chuff_wave(rng, sr, strong=False):
+    """One beat of the engine's exhaust: a puff of steam up the chimney (soft noise under about 1.7 kHz with a
+    little hiss on it, in at once, gone in about 0.1 s); the strong one deeper (1.1 kHz) and longer."""
+    k = int((0.16 if strong else 0.11) * sr)
+    t = np.arange(k) / sr
+    w = soft_noise(rng, sr, k, 1100 if strong else 1700) + 0.35 * hiss_noise(rng, sr, k, 4500, 0.5)
+    return w * np.minimum(1, t / 0.012) * np.exp(-t / (0.055 if strong else 0.035)) * fade_end(k, sr)
+
+
+def knock_wave(rng, sr):
+    """A wheel over a rail joint: a knock (620 Hz, a thud at 170 Hz under it, a tick of noise). Two of them 85 ms
+    apart are one joint."""
+    k = int(0.05 * sr)
+    t = np.arange(k) / sr
+    tau = 2 * np.pi
+    knock = np.sin(tau * 620 * t) * np.exp(-t / 0.008) + 0.6 * np.sin(tau * 170 * t) * np.exp(-t / 0.02) + 0.5 * hiss_noise(rng, sr, k, 6000, 0.5) * np.exp(-t / 0.003)
+    return knock * fade_end(k, sr)
+
+
+def steam_wave(rng, sr, secs):
+    """Steam let go: a bright hiss that opens in 30 ms and dies away over `secs`."""
+    k = int(secs * sr)
+    t = np.arange(k) / sr
+    return hiss_noise(rng, sr, k, 9000, 0.8) * np.minimum(1, t / 0.03) * np.exp(-t / (secs / 3)) * fade_end(k, sr, 0.05)
+
+
+def whistle_wave(sr, k, pipes, fall=0.0):
+    """The steam whistle, `k` samples of it: pipes at `pipes` Hz together, each with three overtones; it slides up
+    0.7 of a half step into its note, wavers a little, and sags over its last fifth as the steam goes. `fall` (half
+    steps): it sinks that far over its length and thins out, as a train's does going by."""
+    t = np.arange(k) / sr
+    u = t / t[-1]
+    tau = 2 * np.pi
+    w = np.zeros(k)
+    for j, hz in enumerate(pipes):
+        f = hz * 2 ** ((-0.7 * np.exp(-t / 0.05) - 0.6 * np.clip((u - 0.8) / 0.2, 0, 1) ** 2 - fall * u**1.5) / 12) * (1 + 0.004 * np.sin(tau * 6.5 * t + j))
+        ph = tau * np.cumsum(f) / sr
+        w += np.sin(ph) + 0.5 * np.sin(2 * ph + 1) + 0.33 * np.sin(3 * ph + 2) + 0.15 * np.sin(4 * ph)
+    away = 1 - 0.65 * u**1.5 if fall else 1.0
+    return w / 3 * np.minimum(1, t / 0.04) * fade_end(k, sr, 0.12) * (1 + 0.08 * np.sin(tau * 11 * t)) * away
+
+
 def render(window=None, part="song") -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
     (a sample, to compare voices on). `part` "ult": the crossing by itself instead, with the song's own voices, levels
@@ -447,47 +511,25 @@ def render(window=None, part="song") -> np.ndarray:
 
     # ---- the train ----
     def whistle(b, d, vol=0.045, names="D#5 F#5 A5", pan=0.15, fall=0.0):
-        """The steam whistle: three pipes, a diminished chord; it slides up into its note and sags as the steam goes.
-        `fall` (half steps): it sinks that far over its length and thins out, as a train's does going by."""
+        """The steam whistle (whistle_wave): three pipes, a diminished chord unless told otherwise."""
         at(b, d)
-        k = x.k(d)
-        t = np.arange(k) / sr
-        u = t / t[-1]
-        w = np.zeros(k)
-        for j, m in enumerate(n(c) for c in names.split()):
-            f = x.hz(m) * 2 ** ((-0.7 * np.exp(-t / 0.05) - 0.6 * np.clip((u - 0.8) / 0.2, 0, 1) ** 2 - fall * u**1.5) / 12) * (1 + 0.004 * np.sin(tau * 6.5 * t + j))
-            ph = tau * np.cumsum(f) / sr
-            w += np.sin(ph) + 0.5 * np.sin(2 * ph + 1) + 0.33 * np.sin(3 * ph + 2) + 0.15 * np.sin(4 * ph)
-        away = 1 - 0.65 * u**1.5 if fall else 1.0
-        put("fx", b, w / 3 * np.minimum(1, t / 0.04) * tail(k, 0.12) * (1 + 0.08 * np.sin(tau * 11 * t)) * away * vol, pan)
+        put("fx", b, whistle_wave(sr, x.k(d), [x.hz(n(c)) for c in names.split()], fall) * vol, pan)
 
     # ---- the crossing's own sounds: the engine heard for itself, and birds ----
     def soft(k, cut_hz):
-        """Noise with its highs rolled off."""
-        size = max(2, int(sr / cut_hz / 2))
-        y = np.convolve(rng.uniform(-1, 1, k + 2 * size), np.ones(size) / size, "same")[size : size + k]
-        return y / (np.sqrt(np.mean(y**2)) + 1e-9) * 0.5
+        return soft_noise(rng, sr, k, cut_hz)
 
     def chuff(b, vol=0.1, pan=0.0, strong=False):
-        """One beat of the engine's exhaust: a puff of steam up the chimney; the strong one deeper and longer."""
-        k = int((0.16 if strong else 0.11) * sr)
-        t = np.arange(k) / sr
-        w = soft(k, 1100 if strong else 1700) + 0.35 * hiss(k, 4500, 0.5)
-        put("loco", b, w * np.minimum(1, t / 0.012) * np.exp(-t / (0.055 if strong else 0.035)) * tail(k) * vol * (1.0 if strong else 0.6), pan)
+        """One beat of the engine's exhaust (chuff_wave); the strong one deeper, longer and louder."""
+        put("loco", b, chuff_wave(rng, sr, strong) * vol * (1.0 if strong else 0.6), pan)
 
     def clack(b, vol=0.05, pan=0.3):
         """Wheels over a rail joint: two knocks, close together."""
         for late in (0.0, 0.085):
-            k = int(0.05 * sr)
-            t = np.arange(k) / sr
-            knock = np.sin(tau * 620 * t) * np.exp(-t / 0.008) + 0.6 * np.sin(tau * 170 * t) * np.exp(-t / 0.02) + 0.5 * hiss(k, 6000, 0.5) * np.exp(-t / 0.003)
-            put("loco", b, knock * tail(k) * vol, pan, late=late)
+            put("loco", b, knock_wave(rng, sr) * vol, pan, late=late)
 
     def steam(b, secs, vol=0.03, pan=-0.3):
-        """Steam let go: a hiss that opens and dies away."""
-        k = int(secs * sr)
-        t = np.arange(k) / sr
-        put("loco", b, hiss(k, 9000, 0.8) * np.minimum(1, t / 0.03) * np.exp(-t / (secs / 3)) * tail(k, 0.05) * vol, pan)
+        put("loco", b, steam_wave(rng, sr, secs) * vol, pan)
 
     def engine(b, length, vol=0.028):
         """The engine's weight on the rails: a low band of noise (round 110 Hz, where a phone still speaks),

@@ -747,3 +747,14 @@ variations of different chirps ... the director chat should know all the differe
   his words, what each could be for, and the recipe (they are sliding sine whistles, so the characters lane can
   build them in code as the other bosses' sounds are). Told the director.
 - Sent Eric the sheet. No word yet on which he likes.
+
+**The train's sound for Birdie's ordinary move (Nov 23).** Eric: "also with the train sound from the same clip ...
+I want ... the train sound made ... when he does his normal move throughout the game when he goes across the board
+... a couple versions of that too, like just a couple different lengths or whatever. Nothing crazy."
+- The crossing's engine sounds are plain functions now (`chuff_wave`, `knock_wave`, `steam_wave`, `whistle_wave` in
+  song_aj.py; the crossing renders the same to the sample). `python3 birdie_train.py <folder>` cuts four runs from
+  them at the song's pace: short (0.59 s, three puffs), medium (0.90 s, five), long (1.78 s, eight, steam at the
+  end), and the medium with a toot of the whistle. Dry, mono, 44.1 kHz, one gain for the set.
+- `stills/trailer-v2`, commit `6817770f`, `birdie-train/`: the four as .wav and .mp3, a sheet, and a README with his
+  words, what each could be for, and what each sound is made of (to build in code). Told the director.
+- Sent Eric the sheet. No word yet on which he likes, nor on the chirps.
