@@ -1829,3 +1829,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Lobby round 4 art done (stills/birdie-12, $4.39 of $8; runner couldn't read round 3's file: "its tools refused that path": fix the
   runner's read allow-list, queue). Wiring brief birdie-lobby-4-wire (Opus high) starts AFTER the cadence xhigh job ends. Director checks
   the whole room in-game before Eric sees it. Watch: the art's table is a standing 30x47 board: must read as a flat table top in game.
+- Nov 23 ~19:35: #911 (cadence, slower train 1950 ms, warning sign; director raised sign opacity to 60-80%) open e2f74b2e, CI bjd0jw78v,
+  review session_01JuCWRs3Kat2uSdabVPNH2J → review/birdie-cadence-warning. Lobby wire session_01JuCWRvBucHcMNkQbNmJHmP (Opus high) →
+  claude/birdie-lobby-4. main after #909/#910: run pending (b0rsw5zzy).
