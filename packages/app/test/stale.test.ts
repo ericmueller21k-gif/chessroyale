@@ -110,3 +110,32 @@ describe("a chunk gone while the page loads again: nothing goes on to use it (No
     await expect(chunk(Promise.reject(new Error("offline")))).rejects.toThrow("offline");
   });
 });
+
+describe("Resume's tap, carried across that reload (solo-kept.ts noteResuming; main's run 45088115360, Nov 23)", () => {
+  const kept = async () => {
+    vi.resetModules();
+    return import("../src/solo-kept.ts");
+  };
+  it("the page loaded mid-resume takes it once, for that game alone, within the minute", async () => {
+    tab();
+    (await kept()).noteResuming("g1", 1_000_000);
+    const next = await kept();
+    expect(next.takeCarriedResume("g2", 1_001_000)).toBe(false);
+    expect(next.takeCarriedResume("g1", 1_001_000)).toBe(true);
+    expect(next.takeCarriedResume("g1", 1_001_000)).toBe(false);
+    // (Gone from storage as it was read: the page after this one shows the card.)
+    expect((await kept()).takeCarriedResume("g1", 1_002_000)).toBe(false);
+  });
+  it("not once the resume is in, nor after the minute, nor without storage", async () => {
+    tab();
+    const k = await kept();
+    k.noteResuming("g1", 1_000_000);
+    k.noteResuming(null);
+    expect((await kept()).takeCarriedResume("g1", 1_001_000)).toBe(false);
+    (await kept()).noteResuming("g1", 1_000_000);
+    expect((await kept()).takeCarriedResume("g1", 1_000_000 + 60_001)).toBe(false);
+    tab(true);
+    (await kept()).noteResuming("g1", 1_000_000);
+    expect((await kept()).takeCarriedResume("g1", 1_001_000)).toBe(false);
+  });
+});
