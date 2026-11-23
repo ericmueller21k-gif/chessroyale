@@ -87,3 +87,7 @@ Eric's wiring:
 - Marks for visuals (s into the piece): 0.0 steam, band drops, first birds; 1.48 first whistle (long, long, short, then a long one from
   6.5 sinking away by 9.3); 13.33 snare roll; 14.815 the drop.
 - Director's call on the clocks: the wait is his turn, so the crowd's clock doesn't run; he's untimed as usual.
+
+## The cutscene: Eric on the second pass (Nov 23)
+"there's two issues. The front of the train is too blocky now. It doesn't even look like a real, head of how a train looks. And it
+also should be actually looking like it hits him. It's to the side of him."
