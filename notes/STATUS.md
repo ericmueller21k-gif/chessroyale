@@ -1785,3 +1785,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~10:00 UTC: #903 chip race MERGED (f429337); deploy + main watcher.
 - Nov 23 ~10:05 UTC: QUEUED after the town home job merges: Birdie's ride + Birdie's boss crate (item-builder, full lane: odds; the established boss-crate template, BOSS_CRATE_PRICE, the ride Mythic like every ride, sold by the bartender). Ride drawing: claude/boss-art e764383d (birdie-train-ride). Tier settled: Mythic (all rides are).
 - Nov 23 ~10:25 UTC: main f429337 (#903) full run GREEN (no flakes); live. Running: town home job only.
+- Nov 23 ~10:45 UTC: town home -> #904 (d6c50cd; station Meadow St 16-19, lobby 12x12, bartender Shopkeeper, challenge table, flip board in code, #901 nits), phone stills sent to Eric; CI (full suite: ShopRoom shared). Helper archived. Lobby idle draw 7-8 ms at 4x (others 0.5): ok, noted. Next after merge: ride + Birdie crate (item-builder, full lane).
