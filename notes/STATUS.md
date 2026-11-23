@@ -1813,3 +1813,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~18:05: main eba5084 RED: squads-replay.spec.ts:125 [phone] passed only on retry (.rp-over still up at 2.5 s, line 207; unrelated
   to #907). Fix-forward session_01JuCWRvfubi6njxC5xSxTcE (Opus high) brief squads-replay-125-flake → claude/squads-replay-125. No other merge
   before it. Watcher bi2h6dw15 (flake / tail / lobby4: first one done).
+- Nov 23 ~18:10: #909 (tail off, train smooth) open a1a5d377 (merged main; bosses.md conflict resolved by director), CI bihfcrud9, review
+  session_01JuCWRtRgmZYShMxYQ3n8Ku → review/birdie-tail-smooth. Merge only after main is green (flake fix).
+  Queue: other bosses set animationDelay from each frame's `now` (Timber, Gardener, Tiger, PowerParts Flight, Grex shots): measure each
+  per display frame as #909 did; fix with the same `Timed` pattern where the layer redraws mid-animation (one job, Opus high).
