@@ -1826,3 +1826,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Lobby round 4 art running (Eric said "Yes ok to spend"; screenshot force-added 6f6f5ff5), watcher bado6wxq2.
 - Nov 23 ~19:05: #910 merged 45e0422, #909 merged cd3c9c9 (main run watcher b0rsw5zzy). Running: cadence-warning
   session_01JuCWRru2X1GoUsqTgFasSM (Opus xhigh: no other Opus until it's done). Lobby round 4 art (Haiku) watcher bado6wxq2.
+- Lobby round 4 art done (stills/birdie-12, $4.39 of $8; runner couldn't read round 3's file: "its tools refused that path": fix the
+  runner's read allow-list, queue). Wiring brief birdie-lobby-4-wire (Opus high) starts AFTER the cadence xhigh job ends. Director checks
+  the whole room in-game before Eric sees it. Watch: the art's table is a standing 30x47 board: must read as a flat table top in game.
