@@ -1022,8 +1022,10 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   the lobby's and solo's `turnAt` so a reload carries his fall on). His art: `characters/birdie*.ts` (young and Armored Birdie in one figure, `birdie-figure.ts`;
   the cutscene baked into `birdie-cutscene.png` by `scripts/bake-birdie-cutscene.ts`), the train, crossing and smash in
   `characters/effects/birdie.ts`; his sounds his own (`birdie-sounds.ts`; 2026-11-23-birdie-sounds.md): his voice seven chirps and his move
-  four train runs, synthesized from the music helper's recipes (`stills/trailer-v2`); a move's run picked by how far his piece goes
-  (`birdieRun`), the toot run on a capture or check, a chirp over its start; `hello` his entrance and his challenge (`SELECT_SOUND`). A
+  five train whistles (2026-11-23-birdie-whistles.md), synthesized from the music helper's recipes (`stills/trailer-v2`); a move's
+  whistle picked by `birdieWhistle`: the double toot for most moves, one toot for one square, the long blast for five or more, toot-long
+  on a capture or check, the peep-peep about one move in five (from the move and his move's number), a chirp over its start; three
+  puffing runs kept for his entrance, his ride, the town's ride loop and his challenge's wipe; `hello` his entrance and his challenge (`SELECT_SOUND`). A
   kit's `cueSound(cue, boss, yourTurn)` picks a cue's sound from the battle (null: silent); his loops' chirps only on your turn, never
   as your move lands. Tests: `app/test/birdie-sounds.test.ts`. His train on your king ends the battle: the runner's
   `stageComplete`/`finishBossBattle` read `trainWon`, and the board holds `powerWinShowMs` for the ride before the result (solo
