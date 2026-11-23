@@ -15,7 +15,7 @@ export type BirdieSound = "coo" | "toot" | "whistle" | "bell" | "roll" | "brake"
 const murk = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, lowpass(rate, cut, noise(seed)));
 
 /** A note's swell and fall over `len` seconds from `at` (0 outside it). */
-const swell = (t: number, at: number, len: number) => (t < at || t > at + len ? 0 : Math.sin((Math.PI * (t - at)) / len) ** 1.5);
+const swell = (t: number, at: number, len: number) => (t < at || t > at + len ? 0 : Math.max(0, Math.sin((Math.PI * (t - at)) / len)) ** 1.5);
 
 const SOUNDS = {
   // A mourning dove's coo: a soft rising "hoo", a longer "OO", two low "oo"s after, breathy.
@@ -51,7 +51,7 @@ const SOUNDS = {
   whistle: (rate) => {
     const v = osc(rate, (t) => 2300 + 300 * Math.min(1, t / 0.05) + 140 * Math.sin(2 * Math.PI * 28 * t), sine);
     const air = bandpass(rate, () => 2600, 2, noise(1211));
-    return render(rate, 0.42, (t) => swell(t, 0, 0.42) ** 0.6 * (v(t) + 0.25 * air(t)));
+    return render(rate, 0.42, (t) => Math.max(0, swell(t, 0, 0.42)) ** 0.6 * (v(t) + 0.25 * air(t)));
   },
   // The crossing's bell: two dings, a bright bell's partials ringing down.
   bell: (rate) => {

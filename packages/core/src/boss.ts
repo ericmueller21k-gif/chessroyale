@@ -1870,7 +1870,10 @@ export interface PowerEvent {
   seeds?: number;
   /** His watering: what came up where, in the order it plays. */
   growth?: WaterGrowth[];
-  /** The circus tiger's balloon: its shape as everyone sees it (a fake queen is "q"), and its color (0-5). */
+  /**
+   * The circus tiger's balloon: its shape as everyone sees it (a fake queen is "q"), and its color (0-5). Birdie's train (its warning,
+   * its smash): the kind of the crowd's piece on the line (none: the crowd's king).
+   */
   shape?: BalloonShape;
   color?: number;
   /** His hoops: each block by its corner, in throw order. */

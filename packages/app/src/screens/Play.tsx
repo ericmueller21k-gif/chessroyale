@@ -33,7 +33,7 @@ import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { useReplay } from "../hooks.ts";
-import { REFUSED_MS, refusedLine, swapLine, throughLine } from "../refused.ts";
+import { REFUSED_MS, refusedLine, swapLine, throughLine, trainLine } from "../refused.ts";
 import { Hud } from "./Hud.tsx";
 
 const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
@@ -224,8 +224,8 @@ export function PlayScreen({
   // only move: the limit lifted for it), says so through your turn.
   const [refused, setRefused] = useState<{ line: string; fen: string; at: number } | null>(null);
   const refusedNow = refused && refused.fen === board.fen && now - refused.at < REFUSED_MS ? refused.line : null;
-  // (Sawyer's Saw Swap before his last move: said the same way, through your turn: swapLine.)
-  const through = match.boss ? (throughLine(match.boss) ?? swapLine(match.boss)) : null;
+  // (Sawyer's Saw Swap before his last move: said the same way, through your turn: swapLine. Birdie's train's warning: trainLine.)
+  const through = match.boss ? (throughLine(match.boss) ?? swapLine(match.boss) ?? trainLine(match.boss)) : null;
   // The God King strikes from his spot (or, the old way behind settings.kingOnBoard, summoned onto your king's square).
   const onBoardKing = !!match.settings.kingOnBoard;
   const command = useMemo(() => {

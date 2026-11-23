@@ -84,6 +84,8 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
   recluse: [30, 135, 30, 2],
   // (Chandy at rest: his frames with the rifle held level, aiming and firing, lie over the board: OVER_BOARD.)
   chandy: [57, 117, 43, 3],
+  // (Birdie, young and armored: the armored stands taller.)
+  birdie: [37, 83, 35, 2],
 };
 
 /**
@@ -114,6 +116,7 @@ export const SIDE_SWING: Readonly<Record<string, readonly [left: number, right: 
   zebra: [33, 58],
   recluse: [31, 30],
   chandy: [57, 98],
+  birdie: [37, 36],
 };
 
 /**

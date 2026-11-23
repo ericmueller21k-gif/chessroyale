@@ -83,6 +83,9 @@ const armoredBeat = (cue: string): Anim =>
   });
 const armoredLoop = (): Anim => lazyAnim(armoredIdle);
 
+/** His spot empty from the end of his `fall` (where he stands) to the cutscene's hit, when he's back as Armored Birdie. */
+const away: Anim = lazyAnim(() => ({ loop: false, frames: [{ ms: Math.max(1, BIRDIE_BEATS.fall.hitAt - YOUNG.anims.fall!.frames.reduce((s, f) => s + f.ms, 0)), layers: [], cue: "away" }] }));
+
 /** His animations as young Birdie draws them (every one of the art's). */
 const YOUNG_ANIMS = ["idle", "entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "signal", "depart", "fall"] as const;
 
@@ -94,6 +97,7 @@ export const BIRDIE_FIGURE: Character = {
   anims: {
     ...Object.fromEntries(YOUNG_ANIMS.map((n) => [n, young(n)])),
     gone,
+    away,
     // Armored Birdie (his fall on): his idle, and a breath of it for each one-shot, each with its cue.
     p_idle: armoredLoop(),
     p_thinking: armoredLoop(),

@@ -666,7 +666,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   chandyDodgeKing: { ch: EFFECT_SPRITES.chandyDodgeKing, covers: "square", start: "crack", end: "shatter11", sounds: CHANDY_DODGE_SOUNDS },
   // Birdie's (effects/birdie.ts; his own sounds, birdie-sounds.ts): the crossing lights with a ding and flashes while the warning stands;
   // the smash on the piece his train reaches.
-  birdieCrossing: { ch: EFFECT_SPRITES.birdieCrossing, covers: "square", start: "on", loop: "crossing", sounds: { ding: "birdieBell" } },
+  birdieCrossing: { ch: EFFECT_SPRITES.birdieCrossing, covers: "square", start: "on", loop: "crossing", end: "off", sounds: { ding: "birdieBell" } },
   birdieSmash: { ch: EFFECT_SPRITES.birdieSmash, covers: "square", start: "smash", sounds: { smash: "birdieSmash" } },
 };
 

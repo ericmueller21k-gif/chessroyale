@@ -393,7 +393,12 @@ const leftSquare = (id: string, anims: Record<string, Anim>): Character => ({ ..
 export const BIRDIE_CROSSING = leftSquare("birdie-crossing", {
   on: lazyAnim(() => ({ loop: false, frames: [{ ...crossing.frames[0]!, cue: "ding" }, crossing.frames[1]!] })),
   crossing,
+  // (Gone as the train passes or the warning ends: an empty frame.)
+  off: lazyAnim(() => ({ loop: false, frames: [{ ms: 60, layers: [] }] })),
 });
 
 /** The train's smash on the piece it reaches: the art's `smash` (its `smash` cue on the flash), on the piece's square. */
-export const BIRDIE_SMASH = leftSquare("birdie-smash", { smash });
+export const BIRDIE_SMASH = leftSquare("birdie-smash", {
+  // (The art's, then an empty frame: gone once it has played.)
+  smash: lazyAnim(() => ({ loop: false, frames: [...smash.frames, { ms: 40, layers: [] }] })),
+});

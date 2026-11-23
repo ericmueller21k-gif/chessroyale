@@ -1130,6 +1130,10 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // from his fall on, Armored Birdie (`powered`: every animation its `p_` twin, his armored idle, from the cutscene's hit: birdie-state.ts).
   // His sounds are his own (birdie-sounds.ts); his lines are placeholders for Eric.
   Birdie: {
+    // (His phone bar's fit, young Birdie and Armored Birdie both: npx tsx scripts/bar-fit.ts.)
+    barScale: 1.08,
+    barShift: 6,
+    barName: 7,
     ch: BIRDIE_FIGURE,
     anims: {
       strike: "capture",
@@ -1156,6 +1160,11 @@ export const BOSS_KITS: Record<string, BossKit> = {
       go: "birdieToot",
       fall: "birdieWhoosh",
       armor: "birdieClank",
+      // (His nod and his point at the board: a light tap and a coo; his spot emptied as his train rides off, its roll; as he falls, the wind.)
+      nod: "birdieHop",
+      point: "birdieCoo",
+      gone: "birdieRoll",
+      away: "birdieWhoosh",
     },
     lines: BIRDIE_LINES,
     chance: { entrance: 1, capture: 0.3, hurt: 0.4, check: 0.5, rattled: 0.3, power: 0.6, powerHit: 0.5, ultimate: 1, victory: 1, defeat: 1 },

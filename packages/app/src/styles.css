@@ -28544,3 +28544,97 @@ body.dash-away .bc-bubble:not(.dash-say) {
   right: auto;
   margin-left: -6px;
 }
+
+/* ---- Birdie (components/Birdie.tsx; docs/decisions/2026-11-23-birdie-rules.md): his train's ride over the board. Everything in eighths
+   of the board's own size (--board-size), never % of the wrap. ---- */
+/* The track: the board's own box, clipping the train as it comes in over its edge and leaves past the other. */
+.bd-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  overflow: hidden;
+  z-index: 9;
+  pointer-events: none;
+}
+/* The train from above, two squares long and one wide, its middle moving from (x0, y0) to (x1, y1) (shares of the board) over the ride,
+   turned to the line's way (its art's nose to our right). */
+.bd-train {
+  position: absolute;
+  width: calc(var(--board-size, 100%) / 4);
+  height: calc(var(--board-size, 100%) / 8);
+  left: calc(var(--board-size, 100%) * var(--x0));
+  top: calc(var(--board-size, 100%) * var(--y0));
+  translate: -50% -50%;
+  rotate: var(--turn, 0deg);
+  animation-name: bd-ride;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+@keyframes bd-ride {
+  to {
+    left: calc(var(--board-size, 100%) * var(--x1));
+    top: calc(var(--board-size, 100%) * var(--y1));
+  }
+}
+.bd-train canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+/* The line's pieces while the train rides (the board leaves them off): each on its square, stepping aside across the line as it comes and
+   back after its tail (--ax, --ay: squares). */
+.hb-pieces.bd-pieces {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 8;
+  pointer-events: none;
+}
+.bd-pieces > piece {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: cover;
+}
+.bd-pieces > piece.bd-aside {
+  animation-name: bd-aside;
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: both;
+}
+@keyframes bd-aside {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  18%,
+  82% {
+    translate: calc(var(--ax) * 100%) calc(var(--ay) * 100%);
+  }
+}
+/* The crossing on the warned line: the shared board canvas under the pieces (as the fire's shadows: z-index 1, the pieces 2). */
+.board-wrap > .fx-board.bd-crossing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 1;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+/* The smash on its square: the shared board canvas, over the pieces. */
+.fx-board.bd-fx {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 7;
+  image-rendering: pixelated;
+  pointer-events: none;
+}

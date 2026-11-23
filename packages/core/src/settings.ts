@@ -2620,15 +2620,27 @@ export const BIRDIE_CINEMATIC = {
   dropMs: 840,
   /** The scene fades in over the board and everything above it, as Moo's field does (a CSS fade). */
   fadeInMs: 400,
-  /** He tumbles through the air, the sky streaking past (speed lines, wind); the track comes into view below toward its end. */
-  tumbleMs: 2000,
+  /** He tumbles through the air, the sky streaking past (the drawing's `fall`, 600 ms a loop). */
+  tumbleMs: 900,
   /**
-   * His train barrels up the track toward him, closer and closer, its headlights brighter and brighter (the Hidden Boss's light, as
-   * Moo's moon: components/recluse-light.ts): glowing from the train's start, the light whole at its end (the hit).
+   * His train comes up the track toward him (the drawing's `approach`, 390 ms a frame), its headlights brighter and brighter, to its last
+   * frame (the hit, its `hit` cue at 3120 ms) and `hitHoldMs` of it; the light whole then.
    */
-  trainMs: 1800,
-  /** The light from the hit dies back and Armored Birdie stands in it (his armored idle). */
-  revealMs: 1400,
+  approachMs: 3120,
+  hitHoldMs: 200,
+  /**
+   * The headlights' light (the Hidden Boss's, components/recluse-light.ts, as Moo's moon's: Eric, "how we did the lights"): glowing from
+   * `glowMs` before the hit, its rays over the whole screen from `radiateMs` before it, the white from `whiteMs` before it, whole at the
+   * hit; held `lightHoldMs`, then dying back over `lightMs` as Armored Birdie stands in the steam.
+   */
+  glowMs: 2100,
+  radiateMs: 1100,
+  whiteMs: 450,
+  lightHoldMs: 120,
+  lightMs: 800,
+  /** Armored Birdie's reveal (the drawing's `reveal`: the steam clearing off him, 1200 ms), then `holdMs` of him standing (`hold`). */
+  revealMs: 1200,
+  holdMs: 500,
   /** The scene fades out (a CSS fade); he's in his spot as Armored Birdie. */
   fadeOutMs: 400,
   /** His thinking lasts this much past the cutscene's end (as MOO_CINEMATIC.tailPadMs). */

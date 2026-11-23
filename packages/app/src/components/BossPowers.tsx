@@ -26,6 +26,7 @@ import { TIMBER_UI } from "./Timber.tsx";
 import { DASH_UI } from "./Dash.tsx";
 import { ZEBRA_UI } from "./Zebra.tsx";
 import { CHANDY_UI } from "./Chandy.tsx";
+import { BIRDIE_UI } from "./Birdie.tsx";
 import { Cast, PowerBanner, kitLine, momentKey, rageWarn, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
@@ -54,7 +55,7 @@ export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
 export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
-const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI, CHANDY_UI] as BossUi[]).map((u) => [u.id, u]));
+const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI, CHANDY_UI, BIRDIE_UI] as BossUi[]).map((u) => [u.id, u]));
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
@@ -93,6 +94,7 @@ const MOMENT_UI: Record<PowerEventKind, MomentUi> = {
   ...DASH_UI.moments,
   ...ZEBRA_UI.moments,
   ...CHANDY_UI.moments,
+  ...BIRDIE_UI.moments,
 };
 
 /** The moments that play on a screen of their own, in the order they're looked for. */

@@ -27,7 +27,7 @@
  * - Armored Birdie no longer uses the train: no more warnings. His armored power is Eric's to design (Nov 23: "the same idea, but
  *   stronger, later"): it goes in `armoredTurn` (a clean place for it: nothing yet).
  */
-import { BIRDIE_CINEMATIC, BOSS_POWERS, type BirdieState, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BOSS_POWERS, type BalloonShape, type BirdieState, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
 import { boardEnd, type BoardState } from "../boards.ts";
 import { applyMove, keptEnPassant, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "../rules.ts";
 import { stockfishRefuses, type MoveScore } from "../uci.ts";
@@ -46,8 +46,9 @@ type BirdieSettings = BossPowerSettings["birdie"];
  *   aside as it nears (`asideMs` before its nose and back after its tail), the warned piece smashed as its nose reaches it (the
  *   train's `smash`, 420 ms) or stepping aside too (spared); then his `entrance` (2140 ms) back to his spot from `backAt`.
  * - **trainWin**: the same ride, your king smashed; its banner first.
- * - **birdieFall**: his `fall` where he stands (BIRDIE_CINEMATIC.dropMs), then the cutscene's beats (BIRDIE_CINEMATIC); `armorAt`, from
- *   the moment's start, is when he's Armored Birdie (the hit's light at its whitest); `total`, the whole of it.
+ * - **birdieFall**: his `fall` where he stands (BIRDIE_CINEMATIC.dropMs), then the cutscene's beats (BIRDIE_CINEMATIC): the scene fades in
+ *   (`cutAt`), he tumbles (`tumbleAt`), his train comes up the track (`approachAt`) and hits him (`hitAt`, the light whole: he's Armored
+ *   Birdie from then, `armorAt`), his reveal, he stands (`holdAt`), the scene fades out (`fadeOutAt`); `total`, the whole of it.
  */
 export const BIRDIE_BEATS = {
   signal: { lightAt: 500, total: 1500 },
@@ -63,10 +64,11 @@ export const BIRDIE_BEATS = {
     const c = BIRDIE_CINEMATIC;
     const cutAt = c.dropMs;
     const tumbleAt = cutAt + c.fadeInMs;
-    const trainAt = tumbleAt + c.tumbleMs;
-    const armorAt = trainAt + c.trainMs;
-    const fadeOutAt = armorAt + c.revealMs;
-    return { cutAt, tumbleAt, trainAt, armorAt, fadeOutAt, total: fadeOutAt + c.fadeOutMs };
+    const approachAt = tumbleAt + c.tumbleMs;
+    const hitAt = approachAt + c.approachMs + c.hitHoldMs;
+    const holdAt = hitAt + c.revealMs;
+    const fadeOutAt = holdAt + c.holdMs;
+    return { cutAt, tumbleAt, approachAt, hitAt, armorAt: hitAt, holdAt, fadeOutAt, total: fadeOutAt + c.fadeOutMs };
   })(),
 } as const;
 
@@ -337,7 +339,7 @@ export const BIRDIE: BossRules = {
       return;
     }
     next.birdie = { ...bd, warn: { turn: t.turn, ...pick }, next: t.turn + (test ? 1 : Math.max(1, Math.round(s.trainEvery))) };
-    t.events.push({ kind: "trainSignal", turn: t.turn, square: pick.square, squares: [...pick.squares] });
+    t.events.push({ kind: "trainSignal", turn: t.turn, square: pick.square, squares: [...pick.squares], ...(pick.piece !== "k" ? { shape: pick.piece as BalloonShape } : {}) });
   },
   // A warned turn: the judge's best moves change (the train), so it doesn't count for fair play, and the Last Stand sits out.
   powerTurn: (boss) => !!warnOn(boss.powers, turnOf(boss)),
@@ -403,7 +405,7 @@ export const birdieBattle = {
         ride = { at: boss.crowdMoves, ...line, ...(out.king ? { king: true as const } : {}), ...(out.spared ? { spared: true as const } : {}) };
         if (out.king) events.push({ kind: "trainWin", turn: p.turn, square: w.square, squares: [...w.squares] });
         else {
-          events.push({ kind: "trainSmash", turn: p.turn, square: w.square, squares: [...w.squares], ...(out.spared ? { fizzled: [w.square] } : {}) });
+          events.push({ kind: "trainSmash", turn: p.turn, square: w.square, squares: [...w.squares], shape: out.piece as BalloonShape, ...(out.spared ? { fizzled: [w.square] } : {}) });
           if (!out.spared) {
             const ply = board.history.length;
             b.boards.set(board.id, { ...board, fen: out.fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: out.fen }] });
