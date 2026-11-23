@@ -1852,3 +1852,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - #913 (lobby round 4) review clean (review/birdie-lobby-4). Nits queued (future rooms using `counters`): player/stool beside an arm's outer
   side draws over its near end (z = north row); upTop/lightsAt/ceiling panels don't know counters; counter branch skips ghost/emissive/cull;
   partial-fade moving vs resting differ; per-counter canvas memory. Look at walking down each arm's outside in frames:boss.
+- Nov 23 ~21:45: #913 (lobby round 4 + smooth arms + facing fix) merged e018846, main run pending. #912 main GREEN. Beak fix drawn
+  (stills/birdie-14, $0.75, boss-art 7f944063f) → wiring session_01JuCWRtS5qdqHYpy2wwx1Dq (Opus medium, claude/birdie-fall-beak).
