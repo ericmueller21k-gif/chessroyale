@@ -758,3 +758,14 @@ I want ... the train sound made ... when he does his normal move throughout the 
 - `stills/trailer-v2`, commit `6817770f`, `birdie-train/`: the four as .wav and .mp3, a sheet, and a README with his
   words, what each could be for, and what each sound is made of (to build in code). Told the director.
 - Sent Eric the sheet. No word yet on which he likes, nor on the chirps.
+
+**Whistles, not puffing, for Birdie's move (Nov 23).** Of the four runs: "I was thinking more whistles than the other
+stuff. Or we want a couple different whistles. And like the double whistle, you know how the trains go like toot
+toot?" "The train sound" from him means its whistle first. Lesson: when he asks for a sound out of a piece that has
+several, send one of each kind before making versions of one.
+- `birdie_train.py` now also writes five whistles from the song's own (`whistle_wave`; pipes B, E, G): toot (0.28 s),
+  toot-toot (0.58 s: the double he asked for), long (0.90 s), toot-long (1.05 s), and peep-peep (0.40 s: a smaller
+  whistle, the chord a step up its pipes). The four runs are unchanged, bit for bit.
+- `stills/trailer-v2`, commit `e5982a41`, `birdie-train/`: the whistles beside the runs; the README now leads with
+  his words and the whistles, and calls the runs the "other stuff" (under a whistle, or left out). Told the director.
+- Sent Eric the whistles' sheet. Still no word on which chirps or whistles he likes beyond the double toot.

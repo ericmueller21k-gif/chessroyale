@@ -3,11 +3,15 @@ knock_wave, steam_wave and whistle_wave) cut to a few short runs. Eric, Nov 23: 
 ... I want ... the train sound made ... when he does his normal move throughout the game when he goes across the
 board ... a couple versions of that too, like just a couple different lengths or whatever. Nothing crazy."
 
+Then, of those runs: "I was thinking more whistles than the other stuff. Or we want a couple different whistles. And
+like the double whistle, you know how the trains go like toot toot?" So the whistles are the move's sound, five of
+them (the song's own whistle: its three pipes, B, E and G), and the runs are there to go under one if wanted.
+
     python3 birdie_train.py <out folder>
 
-Writes each run dry, mono, 44.1 kHz, as .wav and .mp3, and a sheet of them in a row. The puffs come as fast as in
-the song (an 8th at 162: 0.185 s), the strong one first and then every fourth; each run swells and falls a little, as
-a train coming and going by. One gain for the whole set (the loudest peaks at -6 dBFS).
+Writes each whistle and each run dry, mono, 44.1 kHz, as .wav and .mp3, and a sheet of each kind in a row. The runs'
+puffs come as fast as in the song (an 8th at 162: 0.185 s), the strong one first and then every fourth; each run
+swells and falls a little, as a train coming and going by. One gain for each set (its loudest peaks at -6 dBFS).
 """
 import os
 import subprocess
@@ -31,6 +35,28 @@ RUNS = {
     "long": ((0.6, 0.8, 1.0, 1.0, 1.0, 0.9, 0.75, 0.6), (0.28, 0.83, 1.2), True, 0.0),
     "toot": ((0.8, 1.0, 1.0, 0.9, 0.7), (0.28, 0.65), False, 0.32),
 }
+
+
+# A whistle: its blasts, each (seconds in, how long, how loud), and its pipes (Hz). "peep-peep" is a smaller whistle:
+# the same chord a step up the pipes (E, G, B).
+HIGH = (659.26, 783.99, 987.77)
+WHISTLES = {
+    "toot": (((0.0, 0.28, 1.0),), PIPES),
+    "toot-toot": (((0.0, 0.24, 0.9), (0.34, 0.24, 1.0)), PIPES),
+    "long": (((0.0, 0.9, 1.0),), PIPES),
+    "toot-long": (((0.0, 0.2, 0.9), (0.3, 0.75, 1.0)), PIPES),
+    "peep-peep": (((0.0, 0.16, 0.9), (0.24, 0.16, 1.0)), HIGH),
+}
+
+
+def whistle(kind: str) -> np.ndarray:
+    blasts, pipes = WHISTLES[kind]
+    out = np.zeros(int(SR * 3))
+    for at, secs, loud in blasts:
+        w = whistle_wave(SR, int(secs * SR), pipes) * loud
+        i = int(round(at * SR))
+        out[i : i + len(w)] += w
+    return out[: int(round((blasts[-1][0] + blasts[-1][1]) * SR))]
 
 
 def run(kind: str, rng) -> np.ndarray:
@@ -63,23 +89,28 @@ def save(path: str, x: np.ndarray) -> None:
         w.writeframes((np.clip(x, -1, 1) * 32767).astype("<i2").tobytes())
 
 
-def main(out: str) -> None:
-    os.makedirs(out, exist_ok=True)
-    rng = np.random.default_rng(162)
-    made = {kind: run(kind, rng) for kind in RUNS}
+def write(out: str, stem: str, made: dict) -> None:
+    """A set of sounds under one gain (the loudest peaks at -6 dBFS), each as .wav and .mp3, and a sheet of them."""
     gain = 10 ** (-6 / 20) / max(np.abs(x).max() for x in made.values())
     sheet = [np.zeros(int(0.3 * SR))]
     for kind, x in made.items():
         x = x * gain
-        save(f"{out}/birdie-train-{kind}.wav", x)
-        subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", f"{out}/birdie-train-{kind}.wav", "-c:a", "libmp3lame", "-b:a", "112k", f"{out}/birdie-train-{kind}.mp3"], check=True)
+        save(f"{out}/{stem}-{kind}.wav", x)
+        subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", f"{out}/{stem}-{kind}.wav", "-c:a", "libmp3lame", "-b:a", "112k", f"{out}/{stem}-{kind}.mp3"], check=True)
         sheet += [x, np.zeros(int(0.8 * SR))]
         sp = np.abs(np.fft.rfft(x)) ** 2
         f = np.fft.rfftfreq(len(x), 1 / SR)
-        print(f"{kind:7} {len(x) / SR:.2f} s, {len(RUNS[kind][0])} puffs, peak {20 * np.log10(np.abs(x).max()):.1f} dBFS, rms {20 * np.log10(np.sqrt(np.mean(x**2))):.1f}, "
-              f"under 6 kHz {100 * sp[f < 6000].sum() / sp.sum():.1f}% of it, under 150 Hz {100 * sp[f < 150].sum() / sp.sum():.1f}%")
-    save(f"{out}/birdie-train-sheet.wav", np.concatenate(sheet))
-    subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", f"{out}/birdie-train-sheet.wav", "-c:a", "libmp3lame", "-b:a", "128k", f"{out}/birdie-train-sheet.mp3"], check=True)
+        print(f"{stem}-{kind:10} {len(x) / SR:.2f} s, peak {20 * np.log10(np.abs(x).max()):.1f} dBFS, rms {20 * np.log10(np.sqrt(np.mean(x**2))):.1f}, "
+              f"under 6 kHz {100 * sp[f < 6000].sum() / sp.sum():.1f}% of it, strongest at {f[np.argmax(sp)]:.0f} Hz")
+    save(f"{out}/{stem}-sheet.wav", np.concatenate(sheet))
+    subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", f"{out}/{stem}-sheet.wav", "-c:a", "libmp3lame", "-b:a", "128k", f"{out}/{stem}-sheet.mp3"], check=True)
+
+
+def main(out: str) -> None:
+    os.makedirs(out, exist_ok=True)
+    rng = np.random.default_rng(162)
+    write(out, "birdie-train", {kind: run(kind, rng) for kind in RUNS})
+    write(out, "birdie-whistle", {kind: whistle(kind) for kind in WHISTLES})
 
 
 if __name__ == "__main__":
