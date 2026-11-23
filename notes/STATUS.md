@@ -1854,3 +1854,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   partial-fade moving vs resting differ; per-counter canvas memory. Look at walking down each arm's outside in frames:boss.
 - Nov 23 ~21:45: #913 (lobby round 4 + smooth arms + facing fix) merged e018846, main run pending. #912 main GREEN. Beak fix drawn
   (stills/birdie-14, $0.75, boss-art 7f944063f) → wiring session_01JuCWRtS5qdqHYpy2wwx1Dq (Opus medium, claude/birdie-fall-beak).
+- Nov 23 ~22:15: #913 main GREEN (lobby round 4 live). #914 (fall beak) merged 262c7ee, main run pending. No helpers running.
+  Queue: animationDelay audit for other bosses (+#909 nits); #911 nits; #912/#913 nits; Resume follow-up; street-plan script name;
+  frames:boss can't pick admins-first bosses; art runner read-path cause; stale branches/sessions cleanup.
