@@ -1,0 +1,305 @@
+/**
+ * The Boss raid screen's character select (Eric, Oct 16: "old school Street Fighter 2 style"): what each boss does as
+ * it steps onto the stage. One sound of its own (its most iconic, from its sound pack: played once, through the mute
+ * switch) and a line from those it already says that read right outside a match (nothing about a move, a capture, a
+ * power, the board or the crowd). docs/decisions/2026-10-16-boss-character-select.md.
+ *
+ * The lines are the bosses' existing ones until Eric approves new ones (drafts from each boss's lore: the PR and the
+ * decision file); an approved set replaces a boss's list here, in one edit.
+ */
+import type { SoundName } from "../sound.ts";
+
+/** Each boss's sound as it steps onto the stage, by its roster id. */
+export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
+  // His freeze (the ice cracking over a piece).
+  gingerbread: "gingerCrackle",
+  // His pie, splatting.
+  clown: "clownSplat",
+  // His sparkler's fizz.
+  grex: "grexFizz",
+  // The darkness pouring out of him.
+  hollow: "hollowCast",
+  // A toy block landing.
+  bigboy: "bigboyClack",
+  // The saw revving.
+  sawyer: "sawyerRev",
+  // The lasso whirling.
+  pig: "pigWhirl",
+  // His trumpet.
+  alfil: "alfilTrumpet",
+  // Chirp's chirp.
+  hopper: "hopperChirp",
+  // A splash of paint.
+  smudgy: "smudgySplash",
+  // His happy moo.
+  moo: "mooHappy",
+  // His happy grunt and a splash.
+  gardener: "gardenerHello",
+  // A big, bored yawn, then a balloon squeak.
+  tiger: "tigerHello",
+  // A page turning, then a flap of its wing.
+  folio: "folioHello",
+  // His happy beaver chitter (Eric, Nov 2).
+  timber: "timberChitter",
+  // A sneaker squeak, a slap of his clock and his "yeah!".
+  dash: "dashHello",
+  // His bread rifle's little pop, then his belly laugh.
+  zebra: "zebraPop",
+  // Chandy: his rifle's pulse shot (his own: chandy-sounds.ts).
+  chandy: "chandyShot",
+  // Birdie: his "hello", the chirps he greets a challenger with (Eric, Nov 23; his own: birdie-sounds.ts).
+  birdie: "birdieHello",
+  // The Hidden Boss: his low, ominous hum (the stare).
+  recluse: "recluseHum",
+};
+
+/**
+ * What a boss says when you tap it in the town square (Eric, Oct 27: "when you click on a boss in the town, he should make
+ * a noise"): sounds of its own for the town, taken in turn, else its select sound.
+ */
+export const TOWN_SOUNDS: Readonly<Record<string, readonly SoundName[]>> = {
+  // A low, slow murmur, then a soft "mm-hm" (Eric's picks).
+  folio: ["folioMurmur", "folioHum"],
+  // His gnaw, a hand saw's strokes, a knock on wood.
+  timber: ["timberChitter", "timberSaw", "timberKnock"],
+};
+
+/** The sound for a boss's `n`th tap in the town square (from 0). */
+export const townSound = (id: string, n: number): SoundName | undefined => {
+  const own = TOWN_SOUNDS[id];
+  return own?.length ? own[n % own.length] : SELECT_SOUND[id];
+};
+
+/** Each boss's lines on the stage (one at random a tap, never the same twice running), by its roster id. */
+export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
+  gingerbread: ["Ginger is here!", "You'll crumble!", "Fresh out of the freezer!", "Cool as ice."],
+  clown: ["Honk honk! Showtime!", "Step right up!", "Who ordered a clown?"],
+  grex: ["Grex in the house!", "Feel the heat!", "Rawr! I mean… hi.", "Hot stuff coming through!"],
+  hollow: ["Hollow is here.", "Did you leave a light on?", "I was always here.", "Hush now."],
+  bigboy: ["Big boy here!", "Wanna play?", "Mine! All mine!"],
+  sawyer: ["Measure twice, cut once.", "Hard hat zone!", "Let's get sawing."],
+  pig: ["Howdy, varmints.", "Saddle up!", "Yee-haw!"],
+  alfil: ["Before your bishops, there was me.", "The old piece is back.", "Make room. Big guy coming through.", "Old school wins."],
+  hopper: ["Chub and Chirp! Best friends!", "He's Chirp. I'm Chub. We hop.", "Got any carrots?"],
+  // The director's draft (Oct 19), as written: two of his entrance lines and a smug one, which read right outside a match.
+  smudgy: ["Chameleons blend. I stand out.", "Artist at work. Wet paint!", "A masterpiece, if I say so myself."],
+  // The director's draft (Oct 20), as written (`{heart}` is one of his pixel icons, drawn in the line: speech-icons.ts).
+  moo: ["Hi! I'm Moo, best friend. (Moo! {heart})", "I watched your farm. Let's play! (Moo? {question})", "Best friends, best moves! (Moo! {heart})"],
+  // The director's draft (Oct 21), as written: his entrance, a seed line and a smug one, which read right outside a match.
+  gardener: ["Mind the flower beds.", "Good soil here. Very good soil.", "Everything's coming up roses."],
+  // The director's draft (Oct 24), as written: lines that read right outside a match.
+  tiger: ["No roaring tonight. Balloons only.", "Another masterpiece.", "Don't rush the artist."],
+  // Folio (the director's, Oct 26): its select and intro line, the only one (its tile comes with the wiring lane).
+  folio: ["Every game's a draft. Write one?"],
+  timber: ["Hard hats on. We're building today.", "Measure twice, checkmate once.", "Got wood? I've got plenty."],
+  dash: ["Yo yo yo! Dash in the building, cuz!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
+  zebra: ["Nothing here but a bakery.", "You want a game? Sit down, kid.", "Pop! Ha! Relax, it's just a roll."],
+  // Chandy (placeholders for Eric, Nov 16): his select and challenge lines.
+  chandy: ["You're already in my sights.", "Hold still. This won't take long.", "One shot. That's all I need."],
+  // (Placeholders for Eric.)
+  birdie: ["All aboard!", "Next stop: checkmate!", "Tickets, please!"],
+  // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
+  recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
+};
+
+/** The boss whose lines go in turn rather than at random (the Hidden Boss's two). */
+const IN_TURN = new Set(["recluse"]);
+
+/**
+ * The line for this tap: in turn for the Hidden Boss, else one at random that isn't the one said last (`last`).
+ * `rand` in [0, 1) (Math.random; a test's own).
+ */
+export function selectLine(id: string, last: string | null, rand: number = Math.random()): string | null {
+  const lines = SELECT_LINES[id];
+  if (!lines?.length) return null;
+  if (IN_TURN.has(id)) return lines[(lines.indexOf(last ?? "") + 1) % lines.length]!;
+  const pool = lines.length > 1 ? lines.filter((l) => l !== last) : lines;
+  return pool[Math.min(pool.length - 1, Math.floor(rand * pool.length))]!;
+}
+
+/**
+ * How big the picked boss stands on the stage, as a multiple of its size before (Eric, Nov 11: "on this screen they need to be a
+ * bit bigger"): the one setting for the stage's figure. Capped by the room above its feet (BossSelect's placeOnStage), so a tall
+ * boss is held to the stage's height, never cut off; the in-game sizes are untouched.
+ */
+export const STAGE_PAWN = 2;
+
+/**
+ * Your pawn's figure on the stage, in cqi of a platform's width (about 45: its visible top to its foot, measured at 428 px wide). The
+ * picked boss's figure aims at STAGE_PAWN times this (Nov 12, Eric: "it's okay if the boss is even a little bigger than our guy").
+ */
+export const STAGE_PAWN_FIGURE = 45;
+
+/**
+ * The room the speech bubble's band gives above the platform, in cqi of a platform's width (Nov 12, the director: "he's ~1.46x the
+ * pawn... make him grow into that room"). The boss may rise into it, and the bubble rises over his head with him. Only on a window
+ * 740 px tall or more and for guests: admins' fourth row takes that room, and a short window keeps the old room cap.
+ */
+export const STAGE_RISE = 26;
+
+/**
+ * Tiles to a row, on a phone and a computer alike (Eric, Oct 23: "just 5 per row, and it doesn't matter if you're on a
+ * desktop"; Nov 12: six, so the screen fits with no scroll). The CSS reads it as `--bs-per`.
+ */
+export const TILES_PER_ROW = 6;
+
+/** The gap between two tiles, in px (styles.css, `--bs-gap`; Eric, Nov 12: "still... a little bit of gap"). */
+export const TILE_GAP = 4;
+
+/** A tile's height as a multiple of its width (styles.css, `--bs-h`): its visible width is 0.8 of its width (the slant is 0.2), so
+ *  it is 1.25 times as tall as that (Nov 12: about square, six to a row; was 1.24 at five). */
+export const TILE_RATIO = 1;
+
+/**
+ * How many tiles go in each row for `n` tiles with `per` to a row: full rows of `per`, the last the rest (sixteen: 6, 6, 4;
+ * nineteen, the admins': 6, 6, 6, 1). Full rows of `per` always (six now, Eric, Nov 12), so a new boss's tile moves no
+ * other boss's tile (Oct 27, Folio's: sharing sixteen out as 4, 4, 4, 4 would have moved every tile; Eric's rule, nothing
+ * shifts). A short row is centered.
+ */
+export function rowSizes(n: number, per: number): number[] {
+  if (n <= 0) return [];
+  return Array.from({ length: Math.ceil(n / per) }, (_, i) => Math.min(per, n - i * per));
+}
+
+/**
+ * How a boss's whole figure sits in its tile (Eric, Oct 23, from a Street Fighter 6 select: "the full character sprite, but
+ * it simply gets cut off on the corners of the boxes… use their neck area as the starting point"). The figure is the
+ * portrait's frame at full size; the tile's slanted shape cuts off what doesn't fit.
+ *  - `neck`: the figure's neck, in its frame's pixels (x across, y down): pinned to the tile's middle, `at` of the way down.
+ *  - `span`: how many of the frame's pixels fit across the tile (a smaller number is a closer shot).
+ *  - `at`: how far down the tile the neck sits (0 to 1): the head is above it, the body below, running on past the edge.
+ * Tuned by eye in the 4x sheet of every tile (docs/decisions/2026-10-23-boss-select-sf.md). A test checks that the figure
+ * covers the whole tile and that its head is inside it.
+ */
+export interface Framing {
+  neck: readonly [x: number, y: number];
+  span: number;
+  at: number;
+}
+export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
+  gingerbread: { neck: [44, 49], span: 44, at: 0.43 },
+  clown: { neck: [37, 49], span: 55, at: 0.59 },
+  grex: { neck: [38, 55], span: 62, at: 0.4 },
+  hollow: { neck: [51, 50], span: 64, at: 0.47 },
+  bigboy: { neck: [49, 50], span: 57, at: 0.59 },
+  sawyer: { neck: [45, 40], span: 56, at: 0.69 },
+  pig: { neck: [43, 50], span: 55, at: 0.69 },
+  alfil: { neck: [35, 52], span: 59, at: 0.55 },
+  hopper: { neck: [38, 42], span: 57, at: 0.47 },
+  smudgy: { neck: [41, 46], span: 55.5, at: 0.51 },
+  moo: { neck: [36, 58], span: 56, at: 0.39 },
+  gardener: { neck: [48, 56], span: 57, at: 0.42 },
+  // (His bunch of balloons rides high over his head: the neck low in the tile, so the balloons are in it too.)
+  tiger: { neck: [31, 78], span: 58, at: 0.69 },
+  // (Its long neck: the point under its head, so its head, beak and the near wing's root are in the tile.)
+  folio: { neck: [30, 40], span: 58, at: 0.5 },
+  // (His hat and buck teeth in the tile, the planks' ends over his shoulders.)
+  timber: { neck: [38, 79], span: 58, at: 0.52 },
+  // (His backwards cap and grin in the tile, the clock under his arm below.)
+  dash: { neck: [36, 44], span: 54, at: 0.5 },
+  // (His fedora and the white of his face in the tile, his round belly and the planks' end below it.)
+  zebra: { neck: [40, 56], span: 58, at: 0.5 },
+  // (His head, lens and war paint in the tile, the slung rifle over his shoulder.)
+  chandy: { neck: [62, 72], span: 60, at: 0.56 },
+  // (His cap and face in the tile, his train's roof under him.)
+  birdie: { neck: [30, 45], span: 58, at: 0.5 },
+  recluse: { neck: [33, 47], span: 61, at: 0.5 },
+};
+
+/**
+ * The color behind each boss's figure (Eric, Oct 23: "make the background kind of appropriate based on their colors, but…
+ * it can't be something that makes it so they're difficult to see"): a color from the boss's own palette, chosen to stand
+ * apart from the figure's, which the stylesheet softens into a gradient (darker in the dark theme, lighter in the light
+ * one). The Hidden Boss's tile is always dark and "?" has a neutral fill: neither is here.
+ */
+export const SELECT_TINT: Readonly<Record<string, string>> = {
+  gingerbread: "#3fae4f",
+  clown: "#4aa3ff",
+  grex: "#e5566a",
+  hollow: "#ffcf3a",
+  bigboy: "#a24cf5",
+  sawyer: "#e1262c",
+  pig: "#fff3b0",
+  alfil: "#1d3d8c",
+  hopper: "#9fd8ff",
+  smudgy: "#0e5c60",
+  moo: "#5d7ad8",
+  gardener: "#7fe0ae",
+  // (His knight balloon's blue: across the wheel from his orange, so his stripes and his red vest stay clear on it.)
+  tiger: "#2f7fe0",
+  // (Its deep ink: its cream paper and its vermilion seal stand clear on it, in the light theme's lighter wash too.)
+  folio: "#575c78",
+  // (A workshop blue-green, across the wheel from his orange hat and vest and his brown fur.)
+  timber: "#2f8f9d",
+  // (A deep violet, across the wheel from his gold fur and orange cap and away from his teal jacket.)
+  dash: "#5a3f8e",
+  // (A bakery pink, across from his white fur and dark stripes; his vest's maroon stays clear of it.)
+  zebra: "#d9667a",
+  // (A deep berry, across the wheel from his green and away from his rifle's cyan.)
+  chandy: "#8a3a52",
+  // (His cap's blue: apart from his brown and the train's yellow.)
+  birdie: "#4a60a8",
+};
+
+/**
+ * Each boss's goodbye in the town, after a battle it fought from there (Eric, Nov 7: "that boss says one goodbye line in their
+ * personality"): one line, by its roster id, said as you walk back into the square (its bubble, and the town's chat). In its own
+ * voice, short, no emoji; under 60 characters (a test checks: it fits the bubble's two rows).
+ */
+export const GOODBYE_LINES: Readonly<Record<string, string>> = {
+  gingerbread: "That was fun! Come back soon, it's cool in here.",
+  clown: "That was a blast! Honk honk, come back anytime!",
+  grex: "That was hot! Come back and play again soon!",
+  hollow: "Good game. The dark will keep your seat warm.",
+  bigboy: "That was fun! Big boy wants a rematch. Come back!",
+  sawyer: "Good game. Come back, the table will hold up.",
+  pig: "That was fun, partner. Come back anytime!",
+  alfil: "Good game! The Pyramid door stays open for you.",
+  hopper: "That was fun! Hop back soon, friend!",
+  smudgy: "That was fun! Come back, I've got a new painting.",
+  moo: "That was fun! Come back anytime! (Moo!)",
+  gardener: "That was fun. Mind the flower beds on your way out.",
+  tiger: "That was fun! Come back anytime, no roaring needed.",
+  folio: "That was a good read. Come back for another draft.",
+  timber: "That was fun! Come back anytime, the sawdust is fresh.",
+  dash: "That was fun, bro. Come back anytime. No cap.",
+  zebra: "Good game, kid. Come back for fresh bread anytime.",
+  // (A placeholder for Eric, Nov 16.)
+  chandy: "Good game. I'll keep you in my sights.",
+  birdie: "Good game! Next train leaves soon.",
+  recluse: "Good game. Come back and bring a better opening.",
+};
+
+/**
+ * Where each boss's mouth is on the select stage, as fractions of its art box (the figure's canvas on the stage): x 0 = left
+ * edge … 1 = right edge, y 0 = top … 1 = bottom. The speech bubble keeps its place; its tail moves along the bubble's bottom
+ * edge to point at this point (BossSelect's placeSayTail). Eric, Nov 20: "where they need to be is pointing at the head or
+ * near the mouth." Estimates read off the stage at 1440 x 900 (docs/decisions/2026-11-20-say-at-mouth.md); a boss not listed
+ * uses SAY_AT_DEFAULT.
+ */
+export const SAY_AT: Readonly<Record<string, { x: number; y: number }>> = {
+  gingerbread: { x: 0.51, y: 0.47 },
+  clown: { x: 0.5, y: 0.2 },
+  grex: { x: 0.52, y: 0.22 },
+  hollow: { x: 0.5, y: 0.25 },
+  bigboy: { x: 0.5, y: 0.27 },
+  sawyer: { x: 0.58, y: 0.32 },
+  pig: { x: 0.45, y: 0.4 },
+  alfil: { x: 0.4, y: 0.38 },
+  hopper: { x: 0.48, y: 0.3 },
+  smudgy: { x: 0.5, y: 0.33 },
+  moo: { x: 0.5, y: 0.22 },
+  gardener: { x: 0.45, y: 0.3 },
+  tiger: { x: 0.45, y: 0.42 },
+  folio: { x: 0.5, y: 0.25 },
+  // The admins' four (BOSS_ADMIN_FIRST): Don Dough's line, Dash, Timber and Chandy (Nov 20, read off their stage at 1440 x 900).
+  zebra: { x: 0.52, y: 0.37 },
+  dash: { x: 0.36, y: 0.26 },
+  timber: { x: 0.42, y: 0.44 },
+  chandy: { x: 0.5, y: 0.47 },
+  // (Birdie, Nov 23: his beak, left of his head, estimated from his art.)
+  birdie: { x: 0.25, y: 0.42 },
+};
+
+/** A boss not in SAY_AT: a face about a third of the way down, in the middle. */
+export const SAY_AT_DEFAULT = { x: 0.5, y: 0.33 };

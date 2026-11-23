@@ -1,0 +1,122 @@
+/**
+ * Bakes the bosses' sidekicks (packages/app/src/characters/sidekicks/*.ts, Eric's approved art, copied as drawn) into
+ * one picture each for the town square: `packages/app/src/town/sidekicks/<boss>.png`, with what the town needs to play
+ * them in `packages/app/src/town/sidekick-sheets.ts` (both generated; don't edit them by hand).
+ *
+ * Why (docs/decisions/2026-10-28-sidekicks-in-town.md): the sprites' code paints their parts as it loads, about 3 s of
+ * the page's thread for the fourteen, and drawing their 875 frames another 0.6 s, which would hold the town's first
+ * frame back by about 2.8 s (measured). Baked, the town loads fourteen small pictures and cuts them into frames: no art
+ * code runs on a phone. A sheet's rows are idle, walk, sit and wave, a frame a column; with each, its frames' times, the
+ * figure's size and feet, where its head is (idle's and sit's first frames) and a hash of every frame's pixels, which
+ * `packages/app/test/town-bots.test.ts` checks against the sprites, so a sheet can't go stale.
+ *
+ * Run after changing a sidekick: `npx tsx scripts/bake-sidekicks.ts`.
+ */
+import { createHash } from "node:crypto";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { deflateSync } from "node:zlib";
+import { renderFrame, type Character } from "../packages/app/src/characters/sprite.ts";
+
+const DIR = "packages/app/src/characters/sidekicks";
+const OUT = "packages/app/src/town/sidekick-sheets.ts";
+const PNGS = "packages/app/src/town/sidekicks";
+export const SHEET_ANIMS = ["idle", "walk", "sit", "wave"] as const;
+
+/** A hash of a sidekick's frames' pixels, in the sheet's order (the test recomputes it from the sprite). */
+export function sheetHash(ch: Character): string {
+  const h = createHash("sha256");
+  for (const a of SHEET_ANIMS) for (const f of ch.anims[a]!.frames) h.update(renderFrame(ch, f).data);
+  return h.digest("hex").slice(0, 16);
+}
+
+const CRC = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+const crc32 = (buf: Uint8Array) => {
+  let c = 0xffffffff;
+  for (const b of buf) c = CRC[(c ^ b) & 255]! ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+};
+const chunk = (type: string, body: Uint8Array) => {
+  const out = Buffer.alloc(12 + body.length);
+  out.writeUInt32BE(body.length, 0);
+  out.write(type, 4, "ascii");
+  Buffer.from(body).copy(out, 8);
+  out.writeUInt32BE(crc32(out.subarray(4, 8 + body.length)), 8 + body.length);
+  return out;
+};
+export function png(w: number, h: number, data: Uint8Array): Buffer {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.set([8, 6, 0, 0, 0], 8);
+  const raw = Buffer.alloc((w * 4 + 1) * h);
+  for (let y = 0; y < h; y++) Buffer.from(data.buffer, data.byteOffset + y * w * 4, w * 4).copy(raw, y * (w * 4 + 1) + 1);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw, { level: 9 })), chunk("IEND", new Uint8Array())]);
+}
+
+/** The first row with a drawn pixel. */
+function topRow(w: number, data: Uint8ClampedArray): number {
+  for (let i = 3; i < data.length; i += 4) if (data[i]! > 0) return Math.floor((i - 3) / 4 / w);
+  return 0;
+}
+
+async function main() {
+  const entries: string[] = [];
+  mkdirSync(PNGS, { recursive: true });
+  for (const file of readdirSync(DIR).filter((f) => f.endsWith(".ts")).sort()) {
+    const mod = (await import(`../${DIR}/${file}`)) as Record<string, unknown>;
+    const ch = Object.values(mod).find((v): v is Character => !!v && typeof v === "object" && "anims" in v && "palette" in v)!;
+    const cols = Math.max(...SHEET_ANIMS.map((a) => ch.anims[a]!.frames.length));
+    const W = cols * ch.w;
+    const H = SHEET_ANIMS.length * ch.h;
+    const sheet = new Uint8Array(W * H * 4);
+    const top: Record<string, number> = {};
+    SHEET_ANIMS.forEach((a, row) =>
+      ch.anims[a]!.frames.forEach((f, col) => {
+        const { data } = renderFrame(ch, f);
+        if (col === 0) top[a] = topRow(ch.w, data);
+        for (let y = 0; y < ch.h; y++) sheet.set(data.subarray(y * ch.w * 4, (y + 1) * ch.w * 4), ((row * ch.h + y) * W + col * ch.w) * 4);
+      }),
+    );
+    const ms = Object.fromEntries(SHEET_ANIMS.map((a) => [a, ch.anims[a]!.frames.map((f) => f.ms)]));
+    const name = file.replace(/\.ts$/, "");
+    const pic = png(W, H, sheet);
+    writeFileSync(`${PNGS}/${name}.png`, pic);
+    entries.push(
+      `  ${name}: {\n    id: ${JSON.stringify(ch.id)},\n    w: ${ch.w},\n    h: ${ch.h},\n    foot: [${ch.foot[0]}, ${ch.foot[1]}],\n    top: { idle: ${top.idle}, sit: ${top.sit} },\n    ms: ${JSON.stringify(ms).replace(/"(\w+)":/g, "$1: ").replace(/,/g, ", ")},\n    hash: "${sheetHash(ch)}",\n  },`,
+    );
+    console.log(`${name}: ${W} x ${H}, ${(pic.length / 1024).toFixed(1)} KB`);
+  }
+  writeFileSync(
+    OUT,
+    `// Generated by scripts/bake-sidekicks.ts from packages/app/src/characters/sidekicks/*.ts: don't edit by hand
+// (npx tsx scripts/bake-sidekicks.ts). Each sidekick's sheet is ./sidekicks/<name>.png: rows idle, walk, sit, wave; a frame a column,
+// ${"`w`"} x ${"`h`"} pixels each.
+
+/** A baked sidekick: what the town needs to play its sheet's frames. */
+export interface SidekickSheet {
+  /** The sprite's id ("sidekick-hollow"). */
+  id: string;
+  /** A frame's size, and where its feet stand in it, in pixels. */
+  w: number;
+  h: number;
+  foot: readonly [number, number];
+  /** The first drawn row of idle's and sit's first frames (its head: the name tag sits there). */
+  top: { readonly idle: number; readonly sit: number };
+  /** Each frame's time (ms), by animation, in the sheet's row order. */
+  ms: { readonly idle: readonly number[]; readonly walk: readonly number[]; readonly sit: readonly number[]; readonly wave: readonly number[] };
+  /** A hash of every frame's pixels (the test checks it against the sprite). */
+  hash: string;
+}
+
+export const SIDEKICK_SHEETS = {
+${entries.join("\n")}
+} as const satisfies Record<string, SidekickSheet>;
+`,
+  );
+}
+
+if (process.argv[1]?.endsWith("bake-sidekicks.ts")) await main();

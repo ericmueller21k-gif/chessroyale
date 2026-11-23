@@ -1,0 +1,1273 @@
+import type { ComponentChildren, JSX } from "preact";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
+import {
+  BOSS_CRATES,
+  CRATES,
+  FISCHER,
+  XP,
+  everyLevel,
+  levelOf,
+  ITEM_COLORS,
+  GOD_KING_SHOP,
+  PAWN_COLORS,
+  PURITY_BANDS,
+  sideOfPawn,
+  SHOP_ITEMS,
+  SLOT_NAMES,
+  TIERS,
+  bossCrateDef,
+  crateDef,
+  fischerOdds,
+  isAdminCopy,
+  hiddenByOutfit,
+  isShiny,
+  ownsOutfit,
+  itemChance,
+  liveStrip,
+  presentChance,
+  presentItems,
+  itemColor,
+  bannerPlusMs,
+  itemDef,
+  purity,
+  rollBlemish,
+  secondColor,
+  stackItems,
+  tierInfo,
+  wornFromLocker,
+  isPlayable,
+  adminFirst,
+  tokenBossName,
+  tokenBosses,
+  HUNCHESS_FINISH,
+  WELCOME_CRATE,
+  WELCOME_GIFT,
+  WELCOME_TEXT,
+  isHunchess,
+  isWelcomeCrate,
+  showsPurity,
+  pickableBossCrates,
+  type BossCrateDef,
+  type CrateDef,
+  type CrateLook,
+  type CrateRoll,
+  type ItemInstance,
+  type ItemSlot,
+  type ItemStack,
+  type PawnColor,
+  type PresentTier,
+} from "@chessroyale/core";
+import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor } from "../account.ts";
+import { TokenArt } from "../components/TokenArt.tsx";
+import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
+import { FightBanner } from "../components/FightBanner.tsx";
+import { GamblingWarning } from "../components/GamblingWarning.tsx";
+import { KingEffectPreview } from "../components/Cosmetics.tsx";
+import { play, unlockAudio } from "../sound.ts";
+import { useAccount } from "./Profile.tsx";
+import { testParams } from "../test-switches.ts";
+import { haptic } from "../haptics.ts";
+import { welcomeResumeRow, welcomeRows, type WelcomeRowView } from "../welcome-rows.ts";
+
+const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
+const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
+/** FISCHER RANDOM!'s banner (ms): 2.5 s since Oct 15, and the banners' extra since Oct 24 (bannerPlusMs). */
+const fischerBannerMs = () => 2500 + bannerPlusMs();
+const pct = (x: number) => (x >= 0.01 ? `${(x * 100).toFixed(x >= 0.1 ? 0 : 1)}%` : `${(x * 100).toFixed(2)}%`);
+
+/** An item's one-line finish: "Emerald · Purity 91.5%". */
+/** Its color name (both, for a two-color item). */
+type Colored = { def: string; color: string; color2?: string | null; seed: number };
+/** An item's color, or both (two-color items, and the tube's second stripe color, which its seed gives). */
+export const colorName = (it: Colored) => {
+  const c2 = secondColor(it);
+  return itemColor(it.color).name + (c2 ? ` & ${itemColor(c2).name}` : "");
+};
+export const finishLine = (it: Colored & { blemish: number }) => (showsPurity(it.def) ? `${colorName(it)} · Purity ${purity(it.blemish).toFixed(1)}%` : HUNCHESS_FINISH_NAME);
+/** A HunChess ride's finish, in place of its color and purity (Eric, Nov 6: "Purity isn't listed for these"). */
+const HUNCHESS_FINISH_NAME = "HunChess gold & black";
+
+/** "Not tradeable" (Eric, Nov 6): on the Welcome Crate and its rides, wherever they show. */
+export function NotTradeable() {
+  return <span class="not-tradeable">{WELCOME_TEXT.notTradeable}</span>;
+}
+
+// ---------------- Crates ----------------
+
+/**
+ * How each crate looks: its own box on the crate page, and the box each tier comes in on the strip (Winter's
+ * presents, Beta's supply boxes; Eric, Oct 11: only the container is new, everything else is reused).
+ */
+const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { color: string }) => JSX.Element; box: string; boxes: string }> = {
+  winter: { Crate: WinterCrateArt, Box: PresentArt, box: "present", boxes: "Presents" },
+  beta: { Crate: BetaCrateArt, Box: SupplyBoxArt, box: "supply box", boxes: "Supply boxes" },
+  hunchess: { Crate: HunchessCrateArt, Box: HunchessBoxArt, box: "box", boxes: "Boxes" },
+};
+
+/**
+ * A crate opened but not seen yet: the server rolled it, but you left during the spin (Eric, Oct 8). Kept on the
+ * device (and in memory, if storage is off) until its reveal shows; coming back to the crates opens straight to it.
+ */
+type Unseen = { crate: string; roll: CrateRoll; item: ItemInstance };
+const UNSEEN_KEY = "hunchess-crate-unseen";
+let unseenHere: Unseen | null = null;
+function setUnseen(u: Unseen | null) {
+  unseenHere = u;
+  try {
+    if (u) localStorage.setItem(UNSEEN_KEY, JSON.stringify(u));
+    else localStorage.removeItem(UNSEEN_KEY);
+  } catch {
+    // No storage (private mode): memory alone keeps it while the app is open.
+  }
+}
+function getUnseen(): Unseen | null {
+  try {
+    const v = localStorage.getItem(UNSEEN_KEY);
+    if (v) return JSON.parse(v) as Unseen;
+  } catch {
+    // Fall back to memory.
+  }
+  return unseenHere;
+}
+
+/** A crate by its id: the Crates tab's own (a series crate: one you hold opens with a crate key, Nov 9), or a boss's (bought in its shop, picked at a level or won, held until you open it). */
+const anyCrate = (id: string): CrateDef | undefined => crateDef(id) ?? bossCrateDef(id) ?? (isWelcomeCrate(id) ? WELCOME_CRATE : undefined);
+const isBossCrate = (c: CrateDef): c is BossCrateDef => "boss" in c;
+/** "Babur's", "Puddles'" (as his home's and his crate's names have it). */
+const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
+/** How many of a crate your locker holds, unopened (a boss crate's, or since Nov 9 a series crate's). */
+const heldOf = (locker: { bossCrates?: Record<string, number>; seriesCrates?: Record<string, number> } | undefined, c: CrateDef) =>
+  locker?.bossCrates?.[c.id] ?? locker?.seriesCrates?.[c.id] ?? 0;
+/** Your crate keys (none before the locker loads). */
+const keysOf = (locker: { keys?: number | null } | undefined) => locker?.keys ?? 0;
+/**
+ * The test switches ?fischer and ?shiny for a crate's roll (Nov 9): only where the server's TEST_SWITCHES is "1" (local, e2e,
+ * staging) or on the dev server, never an admin's elsewhere (Eric: no admin special ability for opening). The server checks too.
+ */
+const crateSwitchesHere = () => import.meta.env.DEV || !!account().config?.testSwitches;
+
+/** A crate's name with its series on a line of its own ("Beta Crate", then "Series 001"): no line ends on the " · ". */
+function CrateName({ name }: { name: string }) {
+  const [head, series] = name.split(" · ");
+  return (
+    <>
+      {head}
+      {series && (
+        <>
+          {" "}
+          <span class="crate-series">{series}</span>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Your crates and keys, and each crate's page: what's inside and the odds, and the button to open one. */
+export function CratesPanel() {
+  const { profile } = useAccount();
+  const locker = profile?.locker;
+  // A crate you left during its spin opens straight to its reveal (unless that item's gone, e.g. deleted).
+  const [resume] = useState(() => {
+    const u = getUnseen();
+    if (!u || !anyCrate(u.crate) || (locker && !locker.items.some((i) => i.id === u.item.id))) return null;
+    return u;
+  });
+  const [open, setOpen] = useState<CrateDef | null>(() => (resume && !isWelcomeCrate(resume.crate) ? anyCrate(resume.crate)! : null));
+  // The Welcome Crate row open (1 or 2); an unseen one's reveal resumes on its own row.
+  const [resumeRow] = useState<number | null>(() => (resume && isWelcomeCrate(resume.crate) ? welcomeResumeRow(welcomeRowsNow(profile)) : null));
+  const [welcomeOpen, setWelcomeOpen] = useState<number | null>(resumeRow);
+  const welcome = welcomeRowsNow(profile);
+  // A crate's page opens at its top (you may have scrolled the list down to its row: its hero and the gambling ring show first).
+  useEffect(() => {
+    if (open || welcomeOpen !== null) window.scrollTo(0, 0);
+  }, [open, welcomeOpen]);
+  const count = (n: number | null | undefined) => String(n ?? 0);
+  const [picking, setPicking] = useState(false);
+  if (picking) return <BossPickPage onBack={() => setPicking(false)} />;
+  if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
+  if (welcomeOpen !== null) {
+    const row = welcome.find((r) => r.n === welcomeOpen)!;
+    return <WelcomePage row={row} resume={resumeRow !== null && welcomeOpen === resumeRow ? (resume ?? undefined) : undefined} onBack={() => setWelcomeOpen(null)} />;
+  }
+  return (
+    <div class="crates">
+      <GamblingWarning />
+      <div class="crate-stock">
+        <span class="stock">
+          <span class="stock-art">
+            <KeyArt />
+          </span>
+          Keys × {count(locker?.keys)}
+        </span>
+        <span class="stock">Crates × {count(locker?.crates)}</span>
+      </div>
+      {welcome.map((row) => (
+        <WelcomeRow key={row.n} row={row} onOpen={() => setWelcomeOpen(row.n)} />
+      ))}
+      <BossPickRow picks={locker?.bossPicks ?? 0} onOpen={() => setPicking(true)} />
+      <TokenStock tokens={locker?.tokens ?? {}} admin={!!profile?.admin} />
+      {profile?.admin && <AdminGrants />}
+      {/* The series crates (Nov 9): each with how many you hold; a padlock while it can't be opened (none held, or no key), greyed at
+          none (shown, not hidden: its page still shows what's inside). */}
+      {CRATES.map((c) => {
+        const { Crate } = CRATE_LOOKS[c.look];
+        const n = heldOf(locker, c);
+        const locked = !n || !keysOf(locker);
+        return (
+          <button type="button" key={c.id} class={`ff-window crate-row series-crate-row${n ? "" : " none"}${locked ? " locked" : ""}`} data-crate={c.id} data-held={n} onClick={() => setOpen(c)}>
+            <span class="crate-row-art">
+              <Crate />
+              {locked && (
+                <span class="welcome-lock crate-lock">
+                  <Padlock />
+                </span>
+              )}
+            </span>
+            <span class="crate-row-text">
+              <strong>
+                <CrateName name={c.name} />
+              </strong>
+              <span class="crate-row-blurb">{c.blurb}</span>
+              <span class="crate-row-held">{n ? `You have ${n} · ${c.items.length} items` : `You have none · ${c.items.length} items`}</span>
+            </span>
+            <span class="ff-cursor" aria-hidden="true">
+              ▶
+            </span>
+          </button>
+        );
+      })}
+      <p class="small muted crates-how">Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward.</p>
+      {/* The boss crates (Eric, Nov 2: a buy in a boss's shop "adds the crate to your inventory"): each with how many you hold,
+          greyed at none (shown, not hidden: its page still shows what's inside); opened here as any crate. */}
+      <h3 class="ff-title">Boss crates</h3>
+      {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
+      {BOSS_CRATES.filter((c) => profile?.admin || heldOf(locker, c) > 0 || !adminFirst({ id: c.boss })).map((c) => {
+        const { Crate } = CRATE_LOOKS[c.look];
+        const n = heldOf(locker, c);
+        return (
+          <button type="button" key={c.id} class={`ff-window crate-row boss-crate-row${n ? "" : " none"}`} data-crate={c.id} data-held={n} onClick={() => setOpen(c)}>
+            <span class="crate-row-art">
+              <Crate />
+              <span class="crate-row-token">
+                <TokenArt boss={c.boss} />
+              </span>
+            </span>
+            <span class="crate-row-text">
+              <strong>{c.name}</strong>
+              <span class="crate-row-blurb">{c.blurb}</span>
+              <span class="crate-row-held">{n ? `You have ${n}` : "You have none"}</span>
+            </span>
+            <span class="ff-cursor" aria-hidden="true">
+              ▶
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Where the Welcome Crates are (the locker's `welcome`; none earned yet for a guest or before the locker loads). */
+const welcomeOf = (profile: ReturnType<typeof useAccount>["profile"]) =>
+  profile?.locker?.welcome ?? { games: 0, next: WELCOME_GIFT.milestones[0] as number | null, unopened: 0, status: "locked" as const, notice: false };
+/** Both Welcome Crate rows (Eric, Nov 6), from the account's locker: the rides in it are the HunChess ones (welcome-rows.ts). */
+const welcomeRowsNow = (profile: ReturnType<typeof useAccount>["profile"]): WelcomeRowView[] => {
+  const rides = (profile?.locker?.items ?? []).filter((i) => isHunchess(i.def)).map((i) => ({ id: i.id, def: i.def }));
+  return welcomeRows(welcomeOf(profile), !!profile?.user.signedIn, rides);
+};
+
+/** A Welcome Crate's meter: its bar filling, and "3/5" beside it (full at ready and opened). */
+function WelcomeMeter({ row }: { row: WelcomeRowView }) {
+  return (
+    <span class="welcome-meter" role="progressbar" aria-label={`Welcome Crate ${row.n} progress`} aria-valuemin={0} aria-valuemax={row.milestone} aria-valuenow={row.done}>
+      <span class="welcome-bar">
+        <span class="welcome-bar-fill" style={{ width: `${Math.round(row.fill * 100)}%` }} />
+      </span>
+      <span class="welcome-meter-text">{row.meter}</span>
+    </span>
+  );
+}
+
+/** The padlock on a locked crate (drawn in a 24-unit box). */
+function Padlock() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" class="welcome-lock-icon">
+      <path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+      <rect x="4" y="10" width="16" height="11" rx="2.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+/**
+ * One of the two Welcome Crate rows in the Crates tab (Eric, Nov 6), both there from the start for every player (shown, not hidden):
+ * the gold-and-black crate, its name, "Thank you for being an early tester!", "Not tradeable", its own meter and its state: locked (a
+ * padlock, greyed a little: "Finish 5 games to unlock"; a guest's "Sign in to earn"), ready ("Ready"), or opened ("Opened" and its ride).
+ */
+function WelcomeRow({ row, onOpen }: { row: WelcomeRowView; onOpen: () => void }) {
+  return (
+    <button type="button" class={`ff-window crate-row welcome-crate-row ${row.state}`} data-crate={WELCOME_CRATE.id} data-welcome={row.state} data-welcome-n={row.n} onClick={onOpen}>
+      <span class="crate-row-art">
+        <HunchessCrateArt />
+        {row.state === "locked" && (
+          <span class="welcome-lock">
+            <Padlock />
+          </span>
+        )}
+      </span>
+      <span class="crate-row-text">
+        <strong>Welcome Crate {row.n}</strong>
+        <span class="crate-row-blurb welcome-thanks">{WELCOME_TEXT.thanks}</span>
+        <WelcomeMeter row={row} />
+        <span class="crate-row-held welcome-progress">{row.line}</span>
+        {row.ride && <span class="small">{itemDef(row.ride.def)?.name}</span>}
+        <span>
+          <NotTradeable />
+        </span>
+      </span>
+      <span class="ff-cursor" aria-hidden="true">
+        ▶
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Your boss tokens (Nov 2, shops round 2), beside your keys and crates: every live boss's token with how many you have (greyed at
+ * none: shown, not hidden), and any other boss's you hold (an admin's: Timber's, for admins first). From boss battles; spent on a
+ * boss's crate in its shop in the town.
+ */
+function TokenStock({ tokens, admin }: { tokens: Record<string, number>; admin: boolean }) {
+  const bosses = tokenBosses().filter((b) => admin || !!tokens[b.id] || isPlayable(b));
+  return (
+    <section class="token-stock" aria-label="Boss tokens">
+      <h3 class="ff-title">Boss tokens</h3>
+      <div class="token-grid">
+        {bosses.map((b) => {
+          const n = tokens[b.id] ?? 0;
+          return (
+            <span key={b.id} class={`token-cell${n ? "" : " none"}`} data-boss={b.id} title={`${tokenBossName(b.id)} token`}>
+              <TokenArt boss={b.id} />
+              <span class="token-count">× {n}</span>
+            </span>
+          );
+        })}
+      </div>
+      <p class="small muted">From boss battles. Spend them on a boss's crate in its shop in the town.</p>
+    </section>
+  );
+}
+
+/**
+ * A level's boss crate to choose (Nov 9: every XP.bossCrateEvery-th level, 20th since Nov 20), always there (shown, not hidden): greyed with none to choose, "Choose your
+ * boss crate" when one waits. Its page lists the live bosses' crates.
+ */
+function BossPickRow({ picks, onOpen }: { picks: number; onOpen: () => void }) {
+  const [first] = pickableBossCrates();
+  const Crate = first ? CRATE_LOOKS[first.look].Crate : BetaCrateArt;
+  return (
+    <button type="button" class={`ff-window crate-row boss-pick-row${picks ? "" : " none"}`} data-picks={picks} onClick={onOpen}>
+      <span class="crate-row-art">
+        <Crate />
+      </span>
+      <span class="crate-row-text">
+        <strong>{picks ? (picks === 1 ? "Choose your boss crate" : `Choose your ${picks} boss crates`) : "Boss crate choice"}</strong>
+        <span class="crate-row-blurb">Every {XP.bossCrateEvery}th level, you pick a boss's crate. It opens without tokens or a key.</span>
+        <span class="crate-row-held">{picks ? `${picks} to choose` : "None to choose"}</span>
+      </span>
+      <span class="ff-cursor" aria-hidden="true">
+        ▶
+      </span>
+    </button>
+  );
+}
+
+/** Choosing a level's boss crate (Nov 9): every live boss's crate, each a tap (greyed with none to choose); the answer under them. */
+function BossPickPage({ onBack }: { onBack: () => void }) {
+  const picks = useAccount().profile?.locker?.bossPicks ?? 0;
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const choose = (c: BossCrateDef) => {
+    setBusy(true);
+    setSaid(null);
+    unlockAudio();
+    play("menuSelect");
+    void pickBossCrate(c.id)
+      .then(() => setSaid(`${c.name} is in your inventory.`))
+      .catch((e: unknown) => setSaid(e instanceof Error ? e.message : "Something went wrong."))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div class="crate-page boss-pick-page">
+      <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
+        ‹ Crates
+      </button>
+      <h3 class="ff-title">{picks ? (picks === 1 ? "Choose your boss crate" : `Choose your ${picks} boss crates`) : "Boss crate choice"}</h3>
+      <p class="small muted">
+        Every {XP.bossCrateEvery}th level gives you a boss crate: pick whose. It goes into your boss crates and opens like any of them,
+        without tokens or a key.
+      </p>
+      <p class="small boss-pick-said" aria-live="polite">
+        {said ?? (picks ? `${picks} to choose.` : `None to choose. Your next is at level ${Math.ceil((levelNow() + 1) / XP.bossCrateEvery) * XP.bossCrateEvery}.`)}
+      </p>
+      <div class="boss-pick-grid">
+        {pickableBossCrates().map((c) => {
+          const { Crate } = CRATE_LOOKS[c.look];
+          return (
+            <button type="button" key={c.id} class="ff-window boss-pick" data-crate={c.id} disabled={!picks || busy} onClick={() => choose(c)}>
+              <span class="crate-row-art">
+                <Crate />
+                <span class="crate-row-token">
+                  <TokenArt boss={c.boss} />
+                </span>
+              </span>
+              <span class="boss-pick-name">{c.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+/** Your level now (the profile's XP). */
+const levelNow = () => levelOf(account().profile?.xp ?? 0);
+
+/** Admins only: test grants to yourself (crate keys, any boss's tokens), for trying the boss crates (the server checks it's you). */
+function AdminGrants() {
+  const [boss, setBoss] = useState("tiger");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const give = (body: { keys?: number; boss?: string; tokens?: number }) => {
+    setBusy(true);
+    setError(null);
+    void grantTestItems(body)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Something went wrong."))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <section class="admin-grants" aria-label="Admin test grants">
+      <strong>Admin: test grants</strong>
+      <div class="admin-grants-row">
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ keys: 1 })}>
+          +1 crate key
+        </button>
+        {/* (Eric, Nov 9: up to 100 keys at once, now that every crate takes one: BOSS_TOKENS.keysGrantMax.) */}
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ keys: 100 })}>
+          +100 crate keys
+        </button>
+      </div>
+      <div class="admin-grants-row">
+        <select aria-label="Boss" value={boss} onChange={(e) => setBoss((e.target as HTMLSelectElement).value)}>
+          {tokenBosses().map((b) => (
+            <option key={b.id} value={b.id}>
+              {tokenBossName(b.id)}
+            </option>
+          ))}
+        </select>
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ boss, tokens: 1 })}>
+          +1 token
+        </button>
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ boss, tokens: 3 })}>
+          +3 tokens
+        </button>
+      </div>
+      {error && <p class="shop-error">{error}</p>}
+    </section>
+  );
+}
+
+function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
+  // A boss crate opens only one you hold (the server's, once each), never with a test switch; a series crate one you hold, with a key.
+  const boss = isBossCrate(crate) ? crate : null;
+  const locker = useAccount().profile?.locker;
+  const held = heldOf(locker, crate);
+  const keys = keysOf(locker);
+  const canOpen = boss ? held > 0 : held > 0 && keys > 0;
+  // Test switches (the server checks too): ?fischer=1, ?shiny=1 force the roll, until changed with the boxes below; only where the
+  // server's TEST_SWITCHES is on (crateSwitchesHere). (Read on every render: whether you may is known once the config is.)
+  const [fischerSet, setForceFischer] = useState<boolean | null>(null);
+  const [shinySet, setForceShiny] = useState<boolean | null>(null);
+  const forceFischer = crateSwitchesHere() && (fischerSet ?? testParams().get("fischer") === "1");
+  const forceShiny = crateSwitchesHere() && (shinySet ?? testParams().get("shiny") === "1");
+  const [opening, setOpening] = useState(!!resume);
+  const look = CRATE_LOOKS[crate.look];
+  // Commonest first; Legendary and Mythic (Fischer Random) last.
+  const items = [...crate.items].sort((a, b) => tierIndex(a) - tierIndex(b));
+  if (opening)
+    return <CrateOpening crate={crate} force={boss ? {} : { fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />;
+  return (
+    <div class="crate-page">
+      <GamblingWarning />
+      <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
+        ‹ Crates
+      </button>
+      <div class="ff-window crate-hero">
+        <span class="crate-hero-art">
+          <look.Crate />
+        </span>
+        <strong>
+          <CrateName name={crate.name} />
+        </strong>
+        <span class="small">{crate.blurb}</span>
+        {boss ? (
+          <span class="small crate-held" data-held={held}>
+            {held ? `You have ${held}.` : `You have none. ${possessive(tokenBossName(boss.boss))} shop in the town sells it.`}
+          </span>
+        ) : (
+          <span class="small crate-held" data-held={held} data-keys={keys}>
+            {!held
+              ? "You have none. Leveling up and the daily reward give you crates."
+              : !keys
+                ? `You have ${held}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
+                : `You have ${held}, and ${keys} ${keys === 1 ? "key" : "keys"}.`}
+          </span>
+        )}
+      </div>
+      <h3 class="ff-title">{look.boxes}</h3>
+      <p class="small muted">
+        The crate holds a {look.box} for each tier, in its color. A {look.box} opens to one of its tier's items, each as likely as the others.
+      </p>
+      <div class="odds-list">
+        {liveStrip(crate).map(({ tier }) => {
+          if (tier === FISCHER)
+            return (
+              <div key={tier} class="odds-row" style={{ "--tier": "#fbbf24" }}>
+                <span class="odds-art">
+                  <FischerArt />
+                </span>
+                <span class="odds-text">
+                  <strong>Fischer Random</strong>
+                  <span class="odds-tier">A second spin: Legendary or Mythic</span>
+                </span>
+                <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
+              </div>
+            );
+          const t = tierInfo(tier);
+          const n = presentItems(crate, tier).length;
+          return (
+            <div key={tier} class="odds-row" style={{ "--tier": t.color }}>
+              <span class="odds-art">
+                <look.Box color={t.color} />
+              </span>
+              <span class="odds-text">
+                <strong>
+                  {t.name} {look.box}
+                </strong>
+                <span class="odds-tier">{n === 1 ? "1 item" : `${n} items, ${pct(presentChance(crate, tier) / n)} each`}</span>
+              </span>
+              <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
+            </div>
+          );
+        })}
+      </div>
+      <h3 class="ff-title">Possible items</h3>
+      <div class="odds-list">
+        {items.map((def) => {
+          const d = itemDef(def)!;
+          const t = tierInfo(d.tier);
+          const special = d.tier === "legendary" || d.tier === "mythic";
+          return (
+            <div key={def} class="odds-row" style={{ "--tier": t.color }}>
+              <span class="odds-art">
+                <ItemArt def={def} finish={{ color: "red", color2: "emerald", blemish: 12, seed: 1 }} />
+              </span>
+              <span class="odds-text">
+                <strong>{d.name}</strong>
+                <span class="odds-tier">
+                  {t.name} · {SLOT_NAMES[d.slot]}
+                  {special ? " · Fischer Random only" : ""}
+                </span>
+              </span>
+              <span class="odds-pct">{pct(itemChance(crate, def))}</span>
+            </div>
+          );
+        })}
+      </div>
+      <details class="odds-more">
+        <summary>Colors and purity</summary>
+        <p class="small">Every item also rolls a color and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250).</p>
+        <div class="color-odds">
+          {ITEM_COLORS.map((c) => (
+            <span key={c.id} class="color-chip">
+              <i style={{ background: c.hex2 ? `linear-gradient(135deg, ${c.hex}, ${c.hex2}, ${c.hex})` : c.hex }} />
+              {c.name} {c.weight}%
+            </span>
+          ))}
+        </div>
+        <div class="color-odds">
+          {PURITY_BANDS.map((b) => (
+            <span key={b.low} class="color-chip">
+              Purity {b.low}-{b.high}%{b.low >= 90 ? " ✨" : ""}: {b.weight}%
+            </span>
+          ))}
+        </div>
+      </details>
+      {!boss && crateSwitchesHere() && (
+        <div class="test-switches">
+          <span class="muted small">Testing:</span>
+          <label class="check small">
+            <input type="checkbox" checked={forceFischer} onChange={(e) => setForceFischer(e.currentTarget.checked)} /> Land on Fischer Random
+          </label>
+          <label class="check small">
+            <input type="checkbox" checked={forceShiny} onChange={(e) => setForceShiny(e.currentTarget.checked)} /> Shiny
+          </label>
+        </div>
+      )}
+      {/* (Greyed with none to open, or a series crate with no key: shown, not hidden.) */}
+      <button
+        type="button"
+        class="ff-button"
+        disabled={!canOpen}
+        onClick={() => {
+          // (A tap: the moment a phone allows sound, so the strip's clicks are heard.)
+          unlockAudio();
+          play("menuSelect");
+          setOpening(true);
+        }}
+      >
+        {boss ? "▶ Open" : "▶ Open · uses 1 key"}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * A Welcome Crate's page (Eric, Nov 6): the crate, its name, "Thank you for being an early tester!", "Not tradeable", its meter and state
+ * ("Finish 5 games to unlock", "Ready", "Opened" with its ride), and every ride it can give (each as likely), in the HunChess colorway,
+ * with no purity anywhere. "▶ Open" opens a ready one (greyed until then, and once it's opened), with the Crates tab's own strip and reveal.
+ */
+function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Unseen; onBack: () => void }) {
+  const [opening, setOpening] = useState(!!resume);
+  if (opening) return <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />;
+  return (
+    <div class="crate-page welcome-page">
+      <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
+        ‹ Crates
+      </button>
+      <div class={`ff-window crate-hero welcome-crate-hero ${row.state}`}>
+        <span class="crate-hero-art">
+          <HunchessCrateArt />
+          {row.state === "locked" && (
+            <span class="welcome-lock">
+              <Padlock />
+            </span>
+          )}
+        </span>
+        <strong>Welcome Crate {row.n}</strong>
+        <span class="small welcome-thanks">{WELCOME_TEXT.thanks}</span>
+        <NotTradeable />
+        <WelcomeMeter row={row} />
+        <span class="small crate-held welcome-progress" data-welcome={row.state}>
+          {row.line}
+        </span>
+        {row.ride && <span class="small">{itemDef(row.ride.def)?.name}</span>}
+      </div>
+      <p class="small muted">
+        Two per account: Welcome Crate 1 for finishing {WELCOME_GIFT.milestones[0]} games in any mode or against any boss, Welcome Crate 2 at{" "}
+        {WELCOME_GIFT.milestones[1]}. Each holds one ride, any of the game's rides, each as likely (the second never the first's), in HunChess
+        gold and black. They and their rides can't be traded.
+      </p>
+      <h3 class="ff-title">Possible rides</h3>
+      <div class="odds-list">
+        {WELCOME_CRATE.items.map((def) => {
+          const d = itemDef(def)!;
+          return (
+            <div key={def} class="odds-row" style={{ "--tier": "#f2c14e" }}>
+              <span class="odds-art">
+                <ItemArt def={def} finish={{ ...HUNCHESS_FINISH, seed: 1 }} />
+              </span>
+              <span class="odds-text">
+                <strong>{d.name}</strong>
+                <span class="odds-tier">Ride · HunChess gold & black</span>
+              </span>
+              <span class="odds-pct">{pct(1 / WELCOME_CRATE.items.length)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        class="ff-button"
+        disabled={row.state !== "ready"}
+        onClick={() => {
+          unlockAudio();
+          play("menuSelect");
+          setOpening(true);
+        }}
+      >
+        ▶ Open
+      </button>
+    </div>
+  );
+}
+
+// ---------------- Opening ----------------
+
+type Tile =
+  | { kind: "item"; def: string; finish: { color: string; color2?: string; blemish: number; seed: number } }
+  | { kind: "present"; tier: PresentTier }
+  | { kind: "fischer" };
+
+function pickWeighted<T extends { weight: number }>(list: readonly T[]): T {
+  let r = Math.random() * list.reduce((s, x) => s + x.weight, 0);
+  for (const x of list) if ((r -= x.weight) < 0) return x;
+  return list[list.length - 1]!;
+}
+
+/** A decoy's look, by the real color and purity odds (so the strip doesn't make a shiny look common). */
+const decoyFinish = () => ({ color: pickWeighted(ITEM_COLORS).id, color2: pickWeighted(ITEM_COLORS).id, blemish: rollBlemish(Math.random), seed: Math.floor(Math.random() * 2 ** 31) });
+
+/** A strip of tiles: decoys drawn by `pick`, the result at `land`. */
+function stripTiles(pick: () => Tile, landTile: Tile, length: number, land: number): Tile[] {
+  return Array.from({ length }, (_, i) => (i === land ? landTile : pick()));
+}
+
+/** The crate's strip: presents by the odds, Fischer Random a little more often than it lands (to tease). */
+const presentTile = (crate: CrateDef) => (): Tile => {
+  const { tier } = pickWeighted(liveStrip(crate).map((x) => (x.tier === FISCHER ? { ...x, weight: x.weight * 3 } : x)));
+  return tier === FISCHER ? { kind: "fischer" } : { kind: "present", tier };
+};
+/** A second spin's decoys: items by their odds. */
+const itemTile = (list: readonly { item: string; weight: number }[]) => (): Tile => {
+  const def = pickWeighted(list).item;
+  // (A HunChess ride's decoy in its own finish: no blotches, no other colors.)
+  return { kind: "item", def, finish: isHunchess(def) ? { ...HUNCHESS_FINISH, seed: 1 } : decoyFinish() };
+};
+
+function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
+  if (tile.kind === "fischer") {
+    return (
+      <span class="spin-tile fischer">
+        <FischerArt />
+        <span class="spin-tile-name">Fischer Random</span>
+      </span>
+    );
+  }
+  if (tile.kind === "present") {
+    const t = tierInfo(tile.tier);
+    const { Box } = CRATE_LOOKS[look];
+    return (
+      <span class="spin-tile present" style={{ "--tier": t.color }}>
+        <Box color={t.color} />
+        <span class="spin-tile-name">{t.name}</span>
+      </span>
+    );
+  }
+  const d = itemDef(tile.def)!;
+  return (
+    <span class="spin-tile" style={{ "--tier": tierInfo(d.tier).color }}>
+      <ItemArt def={tile.def} finish={tile.finish} />
+      <span class="spin-tile-name">{d.name}</span>
+    </span>
+  );
+}
+
+/**
+ * The strip: it races past a center marker, slows (ease-out) and lands on the result, with a click for every
+ * tile that passes (fast, then slower and slower).
+ */
+function Spin({ tiles, land, ms, look, onDone }: { tiles: Tile[]; land: number; ms: number; look: CrateLook; onDone: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = track.current!;
+    const first = el.children[0] as HTMLElement;
+    const step = first.offsetWidth + 6;
+    const width = box.current!.offsetWidth;
+    // Land somewhere inside the tile (not dead center), like a real wheel.
+    const target = land * step + step / 2 - width / 2 + (Math.random() - 0.5) * step * 0.6;
+    const start = performance.now();
+    let last = -1;
+    let raf = 0;
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - start) / ms);
+      const x = target * (1 - Math.pow(1 - t, 4));
+      el.style.transform = `translateX(${-x}px)`;
+      const idx = Math.floor((x + width / 2) / step);
+      if (idx !== last) {
+        if (last >= 0) play("reel");
+        last = idx;
+      }
+      if (t < 1) raf = requestAnimationFrame(frame);
+      else setTimeout(onDone, 450);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <div class="spin" ref={box}>
+      <div class="spin-marker" aria-hidden="true" />
+      <div class="spin-track" ref={track}>
+        {tiles.map((t, i) => (
+          <TileView key={i} tile={t} look={look} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Opening a crate: the server rolls, the strip spins to a tier's present, which unwraps straight to the reveal; or
+ * to Fischer Random, which gets its banner and a second spin among its items before the reveal.
+ */
+/** A boss crate's picture with its boss's token on its corner, as its Crates tab row draws it (and Boingo's claw machine's prize, Nov 6). */
+export function BossCrateArt({ crate }: { crate: BossCrateDef }) {
+  const { Crate } = CRATE_LOOKS[crate.look];
+  return (
+    <span class="crate-row-art">
+      <Crate />
+      <span class="crate-row-token">
+        <TokenArt boss={crate.boss} />
+      </span>
+    </span>
+  );
+}
+
+/** A crate opening: the strip, the unwrap, Fischer Random and the reveal (the Crates tab's; Boingo's claw machine's Open now, Nov 6). */
+export function CrateOpening({
+  crate,
+  force,
+  resume,
+  onClose,
+}: {
+  crate: CrateDef;
+  force: { fischer?: boolean; shiny?: boolean };
+  /** A crate already opened but not seen (you left during the spin): straight to its reveal. */
+  resume?: Unseen;
+  onClose: () => void;
+}) {
+  const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
+  // "Open another": only while you hold one more (greyed at none), a series crate also a key (Nov 9). (A Welcome Crate: another only
+  // while a second waits.)
+  const lockerNow = useAccount().profile?.locker;
+  const welcomeLeft = lockerNow?.welcome?.unopened ?? 0;
+  const more = isWelcomeCrate(crate.id) ? welcomeLeft > 0 : heldOf(lockerNow, crate) > 0 && (isBossCrate(crate) || keysOf(lockerNow) > 0);
+  const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">(resume ? "reveal" : "spin");
+  const [round, setRound] = useState(0);
+  useEffect(() => {
+    if (round === 0 && resume) return;
+    let here = true;
+    setResult(null);
+    setStage("spin");
+    openCrate(crate.id, force)
+      .then((r) => {
+        // It's yours now: if you leave before the reveal, it waits for you (the reveal clears it).
+        setUnseen({ crate: crate.id, ...r });
+        if (here) setResult(r);
+      })
+      .catch((e) => here && setError(e instanceof Error ? e.message : "Couldn't open the crate."));
+    return () => {
+      here = false;
+    };
+  }, [round]);
+  const strips = useMemo(() => {
+    if (!result) return null;
+    const { roll, item } = result;
+    const finish = { color: item.color, color2: item.color2 ?? undefined, blemish: item.blemish, seed: item.seed };
+    const tier = itemDef(item.def)!.tier as PresentTier;
+    return {
+      tier,
+      one: stripTiles(presentTile(crate), roll.fischer ? { kind: "fischer" } : { kind: "present", tier }, 46, 38),
+      // Only Fischer Random spins again; a present opens straight to its item (Eric, Oct 7).
+      two: roll.fischer ? stripTiles(itemTile(fischerOdds(crate)), { kind: "item", def: item.def, finish }, 30, 24) : [],
+    };
+  }, [result]);
+  const afterFirst = () => {
+    if (!strips) return;
+    if (result?.roll.fischer) {
+      // (Its banner's 2.5 s and a beat: every banner a second longer, Eric, Oct 15; and the banners' extra, Oct 24.)
+      setStage("fischer");
+      setTimeout(() => setStage("spin2"), fischerBannerMs() + 200);
+    } else {
+      setStage("unwrap");
+      setTimeout(() => setStage("reveal"), 1150);
+    }
+  };
+  return (
+    <div class="crate-opening">
+      <h2 class="ff-title">
+        <CrateName name={crate.name} />
+      </h2>
+      {error && <p class="shop-error">{error}</p>}
+      {!result && !error && <p class="muted">Opening…</p>}
+      {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} look={crate.look} onDone={afterFirst} />}
+      {strips && stage === "fischer" && (
+        <div class="fischer-stage">
+          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub={isWelcomeCrate(crate.id) ? "A HunChess ride" : "Legendary or Mythic"} sound="bannerStart" ms={fischerBannerMs()} />
+        </div>
+      )}
+      {strips && stage === "unwrap" && <Unwrap tier={strips.tier} look={crate.look} />}
+      {strips && stage === "spin2" && (
+        <Spin key={`b${round}`} tiles={strips.two} land={24} ms={4800} look={crate.look} onDone={() => setStage("reveal")} />
+      )}
+      {result && stage === "reveal" && (
+        <Reveal
+          item={result.item}
+          again={more}
+          onAgain={() => setRound((r) => r + 1)}
+          onClose={onClose}
+        />
+      )}
+    </div>
+  );
+}
+
+/** A present (or a supply box) opening: it shakes, then bursts open. */
+function Unwrap({ tier, look }: { tier: PresentTier; look: CrateLook }) {
+  const t = tierInfo(tier);
+  const { Box, box } = CRATE_LOOKS[look];
+  useEffect(() => {
+    play("select");
+  }, []);
+  return (
+    <div class="present-stage" style={{ "--tier": t.color }}>
+      <span class="present-stage-art">
+        <Box color={t.color} />
+      </span>
+      <strong>
+        {t.name} {box}
+      </strong>
+    </div>
+  );
+}
+
+/** The reveal: an FF-style window with the item, its tier, color, purity and (if so) its shine. */
+function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; again?: boolean; onAgain: () => void; onClose: () => void }) {
+  const d = itemDef(item.def)!;
+  const t = tierInfo(d.tier);
+  // (A HunChess ride: no purity, so no shine named either; Eric, Nov 6.)
+  const hc = isHunchess(item.def);
+  const shiny = !hc && isShiny(item.blemish);
+  const special = d.tier === "legendary" || d.tier === "mythic";
+  const [worn, setWorn] = useState(false);
+  useEffect(() => {
+    setUnseen(null);
+    play(special || shiny ? "bannerStart" : "select");
+  }, []);
+  return (
+    <div class={`ff-window reveal-card${shiny ? " shiny" : ""}${special ? " special" : ""}`} style={{ "--tier": t.color }}>
+      <span class="reveal-tier">{t.name}</span>
+      <span class="reveal-art">
+        <ItemArt def={item.def} finish={item} />
+      </span>
+      <strong class="reveal-name">{d.name}</strong>
+      <span class="reveal-finish">
+        {finishLine(item)}
+        {shiny ? " ✨" : ""}
+      </span>
+      {shiny && <span class="reveal-shiny">Shiny!</span>}
+      {hc && <NotTradeable />}
+      <span class="reveal-desc">{d.description}</span>
+      <div class="reveal-actions">
+        <button
+          type="button"
+          class="ff-button small"
+          disabled={worn}
+          onClick={() => {
+            void equipLockerItem(d.slot, item.id).then(() => setWorn(true));
+            play("menuSelect");
+          }}
+        >
+          {worn ? "Wearing it" : "▶ Wear"}
+        </button>
+        <button type="button" class="ff-button small" disabled={!again} onClick={onAgain}>
+          ▶ Open another
+        </button>
+        <button type="button" class="ff-button small" onClick={onClose}>
+          ▶ Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Locker ----------------
+
+type LockerTab = ItemSlot | "all";
+const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "ride"];
+const tabName = (t: LockerTab) => (t === "all" ? "All" : SLOT_NAMES[t]);
+
+/**
+ * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same color
+ * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: God King effects. Tap to
+ * wear (tap again to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result (on its ride,
+ * if you wear one: Oct 31, in the same box).
+ * (The pawn hats are crate items now, from the Beta crate.) An admin's locker has one of everything: an admin copy
+ * (core/admin-copies.ts) carries an "Admin" tag, wears like any item and can't be deleted (there's nothing stored).
+ * The preview is one pawn in your default color (W or B, bottom right: pawn-color.ts; Eric, Nov 7).
+ */
+export function LockerPanel({ onShop }: { onShop?: () => void }) {
+  const { profile } = useAccount();
+  const [tab, setTab] = useState<LockerTab>("all");
+  const [deleting, setDeleting] = useState<ItemStack | null>(null);
+  const locker = profile?.locker;
+  const shop = profile?.shop;
+  const pawn = myPawnColor();
+  if (!locker) return <p class="muted">Your locker needs your account.</p>;
+  const top = (s: ItemStack) => s.items[0]!;
+  // (The Outfit slot is secret, Eric, Nov 10: its tab shows only once you own an outfit; his exception to "nothing hidden".)
+  const outfits = ownsOutfit(locker.items);
+  // (An item this app doesn't know, e.g. one added since it loaded, as an admin's copy of it: left out, not a crash.)
+  const stacks = stackItems(locker.items)
+    .filter((s) => itemDef(top(s).def) && (tab === "all" || itemDef(top(s).def)?.slot === tab))
+    .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
+  // What you got in the shop: God King effects (under All; the God King tab is gone, Eric, Nov 7).
+  const fromShop = GOD_KING_SHOP ? SHOP_ITEMS.filter((i) => wornFromLocker(i) && shop?.owned.includes(i.id)) : [];
+  const shopTab = tab === "all" && GOD_KING_SHOP;
+  const wornIn = (s: ItemStack) => {
+    const slot = itemDef(top(s).def)!.slot;
+    return s.items.some((i) => i.id === locker.equipped[slot]);
+  };
+  return (
+    <div class="locker">
+      <div class="ff-window locker-preview">
+        <span class="locker-avatar">
+          <Avatar look={locker.look} side={sideOfPawn(pawn)} ride outlined />
+        </span>
+        <div class="locker-pawn-pick" role="group" aria-label="Your default pawn color">
+          {PAWN_COLORS.map((c) => (
+            <button
+              type="button"
+              key={c}
+              class={`locker-pawn-letter ${c}${pawn === c ? " on" : ""}`}
+              aria-pressed={pawn === c}
+              aria-label={c === "white" ? "White" : "Black"}
+              onClick={() => pickPawnColor(c)}
+            >
+              {c === "white" ? "W" : "B"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div class={`shop-tabs locker-tabs${outfits ? " with-outfit" : ""}`} role="tablist">
+        {(outfits ? [...LOCKER_TABS, "outfit" as const] : LOCKER_TABS).map((t) => (
+          <button type="button" role="tab" key={t} aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>
+            {tabName(t)}
+          </button>
+        ))}
+      </div>
+      {!stacks.length && <p class="muted">No crate items here yet. Open a crate!</p>}
+      {stacks.length > 0 && (
+        <div class="locker-grid">
+          {stacks.map((s) => {
+            const it = top(s);
+            const d = itemDef(it.def)!;
+            const worn = wornIn(s);
+            // (An admin copy is never stacked: it's there only for an item you don't own.)
+            const admin = isAdminCopy(it.id);
+            // (A HunChess ride, the Welcome Crate's: no purity, and "Not tradeable"; Eric, Nov 6.)
+            const hc = isHunchess(it.def);
+            // (An outfit on, Nov 10: every other item but eyewear shows greyed, still wearable underneath; nothing hidden.)
+            const covered = hiddenByOutfit(locker.look, it.def);
+            return (
+              <HoldButton
+                key={s.key}
+                class={`locker-item${worn ? " worn" : ""}${covered ? " covered" : ""}${!hc && isShiny(it.blemish) ? " shiny" : ""}${hc ? " hunchess-item" : ""}`}
+                style={{ "--tier": tierInfo(d.tier).color }}
+                label={`${d.name}${covered ? ", hidden by your outfit" : ""}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
+                onTap={() => {
+                  play("menuSelect");
+                  void equipLockerItem(d.slot, worn ? null : it.id);
+                }}
+                onHold={
+                  admin
+                    ? undefined
+                    : () => {
+                        play("menuOpen");
+                        setDeleting(s);
+                      }
+                }
+              >
+                <ItemArt def={it.def} finish={it} />
+                <strong>{d.name}</strong>
+                {hc ? (
+                  <>
+                    <span class="small">HunChess</span>
+                    <NotTradeable />
+                  </>
+                ) : (
+                  <>
+                    <span class="small">{colorName(it)}</span>
+                    <span class="small muted">
+                      {purity(it.blemish).toFixed(1)}%{isShiny(it.blemish) ? " ✨" : ""}
+                    </span>
+                  </>
+                )}
+                {worn && <span class="locker-worn">Worn</span>}
+                {covered && <span class="locker-covered">Hidden by your outfit</span>}
+                {s.items.length > 1 && <span class="locker-count">×{s.items.length}</span>}
+                {admin && <span class="locker-admin">Admin</span>}
+              </HoldButton>
+            );
+          })}
+        </div>
+      )}
+      {shopTab && shop && (
+        <>
+          <h3 class="ff-title locker-subhead">From the shop</h3>
+          <div class="locker-grid">
+            {fromShop.map((item) => {
+              const worn = shop.equipped.king === item.id;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  class={`locker-item default${worn ? " worn" : ""}`}
+                  onClick={() => {
+                    play("menuSelect");
+                    // A God King effect stays on until you pick another (he always has one).
+                    if (!worn) void equipShopItem(item.id);
+                  }}
+                >
+                  <span class="locker-default-art">
+                    <KingEffectPreview look={item.look} />
+                  </span>
+                  <strong>{item.name}</strong>
+                  <span class="small muted">God King effect</span>
+                  {worn && <span class="locker-worn">On</span>}
+                  {shop.admin?.includes(item.id) && <span class="locker-admin">Admin</span>}
+                </button>
+              );
+            })}
+          </div>
+          {onShop && (
+            <p class="muted small">
+              More God King effects in the{" "}
+              <button type="button" class="link-button" onClick={onShop}>
+                Shop ›
+              </button>
+            </p>
+          )}
+        </>
+      )}
+      {deleting && <DeleteDialog stack={deleting} wornId={locker.equipped[itemDef(top(deleting).def)!.slot]} onClose={() => setDeleting(null)} />}
+    </div>
+  );
+}
+
+/** The locker's W or B: your default pawn color, saved (the account, or this device as a guest). A tap on the color you have does nothing. */
+function pickPawnColor(c: PawnColor) {
+  if (c === myPawnColor()) return;
+  play("menuSelect");
+  void setPawnColor(c).catch(() => undefined);
+}
+
+/**
+ * A button you can tap, or hold (about half a second; or right-click) for something else (none without `onHold`).
+ * Moving the finger (a scroll) cancels the hold, and a hold doesn't also count as a tap.
+ */
+function HoldButton({
+  onTap,
+  onHold,
+  label,
+  children,
+  ...rest
+}: { onTap: () => void; onHold?: () => void; label: string; children: ComponentChildren; class: string; style: Record<string, string> }) {
+  const timer = useRef(0);
+  const held = useRef(false);
+  const from = useRef<{ x: number; y: number } | null>(null);
+  const cancel = () => {
+    window.clearTimeout(timer.current);
+    timer.current = 0;
+  };
+  const hold = () => {
+    cancel();
+    // (Held, with or without anything to do: the click that follows isn't a tap.)
+    held.current = true;
+    if (!onHold) return;
+    haptic("crateHold");
+    onHold();
+  };
+  return (
+    <button
+      type="button"
+      {...rest}
+      aria-label={label}
+      onPointerDown={(e) => {
+        held.current = false;
+        from.current = { x: e.clientX, y: e.clientY };
+        cancel();
+        timer.current = window.setTimeout(hold, 550);
+      }}
+      onPointerMove={(e) => {
+        if (from.current && Math.hypot(e.clientX - from.current.x, e.clientY - from.current.y) > 10) cancel();
+      }}
+      onPointerUp={cancel}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (!held.current) hold();
+      }}
+      onClick={() => {
+        if (held.current) held.current = false;
+        else onTap();
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Deleting a crate item for good, after a confirmation. A stack offers to delete the extras (keeping the purest) or
+ * all of them. If the one you wear goes, the one you keep goes on instead.
+ */
+function DeleteDialog({ stack, wornId, onClose }: { stack: ItemStack; wornId: string | undefined; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const top = stack.items[0]!;
+  const d = itemDef(top.def)!;
+  const n = stack.items.length;
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
+    // (Its Escape is its own, heard first: nothing under it (the inventory layer, a screen) acts on it too.)
+    const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopImmediatePropagation(), onClose());
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, []);
+  const go = async (ids: string[], keep?: ItemInstance) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteLockerItems(ids);
+      if (keep && wornId && ids.includes(wornId)) await equipLockerItem(d.slot, keep.id);
+      play("menuClose");
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't delete it.");
+      setBusy(false);
+    }
+  };
+  return (
+    <div class="locker-dialog-back" onClick={onClose}>
+      <div class="ff-window locker-dialog" role="dialog" aria-modal="true" aria-labelledby="locker-dialog-title" style={{ "--tier": tierInfo(d.tier).color }} onClick={(e) => e.stopPropagation()}>
+        <span class="locker-dialog-art">
+          <ItemArt def={top.def} finish={top} />
+        </span>
+        <strong id="locker-dialog-title">
+          Delete {d.name}
+          {n > 1 ? ` ×${n}` : ""}?
+        </strong>
+        <span class="small">{n > 1 && showsPurity(top.def) ? `${colorName(top)} · the best is ${purity(top.blemish).toFixed(1)}%` : finishLine(top)}</span>
+        <p class="small">It's gone for good. This can't be undone.</p>
+        {error && <p class="shop-error">{error}</p>}
+        <div class="locker-dialog-actions">
+          {n > 1 && (
+            <button type="button" class="ff-button small" disabled={busy} onClick={() => void go(stack.items.slice(1).map((i) => i.id), top)}>
+              ▶ Delete {n - 1 === 1 ? "the extra one" : `the ${n - 1} extras`}, keep the best
+            </button>
+          )}
+          <button type="button" class="ff-button small danger" disabled={busy} onClick={() => void go(stack.items.map((i) => i.id))}>
+            ▶ {n > 1 ? `Delete all ${n}` : "Delete"}
+          </button>
+          <button type="button" class="ff-button small" disabled={busy} autoFocus onClick={onClose}>
+            ▶ Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export { crateDef };

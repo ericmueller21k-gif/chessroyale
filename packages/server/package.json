@@ -1,0 +1,12 @@
+{
+  "name": "@chessroyale/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lobby server: a Cloudflare Worker with one Durable Object per lobby.",
+  "dependencies": {
+    "@chessroyale/chess": "*",
+    "@chessroyale/core": "*",
+    "@cloudflare/containers": "^0.3.7"
+  }
+}

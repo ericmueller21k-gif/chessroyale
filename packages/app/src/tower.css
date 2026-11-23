@@ -1,0 +1,959 @@
+/* The Battle Tower (PR 10): the run's strip over the battle and the split boss bar (screens/TowerBar.tsx, mockups 1 to 6), the result's
+   buttons; (PR 11b) the clerk's card. Colors from the front door's tokens (light and dark). */
+
+/* ---- The clerk's card in the town's tower (town/TowerDesk.tsx, PR 11b): "Start over", small under Start or Continue ---- */
+.town-btn.tw-over {
+  min-height: 36px;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+/* (Its own lines beat the town card's text style (`.town-card-text`, town.css) by their selector, never by which stylesheet loads last:
+   tower.css loads before or after town.css depending on what opened first, and since #839 (the town drawing the run's hearts) always
+   before, which turned the plan line's 12 px / 1.3 into 13 px / 1.35, its three lines taller than their box. The review of #839.) */
+.tw-desk .tw-desk-note {
+  margin: 4px 0 0;
+}
+
+/* ---- A run's lives (Nov 20; components/TowerHearts.tsx): every heart always there, a spent one greyed ---- */
+.tw-hearts {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  vertical-align: -1px;
+}
+.tw-heart {
+  width: 15px;
+  height: 13px;
+}
+/* The pixel heart's colors (components/TowerHearts.tsx): a dark red border, red, a light highlight. A spent one is hollow: its border
+   greyed, its slot a faint shape (--tw-slot: dark theme first, light below). */
+:root {
+  --tw-slot: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme="light"] {
+  --tw-slot: rgba(0, 0, 0, 0.12);
+}
+.tw-px-b {
+  fill: #7a1426;
+}
+.tw-px-r {
+  fill: #e0283e;
+}
+.tw-px-h {
+  fill: #ff8f9a;
+}
+.tw-heart.spent .tw-px-b {
+  fill: #8a8580;
+  opacity: 0.6;
+}
+.tw-heart.spent .tw-px-r,
+.tw-heart.spent .tw-px-h {
+  fill: var(--tw-slot);
+}
+/* The match's lives on a phone: at the strip's right end, the strip's text still centered (absolute, so it takes no room from it). */
+.hud-stage:has(> .tw-strip) {
+  position: relative;
+}
+.tw-strip-lives {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+/* On a computer: beside the board, in its bottom rank (the h1 square), the two hearts one above the other (the room beside the board is
+   a little more than a heart wide: your pawn stands in it), a third of a square high each, 2 px from the board's edge. Drawn over the
+   board's wrap (its size: --board-size), taps pass through. */
+.tw-board-lives {
+  position: absolute;
+  left: calc(100% + 2px);
+  top: calc(var(--board-size, 100%) * 15 / 16);
+  transform: translateY(-50%);
+  flex-direction: column;
+  pointer-events: none;
+  z-index: 1;
+}
+.tw-board-lives .tw-heart {
+  width: calc(var(--board-size, 100%) / 24 * 9 / 8);
+  height: calc(var(--board-size, 100%) / 24);
+}
+/* The clerk's card: your solo climb's lives and floors lost, one line whatever it says (greyed in a party, as the solo half). */
+.tw-desk-lives {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 20px;
+  margin: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tw-desk-panel.in-party .tw-desk-lives {
+  opacity: 0.5;
+}
+/* The floor room: the run's lives in its corner (the room's bottom left, as the Hidden Boss's count; taps pass through). */
+.tw-room-lives {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(20, 12, 8, 0.82);
+  border: 1px solid #c9a24a;
+  color: #f6e7c1;
+  font: 700 14px/1 Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+}
+.tw-room-lives .tw-heart {
+  width: 17px;
+  height: 15px;
+}
+
+/* ---- The clerk's three ways to climb (Nov 20: Solo, Invite friends, Open party) and the panel under them, one size whatever it holds ---- */
+.town-card:has(.tw-desk) {
+  width: 272px;
+  max-width: min(272px, calc(100vw - 24px));
+}
+/* (Eric, Nov 20: "the whole box itself should be centered": a keeper's panel stands in the middle of the room, ShopRoom.tsx `cardMid`,
+   with no tail; and every label and line in it centered, as the card's title is. docs/decisions/2026-11-20-ui-centered.md.) */
+.town-card.town-mid::after {
+  display: none;
+}
+.tw-desk-ways {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+/* (Its title as close to the ways as they are to what's under them: one even 6 px down the card, so it fits over a phone's room above
+   the walking keys, Nov 20.) */
+.town-card.town-mid h2 {
+  margin-bottom: 6px;
+}
+.tw-way {
+  min-height: 44px;
+  padding: 4px 6px;
+  border: 1.5px solid var(--card-gold, #d9bb8c);
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.15;
+  cursor: pointer;
+}
+.tw-way.on {
+  background: var(--card-gold, #d9bb8c);
+  color: #20212a;
+}
+.tw-way:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tw-way.on:disabled {
+  opacity: 1;
+}
+/* The parties open to newcomers (Eric, Nov 20): a box of one size, three rows tall, scrolling inside when there are more. */
+.tw-open {
+  margin-bottom: 6px;
+}
+.tw-open-head {
+  margin: 0 0 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--card-gold, #d9bb8c);
+}
+/* (Its rows 3 px apart, the last one with nothing under it: three fit exactly, with no scroll (the delta review of #835, finding 5); its
+   scrollbar's room kept always, so the rows never narrow as one comes and goes on a computer that draws one.) */
+.tw-open-list {
+  height: calc(3 * 28px + 2 * 3px);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  /* (Both edges: its words stay in the box's middle on a computer that draws a scrollbar.) */
+  scrollbar-gutter: stable both-edges;
+  overscroll-behavior: contain;
+  list-style: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.tw-open-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-bottom: 3px;
+  padding: 0 4px 0 8px;
+  font-size: 12px;
+  text-align: left;
+}
+.tw-open-row:last-child {
+  margin-bottom: 0;
+}
+.tw-open-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-open-n {
+  flex: none;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+/* Its box the size of its widest label (both laid in one cell, the other unseen): "Join" to "Joined" never moves the row. */
+.tw-open-join {
+  flex: none;
+  display: inline-grid;
+  justify-items: center;
+  align-items: center;
+  min-height: 26px;
+  padding: 2px 10px;
+  border: 1px solid var(--card-gold, #d9bb8c);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: 700 12px Archivo, sans-serif;
+  cursor: pointer;
+}
+.tw-open-join > span {
+  grid-area: 1 / 1;
+}
+.tw-open-join > .tw-open-size {
+  visibility: hidden;
+}
+.tw-open-join:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* (Its one line, "Reading…" or "No open parties right now.", in the middle of the box, not hung at its top: Eric, Nov 20.) */
+.tw-open-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 0 8px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* One layout in both states (the review of #835, finding 11): the party's half (seats, the line, READY or START, Leave party), then the
+   solo half; the half that doesn't apply greyed, nothing swapped. */
+.tw-desk-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: flex-start;
+}
+/* (One even gap between its rows, the panel's own: a button's own top margin made some 10 px and others 4: Eric, Nov 20, "no dead gaps".) */
+.tw-desk-panel .town-btn {
+  margin-top: 0;
+}
+.tw-desk-panel.solo .tw-seats {
+  opacity: 0.5;
+}
+.tw-desk-row {
+  display: flex;
+  gap: 6px;
+}
+.tw-desk-row > .town-btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.tw-seats {
+  display: grid;
+  /* (Two equal halves whatever the names: a long one is cut with "…", never widens its column.) */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* (Its dot, name and mark centered in the seat, as the card's other lines: Eric, Nov 20.) */
+.tw-seat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+.tw-seat.free {
+  opacity: 0.5;
+}
+.tw-seat.away .tw-seat-name {
+  opacity: 0.6;
+}
+.tw-seat-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pt-c);
+}
+.tw-seat.free .tw-seat-dot {
+  background: transparent;
+  border: 1.5px dashed rgba(255, 255, 255, 0.6);
+}
+.tw-seat-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-seat-mark {
+  flex: none;
+  color: var(--card-gold, #d9bb8c);
+}
+/* A member's Kick (the leader's; greyed during a floor): a small round button at the seat's end, asked first. */
+.tw-kick {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0 -2px 0 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  font: 700 11px/1 Archivo, sans-serif;
+  cursor: pointer;
+}
+.tw-kick:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+/* Three lines, always, whatever it says (the plan, a refusal, the solo climb's note), so nothing under it moves: a fixed height, never a
+   least one (the delta review of #835, finding 3), and words written to fit it (tower-plan.ts; e2e/tower-party.spec.ts measures the
+   longest). */
+/* (Its words in the middle of their three lines, so one or two lines leave no gap under them: Eric, Nov 20; `safe`: words too long for
+   the box would start at its top, so a test's overflow measure still sees them.) */
+.tw-desk .tw-plan {
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  height: calc(3 * 1.3em);
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+/* ---- The tower's screen (screens/Tower.tsx): kept unused at Eric's word, Nov 19 (PR 11b) ---- */
+.tw-page {
+  height: var(--app-h);
+}
+.tw-card {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 3px solid var(--fd-line);
+  border-radius: 18px;
+  background: var(--fd-panel);
+}
+.tw-card.tw-saved {
+  border-color: var(--fd-gold);
+}
+.tw-art {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 96px;
+  border-radius: 10px;
+  background: var(--fd-seat);
+}
+.tw-sky {
+  width: 48px;
+  height: 80px;
+  fill: var(--fd-sub);
+}
+.tw-sky .tw-win {
+  fill: var(--fd-gold);
+}
+.tw-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tw-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--fd-sub);
+}
+.tw-floor {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--fd-text);
+}
+.tw-floor small {
+  font-family: Archivo, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fd-sub);
+}
+.tw-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 14px;
+  color: var(--fd-sub);
+  white-space: nowrap;
+}
+.tw-line b {
+  color: var(--fd-text);
+}
+.tw-bests {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.tw-best {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+}
+.tw-best small {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--fd-sub);
+}
+.tw-best b {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--fd-text);
+}
+.tw-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  width: min(300px, 100%);
+  margin: 0 auto;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--fd-seat);
+}
+.tw-switch button {
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--fd-text);
+}
+.tw-switch button small {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--fd-sub);
+}
+.tw-switch button.on {
+  background: var(--fd-panel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+/* (Party: greyed, never hidden, until party runs open: PR 12.) */
+.tw-switch button:disabled {
+  opacity: 0.45;
+}
+.tw-stage .bs-inv-btn:disabled {
+  opacity: 0.45;
+}
+/* (2 or 3 bosses: each its own platform, a share of the boss side, one size for all.) */
+.tw-spots {
+  display: flex;
+  justify-content: center;
+  width: var(--bs-sw);
+}
+.tw-spots .tw-spot {
+  flex: none;
+}
+.tw-n2 .tw-spot {
+  width: calc(var(--bs-sw) / 2);
+}
+.tw-n3 .tw-spot {
+  width: calc(var(--bs-sw) / 3);
+}
+.tw-names {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tw-rating {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--fd-gold-text);
+}
+.bs-start.tw-start {
+  width: 300px;
+  font-size: 18px;
+  white-space: nowrap;
+}
+.tw-start:disabled,
+.tw-new:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.tw-new {
+  display: block;
+  margin: 14px auto 0;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  font-size: 16px;
+  text-decoration: underline;
+  color: var(--fd-sub);
+  cursor: pointer;
+}
+
+/* ---- The bosses beaten, small portraits (the strip's) ---- */
+.tw-beaten {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.tw-more {
+  font-weight: 800;
+  color: var(--fd-text);
+  margin-right: 2px;
+}
+.tw-face {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  overflow: hidden;
+}
+.tw-face > *,
+.tw-face .boss-portrait {
+  width: 100%;
+  height: 100%;
+}
+.tw-face canvas,
+.tw-face img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.tw-unknown {
+  font-weight: 800;
+  color: var(--fd-dim);
+}
+
+/* ---- The run's strip (Eric, Nov 20): "Battle Tower · Floor 4" and the hearts, one centered line in place of "BOSS · move 1" ---- */
+.tw-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+/* (A phone's top stage takes the room the strip needs, and leaves the gear's 44 px at its right out of the middle, so the strip centers
+   over the board.) */
+.hud-stage:has(> .tw-strip) {
+  flex: 1;
+  min-width: 0;
+  padding-left: 44px;
+}
+/* The title's words are cut first, with "…", the hearts never. */
+.tw-strip-top {
+  min-width: 0;
+  font-weight: 800;
+  font-size: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tw-strip-top span {
+  font-weight: 600;
+  color: var(--fd-sub, var(--muted));
+}
+
+/* ---- The split boss bar (2 or 3 bosses) as an accordion (Eric, Nov 21; TowerBar.tsx). One part a boss, a window onto his card: the
+   open part (the boss to move, or one tapped open) takes 75% of the room the gaps and outlines leave (its flex-grow, set inline), the
+   folded ones share the rest. The card is the lone bar's own box (`.boss-bar.has-char`, styles.css), laid out once at the open part's
+   width (the bar a size container: --tw-open of 100cqw less the gaps and outlines): a folded window shows its left side, his figure;
+   opening reveals more of the same card. The bar's height never changes (95 px a phone; a computer's 89, below, in the board's room). The windows slide (flex-grow, 300 ms); instantly with reduced motion. Eric's named exception to "nothing shifts". ---- */
+.tw-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0;
+  height: 95px;
+  position: relative;
+  container-type: inline-size;
+}
+.tw-part {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: block;
+  border: 3px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: flex-grow 0.3s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-part {
+    transition: none;
+  }
+}
+/* (Never dimmed, never hidden: Eric, Nov 21. The boss to move is marked by the yellow outline and the TO MOVE tag alone.) */
+.tw-part.tw-to-move {
+  border-color: #f2c14e;
+}
+.tw-window {
+  display: block;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 9px;
+}
+.tw-bcard.boss-bar {
+  box-sizing: border-box;
+  width: calc((100cqw - (var(--tw-n) - 1) * 4px - var(--tw-n) * 6px) * var(--tw-open));
+  height: 89px;
+  min-height: 0;
+  border-radius: 0;
+}
+/* (A phone's card is narrower and shorter than a lone bar (249 to 257 px by 89, the lone bar's 362 by 99): the figure's box and the gap
+   a little narrower, the name and status a size smaller, and his prop drawn as on a lone bar, scaled to 82% from the room's top right.) */
+@media (max-width: 899px), (max-height: 599px) {
+  .tw-bcard.boss-bar {
+    gap: 8px;
+  }
+  .tw-bcard .boss-name strong {
+    font-size: 14px;
+  }
+  .tw-bcard .boss-next {
+    font-size: 11px;
+  }
+  .tw-bcard .boss-prop:not(:has(> .dd-timers)) {
+    transform: scale(0.82);
+    transform-origin: right top;
+  }
+}
+/* (The tag rides the window's top edge at its left, over the outline: outside the window, so a folded part never cuts it.) */
+.tw-tag {
+  position: absolute;
+  top: -1px;
+  left: 6px;
+  z-index: 5;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: #f2c14e;
+  color: #1a1406;
+  font-size: 8px;
+  line-height: 11px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* (The boss to move folded, another tapped open: his tag centered on his narrow window, so it never runs past the bar's end.) */
+.tw-part:not(.tw-part-open) > .tw-tag {
+  left: 50%;
+  transform: translateX(-50%);
+}
+/* (A folded boss's words, a phone's (Eric, Nov 21: drawn over the bar beside his window, not inside it): a room the card's width less the
+   tail's 14 px, its edge 14 px past his outline toward the open part, so it always stays over the bar; the bubble at its foot as a lone
+   bar's, its tail at his window. His part doesn't open for the line.) */
+.tw-say {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  width: calc((100cqw - (var(--tw-n) - 1) * 4px - var(--tw-n) * 6px) * var(--tw-open) - 14px);
+  pointer-events: none;
+}
+.tw-say-right {
+  left: calc(100% + 11px);
+}
+.tw-say-left {
+  right: calc(100% + 11px);
+}
+.tw-say .bc-bar-bubble {
+  bottom: 2px;
+}
+.tw-say-left .bc-bar-bubble {
+  left: auto;
+  right: 0;
+}
+/* (Its tail turned to point right, at a window on its right: the square's top and right edges.) */
+.tw-say-left .bc-bar-bubble::after {
+  left: auto;
+  right: -11px;
+  border-bottom: 0;
+  border-left: 0;
+  border-top: 3px solid #1a1406;
+  border-right: 3px solid #1a1406;
+}
+/* (A phone's figure box: the card's height, one width for every boss so the name column starts at one place, his figure at its left
+   foot so a folded window shows the most of him.) */
+.tw-card-face {
+  flex: none;
+  align-self: flex-end;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  width: 60px;
+  height: 78px;
+}
+@media (min-width: 900px) and (pointer: fine) {
+  .tw-bar {
+    height: 61px;
+  }
+  .tw-bcard.boss-bar {
+    height: 55px;
+  }
+}
+/* ---- A computer's tower bar, taller (Eric, Nov 21: "Shouldn't we be making the boss thing bigger? ... I would be going with the one of
+   these two that you'd use the bigger boss bar"): the 28 px the floor's title left between the bar and the board (it's over the column
+   beside the board now: `.tw-col-title`) go to the bar, not the board. The split bar 89 px (61 before), each card 83 inside its outline;
+   a lone floor's bar the same 89 px, its padding the card's plus the outline's 3 px, so both kinds of floor look alike and their boards
+   sit in one place, main's for a floor of several (board-size.css keeps the room at 151 px: the board main's size). What's in the bar grows
+   as a phone's does: his face in one 84 x 74 box for every boss (fit whole, as the bar fits it to 48 px wide elsewhere; the name column
+   starts at one place), his name, LVL and meters a size up (the column at 1.2), the status a size up, and the props that size themselves to
+   the room (Hollow's bulbs, Grex's candles: drawn at 2x on a computer) at 1.5, 3x, whole pixels, never wider than the room. The props
+   of bosses not in the tower's pool yet (Timber's workshop, Tick's tally, Don Dough's timers) and Babur's pump (by his figure, or the
+   taller bar's own sums) keep their size. Boss battles outside the tower, and a phone: unchanged. ---- */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .tw-bar {
+    height: 89px;
+  }
+  .tw-bcard.boss-bar {
+    height: 83px;
+  }
+  /* (At least: Babur's taller bar, where his pump has no room by his figure, is as tall as his pump, as on main: styles.css `.tg-tall`.) */
+  .screen.game:has(> .gm-tools > .tw-col-title) > .boss-bar:not(.tw-bar) {
+    box-sizing: border-box;
+    min-height: 89px;
+    padding: 6px 13px 7px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char {
+    gap: 12px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-icon .boss-portrait {
+    width: 84px;
+    height: 74px;
+    margin: 0;
+    object-fit: contain;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-name {
+    zoom: 1.2;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-next {
+    font-size: 13px;
+  }
+  .screen.game:has(> .gm-tools > .tw-col-title) .boss-bar.has-char .boss-prop > :is(.life-strip, .pw-pips) {
+    zoom: 1.5;
+  }
+}
+
+/* ---- The result's buttons ---- */
+.tw-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0;
+  text-align: center;
+}
+.tw-result-line {
+  font-weight: 800;
+  font-size: 16px;
+}
+.tw-result-sub {
+  font-size: 14px;
+  color: var(--muted, var(--fd-sub));
+}
+.tw-result .btn:disabled {
+  opacity: 0.5;
+}
+
+/* ---- A computer's title over the column beside the board, and the figures stacked beside the board ---- */
+/* (Eric, Nov 21: "we need all that space for the boss for the bar at the top ... put it to the right above the moves black container".)
+   The run's title is the first line of the column's tools (`.gm-tools`, game-frame.css: the bar's row, the Moves box's left edge and
+   width), its top level with the bar's top, centered; the tools on the line under it at the right, then the Moves box. The two rows
+   (20 + 4 + 28 px) fit the tower bar's row (89 px, both kinds of floor, below), so the board stays right under the bar; the title's old
+   28 px are the bar's (board-size.css). */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  /* (Two fixed rows, the tools' as tall as their one line elsewhere (28 px; the gear's 42 px button overflows it, centered, as there).) */
+  .screen.game > .gm-tools:has(> .tw-col-title) {
+    align-self: start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: 20px 28px;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 4px;
+    height: 52px;
+  }
+  .screen.game > .gm-tools > .tw-col-title {
+    grid-column: 1 / -1;
+  }
+  .screen.game > .gm-tools:has(> .tw-col-title) > .match-tools {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .screen.game > .gm-tools:has(> .tw-col-title) > .mm {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}
+.tw-col-title {
+  display: flex;
+  height: 20px;
+  line-height: 20px;
+}
+.boss-side.tw-side {
+  align-self: stretch;
+}
+.tw-side-fig {
+  position: absolute;
+  right: 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  transition: transform 0.3s ease;
+}
+.tw-side-body {
+  position: relative;
+  display: block;
+}
+.tw-side-fig.tw-to-move {
+  transform: translateX(18px);
+}
+/* A boss's own moment that draws him somewhere else (Eric, Nov 21: Grex "showing twice"): his figure, and only his (`.tw-casting`,
+   TowerBar.tsx), steps out of his part or his place beside the board for it, as a lone boss's does (styles.css, `.pm-caster`): on a phone for
+   every moment he casts at the board's corner, on a computer only while the moment draws him on the board (`.boss-moment`, the Full Moon).
+   Hidden, not removed: his box keeps its size and place; every other boss stays drawn. */
+.screen:has(.power-moment:not(.pm-stay)) .tw-casting .tw-fig-box {
+  visibility: hidden;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen:has(.power-moment:not(.pm-stay)) .tw-casting .tw-fig-box {
+    visibility: visible;
+  }
+  .screen:has(.power-moment .boss-moment) .tw-casting .tw-fig-box,
+  .screen:has(.power-moment.pm-fullmoon) .tw-casting .tw-fig-box {
+    visibility: hidden;
+  }
+}
+.tw-fig {
+  display: block;
+  image-rendering: pixelated;
+}
+.tw-part-portrait {
+  width: 40px;
+  height: 40px;
+}
+.tw-fig-box {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+.tw-fig-box .tw-fig {
+  position: absolute;
+  max-width: none;
+}
+.tw-side-bubble {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  width: max-content;
+  max-width: 220px;
+  margin-bottom: 6px;
+}
+
+/* ---- A boss's prop on a floor of several (BossUi.towerProp): Babur's pump (Eric, Nov 20: his balloons weren't to be seen on a shared
+   floor). A phone's in his part of the split bar, 1.25x (42.5 x 45), standing on the figure's row at the part's left; a computer's beside
+   his figure by the board, 2x (about the board's balloons), on his feet's line toward the window's edge, over his edge as a lone boss's.
+   Positioned, so it never sizes or moves anything; never dimmed with his part (his balloon grows while others are to move). ---- */
+.tw-side-body > .tg-pump-slot {
+  position: absolute;
+  left: 2px;
+  right: auto;
+  top: 3px;
+  bottom: auto;
+  width: 42.5px;
+  height: 45px;
+}
+.tw-side-body > .tg-pump-slot > .tg-pump {
+  width: 100%;
+  height: 100%;
+}
+@media (min-width: 900px) and (pointer: fine) {
+  .tw-side-body > .tg-pump-slot {
+    left: auto;
+    right: calc(100% - 16px);
+    top: auto;
+    bottom: 0;
+    width: 68px;
+    height: 72px;
+  }
+}
+
+/* ---- Babur's balloons off on this floor (noAdd: a floor of several whose primary is another boss, BATTLE_TOWER.addsPieces; Eric, Nov 20):
+   his pump stays in its place, empty, greyed and dimmed, an OFF tag over its foot, never dimmed (its label says why). Positioned: nothing
+   moves. ---- */
+.tw-bcard .tg-pump-slot.tg-off > .tg-pump,
+.tw-side-body > .tg-pump-slot.tg-off > .tg-pump {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+.tg-pump-slot > .tg-off-tag {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  font: 700 9px/12px system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+@media (min-width: 900px) and (pointer: fine) {
+  .tw-side-body > .tg-pump-slot > .tg-off-tag {
+    font-size: 11px;
+    line-height: 14px;
+  }
+}
