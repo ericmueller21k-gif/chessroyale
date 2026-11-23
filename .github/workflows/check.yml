@@ -68,8 +68,8 @@ jobs:
 
   # (Two halves since Nov 19: the tower's kit and layer tests doubled this job, which then set check's time; the sweep's N2,
   # Eric's OK. Every test still runs on every PR, half on each runner.) Split by time since Nov 23 (Eric: "Yes, rebalance"):
-  # vitest's --shard split by file count, 1 : 2.8 by time. Half 1 is the typecheck plus the two slowest files; half 2 the rest.
-  # The same two names in both steps, so every file runs exactly once.
+  # vitest's --shard split by file count, 1 : 2.8 by time. Half 1 is the typecheck plus HALF1 (the slowest files by CI's own
+  # times, Nov 23); half 2 is every other file. One list, so every file runs exactly once; rebalance by moving names.
   chess:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -77,6 +77,11 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2]
+    env:
+      HALF1: >-
+        packages/chess/test/boss-kit-side.test.ts packages/chess/test/several-bosses.test.ts
+        packages/chess/test/boss-kit.test.ts packages/chess/test/square-layer-twin.test.ts
+        packages/chess/test/edge-layer-twin.test.ts packages/chess/test/held-layer-twin.test.ts
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -88,11 +93,11 @@ jobs:
       - if: ${{ matrix.shard == 1 }}
         run: npm run typecheck
       - if: ${{ matrix.shard == 1 }}
-        name: packages/chess's tests (half 1 of 2, the two slowest files)
-        run: npx vitest run packages/chess/test/boss-kit-side.test.ts packages/chess/test/several-bosses.test.ts
+        name: packages/chess's tests (half 1 of 2, the slowest files)
+        run: npx vitest run $HALF1
       - if: ${{ matrix.shard == 2 }}
         name: packages/chess's tests (half 2 of 2, the rest)
-        run: npx vitest run packages/chess/test --exclude "packages/chess/test/boss-kit-side.test.ts" --exclude "packages/chess/test/several-bosses.test.ts"
+        run: npx vitest run packages/chess/test $(for f in $HALF1; do printf -- '--exclude %s ' "$f"; done)
 
   # (The name every reader and rule knows: green only when both jobs are.)
   check:
