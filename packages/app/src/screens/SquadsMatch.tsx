@@ -336,14 +336,16 @@ function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing
   const [skipped, setSkipped] = useState<string | null>(null);
   const frames = useMemo(() => (n > 0 && total > 0 ? replayFrames(b.startFen, b.moves, b.by ?? [], n) : []), [half, n, total, b.moves.length]);
   const startedAt = m.current?.startedAt ?? 0;
-  const frame = !browsing && skipped !== half && frames.length > 1 ? replayFrameAt(frames, total, Date.now() - startedAt) : null;
-  // (Drawn again as each move lands, and as it ends.)
+  const now = Date.now();
+  const frame = !browsing && skipped !== half && frames.length > 1 ? replayFrameAt(frames, total, now - startedAt) : null;
+  // (Drawn again as each move lands, and as it ends. The next moment is the one after this drawing, as the reveal's: the
+  // effect runs a frame later, and on a busy device that can be past the end, which once left the replay up until the
+  // next lobby message: main's run 45230830938, Nov 23.)
   const [, redraw] = useState(0);
+  const next = frame ? [...replayTimes(frames.length - 1, total), total].map((x) => startedAt + x).find((x) => x > now) : undefined;
   useEffect(() => {
-    if (!frame) return;
-    const next = [...replayTimes(frames.length - 1, total), total].map((x) => startedAt + x).find((x) => x > Date.now());
     if (next === undefined) return;
-    const t = setTimeout(() => redraw((k) => k + 1), next - Date.now() + 5);
+    const t = setTimeout(() => redraw((k) => k + 1), Math.max(0, next - Date.now()) + 5);
     return () => clearTimeout(t);
   });
   return { frame, step: frame ? frames.indexOf(frame) : 0, count: frames.length - 1, skip: () => setSkipped(half), arrivedAt: arrivedAt.current };
