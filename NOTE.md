@@ -7,11 +7,18 @@ Headless Chromium, the game's own room, as an admin. Branch `claude/birdie-lobby
 - `gates-lowering-phone.png`, `gates-down-phone.png`, `gates-table-phone.png`: his challenge. The gates lowering on the marks, then down
   and flashing through his line, then the table beat.
 - `table-close-phone.png`: the table and both bar arms, close (the Close camera from the floor south of the table).
-- `arm-west-close-phone.png`: the west bar arm and its stools, close, from the floor beside the seats.
+- `arm-west-close-phone.png`: the west bar arm and its stools, close, from the floor beside the seats (3, 6): its outer side.
+- `arm-east-close-phone.png`: the east bar arm and its stools, close, from the floor east of the bar (9, 6): its outer side.
+
+Fix round (Nov 23, the director's check): all retaken. Each arm is now one piece (1 x 3) that the room stands up in thin slices along
+its depth, so it reads as one counter from every camera.
 
 ## Eric's notes, and what the in-game stills show
-- **"The bar … should be risen, and their stools should be there":** `room-phone` and `table-close`. Both arms stand raised like the front
-  run, the same height, with their charcoal side faces and red stripe toward the stools. Three stools stand against each arm.
+- **"The bar … should be risen, and their stools should be there":** `gates-down` (the room's usual camera, no banner), `table-close`,
+  `arm-west-close` and `arm-east-close`. Each arm is one continuous counter: one straight top edge running back from the run's top at the
+  run's height, and one continuous charcoal side face with its red stripe toward the stools, from the usual camera, close, and from
+  either side. Three stools stand against each arm, drawn over it as the art drew them; the feeders on the arms, the vat's heap and the
+  bartender inside the U all show.
 - **"Make the birdseed pile bigger so it's clear":** `room-phone` and `gates-down`. A big heap on the run's east end, and the vat's heap
   beside the bartender over the run's far edge.
 - **"The train tracks … should move over on top of the table":** `room-phone` and `room-desktop`. The tracks run across the room on row 7
@@ -30,6 +37,6 @@ Headless Chromium, the game's own room, as an admin. Branch `claude/birdie-lobby
 - The vat moved up beside the bartender so its heap shows over the run.
 
 ## Worth a look
-- From close up and from the side (`arm-west-close`), each arm shows as three stepped faces, one per row. This happens because every
-  room piece stands up at its row. From the room's usual camera the arms read as one raised counter.
+- From the usual camera the arms' tops rise toward the back wall as they recede, as the run's top does over its face: every upright
+  thing in the room stands up at its depth this way, and the arms now do it smoothly, not in three steps.
 - The art's bar stools stand a little taller than the table's top.
