@@ -12,9 +12,12 @@
  * - Each other layer of the art is a piece on the row its foot is on (its picture's bottom), in the art's own order within a row. A layer
  *   that changes over the art's idle (the birds' bob) is a piece of 4 beats; the gates are a piece each (their post, motor, arm, lights and
  *   crossbuck), with their `lower` and `down` as pieces of their own (SHOP_BIRDIE_GATE_PLAYS), which ShopRoom plays for a challenge.
- * - The bar is one U-shaped picture in the art, its top raised 36 px over its squares: it's cut into the arms' rows (each arm's square of
- *   top with the 36 px under it: its raised top and its side face, standing on its row) and the front run (its top and front face, on
- *   row 4), so in the room's camera each reads as a raised counter, as the run always has. The cuts carry the bar's own outline.
+ * - The bar is one U-shaped picture in the art, its top raised 36 px over its squares: it's cut into its two arms (each one piece 1 x 3
+ *   squares, rows 1 to 3: its raised top and its side face, from its north end to its south row's 36 px under the top) and the front run
+ *   (its top and front face, on row 4). ShopRoom stands an arm as a counter (SHOP_BIRDIE_COUNTERS): in thin slices, each at its own
+ *   depth, so its top runs on as one straight edge at the run's height and its side face as one face (cut a piece a row, each stood up
+ *   at its row, the arms showed as three stepped slabs: the fix round, Nov 23). An arm is listed with its north row's pieces, so the
+ *   feeders on it and the stools against it draw over it, as the art drew them. The cuts carry the bar's own outline.
  *
  * The room's own calls (docs/decisions/2026-11-23-birdie-lobby-4.md):
  * - The bartender pours into a counter feeder (the art's notes: the pour lands 26 px right and 28 px up of his feet; his dip reaches back
@@ -163,11 +166,11 @@ for (let r = 0; r < SHOP_BIRDIE_N; r++)
 // -- The upright pieces: each on its row, in the art's order within a row (`i`).
 type Up = { row: number; i: number; place: ShopPlace };
 const ups: Up[] = [];
-/** Puts a piece on (col, row), `w` squares wide; its foot that row's middle. */
-function stand(base: string, beats: readonly Beat[], col: number, row: number, i: number, opts: Partial<ShopPlace> = {}) {
+/** Puts a piece on (col, row), `w` squares wide; its foot that row's middle. Listed with `sortRow`'s pieces (a counter: its north row). */
+function stand(base: string, beats: readonly Beat[], col: number, row: number, i: number, opts: Partial<ShopPlace> = {}, sortRow = row) {
   const w = opts.w ?? 1;
   const name = nameFor(base, beats, (col + w / 2) * T, artY(row));
-  ups.push({ row, i, place: { name, col, row, solid: true, ...opts } });
+  ups.push({ row: sortRow, i, place: { name, col, row, solid: true, ...opts } });
 }
 /** A layer's own beats over the art's idle: one if it never changes, else its four. */
 const beatsOf = (idx: readonly number[], move: (l: Layer) => At = (l) => l): Beat[] => {
@@ -216,12 +219,10 @@ L0.forEach((l, i) => {
     // edge with it. Then the front run, its top and its front face, on row 4.)
     const x0 = bar.x - 1;
     const x1 = bar.x + BAR_W + 1;
-    for (const [side, cx0, cx1, col] of [["w", x0, bar.x + T + 1, 5], ["e", bar.x + BAR_W - T - 1, x1, 8]] as const)
-      for (let r = 1; r <= 3; r++) {
-        const y0 = r === 1 ? bar.y - 1 : rowY(r) - BAR_UP;
-        const name = cut(`counter-arm-${side}-${r}`, barCells, cx0, y0, cx1, rowY(r + 1));
-        stand(`counter-arm-${side}-${r}`, [{ layers: [{ part: name, x: cx0, y: y0 }], ms: 1000 }], col, r, i);
-      }
+    for (const [side, cx0, cx1, col] of [["w", x0, bar.x + T + 1, 5], ["e", bar.x + BAR_W - T - 1, x1, 8]] as const) {
+      const name = cut(`counter-arm-${side}`, barCells, cx0, bar.y - 1, cx1, rowY(4));
+      stand(`counter-arm-${side}`, [{ layers: [{ part: name, x: cx0, y: bar.y - 1 }], ms: 1000 }], col, 3, i, { d: 3 }, 1);
+    }
     const run = cut("counter-run", barCells, x0, RUN_TOP - 1, x1, bar.y + BAR_H + 1);
     return stand("counter", [{ layers: [{ part: run, x: x0, y: RUN_TOP - 1 }], ms: 1000 }], 5, 4, i, { w: 4 });
   }
@@ -380,8 +381,10 @@ LAYOUT.push({ name: "crate", col: 5, row: 4, solid: false }); // on the run (see
 /** Every piece's place: the floor tiles first, then the upright ones by row, in the art's order within a row. */
 export const SHOP_BIRDIE_ROOM_LAYOUT: readonly ShopPlace[] = LAYOUT;
 export const SHOP_BIRDIE_ROOM_PIECES: Readonly<Record<string, Character>> = PIECES;
-/** No deep piece: everything stands up at its foot. */
+/** No deep piece stands up whole at its foot. */
 export const SHOP_BIRDIE_UPRIGHT: readonly string[] = [];
+/** The bar's two arms, each 1 x 3 squares: counters (ShopRoom), standing up in slices along their depth. */
+export const SHOP_BIRDIE_COUNTERS: readonly string[] = ["counter-arm-w", "counter-arm-e"];
 /** The table's flat top (ShopRoom: the renderer's slab and board over its leg, no pieces, as the room stands). */
 export const SHOP_BIRDIE_TABLE_TOP = { piece: "match-table", palette: SHOP_BIRDIE_TABLE_PALETTE } as const;
 /** The battle spot's marks: the boss west of the west stool, you east of the east one (as every room's: the boss on the left). */

@@ -96,6 +96,13 @@ export interface RoomArt {
   poolBlend?: "multiply";
   /** Deep pieces that stand up at their foot, as any upright piece (Big Boy's airplane, flying round over three squares by three), not laid flat as a plan. */
   upright?: readonly string[];
+  /**
+   * Deep pieces that stand up along their depth, as a counter (Birdie's bar arms, 1 x 3, Nov 23): the picture's bottom card (its height
+   * less `d - 1` squares) stands at its south row as any upright piece; the rows above it recede north a square every 37, each thin slice
+   * standing at its own depth as a card would, so its top runs on as one straight edge at a card's height. Sorted with its north row's
+   * pieces, so what stands on it or against it draws over it.
+   */
+  counters?: readonly string[];
   /** Its battle circle's drawn start marks, when its art exports them (Big Boy's rug: the boss's west, yours east). */
   marks?: DrawnMarks;
   /** A room that isn't a box (Hollow's cave): its floor's shape, `.` floor and `#` rock (room.ts makeRoom blocks the rock). */
@@ -270,6 +277,7 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
       lights: m.SHOP_BIRDIE_ROOM_LIGHTS,
       pools: m.SHOP_BIRDIE_ROOM_POOLS,
       upright: m.SHOP_BIRDIE_UPRIGHT,
+      counters: m.SHOP_BIRDIE_COUNTERS,
       marks: m.SHOP_BIRDIE_MARKS,
       flaps: m.birdieFlaps(performance.now()),
       tableTop: m.SHOP_BIRDIE_TABLE_TOP,
@@ -868,6 +876,8 @@ interface Up {
   cut: number;
   /** How far into its loop it stands (ms; ShopPlace `t0`). */
   t0?: number;
+  /** A counter's squares deep (RoomArt `counters`): drawn in slices along its depth. */
+  deep?: number;
 }
 
 /** Runs the room in `box` on `cv`: the loop, the camera, the input and the cards. Returns its controls and its stop. */
@@ -1137,6 +1147,10 @@ function startRoom(
     const d = p.d ?? 1;
     const ch = art.pieces[p.name]!;
     const to = doorOf(p);
+    if (d > 1 && art.counters?.includes(p.name)) {
+      ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row, z: p.row - d + 1, ox: 0, oy: 0, flip: false, cut: 0, deep: d });
+      continue;
+    }
     if (d > 1 && !art.upright?.includes(p.name)) {
       // The plan lies flat on its w x d squares; the strip above its north row (its plants' tops) stands up there.
       flats.push(p);
@@ -2635,6 +2649,13 @@ function startRoom(
     const play = playing(u.name, now);
     const img = play ? frameAt(play.name, play.t) : (darkPiece(u, now) ?? frameAt(roomFx?.swap?.(u.name) ?? (iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name), now + (u.t0 ?? 0)));
     const ch = frames[play?.name ?? u.name]!.ch;
+    if (u.deep) {
+      g.globalAlpha = upAlpha(pt.depth, false, false);
+      upsN++;
+      drawCounter(u, img, ch);
+      g.globalAlpha = 1;
+      return;
+    }
     const s = pt.k / SQ;
     const fx = u.flip ? ch.w - 1 - ch.foot[0] : ch.foot[0];
     const h = u.cut || img.height;
@@ -2674,6 +2695,42 @@ function startRoom(
     // (A table's flat top over its leg: `tableTop`.)
     if (art.tableTop && u.name === art.tableTop.piece) paintTable(g, v, u.c - camX, camY - u.r, art.tableTop.palette, "across", g.globalAlpha, 0);
     g.globalAlpha = 1;
+  };
+  /**
+   * A counter (RoomArt `counters`), its slices far to near: each `COUNTER_STEP` rows of its receding top, standing at its own depth with
+   * its top as far over its foot as the bottom card's is; where the camera sees past a side (nearer slices drawn further in than this
+   * one's edge), that edge's columns go down a card's height, as its side face. Then the bottom card, whole, at its south row.
+   */
+  const COUNTER_STEP = 3;
+  const cAt = { l: 0, r: 0 };
+  const drawCounter = (u: Up, img: HTMLCanvasElement, ch: Character) => {
+    const rec = (u.deep! - 1) * SQ;
+    const card = img.height - rec;
+    const [fx, fy] = ch.foot;
+    const iw = img.width;
+    // (The bottom card's edges on screen: a nearer slice's.)
+    if (!P(u.c, u.r)) return;
+    const sR = pt.k / SQ;
+    cAt.l = pt.x - fx * sR;
+    cAt.r = cAt.l + iw * sR;
+    for (let a = 0; a <= rec; a += COUNTER_STEP) {
+      const last = a + COUNTER_STEP > rec;
+      const top = last ? rec : a;
+      if (!P(u.c, u.r - (rec - top) / SQ) || pt.depth <= S.nearGone) continue;
+      const s = pt.k / SQ;
+      const x = pt.x - fx * s;
+      const y = pt.y + (rec - fy) * s;
+      if (last) {
+        g.drawImage(img, 0, rec, iw, card, x, y, iw * s, card * s);
+        break;
+      }
+      const n = Math.min(COUNTER_STEP + 1, rec - a);
+      g.drawImage(img, 0, a, iw, n, x, y, iw * s, n * s);
+      const wl = Math.min(iw, Math.ceil((cAt.l - x) / s) + 1);
+      if (wl > 1) g.drawImage(img, 0, a, wl, card, x, y, wl * s, card * s);
+      const wr = Math.min(iw, Math.ceil((x + iw * s - cAt.r) / s) + 1);
+      if (wr > 1) g.drawImage(img, iw - wr, a, wr, card, x + (iw - wr) * s, y, wr * s, card * s);
+    }
   };
   /** A piece's play for the challenge now (`plays`: its `lower`, then its `down`, from you both on your marks), or null: its idle. */
   const playing = (name: string, now: number): { name: string; t: number } | null => {

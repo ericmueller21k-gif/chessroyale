@@ -43,7 +43,8 @@ function composed(): Uint8ClampedArray {
       }
   };
   // (The floor and the plans first, as ShopRoom lays them: a plan's foot its picture's bottom, on its squares' south edge.)
-  const plan = (p: (typeof A.SHOP_BIRDIE_ROOM_LAYOUT)[number]) => !isFloor(p.name) && (p.d ?? 1) > 1 && !A.SHOP_BIRDIE_UPRIGHT.includes(p.name);
+  // (A counter, the bar's arms, stands at its south row as any upright piece: its picture is the art's round that foot.)
+  const plan = (p: (typeof A.SHOP_BIRDIE_ROOM_LAYOUT)[number]) => !isFloor(p.name) && (p.d ?? 1) > 1 && !A.SHOP_BIRDIE_UPRIGHT.includes(p.name) && !A.SHOP_BIRDIE_COUNTERS.includes(p.name);
   for (const p of A.SHOP_BIRDIE_ROOM_LAYOUT.filter((q) => isFloor(q.name) || plan(q))) {
     const ch = A.SHOP_BIRDIE_ROOM_PIECES[p.name]!;
     if (plan(p)) blit(ch, p.col * T + ch.foot[0], Y0 + (p.row + 1) * T);
@@ -80,10 +81,10 @@ describe("Birdie's Station: the lobby, the art's picture cut into the room's pie
     const art = renderFrame(SHOP_BIRDIE_INTERIOR_4, SHOP_BIRDIE_INTERIOR_4.anims.idle!.frames[0]!).data;
     const ours = composed();
     const W = SHOP_BIRDIE_INTERIOR_4.w;
-    // (The vat's old place and new; the east gate's old place and new (a square east, clear of your mark); the stools' rims tucked against the bar's arms, which the art drew over the arms and the room draws under
-    // the arm's next row, nearer; the run's feeder's old place and new; the table, the town's at its row's middle: x0, y0, x1, y1 in the
-    // art's pixels.)
-    const moved = [[220, 110, 270, 215], [183, 115, 190, 235], [329, 115, 336, 235], [200, 200, 222, 222], [270, 180, 292, 203], [185, 320, 297, 382], [248, 335, 396, 416]];
+    // (The vat's old place and new; the east gate's old place and new (a square east, clear of your mark); the row-3 stools' rims tucked
+    // against the bar, which the art drew over the run's far edge and the room draws under the run, nearer; the run's feeder's old place
+    // and new; the table, the town's at its row's middle: x0, y0, x1, y1 in the art's pixels.)
+    const moved = [[220, 110, 270, 215], [183, 195, 190, 206], [329, 195, 336, 206], [200, 200, 222, 222], [270, 180, 292, 203], [185, 320, 297, 382], [248, 335, 396, 416]];
     let diff = 0;
     for (let y = 0; y < SHOP_BIRDIE_INTERIOR_4.h; y++)
       for (let x = 0; x < W; x++) {
@@ -130,18 +131,31 @@ describe("Birdie's Station: the lobby, the art's picture cut into the room's pie
     expect(A.SHOP_BIRDIE_ROOM_LAYOUT.find((q) => q.name === "vat")!.row).toBeLessThan(A.SHOP_BIRDIE_BARTENDER_AT[1]);
     expect(A.SHOP_BIRDIE_ROOM_LAYOUT.find((q) => q.name === "counter")!.row).toBeGreaterThan(A.SHOP_BIRDIE_BARTENDER_AT[1]);
   });
-  it("its bar's arms stand up, each row of them, beside the run's height, their stools against them; no feeder at the table", () => {
-    // (Eric, Nov 23: "It should be, actually like risen, and then their stools should actually be there as well.")
-    for (const side of ["w", "e"])
-      for (let r = 1; r <= 3; r++) {
-        const p = A.SHOP_BIRDIE_ROOM_LAYOUT.find((q) => q.name === `counter-arm-${side}-${r}`)!;
-        expect([p.col, p.row, p.solid], `${side}${r}`).toEqual([side === "w" ? 5 : 8, r, true]);
-        // (Its raised top: 36 px over its square's north edge, as the run's is over row 4's.)
-        const ch = A.SHOP_BIRDIE_ROOM_PIECES[p.name]!;
-        expect(ch.foot[1], `${side}${r}`).toBeGreaterThanOrEqual(36 + 18);
-      }
+  it("its bar's arms are one counter each, rows 1 to 3, at the run's height, their stools against them; no feeder at the table", () => {
+    // (Eric, Nov 23: "It should be, actually like risen, and then their stools should actually be there as well." The fix round: one
+    // piece an arm, standing up along its depth (ShopRoom's counters), not a piece a row, which showed as three stepped slabs.)
+    expect(A.SHOP_BIRDIE_ROOM_LAYOUT.filter((q) => q.name.startsWith("counter-arm"))).toEqual([
+      { name: "counter-arm-w", col: 5, row: 3, d: 3, solid: true },
+      { name: "counter-arm-e", col: 8, row: 3, d: 3, solid: true },
+    ]);
+    expect(A.SHOP_BIRDIE_COUNTERS).toEqual(["counter-arm-w", "counter-arm-e"]);
+    const run = A.SHOP_BIRDIE_ROOM_PIECES.counter!;
+    for (const side of ["w", "e"]) {
+      const ch = A.SHOP_BIRDIE_ROOM_PIECES[`counter-arm-${side}`]!;
+      // (Its bottom card, below its two receding squares of rows, stands as tall over its foot as the run's whole card over the run's.)
+      expect(ch.foot[1] - 2 * T, side).toBe(run.foot[1]);
+      expect(Math.abs(ch.h - 2 * T - run.h), side).toBeLessThanOrEqual(1);
+      // (Its squares are solid, the U's inside behind them.)
+      for (let r = 1; r <= 3; r++) expect(walkable(room, side === "w" ? 5 : 8, r), `${side}${r}`).toBe(false);
+    }
+    // (Listed before the stools against it and the feeders on it, so they draw over it, as the art drew them.)
+    const at = (pred: (q: (typeof A.SHOP_BIRDIE_ROOM_LAYOUT)[number]) => boolean) => A.SHOP_BIRDIE_ROOM_LAYOUT.findIndex(pred);
+    for (const [arm, c] of [["counter-arm-w", 4], ["counter-arm-e", 9]] as const) {
+      expect(at((q) => q.name === arm)).toBeLessThan(at((q) => q.name.startsWith("stool") && q.col === c && q.row === 1));
+      expect(at((q) => q.name === arm)).toBeLessThan(at((q) => q.name.startsWith("feeder") && q.col === (c === 4 ? 5 : 8) && q.row === 1));
+    }
     expect(A.SHOP_BIRDIE_UPRIGHT).toEqual([]);
-    expect(A.SHOP_BIRDIE_ROOM_LAYOUT.every((p) => (p.d ?? 1) === 1)).toBe(true);
+    expect(A.SHOP_BIRDIE_ROOM_LAYOUT.every((p) => (p.d ?? 1) === 1 || A.SHOP_BIRDIE_COUNTERS.includes(p.name))).toBe(true);
     for (const [c, r] of [[4, 1], [4, 2], [4, 3], [9, 1], [9, 2], [9, 3]]) expect(A.SHOP_BIRDIE_ROOM_LAYOUT.some((p) => p.name.startsWith("stool") && p.col === c && p.row === r), `${c},${r}`).toBe(true);
     expect(A.SHOP_BIRDIE_ROOM_LAYOUT.filter((p) => p.name.startsWith("feeder") && p.row >= 5)).toEqual([]);
     // ("make the birdseed pile bigger so it's clear": the vat's heap 40 px across, its top over the run's far edge.)
