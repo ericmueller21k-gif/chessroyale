@@ -1846,3 +1846,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~20:15: lobby round 4 wired (claude/birdie-lobby-4, stills/birdie-lobby-4). Director's whole-room check: all 8 notes hold; arms
   show as 3 stepped slabs (per-row pieces) → fix round session_01JuCWRsAYfrQZPLubrUFC1j (one deep piece per arm). Then PR + boss-lane
   review. #912 (happy fall + whoosh fix) CI running (b81chlef5).
+- Nov 23 ~20:35: #912 merged f7cc0fa (main run bfr8xdzao). Eric: fall beak "shouldn't be red ... see through it like a normal open beak",
+  "Yes ok to spend" → art session_01JuCWRtGbafNdASdgF8Svsi (brief birdie-art-14, cap $3, stills/birdie-14). Then a small wiring job:
+  copy arena-birdie-fall-beak into birdie-cutscene-fall.ts, re-bake, hash (Opus medium).
