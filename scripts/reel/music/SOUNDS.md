@@ -673,3 +673,17 @@ And number 1 is the answer ... solo 1, not solo 2": the song as sent, the solo o
 - Told the director: the slow opening is part of the loop; the song carries his own sounds (say if they are
   mistaken for the fight's); its quiet middle is 3 dB under the rest.
 - Every built boss now has a theme. Without one: the nine placeholder bosses.
+
+**A grand piano in the violin's place, to hear it (Nov 23).** After approving the third go: "Can I hear a version
+where the main horn instrument is replaced with a grand piano, the one that plays right when the song starts after
+the brush strokes like 6 seconds in ... I know we already have piano that's fine just wanna try this out."
+- The voice that comes in at 0:06 is the violin (`Mix.fiddle`): he hears it as a horn. Worth knowing for the next
+  songs: this bowed voice can read as a wind or brass instrument.
+- `python3 song_ao.py out.wav box grand`: every line the violins have (the tune, the second violin's harmony, the
+  long pulls over the waltz, the rush's doubling) on a new grand piano voice (`grand`: three strings, overtones a
+  little sharp, a hammer an eighth of the way along, a quick first fall and a long ring, a felt knock). Single notes,
+  where the song's other piano plays in octaves. Nothing else changed.
+- What a piano can't do there: hold. The violin's long notes (three to eight beats) now ring and fade.
+- Measured: the lead -22 dB RMS in the main parts (the violin was -21); the song 3 to 4 dB lower between 2 and
+  8 kHz than with the violin, the same below; -16.0 LUFS, peak -1.2 dBFS.
+- Sent as a full song; the game still has the violin version (stills `e74fb337`) until he says which.

@@ -118,6 +118,7 @@ CHORDS = (
     + named("D:M B:m G:M A:s D:M D:L D:M D:L", "D")
 )
 assert len(CHORDS) == BARS
+GRAND = 0.45  # how loud the grand piano's notes are, where it has the violin's lines
 fold = lambda m, lo: lo + (m - lo) % 12  # the note of that name in the twelve half steps from `lo` up
 DRIPS = (2, 0, 2, 4, 2, 1, 3, 2)  # the drips' bar, 8th by 8th: which of the chord's five (2: the note that never moves)
 
@@ -183,7 +184,7 @@ def pairs_of(start, text):
     return out
 
 
-def render(window=None, voice="box") -> np.ndarray:
+def render(window=None, voice="box", lead="violin") -> np.ndarray:
     x = Ride(RIDE, BEATS, None, os=2, seed=211, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -474,10 +475,45 @@ def render(window=None, voice="box") -> np.ndarray:
         x.buses[name] = bus + wet * np.fft.irfft(np.fft.rfft(bus, axis=1) * np.fft.rfft(ir, axis=1) / (1 + (f / 4000) ** 2) * (f > 60), n=size, axis=1)
 
     # ---- the voices ----
+    grands = {}
+
+    def grand(m):
+        """A note of a grand piano, four seconds of it, its loudest point 1; kept once made. Three strings a hair
+        apart; overtones a little sharp of whole multiples, more so the higher they are; the hammer strikes an eighth
+        of the way along, so every eighth overtone is weak; each overtone has a quick first fall and a long ring after
+        it, the high ones gone first, so the note darkens as it rings; a felt hammer's soft knock on the front."""
+        if m not in grands:
+            k = int(4.0 * sr)
+            t = np.arange(k) / sr
+            f0 = x.hz(m)
+            h = np.arange(1, int(np.clip(11000 / f0, 3, 40)) + 1)
+            sharp = np.sqrt(1 + min(0.006, 0.00028 * (f0 / 262) ** 1.3) * h * h)
+            loud = np.exp(-h * f0 / 2600) / h * (0.35 + 0.65 * np.abs(np.sin(np.pi * h / 8.3)))
+            ring = 2.0 * (262 / f0) ** 0.6 / (1 + 0.12 * (h - 1))
+            fall = 0.6 * np.exp(-np.outer(5 / ring, t)) + 0.4 * np.exp(-np.outer(1 / ring, t))
+            w = np.zeros(k)
+            for j, (off, share) in enumerate(((0.0, 1.0), (-0.4, 0.7), (0.6, 0.5))):  # (the three never quite cancel)
+                ph = np.outer(h * sharp, tau * f0 * 2 ** (off / 1200) * t) + (1.9 * h)[:, None]
+                w += share * (loud[:, None] * np.sin(ph) * fall).sum(axis=0)
+            w = w / np.abs(w).max() * np.minimum(1, t / 0.003)
+            w += 0.16 * murk(k, 1800) * np.exp(-t / 0.008) + 0.06 * np.sin(tau * (70 + f0 / 6) * t) * np.exp(-t / 0.02)
+            grands[m] = w / np.abs(w).max() * tail(k, 0.3)
+        return grands[m]
+
+    def hammered(b, d, m, vol=1.0, pan=0.2, bus="lead"):
+        """A note on the grand piano: it rings for its length and a little over, then the damper falls."""
+        at(b, d)
+        w = grand(m)[: min(int(4.0 * sr), x.k(d + 0.35))]
+        damp = int(0.15 * sr)
+        put(bus, b, w * np.minimum(1, (len(w) - np.arange(len(w))) / damp) * GRAND * vol, pan)
+
     def bowed(start, text, vol=1.0, pan=0.2, up=0, bus="lead"):
         """The violin: a little slide up into each note, vibrato on the long ones; a long note is one pull of the bow,
-        leaning in and easing off."""
+        leaning in and easing off. (`lead` "grand": the same lines on a grand piano, to hear it there.)"""
         for b, d, m in notes(start, text):
+            if lead == "grand":
+                hammered(b, d, m + up, vol, pan, bus)
+                continue
             at(b, d)
             w = x.fiddle(m + up, d * 0.96, 0.145 * vol)
             if d >= 2:
@@ -526,7 +562,9 @@ def render(window=None, voice="box") -> np.ndarray:
                 t3, _, t7, _ = c.tones
                 m = c.root + lift + ((-5, t3, 7), (0, 7, t7), (t3, t7, 14))[r % 3][j]
                 key(b + off, d * 0.9, m, v, octave=0.5)
-                if violin:
+                if violin and lead == "grand":
+                    hammered(b + off, d, m, violin * v)
+                elif violin:
                     at(b + off, d)
                     put("lead", b + off, x.fiddle(m, d * 0.94, 0.145 * violin * v), 0.2)
 
@@ -766,8 +804,8 @@ def render(window=None, voice="box") -> np.ndarray:
     return x.play(x.mixdown(levels, lowpass=9000, room=0.18))
 
 
-def main(out: str, voice: str = "box") -> None:
-    write_wav(out, render(voice=voice))
+def main(out: str, voice: str = "box", lead: str = "violin") -> None:
+    write_wav(out, render(voice=voice, lead=lead))
 
 
 if __name__ == "__main__":
