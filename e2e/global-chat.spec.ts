@@ -222,9 +222,12 @@ async function homeAt(p: Page, id: string) {
 /** Into Babur's Circus (its card's Go in). */
 async function goIntoCircus(p: Page) {
   if (!(await homeAt(p, "tiger"))) {
-    const chip = p.getByRole("button", { name: "Go to Babur's Circus" });
-    if (await chip.count()) await chip.dispatchEvent("click");
-    else await p.evaluate(() => (window as unknown as { __townGlide?: (to: string) => void }).__townGlide?.("tiger"));
+    // (Found and clicked in one step, as town.spec's toBabur: a count, then a click, raced the chip's slide off the edge.)
+    await p.evaluate(() => {
+      const chip = document.querySelector<HTMLElement>(`[aria-label="Go to Babur's Circus"]`);
+      if (chip) chip.click();
+      else (window as unknown as { __townGlide?: (to: string) => void }).__townGlide?.("tiger");
+    });
   }
   await expect.poll(() => homeAt(p, "tiger")).not.toBeNull();
   const card = p.getByRole("dialog", { name: "Babur's Circus", exact: true });
