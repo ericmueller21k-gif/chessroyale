@@ -86,14 +86,18 @@ export function headlightOn(t: number): boolean {
 }
 
 /**
- * Where the headlights are in the picture at `t` (art pixels): between the two lamps of the approach's frame (the drawing's notes: a
- * speck in the haze at about (160, 228) on its first frame, its lamps at (54, 199) and (130, 199) on its last), easing between them as
- * it comes; at the hit and after, its last.
+ * The middle between the headlights in each frame of the approach (art pixels; measured from the drawing's lamps, keys W and V, Nov 23's
+ * approved third pass: two dots in the haze at (98, 219) and (101, 219) on its first frame, the lamps at (61, 150) and (138, 150) on
+ * its last, the hit). The train comes straight down the middle of the track, so only its height changes.
  */
+export const HEADLIGHTS_Y: readonly number[] = [219, 210, 200, 189, 179, 169, 161, 154, 150];
+/** Where the headlights are in the picture at `t` (art pixels): their frame's middle, eased into the next frame's; at the hit and after, the last. */
 export function headlightsAt(t: number): { x: number; y: number } {
-  const p = clamp01((t - B.approachAt) / Math.max(1, C.approachMs));
-  const e = p * p;
-  return { x: 160 + (92 - 160) * e, y: 228 + (199 - 228) * e };
+  const n = HEADLIGHTS_Y.length - 1;
+  const f = clamp01((t - B.approachAt) / Math.max(1, C.approachMs)) * n;
+  const i = Math.min(n - 1, Math.floor(f));
+  const y = HEADLIGHTS_Y[i]! + (HEADLIGHTS_Y[i + 1]! - HEADLIGHTS_Y[i]!) * (f - i);
+  return { x: 100, y };
 }
 
 /** The sheet fetched and decoded ahead, as his battle starts (Birdie.tsx, prewarmBirdie): never a blank first frame. */
