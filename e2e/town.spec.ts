@@ -1694,8 +1694,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   expect(boings).toEqual([0, 1, 2, 3].map((i) => `ride:boing:boingo-pogo:${(n0 + i) % 4}`));
   expect((await rideNow(page)).you.sound).toMatchObject({ boings: b0 + 4, ride: null, live: 0 });
   await expect.poll(async () => (await rideNow(page)).you.sound.boingsLive, { message: "standing: every boing played out", timeout: 2_000 }).toBe(0);
-  // Birdie's Train (Nov 23; the review's N2): its loop made in code, no file, in a real browser: made as the town shows, before a key
-  // makes the audio (never on a moving frame: the review's N1), then one live source as you ride.
+  // Birdie's Train (Nov 23; the review's N2): its loop made in code, no file, in a real browser: made before your first move, never on
+  // it (the review's N1), then one live source as you ride.
   await wearItem(page, "ride", train!);
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });

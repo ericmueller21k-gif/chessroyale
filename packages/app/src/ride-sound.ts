@@ -98,7 +98,13 @@ function synthBuffer(ctx: BaseAudioContext | undefined, name: NonNullable<RideLo
   const rate = ctx?.sampleRate ?? SYNTH_RATE;
   const x = samples(rate);
   const length = Math.max(x.length, Math.ceil(loop.end * rate) + 1);
-  const buf = ctx ? ctx.createBuffer(1, length, rate) : new AudioBuffer({ numberOfChannels: 1, length, sampleRate: rate });
+  // (A browser can have AudioBuffer without its constructor (Safari before 14.1): no buffer then, as prepareAudio's own try.)
+  let buf: AudioBuffer;
+  try {
+    buf = ctx ? ctx.createBuffer(1, length, rate) : new AudioBuffer({ numberOfChannels: 1, length, sampleRate: rate });
+  } catch {
+    return null;
+  }
   buf.getChannelData(0).set(x);
   return buf;
 }

@@ -1554,12 +1554,12 @@ test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words,
 
 /**
  * Birdie's Boss Crate (Nov 23; docs/decisions/2026-11-23-birdie-ride-crate.md), on a phone and a computer (its layout): his bartender sells
- * it as every Shopkeeper does (Talk opens it): his Train first among its prizes, the boss crates' price, what you have. His lobby draws
- * no crate of its own, so the card and its pop-up show the Crates tab's (his token on its corner), in the card's own crate box, whole.
+ * it as every Shopkeeper does (Talk opens it): his Train first among its prizes, the boss crates' price, what you have. Its picture on
+ * the card and its pop-up is the crate on his bar (docs/decisions/2026-11-23-birdie-crate-bar.md), as every shop's, in the card's crate box.
  * Bought for real through the server, with an admin's granted tokens (he's in the game for admins first). With SHOP_SHOTS, the stills:
  * the card, and his Train under your pawn in the town.
  */
-test("Birdie's Station (Nov 23): his bartender sells Birdie's Boss Crate, his Train first; its picture the Crates tab's, whole in the crate box on the card and its bought pop-up; bought for real", async ({ page }) => {
+test("Birdie's Station (Nov 23): his bartender sells Birdie's Boss Crate, his Train first; its picture the crate on his bar, in the crate box on the card and its bought pop-up; bought for real", async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1581,18 +1581,14 @@ test("Birdie's Station (Nov 23): his bartender sells Birdie's Boss Crate, his Tr
   await expect(crate.locator(".shop-prize-kind").first()).toHaveText("Mythic ride");
   await expect(crate.locator(".shop-room-price")).toHaveText("3 Birdie tokens, or 1 Birdie token + 1 crate key");
   await expect(crate).toContainText("You have 3 Birdie tokens and 0 crate keys.");
-  // The crate's picture: the Crates tab's, his token on it, inside the box every shop's crate picture has (90 x 81); the bought
-  // pop-up's too (its own CSS: the review's N3).
+  // The crate's picture: the crate on his bar (the room's drawing, its first frame three times its size), as every shop's, in the box
+  // every shop's crate picture has (90 x 81); the bought pop-up's too.
   const wholeInBox = async (pic: Locator, where: string) => {
-    await expect(pic).toHaveClass(/shop-crate-drawn/);
-    await expect(pic.locator(".crate-row-art svg").first()).toBeVisible();
-    await expect(pic.locator(".crate-row-token")).toHaveCount(1);
+    await expect(pic).toHaveJSProperty("tagName", "CANVAS");
+    await expect(pic).not.toHaveClass(/shop-crate-drawn/);
+    expect(await pic.evaluate((c: HTMLCanvasElement) => [c.width, c.height]), `${where}: the bar's crate, 3x`).toEqual([90, 81]);
     const box = (await pic.boundingBox())!;
     expect([Math.round(box.width), Math.round(box.height)], `${where}: its box`).toEqual([90, 81]);
-    for (const part of [pic.locator(".crate-row-art"), pic.locator(".crate-row-token")]) {
-      const b = (await part.boundingBox())!;
-      expect(b.x >= box.x - 0.5 && b.y >= box.y - 0.5 && b.x + b.width <= box.x + box.width + 0.5 && b.y + b.height <= box.y + box.height + 0.5, `${where}: whole in its box`).toBe(true);
-    }
   };
   await wholeInBox(crate.locator(".shop-crate-pic"), "the card");
   const byTokens = crate.getByRole("button", { name: "Buy with 3 Birdie tokens" });

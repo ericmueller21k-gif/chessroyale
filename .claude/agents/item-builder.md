@@ -33,7 +33,8 @@ If a request needs gameplay, engine or protocol changes, say so and stop; that's
    2%, adding up to 100), and a present opens to one of its tier's items, evenly (Eric, Oct 6). So a Common to Epic
    item goes in the crate's `items`, and a Legendary or Mythic one in its `fischer` list (adding up to 100).
    Keep the ladder: each tier's present rarer than the one below. A new item lowers the chance of the others in its
-   present: tell Eric the new numbers in one line.
+   present: tell Eric the new numbers in one line. A boss's ride goes in with its boss crate (`BOSS_CRATES`), in the same PR:
+   the Welcome Crate knows a ride is an admins-first boss's only through its crate, and lists it to everyone otherwise.
 3. **Draw it** in `Items.tsx`: one component, added to `ITEM_ART`. Conventions:
    - Draw on the pawn's 100 × 100 square. The cburnett pawn: head top y 20, head center (50, 29), radius 9, the neck
      about y 35–38, collar to about y 47, base about y 88, body width about x 25–75. `PAWN_PATH` is the pawn itself.

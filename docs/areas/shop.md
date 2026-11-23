@@ -100,7 +100,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
   (the town's cells for it; a test fails until it's run).
-- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Grex's with Giraffe Gallop, everyone's; Nov 5, Ginger's with the Candy Cane Sled, everyone's (its id `boss-gingerbread`: his boss id is also the Gingerbread Man skin's item id, and nothing confuses the two), and Folio's with the Paper Crane, everyone's; Nov 6, Smudgy's with the Brush Ride and Boingo's with Boingo's Pogo, everyone's; Nov 23, Birdie's with Birdie's Train, admins first as he is, its card's picture the Crates tab's crate as his lobby draws none; town-square.md, "Inside a shop"): the
+- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Grex's with Giraffe Gallop, everyone's; Nov 5, Ginger's with the Candy Cane Sled, everyone's (its id `boss-gingerbread`: his boss id is also the Gingerbread Man skin's item id, and nothing confuses the two), and Folio's with the Paper Crane, everyone's; Nov 6, Smudgy's with the Brush Ride and Boingo's with Boingo's Pogo, everyone's; Nov 23, Birdie's with Birdie's Train, admins first as he is, on his bar since the same day; town-square.md, "Inside a shop"): the
   Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
   tokens, or 1 token and 1 crate key) and what you have. Since round 2 (below) buying is real.
 - **Boss tokens, crate keys and buying a boss crate** (Nov 2, round 2; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md);
@@ -184,7 +184,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     usual strip, Fischer Random ("A HunChess ride") and the reveal ("Not tradeable", no purity, no "Open another").
   - **The prize:** one ride, any of the game's rides but an admins-first boss's (Nov 23, `welcomeRide`: Timber's, Dash's and Birdie's for
     now, 15 rides at 6.67%; each back by itself when its boss goes live; holders keep theirs;
-    [2026-11-23-welcome-crate-admin-first.md](../decisions/2026-11-23-welcome-crate-admin-first.md)), each as likely, in the **HunChess colorway** (`<ride>-hunchess`, its own item:
+    [2026-11-23-welcome-crate-admin-first.md](../decisions/2026-11-23-welcome-crate-admin-first.md); a boss's ride goes in with its boss
+    crate, or the Welcome Crate can't tell it's an admins-first boss's and lists it), each as likely, in the **HunChess colorway** (`<ride>-hunchess`, its own item:
     `HUNCHESS_RIDES` in crates.ts, made from every ride; "HunChess Balloon Pup"), rolled and stored by the server
     (`POST /api/locker/open {crate: "welcome-hunchess"}`: one transaction, opened once; again answers the same ride). Drawn from its
     ride's drawing, cells, size and pace (`components/rides/hunchess.tsx`: an SVG filter remapping each ride layer to black, gold and
