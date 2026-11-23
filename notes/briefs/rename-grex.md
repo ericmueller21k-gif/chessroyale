@@ -4,7 +4,9 @@ Eric, Nov 23: "We can actually change his name to Grex everywhere, code can stay
 The fireworks giraffe boss (roster id `grex`) is called "Jefferson" in player text today (`packages/core/src/boss.ts:173` `name:
 "Jefferson"`, "Jefferson's Fireworks" in `packages/app/src/town/world.ts`, "Jefferson's Boss Crate" in `crates.ts`, lines, the FAQ...).
 Note the spelling: **Grex** (capital G, the rest lowercase), never "G-REX" or "GREX".
-Step by step, on branch `claude/rename-grex` from `origin/main`:
+Step by step. **Start exactly like this** (a first attempt branched from a weeks-old main by mistake):
+`git fetch origin main && git checkout -B claude/rename-grex-2 origin/main && git log --oneline -1` (that commit must be today's main:
+a merge of PR #890 or later; stop and say so if it isn't). Work and push only on `claude/rename-grex-2`. Then:
 1. `git grep -n "Jefferson"` over `packages/*/src`, `packages/app/public`, `e2e`, `packages/*/test`, `docs/areas`, `docs/rules`,
    `.claude/LESSONS.md`. Change every player-visible "Jefferson" to "Grex" and "Jefferson's" to "Grex's": names, titles, lines
    and bubbles, banners, the FAQ, shop and room names, crate and item names, `themes.json`'s "boss" note, aria labels. Code
@@ -22,4 +24,4 @@ Step by step, on branch `claude/rename-grex` from `origin/main`:
 6. Prove it with `npm run typecheck`, the unit tests of the packages you touched, and `node e2e/ci-select.mjs files <changed paths>`'s
    specs that mention the name (just the tests whose titles or text you changed), phone, locally.
 Write `.pr-body.md` (what changed, what players see, changed checks old → new, the lines from step 3), put the two stills on an orphan
-branch `stills/rename-grex`, write `.done`, push and stop. Don't open PRs or wait on CI. Commits end with the `Claude-Session:` line only.
+branch `stills/rename-grex-2`, write `.done`, push and stop. Don't open PRs or wait on CI. Commits end with the `Claude-Session:` line only.
