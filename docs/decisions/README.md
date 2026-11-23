@@ -6,6 +6,10 @@ work today is in [`docs/areas/`](../areas/README.md).
 
 ## Writing one
 
+**Not here:** an audit or review goes to `notes/` on the `claude/director-notes` branch (the director reads it; helpers
+don't), and a design still being decided goes to [`docs/ideas/`](../ideas/), then into its area page once it ships. A
+decision note says what was decided and why, in about 200 words, and links the design or audit it came from.
+
 - **One new file per decision**, named `YYYY-MM-DD-short-title.md` (lower case, hyphens), so the folder lists them in
   the order they were made. A PR may add several. Never append to `DECISIONS.md` and never rewrite another lane's
   file; a later decision that changes an earlier one gets its own file and links back.
