@@ -102,6 +102,43 @@ export function clearKeptSolo(game?: string): void {
   }
 }
 
+/**
+ * Resume's tap, carried across a reload that comes before its game is in (Nov 23, main's run 45088115360: a chunk the resume loads
+ * failed, stale.ts loaded the page again, and the card came back with nothing started, the tap lost). This tab notes the game while its
+ * resume loads (App.tsx resumeKept); a page loaded within RESUME_CARRY_MS takes the note once, as it loads, and resumes that game as the
+ * card for it comes (the tap was made: never the card again). As stale.ts carries the town's place.
+ */
+const RESUMING_KEY = "brc.resuming";
+export const RESUME_CARRY_MS = 60_000;
+/** The game whose resume is loading in this tab (null: none now, or it's in). */
+export function noteResuming(game: string | null, now = Date.now()): void {
+  try {
+    if (game) sessionStorage.setItem(RESUMING_KEY, JSON.stringify({ game, at: now }));
+    else sessionStorage.removeItem(RESUMING_KEY);
+  } catch {
+    // (No storage: a reload mid-resume shows the card again.)
+  }
+}
+/** The note the page before this one left (read once, as this module loads, and gone from storage at once). */
+const carried: { game: string; at: number } | null = (() => {
+  try {
+    const raw = sessionStorage.getItem(RESUMING_KEY);
+    if (raw === null) return null;
+    sessionStorage.removeItem(RESUMING_KEY);
+    const v = JSON.parse(raw) as { game?: unknown; at?: unknown };
+    return typeof v.game === "string" && typeof v.at === "number" ? { game: v.game, at: v.at } : null;
+  } catch {
+    return null;
+  }
+})();
+let carriedTaken = false;
+/** True once, for the game the page before this one was resuming (within RESUME_CARRY_MS of its tap): resume it, no card. */
+export function takeCarriedResume(game: string, now = Date.now()): boolean {
+  if (carriedTaken || !carried || carried.game !== game || now - carried.at > RESUME_CARRY_MS || now < carried.at) return false;
+  carriedTaken = true;
+  return true;
+}
+
 /** It began SOLO_ABANDON.staleHours ago: the server records it as left at any profile read, so it's never resumed. */
 export const keptStale = (k: Pick<KeptSolo, "at">, now = Date.now()): boolean => now - k.at >= SOLO_ABANDON.staleHours * 3_600_000;
 
