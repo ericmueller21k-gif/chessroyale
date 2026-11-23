@@ -56,7 +56,7 @@ Boss raid screen, the random pick, raids and lobbies, Boss alone's menu, and hom
 ## My calls
 
 - **Banners for the cast and the Slam, none for the fusion and the landing.** Every boss's passive and ultimate open
-  with one; the fusion and the landing are payoffs (as Grex's fireballs), and what they mean is the dock's line.
+  with one; the fusion and the landing are payoffs (as Jefferson's fireballs), and what they mean is the dock's line.
   The cast's sub-line says what it means for you ("a7 and c7 fuse next turn"); the Slam's how many and how long.
 - **The fusion's dock line is said on his turn only** (the boss's screen), not on your turn's: "Your move." stays the
   line you play by, and the board shows the elephant.
