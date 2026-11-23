@@ -153,3 +153,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - **A ban locks the whole device** (Eric, Nov 13: "just the whole device is banned... If you get banned and your sister gets upset about it, so be it. We can always revert it later"). No "sign in to another account" on a banned device.
 - Arm a .done/.question watcher on a helper's branch the moment it starts (Nov 17: a finished helper sat unseen 5 h 20 min).
 - The fireworks giraffe boss (id `grex`) is **Grex** in all player text (Eric, Nov 23; was Jefferson). Code ids stay.
+- The town paints everything on its loading screen, never while you walk (Eric, Nov 11, restated Nov 23: 'load first in order to not have slow FPS'). A longer load for that is expected; optimize within it, never by moving painting to walk time.
