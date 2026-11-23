@@ -4228,7 +4228,7 @@ export const ALERTS = {
  * (IndexedDB, as PNG pages); a later visit on the same build and layout loads them instead of painting. Anything odd paints as before.
  * `on`: the switch. `maxMB`: the most it keeps (more, and nothing is kept). `pagePx`: a page's side. `waitMs`: how long the loading
  * screen waits for the kept pictures to be read and decoded before it paints instead. `afterMs`: how long after the first visit's first
- * frame they're kept (composed a page at a time, encoded in a worker).
+ * frame they're kept (composed a page at a time, up to `sliceMs` a frame, encoded in a worker).
  * docs/decisions/2026-11-23-town-keep-pictures.md.
  */
 export const TOWN_PICTURES = {
@@ -4237,6 +4237,7 @@ export const TOWN_PICTURES = {
   pagePx: 2048,
   waitMs: 4000,
   afterMs: 1500,
+  sliceMs: 3,
 } as const;
 
 /**

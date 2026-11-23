@@ -2823,8 +2823,8 @@ function startTown(
     // (Whatever goes wrong here, the town opens: what wasn't made is made as it shows, as before.)
     try {
       // The pictures as the last visit on this build painted them, if they're kept (keep-pictures.ts; Nov 23): then none is painted.
-      // (Not in the dev server, whose code changes under the same name; nor on a 2D painter, which never loads.)
-      const shelf = painter.keep && !import.meta.env.DEV && !testParams().has("paintall") ? idbShelf() : null;
+      // (Not in the dev server, whose code changes under the same name; nor on a 2D painter, which never loads; nor with `?paintall`.)
+      const shelf = painter.keep && !import.meta.env.DEV && !TOWN_ASKED.paintAll ? idbShelf() : null;
       const key = pictureKey(APP_VERSION, import.meta.url, r.pictureSig());
       const from = await restore(shelf, key, domPageIO(art2d));
       pictures.kept = !!from;
@@ -2885,7 +2885,7 @@ function startTown(
   /** This visit's pictures kept for the next (keep-pictures.ts `save`), in the background: a page at a time, encoded in a worker. */
   const keepPictures = async (shelf: Shelf | null, key: string) => {
     const t = performance.now();
-    const io = domSaveIO(art2d);
+    const io = domSaveIO(art2d, () => alive);
     pictures.saved = alive && r.pics ? await save(shelf, key, r.pics, io) : null;
     io?.done();
     pictures.saveMs = performance.now() - t;
