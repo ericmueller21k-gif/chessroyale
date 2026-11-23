@@ -386,37 +386,6 @@ function build(): Character {
     );
   }
 
-  /** His long dove's tail sweeping behind him to our right: grey-brown, banded, a dark band and a pale tip. */
-  const tailName = body(
-    painted("tail", 96, 150, 102, 92, (F) => {
-      // A long wedge from behind his hips down to our right, widening, its tip rounded to a point.
-      const [x0, y0] = [102, 166];
-      const ux = 0.2;
-      const uy = 0.98;
-      const LEN = 64;
-      const coords = (x: number, y: number) => {
-        const along = (x + 0.5 - x0) * ux + (y + 0.5 - y0) * uy;
-        const across = -(x + 0.5 - x0) * uy + (y + 0.5 - y0) * ux;
-        return [along, across] as const;
-      };
-      // Fanning out toward the end, which is cut into rounded feather tips.
-      const hw = (a: number) => 6 + a * 0.2;
-      const endAt = (c: number) => LEN - (c * c) / 30 - Math.abs(((c + 60) % 6) - 3) * 1.4;
-      const inside: Inside = (x, y) => {
-        const [a, c] = coords(x, y);
-        return a >= 0 && Math.abs(c) < hw(a) && a < endAt(c);
-      };
-      F(inside, (x, y) => {
-        const [a, c] = coords(x, y);
-        const end = endAt(c);
-        if (a > end - 6) return c < -2 ? "e" : "d";
-        if (a > end - 12) return "s";
-        if (Math.abs(c) > 1 && Math.round(c + 60) % 6 === 0) return "b";
-        return ramp("bcde", 0.6 - (0.45 * c) / hw(a) - a * 0.002);
-      });
-    }),
-  );
-
   wing("wingF", [[46, 114], [66, 116], [68, 132], [62, 160], [54, 184], [44, 204], [35, 190], [35, 160], [39, 132]], true);
   wing("wingN", [[134, 116], [154, 114], [161, 132], [165, 160], [165, 190], [156, 204], [146, 184], [138, 160], [132, 132]], false);
   pauldron("pauldronF", 63, 108, 19, 14, LAMP_F, GLASS_F, true);
@@ -645,7 +614,7 @@ function build(): Character {
     specks?: Speck[];
   }
   const L = (name: string): Layer => ({ part: name, x: AT[name]![0], y: AT[name]![1] });
-  const HIM = [tailName, "wingF", "pauldronF", "legF", "legN", "hips", "head", "chest", "tie", "wingN", "pauldronN", "cap"];
+  const HIM = ["wingF", "pauldronF", "legF", "legN", "hips", "head", "chest", "tie", "wingN", "pauldronN", "cap"];
   function shot(ms: number, s: Shot): Frame {
     const b = s.bloom ?? 0;
     const glow = [L(`bloomF${b}0`), L(`bloomN${b}0`)];
