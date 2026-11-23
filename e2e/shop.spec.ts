@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
 import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, tapInTown, test, townTapPoint, wearItem, townReady } from "./helpers.ts";
 
@@ -1559,7 +1559,7 @@ test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words,
  * Bought for real through the server, with an admin's granted tokens (he's in the game for admins first). With SHOP_SHOTS, the stills:
  * the card, and his Train under your pawn in the town.
  */
-test("Birdie's Station (Nov 23): his bartender sells Birdie's Boss Crate, his Train first; its picture the Crates tab's, whole in the card's crate box; bought for real", async ({ page }) => {
+test("Birdie's Station (Nov 23): his bartender sells Birdie's Boss Crate, his Train first; its picture the Crates tab's, whole in the crate box on the card and its bought pop-up; bought for real", async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1581,17 +1581,20 @@ test("Birdie's Station (Nov 23): his bartender sells Birdie's Boss Crate, his Tr
   await expect(crate.locator(".shop-prize-kind").first()).toHaveText("Mythic ride");
   await expect(crate.locator(".shop-room-price")).toHaveText("3 Birdie tokens, or 1 Birdie token + 1 crate key");
   await expect(crate).toContainText("You have 3 Birdie tokens and 0 crate keys.");
-  // The crate's picture: the Crates tab's, his token on it, inside the box every shop's crate picture has (90 x 81).
-  const pic = crate.locator(".shop-crate-pic");
-  await expect(pic).toHaveClass(/shop-crate-drawn/);
-  await expect(pic.locator(".crate-row-art svg").first()).toBeVisible();
-  await expect(pic.locator(".crate-row-token")).toHaveCount(1);
-  const box = (await pic.boundingBox())!;
-  expect([Math.round(box.width), Math.round(box.height)]).toEqual([90, 81]);
-  for (const part of [pic.locator(".crate-row-art"), pic.locator(".crate-row-token")]) {
-    const b = (await part.boundingBox())!;
-    expect(b.x >= box.x - 0.5 && b.y >= box.y - 0.5 && b.x + b.width <= box.x + box.width + 0.5 && b.y + b.height <= box.y + box.height + 0.5, "whole in its box").toBe(true);
-  }
+  // The crate's picture: the Crates tab's, his token on it, inside the box every shop's crate picture has (90 x 81); the bought
+  // pop-up's too (its own CSS: the review's N3).
+  const wholeInBox = async (pic: Locator, where: string) => {
+    await expect(pic).toHaveClass(/shop-crate-drawn/);
+    await expect(pic.locator(".crate-row-art svg").first()).toBeVisible();
+    await expect(pic.locator(".crate-row-token")).toHaveCount(1);
+    const box = (await pic.boundingBox())!;
+    expect([Math.round(box.width), Math.round(box.height)], `${where}: its box`).toEqual([90, 81]);
+    for (const part of [pic.locator(".crate-row-art"), pic.locator(".crate-row-token")]) {
+      const b = (await part.boundingBox())!;
+      expect(b.x >= box.x - 0.5 && b.y >= box.y - 0.5 && b.x + b.width <= box.x + box.width + 0.5 && b.y + b.height <= box.y + box.height + 0.5, `${where}: whole in its box`).toBe(true);
+    }
+  };
+  await wholeInBox(crate.locator(".shop-crate-pic"), "the card");
   const byTokens = crate.getByRole("button", { name: "Buy with 3 Birdie tokens" });
   const byKey = crate.getByRole("button", { name: "Buy with 1 Birdie token + 1 crate key" });
   await expect(byTokens).toBeEnabled();
@@ -1602,7 +1605,7 @@ test("Birdie's Station (Nov 23): his bartender sells Birdie's Boss Crate, his Tr
   await expect(crate.locator(".shop-msg")).toHaveText("Birdie's Boss Crate is in your inventory.");
   const got = page.getByRole("dialog", { name: "You got Birdie's Boss Crate!", exact: true });
   await expect(got).toBeVisible();
-  await expect(got.locator(".shop-crate-pic.shop-crate-drawn .crate-row-art svg").first()).toBeVisible();
+  await wholeInBox(got.locator(".shop-crate-pic"), "the pop-up");
   await got.getByRole("button", { name: "Later" }).click();
   await expect(got).toBeHidden();
   await expect(crate).toContainText("You have 0 Birdie tokens and 0 crate keys.");

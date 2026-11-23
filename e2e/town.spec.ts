@@ -1419,11 +1419,12 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
   await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
-  const [chirp, shoes, dozer, pogo] = await giveItems(page, [
+  const [chirp, shoes, dozer, pogo, train] = await giveItems(page, [
     { def: "riding-chirp", color: "cobalt", blemish: 40 },
     { def: "cheetah-shoes", color: "red", blemish: 0 },
     { def: "sawyer-dozer", color: "gold", blemish: 0 },
     { def: "boingo-pogo", color: "gold", blemish: 0 },
+    { def: "birdie-train", color: "yellow", blemish: 0 },
   ]);
   await wearItem(page, "ride", chirp!);
   // Nothing is fetched for a ride but its drawing (Nov 1: its frames are drawn from it, no sheets; Nov 1, rides lazy: each ride's
@@ -1692,6 +1693,32 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   expect(boings).toEqual([0, 1, 2, 3].map((i) => `ride:boing:boingo-pogo:${(n0 + i) % 4}`));
   expect((await rideNow(page)).you.sound).toMatchObject({ boings: b0 + 4, ride: null, live: 0 });
   await expect.poll(async () => (await rideNow(page)).you.sound.boingsLive, { message: "standing: every boing played out", timeout: 2_000 }).toBe(0);
+  // Birdie's Train (Nov 23; the review's N2): its loop made in code, no file, in a real browser: made as the town shows, before a key
+  // makes the audio (never on a moving frame: the review's N1), then one live source as you ride.
+  await wearItem(page, "ride", train!);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your train's frames are ready", timeout: 30_000 }).toBe(true);
+  expect((await rideNow(page)).you.ride).toBe("birdie-train");
+  await expect.poll(async () => (await rideNow(page)).you.sound.decoded, { message: "the train's loop made as the town shows", timeout: 5_000 }).toContain("birdie-train");
+  await page.keyboard.press("Shift");
+  // (Read every 15 ms from before the walk until it plays: a step is over in about 90 ms, the loop in RIDE_SOUND.holdMs after.)
+  const trainHeard = page.evaluate(
+    () =>
+      new Promise<unknown>((done) => {
+        const w = window as unknown as { __townRide: () => { you: { sound: { ride: string | null; live: number } } } };
+        const t0 = performance.now();
+        const look = () => {
+          const s = w.__townRide().you.sound;
+          if ((s.ride === "birdie-train" && s.live === 1) || performance.now() - t0 > 10_000) return done(s);
+          setTimeout(look, 15);
+        };
+        look();
+      }),
+  );
+  await ride([24, 25]);
+  expect(await trainHeard, "the train's loop plays as you ride").toMatchObject({ ride: "birdie-train", live: 1, loop: [true, expect.any(Number), expect.any(Number)], decoded: expect.arrayContaining(["birdie-train"]) });
+  await expect.poll(async () => (await rideNow(page)).you.sound, { message: "standing: the train's loop stopped", timeout: 2_000 }).toMatchObject({ ride: null, live: 0 });
   expect(fetched).toEqual([]);
   expect(errors).toEqual([]);
 });
