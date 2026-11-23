@@ -19,7 +19,8 @@
  * - The **cast** acts run before the first beat: who is there from the walk in (Timber's log lying by his mark, Smudgy's cloth).
  *
  * Actors: "boss" (its own moves' sheet, or its town figure with `play: null`), "you", "line" and "chant" (the boss's bubbles),
- * "table" (the table's picture), "board" (its slab, board and pieces), "stools" (their place: the table's picture has them), and the
+ * "table" (the table's picture), "board" (its slab, board and pieces), "top" (its slab and board alone, no pieces: Birdie's table as his
+ * room has it), "stools" (their place: the table's picture has them), and the
  * boss's own props by the names its data gives them.
  */
 import type { Character } from "../../characters/sprite.ts";
@@ -277,7 +278,7 @@ export function standAt(
 
 /** A prop of a boss's intro: its art, where it stands and how it's drawn (ShopRoom `drawCast`). */
 export interface Prop {
-  /** Its art (its animations are the actor's); none: a part of the room's table ("table": its picture, "board": its slab, board and pieces). */
+  /** Its art (its animations are the actor's); none: a part of the room's table ("table": its picture, "board": its slab, board and pieces, "top": its slab and board alone). */
   ch?: Character;
   /** Its foot at each of these, one drawing each (Timber's stumps, at both stools); none: where its acts move it (from the table). */
   at?: readonly Place[];

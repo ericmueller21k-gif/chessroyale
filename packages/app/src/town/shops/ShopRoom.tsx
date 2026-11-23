@@ -129,6 +129,16 @@ export interface RoomArt {
    */
   flaps?: { readonly piece: string; readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly board: { readonly canvas: HTMLCanvasElement; tick(now: number): boolean; text(): { title: string; rows: string[] } } };
   /**
+   * A table standing in the room as its piece (Birdie's Station, Nov 23): its flat top, the renderer's slab and board (`paintTable`, no
+   * pieces, in `palette`), drawn over the piece, as every boss's battle table's lies flat. In a challenge the intro stands in for it.
+   */
+  tableTop?: { readonly piece: string; readonly palette: Readonly<Record<string, string>> };
+  /**
+   * Pieces that play for a challenge (Birdie's crossing gates, Nov 23): from you both on your marks, its `lower` once, then its `down` on
+   * and on until the battle takes the screen; their idle as the room stands. Each a piece of the room's own.
+   */
+  plays?: Readonly<Record<string, { readonly lower: string; readonly down: string }>>;
+  /**
    * Its people (Rolling Dough's, Nov 11: the door guards, Don Dough and his crew), drawn from their art: each one's character and the
    * animations the room plays (drawn once as the room loads); who does what is its `scene`'s (shops/zebra-scene.ts).
    */
@@ -262,6 +272,8 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
       upright: m.SHOP_BIRDIE_UPRIGHT,
       marks: m.SHOP_BIRDIE_MARKS,
       flaps: m.birdieFlaps(performance.now()),
+      tableTop: m.SHOP_BIRDIE_TABLE_TOP,
+      plays: m.SHOP_BIRDIE_GATE_PLAYS,
     })),
   // (The Battle Tower's lobby, Nov 19: a 10 x 10 box room seen whole, its side walls one surface each (its scene, shops/tower-scene.ts,
   // the room's `fx`: Town.tsx); the empty "Best floors" board's head written by the game.)
@@ -2619,8 +2631,10 @@ function startRoom(
     // (Hollow's intro: a lantern going out, bulbs gone dark, the tree draining: its own frame, and its lit pixels for over the dark.)
     // (Ginger's intro: the stockroom door open while the board carriers come out.)
     // (The Battle Tower's floor: its elevator open, the scene's `swap`.)
-    const img = darkPiece(u, now) ?? frameAt(roomFx?.swap?.(u.name) ?? (iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name), now + (u.t0 ?? 0));
-    const ch = frames[u.name]!.ch;
+    // (Birdie's crossing gates: their `lower`, then their `down`, from you both on your marks: `plays`.)
+    const play = playing(u.name, now);
+    const img = play ? frameAt(play.name, play.t) : (darkPiece(u, now) ?? frameAt(roomFx?.swap?.(u.name) ?? (iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name), now + (u.t0 ?? 0)));
+    const ch = frames[play?.name ?? u.name]!.ch;
     const s = pt.k / SQ;
     const fx = u.flip ? ch.w - 1 - ch.foot[0] : ch.foot[0];
     const h = u.cut || img.height;
@@ -2657,7 +2671,17 @@ function startRoom(
       g.drawImage(fl.board.canvas, x + fl.x * s, y + fl.y * s, fl.w * s, fl.h * s);
       g.imageSmoothingEnabled = false;
     }
+    // (A table's flat top over its leg: `tableTop`.)
+    if (art.tableTop && u.name === art.tableTop.piece) paintTable(g, v, u.c - camX, camY - u.r, art.tableTop.palette, "across", g.globalAlpha, 0);
     g.globalAlpha = 1;
+  };
+  /** A piece's play for the challenge now (`plays`: its `lower`, then its `down`, from you both on your marks), or null: its idle. */
+  const playing = (name: string, now: number): { name: string; t: number } | null => {
+    const pl = art.plays?.[name];
+    if (!pl || onMarksAt < 0 || now < onMarksAt) return null;
+    const t = now - onMarksAt;
+    const lower = frames[pl.lower]!.loop;
+    return t < lower ? { name: pl.lower, t } : { name: pl.down, t: t - lower };
   };
   /**
    * A sign's words (Boingo's price sign: "BOINGO'S POGO", "3 Boingo tokens"), written on its face in the room's own font, sized to fit
@@ -3549,7 +3573,7 @@ function startRoom(
     for (const [who, p] of Object.entries(ca.data.props)) {
       const a = c[who];
       if (!!p.over !== over || !a?.on) continue;
-      if (who === "board") {
+      if (who === "board" || who === "top") {
         if (!P(marks.table.c, marks.table.r)) continue;
         const dx = marks.table.c - camX;
         const dz = camY - marks.table.r;
@@ -3567,7 +3591,8 @@ function startRoom(
           g.save();
           g.translate(0, -up);
         }
-        paintTable(g, v, dx, dz, T.palette, marks.layout);
+        // ("top": the slab and board alone, no pieces, standing from the walk in: Birdie's table as his room has it.)
+        paintTable(g, v, dx, dz, T.palette, marks.layout, 1, who === "top" ? 0 : 1);
         if (up) g.restore();
         if (wet) g.restore();
         continue;
