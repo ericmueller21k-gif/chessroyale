@@ -40,3 +40,7 @@ its depth, so it reads as one counter from every camera.
 - From the usual camera the arms' tops rise toward the back wall as they recede, as the run's top does over its face: every upright
   thing in the room stands up at its depth this way, and the arms now do it smoothly, not in three steps.
 - The art's bar stools stand a little taller than the table's top.
+
+Facing fix (Nov 23, Eric: "He's facing the wrong way in the building"): `gates-lowering-phone.png`, `gates-down-phone.png` and
+`gates-table-phone.png` retaken. On his mark west of the table Birdie now faces it (east): his train's nose and his face toward the
+table and you, through every beat.
