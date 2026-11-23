@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { HUNCHESS_RIDES, WELCOME_CRATE_ID, XP } from "@chessroyale/core";
+import { WELCOME_CRATE, WELCOME_CRATE_ID, XP } from "@chessroyale/core";
 import { asSignedIn, named, test } from "./helpers.ts";
 
 /**
@@ -110,7 +110,8 @@ test("the Welcome Crates: 5 finished games earn the first once; its notice, open
   await expect(hero.locator(".not-tradeable")).toHaveText("Not tradeable");
   // No purity anywhere on its page (Eric: "Purity isn't listed for these").
   await expect(page.locator(".welcome-page")).not.toContainText(/purity/i);
-  await expect(page.locator(".welcome-page .odds-row")).toHaveCount(HUNCHESS_RIDES.length);
+  // (Every ride it can give: every ride's colorway but an admins-first boss's, Nov 23.)
+  await expect(page.locator(".welcome-page .odds-row")).toHaveCount(WELCOME_CRATE.items.length);
   await shot(page, "crate-card");
   // (Locked, not ready, its Open greyed; the second crate's page says what it needs.)
   await page.goto("/shop?crates");
@@ -136,7 +137,7 @@ test("the Welcome Crates: 5 finished games earn the first once; its notice, open
   let locker = await lockerNow(page);
   const won = locker.items.filter((i) => i.def.endsWith("-hunchess"));
   expect(won).toHaveLength(1);
-  expect(HUNCHESS_RIDES.map((d) => d.id)).toContain(won[0]!.def);
+  expect(WELCOME_CRATE.items).toContain(won[0]!.def);
   expect(locker.welcome).toMatchObject({ status: "opened", item: won[0]!.id });
   // Wear it from the reveal.
   await reveal.getByRole("button", { name: "▶ Wear" }).click();

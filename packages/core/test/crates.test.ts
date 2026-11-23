@@ -32,6 +32,11 @@ import {
   BOSS_CRATE_POOL,
   MYTHIC_CRATE_ITEMS,
   OUTFIT,
+  BOSS_ADMIN_FIRST,
+  HUNCHESS_RIDES,
+  WELCOME_CRATE,
+  hunchessBase,
+  rollWelcome,
   type CrateDef,
   type ItemLook,
 } from "../src/index.ts";
@@ -384,6 +389,15 @@ describe("boss crates", () => {
     expect(fischerOdds(BOSS_CRATES[0]!)).toEqual([{ item: BOSS_CRATES[0]!.ride, weight: 100 }]);
     expect(ride).toBeCloseTo(0.02, 12);
     expect(BOSS_CRATES.find((c) => c.boss === "birdie")).toMatchObject({ name: "Birdie's Boss Crate", ride: "birdie-train", blurb: "Birdie's Train, and the Beta Crate's hats, shades and gear" });
+  });
+
+  it("no Welcome Crate ride belongs to an admins-first boss (Nov 23): every other ride's HunChess colorway is in, and a holder's left-out ride leaves out nothing", () => {
+    const bossOf = (def: string) => BOSS_CRATES.find((c) => c.ride === hunchessBase(def))?.boss;
+    const out = HUNCHESS_RIDES.filter((d) => BOSS_ADMIN_FIRST.includes(bossOf(d.id) ?? "")).map((d) => d.id);
+    // (Timber's, Dash's and Birdie's while they're admins first; each comes back by itself when its boss leaves BOSS_ADMIN_FIRST.)
+    for (const boss of ["timber", "dash", "birdie"].filter((b) => BOSS_ADMIN_FIRST.includes(b))) expect(out).toContain(`${BOSS_CRATES.find((c) => c.boss === boss)!.ride}-hunchess`);
+    expect(WELCOME_CRATE.items).toEqual(HUNCHESS_RIDES.map((d) => d.id).filter((id) => !out.includes(id)));
+    for (const k of [0, 0.5, 0.999]) expect(WELCOME_CRATE.items).toContain(rollWelcome(() => k, out.slice(0, 1)).def);
   });
 });
 
