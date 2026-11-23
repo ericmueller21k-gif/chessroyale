@@ -85,11 +85,11 @@ const ctx = {
     return s;
   },
 };
-const sound = vi.hoisted(() => ({ muted: false, hidden: false, mute: [] as (() => void)[], rebuilt: [] as (() => void)[], asked: [] as string[] }));
+const sound = vi.hoisted(() => ({ muted: false, hidden: false, noAudio: false, mute: [] as (() => void)[], rebuilt: [] as (() => void)[], asked: [] as string[] }));
 vi.mock("../src/sound.ts", () => ({
   isMuted: () => sound.muted,
   isPageHidden: () => sound.hidden,
-  gameBus: (unsoftened?: boolean) => ({ ctx, out: unsoftened ? BRIGHT : OUT }),
+  gameBus: (unsoftened?: boolean) => (sound.noAudio ? null : { ctx, out: unsoftened ? BRIGHT : OUT }),
   loadAudioFile: (url: string) => (sound.asked.push(url), Promise.resolve({ url })),
   onMuteChange: (fn: () => void) => (sound.mute.push(fn), () => undefined),
   onAudioRebuilt: (fn: () => void) => (sound.rebuilt.push(fn), () => undefined),
@@ -260,6 +260,49 @@ describe("a ride's moving sound", () => {
     move("birdie-train", 50);
     expect(ctx.buffers.filter((b) => b.length === buf.length)).toHaveLength(1);
     expect(rideSoundState()).toMatchObject({ ride: "birdie-train", live: 1, decoded: expect.arrayContaining(["birdie-train"]) });
+  });
+
+  it("Birdie's Train warmed before the audio is made (a cold visit; the review's N1, Nov 23): made then, on a buffer of its own at SYNTH_RATE, so the first move only starts it", async () => {
+    // (A fresh copy of the module, nothing made yet; Web Audio's own AudioBuffer, faked.)
+    vi.useRealTimers();
+    vi.resetModules();
+    const cold = await import("../src/ride-sound.ts");
+    vi.useFakeTimers({ now: 0 });
+    cold.rideSoundForTests(() => Date.now());
+    class FakeAudioBuffer {
+      length: number;
+      sampleRate: number;
+      data: Float32Array;
+      constructor(o: { numberOfChannels: number; length: number; sampleRate: number }) {
+        [this.length, this.sampleRate, this.data] = [o.length, o.sampleRate, new Float32Array(o.length)];
+      }
+      getChannelData() {
+        return this.data;
+      }
+    }
+    vi.stubGlobal("AudioBuffer", FakeAudioBuffer);
+    try {
+      sound.noAudio = true;
+      cold.warmRideSound("birdie-train");
+      sound.noAudio = false;
+      expect(cold.rideSoundState().decoded).toEqual(["birdie-train"]);
+      const made = ctx.buffers.length;
+      cold.rideMoving("birdie-train");
+      expect(ctx.buffers.length, "nothing made on the moving frame").toBe(made);
+      const [src] = playing();
+      const buf = src!.buffer as FakeAudioBuffer;
+      expect(buf).toBeInstanceOf(FakeAudioBuffer);
+      expect(buf.sampleRate).toBe(cold.SYNTH_RATE);
+      expect(buf.length).toBeGreaterThan(BIRDIE_RIDE_LOOP.end * cold.SYNTH_RATE);
+      const run = birdieSound(BIRDIE_RIDE_LOOP.run, cold.SYNTH_RATE);
+      expect(Array.from(buf.data.subarray(0, run.length))).toEqual(Array.from(run));
+      expect([src!.loop, src!.loopStart, src!.loopEnd]).toEqual([true, BIRDIE_RIDE_LOOP.start, BIRDIE_RIDE_LOOP.end]);
+      expect(cold.rideSoundState()).toMatchObject({ ride: "birdie-train", live: 1 });
+    } finally {
+      sound.noAudio = false;
+      cold.rideSoundForTests(() => Date.now());
+      vi.unstubAllGlobals();
+    }
   });
 
   it("a frame loop that halts mid-walk (the town closing, a hidden tab): it stops all the same", () => {

@@ -10,8 +10,8 @@
  * overlap freely. No fade, no timer: standing, no steps, so nothing.
  *
  * A `loop` ride (the dozer): one loop at a time (`/sounds/rides/<id>.wav`: one loop of exactly 1 s with 0.1 s of itself either side).
- * A `synth` loop (Birdie's Train, Nov 23) has no file: its samples are made in code as its boss's sounds are (`SYNTHS`), the first time
- * it's asked for once the audio is made, and it loops where they say.
+ * A `synth` loop (Birdie's Train, Nov 23) has no file: its samples are made in code as its boss's sounds are (`SYNTHS`), when the town
+ * warms it (before the audio is made too: on a buffer of its own, `SYNTH_RATE`), never on a moving frame, and it loops where they say.
  * A hard start and stop, no fades (Eric, Nov 16: "it should be a hard start and stop when you start moving and stop. Like boingo";
  * docs/decisions/2026-11-16-ride-sound-hard.md): full level and speed on your first moving frame, out once you stop.
  *
@@ -35,6 +35,11 @@ export const RIDE_LOOP = { start: 0.1, end: 1.1 } as const;
 export const SYNTHS: Readonly<Record<NonNullable<RideLoopSound["synth"]>, { samples: (rate: number) => Float32Array; loop: { start: number; end: number } }>> = {
   birdie: { samples: (rate) => birdieSound(BIRDIE_RIDE_LOOP.run, rate), loop: BIRDIE_RIDE_LOOP },
 };
+/**
+ * A synth loop's sample rate when it's made before the audio is (the town's first frame on a cold visit): a phone's usual. A context at
+ * another rate resamples it as it plays, as it does a decoded file's.
+ */
+export const SYNTH_RATE = 48000;
 /** Where a loop ride's loop runs (s): its synth's, or every file's. */
 const loopOf = (s: RideLoopSound) => (s.synth ? SYNTHS[s.synth].loop : RIDE_LOOP);
 export const rideSoundFile = (id: string) => `/sounds/rides/${id}.wav`;
@@ -64,15 +69,16 @@ export const rideSoundId = (id: string | null | undefined): string | null => (id
 
 /**
  * Fetches and decodes a ride's loop once (the town warms yours after its first frame; a first move asks for it too). A `synth` loop is
- * made at once instead, on the audio's context (not yet made: the first move makes it).
+ * made at once instead, at the audio's rate, or at `SYNTH_RATE` before the audio is made, so its making (about 28 ms on a computer's
+ * CPU, more on a phone) never lands on your first moving frame (the review's N1, Nov 23).
  */
 export function warmRideSound(item: string | null | undefined) {
   const id = rideSoundId(item);
   const s = id ? RIDE_SOUND.rides[id] : undefined;
   if (!id || !s || buffers.has(id) || asking.has(id)) return;
   if (s.kind === "loop" && s.synth) {
-    const ctx = gameBus()?.ctx;
-    if (ctx) buffers.set(id, synthBuffer(ctx, s.synth));
+    const buf = synthBuffer(gameBus()?.ctx, s.synth);
+    if (buf) buffers.set(id, buf);
     return;
   }
   asking.add(id);
@@ -82,11 +88,17 @@ export function warmRideSound(item: string | null | undefined) {
   });
 }
 
-/** A synth loop's samples on a buffer, with room to its loop's end (a run may stop short of it: silence after). */
-function synthBuffer(ctx: BaseAudioContext, name: NonNullable<RideLoopSound["synth"]>): AudioBuffer {
+/**
+ * A synth loop's samples on a buffer, with room to its loop's end (a run may stop short of it: silence after): the context's, or with
+ * none yet one of its own at `SYNTH_RATE` (null where there's no Web Audio at all).
+ */
+function synthBuffer(ctx: BaseAudioContext | undefined, name: NonNullable<RideLoopSound["synth"]>): AudioBuffer | null {
+  if (!ctx && typeof AudioBuffer !== "function") return null;
   const { samples, loop } = SYNTHS[name];
-  const x = samples(ctx.sampleRate);
-  const buf = ctx.createBuffer(1, Math.max(x.length, Math.ceil(loop.end * ctx.sampleRate) + 1), ctx.sampleRate);
+  const rate = ctx?.sampleRate ?? SYNTH_RATE;
+  const x = samples(rate);
+  const length = Math.max(x.length, Math.ceil(loop.end * rate) + 1);
+  const buf = ctx ? ctx.createBuffer(1, length, rate) : new AudioBuffer({ numberOfChannels: 1, length, sampleRate: rate });
   buf.getChannelData(0).set(x);
   return buf;
 }
@@ -176,7 +188,7 @@ function start(id: string, s: RideLoopSound) {
   if (isMuted() || isPageHidden()) return;
   const bus = gameBus(s.bright);
   if (!bus || bus.ctx.state !== "running") return;
-  // (A synth loop is made here if it hadn't been, and plays on this frame; a file's plays once it has come.)
+  // (A synth loop the town didn't warm is made here, and plays on this frame; a file's plays once it has come.)
   if (!buffers.has(id)) warmRideSound(id);
   const buf = buffers.get(id);
   if (!buf) return;
