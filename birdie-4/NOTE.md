@@ -1,6 +1,6 @@
 # Birdie's home, round 4 (Nov 23): the station outside and its lobby inside
 
-**Status: the station is done. The lobby is NOT done (blocked on a rerun decision).** No `.done` yet.
+**Status: done.** The station and the lobby are drawn; the lobby's rerun was approved by Eric and finished at $3.34 (see below).
 
 ## Spend (Claude API, the paid runner only; plan usage: none)
 Eric approved up to $12 for this round ("two runs at about $6 each"). Cap $6 per run, effort high, the default model.
@@ -9,7 +9,8 @@ Eric approved up to $12 for this round ("two runs at about $6 each"). Cap $6 per
 |---|---|---|
 | `house-birdie` (the station, from the street) | Finished, called done, 13 turns, 7 renders | $1.34 |
 | `shop-birdie-interior` (the lobby), first attempt | Stopped at turn 7: one turn hit the 48,000 output-token ceiling (the default) before any drawing was saved. No drawing. | $1.14 |
-| **Total so far** | | **$2.48 of $12** |
+| `shop-birdie-interior`, rerun with the battle crossing (Eric approved), `BOSS_ART_MAX_TOKENS=96000` | Finished, called done, 25 turns, 17 renders | $3.34 |
+| **Total** | | **$5.82 of $12** |
 
 ## The lobby: what blocked it, and the decision needed
 - The first attempt ran out of output room while writing the room's first full draft. The runner's documented remedy is
