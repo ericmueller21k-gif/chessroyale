@@ -15,9 +15,10 @@ type Hooks = {
   __soundLog?: string[];
   __shopAt?: (k: string, s?: [number, number]) => { x: number; y: number } | null;
   __shopFlaps?: () => { title: string; rows: string[] } | null;
-  __shopIntro?: () => { step: string; plays: Record<string, string> | null } | null;
+  __shopIntro?: () => { step: string; plays: Record<string, string> | null; looks: 1 | 0 | -1 | null } | null;
   __birdieSteps?: string[];
   __birdieGates?: string[];
+  __birdieLooks?: string[];
 };
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 const sounds = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__soundLog ?? []);
@@ -74,11 +75,14 @@ test("his challenge: his hello as he says his line at the middle table, the boar
     w.__soundLog = [];
     w.__birdieSteps = [];
     w.__birdieGates = [];
+    w.__birdieLooks = [];
     const tick = () => {
       const s = w.__shopIntro?.();
       if (s && w.__birdieSteps!.at(-1) !== s.step) w.__birdieSteps!.push(s.step);
       const g = s?.plays ? `${s.step}:${Object.values(s.plays).join(",")}` : null;
       if (g && w.__birdieGates!.at(-1) !== g) w.__birdieGates!.push(g);
+      const lk = s && s.step !== "walk" ? `${s.step}:${s.looks}` : null;
+      if (lk && w.__birdieLooks!.at(-1) !== lk) w.__birdieLooks!.push(lk);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -97,6 +101,10 @@ test("his challenge: his hello as he says his line at the middle table, the boar
   expect(gates[0]).toBe("walk:idle,idle");
   expect(gates).toContain("face:lower,lower");
   expect(gates.some((g) => g.startsWith("table:") && g.endsWith(":down,down"))).toBe(true);
+  // (On his mark, west of the table, he faces it, east, through every beat: Eric, Nov 23, "He's facing the wrong way in the building".)
+  const looks = await page.evaluate(() => (window as unknown as Hooks).__birdieLooks ?? []);
+  expect(looks.length).toBeGreaterThan(0);
+  expect(looks.filter((l) => !l.endsWith(":1")), "every beat facing east").toEqual([]);
   const log = await sounds(page);
   // (His hello twice: the tap on him out front, and his line at the table; then the board's pop.)
   expect(log.filter((l) => l.startsWith("birdieHello:")).length).toBeGreaterThanOrEqual(2);
