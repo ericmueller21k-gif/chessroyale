@@ -1989,3 +1989,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   item build.
 - Nov 25 ~04:45: #926 crates tidy MERGED (025406c), deploy + main run watched. No helpers running. Waiting on Eric: item build go;
   desktop opening size feel (DESK_MAX 1.5).
+- Nov 25 ~05:00: ERIC (Crowd desktop screenshot): status line centered + bigger; left/right columns flush with the board's bottom; chat
+  higher → brief crowd-desktop-flush (Opus medium, light, "fixed pretty quickly"). Vote-zone labels for 3 s (tower-arrow-like 3D text or
+  other ideas, gone once you vote) → MOCKUP brief vote-labels-mockup (Opus high). Both started.
