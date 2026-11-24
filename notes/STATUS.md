@@ -1878,3 +1878,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (god-king, Opus high) running; stills sent. Power tips helper session_01JuCWRrNXUEsotiqAbVfmjk (Opus high, claude/power-tips), watcher on .done.
 - Nov 24 ~09:50: #916 review: nothing important. Nits QUEUED: sign observer bound to the board element at mount; a remount mid-ride replays
   roll/brake; heard moves off by one when Birdie is White (P, also #911); sim rides now include misses.
+- Nov 24 ~10:05: #916 Birdie train-miss + sounds + sign MERGED (993684b), deploy + main run watched. Power tips helper running.
