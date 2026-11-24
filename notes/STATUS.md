@@ -1941,3 +1941,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   WAITING on his call per item.
 - Nov 24 ~22:10: stings helper (session_01JuCWRsHX7XJVJvjkQzC951) step 1 DONE, paused on .question: 6 clips sent to Eric. Its question
   (Transcendent sound replaces the banner's whoosh: default replace) — my call: replace. WAITING on Eric's OK → message the helper.
+- Nov 24 ~22:30: #922 RED on 9150c3ff: phone shop.spec:1239 "Open another" reveal stays hidden (both tries; reproduced locally; old head
+  passes run 2, both heads fail run 1 at a click timeout). Fix round sent to the build helper session_01JuCWRvbgbMWMDmdRZZyvki (its own PR);
+  watcher on .done "fix round".
