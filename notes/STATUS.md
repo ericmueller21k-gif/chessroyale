@@ -1975,3 +1975,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   both). #923 CI bjap4yjre; merge after. Item mockup running.
 - Nov 25 ~03:05: #923 bonus crate MERGED (94c408c); main run for it (covers #924/#925) watched. Next: crates page tidy (Opus medium; brief
   crates-page-tidy.md incl. #923 follow-ups) can start now beside the item mockup.
+- Nov 25 ~03:20: item polish mockup DONE (stills/item-polish-mockup; code claude/item-polish-mockup). Sent Eric 9 files. Picks to confirm:
+  crown rebuild, cane spiral, tube barber (vs confetti), parrot flap, tommy key+puff, smiley = 6 expressions from the seed (no stored
+  data; targeted), pirate wink optional. Perf: animate only where the item is the focus; keep grids/lists still (also the shine).
