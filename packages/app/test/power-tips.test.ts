@@ -98,9 +98,12 @@ describe("a tip's exchange", () => {
     vi.advanceTimersByTime(typeMs(b) + POWER_TIPS.replyMs + 50);
     expect(kingLine()?.text).toBe(k);
     expect(bossVoice.line()?.text).toBe(b);
+    // (His line stays up until the answer has typed out.)
+    vi.advanceTimersByTime(typeMs(k));
+    expect(bossVoice.line()?.text).toBe(b);
     // (Through his line's time, still held; after it, he speaks again.)
     expect(kingSay("queenDanger", "q-2")).toBeNull();
-    vi.advanceTimersByTime(SPEECH.maxReadMs + typeMs(k) + SPEECH.fadeMs + 100);
+    vi.advanceTimersByTime(SPEECH.maxReadMs + SPEECH.fadeMs + 100);
     expect(kingSay("queenDanger", "q-3")).not.toBeNull();
   });
 
