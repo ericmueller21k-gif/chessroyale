@@ -311,7 +311,6 @@
         "packages/app/src/components/LastStand.tsx",
         "packages/app/src/components/FightBanner.tsx",
         "packages/app/src/godKing.ts",
-        "packages/app/src/power-tips.ts",
         "packages/app/src/characters/god-king*.ts",
         "packages/app/public/sounds/god-king/**"
       ],
@@ -323,6 +322,10 @@
         "e2e/king-save-altered.spec.ts",
         "e2e/recluse.spec.ts"
       ]
+    },
+    "Power tips (docs/decisions/2026-11-24-power-tips.md: a tip replaces its boss's line for that moment, so every tipped boss's spec)": {
+      "paths": ["packages/app/src/power-tips.ts"],
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/birdie.spec.ts", "e2e/hollow.spec.ts", "e2e/sawyer.spec.ts", "e2e/chandy.spec.ts", "e2e/boss-powers.spec.ts", "e2e/boss-character.spec.ts"]
     },
     "Alfil": {
       "paths": [
