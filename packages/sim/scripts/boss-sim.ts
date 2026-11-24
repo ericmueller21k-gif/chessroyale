@@ -322,6 +322,11 @@ interface RaidPatch {
   heed?: number;
   /** The crowd's bots around this rating (Settings.botLevel: BOT_LOBBY's mean 1150 otherwise): a stronger crowd plays longer games. */
   botLevel?: number;
+  /**
+   * The whole crowd plays the engine's best move (the sim's engine, RAID_NODES), where heeding (patch.heed) doesn't pick: a player who
+   * doesn't blunder. With a `tier` that makes him its match, games run deep, as Eric's did (Chandy, Nov 24, run H).
+   */
+  best?: boolean;
 }
 
 /** His best capture of the piece on `sq` (`fen`: him to move), by the exchange check (pawns), or null: none. */
@@ -983,9 +988,17 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           else if (!p.crease && p.ultAt === p.turn && p.events.some((e) => e.kind === "creaseEnd")) creasesOff.push(p.turn);
         }
         // (Chandy: a crowd that heeds his crosshairs, as a person does (patch.heed); and what the crowd's move did to the hunting locks.)
+        let heeded = false;
         if (patch.heed !== undefined && bossId === "chandy") {
           const h = await heedChandy(runner, engines[0]!, patch.heed);
           if (h) chandy.heeds.push({ at: runner.boss!.crowdMoves + 1, ...h });
+          heeded = !!h && h.cost !== null;
+        }
+        if (patch.best && !heeded) {
+          const fen = boardFen();
+          const ok = runner.crowdAllowed() ?? legalMoves(fen);
+          const top = (await engines[0]!.topMoves(fen, 8)).filter((m) => ok.includes(m.move)).sort((a, b) => b.expected - a.expected)[0];
+          if (top) for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, top.move);
         }
         const crowdFen = bossId === "chandy" ? boardFen() : "";
         const crowdPly = runner.boards.get(runner.state.boards[0]!)!.history.length;
