@@ -47,5 +47,12 @@ mostly waited, and his strongest move earned nothing. The bots' sim hid it: the 
 
 ## Result (20 battles each, reports/chandy-sim.md run H)
 
-See the report's table: the calibration sim's crowd score is unchanged (0.03 before and after); a crowd that heeds the crosshair goes
-from a median of 3 upgrades by crowd move 25 to 5; the Eric-like player's numbers are in the report.
+- His strength: the calibration's crowd (the bots) scores 0.03 before and after (the same 0 wins, 1 draw, 19 losses); the Eric-like
+  player 0.17 both; the heeding crowd 0.05 to 0.03 (within noise). Inside his band (run D 0.02; the pack 0.05 to 0.17).
+- Upgrades by crowd move 30, battles with 4 or more: the Eric-like player 14 of 20 to 19 of 20 (median 4.5 to 5); the stronger
+  heeding crowd 11 of 18 to 17 of 18. By move 25 the heeding crowd's median goes from 3 to 5. His third upgrade comes 3.5 to 8 crowd
+  moves sooner in every crowd; the fifth 3 to 8.5 sooner.
+- The shot's shatters of its locked piece, each an upgrade now: 14 in the Eric-like player's 20 battles (7 hit a lock before, which
+  earned nothing).
+- The sim's Eric-like player still loses more pieces than Eric did (19 of 20 reached 5 upgrades before too), so real play will say
+  more: `huntLoss` and `takeMargin` are the knobs.
