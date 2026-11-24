@@ -1919,3 +1919,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   QUEUED until the crate build merges. My calls: no Welcome Crate, no admins-first boss crates (except admins).
 - Nov 24 ~19:05: #920 LIVE (f0e89d7); main RED: [desktop] zebra-home.spec:273 music carry missing, BOTH tries (real). Prior main 8423926
   green → #920 suspect. Fix helper (Opus high, brief fix-zebra-music-carry). Hold merges.
+- Nov 24 ~19:45: zebra fix DONE → #921 (237abd69): NOT #920; a latent race (splashMusic's late-decode branch never logged the carry;
+  8423926 fails too with a 0.7 s decode delay). Log fix + spec polls. CI watched. Crate build still running.
