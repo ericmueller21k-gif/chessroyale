@@ -1888,3 +1888,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   wasn't in #917's targeted run). Cause: power-tips.ts mapped only to the God King's area. Fix forward claude/sawyer-tip-fix (mine):
   spec accepts the tip line; power-tips.ts gets its own area running every tipped boss's spec. Hold merges until green.
 - Nov 24 ~11:40: #918 (sawyer spec + power-tips area) MERGED (2857732), main full run watched.
+- Nov 24 ~11:55: #918 LIVE (2857732); main RED by FLAKY_RED: [desktop] boss-bar.spec:301 hung 5 min at openSoloBoss's "Boss Battle"
+  heading (passed on retry). SECOND time (moo Nov 20, same wait) → the recur trigger of Nov 20's call. Helper (Opus high) on the cause,
+  brief notes/briefs/boss-screen-hang.md, claude/boss-screen-hang. Hold merges until main is green.
