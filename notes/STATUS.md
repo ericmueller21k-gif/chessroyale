@@ -1876,3 +1876,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~09:25: #915 LIVE (8b621ea), main full run GREEN. Running: Birdie train-miss helper (xhigh). Queue: power tips; #915 N1 (two upgrades one turn).
 - Nov 24 ~09:40: Birdie train-miss DONE → #916 (4fa067c0; merged main myself: bosses.md + boss-sim.ts conflicts), CI ba9vb4kqs, quick review
   (god-king, Opus high) running; stills sent. Power tips helper session_01JuCWRrNXUEsotiqAbVfmjk (Opus high, claude/power-tips), watcher on .done.
+- Nov 24 ~09:50: #916 review: nothing important. Nits QUEUED: sign observer bound to the board element at mount; a remount mid-ride replays
+  roll/brake; heard moves off by one when Birdie is White (P, also #911); sim rides now include misses.
