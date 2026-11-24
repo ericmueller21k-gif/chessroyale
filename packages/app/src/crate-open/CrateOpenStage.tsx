@@ -182,9 +182,12 @@ export function CrateStage({
     const timers: ReturnType<typeof setTimeout>[] = [];
     if (ending === "none") b.ending.forEach((a) => a.cancel());
     const all = [...b.anims, ...(ending === "none" ? [] : b.ending)];
-    if (ending !== "none" && tier) for (const a of buildTierLight(root, b.T, tier, reduced)) all.push((a.pause(), a));
+    const light = ending !== "none" && tier ? buildTierLight(root, b.T, tier, reduced) : [];
+    for (const a of light) all.push((a.pause(), a));
+    let ran = false;
     let raf = requestAnimationFrame(() => {
       raf = requestAnimationFrame(() => {
+        ran = true;
         // (A frame's lead, so the first frame drawn is the strip's first.)
         const lead = 50;
         const start = (document.timeline.currentTime as number) + lead;
@@ -199,6 +202,11 @@ export function CrateStage({
       cancelAnimationFrame(raf);
       stopSound();
       timers.forEach(clearTimeout);
+      // (Called off before it started (its answer taken back): ready to start again on the next one, its tier's light made anew then.)
+      if (!ran) {
+        started.current = false;
+        light.forEach((a) => a.cancel());
+      }
     };
   }, [go, ending]);
 
