@@ -5,7 +5,8 @@ import { useLayoutEffect, useRef } from "preact/hooks";
  * left and the chat in the column on the right end where the board ends, its frame included (the move clock's bar mirrored under it,
  * whether or not a clock runs, so nothing moves between phases). CSS can't know where the board ends (its side is the window's height
  * or its column's width, whichever is less), so this measures it and writes, on the arena around the screen:
- * - `--side-foot`: from the scoreboard's top (`.tower-side`) to that line;
+ * - `--side-foot`: from the scoreboard's top (`.tower-side`) to that line; `--side-pad`: its padding, so its table's top is the squares' top
+ *   (Eric: "the same height as the chessboard");
  * - `--chat-foot`: from the chat's top (the screen's `.under-board.side`) to it;
  * - `--board-shift`: the board's middle less the title line's, so the status line centers on the board's squares.
  * board-size.css uses them on a computer only; a phone never reads them. Neither box's height moves its own top, so there is no loop.
@@ -28,7 +29,15 @@ export function measureBoardFoot(arena: HTMLElement) {
   // (The status line over the board centers on the squares: the title line keeps its place, only its words move, so this is steady.)
   const row = arena.querySelector(":scope > .screen.game > .hud-row")?.getBoundingClientRect();
   put("--board-shift", row ? `${(b.left + b.width / 2 - (row.left + row.width / 2)).toFixed(1)}px` : "");
-  put("--side-foot", to(arena.querySelector(":scope > .tower-side")));
+  // (Eric, Nov 25: the scoreboard "literally the same height as the chessboard": its table's top on the squares' top too. The column's own
+  // top never moves (sticky at the screen's top), so its padding is the table's offset from there: what it is now plus the gap left.)
+  const side = arena.querySelector<HTMLElement>(":scope > .tower-side");
+  const table = side?.querySelector<HTMLElement>(":scope > .tower");
+  if (side && table) {
+    const pad = parseFloat(getComputedStyle(side).paddingTop) || 0;
+    put("--side-pad", `${Math.max(0, Math.round(pad + b.top - table.getBoundingClientRect().top))}px`);
+  }
+  put("--side-foot", to(side ?? null));
   put("--chat-foot", to(arena.querySelector(":scope > .screen.game > .under-board.side")));
 }
 

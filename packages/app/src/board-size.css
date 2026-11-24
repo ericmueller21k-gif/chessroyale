@@ -184,6 +184,8 @@
 
   .arena:not(.sq-arena) > .tower-side {
     max-height: var(--side-foot, var(--app-h));
+    /* (Its table's top on the board's squares' top: the scoreboard as tall as the board, Eric, Nov 25. board-foot.ts.) */
+    padding-top: var(--side-pad, 14px);
     padding-bottom: 0;
   }
   .arena > .screen.game:not(:has(> .boss-dock)) > .under-board.side {

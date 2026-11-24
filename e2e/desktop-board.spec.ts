@@ -388,6 +388,8 @@ test("a computer's 50 v 50 (Eric, Nov 25): the status line centered over the boa
       return {
         foot: w.top + side + parseFloat(css.getPropertyValue("--timer-bar-h")),
         scoreboard: box(".arena > .tower-side")?.bottom ?? NaN,
+        tableTop: box(".arena > .tower-side > .tower")?.top ?? NaN,
+        top: w.top,
         chat: box(".screen.game > .under-board.side") ?? null,
         slot: box(".screen.game > .play-footer, .screen.game > .poll") ?? null,
         mid: (l + r) / 2,
@@ -407,8 +409,8 @@ test("a computer's 50 v 50 (Eric, Nov 25): the status line centered over the boa
     // (Measured after the window settles: board-foot.ts writes the line on a resize.)
     await expect.poll(async () => {
       const g = await lines(page);
-      return Math.max(Math.abs(g.scoreboard - g.foot), Math.abs((g.chat?.bottom ?? NaN) - g.foot), Math.abs(g.mid - g.board) - 1);
-    }, { message: `${size}: the scoreboard's and the chat's bottoms on the board's, the line over its middle`, timeout: 5_000 }).toBeLessThanOrEqual(1);
+      return Math.max(Math.abs(g.scoreboard - g.foot), Math.abs((g.chat?.bottom ?? NaN) - g.foot), Math.abs(g.tableTop - g.top), Math.abs(g.mid - g.board) - 1);
+    }, { message: `${size}: the scoreboard's top and bottom on the board's (Eric: "the same height as the chessboard"), the chat's bottom, the line over its middle`, timeout: 5_000 }).toBeLessThanOrEqual(1);
     const g = await lines(page);
     expect(Math.abs(g.mid - g.board), `${size}: the status line centered over the board (${g.mid} / ${g.board})`).toBeLessThanOrEqual(2);
     expect(g.font, `${size}: the status line bigger (${g.font} px)`).toBeGreaterThanOrEqual(w > 1300 ? 22 : 18);
