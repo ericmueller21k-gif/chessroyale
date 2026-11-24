@@ -2936,6 +2936,21 @@ export const SPEECH = {
 } as const;
 
 /**
+ * Power tips (packages/app/src/power-tips.ts): the first time you see a boss's power, he and the God King trade a line or two
+ * explaining it. Eric, Nov 24: "it says it once always the first time, but then maybe it comes up again in a game or two, and then
+ * maybe in like 5 or 6 games, and then after that just every like 5 games against that boss, so you don't really see it too often.
+ * But we can keep that pattern strict for all the bosses ... just like one number." Counted per account on this device: the battles
+ * in which that power was seen (a battle counts once, as the power first comes). The tip plays in a battle whose count is in `at`,
+ * then every `every` battles after the last of them (1, 3, 8, then 13, 18, ...). Once a battle at most.
+ */
+export const POWER_TIPS = {
+  at: [1, 3, 8],
+  every: 5,
+  /** The next line of the exchange starts this long after the one before has typed out (ms): the God King answers. */
+  replyMs: 700,
+} as const;
+
+/**
  * The God King's chatter (packages/app/src/godKing.ts). Eric, Oct 9, 2026: he talked too much. Critical moments always
  * speak (a new danger to your queen or king, a mate threat, a queen taken either way, his own strikes and moves, his
  * Last Stand, a boss's power); everything else is paced by these numbers.
