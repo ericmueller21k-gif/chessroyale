@@ -104,7 +104,7 @@ describe("a tip's exchange", () => {
     expect(kingSay("queenDanger", "q-3")).not.toBeNull();
   });
 
-  it("his reply waits for a critical line of his already up to end, rather than lapse behind it", () => {
+  it("his reply waits for a critical line of his already up to end, rather than lapse behind it, the boss's line held back to match", () => {
     vi.useFakeTimers();
     const t0 = 7_000_000;
     vi.setSystemTime(t0);
@@ -120,6 +120,8 @@ describe("a tip's exchange", () => {
     expect(kingLine()?.text).toBe(danger);
     vi.advanceTimersByTime(150);
     expect(kingLine()?.text).toBe(k);
+    // (The exchange started later, so the boss's line is still up beside his answer.)
+    expect(bossVoice.line()?.text).toBe(tip.lines[0]!.text);
     // (Meanwhile, and through his reply, his other lines held.)
     expect(kingSay("queenDanger", "q-9")).toBeNull();
   });

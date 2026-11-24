@@ -168,7 +168,15 @@ export function playTip(tip: PowerTip, key: string, now = Date.now()) {
     holdFrom(i, at);
     if (i + 1 < tip.lines.length) after(v, k, l.text, (t) => say(i + 1, t));
   };
-  say(0, now);
+  // (The God King mid-line (a critical one, said before the tip): the whole exchange starts later, so that his answer comes as that line
+  // ends, the boss's line still up beside it, rather than the boss's line long gone by then.)
+  const j = tip.lines.findIndex((x) => x.who === "king");
+  const up = j > 0 && !kingFallen() ? kingVoice.line(now) : null;
+  const natural = now + tip.lines.slice(0, j).reduce((ms, x) => ms + typeMs(x.text) + SCHEDULE.replyMs, 0);
+  const start = up && up.priority >= CRITICAL && !up.key.includes(":tip:") && up.until > natural ? now + (up.until - natural) : now;
+  if (start === now) return say(0, now);
+  holdFrom(0, start);
+  setTimeout(() => say(0, Math.max(start, Date.now())), start - now);
 }
 
 /** Calls `next` once the line `key` (in `voice`) has typed out and `replyMs` more have passed; if it never comes up, after its wait. */
