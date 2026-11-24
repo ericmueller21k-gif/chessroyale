@@ -1857,3 +1857,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 23 ~22:15: #913 main GREEN (lobby round 4 live). #914 (fall beak) merged 262c7ee, main GREEN, live. No helpers running.
   Queue: animationDelay audit for other bosses (+#909 nits); #911 nits; #912/#913 nits; Resume follow-up; street-plan script name;
   frames:boss can't pick admins-first bosses; art runner read-path cause; stale branches/sessions cleanup.
+- Nov 24 ~07:00: Eric asked for a launch-readiness list → notes/launch-audit.md, notes/swarm-audit.md (answered; asked him to OK the swarm's
+  step 1, staging ~$1-3/run). Chandy upgrades job session_01JuCWRswQvUaC6uUYWuHWFT (Opus xhigh, brief chandy-upgrades, claude/chandy-upgrades):
+  aggressive hunting after 2 taught upgrades, the shot's victim locked = upgrade, "Queen lock" → "Lock-on Shot", God King warning. Watcher bub2jklk5.
