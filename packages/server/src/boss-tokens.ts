@@ -4,6 +4,7 @@ import {
   TOKEN_WINDOW_MS,
   battleCounts,
   bossCrateDef,
+  crateDef,
   dropBosses,
   dropLimit,
   isTokenBoss,
@@ -328,26 +329,37 @@ const grantCount = (n: unknown, max: number = BOSS_TOKENS.grantMax) => (typeof n
 
 /**
  * An admin's test grant (the Crates tab's admin box; the API checks it's an admin): crate keys (up to BOSS_TOKENS.keysGrantMax, 100,
- * at once: Eric, Nov 9), and any boss's tokens, to their own account. Never a drop: the window doesn't count it. Keyed by the app's request id (`grant:<ledger id>:<request>`): a retry
- * gives nothing more. (An older app's, with none: a fresh key.)
+ * at once: Eric, Nov 9), any boss's tokens, and crates (Nov 25: up to BOSS_TOKENS.cratesGrantMax of one crate, a series crate from
+ * `CRATES` or a boss crate from `BOSS_CRATES`), to their own account. Never a drop: the window doesn't count it. Keyed by the app's
+ * request id (`grant:<ledger id>:<request>`): a retry gives nothing more. (An older app's, with none: a fresh key.)
  */
 export async function grantTestItems(
   sql: Sql,
   userId: string,
-  body: { keys?: unknown; boss?: unknown; tokens?: unknown; request?: unknown },
+  body: { keys?: unknown; boss?: unknown; tokens?: unknown; crate?: unknown; crates?: unknown; request?: unknown },
   now = Date.now(),
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const keys = grantCount(body.keys, BOSS_TOKENS.keysGrantMax);
   const tokens = isTokenBoss(body.boss) ? grantCount(body.tokens) : 0;
-  if (!keys && !tokens) return { ok: false, message: "Nothing to give." };
+  const series = typeof body.crate === "string" ? crateDef(body.crate) : undefined;
+  const boss = typeof body.crate === "string" ? bossCrateDef(body.crate) : undefined;
+  const crates = series || boss ? grantCount(body.crates, BOSS_TOKENS.cratesGrantMax) : 0;
+  if (!keys && !tokens && !crates) return { ok: false, message: "Nothing to give." };
   const me = await ledgerAccount(sql, userId);
   if (!me) return { ok: false, message: "Nothing to give." };
   const request = requestId(body.request);
+  const id = request ? keyFor(opKeys.request("grant", request), me) : `grant:${randomHex(9)}`;
   await applyOp(sql, me, {
-    id: request ? keyFor(opKeys.request("grant", request), me) : `grant:${randomHex(9)}`,
+    id,
     reason: "admin grant",
     now,
-    legs: [...(keys ? [leg.keys(userId, keys)] : []), ...(tokens ? [leg.tokens(userId, body.boss as string, tokens)] : [])],
+    legs: [
+      ...(keys ? [leg.keys(userId, keys)] : []),
+      ...(tokens ? [leg.tokens(userId, body.boss as string, tokens)] : []),
+      ...(series && crates ? [leg.seriesCrates(userId, series.id, crates, id)] : []),
+      // (A boss crate is a row each: its own id, as a bought one's.)
+      ...(boss && crates ? Array.from({ length: crates }, () => leg.bossCrateIn(userId, randomHex(9), boss.id, now)) : []),
+    ],
   });
   return { ok: true };
 }

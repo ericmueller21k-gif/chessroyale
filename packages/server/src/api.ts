@@ -671,11 +671,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const r = await equipLocker(sql, current.id, b.slot, b.item ?? null, admin);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
-  // POST /api/locker/grant {keys?, boss?, tokens?, request}: an admin's test grant to their own account (crate keys, up to
+  // POST /api/locker/grant {keys?, boss?, tokens?, crate?, crates?, request}: an admin's test grant to their own account (crate keys, up to
   // BOSS_TOKENS.keysGrantMax (100) at once; a boss's tokens; once per request id); for anyone else it isn't there. Answers the locker.
   if (path === "/api/locker/grant" && request.method === "POST") {
     if (!admin) return json({ message: "Not found" }, 404);
-    const b = (await request.json().catch(() => ({}))) as { keys?: unknown; boss?: unknown; tokens?: unknown; request?: unknown };
+    const b = (await request.json().catch(() => ({}))) as { keys?: unknown; boss?: unknown; tokens?: unknown; crate?: unknown; crates?: unknown; request?: unknown };
     const r = await grantTestItems(sql, current.id, b && typeof b === "object" ? b : {}, now);
     return r.ok ? json(await lockerState(sql, current.id, admin)) : json({ message: r.message }, 400);
   }

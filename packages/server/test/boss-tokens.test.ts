@@ -487,6 +487,16 @@ describe("admins' test grants", () => {
     expect([k.status, (k.body.locker as { keys: number }).keys, (k.body.locker as { bossCrates: unknown }).bossCrates]).toEqual([200, 2 + 200 - 1, { "boss-tiger": 2 }]);
     // The player can't buy without tokens.
     expect(await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "tokens" }, playerCookie)).toEqual({ status: 400, body: { message: "You need 3 Babur tokens." } });
+    // Crates (Nov 25: "how do I get more crates?"): a series crate or a boss crate, up to cratesGrantMax at once; only a crate that exists;
+    // the player can't.
+    const before = (await call(env, "/api/locker/grant", { keys: 1 }, ericCookie)).body as { seriesCrates?: Record<string, number>; bossCrates?: Record<string, number> };
+    const s = (await call(env, "/api/locker/grant", { crate: "winter-1", crates: 5 }, ericCookie)).body as { seriesCrates: Record<string, number> };
+    expect(s.seriesCrates["winter-1"] ?? 0).toBe((before.seriesCrates?.["winter-1"] ?? 0) + 5);
+    const b2 = (await call(env, "/api/locker/grant", { crate: babur.id, crates: 1000 }, ericCookie)).body as { bossCrates: Record<string, number> };
+    expect(BOSS_TOKENS.cratesGrantMax).toBe(10);
+    expect(b2.bossCrates[babur.id]).toBe((before.bossCrates?.[babur.id] ?? 0) + BOSS_TOKENS.cratesGrantMax);
+    expect(await call(env, "/api/locker/grant", { crate: "nope", crates: 5 }, ericCookie)).toEqual({ status: 400, body: { message: "Nothing to give." } });
+    expect(await call(env, "/api/locker/grant", { crate: "winter-1", crates: 5 }, playerCookie)).toEqual({ status: 404, body: { message: "Not found" } });
   });
 });
 

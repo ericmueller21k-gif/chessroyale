@@ -662,8 +662,8 @@ export async function playClawOnServer(boss: string, request: string, seed?: num
 /** How many of a boss crate ("boss-tiger") you hold, unopened, as your locker has it now. */
 export const bossCrateCount = (crate: string): number => state.profile?.locker?.bossCrates?.[crate] ?? 0;
 
-/** An admin's test grant to themselves: crate keys, and a boss's tokens (once: postOnce). Your locker comes back with it. */
-export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number }): Promise<void> {
+/** An admin's test grant to themselves: crate keys, a boss's tokens, crates (once: postOnce). Your locker comes back with it. */
+export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number; crate?: string; crates?: number }): Promise<void> {
   const locker = await postOnce<Locker>("/api/locker/grant", body);
   if (state.profile) set({ profile: { ...state.profile, locker } });
 }

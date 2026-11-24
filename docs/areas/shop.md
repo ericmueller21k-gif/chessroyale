@@ -159,8 +159,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     haven't got ("You have no Babur's Boss Crate to open."). The roll is the server's, never a test switch's. The shop's kill switch
     refuses it too.
   - **Admins' test grants** (the Crates tab's "Admin: test grants", admins only: "+1 crate key", "+100 crate keys" (Nov 9); a boss,
-    "+1 token", "+3 tokens"; `POST /api/locker/grant`, "Not found" for anyone else; at most `keysGrantMax` (100) keys and `grantMax` (10)
-    tokens at once). Never a drop: the window doesn't count them. Every admin-only ability: [2026-11-09-admin-abilities.md](../decisions/2026-11-09-admin-abilities.md).
+    "+1 token", "+3 tokens"; and a crate, any series or boss crate, "+5 crates" (Nov 25: [2026-11-25-admin-crate-grant.md](../decisions/2026-11-25-admin-crate-grant.md)); `POST /api/locker/grant`, "Not found" for anyone else; at most `keysGrantMax` (100) keys and `grantMax` (10)
+    tokens at once, `cratesGrantMax` (10) crates). Never a drop: the window doesn't count them. Every admin-only ability: [2026-11-09-admin-abilities.md](../decisions/2026-11-09-admin-abilities.md).
   - **Stored** (each an account's: `account-data.ts`, "bossTokens"; the privacy page's "Boss tokens"): `boss_tokens` (counts),
     `boss_token_drops` (each drop: when, which battle; kept 30 days, the Worker's schedule clears older), `solo_battles` (the open one),
     `boss_crates` (Nov 2: each crate bought and not opened yet, its crate id and when; a new table, so older data reads as none), and
