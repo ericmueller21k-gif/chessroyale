@@ -4532,7 +4532,9 @@ export const BOSS_CRATE_PRICE = {
  * Where sign-in is set up, only signed-in accounts earn them (a guest's would move on signing in: many guests into one account).
  * `shortNames`: a boss whose token says a shorter name than the boss's own ("Boingo token", as its picture is named).
  * `grantMax`: the most an admin's test grant gives at once of one boss's tokens; `keysGrantMax` of crate keys (Eric, Nov 9: an admin
- * grants themselves up to 100 keys at once, now that crates take one: docs/decisions/2026-11-09-xp-phase2-keys.md).
+ * grants themselves up to 100 keys at once, now that crates take one: docs/decisions/2026-11-09-xp-phase2-keys.md); `cratesGrantMax` of one
+ * crate, a series crate or a boss crate (Eric, Nov 25: "how do I get more crates? ... I'm literally out of crates and I don't see a way to
+ * generate more").
  */
 export const BOSS_TOKENS = {
   moves: 10,
@@ -4543,6 +4545,7 @@ export const BOSS_TOKENS = {
   shortNames: { clown: "Boingo" } as Readonly<Record<string, string>>,
   grantMax: 10,
   keysGrantMax: 100,
+  cratesGrantMax: 10,
 } as const;
 
 /**

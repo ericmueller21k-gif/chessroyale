@@ -460,9 +460,11 @@ const levelNow = () => levelOf(account().profile?.xp ?? 0);
 /** Admins only: test grants to yourself (crate keys, any boss's tokens), for trying the boss crates (the server checks it's you). */
 function AdminGrants() {
   const [boss, setBoss] = useState("tiger");
+  // (Nov 25, Eric: "how do I get more crates?": any series crate or boss crate, 5 at a time.)
+  const [crate, setCrate] = useState(CRATES[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const give = (body: { keys?: number; boss?: string; tokens?: number }) => {
+  const give = (body: { keys?: number; boss?: string; tokens?: number; crate?: string; crates?: number }) => {
     setBusy(true);
     setError(null);
     void grantTestItems(body)
@@ -494,6 +496,18 @@ function AdminGrants() {
         </button>
         <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ boss, tokens: 3 })}>
           +3 tokens
+        </button>
+      </div>
+      <div class="admin-grants-row">
+        <select aria-label="Crate" value={crate} onChange={(e) => setCrate((e.target as HTMLSelectElement).value)}>
+          {[...CRATES, ...BOSS_CRATES].map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy || !crate} onClick={() => give({ crate, crates: 5 })}>
+          +5 crates
         </button>
       </div>
       {error && <p class="shop-error">{error}</p>}
