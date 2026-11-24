@@ -1982,3 +1982,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   to the mockup helper (session_01JuCWRui15X9QkMp1BD5a2N). Crown/parrot/tommy/smiley not objected to (asked again).
 - Nov 25 ~04:00: container restarted (watchers re-armed: main run 94c408c bbso27ecp; mockup v2 b76t5s6xe). Crates tidy DONE → #926
   (53c38b20), CI watched, helper archived. Desktop opening scale DESK_MAX 1.5 (box still smallish at 1920: ask Eric after he tries it).
+- Nov 25 ~04:20: item mockup v2 DONE (cane magic strand, tube confetti bigger bits); sent to Eric. On his OK: build helper (item-builder
+  lane, Opus high, targeted): crown, cane v2, tube confetti v2, parrot flap, tommy key+puff, smiley 6 expressions from the seed;
+  animate only where the item is the focus, grids still (and the shine too). Mockup helper session_01JuCWRui15X9QkMp1BD5a2N: archive.
