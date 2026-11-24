@@ -358,19 +358,22 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   else expect(share, "smaller on a computer").toBeLessThan(0.16);
   expect(Number(await small.evaluate((el) => getComputedStyle(el).opacity)), "partly see-through").toBeCloseTo(0.7, 2);
   // The dot: where the plan's square is (54 columns across the map's width), moving as you walk.
-  await walkTo(page, [8, 28]);
+  // (West of the park, outside the squares the town's bots stand on, world.ts freeSpot (columns 14 to 29, rows 21 to 34): a bot standing
+  // on the square an arrow steps to takes it, and the step waits for as long as it stands there: main 025406c, Nov 25.)
+  await walkTo(page, [2, 28]);
   await page.waitForTimeout(200);
   const s = (await small.locator("canvas").boundingBox())!.width / 54;
   const d0 = await dot(page);
   const cv0 = (await small.locator("canvas").boundingBox())!;
-  expect(Math.abs(d0.x - (cv0.x + 8.5 * s)), "your column").toBeLessThan(1.5);
+  expect(Math.abs(d0.x - (cv0.x + 2.5 * s)), "your column").toBeLessThan(1.5);
   expect(d0.deg, "the arrow north").toBe(0);
-  await walkTo(page, [14, 28]);
+  await walkTo(page, [8, 28]);
   await page.waitForTimeout(200);
   const d1 = await dot(page);
   expect(Math.abs(d1.x - d0.x - 6 * s), "six squares east").toBeLessThan(1.5);
   expect(Math.abs(d1.y - d0.y), "the same row").toBeLessThan(0.6);
-  await walkTo(page, [14, 23]);
+  // (Row 23 is walled from column 3 east: the row's west end, five squares south of row 28.)
+  await walkTo(page, [1, 23]);
   await page.waitForTimeout(200);
   expect(Math.abs((await dot(page)).y - d1.y - 5 * s), "five squares south: down the map").toBeLessThan(1.5);
   // The arrow turns with the camera: a look round a quarter to the right points it east.
