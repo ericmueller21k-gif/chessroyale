@@ -34,6 +34,13 @@ export function timeline(spinMs: number = CRATE_OPEN.spinMs, box = true) {
 export type Timeline = ReturnType<typeof timeline>;
 
 /**
+ * The bonus crate's card (Nov 24; docs/decisions/2026-11-24-bonus-crate.md): a beat after the item's card has formed (`afterCardMs`), the
+ * item's stage dims and a short gold beam shoots up (`beamMs`), the bonus card forming over it (`cardAt`, `cardMs`), the beam then
+ * fading back. In ms from the bonus's own start.
+ */
+export const BONUS = { afterCardMs: 700, beamMs: 320, cardAt: 160, cardMs: 340 } as const;
+
+/**
  * How far the strip has moved at `u` (0 to 1 of the spin), as a share of the distance: a cubic ease-out (the old strip's quartic left
  * its last third a silent crawl inside the winning tile: its last click came at 66% of the spin). It lands just past the winning
  * tile's near edge (`LAND_AT`), so the last click comes late (about 80%): the strip creeps over the last edge and stops, the near miss.

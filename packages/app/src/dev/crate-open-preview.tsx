@@ -2,7 +2,7 @@ import { render } from "preact";
 import { useState } from "preact/hooks";
 import "../board/pieces.css";
 import "../styles.css";
-import { CRATES, TIERS, itemDef, type CrateRoll, type ItemInstance, type ItemTier } from "@chessroyale/core";
+import { CRATES, TIERS, itemDef, opensWithKey, type CrateRoll, type ItemInstance, type ItemTier } from "@chessroyale/core";
 import { CrateOpening } from "../screens/Crates.tsx";
 import { unlockAudio } from "../sound.ts";
 
@@ -12,7 +12,8 @@ import { unlockAudio } from "../sound.ts";
  * (scripts/crate-open-perf.mjs). The roll here is made up; the game's is the server's.
  *
  * Query: `tier=`, `look=beta|winter|hunchess`, `fischer=0|1` (Legendary and Mythic come through Fischer Random in the game: on by
- * default for them), `delay=` (ms the fake server takes: 300), `capture=1` (opens at once, no controls).
+ * default for them), `delay=` (ms the fake server takes: 300), `capture=1` (opens at once, no controls), `bonus=<crate id>` (the
+ * opening also gives that bonus crate, Nov 24: its card after the item's).
  */
 const q = new URLSearchParams(location.search);
 const capture = q.get("capture") === "1";
@@ -22,7 +23,9 @@ function fakeRoll(look: string, tier: ItemTier, fischer: boolean, delay: number)
   const def = crate.items.find((i) => itemDef(i)?.tier === tier) ?? crate.items[0]!;
   const item: ItemInstance = { id: "preview", def, color: "red", color2: "yellow", blemish: 9, seed: 7 };
   const roll: CrateRoll = { fischer, def, color: item.color, color2: item.color2 ?? undefined, blemish: item.blemish, seed: item.seed };
-  return { crate, open: () => new Promise<{ roll: CrateRoll; item: ItemInstance }>((ok) => setTimeout(() => ok({ roll, item }), delay)) };
+  const b = q.get("bonus");
+  const bonus = b ? { crate: b, key: opensWithKey(b) } : undefined;
+  return { crate, open: () => new Promise<{ roll: CrateRoll; item: ItemInstance }>((ok) => setTimeout(() => ok({ roll, item, ...(bonus ? { bonus } : {}) }), delay)) };
 }
 
 function Page() {

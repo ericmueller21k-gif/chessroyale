@@ -44,3 +44,11 @@ export function rollBonus(rng: Rng, opts: { admin?: boolean; force?: true | stri
   const crate = forced ?? pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))]!;
   return { crate: crate.id, key: opensWithKey(crate.id) };
 }
+
+/**
+ * The bonus in one plain line, as every crate's odds panel and the FAQ show it (the director's words, Nov 24, and two of ours for
+ * accuracy: a boss crate needs no key, and a bonus crate's own opening never gives one): "Every opening: 25% chance of a bonus crate
+ * (any crate, chosen evenly) and its key if it needs one. Opening a bonus crate never gives another."
+ */
+export const bonusOddsLine = (chance: number = CRATE_BONUS.chance): string =>
+  `Every opening: ${Math.round(chance * 1000) / 10}% chance of a bonus crate (any crate, chosen evenly) and its key if it needs one. Opening a bonus crate never gives another.`;

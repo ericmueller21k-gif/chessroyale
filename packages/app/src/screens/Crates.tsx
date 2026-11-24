@@ -47,6 +47,8 @@ import {
   isWelcomeCrate,
   showsPurity,
   pickableBossCrates,
+  bonusOddsLine,
+  type BonusRoll,
   type BossCrateDef,
   type CrateDef,
   type CrateLook,
@@ -57,15 +59,15 @@ import {
   type PawnColor,
   type PresentTier,
 } from "@chessroyale/core";
-import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor } from "../account.ts";
+import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor, type OpenForce, type Opened } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
 import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { crateSoundsReady, play, unlockAudio, warmCrateSounds } from "../sound.ts";
-import { CrateStage, OpenLayer } from "../crate-open/CrateOpenStage.tsx";
-import { STRIPS } from "../crate-open/timeline.ts";
+import { BonusStage, CrateStage, OpenLayer } from "../crate-open/CrateOpenStage.tsx";
+import { BONUS, STRIPS } from "../crate-open/timeline.ts";
 import { useAccount } from "./Profile.tsx";
 import { testParams } from "../test-switches.ts";
 import { haptic } from "../haptics.ts";
@@ -112,7 +114,7 @@ const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { colo
  * A crate opened but not seen yet: the server rolled it, but you left during the spin (Eric, Oct 8). Kept on the
  * device (and in memory, if storage is off) until its reveal shows; coming back to the crates opens straight to it.
  */
-type Unseen = { crate: string; roll: CrateRoll; item: ItemInstance };
+type Unseen = { crate: string } & Opened;
 const UNSEEN_KEY = "hunchess-crate-unseen";
 let unseenHere: Unseen | null = null;
 function setUnseen(u: Unseen | null) {
@@ -514,6 +516,21 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   const [shinySet, setForceShiny] = useState<boolean | null>(null);
   const forceFischer = crateSwitchesHere() && (fischerSet ?? testParams().get("fischer") === "1");
   const forceShiny = crateSwitchesHere() && (shinySet ?? testParams().get("shiny") === "1");
+  // (?bonus=1: a bonus crate for sure, its crate rolled; ?bonus=<crate id>: that one. Nov 24.)
+  const [bonusSet, setForceBonus] = useState<boolean | null>(null);
+  const bonusParam = testParams().get("bonus");
+  const forceBonus: true | string | undefined = !crateSwitchesHere()
+    ? undefined
+    : bonusSet === false
+      ? undefined
+      : bonusSet === true
+        ? (bonusParam && bonusParam !== "1" ? bonusParam : true)
+        : bonusParam === "1"
+          ? true
+          : bonusParam || undefined;
+  const bonusHeld = locker?.bonusCrates?.[crate.id] ?? 0;
+  // (How many of them are bonus ones: "You have 2 (1 bonus)". Nov 24.)
+  const heldWords = `${held}${bonusHeld ? ` (${bonusHeld} bonus)` : ""}`;
   const [opening, setOpening] = useState(!!resume);
   // (The opening's sounds made ahead in the sound worker as its page opens, once sound is on: before the Open's tap.)
   useEffect(() => warmCrateSounds(), []);
@@ -523,7 +540,14 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   return (
     <div class="crate-page">
       {/* (The opening on its own layer over this page, which stays as it is under it: Nov 24.) */}
-      {opening && <CrateOpening crate={crate} force={boss ? {} : { fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />}
+      {opening && (
+        <CrateOpening
+          crate={crate}
+          force={boss ? {} : { fischer: forceFischer, shiny: forceShiny, ...(forceBonus ? { bonus: forceBonus } : {}) }}
+          resume={resume}
+          onClose={() => setOpening(false)}
+        />
+      )}
       <GamblingWarning />
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
@@ -538,15 +562,15 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         <span class="small">{crate.blurb}</span>
         {boss ? (
           <span class="small crate-held" data-held={held}>
-            {held ? `You have ${held}.` : `You have none. ${possessive(tokenBossName(boss.boss))} shop in the town sells it.`}
+            {held ? `You have ${heldWords}.` : `You have none. ${possessive(tokenBossName(boss.boss))} shop in the town sells it.`}
           </span>
         ) : (
           <span class="small crate-held" data-held={held} data-keys={keys}>
             {!held
               ? "You have none. Leveling up and the daily reward give you crates."
               : !keys
-                ? `You have ${held}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
-                : `You have ${held}, and ${keys} ${keys === 1 ? "key" : "keys"}.`}
+                ? `You have ${heldWords}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
+                : `You have ${heldWords}, and ${keys} ${keys === 1 ? "key" : "keys"}.`}
           </span>
         )}
       </div>
@@ -587,6 +611,8 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           );
         })}
       </div>
+      {/* The bonus crate (Nov 24): one plain line, the same as the FAQ's (core bonusOddsLine). */}
+      <p class="small muted crate-bonus-odds">{bonusOddsLine()}</p>
       <h3 class="ff-title">Possible items</h3>
       <div class="odds-list">
         {items.map((def) => {
@@ -637,6 +663,9 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           </label>
           <label class="check small">
             <input type="checkbox" checked={forceShiny} onChange={(e) => setForceShiny(e.currentTarget.checked)} /> Shiny
+          </label>
+          <label class="check small">
+            <input type="checkbox" checked={!!forceBonus} onChange={(e) => setForceBonus(e.currentTarget.checked)} /> Bonus crate
           </label>
         </div>
       )}
@@ -822,14 +851,14 @@ export function CrateOpening({
   opener = openCrate,
 }: {
   crate: CrateDef;
-  force: { fischer?: boolean; shiny?: boolean };
+  force: OpenForce;
   /** A crate already opened but not seen (you left during the spin): straight to its reveal. */
   resume?: Unseen;
   onClose: () => void;
   /** The roll (the server's; the dev preview page's own fake one, for its frames). */
-  opener?: (crate: string, force: { fischer?: boolean; shiny?: boolean }) => Promise<{ roll: CrateRoll; item: ItemInstance }>;
+  opener?: (crate: string, force: OpenForce) => Promise<Opened>;
 }) {
-  const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
+  const [result, setResult] = useState<Opened | null>(resume ?? null);
   // "Open another": only while you hold one more (greyed at none), a series crate also a key (Nov 9). (A Welcome Crate: another only
   // while a second waits.)
   const lockerNow = useAccount().profile?.locker;
@@ -841,6 +870,8 @@ export function CrateOpening({
   // The card has formed (the reveal is shown: the crate is seen).
   const [shown, setShown] = useState(!!resume);
   const [round, setRound] = useState(0);
+  // The bonus crate's card (Nov 24): up a beat after the item's card has formed, until its OK.
+  const [bonusUp, setBonusUp] = useState<BonusRoll | null>(null);
   // "Open another": everything back to the start in the same update as the new round, so the new strip never mounts with the last
   // answer (it would start on it, then be stopped as the answer cleared, and wait for ever: its card never shown).
   const again = () => {
@@ -848,8 +879,18 @@ export function CrateOpening({
     setError(null);
     setStage("spin");
     setShown(false);
+    setBonusUp(null);
     setRound((r) => r + 1);
   };
+  useEffect(() => {
+    const bonus = shown ? result?.bonus : undefined;
+    if (!bonus) return;
+    const t = setTimeout(() => {
+      setBonusUp(bonus);
+      play("bannerStart");
+    }, BONUS.afterCardMs);
+    return () => clearTimeout(t);
+  }, [shown, result]);
   const still = round === 0 && !!resume;
   useEffect(() => {
     if (still) return;
@@ -973,9 +1014,54 @@ export function CrateOpening({
               ▶ Done
             </button>
           )}
+          {bonusUp && (
+            <BonusStage key={`c${round}`}>
+              <BonusCard bonus={bonusUp} onOk={() => setBonusUp(null)} />
+            </BonusStage>
+          )}
         </div>
       </div>
     </OpenLayer>
+  );
+}
+
+/**
+ * The bonus crate's card's words and buttons (Nov 24; docs/decisions/2026-11-24-bonus-crate.md), under "BONUS!": the crate's art (a boss
+ * crate's with its boss's token), its name, "+1 crate key" with the key when one came with it, where it is, and OK (back to the item's
+ * card). It's in your inventory already: the opening's answer brought it.
+ */
+export function BonusCard({ bonus, onOk }: { bonus: BonusRoll; onOk: () => void }) {
+  const crate = anyCrate(bonus.crate);
+  const { Crate } = CRATE_LOOKS[crate?.look ?? "beta"];
+  return (
+    <>
+      <span class="reveal-tier">BONUS!</span>
+      <span class="reveal-art cox-bonus-art">
+        <Crate />
+        {crate && isBossCrate(crate) && (
+          <span class="crate-row-token">
+            <TokenArt boss={crate.boss} />
+          </span>
+        )}
+      </span>
+      <strong class="reveal-name">
+        <CrateName name={crate?.name ?? bonus.crate} />
+      </strong>
+      {bonus.key && (
+        <span class="cox-bonus-key">
+          <span class="stock-art">
+            <KeyArt />
+          </span>
+          +1 crate key
+        </span>
+      )}
+      <span class="reveal-desc">A bonus crate{bonus.key ? " and its key" : ""}, in your inventory's Crates.</span>
+      <div class="reveal-actions">
+        <button type="button" class="ff-button small" onClick={onOk}>
+          ▶ OK
+        </button>
+      </div>
+    </>
   );
 }
 

@@ -23,7 +23,7 @@ import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import { tierInfo, type ItemTier } from "@chessroyale/core";
 import { lightMasks } from "../components/recluse-light.ts";
 import { playCrateCues } from "../sound.ts";
-import { OVERSHOOT, TIER_POWER, clickTimes, cues, isBig, stripEase, stripTarget, timeline, type Timeline } from "./timeline.ts";
+import { BONUS, OVERSHOOT, TIER_POWER, clickTimes, cues, isBig, stripEase, stripTarget, timeline, type Timeline } from "./timeline.ts";
 
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -279,6 +279,46 @@ export function CrateStage({
         {item}
       </div>
       <div class="cox-whiteout" />
+    </div>
+  );
+}
+
+/**
+ * The bonus crate's card (Nov 24; docs/decisions/2026-11-24-bonus-crate.md): a second card over the item's, on a short gold beam. The
+ * item's stage dims behind it (and takes no tap while it's up), the opening's own beam (its shaft and core) shoots up in gold behind
+ * the card, and a reveal card forms round `children` (Crates.tsx `BonusCard`'s crate, name and key) as the item's card
+ * formed. Web Animations on transform and opacity, as the opening's; reduced motion: the beam fades up, the card fades in. Its beats:
+ * timeline.ts `BONUS`.
+ */
+export function BonusStage({ children }: { children: ComponentChildren }) {
+  const stage = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = stage.current!;
+    for (const [k, v] of Object.entries(maskVars())) root.style.setProperty(k, v);
+    const reduced = reducedMotion();
+    const out: Animation[] = [];
+    const at = animator(out);
+    const $ = (s: string) => root.querySelector(s) as HTMLElement;
+    at($(".cox-bonus-dim"), [{ opacity: 0 }, { opacity: 1 }], 0, 220, { easing: "ease-out" });
+    const beam = $(".cox-beam");
+    if (reduced) at(beam, [{ opacity: 0, transform: "none" }, { opacity: 1, transform: "none" }], 60, 300, { easing: "ease-out" });
+    else at(beam, [{ transform: "scaleY(0) scaleX(0.5)", opacity: 1 }, { transform: "scaleY(1.04) scaleX(1.15)", opacity: 1, offset: 0.55 }, { transform: "scaleY(1) scaleX(1)", opacity: 1 }], 60, BONUS.beamMs, { easing: "cubic-bezier(.1,.9,.3,1)" });
+    at(beam, [{ opacity: 1 }, { opacity: 0.35 }], BONUS.cardAt + BONUS.cardMs, 500, { fill: "forwards", easing: "ease-out", composite: "replace" });
+    const card = $(".cox-card");
+    at(card, [{ visibility: "hidden" }, { visibility: "visible" }], BONUS.cardAt, 1, { easing: "steps(1, start)" });
+    at(card, [{ opacity: 0, transform: reduced ? "none" : "translateY(40px) scale(0.86)" }, { opacity: 1, transform: "none" }], BONUS.cardAt, BONUS.cardMs, { easing: "cubic-bezier(.2,1.3,.4,1)" });
+    return () => out.forEach((a) => a.cancel());
+  }, []);
+  return (
+    <div class="cox-stage cox-bonus" ref={stage} style={{ "--tier": "#fbbf24", "--power": "0.55", "--lid": "0.5" }} data-testid="crate-bonus">
+      <div class="cox-bonus-dim" />
+      <div class="cox-light cox-beam">
+        <div class="cox-beam-shaft" />
+        <div class="cox-beam-core" />
+      </div>
+      <div class="ff-window cox-card reveal-card special cox-bonus-card" role="dialog" aria-label="Bonus crate">
+        {children}
+      </div>
     </div>
   );
 }
