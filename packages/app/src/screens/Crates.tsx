@@ -841,6 +841,15 @@ export function CrateOpening({
   // The card has formed (the reveal is shown: the crate is seen).
   const [shown, setShown] = useState(!!resume);
   const [round, setRound] = useState(0);
+  // "Open another": everything back to the start in the same update as the new round, so the new strip never mounts with the last
+  // answer (it would start on it, then be stopped as the answer cleared, and wait for ever: its card never shown).
+  const again = () => {
+    setResult(null);
+    setError(null);
+    setStage("spin");
+    setShown(false);
+    setRound((r) => r + 1);
+  };
   const still = round === 0 && !!resume;
   useEffect(() => {
     if (still) return;
@@ -894,7 +903,7 @@ export function CrateOpening({
   }, [result]);
   const tier = (result ? itemDef(result.item.def)!.tier : null) as PresentTier | null;
   const art = result && <ItemArt def={result.item.def} finish={result.item} />;
-  const details = result && <RevealDetails item={result.item} again={more} shown={shown} onAgain={() => setRound((r) => r + 1)} onClose={onClose} />;
+  const details = result && <RevealDetails item={result.item} again={more} shown={shown} onAgain={again} onClose={onClose} />;
   const one = strips?.one ?? decoys;
   return (
     <OpenLayer label={crate.name}>
@@ -908,7 +917,7 @@ export function CrateOpening({
       </div>
       <div class="cox-room">
         <div class="cox-stages">
-          {still && result && <Reveal item={result.item} again={more} onAgain={() => setRound((r) => r + 1)} onClose={onClose} />}
+          {still && result && <Reveal item={result.item} again={more} onAgain={again} onClose={onClose} />}
           {!still && stage !== "spin2" && (
             <CrateStage
               key={`a${round}`}

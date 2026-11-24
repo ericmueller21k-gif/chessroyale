@@ -227,7 +227,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   answer; reduced motion drops the blur, shake and jolt and fades the beam. The sound (made in code: `crate-open/sounds.ts`; Eric's
   mix, Nov 24: the mockup's slot reel spinning, its "card in the spokes" ending) is made ahead in the sound worker as a crate's page opens
   and as Open is tapped, and laid on the audio clock (`timeline.ts` `cues`, sound.ts `playCrateCues`): a metal tick at each tile edge
-  crossing, heavier as it slows, a low swell under the slowdown and a clunk as the reel locks; the box's thud and shake, then a glassy
+  crossing, heavier as it slows, and a clunk as the reel locks (no swell, no charge: Eric); the box's thud and knocks, then a glassy
   chord that climbs with the tier. The roll, the odds and what's won are the server's, unchanged.
 
 ## Where the code is
