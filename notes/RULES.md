@@ -174,3 +174,5 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - **The art runner can read only its own drawing (`scripts/boss-art/out/<id>/<id>.ts`) and `packages/app/src/characters/**` (Nov 23):** a
   pass that starts from an earlier drawing gets that drawing copied in as its own starting file (id renamed) before the run. Lobby round 4
   couldn't read round 3 (it lives under `town/shops`) and redrew the room by eye.
+- **No lawyer, ever (Eric, Nov 24, a veto, "as I've asked before"):** never suggest or ask about a lawyer or attorney review (legal pages,
+  loot boxes, likeness, anything). Not essential for this game. We fill and word the legal pages ourselves.

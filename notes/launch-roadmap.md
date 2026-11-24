@@ -3,9 +3,9 @@
 ## Eric's side (accounts, money, legal, switches only he can flip)
 1. LLC; then the business details the legal pages need (name, postal address, governing state).
 2. Stripe account (in the LLC's name), Stripe Tax registrations as needed; Canada GST threshold.
-3. Lawyer pass on Terms/Privacy, the paid crates (loot-box rules), and the Hidden Boss's likeness and quotes.
+3. ~~Lawyer pass~~ DROPPED by Eric (Nov 24, vetoed; never raise it again).
 4. DMCA agent at the US Copyright Office ($6).
-5. Turn on support@hunchess.com forwarding (Cloudflare Email Routing, free).
+5. ~~support@hunchess.com forwarding~~ DONE (Eric, Nov 24: already forwards to him).
 6. Monitoring switches: a Discord webhook for alerts (ALERT_WEBHOOK), Cloudflare billing alerts ($25, $100), usage notifications,
    a free uptime check on /api/live; 2FA on his Google and email (admin access follows those inboxes).
 7. Decisions: drop the struck-through "50% off" prices or make them real; whether coins can buy crate keys (paid loot boxes);
