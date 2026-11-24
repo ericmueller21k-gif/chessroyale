@@ -680,20 +680,22 @@ export function shotSaves(fen: string, target: string, crowd: Side, moves: reado
  * The piece the Lock-on Shot will most likely hit (Eric, Nov 24: "When he does his queen shot, we should already know ... which piece
  * you're most likely to sacrifice. So have him mark that piece as well"), decided once as he aims (`passed`: the crowd to move;
  * `target`: the aim's square), from the position alone so every device agrees: the piece already first down the target's file from
- * his edge, if one is in front of it; else the cheapest piece a move of yours can put there (ties: the one more of your moves put
- * there, then the seed), as its square now; else the target. Null: nothing to aim at.
+ * his edge, if one is in front of it (your king there: null, it stops the round); else the cheapest piece a move of yours can put there
+ * (never your king; ties: the one more of your moves put there, then the seed), as its square now; else the target. Null: none.
  */
 export function shotVictim(passed: string, target: string, crowd: Side, seed: number, n: number): string | null {
   const first = shotTarget(passed, target, crowd);
-  if (!first) return null;
+  if (!first || pieceAt(passed, first)?.type === "k") return null;
   if (first !== target) return first;
   const ways = new Map<string, number>();
   for (const m of shotSaves(passed, target, crowd)) {
     const now = from(m) === target ? to(m) : target;
     const hit = shotTarget(applyMove(passed, m), now, crowd)!;
-    // (The piece as it stands now: the mover, if it's the one that stepped in front; castling's rook isn't counted.)
+    // (The piece as it stands now: the mover, if it's the one that stepped in front; castling's rook isn't counted, nor your king, which
+    // stops the round: nothing shatters.)
     const sq = hit === to(m) ? from(m) : hit;
-    if (pieceAt(passed, sq)?.color === crowd) ways.set(sq, (ways.get(sq) ?? 0) + 1);
+    const piece = pieceAt(passed, sq);
+    if (piece?.color === crowd && piece.type !== "k") ways.set(sq, (ways.get(sq) ?? 0) + 1);
   }
   const pick = seeded([...ways.keys()], seed, (x) => x, "shot-victim", n).sort((a, b) => VALUE[pieceAt(passed, a)!.type]! - VALUE[pieceAt(passed, b)!.type]! || ways.get(b)! - ways.get(a)!)[0];
   return pick ?? target;

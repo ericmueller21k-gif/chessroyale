@@ -23,6 +23,8 @@ import {
   dodgeTimeline,
   dodgeVolley,
   heldIn,
+  huntable,
+  huntTakes,
   kingAttacked,
   legalMoves,
   linesAfter,
@@ -42,6 +44,8 @@ import {
   rageOf,
   ragePaused,
   safeSquares,
+  shotSaves,
+  shotVictim,
   stopReason,
   steerPick,
   testCapture,
@@ -140,6 +144,8 @@ describe("Chandy's sheet", () => {
     // upgrade window; the meter every 6 of your moves; five upgrades; Dodge once a battle, his rage full 3 of your moves after the
     // fifth (Eric, Nov 16: "He only ults once per game, no matter what").)
     expect([S.takeMargin, S.chaseMargin, S.lockLines]).toEqual([2, 0.75, 5]);
+    // (The hunt after his taught upgrades: a trade for a locked piece netting him at least −1 pawn, Nov 24.)
+    expect(S.huntLoss).toBe(1);
     expect([S.upgradeMs, S.meterEvery, S.upgradesMax, BOSS_POWERS.maxUltimates.chandy, S.dodgeAfterMoves]).toEqual([2000, 6, 5, 1, 1]);
     // (D6a: a 3 s vote and 300 ms of lag grace.)
     expect([S.dodgeVoteMs, S.dodgeGraceMs, S.dodgeRounds]).toEqual([3000, 300, 3]);
@@ -188,9 +194,14 @@ describe("the locks (L1-L6)", () => {
       if (r.queenLockDue()) await r.playQueenLock().catch(() => r.applyQueenLock(null));
       if (!r.bossToMove()) continue;
       const before = fenOf(r);
+      // (The upgrades before his move: the Lock-on Shot's shatter of its locked piece, at the start of his turn, is one too (Nov 24).)
+      const up0 = cOf(r).upgrades;
       expect(cOf(r).locks).toEqual([]);
       expect(r.bossLocks()).toBeNull();
-      expect(r.boss!.powers!.events.some((e) => e.kind === "lockOn")).toBe(false);
+      // (Only the Lock-on Shot's lock may have come: the piece its round would most likely hit, locked as its aim showed (Nov 24), no
+      // hunting lock, and gone as it fired.)
+      const events = r.boss!.powers!.events;
+      expect(events.some((e) => e.kind === "lockOn" && !events.some((x) => x.kind === "queenAim"))).toBe(false);
       const marks: string[] = [];
       const move = await r.playBoss(undefined, async () => {
         // (The moment, before his move shows: the lock on the piece, still on the board.)
@@ -209,8 +220,10 @@ describe("the locks (L1-L6)", () => {
         const aim = queenLockAim(fenOf(r), r.boss!.crowdSide, 0, 0);
         expect([cOf(r).unlocked[0], aim && pieceAt(fenOf(r), aim)?.type]).toEqual(["queenlock", "r"]);
       }
-      // (Upgrades 1 and 2 come with the captures; the hunt only once both have taught it.)
-      expect([cOf(r).upgrades, cOf(r).marked ?? 0, cOf(r).taught]).toEqual([caught, caught, caught >= S.teachCaptures ? true : undefined]);
+      // (Upgrades 1 and 2 come with the captures (a shot's shatter of its locked piece may add one: Nov 24); the hunt only once both have
+      // taught it.)
+      const took = !!taken && taken.color === r.boss!.crowdSide;
+      expect([cOf(r).upgrades - up0, cOf(r).marked ?? 0, cOf(r).taught]).toEqual([took ? 1 : 0, caught, caught >= S.teachCaptures ? true : undefined]);
     }
     expect(caught).toBe(S.teachCaptures);
   });
@@ -364,6 +377,116 @@ describe("the steering (L3)", () => {
     expect(steerPick(f, "e8d7", lines, ["d4"])).toBe("b8c6");
     // (Too far: 0.3 against 0.6 is more than three quarters of a pawn.)
     expect(steerPick(f, "e8d7", [lines[0]!, { move: "b8c6", expected: 0.3 }], ["d4"])).toBe("e8d7");
+  });
+});
+
+describe("the hunt (Eric, Nov 24: \"aggressively trying to capture a piece and upgrade ... if it's like a decent trade, but maybe slightly negative, he still targets it\")", () => {
+  // (Black to move: his bishop on b7 can take your knight on d5, your e4 pawn takes back: an even trade.)
+  const even = "4k3/1b6/8/3N4/4P3/8/8/4K3 b - - 0 1";
+  // (His rook on d8 the only taker: a rook for a knight, two pawns down.)
+  const costly = "3rk3/8/8/3N4/4P3/8/8/4K3 b - - 0 1";
+  it("reaches a locked piece he can take by a trade netting him at least −huntLoss by the exchange check; never a worse one", () => {
+    expect(huntTakes(even, ["d5"])).toEqual(["b7d5"]);
+    expect(huntable(even, "d5", "w")).toBe(true);
+    // (Asked with you to move: read with him to move.)
+    expect(huntable(even.replace(" b ", " w "), "d5", "w")).toBe(true);
+    expect(huntTakes(costly, ["d5"])).toEqual([]);
+    expect(huntable(costly, "d5", "w")).toBe(false);
+    // (Not a locked square, or a move he may not play: nothing.)
+    expect(huntTakes(even, ["e4"])).toEqual([]);
+    expect(huntTakes(even, ["d5"], ["e8d8"])).toEqual([]);
+  });
+
+  it("takes a hunted piece outside his top lines when its own search puts it within takeMargin of his best; never a mate against him or further", () => {
+    const top: MoveScore[] = [
+      { move: "e8e7", expected: 0.6 },
+      { move: "e8d7", expected: 0.59 },
+      { move: "b7a6", expected: 0.58 },
+    ];
+    // (Its own search, with his best: 0.5 against 0.6, under half a pawn.)
+    expect(steerPick(even, "e8e7", top, ["d5"], null, undefined, [{ move: "e8e7", expected: 0.6 }, { move: "b7d5", expected: 0.5 }])).toBe("b7d5");
+    // (Too far: 0.1 against 0.6, about 2.7 pawns.)
+    expect(steerPick(even, "e8e7", top, ["d5"], null, undefined, [{ move: "e8e7", expected: 0.6 }, { move: "b7d5", expected: 0.1 }])).toBe("e8e7");
+    // (A mate against him after it: never.)
+    expect(steerPick(even, "e8e7", top, ["d5"], null, undefined, [{ move: "e8e7", expected: 0.6 }, { move: "b7d5", expected: 0.55, mate: -3 }])).toBe("e8e7");
+    // (Not scored: as before, his pick.)
+    expect(steerPick(even, "e8e7", top, ["d5"])).toBe("e8e7");
+    // (A trade worse than huntLoss scored anyway: not the hunt's; only in his top lines would it count, as before.)
+    expect(steerPick(costly, "e8e7", top, ["d5"], null, undefined, [{ move: "e8e7", expected: 0.6 }, { move: "d8d5", expected: 0.58 }])).toBe("e8e7");
+    expect(steerPick(costly, "e8e7", [top[0]!, { move: "d8d5", expected: 0.58 }], ["d5"])).toBe("d8d5");
+  });
+
+  it("a lock whose piece got away ends at once while another piece can be hunted (relock), else as before (past its hunt and safe)", () => {
+    const l = { square: "d5", piece: "n", at: 4 };
+    const away = "4k3/8/8/3N4/8/8/8/4K3 w - - 0 1";
+    expect(lockEnds(away, "w", { moves: 5 }, l)).toBe(false);
+    expect(lockEnds(away, "w", { moves: 5 }, l, S, true)).toBe(true);
+    // (Still huntable (the even trade): it stays, whatever the age, until liveTurns.)
+    const hunted = "4k3/1b6/8/3N4/4P3/8/8/4K3 w - - 0 1";
+    expect(lockEnds(hunted, "w", { moves: 5 }, l, S, true)).toBe(false);
+    expect(lockEnds(hunted, "w", { moves: 8 }, l, S, true)).toBe(false);
+    expect(lockEnds(hunted, "w", { moves: 9 }, l, S, true)).toBe(true);
+  });
+
+  it("his move after a lock got away: it goes and your most gettable piece is locked instead (re-lock), not a second lock beside it", async () => {
+    const r = battle(5);
+    await crowdMove(r);
+    // (Black to move, taught: his lock on your knight on h1, which nothing of his reaches; your bishop on e4 hangs to his knight on f6.)
+    onPosition(r, "4k3/8/5n2/8/4B3/8/8/4K2N b - - 0 1", "w", { taught: true, marked: 2, upgrades: 2, unlocked: ["beam", "shields"], locks: [{ square: "h1", piece: "n", at: 0 }], moves: 1 });
+    expect(r.bossLocks()).toEqual(["h1"]);
+    r.applyBossMove("e8d8");
+    expect(cOf(r).locks.map((l) => l.square)).toEqual(["e4"]);
+    expect(r.boss!.powers!.events.filter((e) => e.kind === "lockOn").map((e) => e.square)).toEqual(["e4"]);
+  });
+});
+
+describe("the Lock-on Shot's victim (Eric, Nov 24: \"we should already know ... which piece you're most likely to sacrifice. So have him mark that piece as well\")", () => {
+  it("is the piece already in front of the target; else the cheapest you can put there (never your king); else nothing", () => {
+    expect(shotVictim("4k3/8/8/8/8/8/3P4/3QK3 w - - 0 1", "d1", "w", 1, 0)).toBe("d2");
+    // (Only your bishop on c4 can step in front of your queen on d4.)
+    expect(shotVictim("4k3/8/8/8/2BQ4/8/8/4K3 w - - 0 1", "d4", "w", 1, 0)).toBe("c4");
+    // (Your c2 pawn can take onto d3, your knight can go to d2, your queen can hide behind the c2 pawn, your king can step in front:
+    // the pawn, whatever the seed.)
+    const fen = "4k3/8/8/8/8/3p4/2P5/1N1QK3 w - - 0 1";
+    expect(shotSaves(fen, "d1", "w").sort()).toEqual(["b1d2", "c2d3", "d1c1", "e1d2"]);
+    for (let seed = 0; seed < 10; seed++) expect(shotVictim(fen, "d1", "w", seed, 0)).toBe("c2");
+    // (Your king already in front: it stops the round, no victim.)
+    expect(shotVictim("4k3/8/8/8/8/8/3K4/3Q4 w - - 0 1", "d1", "w", 1, 0)).toBeNull();
+  });
+
+  it("is locked as the aim shows (a crosshair, 1 pip), and its shatter is an upgrade; the lock goes with the shot", async () => {
+    const r = battle(8);
+    await crowdMove(r);
+    onPosition(r, "4k3/pppp4/8/8/8/8/3P4/3QK2R b - - 0 1", "w", { upgrades: 1, unlocked: ["queenlock"], due: "queenlock", meter: S.meterEvery });
+    expect(r.applyQueenLock(null)).toBe("d1");
+    expect(cOf(r).aim).toMatchObject({ square: "d1", victim: "d2" });
+    expect(cOf(r).locks).toEqual([{ square: "d2", piece: "p", at: cOf(r).moves, shot: true }]);
+    expect(r.boss!.powers!.events.filter((e) => e.kind === "lockOn").map((e) => e.square)).toEqual(["d2"]);
+    expect(lockLeft(cOf(r), cOf(r).locks[0]!)).toBe(1);
+    // (Not one he hunts: it steers nothing.)
+    expect(r.bossLocks()).toBeNull();
+    await crowdMove(r, () => "e1f2");
+    expect(cOf(r).shot).toMatchObject({ square: "d2", piece: "p" });
+    expect([cOf(r).upgrades, cOf(r).upgrade?.stage, cOf(r).locks]).toEqual([2, 2, []]);
+    // (Shown as your turn after his move begins, as a capture's.)
+    await r.playBoss();
+    expect(r.boss!.powers!.events.find((e) => e.kind === "upgrade")).toMatchObject({ stage: 2 });
+  });
+
+  it("follows its piece as you move it in front; another piece in front instead shatters with no upgrade", async () => {
+    const at = "4k3/pppp4/8/8/8/3p4/2P5/1N1QK3 b - - 0 1";
+    for (const [move, hit, upgrades] of [
+      ["c2d3", "d3", 2],
+      ["b1d2", "d2", 1],
+    ] as const) {
+      const r = battle(8);
+      await crowdMove(r);
+      onPosition(r, at, "w", { upgrades: 1, unlocked: ["queenlock"], due: "queenlock", meter: S.meterEvery });
+      expect(r.applyQueenLock(null)).toBe("d1");
+      expect(cOf(r).locks.map((l) => l.square)).toEqual(["c2"]);
+      await crowdMove(r, () => move);
+      expect([cOf(r).shot?.square, cOf(r).upgrades, cOf(r).locks]).toEqual([hit, upgrades, []]);
+    }
   });
 });
 
