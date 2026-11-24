@@ -1963,3 +1963,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   review (Opus xhigh, read-only) running. After the review: stings helper resume + item polish mockup (2 x high), then crates page tidy.
 - Nov 25 ~01:10: #923 review: no blocker; M1 (double-tap OK spends a key), M2 (bonus card skippable), N3 odds text exactness + N4/N5/N7/N8
   → fresh fix helper (Opus high, brief bonus-crate-fixes.md). Then a delta re-review. Stings helper resumed alongside (2 x high).
+- Nov 25 ~01:40: ERIC approved the v2 levels ("much better, that's what they should be for all"). ERIC out of crates → #924 (mine,
+  b14e6997): admin "+5 crates" any series/boss crate (cratesGrantMax 10), CI watched. Running: bonus fixes (high), stings step 2 (high).
