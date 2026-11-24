@@ -59,6 +59,88 @@ async function markQuestsSeen(context: import("@playwright/test").BrowserContext
 }
 let questsSeenDefault = true;
 
+/**
+ * The renderer watchdog (Nov 24; docs/decisions/2026-11-24-renderer-watchdog.md). Twice in CI (moo.spec Nov 20, boss-bar.spec Nov 24) a
+ * 5 s expect ran for minutes, to the test's timeout, with no trace: Playwright's expect makes its first check without any timeout, so a
+ * page whose main thread never answers holds it until the test times out. This names the code: the test's page is pinged every
+ * `HANG_PING_MS`; a ping unanswered for `HANG_AFTER_MS` pauses the page's script (Debugger.pause reaches a busy main thread, where an
+ * evaluate can't), and its stack, with the code around each place, is attached to the test ("renderer-hang") and printed to the log.
+ * The session and its Debugger domain are opened with the page: once the page hangs, a new one gets no answer. A test that times
+ * out with the page still answering says so too (then it was Playwright's wait, not the page). Nothing is checked or failed here.
+ */
+const HANG_PING_MS = 10_000;
+const HANG_AFTER_MS = 30_000;
+async function watchRenderer(page: Page, testInfo: import("@playwright/test").TestInfo): Promise<() => Promise<void>> {
+  let cdp: import("@playwright/test").CDPSession;
+  try {
+    cdp = await page.context().newCDPSession(page);
+    await cdp.send("Debugger.enable");
+  } catch {
+    return async () => {};
+  }
+  /** The unanswered ping's time (null: none out), the last answer, and the hang once seen (its start; `pausing` while its stack is read). */
+  let waiting: number | null = null;
+  let answered = Date.now();
+  let hung: number | null = null;
+  let pausing = false;
+  let recovered = false;
+  let stopped = false;
+  const report = (text: string) => {
+    console.error(`[renderer-hang] ${testInfo.titlePath.join(" › ")}\n${text}`);
+    void testInfo.attach("renderer-hang", { body: text, contentType: "text/plain" }).catch(() => {});
+  };
+  type Paused = { callFrames: { functionName: string; url: string; location: { scriptId: string; lineNumber: number; columnNumber?: number } }[] };
+  const snapshot = async (since: number) => {
+    pausing = true;
+    const head = `The page didn't answer for ${Math.round((Date.now() - since) / 1000)} s (${page.url()}).`;
+    const paused = new Promise<Paused>((r) => cdp.once("Debugger.paused", r));
+    const got = await Promise.race([cdp.send("Debugger.pause").then(() => paused), new Promise<null>((r) => setTimeout(() => r(null), 10_000))]).catch(() => null);
+    if (stopped) return;
+    if (!got) report(`${head} It didn't pause either: no script running (stuck in the browser's own work: layout, painting, decoding), or the browser itself stuck.`);
+    else {
+      const lines = [`${head} Its script's stack:`];
+      const sources = new Map<string, Promise<string[]>>();
+      for (const f of got.callFrames.slice(0, 12)) {
+        const { scriptId, lineNumber: ln, columnNumber: col = 0 } = f.location;
+        if (!sources.has(scriptId)) sources.set(scriptId, cdp.send("Debugger.getScriptSource", { scriptId }).then((x) => x.scriptSource.split("\n"), () => []));
+        const src = (await sources.get(scriptId)!)[ln] ?? "";
+        lines.push(`  at ${f.functionName || "(anonymous)"} ${f.url || "(no url)"}:${ln + 1}:${col + 1}`, `     ${src.slice(Math.max(0, col - 160), col)}⟦here⟧${src.slice(col, col + 160)}`);
+      }
+      await cdp.send("Debugger.resume").catch(() => {});
+      report(lines.join("\n"));
+    }
+    // (Pings again from here: the one out was answered by the pause, not by the page.)
+    pausing = false;
+    waiting = null;
+  };
+  const tick = setInterval(() => {
+    if (pausing) return;
+    if (waiting === null) {
+      const at = (waiting = Date.now());
+      // (An answer, or an error (a page loading again has no context for a moment): either way the renderer answered.)
+      const back = () => {
+        if (stopped || pausing || waiting !== at) return;
+        answered = Date.now();
+        waiting = null;
+        // (A hang that ends: how long it lasted, so a slow stretch reads apart from an endless one.)
+        if (hung !== null && !recovered) (recovered = true), report(`The page answered again ${Math.round((answered - hung) / 1000)} s after it stopped answering.`);
+      };
+      void cdp.send("Runtime.evaluate", { expression: "0" }).then(back, back);
+    } else if (hung === null && Date.now() - waiting >= HANG_AFTER_MS) {
+      hung = waiting;
+      void snapshot(waiting);
+    }
+  }, HANG_PING_MS);
+  return async () => {
+    stopped = true;
+    clearInterval(tick);
+    if (testInfo.status === "timedOut" && hung === null)
+      report(`The test timed out with the page still answering (its last answer ${Math.round((Date.now() - answered) / 1000)} s before the end; ${page.url()}): not a renderer hang.`);
+    // (Not waited on past a moment: a hung page may never let the session go.)
+    await Promise.race([cdp.detach().catch(() => {}), new Promise((r) => setTimeout(r, 2000))]);
+  };
+}
+
 export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenDefaultForTest: void; seenWalkthrough: void; questsSeen: boolean; questsSeenForTest: void; seenQuests: void }>({
   tutorialSeen: [true, { option: true }],
   // Sets the default for this test's contexts, then puts it back.
@@ -110,6 +192,12 @@ export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean;
     },
     { scope: "worker" },
   ],
+  // (The test's page, watched for a hang: watchRenderer.)
+  page: async ({ page }, use, testInfo) => {
+    const stop = await watchRenderer(page, testInfo);
+    await use(page);
+    await stop();
+  },
   closeOwnContexts: [
     async ({ browser, context }, use) => {
       const before = new Set(browser.contexts());
