@@ -33,3 +33,9 @@ nothing else), `docs/areas/match.md` (the Crowd screen), the computer layout of 
    before. One still per computer size you checked (orphan `stills/crowd-desktop-flush`, never under docs/), plus one phone still.
    Decision note (about five lines). Area page. PR body in `.pr-body.md` (changed checks old → new). `.done`, push, stop. Commits end with
    only `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR`.
+
+## Added Nov 25 (Eric)
+"the scoreboard. I don't think it needs to be so high up. Why don't we just make it literally the same height as the chessboard? ... it
+fits the exact same on the left side." So the left scoreboard's **top AND bottom** match the board's top and bottom exactly (same height as
+the board, top-aligned with it, not starting higher up the page). Check it in the e2e: the scoreboard's top and bottom within 1 px of the
+board's.
