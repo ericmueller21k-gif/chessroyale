@@ -494,6 +494,10 @@
 .cox-bonus-key .key-art svg {
   transform: scale(1.3);
 }
+/* (Opaque: the item's card under it doesn't show through.) */
+.cox-card.reveal-card.cox-bonus-card {
+  background: linear-gradient(180deg, #2a3cbd 0%, #13207a 55%, #0a1150 100%);
+}
 /* "BONUS!": the card's title, bigger than a tier's name. */
 .cox-bonus-card .reveal-tier {
   font-size: 18px;
