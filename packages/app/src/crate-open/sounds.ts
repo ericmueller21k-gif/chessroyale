@@ -14,7 +14,7 @@
  */
 import { TIERS, type ItemTier } from "@chessroyale/core";
 import { bandpass, noise, rng, soundCache } from "../characters/synth.ts";
-import { EASE_POWER, isBig, timeline, type Timeline } from "./timeline.ts";
+import { EASE_POWER, timeline, type Timeline } from "./timeline.ts";
 
 const TAU = Math.PI * 2;
 
@@ -203,59 +203,150 @@ function boxShake(rate: number, T: Timeline, out: Float32Array, from: number) {
   }
 }
 
-/** The sting's root: it climbs with the tier, so a better item sounds brighter before you've read it. */
-function stingRoot(tier: ItemTier): number {
-  const steps: Record<ItemTier, number> = { common: -3, uncommon: -1, rare: 1, epic: 4, legendary: 0, mythic: 3 };
-  return 523.25 * Math.pow(2, steps[tier] / 12);
-}
+/**
+ * Each tier's own ending (Eric, Nov 24: "keep like common and uncommon the same, but like rare and whatever goes up should each have
+ * their own"), all in the family of A's glassy chord and climbing in excitement; no build-up before the burst (the burst itself grows):
+ * - Common and Uncommon: one shared sting, today's (the chord strummed over a small crack, boom and whoosh; a few glints).
+ * - Rare: brighter (a step up), with a shimmer: the chord's upper notes held an octave up, trembling.
+ * - Epic: fuller (a bass octave under the chord), and a rising arpeggio after the burst.
+ * - Legendary: the big chord with a choir under it and a bell tolling.
+ * - Mythic: the biggest, its own color: a fanfare's chord change (the flat sixth, the flat seventh, home), the choir and the bell on
+ *   home, and a sparkle cascade falling over it.
+ */
+type StingSpec = { root: number; sec: number; size: number; roomSize: number; wet: number; glints: number; spread: number };
+const STINGS: Record<ItemTier, StingSpec> = {
+  common: { root: -3, sec: 1.5, size: 0, roomSize: 0.65, wet: 0.4, glints: 6, spread: 0.5 },
+  uncommon: { root: -3, sec: 1.5, size: 0, roomSize: 0.65, wet: 0.4, glints: 6, spread: 0.5 },
+  rare: { root: 1, sec: 1.7, size: 0.25, roomSize: 0.72, wet: 0.45, glints: 9, spread: 0.8 },
+  epic: { root: 4, sec: 1.9, size: 0.5, roomSize: 0.78, wet: 0.48, glints: 9, spread: 0.9 },
+  legendary: { root: 0, sec: 2.4, size: 1, roomSize: 0.85, wet: 0.55, glints: 12, spread: 1.0 },
+  mythic: { root: 3, sec: 3.2, size: 1, roomSize: 0.9, wet: 0.6, glints: 16, spread: 1.6 },
+};
+const semis = (n: number) => Math.pow(2, n / 12);
 
 /** The chord's notes over a root: a bright major add-9 (not a jingle). */
 const CHORD = [1, 1.2599, 1.4983, 2, 2.2449];
 
-/** One note of the sting: glassy (a hair-sharp second partial for the shimmer). */
-function stingNote(rate: number, f: number, sec: number): Float32Array {
-  const a = partials(rate, sec, f, [[1, 1, 0.9], [2.76, 0.22, 0.22], [5.4, 0.08, 0.08]], 0.003);
-  const b = partials(rate, sec, f, [[1, 0.6, 1.0]], 0.003, 0.0022);
-  for (let i = 0; i < a.length; i++) a[i]! += b[i]!;
-  return a;
+/** Fades a buffer's last `sec` out (in place) so a held note that's cut doesn't click; returns it. */
+function fadeOut(x: Float32Array, rate: number, sec = 0.15): Float32Array {
+  const n = Math.min(x.length, Math.round(rate * sec));
+  for (let i = 0; i < n; i++) x[x.length - 1 - i]! *= i / n;
+  return x;
 }
 
-/** The burst and the reveal's sting (the bigger one for Legendary and Mythic). */
-function sting(rate: number, tier: ItemTier, out: Float32Array, at: number) {
-  const big = isBig(tier);
-  const root = stingRoot(tier);
-  const sec = big ? 2.0 : 1.5;
-  const dry = new Float32Array(Math.ceil(rate * (sec + 0.3)));
-  // The lid cracking off: a short bright crack, and a low boom under it.
+/** One note of the sting: glassy (a hair-sharp second partial for the shimmer). `d` scales its ring (a short stab under 1). */
+function stingNote(rate: number, f: number, sec: number, d = 1): Float32Array {
+  const a = partials(rate, sec, f, [[1, 1, 0.9 * d], [2.76, 0.22, 0.22 * d], [5.4, 0.08, 0.08 * d]], 0.003);
+  const b = partials(rate, sec, f, [[1, 0.6, 1.0 * d]], 0.003, 0.0022);
+  for (let i = 0; i < a.length; i++) a[i]! += b[i]!;
+  return fadeOut(a, rate);
+}
+
+/** A chord strummed upward quickly from `at`. */
+function strum(dry: Float32Array, rate: number, root: number, notes: readonly number[], at: number, step: number, gain: number, sec: number, d = 1) {
+  notes.forEach((m, i) => mix(dry, rate, stingNote(rate, root * m, sec, d), at + 0.012 + i * step, gain * (m < 1 ? 0.8 : 1)));
+}
+
+/** The lid cracking off, a low boom under it and the beam's rising whoosh: `size` 0 (today's small) to 1 (today's big). */
+function burst(dry: Float32Array, rate: number, size: number) {
+  const z = (a: number, b: number) => a + (b - a) * size;
   mix(dry, rate, shape(biquad(whiteNoise(rate, 0.05, 61), rate, "hp", 900, 0.7), rate, ad(0.0003, 0.009)), 0, 0.6);
-  mix(dry, rate, sweep(rate, big ? 0.9 : 0.5, big ? 70 : 90, big ? 32 : 48, big ? 0.35 : 0.2, ad(0.002, big ? 0.28 : 0.14)), 0, big ? 1.0 : 0.6);
-  // The beam shooting up: a rising whoosh.
-  const wl = big ? 0.7 : 0.45;
+  mix(dry, rate, sweep(rate, z(0.5, 0.9), z(90, 70), z(48, 32), z(0.2, 0.35), ad(0.002, z(0.14, 0.28))), 0, z(0.6, 1.0));
+  const wl = z(0.45, 0.7);
   const n = noise(62);
-  const bp = bandpass(rate, (t) => 500 * Math.pow(big ? 14 : 9, t / wl), 1.6, () => n(0));
+  const bp = bandpass(rate, (t) => 500 * Math.pow(z(9, 14), t / wl), 1.6, () => n(0));
   const whoosh = new Float32Array(Math.ceil(rate * wl));
   for (let i = 0; i < whoosh.length; i++) {
     const t = i / rate;
     whoosh[i] = bp(t) * Math.sin((Math.PI * t) / wl) ** 1.5;
   }
-  mix(dry, rate, whoosh, 0, big ? 0.45 : 0.3);
-  // The chord, strummed upward quickly.
-  const notes = big ? [0.5, ...CHORD, 3] : CHORD;
-  notes.forEach((m, i) => mix(dry, rate, stingNote(rate, root * m, sec), 0.012 + i * (big ? 0.022 : 0.016), (big ? 0.2 : 0.22) * (m < 1 ? 0.8 : 1)));
-  if (big) {
-    // Legendary: a rising sparkle run over the chord, and a held choir of the chord an octave down.
-    [2, 2.52, 3, 4, 5.04, 6, 8].forEach((m, i) => mix(dry, rate, partials(rate, 0.5, root * m, [[1, 1, 0.16], [2.76, 0.2, 0.05]], 0.002), 0.09 + i * 0.045, 0.09));
-    const choir = (t: number) => Math.min(1, t / 0.12) * Math.exp(-t / 1.3);
-    const pad = new Float32Array(Math.ceil(rate * sec));
-    for (const m of [0.5, 0.63, 0.75, 1]) for (const d of [-0.006, 0.006]) mix(pad, rate, saw(rate, sec, root * m * (1 + d), choir, 2400), 0, 0.12);
-    mix(dry, rate, biquad(pad, rate, "lp", 1700, 0.7), 0.03, 1);
+  mix(dry, rate, whoosh, 0, z(0.3, 0.45));
+}
+
+/** A held, trembling note (two voices a hair apart, a 5.5 Hz tremolo): the shimmer. */
+function shimmer(rate: number, f: number, sec: number, attack = 0.06, decay = 0.9): Float32Array {
+  const out = new Float32Array(Math.ceil(rate * sec));
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate;
+    const env = Math.min(1, t / attack) * Math.exp(-t / decay) * (0.65 + 0.35 * Math.sin(TAU * 5.5 * t));
+    out[i] = (Math.sin(TAU * f * t) + 0.8 * Math.sin(TAU * f * 1.004 * t)) * env;
   }
-  // A few glints high up, as the light catches.
+  return fadeOut(out, rate);
+}
+
+/** A held choir of `ratios` over `root` (detuned saws, softened), swelling in over 0.12 s and fading. */
+function choir(dry: Float32Array, rate: number, root: number, ratios: readonly number[], at: number, sec: number) {
+  const env = (t: number) => Math.min(1, t / 0.12) * Math.exp(-t / 1.3);
+  const pad = new Float32Array(Math.ceil(rate * sec));
+  for (const m of ratios) for (const d of [-0.006, 0.006]) mix(pad, rate, saw(rate, sec, root * m * (1 + d), env, 2400), 0, 0.12);
+  mix(dry, rate, fadeOut(biquad(pad, rate, "lp", 1700, 0.7), rate, 0.3), at, 1);
+}
+
+/** A bell struck once (a church bell's partials: the hum an octave down, the minor-third tierce, the quint, the nominal). */
+function bell(rate: number, f: number, sec: number): Float32Array {
+  return fadeOut(partials(rate, sec, f, [[0.5, 0.55, 2.6], [1, 1, 1.9], [1.19, 0.4, 1.2], [1.5, 0.3, 0.9], [2, 0.38, 0.8], [2.52, 0.2, 0.45], [3, 0.16, 0.3], [4.07, 0.1, 0.18]], 0.001), rate, 0.3);
+}
+
+/** A few glints high up, as the light catches. */
+function glints(dry: Float32Array, rate: number, count: number, spread: number) {
   const r = rng(71);
-  for (let i = 0; i < (big ? 12 : 6); i++) {
-    mix(dry, rate, partials(rate, 0.25, 2600 + 4200 * r(), [[1, 1, 0.07 + 0.08 * r()]], 0.001), 0.05 + r() * (big ? 0.9 : 0.5), 0.035);
+  for (let i = 0; i < count; i++) mix(dry, rate, partials(rate, 0.25, 2600 + 4200 * r(), [[1, 1, 0.07 + 0.08 * r()]], 0.001), 0.05 + r() * spread, 0.035);
+}
+
+/** The burst and the reveal's sting, each tier its own (STINGS). */
+function sting(rate: number, tier: ItemTier, out: Float32Array, at: number) {
+  const s = STINGS[tier];
+  const root = 523.25 * semis(s.root);
+  const dry = new Float32Array(Math.ceil(rate * (s.sec + 0.3)));
+  burst(dry, rate, s.size);
+  if (tier === "common" || tier === "uncommon") {
+    strum(dry, rate, root, CHORD, 0, 0.016, 0.22, s.sec);
+  } else if (tier === "rare") {
+    strum(dry, rate, root, CHORD, 0, 0.016, 0.22, s.sec);
+    for (const m of [2, 2.52, 3]) mix(dry, rate, shimmer(rate, root * m, s.sec - 0.1), 0.05, 0.05);
+  } else if (tier === "epic") {
+    strum(dry, rate, root, [0.5, ...CHORD], 0, 0.018, 0.2, s.sec);
+    [1, 1.26, 1.5, 2, 2.52, 3, 4, 5.04].forEach((m, i) => mix(dry, rate, stingNote(rate, root * m, 0.8, 0.45), 0.16 + i * 0.06, 0.09 + 0.006 * i));
+  } else if (tier === "legendary") {
+    strum(dry, rate, root, [0.5, ...CHORD, 3], 0, 0.022, 0.2, s.sec);
+    choir(dry, rate, root, [0.5, 0.63, 0.75, 1], 0.03, s.sec);
+    mix(dry, rate, bell(rate, root, s.sec), 0.01, 0.2);
+  } else {
+    // Mythic: the fanfare's change (bVI, bVII, then home), the choir and the bell on home, the sparkles falling over it.
+    const home = 0.46;
+    strum(dry, rate, root * semis(-4), [0.5, 1, 1.26, 1.5, 2], 0, 0.014, 0.17, 0.6, 0.35);
+    strum(dry, rate, root * semis(-2), [0.5, 1, 1.26, 1.5, 2], 0.23, 0.014, 0.17, 0.6, 0.35);
+    strum(dry, rate, root, [0.5, ...CHORD, 3], home, 0.02, 0.2, s.sec - home);
+    choir(dry, rate, root, [0.5, 0.63, 0.75, 1], home + 0.02, s.sec - home);
+    mix(dry, rate, bell(rate, root, s.sec - home), home, 0.2);
+    const fall = [8, 6, 5.04, 4, 3, 2.52, 2, 1.5, 6, 5.04, 4, 3, 2.52, 2];
+    fall.forEach((m, i) => mix(dry, rate, partials(rate, 0.5, root * m, [[1, 1, 0.18], [2.76, 0.2, 0.05]], 0.002), home + 0.08 + i * 0.07, 0.08 - 0.002 * i));
   }
-  mix(out, rate, room(dry, rate, big ? 0.85 : 0.65, big ? 0.55 : 0.4), at, 1);
+  glints(dry, rate, s.glints, s.spread);
+  mix(out, rate, room(dry, rate, s.roomSize, s.wet), at, 1);
+}
+
+/**
+ * The Transcendent moment (Eric, Nov 24: "Fischer Random" renamed after the highest rank): the strip lands on its tile. Its own
+ * color, apart from the stings: a harp's quick sweep up a Lydian scale onto a held, trembling Lydian chord (major 7, raised 4), a
+ * soft deep gong under it and a crystal ting on top. No build-up after it: the banner's moment, then the second strip.
+ */
+function transcendent(rate: number): Float32Array {
+  const root = 587.33;
+  const sec = 2.2;
+  const dry = new Float32Array(Math.ceil(rate * (sec + 0.3)));
+  // The gong under it: a low inharmonic strike, soft.
+  mix(dry, rate, fadeOut(partials(rate, 1.8, 73.4, [[1, 1, 0.8], [1.47, 0.5, 0.55], [2.09, 0.35, 0.45], [2.56, 0.25, 0.3], [3.31, 0.15, 0.2]], 0.006), rate, 0.4), 0, 0.32);
+  // The harp: two octaves of the Lydian scale up from an octave under the root in 0.34 s.
+  const lydian = [0, 2, 4, 6, 7, 9, 11];
+  const steps = Array.from({ length: 15 }, (_, i) => lydian[i % 7]! + 12 * Math.floor(i / 7) - 12);
+  steps.forEach((n, i) => mix(dry, rate, partials(rate, 0.7, root * semis(n), [[1, 1, 0.35], [2, 0.3, 0.14], [3, 0.12, 0.07]], 0.002), i * 0.024, 0.1));
+  // The chord it lands on, held and trembling.
+  const land = 0.36;
+  for (const n of [-12, 0, 4, 6, 11, 14]) mix(dry, rate, shimmer(rate, root * semis(n), sec - land, 0.04, 0.85), land, n < 0 ? 0.1 : 0.075);
+  // The crystal ting on the landing.
+  mix(dry, rate, partials(rate, 1.2, root * 4, [[1, 1, 0.5], [2.76, 0.3, 0.16], [5.4, 0.1, 0.06]], 0.001), land, 0.14);
+  return room(dry, rate, 0.88, 0.6);
 }
 
 // ---------------- The pieces, by name ----------------
@@ -292,15 +383,19 @@ function shake(rate: number, T: Timeline, tier: ItemTier): Float32Array {
   return out;
 }
 
-/** The burst and the sting, with its room's tail. */
-function stingAlone(rate: number, tier: ItemTier): Float32Array {
-  const big = isBig(tier);
-  const out = new Float32Array(Math.ceil(rate * ((big ? 2.0 : 1.5) + (big ? 2.2 : 1.9))));
-  sting(rate, tier, out, 0);
-  // (Trim the room's silent end.)
+/** Trims a buffer's silent end (the room's). */
+function trim(out: Float32Array): Float32Array {
   let end = out.length;
   while (end > 0 && Math.abs(out[end - 1]!) < 1e-4) end--;
   return out.slice(0, end);
+}
+
+/** The burst and the sting, with its room's tail. */
+function stingAlone(rate: number, tier: ItemTier): Float32Array {
+  const s = STINGS[tier];
+  const out = new Float32Array(Math.ceil(rate * (s.sec + 0.6 + 1.6 * s.roomSize + 0.1)));
+  sting(rate, tier, out, 0);
+  return trim(out);
 }
 
 function make(name: string, rate: number): Float32Array {
@@ -308,6 +403,7 @@ function make(name: string, rate: number): Float32Array {
   if (name === "whirr") return whirr(rate, T.spinMs);
   if (name === "lock") return reelLock(rate).map((v) => v * 1.6);
   if (name === "land") return land(rate, T);
+  if (name === "transcendent") return trim(transcendent(rate));
   const tick = /^tick(\d)([ab])$/.exec(name);
   if (tick) {
     const fast = TICKS[Number(tick[1])]!;
