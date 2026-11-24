@@ -22,8 +22,11 @@ merged, start from origin/main; else from that branch (`git checkout -B claude/c
 
 **Step 2 (after the director's go):** wire the approved stings; rename "Fischer Random" to **"Transcendent"** everywhere a player reads it
 in the crates (the strip's tile, the banner, the odds panel, the FAQ, the reveal; code names like `FISCHER` may stay). It is NOT the chess
-variant: leave any "Fischer Random"/Chess960 start option in votes.ts and elsewhere untouched. The tile's picture: a new "Transcendent"
-crate drawing from the paid art runner (brief its look: a cooler, special crate, prismatic/iridescent, glowing; the item-builder's
-crate() kit is the established pattern for crates) ONLY after the director confirms Eric's spend; until then keep the old tile. Tests,
+variant: leave any "Fischer Random"/Chess960 start option in votes.ts and elsewhere untouched. The tile's picture (director's call, Nov 24): the strip's boxes are code-drawn SVGs (`components/Items.tsx` `SupplyBoxArt`,
+`HunchessBoxArt`; today's tile is `FischerArt`, a gold crown with a "?"), so the Transcendent tile is a new SVG crate in the same flat
+style and outline as `SupplyBoxArt` (a pixel sprite from the art runner would clash with them): a special crate, prismatic/iridescent
+(a shifting rainbow-pearl gradient on its panels, a bright star or gem emblem, a soft glow and two or three sparkles), reading clearly at
+the strip's tile size and in the banner. Replace `FischerArt` with it wherever that tile shows. Eric approved up to $5 of art spend; not
+needed for this, so none is spent. Stills of the tile (strip, banner, odds panel) for Eric. Tests,
 decision note, area pages, PR body, `.done` as usual. Never images under docs/. Commits end with only
 `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By, no model names).

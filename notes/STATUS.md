@@ -1934,3 +1934,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   rare/epic/legendary/mythic own; a Transcendent moment), rename Fischer Random → "Transcendent" (crates only, not the chess variant), new
   Transcendent crate tile art (art runner: ASKED Eric for spend ~$5 cap). Helper step 1 = audio only (brief crate-tier-stings). Bonus
   crate (xhigh) after these.
+- Nov 24 ~21:45: ERIC OK'd $5 art spend for the Transcendent crate. MY CALL: not needed: the strip's boxes are code SVGs (SupplyBoxArt
+  style), so the new tile is an SVG crate in that style (a runner pixel sprite would clash). Brief updated; spend unused (told Eric).
