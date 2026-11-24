@@ -66,11 +66,14 @@ let questsSeenDefault = true;
  * `HANG_PING_MS`; a ping unanswered for `HANG_AFTER_MS` pauses the page's script (Debugger.pause reaches a busy main thread, where an
  * evaluate can't), and its stack, with the code around each place, is attached to the test ("renderer-hang") and printed to the log.
  * The session and its Debugger domain are opened with the page: once the page hangs, a new one gets no answer. A test that times
- * out with the page still answering says so too (then it was Playwright's wait, not the page). Nothing is checked or failed here.
+ * out with the page still answering says so too (then it was Playwright's wait, not the page). Nothing is checked or failed here, and
+ * the `@perf` specs aren't watched (nothing extra in the frames they time).
  */
 const HANG_PING_MS = 10_000;
 const HANG_AFTER_MS = 30_000;
 async function watchRenderer(page: Page, testInfo: import("@playwright/test").TestInfo): Promise<() => Promise<void>> {
+  // (Not the frame-budget specs: nothing extra in the page they time.)
+  if (testInfo.tags.includes("@perf") || /@perf\b/.test(testInfo.titlePath.join(" "))) return async () => {};
   let cdp: import("@playwright/test").CDPSession;
   try {
     cdp = await page.context().newCDPSession(page);
@@ -193,10 +196,11 @@ export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean;
     { scope: "worker" },
   ],
   // (The test's page, watched for a hang: watchRenderer.)
+  // (Opened alongside the test, not before it: nothing waits on it.)
   page: async ({ page }, use, testInfo) => {
-    const stop = await watchRenderer(page, testInfo);
+    const watching = watchRenderer(page, testInfo);
     await use(page);
-    await stop();
+    await (await watching)();
   },
   closeOwnContexts: [
     async ({ browser, context }, use) => {

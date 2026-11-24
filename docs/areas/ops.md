@@ -121,6 +121,13 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     main", Nov 10, audit F1): fix it at its cause from its trace, never with a longer wait or a retry. A PR isn't held
     up by one. The summary's title says which red it is (Nov 12, audit Q3): "red: flaky only (N)" (fix the flakes) or
     "red: N failed" (a real failure: find its cause or revert). A red run with no failed test (GitHub dropped shards): "Re-run failed jobs" once.
+  - **A page that stops answering names its code** (Nov 24, `docs/decisions/2026-11-24-renderer-watchdog.md`): Playwright's `expect`
+    makes its first check with no timeout, so a hung page holds a 5 s expect until the test's 5-minute timeout, with no trace (moo.spec
+    Nov 20, boss-bar.spec Nov 24). `watchRenderer` in `e2e/helpers.ts` watches every test's `page`: a ping every 10 s, and one unanswered
+    for 30 s pauses the page's script (`Debugger.pause`) and prints its stack, with the code at each place, to the log as
+    `[renderer-hang]` and attaches it to the test (the HTML report, kept for a failed or flaky run). "It didn't pause either" means no
+    script was running (layout, painting, decoding, or the browser stuck); "timed out with the page still answering" means the wait
+    was Playwright's, not the page's. It only reports: no test fails because of it.
   - **A test of what comes after a battle ends it with the hook** (Nov 23, `docs/decisions/2026-11-23-e2e-end-hook.md`): `endBattle(page,
     "win" | "loss" | "draw")` in `e2e/helpers.ts` (the admins' 🏆 path, `asAdmin` first), through the battle's real end; only a test of
     playing a battle plays it to its end. A spec that played moves to reach a screen assumed how long the battle lasts ("play" vs "results").
