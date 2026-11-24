@@ -40,13 +40,22 @@ type Orientation = "white" | "black";
 export const BIRDIE_WORDS = {
   /** The warning's, through your turn: the piece on his line. */
   move: (piece: string | undefined) => `Move your ${PIECE_WORD[piece ?? "k"] ?? "piece"}!`,
-  smashed: (piece: string | undefined) => `His train hit your ${PIECE_WORD[piece ?? "p"] ?? "piece"}.`,
-  spared: (piece: string | undefined) => `The train spared your ${PIECE_WORD[piece ?? "p"] ?? "piece"}.`,
+  // (His ride's three, after his face and "Birdie: " in the dock's line: whole in a phone's dock, 196 px wide on the test phone, with
+  // room for an iPhone's wider fonts (Nov 24, measured in the app's font: "Bishop smashed!" about 175 px of it with his name; the old
+  // "His train hit your knight." about 218 and "The train spared your bishop." about 253 were cut short).)
+  smashed: (piece: string | undefined) => `${pieceName(piece)} smashed!`,
+  spared: (piece: string | undefined) => `${pieceName(piece)} spared.`,
   /** Your move saved the piece and his train rode by anyway (Nov 24): never a word of a piece lost. */
-  missed: "Saved! His train hit nothing.",
+  missed: "Nothing hit!",
   win: "END OF THE LINE!",
   winSub: "His train hit your king",
 } as const;
+
+/** A piece's name to start a line ("Knight"). */
+const pieceName = (piece: string | undefined) => {
+  const w = PIECE_WORD[piece ?? "p"] ?? "piece";
+  return w[0]!.toUpperCase() + w.slice(1);
+};
 
 /** A square's column and row as the board is seen. */
 const drawnAt = (sq: string, o: Orientation) => {

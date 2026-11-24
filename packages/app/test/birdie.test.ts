@@ -199,14 +199,17 @@ describe("his words", () => {
     expect(BIRDIE_WORDS.move(undefined)).toBe("Move your king!");
     // (As short as the Saw Swap's "Swapped out of check.", which fits a phone's dock at 320 px.)
     expect(trainLine(view("b"))!.length).toBeLessThanOrEqual("Swapped out of check.".length);
-    // His ride's line in the dock: a smash, a sparing, a miss (Nov 24: your piece saved, never a word of a piece lost; no longer than
-    // the sparing's longest, which fits a phone's dock at 320 px).
+    // His ride's line in the dock: a smash, a sparing, a miss (Nov 24: your piece saved, never a word of a piece lost). Each whole in
+    // the test phone's dock after "Birdie: " (e2e/birdie.spec.ts measures the smash's and the miss's): no longer than "Bishop smashed!".
     const squares = lineSquares("b", "w");
-    expect(dockLine({ kind: "trainSmash", squares, shape: "n" })).toBe("His train hit your knight.");
-    expect(dockLine({ kind: "trainSmash", squares, shape: "b", fizzled: ["b1"] })).toBe("The train spared your bishop.");
+    expect(dockLine({ kind: "trainSmash", squares, shape: "n" })).toBe("Knight smashed!");
+    expect(dockLine({ kind: "trainSmash", squares, shape: "b", fizzled: ["b1"] })).toBe("Bishop spared.");
     const miss = dockLine({ kind: "trainSmash", squares, shape: "n", missed: true })!;
-    expect(miss).toBe(BIRDIE_WORDS.missed);
-    expect(miss).not.toMatch(/your|lost|hit your/i);
-    expect(miss.length).toBeLessThanOrEqual(BIRDIE_WORDS.spared("b").length);
+    expect(miss).toBe("Nothing hit!");
+    expect(miss).not.toMatch(/your|lost|smash/i);
+    for (const shape of ["p", "n", "b", "r", "q"]) {
+      expect(BIRDIE_WORDS.smashed(shape).length).toBeLessThanOrEqual("Bishop smashed!".length);
+      expect(BIRDIE_WORDS.spared(shape).length).toBeLessThanOrEqual("Bishop smashed!".length);
+    }
   });
 });
