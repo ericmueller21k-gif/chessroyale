@@ -1880,3 +1880,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   roll/brake; heard moves off by one when Birdie is White (P, also #911); sim rides now include misses.
 - Nov 24 ~10:05: #916 Birdie train-miss + sounds + sign MERGED (993684b), deploy + main run watched. Power tips helper running.
 - Nov 24 ~10:30: #916 LIVE (993684b), main full run GREEN. Running: power tips helper (Opus high).
+- Nov 24 ~10:50: power tips DONE → #917 (5130e2d1; targeted), CI watched, stills sent (5 exchanges). No helpers running.
