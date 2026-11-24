@@ -1925,3 +1925,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   brief crate-sound-mix) on the same branch; then the PR. #921 CI running (main red until merged). Bonus crate after crate build merges.
 - Nov 24 ~20:15: the build helper DID get the mix late (f0ee25b9); the 2nd mix helper interrupted + archived (pushed nothing). Crate build
   → #922 (7da3d019; e2e not re-run locally after the mix: CI decides), CI watched; mix videos sent to Eric. #921 CI running.
+- Nov 24 ~20:30: #921 MERGED (18320b1), main run watched. #922 CI running; merge it after main is green.
