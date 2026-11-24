@@ -103,6 +103,11 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
   readable for 2.2 s plus 35 ms a character (at most 4.5 s); a critical line cuts in on a remark or small talk, but
   waits for another critical line to have its time; the others wait their turn and lapse after 5 s.
+- **Power tips** (Nov 24, a pilot of five): the first time you see some bosses' powers (Birdie's train, Hollow's dark, Sawyer's split,
+  Chandy's lock, Boingo's pie), the boss says a line to him and he answers, explaining it (`packages/app/src/power-tips.ts`, one row a
+  tip). Again in the 3rd and 8th battle with that power, then every 5th (`POWER_TIPS` in settings.ts), counted per account on this
+  device. His reply comes once the boss's line has typed out (`replyMs`), at the critical priority, and his other lines are held until
+  it has had its time (`holdKing`): no double talk. `?tip=all` plays them every battle. docs/decisions/2026-11-24-power-tips.md.
 - **How he judges a blunder** (Eric, Oct 10: option 3 of the Last Stand proposals). He judges the crowd's move as
   it's played, before the boss replies, by how much it lowers the crowd's chances (the judge's expected score, the eval
   bar's number), not by the material: players sometimes sacrifice on purpose, and a sacrifice the engine likes gives
@@ -134,6 +139,7 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 | Banners | `packages/app/src/components/FightBanner.tsx`, cut-ins in `GodKing.tsx` and `LastStand.tsx` |
 | The dock and his command menu | `packages/app/src/components/BossDock.tsx` |
 | His lines | `packages/app/src/godKing.ts` (against the Hidden Boss: `characters/recluse-lines.ts`) |
+| Power tips (the boss and he explaining a power) | `packages/app/src/power-tips.ts`, said from `useMomentSpeech` in `components/BossPowers.tsx` |
 | The boss screens | `packages/app/src/screens/Boss.tsx`, the boss parts of `Crowd.tsx` and `Play.tsx` |
 | Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0, credited in `CREDITS.md`), `src/sound.ts`; synthesized (his "can't"): `src/characters/god-king-sounds.ts` |
 
@@ -141,7 +147,7 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 `packages/core/src/settings.ts`: the `king*` keys (`kingChargesMax`, `kingPowerUpsPerCharge`, `kingStrikeLoss`,
 `kingStrikeMs`, `kingBotLoss`, `kingBotFollow`, `kingOnBoard`: the old summon-onto-the-board style, kept off), the
-`lastStand*` keys, and `KING_SPEECH`.
+`lastStand*` keys, `KING_SPEECH`, and `POWER_TIPS` (the tips' schedule and his reply's beat).
 
 ## Tests and tools
 
