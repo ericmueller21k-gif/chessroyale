@@ -1,6 +1,6 @@
 import { XP, bossCrateDef, isPickableBossCrate, levelOf, levelReward, type QuestPaid, type XpRewards } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
-import { applyOp, cond, keyFor, leg, ledgerAccount, opKeys, opStatements, type LedgerAccount, type Op } from "./ledger.ts";
+import { applyOp, cond, foldBonus, keyFor, leg, ledgerAccount, opKeys, opStatements, type LedgerAccount, type Op } from "./ledger.ts";
 
 /**
  * XP phase 2's rewards (Eric, Nov 9: "go with phase two"; the approved design's sections 2 and 4; XP in settings.ts;
@@ -161,12 +161,14 @@ export async function gameRewards(sql: Sql, me: LedgerAccount, game: string, que
 }
 
 /** Your series crates, by crate id (only those you hold some of), and your boss crates to pick. */
-export async function seriesHoldings(sql: Sql, userId: string): Promise<{ seriesCrates: Record<string, number>; bossPicks: number }> {
+export async function seriesHoldings(sql: Sql, userId: string): Promise<{ seriesCrates: Record<string, number>; seriesBonus: Record<string, number>; bossPicks: number }> {
   const [rows, wallet] = await Promise.all([
     sql.all<{ crate: string; n: number }>("SELECT crate, n FROM series_crates WHERE user_id = ? AND n > 0 ORDER BY crate", userId),
     sql.first<{ boss_picks: number | null }>("SELECT boss_picks FROM wallets WHERE user_id = ?", userId),
   ]);
-  return { seriesCrates: Object.fromEntries(rows.map((r) => [r.crate, r.n])), bossPicks: wallet?.boss_picks ?? 0 };
+  // (Bonus crates, Nov 24: counted with their crate's, and how many of them are bonus ones: ledger.ts foldBonus.)
+  const { all, bonus } = foldBonus(Object.fromEntries(rows.map((r) => [r.crate, r.n])));
+  return { seriesCrates: all, seriesBonus: bonus, bossPicks: wallet?.boss_picks ?? 0 };
 }
 
 /**

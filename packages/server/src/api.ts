@@ -1,4 +1,4 @@
-import { deleteLockerItems, equipLocker, lockerState, openCrate, type AdminCheck } from "./locker.ts";
+import { deleteLockerItems, equipLocker, lockerState, openCrate, type AdminCheck, type BonusMode } from "./locker.ts";
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
@@ -637,23 +637,31 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json(await setChatPicks(sql, current.id, b && typeof b === "object" ? b : {}, admin));
   }
 
-  // The locker. GET /api/locker; POST /api/locker/open {crate, request, fischer?, shiny?} (`request`: the app's id for the open, so a
-  // retry opens it once; a series crate takes one you hold and a crate key, for everyone (Nov 9); the test switches ?fischer and ?shiny
+  // The locker. GET /api/locker; POST /api/locker/open {crate, request, fischer?, shiny?, bonus?} (`request`: the app's id for the open, so a
+  // retry opens it once; answers {roll, item, bonus?, locker}, `bonus` a bonus crate it gave, Nov 24; a series crate takes one you hold and
+  // a crate key, for everyone (Nov 9); the test switches ?fischer and ?shiny
   // only where TEST_SWITCHES is "1", never an admin's elsewhere (Eric, Nov 9: no admin special ability); a boss crate is one you hold,
   // opened once, never with a test switch: openBossCrate); POST /api/locker/pick {crate, request} (a level's boss crate picked:
   // rewards.ts); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete {items} (deletes your crate
   // items for good).
   if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id, admin));
   if (path === "/api/locker/open" && request.method === "POST") {
-    const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown; request?: unknown };
-    const force = (env as AdminEnv).TEST_SWITCHES === "1" ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
+    const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown; request?: unknown; bonus?: unknown };
+    const testing = (env as AdminEnv).TEST_SWITCHES === "1";
+    const force = testing ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
+    // The bonus crate (Nov 24; core bonus-crate.ts): the server's roll on every opening. Where TEST_SWITCHES is "1" (local, e2e,
+    // staging), only when the test asks (`bonus`: true, or a crate's id: ?bonus=1 / ?bonus=winter-1), so a test's counts stay what it set.
+    const bonus: BonusMode = !testing ? "roll" : b.bonus === true ? { force: true } : typeof b.bonus === "string" && b.bonus ? { force: b.bonus } : "off";
     // (The Welcome Crate, Nov 6: yours once you've earned it, opened once, the server's roll only: welcome.ts.)
     if (isWelcomeCrate(b.crate)) {
       const w = await openWelcomeCrate(sql, current.id, now);
       return w.ok ? json({ ...w, locker: await lockerState(sql, current.id, admin) }) : json({ message: w.message }, 400);
     }
     const once = requestId(b.request);
-    const r = typeof b.crate === "string" && bossCrateDef(b.crate) ? await openBossCrate(sql, current.id, b.crate, now, admin, once) : await openCrate(sql, current.id, b.crate, force, now, admin, once);
+    const r =
+      typeof b.crate === "string" && bossCrateDef(b.crate)
+        ? await openBossCrate(sql, current.id, b.crate, now, admin, once, { bonus })
+        : await openCrate(sql, current.id, b.crate, force, now, admin, once, { bonus });
     return r.ok ? json(r) : json({ message: r.message }, 400);
   }
   if (path === "/api/locker/pick" && request.method === "POST") {
