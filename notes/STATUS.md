@@ -1985,3 +1985,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~04:20: item mockup v2 DONE (cane magic strand, tube confetti bigger bits); sent to Eric. On his OK: build helper (item-builder
   lane, Opus high, targeted): crown, cane v2, tube confetti v2, parrot flap, tommy key+puff, smiley 6 expressions from the seed;
   animate only where the item is the focus, grids still (and the shine too). Mockup helper session_01JuCWRui15X9QkMp1BD5a2N: archive.
+- Nov 25 ~04:30: main full run GREEN on 94c408c (#923 bonus crate + #924 + #925 all live). #926 CI running. Waiting on Eric's go for the
+  item build.
