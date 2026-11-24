@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact
 import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, towerPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, ownMoves, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
+import { BoardFoot } from "./board-foot.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
@@ -2736,6 +2737,8 @@ export function App() {
           </aside>
           )}
           {screen}
+          {/* (A computer: the scoreboard and the chat end on the board's bottom line. board-foot.ts.) */}
+          <BoardFoot />
           {/* (Dash's clock tap: beside the match's screens, so his crawl finishes as your move goes in. DashStall.tsx.) */}
           {(match as GameView).boss?.id === "dash" && <DashTap match={match as GameView} />}
         </div>
