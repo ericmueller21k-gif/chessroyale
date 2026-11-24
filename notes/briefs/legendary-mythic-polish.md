@@ -28,7 +28,11 @@ Mockup only (a preview page + GIFs/stills on orphan `stills/item-polish-mockup`,
 6. **Smiley Face (no animation):** a set of expressions as variants of the same item (e.g. smile, wink, grin with tongue, cool, surprised,
    laughing): 5 or 6 drawings in its style, shown on pawns. Say how it would work: as a variant rolled with the item (like its color; would
    need stored data: full lane) or as separate items in the crate (changes the crate's list and per-item odds); recommend one.
-7. Leave the Banana Suit and the Pirate Hat as they are.
+7. **Banana Suit: never touched** (Eric: "that one's just going to stay default").
+8. **Pirate Hat:** left alone for now; if you have one good idea for it (subtle), show it as an optional extra, clearly marked optional.
+
+Eric (Nov 25) on the tube: "I like your gift wrap tube idea": the director's first idea, its stripes scrolling like a barber pole with
+a sparkle at the tip, is the lead; still show one alternative beside it.
 Rules: animations are CSS/SVG transforms and opacity only (no new frame loop), slow and calm, off with reduced motion; legible at pawn
 size; light and dark. Frame rate: measure once on the items preview at 4x CPU. `NOTE.md` on the stills branch (each GIF, your picks).
 `.done` on `claude/item-polish-mockup`, push, stop. Commits end with only
