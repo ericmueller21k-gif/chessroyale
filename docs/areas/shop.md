@@ -215,6 +215,20 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **The icon builder** (the profile): a 48 × 48 pixel drawing with a paint bucket and undo (`UNDO_STEPS`), saved as a
   small PNG data URL (at most 16 KB, checked by the server).
 
+- **The crate opening** (Nov 24; [2026-11-24-crate-open-build.md](../decisions/2026-11-24-crate-open-build.md); `crate-open/`): every
+  crate opens the same way (its page's Open, the Welcome Crate, a boss crate's "Open now" in its shop, Boingo's claw machine), on its own
+  layer over the screen it came from (`OpenLayer`): the whole phone screen, or a computer's middle column, top to bottom, on a blue-black
+  background; the screen under it stays as it was. The strip (46 tiles, landing on the 39th) spins `CRATE_OPEN.spinMs` (4 s) with a
+  cubic slowdown, a blurred copy fading as it slows, and stops just past the winning tile's near edge, runs a few pixels over and settles.
+  Then the winning tier's box drops in, shakes (light leaking from its lid), and its lid bursts off with a beam in the item's tier color;
+  the item rises out of the beam into the reveal card, which forms round it (Legendary and Mythic: more rays, light over the whole stage,
+  a flash, a jolt). Fischer Random: its banner, then a second strip among its items, whose winner's beam comes up without a box. All of it
+  is Web Animations on transform and opacity, set up while "Opening…" waits for the server and started together two frames after the
+  answer; reduced motion drops the blur, shake and jolt and fades the beam. The sound ("card in the spokes", made in code:
+  `crate-open/sounds.ts`) is made ahead in the sound worker as a crate's page opens and as Open is tapped, and laid on the audio clock
+  (`timeline.ts` `cues`, sound.ts `playCrateCues`): a papery flap at each tile edge crossing, buzzing fast and fluttering slow, the box's
+  thud and shake, then a glassy chord that climbs with the tier. The roll, the odds and what's won are the server's, unchanged.
+
 ## Where the code is
 
 | What | Where |
@@ -225,7 +239,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`; the shop page's `BossCrateArt`, `MythicCrateArt`, `BundleArt`) | `packages/app/src/components/Items.tsx` |
 | The paint every item uses (color, shine, `Region`, `LINE`) and its blemish's blotches | `packages/app/src/components/item-paint.tsx` and `blotches.ts` (moved out of Items.tsx, Oct 31) |
 | Rides' drawings (`RIDES`) | `packages/app/src/components/rides/` (`draw.tsx`: one layer as SVG); their town cells: `scripts/measure-rides.ts` |
-| Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
+| The crate opening's picture, layer, timeline and sounds | `packages/app/src/crate-open/` (`CrateOpenStage.tsx`, `timeline.ts`, `sounds.ts`, `crate-open.css`); its preview `/crate-open-preview.html` (`dev/crate-open-preview.tsx`); `scripts/crate-open-frames.ts` (stills, frames, an MP4 with sound), `scripts/crate-open-perf.mjs` (frame times at 4x) |
+| Crate page, the opening's flow (`CrateOpening`), reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
 | Boss tokens, crate keys, the boss crate purchase, solo battles, admins' grants | `packages/server/src/boss-tokens.ts`; rules `packages/core/src/boss-tokens.ts`; the crates `BOSS_CRATES` in `crates.ts` |
 | The ledger: the only writer of coins, crates, keys, tokens, shop items, items, boss crates and Welcome Crates, each change an op with its legs, append-only (Nov 6; a buy, an open or a grant keyed by the app's request id, so its retry applies once; an open's every attempt answers the item as stored, never its own roll) | `packages/server/src/ledger.ts`; `docs/decisions/2026-11-06-ledger.md`, `2026-11-06-ledger-2.md` |
@@ -240,9 +255,15 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 `crates.ts` (`ITEM_DEFS`, `CRATES`, `BOSS_CRATES`, `ITEM_COLORS`, `PURITY_BANDS`), `XP` (the crates and keys a level and the daily
 reward give, `rewardCrate`), `BOSS_TOKENS` and
 `BOSS_CRATE_PRICE` and `SHOP` (the Shop page's discount, prices, limited items, the bundle's Mythic chance) in settings.ts, `shop.ts` (`SHOP_ITEMS`,
-`SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts.
+`SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts. `CRATE_OPEN.spinMs` (settings.ts): how long the crate opening's strip
+spins (4 s, Nov 24); its other beats are in `crate-open/timeline.ts`.
 
 ## Tests and tools
+
+- The crate opening (Nov 24): unit `packages/app/test/crate-open.test.ts` (the clicks' times, the cues, every sound piece made and
+  level); e2e `e2e/crate-banner.spec.ts`, "the opening covers the whole phone screen or the computer's middle column…" (the layer's box,
+  phone and computer, on top at its corners, the side columns uncovered; Done leaves the page under it where it was; `CRATE_SHOTS=<dir>`
+  saves its stills); the crate specs wait for `.crate-opening .cox-reel` and `.reveal-card` on the layer.
 
 - Unit: `packages/core/test/crates.test.ts` (rides: their slot, no crate, a look keeping its ride), `bot-looks.test.ts`, `packages/server/test/accounts.test.ts` (a ride in the ride slot only),
   `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `claw.test.ts` (the claw machine: one token a play, refused with none, about 25%, the crate on a win, a retry, plays at once, guests, the seed only with TEST_SWITCHES, the admins' grant), `boss-tokens.test.ts` (the drop rule and its window, a race for the
