@@ -22,7 +22,7 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
     const crate = crateDef(id)!;
     await page.locator(`.crate-row[data-crate="${id}"]`).click();
     await expect(page.locator(".crate-hero strong")).toHaveText(crate.name.replace(" · ", " ")); // (the series on its own line)
-    // A box for each of the four tiers, then Fischer Random, then every item with its chance.
+    // A box for each of the four tiers, then Transcendent, then every item with its chance.
     await expect(page.locator(`.odds-row ${box}`)).toHaveCount(4);
     await expect(page.locator(".odds-row")).toHaveCount(5 + crate.items.length);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);

@@ -1442,7 +1442,7 @@ export function TranscendentArt() {
   const star = (x: number, y: number, r: number) => `M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z`;
   const corner = (x: number, y: number, sx: number, sy: number) => `M${x} ${y + 9 * sy} V${y} H${x + 9 * sx}`;
   return (
-    <span class="item-art present-art supply-art transcendent-art">
+    <span class="item-art transcendent-art">
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <defs>
           <radialGradient id="transcendent-glow" cx="0.5" cy="0.5" r="0.5">

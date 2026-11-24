@@ -43,7 +43,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   **Winter Crate · Series 1**. Each lists its items once; an item's tier says where it is.
   Every drop rolls three things independently:
   1. **its tier**, which decides the item: the opening strip lands on a tier's box (Common to Epic, color-coded:
-     Winter's presents, Beta's supply boxes), which opens to one of that tier's items evenly, or on **Fischer Random**
+     Winter's presents, Beta's supply boxes), which opens to one of that tier's items evenly, or on **Transcendent** (called
+     Fischer Random until Nov 24; still `FISCHER` / `fischer` in the code; its tile a prismatic crate, `TranscendentArt`)
      (Legendary and Mythic items only, by tier: Legendary 80, Mythic 20, shared evenly). Both crates: 40/26/18/14/2.
      A tier with no items is left off the strip, and a test keeps every live crate's tiers filled;
   2. **its color** (red and yellow common, Pearl the rarest; some items roll a second color, and the Gift-Wrap Tube's
@@ -222,13 +223,17 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   cubic slowdown, a blurred copy fading as it slows, and stops just past the winning tile's near edge, runs a few pixels over and settles.
   Then the winning tier's box drops in, shakes (light leaking from its lid), and its lid bursts off with a beam in the item's tier color;
   the item rises out of the beam into the reveal card, which forms round it (Legendary and Mythic: more rays, light over the whole stage,
-  a flash, a jolt). Fischer Random: its banner, then a second strip among its items, whose winner's beam comes up without a box. All of it
+  a flash, a jolt). Transcendent: its banner ("TRANSCENDENT!") with its own sound, then a second strip among its items, whose winner's beam comes up without a box. All of it
   is Web Animations on transform and opacity, set up while "Opening…" waits for the server and started together two frames after the
   answer; reduced motion drops the blur, shake and jolt and fades the beam. The sound (made in code: `crate-open/sounds.ts`; Eric's
   mix, Nov 24: the mockup's slot reel spinning, its "card in the spokes" ending) is made ahead in the sound worker as a crate's page opens
   and as Open is tapped, and laid on the audio clock (`timeline.ts` `cues`, sound.ts `playCrateCues`): a metal tick at each tile edge
   crossing, heavier as it slows, and a clunk as the reel locks (no swell, no charge: Eric); the box's thud and knocks, then a glassy
-  chord that climbs with the tier. The roll, the odds and what's won are the server's, unchanged.
+  chord, each tier its own (Nov 24, [2026-11-24-crate-tier-stings.md](../decisions/2026-11-24-crate-tier-stings.md): Common and
+  Uncommon one shared; Rare a shimmer; Epic a rising arpeggio; Legendary bright, a choir above and a chime run; Mythic a fanfare's
+  chord change and a sparkle cascade), and Transcendent's own as its banner comes up (`T.bannerAt`). Every ending plays a few dB
+  under the ticks (Eric: they "hurt my ears"): `ENDING_DB` in sounds.ts, measured with EBU R128; `scripts/render-crate-stings.ts`
+  renders each tier's opening as audio to listen to and re-measure. The roll, the odds and what's won are the server's, unchanged.
 
 ## Where the code is
 
@@ -262,7 +267,7 @@ spins (4 s, Nov 24); its other beats are in `crate-open/timeline.ts`.
 ## Tests and tools
 
 - The crate opening (Nov 24): unit `packages/app/test/crate-open.test.ts` (the clicks' times, the cues, every sound piece made and
-  level); e2e `e2e/crate-banner.spec.ts`, "the opening covers the whole phone screen or the computer's middle column…" (the layer's box,
+  level, every ending's loudness K-weighted under the ticks', the stings climbing); e2e `e2e/crate-banner.spec.ts`, "the opening covers the whole phone screen or the computer's middle column…" (the layer's box,
   phone and computer, on top at its corners, the side columns uncovered; Done leaves the page under it where it was; `CRATE_SHOTS=<dir>`
   saves its stills); the crate specs wait for `.crate-opening .cox-reel` and `.reveal-card` on the layer.
 
@@ -284,7 +289,7 @@ spins (4 s, Nov 24); its other beats are in `crate-open/timeline.ts`.
   riding in boxes that don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds,
   straight in the local database; Nov 15, "a shiny ride's shine stays inside its own shapes": a shiny pogo and crown worn, every
   shine's clip is its own Region's and no two clips on the page share an id with different shapes).
-- The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
+- The Transcendent banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
   must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of
   the repo). `sheet=1` gives a short sheet to show a batch (cards, both pawns, `colors=`, `outfits=a+b;c`). `scale=1` or `scale=2`
