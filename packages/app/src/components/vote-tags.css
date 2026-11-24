@@ -16,6 +16,8 @@
 }
 .vote-tags .vt {
   position: absolute;
+  /* (A name of up to 10 letters stays on one line, shrunk to fit its zone: VoteZoneTags's --vt-fit.) */
+  --vt-w: 23.5cqw;
   opacity: 0;
   animation-duration: var(--vt-ms, 3s);
   animation-delay: var(--vt-delay, 0ms);
@@ -23,8 +25,14 @@
   animation-fill-mode: both;
 }
 
+.vote-tags .vt.one .vt-word,
+.vote-tags .vt.one .vt-tag,
+.vote-tags .vt.one .vt-name {
+  white-space: nowrap;
+}
+
 /* ---- A: floor letters, the Battle Tower's floor arrow's look (SHOP_TOWER_FLOOR_ARROW_PALETTE: top #f4b740, rim #ffd877,
-   sides #8a5c08, edge #0e1014), lying on the board just above each zone, a small arrow at its foot pointing in. ---- */
+   sides #8a5c08, edge #0e1014; its depth in em, so a smaller word has thinner sides), lying on the board just above each zone, a small arrow at its foot pointing in. ---- */
 .vt-a .vt {
   /* (Its foot a fifth of a square above the zone: the word and its arrow fill the empty rank above the zone.) */
   translate: -50% calc(-100% - 0.4cqw);
@@ -34,35 +42,35 @@
   display: grid;
   justify-items: center;
   gap: 0.6cqw;
-  /* Lying on the floor: the top leans away, as the tower's arrow lies on its floor. */
-  transform: perspective(42cqw) rotateX(40deg);
+  /* Lying on the floor: the top leans away, as the tower's arrow lies on its floor; drawn tall first, as words painted on a floor are,
+     so they read at a glance once laid down. */
+  transform: perspective(42cqw) rotateX(36deg) scaleY(1.5);
   transform-origin: 50% 100%;
 }
 .vt-word {
   font-family: "Archivo Black", "Arial Black", Impact, system-ui, sans-serif;
-  font-size: 5.4cqw;
-  line-height: 0.95;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  /* (The zones touch: each word fits its zone's two squares, less a little; a long name takes two lines.) */
+  font-size: min(4.9cqw, calc(var(--vt-w) / var(--vt-fit) / 0.6));
+  line-height: 0.9;
   text-align: center;
-  max-width: 27cqw;
+  max-width: var(--vt-w);
   text-wrap: balance;
   color: #f4b740;
-  -webkit-text-stroke: 0.55cqw #0e1014;
+  -webkit-text-stroke: 0.1em #0e1014;
   paint-order: stroke fill;
   /* Its pale rim (a sliver above the top), its slab's deep-gold sides (stacked under), the dark edge under them, a soft shadow on the
      floor. */
   text-shadow:
-    0 -0.25cqw 0 #ffd877,
-    0 0.35cqw 0 #c8860d,
-    0 0.7cqw 0 #8a5c08,
-    0 1cqw 0 #8a5c08,
-    0 1.35cqw 0 #0e1014,
-    0 2cqw 1.6cqw rgba(0, 0, 0, 0.45);
+    0 -0.05em 0 #ffd877,
+    0 0.07em 0 #c8860d,
+    0 0.13em 0 #8a5c08,
+    0 0.19em 0 #8a5c08,
+    0 0.26em 0 #0e1014,
+    0 0.4em 0.32em rgba(0, 0, 0, 0.45);
 }
 .vt-arrow {
   width: 6.4cqw;
-  height: 3.2cqw;
+  height: 2.6cqw;
   filter: drop-shadow(0 0.7cqw 0 #8a5c08) drop-shadow(0 0.35cqw 0 #0e1014);
 }
 .vt-arrow::before {
@@ -113,8 +121,8 @@
 .vt-tag {
   position: relative;
   display: block;
-  max-width: 26cqw;
-  padding: 0.9cqw 2.2cqw 1cqw;
+  max-width: var(--vt-w);
+  padding: 0.9cqw 1.5cqw 1cqw;
   border-radius: 2.4cqw;
   background: rgba(10, 12, 16, 0.88);
   box-shadow:
@@ -122,7 +130,7 @@
     0 1cqw 2.4cqw rgba(0, 0, 0, 0.35);
   color: #fff;
   font-weight: 800;
-  font-size: 3.7cqw;
+  font-size: min(3.7cqw, calc((var(--vt-w) - 3cqw) / var(--vt-fit) / 0.56));
   line-height: 1.15;
   text-align: center;
   text-wrap: balance;
@@ -186,11 +194,11 @@
 }
 .vt-name {
   position: relative;
-  max-width: 23cqw;
+  max-width: calc(var(--vt-w) - 1.5cqw);
   /* (Just below the middle, clear of the zone's count on its far half.) */
   translate: 0 2.2cqw;
   font-weight: 900;
-  font-size: 4.3cqw;
+  font-size: min(4.3cqw, calc((var(--vt-w) - 1.5cqw) / var(--vt-fit) / 0.6));
   line-height: 1.05;
   text-align: center;
   text-wrap: balance;

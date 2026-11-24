@@ -24,16 +24,18 @@ const VOTE_TAG_GONE_MS = 280;
 
 const ASKED = (() => {
   try {
-    return new URLSearchParams(globalThis.location?.search ?? "").get("votetags");
+    const q = new URLSearchParams(globalThis.location?.search ?? "");
+    return { look: q.get("votetags"), hold: q.has("votetaghold") };
   } catch {
-    return null;
+    return { look: null, hold: false };
   }
 })();
 
 /** The look asked for by `?votetags=` (a test switch), or null: no tags (today's game). */
 export function voteTagStyle(): VoteTagStyle | null {
   if (!testSwitchesAllowed()) return null;
-  return ASKED === "a" || ASKED === "b" || ASKED === "c" ? ASKED : null;
+  const a = ASKED.look;
+  return a === "a" || a === "b" || a === "c" ? a : null;
 }
 
 export interface VoteTag {
@@ -43,40 +45,77 @@ export interface VoteTag {
   box: { left: number; top: number; width: number; height: number };
 }
 
-export function VoteZoneTags({ look, tags, startsAt, now, voted }: { look: VoteTagStyle | null; tags: readonly VoteTag[]; startsAt: number; now: number; voted: boolean }) {
+export function VoteZoneTags({
+  look,
+  tags,
+  startsAt,
+  now,
+  voted,
+}: {
+  look: VoteTagStyle | null;
+  tags: readonly VoteTag[];
+  startsAt: number;
+  now: number;
+  voted: boolean;
+}) {
   // When your vote went in (on this screen): the tags fade from then.
   const votedAt = useRef<number | null>(null);
   if (voted && votedAt.current === null) votedAt.current = now;
   if (!voted) votedAt.current = null;
+  // (A screen that opens after the vote began joins the motion where it is: a negative delay, fixed when the tags first show, as
+  // the animation's clock runs from then.)
+  const delay = useRef<{ startsAt: number; ms: number } | null>(null);
+  if (delay.current?.startsAt !== startsAt) delay.current = { startsAt, ms: -Math.max(0, Math.round(now - startsAt)) };
   const since = now - startsAt;
-  if (!look || since < 0 || since >= VOTE_TAG_MS) return null;
+  // (`?votetaghold`, the mockup's stills: the tags stay mounted past their 3 s, for the capture script to step their animation.)
+  if (!look || since < 0 || (since >= VOTE_TAG_MS && !ASKED.hold)) return null;
   if (votedAt.current !== null && now - votedAt.current >= VOTE_TAG_GONE_MS) return null;
-  // (A screen that opens after the vote began joins the motion where it is: a negative delay.)
-  const style = { "--vt-ms": `${VOTE_TAG_MS}ms`, "--vt-delay": `${-Math.round(since)}ms` };
+  const style = {
+    "--vt-ms": `${VOTE_TAG_MS}ms`,
+    "--vt-delay": `${delay.current.ms}ms`,
+  };
   return (
     <div class={`vote-tags vt-${look}${votedAt.current !== null ? " gone" : ""}`} style={style} aria-hidden="true">
-      {tags.map((t, i) => (
-        <div
-          key={t.key}
-          class="vt"
-          style={
-            look === "c"
-              ? { left: `${t.box.left}%`, top: `${t.box.top}%`, width: `${t.box.width}%`, height: `${t.box.height}%`, "--vt-i": String(i) }
-              : { left: `${t.box.left + t.box.width / 2}%`, top: `${t.box.top}%`, "--vt-i": String(i) }
-          }
-        >
-          {look === "a" ? (
-            <span class="vt-floor">
-              <span class="vt-word">{t.label}</span>
-              <span class="vt-arrow" />
-            </span>
-          ) : look === "b" ? (
-            <span class="vt-tag">{t.label}</span>
-          ) : (
-            <span class="vt-name">{t.label}</span>
-          )}
-        </div>
-      ))}
+      {tags.map((t, i) => {
+        // (The zones touch, so a name fits its own zone's width: up to 10 letters on one line, shrunk to fit if it must; longer, it
+        // wraps, its longest word fitting. `--vt-fit`: the letters a line must hold.)
+        const one = t.label.length <= 10;
+        const fit = one ? t.label.length : Math.max(...t.label.split(" ").map((w) => w.length));
+        const at =
+          look === "c"
+            ? {
+                left: `${t.box.left}%`,
+                top: `${t.box.top}%`,
+                width: `${t.box.width}%`,
+                height: `${t.box.height}%`,
+              }
+            : {
+                left: `${t.box.left + t.box.width / 2}%`,
+                top: `${t.box.top}%`,
+              };
+        return (
+          <div
+            key={t.key}
+            class={`vt${one ? " one" : ""}`}
+            style={{
+              ...at,
+              "--vt-i": String(i),
+              "--vt-fit": String(Math.max(6, fit)),
+            }}
+          >
+            {look === "a" ? (
+              <span class="vt-floor">
+                <span class="vt-word">{t.label}</span>
+                <span class="vt-arrow" />
+              </span>
+            ) : look === "b" ? (
+              <span class="vt-tag">{t.label}</span>
+            ) : (
+              <span class="vt-name">{t.label}</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
