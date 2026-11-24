@@ -203,16 +203,16 @@ test("crates: the opening covers the whole phone screen or the computer's middle
   const shots = process.env.CRATE_SHOTS;
   const name = test.info().project.name;
   await named(page, "Layer Opener");
-  await giveCrates(page, "beta-001", 1, 1);
+  // (Two, so its "You have" line keeps its length: the page under it changes only by the one opened.)
+  await giveCrates(page, "beta-001", 2, 2);
   await page.goto("/shop?crates");
   await page.locator('.crate-row[data-crate="beta-001"]').click();
   const open = page.getByRole("button", { name: /Open · uses 1 key/ });
   await open.scrollIntoViewIfNeeded();
-  // (The hero's top, left and width: its height follows its "You have" line, which the opening changes.)
   const where = () =>
     page.evaluate(() => {
       const r = document.querySelector(".crate-hero")!.getBoundingClientRect();
-      return { y: scrollY, top: r.top, left: r.left, width: r.width };
+      return { y: scrollY, box: [r.left, r.top, r.width, r.height] };
     });
   const before = await where();
   await open.click();
@@ -258,5 +258,5 @@ test("crates: the opening covers the whole phone screen or the computer's middle
   await expect(layer).toHaveCount(0);
   // The page under it as it was: in the same place, scrolled the same, its count gone down by the one opened.
   expect(await where()).toEqual(before);
-  await expect(page.locator(".crate-held")).toContainText("You have none");
+  await expect(page.locator(".crate-held")).toHaveText("You have 1, and 1 key.");
 });

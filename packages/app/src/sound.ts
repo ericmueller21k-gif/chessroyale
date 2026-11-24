@@ -2168,8 +2168,24 @@ function warmMade(list: readonly BossSound[]) {
  * The crate opening's sounds (crate-open/sounds.ts, Nov 24), made ahead in the sound worker as an Open is tapped (and as a crate's page
  * opens, once sound is on): a few seconds before the first click plays. A no-op before the first tap.
  */
-export function warmCrateSounds(): void {
-  warmMade(CRATE_SOUNDS.map((n): BossSound => ["crate", n]));
+export function warmCrateSounds(tier?: string): void {
+  warmMade((tier ? [`shake-${tier}`, `sting-${tier}`] : CRATE_SOUNDS).map((n): BossSound => ["crate", n]));
+}
+
+/**
+ * Resolves once the opening's first sounds (the whirr, the flaps, the rest) are made, or after `capMs` (a slow worker), whichever is
+ * first; at once without sound. The strip waits on it with the server's answer, so none of them is made on its frames.
+ */
+export function crateSoundsReady(capMs: number): Promise<void> {
+  const t0 = nowMs();
+  return new Promise((done) => {
+    const look = () => {
+      const c = ctx;
+      if (!c || muted || c.state !== "running" || nowMs() - t0 >= capMs || CRATE_SOUNDS.every((n) => cached(["crate", n], c.sampleRate))) done();
+      else setTimeout(look, 40);
+    };
+    look();
+  });
 }
 
 /**
@@ -2179,6 +2195,8 @@ export function warmCrateSounds(): void {
  */
 export function playCrateCues(list: readonly { at: number; sound: string }[], leadMs: number): () => void {
   (globalThis as { __soundLog?: string[] }).__soundLog?.push(`crateOpen:${ctx?.state ?? "none"}${muted ? ":muted" : ""}`);
+  // (The clip script reads this to lay the same sound under its recording: scripts/crate-open-frames.ts.)
+  (globalThis as { __crateCues?: unknown[] }).__crateCues?.push({ at: nowMs() + leadMs, list });
   if (muted || !ctx || !master || pageHidden() || ctx.state !== "running") return () => undefined;
   const c = ctx;
   const out = c.createGain();

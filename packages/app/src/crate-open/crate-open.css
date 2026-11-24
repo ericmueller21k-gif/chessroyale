@@ -424,7 +424,7 @@
 /* (Over the whole layer: far past the stage, cut at the layer's edges.) */
 .cox-whiteout {
   position: absolute;
-  inset: -1500px;
+  inset: -600px;
   z-index: 7;
   pointer-events: none;
   opacity: 0;

@@ -63,7 +63,7 @@ import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, Ite
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
-import { play, unlockAudio, warmCrateSounds } from "../sound.ts";
+import { crateSoundsReady, play, unlockAudio, warmCrateSounds } from "../sound.ts";
 import { CrateStage, OpenLayer } from "../crate-open/CrateOpenStage.tsx";
 import { STRIPS } from "../crate-open/timeline.ts";
 import { useAccount } from "./Profile.tsx";
@@ -515,6 +515,8 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   const forceFischer = crateSwitchesHere() && (fischerSet ?? testParams().get("fischer") === "1");
   const forceShiny = crateSwitchesHere() && (shinySet ?? testParams().get("shiny") === "1");
   const [opening, setOpening] = useState(!!resume);
+  // (The opening's sounds made ahead in the sound worker as its page opens, once sound is on: before the Open's tap.)
+  useEffect(() => warmCrateSounds(), []);
   const look = CRATE_LOOKS[crate.look];
   // Commonest first; Legendary and Mythic (Fischer Random) last.
   const items = [...crate.items].sort((a, b) => tierIndex(a) - tierIndex(b));
@@ -663,6 +665,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
  */
 function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Unseen; onBack: () => void }) {
   const [opening, setOpening] = useState(!!resume);
+  useEffect(() => warmCrateSounds(), []);
   return (
     <div class="crate-page welcome-page">
       {opening && <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />}
@@ -848,10 +851,14 @@ export function CrateOpening({
     setShown(false);
     // (Its sounds made ahead in the sound worker, while the server answers: none is made on the opening's frames.)
     warmCrateSounds();
+    // (Under "Opening…": the server's answer, and the strip's first sounds made in the worker, up to a short wait.)
+    const ready = crateSoundsReady(1500);
     opener(crate.id, force)
-      .then((r) => {
+      .then(async (r) => {
         // It's yours now: if you leave before the reveal, it waits for you (the reveal clears it).
         setUnseen({ crate: crate.id, ...r });
+        warmCrateSounds(itemDef(r.item.def)!.tier);
+        await ready;
         if (here) setResult(r);
       })
       .catch((e) => here && setError(e instanceof Error ? e.message : "Couldn't open the crate."));
@@ -877,6 +884,14 @@ export function CrateOpening({
   }, [result]);
   const look = CRATE_LOOKS[crate.look];
   const fischer = !!result?.roll.fischer;
+  // Fischer Random's second strip is set up out of sight while the first spins (its setup off the banner's first frames).
+  const [ahead, setAhead] = useState(false);
+  useEffect(() => {
+    setAhead(false);
+    if (!fischer) return;
+    const t = setTimeout(() => setAhead(true), 1500);
+    return () => clearTimeout(t);
+  }, [result]);
   const tier = (result ? itemDef(result.item.def)!.tier : null) as PresentTier | null;
   const art = result && <ItemArt def={result.item.def} finish={result.item} />;
   const details = result && <RevealDetails item={result.item} again={more} shown={shown} onAgain={() => setRound((r) => r + 1)} onClose={onClose} />;
@@ -921,7 +936,7 @@ export function CrateOpening({
             />
           )}
           {/* Fischer Random's second strip: set up under its banner, then spun; its winner's beam comes up without a box. */}
-          {!still && strips && fischer && stage !== "spin" && (
+          {!still && strips && fischer && (ahead || stage !== "spin") && (
             <CrateStage
               key={`b${round}`}
               tiles={STRIPS.fischer.tiles}
@@ -935,7 +950,7 @@ export function CrateOpening({
               cardClass={revealClass(result!.item)}
               cardBody={details}
               go={stage === "spin2"}
-              hidden={stage === "fischer"}
+              hidden={stage !== "spin2"}
               onCard={() => setShown(true)}
             />
           )}

@@ -347,14 +347,15 @@ function make(name: string, rate: number): Float32Array {
  */
 const LEVEL = 0.92 * 10 ** (-4 / 20);
 
-/** Every piece's name (the worker makes them all ahead, as an Open is tapped). */
+/** Every piece but the tiers' (the worker makes them ahead as an Open is tapped; a tier's shake and sting once the roll is in). */
 export const CRATE_SOUNDS: readonly string[] = [
   "whirr",
   "rest",
   "land",
   ...FLAPS.flatMap((_, i) => [`flap${i}a`, `flap${i}b`]),
-  ...TIERS.flatMap((t) => [`shake-${t.id}`, `sting-${t.id}`]),
 ];
+/** Every tier's own: its shake and its sting. */
+export const TIER_SOUNDS: readonly string[] = TIERS.flatMap((t) => [`shake-${t.id}`, `sting-${t.id}`]);
 
 const cache = soundCache("crate");
 /** The samples of one piece at a sample rate (made once, then reused). */

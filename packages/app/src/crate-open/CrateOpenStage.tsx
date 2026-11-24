@@ -171,26 +171,32 @@ export function CrateStage({
     };
   }, []);
 
-  // Go: the answer's in. Drop what doesn't apply, add the tier's extras, and start every animation and every sound together.
+  // Go: the answer's in. Drop what doesn't apply, add the tier's extras, and start every animation and every sound together: two frames
+  // on, so the answer's own drawing (its tiles, the card, the item) is painted while the strip is still at rest, not on its first frames.
   useEffect(() => {
     const b = built.current;
     if (!go || !b || started.current || ending === null) return;
     started.current = true;
     const root = stage.current!;
+    let stopSound = () => undefined as void;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     if (ending === "none") b.ending.forEach((a) => a.cancel());
     const all = [...b.anims, ...(ending === "none" ? [] : b.ending)];
-    if (ending !== "none" && tier) all.push(...buildTierLight(root, b.T, tier, reduced));
-    // (A frame's lead, so the first frame drawn is the strip's first.)
-    const lead = 50;
-    const start = (document.timeline.currentTime as number) + lead;
-    for (const a of all) a.startTime = start;
-    hooks.__crateAnims = all;
-    const stopSound = playCrateCues(cues(b.T, clickTimes(b.T.spinMs, b.width, land), ending === "none" ? null : tier), lead);
-    const timers = [
-      onStop && setTimeout(onStop, lead + b.T.stop + 450),
-      ending !== "none" && onCard && setTimeout(onCard, lead + b.T.cardAt + b.T.cardMs),
-    ].filter((t): t is ReturnType<typeof setTimeout> => !!t);
+    if (ending !== "none" && tier) for (const a of buildTierLight(root, b.T, tier, reduced)) all.push((a.pause(), a));
+    let raf = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(() => {
+        // (A frame's lead, so the first frame drawn is the strip's first.)
+        const lead = 50;
+        const start = (document.timeline.currentTime as number) + lead;
+        for (const a of all) a.startTime = start;
+        hooks.__crateAnims = all;
+        stopSound = playCrateCues(cues(b.T, clickTimes(b.T.spinMs, b.width, land), ending === "none" ? null : tier), lead);
+        if (onStop) timers.push(setTimeout(onStop, lead + b.T.stop + 450));
+        if (ending !== "none" && onCard) timers.push(setTimeout(onCard, lead + b.T.cardAt + b.T.cardMs));
+      });
+    });
     return () => {
+      cancelAnimationFrame(raf);
       stopSound();
       timers.forEach(clearTimeout);
     };
@@ -413,7 +419,10 @@ function buildEnding(root: HTMLElement, T: Timeline, ending: "box" | "beam", lid
   );
   at($(".cox-item-glow"), [{ opacity: 0.9, transform: "scale(1.4)" }, { opacity: 0.55, transform: "scale(1)" }], T.riseAt, T.riseMs + 300);
   // (Hidden, not just see-through, until it forms: nothing on it can be tapped or found before.)
-  at($(".cox-card"), [{ opacity: 0, transform: reduced ? "none" : "scale(0.86)", visibility: "hidden" }, { opacity: 0, visibility: "visible", offset: 0.001 }, { opacity: 1, transform: "none", visibility: "visible" }], T.cardAt, T.cardMs, { easing: "cubic-bezier(.2,1.3,.4,1)" });
+  // (Two animations: the visibility, which only the page can change, apart from the fade and scale, which run on the compositor.)
+  const card = $(".cox-card");
+  at(card, [{ visibility: "hidden" }, { visibility: "visible" }], T.cardAt, 1, { easing: "steps(1, start)" });
+  at(card, [{ opacity: 0, transform: reduced ? "none" : "scale(0.86)" }, { opacity: 1, transform: "none" }], T.cardAt, T.cardMs, { easing: "cubic-bezier(.2,1.3,.4,1)" });
   return out;
 }
 
