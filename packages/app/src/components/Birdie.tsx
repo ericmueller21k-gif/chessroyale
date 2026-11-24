@@ -1,7 +1,7 @@
 import { BIRDIE_BEATS, bannerLeadMs, birdieLeadMs, pieceAt, powerFxMs, trainReaches, withPiece, withoutPiece } from "@chessroyale/chess";
-import { BIRDIE_CINEMATIC } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, BIRDIE_SIGN } from "@chessroyale/core";
 import type { ComponentChildren } from "preact";
-import { useState } from "preact/hooks";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BIRDIE_CROSSING, BIRDIE_SMASH, BIRDIE_TRAIN } from "../characters/effects/birdie.ts";
 import { noteArmor } from "../characters/birdie-state.ts";
 import { rejoinedAt } from "../characters/moo-state.ts";
@@ -187,29 +187,55 @@ function Timed({ tag: Tag, at, style, children, ...rest }: { tag: "span" | "piec
 }
 
 /**
- * The warning sign on the marked piece (Eric, Nov 23: "mark the piece required to move with a yellow train warning ⚠️ like this that's
- * glowing over the tile but also a see through, make it look clean. This way the player knows which piece is in danger";
- * docs/decisions/2026-11-23-birdie-cadence-warning.md): a yellow warning triangle with its "!" over the piece's square, as the board is
- * seen (a flipped board too), see-through so the piece reads through it, glowing in a slow pulse (styles.css `.bd-sign`: opacity alone,
- * composited; no frame loop of its own). `at`: when it lit (the crossing's `signal` cue), its pulse's beat kept from then by a copy drawn
- * anew; 0: not known here (lit before this screen), its pulse from its first drawing.
+ * The warned piece picked up on its board now (`board`, the drawn board's `.hb-board`): dragged (its element `dragging`), or tapped to
+ * select it (the board's selected square is its square: the same place, the board placing both with one function).
+ */
+function heldOn(board: Element, square: string): boolean {
+  const piece = board.querySelector<HTMLElement>(`piece[data-square="${square}"]`);
+  if (!piece) return false;
+  if (piece.classList.contains("dragging")) return true;
+  const sel = board.querySelector<HTMLElement>("square.selected");
+  return !!sel && sel.style.transform === piece.style.transform;
+}
+
+/**
+ * The warning sign on the marked piece (Eric, Nov 24, redoing Nov 23's: "an actual straight triangle, like the actual railroad crossing
+ * sign looks ... it's no longer see-through, and it simply like blinks on and off ... it doesn't need to do a fade even ... when you tap
+ * your piece, it stops blinking ... if you set your piece back down, it keeps blinking there"; docs/decisions/2026-11-24-birdie-train-miss.md):
+ * a straight-edged yellow warning triangle, a black border and a black "!", fully opaque, small in the top-right corner of the piece's
+ * square as the board is seen (a flipped board too), so the piece stays readable. It blinks hard on and off (BIRDIE_SIGN.blinkMs, half
+ * each; styles.css `.bd-sign`: a step animation of its opacity, composited, no frame loop of its own), its beat from `at` (when it lit:
+ * the crossing's `signal` cue; kept by a copy drawn anew; 0: not known here, from its first drawing). While the piece is picked up
+ * (selected or dragged) it's hidden (`data-held`), back blinking once it's set down; it never takes a tap (the piece under it does).
  */
 function WarnSign({ square, orientation, at }: { square: string; orientation: Orientation; at: number }) {
   const [drawn] = useState(Date.now);
+  const ref = useRef<HTMLSpanElement>(null);
   const c = drawnAt(square, orientation);
+  // (Its board's taps don't draw this layer again: it watches its board's pieces and squares, and is set before the frame is painted.)
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const board = el?.closest(".board-wrap")?.querySelector(".hb-board");
+    if (!el || !board) return;
+    const look = () => el.toggleAttribute("data-held", heldOn(board, square));
+    look();
+    const watch = new MutationObserver(look);
+    watch.observe(board, { subtree: true, childList: true, attributes: true, attributeFilter: ["class", "style"] });
+    return () => watch.disconnect();
+  }, [square]);
   return (
-    <span class="bd-sign" data-square={square} style={{ "--sq-x": String(c.col), "--sq-y": String(c.row), animationDelay: `${at ? at - drawn : 0}ms` }}>
+    <span ref={ref} class="bd-sign" data-square={square} style={{ "--sq-x": String(c.col), "--sq-y": String(c.row), animationDuration: `${BIRDIE_SIGN.blinkMs}ms`, animationDelay: `${at ? at - drawn : 0}ms` }}>
       <svg viewBox="0 0 100 100" aria-hidden="true">
-        <path class="bd-sign-edge" d={SIGN} />
         <path class="bd-sign-face" d={SIGN} />
-        <rect class="bd-sign-mark" x="44.5" y="35" width="11" height="28" rx="5.5" />
-        <circle class="bd-sign-mark" cx="50" cy="73.5" r="6" />
+        <path class="bd-sign-mark" d={BANG} />
+        <rect class="bd-sign-mark" x="44" y="70" width="12" height="11" />
       </svg>
     </span>
   );
 }
-/** The sign's triangle (its corners rounded by its strokes' round joins). */
-const SIGN = "M50 11 L91 84 L9 84 Z";
+/** The sign's triangle, its corners sharp (miter joins), and its "!" bar, a little wider at the top. */
+const SIGN = "M50 8 L94 88 L6 88 Z";
+const BANG = "M43 36 L57 36 L54.5 64 L45.5 64 Z";
 
 /** The crossing on each square of the warned line: lit at the warning's `signal` cue on this screen, else already flashing. */
 function crossingItems(squares: readonly string[], since: number, until: (i: number) => number, now: number): BoardItem[] {

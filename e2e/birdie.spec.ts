@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import sharp from "sharp";
 import { BIRDIE_BEATS } from "@chessroyale/chess";
+import { BIRDIE_SIGN } from "@chessroyale/core";
 import { asAdmin, openBossRaid, pickMove, submitMove, test } from "./helpers.ts";
 
 /**
@@ -58,7 +59,11 @@ async function record(page: Page) {
           const r = sign.getBoundingClientRect();
           const el = document.querySelector(`.hb-board piece[data-square="${sq}"]`) ?? document.querySelector(`.bd-pieces piece[data-square="${sq}"]`);
           const pc = el?.getBoundingClientRect();
-          return { sq, opacity: Number(getComputedStyle(sign).opacity), on: el?.className ?? null, off: pc ? Math.max(Math.abs(r.x + r.width / 2 - pc.x - pc.width / 2), Math.abs(r.y + r.height / 2 - pc.y - pc.height / 2), Math.abs(r.width - pc.width)) : null };
+          // (Its drawing in its square, Nov 24: its width, and its gaps to the square's right and top, in squares.)
+          const g = sign.querySelector("svg")!.getBoundingClientRect();
+          const mark = { w: g.width / r.width, right: (r.right - g.right) / r.width, top: (g.top - r.top) / r.height };
+          const cs = getComputedStyle(sign);
+          return { sq, opacity: Number(cs.opacity), vis: cs.visibility, held: sign.hasAttribute("data-held"), mark, on: el?.className ?? null, off: pc ? Math.max(Math.abs(r.x + r.width / 2 - pc.x - pc.width / 2), Math.abs(r.y + r.height / 2 - pc.y - pc.height / 2), Math.abs(r.width - pc.width)) : null };
         })() : null,
         train: train ? (() => {
           const r = train.getBoundingClientRect();
@@ -112,7 +117,7 @@ type Frame = {
   plies: number | null;
   events: string[];
   crossing: boolean;
-  sign: { sq: string; opacity: number; on: string | null; off: number | null } | null;
+  sign: { sq: string; opacity: number; vis: string; held: boolean; mark: { w: number; right: number; top: number }; on: string | null; off: number | null } | null;
   train: { x: number; y: number; w: number } | null;
   aside: number;
   lineCount: number | null;
@@ -234,13 +239,19 @@ test("Birdie's train: the crossing on his line, the dock names your piece, a sig
   expect(whole, "the warned piece drawn whole over the crossing").toBeGreaterThan(0.9);
   // Never a crossing when no warning is for your turn.
   expect(rec.filter((r) => r.phase === "play" && !r.warn && !r.moments.length).every((r) => !r.crossing), "no crossing without a warning").toBe(true);
-  // The warning sign (Eric, Nov 23): on your marked piece's square whenever the crossing shows on your warned turn, on it to the pixel,
-  // see-through; never on a square without one of your pieces drawn on it this same frame (the board's, or his layer's during the ride),
+  // The warning sign (Eric, Nov 23; redone Nov 24): on your marked piece's square whenever the crossing shows on your warned turn, on it
+  // to the pixel; never on a square without one of your pieces drawn on it this same frame (the board's, or his layer's during the ride),
   // so gone the moment that piece moves; and gone after the move that saved it.
   const lit = warned.filter((r) => r.crossing);
   expect(lit.filter((r) => r.sign?.sq === r.warn!.square).length / lit.length, "the sign on the marked piece while its line is lit").toBeGreaterThan(0.95);
   const signs = rec.filter((r) => r.sign);
-  expect(signs.every((r) => r.sign!.opacity >= 0.59 && r.sign!.opacity <= 0.81), `see-through: ${[...new Set(signs.map((r) => r.sign!.opacity.toFixed(2)))]}`).toBe(true);
+  // (Old, Nov 23: see-through, 60 to 80% opaque in a slow pulse. Nov 24: opaque, a hard blink with no fade, every frame fully on or fully
+  // off; small in its square's top-right corner, about a third of it.)
+  expect([...new Set(signs.map((r) => r.sign!.opacity))].sort(), "opaque, blinking on and off, never between").toEqual([0, 1]);
+  const mark = signs[0]!.sign!.mark;
+  expect(mark.w, "its width, in squares").toBeGreaterThan(0.3);
+  expect(mark.w).toBeLessThan(0.42);
+  expect(Math.max(mark.right, mark.top), "in the square's top-right corner").toBeLessThan(0.06);
   expect(Math.max(...lit.map((r) => r.sign?.off ?? 0)), "the sign on its square (px)").toBeLessThanOrEqual(1.5);
   const yours = (await page.evaluate(() => (window as any).match.boss.crowdSide)) === "w" ? "white" : "black";
   const stray = signs.filter((r) => !r.sign!.on?.split(" ").includes(yours));
@@ -285,6 +296,35 @@ test("Birdie's train: the crossing on his line, the dock names your piece, a sig
   expect(errors).toEqual([]);
 });
 
+/**
+ * The warning sign held (Eric, Nov 24): a tap on its spot (its drawing, in the square's top-right corner) picks the piece under it up (the
+ * sign takes no tap) and the sign is hidden while it's held; a tap on the piece again sets it down, and the sign blinks again. Then it
+ * blinks on for three of its beats before the test moves on (the recorder reads its blink).
+ */
+async function signHeld(page: Page, square: string) {
+  const sign = page.locator(`.bd-sign[data-square="${square}"]`);
+  await expect(sign).toHaveCount(1, { timeout: 10_000 });
+  const tap = async (x: number, y: number) => (test.info().project.name === "phone" ? page.touchscreen.tap(x, y) : page.mouse.click(x, y));
+  const selected = () =>
+    page.evaluate((sq) => {
+      const piece = document.querySelector<HTMLElement>(`.hb-board piece[data-square="${sq}"]`);
+      const sel = document.querySelector<HTMLElement>(".hb-board square.selected");
+      return !!piece && !!sel && sel.style.transform === piece.style.transform;
+    }, square);
+  const spot = (await sign.locator("svg").boundingBox())!;
+  await tap(spot.x + spot.width / 2, spot.y + spot.height / 2);
+  await expect.poll(selected, { timeout: 5_000 }).toBe(true);
+  await expect(sign).toHaveAttribute("data-held", "");
+  await expect(sign).toHaveCSS("visibility", "hidden");
+  await page.waitForTimeout(800);
+  const piece = (await page.locator(`.hb-board piece[data-square="${square}"]`).boundingBox())!;
+  await tap(piece.x + piece.width / 2, piece.y + piece.height / 2);
+  await expect.poll(selected, { timeout: 5_000 }).toBe(false);
+  await expect(sign).not.toHaveAttribute("data-held");
+  await expect(sign).toHaveCSS("visibility", "visible");
+  await page.waitForTimeout(3 * BIRDIE_SIGN.blinkMs);
+}
+
 /** The drawn board's pieces for a position (`fen`), as the recorder writes them (`drawn`). */
 const drawnOf = (fen: string) =>
   new Chess(fen)
@@ -311,6 +351,7 @@ test("Birdie's train when you saved the piece (Eric, Nov 24): it still rides the
       played.add(s.fen);
       const move = moveOf(s.fen, s.allowed, s.warn ? { from: s.warn.square } : undefined);
       if (s.warn && !saved && move.startsWith(s.warn.square)) {
+        await signHeld(page, s.warn.square);
         const after = new Chess(s.fen);
         after.move({ from: move.slice(0, 2), to: move.slice(2, 4), ...(move[4] ? { promotion: move[4] } : {}) });
         saved = { at: s.crowdMoves + 1, square: s.warn.square, piece: s.warn.piece, fen: after.fen() };
@@ -354,6 +395,27 @@ test("Birdie's train when you saved the piece (Eric, Nov 24): it still rides the
   const gone = turn.slice(turn.findLastIndex((r) => r.train) + 1).slice(3);
   expect(gone.length, "frames after the train has gone, before his reply").toBeGreaterThan(5);
   expect(gone.filter((r) => r.drawn !== drawnOf(saved!.fen)).map((r) => r.drawn).slice(0, 1), "the board after the ride").toEqual([]);
+  // The sign on the warned turn (Eric, Nov 24): a hard blink, about 0.6 s on and 0.6 s off (BIRDIE_SIGN.blinkMs), never between; hidden
+  // in every frame its piece was held (signHeld picked it up and set it down), shown in every other.
+  const warnedTurn = rec.filter((r) => r.phase === "play" && r.sign && r.crowdMoves === saved!.at - 1);
+  expect(warnedTurn.every((r) => (r.sign!.held ? r.sign!.vis === "hidden" : r.sign!.vis === "visible")), "hidden only while held").toBe(true);
+  expect(warnedTurn.some((r) => r.sign!.held), "held for a while").toBe(true);
+  const free = warnedTurn.filter((r) => !r.sign!.held);
+  // (Its on and off runs in each unbroken stretch of frames, each from its first frame to the next run's; the first and last of a stretch
+  // are cut off by it, so only the whole ones between count.)
+  const whole: number[] = [];
+  let stretch: Frame[] = [];
+  for (const r of [...free, null]) {
+    if (r && (!stretch.length || r.t - stretch.at(-1)!.t < 100)) {
+      stretch.push(r);
+      continue;
+    }
+    const starts = stretch.filter((x, i) => i === 0 || x.sign!.opacity !== stretch[i - 1]!.sign!.opacity).map((x) => x.t);
+    for (let i = 1; i + 1 < starts.length; i++) whole.push(starts[i + 1]! - starts[i]!);
+    stretch = r ? [r] : [];
+  }
+  expect(whole.length, "whole blinks seen").toBeGreaterThan(2);
+  expect(whole.every((ms) => ms > BIRDIE_SIGN.blinkMs / 2 - 150 && ms < BIRDIE_SIGN.blinkMs / 2 + 150), `on and off runs: ${whole}`).toBe(true);
   // His reply only after the ride's whole length, as on a smash.
   const reply = rec.find((r) => r.t > ride[0]!.t && r.plies !== null && r.plies > plies);
   expect(reply, "his reply").toBeTruthy();

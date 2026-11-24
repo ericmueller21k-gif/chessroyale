@@ -1043,9 +1043,14 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   - The three puffing runs are kept for his ride, the town's ride loop and his challenge's wipe.
 
   A kit's `cueSound(cue, boss, yourTurn, anim)` picks a cue's sound from the battle (null: silent); `anim` is the animation the cue is
-  in, since his `oof` sounds in his hurt (silent) and his defeat (heard). The warning sign on the marked piece (`WarnSign` in Birdie.tsx, `.bd-sign`: a yellow
-  triangle in SVG over its square, 60 to 80% opaque (36 to 50% read faint on the cream squares: the director, Nov 23), its opacity pulsing, its glow drawn once; from the crossing's light until the drawn
-  board no longer has the piece there, or his train reaches it). Tests: `app/test/birdie-sounds.test.ts`. His train on your king ends the battle: the runner's
+  in, since his `oof` sounds in his hurt (silent) and his defeat (heard).
+
+  The warning sign on the marked piece (`WarnSign` in Birdie.tsx, `.bd-sign`; redone by Eric, Nov 24, 2026-11-24-birdie-train-miss.md):
+  a straight-edged yellow triangle in SVG with a black border and a black "!", fully opaque, small (36% of the square) in its square's
+  top-right corner. It blinks hard on and off with no fade (`BIRDIE_SIGN.blinkMs`, 1.2 s: 0.6 on, 0.6 off; a step animation of its
+  opacity). It's hidden (`data-held`) while its piece is picked up (selected, or dragged: a MutationObserver on its board) and blinks again
+  once the piece is set down. It never takes a tap. It shows from the crossing's light until the drawn board no longer has the piece
+  there, or his train reaches it. Tests: `app/test/birdie-sounds.test.ts`. His train on your king ends the battle: the runner's
   `stageComplete`/`finishBossBattle` read `trainWon`, and the board holds `powerWinShowMs` for the ride before the result (solo
   `winShownAt`, the lobby's `winShown`). Tests: `chess/test/birdie.test.ts`, `server/test/birdie-lobby.test.ts`,
   `app/test/birdie.test.ts`, `e2e/birdie.spec.ts`.

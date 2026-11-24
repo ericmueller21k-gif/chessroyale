@@ -2625,6 +2625,13 @@ export const MOO_CINEMATIC = {
 export const BIRDIE_RIDE = { rideMs: 1950 } as const;
 
 /**
+ * Birdie's warning sign on the marked piece (components/Birdie.tsx WarnSign, `.bd-sign`): how long one blink takes, ms, shown half of it
+ * and hidden half, hard on and off with no fade. Eric, Nov 24: "it simply like blinks on and off ... it doesn't need to do a fade even.
+ * It just blinks every like ... second or second and a half" (docs/decisions/2026-11-24-birdie-train-miss.md): 0.6 s on, 0.6 s off.
+ */
+export const BIRDIE_SIGN = { blinkMs: 1200 } as const;
+
+/**
  * Birdie's fall (Eric, Nov 23: "A cinematic like Moo's Full Moon: it takes the same space on screen as Moo's, about 6 to 7 s long. A cut
  * to a close-up: he falls out of his spot on the board… he tumbles through the air like a bird falling from a great height… the
  * background is blurred, with wind and speed lines… a train track comes into view below, and his own train barrels toward him…

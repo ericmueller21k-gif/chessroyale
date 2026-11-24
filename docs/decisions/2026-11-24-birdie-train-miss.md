@@ -13,3 +13,10 @@ Eric: "I think he's doing a little too much chirping and the train noises. Let's
 - Chirps: his hello at the battle's start. After that, one chirp on his 1st move and then every 5th (`BIRDIE_SOUND_EVERY` [5], was [3, 4]), and it's that move's own: a capture's trill, a check's teeoo, else the nod. His victory, defeat and fall are unchanged.
 - *(mine)* His idle chatter, his smug teeoo and his hurt scold are silent: they don't fall on his own move, so they never get the one chirp. His return from a ride has no hello, since that would be a chirp after the start.
 - *(mine)* The kit's `cueSound` also gets the animation's name, because the `oof` cue is in both his hurt (now silent) and his defeat (unchanged).
+
+## The warning sign redone (added Nov 24)
+
+Eric: "an actual straight triangle, like the actual railroad crossing sign looks ... no longer see-through, and it simply like blinks on and off ... it doesn't need to do a fade even. It just blinks every like ... second or second and a half. But then when you tap your piece, it stops blinking ... if you set your piece back down, it keeps blinking there ... make sure that whatever that actual object is there is like totally non-tappable".
+- The sign is a straight-edged yellow triangle with a black border and a black "!", fully opaque. It blinks hard on and off with no fade (`BIRDIE_SIGN.blinkMs`, 1.2 s: 0.6 s on, 0.6 s off). It's hidden while its piece is selected or dragged, blinks again once the piece is set down, and never takes a tap. Its look is Eric's call now.
+- *(mine)* It's 36% of the square wide, in the square's top-right corner as the board is seen, 3% in from the edges. That corner is where a piece's drawing is emptiest, so the piece stays readable. The old glow is gone.
+- *(mine)* "Picked up" is read from the board itself: the piece's `dragging` class, or the board's selected square sitting on the piece's square. The sign watches its board with a MutationObserver, because a tap redraws the board but not his layer. The shared board is unchanged.
