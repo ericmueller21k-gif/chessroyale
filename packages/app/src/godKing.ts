@@ -226,6 +226,21 @@ let fallen = false;
 export function setKingFallen(on: boolean) {
   fallen = on;
 }
+export const kingFallen = () => fallen;
+
+/**
+ * A power tip's exchange (power-tips.ts) is his word for its moment (Nov 24: no double talk): his other lines are held until his part
+ * of it is over, but for those that answer your own call or his fall (`THROUGH_HOLD`). `battle`: a new number at each reset, so a tip
+ * is decided once a battle.
+ */
+let heldUntil = 0;
+let battle = 0;
+/** His other lines held until `until` (set again as the tip goes on: once his part is said, to the end of its time). */
+export function holdKing(until: number) {
+  heldUntil = until;
+}
+export const kingBattle = () => battle;
+const THROUGH_HOLD: ReadonlySet<KingCue> = new Set(["struck", "kingPlays", "lastStand", "lastWords", "rise", "rushAsk", "rushWell"]);
 
 /** The line in his Last Stand's banner: the same on every screen for the same move. */
 export function lastStandLine(seed: string): string {
@@ -253,6 +268,8 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
   // Fallen, he stays silent (Eric, Oct 9: the blizzard's word too), but for his last words and his return.
   // (Dash's Scramble Rush: his word with it, fallen or not.)
   if (fallen && cue !== "lastWords" && cue !== "rise" && cue !== "rushAsk" && cue !== "rushWell") return null;
+  // (A power tip's exchange is his word just now.)
+  if (now < heldUntil && !THROUGH_HOLD.has(cue)) return null;
   if (spoken.has(key)) return null;
   spoken.add(key);
   if (spoken.size > 300) spoken.clear();
@@ -288,6 +305,8 @@ export function kingLine(now = Date.now()): Spoken | null {
 export function resetKingSpeech() {
   kingVoice.reset();
   fallen = false;
+  heldUntil = 0;
+  battle++;
   lastAt = 0;
   quietMoves = 0;
   moveNo = 0;

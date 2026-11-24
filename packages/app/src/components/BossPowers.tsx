@@ -31,6 +31,7 @@ import { Cast, PowerBanner, kitLine, momentKey, rageWarn, ragePct, type BossUi, 
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
 import { partOf } from "../boss-side.ts";
+import { playTip, tipNow } from "../power-tips.ts";
 
 /**
  * Boss powers on screen: what every player sees, from the battle's shared state (NetBoss.powers), so online everyone
@@ -57,6 +58,8 @@ export { PowerBanner, type Moment } from "./PowerParts.tsx";
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
 const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI, CHANDY_UI, BIRDIE_UI] as BossUi[]).map((u) => [u.id, u]));
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
+/** The kinds of power moment a boss has (its file's), for the power tips' table test. */
+export const bossMomentKinds = (id: string): PowerEventKind[] => Object.keys(BOSS_UI.get(id)?.moments ?? {}) as PowerEventKind[];
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
 export const WARN: MomentUi = {
@@ -227,9 +230,13 @@ export function useMomentSpeech(boss: BossView, moments: readonly Moment[], now:
     // (Its time runs from when this device says it, as a boss's animations do: a busy frame never eats into it.)
     // (A long line comes in parts that each fit the bar's two rows, "\n" between them (Don Dough's): said one after another.)
     // (A floor of several: in the words of the boss who cast it, keyed by his id, so his own bubble says it: TowerBar speakerOf.)
+    // (A power tip, the first time you see a power and now and then after (power-tips.ts): its exchange in place of the line.)
     for (const m of due) {
       const by = partOf(boss, m.boss);
-      (powerLine(bossKit(by.name), m) ?? "").split("\n").forEach((part, i) => bossVoice.say(part, `${by.id}:${boss.startMove}:${m.key}${i ? `:${i}` : ""}`, momentPriority(m)));
+      const key = `${by.id}:${boss.startMove}:${m.key}`;
+      const tip = by.id ? tipNow(by.id, m) : null;
+      if (tip) playTip(tip, key);
+      else (powerLine(bossKit(by.name), m) ?? "").split("\n").forEach((part, i) => bossVoice.say(part, `${key}${i ? `:${i}` : ""}`, momentPriority(m)));
     }
   }, [last]);
 }

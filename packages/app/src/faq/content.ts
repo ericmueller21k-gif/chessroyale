@@ -13,6 +13,7 @@
  * - Something built but not yet on for players is marked "Being tested"; something only planned, "Planned".
  */
 import {
+  POWER_TIPS,
   BATTLE_TOWER,
   BOT_LEVELS,
   CROWD_PARTY,
@@ -1068,7 +1069,7 @@ function godKing(src: FaqSources): FaqSection {
     body: `
 ### Who he is {#king-who}
 
-The crowd's champion in every Boss Battle (alone, in a party or in a group). He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}) once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.` : ""}
+The crowd's champion in every Boss Battle (alone, in a party or in a group). He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you. The first time you meet some of the bosses' powers, the boss and he trade a line or two explaining it, and again in the ${andList(POWER_TIPS.at.slice(1).map(ordinal))} battles in which you see that power, then every ${ordinal(POWER_TIPS.every)} (the ${ordinal(POWER_TIPS.at.at(-1)! + POWER_TIPS.every)}, the ${ordinal(POWER_TIPS.at.at(-1)! + 2 * POWER_TIPS.every)} and so on), counted for your account on this device.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}) once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.` : ""}
 
 ### Strike or play: his charges {#king-charges}
 

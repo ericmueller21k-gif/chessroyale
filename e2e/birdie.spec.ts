@@ -490,3 +490,55 @@ test("Birdie's fall: his cutscene plays as he thinks (the fall, the approach, th
   expect(warnedAfter.some((r) => r.through === `Move your ${NAMES[r.warn!.piece]}!`), "the dock names your piece").toBe(true);
   expect(errors).toEqual([]);
 });
+
+/**
+ * His power tip (docs/decisions/2026-11-24-power-tips.md): with `?tip=all`, as his first warning comes, his tip line in his bubble, then
+ * the God King's answer in his; a second battle without the switch (this account's count 2 on this device: not due) says neither.
+ */
+test("Birdie's power tip: his line then the God King's as the first warning comes; a second battle (count 2) without the switch, none", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(240_000);
+  const BOSS = "All aboard! Clear the tracks!";
+  const KING = "See the yellow sign? Move that piece. His train only hits the one under the sign.";
+  await asAdmin(page);
+  for (const [n, sw] of [[1, "&tip=all"], [2, ""]] as const) {
+    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=birdie&power=train&mode=raid${sw}`);
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    // (When each line was first in its bubble, every frame.)
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__tips = {} as Record<string, number>;
+      const look = () => {
+        for (const e of document.querySelectorAll(".bc-bubble, .gk-bubble")) {
+          const k = `${e.classList.contains("gk-bubble") ? "king" : "boss"}:${e.getAttribute("aria-label")}`;
+          w.__tips[k] ??= Date.now();
+        }
+        requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+    // Your moves until his first warning is yours to answer, then his exchange's time.
+    const deadline = Date.now() + 90_000;
+    let warned = false;
+    while (!warned && Date.now() < deadline) {
+      const s = await yourTurn(page);
+      if (s?.warn) warned = true;
+      else if (s) await submitMove(page, moveOf(s.fen, s.allowed), s.fen);
+      await page.waitForTimeout(200);
+    }
+    expect(warned, "his first warning").toBe(true);
+    await page.waitForTimeout(4_000);
+    const seen = await page.evaluate(() => (window as any).__tips as Record<string, number>);
+    const count = await page.evaluate(() => Object.entries(localStorage).find(([k]) => k.startsWith("brc.tips.") && k.endsWith(".birdie.train"))?.[1] ?? null);
+    expect(count, "battles in which his train was seen").toBe(String(n));
+    if (n === 1) {
+      expect(seen[`boss:${BOSS}`], "his tip line").toBeDefined();
+      expect(seen[`king:${KING}`], "the God King's answer").toBeDefined();
+      expect(seen[`king:${KING}`]!).toBeGreaterThan(seen[`boss:${BOSS}`]!);
+    } else {
+      expect(seen[`boss:${BOSS}`], "no tip line").toBeUndefined();
+      expect(seen[`king:${KING}`], "no answer").toBeUndefined();
+    }
+  }
+});

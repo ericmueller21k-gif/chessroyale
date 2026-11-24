@@ -207,6 +207,7 @@
         "e2e/boss-powers.spec.ts",
         "e2e/boss-select.spec.ts",
         "e2e/boss-speech.spec.ts",
+        "e2e/birdie.spec.ts",
         "e2e/formats.spec.ts",
         "e2e/grex.spec.ts",
         "e2e/hollow.spec.ts",
@@ -310,6 +311,7 @@
         "packages/app/src/components/LastStand.tsx",
         "packages/app/src/components/FightBanner.tsx",
         "packages/app/src/godKing.ts",
+        "packages/app/src/power-tips.ts",
         "packages/app/src/characters/god-king*.ts",
         "packages/app/public/sounds/god-king/**"
       ],
