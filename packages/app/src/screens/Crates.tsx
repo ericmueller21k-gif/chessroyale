@@ -68,6 +68,7 @@ import { useAccount } from "./Profile.tsx";
 import { testParams } from "../test-switches.ts";
 import { haptic } from "../haptics.ts";
 import { welcomeResumeRow, welcomeRows, type WelcomeRowView } from "../welcome-rows.ts";
+import { bossCratesShown, NO_BOSS_CRATES_LINE, readShowUnowned, saveShowUnowned } from "../boss-crate-rows.ts";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
 const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
@@ -183,12 +184,18 @@ export function CratesPanel() {
   }, [open, welcomeOpen]);
   const count = (n: number | null | undefined) => String(n ?? 0);
   const [picking, setPicking] = useState(false);
+  const [showUnowned, setShowUnowned] = useState(readShowUnowned);
   if (picking) return <BossPickPage onBack={() => setPicking(false)} />;
   if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
   if (welcomeOpen !== null) {
     const row = welcome.find((r) => r.n === welcomeOpen)!;
     return <WelcomePage row={row} resume={resumeRow !== null && welcomeOpen === resumeRow ? (resume ?? undefined) : undefined} onBack={() => setWelcomeOpen(null)} />;
   }
+  const bossRows = bossCratesShown(
+    BOSS_CRATES.filter((c) => profile?.admin || heldOf(locker, c) > 0 || !adminFirst({ id: c.boss })),
+    (c) => heldOf(locker, c),
+    showUnowned,
+  );
   return (
     <div class="crates">
       <GamblingWarning />
@@ -238,10 +245,26 @@ export function CratesPanel() {
       })}
       <p class="small muted crates-how">Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward.</p>
       {/* The boss crates (Eric, Nov 2: a buy in a boss's shop "adds the crate to your inventory"): each with how many you hold,
-          greyed at none (shown, not hidden: its page still shows what's inside); opened here as any crate. */}
-      <h3 class="ff-title">Boss crates</h3>
+          greyed at none; opened here as any crate. Since Nov 24 (Eric's own exception to "nothing hidden"): only the ones you hold,
+          unless "Show unowned" is checked (boss-crate-rows.ts). */}
+      <div class="boss-crates-head">
+        <h3 class="ff-title">Boss crates</h3>
+        <label class="show-unowned">
+          <input
+            type="checkbox"
+            checked={showUnowned}
+            onChange={(e) => {
+              const on = e.currentTarget.checked;
+              setShowUnowned(on);
+              saveShowUnowned(on);
+            }}
+          />
+          Show unowned
+        </label>
+      </div>
       {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
-      {BOSS_CRATES.filter((c) => profile?.admin || heldOf(locker, c) > 0 || !adminFirst({ id: c.boss })).map((c) => {
+      {bossRows.length === 0 && <p class="small muted no-boss-crates">{NO_BOSS_CRATES_LINE}</p>}
+      {bossRows.map((c) => {
         const { Crate } = CRATE_LOOKS[c.look];
         const n = heldOf(locker, c);
         return (
