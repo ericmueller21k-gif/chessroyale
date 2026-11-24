@@ -1905,3 +1905,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~17:40: quests gap + boss crates DONE → #920 (ca6d0a0b; I moved its 2 PNGs out of docs/ to stills/quests-gap-boss-crates:
   helpers keep putting images in docs/ → add to the brief template's footer). CI watched. Crate mockup helper still running. Eric signing up
   for Exchange Online Plan 1 (told: 1 user, support@ alias, turn off Email Routing first, keep Resend records).
+- Nov 24 ~18:10: #920 MERGED (f0e89d7), deploy + main run watched. Crate mockup helper running. Eric's email: Exchange Online Plan 1 (1 user);
+  Cloudflare routes only support@ + privacy@ → Gmail, catch-all off; plan given: verify TXT, aliases (eric/support/privacy), then disable
+  Email Routing and add MX/SPF/autodiscover; keep Resend records.
