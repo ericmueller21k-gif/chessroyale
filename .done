@@ -1,6 +1,0 @@
-Chandy upgrades (brief notes/briefs/chandy-upgrades.md): done on claude/chandy-upgrades.
-- Cause measured (run H): vs a crowd that sees the crosshairs, locks mostly escape (Eric-like: 315 escaped / 105 taken), 60% of hunting moves had nothing to take, trades only counted inside his top 5 lines, escaped locks sat up to 3 turns, the queen lock's shot never upgraded.
-- Built: the hunt (huntLoss 1, trades scored in one search, within takeMargin, never into mate), re-lock on escape, the shot's victim locked (shotVictim) and its shatter an upgrade, "Lock-on Shot" everywhere players read it, the God King's warning (quiet when no block).
-- Sim (20 each, before -> after): bots 0.03 -> 0.03 crowd score; Eric-like 0.17 -> 0.17, 4+ upgrades by move 30 in 14 -> 19 of 20; heeding stronger crowd 11/18 -> 17/18.
-- Tests: typecheck; chess chandy + boss kit; server chandy-lobby (+1) and parity; app chandy-wired (+2), god-king, faq; e2e chandy.spec (11), Chandy smoke + chandy-home locally. CI will run the whole suite (runner-tools.ts).
-- PR body: .pr-body.md. Decision: docs/decisions/2026-11-24-chandy-upgrades.md. Report: reports/chandy-sim.md run H.
