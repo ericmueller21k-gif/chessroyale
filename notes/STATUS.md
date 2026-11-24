@@ -1887,3 +1887,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~11:25: #917 LIVE (96536fe); main full run RED: sawyer.spec:104 (split's line: the power tip replaced his line; sawyer.spec
   wasn't in #917's targeted run). Cause: power-tips.ts mapped only to the God King's area. Fix forward claude/sawyer-tip-fix (mine):
   spec accepts the tip line; power-tips.ts gets its own area running every tipped boss's spec. Hold merges until green.
+- Nov 24 ~11:40: #918 (sawyer spec + power-tips area) MERGED (2857732), main full run watched.
