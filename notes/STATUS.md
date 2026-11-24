@@ -1911,3 +1911,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~18:20: crate mockup DONE (claude/crate-open-mockup d59369d6, stills/crate-open-mockup; no art needed; reuses recluse-light's
   `lightSprites(rgb)`; 60 fps at 4x). Sent Eric 4 videos + 2 stills. ASKED: sound A/B/C (rec A), spin length 2.7/4/6.2 (rec 4 s),
   near-edge stop, box vs crate drops. Build after his picks (targeted, crate specs).
+- Nov 24 ~18:40: Eric: email DONE (Exchange; eric@, privacy@, support@ retry). Crate pick: "number 4" = the 4th video (Rare, sound A) →
+  sound A; my calls: 4 s spin, near-edge stop, winning box drops (told him). NEW: phone full-screen takeover on the blue-black bg; computer
+  the full middle column. Build helper (Opus high, brief crate-open-build).
