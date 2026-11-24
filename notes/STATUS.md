@@ -1965,3 +1965,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   → fresh fix helper (Opus high, brief bonus-crate-fixes.md). Then a delta re-review. Stings helper resumed alongside (2 x high).
 - Nov 25 ~01:40: ERIC approved the v2 levels ("much better, that's what they should be for all"). ERIC out of crates → #924 (mine,
   b14e6997): admin "+5 crates" any series/boss crate (cratesGrantMax 10), CI watched. Running: bonus fixes (high), stings step 2 (high).
+- Nov 25 ~01:55: stings DONE → #925 (520243f7; per-tier stings, levels under the ticks, Transcendent rename + SVG tile; ERIC: "that
+  transcendent crate looks sick"), CI watched; stings helper archived. Item polish mockup can start now (1 high slot free).
