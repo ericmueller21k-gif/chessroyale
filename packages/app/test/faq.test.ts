@@ -469,7 +469,7 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("your first counted battle always gives you a boss's token");
     expect(t).toContain("25% of the time, up to 3");
     expect(t).toContain("its crate for 3 tokens of that boss, or 1 token and 1 crate key");
-    expect(t).toContain("Babur's Boss Crate holds Balloon Pup (2% of the time: the only item behind its Fischer Random) and 24 Common to Epic items");
+    expect(t).toContain("Babur's Boss Crate holds Balloon Pup (2% of the time: the only item behind its Transcendent) and 24 Common to Epic items");
     expect(t).toContain("Puddles' Boss Crate holds Puddles's Mower");
     const moved = section("crates", { ...FAQ_DEFAULTS, bossTokens: { ...FAQ_DEFAULTS.bossTokens, moves: 12, cap: 4 }, bossCratePrice: { tokens: 5, withKey: { tokens: 2, keys: 1 } } });
     expect(moved).toContain("reaches 12 of your moves");

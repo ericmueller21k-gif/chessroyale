@@ -29,7 +29,8 @@ export function timeline(spinMs: number = CRATE_OPEN.spinMs, box = true) {
   const riseMs = 650;
   const cardAt = riseAt + riseMs - 120; // the reveal card forms round it
   const cardMs = 340;
-  return { spinMs, settleMs, stop, dropAt, dropMs, landAt, shakeMs, burstAt, riseAt, riseMs, cardAt, cardMs, box };
+  const bannerAt = stop + 450; // Transcendent's banner comes up (a strip that lands on it: no box, no item), with its sound
+  return { spinMs, settleMs, stop, dropAt, dropMs, landAt, shakeMs, burstAt, riseAt, riseMs, cardAt, cardMs, bannerAt, box };
 }
 export type Timeline = ReturnType<typeof timeline>;
 
@@ -83,10 +84,10 @@ export function tickLevel(gap: number): number {
 /**
  * Every sound of one strip and what follows it, as cues: the reel's hum, a tick per click (alternating two takes so a run doesn't
  * sound looped) and the lock at the stop (no swell: Eric, Nov 24, no charge-up) (the spin is sound C's, the slot reel: Eric, Nov 24); then, if
- * `tier` (the strip that ends in the item): the box landing and shaking (with a box) and the sting (sound A's ending). The live opening
+ * `tier` (the strip that ends in the item; "transcendent" for one landing on Transcendent: its sound as its banner comes up): the box landing and shaking (with a box) and the sting (sound A's ending). The live opening
  * and the clip script play the same list.
  */
-export function cues(T: Timeline, clicks: readonly number[], tier: ItemTier | null): CrateCue[] {
+export function cues(T: Timeline, clicks: readonly number[], tier: ItemTier | "transcendent" | null): CrateCue[] {
   const out: CrateCue[] = [
     { at: 0, sound: "whirr" },
   ];
@@ -95,7 +96,9 @@ export function cues(T: Timeline, clicks: readonly number[], tier: ItemTier | nu
     out.push({ at: ms, sound: `tick${tickLevel(gap)}${i % 2 ? "b" : "a"}` });
   });
   out.push({ at: T.stop - 40, sound: "lock" });
-  if (!tier) return out;
+  // (A strip landing on Transcendent: its own sound as its banner comes up, in place of the banner's usual whoosh; Nov 24.)
+  if (tier === "transcendent") out.push({ at: T.bannerAt, sound: "transcendent" });
+  if (!tier || tier === "transcendent") return out;
   if (T.box) {
     out.push({ at: T.dropAt, sound: "land" });
     out.push({ at: T.landAt + 60, sound: `shake-${tier}` });

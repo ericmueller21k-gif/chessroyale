@@ -1109,7 +1109,7 @@ He also sits out while a boss's power has changed the board (hoops, blocks, plan
 }
 
 function crates(src: FaqSources): FaqSection {
-  const name = (id: string) => (id === "fischer" ? "Fischer Random" : (src.itemTiers.find((t) => t.id === id)?.name ?? id));
+  const name = (id: string) => (id === "fischer" ? "Transcendent" : (src.itemTiers.find((t) => t.id === id)?.name ?? id));
   const strips = src.crates.map((c) => {
     const live = liveStrip(c);
     const total = sum(live.map((x) => x.weight)) || 1;
@@ -1145,7 +1145,7 @@ function crates(src: FaqSources): FaqSection {
     return (live.find((x) => x.tier === "fischer")?.weight ?? 0) / (sum(live.map((x) => x.weight)) || 1);
   };
   const bossCrates = src.bossCrates
-    .map((c) => `**${c.name}** holds ${itemDef(c.ride)?.name ?? c.ride} (${pct(fischerShare(c), 0)} of the time: the only item behind its Fischer Random) and ${c.items.length - 1} Common to Epic items`)
+    .map((c) => `**${c.name}** holds ${itemDef(c.ride)?.name ?? c.ride} (${pct(fischerShare(c), 0)} of the time: the only item behind its Transcendent) and ${c.items.length - 1} Common to Epic items`)
     .join("; ");
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
   return {
@@ -1158,7 +1158,7 @@ function crates(src: FaqSources): FaqSection {
 
 Every item from a crate rolls three things, each on its own:
 
-1. **Its tier, which decides the item.** The strip lands on a tier's box, which opens to one of that tier's items, each as likely as the others. Or it lands on **Fischer Random**, a second spin for the rarest items: ${fischerWords}.
+1. **Its tier, which decides the item.** The strip lands on a tier's box, which opens to one of that tier's items, each as likely as the others. Or it lands on **Transcendent**, a second spin for the rarest items: ${fischerWords}.
 2. **Its color.**
 3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**.
 

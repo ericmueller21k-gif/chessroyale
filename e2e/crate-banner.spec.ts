@@ -22,7 +22,7 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
     const crate = crateDef(id)!;
     await page.locator(`.crate-row[data-crate="${id}"]`).click();
     await expect(page.locator(".crate-hero strong")).toHaveText(crate.name.replace(" · ", " ")); // (the series on its own line)
-    // A box for each of the four tiers, then Fischer Random, then every item with its chance.
+    // A box for each of the four tiers, then Transcendent, then every item with its chance.
     await expect(page.locator(`.odds-row ${box}`)).toHaveCount(4);
     await expect(page.locator(".odds-row")).toHaveCount(5 + crate.items.length);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
@@ -110,12 +110,12 @@ test("crates: the gambling warning's red ring is always at the top of the crate 
 });
 
 /**
- * The crate opening's "FISCHER RANDOM!" banner fits its words at every width (DECISIONS.md, "The computer's play
+ * The crate opening's "TRANSCENDENT!" banner (once "FISCHER RANDOM!") fits its words at every width (DECISIONS.md, "The computer's play
  * column, your icon, no sun"): on a computer it was cut off at both ends and top and bottom. Measured every animation
  * frame while it's up: the face and the words within the stage's width, the words within the band (its slanted edges
  * too), the band within the stage; and the words big enough to read.
  */
-test("crates: the Fischer Random banner fits its words, phone and computer, with readable text", async ({ page }) => {
+test("crates: the Transcendent banner fits its words, phone and computer, with readable text", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Crate Opener");
   await page.addInitScript(() => {
@@ -167,7 +167,7 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
     await page.goto("/shop?crates&fischer=1");
     await page.locator('.crate-row[data-crate="beta-001"]').click();
     // (The test switch applies once your account says you may: this server's TEST_SWITCHES.)
-    await expect(page.getByLabel("Land on Fischer Random")).toBeChecked();
+    await expect(page.getByLabel("Land on Transcendent")).toBeChecked();
     await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
     await expect(page.locator(".fischer-stage")).toBeVisible({ timeout: 20_000 });
     await page.evaluate(() => ((window as any).__fb.length = 0));
