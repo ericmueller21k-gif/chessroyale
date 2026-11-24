@@ -278,6 +278,41 @@ describe("the bonus crate: retries and opens at once", () => {
     expect(await stock(sql, ann.id)).toEqual({ series: {}, boss: { "boss-tiger": 1 }, bonus: { "boss-tiger": 1 }, keys: 0 });
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
   });
+
+  it("a boss crate: two different opens at once, holding one ordinary and one bonus crate: both open, one each; only the ordinary one rolls", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await stockCrates(sql, ann.id, "winter-1", 1);
+    await openCrate(sql, ann.id, "winter-1", {}, T0, false, rid(), { bonus: force("boss-tiger") });
+    await stockBossCrates(sql, ann.id, "boss-tiger", 1);
+    expect(await stock(sql, ann.id)).toMatchObject({ boss: { "boss-tiger": 2 }, bonus: { "boss-tiger": 1 } });
+    const rs = await Promise.all([0, 1].map(() => openBossCrate(sql, ann.id, "boss-tiger", T0, false, rid(), { bonus: force("boss-folio") })));
+    expect(rs.map((r) => r.ok)).toEqual([true, true]);
+    // (Two items, not one answered twice; one bonus, from the ordinary crate's opening.)
+    expect(new Set(rs.map((r) => r.ok && r.item.id)).size).toBe(2);
+    expect(rs.filter((r) => r.ok && r.bonus).map((r) => r.ok && r.bonus)).toEqual([{ crate: "boss-folio", key: false }]);
+    expect(await stock(sql, ann.id)).toEqual({ series: {}, boss: { "boss-folio": 1 }, bonus: { "boss-folio": 1 }, keys: 0 });
+    // A third: none left.
+    expect((await openBossCrate(sql, ann.id, "boss-tiger", T0, false, rid())).ok).toBe(false);
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
+
+  it("an older app's open (no request id) that gives a bonus: granted once, in the opening's op, and the answer has it", async () => {
+    const { sql, db } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await stockCrates(sql, ann.id, "beta-001", 1);
+    const r = await openCrate(sql, ann.id, "beta-001", {}, T0, false, null, { bonus: force("winter-1") });
+    expect(r.ok && r.bonus).toEqual({ crate: "winter-1", key: true });
+    expect(r.ok && r.locker.bonusCrates).toEqual({ "winter-1": 1 });
+    expect(opsSince(db, "crate open").length).toBe(1);
+    // A boss crate's, the same.
+    await stockBossCrates(sql, ann.id, "boss-tiger", 1);
+    const b = await openBossCrate(sql, ann.id, "boss-tiger", T0, false, null, { bonus: force("boss-folio") });
+    expect(b.ok && b.bonus).toEqual({ crate: "boss-folio", key: false });
+    expect(opsSince(db, "boss crate open").length).toBe(1);
+    expect(await stock(sql, ann.id)).toEqual({ series: { "winter-1": 1 }, boss: { "boss-folio": 1 }, bonus: { "winter-1": 1, "boss-folio": 1 }, keys: 1 });
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
 });
 
 describe("the bonus crate: the account's data", () => {
@@ -339,6 +374,9 @@ describe("the bonus crate through the API", () => {
     expect([asked.status, asked.body.bonus]).toEqual([200, { crate: "winter-1", key: true }]);
     expect(asked.body.locker!.bonusCrates["winter-1"]).toBeGreaterThanOrEqual(1);
     expect((await call(test, { crate: "beta-001", request: rid(), bonus: true }, cookie)).body.bonus).toBeDefined();
+    // (As strings, the app's ?bonus=: "1" one rolled; "0" and "" none.)
+    expect((await call(test, { crate: "beta-001", request: rid(), bonus: "1" }, cookie)).body.bonus).toBeDefined();
+    for (const off of ["0", ""]) expect((await call(test, { crate: "beta-001", request: rid(), bonus: off }, cookie)).body.bonus, off).toBeUndefined();
     // A boss crate's opening through the API: the same switch.
     await stockBossCrates(sql, ann.id, "boss-tiger", 1);
     expect((await call(test, { crate: "boss-tiger", request: rid(), bonus: "beta-001" }, cookie)).body.bonus).toEqual({ crate: "beta-001", key: true });

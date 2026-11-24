@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { BOSS_ADMIN_FIRST, BOSS_CRATES, CRATES, CRATE_BONUS, WELCOME_CRATE_ID, bonusPool, mulberry32, opensWithKey, rollBonus } from "@chessroyale/core";
+import { describe, expect, it, vi } from "vitest";
+import { BOSS_ADMIN_FIRST, BOSS_CRATES, CRATES, CRATE_BONUS, WELCOME_CRATE_ID, bonusOddsLine, bonusPool, mulberry32, opensWithKey, rollBonus } from "@chessroyale/core";
 
 /**
  * The bonus crate (Eric, Nov 24; docs/decisions/2026-11-24-bonus-crate.md): 25% of openings also give a crate, any crate evenly (retired
@@ -73,5 +73,36 @@ describe("the bonus crate: the odds", () => {
 
   it("the same seed rolls the same bonus (the server's roll is the item's own stream, so a seed replays the whole opening)", () => {
     for (let s = 1; s <= 50; s++) expect(rollBonus(mulberry32(s))).toEqual(rollBonus(mulberry32(s)));
+  });
+});
+
+describe("the bonus crate: edges and its words (the review, Nov 25)", () => {
+  it("an empty pool gives no bonus, never a throw (even forced)", async () => {
+    vi.resetModules();
+    vi.doMock("../src/crates.ts", async (orig) => ({ ...(await orig<typeof import("../src/crates.ts")>()), CRATES: [], BOSS_CRATES: [] }));
+    try {
+      const empty = await import("../src/bonus-crate.ts");
+      expect(empty.bonusPool(true)).toEqual([]);
+      for (let s = 1; s <= 50; s++) expect(empty.rollBonus(mulberry32(s))).toBeNull();
+      expect(empty.rollBonus(mulberry32(1), { force: true })).toBeNull();
+      expect(empty.rollBonus(mulberry32(1), { force: "winter-1", admin: true })).toBeNull();
+      expect(empty.bonusOddsLine()).toBe("Opening a crate gives no bonus crate for now.");
+    } finally {
+      vi.doUnmock("../src/crates.ts");
+      vi.resetModules();
+    }
+  });
+
+  it("the odds line is exact: which openings, the chance, how many crates and each one's share, the key, what's left out", () => {
+    const n = bonusPool().length;
+    const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
+    expect(bonusOddsLine()).toBe(
+      `Opening a series or boss crate: 25% chance of a bonus crate, one of ${n} crates chosen evenly (about ${pct(1 / n)} each, so about ${pct(0.25 / n)} of openings for each), with its key if it needs one. The Welcome Crate and crates of bosses not yet released aren't in it. Opening a bonus crate never gives another.`,
+    );
+    // (Not "every opening": the Welcome Crate's gives none.)
+    expect(bonusOddsLine()).not.toMatch(/every opening|any crate/i);
+    expect(bonusOddsLine(0.3, 10)).toContain("30% chance of a bonus crate, one of 10 crates chosen evenly (about 10% each, so about 3% of openings for each)");
+    expect(bonusOddsLine(0.25, 1)).toContain("25% chance of a bonus crate, that one crate, with its key");
+    expect(bonusOddsLine(0)).toBe("Opening a crate gives no bonus crate for now.");
   });
 });

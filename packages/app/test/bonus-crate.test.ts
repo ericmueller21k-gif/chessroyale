@@ -74,12 +74,12 @@ describe("the bonus crate's card", () => {
 
 describe("the bonus crate's odds line", () => {
   it("each crate's odds panel and the FAQ say it in one plain line, from CRATE_BONUS", () => {
-    expect(bonusOddsLine()).toBe("Every opening: 25% chance of a bonus crate (any crate, chosen evenly) and its key if it needs one. Opening a bonus crate never gives another.");
+    expect(bonusOddsLine()).toMatch(/^Opening a series or boss crate: 25% chance of a bonus crate, one of \d+ crates chosen evenly /);
     expect(CRATE_BONUS.chance).toBe(0.25);
-    expect(bonusOddsLine(0.3)).toContain("Every opening: 30% chance");
+    expect(bonusOddsLine(0.3)).toContain("Opening a series or boss crate: 30% chance");
     const faq = (src = FAQ_DEFAULTS) => faqPage(src).sections.find((s) => s.id === "crates")!.body;
     expect(faq()).toContain(`**Bonus crates.** ${bonusOddsLine()}`);
-    expect(faq({ ...FAQ_DEFAULTS, crateBonus: { chance: 0.1 } })).toContain("Every opening: 10% chance of a bonus crate");
-    expect(faq()).toContain("not the Welcome Crate");
+    expect(faq({ ...FAQ_DEFAULTS, crateBonus: { chance: 0.1 } })).toContain("10% chance of a bonus crate");
+    expect(faq()).toContain("The Welcome Crate and crates of bosses not yet released aren't in it.");
   });
 });

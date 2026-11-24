@@ -651,7 +651,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const force = testing ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
     // The bonus crate (Nov 24; core bonus-crate.ts): the server's roll on every opening. Where TEST_SWITCHES is "1" (local, e2e,
     // staging), only when the test asks (`bonus`: true, or a crate's id: ?bonus=1 / ?bonus=winter-1), so a test's counts stay what it set.
-    const bonus: BonusMode = !testing ? "roll" : b.bonus === true ? { force: true } : typeof b.bonus === "string" && b.bonus ? { force: b.bonus } : "off";
+    // ("0", "1" and "" as strings: none, a rolled one, none; the review, Nov 25.)
+    const bonus: BonusMode = !testing
+      ? "roll"
+      : b.bonus === true || b.bonus === "1"
+        ? { force: true }
+        : typeof b.bonus === "string" && b.bonus && b.bonus !== "0"
+          ? { force: b.bonus }
+          : "off";
     // (The Welcome Crate, Nov 6: yours once you've earned it, opened once, the server's roll only: welcome.ts.)
     if (isWelcomeCrate(b.crate)) {
       const w = await openWelcomeCrate(sql, current.id, now);

@@ -36,9 +36,10 @@ export type Timeline = ReturnType<typeof timeline>;
 /**
  * The bonus crate's card (Nov 24; docs/decisions/2026-11-24-bonus-crate.md): a beat after the item's card has formed (`afterCardMs`), the
  * item's stage dims and a short gold beam shoots up (`beamMs`), the bonus card forming over it (`cardAt`, `cardMs`), the beam then
- * fading back. In ms from the bonus's own start.
+ * fading back. In ms from the bonus's own start. `calmMs` (the review, Nov 25): after its OK, how long the item's card's buttons stay
+ * inert (a double tap on OK, which sits over "Open another", opens nothing).
  */
-export const BONUS = { afterCardMs: 700, beamMs: 320, cardAt: 160, cardMs: 340 } as const;
+export const BONUS = { afterCardMs: 700, beamMs: 320, cardAt: 160, cardMs: 340, calmMs: 300 } as const;
 
 /**
  * How far the strip has moved at `u` (0 to 1 of the spin), as a share of the distance: a cubic ease-out (the old strip's quartic left

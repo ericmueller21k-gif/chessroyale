@@ -38,6 +38,8 @@ export interface BonusRoll {
  */
 export function rollBonus(rng: Rng, opts: { admin?: boolean; force?: true | string } = {}): BonusRoll | null {
   const pool = bonusPool(opts.admin);
+  // (No crate to give, e.g. a list emptied in a test: no bonus, never a throw that would fail the opening.)
+  if (!pool.length) return null;
   const hit = rng() < CRATE_BONUS.chance;
   const forced = typeof opts.force === "string" ? pool.find((c) => c.id === opts.force) : undefined;
   if (!hit && !opts.force) return null;
@@ -45,10 +47,18 @@ export function rollBonus(rng: Rng, opts: { admin?: boolean; force?: true | stri
   return { crate: crate.id, key: opensWithKey(crate.id) };
 }
 
+/** A share as a percentage, to one decimal place at most ("25%", "8.3%"). */
+const pct = (x: number): string => `${Math.round(x * 1000) / 10}%`;
+
 /**
- * The bonus in one plain line, as every crate's odds panel and the FAQ show it (the director's words, Nov 24, and two of ours for
- * accuracy: a boss crate needs no key, and a bonus crate's own opening never gives one): "Every opening: 25% chance of a bonus crate
- * (any crate, chosen evenly) and its key if it needs one. Opening a bonus crate never gives another."
+ * The bonus in plain, exact words, as every crate's odds panel and the FAQ show it (an odds disclosure must be exact; the review, Nov 25):
+ * which openings roll it (a series or boss crate's: not the Welcome Crate's, not a bonus crate's), the chance, how many crates it's one
+ * of and each one's share (`crates`: a player's pool, `bonusPool()`), the key, and what the pool leaves out. Today: "Opening a series or
+ * boss crate: 25% chance of a bonus crate, one of N crates chosen evenly (about X% each, so about Y% of openings for each), with its key
+ * if it needs one. The Welcome Crate and crates of bosses not yet released aren't in it. Opening a bonus crate never gives another."
  */
-export const bonusOddsLine = (chance: number = CRATE_BONUS.chance): string =>
-  `Every opening: ${Math.round(chance * 1000) / 10}% chance of a bonus crate (any crate, chosen evenly) and its key if it needs one. Opening a bonus crate never gives another.`;
+export function bonusOddsLine(chance: number = CRATE_BONUS.chance, crates: number = bonusPool().length): string {
+  if (crates <= 0 || chance <= 0) return "Opening a crate gives no bonus crate for now.";
+  const each = crates === 1 ? "that one crate" : `one of ${crates} crates chosen evenly (about ${pct(1 / crates)} each, so about ${pct(chance / crates)} of openings for each)`;
+  return `Opening a series or boss crate: ${pct(chance)} chance of a bonus crate, ${each}, with its key if it needs one. The Welcome Crate and crates of bosses not yet released aren't in it. Opening a bonus crate never gives another.`;
+}
