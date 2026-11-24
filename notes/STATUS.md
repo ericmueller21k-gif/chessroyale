@@ -1897,3 +1897,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~12:45: #919 watchdog MERGED (8423926), main full run watched (should turn main green).
 - Nov 24 ~13:30: #919 LIVE (8423926), main full run GREEN (no [renderer-hang]). Merges open. No helpers running. Waiting on Eric: power tips
   playtest; Discord webhook (ALERT_WEBHOOK, his to set). Queue: #915 N1, #916 nits, earlier nits (see above).
+- Nov 24 ~13:45: ERIC list: (1) quests pop-up 12 h gap after closing + (2) boss crates "Show unowned" (default unchecked) → helper (Opus
+  medium, brief quests-gap-boss-crates); (3) crate opening overhaul: MOCKUP + 3 sound clips (card in spokes / ratchet / slot tick) + RL-style
+  open with rarity-colored light → helper (Opus high, brief crate-open-mockup); (4) test crates: told him the Crates tab's admin "+100 crate
+  keys" exists; coins grant offered (full lane) if he wants; (5) LLC bought (pending); Stripe TEST mode: yes, now (his: create account, test
+  keys into Cloudflare). Payments build queued next.
