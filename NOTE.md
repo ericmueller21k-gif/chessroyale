@@ -23,3 +23,8 @@ only the ending after the lid bursts changes per tier. MP3s for listening; WAVs 
 - `opening-transcendent-mythic-v2.mp3`: the Transcendent path at the new levels.
 - Levels: every ending now plays under the spin's ticks (EBU R128 momentary max: ticks -15.8 LUFS; stings Common -21 climbing to
   Mythic -19, Transcendent -19.5, the box's land -23.5; every ending's peak 5 to 9 dB under the ticks' peak).
+
+## Stills (step 2)
+
+`phone/` and `computer/`: `1-landed` (the strip stopped on the new Transcendent tile: a prismatic crate on deep violet) and `2-banner`
+("TRANSCENDENT!" with the tile as its face). From the dev preview (`/crate-open-preview.html?tier=mythic&fischer=1&capture=1`).
