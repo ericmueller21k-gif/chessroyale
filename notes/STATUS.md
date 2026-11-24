@@ -1884,3 +1884,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~10:55: #917 RED: boss-speech.spec:124 (Boingo/Hollow tip lines held ~1.2 s past their time for the answer). FIXED BY ME
   (4884debb: each line keeps its own time; spec + birdie tip check pass locally). CI bog9tqk0k.
 - Nov 24 ~11:30: #917 power tips MERGED (96536fe), deploy + main run watched. No helpers running. Waiting on Eric's playtest of the 5 tips.
+- Nov 24 ~11:25: #917 LIVE (96536fe); main full run RED: sawyer.spec:104 (split's line: the power tip replaced his line; sawyer.spec
+  wasn't in #917's targeted run). Cause: power-tips.ts mapped only to the God King's area. Fix forward claude/sawyer-tip-fix (mine):
+  spec accepts the tip line; power-tips.ts gets its own area running every tipped boss's spec. Hold merges until green.
