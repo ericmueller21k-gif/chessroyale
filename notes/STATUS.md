@@ -1998,3 +1998,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~05:50: crowd desktop flush DONE (helper missed Eric's scoreboard-top add-on; I added it: --side-pad, e2e checks table top) →
   #927 (951466c7), CI watched, still sent. Helper archived. Running: town arrowStep fix (medium), vote labels mockup (high). Main still
   red (flaky town-controls) until that fix merges; #927 waits for it.
+- Nov 25 ~06:05: vote labels mockup DONE (claude/vote-labels-mockup cd565df0, ?votetags=a|b|c; stills/vote-labels-mockup); sent A/B/C.
+  Helper's pick A (tower-gold floor letters), B fallback. Waiting on Eric's pick → build from that branch (targeted).
