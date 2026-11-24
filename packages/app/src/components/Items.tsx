@@ -107,36 +107,157 @@ export const TUBE_STRIPES = (() => {
   }
   return out;
 })();
+/**
+ * Item animations (Nov 24 mockup, Eric: "anything that's a mythic needs to have some slight animation to it ... not
+ * obnoxiously"). CSS only, on transforms and opacity (styles.css, the `ia-` classes): no frame loop, slow and calm, off
+ * with reduced motion, where every part rests in the still drawing. `Pivot` turns or scales its children about a point
+ * in the drawing's own units, the same in every frame the item is drawn in (a pawn, a card, a tilted group).
+ */
+function Pivot({ x, y, cls, style, children }: { x: number; y: number; cls: string; style?: string; children: ComponentChildren }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <g class={`ia ${cls}`} style={style}>
+        <g transform={`translate(${-x} ${-y})`}>{children}</g>
+      </g>
+    </g>
+  );
+}
+/** A small four-point sparkle centered on (x, y), `r` from its middle to a point. */
+const sparkle = (x: number, y: number, r: number) =>
+  `M${x} ${y - r} Q${x + r * 0.18} ${y - r * 0.18} ${x + r} ${y} Q${x + r * 0.18} ${y + r * 0.18} ${x} ${y + r} Q${x - r * 0.18} ${y + r * 0.18} ${x - r} ${y} Q${x - r * 0.18} ${y - r * 0.18} ${x} ${y - r} Z`;
+/** Which of a mockup's options an item is drawn with (the preview page sets it on the item; Nov 24 mockup only). */
+const optionOf = (p: Paint) => (p.finish as Finish & { variant?: string }).variant;
+
+/** The tube's stripes reaching one period (three bands) further down, for the barber pole's scroll (cut by a clip). */
+const TUBE_PERIOD = 3 * 4.6;
+const TUBE_SCROLL = (() => {
+  const BAND = 4.6;
+  const RISE = 6;
+  const out: string[][] = [[], [], []];
+  let k = 0;
+  for (let y = TUBE.top - BAND - RISE; y < TUBE.bottom + 2 * TUBE_PERIOD + RISE; y += BAND, k++)
+    out[k % 3]!.push(`M${TUBE.x0} ${+y.toFixed(2)} L${TUBE.x1} ${+(y - RISE).toFixed(2)} L${TUBE.x1} ${+(y - RISE + BAND).toFixed(2)} L${TUBE.x0} ${+(y + BAND).toFixed(2)} Z`);
+  return out;
+})();
+/**
+ * The Gift-Wrap Tube. Nov 24 mockup (Eric: "definitely needs something more than just ... a shiny effect"; Nov 25: "I like your
+ * gift wrap tube idea"): every few seconds its stripes wind up the tube like a barber pole's, two turns, and a sparkle
+ * pings at its tip. The option beside it (`confetti`): a small puff of confetti in its colors from the tip now and then.
+ */
 function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
-  const [white, first, second] = TUBE_STRIPES;
+  const [white, first, second] = TUBE_SCROLL;
+  const confetti = optionOf(p) === "confetti";
+  const bits: [number, number, number, string][] = [
+    [-7, -9, -160, "#fbfbf8"],
+    [-3, -12, 120, p.hex],
+    [1, -13, -90, p2.hex],
+    [5, -10, 200, "#fbfbf8"],
+    [8, -6, -140, p.hex],
+    [-9, -4, 150, p2.hex],
+  ];
   return (
     <g transform="rotate(16 82 58)">
-      {white!.map((d) => (
-        <path key={d} d={d} fill="#fbfbf8" />
-      ))}
-      <Region p={p} name="stripes" d={first!} outline={false} />
-      <Region p={p2} name="stripes2" d={second!} outline={false} />
+      <clipPath id={`${p.id}-tube`}>
+        <rect x={TUBE.x0} y={TUBE.top} width={TUBE.x1 - TUBE.x0} height={TUBE.bottom - TUBE.top} rx="1.2" />
+      </clipPath>
+      <g clip-path={`url(#${p.id}-tube)`}>
+        <g class={confetti ? undefined : "ia ia-scroll"}>
+          {white!.map((d) => (
+            <path key={d} d={d} fill="#fbfbf8" />
+          ))}
+          <Region p={p} name="stripes" d={first!} outline={false} />
+          <Region p={p2} name="stripes2" d={second!} outline={false} />
+        </g>
+      </g>
       <rect x={TUBE.x0} y={TUBE.top} width={TUBE.x1 - TUBE.x0} height={TUBE.bottom - TUBE.top} rx="1.2" fill="none" {...LINE} {...lw(2.4)} />
+      {confetti ? (
+        bits.map(([dx, dy, r, c], i) => (
+          <Pivot key={i} x={82 + (i - 2.5) * 0.9} y={16.5} cls="ia-confetti" style={`--dx:${dx}px;--dy:${dy}px;--r:${r}deg`}>
+            <rect x={81.2 + (i - 2.5) * 0.9} y={15.6} width="1.6" height="1.9" rx="0.3" fill={c} stroke="#1d1d1f" {...lw(0.5)} />
+          </Pivot>
+        ))
+      ) : (
+        <Pivot x={82} y={14.6} cls="ia-ping">
+          <path d={sparkle(82, 14.6, 4.2)} fill="#fffbe8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(0.8)} />
+        </Pivot>
+      )}
     </g>
   );
 }
 
+/** One flame rising from (x, y), `w` across its widest and `h` tall, its tip leaning a little and curling back. */
+const flamePath = (x: number, y: number, w: number, h: number) => {
+  const a = w / 2;
+  return (
+    `M${x} ${y} C${x - a * 1.25} ${y - h * 0.05} ${x - a * 1.2} ${y - h * 0.42} ${x - a * 0.55} ${y - h * 0.62} ` +
+    `C${x - a * 0.15} ${y - h * 0.76} ${x - a * 0.45} ${y - h * 0.9} ${x - a * 0.12} ${y - h} ` +
+    `C${x + a * 0.5} ${y - h * 0.86} ${x + a * 0.25} ${y - h * 0.7} ${x + a * 0.62} ${y - h * 0.56} ` +
+    `C${x + a * 1.05} ${y - h * 0.42} ${x + a * 1.3} ${y - h * 0.1} ${x} ${y} Z`
+  );
+};
+/** One ice shard, standing at x on the band, its point at `top`, `w` either side; and its shaded right face. */
+const shard = (x: number, top: number, w: number) => [
+  `M${x - w} 22.6 L${x - w * 0.62} ${top + 3.4} L${x} ${top} L${x + w * 0.62} ${top + 3.4} L${x + w} 22.6 Z`,
+  `M${x} ${top} L${x + w * 0.62} ${top + 3.4} L${x + w} 22.6 L${x + w * 0.12} 22.6 Z`,
+];
+/**
+ * The Fire & Ice Crown, rebuilt (Nov 24 mockup; Eric: "the top little parts that are floating, we should replace those with
+ * actual like flames ... the fire needs to be a bit cooler"): a band of ice with four ice shards, and between them three real
+ * flames rising out of the ice, in the item's color: each one layered (its color outside, lighter inside, a near-white core),
+ * with a soft glow of its color behind and the odd ember drifting up. The flames flicker, calmly, each at its own pace. The ice
+ * stays ice, whatever the color: only the fire takes it.
+ */
 function FireIceCrown({ p }: { p: Paint }) {
   const id = p.id;
-  const flame = (x: number, y: number, s: number) =>
-    `M${x} ${y} C${x - 5 * s} ${y - 4 * s} ${x - 2 * s} ${y - 9 * s} ${x} ${y - 13 * s} C${x + 1 * s} ${y - 8 * s} ${x + 6 * s} ${y - 6 * s} ${x} ${y} Z`;
+  const mid = lighten(p.hex, 0.42);
+  const core = lighten(p.hex, 0.88);
+  const flames: [number, number, number, string][] = [
+    [38.9, 8, 17, "f1"],
+    [50, 10.4, 25, "f2"],
+    [61.1, 8, 17, "f3"],
+  ];
   return (
     <g>
       <defs>
         <linearGradient id={`${id}-ice`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#f0fbff" />
-          <stop offset="1" stop-color="#8fd3f4" />
+          <stop offset="0" stop-color="#f4fcff" />
+          <stop offset="1" stop-color="#9fdaf6" />
         </linearGradient>
+        {/* The fire: deeper at its root, the item's color through its body, brightening at its tip. */}
+        <linearGradient id={`${id}-fire`} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color={darken(p.hex, 0.18)} />
+          <stop offset="0.55" stop-color={p.hex} />
+          <stop offset="1" stop-color={lighten(p.hex, 0.4)} />
+        </linearGradient>
+        <radialGradient id={`${id}-glow`}>
+          <stop offset="0" stop-color={p.hex} stop-opacity="0.55" />
+          <stop offset="0.6" stop-color={p.hex} stop-opacity="0.2" />
+          <stop offset="1" stop-color={p.hex} stop-opacity="0" />
+        </radialGradient>
       </defs>
-      <Region p={p} name="flames" fill={p.flameFill} d={[flame(39, 14, 0.8), flame(50, 9, 1), flame(61, 14, 0.8)]} />
-      <path d="M33 26 L33 14 L39 18 L44 9 L50 15 L56 9 L61 18 L67 14 L67 26 Z" fill={`url(#${id}-ice)`} {...LINE} />
-      <path d="M36 22 L64 22" stroke="#bae6fd" {...lw(1.6)} />
-      <circle cx="50" cy="21" r="2.2" fill="#38bdf8" stroke="#1d1d1f" {...lw(1.2)} />
+      <ellipse class="ia ia-glow" cx="50" cy="12" rx="22" ry="15" fill={`url(#${id}-glow)`} />
+      {[shard(33.8, 13.4, 2.4), shard(44, 10.6, 2.6), shard(56, 10.6, 2.6), shard(66.2, 13.4, 2.4)].map(([s, face]) => (
+        <g key={s}>
+          <path d={s} fill={`url(#${id}-ice)`} />
+          <path d={face} fill="#7cc6ec" opacity="0.55" />
+          <path d={s} fill="none" {...LINE} {...lw(1.8)} />
+        </g>
+      ))}
+      {flames.map(([x, w, h, k]) => (
+        <Pivot key={k} x={x} y={23} cls={`ia-flame ${k}`}>
+          <Region p={p} name={`flame-${k}`} fill={`url(#${id}-fire)`} d={[flamePath(x, 23, w, h)]} line={1.7} />
+          <path class="ia ia-core" d={flamePath(x + 0.1, 23, w * 0.64, h * 0.72)} fill={mid} />
+          <path d={flamePath(x + 0.2, 23.2, w * 0.34, h * 0.44)} fill={core} />
+        </Pivot>
+      ))}
+      {/* Embers: a spark drifts up from the fire now and then. */}
+      <circle class="ia ia-ember e1" cx="47.5" cy="3" r="0.9" fill={core} stroke={p.hex} {...lw(0.5)} />
+      <circle class="ia ia-ember e2" cx="60" cy="8" r="0.75" fill={core} stroke={p.hex} {...lw(0.5)} />
+      <path d="M31.6 21.6 Q50 24.4 68.4 21.6 L68.4 26.4 Q50 29.2 31.6 26.4 Z" fill={`url(#${id}-ice)`} {...LINE} {...lw(2.4)} />
+      <path d="M34.6 24.1 Q50 26.6 65.4 24.1" fill="none" stroke="#c9eefc" stroke-linecap="round" {...lw(1.2)} />
+      <path d="M50 21.9 L52.5 24.6 L50 27.3 L47.5 24.6 Z" fill="#38bdf8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1)} />
+      <path d="M49.1 23.4 L50 22.6" stroke="#fff" stroke-linecap="round" {...lw(0.8)} />
+      <path class="ia ia-frost" d={sparkle(33.8, 16.6, 1.8)} fill="#fff" />
     </g>
   );
 }
@@ -168,6 +289,33 @@ function Present({ p, p2 }: { p: Paint; p2: Paint }) {
 
 /** A candy cane at the pawn's side: white, striped in its color. */
 const CANE = "M86 94 L86 30 A14 14 0 0 0 58 30 L58 33 A3 3 0 0 0 64 33 L64 30 A8 8 0 0 1 80 30 L80 94 A3 3 0 0 0 86 94 Z";
+/**
+ * The swirl's steps (Nov 24 mockup), bottom to top along the cane's middle: up the shaft, round the hook, to its tip. Each
+ * is a short line of light across the cane, slanted like its stripes, so lit in turn they read as light winding up them.
+ */
+const CANE_SWIRL = (() => {
+  const out: string[] = [];
+  const step = 4.4;
+  const half = 3.6;
+  const slant = (24 * Math.PI) / 180;
+  /** A line across the cane at (x, y), where the cane runs along angle `a` (radians), slanted like the stripes. */
+  const across = (x: number, y: number, a: number) => {
+    const n = a + Math.PI / 2 - slant;
+    const dx = Math.cos(n) * half;
+    const dy = Math.sin(n) * half;
+    return `M${+(x - dx).toFixed(2)} ${+(y - dy).toFixed(2)} L${+(x + dx).toFixed(2)} ${+(y + dy).toFixed(2)}`;
+  };
+  for (let y = 91; y > 30; y -= step) out.push(across(83, y, -Math.PI / 2));
+  // Round the hook: its middle is a circle about (72, 30), 11 across, from the right (0°) over the top to the left.
+  for (let t = 0.2; t <= Math.PI + 0.01; t += step / 11) out.push(across(72 + 11 * Math.cos(t), 30 - 11 * Math.sin(t), -t - Math.PI / 2));
+  out.push(across(61, 32.4, Math.PI / 2));
+  return out;
+})();
+/**
+ * A candy cane at the pawn's side: white, striped in its color. Nov 24 mockup (Eric: "since it's like a magical thing, it
+ * should do this cool like magical spiral swirl that goes from the bottom of it all the way ... up to the top, and then kind of
+ * repeats every so often"): a band of light winds up its stripes, round the hook, and a sparkle pops at its tip; then it rests.
+ */
 function CandyCane({ p }: { p: Paint }) {
   const stripes = [];
   for (let y = -6; y < 112; y += 10) stripes.push(`M50 ${y} L100 ${y + 22} L100 ${y + 27} L50 ${y + 5} Z`);
@@ -180,8 +328,19 @@ function CandyCane({ p }: { p: Paint }) {
       <g clip-path={`url(#${p.id}-cane)`}>
         <Region p={p} name="stripes" d={stripes} outline={false} />
         <path d="M84.5 34 V90" stroke="#fff" opacity="0.55" {...lw(1.6)} stroke-linecap="round" />
+        <g fill="none" stroke-linecap="round">
+          {CANE_SWIRL.map((d, i) => (
+            <g key={d} class="ia ia-swirl" style={`animation-delay:${(i * 0.075).toFixed(3)}s`}>
+              <path d={d} stroke="#ffcf4a" opacity="0.8" {...lw(3.6)} />
+              <path d={d} stroke="#fffbe8" {...lw(1.5)} />
+            </g>
+          ))}
+        </g>
       </g>
       <path d={CANE} fill="none" {...LINE} />
+      <Pivot x={60.6} y={35.4} cls="ia-pop" style={`animation-delay:${(CANE_SWIRL.length * 0.075).toFixed(3)}s`}>
+        <path d={sparkle(60.6, 35.4, 5)} fill="#fffbe8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(0.8)} />
+      </Pivot>
     </g>
   );
 }
@@ -458,20 +617,56 @@ function DarkShades({ p }: { p: Paint }) {
   );
 }
 
+/** The Smiley Face's expressions (Nov 24 mockup; Eric: "a few of them are different expressions ... they can just be like that"). */
+export const SMILEY_EXPRESSIONS = ["smile", "wink", "tongue", "cool", "surprised", "laughing"] as const;
+/**
+ * A smiley's expression. Recommended (the mockup's note): from the item's seed, as the Gift-Wrap Tube's second color is, so it's
+ * never stored and the crate doesn't change. (A real build would put this in core beside `secondColor`, with the name on the card.)
+ */
+export const smileyExpression = (seed: number) => SMILEY_EXPRESSIONS[(((seed ^ 0x51e7) * 2654435761) >>> 0) % SMILEY_EXPRESSIONS.length]!;
 /**
  * A smiley face (Beta, a one-off): a flat round dot smiley over the whole head, in its color; dark dot eyes and smile.
- * A third bigger than first drawn (Eric, Oct 15), around the same middle (50, 29), lines and all.
+ * A third bigger than first drawn (Eric, Oct 15), around the same middle (50, 29), lines and all. Nov 24 mockup: one of six
+ * expressions (`SMILEY_EXPRESSIONS`), each drawn with the same eyes, ink and lines.
  */
 function SmileyFace({ p }: { p: Paint }) {
   const n = parseInt(p.hex.slice(1), 16);
   const dark = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 < 0.25;
   const ink = dark ? "#f8fafc" : "#1d1d1f";
+  const face = optionOf(p) ?? smileyExpression(p.finish.seed);
+  const stroke = { fill: "none", stroke: ink, "stroke-linecap": "round" as const, "stroke-linejoin": "round" as const };
+  const eye = (x: number) => <ellipse cx={x} cy="24.74" rx="1.8" ry="2.66" fill={ink} />;
+  const shut = (x: number) => <path d={`M${x - 2.5} 25.4 Q${x} 22.6 ${x + 2.5} 25.4`} {...stroke} {...lw(2.1)} />;
+  const smile = <path d="M42.02 31.13 Q50 39.64 57.98 31.13" {...stroke} {...lw(2.5)} />;
+  const tongue = (d: string) => <path d={d} fill="#f2788f" stroke={ink} stroke-linejoin="round" {...lw(1.1)} />;
   return (
     <g>
       <Region p={p} name="face" d={["M36 29 a14 14 0 1 0 28 0 a14 14 0 1 0 -28 0 Z"]} line={3.2} />
-      <ellipse cx="45.08" cy="24.74" rx="1.8" ry="2.66" fill={ink} />
-      <ellipse cx="54.92" cy="24.74" rx="1.8" ry="2.66" fill={ink} />
-      <path d="M42.02 31.13 Q50 39.64 57.98 31.13" fill="none" stroke={ink} stroke-linecap="round" {...lw(2.5)} />
+      {face === "smile" && [eye(45.08), eye(54.92), smile]}
+      {face === "wink" && [eye(45.08), shut(54.92), <path d="M42.4 31.6 Q50.6 39 57.6 30.4" {...stroke} {...lw(2.5)} />]}
+      {face === "tongue" && [
+        eye(45.08),
+        eye(54.92),
+        tongue("M50.6 34.6 Q51 40.8 54 40.6 Q57 40.2 55.8 33.6 Z"),
+        <path d="M42.02 31.13 Q50 39.64 57.98 31.13" {...stroke} {...lw(2.5)} />,
+      ]}
+      {face === "cool" && [
+        <path d="M38.8 22.2 H61.2 M40.4 22.4 H48.2 Q48.6 22.4 48.4 23 L47.6 26.6 Q47.2 27.8 46 27.8 H42.4 Q41.2 27.8 40.9 26.6 L40 23 Q39.9 22.4 40.4 22.4 Z M51.8 22.4 H59.6 Q60.1 22.4 60 23 L59.1 26.6 Q58.8 27.8 57.6 27.8 H54 Q52.8 27.8 52.4 26.6 L51.6 23 Q51.4 22.4 51.8 22.4 Z" fill={ink} stroke={ink} stroke-linejoin="round" {...lw(1.2)} />,
+        <path d="M42.2 23.8 L43.4 23.8 M53.6 23.8 L54.8 23.8" stroke={dark ? "#1d1d1f" : "#fff"} stroke-linecap="round" opacity="0.8" {...lw(1)} />,
+        <path d="M44 34 Q51.4 36.8 56.8 31.6" {...stroke} {...lw(2.5)} />,
+      ]}
+      {face === "surprised" && [
+        <ellipse cx="45.08" cy="24.4" rx="2.1" ry="3" fill={ink} />,
+        <ellipse cx="54.92" cy="24.4" rx="2.1" ry="3" fill={ink} />,
+        <path d="M42.4 19.6 Q45 18 47.6 19.4 M52.4 19.4 Q55 18 57.6 19.6" {...stroke} {...lw(1.6)} />,
+        <ellipse cx="50" cy="34.4" rx="2.7" ry="3.3" fill={ink} />,
+      ]}
+      {face === "laughing" && [
+        shut(45.08),
+        shut(54.92),
+        <path d="M41.4 30.2 Q50 43 58.6 30.2 Z" fill={ink} stroke={ink} stroke-linejoin="round" {...lw(1.4)} />,
+        tongue("M45.4 36.6 Q50 33.6 54.6 36.6 Q50 40.4 45.4 36.6 Z"),
+      ]}
     </g>
   );
 }
@@ -510,6 +705,8 @@ function SuitAndTie({ p, p2, side }: { p: Paint; p2: Paint; side: "w" | "b" }) {
  * tilted. Thinner outlines, so the barrel shows on a small pawn.
  */
 function TommyGun({ p, p2 }: { p: Paint; p2: Paint }) {
+  /** Nov 24 mockup: "drum" (its key turns a notch), "puff" (a puff from the muzzle), or both (the pick). */
+  const tommy = optionOf(p);
   const fins = [];
   for (let x = 51.5; x < 64; x += 2) fins.push(<path key={x} d={`M${x} -3.2 V3.2`} />);
   return (
@@ -521,9 +718,22 @@ function TommyGun({ p, p2 }: { p: Paint; p2: Paint }) {
       <Region p={p} name="fins" d={["M50 -3.4 H64.5 V3.4 H50 Z"]} over={<g stroke="#000" opacity="0.4" {...lw(0.9)}>{fins}</g>} line={1.8} />
       <Region p={p} name="receiver" d={["M19 -4.6 H22 L23 -6.6 H25.4 L26.4 -4.6 H46 Q47.6 -4.6 47.6 -3 V3 Q47.6 4.2 46.4 4.2 H19 Z"]} line={2} />
       <Region p={p} name="drum" d={["M33 11.6 a7.8 7.8 0 1 0 15.6 0 a7.8 7.8 0 1 0 -15.6 0 Z"]} line={2} />
-      <circle cx="40.8" cy="11.6" r="3.4" fill="none" stroke="#000" opacity="0.35" {...lw(1.2)} />
-      <circle cx="40.8" cy="11.6" r="1.1" fill="#1d1d1f" />
+      <circle cx="40.8" cy="11.6" r="4.6" fill="none" stroke="#000" opacity="0.35" {...lw(1.2)} />
+      {/* The drum's winding key (Nov 24 mockup): it turns a notch now and then (half a turn: it looks the same after). */}
+      <Pivot x={40.8} y={11.6} cls={tommy !== "puff" ? "ia-notch" : ""}>
+        <path d="M37.4 11.6 H44.2" stroke="#1d1d1f" stroke-linecap="round" {...lw(2.6)} />
+        <path d="M37.4 11.6 H44.2" stroke={lighten(p.hex, 0.55)} stroke-linecap="round" {...lw(1.1)} />
+        <circle cx="40.8" cy="11.6" r="1.1" fill="#1d1d1f" />
+      </Pivot>
       <path d="M79.6 -2.7 V-4.6" fill="none" {...LINE} {...lw(1.6)} />
+      {tommy !== "drum" && (
+        // A tiny puff of smoke from the muzzle, a little after the drum turns.
+        <Pivot x={84} y={0} cls="ia-puff">
+          <circle cx="85.4" cy="0.4" r="1.9" fill="#e4e4e7" stroke="#52525b" {...lw(0.7)} />
+          <circle cx="87.6" cy="-1.4" r="1.4" fill="#f4f4f5" stroke="#52525b" {...lw(0.7)} />
+          <circle cx="87.4" cy="1.6" r="1.1" fill="#f4f4f5" stroke="#52525b" {...lw(0.7)} />
+        </Pivot>
+      )}
     </g>
   );
 }
@@ -782,7 +992,15 @@ function PirateHat({ p }: { p: Paint }) {
       <path d="M45.2 20.2 L54.8 27.2 M54.8 20.2 L45.2 27.2" stroke="#fbfbf8" stroke-linecap="round" {...lw(1.5)} />
       <path d="M46.6 22.8 Q46.6 19 50 19 Q53.4 19 53.4 22.8 Q53.4 24.2 52.2 24.8 V26 H47.8 V24.8 Q46.6 24.2 46.6 22.8 Z" fill="#fbfbf8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(0.8)} />
       <circle cx="48.6" cy="22.6" r="1" fill="#1d1d1f" />
-      <circle cx="51.4" cy="22.6" r="1" fill="#1d1d1f" />
+      {optionOf(p) === "wink" ? (
+        // Nov 24 mockup, OPTIONAL: the skull winks now and then.
+        <>
+          <circle class="ia ia-wink-open" cx="51.4" cy="22.6" r="1" fill="#1d1d1f" />
+          <path class="ia ia-wink-shut" d="M50.3 22.8 Q51.4 21.9 52.5 22.8" fill="none" stroke="#1d1d1f" stroke-linecap="round" {...lw(0.8)} />
+        </>
+      ) : (
+        <circle cx="51.4" cy="22.6" r="1" fill="#1d1d1f" />
+      )}
     </g>
   );
 }
@@ -793,6 +1011,8 @@ function PirateHat({ p }: { p: Paint }) {
  * its wing and long tail in the second; a hooked beak and a ringed eye.
  */
 function Parrot({ p, p2 }: { p: Paint; p2: Paint }) {
+  /** Nov 24 mockup: a quick double flap of its wing every few seconds (the pick), or a head tilt (`tilt`). */
+  const tilt = optionOf(p) === "tilt";
   return (
     <g transform="translate(102.6 -0.4) scale(-1 1)">
       <Region p={p2} name="tail" d={["M64 35.4 L68 34.8 L74.6 55.4 L71 56.4 Z", "M67 35 L70.4 34.2 L79.4 52 L76.2 53.4 Z"]} line={1.7} />
@@ -802,12 +1022,16 @@ function Parrot({ p, p2 }: { p: Paint; p2: Paint }) {
         d={["M59.6 29.4 Q59.6 20.4 66.6 20.4 Q73.2 20.8 72.6 29.8 Q71.8 37.8 64.4 40.6 Q59.6 36.8 59.6 29.4 Z"]}
         line={2}
       />
-      <Region p={p} name="head" d={["M60.4 16.6 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0 Z"]} line={2} />
-      <Region p={p2} name="wing" d={["M61.8 25.4 Q66.8 23.6 69.8 28 Q70 34.8 64.4 40 Q60.6 34.4 61.8 25.4 Z"]} line={1.5} />
+      <Pivot x={66.4} y={21.6} cls={tilt ? "ia-tilt" : ""}>
+        <Region p={p} name="head" d={["M60.4 16.6 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0 Z"]} line={2} />
+        <path d="M71.6 13.4 Q77.6 13.6 77.2 19.8 Q75.6 17.6 72.2 18.4 Z" fill="#f2c14e" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.2)} />
+        <circle cx="68.4" cy="15.2" r="2.1" fill="#fbfbf8" stroke="#1d1d1f" {...lw(0.8)} />
+        <circle cx="68.9" cy="15.2" r="1" fill="#1d1d1f" />
+      </Pivot>
+      <Pivot x={65.4} y={25} cls={tilt ? "" : "ia-flap"}>
+        <Region p={p2} name="wing" d={["M61.8 25.4 Q66.8 23.6 69.8 28 Q70 34.8 64.4 40 Q60.6 34.4 61.8 25.4 Z"]} line={1.5} />
+      </Pivot>
       <path d="M62 40.2 l-1.8 1.4 M62 40.2 l0.6 1.8 M66.2 39.6 l-1.2 1.6 M66.2 39.6 l1.2 1.6" fill="none" stroke="#3f3f46" stroke-linecap="round" {...lw(1.2)} />
-      <path d="M71.6 13.4 Q77.6 13.6 77.2 19.8 Q75.6 17.6 72.2 18.4 Z" fill="#f2c14e" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.2)} />
-      <circle cx="68.4" cy="15.2" r="2.1" fill="#fbfbf8" stroke="#1d1d1f" {...lw(0.8)} />
-      <circle cx="68.9" cy="15.2" r="1" fill="#1d1d1f" />
     </g>
   );
 }

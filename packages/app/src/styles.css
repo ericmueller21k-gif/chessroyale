@@ -8802,6 +8802,294 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   }
 }
 
+/*
+ * Item animations (Nov 24 mockup; Items.tsx, `Pivot`): transforms and opacity only, slow, most of each cycle at rest. Each
+ * part turns about its own point (Pivot's group sits there, so `transform-origin: 0 0`). With reduced motion they stop where
+ * the still drawing has them (the lights and sparkles unseen).
+ */
+.ia {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+/* The Fire & Ice Crown: three flames, each flickering at its own pace; a glow that breathes; an ember now and then. */
+.ia-flame {
+  animation: ia-flicker 2.9s ease-in-out infinite;
+}
+.ia-flame.f1 {
+  animation-duration: 2.5s;
+  animation-delay: -0.8s;
+}
+.ia-flame.f3 {
+  animation-duration: 2.7s;
+  animation-delay: -1.9s;
+}
+@keyframes ia-flicker {
+  0%,
+  100% {
+    transform: scale(1, 1) skewX(0deg);
+  }
+  30% {
+    transform: scale(0.95, 1.07) skewX(-3deg);
+  }
+  55% {
+    transform: scale(1.03, 0.95) skewX(2deg);
+  }
+  80% {
+    transform: scale(0.97, 1.04) skewX(-1.2deg);
+  }
+}
+.ia-core {
+  animation: ia-core 1.7s ease-in-out infinite;
+}
+@keyframes ia-core {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+.ia-glow {
+  animation: ia-glow 3.4s ease-in-out infinite;
+}
+@keyframes ia-glow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+.ia-ember {
+  opacity: 0;
+  animation: ia-ember 4.6s ease-out infinite;
+}
+.ia-ember.e2 {
+  animation-duration: 5.8s;
+  animation-delay: -2.4s;
+}
+@keyframes ia-ember {
+  0%,
+  62% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  66% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(1.5px, -9px);
+  }
+}
+.ia-frost {
+  opacity: 0;
+  animation: ia-frost 5.2s ease-in-out infinite;
+}
+@keyframes ia-frost {
+  0%,
+  80%,
+  100% {
+    opacity: 0;
+  }
+  88% {
+    opacity: 1;
+  }
+}
+/* The Candy Cane: a band of light winds up its stripes (each step lit in turn, by its delay), then a sparkle at its tip. */
+.ia-swirl {
+  opacity: 0;
+  animation: ia-swirl 6s linear infinite;
+}
+@keyframes ia-swirl {
+  0% {
+    opacity: 0;
+  }
+  3% {
+    opacity: 1;
+  }
+  13%,
+  100% {
+    opacity: 0;
+  }
+}
+.ia-pop,
+.ia-ping {
+  opacity: 0;
+  transform: scale(0);
+  animation: ia-pop 6s ease-out infinite;
+}
+@keyframes ia-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  4% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+  12%,
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(90deg);
+  }
+}
+/* The Gift-Wrap Tube: its stripes wind up two turns (two of their periods, 27.6), then rest; a sparkle pings at its tip. */
+.ia-scroll {
+  animation: ia-scroll 6.5s ease-in-out infinite;
+}
+@keyframes ia-scroll {
+  0% {
+    transform: translateY(0);
+  }
+  40%,
+  100% {
+    transform: translateY(-27.6px);
+  }
+}
+.ia-ping {
+  animation-duration: 6.5s;
+  animation-delay: 2.2s;
+}
+/* (Its option: a puff of confetti from the tip, every few seconds.) */
+.ia-confetti {
+  opacity: 0;
+  animation: ia-confetti 5.5s ease-out infinite;
+}
+@keyframes ia-confetti {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  3% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 1;
+  }
+  30%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--r));
+  }
+}
+/* The Parrot: a quick double flap of its wing every 6 seconds (or, its option, a curious head tilt). */
+.ia-flap {
+  animation: ia-flap 6s ease-in-out infinite;
+}
+@keyframes ia-flap {
+  0%,
+  78% {
+    transform: rotate(0deg);
+  }
+  81% {
+    transform: rotate(34deg) scale(1, 0.92);
+  }
+  84% {
+    transform: rotate(4deg);
+  }
+  87% {
+    transform: rotate(30deg) scale(1, 0.92);
+  }
+  91%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+.ia-tilt {
+  animation: ia-tilt 7s ease-in-out infinite;
+}
+@keyframes ia-tilt {
+  0%,
+  60% {
+    transform: rotate(0deg);
+  }
+  65%,
+  84% {
+    transform: rotate(-14deg);
+  }
+  90%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+/* The Tommy Gun: the drum's key turns a notch (half a turn, a little past and back), then a puff from the muzzle. */
+.ia-notch {
+  animation: ia-notch 7s ease-out infinite;
+}
+@keyframes ia-notch {
+  0%,
+  50% {
+    transform: rotate(0deg);
+  }
+  55% {
+    transform: rotate(196deg);
+  }
+  58%,
+  100% {
+    transform: rotate(180deg);
+  }
+}
+.ia-puff {
+  opacity: 0;
+  animation: ia-puff 7s ease-out infinite;
+}
+@keyframes ia-puff {
+  0%,
+  70% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  73% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  88%,
+  100% {
+    opacity: 0;
+    transform: translate(4px, -1px) scale(1.9);
+  }
+}
+/* (The Pirate Hat, optional: its skull winks every 9 seconds.) */
+.ia-wink-open {
+  animation: ia-wink 9s linear infinite;
+}
+.ia-wink-shut {
+  opacity: 0;
+  animation: ia-wink-shut 9s linear infinite;
+}
+@keyframes ia-wink-shut {
+  0%,
+  90%,
+  96%,
+  100% {
+    opacity: 0;
+  }
+  90.5%,
+  95.5% {
+    opacity: 1;
+  }
+}
+@keyframes ia-wink {
+  0%,
+  90%,
+  96%,
+  100% {
+    opacity: 1;
+  }
+  90.5%,
+  95.5% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ia {
+    animation: none !important;
+  }
+}
+
 /* ---- The God King's Last Stand (components/LastStand.tsx; timings in boss-timing.ts) ---- */
 .last-stand {
   position: absolute;
