@@ -1874,3 +1874,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~09:00: #915 Chandy upgrades MERGED (8b621ea), deploy + main run watched (boducfwc3). ERIC: Birdie sign redone (straight
   triangle, opaque, hard blink ~0.6 s on/off, hidden while held) added to the train-miss helper (item 9). Queue: power tips (after Birdie).
 - Nov 24 ~09:25: #915 LIVE (8b621ea), main full run GREEN. Running: Birdie train-miss helper (xhigh). Queue: power tips; #915 N1 (two upgrades one turn).
+- Nov 24 ~09:40: Birdie train-miss DONE → #916 (4fa067c0; merged main myself: bosses.md + boss-sim.ts conflicts), CI ba9vb4kqs, quick review
+  (god-king, Opus high) running; stills sent. Power tips helper session_01JuCWRrNXUEsotiqAbVfmjk (Opus high, claude/power-tips), watcher on .done.
