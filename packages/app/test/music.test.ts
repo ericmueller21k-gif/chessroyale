@@ -464,6 +464,32 @@ describe("a boss's room", () => {
     expect(musicNow()?.boss).toBe("grex");
   });
 
+  it("a splash whose theme decodes late, the battle already picked (a slow device; CI, Nov 24): the battle carries it on, logged, no restart", async () => {
+    const g = globalThis as { __soundLog?: string[] };
+    g.__soundLog = [];
+    let open = () => {};
+    gate.intro = new Promise((ok) => (open = ok));
+    try {
+      const splash = splashMusic("grex");
+      await settle();
+      bossMusic({ key: "late-fight", boss: "grex", live: false });
+      expect(ctx.sources).toHaveLength(0);
+      open();
+      await splash;
+      expect(ctx.sources).toHaveLength(2);
+      expect(g.__soundLog.filter((l) => l === "music:splash:grex" || l === "music:carry:grex")).toEqual(["music:splash:grex", "music:carry:grex"]);
+      splashDone();
+      bossMusic({ key: "late-fight", boss: "grex", live: true });
+      await settle();
+      expect(ctx.sources).toHaveLength(2);
+      expect(ctx.sources.every((s) => s.stoppedAt === null)).toBe(true);
+      expect(g.__soundLog.filter((l) => l.startsWith("music:start") || l.startsWith("music:splashEnd"))).toEqual([]);
+    } finally {
+      gate.intro = null;
+      delete g.__soundLog;
+    }
+  });
+
   it("a splash whose battle never comes (called off): its music fades out and stops once the splash is gone", async () => {
     await splashMusic("grex");
     ctx.currentTime = 120;

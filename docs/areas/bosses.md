@@ -56,7 +56,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   theme plays in both: you must walk in); leaving fades it out over 1.5 s and lets it go. A challenge from the town starts it as the
   boss's splash starts (`splashMusic` in Town.tsx `stormIn`; a room's theme already playing, Don's, carries straight through), the
   splash's covering frame held until it's started, `MUSIC.splashHoldMs` (2 s) at most, then the music joins when ready; the battle
-  takes it over (`bossMusic`) with no restart at "START!". From the boss menu: started after the intro, as before. Same player, gain,
+  takes it over (`bossMusic`) with no restart at "START!" (decoded only after the battle has started, on a slow device: the battle takes it
+  over as it starts, logged `music:carry` the same; Nov 24, [decision](../decisions/2026-11-24-splash-music-late-carry.md)). From the boss menu: started after the intro, as before. Same player, gain,
   switches and fades throughout. Tests: `music.test.ts` ("a boss's room"), `e2e/zebra-home.spec.ts` (Don's theme carried through).
   docs/decisions/2026-11-11-area-banner-room-music.md.
   **The town's own theme (Nov 15):** a boss's room theme, splash or battle takes over from it, and leaving the room hands back to it
