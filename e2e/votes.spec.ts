@@ -201,6 +201,50 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
   expect([10, 15, 20]).toContain(clock);
 });
 
+test("the zones' name tags (Eric, Nov 25, VOTE_TAGS): one over each zone as the vote opens; without a vote, gone after about 3 s; your vote in, gone at once; reduced motion, no bob", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  const touch = test.info().project.name === "phone";
+  await page.goto("/?debug&mode=crowd&augments=1");
+  await soloFromHome(page);
+  await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
+  const tags = page.locator(".vote-tags .vt");
+  /** Each tag: its name, and whether it stands centered over its own zone, just above its top edge. */
+  const placed = () =>
+    page.evaluate(() => {
+      const zones = [...document.querySelectorAll(".vote-zone")].map((e) => e.getBoundingClientRect());
+      return [...document.querySelectorAll<HTMLElement>(".vote-tags .vt")].map((e, i) => {
+        const t = e.querySelector(".vt-tag")!.getBoundingClientRect();
+        const z = zones[i]!;
+        const mid = t.x + t.width / 2;
+        return { name: e.textContent, over: mid > z.x && mid < z.x + z.width && Math.abs(mid - (z.x + z.width / 2)) < 3, above: t.bottom <= z.top + 1 && t.bottom > z.top - z.height, inside: t.x >= z.x - 1 && t.right <= z.right + 1, anim: getComputedStyle(e).animationName };
+      });
+    });
+  // The vote opens: three tags, the cards' names, each over its own zone (the zones touch: each fits its own width).
+  await expect(tags).toHaveCount(3);
+  const seen = Date.now();
+  const first = await placed();
+  expect(first.map((t) => t.name)).toEqual(await page.locator(".vote-card strong").allTextContents());
+  for (const t of first) expect(t, `${t.name}'s tag`).toMatchObject({ over: true, above: true, inside: true, anim: "vt-b" });
+  // No vote: they go by themselves, about 3 s after the vote opened (and you still haven't voted).
+  await expect(tags).toHaveCount(0, { timeout: 5_000 });
+  expect(Date.now() - seen).toBeGreaterThan(1_500);
+  expect(await page.evaluate(() => (window as any).match.myVote)).toBeNull();
+
+  // The next vote, with reduced motion: the tags appear without the bob, and your vote in sends them away at once.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator(".vote-banner")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 10_000 });
+  await expect(tags).toHaveCount(3);
+  for (const t of await placed()) expect(t.anim, `${t.name}'s tag, reduced motion`).toBe("vt-b-still");
+  const zone = await centre(page, ".vote-zone", 0);
+  if (touch) await page.touchscreen.tap(zone.x, zone.y);
+  else await page.mouse.click(zone.x, zone.y);
+  const voted = Date.now();
+  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(0);
+  await expect(tags).toHaveCount(0, { timeout: 1_000 });
+  expect(Date.now() - voted, "gone well before their 3 s").toBeLessThan(1_500);
+});
+
 test("time's up: whoever didn't vote (you, and a few bots) walks to the winner, then the banner names it", async ({ page }) => {
   test.setTimeout(2 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
