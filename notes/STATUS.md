@@ -1971,3 +1971,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   running; fix helper archived. Merge order: #924, #925, then #923 (#923 will conflict with #925 in Crates.tsx: resolve).
 - Nov 25 ~02:35: #923 delta re-review: MERGEABLE. Follow-ups (OK inert until fade-in, admin odds line, old-Safari inert, 2 tests) added to
   the crates-page-tidy brief (same screen). Merge after CI + after #924/#925.
+- Nov 25 ~02:50: #925 MERGED (373af08) and #924 MERGED (2e87f00); main runs watched (bkxd8tbk3 for 373af08; the newer push's run covers
+  both). #923 CI bjap4yjre; merge after. Item mockup running.
