@@ -1948,3 +1948,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   b5tghv6o3, PR comment posted. Then merge. Waiting on Eric: sting clips, mythic items' fate.
 - Nov 24 ~23:30: #922 crate opening MERGED (865d1dc), deploy + main run watched; build helper archived. Next: bonus crate (xhigh, full) once
   main is green; stings helper paused for Eric's OK (session_01JuCWRsHX7XJVJvjkQzC951, will need to merge main first).
+- Nov 24 ~23:45: #922 LIVE (865d1dc), main GREEN. Bonus crate helper started (Opus xhigh alone, full lane, claude/bonus-crate); watcher.
+  Stings helper paused (idle) for Eric; its step 2 waits for the bonus crate (concurrency + same files).
