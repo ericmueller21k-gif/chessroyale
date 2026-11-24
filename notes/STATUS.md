@@ -1967,3 +1967,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   b14e6997): admin "+5 crates" any series/boss crate (cratesGrantMax 10), CI watched. Running: bonus fixes (high), stings step 2 (high).
 - Nov 25 ~01:55: stings DONE → #925 (520243f7; per-tier stings, levels under the ticks, Transcendent rename + SVG tile; ERIC: "that
   transcendent crate looks sick"), CI watched; stings helper archived. Item polish mockup can start now (1 high slot free).
+- Nov 25 ~02:20: #923 review fixes DONE (644965ff; prepped 297338c1, main merged), CI bjap4yjre, delta re-review (Opus high, read-only)
+  running; fix helper archived. Merge order: #924, #925, then #923 (#923 will conflict with #925 in Crates.tsx: resolve).
