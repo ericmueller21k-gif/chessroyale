@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- Dev only (not in the build). MOCKUP (claude/crate-open-mockup): the crate opening overhauled, with its three sound options. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Crate opening mockup</title>
+  </head>
+  <body style="background: #10122a; margin: 0">
+    <!-- The strip's motion blur: a horizontal-only blur for the strip's blurred copy. -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <filter id="cox-hblur" x="-5%" width="110%"><feGaussianBlur stdDeviation="9 0" /></filter>
+    </svg>
+    <div id="app"></div>
+    <script type="module" src="/src/dev/crate-open-preview.tsx"></script>
+  </body>
+</html>
