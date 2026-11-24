@@ -454,6 +454,7 @@ export const CRATE_SOUNDS: readonly string[] = [
   "whirr",
   "lock",
   "land",
+  "transcendent",
   ...TICKS.flatMap((_, i) => [`tick${i}a`, `tick${i}b`]),
 ];
 /** Every tier's own: its shake and its sting. */

@@ -59,7 +59,7 @@ import {
 } from "@chessroyale/core";
 import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
-import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
+import { Avatar, BetaCrateArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, TranscendentArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
@@ -560,10 +560,10 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
             return (
               <div key={tier} class="odds-row" style={{ "--tier": "#fbbf24" }}>
                 <span class="odds-art">
-                  <FischerArt />
+                  <TranscendentArt />
                 </span>
                 <span class="odds-text">
-                  <strong>Fischer Random</strong>
+                  <strong>Transcendent</strong>
                   <span class="odds-tier">A second spin: Legendary or Mythic</span>
                 </span>
                 <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
@@ -602,7 +602,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
                 <strong>{d.name}</strong>
                 <span class="odds-tier">
                   {t.name} · {SLOT_NAMES[d.slot]}
-                  {special ? " · Fischer Random only" : ""}
+                  {special ? " · Transcendent only" : ""}
                 </span>
               </span>
               <span class="odds-pct">{pct(itemChance(crate, def))}</span>
@@ -633,7 +633,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         <div class="test-switches">
           <span class="muted small">Testing:</span>
           <label class="check small">
-            <input type="checkbox" checked={forceFischer} onChange={(e) => setForceFischer(e.currentTarget.checked)} /> Land on Fischer Random
+            <input type="checkbox" checked={forceFischer} onChange={(e) => setForceFischer(e.currentTarget.checked)} /> Land on Transcendent
           </label>
           <label class="check small">
             <input type="checkbox" checked={forceShiny} onChange={(e) => setForceShiny(e.currentTarget.checked)} /> Shiny
@@ -766,8 +766,8 @@ function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
   if (tile.kind === "fischer") {
     return (
       <span class="spin-tile fischer">
-        <FischerArt />
-        <span class="spin-tile-name">Fischer Random</span>
+        <TranscendentArt />
+        <span class="spin-tile-name">Transcendent</span>
       </span>
     );
   }
@@ -965,7 +965,7 @@ export function CrateOpening({
           )}
           {stage === "fischer" && (
             <div class="fischer-stage">
-              <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub={isWelcomeCrate(crate.id) ? "A HunChess ride" : "Legendary or Mythic"} sound="bannerStart" ms={fischerBannerMs()} />
+              <FightBanner tone="hero" face={<TranscendentArt />} text="TRANSCENDENT!" sub={isWelcomeCrate(crate.id) ? "A HunChess ride" : "Legendary or Mythic"} ms={fischerBannerMs()} />
             </div>
           )}
           {error && (

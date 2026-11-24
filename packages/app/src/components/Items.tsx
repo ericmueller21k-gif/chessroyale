@@ -1433,23 +1433,61 @@ export function Avatar({ look: equipped, side = "w", ride = false, outlined = fa
   );
 }
 
-/** Fischer Random's tile: a solid gold king's crown with a question mark. */
-export function FischerArt() {
+/**
+ * Transcendent's tile (Nov 24: "Fischer Random" renamed after the highest rank; Eric: "do away with the little king with the question
+ * mark and we actually make a cooler looking crate in its place"): a supply crate (SupplyBoxArt's shape) gone prismatic, its sides an
+ * iridescent sheen, a glowing star on its band, light breaking out over its lid and sparkles round it.
+ */
+export function TranscendentArt() {
+  const star = (x: number, y: number, r: number) => `M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z`;
+  const corner = (x: number, y: number, sx: number, sy: number) => `M${x} ${y + 9 * sy} V${y} H${x + 9 * sx}`;
   return (
-    <span class="item-art fischer-art">
+    <span class="item-art present-art supply-art transcendent-art">
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <defs>
-          <linearGradient id="fischer-gold" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#ffe58a" />
-            <stop offset="1" stop-color="#d49b12" />
+          <radialGradient id="transcendent-glow" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#f5f3ff" stop-opacity="0.9" />
+            <stop offset="0.55" stop-color="#c4b5fd" stop-opacity="0.45" />
+            <stop offset="1" stop-color="#a78bfa" stop-opacity="0" />
+          </radialGradient>
+          <linearGradient id="transcendent-prism" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#a78bfa" />
+            <stop offset="0.35" stop-color="#67e8f9" />
+            <stop offset="0.68" stop-color="#f0abfc" />
+            <stop offset="1" stop-color="#fde68a" />
+          </linearGradient>
+          <linearGradient id="transcendent-lid" x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#c4b5fd" />
+            <stop offset="0.5" stop-color="#a5f3fc" />
+            <stop offset="1" stop-color="#f5d0fe" />
           </linearGradient>
         </defs>
-        <path d="M18 78 L14 34 L32 50 L50 22 L68 50 L86 34 L82 78 Z" fill="url(#fischer-gold)" {...LINE} />
-        <rect x="16" y="76" width="68" height="10" rx="3" fill="url(#fischer-gold)" {...LINE} />
-        <circle cx="50" cy="16" r="6" fill="url(#fischer-gold)" {...LINE} />
-        <text x="50" y="72" text-anchor="middle" font-size="34" font-weight="900" fill="#3b2a00" font-family="system-ui, sans-serif">
-          ?
-        </text>
+        <circle cx="50" cy="52" r="49" fill="url(#transcendent-glow)" />
+        <g stroke="#fefce8" stroke-linecap="round" opacity="0.85" {...lw(2.4)}>
+          <path d="M50 20 V6 M38 21 L31 9 M62 21 L69 9 M28 25 L17 17 M72 25 L83 17" />
+        </g>
+        <rect x="14" y="34" width="72" height="52" rx="3" fill="url(#transcendent-prism)" {...LINE} />
+        <g fill="none" stroke="#ffffff" opacity="0.55" {...lw(1.6)}>
+          <path d="M16 47 H84 M16 73 H84" />
+          <path d="M22 84 L40 74 M62 46 L80 36" />
+        </g>
+        <rect x="14" y="48" width="72" height="24" fill="#4c1d95" stroke="#1d1d1f" {...lw(2.2)} />
+        <path d={star(50, 60, 10)} fill="#fefce8" />
+        <path d={star(50, 60, 4.5)} fill="#ffffff" />
+        <rect x="10" y="24" width="80" height="12" rx="3" fill="url(#transcendent-lid)" {...LINE} />
+        <path d="M14 30 H86" stroke="#ffffff" opacity="0.6" {...lw(1.4)} />
+        <g fill="none" stroke="#f5f3ff" stroke-linecap="square" {...lw(4)}>
+          <path d={corner(16.5, 38, 1, 1)} />
+          <path d={corner(83.5, 38, -1, 1)} />
+          <path d={corner(16.5, 83.5, 1, -1)} />
+          <path d={corner(83.5, 83.5, -1, -1)} />
+        </g>
+        <g fill="#fefce8">
+          <path d={star(9, 48, 5)} />
+          <path d={star(92, 70, 4)} />
+          <path d={star(88, 44, 2.5)} />
+          <path d={star(12, 80, 2.5)} />
+        </g>
       </svg>
     </span>
   );

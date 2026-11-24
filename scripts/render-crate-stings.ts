@@ -48,14 +48,12 @@ for (const tier of ["common", "rare", "epic", "legendary", "mythic"] as ItemTier
 }
 wav("transcendent-alone", renderCues(RATE, [{ at: 0, sound: "transcendent" }], end([{ at: 0, sound: "transcendent" }])));
 
-// A Transcendent opening as the game runs it: the first strip (no item), the moment as it lands, the banner, the second strip's Mythic.
-const first = cues(T, clicks, null);
-const landAt = T.stop;
+// A Transcendent opening as the game runs it: the first strip (no item; its sound as the banner comes up), the banner, the second
+// strip's Mythic.
 const T2 = timeline(undefined, false);
-const second = landAt + 2500 + bannerPlusMs() + 200;
+const second = T.bannerAt + 2500 + bannerPlusMs() + 200;
 const list = [
-  ...first,
-  { at: landAt, sound: "transcendent" },
+  ...cues(T, clicks, "transcendent"),
   ...cues(T2, clickTimes(T2.spinMs, WIDTH, STRIPS.fischer.land), "mythic").map((c) => ({ ...c, at: c.at + second })),
 ];
 wav("opening-transcendent-mythic", renderCues(RATE, list, end(list)));

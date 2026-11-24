@@ -8450,10 +8450,11 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
     animation: none;
   }
 }
+/* Transcendent's tile (once Fischer Random's gold; Nov 24): a deep violet under its prismatic crate. */
 .spin-tile.fischer {
-  --tier: #fbbf24;
-  background: linear-gradient(180deg, #4a3500, #1f1600);
-  border-color: #fde68a;
+  --tier: #c4b5fd;
+  background: linear-gradient(180deg, #3b1f6e, #160a33);
+  border-color: #e9d5ff;
 }
 /*
  * Fischer Random's banner, in the crate opening rather than over a board: it fits its words at every width (on a

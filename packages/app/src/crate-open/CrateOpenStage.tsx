@@ -193,8 +193,8 @@ export function CrateStage({
         const start = (document.timeline.currentTime as number) + lead;
         for (const a of all) a.startTime = start;
         hooks.__crateAnims = all;
-        stopSound = playCrateCues(cues(b.T, clickTimes(b.T.spinMs, b.width, land), ending === "none" ? null : tier), lead);
-        if (onStop) timers.push(setTimeout(onStop, lead + b.T.stop + 450));
+        stopSound = playCrateCues(cues(b.T, clickTimes(b.T.spinMs, b.width, land), ending === "none" ? "transcendent" : tier), lead);
+        if (onStop) timers.push(setTimeout(onStop, lead + b.T.bannerAt));
         if (ending !== "none" && onCard) timers.push(setTimeout(onCard, lead + b.T.cardAt + b.T.cardMs));
       });
     });
