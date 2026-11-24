@@ -1883,3 +1883,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~10:50: power tips DONE → #917 (5130e2d1; targeted), CI watched, stills sent (5 exchanges). No helpers running.
 - Nov 24 ~10:55: #917 RED: boss-speech.spec:124 (Boingo/Hollow tip lines held ~1.2 s past their time for the answer). FIXED BY ME
   (4884debb: each line keeps its own time; spec + birdie tip check pass locally). CI bog9tqk0k.
+- Nov 24 ~11:30: #917 power tips MERGED (96536fe), deploy + main run watched. No helpers running. Waiting on Eric's playtest of the 5 tips.
