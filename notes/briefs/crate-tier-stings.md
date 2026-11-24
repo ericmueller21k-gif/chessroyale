@@ -30,3 +30,18 @@ the strip's tile size and in the banner. Replace `FischerArt` with it wherever t
 needed for this, so none is spent. Stills of the tile (strip, banner, odds panel) for Eric. Tests,
 decision note, area pages, PR body, `.done` as usual. Never images under docs/. Commits end with only
 `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By, no model names).
+
+## Eric's answer to Step 1 (Nov 24, ~00:05)
+
+"Yeah, the sound clips are fine. The legendary one sounds like a little like depressing almost ... it needs slight change. It's also very
+loud in my headset. I just want to make sure that all of those sounds are a little bit quieter than the ticking sound, like when the thing's
+spinning, just because they hurt my ears a little bit."
+- Common, Rare, Epic, Mythic and the Transcendent moment: approved as they are.
+- **Legendary:** make it bright and triumphant, not somber (no slow tolling bell, no low choir an octave down; a major, rising, celebratory
+  chord: e.g. a bright bell or chime run upward and an uplifting choir/pad above, not below). Keep it clearly bigger than Epic and below
+  Mythic.
+- **Levels:** every ending (each tier's sting, the box's land/knocks, the Transcendent moment) is a little QUIETER than the spin's ticks:
+  measure the ticks' loudness (short-term LUFS or RMS over the spin) and set each ending's loudness a few dB under it, peaks too. Check the
+  whole opening on headphones-level playback: nothing jumps out.
+- Send the director a new audio-only Legendary clip (and one Mythic for the level check) before wiring; then go on with Step 2 (the
+  rename to Transcendent and the SVG Transcendent crate tile, as above) once the director says go.
