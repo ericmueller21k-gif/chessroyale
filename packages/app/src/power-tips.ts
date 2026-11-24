@@ -1,7 +1,7 @@
 import { POWER_TIPS as SCHEDULE, SPEECH, type PowerEventKind } from "@chessroyale/core";
 import { account } from "./account.ts";
 import { holdKing, kingBattle, kingFallen, kingVoice } from "./godKing.ts";
-import { CRITICAL, bossVoice, holdMs, readMs, typeMs, type Voice } from "./speech.tsx";
+import { CRITICAL, bossVoice, holdMs, typeMs, type Voice } from "./speech.tsx";
 import { testParams, testSwitchesAllowed } from "./test-switches.ts";
 
 /**
@@ -18,7 +18,7 @@ import { testParams, testSwitchesAllowed } from "./test-switches.ts";
  *   (better to explain than not). Each player's own device decides, alone or in a group.
  * - **How:** through the speech bubbles (speech.tsx), at the critical priority, as the moment's own line would be (BossPowers'
  *   useMomentSpeech): the boss's lines in place of his line for that moment, the God King's once the line before has typed out
- *   (`replyMs`), the line before staying up until the answer has typed out. His ordinary lines are held until his part is over
+ *   (`replyMs`), each line keeping its own time. His ordinary lines are held until his part is over
  *   (godKing.ts holdKing): no double talk; mid-line as it comes, the exchange starts later, so his answer comes as that line ends.
  *   Fallen, he says nothing.
  * - The test switch `?tip=all` plays every tip in every battle (stills, e2e).
@@ -166,10 +166,9 @@ export function playTip(tip: PowerTip, key: string, now = Date.now()) {
       setTimeout(() => say(i, Math.max(up.until, Date.now())), up.until - Date.now());
       return;
     }
-    // (A line that gets an answer stays readable until the answer has typed out, and then its own time: a conversation, both up together.)
-    const next = tip.lines[i + 1];
-    const hold = next ? SCHEDULE.replyMs + typeMs(next.text) + readMs(l.text) : undefined;
-    if (!v.say(l.text, k, CRITICAL, at, hold)) return say(i + 1, at);
+    // (Each line keeps its own time, as every line does (boss-speech.spec: up whole for its time, gone within a second after it; Eric:
+    // "a few seconds… not that long"): the answer starts as it has typed out, so the two are up together for most of it.)
+    if (!v.say(l.text, k, CRITICAL, at)) return say(i + 1, at);
     holdFrom(i, at);
     if (i + 1 < tip.lines.length) after(v, k, l.text, (t) => say(i + 1, t));
   };

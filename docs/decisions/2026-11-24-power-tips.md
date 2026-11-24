@@ -8,6 +8,6 @@ lock, Boingo's pie (`packages/app/src/power-tips.ts`).
 - **Per account on this device** (localStorage): no server data. An unreadable store shows the tip.
 - **Replaces both ordinary lines:** the boss's tip line stands in for his line for that moment; the God King's other lines are held
   until his answer has had its time (not those answering your call, or his fall). Fallen, he stays silent.
-- **Timing calls:** a line that gets an answer stays up until the answer has typed out; with the God King mid-line, the exchange
+- **Timing calls:** each line keeps its own time, as every line does (`e2e/boss-speech.spec.ts`; Eric: "a few seconds… not that long"), the answer starting as the line before has typed out (a first draft held the boss's line until the answer had typed out: up to about 1.2 s past its time, which that spec caught); with the God King mid-line, the exchange
   starts later, so his answer never lapses in his queue.
 - Boingo's "freezes" became "freeze" (plural subject). `?tip=all` plays every tip every battle.
