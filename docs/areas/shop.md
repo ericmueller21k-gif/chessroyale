@@ -146,8 +146,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     [2026-11-12-boss-crate-bought.md](../decisions/2026-11-12-boss-crate-bought.md)).
   - **Boss crates you hold** (Eric, Nov 2: "Buying a boss crate from shopkeepers adds the crate to your inventory … they open and shuffle
     the same way normal crate animations work"; [2026-11-02-nov2-fixes-b.md](../decisions/2026-11-02-nov2-fixes-b.md)): the Crates tab
-    lists every boss crate under **"Boss crates"**, below the others, its boss's token on the crate's corner, its blurb and **"You have
-    2"** (greyed with **"You have none"**: shown, not hidden; a tap still shows what's inside). Its page says **"You have 2."** or
+    lists the boss crates under **"Boss crates"**, below the others, its boss's token on the crate's corner, its blurb and **"You have
+    2"**. Beside the title, **"Show unowned"** (Eric, Nov 24, his exception to "nothing hidden"; [decision](../decisions/2026-11-24-quests-gap.md),
+    `boss-crate-rows.ts`): unchecked by default, only the ones you hold (none: "You have no boss crates yet. Check Show unowned to see them
+    all."); checked, every one, greyed with **"You have none"** at none (a tap still shows what's inside); remembered on this device. Its page says **"You have 2."** or
     **"You have none. Babur's shop in the town sells it."**; **"▶ Open"** (greyed at none; no test switches for these) opens it with the
     Crates tab's own strip, unwrap, Fischer Random and reveal, from the crate's own pool (`BOSS_CRATES`); "▶ Open another" greys when none
     is left. The locker's `bossCrates` (crate id → how many). **Opening** (`POST /api/locker/open {crate}` with a boss crate's id:

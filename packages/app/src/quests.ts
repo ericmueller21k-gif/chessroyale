@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { questCountdown, type QuestsAnswer } from "@chessroyale/core";
+import { QUESTS, questCountdown, type QuestsAnswer } from "@chessroyale/core";
 import { account, fetchQuests, mustSignInToPlayOnline, rerollQuestNow, setTestQuests } from "./account.ts";
 import { testParams } from "./test-switches.ts";
 import { TUTORIAL_SEEN_KEY } from "./tutorial.ts";
@@ -78,6 +78,40 @@ export function questsMoved(before: Readonly<Record<string, number>> | null, a: 
   }
   return moved;
 }
+/**
+ * When each account last closed the overlay on this device (Nov 24, docs/decisions/2026-11-24-quests-gap.md): `{ [user id]: ms }`. For
+ * `QUESTS.autoOpenGapHours` after it, the overlay doesn't open by itself (the day's first visit, a game that moved a quest); the Quests
+ * button always opens it.
+ */
+export const QUESTS_CLOSED_KEY = "hunchess.quests.closedAt";
+/** The overlay waits (doesn't open by itself): closed at `closedAt`, `now` is under the gap after it. A clock set back doesn't hold it. */
+export function autoOpenWaits(closedAt: number | null, now: number, gapHours: number = QUESTS.autoOpenGapHours): boolean {
+  if (closedAt === null || !Number.isFinite(closedAt)) return false;
+  const gone = now - closedAt;
+  return gone >= 0 && gone < gapHours * 3_600_000;
+}
+function closedTimes(): Record<string, number> {
+  try {
+    const v = JSON.parse(localStorage.getItem(QUESTS_CLOSED_KEY) ?? "null") as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+/** When `user` last closed the overlay on this device (null: never). */
+export function questsClosedAt(user: string): number | null {
+  const at = closedTimes()[user];
+  return typeof at === "number" ? at : null;
+}
+/** The overlay closed (any way): it waits the gap before opening by itself again for this account. */
+export function noteQuestsClosed(user: string, now = Date.now()): void {
+  try {
+    localStorage.setItem(QUESTS_CLOSED_KEY, JSON.stringify({ ...closedTimes(), [user]: now }));
+  } catch {
+    // (No storage: it may open by itself again as before.)
+  }
+}
+
 function popsOff(): boolean {
   try {
     return !!localStorage.getItem(QUESTS_NO_POP_KEY);
@@ -118,12 +152,15 @@ export function otherNoticeUp(): boolean {
  * Home's quests: fetched as home shows (whenever quests are yours), opened once on the day's first visit, after a game that moved one
  * (`from`: each moved quest's old count, the overlay slides it to its new one; Nov 10), and from the Quests button. `reroll`: today's free reroll (the answer replaces the list). `busy` (queueing, or another notice up; review of #575,
  * m3): as the answer comes in, the overlay doesn't open by itself and the day isn't marked seen, so it stays due until the next
- * home visit.
+ * home visit. Closed less than `QUESTS.autoOpenGapHours` ago (Nov 24), it doesn't open by itself either: the day stays due and the moved
+ * counts unseen, so the next opening (the button's too) slides them. `manual`: the card is already showing (Chess Town's layer).
  */
-export function useQuests(on: boolean, busy = false) {
+export function useQuests(on: boolean, busy = false, manual = false) {
   const [answer, setAnswer] = useState<{ a: QuestsAnswer; at: number } | null>(null);
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState<Record<string, number> | null>(null);
+  // (Moved quests held back by the gap: the button's opening slides them.)
+  const waiting = useRef<Record<string, number> | null>(null);
   const live = useRef(true);
   const busyNow = useRef(busy);
   busyNow.current = busy;
@@ -141,13 +178,15 @@ export function useQuests(on: boolean, busy = false) {
         const pop = Object.keys(moved).length > 0 && !popsOff();
         const due = questsDueToday(a);
         const free = !busyNow.current && !otherNoticeUp();
-        if ((due || pop) && free) {
+        const waits = !manual && autoOpenWaits(questsClosedAt(user), Date.now());
+        if ((due || pop) && free && !waits) {
           if (due) markQuestsSeen(a);
           setFrom(pop ? moved : null);
           setOpen(true);
         }
-        // (Held back (queueing, another notice): the old counts stay, so the next home visit slides them.)
-        if (!pop || free) rememberShown(user, a);
+        // (Held back (queueing, another notice, the gap): the old counts stay, so the next opening slides them.)
+        if (!pop || (free && !waits)) rememberShown(user, a);
+        else if (waits) waiting.current = moved;
       })
       .catch(() => undefined);
     return () => {
@@ -169,8 +208,17 @@ export function useQuests(on: boolean, busy = false) {
   const close = useCallback(() => {
     setOpen(false);
     setFrom(null);
+    noteQuestsClosed(account().profile?.user.id ?? "");
   }, []);
-  const show = useCallback(() => setOpen(true), []);
+  const show = useCallback(() => {
+    const moved = waiting.current;
+    if (moved && answer) {
+      waiting.current = null;
+      setFrom(moved);
+      rememberShown(account().profile?.user.id ?? "", answer.a);
+    }
+    setOpen(true);
+  }, [answer]);
   return { answer: answer?.a ?? null, receivedAt: answer?.at ?? 0, open: open && !!answer, from, show, close, reroll };
 }
 
