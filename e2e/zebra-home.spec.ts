@@ -364,9 +364,11 @@ test("Rolling Dough: Challenge plays the beat (the crew aim at you, following yo
   await expect(page.getByRole("group", { name: "Don Dough's oven timers" })).toBeAttached();
   await shot(page, "challenge-battle");
   // His theme: not as you walk in (Eric, Nov 23: "walking into a building no longer triggers the boss's music"; the town's carries on
-  // inside), started by his splash (Nov 11) and carried into the battle: no restart, fetched once.
-  const musicLog = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog.filter((l) => l.startsWith("music:")));
-  expect(musicLog.filter((l) => !l.startsWith("music:level") && !l.startsWith("music:load") && !l.startsWith("music:town:"))).toEqual(["music:splash:zebra", "music:carry:zebra"]);
+  // inside), started by his splash (Nov 11) and carried into the battle: no restart, fetched once. (Polled: on a slow runner the theme's
+  // decode can land after the battle shows under the splash; the battle carries it on from then, Nov 24.)
+  const music = () => page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog.filter((l) => l.startsWith("music:")));
+  await expect.poll(async () => (await music()).filter((l) => !l.startsWith("music:level") && !l.startsWith("music:load") && !l.startsWith("music:town:")), { timeout: 5000 }).toEqual(["music:splash:zebra", "music:carry:zebra"]);
+  const musicLog = await music();
   // (The town's own theme, Nov 15: started in the street, carried on through his rooms, given way only to his splash.)
   const splashAt = musicLog.indexOf("music:splash:zebra");
   expect(musicLog.slice(0, splashAt).filter((l) => l === "music:town:start" || l === "music:town:end")).toEqual(["music:town:start", "music:town:end"]);
