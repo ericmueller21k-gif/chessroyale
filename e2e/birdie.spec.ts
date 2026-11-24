@@ -1,14 +1,16 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import sharp from "sharp";
+import { BIRDIE_BEATS } from "@chessroyale/chess";
 import { asAdmin, openBossRaid, pickMove, submitMove, test } from "./helpers.ts";
 
 /**
  * Birdie (id birdie), played alone as an admin (he's in the game for admins first), the state read from the game and what's on screen
  * read from the page every frame (docs/decisions/2026-11-23-birdie-rules.md, 2026-11-23-birdie-fall.md):
  * - The Train (?power=train: warned every turn from your second): the crossing lights on his line, the dock names your piece ("Move
- *   your knight!"), a see-through warning sign over it (Nov 23); moving that piece saves it (no ride, the sign gone with it); leaving
- *   it, his train rides the line at the start of his turn and smashes it: the train on the board, the piece gone.
+ *   your knight!"), a see-through warning sign over it (Nov 23); moving that piece saves it (the sign gone with it), and his train still
+ *   rides the line and misses (Eric, Nov 24): the train crosses the board, nothing hit, the board the same after; leaving it, his train
+ *   rides the line at the start of his turn and smashes it: the train on the board, the piece gone.
  * - The Fall (?power=fall: after your second move): his fall's cutscene (the fall, the approach to its hit, the reveal, the hold) over
  *   the board as he "thinks", then Armored Birdie in the boss bar (his powered twin's loops, `p_`) for the rest of the battle, and no
  *   train warns again.
@@ -69,9 +71,22 @@ async function record(page: Page) {
           if (!r || !fen) return null;
           const rows = fen.split(" ")[0]!.split("/").map((row) => row.replace(/\d/g, (d) => ".".repeat(Number(d))));
           const at = (sq: string) => rows[8 - Number(sq[1])]![sq.charCodeAt(0) - 97]!;
-          return (r.squares as string[]).filter((sq) => at(sq) !== "." && at(sq).toLowerCase() !== "k").length + (r.spared || r.king ? 0 : 1);
+          return (r.squares as string[]).filter((sq) => at(sq) !== "." && at(sq).toLowerCase() !== "k").length + (r.spared || r.king || r.missed ? 0 : 1);
         })(),
         through: document.querySelector(".boss-dock .through-note")?.textContent?.trim() ?? null,
+        // (The dock's first line, and whether it's cut short; the smash's effect on the board; the drawn board's pieces, square:color kind.)
+        dock: (() => {
+          const el = document.querySelector<HTMLElement>(".boss-dock .dock-line");
+          return el ? { text: el.textContent?.trim() ?? "", cut: el.scrollWidth > el.clientWidth + 1 } : null;
+        })(),
+        smash: !!document.querySelector(".fx-board.bd-fx"),
+        drawn: [...document.querySelectorAll<HTMLElement>(".hb-board piece[data-square]")]
+          .map((e) => {
+            const c = e.className.split(/\s+/);
+            return `${e.dataset.square}:${c.find((x) => x === "white" || x === "black")} ${c.find((x) => /^(pawn|knight|bishop|rook|queen|king)$/.test(x))}`;
+          })
+          .sort()
+          .join(","),
         cine: document.querySelector<HTMLElement>(".bd-cine")?.dataset.pic ?? null,
         bar: document.querySelector(".boss-char.place-bar")?.getAttribute("data-anim") ?? null,
         moments: [...document.querySelectorAll(".power-moment")].map((e) => e.className.replace("power-moment", "").trim()),
@@ -88,7 +103,7 @@ type Frame = {
   crowdMoves: number | null;
   fen: string | null;
   warn: { turn: number; line: string; square: string; piece: string } | null;
-  ride: { at: number; line: string; square: string; piece: string; spared?: true; king?: true } | null;
+  ride: { at: number; line: string; square: string; piece: string; spared?: true; king?: true; missed?: true } | null;
   fell: number | null;
   drop: number | null;
   plies: number | null;
@@ -99,6 +114,9 @@ type Frame = {
   aside: number;
   lineCount: number | null;
   through: string | null;
+  dock: { text: string; cut: boolean } | null;
+  smash: boolean;
+  drawn: string;
   cine: string | null;
   bar: string | null;
   moments: string[];
@@ -229,8 +247,8 @@ test("Birdie's train: the crossing on his line, the dock names your piece, a sig
   expect(movedOn.length, "frames after the saved piece moved").toBeGreaterThan(5);
   expect(movedOn.filter((r) => r.sign?.sq === saved!.square).length, "the sign gone once its piece moved").toBe(0);
 
-  // Saved: no ride after that move.
-  expect(rec.some((r) => r.ride?.at === saved!.at), "no ride for the piece you moved").toBe(false);
+  // Saved: his train still rides after that move, and misses (Nov 24; its whole check: "Birdie's train when you saved the piece").
+  expect(rec.find((r) => r.ride?.at === saved!.at)?.ride, "a miss ride for the piece you moved").toMatchObject({ square: saved!.square, missed: true });
 
   // The smash: his train on the board through its ride, then your piece gone from its square.
   const ride = rec.filter((r) => r.ride?.at === left!.at);
@@ -257,6 +275,81 @@ test("Birdie's train: the crossing on his line, the dock names your piece, a sig
   // And the train gone again once your turn is back.
   expect(rec.at(-1)!.phase).toBe("play");
   expect(rec.at(-1)!.train).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+/** The drawn board's pieces for a position (`fen`), as the recorder writes them (`drawn`). */
+const drawnOf = (fen: string) =>
+  new Chess(fen)
+    .board()
+    .flat()
+    .flatMap((p) => (p ? [`${p.square}:${p.color === "w" ? "white" : "black"} ${NAMES[p.type]}`] : []))
+    .sort()
+    .join(",");
+
+test("Birdie's train when you saved the piece (Eric, Nov 24): it still rides the line and misses, nothing hit, the board the same after", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await battle(page, "train");
+  // Your first warned piece moved (saved); then play on until your turn after his reply.
+  let saved: { at: number; square: string; piece: string; fen: string } | null = null;
+  const played = new Set<string>();
+  const deadline = Date.now() + 110_000;
+  while (Date.now() < deadline) {
+    if ((await phase(page)) === "results") break;
+    const s = await yourTurn(page);
+    if (s && saved && s.crowdMoves >= saved.at) break;
+    if (s && !played.has(s.fen)) {
+      played.add(s.fen);
+      const move = moveOf(s.fen, s.allowed, s.warn ? { from: s.warn.square } : undefined);
+      if (s.warn && !saved && move.startsWith(s.warn.square)) {
+        const after = new Chess(s.fen);
+        after.move({ from: move.slice(0, 2), to: move.slice(2, 4), ...(move[4] ? { promotion: move[4] } : {}) });
+        saved = { at: s.crowdMoves + 1, square: s.warn.square, piece: s.warn.piece, fen: after.fen() };
+      }
+      await submitMove(page, move, s.fen);
+    }
+    await page.waitForTimeout(200);
+  }
+  expect(saved, "a warned piece moved").toBeTruthy();
+  const rec = await recorded(page);
+  // His train rides the warned line after your saving move: a miss.
+  const ride = rec.filter((r) => r.ride?.at === saved!.at);
+  expect(ride[0]!.ride).toMatchObject({ square: saved!.square, piece: saved!.piece, missed: true });
+  expect(ride.some((r) => r.events.includes("trainSmash"))).toBe(true);
+  // (Until his reply lands: the frames of his turn.)
+  const plies = ride[0]!.plies!;
+  const turn = ride.filter((r) => r.plies === plies);
+  // The train crosses the board: on it, moving on every frame of its ride, from one edge to past the other along the line.
+  const onBoard = turn.filter((r) => r.train);
+  expect(onBoard.length, "the train on the board").toBeGreaterThan(20);
+  const file = /^[a-h]$/.test(ride[0]!.ride!.line);
+  const along = onBoard.map((r) => (file ? r.train!.y : r.train!.x));
+  const size = (await page.locator(".hb-board").boundingBox())!.width;
+  expect(Math.max(...along) - Math.min(...along), "the train's travel along its line (px)").toBeGreaterThan(size * 0.8);
+  const still = onBoard.slice(1).filter((r, i) => r.train!.x === onBoard[i]!.train!.x && r.train!.y === onBoard[i]!.train!.y).length;
+  expect(still, "frames the train stood still in its ride").toBeLessThanOrEqual(2);
+  expect(onBoard.at(-1)!.t - onBoard[0]!.t, "the train's ride on screen").toBeGreaterThan(1_600);
+  // Everything misses: every piece on the line drawn stepping aside as it starts, none smashed; no sign, no smash, through his turn.
+  expect(onBoard[0]!.aside, `the line's pieces as the ride starts: ${onBoard[0]!.aside} of ${onBoard[0]!.lineCount}`).toBe(onBoard[0]!.lineCount);
+  expect(turn.filter((r) => r.sign).length, "no warning sign on a miss").toBe(0);
+  expect(turn.filter((r) => r.smash).length, "no smash on a miss").toBe(0);
+  // The dock says nothing was hit, whole on the screen.
+  const said = turn.filter((r) => r.dock?.text.includes("Saved! His train hit nothing."));
+  expect(said.length, `the dock's line: ${[...new Set(turn.map((r) => r.dock?.text))]}`).toBeGreaterThan(5);
+  expect(said.filter((r) => r.dock!.cut).length, "the dock's line cut short").toBe(0);
+  // The board the same after: the game's position through his turn is the one your move left, and once the train has gone the board
+  // draws exactly it, before his reply.
+  const placement = (fen: string) => fen.split(" ")[0];
+  expect(turn.every((r) => placement(r.fen!) === placement(saved!.fen)), "the position your move left, through the ride").toBe(true);
+  const gone = turn.slice(turn.findLastIndex((r) => r.train) + 1).slice(3);
+  expect(gone.length, "frames after the train has gone, before his reply").toBeGreaterThan(5);
+  expect(gone.filter((r) => r.drawn !== drawnOf(saved!.fen)).map((r) => r.drawn).slice(0, 1), "the board after the ride").toEqual([]);
+  // His reply only after the ride's whole length, as on a smash.
+  const reply = rec.find((r) => r.t > ride[0]!.t && r.plies !== null && r.plies > plies);
+  expect(reply, "his reply").toBeTruthy();
+  expect(reply!.t - ride[0]!.t, "his reply after the ride").toBeGreaterThanOrEqual(BIRDIE_BEATS.ride.total - 300);
   expect(errors).toEqual([]);
 });
 

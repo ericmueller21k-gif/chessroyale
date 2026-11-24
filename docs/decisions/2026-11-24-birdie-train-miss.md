@@ -1,0 +1,6 @@
+# Birdie's train rides even when you saved the piece, and misses (Nov 24, 2026)
+
+Eric: "we still need to show the birdie driving his train across the board animation, even when there's no pieces to hit. He just simply drives across and then everything misses."
+- Whenever his warning comes due (not once the game is over, at the move cap or with the battle decided), the train rides the warned line. If your move saved the piece, the ride misses: the board is unchanged, nothing is taken off, every piece on the line steps aside, and there's no sign, smash or smash sound. The dock says "Saved! His train hit nothing." Timing, the hold of his move (solo and online), his fall after it, the judge and fair play are unchanged.
+- *(mine)* The miss is `trainSmash` with `missed: true`, not a new event kind. It's the same ride, so every place that times or holds a ride (`birdieTurnMs`, `POWER_FX`, the lobby's hold, solo's beats) already covers it with no new path. This follows the sparing's `fizzled`.
+- *(mine)* The piece counts as saved when your move started on its square, or when the square no longer holds your piece of the warned kind. Another piece of yours standing there is never smashed in its place. A single boss couldn't get there in one move; on a floor with several bosses, another boss's power could.
