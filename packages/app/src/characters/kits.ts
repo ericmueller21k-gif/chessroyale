@@ -42,7 +42,6 @@ import { CHANDY_LINES } from "./chandy-lines.ts";
 import { BIRDIE_FIGURE } from "./birdie-figure.ts";
 import { BIRDIE_LINES } from "./birdie-lines.ts";
 import { birdieArmoredNow } from "./birdie-state.ts";
-import { birdieWhistle, type BirdieWhistle } from "./birdie-sounds.ts";
 import { ZEBRA_CHANCE, ZEBRA_LINES } from "./zebra-lines.ts";
 import { DASH_ATTACK, DASH_FIGURE as DASH } from "./dash-figure.ts";
 import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
@@ -135,8 +134,9 @@ export interface BossKit extends BeatLines {
    * its clock running (not as its move lands and is judged). Undefined (or it returns undefined): `sounds[cue]`; null: silent this
    * time. Every sound it can return is in `sounds` too, so it's made ahead. Only BossCharacter reads it: a boss drawn through SpriteAnim
    * (BossEffect.tsx: BossMoment, KingAttack) still plays `sounds[cue]`, so a Birdie moment drawn there would play his plain sounds.
+   * `anim`: the figure's animation the cue is in (its powered twin's `p_` name too), when one cue sounds in several.
    */
-  cueSound?: (cue: string, boss: BossView, yourTurn: boolean) => SoundName | null | undefined;
+  cueSound?: (cue: string, boss: BossView, yourTurn: boolean, anim?: string) => SoundName | null | undefined;
   /** The part of a frame a portrait shows, and from which animation and frame. */
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
   /**
@@ -212,20 +212,11 @@ export interface BossKit extends BeatLines {
 }
 
 
-/** Birdie's move whistles by name (birdie-sounds.ts). */
-const BIRDIE_WHISTLE: Record<BirdieWhistle, SoundName> = {
-  whistleToot: "birdieWhistleToot",
-  whistleTootToot: "birdieWhistleTootToot",
-  whistleLong: "birdieWhistleLong",
-  whistleTootLong: "birdieWhistleTootLong",
-  whistlePeepPeep: "birdieWhistlePeepPeep",
-};
-/** His chirp over a move's whistle, and his chatter at rest, taken in turn by his move's number (the same on every device). */
+/** His chirp on a heard move of his (the nod), taken in turn by his move's number (the same on every device). */
 const BIRDIE_NOD: readonly SoundName[] = ["birdieCheer", "birdieTsip"];
-const BIRDIE_CHATTER: readonly SoundName[] = ["birdieTsip", "birdieAsk", "birdieTeeoo"];
 /**
- * Whether Birdie's move number `n` is one of his heard moves (BIRDIE_SOUND_EVERY, Eric, Nov 23: "only like every 3-4 of his moves"): his
- * first (n 1), then the gaps in turn (3, 4, 3, 4: 1, 4, 8, 11, 15 ...). The same on every device: from his move's number alone.
+ * Whether Birdie's move number `n` is one of his heard moves (BIRDIE_SOUND_EVERY, Eric, Nov 24: "cap the chirping to ... maybe once every
+ * 5 of his moves at most"): his first (n 1), then the gaps in turn (5: 1, 6, 11 ...). The same on every device: from his move's number alone.
  */
 export function birdieHeard(n: number, every: readonly number[] = BIRDIE_SOUND_EVERY): boolean {
   const cycle = every.reduce((a, b) => a + b, 0);
@@ -239,21 +230,34 @@ export function birdieHeard(n: number, every: readonly number[] = BIRDIE_SOUND_E
   return false;
 }
 
+/** His train rode the board this turn (a smash, a miss, your king): his entrance now is his return from it. */
+const birdieRode = (boss: Pick<BossView, "powers">): boolean => {
+  const p = boss.powers;
+  return !!p?.events?.some((e) => (e.kind === "trainSmash" || e.kind === "trainWin") && e.turn === p.turn);
+};
 /**
- * Birdie's cues whose sound comes from the battle (BossKit.cueSound): his move's whistle (by how far his piece went, now and then the
- * peeps: birdieWhistle) and the chirp over it, only on his heard moves (birdieHeard: every 3 or 4 of his moves; the others are silent but
- * for the board's own move sound); his chirps in turn. His chatter and his smug teeoo (his loops' cues) only on your turn after a heard
- * move of his, never as your move lands, when only the board's knock is heard (Eric, Oct 10; boss-kits.test.ts). A capture's and a
- * check's sounds (`tootRun`, `trill`, `flash`) are his kit's, heard every time (Nov 23, director's call: they're events).
+ * Birdie's cues whose sound comes from the battle (BossKit.cueSound; Eric, Nov 24: "he's doing a little too much chirping and the train
+ * noises ... cap the chirping to ... maybe once every 5 of his moves at most ... his train noise is really, let's just keep it for when the
+ * train actually crosses"):
+ * - His train's whistles and horns only on his ride (his depart's `pull` and `go`, his return's `roll` and `brake`): his move's whistle
+ *   (`run`), a capture's or a check's toot-long (`tootRun`) and the warning's conductor's whistle (`signal`) are silent; his entrance's
+ *   `roll` and `brake` only on his return from a ride, never at the battle's start.
+ * - His chirps: his hello (`tip`) at the battle's start (not on his return from a ride: a chirp after the start); then one chirp on his
+ *   heard moves only (birdieHeard: his 1st, then every 5th), his move's own (a capture's `trill`, a check's teeoo `flash`, else the
+ *   `nod`), the others silent but for the board's own move sound. His chatter, his smug teeoo and his hurt scold are silent; his defeat's
+ *   scold, his victory and his fall are unchanged.
  */
-export function birdieCue(cue: string, boss: Pick<BossView, "board">, yourTurn = true): SoundName | null | undefined {
+export function birdieCue(cue: string, boss: Pick<BossView, "board" | "powers">, _yourTurn = true, anim = ""): SoundName | null | undefined {
   const h = boss.board.history;
   const his = Math.floor(h.length / 2);
   const heard = birdieHeard(his);
-  if (cue === "run") return heard ? BIRDIE_WHISTLE[birdieWhistle(h[h.length - 1], false, his)] : null;
+  if (cue === "run" || cue === "tootRun" || cue === "signal") return null;
+  if (cue === "roll" || cue === "brake") return birdieRode(boss) ? undefined : null;
+  if (cue === "tip") return birdieRode(boss) ? null : undefined;
   if (cue === "nod") return heard ? BIRDIE_NOD[his % BIRDIE_NOD.length] : null;
-  if (cue === "chatter") return yourTurn && heard ? BIRDIE_CHATTER[his % BIRDIE_CHATTER.length] : null;
-  if (cue === "coo") return yourTurn && heard ? undefined : null;
+  if (cue === "trill" || cue === "flash") return heard ? undefined : null;
+  if (cue === "chatter" || cue === "coo") return null;
+  if (cue === "oof") return anim.replace(/^p_/, "") === "defeat" ? undefined : null;
   if (cue === "gone" || cue === "away") return null;
   return undefined;
 }
@@ -1208,8 +1212,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
       brake: "birdieBrake",
       pop: "birdieHop",
       tip: "birdieHello",
-      // His moves: his train's whistle as his piece sets off (the double toot; by how far it goes, now and then the peeps: cueSound), a
-      // chirp over its start as he nods; a capture or a check, a toot then a long one, then his trill or his teeoo.
+      // His moves: his train's whistle as his piece sets off, a chirp over its start as he nods; a capture or a check, a toot then a long
+      // one, then his trill or his teeoo. (Since Nov 24 the whistles and toots are silent off his ride, and one chirp at most every 5 of
+      // his moves: cueSound, birdieCue. The names stay, made ahead.)
       run: "birdieWhistleTootToot",
       nod: "birdieCheer",
       tootRun: "birdieWhistleTootLong",

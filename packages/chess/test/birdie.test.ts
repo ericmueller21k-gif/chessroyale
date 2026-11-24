@@ -17,6 +17,7 @@ import {
   legalMoves,
   lineSquares,
   pieceAt,
+  positionOver,
   powerTurn,
   powerWinShowMs,
   rageOf,
@@ -33,6 +34,7 @@ import {
   trainSquare,
   trainWon,
   triggerUltimate,
+  withPiece,
   withoutPiece,
   type EngineLike,
 } from "../src/index.ts";
@@ -209,12 +211,66 @@ describe("the Train in a battle", () => {
     expect(powerTurn(last.boss!, fenOf(last))).toBe(false);
   });
 
-  it("a move of the warned piece saves it: no train", async () => {
+  it("a move of the warned piece saves it: his train still rides the line and misses (Eric, Nov 24), the board unchanged, no base", async () => {
     const r = battle(3);
     await untilTurn(r, 2);
     const w = birdieOf(r)!.warn!;
-    await crowdMove(r, (_f, allowed) => allowed.filter((m) => m.startsWith(w.square)).sort()[0]!);
+    const before = fenOf(r);
+    const move = (r.crowdAllowed() ?? legalMoves(before)).filter((m) => m.startsWith(w.square)).sort()[0]!;
+    await crowdMove(r, () => move);
+    const board = r.boards.get(r.state.boards[0]!)!;
     expect(birdieOf(r)!.warn).toBeNull();
+    expect(r.boss!.powers!.events.some((e) => e.kind === "trainWin")).toBe(false);
+    const ev = r.boss!.powers!.events.find((e) => e.kind === "trainSmash");
+    expect(ev).toMatchObject({ square: w.square, squares: w.squares, missed: true });
+    expect(ev?.fizzled).toBeUndefined();
+    expect(birdieOf(r)!.ride).toEqual({ at: 2, line: w.line, squares: w.squares, square: w.square, piece: w.piece, missed: true });
+    // (Nothing taken off: no base at this ply, the position the move left; nobody's win.)
+    expect(board.bases?.some((b) => b.ply === board.history.length) ?? false).toBe(false);
+    expect(board.fen).toBe(applyMove(before, move));
+    expect(trainWon(r.boss!)).toBe(false);
+    // (Timed as a smash ride, solo and online: the same event kind, so the same hold.)
+    expect(birdieTurnMs(r.bossView()!)).toBe(POWER_FX.trainSmash + BIRDIE_CINEMATIC.tailPadMs);
+    expect(r.bossToMove()).toBe(true);
+    await r.playBoss();
+    expect(r.boss!.crowdMoves).toBe(2);
+  });
+
+  it("another piece of yours on the warned square is never smashed: the warned piece is gone, the train misses", async () => {
+    const r = battle(3);
+    await untilTurn(r, 2);
+    const w = birdieOf(r)!.warn!;
+    // (As if another power had swapped it: a piece of yours of another kind stands there now.)
+    const other = w.piece === "n" ? "b" : "n";
+    setBoard(r, withPiece(fenOf(r), w.square, { color: "w", type: other }));
+    await crowdMove(r, (fen, allowed) => allowed.filter((m) => !m.startsWith(w.square) && !positionOver(applyMove(fen, m))).sort()[0]!);
+    expect(pieceAt(fenOf(r), w.square)).toEqual({ color: "w", type: other });
+    expect(birdieOf(r)!.ride).toMatchObject({ at: 2, square: w.square, missed: true });
+    expect(r.boss!.powers!.events.find((e) => e.kind === "trainSmash")?.missed).toBe(true);
+  });
+
+  it("a miss and his fall on the same turn: the train first, then his fall", async () => {
+    const r = battle(3, "w", "fall");
+    await untilTurn(r, 2);
+    const w = birdieOf(r)!.warn!;
+    expect(w.turn).toBe(2);
+    await crowdMove(r, (_f, allowed) => allowed.filter((m) => m.startsWith(w.square)).sort()[0]!);
+    const events = r.boss!.powers!.events.filter((e) => e.turn === r.boss!.powers!.turn && (e.kind === "trainSmash" || e.kind === "birdieFall"));
+    expect(events.map((e) => [e.kind, !!e.missed])).toEqual([["trainSmash", true], ["birdieFall", false]]);
+    const view = r.bossView()!;
+    expect(birdieTurnLayout(view).map((m) => m.kind)).toEqual(["trainSmash", "birdieFall"]);
+    expect(birdieTurnMs(view)).toBe(POWER_FX.trainSmash + POWER_FX.birdieFall + BIRDIE_CINEMATIC.tailPadMs);
+  });
+
+  it("nothing rides once the game is over on the board, saved or not", async () => {
+    const r = battle(3);
+    await untilTurn(r, 2);
+    const p = r.boss!.powers!;
+    // (Your rook mates his king on its back rank with the move that leaves the warned b1 knight's square: no ride after a mate.)
+    setBoard(r, "6k1/5ppp/8/8/8/8/R7/1N2K3 w - - 0 1");
+    r.state = { ...r.state, boss: { ...r.boss!, powers: { ...p, birdie: { ...p.birdie!, warn: { turn: p.turn, line: "b", squares: lineSquares("b", "w"), square: "b1", piece: "n" } } } } };
+    await crowdMove(r, () => "a2a8");
+    expect(positionOver(fenOf(r))).toBe(true);
     expect(r.boss!.powers!.events.some((e) => e.kind === "trainSmash" || e.kind === "trainWin")).toBe(false);
   });
 

@@ -12,6 +12,7 @@ import { birdieSound } from "../src/characters/birdie-sounds.ts";
 import { birdieMusic } from "../src/birdie-music.ts";
 import { noteRejoin } from "../src/characters/moo-state.ts";
 import type { Moment } from "../src/components/PowerParts.tsx";
+import { dockLine } from "../src/components/BossPowers.tsx";
 import { trainLine } from "../src/refused.ts";
 import { cutsceneHash } from "../../../scripts/bake-birdie-cutscene.ts";
 import type { BossView } from "../src/game.ts";
@@ -149,6 +150,32 @@ describe("the board during his train's ride", () => {
     expect(ridePieces("1k6/8/8/8/8/8/8/1K6 b - - 0 1", crowd, { square: "b1", piece: "k" }, ride.squares, rideAt, rideAt)).toEqual([]);
   });
 
+  it("a miss (Nov 24, your piece saved): the board as it is until the ride, every piece on the line stepping aside, none smashed", () => {
+    // Your knight moved off b1 to c3 (saved): his rook on b8 the only piece left on the b-file.
+    const saved = "1r2k3/8/8/8/8/2N5/P6P/4K3 b - - 0 1";
+    const missed = { ...ride, missed: true as const };
+    const mb = { ...boss, powers: { birdie: { warn: null, ride: missed, fell: null } } } as unknown as BossView;
+    const mm: Moment = { ...m, missed: true };
+    const rideAt = 1000 + BIRDIE_BEATS.ride.rideAt;
+    // (Nothing put back on b1 before the ride: there's nothing to smash.)
+    expect(birdieFen(mb, [mm], 1000, saved)).toBeNull();
+    const riding = birdieFen(mb, [mm], rideAt + 10, saved)!;
+    expect(pieceAt(riding.fen, "b8")).toBeNull();
+    expect(pieceAt(riding.fen, "b1")).toBeNull();
+    expect(pieceAt(riding.fen, "c3")).toEqual({ color: "w", type: "n" });
+    expect(birdieFen(mb, [mm], 1000 + BIRDIE_BEATS.ride.backAt, saved)).toBeNull();
+    expect(ridePieces(saved, crowd, missed, ride.squares, rideAt, rideAt + 10)).toEqual([{ square: "b8", i: 0, color: "b", type: "r", smashed: false }]);
+    // (Moved along the line, b1 to b4: it steps aside as the train passes too, never smashed, never gone.)
+    const along = "1r2k3/8/8/8/1N6/8/P6P/4K3 b - - 0 1";
+    for (const now of [rideAt, rideAt + trainReaches(7) + 1]) {
+      expect(ridePieces(along, crowd, missed, ride.squares, rideAt, now).map((x) => [x.square, x.smashed])).toEqual([
+        ["b8", false],
+        ["b4", false],
+      ]);
+    }
+    expect(birdieDecor(mb, [mm], 99_999)).toBeUndefined();
+  });
+
   it("your king, smashed: hidden from the train's hit on (the battle his), never taken off the drawn board", () => {
     const won = { ...boss, powers: { birdie: { warn: null, ride: { ...ride, line: "e", squares: lineSquares("e", crowd), square: "e1", piece: "k", king: true }, fell: null } } } as unknown as BossView;
     const w: Moment = { ...m, kind: "trainWin", square: "e1", squares: lineSquares("e", crowd) };
@@ -172,5 +199,17 @@ describe("his words", () => {
     expect(BIRDIE_WORDS.move(undefined)).toBe("Move your king!");
     // (As short as the Saw Swap's "Swapped out of check.", which fits a phone's dock at 320 px.)
     expect(trainLine(view("b"))!.length).toBeLessThanOrEqual("Swapped out of check.".length);
+    // His ride's line in the dock: a smash, a sparing, a miss (Nov 24: your piece saved, never a word of a piece lost). Each whole in
+    // the test phone's dock after "Birdie: " (e2e/birdie.spec.ts measures the smash's and the miss's): no longer than "Bishop smashed!".
+    const squares = lineSquares("b", "w");
+    expect(dockLine({ kind: "trainSmash", squares, shape: "n" })).toBe("Knight smashed!");
+    expect(dockLine({ kind: "trainSmash", squares, shape: "b", fizzled: ["b1"] })).toBe("Bishop spared.");
+    const miss = dockLine({ kind: "trainSmash", squares, shape: "n", missed: true })!;
+    expect(miss).toBe("Nothing hit!");
+    expect(miss).not.toMatch(/your|lost|smash/i);
+    for (const shape of ["p", "n", "b", "r", "q"]) {
+      expect(BIRDIE_WORDS.smashed(shape).length).toBeLessThanOrEqual("Bishop smashed!".length);
+      expect(BIRDIE_WORDS.spared(shape).length).toBeLessThanOrEqual("Bishop smashed!".length);
+    }
   });
 });

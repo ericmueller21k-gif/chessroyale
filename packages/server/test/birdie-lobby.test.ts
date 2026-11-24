@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { BIRDIE_CINEMATIC, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
 import { BIRDIE_BEATS, armoredBrain, birdieImpactMs, birdieTurnMs, legalMoves, lineSquares, powerWinShowMs, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -112,6 +112,47 @@ describe("Birdie online", () => {
     expect(results).toBeTruthy();
     expect(results!.at - at).toBeGreaterThanOrEqual(ms);
     expect(r.boss!.result).toBe("boss");
+  });
+
+  it("a saved piece (Nov 24): his train still rides and misses, his thinking held for the same ride, his move after it", () => {
+    const l = birdieLobby();
+    // (The test switch warns every turn from the second: play the first turn, then the second is warned.)
+    l.toPlay();
+    for (const id of ["p1", "p2"]) l.core.message(id, { t: "pick", key: l.last(id, "round")!.key, move: (l.last(id, "round")!.boss?.powers?.allowed ?? legalMoves(l.last(id, "round")!.board!.fen))[0]! });
+    expect(l.hostScores()).toBeTruthy();
+    l.drop("p1", "round");
+    l.drop("p2", "round");
+    l.toPlay();
+    const r = l.runner();
+    const w = r.boss!.powers!.birdie!.warn!;
+    expect(w.turn).toBe(r.boss!.crowdMoves + 1);
+    // Both of you move the warned piece.
+    const round = l.last("p1", "round")!;
+    const move = (round.boss?.powers?.allowed ?? legalMoves(round.board!.fen)).find((m) => m.startsWith(w.square))!;
+    expect(move).toBeTruthy();
+    for (const pid of ["p1", "p2"]) l.core.message(pid, { t: "pick", key: l.last(pid, "round")!.key, move });
+    l.hostScores();
+    const isHeld = (x: { msg: Msg }) => x.msg.t === "boss" && "thinking" in x.msg && !!x.msg.thinking && !!x.msg.boss?.powers?.events.some((e) => e.kind === "trainSmash");
+    for (let i = 0; i < 40 && !l.log.some(isHeld); i++) l.advance(500);
+    const held = l.log.find(isHeld);
+    expect(held, "his thinking carries the ride").toBeTruthy();
+    const view = (held!.msg as Extract<Msg, { t: "boss" }>).boss!;
+    expect(view.powers!.events.find((e) => e.kind === "trainSmash")).toMatchObject({ square: w.square, missed: true });
+    expect(view.powers!.birdie!.ride).toMatchObject({ square: w.square, missed: true });
+    expect(view.powers!.birdie!.turnAt).toMatchObject({ turn: view.powers!.turn, at: held!.at });
+    // (The same hold as a smash's ride: the ride's whole length and its margin.)
+    expect(birdieTurnMs(view)).toBe(BIRDIE_BEATS.ride.total + BIRDIE_CINEMATIC.tailPadMs);
+    const req = l.last("p1", "bossRequest");
+    if (req) {
+      l.drop("p1", "bossRequest");
+      l.core.message("p1", { t: "bossMove", key: req.key, move: legalMoves(req.fen)[0]! });
+    }
+    const shown = (x: { at: number; msg: Msg }) => x.at >= held!.at && x.msg.t === "boss" && !("thinking" in x.msg && x.msg.thinking);
+    for (let i = 0; i < 40 && !l.log.some(shown); i++) l.advance(500);
+    const moved = l.log.find(shown);
+    expect(moved, "his move").toBeTruthy();
+    expect(moved!.at - held!.at).toBeGreaterThanOrEqual(birdieTurnMs(view));
+    expect(r.boss!.result ?? null).toBeNull();
   });
 
   it("his fall (Nov 23): his thinking holds for his ult's piece, its start and the train's impact sent with every message of it (turnAt), his move after the impact", () => {

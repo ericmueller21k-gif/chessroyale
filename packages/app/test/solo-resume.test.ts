@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_ADMIN_FIRST, DEFAULT_SETTINGS, RAID_SETTINGS, SOLO_ABANDON, ownMoves, type Settings } from "@chessroyale/core";
-import { BIRDIE_BEATS, MatchRunner, START_FEN, chooseRush, dodgeArena, dodgeTimeline, legalMoves, lightsOutTimeline, lineSquares, powerWinShowMs, rushBeats, rushTimeline, type UciEngine } from "@chessroyale/chess";
+import { BIRDIE_BEATS, MatchRunner, birdieTurnLayout, START_FEN, chooseRush, dodgeArena, dodgeTimeline, legalMoves, lightsOutTimeline, lineSquares, powerWinShowMs, rushBeats, rushTimeline, type UciEngine } from "@chessroyale/chess";
 import { KEPT_ENDED, account, askForfeitFirst, forfeitKeptSolo, keptSoloOpen, loadAccount, offerKeptSolo, reofferKeptSolo, takeKeptSolo } from "../src/account.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { SoloKeep, forfeitAsk, keptMoves, keptSoloFor, loadKeptSolo, type KeptSolo } from "../src/solo-kept.ts";
@@ -623,18 +623,20 @@ describe("a solo boss battle kept on the device, resumed (step 2)", () => {
       expect(falling(m)).toBe(true);
       const began = (x: SoloMatch) => (x.phase as { boss: { powers: { birdie: { turnAt?: { at: number; dropAt?: number } } } } }).boss.powers.birdie.turnAt!;
       const t0 = began(m).at;
-      expect(began(m).dropAt! - t0).toBe(BIRDIE_BEATS.fall.impactAt);
+      // (His fall's start in his turn: after his train's ride when it rode that turn, a warned piece saved too since Nov 24.)
+      const fall0 = birdieTurnLayout((m.phase as { boss: Parameters<typeof birdieTurnLayout>[0] }).boss).find((x) => x.kind === "birdieFall")!.at;
+      expect(began(m).dropAt! - t0).toBe(fall0 + BIRDIE_BEATS.fall.impactAt);
       // (Into his wait past his line: kept at that beat.)
-      await step(t0 + BIRDIE_BEATS.fall.lineAt + 500 - Date.now());
+      await step(t0 + fall0 + BIRDIE_BEATS.fall.lineAt + 500 - Date.now());
       const k = loadKeptSolo()!;
-      expect(k.kept.moment!.ms).toBeGreaterThanOrEqual(BIRDIE_BEATS.fall.lineAt);
-      expect(k.kept.moment!.ms).toBeLessThan(BIRDIE_BEATS.fall.fallAt);
+      expect(k.kept.moment!.ms).toBeGreaterThanOrEqual(fall0 + BIRDIE_BEATS.fall.lineAt);
+      expect(k.kept.moment!.ms).toBeLessThan(fall0 + BIRDIE_BEATS.fall.fallAt);
       m.dispose();
       const r = resumed(k);
       await until(r, () => falling(r), "his fall, resumed");
       const t1 = began(r).at;
       expect(Math.abs(Date.now() - t1 - k.kept.moment!.ms)).toBeLessThan(300);
-      expect(began(r).dropAt! - t1).toBe(BIRDIE_BEATS.fall.impactAt);
+      expect(began(r).dropAt! - t1).toBe(fall0 + BIRDIE_BEATS.fall.impactAt);
       // (His move only after the drop, never before.)
       const drop = began(r).dropAt!;
       await until(r, () => !(r.phase.kind === "boss" && r.phase.thinking), "his move");
