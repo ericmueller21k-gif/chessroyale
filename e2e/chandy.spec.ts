@@ -6,7 +6,8 @@ import { asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 /**
  * Chandy (his rules, Nov 16; docs/decisions/2026-11-16-chandy-rules.md), in the game for admins first (BOSS_ADMIN_FIRST): his tile only
  * on an admin's Boss raid screen; Boss alone with the test switches: each of his meter's five moves shows (its event, its banner, his
- * layer over the board), the queen lock's aim and then its shot; a lock's crosshair and, when he takes the locked piece, the upgrade
+ * layer over the board), the Lock-on Shot's aim (its name since Nov 24), the God King's warning and the crosshair on the piece its round
+ * will hit, then its shot and the upgrade that shatter earns; a lock's crosshair and, when he takes the locked piece, the upgrade
  * window; and Dodge (`&power=dodge`): the scope-in, the warning volley, a round's vote (your tap counted on the square, ringed),
  * DODGED, a hit that cracks your king, then the second that ends the battle. Dodge's last chance (`&win=1`: your mate in one from the start): it comes at once with no upgrades, and after three
  * dodged rounds your mate wins. (At a battle's first turn no warning shows, as no first turn's moments do: the intro has the screen.
@@ -41,7 +42,7 @@ async function playOne(page: Page, pick?: (legal: { uci: string; piece: string; 
 async function watch(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
-    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], words: [] as string[], first: [] as { square: string; fen: string; thinking: boolean }[] };
+    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], words: [] as string[], first: [] as { square: string; fen: string; thinking: boolean }[], king: [] as string[] };
     const look = () => {
       const r = w.__ch;
       for (const e of w.match?.boss?.powers?.events ?? []) if (!r.kinds.includes(e.kind)) r.kinds.push(e.kind);
@@ -54,6 +55,11 @@ async function watch(page: Page) {
         if (t && !r.banners.includes(t)) r.banners.push(t);
       }
       if (document.querySelector(".power-board .ch-over")) r.layer++;
+      // (The God King's lines, as his bubble says them.)
+      for (const b of document.querySelectorAll(".gk-bubble[aria-label]")) {
+        const t = b.getAttribute("aria-label") ?? "";
+        if (t && !r.king.includes(t)) r.king.push(t);
+      }
       const up = document.querySelector(".ch-upgrade")?.getAttribute("aria-label");
       if (up && !r.upgrade.includes(up)) r.upgrade.push(up);
       const root = document.querySelector(".cd-root");
@@ -68,7 +74,7 @@ async function watch(page: Page) {
     requestAnimationFrame(look);
   });
 }
-const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[] });
+const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[]; king: string[] });
 
 /**
  * Dodge's opening as a frame sampler can promise it (Nov 19: a long CI frame skipped the 600 ms slide): the phases sampled
@@ -187,7 +193,7 @@ test.describe("Chandy", () => {
       expect(errors).toEqual([]);
     });
 
-  test("his queen lock: his whole turn aiming down her file, your free move, then the shot shatters the pawn in front of her", { tag: "@phone-only" }, async ({ page }) => {
+  test("his Lock-on Shot (the queen lock until Nov 24): his whole turn aiming down her file, the God King's warning, the pawn in front of her locked too; your free move, then the shot shatters it: an upgrade", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(120_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -197,8 +203,14 @@ test.describe("Chandy", () => {
     await yourMove(page);
     let s = await seen(page);
     expect(s.kinds).toContain("queenAim");
-    expect(s.banners.some((b) => /QUEEN LOCK!/.test(b))).toBe(true);
+    expect(s.banners.some((b) => /LOCK-ON SHOT!/.test(b))).toBe(true);
+    expect(s.banners.some((b) => /QUEEN LOCK/i.test(b))).toBe(false);
     expect(await page.evaluate(() => (window as any).match.boss.powers.chandy.aim)).toBe("d1");
+    // (The piece its round will hit, the d2 pawn in front of her, locked too: its crosshair, one pip (it fires next).)
+    expect(await page.evaluate(() => (window as any).match.boss.powers.chandy.locks)).toContainEqual({ square: "d2", left: 1 });
+    // (The God King's warning: put a piece in front of her. Your d2 pawn already is, so a move can keep one there.)
+    await expect.poll(async () => (await seen(page)).king.some((t) => /queen/i.test(t) && /front|behind|block/i.test(t)), { timeout: 10_000 }).toBe(true);
+    const upgrades = await page.evaluate(() => (window as any).match.boss.powers.chandy.upgrades as number);
     // (His turn was spent: no move of his on the board since yours.)
     await playOne(page, (legal) => legal.find((m) => m.piece === "n" && !m.captured && m.uci !== "d2d3" && m.uci !== "d2d4")?.uci);
     await yourMove(page);
@@ -207,6 +219,9 @@ test.describe("Chandy", () => {
     const after = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, shot: (window as any).match.boss.powers.chandy.shot }));
     expect(after.shot).toMatchObject({ square: "d2", piece: "p" });
     expect(new Chess(after.fen).get("d2" as never)).toBeFalsy();
+    // (Its shatter of the locked pawn is an upgrade, as a capture: the window as your turn begins.)
+    expect(await page.evaluate(() => (window as any).match.boss.powers.chandy.upgrades)).toBe(upgrades + 1);
+    await expect.poll(async () => (await seen(page)).upgrade.some((u) => u.includes(`${upgrades + 1} of 5`)), { timeout: 10_000 }).toBe(true);
     expect(errors).toEqual([]);
   });
 

@@ -190,7 +190,7 @@ function Preview() {
           })}
         </div>
         {power && <BoardEffects items={powerItems(power.p, power.since)} orientation="white" class="chp-fx" />}
-        {upgrade && <ChandyUpgrade stage={upgrade.stage} move={["Scatter shot", "Beam", "Shields", "Rapid fire", "Queen lock"][upgrade.stage - 1]} since={upgrade.since} />}
+        {upgrade && <ChandyUpgrade stage={upgrade.stage} move={["Scatter shot", "Beam", "Shields", "Rapid fire", "Lock-on Shot"][upgrade.stage - 1]} since={upgrade.since} />}
         {dodgeView && <ChandyDodge view={dodgeView} />}
       </div>
       <p class="chp-note">Dodge: tap a square while the vote runs (the safe square ends on e5).</p>

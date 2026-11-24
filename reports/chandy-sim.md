@@ -6,6 +6,9 @@ upgrade (5), each unlocking a move his meter fires every 6 crowd moves. **Dodge*
 the fifth upgrade, or at once when the crowd can mate him): a warning volley, then 3 rounds of a 3 s vote while clones teleport; the
 second hit ends the battle (one hit until run D).
 
+**Run H (Nov 24): the hunt after his taught upgrades and the Lock-on Shot's victim: the calibration's crowd scores 0.03 before and
+after; a player like Eric reaches 4 or more upgrades by crowd move 30 in 19 battles of 20 (was 14), scoring 0.17 both (below).**
+
 The aims (the brief, L1, L4, L5): his crowd score inside the pack; 5 upgrades in at least 9 battles in 10, the fifth by about move
 35; if fewer, raise L3's steering margins before changing the rule. Run C's (Nov 16): Dodge in at least 85% of battles.
 
@@ -61,6 +64,60 @@ queen with nothing to shield her), which the unit test pins. Without upgrade 2 t
 with G1, **1 of 16 with G2**. The trade: the aim is his whole turn, so upgrade 2 comes later (1 to 2: 5 of your moves, median, was
 3.5); upgrades 3 and 5 didn't move. The crowd's results are within noise (20 battles; the sims vary run to run: upgrade 1, which
 neither change touches, moved from 8 to 9).
+
+**Run H (Nov 24, the hunt, the Lock-on Shot's victim; docs/decisions/2026-11-24-chandy-upgrades.md).** Eric, a deep endgame with
+his rifle at 2 upgrades: "the only 2 we got were the ones that we force him to get ... he ended up just doing the queen shot 3 times."
+Measured first, on main (`raid-chandyHb0-2`, `raid-chandyEb`; the sim now logs each hunting move, each crowd move against a lock he
+could win, and how each lock ended), then after (`raid-chandyHa0`, `Ha2`, `Ea`). 5 battles each on seeds 11 to 14, `"pickSec":5`
+(Eric's pace; it changes nothing for Chandy). Four crowds: **the bots** (the calibration's); **bots that heed** the crosshairs as a
+person sees them (`"heed":1`: with a locked piece he can win, the whole crowd plays its best move that saves it within a pawn; with
+the shot aimed, its best block); **stronger bots that heed** (`"botLevel":1800`); and **a player like Eric** (`"alone":true,
+"best":true,"tier":2400`: Boss alone, one player who plays the engine's best move, heeds the crosshairs and finds Dodge's safe
+square, against the boss at 2150: games run to the sim's 60 moves, as Eric's did).
+
+Why his locks rarely became upgrades (before; hunting moves: his moves with a lock he hunts; "a trade outside them": a capture of a
+locked piece outside his top 5 lines, netting him at least −1 pawn, within 2 pawns of his best by the engine):
+
+| Crowd (before) | Battles | Hunting moves | No capture of a locked piece | A capture in his top 5 lines, within 2 pawns | A trade outside them | His takes | Crowd moves vs a lock he could win: moved away / guarded / left | Locks ended: taken / escaped / too old / shot | Shots that hit a piece |
+|---|---|---|---|---|---|---|---|---|---|
+| Bots | 20 | 429 | 174 (41%) | 137 | 44 | 114 | 33 / 28 / 77 | 114 / 125 / 5 / 2 | 33 of 33 |
+| Bots that heed | 20 | 507 | 253 (50%) | 131 | 25 | 107 | 57 / 63 / 38 | 107 / 164 / 7 / 2 | 31 of 31 |
+| Stronger bots that heed | 20 | 660 | 361 (55%) | 125 | 34 | 94 | 72 / 85 / 36 | 94 / 225 / 16 / 9 | 31 of 31 |
+| A player like Eric | 20 | 861 | 519 (60%) | 112 | 20 | 105 | 107 / 136 / 40 | 105 / 315 / 16 / 7 | 24 of 25 |
+
+The more the crowd sees the crosshairs, the more locks escape (Eric-like: 315 escaped for 105 taken) and the more of his hunting
+moves have nothing to take (60%). His steering only took a trade inside his top 5 lines; an escaped lock sat on its safe piece for up
+to 3 of his turns; and the queen lock's shot hit a piece nearly every time it fired, never an upgrade. Against the bots none of this
+showed: they lose pieces anyway (5 upgrades in 19 battles of 20 before any change). Lock ends from the sim's view (`ended`), by why
+each lock went; "steering found nothing in lockLines" is the "no capture" column plus the captures outside his top lines.
+
+Before and after (the crowd's score: wins plus half the draws; upgrades by crowd move 25 and 30: the median, and the battles with 4 or
+more of those that lasted so long; shatters: locks the shot shattered, each an upgrade after):
+
+| Run H | Battles | Crowd wins / draws / boss wins | Crowd score | Crowd moves (median) | Upgrades by move 25 | By move 30 | Upgrade 3 / 5 (median crowd move) | 5 upgrades | His takes a battle | Shatters of a lock |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Bots, before | 20 | 0 / 1 / 19 | 0.03 (± 0.02) | 37.5 | 4 (13 of 20) | 5 (15 of 19) | 20 / 27 | 19 | 5.7 | 2 |
+| **Bots, after** | 20 | 0 / 1 / 19 | **0.03 (± 0.02)** | 37.5 | 5 (18 of 20) | 5 (19 of 19) | 12 / 21 | 20 | 7.8 | 13 |
+| Stronger, heeding, before | 20 | 0 / 2 / 18 | 0.05 (± 0.03) | 47 | 3 (6 of 20) | 4 (11 of 18) | 20.5 / 32.5 | 18 | 4.7 | 9 |
+| **Stronger, heeding, after** | 20 | 0 / 1 / 19 | 0.03 (± 0.02) | 42.5 | **5 (16 of 20)** | 5 (17 of 18) | 15 / 24 | 19 | 6.5 | 19 |
+| Like Eric, before | 20 | 1 / 5 / 14 | 0.17 (± 0.06) | 60 | 3.5 (10 of 20) | 4.5 (14 of 20) | 17 / 30 | 19 | 5.2 | 7 |
+| **Like Eric, after** | 20 | 2 / 3 / 15 | **0.17 (± 0.07)** | 60 | 4 (13 of 20) | **5 (19 of 20)** | 13.5 / 27 | 19 | 6.0 | 14 |
+
+- **The target** (the director's: typically 4 to 5 upgrades by the late middlegame, his strength in his band): by crowd move 30, 4 or
+  more in 19 battles of 20 for the player like Eric (was 14) and 17 of 18 for the heeding crowd (was 11); his third upgrade comes 3.5
+  to 8 crowd moves sooner in every crowd.
+- **His strength:** the calibration's crowd (the bots) scores 0.03 before and after, the same wins, draws and losses (run D's 0.02,
+  the pack's 0.05 to 0.17); the Eric-like player 0.17 both; the heeding crowd 0.05 to 0.03 (one draw fewer in 20, within noise). The
+  hunt's trades cost him little by the engine (within 2 pawns, never into a mate), and the upgrades they buy pay it back.
+- **Where the upgrades come from:** more takes a battle (bots 5.7 to 7.8, Eric-like 5.2 to 6.0, the first two taught captures
+  included) and the shot's shatters of its locked piece (Eric-like 7 to 14 in 20 battles; the bots 2 to 13).
+- The sim's player like Eric still loses more pieces than Eric did (19 battles of 20 reach 5 upgrades before too): it stands in for
+  a player who doesn't blunder and saves what's marked, not for Eric's own game. Real play will say more; `huntLoss` and
+  `takeMargin` are the knobs (settings.ts).
+
+`npx tsx packages/sim/scripts/boss-sim.ts raid chandy 5 <seed> 0 <tag> '<patch>'`, seeds 11 to 14, patches: `{"pickSec":5}`;
+`{"pickSec":5,"heed":1}`; `{"pickSec":5,"heed":1,"botLevel":1800}`; `{"pickSec":5,"heed":1,"alone":true,"best":true,"tier":2400}`.
+The before rows ran on main at f7e9936 (the sim's logging only) in a worktree.
 
 ## How: the raid sim
 

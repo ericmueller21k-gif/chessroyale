@@ -79,7 +79,7 @@
  */
 import { BOSS_ALONE_SCORING, BOSS_CLOCK, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, darkSquares, touchesDark, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, isHop, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, attackedSquares, capturedSquare, exchangeNet, fenAtPly, lockAge, locksAfter, shotTarget, darkSquares, touchesDark, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, isHop, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -313,6 +313,85 @@ interface RaidPatch {
   squash?: number;
   /** A test switch (`?power=`), as solo's link sets it: Chandy's `dodge` gives him all five moves from the start (reports/chandy-sim.md, run E). */
   test?: string;
+  /**
+   * Chandy (Nov 24, reports/chandy-sim.md, run H): the crowd heeds his crosshairs as a person does (the bots can't see them). With a
+   * locked piece of the crowd's he can win (a capture of it netting him material by the exchange check), the whole crowd plays its best
+   * move after which none can be won, when it costs at most this many pawns against its best move; with the Lock-on Shot aimed, the best
+   * move that puts a piece in front of its target, when it costs less than the target is worth.
+   */
+  heed?: number;
+  /** The crowd's bots around this rating (Settings.botLevel: BOT_LOBBY's mean 1150 otherwise): a stronger crowd plays longer games. */
+  botLevel?: number;
+  /**
+   * The whole crowd plays the engine's best move (the sim's engine, RAID_NODES), where heeding (patch.heed) doesn't pick: a player who
+   * doesn't blunder. With a `tier` that makes him its match, games run deep, as Eric's did (Chandy, Nov 24, run H).
+   */
+  best?: boolean;
+}
+
+/** His best capture of the piece on `sq` (`fen`: him to move), by the exchange check (pawns), or null: none. */
+function bestNetOn(fen: string, sq: string): number | null {
+  let best: number | null = null;
+  for (const m of legalMoves(fen)) {
+    if (capturedSquare(fen, m) !== sq) continue;
+    const net = exchangeNet(fen, m);
+    if (net !== null && (best === null || net > best)) best = net;
+  }
+  return best;
+}
+
+/**
+ * The crowd heeding Chandy's crosshairs (patch.heed): the Lock-on Shot's target shielded, else every locked piece he could win made
+ * safe, by the whole crowd's pick (as counterTusks). Returns what it did (null: nothing to heed).
+ */
+async function heedChandy(runner: MatchRunner, engine: EngineLike, heed: number): Promise<{ kind: "aim" | "lock"; cost: number | null } | null> {
+  const c = runner.boss?.powers?.chandy;
+  if (!c) return null;
+  const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+  const crowd = runner.boss!.crowdSide;
+  const allowed = runner.crowdAllowed() ?? legalMoves(fen);
+  const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  const play = (move: string) => {
+    for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, move);
+  };
+  const pick = async (ok: (m: string) => boolean, extra: readonly string[], max: number) => {
+    const top = (await engine.topMoves(fen, 8)).filter((m) => allowed.includes(m.move));
+    const more = extra.filter((m) => allowed.includes(m) && !top.some((t) => t.move === m));
+    const scored = [...top, ...(more.length ? await engine.scoreMoves(fen, more) : [])].sort((a, b) => b.expected - a.expected);
+    const best = scored[0];
+    const fit = scored.find((m) => ok(m.move));
+    if (!best || !fit) return null;
+    const cost = Math.max(0, slamPawnsLost(best.expected, fit.expected));
+    if (cost > max) return null;
+    play(fit.move);
+    return Math.round(cost * 100) / 100;
+  };
+  if (c.aim) {
+    const target = c.aim.square;
+    const shape = pieceAt(fen, target)?.type ?? "q";
+    const saves = allowed.filter((m) => {
+      try {
+        const now = m.slice(0, 2) === target ? m.slice(2, 4) : target;
+        const hit = shotTarget(applyMove(fen, m), now, crowd);
+        return !!hit && hit !== now;
+      } catch {
+        return false;
+      }
+    });
+    if (saves.length) return { kind: "aim", cost: await pick((m) => saves.includes(m), saves, VALUE[shape]! - 1) };
+  }
+  const locks = c.locks.filter((l) => pieceAt(fen, l.square)?.color === crowd);
+  if (!locks.length) return null;
+  const winnable = (f: string, sqs: readonly string[]) => sqs.some((sq) => (bestNetOn(f, sq) ?? 0) > 0);
+  if (!winnable(passTurn(fen) ?? fen, locks.map((l) => l.square))) return null;
+  const safe = (m: string) => {
+    try {
+      return !winnable(applyMove(fen, m), locksAfter(fen, m, locks).map((l) => l.square));
+    } catch {
+      return false;
+    }
+  };
+  return { kind: "lock", cost: await pick(safe, allowed.filter((m) => locks.some((l) => l.square === m.slice(0, 2))), heed) };
 }
 
 /** A wrong move into the dark: from a dark square to one it can't legally go to (the first such, for the sim's model). */
@@ -375,6 +454,8 @@ async function counterTusks(runner: MatchRunner, engine: EngineLike, max: number
 async function raid(bosses: string[], games: number, seed: number, strikes: number, tag: string, patch: RaidPatch = {}) {
   const { rageSpeed, ...powers } = (patch.powers ?? {}) as { rageSpeed?: Record<string, number> };
   Object.assign(BOSS_POWERS as Record<string, unknown>, powers, rageSpeed ? { rageSpeed: { ...BOSS_POWERS.rageSpeed, ...rageSpeed } } : {});
+  // (A player who doesn't blunder (patch.best) finds Chandy's Dodge's safe square too: his Dodge never ends the battle early.)
+  if (patch.best) (BOSS_POWERS.chandy as { dodgeBotHit: number }).dodgeBotHit = 1;
   for (const [id, offset] of Object.entries(patch.offset ?? {})) (BOSS_ROSTER.find((d) => d.id === id) as { offset: number }).offset = offset;
   const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
   const engines = [await createNodeEngine({ nodes: RAID_NODES, hashMb: 16 })];
@@ -387,7 +468,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
       // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
       // (Dash: Boss Battle's clock, the bank his slaps take from: the player's time model below.)
-      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, ...(patch.test ? { bossPowerTest: patch.test } : {}), bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}), ...(patch.alone ? { ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: patch.bulbs !== false } : {}) } as Settings;
+      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, ...(patch.test ? { bossPowerTest: patch.test } : {}), bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}), ...(patch.alone ? { ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: patch.bulbs !== false } : {}), ...(patch.botLevel ? { botLevel: patch.botLevel } : {}) } as Settings;
       // (The clock for the hippo gardener's seeds: the crowd's pick (patch.pickSec), the reveal, his turn and the moments.)
       let clockMs = 0;
       const pickSec = patch.pickSec ?? 10;
@@ -506,8 +587,18 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const dash = { pickSec, rushSec: patch.rushSec ?? 2.2, bankMs: BOSS_CLOCK.bankSeconds * 1000, minBankMs: BOSS_CLOCK.bankSeconds * 1000, slaps: 0, stolenMs: 0, scrambles: 0, scrambled: 0, flags: 0, scrambleFlags: 0, slapSeen: -1 };
       // (Chandy: each lock (after which crowd move, its square), each upgrade (after which crowd move), the moves his meter fired,
       // each queen lock aimed (or the turn it waited) and its shot, and each Dodge's rounds.)
-      const chandy = { locks: [] as { at: number; square: string; first?: true }[], upgrades: [] as number[], fired: [] as { at: number; move: string }[], aims: [] as number[], aimWaits: [] as number[], shots: [] as { at: number; piece: string | null }[], dodges: [] as { at: number; rounds: number; hit: boolean; hits: number; won: boolean; random: number; last: boolean; upgrades: number }[] };
+      // (Nov 24, run H: the hunt. `hunt`: each of his ordinary moves with a hunting lock up: the locks, his legal captures of them and
+      // the best one's net by the exchange check (pawns), whether one was in his top lockLines lines and within takeMargin there, the
+      // best capture's loss against his best move by the engine (pawns), whether his move took one or attacked one it didn't before.
+      // `crowd`: each crowd move with a hunting lock he could win (a capture netting him material): the piece moved away, guarded so it
+      // can't be won, or left. `ended`: each lock as it went: taken (an upgrade), shot, too old (liveTurns) or escaped (past its hunt and
+      // not gettable), and the first captures' marks (`first`). `heeds`: the heeding crowd's picks (patch.heed).)
+      const chandy = { locks: [] as { at: number; square: string; first?: true }[], upgrades: [] as number[], fired: [] as { at: number; move: string }[], aims: [] as number[], aimWaits: [] as number[], shots: [] as { at: number; piece: string | null; square?: string | null }[], dodges: [] as { at: number; rounds: number; hit: boolean; hits: number; won: boolean; random: number; last: boolean; upgrades: number }[], hunt: [] as { at: number; locks: number; caps: number; net: number | null; inLines: boolean; inMargin: boolean; capLoss: number | null; took: boolean; chased: boolean }[], crowd: { moved: 0, guarded: 0, left: 0 }, ended: { taken: 0, shot: 0, old: 0, escaped: 0, first: 0 }, heeds: [] as { at: number; kind: string; cost: number | null }[] };
       const chandySeen = new Set<string>();
+      // (Every lock seen, by when it came (`at`, his move count), and those his moves took.)
+      const liveLocks = new Map<number, string>();
+      const takenLocks = new Set<number>();
+      const shotSquares = new Set<string>();
       const CHANDY_FIRED: Record<string, string> = { scatterShot: "scatter", beam: "beam", shields: "shields", rapidFire: "rapidfire", queenAim: "queenlock" };
       const chandyLook = () => {
         const p = runner.boss?.powers;
@@ -520,9 +611,27 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           chandySeen.add(key);
           if (e.kind === "lockOn") chandy.locks.push({ at: e.turn, square: e.square ?? "", ...(e.first ? { first: true as const } : {}) });
           else if (CHANDY_FIRED[e.kind]) chandy.fired.push({ at: e.turn, move: CHANDY_FIRED[e.kind]! });
-          else if (e.kind === "queenShot") chandy.shots.push({ at: e.turn, piece: (e as { shape?: string }).shape ?? null });
+          else if (e.kind === "queenShot") {
+            chandy.shots.push({ at: e.turn, piece: (e as { shape?: string }).shape ?? null, square: (e as { shape?: string }).shape ? (e.square ?? null) : null });
+            if ((e as { shape?: string }).shape && e.square) shotSquares.add(`${e.turn}:${e.square}`);
+          }
         }
+        // (The locks that went since the last look, and why.)
+        const now = new Set(c.locks.map((l) => l.at));
+        for (const [at, sq] of liveLocks) {
+          if (now.has(at)) continue;
+          liveLocks.delete(at);
+          if (takenLocks.has(at)) chandy.ended.taken++;
+          else if (chandy.locks.find((l) => l.at === at || l.square === sq)?.first && !c.taught) chandy.ended.first++;
+          else if ([...shotSquares].some((k) => k.endsWith(`:${sq}`))) chandy.ended.shot++;
+          else if (lockAge(c, { at }) >= BOSS_POWERS.chandy.liveTurns) chandy.ended.old++;
+          else chandy.ended.escaped++;
+        }
+        for (const l of c.locks) liveLocks.set(l.at, l.square);
       };
+      /** Chandy's locks now with what they're on (the crowd's pieces only). */
+      const chandyLocks = () => (runner.boss?.powers?.chandy?.locks ?? []).map((l) => ({ ...l }));
+      const boardFen = () => runner.boards.get(runner.state.boards[0]!)!.fen;
       // (Birdie: each warning (after which crowd move, the piece), each ride (smashed, spared or your king), his fall, and the material
       // he had lost by then.)
       const birdie = { warns: [] as { at: number; piece: string }[], rides: [] as { at: number; piece: string; spared?: true; king?: true }[], fell: null as number | null, lostAtFall: null as number | null };
@@ -745,9 +854,41 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const hoopsAsked = bossId === "tiger" && !!runner.hoopsAsk();
             const ultsBefore = runner.boss!.powers?.ults ?? 0;
             const tw = Date.now();
+            // (Chandy's hunt: what his move could do with the hunting locks up, before it, and what it did.)
+            const huntLocks = bossId === "chandy" ? runner.bossLocks() : null;
+            const locksBefore = bossId === "chandy" ? chandyLocks() : [];
+            const fen0 = boardFen();
+            const ply0 = runner.boards.get(runner.state.boards[0]!)!.history.length;
+            let huntRow: (typeof chandy.hunt)[number] | null = null;
+            if (huntLocks) {
+              const ok = runner.bossAllowed() ?? legalMoves(fen0);
+              const caps = ok.filter((m) => huntLocks.includes(capturedSquare(fen0, m) ?? ""));
+              const top = (await engines[0]!.topMoves(fen0, 8)).filter((m) => ok.includes(m.move)).sort((a, b) => b.expected - a.expected);
+              const lines = top.slice(0, BOSS_POWERS.chandy.lockLines);
+              const best = top[0]?.expected;
+              const loss = (e: number) => (best === undefined ? null : Math.round(Math.max(0, slamPawnsLost(best, e)) * 100) / 100);
+              const capScores = caps.length ? await engines[0]!.scoreMoves(fen0, caps) : [];
+              const nets = caps.map((m) => exchangeNet(fen0, m)).filter((x): x is number => x !== null);
+              const losses = capScores.map((m) => loss(m.expected)).filter((x): x is number => x !== null);
+              huntRow = { at: runner.boss!.crowdMoves, locks: huntLocks.length, caps: caps.length, net: nets.length ? Math.max(...nets) : null, inLines: lines.some((m) => caps.includes(m.move)), inMargin: lines.some((m) => caps.includes(m.move) && (loss(m.expected) ?? 99) <= BOSS_POWERS.chandy.takeMargin), capLoss: losses.length ? Math.min(...losses) : null, took: false, chased: false };
+            }
             // (Chandy's first capture: its lock is marked as his move is about to show, so it's looked at then, as solo shows it.)
             await runner.playBoss(engines[0], bossId === "chandy" ? async () => chandyLook() : undefined);
-            if (bossId === "chandy") chandyLook();
+            if (bossId === "chandy") {
+              const hist = runner.boards.get(runner.state.boards[0]!)!.history;
+              const mv = hist.length > ply0 ? hist[ply0]! : null;
+              const took = mv ? capturedSquare(fen0, mv) : null;
+              for (const l of [...locksBefore, ...chandyLocks()]) if (took && l.square === took) takenLocks.add(l.at);
+              if (huntRow && huntLocks && mv) {
+                const his = runner.boss!.crowdSide === "w" ? "b" : "w";
+                const before = attackedSquares(fen0, his);
+                const after = attackedSquares(applyMove(fen0, mv), his);
+                huntRow.took = !!took && huntLocks.includes(took);
+                huntRow.chased = huntLocks.some((sq) => !before.has(sq) && after.has(sq));
+                chandy.hunt.push(huntRow);
+              }
+              chandyLook();
+            }
             if (bossId === "timber") timberLook();
             if (bossId === "dash") {
               const slap = runner.boss!.powers?.dash?.slap;
@@ -848,6 +989,24 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           if (p.crease && p.crease.at === p.turn && p.events.some((e) => e.kind === "crease")) creases.push({ at: p.turn, line: p.crease.line, loss: round(await creaseCost(engines[0]!, fen, p.crease.line)), warned: round(p.crease.loss) });
           else if (!p.crease && p.ultAt === p.turn && p.events.some((e) => e.kind === "creaseEnd")) creasesOff.push(p.turn);
         }
+        // (Chandy: a crowd that heeds his crosshairs, as a person does (patch.heed); and what the crowd's move did to the hunting locks.)
+        let heeded = false;
+        if (patch.heed !== undefined && bossId === "chandy") {
+          const h = await heedChandy(runner, engines[0]!, patch.heed);
+          if (h) chandy.heeds.push({ at: runner.boss!.crowdMoves + 1, ...h });
+          heeded = !!h && h.cost !== null;
+        }
+        if (patch.best && !heeded) {
+          const fen = boardFen();
+          const ok = runner.crowdAllowed() ?? legalMoves(fen);
+          const top = (await engines[0]!.topMoves(fen, 8)).filter((m) => ok.includes(m.move)).sort((a, b) => b.expected - a.expected)[0];
+          if (top) for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, top.move);
+        }
+        const crowdFen = bossId === "chandy" ? boardFen() : "";
+        const crowdPly = runner.boards.get(runner.state.boards[0]!)!.history.length;
+        const crowdLocks = bossId === "chandy" && runner.boss!.powers?.chandy?.taught ? chandyLocks().filter((l) => pieceAt(crowdFen, l.square)?.color === runner.boss!.crowdSide) : [];
+        const passed = crowdLocks.length ? passTurn(crowdFen) : null;
+        const winnable = passed ? crowdLocks.filter((l) => (bestNetOn(passed, l.square) ?? 0) > 0) : [];
         const tusksBefore = runner.boss!.powers?.tusks;
         // (The sim's clock: this crowd turn's moments, the crowd's pick, the reveal, then his turn.)
         clockMs += powerMomentMs(runner.boss!.powers?.events) + (pickSec + (s.revealSeconds ?? 0) + GARDEN_TURN_SEC) * 1000;
@@ -876,6 +1035,15 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           // (Hollow, a player in the dark: wrong tries before the pick; a forced move played for them; the blackout ends it.)
           if (patch.darkMiss && bossId === "hollow" && (await hollowDark())) continue;
           await runner.score(new Map());
+        }
+        if (bossId === "chandy" && winnable.length) {
+          const mv = runner.boards.get(runner.state.boards[0]!)!.history[crowdPly];
+          if (mv)
+            for (const l of winnable) {
+              if (mv.slice(0, 2) === l.square) chandy.crowd.moved++;
+              else if (!((bestNetOn(applyMove(crowdFen, mv), l.square) ?? 0) > 0)) chandy.crowd.guarded++;
+              else chandy.crowd.left++;
+            }
         }
         if (bossId === "chandy") chandyLook();
         if (bossId === "birdie") birdieLook();

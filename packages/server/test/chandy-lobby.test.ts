@@ -186,7 +186,7 @@ describe("Chandy online: his first capture", () => {
   });
 });
 
-describe("Chandy online: the queen lock's shot and a taught capture's lock in one turn", () => {
+describe("Chandy online: the Lock-on Shot (the queen lock until Nov 24) and a taught capture's lock in one turn", () => {
   it("the shot as his turn begins, then the lock as his second capture is about to show; the hold covers both, then the move (the review of #797)", () => {
     const L = chandyLobby("");
     L.crowdPlays();
@@ -236,5 +236,35 @@ describe("Chandy online: the queen lock's shot and a taught capture's lock in on
     expect(r.boards.get(id)!.fen).not.toBe(before);
     // (His second capture: upgrade 2, taught.)
     expect([r.boss!.powers!.chandy!.marked, r.boss!.powers!.chandy!.taught, r.boss!.powers!.chandy!.upgrades]).toEqual([2, true, 2]);
+  });
+
+  it("the Lock-on Shot's locked piece (Nov 24): its shatter as his turn begins is an upgrade online too, then his capture another; the lock gone with the shot", () => {
+    const L = chandyLobby("");
+    L.crowdPlays();
+    L.hisTurn();
+    for (let i = 0; i < 20 && L.core.save().phase !== "play"; i++) L.advance(2_000);
+    // (As above, but aimed as the rules aim it: the d2 pawn in front of your queen locked too, the shot's victim.)
+    const r = L.runner();
+    const id = r.state.boards[0]!;
+    const board = r.boards.get(id)!;
+    const fen = "4k3/pppp4/5n2/8/6N1/8/3P4/3QK2R w K - 0 1";
+    r.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== board.history.length), { ply: board.history.length, fen }] });
+    const boss = r.state.boss!;
+    const c0 = boss.powers!.chandy!;
+    r.state = { ...r.state, boss: { ...boss, powers: { ...boss.powers!, chandy: { ...c0, locks: [{ square: "d2", piece: "p", at: 1, shot: true }], marked: 1, upgrades: 1, unlocked: ["queenlock"], fresh: null, used: 1, last: "queenlock", fired: { queenlock: 1 }, meter: 0, due: null, aim: { square: "d1", turn: boss.crowdMoves + 1, victim: "d2" } } } } };
+    for (const pid of ["p1", "p2"]) L.core.message(pid, { t: "pick", key: L.last(pid, "round")!.key, move: "h1h2" });
+    const req0 = L.last("p1", "scoreRequest")!;
+    L.core.message("p1", { t: "scores", key: req0.key, boards: req0.jobs.map((j) => ({ boardId: j.boardId, bestMove: "h1h2", bestExpected: 0.5, expectedAfter: Object.fromEntries((j.allowed ?? legalMoves(j.fen)).map((m) => [m, 0.5])), botPicks: {}, botThinkMs: {} })) });
+    L.drop("p1", "scoreRequest");
+    for (let i = 0; i < 300 && !L.last("p1", "bossRequest"); i++) L.advance(100);
+    const req = L.last("p1", "bossRequest")!;
+    L.drop("p1", "bossRequest");
+    const c1 = r.boss!.powers!.chandy!;
+    expect([c1.shot?.square, c1.upgrades, c1.upgrade?.stage, c1.locks]).toEqual(["d2", 2, 2, []]);
+    // (Not taught by it: his captures teach. His second capture then: upgrade 3.)
+    expect(c1.marked).toBe(1);
+    L.core.message("p1", { t: "bossMove", key: req.key, move: "f6g4" });
+    for (let i = 0; i < 100 && r.boards.get(id)!.fen.includes("6N1"); i++) L.advance(200);
+    expect([r.boss!.powers!.chandy!.marked, r.boss!.powers!.chandy!.taught, r.boss!.powers!.chandy!.upgrades]).toEqual([2, true, 3]);
   });
 });
