@@ -1871,3 +1871,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~08:40: ERIC: power tips (boss/king exchange the first time you see a move; per account; shown 1, 3, 8, then every 5 battles; pilot
   of 5) → brief notes/briefs/power-tips.md (Opus high, targeted). QUEUED: starts when the Birdie xhigh helper ends (concurrency). Lines sent to
   Eric for edits. Birdie sounds (train sounds only on the ride, chirps ≤ 1 per 5 moves) added to the train-miss helper.
+- Nov 24 ~09:00: #915 Chandy upgrades MERGED (8b621ea), deploy + main run watched (boducfwc3). ERIC: Birdie sign redone (straight
+  triangle, opaque, hard blink ~0.6 s on/off, hidden while held) added to the train-miss helper (item 9). Queue: power tips (after Birdie).
