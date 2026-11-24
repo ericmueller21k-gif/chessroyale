@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BossPortrait } from "./BossPortrait.tsx";
 import { QUESTS, type QuestIcon, type QuestView } from "@chessroyale/core";
 import { questSound, warmQuestSounds } from "../sound.ts";
@@ -314,8 +314,13 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, paused, fro
  * without exiting out of Chesttown"): the same card as home's, read the same way (useQuests), shown as soon as the answer is in.
  */
 export function QuestsLayer({ onClose }: { onClose: () => void }) {
-  const q = useQuests(true);
+  const q = useQuests(true, false, true);
+  // (Closed here too, the 12 hours before it opens by itself start: Nov 24.)
+  const close = useCallback(() => {
+    q.close();
+    onClose();
+  }, [q.close, onClose]);
   if (!q.answer) return null;
   const left = questCountdowns(q.answer, q.receivedAt);
-  return <QuestsOverlay quests={q.answer.quests} dailyResetIn={left.daily} weeklyResetIn={left.weekly} paused={!!q.answer.paused} from={q.from} onReroll={q.reroll} onClose={onClose} />;
+  return <QuestsOverlay quests={q.answer.quests} dailyResetIn={left.daily} weeklyResetIn={left.weekly} paused={!!q.answer.paused} from={q.from} onReroll={q.reroll} onClose={close} />;
 }

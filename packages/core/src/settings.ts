@@ -4712,6 +4712,13 @@ export const QUESTS = {
   rerollsPerDaily: 1,
   weekStartDay: 1,
   soloMinMinutes: 3,
+  /**
+   * Hours after the quests overlay is closed (Got it, ×, Escape, a tap outside) before it may open by itself again, either way (the
+   * day's first visit, a game that moved a quest), per account on this device; the Quests button opens it any time. Eric, Nov 24: "once
+   * you hit got it, it shouldn't appear again. Let's put it on a 12-hour timer so it only reappears for every person every 12 hours unless
+   * they manually go to the quest button".
+   */
+  autoOpenGapHours: 12,
   show: { startMs: 450, slideMs: 750, gapMs: 250, finishMs: 1100, tickGapMs: 70 },
   daily: [
     { id: "boss-hunter", name: "Boss Hunter", goal: "Win a Boss Battle", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
