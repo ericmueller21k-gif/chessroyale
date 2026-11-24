@@ -32,3 +32,28 @@ Effort xhigh: the ride's moment holds his move online (the server's timing, `BIR
    player-visible, changed checks old → new). Then `.done`, push, stop. Don't open PRs or wait on CI. Helpers reset, never revert.
    Commits end with only `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By line, no model
    names). Never write the Hidden Boss's name. American English.
+
+## Added Nov 24 ~08:30: fewer chirps, train sounds only on the ride (same PR)
+
+Eric (Nov 24): "I think he's doing a little too much chirping and the train noises. Let's really make it so he can chirp at the start of the
+game, and I would say cap the chirping to, you know, maybe once every 5 of his moves at most. He can do a little chirp, and then his train
+noise is really, let's just keep it for when the train actually crosses, when he jumps on it and goes across the board. But I don't think we
+need the train horns for like any other spot right now."
+
+6. **Train sounds only on the ride.** Whistles, horns and toots play only while his train rides the board (from his duck-in/pull-away
+   through its crossing and its roll back in and brake after the ride; smash and miss rides alike). Silent everywhere else:
+   - his ordinary move's whistle (`run`, `runShort`, `runLong`, `runPeeps`: `birdieCue`'s `run` → always null);
+   - a capture's or check's toot-long (`tootRun`);
+   - the warning's conductor's whistle (`signal`); the crossing's bell (`birdieCrossing`'s `ding`) stays, as the warning's cue (it's a
+     crossing bell, not a train);
+   - the battle start's entrance: the train's roll and brake (`roll`, `brake`) are silent at the battle's start (his hop and "hello" chirp
+     stay); they're heard only on his return from a ride;
+   - the fall cutscene's `approach` toot (`BirdieFall.tsx` `PICTURE_SOUND`); its whoosh and clank stay.
+   Keep the sound files and names (no deletions of synths); only what plays changes. Director's calls, record them in the decision note.
+7. **Chirps at most once every 5 of his moves.** His hello at the battle's start stays. After that, all his ordinary chirps (the nod over a
+   move, his chatter and smug teeoo, a capture's trill, a check's teeoo, his hurt scold) share one budget: at most one chirp per 5 of his
+   moves, from his move number alone (the same on every device; e.g. heard moves 1, 6, 11, …: `BIRDIE_SOUND_EVERY: [5]`, Eric's words in
+   its comment). On a heard move, one chirp only (pick the event's: trill or teeoo for a capture/check, else the nod). His victory,
+   defeat and fall sounds are unchanged.
+8. Tests: update `packages/app/test/birdie-sounds.test.ts` / `boss-kits.test.ts` (old → new in the PR body); one focused check that no
+   whistle plays on his ordinary moves and the ride's sounds still play. No new e2e spec.
