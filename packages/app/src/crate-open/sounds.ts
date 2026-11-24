@@ -5,11 +5,12 @@
  *
  * Eric (Nov 24, his first ask): not "that marimba ... a little too silly sounding". Of the mockup's three, his pick (Nov 24, ~18:55):
  * "the spinning sound of number 3 a bit better, but the number 4 ending sound and everything else about number 4": the spin is C's, the
- * slot reel (a heavier metal tick at each tile edge, `tick0` to `tick5` by speed, two takes each; the reel's hum under it, `whirr`; a
- * low swell rising under the slowdown, `swell`; the reel locking with a clunk, `lock`); the ending is A's (the box dropping in and
- * landing, `land`; shaking over a rising charge, `shake-<tier>`; the lid bursting off with a clean glassy chord that climbs with the
+ * slot reel (a heavier metal tick at each tile edge, `tick0` to `tick5` by speed, two takes each; the reel's hum under it, `whirr`; the
+ * reel locking with a clunk, `lock`); the ending is A's (the box dropping in and
+ * landing, `land`; shaking, `shake-<tier>`; the lid bursting off with a clean glassy chord that climbs with the
  * tier, `sting-<tier>`, Legendary and Mythic the bigger ending). timeline.ts `cues` says when each plays; sound.ts `playCrateCues` lays
- * them on the audio clock.
+ * them on the audio clock. No charge-up (Eric, Nov 24: "I don't want like build up right at the end"; "it kind of sounds like a
+ * charge"): no swell under the slowdown and no rising charge under the shake, only its knocks.
  */
 import { TIERS, type ItemTier } from "@chessroyale/core";
 import { bandpass, noise, rng, soundCache } from "../characters/synth.ts";
@@ -182,8 +183,8 @@ function boxLand(rate: number, T: Timeline, out: Float32Array, at: number) {
   mix(out, rate, shape(biquad(whiteNoise(rate, 0.04, 7), rate, "bp", 750, 2), rate, ad(0.0005, 0.008)), land, 0.35);
 }
 
-/** The shake: the box knocking about faster and faster, and the light's charge rising under it to the burst. */
-function boxShake(rate: number, T: Timeline, out: Float32Array, tier: ItemTier, big: boolean, from: number) {
+/** The shake: the box knocking about faster and faster (no charge under it: Eric, Nov 24). */
+function boxShake(rate: number, T: Timeline, out: Float32Array, from: number) {
   const s0 = from;
   const s1 = T.burstAt / 1000;
   const len = s1 - s0;
@@ -200,20 +201,6 @@ function boxShake(rate: number, T: Timeline, out: Float32Array, tier: ItemTier, 
     gap = Math.max(0.032, gap * 0.8);
     k++;
   }
-  // The charge: a rising band of noise and a rising tone, swelling into the burst.
-  const n = noise(21);
-  const charge = new Float32Array(Math.ceil(rate * len));
-  const bp = bandpass(rate, (x) => 350 * Math.pow(12, x / len), 2.2, () => n(0));
-  const top = big ? 2 : 1.5;
-  const root = stingRoot(tier) / 4;
-  let ph = 0;
-  for (let i = 0; i < charge.length; i++) {
-    const x = i / rate;
-    const u = x / len;
-    ph += (root * Math.pow(top, u)) / rate;
-    charge[i] = (bp(x) * 0.9 + Math.sin(TAU * ph) * 0.18 + Math.sin(TAU * ph * 2.003) * 0.08) * u ** 2.2;
-  }
-  mix(out, rate, charge, s0, big ? 0.55 : 0.4);
 }
 
 /** The sting's root: it climbs with the tier, so a better item sounds brighter before you've read it. */
@@ -289,29 +276,6 @@ function whirr(rate: number, spinMs: number): Float32Array {
   return out;
 }
 
-/** The low swell under the slowdown: from 30% of the spin (`swellAt` in timeline.ts) up to the lock, its low-pass opening as it rises. */
-function swell(rate: number, T: Timeline): Float32Array {
-  const len = (T.stop - 30 - T.spinMs * 0.3) / 1000;
-  const sw = new Float32Array(Math.ceil(rate * len));
-  let ph = 0;
-  let ph2 = 0;
-  const sawish = (p: number) => 2 * (p % 1) - 1;
-  for (let i = 0; i < sw.length; i++) {
-    const u = i / rate / len;
-    const f = 98 * Math.pow(2, u);
-    ph += f / rate;
-    ph2 += (f * 1.5) / rate;
-    sw[i] = (sawish(ph) * 0.6 + sawish(ph2) * 0.35 + sawish(ph * 1.004) * 0.5) * u ** 1.8;
-  }
-  const lowAt = biquad(sw, rate, "lp", 500, 0.8);
-  const highAt = biquad(sw, rate, "lp", 2400, 0.8);
-  for (let i = 0; i < sw.length; i++) {
-    const u = i / sw.length;
-    sw[i] = (lowAt[i]! * (1 - u) + highAt[i]! * u) * 0.3;
-  }
-  return sw;
-}
-
 /** The box dropping in and landing, from the drop's start. */
 function land(rate: number, T: Timeline): Float32Array {
   const out = new Float32Array(Math.ceil(rate * (T.dropMs / 1000 + 0.35)));
@@ -319,12 +283,12 @@ function land(rate: number, T: Timeline): Float32Array {
   return out;
 }
 
-/** The shake and its charge, from just after the landing to the burst. */
+/** The shake's knocks, from just after the landing to the burst. */
 function shake(rate: number, T: Timeline, tier: ItemTier): Float32Array {
   const from = T.landAt / 1000 + 0.06;
   const out = new Float32Array(Math.ceil(rate * (T.burstAt / 1000 - from + 0.1)));
   // (boxShake works in the whole sequence's seconds: a timeline shifted so the shake starts at 0 here.)
-  boxShake(rate, { ...T, burstAt: T.burstAt - from * 1000 }, out, tier, isBig(tier), 0);
+  boxShake(rate, { ...T, burstAt: T.burstAt - from * 1000 }, out, 0);
   return out;
 }
 
@@ -342,7 +306,6 @@ function stingAlone(rate: number, tier: ItemTier): Float32Array {
 function make(name: string, rate: number): Float32Array {
   const T = timeline();
   if (name === "whirr") return whirr(rate, T.spinMs);
-  if (name === "swell") return swell(rate, T);
   if (name === "lock") return reelLock(rate).map((v) => v * 1.6);
   if (name === "land") return land(rate, T);
   const tick = /^tick(\d)([ab])$/.exec(name);
@@ -366,7 +329,6 @@ const LEVEL = 0.92 * 10 ** (-4 / 20);
 /** Every piece but the tiers' (the worker makes them ahead as an Open is tapped; a tier's shake and sting once the roll is in). */
 export const CRATE_SOUNDS: readonly string[] = [
   "whirr",
-  "swell",
   "lock",
   "land",
   ...TICKS.flatMap((_, i) => [`tick${i}a`, `tick${i}b`]),

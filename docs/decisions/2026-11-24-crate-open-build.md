@@ -13,3 +13,6 @@
   (no box); the tier's light is CSS-colored masks of the Hidden Boss's light shapes (made once, not per color); the strip waits under
   "Opening…" up to 1.5 s for its first sounds from the sound worker, so none is made on its frames; the old reel's marimba is gone from
   crates only (Settings' "Reveal sound" still voices the move reveal).
+
+- **No charge-up (Eric, Nov 24, after hearing the build):** "I don't want like build up right at the end"; "it kind of sounds like a charge". The
+  swell under the slowdown and the rising charge under the box's shake are gone; the shake keeps its knocks. Approved from an audio-only clip.

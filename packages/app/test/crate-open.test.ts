@@ -24,13 +24,14 @@ describe("the crate opening", () => {
     expect(clicks.at(-1)!).toBeLessThanOrEqual(T.spinMs);
   });
 
-  it("cues every click, the swell and the lock, and (with an item) the box and the tier's sting; Fischer Random's first strip none of those", () => {
+  it("cues every click and the lock (no swell: Eric, Nov 24), and (with an item) the box and the tier's sting; Fischer Random's first strip none of those", () => {
     const all = cues(T, clicks, "rare");
     expect(all.filter((c) => c.sound.startsWith("tick"))).toHaveLength(clicks.length);
-    expect(all.map((c) => c.sound)).toEqual(expect.arrayContaining(["whirr", "swell", "lock", "land", "shake-rare", "sting-rare"]));
+    expect(all.map((c) => c.sound)).toEqual(expect.arrayContaining(["whirr", "lock", "land", "shake-rare", "sting-rare"]));
     expect(all.find((c) => c.sound === "sting-rare")!.at).toBe(T.burstAt);
     const first = cues(T, clicks, null).map((c) => c.sound);
     expect(first.some((s) => /land|shake|sting/.test(s))).toBe(false);
+    expect(all.some((c) => c.sound === "swell")).toBe(false);
     const beam = cues(timeline(undefined, false), clicks, "mythic").map((c) => c.sound);
     expect(beam).toContain("sting-mythic");
     expect(beam.some((s) => /land|shake/.test(s))).toBe(false);

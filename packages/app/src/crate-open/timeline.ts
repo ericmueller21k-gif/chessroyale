@@ -82,14 +82,13 @@ export function tickLevel(gap: number): number {
 
 /**
  * Every sound of one strip and what follows it, as cues: the reel's hum, a tick per click (alternating two takes so a run doesn't
- * sound looped), the swell under the slowdown and the lock at the stop (the spin is sound C's, the slot reel: Eric, Nov 24); then, if
+ * sound looped) and the lock at the stop (no swell: Eric, Nov 24, no charge-up) (the spin is sound C's, the slot reel: Eric, Nov 24); then, if
  * `tier` (the strip that ends in the item): the box landing and shaking (with a box) and the sting (sound A's ending). The live opening
  * and the clip script play the same list.
  */
 export function cues(T: Timeline, clicks: readonly number[], tier: ItemTier | null): CrateCue[] {
   const out: CrateCue[] = [
     { at: 0, sound: "whirr" },
-    { at: T.spinMs * 0.3, sound: "swell" },
   ];
   clicks.forEach((ms, i) => {
     const gap = Math.min((clicks[i + 1] ?? ms + 400) - ms, 400);
