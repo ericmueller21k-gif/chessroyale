@@ -1992,3 +1992,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~05:00: ERIC (Crowd desktop screenshot): status line centered + bigger; left/right columns flush with the board's bottom; chat
   higher → brief crowd-desktop-flush (Opus medium, light, "fixed pretty quickly"). Vote-zone labels for 3 s (tower-arrow-like 3D text or
   other ideas, gone once you vote) → MOCKUP brief vote-labels-mockup (Opus high). Both started.
+- Nov 25 ~05:15: #926 LIVE (025406c); main RED by FLAKY_RED: [phone] town-controls.spec:347 arrowStep timed out (5 s) after a look-drag;
+  passed on retry. Brief fix-town-arrowstep.md (Opus medium): starts as soon as a helper slot frees (crowd-flush or vote mockup).
+  Hold merges until green.
