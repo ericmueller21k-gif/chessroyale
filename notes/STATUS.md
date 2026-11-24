@@ -1860,3 +1860,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~07:00: Eric asked for a launch-readiness list → notes/launch-audit.md, notes/swarm-audit.md (answered; asked him to OK the swarm's
   step 1, staging ~$1-3/run). Chandy upgrades job session_01JuCWRswQvUaC6uUYWuHWFT (Opus xhigh, brief chandy-upgrades, claude/chandy-upgrades):
   aggressive hunting after 2 taught upgrades, the shot's victim locked = upgrade, "Queen lock" → "Lock-on Shot", God King warning. Watcher bub2jklk5.
+- Nov 24 ~08:00: Eric: swarm NOT yet, wanted a roadmap only → notes/launch-roadmap.md, sent. Chandy job DONE → #915 (3a6e54e3; boss lane;
+  whole suite runs: runner-tools.ts is a foundation), CI watcher biga9eg8u, quick review (god-king, Opus high, read-only) running.
