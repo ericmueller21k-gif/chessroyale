@@ -1,0 +1,233 @@
+/*
+ * MOCKUP (Eric, Nov 25; not merged): each vote zone's name for about 3 s as the vote begins (VoteZoneTags.tsx, ?votetags=a|b|c).
+ * Sizes in cqw: the board's width (.board-wrap is the container), a square 12.5cqw, so a tag is the same share of the board on a
+ * phone and a computer. One animation per tag, over --vt-ms (3 s), started at the vote's start (--vt-delay).
+ */
+.vote-tags {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  transition: opacity 280ms ease-in;
+}
+/* Your vote in: they fade (VOTE_TAG_GONE_MS), then go. */
+.vote-tags.gone {
+  opacity: 0;
+}
+.vote-tags .vt {
+  position: absolute;
+  opacity: 0;
+  animation-duration: var(--vt-ms, 3s);
+  animation-delay: var(--vt-delay, 0ms);
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: both;
+}
+
+/* ---- A: floor letters, the Battle Tower's floor arrow's look (SHOP_TOWER_FLOOR_ARROW_PALETTE: top #f4b740, rim #ffd877,
+   sides #8a5c08, edge #0e1014), lying on the board just above each zone, a small arrow at its foot pointing in. ---- */
+.vt-a .vt {
+  /* (Its foot a fifth of a square above the zone: the word and its arrow fill the empty rank above the zone.) */
+  translate: -50% calc(-100% - 0.4cqw);
+  animation-name: vt-a;
+}
+.vt-floor {
+  display: grid;
+  justify-items: center;
+  gap: 0.6cqw;
+  /* Lying on the floor: the top leans away, as the tower's arrow lies on its floor. */
+  transform: perspective(42cqw) rotateX(40deg);
+  transform-origin: 50% 100%;
+}
+.vt-word {
+  font-family: "Archivo Black", "Arial Black", Impact, system-ui, sans-serif;
+  font-size: 5.4cqw;
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-align: center;
+  max-width: 27cqw;
+  text-wrap: balance;
+  color: #f4b740;
+  -webkit-text-stroke: 0.55cqw #0e1014;
+  paint-order: stroke fill;
+  /* Its pale rim (a sliver above the top), its slab's deep-gold sides (stacked under), the dark edge under them, a soft shadow on the
+     floor. */
+  text-shadow:
+    0 -0.25cqw 0 #ffd877,
+    0 0.35cqw 0 #c8860d,
+    0 0.7cqw 0 #8a5c08,
+    0 1cqw 0 #8a5c08,
+    0 1.35cqw 0 #0e1014,
+    0 2cqw 1.6cqw rgba(0, 0, 0, 0.45);
+}
+.vt-arrow {
+  width: 6.4cqw;
+  height: 3.2cqw;
+  filter: drop-shadow(0 0.7cqw 0 #8a5c08) drop-shadow(0 0.35cqw 0 #0e1014);
+}
+.vt-arrow::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(#ffd877, #f4b740 45%);
+  clip-path: polygon(30% 0, 70% 0, 70% 42%, 100% 42%, 50% 100%, 0 42%, 30% 42%);
+}
+/* In, then the arrow's breathing (dimmed a little and nudged toward its zone, as the floor arrow toward its door), then out. */
+@keyframes vt-a {
+  0% {
+    opacity: 0;
+    transform: translateY(-1.5cqw);
+  }
+  14% {
+    opacity: 1;
+    transform: none;
+  }
+  32% {
+    opacity: 0.72;
+    transform: translateY(0.9cqw);
+  }
+  50% {
+    opacity: 1;
+    transform: none;
+  }
+  68% {
+    opacity: 0.72;
+    transform: translateY(0.9cqw);
+  }
+  84% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0.6cqw);
+  }
+}
+
+/* ---- B: a floating tag, the game's dark banner (.vote-banner) in small, a pointer down to its zone. ---- */
+.vt-b .vt {
+  translate: -50% calc(-100% - 2.2cqw);
+  animation-name: vt-b;
+}
+.vt-tag {
+  position: relative;
+  display: block;
+  max-width: 26cqw;
+  padding: 0.9cqw 2.2cqw 1cqw;
+  border-radius: 2.4cqw;
+  background: rgba(10, 12, 16, 0.88);
+  box-shadow:
+    inset 0 0 0 0.35cqw color-mix(in srgb, var(--accent) 85%, transparent),
+    0 1cqw 2.4cqw rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-weight: 800;
+  font-size: 3.7cqw;
+  line-height: 1.15;
+  text-align: center;
+  text-wrap: balance;
+}
+.vt-tag::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  translate: -50% -0.2cqw;
+  border: 1.6cqw solid transparent;
+  border-bottom: none;
+  border-top-color: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+@keyframes vt-b {
+  0% {
+    opacity: 0;
+    transform: translateY(1.5cqw) scale(0.9);
+  }
+  14% {
+    opacity: 1;
+    transform: none;
+  }
+  40% {
+    transform: translateY(-0.7cqw);
+  }
+  66% {
+    transform: none;
+  }
+  86% {
+    opacity: 1;
+    transform: translateY(-0.7cqw);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-1.4cqw);
+  }
+}
+
+/* ---- C: a zone sweep: each zone lights up in turn, left to right (a soft gold glow), its name written across its middle; the
+   names stay until the 3 s are up, then go together. ---- */
+.vt-c .vt {
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  opacity: 1;
+  animation: none;
+}
+.vt-c .vt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  box-shadow:
+    inset 0 0 0 3px #ffd877,
+    inset 0 0 4cqw rgba(255, 216, 119, 0.55),
+    0 0 3cqw rgba(244, 183, 64, 0.8);
+  animation: vt-c-light 1100ms ease-in-out both;
+  animation-delay: calc(var(--vt-delay, 0ms) + var(--vt-i) * 450ms);
+}
+.vt-name {
+  position: relative;
+  max-width: 23cqw;
+  /* (Just below the middle, clear of the zone's count on its far half.) */
+  translate: 0 2.2cqw;
+  font-weight: 900;
+  font-size: 4.3cqw;
+  line-height: 1.05;
+  text-align: center;
+  text-wrap: balance;
+  color: #fff;
+  -webkit-text-stroke: 0.75cqw rgba(10, 12, 16, 0.82);
+  paint-order: stroke fill;
+  opacity: 0;
+  animation: vt-c-name calc(var(--vt-ms, 3s) - var(--vt-i) * 450ms) ease-in-out both;
+  animation-delay: calc(var(--vt-delay, 0ms) + var(--vt-i) * 450ms);
+}
+@keyframes vt-c-light {
+  0% {
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes vt-c-name {
+  0% {
+    opacity: 0;
+    scale: 0.85;
+  }
+  18% {
+    opacity: 1;
+    scale: 1.06;
+  }
+  30% {
+    scale: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

@@ -4,6 +4,7 @@ import type { Color } from "@chessroyale/chess/duel";
 import { Avatar } from "./Items.tsx";
 import { TimerBar } from "./Countdown.tsx";
 import { VoteHint, useVoteHint } from "./VoteHint.tsx";
+import { VoteZoneTags, voteTagStyle } from "./VoteZoneTags.tsx";
 import { useBoardAnimations } from "../hooks.ts";
 
 /**
@@ -152,6 +153,16 @@ export function DuelVote({ you, picks, looks, voteAt, voteEndsAt, now, onPick }:
             );
           })}
         </div>
+        {/* MOCKUP (Eric, Nov 25): each zone's name for 3 s as the vote begins, gone once your pick is in (?votetags=a|b|c). */}
+        {open && (
+          <VoteZoneTags
+            look={voteTagStyle()}
+            tags={DUEL_ZONES.map((z, i) => ({ key: z, label: controlLabel(zoneControl(z)), box: zoneOnScreen(zoneOf(i), orientation) }))}
+            startsAt={voteAt}
+            now={now}
+            voted={!!mine}
+          />
+        )}
         <span class={`vote-pawn dv-pawn${picks[them] ? " in" : ""}`} data-side={them} style={{ left: `${pos(theirAt).left}%`, top: `${pos(theirAt).top}%` }}>
           <Avatar look={looks[them] ?? undefined} side={them} />
         </span>
