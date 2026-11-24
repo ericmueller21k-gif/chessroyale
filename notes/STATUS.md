@@ -2000,3 +2000,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   red (flaky town-controls) until that fix merges; #927 waits for it.
 - Nov 25 ~06:05: vote labels mockup DONE (claude/vote-labels-mockup cd565df0, ?votetags=a|b|c; stills/vote-labels-mockup); sent A/B/C.
   Helper's pick A (tower-gold floor letters), B fallback. Waiting on Eric's pick → build from that branch (targeted).
+- Nov 25 ~06:30: ERIC picked vote labels B (floating tags). Build helper (Opus medium, brief vote-labels-build.md).
