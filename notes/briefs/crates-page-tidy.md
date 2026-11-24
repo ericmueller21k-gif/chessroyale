@@ -32,3 +32,13 @@ STARTS AFTER the bonus crate (`claude/bonus-crate`) merges: it touches the same 
    user and as an admin), the opening on a computer at the box and at the card. Decision note (about five lines), shop.md. PR body in
    `.pr-body.md` (changed checks old → new). `.done`, push, stop. Commits end with only
    `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By, no model names).
+
+## Also in this job: #923's delta re-review follow-ups (Nov 25)
+- **The bonus card's OK takes no tap until its fade-in ends** (`cardAt + cardMs`): a double tap on Done/Open another (first tap brings the
+  card up, the second lands on its OK at 160-300 ms while it's nearly transparent) or a tap about 860 ms in now closes it unseen and clears
+  the unseen record (`Crates.tsx:905-912`, `crate-open/CrateOpenStage.tsx:309-312`). Nothing is lost (the crate is granted). Test it.
+- **The odds line for admins:** `Crates.tsx:615` uses `bonusOddsLine()` (players' pool); the server rolls `bonusPool(admin)`; pass
+  `bonusPool(profile?.admin)` so an admin's line is exact too.
+- **Older Safari (< 15.5) has no `inert`:** guard the item card's buttons with a disabled/pointer-events fallback while the bonus card is
+  up and during the calm.
+- Tests: a reload before OK brings the bonus card back; the client's `?bonus=0`.

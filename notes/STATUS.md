@@ -1969,3 +1969,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   transcendent crate looks sick"), CI watched; stings helper archived. Item polish mockup can start now (1 high slot free).
 - Nov 25 ~02:20: #923 review fixes DONE (644965ff; prepped 297338c1, main merged), CI bjap4yjre, delta re-review (Opus high, read-only)
   running; fix helper archived. Merge order: #924, #925, then #923 (#923 will conflict with #925 in Crates.tsx: resolve).
+- Nov 25 ~02:35: #923 delta re-review: MERGEABLE. Follow-ups (OK inert until fade-in, admin odds line, old-Safari inert, 2 tests) added to
+  the crates-page-tidy brief (same screen). Merge after CI + after #924/#925.
