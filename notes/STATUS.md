@@ -1939,3 +1939,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~22:00: ERIC: mythics need a slight animation (parrot flaps every few s; tommy gun: something spins; fire & ice crown "feels like
   junk": rebuild or replace). Sent him the legendary/mythic list + one sheet (8 non-ride items; the 19 mythic rides are animated already).
   WAITING on his call per item.
+- Nov 24 ~22:10: stings helper (session_01JuCWRsHX7XJVJvjkQzC951) step 1 DONE, paused on .question: 6 clips sent to Eric. Its question
+  (Transcendent sound replaces the banner's whoosh: default replace) — my call: replace. WAITING on Eric's OK → message the helper.
