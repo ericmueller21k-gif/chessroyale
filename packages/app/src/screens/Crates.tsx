@@ -63,7 +63,9 @@ import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, Ite
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
-import { play, unlockAudio } from "../sound.ts";
+import { crateSoundsReady, play, unlockAudio, warmCrateSounds } from "../sound.ts";
+import { CrateStage, OpenLayer } from "../crate-open/CrateOpenStage.tsx";
+import { STRIPS } from "../crate-open/timeline.ts";
 import { useAccount } from "./Profile.tsx";
 import { testParams } from "../test-switches.ts";
 import { haptic } from "../haptics.ts";
@@ -99,10 +101,11 @@ export function NotTradeable() {
  * How each crate looks: its own box on the crate page, and the box each tier comes in on the strip (Winter's
  * presents, Beta's supply boxes; Eric, Oct 11: only the container is new, everything else is reused).
  */
-const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { color: string }) => JSX.Element; box: string; boxes: string }> = {
-  winter: { Crate: WinterCrateArt, Box: PresentArt, box: "present", boxes: "Presents" },
-  beta: { Crate: BetaCrateArt, Box: SupplyBoxArt, box: "supply box", boxes: "Supply boxes" },
-  hunchess: { Crate: HunchessCrateArt, Box: HunchessBoxArt, box: "box", boxes: "Boxes" },
+const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { color: string }) => JSX.Element; box: string; boxes: string; lid: number }> = {
+  // (`lid`: where the box's lid ends, as a share of its drawing's height: the opening's lid flies off there. The mockup's, measured.)
+  winter: { Crate: WinterCrateArt, Box: PresentArt, box: "present", boxes: "Presents", lid: 0.46 },
+  beta: { Crate: BetaCrateArt, Box: SupplyBoxArt, box: "supply box", boxes: "Supply boxes", lid: 0.36 },
+  hunchess: { Crate: HunchessCrateArt, Box: HunchessBoxArt, box: "box", boxes: "Boxes", lid: 0.38 },
 };
 
 /**
@@ -512,13 +515,15 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   const forceFischer = crateSwitchesHere() && (fischerSet ?? testParams().get("fischer") === "1");
   const forceShiny = crateSwitchesHere() && (shinySet ?? testParams().get("shiny") === "1");
   const [opening, setOpening] = useState(!!resume);
+  // (The opening's sounds made ahead in the sound worker as its page opens, once sound is on: before the Open's tap.)
+  useEffect(() => warmCrateSounds(), []);
   const look = CRATE_LOOKS[crate.look];
   // Commonest first; Legendary and Mythic (Fischer Random) last.
   const items = [...crate.items].sort((a, b) => tierIndex(a) - tierIndex(b));
-  if (opening)
-    return <CrateOpening crate={crate} force={boss ? {} : { fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />;
   return (
     <div class="crate-page">
+      {/* (The opening on its own layer over this page, which stays as it is under it: Nov 24.) */}
+      {opening && <CrateOpening crate={crate} force={boss ? {} : { fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />}
       <GamblingWarning />
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
@@ -660,9 +665,10 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
  */
 function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Unseen; onBack: () => void }) {
   const [opening, setOpening] = useState(!!resume);
-  if (opening) return <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />;
+  useEffect(() => warmCrateSounds(), []);
   return (
     <div class="crate-page welcome-page">
+      {opening && <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />}
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
       </button>
@@ -785,50 +791,6 @@ function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
 }
 
 /**
- * The strip: it races past a center marker, slows (ease-out) and lands on the result, with a click for every
- * tile that passes (fast, then slower and slower).
- */
-function Spin({ tiles, land, ms, look, onDone }: { tiles: Tile[]; land: number; ms: number; look: CrateLook; onDone: () => void }) {
-  const box = useRef<HTMLDivElement>(null);
-  const track = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = track.current!;
-    const first = el.children[0] as HTMLElement;
-    const step = first.offsetWidth + 6;
-    const width = box.current!.offsetWidth;
-    // Land somewhere inside the tile (not dead center), like a real wheel.
-    const target = land * step + step / 2 - width / 2 + (Math.random() - 0.5) * step * 0.6;
-    const start = performance.now();
-    let last = -1;
-    let raf = 0;
-    const frame = (now: number) => {
-      const t = Math.min(1, (now - start) / ms);
-      const x = target * (1 - Math.pow(1 - t, 4));
-      el.style.transform = `translateX(${-x}px)`;
-      const idx = Math.floor((x + width / 2) / step);
-      if (idx !== last) {
-        if (last >= 0) play("reel");
-        last = idx;
-      }
-      if (t < 1) raf = requestAnimationFrame(frame);
-      else setTimeout(onDone, 450);
-    };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return (
-    <div class="spin" ref={box}>
-      <div class="spin-marker" aria-hidden="true" />
-      <div class="spin-track" ref={track}>
-        {tiles.map((t, i) => (
-          <TileView key={i} tile={t} look={look} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
  * Opening a crate: the server rolls, the strip spins to a tier's present, which unwraps straight to the reveal; or
  * to Fischer Random, which gets its banner and a second spin among its items before the reveal.
  */
@@ -845,18 +807,27 @@ export function BossCrateArt({ crate }: { crate: BossCrateDef }) {
   );
 }
 
-/** A crate opening: the strip, the unwrap, Fischer Random and the reveal (the Crates tab's; Boingo's claw machine's Open now, Nov 6). */
+/**
+ * A crate opening (the Crates tab's, the Welcome Crate's, a boss crate's: from its page, its shop's "Open now" or Boingo's claw machine):
+ * the server rolls, then on the opening's own layer (Nov 24: the whole phone screen, a computer's middle column; crate-open/) the strip
+ * spins to a tier's box, which drops in, shakes and bursts open with a beam in the item's tier color, the item rising into the reveal
+ * card; or to Fischer Random, which gets its banner, then a second strip among its items whose winner's beam comes up without a box.
+ * What's rolled, how and what's shown as won are unchanged: only the picture and the sound are new.
+ */
 export function CrateOpening({
   crate,
   force,
   resume,
   onClose,
+  opener = openCrate,
 }: {
   crate: CrateDef;
   force: { fischer?: boolean; shiny?: boolean };
   /** A crate already opened but not seen (you left during the spin): straight to its reveal. */
   resume?: Unseen;
   onClose: () => void;
+  /** The roll (the server's; the dev preview page's own fake one, for its frames). */
+  opener?: (crate: string, force: { fischer?: boolean; shiny?: boolean }) => Promise<{ roll: CrateRoll; item: ItemInstance }>;
 }) {
   const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
   // "Open another": only while you hold one more (greyed at none), a series crate also a key (Nov 9). (A Welcome Crate: another only
@@ -865,17 +836,38 @@ export function CrateOpening({
   const welcomeLeft = lockerNow?.welcome?.unopened ?? 0;
   const more = isWelcomeCrate(crate.id) ? welcomeLeft > 0 : heldOf(lockerNow, crate) > 0 && (isBossCrate(crate) || keysOf(lockerNow) > 0);
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">(resume ? "reveal" : "spin");
+  // The strip (and, for a present, its box and the card), Fischer Random's banner, its second strip.
+  const [stage, setStage] = useState<"spin" | "fischer" | "spin2">("spin");
+  // The card has formed (the reveal is shown: the crate is seen).
+  const [shown, setShown] = useState(!!resume);
   const [round, setRound] = useState(0);
+  // "Open another": everything back to the start in the same update as the new round, so the new strip never mounts with the last
+  // answer (it would start on it, then be stopped as the answer cleared, and wait for ever: its card never shown).
+  const again = () => {
+    setResult(null);
+    setError(null);
+    setStage("spin");
+    setShown(false);
+    setRound((r) => r + 1);
+  };
+  const still = round === 0 && !!resume;
   useEffect(() => {
-    if (round === 0 && resume) return;
+    if (still) return;
     let here = true;
     setResult(null);
+    setError(null);
     setStage("spin");
-    openCrate(crate.id, force)
-      .then((r) => {
+    setShown(false);
+    // (Its sounds made ahead in the sound worker, while the server answers: none is made on the opening's frames.)
+    warmCrateSounds();
+    // (Under "Opening…": the server's answer, and the strip's first sounds made in the worker, up to a short wait.)
+    const ready = crateSoundsReady(1500);
+    opener(crate.id, force)
+      .then(async (r) => {
         // It's yours now: if you leave before the reveal, it waits for you (the reveal clears it).
         setUnseen({ crate: crate.id, ...r });
+        warmCrateSounds(itemDef(r.item.def)!.tier);
+        await ready;
         if (here) setResult(r);
       })
       .catch((e) => here && setError(e instanceof Error ? e.message : "Couldn't open the crate."));
@@ -883,96 +875,150 @@ export function CrateOpening({
       here = false;
     };
   }, [round]);
+  // The first strip's decoys, drawn as the opening starts (so the strip is set up while the server answers); its winner once it has.
+  const decoys = useMemo(() => stripTiles(presentTile(crate), { kind: "present", tier: "common" }, STRIPS.crate.tiles, STRIPS.crate.land), [round]);
   const strips = useMemo(() => {
     if (!result) return null;
     const { roll, item } = result;
     const finish = { color: item.color, color2: item.color2 ?? undefined, blemish: item.blemish, seed: item.seed };
     const tier = itemDef(item.def)!.tier as PresentTier;
+    const one = decoys.slice();
+    one[STRIPS.crate.land] = roll.fischer ? { kind: "fischer" } : { kind: "present", tier };
     return {
       tier,
-      one: stripTiles(presentTile(crate), roll.fischer ? { kind: "fischer" } : { kind: "present", tier }, 46, 38),
+      one,
       // Only Fischer Random spins again; a present opens straight to its item (Eric, Oct 7).
-      two: roll.fischer ? stripTiles(itemTile(fischerOdds(crate)), { kind: "item", def: item.def, finish }, 30, 24) : [],
+      two: roll.fischer ? stripTiles(itemTile(fischerOdds(crate)), { kind: "item", def: item.def, finish }, STRIPS.fischer.tiles, STRIPS.fischer.land) : [],
     };
   }, [result]);
-  const afterFirst = () => {
-    if (!strips) return;
-    if (result?.roll.fischer) {
-      // (Its banner's 2.5 s and a beat: every banner a second longer, Eric, Oct 15; and the banners' extra, Oct 24.)
-      setStage("fischer");
-      setTimeout(() => setStage("spin2"), fischerBannerMs() + 200);
-    } else {
-      setStage("unwrap");
-      setTimeout(() => setStage("reveal"), 1150);
-    }
-  };
-  return (
-    <div class="crate-opening">
-      <h2 class="ff-title">
-        <CrateName name={crate.name} />
-      </h2>
-      {error && <p class="shop-error">{error}</p>}
-      {!result && !error && <p class="muted">Opening…</p>}
-      {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} look={crate.look} onDone={afterFirst} />}
-      {strips && stage === "fischer" && (
-        <div class="fischer-stage">
-          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub={isWelcomeCrate(crate.id) ? "A HunChess ride" : "Legendary or Mythic"} sound="bannerStart" ms={fischerBannerMs()} />
-        </div>
-      )}
-      {strips && stage === "unwrap" && <Unwrap tier={strips.tier} look={crate.look} />}
-      {strips && stage === "spin2" && (
-        <Spin key={`b${round}`} tiles={strips.two} land={24} ms={4800} look={crate.look} onDone={() => setStage("reveal")} />
-      )}
-      {result && stage === "reveal" && (
-        <Reveal
-          item={result.item}
-          again={more}
-          onAgain={() => setRound((r) => r + 1)}
-          onClose={onClose}
-        />
-      )}
-    </div>
-  );
-}
-
-/** A present (or a supply box) opening: it shakes, then bursts open. */
-function Unwrap({ tier, look }: { tier: PresentTier; look: CrateLook }) {
-  const t = tierInfo(tier);
-  const { Box, box } = CRATE_LOOKS[look];
+  const look = CRATE_LOOKS[crate.look];
+  const fischer = !!result?.roll.fischer;
+  // Fischer Random's second strip is set up out of sight while the first spins (its setup off the banner's first frames).
+  const [ahead, setAhead] = useState(false);
   useEffect(() => {
-    play("select");
-  }, []);
+    setAhead(false);
+    if (!fischer) return;
+    const t = setTimeout(() => setAhead(true), 1500);
+    return () => clearTimeout(t);
+  }, [result]);
+  const tier = (result ? itemDef(result.item.def)!.tier : null) as PresentTier | null;
+  const art = result && <ItemArt def={result.item.def} finish={result.item} />;
+  const details = result && <RevealDetails item={result.item} again={more} shown={shown} onAgain={again} onClose={onClose} />;
+  const one = strips?.one ?? decoys;
   return (
-    <div class="present-stage" style={{ "--tier": t.color }}>
-      <span class="present-stage-art">
-        <Box color={t.color} />
-      </span>
-      <strong>
-        {t.name} {box}
-      </strong>
-    </div>
+    <OpenLayer label={crate.name}>
+      <div class="cox-head">
+        <h2 class="ff-title">
+          <CrateName name={crate.name} />
+        </h2>
+        <p class={`cox-status${error ? " error" : ""}`} aria-live="polite">
+          {error ?? (!result ? "Opening…" : "")}
+        </p>
+      </div>
+      <div class="cox-room">
+        <div class="cox-stages">
+          {still && result && <Reveal item={result.item} again={more} onAgain={again} onClose={onClose} />}
+          {!still && stage !== "spin2" && (
+            <CrateStage
+              key={`a${round}`}
+              tiles={STRIPS.crate.tiles}
+              land={STRIPS.crate.land}
+              tile={(i) => <TileView tile={one[i]!} look={crate.look} />}
+              ending={result ? (fischer ? "none" : "box") : null}
+              tier={result && !fischer ? tier : null}
+              Box={look.Box}
+              lid={look.lid}
+              item={fischer ? null : art}
+              cardClass={result ? revealClass(result.item) : ""}
+              cardBody={fischer ? null : details}
+              go={!!strips}
+              onStop={
+                fischer
+                  ? () => {
+                      // (Its banner's 2.5 s and a beat: every banner a second longer, Eric, Oct 15; and the banners' extra, Oct 24.)
+                      setStage("fischer");
+                      setTimeout(() => setStage("spin2"), fischerBannerMs() + 200);
+                    }
+                  : undefined
+              }
+              onCard={() => setShown(true)}
+            />
+          )}
+          {/* Fischer Random's second strip: set up under its banner, then spun; its winner's beam comes up without a box. */}
+          {!still && strips && fischer && (ahead || stage !== "spin") && (
+            <CrateStage
+              key={`b${round}`}
+              tiles={STRIPS.fischer.tiles}
+              land={STRIPS.fischer.land}
+              tile={(i) => <TileView tile={strips.two[i]!} look={crate.look} />}
+              ending="beam"
+              tier={tier}
+              Box={look.Box}
+              lid={look.lid}
+              item={art}
+              cardClass={revealClass(result!.item)}
+              cardBody={details}
+              go={stage === "spin2"}
+              hidden={stage !== "spin2"}
+              onCard={() => setShown(true)}
+            />
+          )}
+          {stage === "fischer" && (
+            <div class="fischer-stage">
+              <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub={isWelcomeCrate(crate.id) ? "A HunChess ride" : "Legendary or Mythic"} sound="bannerStart" ms={fischerBannerMs()} />
+            </div>
+          )}
+          {error && (
+            <button type="button" class="ff-button cox-done" onClick={onClose}>
+              ▶ Done
+            </button>
+          )}
+        </div>
+      </div>
+    </OpenLayer>
   );
 }
 
-/** The reveal: an FF-style window with the item, its tier, color, purity and (if so) its shine. */
+/** The reveal card's classes: shiny (a high purity), special (Legendary and Mythic). (A HunChess ride: no purity, so no shine; Eric, Nov 6.) */
+function revealClass(item: ItemInstance) {
+  const d = itemDef(item.def)!;
+  const shiny = !isHunchess(item.def) && isShiny(item.blemish);
+  const special = d.tier === "legendary" || d.tier === "mythic";
+  return `${shiny ? "shiny" : ""}${special ? `${shiny ? " " : ""}special` : ""}`;
+}
+
+/**
+ * The reveal card already opened and not seen (you left during the spin, Oct 8): the card alone, at once, with the game's reveal sound.
+ */
 function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; again?: boolean; onAgain: () => void; onClose: () => void }) {
   const d = itemDef(item.def)!;
   const t = tierInfo(d.tier);
-  // (A HunChess ride: no purity, so no shine named either; Eric, Nov 6.)
-  const hc = isHunchess(item.def);
-  const shiny = !hc && isShiny(item.blemish);
-  const special = d.tier === "legendary" || d.tier === "mythic";
-  const [worn, setWorn] = useState(false);
+  const cls = revealClass(item);
   useEffect(() => {
-    setUnseen(null);
-    play(special || shiny ? "bannerStart" : "select");
+    play(cls ? "bannerStart" : "select");
   }, []);
   return (
-    <div class={`ff-window reveal-card${shiny ? " shiny" : ""}${special ? " special" : ""}`} style={{ "--tier": t.color }}>
+    <div class={`ff-window reveal-card cox-card-still${cls ? ` ${cls}` : ""}`} style={{ "--tier": t.color }}>
       <span class="reveal-tier">{t.name}</span>
       <span class="reveal-art">
         <ItemArt def={item.def} finish={item} />
       </span>
+      <RevealDetails item={item} again={again} shown onAgain={onAgain} onClose={onClose} />
+    </div>
+  );
+}
+
+/** The reveal's words and buttons, under its picture: the item, its tier, color, purity and (if so) its shine; Wear, Open another, Done. */
+function RevealDetails({ item, again, shown, onAgain, onClose }: { item: ItemInstance; again: boolean; shown: boolean; onAgain: () => void; onClose: () => void }) {
+  const d = itemDef(item.def)!;
+  const hc = isHunchess(item.def);
+  const shiny = !hc && isShiny(item.blemish);
+  const [worn, setWorn] = useState(false);
+  useEffect(() => {
+    if (shown) setUnseen(null);
+  }, [shown]);
+  return (
+    <>
       <strong class="reveal-name">{d.name}</strong>
       <span class="reveal-finish">
         {finishLine(item)}
@@ -1000,7 +1046,7 @@ function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; 
           ▶ Done
         </button>
       </div>
-    </div>
+    </>
   );
 }
 

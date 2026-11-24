@@ -191,3 +191,72 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   }
 });
+
+/**
+ * The crate opening's own layer (Eric, Nov 24: "the full phone screen takes over ... using this blue and black background ... on desktop,
+ * it can take up that middle space"; docs/decisions/2026-11-24-crate-open-build.md): on a phone the whole window, on a computer the
+ * middle column between the side menu and the right column, top to bottom; the crate's page under it stays mounted and doesn't move,
+ * so Done leaves it exactly as it was. CRATE_SHOTS=<dir> saves the stills (the spin, the open, the card).
+ */
+test("crates: the opening covers the whole phone screen or the computer's middle column, and Done leaves the page under it as it was", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  const shots = process.env.CRATE_SHOTS;
+  const name = test.info().project.name;
+  await named(page, "Layer Opener");
+  // (Two, so its "You have" line keeps its length: the page under it changes only by the one opened.)
+  await giveCrates(page, "beta-001", 2, 2);
+  await page.goto("/shop?crates");
+  await page.locator('.crate-row[data-crate="beta-001"]').click();
+  const open = page.getByRole("button", { name: /Open · uses 1 key/ });
+  await open.scrollIntoViewIfNeeded();
+  const where = () =>
+    page.evaluate(() => {
+      const r = document.querySelector(".crate-hero")!.getBoundingClientRect();
+      return { y: scrollY, box: [r.left, r.top, r.width, r.height] };
+    });
+  const before = await where();
+  await open.click();
+  const layer = page.getByTestId("crate-opening");
+  await expect(layer).toBeVisible();
+  await expect(layer.locator(".cox-reel")).toBeVisible();
+  const cover = await page.evaluate(() => {
+    const r = document.querySelector('[data-testid="crate-opening"]')!.getBoundingClientRect();
+    const frame = document.querySelector<HTMLElement>(".fd-root.framed");
+    const px = (v: string) => parseFloat(getComputedStyle(frame!).getPropertyValue(v)) || 0;
+    const wide = innerWidth >= 1024;
+    // (What's on top at points across the layer, and just outside it on a computer: the side menu and the right column, uncovered.)
+    const top = (x: number, y: number) => !!document.elementFromPoint(x, y)?.closest('[data-testid="crate-opening"]');
+    return {
+      rect: [r.left, r.top, r.right, r.bottom].map(Math.round),
+      want: [wide ? px("--fd-menu") : 0, 0, innerWidth - (wide ? px("--fd-rail") : 0), innerHeight].map(Math.round),
+      inside: [top(r.left + 2, r.top + 2), top(r.right - 2, r.top + 2), top(r.left + 2, r.bottom - 2), top(r.right - 2, r.bottom - 2), top((r.left + r.right) / 2, (r.top + r.bottom) / 2)],
+      sides: wide ? [top(r.left - 4, innerHeight / 2), top(r.right + 4, innerHeight / 2)] : [],
+      wide,
+    };
+  });
+  expect(cover.rect, "the layer's box").toEqual(cover.want);
+  if (cover.wide) expect(cover.want[0], "a side menu's width").toBeGreaterThan(100);
+  expect(cover.inside, "the layer on top at its corners and middle").toEqual([true, true, true, true, true]);
+  expect(cover.sides, "the side columns uncovered").toEqual(cover.wide ? [false, false] : []);
+  if (shots) {
+    await expect(layer.locator(".cox-status")).toHaveText("");
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${shots}/${name}-1-spin.png` });
+    // (The box shaking, then the beam: about 4.9 s and 5.3 s from the spin's start.)
+    await page.waitForTimeout(3300);
+    await page.screenshot({ path: `${shots}/${name}-2-open.png` });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${shots}/${name}-3-beam.png` });
+  }
+  const card = layer.locator(".reveal-card");
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  if (shots) {
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${shots}/${name}-4-card.png` });
+  }
+  await card.getByRole("button", { name: "▶ Done" }).click();
+  await expect(layer).toHaveCount(0);
+  // The page under it as it was: in the same place, scrolled the same, its count gone down by the one opened.
+  expect(await where()).toEqual(before);
+  await expect(page.locator(".crate-held")).toHaveText("You have 1, and 1 key.");
+});

@@ -790,22 +790,6 @@ button.town-pic.player {
   min-height: 44px;
   margin-top: 8px;
 }
-.shop-opening-veil {
-  padding: 12px;
-  overflow: auto;
-  touch-action: pan-y;
-}
-.shop-opening {
-  box-sizing: border-box;
-  width: min(100%, 420px);
-  max-height: 100%;
-  overflow: auto;
-  padding: 12px;
-  border-radius: 18px;
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
-}
 .shop-pool {
   font: 600 11px/1.3 Archivo, sans-serif;
   color: #a9adb9;

@@ -124,7 +124,7 @@ test("the Welcome Crates: 5 finished games earn the first once; its notice, open
 
   // Open it: the strip, Fischer Random, then the reveal: a HunChess ride, "Not tradeable", no purity, no "Open another".
   await page.getByRole("button", { name: /^▶ Open$/ }).click();
-  await expect(page.locator(".crate-opening .spin")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".crate-opening .cox-reel")).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(2500);
   await shot(page, "opening");
   const reveal = page.locator(".reveal-card");

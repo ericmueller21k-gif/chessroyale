@@ -30,6 +30,7 @@ import { zebraSound, type ZebraSound } from "./characters/zebra-sounds.ts";
 import { chandySound, type ChandySound } from "./characters/chandy-sounds.ts";
 import { birdieSound, type BirdieSound } from "./characters/birdie-sounds.ts";
 import { clawSound, type ClawSound } from "./claw/sounds.ts";
+import { CRATE_SOUNDS, crateSound } from "./crate-open/sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -2144,8 +2145,14 @@ function makeIdle(sound: BossSound, rate: number) {
 export function warmSounds(names: readonly SoundName[]): void {
   if (!ctx) return;
   for (const n of names) warmed.add(n);
+  warmMade([...new Set(names)].flatMap((n) => MAKE[n] ?? []));
+}
+
+/** Sends sounds not made yet to the worker (or makes them in idle moments without one). */
+function warmMade(list: readonly BossSound[]) {
+  if (!ctx) return;
   const rate = ctx.sampleRate;
-  const todo = [...new Set(names)].flatMap((n) => MAKE[n] ?? []).filter((s) => !cached(s, rate) && !pending.has(JSON.stringify([s, rate])));
+  const todo = list.filter((s) => !cached(s, rate) && !pending.has(JSON.stringify([s, rate])));
   const w = soundWorker();
   for (const sound of todo) {
     if (!w) {
@@ -2155,6 +2162,81 @@ export function warmSounds(names: readonly SoundName[]): void {
     pending.add(JSON.stringify([sound, rate]));
     w.postMessage({ sound, rate });
   }
+}
+
+/**
+ * The crate opening's sounds (crate-open/sounds.ts, Nov 24), made ahead in the sound worker as an Open is tapped (and as a crate's page
+ * opens, once sound is on): a few seconds before the first click plays. A no-op before the first tap.
+ */
+export function warmCrateSounds(tier?: string): void {
+  warmMade((tier ? [`shake-${tier}`, `sting-${tier}`] : CRATE_SOUNDS).map((n): BossSound => ["crate", n]));
+}
+
+/**
+ * Resolves once the opening's first sounds (the whirr, the flaps, the rest) are made, or after `capMs` (a slow worker), whichever is
+ * first; at once without sound. The strip waits on it with the server's answer, so none of them is made on its frames.
+ */
+export function crateSoundsReady(capMs: number): Promise<void> {
+  const t0 = nowMs();
+  return new Promise((done) => {
+    const look = () => {
+      const c = ctx;
+      if (!c || muted || c.state !== "running" || nowMs() - t0 >= capMs || CRATE_SOUNDS.every((n) => cached(["crate", n], c.sampleRate))) done();
+      else setTimeout(look, 40);
+    };
+    look();
+  });
+}
+
+/**
+ * Plays the crate opening's cues (crate-open/timeline.ts `cues`: each a piece and its time in ms) on the audio clock, starting
+ * `leadMs` from now, when the picture's clock starts too: so no click waits on a frame. Returns a stop for all of them (the opening
+ * closed part way, or "Open another"). Muted, hidden or without sound, nothing plays; muted part way, it goes quiet.
+ */
+export function playCrateCues(list: readonly { at: number; sound: string }[], leadMs: number): () => void {
+  (globalThis as { __soundLog?: string[] }).__soundLog?.push(`crateOpen:${ctx?.state ?? "none"}${muted ? ":muted" : ""}`);
+  // (The clip script reads this to lay the same sound under its recording: scripts/crate-open-frames.ts.)
+  (globalThis as { __crateCues?: unknown[] }).__crateCues?.push({ at: nowMs() + leadMs, list });
+  if (muted || !ctx || !master || pageHidden() || ctx.state !== "running") return () => undefined;
+  const c = ctx;
+  const out = c.createGain();
+  out.connect(master);
+  const t0 = c.currentTime + leadMs / 1000;
+  const sources: AudioBufferSourceNode[] = [];
+  const lay = (q: { at: number; sound: string }) => {
+    try {
+      const data = crateSound(q.sound, c.sampleRate);
+      const buf = c.createBuffer(1, data.length, c.sampleRate);
+      buf.getChannelData(0).set(data);
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.connect(out);
+      src.start(Math.max(c.currentTime, t0 + q.at / 1000));
+      sources.push(src);
+    } catch {
+      // Ignore audio errors.
+    }
+  };
+  // (A piece the worker hasn't sent back yet (the sting, the most work) is laid a second before it's due, by when it has: never made
+  // on the page as the strip starts.)
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  for (const q of list) {
+    if (q.at < 1000 || cached(["crate", q.sound], c.sampleRate)) lay(q);
+    else timers.push(setTimeout(() => lay(q), leadMs + q.at - 1000));
+  }
+  const quiet = onMuteChange(() => out.gain.setValueAtTime(muted ? 0 : 1, c.currentTime));
+  return () => {
+    quiet();
+    timers.forEach(clearTimeout);
+    for (const src of sources) {
+      try {
+        src.stop();
+      } catch {
+        // (Already ended.)
+      }
+    }
+    out.disconnect();
+  };
 }
 
 /**

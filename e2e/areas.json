@@ -140,6 +140,7 @@
     "packages/app/items-preview.html",
     "packages/app/rides-measure.html",
     "packages/app/chandy-preview.html",
+    "packages/app/crate-open-preview.html",
     "packages/app/src/dev/**",
     "packages/maia-worker/LICENSE",
     "packages/maia-worker/licenses/**",
@@ -841,7 +842,8 @@
         "packages/app/src/components/tokens/**",
         "packages/app/src/components/WelcomeNotice.tsx",
         "packages/server/src/welcome.ts",
-        "packages/app/src/claw/**"
+        "packages/app/src/claw/**",
+        "packages/app/src/crate-open/**"
       ],
       "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts", "e2e/shop.spec.ts", "e2e/welcome-crate.spec.ts", "e2e/claw.spec.ts", "e2e/xp-rewards.spec.ts"]
     },

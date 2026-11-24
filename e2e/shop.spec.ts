@@ -1337,7 +1337,7 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   await expect(page.locator(".crate-held")).toHaveText("You have 2.");
   const open = page.getByRole("button", { name: /^▶ Open$/ });
   await open.click();
-  await expect(page.locator(".crate-opening .spin")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".crate-opening .cox-reel")).toBeVisible({ timeout: 15_000 });
   const reveal = page.locator(".reveal-card");
   await expect(reveal).toBeVisible({ timeout: 30_000 });
   const again = reveal.getByRole("button", { name: "▶ Open another" });
@@ -1345,7 +1345,7 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/boss-crate-reveal-${test.info().project.name}.png` });
   // The second, the last: then "Open another" is greyed (none left), and the page says so, its Open greyed.
   await again.click();
-  await expect(page.locator(".crate-opening .spin")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".crate-opening .cox-reel")).toBeVisible({ timeout: 15_000 });
   await expect(reveal).toBeVisible({ timeout: 30_000 });
   await expect(reveal.getByRole("button", { name: "▶ Open another" })).toBeDisabled();
   await reveal.getByRole("button", { name: "▶ Done" }).click();
@@ -1541,7 +1541,7 @@ test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words,
   expect(await held()).toBe(2);
   await got.getByRole("button", { name: "Open now" }).click();
   await expect(got).toBeHidden();
-  const opening = page.locator(".shop-opening .crate-opening");
+  const opening = page.getByTestId("crate-opening");
   await expect(opening).toBeVisible();
   await expect(opening.getByRole("heading", { level: 2 })).toHaveText("Boingo's Boss Crate");
   await expect.poll(held, { message: "opened: one fewer held" }).toBe(1);

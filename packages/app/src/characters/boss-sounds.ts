@@ -21,6 +21,7 @@ import { zebraSound } from "./zebra-sounds.ts";
 import { chandySound } from "./chandy-sounds.ts";
 import { birdieSound } from "./birdie-sounds.ts";
 import { clawSound } from "../claw/sounds.ts";
+import { crateSound } from "../crate-open/sounds.ts";
 
 /**
  * The bosses' synthesized sounds by module, each name its cache's (synth.ts, soundCache): one table for the page and
@@ -53,6 +54,8 @@ const MAKERS = {
   birdie: birdieSound,
   // (Boingo's claw machine's, not a boss's: the same cache, worker and ahead-of-time making.)
   claw: clawSound,
+  // (The crate opening's, Nov 24: the same cache, worker and ahead-of-time making.)
+  crate: crateSound,
 } as const;
 
 /** One boss sound: its module and its name there. */
