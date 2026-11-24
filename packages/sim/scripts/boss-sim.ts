@@ -454,6 +454,8 @@ async function counterTusks(runner: MatchRunner, engine: EngineLike, max: number
 async function raid(bosses: string[], games: number, seed: number, strikes: number, tag: string, patch: RaidPatch = {}) {
   const { rageSpeed, ...powers } = (patch.powers ?? {}) as { rageSpeed?: Record<string, number> };
   Object.assign(BOSS_POWERS as Record<string, unknown>, powers, rageSpeed ? { rageSpeed: { ...BOSS_POWERS.rageSpeed, ...rageSpeed } } : {});
+  // (A player who doesn't blunder (patch.best) finds Chandy's Dodge's safe square too: his Dodge never ends the battle early.)
+  if (patch.best) (BOSS_POWERS.chandy as { dodgeBotHit: number }).dodgeBotHit = 1;
   for (const [id, offset] of Object.entries(patch.offset ?? {})) (BOSS_ROSTER.find((d) => d.id === id) as { offset: number }).offset = offset;
   const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
   const engines = [await createNodeEngine({ nodes: RAID_NODES, hashMb: 16 })];
