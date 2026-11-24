@@ -1921,3 +1921,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   green → #920 suspect. Fix helper (Opus high, brief fix-zebra-music-carry). Hold merges.
 - Nov 24 ~19:45: zebra fix DONE → #921 (237abd69): NOT #920; a latent race (splashMusic's late-decode branch never logged the carry;
   8423926 fails too with a 0.7 s decode delay). Log fix + spec polls. CI watched. Crate build still running.
+- Nov 24 ~20:00: crate build DONE (b7a0b272) but with A's spin (Eric's C-spin/A-ending change missed). Sound-mix helper (Opus medium,
+  brief crate-sound-mix) on the same branch; then the PR. #921 CI running (main red until merged). Bonus crate after crate build merges.
