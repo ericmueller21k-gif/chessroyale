@@ -1914,3 +1914,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~18:40: Eric: email DONE (Exchange; eric@, privacy@, support@ retry). Crate pick: "number 4" = the 4th video (Rare, sound A) →
   sound A; my calls: 4 s spin, near-edge stop, winning box drops (told him). NEW: phone full-screen takeover on the blue-black bg; computer
   the full middle column. Build helper (Opus high, brief crate-open-build).
+- Nov 24 ~18:55: ERIC: crate sound = C's spin clicks + A's ending (sent to the build helper). ERIC: BONUS CRATE: 25% of every opening
+  also gives a random crate from ALL crates (retired too), evenly, + its key if needed → brief bonus-crate.md (Opus xhigh, FULL lane),
+  QUEUED until the crate build merges. My calls: no Welcome Crate, no admins-first boss crates (except admins).
