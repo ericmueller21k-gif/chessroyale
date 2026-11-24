@@ -8877,28 +8877,59 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
     opacity: 1;
   }
 }
-/* The Candy Cane: a band of light winds up its stripes (each step lit in turn, by its delay), then a sparkle at its tip. */
-.ia-swirl {
-  opacity: 0;
-  animation: ia-swirl 6s linear infinite;
+/* The Candy Cane: a strand of light spirals up round it (a dash running along its path, pathLength 100: the glow's dash
+   40 long, the core's 28, both heads together), shedding sparkle motes; a sparkle pops at the tip; then a rest. At rest the
+   dash sits past the path's end, unseen. */
+.ia-strand {
+  stroke-dasharray: 40 400;
+  stroke-dashoffset: -112;
+  animation: ia-strand-glow 6.5s linear infinite;
 }
-@keyframes ia-swirl {
+.ia-strand.core {
+  stroke-dasharray: 28 400;
+  animation-name: ia-strand-core;
+}
+@keyframes ia-strand-glow {
+  0% {
+    stroke-dashoffset: 40;
+  }
+  37%,
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes ia-strand-core {
+  0% {
+    stroke-dashoffset: 28;
+  }
+  37%,
+  100% {
+    stroke-dashoffset: -112;
+  }
+}
+.ia-mote {
+  opacity: 0;
+  animation: ia-mote 6.5s ease-out infinite;
+}
+@keyframes ia-mote {
   0% {
     opacity: 0;
+    transform: scale(0.3);
   }
-  3% {
+  2% {
     opacity: 1;
+    transform: scale(1);
   }
-  13%,
+  16%,
   100% {
     opacity: 0;
+    transform: translate(var(--dx), -4px) scale(0.2) rotate(60deg);
   }
 }
-.ia-pop,
-.ia-ping {
+.ia-pop {
   opacity: 0;
   transform: scale(0);
-  animation: ia-pop 6s ease-out infinite;
+  animation: ia-pop 6.5s ease-out infinite;
 }
 @keyframes ia-pop {
   0% {
@@ -8915,24 +8946,7 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
     transform: scale(0.2) rotate(90deg);
   }
 }
-/* The Gift-Wrap Tube: its stripes wind up two turns (two of their periods, 27.6), then rest; a sparkle pings at its tip. */
-.ia-scroll {
-  animation: ia-scroll 6.5s ease-in-out infinite;
-}
-@keyframes ia-scroll {
-  0% {
-    transform: translateY(0);
-  }
-  40%,
-  100% {
-    transform: translateY(-27.6px);
-  }
-}
-.ia-ping {
-  animation-duration: 6.5s;
-  animation-delay: 2.2s;
-}
-/* (Its option: a puff of confetti from the tip, every few seconds.) */
+/* The Gift-Wrap Tube: a puff of confetti from its tip every 5.5 s, the bits tumbling out and fading. */
 .ia-confetti {
   opacity: 0;
   animation: ia-confetti 5.5s ease-out infinite;

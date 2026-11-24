@@ -76,8 +76,8 @@ const SECTIONS: { id: string; title: string; note: string; rows: Show[] }[] = [
   },
   {
     id: "cane",
-    title: "Candy Cane",
-    note: "A band of light winds up its stripes from the bottom, round the hook, a sparkle pops at the tip; then a rest of about 4 seconds.",
+    title: "Candy Cane (v2: magic strand)",
+    note: "v2: a thin glowing strand of magic spirals up round the cane, floating just off it: in front of it, then behind it (hidden by the cane), round the hook to the tip, shedding sparkle motes; a sparkle pops at the tip, then about 4 seconds of rest.",
     rows: [
       { def: "candy-cane", color: "red" },
       { def: "candy-cane", color: "emerald" },
@@ -86,13 +86,12 @@ const SECTIONS: { id: string; title: string; note: string; rows: Show[] }[] = [
   },
   {
     id: "tube",
-    title: "Gift-Wrap Tube",
-    note: "Lead (left two): every few seconds its stripes wind up two turns like a barber pole and a sparkle pings at the tip. Option (right two): a small puff of confetti in its colors from the tip.",
+    title: "Gift-Wrap Tube (v2: confetti)",
+    note: "Eric's pick: every 5.5 seconds a small puff of confetti bursts from the tip: five bigger bits in its two colors, white and gold, tumbling up and to the left (so they stay on the pawn's square), then fading.",
     rows: [
-      { def: "gift-tube", color: "red", label: "Barber pole (pick)" },
-      { def: "gift-tube", color: "cobalt", label: "Barber pole (pick)" },
-      { def: "gift-tube", color: "red", variant: "confetti", label: "Confetti puff" },
-      { def: "gift-tube", color: "cobalt", variant: "confetti", label: "Confetti puff" },
+      { def: "gift-tube", color: "red" },
+      { def: "gift-tube", color: "cobalt" },
+      { def: "gift-tube", color: "midnight" },
     ],
   },
   {

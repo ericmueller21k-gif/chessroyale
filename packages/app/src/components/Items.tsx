@@ -128,59 +128,33 @@ const sparkle = (x: number, y: number, r: number) =>
 /** Which of a mockup's options an item is drawn with (the preview page sets it on the item; Nov 24 mockup only). */
 const optionOf = (p: Paint) => (p.finish as Finish & { variant?: string }).variant;
 
-/** The tube's stripes reaching one period (three bands) further down, for the barber pole's scroll (cut by a clip). */
-const TUBE_PERIOD = 3 * 4.6;
-const TUBE_SCROLL = (() => {
-  const BAND = 4.6;
-  const RISE = 6;
-  const out: string[][] = [[], [], []];
-  let k = 0;
-  for (let y = TUBE.top - BAND - RISE; y < TUBE.bottom + 2 * TUBE_PERIOD + RISE; y += BAND, k++)
-    out[k % 3]!.push(`M${TUBE.x0} ${+y.toFixed(2)} L${TUBE.x1} ${+(y - RISE).toFixed(2)} L${TUBE.x1} ${+(y - RISE + BAND).toFixed(2)} L${TUBE.x0} ${+(y + BAND).toFixed(2)} Z`);
-  return out;
-})();
 /**
- * The Gift-Wrap Tube. Nov 24 mockup (Eric: "definitely needs something more than just ... a shiny effect"; Nov 25: "I like your
- * gift wrap tube idea"): every few seconds its stripes wind up the tube like a barber pole's, two turns, and a sparkle
- * pings at its tip. The option beside it (`confetti`): a small puff of confetti in its colors from the tip now and then.
+ * The Gift-Wrap Tube. Mockup v2 (Eric, Nov 24, seeing the options: "I see the confetti coming out. Yeah, I like that more"): now
+ * and then a small puff of confetti bursts from its tip, a few bits in its two colors, white and gold, which tumble out and fade.
  */
 function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
-  const [white, first, second] = TUBE_SCROLL;
-  const confetti = optionOf(p) === "confetti";
+  const [white, first, second] = TUBE_STRIPES;
+  // [how far it flies (x, y), how far it turns, its color]: up and to the left, so it stays on the pawn's square.
   const bits: [number, number, number, string][] = [
-    [-11, -6, -160, "#fbfbf8"],
-    [-7, -11, 120, p.hex],
-    [-2, -13, -90, p2.hex],
-    [2, -11, 200, "#fbfbf8"],
-    [-13, -1, -140, p.hex],
-    [-5, -7, 150, p2.hex],
+    [-13, -5, -160, p.hex],
+    [-8, -12, 140, "#ffd23f"],
+    [-2, -15, -110, p2.hex],
+    [-5, -14, 200, "#fbfbf8"],
+    [-15, 3, -140, p2.hex],
   ];
   return (
     <g transform="rotate(16 82 58)">
-      <clipPath id={`${p.id}-tube`}>
-        <rect x={TUBE.x0} y={TUBE.top} width={TUBE.x1 - TUBE.x0} height={TUBE.bottom - TUBE.top} rx="1.2" />
-      </clipPath>
-      <g clip-path={`url(#${p.id}-tube)`}>
-        <g class={confetti ? undefined : "ia ia-scroll"}>
-          {white!.map((d) => (
-            <path key={d} d={d} fill="#fbfbf8" />
-          ))}
-          <Region p={p} name="stripes" d={first!} outline={false} />
-          <Region p={p2} name="stripes2" d={second!} outline={false} />
-        </g>
-      </g>
+      {white!.map((d) => (
+        <path key={d} d={d} fill="#fbfbf8" />
+      ))}
+      <Region p={p} name="stripes" d={first!} outline={false} />
+      <Region p={p2} name="stripes2" d={second!} outline={false} />
       <rect x={TUBE.x0} y={TUBE.top} width={TUBE.x1 - TUBE.x0} height={TUBE.bottom - TUBE.top} rx="1.2" fill="none" {...LINE} {...lw(2.4)} />
-      {confetti ? (
-        bits.map(([dx, dy, r, c], i) => (
-          <Pivot key={i} x={82 + (i - 2.5) * 0.9} y={16.5} cls="ia-confetti" style={`--dx:${dx}px;--dy:${dy}px;--r:${r}deg`}>
-            <rect x={80.9 + (i - 2.5) * 0.9} y={15.2} width="2.2" height="2.6" rx="0.4" fill={c} stroke="#1d1d1f" {...lw(0.6)} />
-          </Pivot>
-        ))
-      ) : (
-        <Pivot x={82} y={14.6} cls="ia-ping">
-          <path d={sparkle(82, 14.6, 4.2)} fill="#fffbe8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(0.8)} />
+      {bits.map(([dx, dy, r, c], i) => (
+        <Pivot key={i} x={82 + (i - 2) * 1.2} y={16.6} cls="ia-confetti" style={`--dx:${dx}px;--dy:${dy}px;--r:${r}deg`}>
+          <rect x={80.4 + (i - 2) * 1.2} y={14.8} width="3.2" height="3.6" rx="0.5" fill={c} stroke="#1d1d1f" {...lw(0.7)} />
         </Pivot>
-      )}
+      ))}
     </g>
   );
 }
@@ -290,55 +264,82 @@ function Present({ p, p2 }: { p: Paint; p2: Paint }) {
 /** A candy cane at the pawn's side: white, striped in its color. */
 const CANE = "M86 94 L86 30 A14 14 0 0 0 58 30 L58 33 A3 3 0 0 0 64 33 L64 30 A8 8 0 0 1 80 30 L80 94 A3 3 0 0 0 86 94 Z";
 /**
- * The swirl's steps (Nov 24 mockup), bottom to top along the cane's middle: up the shaft, round the hook, to its tip. Each
- * is a short line of light across the cane, slanted like its stripes, so lit in turn they read as light winding up them.
+ * The candy cane's magic strand (mockup v2, Eric: "a magical little spell, like string thing ... it looks like it's basically
+ * floating around the stick ... spiraling around it as it moves up"): a helix round the cane's middle (up the shaft, round the hook,
+ * to its tip), as one path, and where it's in front of the cane (clip shapes for those stretches). A dash of light runs along it.
  */
-const CANE_SWIRL = (() => {
-  const out: string[] = [];
-  const step = 4.4;
-  const half = 3.6;
-  const slant = (24 * Math.PI) / 180;
-  /** A line across the cane at (x, y), where the cane runs along angle `a` (radians), slanted like the stripes. */
-  const across = (x: number, y: number, a: number) => {
-    const n = a + Math.PI / 2 - slant;
-    const dx = Math.cos(n) * half;
-    const dy = Math.sin(n) * half;
-    return `M${+(x - dx).toFixed(2)} ${+(y - dy).toFixed(2)} L${+(x + dx).toFixed(2)} ${+(y + dy).toFixed(2)}`;
+const CANE_STRAND = (() => {
+  const RADIUS = 5.4; // how far it floats from the cane's middle (the cane is 3 either side)
+  const PITCH = 17; // one turn per this much of the cane
+  const STEP = 0.5;
+  // The cane's middle, sampled: [x, y, the normal's x, y] at each step, bottom to tip.
+  const mid: number[][] = [];
+  for (let y = 92; y > 30; y -= STEP) mid.push([83, y, 1, 0]);
+  for (let t = 0; t < Math.PI; t += STEP / 11) mid.push([72 + 11 * Math.cos(t), 30 - 11 * Math.sin(t), Math.cos(t), -Math.sin(t)]);
+  for (let y = 30; y <= 33.6; y += STEP) mid.push([61, y, -1, 0]);
+  const at = (i: number) => (2 * Math.PI * i * STEP) / PITCH;
+  const pt = (i: number, off: number) => `${+(mid[i]![0]! + mid[i]![2]! * off).toFixed(2)} ${+(mid[i]![1]! + mid[i]![3]! * off).toFixed(2)}`;
+  const path = `M${mid.map((_, i) => pt(i, RADIUS * Math.sin(at(i)))).join(" L")}`;
+  // Its front: where the strand comes round toward us (cos > 0), a band along the cane wider than the strand swings.
+  const front: string[] = [];
+  let run: number[] = [];
+  const close = () => {
+    if (run.length > 1) front.push(`M${run.map((i) => pt(i, RADIUS + 3)).join(" L")} L${[...run].reverse().map((i) => pt(i, -RADIUS - 3)).join(" L")} Z`);
+    run = [];
   };
-  for (let y = 91; y > 30; y -= step) out.push(across(83, y, -Math.PI / 2));
-  // Round the hook: its middle is a circle about (72, 30), 11 across, from the right (0°) over the top to the left.
-  for (let t = 0.2; t <= Math.PI + 0.01; t += step / 11) out.push(across(72 + 11 * Math.cos(t), 30 - 11 * Math.sin(t), -t - Math.PI / 2));
-  out.push(across(61, 32.4, Math.PI / 2));
-  return out;
+  mid.forEach((_, i) => (Math.cos(at(i)) > 0 ? run.push(i) : close()));
+  close();
+  // Motes: a few spots on its front where a sparkle is shed as the light passes, each with where it is along the strand (0-1).
+  const motes = [0.14, 0.33, 0.52, 0.7, 0.86].map((share) => {
+    let i = Math.round(share * (mid.length - 1));
+    while (i < mid.length - 1 && Math.cos(at(i)) < 0.8) i++;
+    const [x, y] = pt(i, RADIUS * Math.sin(at(i))).split(" ").map(Number);
+    return { x: x!, y: y!, share: i / (mid.length - 1) };
+  });
+  return { path, front, motes };
 })();
+/** How long the strand's light takes to climb, and its whole cycle (styles.css, `ia-strand`: 37% of 6.5 s). */
+const STRAND_CLIMB = 0.37 * 6.5;
 /**
- * A candy cane at the pawn's side: white, striped in its color. Nov 24 mockup (Eric: "since it's like a magical thing, it
- * should do this cool like magical spiral swirl that goes from the bottom of it all the way ... up to the top, and then kind of
- * repeats every so often"): a band of light winds up its stripes, round the hook, and a sparkle pops at its tip; then it rests.
+ * A candy cane at the pawn's side: white, striped in its color. Mockup v2: a glowing strand of magic spirals up round it, passing in
+ * front of the cane and behind it (hidden by it), from the bottom round the hook to its tip, shedding a few sparkle motes; a sparkle
+ * pops at the tip, then it rests.
  */
 function CandyCane({ p }: { p: Paint }) {
   const stripes = [];
   for (let y = -6; y < 112; y += 10) stripes.push(`M50 ${y} L100 ${y + 22} L100 ${y + 27} L50 ${y + 5} Z`);
+  /** The strand's light: a gold glow and a bright core, the same head, the glow's tail longer (a few turns of it show at once). */
+  const strand = (
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path class="ia ia-strand glow" d={CANE_STRAND.path} pathLength={100} stroke="#ffc53d" opacity="0.7" {...lw(2.4)} />
+      <path class="ia ia-strand core" d={CANE_STRAND.path} pathLength={100} stroke="#fff8d6" {...lw(1.1)} />
+    </g>
+  );
   return (
     <g transform="rotate(14 80 60)">
       <clipPath id={`${p.id}-cane`}>
         <path d={CANE} />
       </clipPath>
+      <clipPath id={`${p.id}-front`}>
+        {CANE_STRAND.front.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </clipPath>
+      {/* Behind the cane: the cane hides it but at its edges, where the strand swings out beside it. */}
+      <g opacity="0.6">{strand}</g>
       <path d={CANE} fill="#fbfbf8" />
       <g clip-path={`url(#${p.id}-cane)`}>
         <Region p={p} name="stripes" d={stripes} outline={false} />
         <path d="M84.5 34 V90" stroke="#fff" opacity="0.55" {...lw(1.6)} stroke-linecap="round" />
-        <g fill="none" stroke-linecap="round">
-          {CANE_SWIRL.map((d, i) => (
-            <g key={d} class="ia ia-swirl" style={`animation-delay:${(i * 0.075).toFixed(3)}s`}>
-              <path d={d} stroke="#ffcf4a" opacity="0.8" {...lw(3.6)} />
-              <path d={d} stroke="#fffbe8" {...lw(1.5)} />
-            </g>
-          ))}
-        </g>
       </g>
       <path d={CANE} fill="none" {...LINE} />
-      <Pivot x={60.6} y={35.4} cls="ia-pop" style={`animation-delay:${(CANE_SWIRL.length * 0.075).toFixed(3)}s`}>
+      <g clip-path={`url(#${p.id}-front)`}>{strand}</g>
+      {CANE_STRAND.motes.map(({ x, y, share }, i) => (
+        <Pivot key={i} x={x} y={y} cls="ia-mote" style={`animation-delay:${(share * (100 / 140) * STRAND_CLIMB).toFixed(2)}s;--dx:${i % 2 ? 2.2 : -2.2}px`}>
+          <path d={sparkle(x, y, 1.9)} fill="#fff6c8" stroke="#c98a00" stroke-linejoin="round" {...lw(0.4)} />
+        </Pivot>
+      ))}
+      <Pivot x={60.6} y={35.4} cls="ia-pop" style={`animation-delay:${((100 / 140) * STRAND_CLIMB).toFixed(2)}s`}>
         <path d={sparkle(60.6, 35.4, 5)} fill="#fffbe8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(0.8)} />
       </Pivot>
     </g>

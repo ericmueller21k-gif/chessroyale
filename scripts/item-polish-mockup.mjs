@@ -62,7 +62,7 @@ for (const c of args.filter((a) => a.startsWith("close=")).map((a) => a.slice(6)
 }
 
 /** Each section's GIF: its length (one whole cycle of what it shows, in seconds). */
-const LENGTH = { crown: 6, cane: 6, tube: 6.5, parrot: 6, tommy: 7, pirate: 9 };
+const LENGTH = { crown: 6, cane: 6.5, tube: 5.5, parrot: 6, tommy: 7, pirate: 9 };
 for (const id of (arg("gif", "") || "").split(",").filter(Boolean)) {
   await page.goto(`${url}?only=${id}`);
   await page.waitForTimeout(1200);
