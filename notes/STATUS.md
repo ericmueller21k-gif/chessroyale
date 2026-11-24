@@ -1973,3 +1973,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   the crates-page-tidy brief (same screen). Merge after CI + after #924/#925.
 - Nov 25 ~02:50: #925 MERGED (373af08) and #924 MERGED (2e87f00); main runs watched (bkxd8tbk3 for 373af08; the newer push's run covers
   both). #923 CI bjap4yjre; merge after. Item mockup running.
+- Nov 25 ~03:05: #923 bonus crate MERGED (94c408c); main run for it (covers #924/#925) watched. Next: crates page tidy (Opus medium; brief
+  crates-page-tidy.md incl. #923 follow-ups) can start now beside the item mockup.
