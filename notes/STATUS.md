@@ -1868,3 +1868,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   + N2/N3/N4 (d8185679; tests fail before). N1 QUEUED (two upgrades in one turn show only the second window). CI watcher bujn06ktc.
 - Nov 24 ~08:21: ERIC: Birdie's train must ride even when the piece was saved (everything misses) → helper session_01JuCWRvpAwEnGvW2Dj3evsv
   (Opus xhigh alone, boss lane, brief birdie-train-miss, claude/birdie-train-miss), watcher on .done.
+- Nov 24 ~08:40: ERIC: power tips (boss/king exchange the first time you see a move; per account; shown 1, 3, 8, then every 5 battles; pilot
+  of 5) → brief notes/briefs/power-tips.md (Opus high, targeted). QUEUED: starts when the Birdie xhigh helper ends (concurrency). Lines sent to
+  Eric for edits. Birdie sounds (train sounds only on the ride, chirps ≤ 1 per 5 moves) added to the train-miss helper.
