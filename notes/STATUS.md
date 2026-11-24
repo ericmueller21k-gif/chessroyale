@@ -1956,3 +1956,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~00:05: ERIC: sting clips fine; Legendary sounds "depressing" → brighter/triumphant; ALL endings quieter than the spin's ticks
   ("hurt my ears"). Added to brief crate-tier-stings. Resume the stings helper (Opus high) once the bonus crate (xhigh) ends; item polish
   mockup (Opus high) alongside it then.
+- Nov 25 ~00:20: ERIC (Crates tab screenshot): used Welcome Crates gone; admin grants to the bottom; page "hard to see what's going on":
+  my order (Ready to open / Boss tokens / All crates / Admin); the opening bigger on a computer (phone fine). Brief crates-page-tidy.md
+  (Opus medium), QUEUED after the bonus crate (same screen). Told Eric the opening was already live (865d1dc).
