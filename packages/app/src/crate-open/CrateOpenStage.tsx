@@ -198,7 +198,7 @@ export function CrateStage({
 
   return (
     <div
-      class={`cox-stage${tier && isBig(tier) ? " big" : ""}${hidden ? " cox-ahead" : ""}${reduced ? " still" : ""}`}
+      class={`cox-stage${tier && isBig(tier) ? " big" : ""}${ending === "beam" ? " beam" : ""}${hidden ? " cox-ahead" : ""}${reduced ? " still" : ""}`}
       ref={stage}
       style={{ "--tier": color, "--power": String(tier ? TIER_POWER[tier] : 0.5), "--lid": String(lid) }}
       aria-hidden={hidden ? "true" : undefined}
@@ -254,7 +254,8 @@ export function CrateStage({
         <div class="cox-line-flare" />
       </div>
       {/* The reveal card (the game's own), forming round the risen item. */}
-      <div class={`ff-window reveal-card cox-card${cardClass ? ` ${cardClass}` : ""}`}>
+      {/* (Only a card that will form is a reveal card: Fischer Random's first strip's stays an unseen shell.) */}
+      <div class={`ff-window cox-card${cardBody ? " reveal-card" : ""}${cardClass ? ` ${cardClass}` : ""}`}>
         <span class="reveal-tier">{tier ? tierInfo(tier).name : " "}</span>
         <span class="reveal-art cox-card-art" />
         {cardBody}

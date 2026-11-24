@@ -798,13 +798,8 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
           </div>
         </div>
       )}
-      {got && opening && (
-        <div class="shop-bought-veil shop-opening-veil">
-          <div class="shop-opening crates" role="dialog" aria-label={got.name}>
-            <CrateOpening crate={got} force={{}} onClose={later} />
-          </div>
-        </div>
-      )}
+      {/* (The opening on its own layer, over the room: crate-open/, Nov 24.) */}
+      {got && opening && <CrateOpening crate={got} force={{}} onClose={later} />}
     </div>
   );
 }

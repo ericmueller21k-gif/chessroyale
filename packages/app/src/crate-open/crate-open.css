@@ -97,6 +97,10 @@
   position: absolute;
   inset: 0;
 }
+/* (Fischer Random's second strip: no box, the light comes up out of the winning tile, on the strip's middle line.) */
+.cox-stage.beam {
+  --box-top: calc(216px - var(--box) * var(--lid));
+}
 /* (Fischer Random's second strip, set up under its banner: there, laid out, unseen.) */
 .cox-stage.cox-ahead {
   visibility: hidden;
@@ -396,7 +400,12 @@
   mix-blend-mode: plus-lighter;
   opacity: 0;
 }
-.cox-card.reveal-card {
+.cox-card {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 16px 14px;
+  text-align: center;
   position: absolute;
   top: 18px;
   left: 0;
@@ -408,7 +417,6 @@
   opacity: 0;
   visibility: hidden;
   animation: none;
-  background: linear-gradient(180deg, rgba(42, 60, 189, 0.92) 0%, rgba(19, 32, 122, 0.94) 55%, rgba(10, 17, 80, 0.96) 100%);
 }
 .cox-card-art {
   background: none;
@@ -424,4 +432,20 @@
 }
 .cox-defs {
   position: absolute;
+}
+/* (A crate opened and not seen yet: its card alone, at once, where the opening's card forms.) */
+.cox-card-still.reveal-card {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  right: 0;
+  width: min(calc(100% - 28px), 420px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  z-index: 5;
+}
+/* (The card forms by its own animation here, not the reveal's pop-in.) */
+.cox-card.reveal-card {
+  animation: none;
+  background: linear-gradient(180deg, rgba(42, 60, 189, 0.92) 0%, rgba(19, 32, 122, 0.94) 55%, rgba(10, 17, 80, 0.96) 100%);
 }

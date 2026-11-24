@@ -171,21 +171,3 @@
   min-height: 34px;
   font-size: 13px;
 }
-/* Open now: the Crates tab's own opening, over the whole screen. */
-.claw-root:has(.claw-opening) {
-  top: 0;
-}
-.claw-veil:has(.claw-opening) {
-  position: absolute;
-  inset: 0;
-  align-items: center;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.55);
-  overflow: auto;
-}
-.claw-machine.claw-opening {
-  height: auto;
-  min-height: 420px;
-  background: var(--surface);
-  color: var(--text);
-}
