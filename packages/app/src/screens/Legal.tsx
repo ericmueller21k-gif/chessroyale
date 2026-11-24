@@ -203,7 +203,7 @@ function Privacy() {
         what={
           <p>
             How many of each boss's tokens you have, each token a boss battle gave you (when, and which battle), when a solo boss
-            battle you're playing began, and the boss crates you bought and haven't opened yet (which, and when you bought each).
+            battle you're playing began, and the boss crates you hold and haven't opened yet (which, whether it came as a bonus, and when you got each).
           </p>
         }
         why="so a token is yours on every device, the game can tell how many you've had in the last day, and a solo battle's length is timed by our server, not your device."
@@ -215,7 +215,7 @@ function Privacy() {
           <p>
             Your XP (your level is worked out from it), and for each game you finish: how long you played it and how many moves you made,
             the XP it gave you and what for, or why it gave none, and the crates and keys it gave you (the daily reward, your levels' and
-            your quests'). The crates you hold by series, and the boss crates you have to pick. When a game you play on your device began
+            your quests'). The crates you hold by series (and how many of them came as a bonus), and the boss crates you have to pick. When a game you play on your device began
             (our server times it), and once you've made {SOLO_ABANDON.minMoves} moves in it, when, with its mode, the number of players, your team and
             the boss, so leaving it counts as a loss. Your quests: which ones you have, when each was given and finished, which games moved each one, and the
             day a reroll gave it.

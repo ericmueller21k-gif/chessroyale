@@ -114,7 +114,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
   {
     // Boss tokens (boss-tokens.ts): how many of each boss's tokens the player has, the tokens their battles dropped (when, and
     // the battle: an online match's lobby code or a solo battle's id), a solo boss battle they have open (when it began), and the
-    // boss crates they bought and haven't opened (which, and when: Nov 2).
+    // boss crates they bought and haven't opened (which, and when: Nov 2; a bonus one's crate starts "bonus:", Nov 24: ledger.ts BONUS_PREFIX).
     name: "bossTokens",
     tables: ["boss_tokens", "boss_token_drops", "solo_battles", "boss_crates"],
     export: async (sql, u) => ({
@@ -130,7 +130,8 @@ export const ACCOUNT_STORES: AccountStore[] = [
     // XP (xp.ts, Nov 9): the solo game the server is timing (when it began, and a test's minutes; since Nov 22, when it became real
     // past SOLO_ABANDON.minMoves and what its loss would record: the mode, players, team, boss and tier). The XP itself is the wallet's
     // (above, with its ledger rows below), and each game's is on its result (its time, moves, XP and rewards). Phase 2 (Nov 9): the
-    // series crates you hold (the daily reward's and levels'; the boss crates to pick are the wallet's `boss_picks`, above).
+    // series crates you hold (the daily reward's and levels'; a bonus one's crate starts "bonus:", Nov 24; the boss crates to pick are the
+    // wallet's `boss_picks`, above).
     name: "xp",
     tables: ["solo_games", "series_crates"],
     export: async (sql, u) => ({
