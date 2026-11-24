@@ -13,7 +13,9 @@ const q = new URLSearchParams(location.search);
 const only = q.get("only");
 
 type Show = { def: string; color: string; color2?: string; variant?: string; label?: string; blemish?: number };
-const finish = (s: Show, i: number) => ({ def: s.def, color: s.color, color2: s.color2 ?? null, blemish: s.blemish ?? 8, seed: 7 + i, variant: s.variant });
+/** `?blemish=30`: every item at that blemish (70% pure: no shine), to measure the animations without the shine. */
+const blemishAll = q.get("blemish");
+const finish = (s: Show, i: number) => ({ def: s.def, color: s.color, color2: s.color2 ?? null, blemish: blemishAll ? Number(blemishAll) : (s.blemish ?? 8), seed: 7 + i, variant: s.variant });
 
 const Row = ({ s, i, dark }: { s: Show; i: number; dark: boolean }) => {
   const d = itemDef(s.def)!;

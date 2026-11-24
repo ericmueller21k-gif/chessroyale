@@ -148,12 +148,12 @@ function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
   const [white, first, second] = TUBE_SCROLL;
   const confetti = optionOf(p) === "confetti";
   const bits: [number, number, number, string][] = [
-    [-7, -9, -160, "#fbfbf8"],
-    [-3, -12, 120, p.hex],
-    [1, -13, -90, p2.hex],
-    [5, -10, 200, "#fbfbf8"],
-    [8, -6, -140, p.hex],
-    [-9, -4, 150, p2.hex],
+    [-11, -6, -160, "#fbfbf8"],
+    [-7, -11, 120, p.hex],
+    [-2, -13, -90, p2.hex],
+    [2, -11, 200, "#fbfbf8"],
+    [-13, -1, -140, p.hex],
+    [-5, -7, 150, p2.hex],
   ];
   return (
     <g transform="rotate(16 82 58)">
@@ -173,7 +173,7 @@ function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
       {confetti ? (
         bits.map(([dx, dy, r, c], i) => (
           <Pivot key={i} x={82 + (i - 2.5) * 0.9} y={16.5} cls="ia-confetti" style={`--dx:${dx}px;--dy:${dy}px;--r:${r}deg`}>
-            <rect x={81.2 + (i - 2.5) * 0.9} y={15.6} width="1.6" height="1.9" rx="0.3" fill={c} stroke="#1d1d1f" {...lw(0.5)} />
+            <rect x={80.9 + (i - 2.5) * 0.9} y={15.2} width="2.2" height="2.6" rx="0.4" fill={c} stroke="#1d1d1f" {...lw(0.6)} />
           </Pivot>
         ))
       ) : (
@@ -235,7 +235,7 @@ function FireIceCrown({ p }: { p: Paint }) {
           <stop offset="1" stop-color={p.hex} stop-opacity="0" />
         </radialGradient>
       </defs>
-      <ellipse class="ia ia-glow" cx="50" cy="12" rx="22" ry="15" fill={`url(#${id}-glow)`} />
+      <ellipse cx="50" cy="12" rx="22" ry="15" fill={`url(#${id}-glow)`} />
       {[shard(33.8, 13.4, 2.4), shard(44, 10.6, 2.6), shard(56, 10.6, 2.6), shard(66.2, 13.4, 2.4)].map(([s, face]) => (
         <g key={s}>
           <path d={s} fill={`url(#${id}-ice)`} />
@@ -246,7 +246,7 @@ function FireIceCrown({ p }: { p: Paint }) {
       {flames.map(([x, w, h, k]) => (
         <Pivot key={k} x={x} y={23} cls={`ia-flame ${k}`}>
           <Region p={p} name={`flame-${k}`} fill={`url(#${id}-fire)`} d={[flamePath(x, 23, w, h)]} line={1.7} />
-          <path class="ia ia-core" d={flamePath(x + 0.1, 23, w * 0.64, h * 0.72)} fill={mid} />
+          <path d={flamePath(x + 0.1, 23, w * 0.64, h * 0.72)} fill={mid} />
           <path d={flamePath(x + 0.2, 23.2, w * 0.34, h * 0.44)} fill={core} />
         </Pivot>
       ))}
@@ -728,10 +728,10 @@ function TommyGun({ p, p2 }: { p: Paint; p2: Paint }) {
       <path d="M79.6 -2.7 V-4.6" fill="none" {...LINE} {...lw(1.6)} />
       {tommy !== "drum" && (
         // A tiny puff of smoke from the muzzle, a little after the drum turns.
-        <Pivot x={84} y={0} cls="ia-puff">
-          <circle cx="85.4" cy="0.4" r="1.9" fill="#e4e4e7" stroke="#52525b" {...lw(0.7)} />
-          <circle cx="87.6" cy="-1.4" r="1.4" fill="#f4f4f5" stroke="#52525b" {...lw(0.7)} />
-          <circle cx="87.4" cy="1.6" r="1.1" fill="#f4f4f5" stroke="#52525b" {...lw(0.7)} />
+        <Pivot x={83.4} y={-1.6} cls="ia-puff">
+          <circle cx="83.6" cy="-2" r="1.7" fill="#cfd0d6" stroke="#3f3f46" {...lw(0.7)} />
+          <circle cx="85.4" cy="-3.2" r="1.25" fill="#e4e4e7" stroke="#3f3f46" {...lw(0.7)} />
+          <circle cx="82" cy="-3.6" r="1" fill="#e4e4e7" stroke="#3f3f46" {...lw(0.7)} />
         </Pivot>
       )}
     </g>
@@ -1263,7 +1263,7 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   antlers: [26, -4, 48, 22],
   "santa-beard": [36, 18, 28, 28],
   snowman: [16, 6, 68, 88],
-  "gift-tube": [65, 15, 34, 86],
+  "gift-tube": [65, 10, 34, 91],
   "fire-ice-crown": [30, -6, 40, 34],
   present: [31, 1, 38, 41],
   "candy-cane": [60, 12, 38, 88],
@@ -1282,7 +1282,7 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   "dark-shades": [36, 24, 28, 11],
   "smiley-face": [34, 13, 32, 32],
   "suit-and-tie": [20, 15, 60, 76],
-  "tommy-gun": [60, 12, 40, 84],
+  "tommy-gun": [60, 8, 40, 88],
   "fake-mustache": [37, 27, 26, 11],
   fedora: [29, 8, 42, 20],
   briefcase: [61, 55, 34, 36],

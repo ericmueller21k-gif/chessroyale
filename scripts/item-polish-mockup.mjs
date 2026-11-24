@@ -36,6 +36,30 @@ if (still !== undefined) {
   console.log(`saved ${name}`);
 }
 
+/** Films one element of a page from 0 to `seconds` into `${out}/${name}.gif`. */
+async function film(query, sel, seconds, name) {
+  await page.goto(`${url}?${query}`);
+  await page.waitForTimeout(1200);
+  const el = page.locator(sel).first();
+  const dir = `${out}/frames-${name}`;
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir);
+  const fps = 15;
+  const n = Math.round(seconds * fps);
+  for (let i = 0; i < n; i++) {
+    await seek((i * 1000) / fps);
+    await el.screenshot({ path: `${dir}/${String(i).padStart(4, "0")}.png` });
+  }
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", `${dir}/%04d.png`, "-vf", "split[a][b];[a]palettegen=stats_mode=full[p];[b][p]paletteuse=dither=none", "-loop", "0", `${out}/${name}.gif`]);
+  rmSync(dir, { recursive: true, force: true });
+  console.log(`saved ${out}/${name}.gif (${n} frames)`);
+}
+// `close=name~def~colors~seconds~extra` (repeatable): a close-up, the item's card and a pawn wearing it at 240 px.
+for (const c of args.filter((a) => a.startsWith("close=")).map((a) => a.slice(6).split("~"))) {
+  const [name, def, colors, seconds, extra = ""] = c;
+  await film(`big=${def}&colors=${colors}${extra}`, "#app > div", Number(seconds), name);
+}
+
 /** Each section's GIF: its length (one whole cycle of what it shows, in seconds). */
 const LENGTH = { crown: 6, cane: 6, tube: 6.5, parrot: 6, tommy: 7, pirate: 9 };
 for (const id of (arg("gif", "") || "").split(",").filter(Boolean)) {
@@ -58,8 +82,10 @@ for (const id of (arg("gif", "") || "").split(",").filter(Boolean)) {
 
 if (arg("fps")) {
   // Every section at once, running, with the CPU slowed 4x: frames drawn in 10 s and the longest gap between two.
+  // (`fps=only=crown` measures one section; `still=` aside, `motion=reduce` measures with the animations off, for a baseline.)
   const cdp = await page.context().newCDPSession(page);
-  await page.goto(url);
+  if (arg("motion") === "reduce") await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(`${url}?${arg("fps") === "1" ? "" : arg("fps")}`);
   await page.waitForTimeout(1500);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   const r = await page.evaluate(
@@ -78,7 +104,7 @@ if (arg("fps")) {
         requestAnimationFrame(tick);
       }),
   );
-  console.log(`4x CPU: ${(r.frames / r.seconds).toFixed(1)} fps over ${r.seconds.toFixed(1)} s, p95 gap ${r.p95.toFixed(1)} ms, worst ${r.worst.toFixed(1)} ms, ${r.animations} animations running`);
+  console.log(`${arg("fps")} ${arg("motion", "")} 4x CPU: ${(r.frames / r.seconds).toFixed(1)} fps over ${r.seconds.toFixed(1)} s, p95 gap ${r.p95.toFixed(1)} ms, worst ${r.worst.toFixed(1)} ms, ${r.animations} animations running`);
 }
 await browser.close();
 await server.close();

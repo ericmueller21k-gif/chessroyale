@@ -8813,53 +8813,32 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
 }
 /* The Fire & Ice Crown: three flames, each flickering at its own pace; a glow that breathes; an ember now and then. */
 .ia-flame {
-  animation: ia-flicker 2.9s ease-in-out infinite;
+  animation: ia-flicker 5s ease-in-out infinite;
 }
 .ia-flame.f1 {
-  animation-duration: 2.5s;
-  animation-delay: -0.8s;
+  animation-delay: -0.35s;
 }
 .ia-flame.f3 {
-  animation-duration: 2.7s;
-  animation-delay: -1.9s;
+  animation-delay: -0.7s;
 }
+/* (Each burst of flicker is followed by a rest: a fire that never stops repaints every frame, Nov 24's 4x CPU measure.) */
 @keyframes ia-flicker {
   0%,
+  56%,
   100% {
     transform: scale(1, 1) skewX(0deg);
   }
-  30% {
+  12% {
     transform: scale(0.95, 1.07) skewX(-3deg);
   }
-  55% {
+  24% {
     transform: scale(1.03, 0.95) skewX(2deg);
   }
-  80% {
-    transform: scale(0.97, 1.04) skewX(-1.2deg);
+  36% {
+    transform: scale(0.97, 1.05) skewX(-1.5deg);
   }
-}
-.ia-core {
-  animation: ia-core 1.7s ease-in-out infinite;
-}
-@keyframes ia-core {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-.ia-glow {
-  animation: ia-glow 3.4s ease-in-out infinite;
-}
-@keyframes ia-glow {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
+  46% {
+    transform: scale(1.01, 0.98) skewX(0.8deg);
   }
 }
 .ia-ember {
@@ -9049,7 +9028,7 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   88%,
   100% {
     opacity: 0;
-    transform: translate(4px, -1px) scale(1.9);
+    transform: translate(0.5px, -3.5px) scale(1.7);
   }
 }
 /* (The Pirate Hat, optional: its skull winks every 9 seconds.) */
