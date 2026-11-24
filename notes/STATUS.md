@@ -1930,3 +1930,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~21:20: #922 CI GREEN on 7da3d019, NOT merged: Eric dislikes the "charge" build-up. Local edit in $S/wt-cr (uncommitted): swell
   removed (cue + piece), charge removed from boxShake (knocks kept); unit + app typecheck pass. Audio-only clips sent (rare, legendary).
   WAITING on Eric's OK, then commit/push, CI, merge.
+- Nov 24 ~21:35: ERIC approved no-charge → pushed 9150c3ff on #922, CI bx16k39j1, then merge. ERIC: per-tier stings (common=uncommon;
+  rare/epic/legendary/mythic own; a Transcendent moment), rename Fischer Random → "Transcendent" (crates only, not the chess variant), new
+  Transcendent crate tile art (art runner: ASKED Eric for spend ~$5 cap). Helper step 1 = audio only (brief crate-tier-stings). Bonus
+  crate (xhigh) after these.
