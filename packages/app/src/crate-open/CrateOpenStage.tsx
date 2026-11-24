@@ -306,13 +306,11 @@ export function BonusStage({ children }: { children: ComponentChildren }) {
     at(beam, [{ opacity: 1 }, { opacity: 0.35 }], BONUS.cardAt + BONUS.cardMs, 500, { fill: "forwards", easing: "ease-out", composite: "replace" });
     const card = $(".cox-card");
     at(card, [{ visibility: "hidden" }, { visibility: "visible" }], BONUS.cardAt, 1, { easing: "steps(1, start)" });
+    // (The focus to its OK once the card shows (a hidden button takes none): a dialog takes it. The review, Nov 25; the item's buttons
+    // under it are inert meanwhile.)
+    out[out.length - 1]!.finished.then(() => card.querySelector<HTMLElement>("button")?.focus({ preventScroll: true })).catch(() => undefined);
     at(card, [{ opacity: 0, transform: reduced ? "none" : "translateY(40px) scale(0.86)" }, { opacity: 1, transform: "none" }], BONUS.cardAt, BONUS.cardMs, { easing: "cubic-bezier(.2,1.3,.4,1)" });
-    // (The focus to its OK as the card shows: a dialog takes it. The review, Nov 25; the item's buttons under it are inert meanwhile.)
-    const focus = setTimeout(() => card.querySelector<HTMLElement>("button")?.focus({ preventScroll: true }), BONUS.cardAt + 40);
-    return () => {
-      clearTimeout(focus);
-      out.forEach((a) => a.cancel());
-    };
+    return () => out.forEach((a) => a.cancel());
   }, []);
   return (
     <div class="cox-stage cox-bonus" ref={stage} style={{ "--tier": "#fbbf24", "--power": "0.55", "--lid": "0.5" }} data-testid="crate-bonus">

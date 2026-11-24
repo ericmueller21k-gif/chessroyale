@@ -322,3 +322,63 @@ test("crates: a bonus crate's card after the item's, the crate and its key in th
   await layer.getByRole("button", { name: "▶ Done" }).click();
   expect(await locker()).toMatchObject({ seriesCrates: {}, bonusCrates: {}, keys: 0 });
 });
+
+/**
+ * The bonus card can't be skipped or tapped through (the review, Nov 25). M2: "Done" tapped as the item's card forms (before the bonus
+ * card's beat) shows the bonus card instead of closing, and the crate stays unseen until its OK. M1: a double tap on OK (it sits over
+ * "Open another") closes the bonus card and opens nothing: the item's buttons stay inert a beat; then the focus is back on them.
+ */
+test("crates: the bonus card can't be skipped by a fast Done, and a double tap on its OK opens no other crate", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await named(page, "Fast Opener");
+  await giveCrates(page, "beta-001", 2, 2);
+  await page.goto("/shop?crates&bonus=winter-1");
+  await page.locator('.crate-row[data-crate="beta-001"]').click();
+  await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
+  const layer = page.getByTestId("crate-opening");
+  const item = layer.locator(".reveal-card:not(.cox-bonus-card)");
+  const bonus = page.getByTestId("crate-bonus");
+  // M2: Done the moment the item's card has formed (in the page, on the frame it does: well inside the bonus card's 700 ms beat).
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const tick = () => {
+          const card = document.querySelector<HTMLElement>(".crate-opening .reveal-card:not(.cox-bonus-card)");
+          const button = [...(card?.querySelectorAll<HTMLButtonElement>(".reveal-actions button") ?? [])].find((b) => b.textContent?.includes("Done"));
+          if (card && button && getComputedStyle(card).visibility === "visible" && getComputedStyle(card).opacity === "1" && !document.querySelector('[data-testid="crate-bonus"]')) {
+            button.click();
+            done();
+          } else requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+  );
+  await expect(bonus.getByRole("dialog", { name: "Bonus crate" })).toBeVisible();
+  await expect(layer, "Done showed the bonus first, not closing").toBeVisible();
+  // (Unseen until its OK: leave now and both wait for you.)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("hunchess-crate-unseen") ?? "null")?.bonus)).toEqual({ crate: "winter-1", key: true });
+  const ok = bonus.getByRole("button", { name: "▶ OK" });
+  await expect(ok, "the dialog takes the focus").toBeFocused();
+  // M1: OK, then at once a second tap on "Open another" (a Beta Crate and a key are left, so it's live). OK sits over it or over Done
+  // (as the item's words wrap them), so a double tap on OK lands there.
+  await bonus.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((x) => x.finished)));
+  const [o, a] = [(await ok.boundingBox())!, (await item.getByRole("button", { name: "▶ Open another" }).boundingBox())!];
+  const name = await item.locator(".reveal-name").textContent();
+  await page.mouse.click(o.x + o.width / 2, o.y + o.height / 2);
+  await page.mouse.click(a.x + a.width / 2, a.y + a.height / 2);
+  await expect(bonus).toHaveCount(0);
+  await page.waitForTimeout(1000);
+  await expect(item.locator(".reveal-name"), "the same item's card, no new opening").toHaveText(name!);
+  await expect(layer.locator(".cox-status")).toHaveText("");
+  type LockerNow = { seriesCrates: Record<string, number>; bonusCrates: Record<string, number>; keys: number };
+  expect(await page.evaluate(async () => (await (await fetch("/api/locker")).json()) as LockerNow)).toMatchObject({
+    seriesCrates: { "beta-001": 1, "winter-1": 1 },
+    bonusCrates: { "winter-1": 1 },
+    keys: 2,
+  });
+  expect(await page.evaluate(() => localStorage.getItem("hunchess-crate-unseen")), "seen once its OK is tapped").toBeNull();
+  // The focus back on the item's card (its first button), which works again.
+  await expect(item.getByRole("button", { name: "▶ Wear" })).toBeFocused();
+  await item.getByRole("button", { name: "▶ Done" }).click();
+  await expect(layer).toHaveCount(0);
+});
