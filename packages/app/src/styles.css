@@ -28658,39 +28658,36 @@ piece.bd-smashed {
   height: calc(var(--board-size, 100%) / 8);
   z-index: 8;
   pointer-events: none;
-  opacity: 0.7;
-  animation: bd-sign 1.8s ease-in-out infinite;
+  /* (A hard blink, no fade, Eric Nov 24: shown half of BIRDIE_SIGN.blinkMs, hidden half; its duration set on the element.) */
+  animation: bd-sign 1.2s step-end infinite;
 }
+/* (Its piece picked up, selected or dragged: hidden, back blinking once it's set down. Birdie.tsx WarnSign.) */
+.bd-sign[data-held] {
+  visibility: hidden;
+}
+/* Small in the square's top-right corner (about a third of it), so the piece stays readable. */
 .bd-sign > svg {
   position: absolute;
-  left: 8%;
-  top: 6%;
-  width: 84%;
-  height: 84%;
+  right: 3%;
+  top: 3%;
+  width: 36%;
+  height: 36%;
   overflow: visible;
-  filter: drop-shadow(0 0 calc(var(--board-size, 360px) / 80) #ffd400) drop-shadow(0 0 calc(var(--board-size, 360px) / 32) rgba(255, 190, 0, 0.95));
-}
-.bd-sign-edge {
-  fill: #261d05;
-  stroke: #261d05;
-  stroke-width: 18;
-  stroke-linejoin: round;
 }
 .bd-sign-face {
   fill: #ffcc12;
-  stroke: #ffcc12;
-  stroke-width: 4;
-  stroke-linejoin: round;
+  stroke: #1a1405;
+  stroke-width: 9;
+  stroke-linejoin: miter;
 }
 .bd-sign-mark {
-  fill: #261d05;
+  fill: #1a1405;
 }
 @keyframes bd-sign {
-  0%,
-  100% {
-    opacity: 0.6;
+  0% {
+    opacity: 1;
   }
   50% {
-    opacity: 0.8;
+    opacity: 0;
   }
 }

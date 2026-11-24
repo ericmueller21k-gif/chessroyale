@@ -1,0 +1,22 @@
+# Birdie's train rides even when you saved the piece, and misses (Nov 24, 2026)
+
+Eric: "we still need to show the birdie driving his train across the board animation, even when there's no pieces to hit. He just simply drives across and then everything misses."
+- Whenever his warning comes due (not once the game is over, at the move cap or with the battle decided), the train rides the warned line. If your move saved the piece, the ride misses: the board is unchanged, nothing is taken off, every piece on the line steps aside, and there's no sign, smash or smash sound. The dock says "Birdie: Nothing hit!". Timing, the hold of his move (solo and online), his fall after it, the judge and fair play are unchanged.
+- *(mine)* The miss is `trainSmash` with `missed: true`, not a new event kind. It's the same ride, so every place that times or holds a ride (`birdieTurnMs`, `POWER_FX`, the lobby's hold, solo's beats) already covers it with no new path. This follows the sparing's `fizzled`.
+- *(mine)* The dock's ride lines are now "Knight smashed!", "Bishop spared." and "Nothing hit!". The test phone's dock line is 196 px wide, and the old "His train hit your knight." and "The train spared your bishop." were cut off there: about 218 and 253 px, from their widths in the app's font, scaled by two lines measured in that dock. The new ones leave at least 21 px to spare, and the e2e checks the smash's and the miss's on screen.
+- *(mine)* The piece counts as saved when your move started on its square, or when the square no longer holds your piece of the warned kind. Another piece of yours standing there is never smashed in its place. With one boss that can't happen in a single move. On a floor with several bosses, another boss's power could in principle put a piece there (no such case was checked).
+
+## Fewer chirps, train sounds only on the ride (added Nov 24)
+
+Eric: "I think he's doing a little too much chirping and the train noises. Let's really make it so he can chirp at the start of the game, and I would say cap the chirping to, you know, maybe once every 5 of his moves at most. ... his train noise is really, let's just keep it for when the train actually crosses".
+- His train's whistles and horns play only on his ride: the pull and toot as he departs, and the roll and brake as he comes back. His move's whistle, a capture's or a check's toot-long, the warning's whistle, the battle start's roll and brake, and the fall cutscene's approach toot are silent. The crossing's bell stays. No sound is deleted; only what plays changed.
+- Chirps: his hello at the battle's start. After that, one chirp on his 1st move and then every 5th (`BIRDIE_SOUND_EVERY` [5], was [3, 4]), and it's that move's own: a capture's trill, a check's teeoo, else the nod. His victory, defeat and fall are unchanged.
+- *(mine)* His idle chatter, his smug teeoo and his hurt scold are silent: they don't fall on his own move, so they never get the one chirp. His return from a ride has no hello, since that would be a chirp after the start.
+- *(mine)* The kit's `cueSound` also gets the animation's name, because the `oof` cue is in both his hurt (now silent) and his defeat (unchanged).
+
+## The warning sign redone (added Nov 24)
+
+Eric: "an actual straight triangle, like the actual railroad crossing sign looks ... no longer see-through, and it simply like blinks on and off ... it doesn't need to do a fade even. It just blinks every like ... second or second and a half. But then when you tap your piece, it stops blinking ... if you set your piece back down, it keeps blinking there ... make sure that whatever that actual object is there is like totally non-tappable".
+- The sign is a straight-edged yellow triangle with a black border and a black "!", fully opaque. It blinks hard on and off with no fade (`BIRDIE_SIGN.blinkMs`, 1.2 s: 0.6 s on, 0.6 s off). It's hidden while its piece is selected or dragged, blinks again once the piece is set down, and never takes a tap. Its look is Eric's call now.
+- *(mine)* It's 36% of the square wide, in the square's top-right corner as the board is seen, 3% in from the edges. That corner is where a piece's drawing is emptiest, so the piece stays readable. The old glow is gone.
+- *(mine)* "Picked up" is read from the board itself: the piece's `dragging` class, or the board's selected square sitting on the piece's square. The sign watches its board with a MutationObserver, because a tap redraws the board but not his layer. The shared board is unchanged.

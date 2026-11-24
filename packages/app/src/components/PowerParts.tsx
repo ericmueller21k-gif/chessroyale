@@ -34,6 +34,8 @@ export interface Moment {
   /** A wave of fireballs: their squares, in the order they land; those that fizzled (the crowd's king stood there). */
   squares?: string[];
   fizzled?: string[];
+  /** Birdie's train rode a line whose piece your move saved: nothing hit (Nov 24). */
+  missed?: true;
   /** Hollow's first cover of the dark. */
   first?: true;
   /** Hollow's block of the dark: its size (2 or 3). */
@@ -101,7 +103,7 @@ export interface MomentUi {
    * line under its name). Left out: the dock keeps the turn's own line (the boss's move). Never the power's name: the
    * banner names it, and the boss's bubble is his character (DECISIONS.md, "Nothing said twice").
    */
-  dock?: (m: Pick<Moment, "kind" | "squares" | "fizzled" | "shape">) => string | null;
+  dock?: (m: Pick<Moment, "kind" | "squares" | "fizzled" | "shape" | "missed">) => string | null;
   /** When what it puts on a square appears there (ms, wall clock); undefined: it puts nothing on that square. */
   appearAt?: (m: Moment, square: string, orientation: "white" | "black") => number | undefined;
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */

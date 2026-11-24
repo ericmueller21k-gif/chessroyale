@@ -877,7 +877,7 @@ export interface SuperFreezeState {
 export interface BirdieState {
   next: number;
   warn: { turn: number; line: string; squares: string[]; square: string; piece: string } | null;
-  ride?: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true } | null;
+  ride?: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true; missed?: true } | null;
   fell?: { at: number } | null;
 }
 
@@ -1838,8 +1838,9 @@ export type PowerEventKind =
   | "dodge"
   | "dodgeWin"
   // Birdie (Nov 23): his train's warning on a line (as the crowd's turn after his move begins: `square` the piece, `squares` the line
-  // in the order the train rides it); the train, at the start of his turn when the crowd's move left the piece there (`trainSmash`:
-  // `fizzled` [the square] when it spared it, the smash not legal); his train on your king (`trainWin`: the battle his); and his fall
+  // in the order the train rides it); the train, at the start of his turn whenever the warning comes due (`trainSmash`: the piece left
+  // there smashed; `fizzled` [the square] when it spared it, the smash not legal; `missed` when the crowd's move saved it, Eric Nov 24:
+  // the same ride, nothing hit); his train on your king (`trainWin`: the battle his); and his fall
   // (`birdieFall`, at the start of his turn: the cutscene, then Armored Birdie).
   | "trainSignal"
   | "trainSmash"
@@ -1854,6 +1855,8 @@ export interface PowerEvent {
   squares?: string[];
   /** Of those, the ones that fizzled as they landed (the crowd's king stood there): no fire tile. */
   fizzled?: string[];
+  /** Birdie's train rode a warned line whose piece your move saved (Nov 24): the same ride, nothing hit. */
+  missed?: true;
   /** Hollow's first cover of the dark (the square of the piece he just moved, with his first-cover line). */
   first?: true;
   /** Hollow's block of the dark: 2 (a 2 x 2) or 3 (his 3 x 3). */

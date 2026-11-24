@@ -110,7 +110,8 @@ export function prewarmBirdieFall(): void {
 }
 
 /** Each picture's sound as it starts (his own: birdie-sounds.ts): the wind of his fall, his train's horn, the clank of his armor. */
-const PICTURE_SOUND: Record<SheetAnim, SoundName | null> = { fall: "birdieWhoosh", approach: "birdieToot", reveal: "birdieClank", hold: null };
+// (The approach's toot silent since Nov 24: his train's whistles and horns only on his ride, Eric.)
+export const PICTURE_SOUND: Record<SheetAnim, SoundName | null> = { fall: "birdieWhoosh", approach: null, reveal: "birdieClank", hold: null };
 /** The pictures whose sound has played, by moment and picture (a screen drawn again never plays one twice). */
 const sounded = new Set<string>();
 

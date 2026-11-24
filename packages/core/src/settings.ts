@@ -2633,6 +2633,13 @@ export const MOO_CINEMATIC = {
 export const BIRDIE_RIDE = { rideMs: 1950 } as const;
 
 /**
+ * Birdie's warning sign on the marked piece (components/Birdie.tsx WarnSign, `.bd-sign`): how long one blink takes, ms, shown half of it
+ * and hidden half, hard on and off with no fade. Eric, Nov 24: "it simply like blinks on and off ... it doesn't need to do a fade even.
+ * It just blinks every like ... second or second and a half" (docs/decisions/2026-11-24-birdie-train-miss.md): 0.6 s on, 0.6 s off.
+ */
+export const BIRDIE_SIGN = { blinkMs: 1200 } as const;
+
+/**
  * Birdie's fall (Eric, Nov 23: "A cinematic like Moo's Full Moon: it takes the same space on screen as Moo's, about 6 to 7 s long. A cut
  * to a close-up: he falls out of his spot on the board… he tumbles through the air like a bird falling from a great height… the
  * background is blurred, with wind and speed lines… a train track comes into view below, and his own train barrels toward him…
@@ -2695,14 +2702,14 @@ export const BIRDIE_CINEMATIC = {
 export const BIRDIE_ULT = { theme: "birdie-ult", pieceAt: 300, introMs: 14815, lineAt: 1780, soloMoveLeadMs: 2500 } as const;
 
 /**
- * How often Birdie's ordinary moves are heard (Eric, Nov 23: "the train sounds happen too often and the chirping in game for birdie, make
- * it only like every 3-4 of his moves, you hear those"; docs/decisions/2026-11-23-birdie-cadence-warning.md). His move's whistle and the
- * chirp over it sound on his first move, then this many of his moves apart, in turn (3, 4, 3, 4 ...: his 1st, 4th, 8th, 11th, 15th ...),
- * counted by his move's number, so every device hears the same moves; his idle chirps on your turn only after a move of his that was
- * heard. The other moves: only the board's own move sound. A capture or a check is heard every time (its toot-long and his chirp), and his
- * entrance, his power, his ride and his fall are unchanged (kits.ts, birdieCue).
+ * How often Birdie chirps (Eric, Nov 24: "I think he's doing a little too much chirping and the train noises. Let's really make it so he
+ * can chirp at the start of the game, and I would say cap the chirping to, you know, maybe once every 5 of his moves at most";
+ * docs/decisions/2026-11-24-birdie-train-miss.md; was [3, 4], Nov 23). His hello at the battle's start, then one chirp on his first move and
+ * then this many of his moves apart, in turn (5: his 1st, 6th, 11th ...), counted by his move's number, so every device hears the same
+ * moves. On such a move, one chirp: his move's own (a capture's trill, a check's teeoo, else the nod). The other moves: only the board's
+ * own move sound. His train's whistles and horns only on his ride; his victory, defeat and fall unchanged (kits.ts, birdieCue).
  */
-export const BIRDIE_SOUND_EVERY: readonly number[] = [3, 4];
+export const BIRDIE_SOUND_EVERY: readonly number[] = [5];
 
 /**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards

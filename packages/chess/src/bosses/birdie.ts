@@ -8,9 +8,13 @@
  *   piece, your king too (`trainSignal`: his `signal` and the crossing on every square of the line). Only a piece your move can save:
  *   it has a move this turn, and the smash would be legal now (not the last shield of your king, not a piece in front of his pawn
  *   about to promote). No line fits: it waits a turn. Several fit: the battle's seed picks (powerRoll), the same on every device.
- * - Your move moves that piece (any move of it, a capture, a promotion, castling with it): it's saved, and the warning ends. Any other
- *   move leaves it there, and at the start of his turn (as your move lands: afterCrowdMove) his train rides the line and smashes it
- *   (`trainSmash`; a base on the board); his own pieces on the line step aside as it passes (on screen only). Your king left there:
+ * - Your move moves that piece (any move of it, a capture, a promotion, castling with it): it's saved, and the warning ends; his train
+ *   still rides the line at the start of his turn and misses (Eric, Nov 24: "He just simply drives across and then everything misses":
+ *   `trainSmash` with `missed`, the board unchanged, every piece on the line stepping aside). Any other move leaves it there, and at the
+ *   start of his turn (as your move lands: afterCrowdMove) his train rides the line and smashes it (`trainSmash`; a base on the board);
+ *   his own pieces on the line step aside as it passes (on screen only). Saved means the warned piece itself left the square: your move
+ *   started there, or the square no longer holds your piece of the warned kind; never another piece of yours that stands there. Your
+ *   king left there:
  *   the train smashes it and the battle is his (`trainWin`; the board unchanged, the result "boss" whatever it says). A smash that
  *   would leave a position no game can have (your king open to his piece, his king checked by the gap, a promotion handed to him, no
  *   move left for him) spares the piece (`trainSmash` with `fizzled`): the train rides by. Nothing rides once the game is over on the
@@ -42,7 +46,7 @@ type BirdieSettings = BossPowerSettings["birdie"];
  * them the same), so the server and solo wait for the board's train too:
  * - **trainSignal** (as the crowd's turn after his move begins): his `signal` (1500 ms), its `signal` cue (his wave's top) at
  *   `lightAt`: the crossing lights up on every square of the line, and stays through the crowd's turn.
- * - **trainSmash** (at the start of his turn, while he thinks): his `depart` (960 ms: he ducks in and the train pulls away, its `go`
+ * - **trainSmash** (at the start of his turn, while he thinks; the same when it misses): his `depart` (960 ms: he ducks in and the train pulls away, its `go`
  *   cue at 290), then from `rideAt` the train crosses the board along the line in `rideMs` (BIRDIE_RIDE.rideMs; from one
  *   board's edge to past the other, `trackSquares` squares of travel: the board's eight, its own length and a square of run-in), the
  *   pieces on the line stepping
@@ -309,8 +313,11 @@ export const birdieArmored = (p: Pick<BossPowerState, "birdie"> | null | undefin
 export interface BirdieView {
   /** The warning now: the line, its squares in riding order, the crowd's piece on it and its kind, and the crowd turn it's for. */
   warn: { turn: number; line: string; squares: string[]; square: string; piece: string } | null;
-  /** His train's last ride (after crowd move `at`): the piece it smashed, spared or (your king) won the battle with. */
-  ride: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true } | null;
+  /**
+   * His train's last ride (after crowd move `at`): the piece it smashed, spared or (your king) won the battle with; `missed`: your move
+   * saved it (`square` and `piece` the warned ones), the same ride with nothing hit.
+   */
+  ride: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true; missed?: true } | null;
   /** He fell after crowd move `fell` (Armored Birdie from then); null: not yet. */
   fell: number | null;
   /**
@@ -389,8 +396,8 @@ export const BIRDIE: BossRules = {
     rank: (boss, top, fen) => trainRanked(top, fen, trainSquare(boss), boss.crowdSide),
     evaluation: (boss, evaluation, fen) => trainJudged(evaluation, fen, trainSquare(boss), boss.crowdSide),
   },
-  afterCrowdMove(b) {
-    birdieBattle.afterCrowdMove(b);
+  afterCrowdMove(b, move) {
+    birdieBattle.afterCrowdMove(b, move);
   },
   // (Several bosses: another boss's power took the warned piece away outside a move: the warning goes with it.)
   followBoard(b) {
@@ -432,11 +439,12 @@ export function armoredBrain(plan: BrainNow, s: Pick<BirdieSettings, "armoredMai
 
 export const birdieBattle = {
   /**
-   * After the crowd's move (him to move): the warning for this move answered (the piece moved: saved), or his train on it (a smash, a
-   * sparing, your king); then his fall when it's due (fallLost lost, the admins' trigger, the test switch). Nothing once the battle is
-   * decided, the game over on the board, or at the move cap. Each a base on the board where it changes it; the events in that order.
+   * After the crowd's move (`move`, UCI; null: none played) with him to move: his train on the warned line whenever the warning for
+   * this move is due (a smash, a sparing, your king; the piece moved, saved: the same ride, missing, `missed`: Eric, Nov 24); then his
+   * fall when it's due (fallLost lost, the admins' trigger, the test switch). Nothing once the battle is decided, the game over on the
+   * board, or at the move cap. Each a base on the board where it changes it; the events in that order.
    */
-  afterCrowdMove(b: Battle, s: BirdieSettings = BOSS_POWERS.birdie): void {
+  afterCrowdMove(b: Battle, move: string | null = null, s: BirdieSettings = BOSS_POWERS.birdie): void {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || boss.id !== "birdie") return;
@@ -447,8 +455,16 @@ export const birdieBattle = {
     const events: PowerEvent[] = [];
     let ride: BirdieState["ride"] = bd.ride ?? null;
     if (w && !over) {
-      const out = trainOutcome(board.fen, w.square, boss.crowdSide);
-      if (out) {
+      // (Saved: the warned piece left its square, your move started there or the square no longer holds your piece of its kind. Another
+      // piece of yours standing there after it is never the warned one: the train misses it too.)
+      const on = pieceAt(board.fen, w.square);
+      const saved = (!!move && from(move) === w.square) || on?.color !== boss.crowdSide || on.type !== w.piece;
+      const out = saved ? null : trainOutcome(board.fen, w.square, boss.crowdSide);
+      if (!out) {
+        // (The miss, Eric Nov 24: the same ride on the same line, the board unchanged, no base; `square` and `piece` the warned ones.)
+        ride = { at: boss.crowdMoves, line: w.line, squares: [...w.squares], square: w.square, piece: w.piece, missed: true };
+        events.push({ kind: "trainSmash", turn: p.turn, square: w.square, squares: [...w.squares], ...(w.piece !== "k" ? { shape: w.piece as BalloonShape } : {}), missed: true });
+      } else {
         const line = { line: w.line, squares: [...w.squares], square: w.square, piece: out.piece };
         ride = { at: boss.crowdMoves, ...line, ...(out.king ? { king: true as const } : {}), ...(out.spared ? { spared: true as const } : {}) };
         if (out.king) events.push({ kind: "trainWin", turn: p.turn, square: w.square, squares: [...w.squares] });
