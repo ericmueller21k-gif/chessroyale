@@ -18,8 +18,10 @@ Read CLAUDE.md, `.claude/LESSONS.md`, `docs/rules/eric.md`, `docs/areas/shop.md`
    admins-first (`BOSS_ADMIN_FIRST`/`adminFirst`: it would leak unreleased content), except for admins; the crate just opened may come up.
    The pool is built from the lists, so a new crate joins it with no change.
 3. **The grant:** the bonus crate goes into your inventory (boss crates into your boss crates, regular ones where crates go), plus one crate
-   key when that crate opens with a key. A bonus crate opened later can roll its own bonus (that's fine: about 1.33 openings per crate on
-   average). Guests: as their inventory works today. `PAUSE_REWARDS`/the shop's kill switch: as the open route already does.
+   key when that crate opens with a key. **A bonus crate can't roll a bonus** (Eric, Nov 24: "flag if a crate came from another crate so ... you can't just keep
+   crating into other crates"): the crate is stored as a bonus one (a flag or a separate count per crate kind: the smallest change to the
+   existing storage; a migration if needed), and opening it never rolls the 25%. Holding both kinds of the same crate, the ordinary ones
+   open first (the player keeps their bonus chance), the bonus ones after. The flag survives a guest signing in and the account export. Guests: as their inventory works today. `PAUSE_REWARDS`/the shop's kill switch: as the open route already does.
 4. **Shown:** after the item's reveal card, a second card "BONUS!" with the crate (its art) and "+1 key" if given, in the new open's style
    (a short beam in gold; reuse the overhaul's pieces). Each crate's odds panel adds one plain line: "Every opening: 25% chance of a bonus
    crate (any crate, chosen evenly) and its key." The FAQ's crates section says the same. The inventory updates at once.
