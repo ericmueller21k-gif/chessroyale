@@ -52,6 +52,21 @@ const light = () =>
     pool: lightImg(128, 128, [255, 206, 112], round),
     glow: lightImg(96, 96, [255, 248, 214], round),
   });
+/**
+ * MOCKUP (claude/crate-open-mockup): the light's own sprites in another color, for the crate opening's beam in an item's tier color.
+ * The same shapes as `light()` (the ray, the shaft, the pool, the glow), made once per color and stretched by CSS.
+ */
+export function lightSprites(rgb: readonly [number, number, number]) {
+  const white = (k: number) => rgb.map((v) => Math.round(v + (255 - v) * k)) as unknown as [number, number, number];
+  return {
+    ray: lightImg(48, 192, white(0.55), beam(0.22, 1.4, 0.14)),
+    tinted: lightImg(48, 192, rgb, beam(0.3, 1.1, 0.16)),
+    shaft: lightImg(96, 192, white(0.05), beam(0.7, 0.75, 0.04)),
+    core: lightImg(48, 192, white(0.7), beam(0.5, 0.6, 0.02)),
+    pool: lightImg(128, 128, rgb, round),
+    glow: lightImg(96, 96, white(0.6), round),
+  };
+}
 function streak(g: Ctx, img: Sprite, x0: number, y0: number, x1: number, y1: number, wx: number, wy: number, alpha: number) {
   if (alpha < 0.01) return;
   g.save();
