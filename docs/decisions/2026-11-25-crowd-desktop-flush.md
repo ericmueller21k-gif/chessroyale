@@ -7,3 +7,5 @@ Eric (Nov 25, a 50 v 50 at 2000 px): the move line "should be centered and proba
 - The gap over the chat was the reveal's vote results (six bars, the result, its note: 259 px). Call: keep that place as one fixed slot (nothing shifts at the reveal) but with thinner bars, 206 px, so the chat starts 56 px higher.
 - Eric (later, Nov 25): the scoreboard "literally the same height as the chessboard": its table's top on the board's squares' top too
   (`--side-pad` from board-foot.ts), its bottom on the board's line as before.
+- Scope (director, Nov 25): the scoreboard's and chat's lines apply to the 50 v 50 only (Eric's screen); a Boss Battle raid keeps its
+  own column as before (`board-layout.spec.ts` pins it).

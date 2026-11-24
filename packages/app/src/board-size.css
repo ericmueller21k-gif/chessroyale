@@ -182,13 +182,14 @@
     display: flex;
   }
 
-  .arena:not(.sq-arena) > .tower-side {
+  /* (The 50 v 50 only: a raid keeps its own column, board-layout.spec.ts.) */
+  .arena:not(.sq-arena):has(> .screen.game.crowd-50) > .tower-side {
     max-height: var(--side-foot, var(--app-h));
     /* (Its table's top on the board's squares' top: the scoreboard as tall as the board, Eric, Nov 25. board-foot.ts.) */
     padding-top: var(--side-pad, 14px);
     padding-bottom: 0;
   }
-  .arena > .screen.game:not(:has(> .boss-dock)) > .under-board.side {
+  .arena > .screen.game.crowd-50:not(:has(> .boss-dock)) > .under-board.side {
     align-self: start;
     height: var(--chat-foot, auto);
     min-height: 0;
