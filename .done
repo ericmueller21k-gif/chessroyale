@@ -1,1 +1,0 @@
-fix round: Open another's hidden card fixed in the app (CrateOpening resets in one update; CrateStage re-arms); the first-run click timeout was --repeat-each's parallel copies sharing the admin email. See .pr-body.md.
