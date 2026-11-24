@@ -28,6 +28,7 @@ const seek = (ms) =>
 const still = arg("still");
 if (still !== undefined) {
   // (`query=big=fire-ice-crown&colors=red` films the drawing page instead; `name=` names the PNG.)
+  if (arg("motion") === "reduce") await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(`${url}?${arg("query", "")}`);
   await page.waitForTimeout(1200);
   const name = `${out}/${arg("name", "all")}-${still}s.png`;
