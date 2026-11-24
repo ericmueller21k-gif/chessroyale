@@ -1031,14 +1031,19 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   and the stepping pieces' `animation-delay` fixed as each is first drawn (`Timed`), as his layer redraws every frame and a delay set
   anew from each frame's `now` retimes the running animation (the train crossed at twice its speed, then stood still off the board); his
   sounds his own (`birdie-sounds.ts`; 2026-11-23-birdie-sounds.md): his voice seven chirps and his move
-  five train whistles (2026-11-23-birdie-whistles.md), synthesized from the music helper's recipes (`stills/trailer-v2`); a move's
-  whistle picked by `birdieWhistle`: the double toot for most moves, one toot for one square, the long blast for five or more, toot-long
-  on a capture or check, the peep-peep about one move in five (from the move and his move's number), a chirp over its start; his
-  ordinary move's whistle and chirp only on his heard moves (Eric, Nov 23: "only like every 3-4 of his moves": his 1st, then 3, 4, 3, 4
-  apart, `BIRDIE_SOUND_EVERY`, `birdieHeard`), a capture or check every time; three
-  puffing runs kept for his entrance, his ride, the town's ride loop and his challenge's wipe; `hello` his entrance and his challenge (`SELECT_SOUND`). A
-  kit's `cueSound(cue, boss, yourTurn)` picks a cue's sound from the battle (null: silent); his loops' chirps only on your turn after a
-  heard move of his, never as your move lands. The warning sign on the marked piece (`WarnSign` in Birdie.tsx, `.bd-sign`: a yellow
+  five train whistles (2026-11-23-birdie-whistles.md), synthesized from the music helper's recipes (`stills/trailer-v2`). **Since Nov 24
+  (Eric: "a little too much chirping and the train noises"; 2026-11-24-birdie-train-miss.md)**:
+  - His train's whistles and horns play only on his ride: the depart's `pull` and `go`, and the `roll` and `brake` of his return from it.
+    His move's whistle (`run`, `birdieWhistle`'s pick kept but unheard), a capture's or a check's toot-long, the warning's conductor's
+    whistle, the battle start's roll and brake, and his fall cutscene's approach toot are silent. The crossing's bell stays.
+  - His hello (`tip`) is heard at the battle's start only (and his challenge, `SELECT_SOUND`).
+  - After that, one chirp on each of his heard moves (his 1st, then every 5th: `BIRDIE_SOUND_EVERY` [5], `birdieHeard`), from that
+    move's animation: a capture's trill, a check's teeoo, else the nod. His chatter, his smug teeoo and his hurt scold are silent. His
+    victory, defeat and fall are unchanged.
+  - The three puffing runs are kept for his ride, the town's ride loop and his challenge's wipe.
+
+  A kit's `cueSound(cue, boss, yourTurn, anim)` picks a cue's sound from the battle (null: silent); `anim` is the animation the cue is
+  in, since his `oof` sounds in his hurt (silent) and his defeat (heard). The warning sign on the marked piece (`WarnSign` in Birdie.tsx, `.bd-sign`: a yellow
   triangle in SVG over its square, 60 to 80% opaque (36 to 50% read faint on the cream squares: the director, Nov 23), its opacity pulsing, its glow drawn once; from the crossing's light until the drawn
   board no longer has the piece there, or his train reaches it). Tests: `app/test/birdie-sounds.test.ts`. His train on your king ends the battle: the runner's
   `stageComplete`/`finishBossBattle` read `trainWon`, and the board holds `powerWinShowMs` for the ride before the result (solo

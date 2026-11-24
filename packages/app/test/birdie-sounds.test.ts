@@ -6,14 +6,15 @@ import { BIRDIE_SOUNDS, RIDE_PACE, birdieSound, birdieWhistle, type BirdieSound 
 import { BOSS_KITS, birdieCue, birdieHeard } from "../src/characters/kits.ts";
 import { SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { cueAt } from "../src/characters/power-art.ts";
+import { PICTURE_SOUND } from "../src/components/BirdieFall.tsx";
 import { MOVE_MEAN_DB, MOVE_PEAK, soundCache } from "../src/characters/synth.ts";
 
 /**
  * Birdie's voice and his train (Eric, Nov 23; docs/decisions/2026-11-23-birdie-sounds.md, 2026-11-23-birdie-whistles.md): seven chirps,
  * three train runs and five whistles built in code from the music helper's recipes (`stills/trailer-v2`: birdie-chirps/, birdie-train/),
  * each under a piece's move, a chirp over a move's whistle still under it and reading over it; his move's whistle picked by how far his
- * piece goes, a capture or a check, and now and then the peeps; his ordinary move heard only every 3 or 4 of his moves (Nov 23,
- * BIRDIE_SOUND_EVERY), a capture or a check every time; his ride's run as long as his (slower) ride.
+ * piece goes, a capture or a check, and now and then the peeps; since Nov 24 his train's whistles and horns only on his ride, and one
+ * chirp at most every 5 of his moves (BIRDIE_SOUND_EVERY), his move's own; his ride's run as long as his (slower) ride.
  */
 
 const RATE = 44100;
@@ -132,65 +133,92 @@ describe("Birdie's sounds", () => {
     expect(peeps / n).toBeLessThan(0.25);
   });
 
-  it("his cues from the battle: the whistle his move's, his chirps in turn by his move's number; each made ahead in his kit", () => {
+  it("his cues from the battle (Eric, Nov 24): no whistle on his moves, one chirp per heard move, his move's own; each made ahead in his kit", () => {
     const at = (...history: string[]) => ({ board: { history } }) as Parameters<typeof birdieCue>[1];
     // (After `n` moves each: his move's number n.)
     const after = (n: number, last = "g8f6") => at(...Array.from({ length: 2 * n - 1 }, () => "e2e4"), last);
-    // (His move's whistle from his last move and his move's number: 1 after one move each, 4 after four; both heard moves.)
-    expect(birdieCue("run", at("e2e4", "e7e6"))).toBe(own(birdieWhistle("e7e6", false, 1)));
-    expect(birdieCue("run", after(4, "a8a3"))).toBe(own(birdieWhistle("a8a3", false, 4)));
-    // (Old: his 2nd move's whistle too; Nov 23: his 2nd and 3rd are silent, BIRDIE_SOUND_EVERY.)
-    expect(birdieCue("run", at("e2e4", "a7a6", "d2d4", "a8a3"))).toBeNull();
-    const heard = new Set(Array.from({ length: 40 }, (_, k) => birdieCue("run", after(k + 1))).filter((x) => x !== null));
-    expect([...heard].sort()).toEqual(["birdieWhistlePeepPeep", "birdieWhistleTootToot"]);
-    // (Old: his 1st and 2nd nods' chirps; now his 1st and 4th, the next heard.)
-    expect(birdieCue("nod", after(1, "e7e5"))).not.toBe(birdieCue("nod", after(4, "b8c6")));
-    expect(birdieCue("chatter", at("e2e4", "e7e5"))).toBeTruthy();
-    expect(birdieCue("tootRun", at("e2e4", "e7e5"))).toBeUndefined();
-    // (His chatter and his smug teeoo only on your turn: as your move lands and is judged, only the board's knock.)
-    expect(birdieCue("chatter", at("e2e4", "e7e5"), false)).toBeNull();
-    expect(birdieCue("coo", at("e2e4", "e7e5"), false)).toBeNull();
-    expect(birdieCue("coo", at("e2e4", "e7e5"), true)).toBeUndefined();
-    // (Each sound a heard move can play is made ahead with the rest of his kit. Old: his moves 1 to 6, each heard; now the silent ones
-    // are null, and of 1 to 6 his 1st and 4th are heard.)
+    // (Old: his move's whistle on his heard moves, by how far it went; Nov 24: never, his train's whistles only on his ride.)
+    for (let n = 1; n <= 12; n++) for (const cue of ["run", "tootRun", "signal"]) expect(birdieCue(cue, after(n, "a8a3")), `${cue} ${n}`).toBeNull();
+    // (His nods' chirps on his 1st and 6th moves, the heard ones, in turn.)
+    expect(birdieCue("nod", after(1, "e7e5"))).not.toBe(birdieCue("nod", after(6, "b8c6")));
+    // (Old: his chatter and his smug teeoo on your turn after a heard move; Nov 24: silent, one chirp a heard move, his move's own.)
+    for (const yours of [true, false]) for (const cue of ["chatter", "coo"]) expect(birdieCue(cue, at("e2e4", "e7e5"), yours), cue).toBeNull();
+    // (Each sound a heard move can play is made ahead with the rest of his kit; of 1 to 6, his 1st and 6th are heard.)
     const sounds = new Set(Object.values(kit.sounds));
-    for (let n = 1; n <= 6; n++)
-      for (const [cue, last] of [["run", "a1a2"], ["run", "a1a4"], ["run", "a1a8"], ["nod", "a1a2"], ["chatter", "a1a2"]] as const) {
-        const got = birdieCue(cue, after(n, last));
-        expect(got === null ? null : sounds.has(got), `${cue} ${n}`).toBe(n === 1 || n === 4 ? true : null);
-      }
+    for (let n = 1; n <= 6; n++) {
+      const got = birdieCue("nod", after(n));
+      expect(got === null ? null : sounds.has(got), `nod ${n}`).toBe(n === 1 || n === 6 ? true : null);
+    }
   });
 
-  it("his ordinary move heard only every 3 or 4 of his moves (Eric, Nov 23), the same on every device; a capture or a check every time", () => {
-    expect(BIRDIE_SOUND_EVERY).toEqual([3, 4]);
+  it("his chirps at most once every 5 of his moves (Eric, Nov 24), the same on every device; a capture's or a check's chirp in the same budget", () => {
+    expect(BIRDIE_SOUND_EVERY).toEqual([5]);
     const at = (...history: string[]) => ({ board: { history } }) as Parameters<typeof birdieCue>[1];
-    // (His move's number n: n moves each, his last a quiet one of two squares. With him White, his move's number is one less than his
-    // count (his first is 0): his 2nd move is heard first, then the same gaps.)
     const after = (n: number) => at(...Array.from({ length: 2 * n - 1 }, () => "e2e4"), "g8f6");
     const heardAt = Array.from({ length: 30 }, (_, k) => k + 1).filter((n) => birdieHeard(n));
-    // His 1st, then 3, 4, 3, 4 ... of his moves apart.
-    expect(heardAt.slice(0, 7)).toEqual([1, 4, 8, 11, 15, 18, 22]);
-    const gaps = heardAt.slice(1).map((n, i) => n - heardAt[i]!);
-    expect(gaps.every((g, i) => g === (i % 2 ? 4 : 3)), `gaps ${gaps}`).toBe(true);
-    // (A battle from the game so far: whatever his move's number, never more than 4 of his moves without a heard one.)
-    for (let n = 0; n < 60; n++) expect([0, 1, 2, 3].some((d) => birdieHeard(n + d)), `from ${n}`).toBe(true);
+    // His 1st, then every 5th.
+    expect(heardAt).toEqual([1, 6, 11, 16, 21, 26]);
+    // (Never two heard moves within 5 of his moves.)
+    for (let n = 0; n < 60; n++) expect([0, 1, 2, 3, 4].filter((d) => birdieHeard(n + d)).length, `from ${n}`).toBeLessThanOrEqual(1);
+    // Each of his moves, played as a plain move, a capture or a check: the chirps it makes (its animation's cues, through his cueSound).
+    const CHIRPS = new Set(["birdieHello", "birdieTsip", "birdieTeeoo", "birdieTrill", "birdieCheer", "birdieAsk", "birdieScold"]);
+    const chirpsOf = (anim: string, n: number) =>
+      BIRDIE_FIGURE.anims[anim]!.frames.flatMap((f) => {
+        if (!f.cue) return [];
+        const pick = kit.cueSound!(f.cue, after(n) as never, false, anim);
+        const sound = pick === null ? null : (pick ?? kit.sounds[f.cue]);
+        return sound && CHIRPS.has(sound) ? [sound] : [];
+      });
     for (let n = 1; n <= 30; n++) {
       const heard = birdieHeard(n);
-      // The whistle and the chirp over it on a heard move; on the others, nothing (only the board's own move sound).
-      expect(birdieCue("run", after(n)) !== null, `run ${n}`).toBe(heard);
-      expect(birdieCue("nod", after(n)) !== null, `nod ${n}`).toBe(heard);
-      // His chirps at rest on your turn only after a heard move of his; never as your move lands.
-      expect(birdieCue("chatter", after(n), true) !== null, `chatter ${n}`).toBe(heard);
-      expect(birdieCue("coo", after(n), true) !== null, `coo ${n}`).toBe(heard);
-      expect(birdieCue("chatter", after(n), false)).toBeNull();
-      // A capture or a check: his kit's toot-long and chirp, on every move of his.
-      for (const cue of ["tootRun", "trill", "flash"]) expect(birdieCue(cue, after(n)), `${cue} ${n}`).toBeUndefined();
+      for (const anim of ["move", "capture", "check", "p_move", "p_capture", "p_check"]) expect(chirpsOf(anim, n).length, `${anim} ${n}`).toBe(heard ? 1 : 0);
+      // (A capture's trill, a check's teeoo, else the nod: the event's own.)
+      if (heard) {
+        expect(chirpsOf("capture", n)).toEqual(["birdieTrill"]);
+        expect(chirpsOf("check", n)).toEqual(["birdieTeeoo"]);
+      }
+      // (His hurt's scold silent; his defeat's and his victory's unchanged.)
+      expect(chirpsOf("hurt", n)).toEqual([]);
+      expect(chirpsOf("p_hurt", n)).toEqual([]);
+      expect(chirpsOf("defeat", n)).toEqual(["birdieScold"]);
+      expect(chirpsOf("victory", n)).toEqual(["birdieCheer"]);
       // (The same answer every time: from his move's number, never a random draw.)
-      expect(birdieCue("run", after(n))).toBe(birdieCue("run", after(n)));
+      expect(birdieCue("nod", after(n))).toBe(birdieCue("nod", after(n)));
     }
-    expect(kit.sounds.tootRun).toBe("birdieWhistleTootLong");
     expect(kit.sounds.trill).toBe("birdieTrill");
     expect(kit.sounds.flash).toBe("birdieTeeoo");
+  });
+
+  it("his train's whistles and horns only on his ride (Eric, Nov 24): its pull and toot as he departs, its roll and brake as he's back; nowhere else", () => {
+    const TRAIN = new Set(["birdieTrainMedium", "birdieTrainLong", "birdieTrainToot", "birdieToot", "birdieWhistle", "birdieBrake", "birdieWhistleToot", "birdieWhistleTootToot", "birdieWhistleLong", "birdieWhistleTootLong", "birdieWhistlePeepPeep"]);
+    // (A turn with his ride among its events, and one without: the battle's start.)
+    const rode = { board: { history: ["e2e4", "e7e5", "d2d4"] }, powers: { turn: 2, events: [{ kind: "trainSmash", turn: 2 }] } };
+    const start = { board: { history: [] }, powers: { turn: 1, events: [] } };
+    const heardOf = (anim: string, boss: object) =>
+      BIRDIE_FIGURE.anims[anim]!.frames.flatMap((f) => {
+        if (!f.cue) return [];
+        const pick = kit.cueSound!(f.cue, boss as never, false, anim);
+        const sound = pick === null ? null : (pick ?? kit.sounds[f.cue]);
+        return sound ? [sound] : [];
+      });
+    // The ride: he ducks in and it pulls away (its long run, its toot); back from it, the train rolls in and brakes.
+    expect(heardOf("depart", rode)).toEqual(["birdieTrainLong", "birdieToot"]);
+    expect(heardOf("entrance", rode).filter((x) => TRAIN.has(x))).toEqual(["birdieTrainMedium", "birdieBrake"]);
+    // (His hello only at the battle's start: his hop, then "hello", the train silent; back from a ride, no hello.)
+    expect(heardOf("entrance", start)).toEqual(["birdieHop", "birdieHello"]);
+    expect(heardOf("entrance", rode)).not.toContain("birdieHello");
+    // Every other animation of his, on any of his moves, his ride's turn or not: never a train sound.
+    const anims = Object.keys(BIRDIE_FIGURE.anims).filter((a) => a !== "depart" && a !== "entrance");
+    for (const anim of anims)
+      for (const n of [1, 2, 6])
+        for (const powers of [rode.powers, start.powers]) {
+          const boss = { board: { history: Array.from({ length: 2 * n }, () => "e2e4") }, powers };
+          expect(heardOf(anim, boss).filter((x) => TRAIN.has(x)), `${anim} ${n}`).toEqual([]);
+        }
+    // (His fall's cutscene: its whoosh and his armor's clank, no toot as the train comes.)
+    expect(Object.values(PICTURE_SOUND).filter((x) => x && TRAIN.has(x))).toEqual([]);
+    expect(PICTURE_SOUND.fall).toBe("birdieWhoosh");
+    expect(PICTURE_SOUND.reveal).toBe("birdieClank");
   });
 
   it("his ride's run lasts his (slower) ride: from its pull as he departs to the train's tail past the board, its steam as it leaves", () => {
