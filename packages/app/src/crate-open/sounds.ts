@@ -209,7 +209,7 @@ function boxShake(rate: number, T: Timeline, out: Float32Array, from: number) {
  * - Common and Uncommon: one shared sting, today's (the chord strummed over a small crack, boom and whoosh; a few glints).
  * - Rare: brighter (a step up), with a shimmer: the chord's upper notes held an octave up, trembling.
  * - Epic: fuller (a bass octave under the chord), and a rising arpeggio after the burst.
- * - Legendary: the big chord with a choir under it and a bell tolling.
+ * - Legendary: bright and triumphant (Eric, Nov 24): the big chord, a choir above it, a chime run climbing to a high ding.
  * - Mythic: the biggest, its own color: a fanfare's chord change (the flat sixth, the flat seventh, home), the choir and the bell on
  *   home, and a sparkle cascade falling over it.
  */
@@ -287,6 +287,11 @@ function bell(rate: number, f: number, sec: number): Float32Array {
   return fadeOut(partials(rate, sec, f, [[0.5, 0.55, 2.6], [1, 1, 1.9], [1.19, 0.4, 1.2], [1.5, 0.3, 0.9], [2, 0.38, 0.8], [2.52, 0.2, 0.45], [3, 0.16, 0.3], [4.07, 0.1, 0.18]], 0.001), rate, 0.3);
 }
 
+/** A bright chime (harmonic partials only, so it rings major). */
+function chime(rate: number, f: number, sec: number): Float32Array {
+  return fadeOut(partials(rate, sec, f, [[1, 1, 0.45], [2, 0.3, 0.2], [3, 0.12, 0.1], [4, 0.06, 0.06]], 0.001), rate);
+}
+
 /** A few glints high up, as the light catches. */
 function glints(dry: Float32Array, rate: number, count: number, spread: number) {
   const r = rng(71);
@@ -308,9 +313,12 @@ function sting(rate: number, tier: ItemTier, out: Float32Array, at: number) {
     strum(dry, rate, root, [0.5, ...CHORD], 0, 0.018, 0.2, s.sec);
     [1, 1.26, 1.5, 2, 2.52, 3, 4, 5.04].forEach((m, i) => mix(dry, rate, stingNote(rate, root * m, 0.8, 0.45), 0.16 + i * 0.06, 0.09 + 0.006 * i));
   } else if (tier === "legendary") {
-    strum(dry, rate, root, [0.5, ...CHORD, 3], 0, 0.022, 0.2, s.sec);
-    choir(dry, rate, root, [0.5, 0.63, 0.75, 1], 0.03, s.sec);
-    mix(dry, rate, bell(rate, root, s.sec), 0.01, 0.2);
+    // Bright and triumphant (Eric, Nov 24: the first one sounded "depressing"): the big chord, a choir above it (not under), a chime
+    // run climbing over it and a high ding at its top (all major: no bell's minor third, no slow toll).
+    strum(dry, rate, root, [0.5, ...CHORD, 3], 0, 0.02, 0.2, s.sec);
+    choir(dry, rate, root, [1, 1.26, 1.5, 2], 0.05, s.sec);
+    [2, 2.24, 2.52, 3, 3.36, 4, 4.49, 5.04, 6].forEach((m, i) => mix(dry, rate, chime(rate, root * m, 0.7), 0.08 + i * 0.045, 0.07));
+    mix(dry, rate, chime(rate, root * 8, 1.2), 0.08 + 9 * 0.045, 0.08);
   } else {
     // Mythic: the fanfare's change (bVI, bVII, then home), the choir and the bell on home, the sparkles falling over it.
     const home = 0.46;
@@ -422,6 +430,25 @@ function make(name: string, rate: number): Float32Array {
  */
 const LEVEL = 0.92 * 10 ** (-4 / 20);
 
+/**
+ * The endings' own level (dB, after the limiter), so every one plays a few dB under the spin's ticks (Eric, Nov 24: the endings "hurt
+ * my ears a little bit"; "a little bit quieter than the ticking sound"). Measured with EBU R128 (ffmpeg's ebur128, momentary max) on
+ * the offline render: the ticks peak at -15.8 LUFS; the stings sit 3 to 5 dB under (Common -21, climbing to Mythic -19), the
+ * Transcendent moment -19.5, the box's land and knocks about 7 dB under, and every ending's peak under the ticks' peak.
+ * docs/decisions/2026-11-24-crate-tier-stings.md. (A sting's own sound changed: re-measure, `scripts/render-crate-stings.ts`.)
+ */
+const ENDING_DB: Record<string, number> = {
+  land: -2,
+  transcendent: -3.7,
+  "sting-common": -7.4,
+  "sting-uncommon": -7.4,
+  "sting-rare": -7.9,
+  "sting-epic": -8.1,
+  "sting-legendary": -7.9,
+  "sting-mythic": -9,
+};
+const endingGain = (name: string) => 10 ** ((ENDING_DB[name] ?? (name.startsWith("shake-") ? -2 : 0)) / 20);
+
 /** Every piece but the tiers' (the worker makes them ahead as an Open is tapped; a tier's shake and sting once the roll is in). */
 export const CRATE_SOUNDS: readonly string[] = [
   "whirr",
@@ -438,7 +465,8 @@ export function crateSound(name: string, rate: number): Float32Array {
   const key = `${name}@${rate}`;
   let s = cache.get(key);
   if (!s) {
-    s = make(name, rate).map((v) => LEVEL * Math.tanh(1.2 * v));
+    const g = LEVEL * endingGain(name);
+    s = make(name, rate).map((v) => g * Math.tanh(1.2 * v));
     cache.set(key, s);
   }
   return s;
