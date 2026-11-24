@@ -523,14 +523,14 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           else if (e.kind === "queenShot") chandy.shots.push({ at: e.turn, piece: (e as { shape?: string }).shape ?? null });
         }
       };
-      // (Birdie: each warning (after which crowd move, the piece), each ride (smashed, spared or your king), his fall, and the material
-      // he had lost by then.)
-      const birdie = { warns: [] as { at: number; piece: string }[], rides: [] as { at: number; piece: string; spared?: true; king?: true }[], fell: null as number | null, lostAtFall: null as number | null };
+      // (Birdie: each warning (after which crowd move, the piece), each ride (smashed, spared, missed: the piece saved, or your king), his
+      // fall, and the material he had lost by then.)
+      const birdie = { warns: [] as { at: number; piece: string }[], rides: [] as { at: number; piece: string; spared?: true; king?: true; missed?: true }[], fell: null as number | null, lostAtFall: null as number | null };
       const birdieLook = () => {
         const bd = runner.boss?.powers?.birdie;
         if (!bd) return;
         if (bd.warn && !birdie.warns.some((w) => w.at === bd.warn!.turn)) birdie.warns.push({ at: bd.warn.turn, piece: bd.warn.piece });
-        if (bd.ride && !birdie.rides.some((x) => x.at === bd.ride!.at)) birdie.rides.push({ at: bd.ride.at, piece: bd.ride.piece, ...(bd.ride.spared ? { spared: true as const } : {}), ...(bd.ride.king ? { king: true as const } : {}) });
+        if (bd.ride && !birdie.rides.some((x) => x.at === bd.ride!.at)) birdie.rides.push({ at: bd.ride.at, piece: bd.ride.piece, ...(bd.ride.spared ? { spared: true as const } : {}), ...(bd.ride.king ? { king: true as const } : {}), ...(bd.ride.missed ? { missed: true as const } : {}) });
         if (bd.fell && birdie.fell === null) {
           birdie.fell = runner.boss!.crowdMoves;
           ults.push({ kind: "fall", turn: runner.boss!.crowdMoves });

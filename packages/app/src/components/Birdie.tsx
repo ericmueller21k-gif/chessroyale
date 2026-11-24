@@ -24,7 +24,9 @@ import { InPlace, PIECE_WORD, type BoardLayerProps, type BossUi, type Moment, ty
  * - **His train** (`trainSmash`, at the start of his turn as your move lands, while he thinks): he ducks into his cab and it pulls away
  *   (his `depart`, in his spot), then the train rides the line across the board from his side, every piece on the line stepping aside as
  *   it comes and back after its tail, and the piece you left there is smashed as the train's nose reaches it (the smash); spared (the
- *   smash wasn't legal), it steps aside too. He rolls back into his spot (his `entrance`).
+ *   smash wasn't legal), it steps aside too. He rolls back into his spot (his `entrance`). Your move saved the piece (`missed`, Eric,
+ *   Nov 24: "He just simply drives across and then everything misses"): the same ride, every piece on the line stepping aside, no sign,
+ *   no smash.
  * - **Your king** (`trainWin`): END OF THE LINE!, then the same ride, your king smashed: the battle is his.
  * - **His fall** (`birdieFall`, at the start of his turn, after the train if it rode), timed to his ult's piece (BIRDIE_ULT: the music
  *   switches as it starts, birdie-music.ts): he waits in his spot and says his line, then his `fall` in his spot, the cutscene
@@ -40,6 +42,8 @@ export const BIRDIE_WORDS = {
   move: (piece: string | undefined) => `Move your ${PIECE_WORD[piece ?? "k"] ?? "piece"}!`,
   smashed: (piece: string | undefined) => `His train hit your ${PIECE_WORD[piece ?? "p"] ?? "piece"}.`,
   spared: (piece: string | undefined) => `The train spared your ${PIECE_WORD[piece ?? "p"] ?? "piece"}.`,
+  /** Your move saved the piece and his train rode by anyway (Nov 24): never a word of a piece lost. */
+  missed: "Saved! His train hit nothing.",
   win: "END OF THE LINE!",
   winSub: "His train hit your king",
 } as const;
@@ -88,14 +92,14 @@ export function birdieTurnMoments(boss: BossView, now = Date.now()): Moment[] {
     .sort((a, b) => MOMENTS[a.kind as keyof typeof MOMENTS].order - MOMENTS[b.kind as keyof typeof MOMENTS].order)
     .map((e) => {
       const lead = bannerLeadMs(e.kind);
-      const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: [...e.squares] } : {}), ...(e.fizzled ? { fizzled: [...e.fizzled] } : {}), ...(e.shape ? { shape: e.shape } : {}) };
+      const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: [...e.squares] } : {}), ...(e.fizzled ? { fizzled: [...e.fizzled] } : {}), ...(e.missed ? { missed: true as const } : {}), ...(e.shape ? { shape: e.shape } : {}) };
       if (e.kind === "birdieFall") noteArmor(boss, m.at + B.fall.armorAt);
       t = m.at + m.ms;
       return m;
     });
 }
 
-/** His train's ride among the moments now (a smash, a sparing, or your king), or null. */
+/** His train's ride among the moments now (a smash, a sparing, a miss, or your king), or null. */
 const rideOf = (moments: readonly Moment[]) => moments.find((m) => m.kind === "trainSmash" || m.kind === "trainWin") ?? null;
 
 /** The kings on `squares` (never taken off a drawn board: code reading it as chess would refuse a position without one). */
@@ -105,7 +109,8 @@ const kingsOn = (fen: string, squares: readonly string[]) => squares.filter((sq)
  * The position the board shows during his train's ride (`fen`: the game's, the smash already made): the piece it smashes back on its
  * square until the ride begins; every piece on the line but a king off the board while it rides (the layer draws them stepping aside,
  * the smashed one until the train reaches it; a king stays, the train passing over it). `still`: the board doesn't animate those
- * changes. Null: no ride now (the position as it is). Your king smashed is hidden by its decor (birdieDecor), never taken off.
+ * changes. Null: no ride now (the position as it is). Your king smashed is hidden by its decor (birdieDecor), never taken off. A miss
+ * smashes nothing: the board as it is until the ride, then the line's pieces off while it rides, as ever.
  */
 export function birdieFen(boss: Pick<BossView, "id" | "crowdSide" | "crowdMoves" | "powers">, moments: readonly Moment[], now: number, fen: string): { fen: string; still: boolean } | null {
   if (boss.id !== "birdie") return null;
@@ -113,7 +118,7 @@ export function birdieFen(boss: Pick<BossView, "id" | "crowdSide" | "crowdMoves"
   const m = rideOf(moments);
   if (!m || !m.squares?.length || !ride) return null;
   const t = now - m.at;
-  const smashed = !ride.spared && !ride.king;
+  const smashed = !ride.spared && !ride.king && !ride.missed;
   if (t < B.ride.rideAt) return smashed ? { fen: withPiece(fen, ride.square, { color: boss.crowdSide, type: ride.piece }), still: true } : null;
   if (t < B.ride.backAt) {
     const kings = kingsOn(fen, m.squares);
@@ -142,11 +147,12 @@ export function birdieDecor(boss: Pick<BossView, "id" | "crowdSide" | "crowdMove
  * The pieces his layer draws on the line while his train rides (`at`: the ride's start on this screen), each with its square's place
  * along the line: every piece on it but a king (the board leaves them off: birdieFen; a king stays on the board, the train passing
  * over it), read from the rules' position (`fen`: the boss's board, never the drawn one, which has them off), the smashed one until
- * the train reaches it.
+ * the train reaches it. A miss: every piece on the line as it stands (the warned piece gone from its square, or stepping aside if it
+ * moved along the line).
  */
-export function ridePieces(fen: string, crowd: "w" | "b", ride: { square: string; piece: string; spared?: true }, squares: readonly string[], at: number, now: number): { square: string; i: number; color: "w" | "b"; type: string; smashed: boolean }[] {
+export function ridePieces(fen: string, crowd: "w" | "b", ride: { square: string; piece: string; spared?: true; missed?: true }, squares: readonly string[], at: number, now: number): { square: string; i: number; color: "w" | "b"; type: string; smashed: boolean }[] {
   return squares.flatMap((square, i) => {
-    const smashed = square === ride.square && !ride.spared;
+    const smashed = square === ride.square && !ride.spared && !ride.missed;
     const pc = smashed ? { color: crowd, type: ride.piece } : pieceAt(fen, square);
     if (!pc || pc.type === "k") return [];
     if (smashed && now >= at + trainReaches(i)) return [];
@@ -229,10 +235,11 @@ function birdieLayer({ boss, p, board, moments, now, orientation }: BoardLayerPr
     const t = now - ride.at;
     const rideAt = ride.at + B.ride.rideAt;
     const reach = (i: number) => rideAt + trainReaches(i);
-    // (The crossing until the train's nose reaches each square; the sign on the piece left there until it reaches it.)
+    // (The crossing until the train's nose reaches each square; the sign on the piece left there until it reaches it: none on a miss,
+    // the piece saved.)
     if (t < B.ride.backAt) items.push(...crossingItems(ride.squares, 0, reach, now));
     const marked = ride.squares.indexOf(bd.ride.square);
-    if (t < B.ride.backAt && marked >= 0 && now < reach(marked)) sign = { square: bd.ride.square, at: 0 };
+    if (!bd.ride.missed && t < B.ride.backAt && marked >= 0 && now < reach(marked)) sign = { square: bd.ride.square, at: 0 };
     if (t >= B.ride.rideAt && t < B.ride.backAt) {
       const first = drawnAt(ride.squares[0]!, orientation);
       const second = drawnAt(ride.squares[1]!, orientation);
@@ -282,8 +289,8 @@ function birdieLayer({ boss, p, board, moments, now, orientation }: BoardLayerPr
         </div>,
       );
     }
-    // The smash on the piece the train reaches (your king too), from that moment.
-    if (!bd.ride.spared) {
+    // The smash on the piece the train reaches (your king too), from that moment: none spared or missed (no shatter, no smash sound).
+    if (!bd.ride.spared && !bd.ride.missed) {
       const i = ride.squares.indexOf(bd.ride.square);
       if (i >= 0 && t >= B.ride.rideAt) smash.push({ square: bd.ride.square, name: "birdieSmash", since: reach(i) });
     }
@@ -339,7 +346,7 @@ function fallView({ moment }: MomentProps) {
  */
 const MOMENTS: Record<"trainSignal" | "trainSmash" | "trainWin" | "birdieFall", MomentUi> = {
   trainSignal: { order: 0, kit: "power", lineAt: B.signal.lightAt, dock: (m) => BIRDIE_WORDS.move(m.shape), view: signalView },
-  trainSmash: { order: 0, kit: "powerHit", dock: (m) => (m.fizzled?.length ? BIRDIE_WORDS.spared(m.shape) : BIRDIE_WORDS.smashed(m.shape)), view: rideView },
+  trainSmash: { order: 0, kit: "powerHit", dock: (m) => (m.missed ? BIRDIE_WORDS.missed : m.fizzled?.length ? BIRDIE_WORDS.spared(m.shape) : BIRDIE_WORDS.smashed(m.shape)), view: rideView },
   trainWin: { order: 0, kit: "powerHit", priority: () => CRITICAL, view: rideView },
   birdieFall: { order: 1, kit: "ultimate", lineAt: B.fall.lineAt, priority: () => CRITICAL, view: fallView },
 };

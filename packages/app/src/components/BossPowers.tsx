@@ -117,7 +117,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   return list.map((e) => {
     // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
     const lead = bannerLeadMs(e.kind);
-    const m: Moment = { kind: e.kind, key: momentKey(e.boss ?? boss.id, e), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.height ? { height: e.height } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}), ...(e.stage !== undefined ? { stage: e.stage } : {}), ...(e.unlock ? { unlock: e.unlock } : {}), ...(e.boss ? { boss: e.boss } : {}) };
+    const m: Moment = { kind: e.kind, key: momentKey(e.boss ?? boss.id, e), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.missed ? { missed: true as const } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.height ? { height: e.height } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}), ...(e.stage !== undefined ? { stage: e.stage } : {}), ...(e.unlock ? { unlock: e.unlock } : {}), ...(e.boss ? { boss: e.boss } : {}) };
     t += lead + m.ms;
     return m;
   });
@@ -201,7 +201,7 @@ export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | 
  * What a power's moment means for you, for the dock, where no banner says it; null otherwise (the dock keeps the turn's
  * own line). The banner names the power; the boss's bubble is his character.
  */
-export function dockLine(m: Pick<Moment, "kind" | "squares" | "fizzled">): string | null {
+export function dockLine(m: Pick<Moment, "kind" | "squares" | "fizzled" | "shape" | "missed">): string | null {
   return MOMENT_UI[m.kind].dock?.(m) ?? null;
 }
 
