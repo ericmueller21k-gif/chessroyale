@@ -1881,3 +1881,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~10:05: #916 Birdie train-miss + sounds + sign MERGED (993684b), deploy + main run watched. Power tips helper running.
 - Nov 24 ~10:30: #916 LIVE (993684b), main full run GREEN. Running: power tips helper (Opus high).
 - Nov 24 ~10:50: power tips DONE → #917 (5130e2d1; targeted), CI watched, stills sent (5 exchanges). No helpers running.
+- Nov 24 ~10:55: #917 RED: boss-speech.spec:124 (Boingo/Hollow tip lines held ~1.2 s past their time for the answer). FIXED BY ME
+  (4884debb: each line keeps its own time; spec + birdie tip check pass locally). CI bog9tqk0k.
