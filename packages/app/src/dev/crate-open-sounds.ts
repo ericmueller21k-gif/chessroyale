@@ -450,7 +450,7 @@ export function renderCrateClip(rate: number, c: CrateClip, from = 0, to?: numbe
   }
   let peak = 0;
   for (const v of clip) peak = Math.max(peak, Math.abs(v));
-  const g = peak > 0 ? 0.89 / peak : 1;
+  const g = peak > 0 ? 0.89 / peak : 1; console.log("g", c.tier, g.toFixed(3));
   for (let i = 0; i < clip.length; i++) clip[i]! *= g;
   return clip;
 }

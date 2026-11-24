@@ -3876,6 +3876,19 @@ export const GOD_KING_SHOP = false;
 export const CHAT_PACKS_SHOP = false;
 
 /**
+ * The crate opening (Nov 24; docs/decisions/2026-11-24-crate-open-build.md; app `crate-open/`). Presentation only: the roll, the odds
+ * and what's won are the server's.
+ */
+export const CRATE_OPEN = {
+  /**
+   * How long the strip spins (ms), each strip (a crate's, and Fischer Random's second). 4 s: the director's call from the mockup's
+   * recommendation (Nov 24; it was 6.2 s, 4.8 s for the second): "2.7 s is a little quick for a crate, and 6.2 s with the open's extra
+   * 3 s makes the whole thing long." One number, so Eric can change it.
+   */
+  spinMs: 4000,
+} as const;
+
+/**
  * The Shop tab's page (Eric, Nov 9: his mockup, our art; docs/decisions/2026-11-09-shop-page.md). Look only for now: no purchase is
  * wired (a tapped price says "Buying opens soon"); Stripe and coin purchases come next.
  */
