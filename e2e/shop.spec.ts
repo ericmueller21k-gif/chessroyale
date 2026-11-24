@@ -1306,18 +1306,32 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   expect(mine(locker)).toHaveLength(0);
   expect([locker.tokens, locker.keys, locker.bossCrates]).toEqual([{}, 0, { "boss-tiger": 2 }]);
 
-  // The inventory (the Crates tab): Babur's crate with the other crates, "You have 2"; Puddles' greyed, "You have none".
+  // The inventory (the Crates tab): Babur's crate with the other crates, "You have 2". "Show unowned" unchecked (Eric, Nov 24): only the
+  // boss crates you hold; checked, every one (Puddles' greyed, "You have none"), and remembered on this device.
   await page.goto("/shop?crates");
   const row = page.locator('.boss-crate-row[data-crate="boss-tiger"]');
   await expect(row).toContainText("Babur's Boss Crate");
   await expect(row).toContainText("You have 2");
   await expect(row).not.toHaveClass(/none/);
-  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toContainText("You have none");
-  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toHaveClass(/none/);
+  const unowned = page.getByRole("checkbox", { name: "Show unowned" });
+  await expect(unowned).not.toBeChecked();
+  await expect(page.locator(".boss-crate-row")).toHaveCount(1);
   if (SHOTS) {
-    await row.scrollIntoViewIfNeeded();
+    await unowned.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/inventory-boss-crates-${test.info().project.name}.png` });
   }
+  await unowned.check();
+  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toContainText("You have none");
+  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toHaveClass(/none/);
+  expect(await page.locator(".boss-crate-row").count()).toBeGreaterThan(1);
+  if (SHOTS) {
+    await row.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}/inventory-boss-crates-unowned-${test.info().project.name}.png` });
+  }
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "Show unowned" })).toBeChecked();
+  await page.getByRole("checkbox", { name: "Show unowned" }).uncheck();
+  await expect(page.locator(".boss-crate-row")).toHaveCount(1);
   // Open it as any crate opens: the strip spins, then the reveal (an item from Babur's crate).
   await row.click();
   await expect(page.locator(".crate-held")).toHaveText("You have 2.");

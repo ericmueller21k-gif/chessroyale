@@ -86,9 +86,20 @@ test.describe("the day's first home visit", () => {
     await seen;
     await page.waitForTimeout(1_000);
     await expect(dialog(page)).toHaveCount(0);
-    // A new day (this device last showed it yesterday): again.
+    // A new day (this device last showed it yesterday), but closed under 12 hours ago (Eric, Nov 24): still not by itself.
     const day = (await answer(page)).day;
     await page.evaluate((d) => localStorage.setItem("hunchess.quests.seenDay", String(d - 86_400_000)), day);
+    const due = page.waitForResponse((r) => r.url().endsWith("/api/quests"));
+    await page.reload();
+    await due;
+    await page.waitForTimeout(1_000);
+    await expect(dialog(page)).toHaveCount(0);
+    // (12 hours on: again.)
+    await page.evaluate(() => {
+      const at = JSON.parse(localStorage.getItem("hunchess.quests.closedAt") ?? "{}") as Record<string, number>;
+      for (const k of Object.keys(at)) at[k]! -= 13 * 3_600_000;
+      localStorage.setItem("hunchess.quests.closedAt", JSON.stringify(at));
+    });
     await page.reload();
     await expect(dialog(page)).toBeVisible({ timeout: 20_000 });
   });
@@ -180,6 +191,43 @@ test("a game that finishes quests: \"Quests +1,800\" under its XP, both rows don
 
 test.describe("quest progress back on home (Nov 10)", () => {
   test.use({ questsSeen: false });
+
+  test("closed: a move doesn't open it by itself for 12 hours (Eric, Nov 24); the Quests button does, and slides it", async ({ page }) => {
+    await homeWith(page, "warm-up:1,squad-up,regular:5", ["Warm Up", "Squad Up", "Regular"]);
+    const remembered = () => page.evaluate(() => Object.values(JSON.parse(localStorage.getItem("hunchess.quests.shown") ?? "{}").at ?? {}));
+    await expect.poll(remembered, { timeout: 20_000 }).toEqual([1, 0, 5]);
+    await entry(page).click();
+    await dialog(page).getByRole("button", { name: "Got it" }).click();
+    await expect(dialog(page)).toHaveCount(0);
+    // (A game moved Warm Up and the weekly since home last saw them: what this device remembers, one count back.)
+    const lastSawLess = () =>
+      page.evaluate(() => {
+        const v = JSON.parse(localStorage.getItem("hunchess.quests.shown")!) as { at: Record<string, number> };
+        for (const k of Object.keys(v.at)) if (v.at[k]! > 0) v.at[k]! -= 1;
+        localStorage.setItem("hunchess.quests.shown", JSON.stringify(v));
+      });
+    await lastSawLess();
+    const came = page.waitForResponse((r) => r.url().endsWith("/api/quests"));
+    await page.goto("/");
+    await came;
+    await page.waitForTimeout(1_000);
+    await expect(dialog(page)).toHaveCount(0);
+    expect(await remembered()).toEqual([0, 0, 4]);
+    // The button: open, sliding the moved rows to their counts.
+    await entry(page).click();
+    await expect(dialog(page).locator(".qo-count")).toHaveText(["1/3", "0/2", "5/10"], { timeout: 10_000 });
+    expect(await remembered()).toEqual([1, 0, 5]);
+    await dialog(page).getByRole("button", { name: "Got it" }).click();
+    // 12 hours on, a move opens it by itself again.
+    await lastSawLess();
+    await page.evaluate(() => {
+      const at = JSON.parse(localStorage.getItem("hunchess.quests.closedAt") ?? "{}") as Record<string, number>;
+      for (const k of Object.keys(at)) at[k]! -= 13 * 3_600_000;
+      localStorage.setItem("hunchess.quests.closedAt", JSON.stringify(at));
+    });
+    await page.goto("/");
+    await expect(dialog(page)).toBeVisible({ timeout: 20_000 });
+  });
 
   test("a game that moves quests: the overlay opens by itself and slides them one after another; a game that moves none: it doesn't open", async ({ page }) => {
     test.setTimeout(5 * 60_000);
