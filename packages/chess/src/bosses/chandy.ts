@@ -250,9 +250,11 @@ export function lockRank(fen: string, square: string, crowd: Side, board: Chess 
 }
 
 /**
- * The crowd's pieces he may lock (never the king or queen, nor `skip`), most capturable first (lockRank), among equals one he can take
- * now by a trade within chandy.huntLoss first (huntable: Nov 24, the hunt), then the more valuable, then the seed; the ones nothing
- * fits (rank 0) by their defenders, fewest first (Q5: nothing fits, the least defended anyway).
+ * The crowd's pieces he may lock (never the king or queen, nor `skip`): the free and under-defended first (lockRank 3, 2), then one he can
+ * take now by a trade within chandy.huntLoss (huntable: Nov 24, the hunt), then the rest by lockRank (1, 0); among equals the more
+ * valuable, then the seed; the ones nothing fits (rank 0) by their defenders, fewest first (Q5: nothing fits, the least defended anyway).
+ * (Huntable before rank 1: a re-lock ends a lock that's neither (lockEnds) because a huntable piece exists, so the passive's pick is
+ * that piece, never the same one again: the review of #915, a blocked pawn re-locked every turn.)
  */
 export function lockOrder(fen: string, crowd: Side, seed: number, n: number, skip: readonly string[] = [], s: Pick<ChandySettings, "huntLoss"> = BOSS_POWERS.chandy): string[] {
   const board = boardFor(fen);
@@ -261,7 +263,8 @@ export function lockOrder(fen: string, crowd: Side, seed: number, n: number, ski
   const rolled = piecesOf(fen, crowd)
     .filter((p) => p.type !== "k" && p.type !== "q" && !skip.includes(p.square))
     .map((p) => ({ ...p, rank: lockRank(fen, p.square, crowd, board, hits), hunt: huntable(fen, p.square, crowd, s, nets) ? 1 : 0, def: attackersOf(board, p.square, crowd).length, roll: powerRoll(seed, "lock", n, p.square) }));
-  return rolled.sort((a, b) => b.rank - a.rank || b.hunt - a.hunt || (a.rank === 0 ? a.def - b.def : 0) || VALUE[b.type]! - VALUE[a.type]! || a.roll - b.roll || (a.square < b.square ? -1 : 1)).map((p) => p.square);
+  const top = (r: number) => (r >= 2 ? r : 0);
+  return rolled.sort((a, b) => top(b.rank) - top(a.rank) || b.hunt - a.hunt || b.rank - a.rank || (a.rank === 0 ? a.def - b.def : 0) || VALUE[b.type]! - VALUE[a.type]! || a.roll - b.roll || (a.square < b.square ? -1 : 1)).map((p) => p.square);
 }
 
 /**
@@ -1214,6 +1217,8 @@ function followLocks(chandy: ChandyState, before: string, move: string): ChandyS
     const followed = was === "q" || was === "r" ? locksAfter(before, move, [{ square: c.aim.square, piece: was, at: 0 }])[0] : undefined;
     c.aim = followed && followed.piece === was ? { ...c.aim, square: followed.square } : null;
   }
+  // (The Lock-on Shot's lock lives only with its aim: an aim gone without firing takes it too (the review of #915).)
+  if (!c.aim && c.locks.some((l) => l.shot)) c.locks = c.locks.filter((l) => !l.shot);
   return c;
 }
 

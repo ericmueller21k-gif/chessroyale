@@ -201,7 +201,9 @@ describe("the locks (L1-L6)", () => {
       // (Only the Lock-on Shot's lock may have come: the piece its round would most likely hit, locked as its aim showed (Nov 24), no
       // hunting lock, and gone as it fired.)
       const events = r.boss!.powers!.events;
-      expect(events.some((e) => e.kind === "lockOn" && !events.some((x) => x.kind === "queenAim"))).toBe(false);
+      events.forEach((e, i) => {
+        if (e.kind === "lockOn" && !e.first) expect(events[i - 1]?.kind).toBe("queenAim");
+      });
       const marks: string[] = [];
       const move = await r.playBoss(undefined, async () => {
         // (The moment, before his move shows: the lock on the piece, still on the board.)
@@ -426,6 +428,29 @@ describe("the hunt (Eric, Nov 24: \"aggressively trying to capture a piece and u
     expect(lockEnds(hunted, "w", { moves: 5 }, l, S, true)).toBe(false);
     expect(lockEnds(hunted, "w", { moves: 8 }, l, S, true)).toBe(false);
     expect(lockEnds(hunted, "w", { moves: 9 }, l, S, true)).toBe(true);
+  });
+
+  it("ranks a piece he can trade for now ahead of a trapped one he can't take yet (the review of #915)", () => {
+    // (Your e4 pawn, blocked: his knight can reach d6 to attack it (rank 1), but nothing takes it now. Your c3 knight: his b5 knight
+    // takes it, your b2 pawn takes back, an even trade (huntable).)
+    const fen = "4k3/8/8/1n2p3/4P3/2N5/1P6/4K3 w - - 0 1";
+    expect(lockRank(fen, "e4", "w")).toBe(1);
+    expect(huntable(fen, "c3", "w")).toBe(true);
+    expect(lockOrder(fen, "w", 7, 5)[0]).toBe("c3");
+  });
+
+  it("a re-lock moves on to the piece he can hunt and stays there, never back to the one that got away (the review of #915)", async () => {
+    const r = battle(5);
+    await crowdMove(r);
+    // (Black to move, taught, his lock on your blocked e4 pawn (rank 1: nothing takes it now); your c3 knight he can trade for.)
+    onPosition(r, "4k3/8/8/1n2p3/4P3/2N5/1P6/4K3 b - - 0 1", "w", { taught: true, marked: 2, upgrades: 2, unlocked: ["beam", "shields"], locks: [{ square: "e4", piece: "p", at: 0 }], moves: 1 });
+    r.applyBossMove("e8d8");
+    expect(cOf(r).locks.map((l) => l.square)).toEqual(["c3"]);
+    // (A quiet move each and his turn again: the knight's lock stays, no new crosshair.)
+    await crowdMove(r, (_, allowed) => (allowed.includes("e1d1") ? "e1d1" : allowed[0]!));
+    r.applyBossMove("d8e8");
+    expect(cOf(r).locks.map((l) => l.square)).toEqual(["c3"]);
+    expect(r.boss!.powers!.events.filter((e) => e.kind === "lockOn")).toEqual([]);
   });
 
   it("his move after a lock got away: it goes and your most gettable piece is locked instead (re-lock), not a second lock beside it", async () => {

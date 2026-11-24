@@ -56,3 +56,14 @@ mostly waited, and his strongest move earned nothing. The bots' sim hid it: the 
   earned nothing).
 - The sim's Eric-like player still loses more pieces than Eric did (19 of 20 reached 5 upgrades before too), so real play will say
   more: `huntLoss` and `takeMargin` are the knobs.
+
+## After the review of #915
+
+- **Re-lock order.** `lockOrder` sorted by `lockRank` before huntable. A blocked pawn his knight could attack next move (rank 1, not huntable) beat a knight
+  he could trade for now (rank 0, huntable), so a re-lock ended the pawn's lock and locked the same pawn again every turn. The order is now: free and
+  under-defended pieces (rank 3, 2), then huntable ones, then the rest by rank. Tests in `chandy.test.ts` ("ranks a piece he can trade for now…",
+  "a re-lock moves on…") fail on the old order.
+- **The shot's lock goes with its aim.** An aim that ends without firing (`followLocks` clears it) now takes its `shot` lock too.
+- **The taught-capture test** now checks that a lock before his first two captures comes right after a Lock-on Shot's aim, not just anywhere after one.
+- **FAQ:** an escaped piece moves his crosshair only if he can trade for another piece; otherwise it stays until its turns run out.
+
