@@ -57,3 +57,22 @@ need the train horns for like any other spot right now."
    defeat and fall sounds are unchanged.
 8. Tests: update `packages/app/test/birdie-sounds.test.ts` / `boss-kits.test.ts` (old → new in the PR body); one focused check that no
    whistle plays on his ordinary moves and the ride's sounds still play. No new e2e spec.
+
+## Added Nov 24 ~08:50: the warning sign redone (same PR)
+
+Eric (Nov 24): "the yellow ... thing that shows which one of your pieces [it is] covers the piece too much ... maybe what it should be
+actually is ... an actual straight triangle, like the actual railroad crossing sign looks. So it's not like a rounded one, a straight one,
+and it's no longer see-through, and it simply like blinks on and off ... it doesn't need to do a fade even. It just blinks every like ...
+second or second and a half. But then when you tap your piece, it stops blinking. ... if you set your piece back down, it keeps blinking
+there. ... it'll stop blinking while you're holding the piece. ... make sure that whatever that actual object is there is like totally
+non-tappable, and you tap whatever's behind it."
+
+9. **The sign (`.bd-sign`, #911's):** a straight-edged warning triangle (sharp corners, not rounded), solid yellow with a black border and
+   a black "!", fully opaque (no see-through). Small enough not to hide the piece: about a third of the square, in the square's top-right
+   corner (your call on the exact size and corner; record it), so the piece stays readable. It blinks hard on/off, no fade: shown about
+   0.6 s, hidden about 0.6 s (one `steps` animation; the period in one constant, Eric's "every second or second and a half"). While the
+   warned piece is picked up (selected by a tap, or being dragged) the sign is hidden; set back down on its square (deselected without
+   moving) it blinks again; moved, it's gone as today. `pointer-events: none` stays (taps go to the piece; e2e: a tap on the sign's spot
+   selects the piece). Replace #911's opacity check in `e2e/birdie.spec.ts` (old → new in the PR body): opaque, the blink's on/off states,
+   hidden while the piece is selected, back after deselecting. Docs and decision note updated (the sign's look is Eric's call now).
+   Stills: the sign on and off on the phone, and with the piece selected.
