@@ -62,7 +62,10 @@ export type KingCue =
   | "rushAsk"
   | "rushWell"
   // Don Dough's dough landing on the board (Nov 11).
-  | "dough";
+  | "dough"
+  // Chandy's Lock-on Shot aimed (Nov 24): at your queen, or at a rook.
+  | "shotQueen"
+  | "shotRook";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   // One of these as the battle begins (Eric, Oct 9: one opening line, from a much bigger pool).
@@ -149,6 +152,11 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   ],
   // Don Dough's lump landing on the board (Nov 11): once a drop.
   dough: ["Squash it before it rises!"],
+  // Chandy's Lock-on Shot, as its aim shows (Eric, Nov 24: "the god king should say something about like, you know, move your queen
+  // behind safety"). The round follows its target down whatever file it ends on, so the way out is a piece in front of it (his words
+  // say so: never "out of the line"). Quiet when no move of yours can put one there.
+  shotQueen: ["He's aiming down our queen's file. Put a piece in front of her!", "That rifle's on our queen. Get her behind a pawn!", "Lock-on! Block the line to our queen!"],
+  shotRook: ["He's aiming down our rook's file. Put a piece in front of it!", "That rifle's on our rook. Get it behind a pawn!", "Lock-on! Block the line to our rook!"],
   // Dash's Scramble Rush (Eric, Nov 6): after his sweep, and the crowd putting enough of the pieces back. Said whether he has
   // fallen or not (his Last Stand spent): the test needs his word.
   rushAsk: ["Put the pieces back where they came from. Hurry!", "Every piece to its own square. Quickly now!", "You saw the board. Set it right, fast!"],
@@ -199,6 +207,8 @@ const KIND: Record<KingCue, Kind> = {
   rushAsk: "critical",
   rushWell: "critical",
   dough: "critical",
+  shotQueen: "critical",
+  shotRook: "critical",
 };
 
 /** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */

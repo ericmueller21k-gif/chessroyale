@@ -21,6 +21,11 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   `boss-powers.ts`, from `callStrike` in the runner). Bots in the crowd follow him (`kingBotLoss`, `kingBotFollow`).
 - **His word after Ginger's blizzard** names what the storm left free: the queen's lines, the king's
   (`blizzardKing`), or another piece's (`blizzardOne`), from the moves allowed.
+- **His warning when Chandy's Lock-on Shot is aimed** (Eric, Nov 24: "the god king should say something about like, you know, move
+  your queen behind safety"): `shotQueen` or `shotRook` (the aim's `shape`), as the aim's banner fires (Boss.tsx): put a piece in
+  front of it (never "out of the line": the round follows its target down whatever file it ends on). Quiet when no move you may play
+  can put one there (`shotSaves` over the turn's allowed moves), as he's quiet about threats you can't heed (Wrangler's duel).
+  docs/decisions/2026-11-24-chandy-upgrades.md.
 - **No charges left** (Eric, Oct 15): a tap on him gets his soft "can't" (two quick, muffled low notes falling,
   synthesized: `characters/god-king-sounds.ts`, made ahead in the sound worker's table as the bosses' are, `kingCant`)
   and a tiny shake, dimmed a moment (`.gk-unit.nope`, 0.4 s); nothing else (no menu, nothing spent).

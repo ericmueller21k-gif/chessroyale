@@ -1118,6 +1118,11 @@ export interface ChandyLock {
   piece: string;
   /** His moves played when it came (its age is his moves since). */
   at: number;
+  /**
+   * The Lock-on Shot's lock (Nov 24): the piece his aimed round will most likely hit (chandy.ts shotVictim), locked as the aim shows and
+   * gone as the shot fires. Not one he hunts: it doesn't count toward chandy.maxLocks, never steers his move and never wears off.
+   */
+  shot?: true;
 }
 
 /**
@@ -1169,8 +1174,9 @@ export interface ChandyDodge {
  * - `meter`: the crowd's moves toward his next move (full at chandy.meterEvery), counting from the first upgrade; `due`: the move
  *   the full meter picked, landing as the crowd's turn begins (the queen lock: his whole turn, at its start); `used`: moves fired.
  * - This crowd turn's effects: `scatter` (the shot's spot and its blocked squares), `beam` (a rank and a file), `shields` (his
- *   pieces), `dizzy` (the crowd's), each for crowd turn `turn`; `aim`: the queen lock's aim, at the crowd's queen, fired at the
- *   start of his turn after crowd turn `turn` (the turn the aim is for); `shot`: its last shot (the crowd move it came after, the square hit; none: it
+ *   pieces), `dizzy` (the crowd's), each for crowd turn `turn`; `aim`: the Lock-on Shot's aim (its code name `queenlock`;
+ *   Nov 24: renamed from the queen lock, as it may aim at a rook), at the crowd's queen (or best rook), fired at the start of his turn
+ *   after crowd turn `turn` (the turn the aim is for); `shot`: its last shot (the crowd move it came after, the square hit; none: it
  *   stopped on the king or found nothing to hit).
  * - `dodge`: his Dodge under way or played (once a battle). `passWait`: the crowd move after which the queen lock waited (the pass
  *   guard). `whole`: the crowd turn the rifle came whole.
@@ -1195,7 +1201,8 @@ export interface ChandyState {
   beam?: { rank: number; file: string; squares: string[]; turn: number } | null;
   shields?: { squares: string[]; turn: number } | null;
   dizzy?: { squares: string[]; turn: number } | null;
-  aim?: { square: string; turn: number } | null;
+  /** `victim`: the piece the shot will most likely hit, decided as he aims (shotVictim) and locked as the aim shows (Nov 24). */
+  aim?: { square: string; turn: number; victim?: string | null } | null;
   shot?: { at: number; square: string | null; piece: string | null } | null;
   dodge?: ChandyDodge | null;
   passWait?: number;

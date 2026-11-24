@@ -1,5 +1,5 @@
 // Chandy wired (his rules, Nov 16; docs/decisions/2026-11-16-chandy-rules.md): his moments' lengths against his art, his board layer
-// (the crosshairs and their pips, the beam's cover, the queen lock's line), the Dodge view through its timeline (the scope, the vote
+// (the crosshairs and their pips, the beam's cover, the Lock-on Shot's line), the Dodge view through its timeline (the scope, the vote
 // with its teleports, the result), his kit at each rifle stage, the dock's words for a move his powers refuse, and the warning's
 // words when the last chance brings Dodge at once.
 import { describe, expect, it } from "vitest";
@@ -8,7 +8,9 @@ import { CHANDY_FIRE_AT, CHANDY_FX, dodgeRounds, dodgeTimeline, safeSquares, lin
 import { BOSS_KITS, stagedKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength } from "../src/characters/power-art.ts";
 import { CHANDY } from "../src/characters/chandy.ts";
-import { chandyFen, chandyItems, dodgeFen, dodgeView, shotHitAt } from "../src/components/Chandy.tsx";
+import { CHANDY_MOVE_NAMES, CHANDY_WORDS, chandyFen, chandyItems, dodgeFen, dodgeView, shotHitAt } from "../src/components/Chandy.tsx";
+import { POWER_WORDS } from "../src/power-words.ts";
+import { KING_LINES } from "../src/godKing.ts";
 import { WARN } from "../src/components/BossPowers.tsx";
 import type { MomentProps } from "../src/components/PowerParts.tsx";
 import { refusedLine } from "../src/refused.ts";
@@ -230,5 +232,28 @@ describe("his weapon screen (Eric, Nov 18: tap him to see his rifle and its upgr
     expect(lookKey({ boss: { ...boss, result: "boss" } as BossView, phase: play })).toBeNull();
     const moved = { ...boss, board: { ...boss.board, history: ["e2e4"] } } as BossView;
     expect(lookKey({ boss: moved, phase: play })).not.toBe(k);
+  });
+});
+
+describe("the Lock-on Shot's words (Nov 24: the queen lock renamed, as it may aim at a rook)", () => {
+  it("is named the Lock-on Shot everywhere a player reads it; its words never say queen unless the piece is one", () => {
+    expect([CHANDY_MOVE_NAMES.queenlock, POWER_WORDS.queenlock]).toEqual(["Lock-on Shot", "Lock-on Shot"]);
+    expect(CHANDY_WORDS.shot("r", false)).toBe("Lock-on Shot: your rook took it.");
+    expect(CHANDY_WORDS.shot("p", false)).toBe("Lock-on Shot: your pawn took it.");
+    expect(CHANDY_WORDS.shot("q", false)).toBe("Lock-on Shot: your queen fell.");
+    expect(CHANDY_WORDS.shot(null, true)).toBe("Lock-on Shot: the shot was stopped.");
+    for (const p of ["p", "n", "b", "r"]) expect(CHANDY_WORDS.shot(p, false)).not.toMatch(/queen/i);
+    expect(CHANDY_WORDS.aim("r")).not.toMatch(/queen/i);
+  });
+
+  it("the God King's warning as it's aimed: a piece in front of the target, the queen's words for her, the rook's for a rook", () => {
+    for (const line of KING_LINES.shotQueen) expect(line).toMatch(/queen/i);
+    for (const line of KING_LINES.shotRook) expect(line).toMatch(/rook/);
+    for (const line of KING_LINES.shotRook) expect(line).not.toMatch(/queen/i);
+    // (The round follows its target down whatever file it ends on: never "out of the line", always a piece in front of it.)
+    for (const line of [...KING_LINES.shotQueen, ...KING_LINES.shotRook]) {
+      expect(line).not.toMatch(/out of the line/i);
+      expect(line).toMatch(/front|behind|block/i);
+    }
   });
 });
