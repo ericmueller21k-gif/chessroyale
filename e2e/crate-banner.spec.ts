@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { crateDef, itemDef } from "@chessroyale/core";
+import { bonusOddsLine, crateDef, itemDef } from "@chessroyale/core";
 import { giveCrates, named, test } from "./helpers.ts";
 
 /**
@@ -259,4 +259,65 @@ test("crates: the opening covers the whole phone screen or the computer's middle
   // The page under it as it was: in the same place, scrolled the same, its count gone down by the one opened.
   expect(await where()).toEqual(before);
   await expect(page.locator(".crate-held")).toHaveText("You have 1, and 1 key.");
+});
+
+/**
+ * The bonus crate (Eric, Nov 24; docs/decisions/2026-11-24-bonus-crate.md): forced here with the test switch ?bonus=winter-1 (the server
+ * honors it only where TEST_SWITCHES is on; elsewhere its own 25% roll decides, and here none comes unless asked). After the item's card,
+ * a beat, the BONUS! card over it (the item's card under it takes no tap) with the Winter Crate and "+1 crate key"; its OK goes back to
+ * the item's card. The inventory has the crate, a bonus one, and its key at once; that crate's own opening gives no bonus, even asked.
+ * CRATE_SHOTS=<dir> saves its still.
+ */
+test("crates: a bonus crate's card after the item's, the crate and its key in the inventory at once, and its own opening gives none", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  const shots = process.env.CRATE_SHOTS;
+  const name = test.info().project.name;
+  await named(page, "Bonus Opener");
+  await giveCrates(page, "beta-001", 1, 1);
+  await page.goto("/shop?crates&bonus=winter-1");
+  await page.locator('.crate-row[data-crate="beta-001"]').click();
+  // Every crate's odds panel says it in one plain line.
+  await expect(page.locator(".crate-bonus-odds")).toHaveText(bonusOddsLine());
+  await expect(page.getByLabel("Bonus crate")).toBeChecked();
+  await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
+  const layer = page.getByTestId("crate-opening");
+  const item = layer.locator(".reveal-card:not(.cox-bonus-card)");
+  await expect(item).toBeVisible({ timeout: 30_000 });
+  const bonus = page.getByTestId("crate-bonus");
+  await expect(bonus.getByRole("dialog", { name: "Bonus crate" })).toBeVisible({ timeout: 10_000 });
+  await expect(bonus).toContainText("BONUS!");
+  await expect(bonus.locator(".reveal-name")).toHaveText(crateDef("winter-1")!.name.replace(" · ", " ")); // (the series on its own line)
+  await expect(bonus.locator(".cox-bonus-key")).toHaveText("+1 crate key");
+  // Already in the inventory: the locker the opening answered (the Beta Crate and its key spent, the Winter Crate and its key in).
+  type LockerNow = { seriesCrates: Record<string, number>; bonusCrates: Record<string, number>; keys: number };
+  const locker = () => page.evaluate(async () => (await (await fetch("/api/locker")).json()) as LockerNow);
+  expect(await locker()).toMatchObject({ seriesCrates: { "winter-1": 1 }, bonusCrates: { "winter-1": 1 }, keys: 1 });
+  // While it's up, the item's card under it takes no tap.
+  const covered = await page.evaluate(() => {
+    const b = document.querySelector(".reveal-card:not(.cox-bonus-card) .reveal-actions button")!.getBoundingClientRect();
+    return !!document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest('[data-testid="crate-bonus"]');
+  });
+  expect(covered, "the item's buttons under the bonus").toBe(true);
+  if (shots) {
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${shots}/${name}-5-bonus.png` });
+  }
+  await bonus.getByRole("button", { name: "▶ OK" }).click();
+  await expect(bonus).toHaveCount(0);
+  // Back to the item's card: no Beta Crate left (the bonus is a Winter Crate), so "Open another" is greyed.
+  await expect(item.getByRole("button", { name: "▶ Open another" })).toBeDisabled();
+  await item.getByRole("button", { name: "▶ Done" }).click();
+  await expect(layer).toHaveCount(0);
+  await page.getByRole("button", { name: "‹ Crates" }).click();
+  await expect(page.locator('.crate-row[data-crate="winter-1"]')).toContainText("You have 1");
+  await expect(page.getByText("Keys × 1")).toBeVisible();
+  // The bonus Winter Crate: "1 bonus"; its own opening gives none, even with the switch on.
+  await page.locator('.crate-row[data-crate="winter-1"]').click();
+  await expect(page.locator(".crate-held")).toHaveText("You have 1 (1 bonus), and 1 key.");
+  await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
+  await expect(layer.locator(".reveal-card")).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(1500);
+  await expect(bonus).toHaveCount(0);
+  await layer.getByRole("button", { name: "▶ Done" }).click();
+  expect(await locker()).toMatchObject({ seriesCrates: {}, bonusCrates: {}, keys: 0 });
 });
