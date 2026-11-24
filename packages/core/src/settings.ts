@@ -3889,6 +3889,18 @@ export const CRATE_OPEN = {
 } as const;
 
 /**
+ * The bonus crate (Eric, Nov 24: "like League of Legends does this ... a crate and key combo in addition to whatever item you get ...
+ * it's a 25% chance, and then every crate possible that exists, even ones that have been retired, just evenly spread ... And if it
+ * requires a key, though, then we need to give it a key as well"; docs/decisions/2026-11-24-bonus-crate.md; core `bonus-crate.ts`,
+ * the server's opens). Every crate opening (a series crate's, a boss crate's) rolls it on the server, in the same op as the item; a
+ * bonus crate's own opening never does (Eric: "you can't just keep crating into other crates").
+ */
+export const CRATE_BONUS = {
+  /** The chance an opening also gives a bonus crate (and its key, if it opens with one). */
+  chance: 0.25,
+} as const;
+
+/**
  * The Shop tab's page (Eric, Nov 9: his mockup, our art; docs/decisions/2026-11-09-shop-page.md). Look only for now: no purchase is
  * wired (a tapped price says "Buying opens soon"); Stripe and coin purchases come next.
  */
