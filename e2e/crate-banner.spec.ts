@@ -314,6 +314,7 @@ test("crates: a bonus crate's card after the item's, the crate and its key in th
   // The bonus Winter Crate: "1 bonus"; its own opening gives none, even with the switch on.
   await page.locator('.crate-row[data-crate="winter-1"]').click();
   await expect(page.locator(".crate-held")).toHaveText("You have 1 (1 bonus), and 1 key.");
+  if (shots) await page.screenshot({ path: `${shots}/${name}-6-bonus-page.png`, fullPage: true });
   await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
   await expect(layer.locator(".reveal-card")).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1500);
