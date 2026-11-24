@@ -1987,3 +1987,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   animate only where the item is the focus, grids still (and the shine too). Mockup helper session_01JuCWRui15X9QkMp1BD5a2N: archive.
 - Nov 25 ~04:30: main full run GREEN on 94c408c (#923 bonus crate + #924 + #925 all live). #926 CI running. Waiting on Eric's go for the
   item build.
+- Nov 25 ~04:45: #926 crates tidy MERGED (025406c), deploy + main run watched. No helpers running. Waiting on Eric: item build go;
+  desktop opening size feel (DESK_MAX 1.5).
