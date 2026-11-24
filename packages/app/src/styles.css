@@ -8090,6 +8090,15 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
 .no-boss-crates {
   margin: 0;
 }
+/* The Crates tab's sections (Nov 25): Ready to open, More crates; each a titled list, rows as before. */
+.crates-section {
+  display: grid;
+  gap: 12px;
+}
+.crates-section > .ff-title,
+.crates-none {
+  margin: 0;
+}
 /* Choosing a level's boss crate (Nov 9): every live boss's crate as a tile, its token on the corner. */
 .boss-pick-grid {
   display: grid;

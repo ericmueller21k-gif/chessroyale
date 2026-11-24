@@ -1190,6 +1190,9 @@ function RevealDetails({ item, again, quiet, onAgain, onClose }: { item: ItemIns
   const hc = isHunchess(item.def);
   const shiny = !hc && isShiny(item.blemish);
   const [worn, setWorn] = useState(false);
+  // (Quiet: no tap or key does anything, also where `inert` isn't known (Safari before 15.5): the class takes no tap, and each button's
+  // own check. #923's re-review, Nov 25.)
+  const unlessQuiet = (f: () => void) => () => void (quiet || f());
   return (
     <>
       <strong class="reveal-name">{d.name}</strong>
@@ -1200,22 +1203,22 @@ function RevealDetails({ item, again, quiet, onAgain, onClose }: { item: ItemIns
       {shiny && <span class="reveal-shiny">Shiny!</span>}
       {hc && <NotTradeable />}
       <span class="reveal-desc">{d.description}</span>
-      <div class="reveal-actions" inert={quiet}>
+      <div class={`reveal-actions${quiet ? " quiet" : ""}`} inert={quiet}>
         <button
           type="button"
           class="ff-button small"
           disabled={worn}
-          onClick={() => {
+          onClick={unlessQuiet(() => {
             void equipLockerItem(d.slot, item.id).then(() => setWorn(true));
             play("menuSelect");
-          }}
+          })}
         >
           {worn ? "Wearing it" : "▶ Wear"}
         </button>
-        <button type="button" class="ff-button small" disabled={!again} onClick={onAgain}>
+        <button type="button" class="ff-button small" disabled={!again} onClick={unlessQuiet(onAgain)}>
           ▶ Open another
         </button>
-        <button type="button" class="ff-button small" onClick={onClose}>
+        <button type="button" class="ff-button small" onClick={unlessQuiet(onClose)}>
           ▶ Done
         </button>
       </div>
