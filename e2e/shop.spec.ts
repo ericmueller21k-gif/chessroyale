@@ -1250,6 +1250,10 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   await expect(babur).toHaveClass(/none/);
   // The admin's test grants: a key, then Babur's tokens.
   const grants = page.getByRole("region", { name: "Admin test grants" });
+  // (The page in its order, Nov 25: keys and crates, Ready to open, Boss tokens, More crates, and the admin's grants last of all, so the
+  // page above them is what every player sees.)
+  expect(await crates.evaluate((el) => [...el.children].filter((c) => c.matches("section")).map((c) => c.getAttribute("aria-label")))).toEqual(["Ready to open", "Boss tokens", "More crates", "Admin test grants"]);
+  expect(await grants.evaluate((el) => el === el.parentElement!.lastElementChild)).toBe(true);
   await grants.getByRole("button", { name: "+1 crate key" }).click();
   await expect(crates.getByText("Keys × 1")).toBeVisible();
   await grants.getByRole("combobox", { name: "Boss" }).selectOption("tiger");

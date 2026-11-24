@@ -45,6 +45,11 @@ function maskVars(): Record<string, string> {
   return masks;
 }
 
+/** The stage's own size (crate-open.css `.cox-stages`), and on a computer how far it's scaled up at most. */
+const STAGE_W = 430;
+const STAGE_H = 540;
+const DESK_MAX = 1.5;
+
 /**
  * The opening's layer: on the body, over everything; on a computer (the frame's three columns) only the middle column, read from the
  * frame it was opened in. Nothing under it scrolls or hears a tap.
@@ -64,11 +69,17 @@ export function OpenLayer({ label, children }: { label: string; children: Compon
       el.style.left = cs ? side(cs.getPropertyValue("--fd-menu")) : "0px";
       el.style.right = cs ? side(cs.getPropertyValue("--fd-rail")) : "0px";
       el.classList.toggle("desk", !!cs);
-      // A short window (a phone on its side): the stage scaled down whole to fit under the title, nothing cut off.
+      // A short window (a phone on its side): the stage scaled down whole to fit under the title, nothing cut off. On a computer
+      // (Eric, Nov 25: "on the desktop, the present is too small ... the whole thing should be a bit bigger"), scaled up whole to the
+      // middle column's width and height, up to DESK_MAX (the card with it: readable, not huge). The phone's unchanged. (Scaled whole,
+      // a transform, as the short window's: every part keeps its place, and the item still rises into the card's picture.)
       const head = el.querySelector<HTMLElement>(".cox-head");
-      const pad = parseFloat(getComputedStyle(el).paddingTop) + parseFloat(getComputedStyle(el).paddingBottom);
+      const ps = getComputedStyle(el);
+      const pad = parseFloat(ps.paddingTop) + parseFloat(ps.paddingBottom);
       const room = el.clientHeight - pad - (head?.offsetHeight ?? 0) - 8;
-      el.style.setProperty("--cox-fit", String(Math.min(1, Math.max(0.4, room / 540))));
+      const across = el.clientWidth - parseFloat(ps.paddingLeft) - parseFloat(ps.paddingRight);
+      const fit = cs ? Math.max(0.4, Math.min(DESK_MAX, room / STAGE_H, across / STAGE_W)) : Math.min(1, Math.max(0.4, room / STAGE_H));
+      el.style.setProperty("--cox-fit", String(fit));
     };
     place();
     root.current?.focus({ preventScroll: true });
@@ -306,10 +317,16 @@ export function BonusStage({ children }: { children: ComponentChildren }) {
     at(beam, [{ opacity: 1 }, { opacity: 0.35 }], BONUS.cardAt + BONUS.cardMs, 500, { fill: "forwards", easing: "ease-out", composite: "replace" });
     const card = $(".cox-card");
     at(card, [{ visibility: "hidden" }, { visibility: "visible" }], BONUS.cardAt, 1, { easing: "steps(1, start)" });
-    // (The focus to its OK once the card shows (a hidden button takes none): a dialog takes it. The review, Nov 25; the item's buttons
-    // under it are inert meanwhile.)
-    out[out.length - 1]!.finished.then(() => card.querySelector<HTMLElement>("button")?.focus({ preventScroll: true })).catch(() => undefined);
     at(card, [{ opacity: 0, transform: reduced ? "none" : "translateY(40px) scale(0.86)" }, { opacity: 1, transform: "none" }], BONUS.cardAt, BONUS.cardMs, { easing: "cubic-bezier(.2,1.3,.4,1)" });
+    // Its OK takes a tap only once the card has faded in (#923's re-review, Nov 25: a double tap on Done, or a tap as it formed, landed on
+    // the OK while it was nearly see-through, closing it unseen): `data-ready` then (crate-open.css), and the focus to it (a dialog
+    // takes it; the item's buttons under it are inert meanwhile).
+    out[out.length - 1]!.finished
+      .then(() => {
+        card.dataset.ready = "";
+        card.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
+      })
+      .catch(() => undefined);
     return () => out.forEach((a) => a.cancel());
   }, []);
   return (

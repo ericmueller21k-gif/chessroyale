@@ -69,9 +69,7 @@
   transform-origin: 50% 0;
   margin-bottom: calc((var(--cox-fit, 1) - 1) * 540px);
 }
-.desk .cox-stages {
-  max-width: 760px;
-}
+/* (On a computer the stage keeps its phone layout and size, scaled up whole by --cox-fit to the middle column: OpenLayer, Nov 25.) */
 /* (Something went wrong: Done, over the stopped strip's box spot.) */
 .cox-done {
   position: absolute;
@@ -497,6 +495,14 @@
 /* (Opaque: the item's card under it doesn't show through.) */
 .cox-card.reveal-card.cox-bonus-card {
   background: linear-gradient(180deg, #2a3cbd 0%, #13207a 55%, #0a1150 100%);
+}
+/* (Its OK takes no tap until the card has faded in: CrateOpenStage.tsx `BonusStage` sets data-ready. A tap meanwhile lands on the dim.) */
+.cox-bonus-card:not([data-ready]) {
+  pointer-events: none;
+}
+/* (The item's buttons while the bonus card is up and a beat after: `inert`, and this for a browser without it (Safari before 15.5).) */
+.reveal-actions.quiet {
+  pointer-events: none;
 }
 /* "BONUS!": the card's title, bigger than a tier's name. */
 .cox-bonus-card .reveal-tier {

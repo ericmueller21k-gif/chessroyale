@@ -147,9 +147,13 @@ test("the Welcome Crates: 5 finished games earn the first once; its notice, open
   // you get after 25").
   await expect(page.locator(".welcome-crate-hero .welcome-progress")).toHaveText("Opened");
   await expect(page.getByRole("button", { name: /^▶ Open$/ })).toBeDisabled();
+  // Back on the Crates tab, a fully opened Welcome Crate shows no row at all (Eric, Nov 25: "they just shouldn't even appear"); crate 2
+  // is still there, locked at 5/25, under More crates.
   await page.goto("/shop?crates");
-  await expect(row1).toContainText("Opened");
   await expect(row2).toContainText("5/25");
+  await expect(row1).toHaveCount(0);
+  await expect(page.locator(".welcome-crate-row")).toHaveCount(1);
+  await expect(page.locator(".crates-more .welcome-crate-row")).toHaveAttribute("data-welcome-n", "2");
   await expect(row2).toHaveClass(/locked/);
 
   // Opening again (a second tap, another device): nothing new, the same ride.
@@ -208,17 +212,17 @@ test("the Welcome Crates: 5 finished games earn the first once; its notice, open
   await page.goto("/shop?crates");
   await expect(row2).toContainText("Ready");
   await expect(row2).toContainText("25/25");
+  await expect(page.locator(".crates-ready .welcome-crate-row")).toHaveCount(1);
   await row2.click();
   await page.getByRole("button", { name: /^▶ Open$/ }).click();
   await expect(reveal).toBeVisible({ timeout: 40_000 });
   await expect(reveal.locator(".reveal-name")).toHaveText(/^HunChess /);
   await reveal.getByRole("button", { name: "▶ Done" }).click();
   await expect(page.locator(".welcome-crate-hero .welcome-progress")).toHaveText("Opened");
+  // Both used: no Welcome Crate rows at all (Nov 25).
   await page.goto("/shop?crates");
-  await expect(row1).toContainText("Opened");
-  await expect(row2).toContainText("Opened");
-  await expect(row1).not.toHaveClass(/locked/);
-  await expect(row2).not.toHaveClass(/locked/);
+  await expect(page.locator(".series-crate-row").first()).toBeVisible();
+  await expect(page.locator(".welcome-crate-row")).toHaveCount(0);
   await shot(page, "both-opened");
   locker = await lockerNow(page);
   const both = locker.items.filter((i) => i.def.endsWith("-hunchess"));
