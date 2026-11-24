@@ -363,6 +363,72 @@ test("a computer: Babur's pump beside him at every size, as big as the board's b
  * window then set to each size in turn. A tablet on its side (1024 × 768 and 1180 × 820, touch) keeps its old layout too: the
  * new sizes are a computer's (a mouse).
  */
+/**
+ * A computer's 50 v 50 (Eric, Nov 25; docs/decisions/2026-11-25-crowd-desktop-flush.md): the status line ("Move 5 · cut in 10 · P38/50 ·
+ * −0.8 · CUT +0.2") centered over the board and bigger (22 px, 1.4 times its 16, where the board is wide enough; a narrower board's as
+ * big as its width holds: about 18 px on 1280 × 800's 504 px board), one line, clear of the gear; the scoreboard, the board (its frame: the clock's bar under it) and the chat end
+ * on one bottom line; the chat starts right under the panel's one fixed slot. A phone's line and panel are as before.
+ */
+test("a computer's 50 v 50 (Eric, Nov 25): the status line centered over the board and bigger; the scoreboard, the board and the chat on one bottom line at 1280 × 800, 1440 × 900, 1920 × 1080 and 2000 × 1100; a phone's as before", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "a computer and a phone, in their own windows");
+  test.setTimeout(5 * 60_000);
+  const lines = (page: Page) =>
+    page.evaluate(() => {
+      const wrap = document.querySelector<HTMLElement>(".board-area .board-row > .board-wrap")!;
+      const css = getComputedStyle(wrap);
+      const side = parseFloat(css.getPropertyValue("--board-size"));
+      const w = wrap.getBoundingClientRect();
+      const hud = document.querySelector(".screen.game > .hud-row > .hud")!;
+      let l = Infinity, r = -Infinity;
+      for (const c of hud.children) {
+        const b = c.getBoundingClientRect();
+        if (b.width) [l, r] = [Math.min(l, b.left), Math.max(r, b.right)];
+      }
+      const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+      return {
+        foot: w.top + side + parseFloat(css.getPropertyValue("--timer-bar-h")),
+        scoreboard: box(".arena > .tower-side")?.bottom ?? NaN,
+        chat: box(".screen.game > .under-board.side") ?? null,
+        slot: box(".screen.game > .play-footer, .screen.game > .poll") ?? null,
+        mid: (l + r) / 2,
+        board: w.left + side / 2,
+        words: r,
+        gear: box(".screen.game > .hud-row > .mm")!.left,
+        hudH: hud.getBoundingClientRect().height,
+        font: parseFloat(getComputedStyle(hud).fontSize),
+      };
+    });
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const page = await ctx.newPage();
+  await into(page, "crowd");
+  for (const size of ["1280x800", "1440x900", "1920x1080", "2000x1100"]) {
+    const [w, h] = dims(size);
+    await page.setViewportSize({ width: w, height: h });
+    // (Measured after the window settles: board-foot.ts writes the line on a resize.)
+    await expect.poll(async () => {
+      const g = await lines(page);
+      return Math.max(Math.abs(g.scoreboard - g.foot), Math.abs((g.chat?.bottom ?? NaN) - g.foot), Math.abs(g.mid - g.board) - 1);
+    }, { message: `${size}: the scoreboard's and the chat's bottoms on the board's, the line over its middle`, timeout: 5_000 }).toBeLessThanOrEqual(1);
+    const g = await lines(page);
+    expect(Math.abs(g.mid - g.board), `${size}: the status line centered over the board (${g.mid} / ${g.board})`).toBeLessThanOrEqual(2);
+    expect(g.font, `${size}: the status line bigger (${g.font} px)`).toBeGreaterThanOrEqual(w > 1300 ? 22 : 18);
+    expect(g.hudH, `${size}: one line`).toBeLessThanOrEqual(42.5);
+    expect(g.words, `${size}: the words clear of the gear`).toBeLessThanOrEqual(g.gear);
+    expect(g.chat!.top - g.slot!.bottom, `${size}: the chat right under the panel's slot`).toBeLessThanOrEqual(24);
+    expect(Math.abs(g.slot!.height - 206), `${size}: the panel one fixed slot (${g.slot!.height})`).toBeLessThanOrEqual(1);
+  }
+  await ctx.close();
+  // A phone: the line and the panel as before (16 px, the words from the left; the panel the locked screen's --mid-h, 104 px).
+  const phone = await touchPage(browser);
+  await into(phone.page, "crowd");
+  const p = await phone.page.evaluate(() => {
+    const hud = document.querySelector(".screen.game > .hud-row > .hud")!;
+    return { font: getComputedStyle(hud).fontSize, justify: getComputedStyle(hud).justifyContent, slot: document.querySelector(".screen.game > .play-footer")!.getBoundingClientRect().height };
+  });
+  expect(p, "a phone: the status line and the panel as before").toEqual({ font: "16px", justify: "normal", slot: 104 });
+  await phone.ctx.close();
+});
+
 const TOUCH = ["390x844", "430x932", "768x1024", "844x390", "1024x768", "1180x820"] as const;
 const MAIN_TOUCH: Record<"alone" | "crowd" | "duel", Record<(typeof TOUCH)[number], [number, number, number]>> = {
   alone: { "390x844": [14, 153, 360], "430x932": [14, 153, 400], "768x1024": [118, 153, 530.7], "844x390": [292, 175, 259], "1024x768": [96, 133, 464], "1180x820": [384, 133, 402.7] },

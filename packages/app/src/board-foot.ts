@@ -1,4 +1,4 @@
-import { useLayoutEffect } from "preact/hooks";
+import { useLayoutEffect, useRef } from "preact/hooks";
 
 /**
  * A computer's one bottom line (Eric, Nov 25: "the board and the two boxes should all be the same lower band"): the scoreboard on the
@@ -11,46 +11,48 @@ import { useLayoutEffect } from "preact/hooks";
  * board-size.css uses them on a computer only; a phone never reads them. Neither box's height moves its own top, so there is no loop.
  * docs/decisions/2026-11-25-crowd-desktop-flush.md.
  */
+/** The board's squares in the arena's screen: their box is what OwnBoard sizes (a whole multiple of 8 device pixels). */
+const SQUARES = ":scope > .screen.game .board-area .board-row > .board-wrap > .board > .hb-container";
+
 export function measureBoardFoot(arena: HTMLElement) {
-  const wrap = arena.querySelector<HTMLElement>(".screen.game .board-area .board-row > .board-wrap");
-  if (!wrap) return;
-  const top = wrap.getBoundingClientRect().top;
-  // (The squares' side: --board-size, up to 8 device pixels under the wrap's; the bar under the board sits right under it.)
-  const side = parseFloat(getComputedStyle(wrap).getPropertyValue("--board-size")) || wrap.getBoundingClientRect().height;
-  const bar = parseFloat(getComputedStyle(wrap).getPropertyValue("--timer-bar-h")) || 0;
-  const foot = top + side + bar;
-  const set = (name: string, el: Element | null) => {
-    const v = el ? `${Math.round(foot - el.getBoundingClientRect().top)}px` : "";
+  const box = arena.querySelector<HTMLElement>(SQUARES);
+  const wrap = box?.closest<HTMLElement>(".board-wrap");
+  if (!box || !wrap) return;
+  // (The squares' box, as drawn: OwnBoard sets its size after the window's, so this is read when it changes, never before.)
+  const b = box.getBoundingClientRect();
+  const foot = b.top + b.height + (parseFloat(getComputedStyle(wrap).getPropertyValue("--timer-bar-h")) || 0);
+  const put = (name: string, v: string) => {
     if (arena.style.getPropertyValue(name) !== v) (v ? arena.style.setProperty(name, v) : arena.style.removeProperty(name));
   };
-  // (The status line over the board centers on the squares, not on the wrap's few spare pixels: `--board-shift`, from the title line's
-  // middle to the board's. The line moves its words, never itself, so measuring it is steady.)
+  const to = (el: Element | null) => (el ? `${Math.round(foot - el.getBoundingClientRect().top)}px` : "");
+  // (The status line over the board centers on the squares: the title line keeps its place, only its words move, so this is steady.)
   const row = arena.querySelector(":scope > .screen.game > .hud-row")?.getBoundingClientRect();
-  const shift = row ? `${(wrap.getBoundingClientRect().left + side / 2 - (row.left + row.width / 2)).toFixed(1)}px` : "";
-  if (arena.style.getPropertyValue("--board-shift") !== shift) (shift ? arena.style.setProperty("--board-shift", shift) : arena.style.removeProperty("--board-shift"));
-  set("--side-foot", arena.querySelector(":scope > .tower-side"));
-  set("--chat-foot", arena.querySelector(":scope > .screen.game > .under-board.side"));
+  put("--board-shift", row ? `${(b.left + b.width / 2 - (row.left + row.width / 2)).toFixed(1)}px` : "");
+  put("--side-foot", to(arena.querySelector(":scope > .tower-side")));
+  put("--chat-foot", to(arena.querySelector(":scope > .screen.game > .under-board.side")));
 }
 
-/** Rendered inside the arena: measures after every render of the match's screens and on a resize of the window or the board. */
+/**
+ * Rendered inside the arena: measures after every render of the match's screens, and whenever the arena or the board's squares change
+ * size (a resize of the window: the squares follow it a moment later, from OwnBoard's own observer, and this follows them).
+ */
 export function BoardFoot() {
+  const seen = useRef<{ ro: ResizeObserver; board: Element | null } | null>(null);
   useLayoutEffect(() => {
     const arena = document.querySelector<HTMLElement>(".arena");
-    if (arena) measureBoardFoot(arena);
+    if (!arena) return;
+    if (!seen.current) {
+      seen.current = { ro: new ResizeObserver(() => measureBoardFoot(arena)), board: null };
+      seen.current.ro.observe(arena);
+    }
+    const board = arena.querySelector(SQUARES);
+    if (board !== seen.current.board) {
+      if (seen.current.board) seen.current.ro.unobserve(seen.current.board);
+      if (board) seen.current.ro.observe(board);
+      seen.current.board = board;
+    }
+    measureBoardFoot(arena);
   });
-  useLayoutEffect(() => {
-    const again = () => {
-      const arena = document.querySelector<HTMLElement>(".arena");
-      if (arena) measureBoardFoot(arena);
-    };
-    const ro = new ResizeObserver(again);
-    const arena = document.querySelector(".arena");
-    if (arena) ro.observe(arena);
-    addEventListener("resize", again);
-    return () => {
-      ro.disconnect();
-      removeEventListener("resize", again);
-    };
-  }, []);
+  useLayoutEffect(() => () => seen.current?.ro.disconnect(), []);
   return null;
 }
