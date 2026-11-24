@@ -11,12 +11,13 @@ import {
   mulberry32,
   rollCrate,
   tokenBossName,
+  type BonusRoll,
   type CrateRoll,
   type ItemInstance,
 } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
-import { lockerState, openedItem, type LockerState } from "./locker.ts";
-import { applyOp, cond, firstLeg, keyFor, leg, ledgerAccount, opKeys, requestId, type LedgerAccount, type OpKey } from "./ledger.ts";
+import { bonusOf, lockerState, openedItem, openingRng, type LockerState, type OpenOptions } from "./locker.ts";
+import { applyOp, bonusAsset, bonusLegs, cond, firstLeg, foldBonus, keyFor, leg, ledgerAccount, opKeys, requestId, type LedgerAccount, type OpKey } from "./ledger.ts";
 
 /**
  * Boss tokens, crate keys and buying a boss's crate (Eric, Nov 2; BOSS_TOKENS and BOSS_CRATE_PRICE in core's settings;
@@ -214,11 +215,16 @@ export function notEnough(boss: string, way: CrateWay): string {
   return `You need ${c.keys ? `${tokens} and ${n(c.keys, "crate key")}` : tokens}.`;
 }
 
-/** The boss crates an account holds, unopened, by crate id ("boss-tiger": only those it has some of). */
-export async function bossCrateHoldings(sql: Sql, userId: string): Promise<Record<string, number>> {
+/**
+ * The boss crates an account holds, unopened, by crate id ("boss-tiger": only those it has some of; bonus ones counted with their crate's,
+ * Nov 24), and how many of those are bonus ones (`bonus`: ledger.ts foldBonus).
+ */
+export async function bossCrateStock(sql: Sql, userId: string): Promise<{ all: Record<string, number>; bonus: Record<string, number> }> {
   const rows = await sql.all<{ crate: string; n: number }>("SELECT crate, COUNT(*) AS n FROM boss_crates WHERE user_id = ? GROUP BY crate ORDER BY crate", userId);
-  return Object.fromEntries(rows.map((r) => [r.crate, r.n]));
+  return foldBonus(Object.fromEntries(rows.map((r) => [r.crate, r.n])));
 }
+/** The boss crates an account holds, unopened, by crate id (bonus ones too). */
+export const bossCrateHoldings = async (sql: Sql, userId: string): Promise<Record<string, number>> => (await bossCrateStock(sql, userId)).all;
 
 /**
  * Buys a boss's crate (BOSS_CRATES) one of its two ways, into your inventory (Eric, Nov 2: "Buying a boss crate from shopkeepers adds
@@ -280,9 +286,12 @@ export const noneToOpen = (name: string) => `You have no ${name} to open.`;
  * Opens one of your boss crates (the Crates tab, Nov 2), as a crate opens: the roll is the server's (its own randomness, never a test
  * switch: a boss crate is paid for), from that crate's pool, and the item goes into the locker. One ledger op per crate, one
  * transaction: the oldest crate you hold comes off and the item goes in, both recorded (the crate's row goes, its history stays in the
- * ledger). So a crate opens once, never twice (two devices at once: one item, one crate gone, the other refused), and nobody opens one
- * they haven't got. The open's key is the app's request id for it (`open:<ledger id>:<request>`): a retry of it opens nothing more
- * and answers the first open's item. (An older app's open, with none, is keyed by the crate it takes: `open:<its row>`.)
+ * ledger), and (Nov 24) the bonus crate and its key when the roll gives one (`opts.bonus`: locker.ts BonusMode; `opts.rng`, a test's).
+ * So a crate opens once, never twice (two devices at once: one item, one crate gone, the other refused), and nobody opens one they
+ * haven't got. The open's key is the app's request id for it (`open:<ledger id>:<request>`): a retry of it opens nothing more, rolls
+ * nothing more and answers the first open's item and bonus. (An older app's open, with none, is keyed by the crate it takes:
+ * `open:<its row>`.) Holding ordinary and bonus ones of a crate, the ordinary ones open first (each rolls a bonus: you keep your
+ * chance), the bonus ones after (they never roll one).
  */
 export async function openBossCrate(
   sql: Sql,
@@ -291,12 +300,13 @@ export async function openBossCrate(
   now: number,
   admin = false,
   request: string | null = null,
-): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
+  opts: OpenOptions = {},
+): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; bonus?: BonusRoll; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? bossCrateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
   let me: LedgerAccount | null = request ? await ledgerAccount(sql, userId) : null;
   const keyed = me && request ? keyFor(opKeys.request("open", request), me) : null;
-  // An open's item as stored. Every attempt answers this, never its own roll, so every answer to one request is the same.
+  // An open's item (and bonus) as stored. Every attempt answers this, never its own roll, so every answer to one request is the same.
   const opened = async (op: string | null) => {
     const first = op ? await openedItem(sql, userId, op) : null;
     return first ? { ok: true as const, ...first, locker: await lockerState(sql, userId, admin) } : null;
@@ -304,19 +314,33 @@ export async function openBossCrate(
   // A retry of an open made already (perhaps of your last crate): its item.
   const first = await opened(keyed);
   if (first) return first;
-  // The oldest one you hold. Another open that took it first or since: the next one, if you hold another.
+  // The oldest ordinary one you hold, else the oldest bonus one. Another open that took it first or since: the next one, if you hold another.
+  const bonusId = bonusAsset(crate.id);
   for (let attempt = 0; attempt < 4; attempt++) {
-    const held = await sql.first<{ id: string }>("SELECT id FROM boss_crates WHERE user_id = ? AND crate = ? ORDER BY bought_at, id LIMIT 1", userId, crate.id);
+    const held = await sql.first<{ id: string; crate: string }>(
+      "SELECT id, crate FROM boss_crates WHERE user_id = ? AND crate IN (?, ?) ORDER BY crate = ?, bought_at, id LIMIT 1",
+      userId,
+      crate.id,
+      bonusId,
+      bonusId,
+    );
     me ??= held ? await ledgerAccount(sql, userId) : null;
     if (!held || !me) break;
-    const roll = rollCrate(mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!), crate);
+    const rng = opts.rng ?? openingRng();
+    const roll = rollCrate(rng, crate);
+    const bonus = held.crate === crate.id ? bonusOf(rng, opts.bonus, admin) : null;
+    const item = randomHex(9);
     const op = keyed ?? `open:${held.id}`;
     const done = await applyOp(sql, me, {
       id: op,
       reason: "boss crate open",
       now,
       when: cond("EXISTS (SELECT 1 FROM boss_crates WHERE id = ? AND user_id = ?)", held.id, userId),
-      legs: [leg.bossCrateOut(userId, held.id, crate.id), leg.item(userId, { ...roll, id: randomHex(9) }, crate.id, now)],
+      legs: [
+        leg.bossCrateOut(userId, held.id, held.crate),
+        leg.item(userId, { ...roll, id: item }, crate.id, now),
+        ...(bonus ? bonusLegs(userId, bonus, item, randomHex(9), now) : []),
+      ],
     });
     // This open's item, or (the same open sent twice at once) the other one's.
     if (done === "applied" || (done === "replay" && keyed)) return (await opened(op)) ?? { ok: false, message: noneToOpen(crate.name) };

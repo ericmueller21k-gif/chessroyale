@@ -58,6 +58,26 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Crate as the locker was read. The Crates tab shows each series crate's count and a padlock while it can't open; its Open is greyed
   without both. `?fischer=1` / `?shiny=1` only where `TEST_SWITCHES` is "1". Every 20th level's boss crate (every 10th until Nov 20) is picked in the Crates tab's
   "Boss crate choice" (`POST /api/locker/pick`; [2026-11-09-xp-phase2-boss-pick.md](../decisions/2026-11-09-xp-phase2-boss-pick.md)).
+- **The bonus crate** (Eric, Nov 24: "like League of Legends does this ... 25% of the time ... every crate possible that exists, even ones
+  that have been retired, just evenly spread"; [2026-11-24-bonus-crate.md](../decisions/2026-11-24-bonus-crate.md); `CRATE_BONUS` in
+  settings, core's `bonus-crate.ts`): every crate opening (a series crate's; a boss crate's, bought, picked or won) has
+  `CRATE_BONUS.chance` (25%) of a bonus crate, any crate in `CRATES` or `BOSS_CRATES`, each as likely (`bonusPool`: not the Welcome
+  Crate, whose own opening rolls none either; not an admins-first boss's crate, except for admins), into the inventory unopened, with a
+  crate key when it opens with one (`opensWithKey`: series crates). Rolled by the server with the item's own roll, in the open's one
+  ledger op (`bonusLegs`; a retry answers the stored item and bonus, `openedBonus`). **A bonus crate never rolls a bonus** (Eric: "you
+  can't just keep crating into other crates"): it's held under its crate's id with a `bonus:` prefix (`series_crates` "bonus:winter-1",
+  a `boss_crates` row "bonus:boss-tiger"; no migration: the ledger, a guest's sign-in, erasing and the download carry it as any crate);
+  holding both kinds, the ordinary ones open first. The locker counts it with its crate's and lists `bonusCrates`; the crate's page:
+  "You have 2 (1 bonus)". **Shown:** a beat after the item's card, a second card over it on a short gold beam (`BonusStage` in
+  `crate-open/`, `BonusCard` in Crates.tsx; its beats `BONUS` in `timeline.ts`): "BONUS!", the crate (a boss crate's with its token),
+  its name, "+1 crate key", OK (back to the item's card; the item's stage dims and its buttons are inert meanwhile and `BONUS.calmMs`,
+  300 ms, after OK, so a double tap on OK, which sits over "Open another", opens nothing; the dialog takes the focus and gives it back to
+  the item's first button). It can't be skipped: Done or Open another before its beat shows it first, and the crate stays unseen (comes
+  back on return) until its OK (the review, Nov 25). Each crate's odds panel and the FAQ (`bonusOddsLine`, N and each share from
+  `bonusPool()`): "Opening a series or boss crate: 25% chance of a bonus crate, one of N crates chosen evenly (about X% each, so about Y%
+  of openings for each), with its key if it needs one. The Welcome Crate and crates of bosses not yet released aren't in it. Opening a
+  bonus crate never gives another." An empty pool gives none. Where `TEST_SWITCHES` is on, only when asked (`?bonus=1`,
+  `?bonus=<crate>`, the "Bonus crate" box; `?bonus=0` or empty: none).
 - **Items** have a slot (head, face, skin, weapon, ride, outfit: `ITEM_SLOTS`, the server's check too), are drawn on the pawn's 100 × 100 square, and fit by anchors
   (head, face, eyes, neck, mouth: each piece's own lines; a mustache sits at the mouth, under a snowman's carrot).
   Every face item is tagged above or below a hat (`faceLayer` in crates.ts; Eric, Oct 30): goggles and shades are drawn
@@ -240,6 +260,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | What | Where |
 | --- | --- |
 | Item list, tiers, colors, crate odds, rolls | `packages/core/src/crates.ts` |
+| The bonus crate: its pool, roll and odds line; its legs, storage and stored answer; its card | `packages/core/src/bonus-crate.ts`; `server/src/ledger.ts` (`bonusLegs`, `openedBonus`, `foldBonus`), `locker.ts` (`openCrate`, `BonusMode`), `boss-tokens.ts` (`openBossCrate`); `crate-open/CrateOpenStage.tsx` (`BonusStage`), `screens/Crates.tsx` (`BonusCard`) |
 | The Welcome Crate: the crate, its roll, `tradeable`, its text; the grant, opening and notice | `packages/core/src/welcome.ts`; `packages/server/src/welcome.ts`; `components/WelcomeNotice.tsx`; the colorway `components/rides/hunchess.tsx` |
 | Shop cosmetics | `packages/core/src/shop.ts`; drawn by `packages/app/src/components/Cosmetics.tsx` |
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`; the shop page's `BossCrateArt`, `MythicCrateArt`, `BundleArt`) | `packages/app/src/components/Items.tsx` |
@@ -261,11 +282,20 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 `crates.ts` (`ITEM_DEFS`, `CRATES`, `BOSS_CRATES`, `ITEM_COLORS`, `PURITY_BANDS`), `XP` (the crates and keys a level and the daily
 reward give, `rewardCrate`), `BOSS_TOKENS` and
 `BOSS_CRATE_PRICE` and `SHOP` (the Shop page's discount, prices, limited items, the bundle's Mythic chance) in settings.ts, `shop.ts` (`SHOP_ITEMS`,
-`SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts. `CRATE_OPEN.spinMs` (settings.ts): how long the crate opening's strip
+`SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts. `CRATE_BONUS.chance` (settings.ts): an opening's chance of a
+bonus crate (0.25, Nov 24). `CRATE_OPEN.spinMs` (settings.ts): how long the crate opening's strip
 spins (4 s, Nov 24); its other beats are in `crate-open/timeline.ts`.
 
 ## Tests and tools
 
+- The bonus crate (Nov 24): unit `packages/core/test/bonus-crate.test.ts` (the pool, built from the lists, its exclusions; 25% and
+  evenness over seeded rolls; the key; the switch), `packages/server/test/bonus-crate.test.ts` (one op's legs; series and boss crates;
+  2,000 seeded openings at about 25%; crypto's own; a bonus crate never rolls and opens last; retries and opens at once; a guest's
+  sign-in, the download, erasing; the API: production rolls, `TEST_SWITCHES` only when asked, the kill switch),
+  `packages/app/test/bonus-crate.test.ts` (the card's words, key and token; its OK; the odds line and the FAQ's from the setting); e2e
+  `e2e/crate-banner.spec.ts`, "crates: a bonus crate's card after the item's…" (`?bonus=winter-1`: the card over the item's, the locker
+  at once, OK, "You have 1 (1 bonus)", its own opening gives none) and "crates: the bonus card can't be skipped by a fast Done, and a
+  double tap on its OK opens no other crate" (the review's M1 and M2, the focus).
 - The crate opening (Nov 24): unit `packages/app/test/crate-open.test.ts` (the clicks' times, the cues, every sound piece made and
   level, every ending's loudness K-weighted under the ticks', the stings climbing); e2e `e2e/crate-banner.spec.ts`, "the opening covers the whole phone screen or the computer's middle column…" (the layer's box,
   phone and computer, on top at its corners, the side columns uncovered; Done leaves the page under it where it was; `CRATE_SHOTS=<dir>`
