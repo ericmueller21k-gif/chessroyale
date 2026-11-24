@@ -6,7 +6,7 @@ import { BOSS_ROSTER, POWER_TIPS, SPEECH } from "@chessroyale/core";
 import { TIPS, playTip, tipDue, tipFor, tipNow } from "../src/power-tips.ts";
 import { bossMomentKinds } from "../src/components/BossPowers.tsx";
 import { kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
-import { bossVoice, typeMs } from "../src/speech.tsx";
+import { bossVoice, holdMs, typeMs } from "../src/speech.tsx";
 
 const store = new Map<string, string>();
 beforeEach(() => {
@@ -102,5 +102,25 @@ describe("a tip's exchange", () => {
     expect(kingSay("queenDanger", "q-2")).toBeNull();
     vi.advanceTimersByTime(SPEECH.maxReadMs + typeMs(k) + SPEECH.fadeMs + 100);
     expect(kingSay("queenDanger", "q-3")).not.toBeNull();
+  });
+
+  it("his reply waits for a critical line of his already up to end, rather than lapse behind it", () => {
+    vi.useFakeTimers();
+    const t0 = 7_000_000;
+    vi.setSystemTime(t0);
+    // (A long warning of his, said just before the tip: up longer than SPEECH.waitMs.)
+    const danger = kingSay("blizzard", "b-1", t0, () => 0)!;
+    expect(holdMs(danger) - typeMs("Pie in your face!") - POWER_TIPS.replyMs - 100).toBeGreaterThan(SPEECH.waitMs);
+    const tip = TIPS.find((t) => t.boss === "clown")!;
+    const k = tip.lines[1]!.text;
+    vi.advanceTimersByTime(100);
+    playTip(tip, "clown:0:pie");
+    const ends = t0 + holdMs(danger);
+    vi.advanceTimersByTime(ends - Date.now() - 50);
+    expect(kingLine()?.text).toBe(danger);
+    vi.advanceTimersByTime(150);
+    expect(kingLine()?.text).toBe(k);
+    // (Meanwhile, and through his reply, his other lines held.)
+    expect(kingSay("queenDanger", "q-9")).toBeNull();
   });
 });

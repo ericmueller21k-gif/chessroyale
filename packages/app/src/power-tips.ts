@@ -144,17 +144,28 @@ export function tipNow(bossId: string, m: { kind: PowerEventKind; key: string; f
  */
 export function playTip(tip: PowerTip, key: string, now = Date.now()) {
   const voiceOf = (l: TipLine): Voice | null => (l.who === "boss" ? bossVoice : kingFallen() ? null : kingVoice);
+  // (His own lines held until his part is over: from `from`, the time the lines from `i` on take to come and his last to be read.)
+  const holdFrom = (i: number, from: number) => {
+    const rest = tip.lines.slice(i);
+    const last = rest.map((x) => x.who).lastIndexOf("king");
+    if (last >= 0 && !kingFallen()) holdKing(from + rest.slice(0, last).reduce((ms, x) => ms + typeMs(x.text) + SCHEDULE.replyMs, 0) + holdMs(rest[last]!.text));
+  };
   const say = (i: number, at: number) => {
     const l = tip.lines[i];
     if (!l) return;
     const k = `${key}:tip:${i}`;
     const v = voiceOf(l);
-    if (!v?.say(l.text, k, CRITICAL, at)) return say(i + 1, at);
-    // (His own lines held until his part is over: until his line has had its time, once it's said; before that, until it would have
-    // had it, the line ahead of it allowed its longest wait.)
-    const rest = tip.lines.slice(i);
-    if (l.who === "king" && !rest.slice(1).some((x) => x.who === "king")) holdKing(at + holdMs(l.text));
-    else if (rest.some((x) => x.who === "king")) holdKing(at + SPEECH.waitMs + rest.reduce((ms, x) => ms + typeMs(x.text) + SCHEDULE.replyMs + holdMs(x.text), 0));
+    if (!v) return say(i + 1, at);
+    // (A critical line already up in that voice, said before the tip (his warning on your queen): this one starts as it ends, rather
+    // than wait in the voice's queue, where a long one would outlast SPEECH.waitMs and drop it.)
+    const up = v.line(at);
+    if (up && up.priority >= CRITICAL && up.until > at && !up.key.startsWith(`${key}:tip:`)) {
+      holdFrom(i, up.until);
+      setTimeout(() => say(i, Math.max(up.until, Date.now())), up.until - Date.now());
+      return;
+    }
+    if (!v.say(l.text, k, CRITICAL, at)) return say(i + 1, at);
+    holdFrom(i, at);
     if (i + 1 < tip.lines.length) after(v, k, l.text, (t) => say(i + 1, t));
   };
   say(0, now);
