@@ -137,11 +137,13 @@ test("crates: the Transcendent banner fits its words, phone and computer, with r
         const tan = Math.tan((7 * Math.PI) / 180);
         const cx = (b.left + b.right) / 2;
         const cy = (b.top + b.bottom) / 2;
+        // (In the stage's own pixels: on a computer the stage is scaled up whole since Nov 25, so the band's own sizes times its scale.)
+        const k = stage.getBoundingClientRect().width / stage.offsetWidth || 1;
         const clear = (e: HTMLElement) => {
           const t = e.getBoundingClientRect();
-          const top = cy - band.offsetHeight / 2 + parseFloat(cs.borderTopWidth) - tan * (t.left - cx);
-          const bottom = cy + band.offsetHeight / 2 - parseFloat(cs.borderBottomWidth) - tan * (t.right - cx);
-          return Math.min(t.top - top, bottom - t.bottom);
+          const top = cy - (k * band.offsetHeight) / 2 + k * parseFloat(cs.borderTopWidth) - tan * (t.left - cx);
+          const bottom = cy + (k * band.offsetHeight) / 2 - k * parseFloat(cs.borderBottomWidth) - tan * (t.right - cx);
+          return Math.min(t.top - top, bottom - t.bottom) / k;
         };
         const settled = ["1", "none"].includes(getComputedStyle(text).scale);
         log.push({
