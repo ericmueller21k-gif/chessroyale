@@ -1944,3 +1944,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~22:30: #922 RED on 9150c3ff: phone shop.spec:1239 "Open another" reveal stays hidden (both tries; reproduced locally; old head
   passes run 2, both heads fail run 1 at a click timeout). Fix round sent to the build helper session_01JuCWRvbgbMWMDmdRZZyvki (its own PR);
   watcher on .done "fix round".
+- Nov 24 ~22:55: #922 fix round DONE (app bug: Open another's stage armed on the old answer then cancelled; fixed). Prepped 384f6d37, CI
+  b5tghv6o3, PR comment posted. Then merge. Waiting on Eric: sting clips, mythic items' fate.
