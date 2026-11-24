@@ -2239,9 +2239,13 @@ export const BOSS_POWERS = {
    *   crosshair locks onto the piece he takes (his engine's own move; any piece but the king) right before it shows, an upgrade; then at
    *   the end of each of his turns he locks your most capturable
    *   piece, `maxLocks` at most, a second once the first is `secondAfter` of his turns old. A lock hunts for `huntTurns` of his turns,
-   *   and lives on to `liveTurns` while the piece is still gettable. His engine is steered within the margins (L3): of its top
-   *   `lockLines` moves, one taking a locked piece within `takeMargin` pawns of his best is played; else one attacking a locked piece
-   *   (or adding an attacker) within `chaseMargin`.
+   *   and lives on to `liveTurns` while the piece is still gettable. His engine is steered within the margins (L3): a capture of a
+   *   locked piece within `takeMargin` pawns of his best (by his engine) is played: one of its top `lockLines` moves, or (the hunt,
+   *   Eric, Nov 24: "aggressively trying to capture a piece and upgrade, even if it ... is a detriment to him, but not a super
+   *   detriment") any trade for one that nets him at least −`huntLoss` pawns by the exchange check, scored against his best; else one
+   *   of the top `lockLines` attacking a locked piece (or adding an attacker) within `chaseMargin`. A locked piece that got away (he
+   *   can't take it within `huntLoss`) while another can be hunted: its lock goes and the next most gettable piece is locked.
+   *   docs/decisions/2026-11-24-chandy-upgrades.md.
    * - **The rifle:** each locked piece he takes is an upgrade (`upgradesMax`), each unlocking one of his five moves at random (the
    *   queen lock first while it could come right then, a queen of yours it can aim at, or with none your best rook (Nov 19):
    *   `queenLockFirst`, Eric, Nov 18); the upgrade window holds everything `upgradeMs` (Eric: 2 s).
@@ -2250,8 +2254,11 @@ export const BOSS_POWERS = {
    *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter; one the pass guard refuses, with
    *   nothing else unlocked, is checked again on his next turn). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
-   * - **The queen lock's shot** (Eric, Nov 20: the piece goes when the round reaches it): the round flies down the file from his edge,
-   *   `shotStepMs` a square; the piece it hits stays on the board until the round's head reaches its square's middle, then shatters.
+   * - **The Lock-on Shot** (code name `queenlock`; "Queen lock" until Nov 24: it may aim at a rook): as he aims, the piece its round
+   *   will most likely hit (the one in front of the target, or the cheapest you can put there) is locked too; the round shattering a
+   *   locked piece or the target is an upgrade, as a capture (Nov 24). Its shot (Eric, Nov 20: the piece goes when the round reaches
+   *   it): the round flies down the file from his edge, `shotStepMs` a square; the piece it hits stays on the board until the round's
+   *   head reaches its square's middle, then shatters.
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
@@ -2275,6 +2282,7 @@ export const BOSS_POWERS = {
     lockLines: 5,
     takeMargin: 2,
     chaseMargin: 0.75,
+    huntLoss: 1,
     upgradesMax: 5,
     upgradeMs: 2000,
     teachCaptures: 2,

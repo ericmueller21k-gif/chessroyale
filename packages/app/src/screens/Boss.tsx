@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { hapticOnce } from "../haptics.ts";
-import { KING_ATTACK, MOO_BEATS, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
+import { KING_ATTACK, MOO_BEATS, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, legalMoves, pieceAt, shotSaves, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, battleDecor, casterOf, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown, yourTopple } from "../components/BigBoy.tsx";
@@ -34,7 +34,7 @@ import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.t
 import type { BossView, DodgeRun, GameView, LightsView, RushView } from "../game.ts";
 import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
 import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
-import { DodgeLayer, chandyFen, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
+import { DodgeLayer, FIRE_AT as CHANDY_FIRE_AT, chandyFen, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
 import { birdieFen, birdieTurnMoments } from "../components/Birdie.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
@@ -390,6 +390,16 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   useEffect(() => {
     if (doughLine) kingSay("dough", `dough-${dough!.key}`);
   }, [doughLine]);
+  // Chandy's Lock-on Shot: the God King's warning as it's aimed, as he fires the aim (Nov 24); quiet when no move of yours can put a piece
+  // in front of its target ("the God King quiet about threats he can't heed": Wrangler's duel).
+  const shotAim = moments.find((m) => m.kind === "queenAim");
+  const shotAimLine = !!shotAim && now >= shotAim.at + CHANDY_FIRE_AT;
+  useEffect(() => {
+    if (!shotAimLine || !shotAim!.square) return;
+    const fen = boss.board.fen;
+    if (!shotSaves(fen, shotAim!.square, boss.crowdSide, boss.powers?.allowed ?? legalMoves(fen)).length) return;
+    kingSay(shotAim!.shape === "r" ? "shotRook" : "shotQueen", `shot-${shotAim!.key}`);
+  }, [shotAimLine]);
   // Wrangler's showdown: the God King's word as "DRAW!" comes.
   const showdown = moments.find((m) => m.kind === "showdown");
   const showdownLine = !!showdown && now >= showdown.at + SHOWDOWN_KING_AT;

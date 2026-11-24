@@ -250,16 +250,62 @@ export function lockRank(fen: string, square: string, crowd: Side, board: Chess 
 }
 
 /**
- * The crowd's pieces he may lock (never the king or queen, nor `skip`), most capturable first (lockRank), ties the more valuable,
- * then the seed; the ones nothing fits (rank 0) by their defenders, fewest first (Q5: nothing fits, the least defended anyway).
+ * The crowd's pieces he may lock (never the king or queen, nor `skip`), most capturable first (lockRank), among equals one he can take
+ * now by a trade within chandy.huntLoss first (huntable: Nov 24, the hunt), then the more valuable, then the seed; the ones nothing
+ * fits (rank 0) by their defenders, fewest first (Q5: nothing fits, the least defended anyway).
  */
-export function lockOrder(fen: string, crowd: Side, seed: number, n: number, skip: readonly string[] = []): string[] {
+export function lockOrder(fen: string, crowd: Side, seed: number, n: number, skip: readonly string[] = [], s: Pick<ChandySettings, "huntLoss"> = BOSS_POWERS.chandy): string[] {
   const board = boardFor(fen);
   const hits = attackedSquares(fen, other(crowd));
+  const nets = takeNets(fen, crowd);
   const rolled = piecesOf(fen, crowd)
     .filter((p) => p.type !== "k" && p.type !== "q" && !skip.includes(p.square))
-    .map((p) => ({ ...p, rank: lockRank(fen, p.square, crowd, board, hits), def: attackersOf(board, p.square, crowd).length, roll: powerRoll(seed, "lock", n, p.square) }));
-  return rolled.sort((a, b) => b.rank - a.rank || (a.rank === 0 ? a.def - b.def : 0) || VALUE[b.type]! - VALUE[a.type]! || a.roll - b.roll || (a.square < b.square ? -1 : 1)).map((p) => p.square);
+    .map((p) => ({ ...p, rank: lockRank(fen, p.square, crowd, board, hits), hunt: huntable(fen, p.square, crowd, s, nets) ? 1 : 0, def: attackersOf(board, p.square, crowd).length, roll: powerRoll(seed, "lock", n, p.square) }));
+  return rolled.sort((a, b) => b.rank - a.rank || b.hunt - a.hunt || (a.rank === 0 ? a.def - b.def : 0) || VALUE[b.type]! - VALUE[a.type]! || a.roll - b.roll || (a.square < b.square ? -1 : 1)).map((p) => p.square);
+}
+
+/**
+ * His best take of each of the crowd's pieces he can capture (read with him to move, whoever `fen` says is; his moves listed once): its
+ * square → the capture of it netting him the most by the exchange check (pawns: what it takes, less the most the crowd can take back).
+ */
+export function takeNets(fen: string, crowd: Side): Map<string, number> {
+  const his = withMover(fen, other(crowd));
+  const out = new Map<string, number>();
+  try {
+    for (const m of legalMoves(his)) {
+      const sq = capturedSquare(his, m);
+      if (!sq || pieceAt(his, sq)?.color !== crowd) continue;
+      const net = exchangeNet(his, m);
+      if (net !== null && net > (out.get(sq) ?? -Infinity)) out.set(sq, net);
+    }
+  } catch {
+    return out;
+  }
+  return out;
+}
+
+/**
+ * He can take the crowd's piece on `square` by a trade netting him at least −chandy.huntLoss pawns (the hunt's reach, Nov 24; `nets`:
+ * takeNets of the position, when it's at hand).
+ */
+export function huntable(fen: string, square: string, crowd: Side, s: Pick<ChandySettings, "huntLoss"> = BOSS_POWERS.chandy, nets: ReadonlyMap<string, number> = takeNets(fen, crowd)): boolean {
+  const net = nets.get(square);
+  return net !== undefined && net >= -s.huntLoss - 1e-9;
+}
+
+/**
+ * The hunt's captures (`fen`: him to move; Eric, Nov 24: "if it's like a decent trade, but maybe slightly negative, he still targets
+ * it"): his moves among `allowed` taking a locked piece by a trade that nets him at least −chandy.huntLoss pawns by the exchange check,
+ * which counts the crowd's best capture back anywhere (so never one that hangs his queen). His engine scores them against his best
+ * (steerPick: within chandy.takeMargin, never into a mate).
+ */
+export function huntTakes(fen: string, locks: readonly string[], allowed: readonly string[] | null = null, s: Pick<ChandySettings, "huntLoss"> = BOSS_POWERS.chandy): string[] {
+  if (!locks.length) return [];
+  return (allowed ?? legalMoves(fen)).filter((m) => {
+    if (!locks.includes(capturedSquare(fen, m) ?? "")) return false;
+    const net = exchangeNet(fen, m);
+    return net !== null && net >= -s.huntLoss - 1e-9;
+  });
 }
 
 /**
@@ -284,19 +330,27 @@ export function testCapture(fen: string, crowd: Side, seed: number, allowed: rea
 /** A lock's age (his moves since it came). */
 export const lockAge = (c: Pick<ChandyState, "moves">, l: Pick<ChandyLock, "at">): number => c.moves - l.at;
 
-/** A lock's turns left on its crosshair (L6: 3, 2, 1): its hunt's, then (still gettable) its life's. */
-export function lockLeft(c: Pick<ChandyState, "moves">, l: Pick<ChandyLock, "at">, s: Pick<ChandySettings, "huntTurns" | "liveTurns"> = BOSS_POWERS.chandy): number {
+/** A lock's turns left on its crosshair (L6: 3, 2, 1): its hunt's, then (still gettable) its life's; the Lock-on Shot's, 1 (it fires next). */
+export function lockLeft(c: Pick<ChandyState, "moves">, l: Pick<ChandyLock, "at" | "shot">, s: Pick<ChandySettings, "huntTurns" | "liveTurns"> = BOSS_POWERS.chandy): number {
+  if (l.shot) return 1;
   const age = lockAge(c, l);
   return Math.max(1, age < s.huntTurns ? s.huntTurns - age : s.liveTurns - age);
 }
 
-/** A lock that ends now (`fen`: the crowd to move): its piece gone or changed, too old, or past its hunt and no longer gettable. */
-export function lockEnds(fen: string, crowd: Side, c: Pick<ChandyState, "moves">, l: ChandyLock, s: Pick<ChandySettings, "huntTurns" | "liveTurns"> = BOSS_POWERS.chandy): boolean {
+/**
+ * A lock that ends now (`fen`: the crowd to move): its piece gone or changed, too old, or past its hunt and no longer gettable (nor
+ * huntable: a trade within chandy.huntLoss keeps it, Nov 24). `relock` (the hunt, Nov 24: "re-locks the next most gettable piece when
+ * one escapes"): another of the crowd's pieces is huntable now, so a lock whose piece got away (neither gettable nor huntable) ends at
+ * once and the next is locked. The Lock-on Shot's lock never ends here: the shot takes it away (only its piece gone ends it).
+ */
+export function lockEnds(fen: string, crowd: Side, c: Pick<ChandyState, "moves">, l: ChandyLock, s: Pick<ChandySettings, "huntTurns" | "liveTurns" | "huntLoss"> = BOSS_POWERS.chandy, relock = false): boolean {
   const piece = pieceAt(fen, l.square);
+  if (l.shot) return !piece || piece.color !== crowd || piece.type !== l.piece;
   if (!piece || piece.color !== crowd || piece.type !== l.piece || piece.type === "q" || piece.type === "k") return true;
   const age = lockAge(c, l);
   if (age >= s.liveTurns) return true;
-  return age >= s.huntTurns && lockRank(fen, l.square, crowd) < 2;
+  if (lockRank(fen, l.square, crowd) >= 2 || huntable(fen, l.square, crowd, s)) return false;
+  return age >= s.huntTurns || (relock && age >= 1);
 }
 
 /** The locks after a move (`fen`: before it): each follows its piece (castling's rook too); one taken is gone; a promotion takes its new letter. */
@@ -330,11 +384,13 @@ export function locksAfter(fen: string, move: string, locks: readonly ChandyLock
 
 /**
  * His move steered toward his locks (`fen`: him to move; `pick`: the move his brain chose; `top`: the engine's top moves, scored for
- * him; `locks`: the locked squares). Of the best chandy.lockLines allowed: the best taking a locked piece within takeMargin pawns of
- * his best (his pick if it does); else one attacking a locked piece or adding an attacker within chaseMargin (his pick if it does,
- * else the best such); else his pick. Pawns as log-odds (bouncePawnLogit), as the pass guard counts them.
+ * him; `locks`: the locked squares; `hunt`: the hunt's captures (huntTakes) scored in one search with his best move, Nov 24). A take
+ * within takeMargin pawns of his best: of the best chandy.lockLines allowed, one taking a locked piece; or one of the hunt's (a trade
+ * within huntLoss by the exchange check), its loss against his best measured in its own search, never one walking into a mate. The best
+ * such (his pick if it's one); else one of those lines attacking a locked piece or adding an attacker within chaseMargin (his pick if it
+ * does, else the best such); else his pick. Pawns as log-odds (bouncePawnLogit), as the pass guard counts them.
  */
-export function steerPick(fen: string, pick: string, top: readonly MoveScore[], locks: readonly string[], allowed: readonly string[] | null = null, s: SteerSettings = BOSS_POWERS): string {
+export function steerPick(fen: string, pick: string, top: readonly MoveScore[], locks: readonly string[], allowed: readonly string[] | null = null, s: SteerSettings = BOSS_POWERS, hunt: readonly MoveScore[] = []): string {
   if (!locks.length || !top.length) return pick;
   const ok = new Set(allowed ?? legalMoves(fen));
   const lines = [...top]
@@ -343,10 +399,19 @@ export function steerPick(fen: string, pick: string, top: readonly MoveScore[], 
     .slice(0, Math.max(1, s.chandy.lockLines));
   const best = lines[0];
   if (!best) return pick;
-  const pawns = (m: MoveScore) => (logit(best.expected) - logit(m.expected)) / s.bouncePawnLogit;
+  const lost = (from: number, m: MoveScore) => (logit(from) - logit(m.expected)) / s.bouncePawnLogit;
+  const pawns = (m: MoveScore) => lost(best.expected, m);
   const takesLock = (m: string) => locks.includes(capturedSquare(fen, m) ?? "");
-  const takes = lines.filter((m) => takesLock(m.move) && pawns(m) <= s.chandy.takeMargin + 1e-9);
-  if (takes.length) return takes.some((m) => m.move === pick) ? pick : takes[0]!.move;
+  // (Each take's loss against his best: from the top lines, else from the hunt's own search (its best the reference).)
+  const loss = new Map<string, number>();
+  for (const m of lines) if (takesLock(m.move)) loss.set(m.move, pawns(m));
+  const huntOk = new Set(huntTakes(fen, locks, [...ok], s.chandy));
+  const mated = (m: MoveScore) => m.mate !== undefined && m.mate < 0;
+  for (const m of top) if (huntOk.has(m.move) && !mated(m) && !loss.has(m.move)) loss.set(m.move, pawns(m));
+  const ref = Math.max(...hunt.map((m) => m.expected));
+  for (const m of hunt) if (huntOk.has(m.move) && !mated(m) && !loss.has(m.move)) loss.set(m.move, Math.max(0, lost(ref, m)));
+  const takes = [...loss].filter(([, x]) => x <= s.chandy.takeMargin + 1e-9).sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : 1));
+  if (takes.length) return takes.some(([m]) => m === pick) ? pick : takes[0]![0];
   if (takesLock(pick)) return pick;
   const his = sideToMove(fen);
   const board = boardFor(fen);
@@ -594,6 +659,45 @@ export function queenLockAim(passed: string | null, crowd: Side, seed: number, n
 
 /** The queen lock may come now (`fen`: him to move): a queen (or, with none it can aim at, a rook) with a cheap save (queenLockAim), and a turn he can pass. */
 export const queenLockOk = (fen: string, crowd: Side, seed: number, n: number): boolean => queenLockAim(passTurn(fen), crowd, seed, n) !== null;
+
+/**
+ * The crowd's moves (of `moves`; `fen`: the crowd to move) that put a piece of theirs in front of the Lock-on Shot's target (`target`:
+ * its square; the aim follows it), so its round hits that piece instead: the target's saves.
+ */
+export function shotSaves(fen: string, target: string, crowd: Side, moves: readonly string[] = legalMoves(fen)): string[] {
+  return moves.filter((m) => {
+    try {
+      const now = from(m) === target ? to(m) : target;
+      const hit = shotTarget(applyMove(fen, m), now, crowd);
+      return !!hit && hit !== now;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * The piece the Lock-on Shot will most likely hit (Eric, Nov 24: "When he does his queen shot, we should already know ... which piece
+ * you're most likely to sacrifice. So have him mark that piece as well"), decided once as he aims (`passed`: the crowd to move;
+ * `target`: the aim's square), from the position alone so every device agrees: the piece already first down the target's file from
+ * his edge, if one is in front of it; else the cheapest piece a move of yours can put there (ties: the one more of your moves put
+ * there, then the seed), as its square now; else the target. Null: nothing to aim at.
+ */
+export function shotVictim(passed: string, target: string, crowd: Side, seed: number, n: number): string | null {
+  const first = shotTarget(passed, target, crowd);
+  if (!first) return null;
+  if (first !== target) return first;
+  const ways = new Map<string, number>();
+  for (const m of shotSaves(passed, target, crowd)) {
+    const now = from(m) === target ? to(m) : target;
+    const hit = shotTarget(applyMove(passed, m), now, crowd)!;
+    // (The piece as it stands now: the mover, if it's the one that stepped in front; castling's rook isn't counted.)
+    const sq = hit === to(m) ? from(m) : hit;
+    if (pieceAt(passed, sq)?.color === crowd) ways.set(sq, (ways.get(sq) ?? 0) + 1);
+  }
+  const pick = seeded([...ways.keys()], seed, (x) => x, "shot-victim", n).sort((a, b) => VALUE[pieceAt(passed, a)!.type]! - VALUE[pieceAt(passed, b)!.type]! || ways.get(b)! - ways.get(a)!)[0];
+  return pick ?? target;
+}
 
 /**
  * The queen lock's shot at the start of his turn (`fen`: him to move; `queen`: where she stands now): the square it shatters and the
@@ -884,14 +988,23 @@ export const CHANDY: BossRules = {
   wearOff(next, t) {
     const c = next.chandy;
     if (!c) return;
-    // This crowd turn's effects only; the locks that end (L1: their piece gone, too old, past their hunt and safe).
+    // This crowd turn's effects only; the locks that end (L1: their piece gone, too old, past their hunt and safe; the hunt, Nov 24:
+    // one that got away while another piece can be hunted, the next locked by the passive).
+    let relock: boolean | null = null;
+    const another = () => {
+      if (relock === null) {
+        const nets = takeNets(t.fen, t.crowd);
+        relock = lockOrder(t.fen, t.crowd, t.seed, c.moves, c.locks.map((l) => l.square), t.s.chandy).some((sq) => huntable(t.fen, sq, t.crowd, t.s.chandy, nets));
+      }
+      return relock;
+    };
     next.chandy = {
       ...c,
       scatter: on(c.scatter, t.turn),
       beam: on(c.beam, t.turn),
       shields: on(c.shields, t.turn),
       dizzy: on(c.dizzy, t.turn),
-      locks: c.locks.filter((l) => !lockEnds(t.fen, t.crowd, c, l, t.s.chandy)),
+      locks: c.locks.filter((l) => !lockEnds(t.fen, t.crowd, c, l, t.s.chandy, false) && !(c.taught && !l.shot && lockEnds(t.fen, t.crowd, c, l, t.s.chandy, true) && another())),
     };
   },
   // Several bosses: the last chance can't wait for his own turn change (a mate open as your turn begins: Dodge now, whoever moved).
@@ -926,6 +1039,14 @@ export const CHANDY: BossRules = {
       // (Its target, a queen or a rook (Nov 19), for the screens' words.)
       const shape = pieceAt(t.fen, c.aim.square)?.type;
       t.events.push({ kind: "queenAim", turn: t.turn, square: c.aim.square, ...(shape === "r" || shape === "q" ? { shape } : {}) });
+      // (The piece the round will most likely hit, decided as he aimed (shotVictim): locked too, its crosshair snapping on after the aim's
+      // (Nov 24). Already locked, or the target itself (the aim's crosshair is on it): nothing more.)
+      const v = c.aim.victim;
+      const piece = v ? pieceAt(t.fen, v) : null;
+      if (v && piece && piece.color === t.crowd && v !== c.aim.square && !c.locks.some((l) => l.square === v)) {
+        next.chandy = { ...c, locks: [...c.locks, { square: v, piece: piece.type, at: c.moves, shot: true }] };
+        t.events.push({ kind: "lockOn", turn: t.turn, square: v });
+      }
     }
   },
   passive(next, t) {
@@ -934,10 +1055,11 @@ export const CHANDY: BossRules = {
     next.nextPassive = t.turn;
     // The meter's move lands (not the queen lock: his turn's own).
     if (c.due && c.due !== "queenlock") c = landMove(c, t);
-    // Then he hunts: a lock, or a second once the first is old enough (L1).
+    // Then he hunts: a lock, or a second once the first is old enough (L1). (The Lock-on Shot's lock isn't one he hunts.)
     const s = t.s.chandy;
-    if (c.taught && (c.locks.length === 0 || (c.locks.length < s.maxLocks && c.locks.every((l) => lockAge(c!, l) >= s.secondAfter)))) {
-      const sq = lockOrder(t.fen, t.crowd, t.seed, c.moves, c.locks.map((l) => l.square))[0];
+    const hunting = c.locks.filter((l) => !l.shot);
+    if (c.taught && (hunting.length === 0 || (hunting.length < s.maxLocks && hunting.every((l) => lockAge(c!, l) >= s.secondAfter)))) {
+      const sq = lockOrder(t.fen, t.crowd, t.seed, c.moves, c.locks.map((l) => l.square), s)[0];
       const piece = sq ? pieceAt(t.fen, sq) : null;
       if (sq && piece) {
         c = { ...c, locks: [...c.locks, { square: sq, piece: piece.type, at: c.moves }] };
@@ -1083,7 +1205,7 @@ export function chandyView(p: BossPowerState, s: ChandySettings = BOSS_POWERS.ch
  */
 function followLocks(chandy: ChandyState, before: string, move: string): ChandyState {
   const c: ChandyState = { ...chandy };
-  c.locks = locksAfter(before, move, c.locks).filter((l) => l.piece !== "q");
+  c.locks = locksAfter(before, move, c.locks).filter((l) => l.piece !== "q" || l.shot);
   if (c.aim) {
     // (The aim follows its piece, a queen or a rook (Nov 19), while it stays that piece: taken, or not there, it's gone.)
     const was = pieceAt(before, c.aim.square)?.type;
@@ -1091,6 +1213,21 @@ function followLocks(chandy: ChandyState, before: string, move: string): ChandyS
     c.aim = followed && followed.piece === was ? { ...c.aim, square: followed.square } : null;
   }
   return c;
+}
+
+/**
+ * An upgrade of his rifle (to chandy.upgradesMax; `fen`: the board as it will be on your turn, for the queen lock's "could it come
+ * then"): its stage, the move it unlocks (unlockPick: the Lock-on Shot first while it could come then, chandy.queenLockFirst), shown as
+ * crowd turn `turn` begins; the fifth makes the rifle whole. Past the fifth: nothing.
+ */
+function upgraded(c: ChandyState, fen: string, crowd: Side, seed: number, turn: number, s: ChandySettings = BOSS_POWERS.chandy): ChandyState {
+  if (c.upgrades >= s.upgradesMax) return c;
+  // (The queen lock first only when it could come now: a queen of yours (or, with none, a rook: Nov 19) with a save, the test queenLockOk
+  // makes after his pass, on the board you'll move on. The review of #797: with a queen it can't aim at, the slot sat dead.)
+  const queen = s.queenLockFirst && !c.unlocked.includes("queenlock") && sideToMove(fen) === crowd && queenLockAim(fen, crowd, seed, c.used) !== null;
+  const unlock = unlockPick(c.unlocked, seed, c.upgrades, queen);
+  const stage = c.upgrades + 1;
+  return { ...c, upgrades: stage, upgrade: { turn, stage, ...(unlock ? { unlock } : {}) }, ...(unlock ? { unlocked: [...c.unlocked, unlock], fresh: unlock } : {}), ...(stage >= s.upgradesMax ? { whole: turn } : {}) };
 }
 
 export const chandyBattle = {
@@ -1110,22 +1247,30 @@ export const chandyBattle = {
     const fen = boardOf(b).fen;
     if (sideToMove(fen) === crowd || !legalMoves(fen).length) return setChandy(b, () => c);
     const events: PowerEvent[] = [];
+    // (An upgrade shown as this turn began: its unlock fires now, below; read before the shot's own upgrade replaces it.)
+    const shown = c.upgrade;
     // The queen lock fires at the start of his turn after its aim (Q5); then he plays his move. (Several bosses on one side: his own
     // next turn, as alone: hisTurn.)
     if (c.aim && c.aim.turn <= boss.crowdMoves && (b.hisTurn?.() ?? true)) {
       const shot = queenShot(fen, c.aim.square, crowd);
       c.shot = { at: boss.crowdMoves, square: shot.square, piece: shot.piece };
       events.push({ kind: "queenShot", turn: p.turn, square: shot.square ?? c.aim.square, squares: shot.trail, ...(shot.square ? { shape: shot.piece as "p" | "n" | "b" | "r" | "q" } : { fizzled: [c.aim.square] }) });
+      // (The Lock-on Shot's round shattering a locked piece, or its target, is an upgrade, as a capture (Nov 24: the piece it would most
+      // likely hit was locked as he aimed). Shown as your turn after his move begins, as a capture's.)
+      const hit = !!shot.square && (shot.square === c.aim.square || c.locks.some((l) => l.square === shot.square));
       c.aim = null;
       if (shot.square) {
         setBoard(b, shot.fen);
         c.locks = c.locks.filter((l) => l.square !== shot.square);
       }
+      // (Its lock goes with the shot, whatever it hit.)
+      c.locks = c.locks.filter((l) => !l.shot);
+      if (hit) c = upgraded(c, passTurn(boardOf(b).fen) ?? boardOf(b).fen, crowd, p.seed, turnOf(boss), s);
     }
     const now = boardOf(b).fen;
     // A new unlock fires at once (fireOnUnlock): your move after its upgrade window has the meter full and the unlock picked, whatever
     // the meter said; a queen lock that can't come now waits for the meter, as ever.
-    const unlock = s.fireOnUnlock && c.upgrade?.unlock && c.upgrade.turn === boss.crowdMoves ? c.upgrade.unlock : null;
+    const unlock = s.fireOnUnlock && shown?.unlock && shown.turn === boss.crowdMoves ? shown.unlock : null;
     if (unlock && (unlock !== "queenlock" || queenLockOk(now, crowd, p.seed, c.used))) {
       c.meter = s.meterEvery;
       c.due = unlock;
@@ -1147,14 +1292,14 @@ export const chandyBattle = {
     const boss = b.state.boss;
     const p = boss?.powers;
     const c = p?.chandy;
-    if (!boss || !p || !c || boss.id !== "chandy" || boss.result || c.taught || c.locks.length || !b.bossToMove() || b.finalGameOver()) return null;
+    if (!boss || !p || !c || boss.id !== "chandy" || boss.result || c.taught || c.locks.some((l) => !l.shot) || !b.bossToMove() || b.finalGameOver()) return null;
     const fen = boardOf(b).fen;
     // (The runner checks it against his allowed moves first: bossMoveMoment.)
     if (!legalMoves(fen).includes(move)) return null;
     const sq = capturedSquare(fen, move);
     const piece = sq ? pieceAt(fen, sq) : null;
     if (!sq || !piece || piece.color !== boss.crowdSide || piece.type === "k") return null;
-    setChandy(b, (x) => ({ ...x, locks: [{ square: sq, piece: piece.type, at: x.moves }] }), [{ kind: "lockOn", turn: p.turn, square: sq, first: true }]);
+    setChandy(b, (x) => ({ ...x, locks: [...x.locks.filter((l) => l.shot && l.square !== sq), { square: sq, piece: piece.type, at: x.moves }] }), [{ kind: "lockOn", turn: p.turn, square: sq, first: true }]);
     return sq;
   },
 
@@ -1175,22 +1320,15 @@ export const chandyBattle = {
       const victim = taken ? pieceAt(before, taken) : null;
       const first = !c.taught && !!victim && victim.color === boss.crowdSide && victim.type !== "k";
       // (Until his captures have taught it the only lock is a capture's mark: one on a piece his move didn't take goes.)
-      if (!c.taught) c.locks = c.locks.filter((l) => l.square === taken);
+      if (!c.taught) c.locks = c.locks.filter((l) => l.shot || l.square === taken);
       if (first) {
         c.marked = (c.marked ?? 0) + 1;
         if (c.marked >= s.teachCaptures) c.taught = true;
       }
       const hit = first || (taken ? c.locks.some((l) => l.square === taken) : false);
       c.locks = locksAfter(before, move, c.locks);
-      if (hit && c.upgrades < s.upgradesMax) {
-        // (The queen lock first only when it could come now: a queen of yours (or, with none, a rook: Nov 19) with a save, the test queenLockOk makes after his
-        // pass, on the board after this move, you to move. The review of #797: with a queen it can't aim at, the slot sat dead.)
-        const queen = s.queenLockFirst && queenLockAim(boardOf(b).fen, boss.crowdSide, p.seed, c.used) !== null;
-        const unlock = unlockPick(c.unlocked, p.seed, c.upgrades, queen);
-        const stage = c.upgrades + 1;
-        // (Shown as your next turn begins: everyTurn.)
-        c = { ...c, upgrades: stage, upgrade: { turn: turnOf(boss), stage, ...(unlock ? { unlock } : {}) }, ...(unlock ? { unlocked: [...c.unlocked, unlock], fresh: unlock } : {}), ...(stage >= s.upgradesMax ? { whole: turnOf(boss) } : {}) };
-      }
+      // (Shown as your next turn begins: everyTurn.)
+      if (hit) c = upgraded(c, boardOf(b).fen, boss.crowdSide, p.seed, turnOf(boss), s);
     }
     setChandy(b, () => c);
   },
@@ -1269,7 +1407,9 @@ export const chandyBattle = {
     setBoard(b, passed);
     b.boards.set(b.state.boards[0]!, { ...boardOf(b), expected: 1 - board.expected, lastMove: null });
     b.bossLast = null;
-    setChandy(b, (x) => ({ ...x, moves: x.moves + 1, aim: { square: queen, turn: turnOf(boss) }, due: null, meter: 0, ...fired(x, "queenlock") }));
+    // (The piece its round will most likely hit, decided now (shotVictim), locked as the aim shows: everyTurn.)
+    const victim = shotVictim(passed, queen, boss.crowdSide, p.seed, c.used);
+    setChandy(b, (x) => ({ ...x, moves: x.moves + 1, aim: { square: queen, turn: turnOf(boss), ...(victim && victim !== queen ? { victim } : {}) }, due: null, meter: 0, ...fired(x, "queenlock") }));
     b.bossPassed();
     return queen;
   },
@@ -1278,8 +1418,9 @@ export const chandyBattle = {
   steer(b: Battle): string[] | null {
     const boss = b.state.boss;
     const c = boss?.powers?.chandy;
-    if (!boss || !c || boss.id !== "chandy" || !c.taught || !c.locks.length || !b.bossToMove()) return null;
-    return c.locks.map((l) => l.square);
+    const hunting = c?.locks.filter((l) => !l.shot) ?? [];
+    if (!boss || !c || boss.id !== "chandy" || !c.taught || !hunting.length || !b.bossToMove()) return null;
+    return hunting.map((l) => l.square);
   },
 
   /** The test switch's move (`?power=lockon`, solo): until his captures have taught it, a capture whenever one nets him no loss (testCapture); else null. */
