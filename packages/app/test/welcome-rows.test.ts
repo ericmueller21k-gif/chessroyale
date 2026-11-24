@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { welcomeResumeRow, welcomeRows, type WelcomeRide } from "../src/welcome-rows.ts";
+import { welcomeResumeRow, welcomeRows, welcomeRowsShown, type WelcomeRide } from "../src/welcome-rows.ts";
 
 /**
  * The two Welcome Crate rows (Eric, Nov 6: "1 out of 5 … 1 out of 25 unlock tracker"): both always there, each with its own meter and
@@ -77,5 +77,36 @@ describe("the Welcome Crate rows (Nov 6)", () => {
     expect(welcomeResumeRow(welcomeRows({ games: 5, next: 25, unopened: 1, status: "ready" }, true))).toBe(1);
     expect(welcomeResumeRow(welcomeRows({ games: 30, next: null, unopened: 0, status: "opened", item: R2.id }, true, [R1, R2]))).toBe(2);
     expect(welcomeResumeRow(welcomeRows({ games: 0, next: 5, unopened: 0, status: "locked" }, true))).toBe(1);
+  });
+});
+
+describe("the Welcome Crate rows the Crates tab lists (Eric, Nov 25: used ones gone)", () => {
+  it("at the start both show (locked, with their meters)", () => {
+    const rows = welcomeRows({ games: 2, next: 5, unopened: 0, status: "locked" }, true);
+    expect(welcomeRowsShown(rows).map((r) => r.n)).toEqual([1, 2]);
+  });
+
+  it("crate 1 fully opened and seen: only crate 2 (still Welcome Crate 2)", () => {
+    const rows = welcomeRows({ games: 6, next: 25, unopened: 0, status: "opened", item: R1.id }, true, [R1]);
+    expect(welcomeRowsShown(rows).map((r) => [r.n, r.state])).toEqual([[2, "locked"]]);
+  });
+
+  it("crate 1 opened but its reveal not seen yet: it stays until it is", () => {
+    const rows = welcomeRows({ games: 6, next: 25, unopened: 0, status: "opened", item: R1.id }, true, [R1]);
+    expect(welcomeRowsShown(rows, welcomeResumeRow(rows)).map((r) => r.n)).toEqual([1, 2]);
+  });
+
+  it("crate 1 opened, crate 2 ready: only crate 2", () => {
+    const rows = welcomeRows({ games: 25, next: null, unopened: 1, status: "ready", item: R1.id }, true, [R1]);
+    expect(welcomeRowsShown(rows).map((r) => [r.n, r.state])).toEqual([[2, "ready"]]);
+  });
+
+  it("both opened and seen: none", () => {
+    const rows = welcomeRows({ games: 30, next: null, unopened: 0, status: "opened", item: R2.id }, true, [R1, R2]);
+    expect(welcomeRowsShown(rows)).toEqual([]);
+  });
+
+  it("a guest's both show (locked: 'Sign in to earn')", () => {
+    expect(welcomeRowsShown(welcomeRows({ games: 0 }, false)).map((r) => r.n)).toEqual([1, 2]);
   });
 });

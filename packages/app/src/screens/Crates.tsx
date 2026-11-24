@@ -48,6 +48,7 @@ import {
   showsPurity,
   pickableBossCrates,
   bonusOddsLine,
+  bonusPool,
   type BonusRoll,
   type BossCrateDef,
   type CrateDef,
@@ -71,7 +72,7 @@ import { BONUS, STRIPS } from "../crate-open/timeline.ts";
 import { useAccount } from "./Profile.tsx";
 import { testParams } from "../test-switches.ts";
 import { haptic } from "../haptics.ts";
-import { welcomeResumeRow, welcomeRows, type WelcomeRowView } from "../welcome-rows.ts";
+import { welcomeResumeRow, welcomeRows, welcomeRowsShown, type WelcomeRowView } from "../welcome-rows.ts";
 import { bossCratesShown, NO_BOSS_CRATES_LINE, readShowUnowned, saveShowUnowned } from "../boss-crate-rows.ts";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
@@ -196,11 +197,24 @@ export function CratesPanel() {
     const row = welcome.find((r) => r.n === welcomeOpen)!;
     return <WelcomePage row={row} resume={resumeRow !== null && welcomeOpen === resumeRow ? (resume ?? undefined) : undefined} onBack={() => setWelcomeOpen(null)} />;
   }
-  const bossRows = bossCratesShown(
-    BOSS_CRATES.filter((c) => profile?.admin || heldOf(locker, c) > 0 || !adminFirst({ id: c.boss })),
-    (c) => heldOf(locker, c),
-    showUnowned,
-  );
+  // The page, top to bottom (Eric, Nov 25: "refactor this page a bit"; docs/decisions/2026-11-25-crates-page-tidy.md): your keys and
+  // crates; Ready to open (every crate you can open now: Welcome Crates still to open, the crates you hold, a boss crate to choose); your
+  // boss tokens; More crates (the rest: each opens its page, odds and contents); and, admins only, the test grants at the very bottom.
+  // Each crate is in one place: Ready to open while you hold it, More crates otherwise.
+  const unseen = getUnseen();
+  const welcomeShown = welcomeRowsShown(welcome, unseen && isWelcomeCrate(unseen.crate) ? welcomeResumeRow(welcome) : null);
+  const bosses = BOSS_CRATES.filter((c) => profile?.admin || heldOf(locker, c) > 0 || !adminFirst({ id: c.boss }));
+  const heldBoss = bossCratesShown(bosses, (c) => heldOf(locker, c), false);
+  // ("Show unowned" (Nov 24) now covers the boss crates you don't hold, in More crates: the ones you hold are under Ready to open.)
+  const moreBoss = showUnowned ? bosses.filter((c) => heldOf(locker, c) === 0) : [];
+  const picks = locker?.bossPicks ?? 0;
+  const pickRow = <BossPickRow picks={picks} onOpen={() => setPicking(true)} />;
+  const readyWelcome = welcomeShown.filter((r) => r.state === "ready");
+  const heldSeries = CRATES.filter((c) => heldOf(locker, c) > 0);
+  const nothingReady = !readyWelcome.length && !heldSeries.length && !heldBoss.length && !picks;
+  const welcomeRow = (row: WelcomeRowView) => <WelcomeRow key={`w${row.n}`} row={row} onOpen={() => setWelcomeOpen(row.n)} />;
+  const seriesRow = (c: CrateDef) => <SeriesCrateRow key={c.id} crate={c} held={heldOf(locker, c)} keys={keysOf(locker)} onOpen={() => setOpen(c)} />;
+  const bossRow = (c: BossCrateDef) => <BossCrateRow key={c.id} crate={c} held={heldOf(locker, c)} onOpen={() => setOpen(c)} />;
   return (
     <div class="crates">
       <GamblingWarning />
@@ -213,85 +227,100 @@ export function CratesPanel() {
         </span>
         <span class="stock">Crates × {count(locker?.crates)}</span>
       </div>
-      {welcome.map((row) => (
-        <WelcomeRow key={row.n} row={row} onOpen={() => setWelcomeOpen(row.n)} />
-      ))}
-      <BossPickRow picks={locker?.bossPicks ?? 0} onOpen={() => setPicking(true)} />
+      <section class="crates-section crates-ready" aria-label="Ready to open">
+        <h3 class="ff-title">Ready to open</h3>
+        {readyWelcome.map(welcomeRow)}
+        {picks > 0 && pickRow}
+        {heldSeries.map(seriesRow)}
+        {heldBoss.map(bossRow)}
+        {nothingReady && <p class="small muted crates-none">Nothing to open right now.</p>}
+      </section>
       <TokenStock tokens={locker?.tokens ?? {}} admin={!!profile?.admin} />
+      <section class="crates-section crates-more" aria-label="More crates">
+        {/* "More crates" and its "Show unowned" box on one line (Nov 24's box, Nov 25's section). */}
+        <div class="boss-crates-head">
+          <h3 class="ff-title">More crates</h3>
+          <label class="show-unowned">
+            <input
+              type="checkbox"
+              checked={showUnowned}
+              onChange={(e) => {
+                const on = e.currentTarget.checked;
+                setShowUnowned(on);
+                saveShowUnowned(on);
+              }}
+            />
+            Show unowned
+          </label>
+        </div>
+        {/* Welcome Crates still to earn (their meters filling), then the series crates you don't hold (greyed, a padlock: shown, not
+            hidden, their pages still show what's inside), the boss crate choice with none to choose (greyed), and with "Show unowned"
+            every boss crate you don't hold. */}
+        {welcomeShown.filter((r) => r.state !== "ready").map(welcomeRow)}
+        {CRATES.filter((c) => heldOf(locker, c) === 0).map(seriesRow)}
+        {picks === 0 && pickRow}
+        {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
+        {moreBoss.map(bossRow)}
+        {!showUnowned && <p class="small muted no-boss-crates">{heldBoss.length ? MORE_BOSS_CRATES_LINE : NO_BOSS_CRATES_LINE}</p>}
+        <p class="small muted crates-how">Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward, and an opening sometimes gives a bonus crate (with its key if it needs one).</p>
+      </section>
+      {/* (Admins only, at the very bottom: the page above it is what every player sees. Eric, Nov 25.) */}
       {profile?.admin && <AdminGrants />}
-      {/* The series crates (Nov 9): each with how many you hold; a padlock while it can't be opened (none held, or no key), greyed at
-          none (shown, not hidden: its page still shows what's inside). */}
-      {CRATES.map((c) => {
-        const { Crate } = CRATE_LOOKS[c.look];
-        const n = heldOf(locker, c);
-        const locked = !n || !keysOf(locker);
-        return (
-          <button type="button" key={c.id} class={`ff-window crate-row series-crate-row${n ? "" : " none"}${locked ? " locked" : ""}`} data-crate={c.id} data-held={n} onClick={() => setOpen(c)}>
-            <span class="crate-row-art">
-              <Crate />
-              {locked && (
-                <span class="welcome-lock crate-lock">
-                  <Padlock />
-                </span>
-              )}
-            </span>
-            <span class="crate-row-text">
-              <strong>
-                <CrateName name={c.name} />
-              </strong>
-              <span class="crate-row-blurb">{c.blurb}</span>
-              <span class="crate-row-held">{n ? `You have ${n} · ${c.items.length} items` : `You have none · ${c.items.length} items`}</span>
-            </span>
-            <span class="ff-cursor" aria-hidden="true">
-              ▶
-            </span>
-          </button>
-        );
-      })}
-      <p class="small muted crates-how">Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward, and an opening sometimes gives a bonus crate (with its key if it needs one).</p>
-      {/* The boss crates (Eric, Nov 2: a buy in a boss's shop "adds the crate to your inventory"): each with how many you hold,
-          greyed at none; opened here as any crate. Since Nov 24 (Eric's own exception to "nothing hidden"): only the ones you hold,
-          unless "Show unowned" is checked (boss-crate-rows.ts). */}
-      <div class="boss-crates-head">
-        <h3 class="ff-title">Boss crates</h3>
-        <label class="show-unowned">
-          <input
-            type="checkbox"
-            checked={showUnowned}
-            onChange={(e) => {
-              const on = e.currentTarget.checked;
-              setShowUnowned(on);
-              saveShowUnowned(on);
-            }}
-          />
-          Show unowned
-        </label>
-      </div>
-      {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
-      {bossRows.length === 0 && <p class="small muted no-boss-crates">{NO_BOSS_CRATES_LINE}</p>}
-      {bossRows.map((c) => {
-        const { Crate } = CRATE_LOOKS[c.look];
-        const n = heldOf(locker, c);
-        return (
-          <button type="button" key={c.id} class={`ff-window crate-row boss-crate-row${n ? "" : " none"}`} data-crate={c.id} data-held={n} onClick={() => setOpen(c)}>
-            <span class="crate-row-art">
-              <Crate />
-              <span class="crate-row-token">
-                <TokenArt boss={c.boss} />
-              </span>
-            </span>
-            <span class="crate-row-text">
-              <strong>{c.name}</strong>
-              <span class="crate-row-blurb">{c.blurb}</span>
-              <span class="crate-row-held">{n ? `You have ${n}` : "You have none"}</span>
-            </span>
-            <span class="ff-cursor" aria-hidden="true">
-              ▶
-            </span>
-          </button>
-        );
-      })}
     </div>
+  );
+}
+
+/** "Check Show unowned" when the boss crates you hold are all under Ready to open. */
+const MORE_BOSS_CRATES_LINE = "Check Show unowned to see the boss crates you don't have.";
+
+/** A series crate's row (Nov 9): how many you hold; a padlock while it can't be opened (none held, or no key), greyed at none. */
+function SeriesCrateRow({ crate: c, held: n, keys, onOpen }: { crate: CrateDef; held: number; keys: number; onOpen: () => void }) {
+  const { Crate } = CRATE_LOOKS[c.look];
+  const locked = !n || !keys;
+  return (
+    <button type="button" class={`ff-window crate-row series-crate-row${n ? "" : " none"}${locked ? " locked" : ""}`} data-crate={c.id} data-held={n} onClick={onOpen}>
+      <span class="crate-row-art">
+        <Crate />
+        {locked && (
+          <span class="welcome-lock crate-lock">
+            <Padlock />
+          </span>
+        )}
+      </span>
+      <span class="crate-row-text">
+        <strong>
+          <CrateName name={c.name} />
+        </strong>
+        <span class="crate-row-blurb">{c.blurb}</span>
+        <span class="crate-row-held">{n ? `You have ${n} · ${c.items.length} items` : `You have none · ${c.items.length} items`}</span>
+      </span>
+      <span class="ff-cursor" aria-hidden="true">
+        ▶
+      </span>
+    </button>
+  );
+}
+
+/** A boss crate's row (Eric, Nov 2: bought in its boss's shop, held until opened here): its boss's token on the corner, greyed at none. */
+function BossCrateRow({ crate: c, held: n, onOpen }: { crate: BossCrateDef; held: number; onOpen: () => void }) {
+  const { Crate } = CRATE_LOOKS[c.look];
+  return (
+    <button type="button" class={`ff-window crate-row boss-crate-row${n ? "" : " none"}`} data-crate={c.id} data-held={n} onClick={onOpen}>
+      <span class="crate-row-art">
+        <Crate />
+        <span class="crate-row-token">
+          <TokenArt boss={c.boss} />
+        </span>
+      </span>
+      <span class="crate-row-text">
+        <strong>{c.name}</strong>
+        <span class="crate-row-blurb">{c.blurb}</span>
+        <span class="crate-row-held">{n ? `You have ${n}` : "You have none"}</span>
+      </span>
+      <span class="ff-cursor" aria-hidden="true">
+        ▶
+      </span>
+    </button>
   );
 }
 
@@ -520,7 +549,10 @@ function AdminGrants() {
 function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
   // A boss crate opens only one you hold (the server's, once each), never with a test switch; a series crate one you hold, with a key.
   const boss = isBossCrate(crate) ? crate : null;
-  const locker = useAccount().profile?.locker;
+  const { profile } = useAccount();
+  const locker = profile?.locker;
+  // (An admin's bonus pool has the bosses not yet released too, as the server rolls it: bonusPool(admin). #923's review, Nov 25.)
+  const admin = !!profile?.admin;
   const held = heldOf(locker, crate);
   const keys = keysOf(locker);
   const canOpen = boss ? held > 0 : held > 0 && keys > 0;
@@ -626,7 +658,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         })}
       </div>
       {/* The bonus crate (Nov 24): one plain line, the same as the FAQ's (core bonusOddsLine). */}
-      <p class="small muted crate-bonus-odds">{bonusOddsLine()}</p>
+      <p class="small muted crate-bonus-odds">{bonusOddsLine(undefined, bonusPool(admin).length)}</p>
       <h3 class="ff-title">Possible items</h3>
       <div class="odds-list">
         {items.map((def) => {
