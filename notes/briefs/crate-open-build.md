@@ -33,3 +33,11 @@ code in (merge or cherry-pick from `claude/crate-open-mockup`; the dev preview p
    player-visible, changed checks old → new). `.done`, push, stop. Don't open PRs or wait on CI. Helpers reset, never revert. Commits end
    with only `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By line, no model names). American
    English.
+
+## Changed Nov 24 ~18:55: the sound (Eric)
+
+Eric: "I am liking the sound, the paint, like the spinning sound of number 3 a bit better, but the number 4 ending sound and everything
+else about number 4." (Video 3 = Legendary with sound C, the slot reel; video 4 = Rare with sound A.) So: **the spin's clicks are C's**
+(the heavier metal tick, with its low swell under the slowdown and the reel's lock clunk) and **the ending is A's** (A's clean glassy
+chord sting, and A's Legendary ending for Legendary/Mythic). Everything else as video 4 (the look). Send one short MP4 with sound of the
+mix (Rare and Legendary) in the stills.
