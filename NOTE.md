@@ -9,6 +9,21 @@ All animation is CSS on SVG transforms and opacity (no frame loop), mostly at re
 and a black pawn, on a light and a dark panel. `*-closeup.gif` = card and pawn at 240 px (easiest to judge); the others are the
 whole section at real size.
 
+## v2 (Nov 24, after Eric's look)
+
+- **v2: Gift-Wrap Tube = the confetti puff** (Eric: "I see the confetti coming out. Yeah, I like that more"); the barber pole is
+  dropped. Fewer, bigger bits (five, 3.2 × 3.6, was six at 2.2 × 2.6): its two colors, white and gold, tumbling up and to the left
+  so they stay on the pawn's square, every 5.5 s. `tube-confetti-v2-closeup.gif`, `tube-v2.gif`.
+- **v2: Candy Cane = a magic strand** (Eric: "a magical little spell, like string thing ... floating around the stick ...
+  spiraling around it as it moves up"): a thin gold strand with a bright core floats just off the cane (5.4 from its middle, the
+  cane is 3 wide each side) and spirals up it, about one turn per 17, round the hook to the tip. Where it passes behind, the cane
+  hides it; at the edges you see it swing out from behind (dimmed). Five sparkle motes are shed as it passes, a sparkle pops at
+  the tip, then about 4 s of rest (6.5 s cycle). One helix path drawn twice (behind the cane, and in front clipped to its front
+  stretches), its light a dash running along it (`stroke-dashoffset`, `pathLength` 100). 10 animations per cane, was 24.
+  Reduced motion: no strand, no motes. 4x CPU, 18 canes, no shine: 57.7 fps. `cane-v2-closeup.gif`, `cane-v2.gif`.
+- Everything else stands as picked: the crown, the parrot's flap, the Tommy Gun's key plus puff, the six Smiley expressions from
+  the seed. (The v1 cane and tube files below are kept for comparison.)
+
 ## Files and picks
 
 | Item | Files | What it does | Pick |
