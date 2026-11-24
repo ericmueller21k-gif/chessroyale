@@ -1864,3 +1864,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   whole suite runs: runner-tools.ts is a foundation), CI watcher biga9eg8u, quick review (god-king, Opus high, read-only) running.
 - Nov 24 ~08:15: ERIC: support email already forwards (done); lawyer VETOED (RULES); he'll send a Discord webhook (told him: put it in
   Cloudflare as the secret ALERT_WEBHOOK himself, never paste it in chat; the repo is public).
+- Nov 24 ~08:25: #915 review: I1 (re-lock re-locked the same escaped piece each turn: lockOrder ranked rank-1 before huntable) FIXED BY ME
+  + N2/N3/N4 (d8185679; tests fail before). N1 QUEUED (two upgrades in one turn show only the second window). CI watcher bujn06ktc.
