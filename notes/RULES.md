@@ -176,3 +176,6 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
   couldn't read round 3 (it lives under `town/shops`) and redrew the room by eye.
 - **No lawyer, ever (Eric, Nov 24, a veto, "as I've asked before"):** never suggest or ask about a lawyer or attorney review (legal pages,
   loot boxes, likeness, anything). Not essential for this game. We fill and word the legal pages ourselves.
+- **A change Eric makes while a helper runs goes into its brief AND is checked in its result before the PR (Nov 24):** the crate build
+  shipped sound A's spin though Eric had asked for C's (the message reached the helper after it had built the sounds). Read the result for
+  every late item before opening the PR.
