@@ -1,14 +1,15 @@
 /**
- * The crate opening's sounds (Nov 24; Eric's pick: A, "card in the spokes": docs/decisions/2026-11-24-crate-open-build.md), made in
- * code like the bosses' (no files, no licenses; characters/synth.ts), each a pure function of the sample rate, cached by name
- * (`soundCache("crate")`) and made ahead in the sound worker (sound.ts `warmCrateSounds`), so nothing is made on the opening's frames.
+ * The crate opening's sounds (Nov 24; docs/decisions/2026-11-24-crate-open-build.md), made in code like the bosses' (no files, no
+ * licenses; characters/synth.ts), each a pure function of the sample rate, cached by name (`soundCache("crate")`) and made ahead in the
+ * sound worker (sound.ts `warmCrateSounds`), so nothing is made on the opening's frames.
  *
- * Eric (Nov 24): "sound more like ... a playing card being moved through the spoke of a wheel ... right now it's like that marimba
- * ... a little too silly sounding." A stiff card flapping against bicycle spokes: a papery snap with a little body, buzzing at speed,
- * fluttering as it slows (`flap0` to `flap5`, two takes each), a rattle as it comes to rest (`rest`); the strip's whirr under it
- * (`whirr`); then the box dropping in and landing (`land`), shaking over a rising charge (`shake-<tier>`), and the lid bursting off
- * with a clean glassy chord that climbs with the tier (`sting-<tier>`; Legendary and Mythic the bigger ending). timeline.ts `cues`
- * says when each plays; sound.ts `playCrateCues` lays them on the audio clock.
+ * Eric (Nov 24, his first ask): not "that marimba ... a little too silly sounding". Of the mockup's three, his pick (Nov 24, ~18:55):
+ * "the spinning sound of number 3 a bit better, but the number 4 ending sound and everything else about number 4": the spin is C's, the
+ * slot reel (a heavier metal tick at each tile edge, `tick0` to `tick5` by speed, two takes each; the reel's hum under it, `whirr`; a
+ * low swell rising under the slowdown, `swell`; the reel locking with a clunk, `lock`); the ending is A's (the box dropping in and
+ * landing, `land`; shaking over a rising charge, `shake-<tier>`; the lid bursting off with a clean glassy chord that climbs with the
+ * tier, `sting-<tier>`, Legendary and Mythic the bigger ending). timeline.ts `cues` says when each plays; sound.ts `playCrateCues` lays
+ * them on the audio clock.
  */
 import { TIERS, type ItemTier } from "@chessroyale/core";
 import { bandpass, noise, rng, soundCache } from "../characters/synth.ts";
@@ -142,25 +143,23 @@ function mix(out: Float32Array, rate: number, src: Float32Array, at: number, gai
 
 // ---------------- The clicks ----------------
 
-/** A: one flap of a stiff card on a spoke. `fast` (0 to 1): at speed the card never settles, so each flap is shorter, brighter, no flutter. */
-function cardFlap(rate: number, seed: number, fast: number, flutter: number): Float32Array {
+/** C: one heavier metal tick of a slot reel (a clack with an inharmonic ring and the reel's mass under it). */
+function reelClack(rate: number, seed: number, heavy: number): Float32Array {
   const r = rng(seed);
-  const len = 0.05 + 0.09 * flutter;
-  const out = new Float32Array(Math.ceil(rate * len));
-  // The snap: paper slapping the spoke (a noisy crack, band-passed high and wide).
-  const snap = shape(biquad(whiteNoise(rate, 0.02, seed), rate, "bp", 2600 + 900 * fast + 300 * r(), 0.9), rate, ad(0.0004, 0.0032));
-  mix(out, rate, snap, 0, 1.0);
-  // The card's own stiff body ringing for a moment (a little different each time it's bent).
-  mix(out, rate, partials(rate, 0.04, 1050 + 220 * r(), [[1, 0.5, 0.009], [1.83, 0.22, 0.005]]), 0, 0.45);
-  // The spoke itself, a dull knock under it.
-  mix(out, rate, partials(rate, 0.04, 240 + 40 * r(), [[1, 1, 0.012]]), 0, 0.22 * (1 - 0.5 * fast));
-  // The card springing back (a second, softer slap) once it has room to.
-  if (fast < 0.85) mix(out, rate, shape(biquad(whiteNoise(rate, 0.012, seed + 7), rate, "bp", 2000, 1.2), rate, ad(0.0005, 0.0025)), 0.008 + 0.004 * r(), 0.35 * (1 - fast));
-  // Slow: it flutters, a few quicker, fainter flaps as it settles (the rattle).
-  for (let k = 1; k <= Math.round(4 * flutter); k++) {
-    const at = 0.018 * k + 0.004 * r();
-    mix(out, rate, shape(biquad(whiteNoise(rate, 0.01, seed + 11 * k), rate, "bp", 2300 - 150 * k, 1.4), rate, ad(0.0004, 0.002)), at, 0.32 * flutter * Math.pow(0.62, k));
-  }
+  const out = new Float32Array(Math.ceil(rate * 0.09));
+  const f = 1380 + 90 * r();
+  mix(out, rate, partials(rate, 0.09, f, [[1, 0.5, 0.012], [2.32, 0.4, 0.009], [3.87, 0.25, 0.006], [5.1, 0.15, 0.004]]), 0, 0.5);
+  mix(out, rate, shape(biquad(whiteNoise(rate, 0.02, seed), rate, "bp", 2600, 1.3), rate, ad(0.0003, 0.0028)), 0, 0.95);
+  mix(out, rate, sweep(rate, 0.08, 165, 120, 0.04, ad(0.001, 0.022)), 0, 0.42 + 0.3 * heavy);
+  return out;
+}
+
+/** C's last: the reel locking (a big clack and a low clunk). */
+function reelLock(rate: number): Float32Array {
+  const out = new Float32Array(Math.ceil(rate * 0.3));
+  mix(out, rate, reelClack(rate, 99, 1), 0, 1.1);
+  mix(out, rate, sweep(rate, 0.25, 130, 70, 0.08, ad(0.001, 0.07)), 0.004, 0.8);
+  mix(out, rate, shape(biquad(whiteNoise(rate, 0.05, 98), rate, "lp", 700, 0.7), rate, ad(0.0005, 0.015)), 0.004, 0.6);
   return out;
 }
 
@@ -274,27 +273,43 @@ function sting(rate: number, tier: ItemTier, out: Float32Array, at: number) {
 
 // ---------------- The pieces, by name ----------------
 
-/** A flap's level (timeline.ts `flapLevel`): how fast the strip is (1 a buzz) and how much the card flutters after (1 a rattle). */
-const FLAPS: readonly (readonly [fast: number, flutter: number])[] = [
-  [1, 0],
-  [0.6, 0],
-  [0.2, 0],
-  [0, 0.25],
-  [0, 0.6],
-  [0, 1],
-];
+/** A tick's level (timeline.ts `tickLevel`): how fast the strip is (1 at full speed: a lighter tick; 0 slow: the reel's full weight). */
+const TICKS: readonly number[] = [1, 0.6, 0.2, 0, 0, 0];
 
-/** The strip's own whirr under the clicks, as loud as it's fast, over a spin of `spinMs`. */
+/** The reel's own hum under the ticks, as loud as it's fast, over a spin of `spinMs`. */
 function whirr(rate: number, spinMs: number): Float32Array {
   const spin = spinMs / 1000;
   const out = new Float32Array(Math.ceil(rate * spin));
   const n = noise(3);
-  const bp = bandpass(rate, () => 700, 0.8, () => n(0));
+  const bp = bandpass(rate, () => 320, 0.8, () => n(0));
   for (let i = 0; i < out.length; i++) {
     const t = i / rate;
-    out[i] = bp(t) * 0.3 * (1 - t / spin) ** (EASE_POWER - 1) * Math.min(1, t * 20);
+    out[i] = bp(t) * 0.27 * (1 - t / spin) ** (EASE_POWER - 1) * Math.min(1, t * 20);
   }
   return out;
+}
+
+/** The low swell under the slowdown: from 30% of the spin (`swellAt` in timeline.ts) up to the lock, its low-pass opening as it rises. */
+function swell(rate: number, T: Timeline): Float32Array {
+  const len = (T.stop - 30 - T.spinMs * 0.3) / 1000;
+  const sw = new Float32Array(Math.ceil(rate * len));
+  let ph = 0;
+  let ph2 = 0;
+  const sawish = (p: number) => 2 * (p % 1) - 1;
+  for (let i = 0; i < sw.length; i++) {
+    const u = i / rate / len;
+    const f = 98 * Math.pow(2, u);
+    ph += f / rate;
+    ph2 += (f * 1.5) / rate;
+    sw[i] = (sawish(ph) * 0.6 + sawish(ph2) * 0.35 + sawish(ph * 1.004) * 0.5) * u ** 1.8;
+  }
+  const lowAt = biquad(sw, rate, "lp", 500, 0.8);
+  const highAt = biquad(sw, rate, "lp", 2400, 0.8);
+  for (let i = 0; i < sw.length; i++) {
+    const u = i / sw.length;
+    sw[i] = (lowAt[i]! * (1 - u) + highAt[i]! * u) * 0.3;
+  }
+  return sw;
 }
 
 /** The box dropping in and landing, from the drop's start. */
@@ -327,13 +342,14 @@ function stingAlone(rate: number, tier: ItemTier): Float32Array {
 function make(name: string, rate: number): Float32Array {
   const T = timeline();
   if (name === "whirr") return whirr(rate, T.spinMs);
-  if (name === "rest") return cardFlap(rate, 500, 0, 1).map((v) => v * 1.2);
+  if (name === "swell") return swell(rate, T);
+  if (name === "lock") return reelLock(rate).map((v) => v * 1.6);
   if (name === "land") return land(rate, T);
-  const flap = /^flap(\d)([ab])$/.exec(name);
-  if (flap) {
-    const [fast, flutter] = FLAPS[Number(flap[1])]!;
-    const loud = 2.2 * (0.6 + 0.4 * (1 - fast)) * 0.8;
-    return cardFlap(rate, flap[2] === "a" ? 100 : 101, fast, flutter).map((v) => v * loud);
+  const tick = /^tick(\d)([ab])$/.exec(name);
+  if (tick) {
+    const fast = TICKS[Number(tick[1])]!;
+    const loud = 2.2 * (0.6 + 0.4 * (1 - fast)) * 0.62;
+    return reelClack(rate, tick[2] === "a" ? 100 : 101, 1 - fast).map((v) => v * loud);
   }
   const [kind, tier] = name.split("-") as [string, ItemTier];
   if (kind === "shake") return shake(rate, T, tier);
@@ -350,9 +366,10 @@ const LEVEL = 0.92 * 10 ** (-4 / 20);
 /** Every piece but the tiers' (the worker makes them ahead as an Open is tapped; a tier's shake and sting once the roll is in). */
 export const CRATE_SOUNDS: readonly string[] = [
   "whirr",
-  "rest",
+  "swell",
+  "lock",
   "land",
-  ...FLAPS.flatMap((_, i) => [`flap${i}a`, `flap${i}b`]),
+  ...TICKS.flatMap((_, i) => [`tick${i}a`, `tick${i}b`]),
 ];
 /** Every tier's own: its shake and its sting. */
 export const TIER_SOUNDS: readonly string[] = TIERS.flatMap((t) => [`shake-${t.id}`, `sting-${t.id}`]);

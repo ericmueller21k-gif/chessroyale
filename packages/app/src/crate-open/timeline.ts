@@ -75,23 +75,27 @@ export const TIER_POWER: Record<ItemTier, number> = { common: 0.35, uncommon: 0.
 /** One of the opening's sounds (sounds.ts) and when it starts (ms from the spin's first frame). */
 export type CrateCue = { at: number; sound: string };
 
-/** How hard a click is, by the gap (ms) to the next: 0 (a buzz at full speed) to 5 (a slow flap with its flutter). */
-export function flapLevel(gap: number): number {
+/** How heavy a tick is, by the gap (ms) to the next: 0 (light, at full speed) to 5 (the reel's full weight, slow). */
+export function tickLevel(gap: number): number {
   return gap < 25 ? 0 : gap < 45 ? 1 : gap < 70 ? 2 : gap < 120 ? 3 : gap < 200 ? 4 : 5;
 }
 
 /**
- * Every sound of one strip and what follows it, as cues: the whirr, a flap per click (alternating two takes so a run doesn't sound
- * looped), the card coming to rest at the stop; then, if `tier` (the strip that ends in the item): the box landing and shaking (with
- * a box) and the sting. The live opening and the clip script play the same list.
+ * Every sound of one strip and what follows it, as cues: the reel's hum, a tick per click (alternating two takes so a run doesn't
+ * sound looped), the swell under the slowdown and the lock at the stop (the spin is sound C's, the slot reel: Eric, Nov 24); then, if
+ * `tier` (the strip that ends in the item): the box landing and shaking (with a box) and the sting (sound A's ending). The live opening
+ * and the clip script play the same list.
  */
 export function cues(T: Timeline, clicks: readonly number[], tier: ItemTier | null): CrateCue[] {
-  const out: CrateCue[] = [{ at: 0, sound: "whirr" }];
+  const out: CrateCue[] = [
+    { at: 0, sound: "whirr" },
+    { at: T.spinMs * 0.3, sound: "swell" },
+  ];
   clicks.forEach((ms, i) => {
     const gap = Math.min((clicks[i + 1] ?? ms + 400) - ms, 400);
-    out.push({ at: ms, sound: `flap${flapLevel(gap)}${i % 2 ? "b" : "a"}` });
+    out.push({ at: ms, sound: `tick${tickLevel(gap)}${i % 2 ? "b" : "a"}` });
   });
-  out.push({ at: T.stop - 50, sound: "rest" });
+  out.push({ at: T.stop - 40, sound: "lock" });
   if (!tier) return out;
   if (T.box) {
     out.push({ at: T.dropAt, sound: "land" });

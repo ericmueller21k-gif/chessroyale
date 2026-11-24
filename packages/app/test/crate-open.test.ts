@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CRATE_OPEN, TIERS } from "@chessroyale/core";
-import { STRIPS, clickTimes, cues, flapLevel, timeline } from "../src/crate-open/timeline.ts";
+import { STRIPS, clickTimes, cues, tickLevel, timeline } from "../src/crate-open/timeline.ts";
 import { CRATE_SOUNDS, TIER_SOUNDS, crateSound } from "../src/crate-open/sounds.ts";
 
 /** The crate opening (Nov 24; docs/decisions/2026-11-24-crate-open-build.md): its timeline, its clicks and its sounds. */
@@ -24,17 +24,17 @@ describe("the crate opening", () => {
     expect(clicks.at(-1)!).toBeLessThanOrEqual(T.spinMs);
   });
 
-  it("cues every click, the rest at the stop, and (with an item) the box and the tier's sting; Fischer Random's first strip none of those", () => {
+  it("cues every click, the swell and the lock, and (with an item) the box and the tier's sting; Fischer Random's first strip none of those", () => {
     const all = cues(T, clicks, "rare");
-    expect(all.filter((c) => c.sound.startsWith("flap"))).toHaveLength(clicks.length);
-    expect(all.map((c) => c.sound)).toEqual(expect.arrayContaining(["whirr", "rest", "land", "shake-rare", "sting-rare"]));
+    expect(all.filter((c) => c.sound.startsWith("tick"))).toHaveLength(clicks.length);
+    expect(all.map((c) => c.sound)).toEqual(expect.arrayContaining(["whirr", "swell", "lock", "land", "shake-rare", "sting-rare"]));
     expect(all.find((c) => c.sound === "sting-rare")!.at).toBe(T.burstAt);
     const first = cues(T, clicks, null).map((c) => c.sound);
     expect(first.some((s) => /land|shake|sting/.test(s))).toBe(false);
     const beam = cues(timeline(undefined, false), clicks, "mythic").map((c) => c.sound);
     expect(beam).toContain("sting-mythic");
     expect(beam.some((s) => /land|shake/.test(s))).toBe(false);
-    expect([flapLevel(10), flapLevel(300)]).toEqual([0, 5]);
+    expect([tickLevel(10), tickLevel(300)]).toEqual([0, 5]);
   });
 
   it("makes every piece, finite and under its ceiling; the sting is the loudest, Legendary's bigger than Common's", () => {
@@ -51,7 +51,7 @@ describe("the crate opening", () => {
       expect(peak(n), n).toBeLessThan(0.6);
     }
     expect(TIER_SOUNDS).toHaveLength(TIERS.length * 2);
-    expect(peak("sting-common")).toBeGreaterThan(peak("flap0a"));
+    expect(peak("sting-common")).toBeGreaterThan(peak("tick0a"));
     expect(rms("sting-legendary")).toBeGreaterThan(rms("sting-common"));
   });
 });
