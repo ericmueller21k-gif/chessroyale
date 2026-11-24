@@ -1950,3 +1950,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   main is green; stings helper paused for Eric's OK (session_01JuCWRsHX7XJVJvjkQzC951, will need to merge main first).
 - Nov 24 ~23:45: #922 LIVE (865d1dc), main GREEN. Bonus crate helper started (Opus xhigh alone, full lane, claude/bonus-crate); watcher.
   Stings helper paused (idle) for Eric; its step 2 waits for the bonus crate (concurrency + same files).
+- Nov 24 ~23:55: ERIC on items: Fire & Ice Crown rebuild (flames replace the top spikes, cooler fire); Banana Suit leave; Smiley → a set
+  of expressions (no animation); Candy Cane magical spiral bottom→top, repeats; Gift-Wrap Tube "needs something more" (unsure: options);
+  Parrot flap / Tommy Gun (earlier). Brief legendary-mythic-polish.md (MOCKUP, Opus high) QUEUED until the bonus crate (xhigh) ends.
