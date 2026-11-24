@@ -188,6 +188,14 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     counts the drops).
 - **Boingo's claw machine** (Nov 6; [2026-11-06-claw-machine.md](../decisions/2026-11-06-claw-machine.md); `CLAW`): its coin slot in his Funhouse opens `openClawMachine()`. One boss
   token in, 25% of the time that boss's Boss Crate, unopened: `POST /api/shop/claw {boss, request}` rolls it through the ledger (`clawOp`, keyed by `request`).
+- **The Crates tab's order** (Eric, Nov 25: "refactor this page a bit ... put the admin stuff all the way at the bottom";
+  [2026-11-25-crates-page-tidy.md](../decisions/2026-11-25-crates-page-tidy.md)), top to bottom: Keys × N and Crates × N; **Ready to
+  open** (a ready Welcome Crate, "Choose your boss crate" when one waits, the series and boss crates you hold; none: "Nothing to open right
+  now."); **Boss tokens**; **More crates** with "Show unowned" beside its title (Welcome Crates still to earn, with their meters; the series
+  crates you don't hold, greyed with a padlock; "Boss crate choice" greyed with none to choose; with the box checked, the boss crates you
+  don't hold); and, admins only, **Admin: test grants** last. Each crate is in one place: Ready to open while you hold it. **A used
+  Welcome Crate's row is gone** (Eric's own exception to "nothing hidden": `welcomeRowsShown` in `welcome-rows.ts`): once opened and its
+  reveal seen; its page and its ride stay.
 - **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
   `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
   - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
@@ -239,7 +247,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **The crate opening** (Nov 24; [2026-11-24-crate-open-build.md](../decisions/2026-11-24-crate-open-build.md); `crate-open/`): every
   crate opens the same way (its page's Open, the Welcome Crate, a boss crate's "Open now" in its shop, Boingo's claw machine), on its own
   layer over the screen it came from (`OpenLayer`): the whole phone screen, or a computer's middle column, top to bottom, on a blue-black
-  background; the screen under it stays as it was. The strip (46 tiles, landing on the 39th) spins `CRATE_OPEN.spinMs` (4 s) with a
+  background; the screen under it stays as it was. On a computer the stage (its phone layout, 430 × 540) is scaled up whole to the
+  column's width and height, at most 1.5× (Nov 25, Eric: "on the desktop, the present is too small"); the phone's is as it was (scaled
+  down only on a short window). The bonus card's OK takes a tap only once it has faded in (`data-ready`). The strip (46 tiles, landing on the 39th) spins `CRATE_OPEN.spinMs` (4 s) with a
   cubic slowdown, a blurred copy fading as it slows, and stops just past the winning tile's near edge, runs a few pixels over and settles.
   Then the winning tier's box drops in, shakes (light leaking from its lid), and its lid bursts off with a beam in the item's tier color;
   the item rises out of the beam into the reveal card, which forms round it (Legendary and Mythic: more rays, light over the whole stage,
