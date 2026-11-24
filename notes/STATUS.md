@@ -1946,3 +1946,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   watcher on .done "fix round".
 - Nov 24 ~22:55: #922 fix round DONE (app bug: Open another's stage armed on the old answer then cancelled; fixed). Prepped 384f6d37, CI
   b5tghv6o3, PR comment posted. Then merge. Waiting on Eric: sting clips, mythic items' fate.
+- Nov 24 ~23:30: #922 crate opening MERGED (865d1dc), deploy + main run watched; build helper archived. Next: bonus crate (xhigh, full) once
+  main is green; stings helper paused for Eric's OK (session_01JuCWRsHX7XJVJvjkQzC951, will need to merge main first).
