@@ -1894,3 +1894,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~13:00: hang helper DONE: cause NOT found (not reproduced: 16 runs at 6x CPU; Playwright's first expect check has no timeout, so a
   hung page holds it to the 300 s test timeout). Watchdog diagnostic → #919 (0f48861e; CDP Debugger.pause on a 30 s silent page, stack to
   the job log as [renderer-hang]). CI watched; merge it, then main's run. Next hang: read [renderer-hang] in the shard's log.
+- Nov 24 ~12:45: #919 watchdog MERGED (8423926), main full run watched (should turn main green).
