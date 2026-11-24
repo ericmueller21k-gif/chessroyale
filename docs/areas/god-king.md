@@ -106,8 +106,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - **Power tips** (Nov 24, a pilot of five): the first time you see some bosses' powers (Birdie's train, Hollow's dark, Sawyer's split,
   Chandy's lock, Boingo's pie), the boss says a line to him and he answers, explaining it (`packages/app/src/power-tips.ts`, one row a
   tip). Again in the 3rd and 8th battle with that power, then every 5th (`POWER_TIPS` in settings.ts), counted per account on this
-  device. His reply comes once the boss's line has typed out (`replyMs`), at the critical priority, and his other lines are held until
-  it has had its time (`holdKing`): no double talk. `?tip=all` plays them every battle. docs/decisions/2026-11-24-power-tips.md.
+  device. His reply comes once the boss's line has typed out (`replyMs`), at the critical priority, the boss's line staying up until
+  the reply has typed out; his other lines are held until it has had its time (`holdKing`): no double talk. Mid-line as the tip comes,
+  the exchange starts later, so his reply comes as that line ends. `?tip=all` plays them every battle. docs/decisions/2026-11-24-power-tips.md.
 - **How he judges a blunder** (Eric, Oct 10: option 3 of the Last Stand proposals). He judges the crowd's move as
   it's played, before the boss replies, by how much it lowers the crowd's chances (the judge's expected score, the eval
   bar's number), not by the material: players sometimes sacrifice on purpose, and a sacrifice the engine likes gives
