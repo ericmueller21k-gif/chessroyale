@@ -1936,3 +1936,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   crate (xhigh) after these.
 - Nov 24 ~21:45: ERIC OK'd $5 art spend for the Transcendent crate. MY CALL: not needed: the strip's boxes are code SVGs (SupplyBoxArt
   style), so the new tile is an SVG crate in that style (a runner pixel sprite would clash). Brief updated; spend unused (told Eric).
+- Nov 24 ~22:00: ERIC: mythics need a slight animation (parrot flaps every few s; tommy gun: something spins; fire & ice crown "feels like
+  junk": rebuild or replace). Sent him the legendary/mythic list + one sheet (8 non-ride items; the 19 mythic rides are animated already).
+  WAITING on his call per item.
