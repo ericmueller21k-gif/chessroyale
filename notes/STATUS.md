@@ -1908,3 +1908,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 24 ~18:10: #920 MERGED (f0e89d7), deploy + main run watched. Crate mockup helper running. Eric's email: Exchange Online Plan 1 (1 user);
   Cloudflare routes only support@ + privacy@ → Gmail, catch-all off; plan given: verify TXT, aliases (eric/support/privacy), then disable
   Email Routing and add MX/SPF/autodiscover; keep Resend records.
+- Nov 24 ~18:20: crate mockup DONE (claude/crate-open-mockup d59369d6, stills/crate-open-mockup; no art needed; reuses recluse-light's
+  `lightSprites(rgb)`; 60 fps at 4x). Sent Eric 4 videos + 2 stills. ASKED: sound A/B/C (rec A), spin length 2.7/4/6.2 (rec 4 s),
+  near-edge stop, box vs crate drops. Build after his picks (targeted, crate specs).
