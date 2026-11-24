@@ -1895,3 +1895,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   hung page holds it to the 300 s test timeout). Watchdog diagnostic → #919 (0f48861e; CDP Debugger.pause on a 30 s silent page, stack to
   the job log as [renderer-hang]). CI watched; merge it, then main's run. Next hang: read [renderer-hang] in the shard's log.
 - Nov 24 ~12:45: #919 watchdog MERGED (8423926), main full run watched (should turn main green).
+- Nov 24 ~13:30: #919 LIVE (8423926), main full run GREEN (no [renderer-hang]). Merges open. No helpers running. Waiting on Eric: power tips
+  playtest; Discord webhook (ALERT_WEBHOOK, his to set). Queue: #915 N1, #916 nits, earlier nits (see above).
