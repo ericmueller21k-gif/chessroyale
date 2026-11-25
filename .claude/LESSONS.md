@@ -386,6 +386,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A test that pulls the test trigger (`triggerUltimate`) states that it took (`powers.ultNext`): it's refused while an ultimate is
     warned-and-coming or under way, and a later one from the meter then passes for it. The test sets its moment up only when nothing is
     pending (`powers.warned`, `powers.ultAt`), never counting on the meter staying low.
+- **A zzz read cleared while the last frame still drew it** (Nov 25, `docs/decisions/2026-11-25-town-afk-drawn-race.md`): a hook's "drawn"
+  (`__townHere().drawn`, `tag`, `dressed` and the like) is what the last frame drew; the state it follows (a server's answer, a timer)
+  changes between frames. Poll the state and what was drawn together, in one read (`[zzz, drawn]`), never one then the other: the
+  second read can come before the next frame.
 
 ## Eric's rules hold
 
