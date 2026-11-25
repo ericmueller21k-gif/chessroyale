@@ -356,8 +356,8 @@ const END_SCROLL_TODAY: Partial<Record<Screen, Record<string, number>>> = {
 };
 // (Nov 25, round 2: the same with the side menu's labels on the 50 v 50 at 1536 × 730: its column 340 → 280, the chat's lines still 4 rows and
 // its emoji one row, game-frame.css. The two shorter laptops keep their icons. Nov 26, the 50 v 50's frame: 166 px at 1536 × 730 (the target
-// met), 33 and 84 on the two shorter laptops, were 8 and 42.)
-const CHAT_TODAY: Partial<Record<Screen, Record<string, number>>> = { crowd: { "1280x600": 33, "1366x650": 84 } };
+// met), 33 and 84 on the two shorter laptops, were 8 and 42. Nov 26, round 2: the opening vote has the game's chat in its place, so the same.)
+const CHAT_TODAY: Partial<Record<Screen, Record<string, number>>> = { crowd: { "1280x600": 33, "1366x650": 84 }, vote: { "1280x600": 33, "1366x650": 84 } };
 
 /** Resign from the gear: the match's end page. */
 async function resignFromGear(page: Page) {
@@ -538,16 +538,18 @@ test("a computer's 50 v 50 (Eric, Nov 26): the labeled top row on the board, cle
  * (1536 × 730 at 125%) and a desktop (1920 × 960). The 50 v 50 (on your own pick or watching, whichever comes, and the other one too) and the
  * 1 v 1 now; Squads and Boss join it in their own PRs. The board's lines are its frame's: the 50 v 50's bottom line is under its clock's bar
  * (mirrored under the board in every phase), the 1 v 1's its squares' foot (its own strip under it).
+ * The 50 v 50's opening vote too (Nov 26, the director's round 2): its column (the line that says what to do, on one line, the cards, the
+ * chat) on the same lines, and nothing moves as the game begins: the board, the scoreboard and the chat are where the game's are.
  */
-test("Eric's column rule (Nov 25): every column on the board's top and bottom lines, the gaps either side of the board equal: the 50 v 50 (both turns) and the 1 v 1 at 1536 × 730 and 1920 × 960", async ({ browser }) => {
+test("Eric's column rule (Nov 25): every column on the board's top and bottom lines, the gaps either side of the board equal: the 50 v 50 (its opening vote and both turns) and the 1 v 1 at 1536 × 730 and 1920 × 960", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
-  test.setTimeout(8 * 60_000);
-  const lines = (page: Page, screen: "crowd" | "duel") =>
+  test.setTimeout(12 * 60_000);
+  const lines = (page: Page, screen: "crowd" | "vote" | "duel") =>
     page.evaluate((screen) => {
       const box = (s: string) => document.querySelector(s)!.getBoundingClientRect();
       const sq = box(".board-area .board-row > .board-wrap .hb-container");
       const wrap = document.querySelector(".board-area .board-row > .board-wrap")!;
-      const bar = screen === "crowd" ? parseFloat(getComputedStyle(wrap).getPropertyValue("--timer-bar-h")) : 0;
+      const bar = screen === "duel" ? 0 : parseFloat(getComputedStyle(wrap).getPropertyValue("--timer-bar-h"));
       const board = { top: sq.top, foot: sq.bottom + bar, left: sq.left, right: sq.right };
       if (screen === "duel") {
         const panel = box(".dv-side > .dv-box");
@@ -555,7 +557,8 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
       }
       const side = box(".arena > .tower-side");
       const table = box(".arena > .tower-side > .tower");
-      const slot = box(".screen.game > .play-footer, .screen.game > .poll");
+      // (The vote's column starts with its line that says what to do, where the game's power-ups row is.)
+      const slot = box(screen === "vote" ? ".screen.game > .board-area > .vote-hint" : ".screen.game > .play-footer, .screen.game > .poll");
       const chat = box(".screen.game > .under-board.side");
       return {
         board,
@@ -563,7 +566,7 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
         gaps: [sq.left - side.right, slot.left - sq.right],
       };
     }, screen);
-  const check = async (page: Page, screen: "crowd" | "duel", at: string) => {
+  const check = async (page: Page, screen: "crowd" | "vote" | "duel", at: string) => {
     await expect.poll(async () => {
       const g = await lines(page, screen);
       return Math.max(...Object.values(g.columns).flatMap((c) => [Math.abs(c.top - g.board.top), Math.abs(c.foot - g.board.foot)]), Math.abs(g.gaps[0]! - g.gaps[1]!));
@@ -576,13 +579,36 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
     expect(Math.abs(g.gaps[0]! - g.gaps[1]!), `${at}: the gaps either side of the board equal (${g.gaps.join(" v ")})`).toBeLessThanOrEqual(1);
   };
   for (const s of [REAL_SCREENS[0], REAL_SCREENS[3]]) {
-    for (const screen of ["crowd", "duel"] as const) {
+    for (const screen of ["vote", "crowd", "duel"] as const) {
       const ctx = await realScreenContext(browser, s);
       const page = await ctx.newPage();
       await into(page, screen);
       await page.waitForTimeout(500);
       if (screen === "duel") await check(page, screen, `the 1 v 1 on the ${s.name}`);
-      else {
+      else if (screen === "vote") {
+        const at = `the 50 v 50's opening vote on the ${s.name}`;
+        await check(page, screen, at);
+        // Its line that says what to do is one line, all of it in view (beside the gear, the column's first line).
+        const hint = await page.locator(".vote-hint").evaluate((e) => ({ h: e.getBoundingClientRect().height, line: parseFloat(getComputedStyle(e).lineHeight), over: e.scrollWidth - e.clientWidth, text: e.textContent }));
+        expect(hint.over, `${at}: "${hint.text}" fits its line`).toBeLessThanOrEqual(0);
+        const range = await page.locator(".vote-hint").evaluate((e) => { const r = document.createRange(); r.selectNodeContents(e); return r.getClientRects().length; });
+        expect(range, `${at}: "${hint.text}" on one line`).toBe(1);
+        // Nothing moves as the game begins: the board, the scoreboard and the chat where the game's are.
+        const places = () =>
+          page.evaluate(() => {
+            const at = (s: string) => {
+              const r = document.querySelector(s)!.getBoundingClientRect();
+              return [r.left, r.top, r.right, r.bottom].map((v) => Math.round(v));
+            };
+            return { board: at(".board-area .board-row > .board-wrap .hb-container"), scoreboard: at(".arena > .tower-side"), chat: at(".screen.game > .under-board.side") };
+          });
+        const before = await places();
+        await expect.poll(() => phase(page), { timeout: 180_000, intervals: [100] }).toMatch(/^(play|watching)$/);
+        await page.waitForTimeout(300);
+        const after = await places();
+        for (const k of Object.keys(before) as (keyof typeof before)[])
+          before[k].forEach((v, i) => expect(Math.abs(after[k][i]! - v), `${at}: the ${k} in the same place at move 1 (${before[k]} → ${after[k]})`).toBeLessThanOrEqual(1));
+      } else {
         // Both turns: your team's pick and the other team's vote, in the order they come.
         const seen = new Set<string>();
         for (let i = 0; i < 2; i++) {

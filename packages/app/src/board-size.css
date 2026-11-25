@@ -286,7 +286,7 @@
     margin: 0 0 4px;
     padding-right: 44px;
   }
-  .arena > .screen.game.crowd-50:not(:has(> .boss-dock)) > .under-board.side {
+  .arena > .screen.game:is(.crowd-50, .cf-vote):not(:has(> .boss-dock)) > .under-board.side {
     grid-column: 2;
     grid-row: 4;
     align-self: start;
@@ -338,7 +338,9 @@
 }
 /* The opening vote in the frame: its title ("VOTE 1 OF 3" over "How are moves picked?") the top row, centered on the board as the game's
    numbers are; the gear where the game's is; the line that says what to do on the column's first line, where the game's power-ups row
-   goes; the cards under it, where the vote box goes. (No chat: the vote has none, as before.) */
+   goes (one line, from the column's left edge); the cards under it, filling the game's slot to its foot; then the game's chat, in its
+   place and size (the rule above), to the board's foot (Eric's column rule; the director's round 2, Nov 26). Nothing moves as the game
+   begins: the board, the scoreboard and the chat are where the game's are. */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
   .screen.game.cf-vote > .vote-hud {
     grid-column: 1;
@@ -381,16 +383,22 @@
     margin: 0;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     font-size: 13px;
     line-height: 15px;
-    text-align: center;
+    text-align: left;
+    white-space: nowrap;
   }
   .screen.game.cf-vote > .vote-cards {
     grid-column: 2;
     grid-row: 3;
     align-self: start;
+    height: calc(var(--crowd-slot) - 36px);
     margin-top: 36px;
+  }
+  /* (A card as tall as the slot: its name and blurb at the top, its bar and count at the foot.) */
+  .screen.game.cf-vote > .vote-cards > .vote-card {
+    grid-template-rows: auto 1fr auto auto;
   }
 }
 /* (The board's drawing step: 8 device pixels, as game-frame.css rounds the boss screens' and the 1 v 1's boxes. At 125% and 150% the step

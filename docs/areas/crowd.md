@@ -25,7 +25,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   column: the power-ups row (the phone's `powerInBox`, in every phase: Play, `WatchScreen`, the reveal's `LockedPowerRow`) with the gear at
   its right end, the vote box's skeleton, the status box (always: `SlotIdle`'s gray "Waiting…" on your own pick), one 250 px slot; then the
   chat to the board's foot. The scoreboard's table and the chat end on the board's lines (`board-foot.ts`). The opening vote is the same
-  frame (`cf-vote`: Vote.tsx `frame`). Guards: `e2e/desktop-board.spec.ts`, "a computer's 50 v 50 (Eric, Nov 26)…" and "Eric's column
+  frame (`cf-vote`: Vote.tsx `frame`, the match): its title the top row; its line that says what to do on the column's first line beside
+  the gear (one line, from the column's left edge: every line it can say fits 236 px, the 280 column's); the cards filling the slot; then
+  the game's chat (`UnderBoard`, the same component and place; chat is open from the lobby on), so the board, the scoreboard and the chat
+  don't move as the game begins (round 2, [2026-11-26-crowd-vote-column.md](../decisions/2026-11-26-crowd-vote-column.md)). A phone's
+  vote has no chat, as before. Guards: `e2e/desktop-board.spec.ts`, "a computer's 50 v 50 (Eric, Nov 26)…" and "Eric's column
   rule (Nov 25)…" (eric.md).
 - **The vote box is a standing skeleton** (Nov 25; [2026-11-25-crowd-poll-skeleton.md](../decisions/2026-11-25-crowd-poll-skeleton.md);
   `SkeletonRows`, `SlotSkeleton` in `screens/Crowd.tsx`): the reveal's box always has its cap's rows (`useBarSlots`), the ones a round

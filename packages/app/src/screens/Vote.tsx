@@ -32,6 +32,8 @@ import { pausedBosses, useServerStatus } from "../status.ts";
 import { VoteHint, useVoteHint } from "../components/VoteHint.tsx";
 import { VoteZoneTags } from "../components/VoteZoneTags.tsx";
 import { VoteZoneHits } from "../components/VoteZoneHits.tsx";
+import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
+import { CROWD_FRAME } from "../components/MatchMenu.tsx";
 
 /** No pieces while the votes run: only everyone's pawns. */
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
@@ -43,7 +45,7 @@ const RESET_MS = 650;
 const LEAVE_MS = 950;
 /** …and the real pieces drop into the starting position (they're down by the time the game's screen takes over). */
 const DROP_MS = 700;
-/** Time's up: "Didn't vote? You're with the crowd" shows above the board this long after the last of them lands. */
+/** Time's up: "No vote? You're with the crowd" shows above the board this long after the last of them lands. */
 const CROWD_LINE_MS = 1100;
 
 type Orientation = "white" | "black";
@@ -107,7 +109,7 @@ export interface VoteHost {
  * White's scattered over ranks 1-2 and Black's over ranks 7-8. Yours is solid and a little bigger (voteYouScale);
  * everyone else's is a faint ghost. Drag your pawn into one of the three zones (or tap a zone, or tap a card) to vote
  * (a tap on a zone takes your pawn there: Eric, Nov 2). Everyone's pawn glides into the zone they vote for as the votes come in, and each zone's count pops
- * as it goes up. When time's up the winning zone lights up and everyone who didn't vote walks into it ("Didn't vote?
+ * as it goes up. When time's up the winning zone lights up and everyone who didn't vote walks into it ("No vote?
  * You're with the crowd"), then the banner names the winner; between the votes everyone walks back to their spot,
  * and after the last one the pawns fade and the real pieces drop into place for the game.
  */
@@ -134,7 +136,7 @@ export function VoteScreen({
   evalBar = true,
   extra,
   below,
-  frame = false,
+  frame,
   chime = true,
   menu,
 }: {
@@ -150,8 +152,11 @@ export function VoteScreen({
   extra?: ComponentChildren;
   /** Under the cards (Squads' standings on a phone). */
   below?: ComponentChildren;
-  /** The 50 v 50's opening vote: its computer frame, the game's (board-size.css, "The 50 v 50's frame"), so the board never moves. */
-  frame?: boolean;
+  /**
+   * The 50 v 50's opening vote (its match): its computer frame, the game's (board-size.css, "The 50 v 50's frame"), so nothing moves when
+   * the game begins. On a computer the column ends in the game's chat, the same component in the same place (UnderBoard).
+   */
+  frame?: GameView;
   /** The result's three tones and the timer's ticks (Crowd's); Squads has neither. */
   chime?: boolean;
   /** At the top line's end: the match's control (Sound, and Leave: MatchMenu); without one, the sound button. */
@@ -166,6 +171,7 @@ export function VoteScreen({
       ? { ...given, options: given.options.map((o) => (o.id === "boss" ? { ...bossFinalOption(rosterWithout(off)), ...(o.disabled ? { disabled: true } : {}) } : o)) }
       : given;
   const now = useFrameNow();
+  const computerFrame = useMedia(CROWD_FRAME) && !!frame;
   const animate = useBoardAnimations();
   const side = match.standings().find((s) => s.isYou)?.team ?? "w";
   const orientation: Orientation = side === "w" ? "white" : "black";
@@ -308,18 +314,18 @@ export function VoteScreen({
   const hint = winner
     ? joined.length && now < Math.max(walkedAt, vote.until) + CROWD_LINE_MS
       ? youJoined
-        ? "You didn't vote, so you're with the crowd."
-        : "Didn't vote? You're with the crowd."
+        ? "No vote: you're with the crowd."
+        : "No vote? You're with the crowd."
       : `${nextLabel}${nextIn ? ` in ${nextIn}…` : "…"}`
     : !open
       ? "Counting the votes…"
       : mine
         ? vote.changeAllowed
-          ? "Vote in. Drag your pawn again to change it."
+          ? "Vote in. Drag to change it."
           : "Vote in. Watch the crowd decide."
         : selected
           ? "Now tap a zone."
-          : "Drag your pawn into a zone, or tap a card.";
+          : "Drag your pawn or tap a card.";
 
   return (
     <div class={`screen game vote-screen${towerClosed ? " tower-closed" : ""}${frame ? " cf-vote" : ""}`}>
@@ -457,6 +463,7 @@ export function VoteScreen({
           );
         })}
       </div>
+      {computerFrame && <UnderBoard match={frame!} />}
       {below}
     </div>
   );

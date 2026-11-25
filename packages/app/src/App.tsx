@@ -2863,7 +2863,7 @@ export function App() {
     case "final":
       return <FinalScreen match={match} final={p.final} />;
     case "vote":
-      return <VoteScreen match={match} vote={p.vote} frame={isCrowdFifty(match)} menu={<MatchMenu exit={exitFor(match)} crowd={isCrowd(match)} />} />;
+      return <VoteScreen match={match} vote={p.vote} frame={isCrowdFifty(match) ? match : undefined} menu={<MatchMenu exit={exitFor(match)} crowd={isCrowd(match)} />} />;
     case "boss":
       // (The loading step, then the intro on a screen of its own: the intro's timeline starts as it mounts.)
       return (
