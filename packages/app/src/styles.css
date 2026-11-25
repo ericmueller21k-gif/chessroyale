@@ -18357,6 +18357,9 @@ img.qicon {
   display: grid;
   gap: 6px;
 }
+.sq-standings-rows {
+  display: contents;
+}
 .sq-standings-head {
   font-size: 13px;
   font-weight: 800;

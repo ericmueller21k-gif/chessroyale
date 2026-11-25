@@ -17,7 +17,8 @@ import { TokenBreakdown } from "../components/SquadsBlocks.tsx";
 import { MercenaryShop } from "../components/MercenaryShop.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { SIDE_PANEL } from "../components/SquadsParts.tsx";
-import { FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
+import { CROWD_FRAME, FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
+import { BoardFoot } from "../board-foot.ts";
 import { ReplayButton } from "../components/MoveReplay.tsx";
 import { useGameXp } from "../components/XpResult.tsx";
 import { EndHeadline, EndRewards } from "../components/EndScreen.tsx";
@@ -152,6 +153,9 @@ export function SquadsQueue({ client, onCancel, onAway }: { client: SquadsClient
 }
 
 /** The pre-game votes on Crowd's vote board: everyone's pawn on your side of an empty board, three zones, three cards. */
+/** What comes after the last vote. */
+const AFTER_VOTES = "The bracket is drawn";
+
 function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vote: NonNullable<SquadsClient["vote"]>; onLeave: () => void; exit: MatchExit | null }) {
   const lobby = client.lobby!;
   // The votes this lobby holds (a test lobby whose mode is set has no Mode vote), each found by its id, never by its
@@ -169,6 +173,8 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
     }),
     [lobby, client.myId],
   );
+  // (A computer's frame, Nov 26: the column under the cards is the lobby's votes, to the board's foot.)
+  const framed = useMedia(CROWD_FRAME);
   const view: VoteView = { ...vote, votes: vote.votes.map((v) => ({ playerId: v.playerId, option: v.option, at: v.at, side: "w" as const, ...(v.joined ? { joined: true as const } : {}) })) };
   return (
     <VoteScreen
@@ -177,7 +183,7 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
       def={def}
       evalBar={false}
       chime={false}
-      next={(i) => (i < defs.length ? defs[i]!.title : "The bracket is drawn")}
+      next={(i) => (i < defs.length ? defs[i]!.title : AFTER_VOTES)}
       extra={
         client.test ? (
           <button type="button" class="sq-next" onClick={() => client.nextRound()}>
@@ -185,7 +191,13 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
           </button>
         ) : undefined
       }
-      below={<StandingsStrip client={client} onLeave={onLeave} exit={exit} />}
+      frame
+      below={
+        <>
+          <StandingsStrip client={client} onLeave={onLeave} exit={exit} />
+          {framed && <VoteSteps titles={defs.map((d) => d.title)} at={vote.index} end={AFTER_VOTES} />}
+        </>
+      }
       menu={
         <>
           {/* Move replay's button by the gear, as in a match (Eric, Nov 5; its tips: the match's coach marks). */}
@@ -194,6 +206,29 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
         </>
       }
     />
+  );
+}
+
+/**
+ * The lobby's votes, in order (a computer's frame, Nov 26: the vote's column under its cards, to the board's foot, Eric's column rule): the
+ * ones done ticked, this one lit, then what comes after them.
+ */
+function VoteSteps({ titles, at, end }: { titles: string[]; at: number; end: string }) {
+  return (
+    <section class="sq-votes" aria-label="The votes">
+      <ol class="sq-votes-list">
+        {titles.map((t, i) => (
+          <li key={t} class={i < at ? "done" : i === at ? "on" : ""}>
+            <i aria-hidden="true">{i < at ? "✓" : i + 1}</i>
+            {t}
+          </li>
+        ))}
+        <li class="end">
+          <i aria-hidden="true">→</i>
+          {end}
+        </li>
+      </ol>
+    </section>
   );
 }
 
@@ -412,6 +447,8 @@ export function SquadsScreen({ client, actions }: { client: SquadsClient; action
         </aside>
       )}
       {body}
+      {/* (A computer: the standings and the column end on the board's bottom line. board-foot.ts.) */}
+      {side && <BoardFoot />}
     </div>
   );
 }
