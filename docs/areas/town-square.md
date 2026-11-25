@@ -271,6 +271,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   you, waits** (a soft green ring pulses on the ground under the free stool); otherwise the pieces stand set up. You at a
   table aren't playing or searching yet (Casual and Ranked come with the tables' matchmaking). While nothing on a board
   moves and the camera holds still, its slab, board and pieces are one cached picture (`boardCache`): frame rates as main.
+  (Canvas 2D only since Nov 25: WebGL draws the board as it is, as it does while you walk, as the cached picture was an upload each
+  time the camera came to rest. The clock's digits are one picture made on the loading screen, each second drawn from it.)
   Its top is lifted onto the table's picture in the camera's true perspective (`tableLift` in `camera.ts`); low on the
   phone's screen, where that would draw it more than `tableBoardGrow` (1.2) times its foot's scale (Oct 28, Eric's warped
   boards: twice the table and more, skewed), it's worked out a little farther off and drawn at the picture's place and
@@ -1307,9 +1309,19 @@ town's pictures…" while it paints (and waits for the sidekicks' sheets), "Buil
 (`paint-gl.ts` `keep`, `kept`: tallest first, the atlas made once as deep as they need, plus 2 spare pages for tags, boards, the
 bubble, signs and text, the only ones that start again). Then the frames start. Measured headless at 1x: 4.5 s (painting 4.3,
 uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After it, 30 s of walking and turning: 0 painted,
-0 uploads, 0 resets. A building in and out uploads nothing of the town. The town's 2D pictures are made in memory (`paint.ts`
+0 uploads, 0 resets. A building in and out uploads nothing of the town. **The labels too (Nov 25; [decision](../decisions/2026-11-25-town-hitches.md)):**
+Eric's laptop's report showed 1,063 uploads in 15 s of walking, every worst frame one with uploads. The labels were made as they first
+showed at each size: a home's name at each size it came to, a sign at each scale, a tag at each size, a cloud, a table clock's every second,
+and the speech bubble every frame its speaker glided a fraction of a pixel. Now `makeLabels` (render.ts, after the fonts are in,
+`fontsIn`) makes and keeps every home's name at sizes 12 to 20 (`NAME_SIZES`; two rows, outline and white), every sign once at its font's
+own pixels (drawn `s` times over, nearest), everyone's tag at sizes 8 to 12 (`TAG_SIZES`), the clouds and sun of the sky now, the clock's
+digits and the bubble's tail. The bubble is one picture a line (body, shadow and words; the last 8 kept), laid on whole device pixels.
+A picture drawn in its own font is never drawn again when another font loads (tags, names, the WebGL text). What's left to make while
+walking: someone arriving later (their tag's sizes, once) and a boss's new line (one picture). About 55 ms more on the loading screen;
+one more atlas page at 1.25x, two at 3x (16 MB each). The town's 2D pictures are made in memory (`paint.ts`
 `art2d`): uploading a GPU canvas waits for the GPU. Hooks: `__townPaint()`'s `loading`, `loadMs`, `loadPaintMs`, `atlas`. Tests:
-`packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…").
+`packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…": walking, a full turn and zooming
+in and out after it upload nothing, on a first visit and a second, Nov 25).
 **Kept between visits (Nov 23; [decision](../decisions/2026-11-23-town-keep-pictures.md)):** after a first visit's first frame its pictures are
 packed into PNG pages (a worker encodes them; 5.8 MB) and kept in IndexedDB (`town/keep-pictures.ts`, `TOWN_PICTURES`). A later visit on the
 same build and layout (`pictureKey`: version, the town chunk's hashed name, `render.ts` `pictureSig`) cuts them back out instead of painting:
