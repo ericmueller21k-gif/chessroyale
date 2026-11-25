@@ -412,7 +412,7 @@ export function VoteScreen({
                   onPointerCancel={onCancel}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Avatar look={myLook.look} side={side} />
+                  <Avatar look={myLook.look} side={side} live />
                 </span>
               )}
             </div>

@@ -29,6 +29,7 @@ import {
   itemColor,
   bannerPlusMs,
   itemDef,
+  itemName,
   purity,
   rollBlemish,
   secondColor,
@@ -1043,7 +1044,7 @@ export function CrateOpening({
     return () => clearTimeout(t);
   }, [result]);
   const tier = (result ? itemDef(result.item.def)!.tier : null) as PresentTier | null;
-  const art = result && <ItemArt def={result.item.def} finish={result.item} />;
+  const art = result && <ItemArt def={result.item.def} finish={result.item} live />;
   const details = result && <RevealDetails item={result.item} again={more} quiet={quiet} onAgain={onAgain} onClose={onDone} onWear={seen} />;
   const one = strips?.one ?? decoys;
   return (
@@ -1187,7 +1188,7 @@ function Reveal({ item, again = true, quiet = false, onAgain, onClose, onWear }:
     <div class={`ff-window reveal-card cox-card-still${cls ? ` ${cls}` : ""}`} style={{ "--tier": t.color }}>
       <span class="reveal-tier">{t.name}</span>
       <span class="reveal-art">
-        <ItemArt def={item.def} finish={item} />
+        <ItemArt def={item.def} finish={item} live />
       </span>
       <RevealDetails item={item} again={again} quiet={quiet} onAgain={onAgain} onClose={onClose} onWear={onWear} />
     </div>
@@ -1208,7 +1209,7 @@ function RevealDetails({ item, again, quiet, onAgain, onClose, onWear }: { item:
   const unlessQuiet = (f: () => void) => () => void (quiet || f());
   return (
     <>
-      <strong class="reveal-name">{d.name}</strong>
+      <strong class="reveal-name">{itemName(item)}</strong>
       <span class="reveal-finish">
         {finishLine(item)}
         {shiny ? " ✨" : ""}
@@ -1281,7 +1282,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
     <div class="locker">
       <div class="ff-window locker-preview">
         <span class="locker-avatar">
-          <Avatar look={locker.look} side={sideOfPawn(pawn)} ride outlined />
+          <Avatar look={locker.look} side={sideOfPawn(pawn)} ride outlined live />
         </span>
         <div class="locker-pawn-pick" role="group" aria-label="Your default pawn color">
           {PAWN_COLORS.map((c) => (
@@ -1323,7 +1324,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                 key={s.key}
                 class={`locker-item${worn ? " worn" : ""}${covered ? " covered" : ""}${!hc && isShiny(it.blemish) ? " shiny" : ""}${hc ? " hunchess-item" : ""}`}
                 style={{ "--tier": tierInfo(d.tier).color }}
-                label={`${d.name}${covered ? ", hidden by your outfit" : ""}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
+                label={`${itemName(it)}${covered ? ", hidden by your outfit" : ""}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
                 onTap={() => {
                   play("menuSelect");
                   void equipLockerItem(d.slot, worn ? null : it.id);
@@ -1338,7 +1339,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                 }
               >
                 <ItemArt def={it.def} finish={it} />
-                <strong>{d.name}</strong>
+                <strong>{itemName(it)}</strong>
                 {hc ? (
                   <>
                     <span class="small">HunChess</span>
@@ -1505,7 +1506,7 @@ function DeleteDialog({ stack, wornId, onClose }: { stack: ItemStack; wornId: st
           <ItemArt def={top.def} finish={top} />
         </span>
         <strong id="locker-dialog-title">
-          Delete {d.name}
+          Delete {itemName(top)}
           {n > 1 ? ` ×${n}` : ""}?
         </strong>
         <span class="small">{n > 1 && showsPurity(top.def) ? `${colorName(top)} · the best is ${purity(top.blemish).toFixed(1)}%` : finishLine(top)}</span>

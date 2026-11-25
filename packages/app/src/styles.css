@@ -8812,6 +8812,241 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   }
 }
 
+/*
+ * Item animations (Nov 25, from the approved Nov 24 mockup; Items.tsx, `Pivot`): transforms and opacity only, slow, most of each
+ * cycle at rest. Each part turns about its own point (Pivot's group sits there, so `transform-origin: 0 0`). They play only inside
+ * `.ia-live` (the item is the focus: your pawn, the locker's preview, a crate's reveal, a profile's cosmetics) and never with
+ * reduced motion; everywhere else every part rests where the still drawing has it (the lights, sparkles and puffs unseen).
+ */
+.ia {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+.ia-ember,
+.ia-frost,
+.ia-mote,
+.ia-pop,
+.ia-confetti,
+.ia-puff {
+  opacity: 0;
+}
+/* The Candy Cane's strand: at rest its dash sits past the path's end, unseen (pathLength 100). */
+.ia-strand {
+  stroke-dasharray: 40 400;
+  stroke-dashoffset: -112;
+}
+.ia-strand.core {
+  stroke-dasharray: 28 400;
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* The Fire & Ice Crown: three flames flicker in a burst, each at its own pace, then rest (a fire that never stops repaints every
+     frame: the mockup's 4x CPU measure); an ember drifts up now and then; a frost twinkle on the ice. */
+  .ia-live .ia-flame {
+    animation: ia-flicker 5s ease-in-out infinite;
+  }
+  .ia-live .ia-flame.f1 {
+    animation-delay: -0.35s;
+  }
+  .ia-live .ia-flame.f3 {
+    animation-delay: -0.7s;
+  }
+  .ia-live .ia-ember {
+    animation: ia-ember 4.6s ease-out infinite;
+  }
+  .ia-live .ia-ember.e2 {
+    animation-duration: 5.8s;
+    animation-delay: -2.4s;
+  }
+  .ia-live .ia-frost {
+    animation: ia-frost 5.2s ease-in-out infinite;
+  }
+  /* The Candy Cane: a strand of light spirals up round it (a dash running along its path: the glow's dash 40 long, the core's 28,
+     both heads together), shedding sparkle motes; a sparkle pops at the tip; then about 4 s of rest (6.5 s). */
+  .ia-live .ia-strand {
+    animation: ia-strand-glow 6.5s linear infinite;
+  }
+  .ia-live .ia-strand.core {
+    animation-name: ia-strand-core;
+  }
+  .ia-live .ia-mote {
+    animation: ia-mote 6.5s ease-out infinite;
+  }
+  .ia-live .ia-pop {
+    animation: ia-pop 6.5s ease-out infinite;
+  }
+  /* The Gift-Wrap Tube: a puff of confetti from its tip every 5.5 s, the bits tumbling out and fading. */
+  .ia-live .ia-confetti {
+    animation: ia-confetti 5.5s ease-out infinite;
+  }
+  /* The Parrot: a quick double flap of its wing every 6 s. */
+  .ia-live .ia-flap {
+    animation: ia-flap 6s ease-in-out infinite;
+  }
+  /* The Tommy Gun: the drum's key turns a notch (half a turn, a little past and back), a second later a puff from the muzzle (7 s). */
+  .ia-live .ia-notch {
+    animation: ia-notch 7s ease-out infinite;
+  }
+  .ia-live .ia-puff {
+    animation: ia-puff 7s ease-out infinite;
+  }
+}
+@keyframes ia-flicker {
+  0%,
+  56%,
+  100% {
+    transform: scale(1, 1) skewX(0deg);
+  }
+  12% {
+    transform: scale(0.95, 1.07) skewX(-3deg);
+  }
+  24% {
+    transform: scale(1.03, 0.95) skewX(2deg);
+  }
+  36% {
+    transform: scale(0.97, 1.05) skewX(-1.5deg);
+  }
+  46% {
+    transform: scale(1.01, 0.98) skewX(0.8deg);
+  }
+}
+@keyframes ia-ember {
+  0%,
+  62% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  66% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(1.5px, -9px);
+  }
+}
+@keyframes ia-frost {
+  0%,
+  80%,
+  100% {
+    opacity: 0;
+  }
+  88% {
+    opacity: 1;
+  }
+}
+@keyframes ia-strand-glow {
+  0% {
+    stroke-dashoffset: 40;
+  }
+  37%,
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes ia-strand-core {
+  0% {
+    stroke-dashoffset: 28;
+  }
+  37%,
+  100% {
+    stroke-dashoffset: -112;
+  }
+}
+@keyframes ia-mote {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  2% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  16%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), -4px) scale(0.2) rotate(60deg);
+  }
+}
+@keyframes ia-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  4% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+  12%,
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(90deg);
+  }
+}
+@keyframes ia-confetti {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  3% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 1;
+  }
+  30%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--r));
+  }
+}
+@keyframes ia-flap {
+  0%,
+  78% {
+    transform: rotate(0deg);
+  }
+  81% {
+    transform: rotate(34deg) scale(1, 0.92);
+  }
+  84% {
+    transform: rotate(4deg);
+  }
+  87% {
+    transform: rotate(30deg) scale(1, 0.92);
+  }
+  91%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes ia-notch {
+  0%,
+  50% {
+    transform: rotate(0deg);
+  }
+  55% {
+    transform: rotate(196deg);
+  }
+  58%,
+  100% {
+    transform: rotate(180deg);
+  }
+}
+@keyframes ia-puff {
+  0%,
+  70% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  73% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  88%,
+  100% {
+    opacity: 0;
+    transform: translate(0.5px, -3.5px) scale(1.7);
+  }
+}
+
 /* ---- The God King's Last Stand (components/LastStand.tsx; timings in boss-timing.ts) ---- */
 .last-stand {
   position: absolute;

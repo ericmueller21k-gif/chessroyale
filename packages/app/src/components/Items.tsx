@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, shownLook, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, shownLook, smileyExpression, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import { HIDE_ALL, type RiderDraft } from "./rides/kit.ts";
@@ -107,8 +107,41 @@ export const TUBE_STRIPES = (() => {
   }
   return out;
 })();
+/**
+ * Item animations (Nov 25, built from the approved Nov 24 mockup; Eric: "anything that's a mythic needs to have some slight
+ * animation to it ... not obnoxiously"). CSS only, on transforms and opacity (styles.css, the `ia-` classes): no frame loop,
+ * slow and calm, mostly at rest. They play only where the item is the focus (`live` on `ItemArt` and `Avatar`: your pawn, the
+ * locker's preview, a crate's reveal, a profile's cosmetics); everywhere else, and with reduced motion, every part rests in the
+ * still drawing. `Pivot` turns or scales its children about a point in the drawing's own units, the same in every frame the
+ * item is drawn in (a pawn, a card, a tilted group).
+ */
+function Pivot({ x, y, cls, style, children }: { x: number; y: number; cls: string; style?: string; children: ComponentChildren }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <g class={`ia ${cls}`} style={style}>
+        <g transform={`translate(${-x} ${-y})`}>{children}</g>
+      </g>
+    </g>
+  );
+}
+/** A small four-point sparkle centered on (x, y), `r` from its middle to a point. */
+const sparkle = (x: number, y: number, r: number) =>
+  `M${x} ${y - r} Q${x + r * 0.18} ${y - r * 0.18} ${x + r} ${y} Q${x + r * 0.18} ${y + r * 0.18} ${x} ${y + r} Q${x - r * 0.18} ${y + r * 0.18} ${x - r} ${y} Q${x - r * 0.18} ${y - r * 0.18} ${x} ${y - r} Z`;
+
+/**
+ * The Gift-Wrap Tube (Nov 25, the mockup's v2; Eric: "I see the confetti coming out. Yeah, I like that more"): every 5.5 s a small
+ * puff of confetti bursts from its tip, five bits in its two colors, white and gold, which tumble up and left and fade.
+ */
 function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
   const [white, first, second] = TUBE_STRIPES;
+  // [how far it flies (x, y), how far it turns, its color]: up and to the left, so it stays on the pawn's square.
+  const bits: [number, number, number, string][] = [
+    [-13, -5, -160, p.hex],
+    [-8, -12, 140, "#ffd23f"],
+    [-2, -15, -110, p2.hex],
+    [-5, -14, 200, "#fbfbf8"],
+    [-15, 3, -140, p2.hex],
+  ];
   return (
     <g transform="rotate(16 82 58)">
       {white!.map((d) => (
@@ -117,26 +150,88 @@ function GiftTube({ p, p2 }: { p: Paint; p2: Paint }) {
       <Region p={p} name="stripes" d={first!} outline={false} />
       <Region p={p2} name="stripes2" d={second!} outline={false} />
       <rect x={TUBE.x0} y={TUBE.top} width={TUBE.x1 - TUBE.x0} height={TUBE.bottom - TUBE.top} rx="1.2" fill="none" {...LINE} {...lw(2.4)} />
+      {bits.map(([dx, dy, r, c], i) => (
+        <Pivot key={i} x={82 + (i - 2) * 1.2} y={16.6} cls="ia-confetti" style={`--dx:${dx}px;--dy:${dy}px;--r:${r}deg`}>
+          <rect x={80.4 + (i - 2) * 1.2} y={14.8} width="3.2" height="3.6" rx="0.5" fill={c} stroke="#1d1d1f" {...lw(0.7)} />
+        </Pivot>
+      ))}
     </g>
   );
 }
 
+/** One flame rising from (x, y), `w` across its widest and `h` tall, its tip leaning a little and curling back. */
+const flamePath = (x: number, y: number, w: number, h: number) => {
+  const a = w / 2;
+  return (
+    `M${x} ${y} C${x - a * 1.25} ${y - h * 0.05} ${x - a * 1.2} ${y - h * 0.42} ${x - a * 0.55} ${y - h * 0.62} ` +
+    `C${x - a * 0.15} ${y - h * 0.76} ${x - a * 0.45} ${y - h * 0.9} ${x - a * 0.12} ${y - h} ` +
+    `C${x + a * 0.5} ${y - h * 0.86} ${x + a * 0.25} ${y - h * 0.7} ${x + a * 0.62} ${y - h * 0.56} ` +
+    `C${x + a * 1.05} ${y - h * 0.42} ${x + a * 1.3} ${y - h * 0.1} ${x} ${y} Z`
+  );
+};
+/** One ice shard, standing at x on the band, its point at `top`, `w` either side; and its shaded right face. */
+const shard = (x: number, top: number, w: number) => [
+  `M${x - w} 22.6 L${x - w * 0.62} ${top + 3.4} L${x} ${top} L${x + w * 0.62} ${top + 3.4} L${x + w} 22.6 Z`,
+  `M${x} ${top} L${x + w * 0.62} ${top + 3.4} L${x + w} 22.6 L${x + w * 0.12} 22.6 Z`,
+];
+/**
+ * The Fire & Ice Crown, rebuilt (Nov 25, from the Nov 24 mockup; Eric: "the top little parts that are floating, we should replace those with
+ * actual like flames ... the fire needs to be a bit cooler"): a band of ice with four ice shards, and between them three real
+ * flames rising out of the ice, in the item's color: each one layered (its color outside, lighter inside, a near-white core),
+ * with a soft glow of its color behind and the odd ember drifting up. The flames flicker, calmly, each at its own pace. The ice
+ * stays ice, whatever the color: only the fire takes it.
+ */
 function FireIceCrown({ p }: { p: Paint }) {
   const id = p.id;
-  const flame = (x: number, y: number, s: number) =>
-    `M${x} ${y} C${x - 5 * s} ${y - 4 * s} ${x - 2 * s} ${y - 9 * s} ${x} ${y - 13 * s} C${x + 1 * s} ${y - 8 * s} ${x + 6 * s} ${y - 6 * s} ${x} ${y} Z`;
+  const mid = lighten(p.hex, 0.42);
+  const core = lighten(p.hex, 0.88);
+  const flames: [number, number, number, string][] = [
+    [38.9, 8, 17, "f1"],
+    [50, 10.4, 25, "f2"],
+    [61.1, 8, 17, "f3"],
+  ];
   return (
     <g>
       <defs>
         <linearGradient id={`${id}-ice`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#f0fbff" />
-          <stop offset="1" stop-color="#8fd3f4" />
+          <stop offset="0" stop-color="#f4fcff" />
+          <stop offset="1" stop-color="#9fdaf6" />
         </linearGradient>
+        {/* The fire: deeper at its root, the item's color through its body, brightening at its tip. */}
+        <linearGradient id={`${id}-fire`} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color={darken(p.hex, 0.18)} />
+          <stop offset="0.55" stop-color={p.hex} />
+          <stop offset="1" stop-color={lighten(p.hex, 0.4)} />
+        </linearGradient>
+        <radialGradient id={`${id}-glow`}>
+          <stop offset="0" stop-color={p.hex} stop-opacity="0.55" />
+          <stop offset="0.6" stop-color={p.hex} stop-opacity="0.2" />
+          <stop offset="1" stop-color={p.hex} stop-opacity="0" />
+        </radialGradient>
       </defs>
-      <Region p={p} name="flames" fill={p.flameFill} d={[flame(39, 14, 0.8), flame(50, 9, 1), flame(61, 14, 0.8)]} />
-      <path d="M33 26 L33 14 L39 18 L44 9 L50 15 L56 9 L61 18 L67 14 L67 26 Z" fill={`url(#${id}-ice)`} {...LINE} />
-      <path d="M36 22 L64 22" stroke="#bae6fd" {...lw(1.6)} />
-      <circle cx="50" cy="21" r="2.2" fill="#38bdf8" stroke="#1d1d1f" {...lw(1.2)} />
+      <ellipse cx="50" cy="12" rx="22" ry="15" fill={`url(#${id}-glow)`} />
+      {[shard(33.8, 13.4, 2.4), shard(44, 10.6, 2.6), shard(56, 10.6, 2.6), shard(66.2, 13.4, 2.4)].map(([s, face]) => (
+        <g key={s}>
+          <path d={s} fill={`url(#${id}-ice)`} />
+          <path d={face} fill="#7cc6ec" opacity="0.55" />
+          <path d={s} fill="none" {...LINE} {...lw(1.8)} />
+        </g>
+      ))}
+      {flames.map(([x, w, h, k]) => (
+        <Pivot key={k} x={x} y={23} cls={`ia-flame ${k}`}>
+          <Region p={p} name={`flame-${k}`} fill={`url(#${id}-fire)`} d={[flamePath(x, 23, w, h)]} line={1.7} />
+          <path d={flamePath(x + 0.1, 23, w * 0.64, h * 0.72)} fill={mid} />
+          <path d={flamePath(x + 0.2, 23.2, w * 0.34, h * 0.44)} fill={core} />
+        </Pivot>
+      ))}
+      {/* Embers: a spark drifts up from the fire now and then. */}
+      <circle class="ia ia-ember e1" cx="47.5" cy="3" r="0.9" fill={core} stroke={p.hex} {...lw(0.5)} />
+      <circle class="ia ia-ember e2" cx="60" cy="8" r="0.75" fill={core} stroke={p.hex} {...lw(0.5)} />
+      <path d="M31.6 21.6 Q50 24.4 68.4 21.6 L68.4 26.4 Q50 29.2 31.6 26.4 Z" fill={`url(#${id}-ice)`} {...LINE} {...lw(2.4)} />
+      <path d="M34.6 24.1 Q50 26.6 65.4 24.1" fill="none" stroke="#c9eefc" stroke-linecap="round" {...lw(1.2)} />
+      <path d="M50 21.9 L52.5 24.6 L50 27.3 L47.5 24.6 Z" fill="#38bdf8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1)} />
+      <path d="M49.1 23.4 L50 22.6" stroke="#fff" stroke-linecap="round" {...lw(0.8)} />
+      <path class="ia ia-frost" d={sparkle(33.8, 16.6, 1.8)} fill="#fff" />
     </g>
   );
 }
@@ -168,20 +263,85 @@ function Present({ p, p2 }: { p: Paint; p2: Paint }) {
 
 /** A candy cane at the pawn's side: white, striped in its color. */
 const CANE = "M86 94 L86 30 A14 14 0 0 0 58 30 L58 33 A3 3 0 0 0 64 33 L64 30 A8 8 0 0 1 80 30 L80 94 A3 3 0 0 0 86 94 Z";
+/**
+ * The candy cane's magic strand (Nov 25, the mockup's v2; Eric: "a magical little spell, like string thing ... it looks like it's basically
+ * floating around the stick ... spiraling around it as it moves up"): a helix round the cane's middle (up the shaft, round the hook,
+ * to its tip), as one path, and where it's in front of the cane (clip shapes for those stretches). A dash of light runs along it.
+ */
+const CANE_STRAND = (() => {
+  const RADIUS = 5.4; // how far it floats from the cane's middle (the cane is 3 either side)
+  const PITCH = 17; // one turn per this much of the cane
+  const STEP = 0.5;
+  // The cane's middle, sampled: [x, y, the normal's x, y] at each step, bottom to tip.
+  const mid: number[][] = [];
+  for (let y = 92; y > 30; y -= STEP) mid.push([83, y, 1, 0]);
+  for (let t = 0; t < Math.PI; t += STEP / 11) mid.push([72 + 11 * Math.cos(t), 30 - 11 * Math.sin(t), Math.cos(t), -Math.sin(t)]);
+  for (let y = 30; y <= 33.6; y += STEP) mid.push([61, y, -1, 0]);
+  const at = (i: number) => (2 * Math.PI * i * STEP) / PITCH;
+  const pt = (i: number, off: number) => `${+(mid[i]![0]! + mid[i]![2]! * off).toFixed(2)} ${+(mid[i]![1]! + mid[i]![3]! * off).toFixed(2)}`;
+  const path = `M${mid.map((_, i) => pt(i, RADIUS * Math.sin(at(i)))).join(" L")}`;
+  // Its front: where the strand comes round toward us (cos > 0), a band along the cane wider than the strand swings.
+  const front: string[] = [];
+  let run: number[] = [];
+  const close = () => {
+    if (run.length > 1) front.push(`M${run.map((i) => pt(i, RADIUS + 3)).join(" L")} L${[...run].reverse().map((i) => pt(i, -RADIUS - 3)).join(" L")} Z`);
+    run = [];
+  };
+  mid.forEach((_, i) => (Math.cos(at(i)) > 0 ? run.push(i) : close()));
+  close();
+  // Motes: a few spots on its front where a sparkle is shed as the light passes, each with where it is along the strand (0-1).
+  const motes = [0.14, 0.33, 0.52, 0.7, 0.86].map((share) => {
+    let i = Math.round(share * (mid.length - 1));
+    while (i < mid.length - 1 && Math.cos(at(i)) < 0.8) i++;
+    const [x, y] = pt(i, RADIUS * Math.sin(at(i))).split(" ").map(Number);
+    return { x: x!, y: y!, share: i / (mid.length - 1) };
+  });
+  return { path, front, motes };
+})();
+/** How long the strand's light takes to climb, and its whole cycle (styles.css, `ia-strand`: 37% of 6.5 s). */
+const STRAND_CLIMB = 0.37 * 6.5;
+/**
+ * A candy cane at the pawn's side: white, striped in its color. Now and then (6.5 s) a glowing strand of magic spirals up round it, passing in
+ * front of the cane and behind it (hidden by it), from the bottom round the hook to its tip, shedding a few sparkle motes; a sparkle
+ * pops at the tip, then it rests.
+ */
 function CandyCane({ p }: { p: Paint }) {
   const stripes = [];
   for (let y = -6; y < 112; y += 10) stripes.push(`M50 ${y} L100 ${y + 22} L100 ${y + 27} L50 ${y + 5} Z`);
+  /** The strand's light: a gold glow and a bright core, the same head, the glow's tail longer (a few turns of it show at once). */
+  const strand = (
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path class="ia ia-strand glow" d={CANE_STRAND.path} pathLength={100} stroke="#ffc53d" opacity="0.7" {...lw(2.4)} />
+      <path class="ia ia-strand core" d={CANE_STRAND.path} pathLength={100} stroke="#fff8d6" {...lw(1.1)} />
+    </g>
+  );
   return (
     <g transform="rotate(14 80 60)">
       <clipPath id={`${p.id}-cane`}>
         <path d={CANE} />
       </clipPath>
+      <clipPath id={`${p.id}-strand-front`}>
+        {CANE_STRAND.front.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </clipPath>
+      {/* Behind the cane: the cane hides it but at its edges, where the strand swings out beside it. */}
+      <g opacity="0.6">{strand}</g>
       <path d={CANE} fill="#fbfbf8" />
       <g clip-path={`url(#${p.id}-cane)`}>
         <Region p={p} name="stripes" d={stripes} outline={false} />
         <path d="M84.5 34 V90" stroke="#fff" opacity="0.55" {...lw(1.6)} stroke-linecap="round" />
       </g>
       <path d={CANE} fill="none" {...LINE} />
+      <g clip-path={`url(#${p.id}-strand-front)`}>{strand}</g>
+      {CANE_STRAND.motes.map(({ x, y, share }, i) => (
+        <Pivot key={i} x={x} y={y} cls="ia-mote" style={`animation-delay:${(share * (100 / 140) * STRAND_CLIMB).toFixed(2)}s;--dx:${i % 2 ? 2.2 : -2.2}px`}>
+          <path d={sparkle(x, y, 1.9)} fill="#fff6c8" stroke="#c98a00" stroke-linejoin="round" {...lw(0.4)} />
+        </Pivot>
+      ))}
+      <Pivot x={60.6} y={35.4} cls="ia-pop" style={`animation-delay:${((100 / 140) * STRAND_CLIMB).toFixed(2)}s`}>
+        <path d={sparkle(60.6, 35.4, 5)} fill="#fffbe8" stroke="#1d1d1f" stroke-linejoin="round" {...lw(0.8)} />
+      </Pivot>
     </g>
   );
 }
@@ -460,18 +620,47 @@ function DarkShades({ p }: { p: Paint }) {
 
 /**
  * A smiley face (Beta, a one-off): a flat round dot smiley over the whole head, in its color; dark dot eyes and smile.
- * A third bigger than first drawn (Eric, Oct 15), around the same middle (50, 29), lines and all.
+ * A third bigger than first drawn (Eric, Oct 15), around the same middle (50, 29), lines and all. Nov 25: one of six
+ * expressions, from its seed (core's `smileyExpression`), each drawn with the same eyes, ink and lines.
  */
 function SmileyFace({ p }: { p: Paint }) {
   const n = parseInt(p.hex.slice(1), 16);
   const dark = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 < 0.25;
   const ink = dark ? "#f8fafc" : "#1d1d1f";
+  const face = smileyExpression({ def: "smiley-face", seed: p.finish.seed })!.id;
+  const stroke = { fill: "none", stroke: ink, "stroke-linecap": "round" as const, "stroke-linejoin": "round" as const };
+  const eye = (x: number) => <ellipse cx={x} cy="24.74" rx="1.8" ry="2.66" fill={ink} />;
+  const shut = (x: number) => <path d={`M${x - 2.5} 25.4 Q${x} 22.6 ${x + 2.5} 25.4`} {...stroke} {...lw(2.1)} />;
+  const smile = <path d="M42.02 31.13 Q50 39.64 57.98 31.13" {...stroke} {...lw(2.5)} />;
+  const tongue = (d: string) => <path d={d} fill="#f2788f" stroke={ink} stroke-linejoin="round" {...lw(1.1)} />;
   return (
     <g>
       <Region p={p} name="face" d={["M36 29 a14 14 0 1 0 28 0 a14 14 0 1 0 -28 0 Z"]} line={3.2} />
-      <ellipse cx="45.08" cy="24.74" rx="1.8" ry="2.66" fill={ink} />
-      <ellipse cx="54.92" cy="24.74" rx="1.8" ry="2.66" fill={ink} />
-      <path d="M42.02 31.13 Q50 39.64 57.98 31.13" fill="none" stroke={ink} stroke-linecap="round" {...lw(2.5)} />
+      {face === "smile" && [eye(45.08), eye(54.92), smile]}
+      {face === "wink" && [eye(45.08), shut(54.92), <path d="M42.4 31.6 Q50.6 39 57.6 30.4" {...stroke} {...lw(2.5)} />]}
+      {face === "tongue" && [
+        eye(45.08),
+        eye(54.92),
+        tongue("M50.6 34.6 Q51 40.8 54 40.6 Q57 40.2 55.8 33.6 Z"),
+        <path d="M42.02 31.13 Q50 39.64 57.98 31.13" {...stroke} {...lw(2.5)} />,
+      ]}
+      {face === "cool" && [
+        <path d="M38.8 22.2 H61.2 M40.4 22.4 H48.2 Q48.6 22.4 48.4 23 L47.6 26.6 Q47.2 27.8 46 27.8 H42.4 Q41.2 27.8 40.9 26.6 L40 23 Q39.9 22.4 40.4 22.4 Z M51.8 22.4 H59.6 Q60.1 22.4 60 23 L59.1 26.6 Q58.8 27.8 57.6 27.8 H54 Q52.8 27.8 52.4 26.6 L51.6 23 Q51.4 22.4 51.8 22.4 Z" fill={ink} stroke={ink} stroke-linejoin="round" {...lw(1.2)} />,
+        <path d="M42.2 23.8 L43.4 23.8 M53.6 23.8 L54.8 23.8" stroke={dark ? "#1d1d1f" : "#fff"} stroke-linecap="round" opacity="0.8" {...lw(1)} />,
+        <path d="M44 34 Q51.4 36.8 56.8 31.6" {...stroke} {...lw(2.5)} />,
+      ]}
+      {face === "surprised" && [
+        <ellipse cx="45.08" cy="24.4" rx="2.1" ry="3" fill={ink} />,
+        <ellipse cx="54.92" cy="24.4" rx="2.1" ry="3" fill={ink} />,
+        <path d="M42.4 19.6 Q45 18 47.6 19.4 M52.4 19.4 Q55 18 57.6 19.6" {...stroke} {...lw(1.6)} />,
+        <ellipse cx="50" cy="34.4" rx="2.7" ry="3.3" fill={ink} />,
+      ]}
+      {face === "laughing" && [
+        shut(45.08),
+        shut(54.92),
+        <path d="M41.4 30.2 Q50 43 58.6 30.2 Z" fill={ink} stroke={ink} stroke-linejoin="round" {...lw(1.4)} />,
+        tongue("M45.4 36.6 Q50 33.6 54.6 36.6 Q50 40.4 45.4 36.6 Z"),
+      ]}
     </g>
   );
 }
@@ -521,9 +710,20 @@ function TommyGun({ p, p2 }: { p: Paint; p2: Paint }) {
       <Region p={p} name="fins" d={["M50 -3.4 H64.5 V3.4 H50 Z"]} over={<g stroke="#000" opacity="0.4" {...lw(0.9)}>{fins}</g>} line={1.8} />
       <Region p={p} name="receiver" d={["M19 -4.6 H22 L23 -6.6 H25.4 L26.4 -4.6 H46 Q47.6 -4.6 47.6 -3 V3 Q47.6 4.2 46.4 4.2 H19 Z"]} line={2} />
       <Region p={p} name="drum" d={["M33 11.6 a7.8 7.8 0 1 0 15.6 0 a7.8 7.8 0 1 0 -15.6 0 Z"]} line={2} />
-      <circle cx="40.8" cy="11.6" r="3.4" fill="none" stroke="#000" opacity="0.35" {...lw(1.2)} />
-      <circle cx="40.8" cy="11.6" r="1.1" fill="#1d1d1f" />
+      <circle cx="40.8" cy="11.6" r="4.6" fill="none" stroke="#000" opacity="0.35" {...lw(1.2)} />
+      {/* The drum's winding key (Nov 25): it turns a notch every 7 s (half a turn: it looks the same after). */}
+      <Pivot x={40.8} y={11.6} cls="ia-notch">
+        <path d="M37.4 11.6 H44.2" stroke="#1d1d1f" stroke-linecap="round" {...lw(2.6)} />
+        <path d="M37.4 11.6 H44.2" stroke={lighten(p.hex, 0.55)} stroke-linecap="round" {...lw(1.1)} />
+        <circle cx="40.8" cy="11.6" r="1.1" fill="#1d1d1f" />
+      </Pivot>
       <path d="M79.6 -2.7 V-4.6" fill="none" {...LINE} {...lw(1.6)} />
+      {/* A tiny puff of smoke from the muzzle, a second after the key turns. */}
+      <Pivot x={83.4} y={-1.6} cls="ia-puff">
+        <circle cx="83.6" cy="-2" r="1.7" fill="#cfd0d6" stroke="#3f3f46" {...lw(0.7)} />
+        <circle cx="85.4" cy="-3.2" r="1.25" fill="#e4e4e7" stroke="#3f3f46" {...lw(0.7)} />
+        <circle cx="82" cy="-3.6" r="1" fill="#e4e4e7" stroke="#3f3f46" {...lw(0.7)} />
+      </Pivot>
     </g>
   );
 }
@@ -803,11 +1003,14 @@ function Parrot({ p, p2 }: { p: Paint; p2: Paint }) {
         line={2}
       />
       <Region p={p} name="head" d={["M60.4 16.6 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0 Z"]} line={2} />
-      <Region p={p2} name="wing" d={["M61.8 25.4 Q66.8 23.6 69.8 28 Q70 34.8 64.4 40 Q60.6 34.4 61.8 25.4 Z"]} line={1.5} />
-      <path d="M62 40.2 l-1.8 1.4 M62 40.2 l0.6 1.8 M66.2 39.6 l-1.2 1.6 M66.2 39.6 l1.2 1.6" fill="none" stroke="#3f3f46" stroke-linecap="round" {...lw(1.2)} />
       <path d="M71.6 13.4 Q77.6 13.6 77.2 19.8 Q75.6 17.6 72.2 18.4 Z" fill="#f2c14e" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.2)} />
       <circle cx="68.4" cy="15.2" r="2.1" fill="#fbfbf8" stroke="#1d1d1f" {...lw(0.8)} />
       <circle cx="68.9" cy="15.2" r="1" fill="#1d1d1f" />
+      {/* Nov 25: a quick double flap of its wing every 6 s. */}
+      <Pivot x={65.4} y={25} cls="ia-flap">
+        <Region p={p2} name="wing" d={["M61.8 25.4 Q66.8 23.6 69.8 28 Q70 34.8 64.4 40 Q60.6 34.4 61.8 25.4 Z"]} line={1.5} />
+      </Pivot>
+      <path d="M62 40.2 l-1.8 1.4 M62 40.2 l0.6 1.8 M66.2 39.6 l-1.2 1.6 M66.2 39.6 l1.2 1.6" fill="none" stroke="#3f3f46" stroke-linecap="round" {...lw(1.2)} />
     </g>
   );
 }
@@ -1039,7 +1242,7 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   antlers: [26, -4, 48, 22],
   "santa-beard": [36, 18, 28, 28],
   snowman: [16, 6, 68, 88],
-  "gift-tube": [65, 15, 34, 86],
+  "gift-tube": [65, 10, 34, 91],
   "fire-ice-crown": [30, -6, 40, 34],
   present: [31, 1, 38, 41],
   "candy-cane": [60, 12, 38, 88],
@@ -1058,7 +1261,7 @@ const FRAMES: Record<string, [number, number, number, number]> = {
   "dark-shades": [36, 24, 28, 11],
   "smiley-face": [34, 13, 32, 32],
   "suit-and-tie": [20, 15, 60, 76],
-  "tommy-gun": [60, 12, 40, 84],
+  "tommy-gun": [60, 8, 40, 88],
   "fake-mustache": [37, 27, 26, 11],
   fedora: [29, 8, 42, 20],
   briefcase: [61, 55, 34, 36],
@@ -1168,15 +1371,16 @@ export function ItemLayer({ def, finish, side = "w" }: { def: string; finish: Fi
 /**
  * One item on its own, framed square (cards, the strip, the reveal). A sparkle when shiny. A ride: with a pawn on it (its tile's
  * box measured ahead, so the pawn sits in place while the ride's drawing loads, and the ride appears under it: `data-drawn` once it has).
+ * `live` (Nov 25): its animation plays (the crate's reveal, a profile's cosmetics); in the grids and lists it rests still.
  */
-export function ItemArt({ def, finish, side = "w", class: cls }: { def: string; finish: Finish; side?: "w" | "b"; class?: string }) {
+export function ItemArt({ def, finish, side = "w", class: cls, live = false }: { def: string; finish: Finish; side?: "w" | "b"; class?: string; live?: boolean }) {
   const ride = rideCells(def);
   const d = useRide(ride && def);
   const [x, y, w, h] = FRAMES[def] ?? ride?.frame ?? [0, 0, 100, 100];
   const s = Math.max(w, h) * 1.12;
   const vb = `${x + w / 2 - s / 2} ${y + h / 2 - s / 2} ${s} ${s}`;
   return (
-    <span class={`item-art${isShiny(finish.blemish) && showsPurity(def) ? " shiny" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+!!d) : undefined}>
+    <span class={`item-art${isShiny(finish.blemish) && showsPurity(def) ? " shiny" : ""}${live ? " ia-live" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+!!d) : undefined}>
       <svg viewBox={vb} aria-hidden="true">
         {ride ? (
           <RideLayers id={def} c={ride} d={d} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
@@ -1327,13 +1531,13 @@ function useIdleFrame(ms: readonly number[]): number {
  * Its box and the pawn's seat are measured ahead (ride-cells.ts): until the ride's drawing has loaded (rides/load.ts) the pawn
  * sits in place and the ride appears under it (`data-drawn` once it has).
  */
-function RidingAvatar({ id, c, mount, side, rider }: { id: string; c: RideCells; mount: NonNullable<ItemLook["ride"]>; side: "w" | "b"; rider: ComponentChildren }) {
+function RidingAvatar({ id, c, mount, side, rider, live }: { id: string; c: RideCells; mount: NonNullable<ItemLook["ride"]>; side: "w" | "b"; rider: ComponentChildren; live?: boolean }) {
   const d = useRide(id);
   const f = useIdleFrame(idleMs(id, c));
   // (Its size: RIDES.scale, or an admin's `?rideScale=`.)
   const k = rideScale(id);
   return (
-    <span class="avatar riding" aria-hidden="true" data-ride={id} data-scale={k} data-drawn={String(+!!d)}>
+    <span class={`avatar riding${live ? " ia-live" : ""}`} aria-hidden="true" data-ride={id} data-scale={k} data-drawn={String(+!!d)}>
       <svg class="avatar-ride" viewBox={rideView(id, c, k)}>
         <defs>
           <clipPath id="avatar-cap">
@@ -1351,9 +1555,10 @@ function RidingAvatar({ id, c, mount, side, rider }: { id: string; c: RideCells;
 /**
  * A player as a pawn (or a snowman) wearing their items: skin, then face, head and a weapon at their side. Used in
  * the votes, the cut screen, the queue and profiles. `ride` (the locker and the profiles, Oct 31): on their ride, if they
- * have one on, in its idle; everywhere else a ride isn't drawn (a match's screens, the crowd, home's pawn).
+ * have one on, in its idle; everywhere else a ride isn't drawn (a match's screens, the crowd, home's pawn). `live` (Nov 25): its
+ * items' animations play (your own pawn, a profile's); everywhere else (the crowd, the grids) they rest still.
  */
-export function Avatar({ look: equipped, side = "w", ride = false, outlined = false }: { look?: ItemLook; side?: "w" | "b"; ride?: boolean; outlined?: boolean }) {
+export function Avatar({ look: equipped, side = "w", ride = false, outlined = false, live = false }: { look?: ItemLook; side?: "w" | "b"; ride?: boolean; outlined?: boolean; live?: boolean }) {
   // (An outfit, Nov 10: only it and any eyewear show; it's drawn round the pawn everywhere, with or without `ride`: core's shownLook.)
   const look = shownLook(equipped);
   const at = (slot: ItemSlot) => look?.[slot];
@@ -1392,6 +1597,7 @@ export function Avatar({ look: equipped, side = "w", ride = false, outlined = fa
         c={c}
         mount={mount}
         side={side}
+        live={live}
         rider={
           <>
             {items(true)}
@@ -1412,7 +1618,7 @@ export function Avatar({ look: equipped, side = "w", ride = false, outlined = fa
     </svg>
   );
   return (
-    <span class="avatar hb-pieces" aria-hidden="true">
+    <span class={`avatar hb-pieces${live ? " ia-live" : ""}`} aria-hidden="true">
       {layer(true)}
       {skin ? (
         <svg class="avatar-skin" viewBox="0 0 100 100">

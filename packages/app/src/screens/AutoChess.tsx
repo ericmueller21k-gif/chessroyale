@@ -317,7 +317,7 @@ function PieceIcon({ color, kind, n = 1, ring = false, shift = false }: { color:
  * then a random wait (`AUTOCHESS.hopEvery`, hop.ts) from its start to the next one's, each pawn on its own draws so the two never fall into
  * step. The dressed pawn's own ground shadow (a skin's art draws one) is hidden here: `.ac-shadow` is the one shadow. `badge`: the level, on yours.
  */
-function HopPawn({ look, side, cfg, badge }: { look?: Parameters<typeof Avatar>[0]["look"]; side: Color; cfg: AutoChessSettings; badge?: ComponentChildren }) {
+function HopPawn({ look, side, cfg, badge, live }: { look?: Parameters<typeof Avatar>[0]["look"]; side: Color; cfg: AutoChessSettings; badge?: ComponentChildren; live?: boolean }) {
   const pawn = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     // (Reduced motion: the pawn stays still.)
@@ -340,7 +340,7 @@ function HopPawn({ look, side, cfg, badge }: { look?: Parameters<typeof Avatar>[
       <span class="ac-shadow" aria-hidden="true" />
       <span class="ac-hop">
         <span class="fd-pawn-box">
-          <Avatar look={look} side={side} />
+          <Avatar look={look} side={side} live={live} />
         </span>
       </span>
       {badge}
@@ -1298,7 +1298,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           </div>
           <div class="ac-side ac-me" aria-label="You">
             <div class="ac-stage">
-              <HopPawn look={myLook} side={mine} cfg={cfg} />
+              <HopPawn look={myLook} side={mine} cfg={cfg} live />
             </div>
             <div class="ac-info" title={myName}>
               <strong class="ac-name">{myName}</strong>
@@ -1373,7 +1373,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                         <span class="ac-shadow" aria-hidden="true" />
                         <span class="ac-hop">
                           <span class="fd-pawn-box">
-                            <Avatar look={myLook} side={mine} />
+                            <Avatar look={myLook} side={mine} live />
                           </span>
                         </span>
                       </span>

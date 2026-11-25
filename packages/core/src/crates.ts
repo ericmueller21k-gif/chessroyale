@@ -75,6 +75,32 @@ export function secondColor(it: { def: string; color: string; color2?: string | 
   return pick(mulberry32((it.seed ^ 0x5eed2c01) >>> 0), ITEM_COLORS.filter((c) => c.id !== first)).id;
 }
 
+/**
+ * The Smiley Face's six expressions (Nov 25; Eric approved the mockup: "a few of them are different expressions"). Like the
+ * tube's second color, a smiley's expression comes from its own seed: never stored, the same on every device, even odds.
+ */
+export const SMILEY_EXPRESSIONS = [
+  { id: "smile", name: "Smile" },
+  { id: "wink", name: "Wink" },
+  { id: "tongue", name: "Tongue" },
+  { id: "cool", name: "Cool" },
+  { id: "surprised", name: "Surprised" },
+  { id: "laughing", name: "Laughing" },
+] as const;
+export type SmileyExpression = (typeof SMILEY_EXPRESSIONS)[number]["id"];
+/** A Smiley Face's expression, from its seed (its own stream, apart from the blotches' and the tube's); none for other items. */
+export function smileyExpression(it: { def: string; seed: number }): (typeof SMILEY_EXPRESSIONS)[number] | undefined {
+  if (it.def !== "smiley-face") return undefined;
+  const r = mulberry32((it.seed ^ 0x5311e7a5) >>> 0)();
+  return SMILEY_EXPRESSIONS[Math.floor(r * SMILEY_EXPRESSIONS.length)]!;
+}
+/** An item's name as its card and the locker show it: the Smiley Face with its expression ("Smiley Face · Wink"). */
+export function itemName(it: { def: string; seed: number }): string {
+  const name = itemDef(it.def)?.name ?? it.def;
+  const face = smileyExpression(it);
+  return face ? `${name} · ${face.name}` : name;
+}
+
 export interface ItemDef {
   id: string;
   name: string;
@@ -446,14 +472,16 @@ export interface ItemInstance {
 }
 
 /**
- * The locker's stacks: copies of the same item in the same color (both colors, for two-color items and the tube)
- * shown as one, the purest on top (Eric, Oct 8). `items` are purest first, so `items[0]` is the top.
+ * The locker's stacks: copies of the same item in the same color (both colors, for two-color items and the tube; the same
+ * expression, for a smiley) shown as one, the purest on top (Eric, Oct 8). `items` are purest first, so `items[0]` is the top.
  */
 export interface ItemStack {
   key: string;
   items: ItemInstance[];
 }
-export const stackKey = (it: Pick<ItemInstance, "def" | "color" | "color2" | "seed">) => `${it.def}|${it.color}|${secondColor(it) ?? ""}`;
+// (A Smiley Face's expression too, Nov 25: a Wink and a Cool are different looks, so they don't stack.)
+export const stackKey = (it: Pick<ItemInstance, "def" | "color" | "color2" | "seed">) =>
+  `${it.def}|${it.color}|${secondColor(it) ?? ""}${smileyExpression(it) ? `|${smileyExpression(it)!.id}` : ""}`;
 export function stackItems(items: readonly ItemInstance[]): ItemStack[] {
   const stacks = new Map<string, ItemInstance[]>();
   for (const it of items) {

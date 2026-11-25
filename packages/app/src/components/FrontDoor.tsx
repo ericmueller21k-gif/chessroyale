@@ -85,9 +85,11 @@ export function DressedPawn({
       clearTimeout(land);
     };
   }, [size]);
+  // (Its items' animations play where the pawn is the focus, Nov 25: your own, bigger than the side menu's ring, and a profile's.)
+  const live = own ? size !== "ring" : size === "profile" || size === "avatar";
   const box = (
     <span class="fd-pawn-box">
-      <Avatar look={look} side={pawnSide} ride={ride} />
+      <Avatar look={look} side={pawnSide} ride={ride} live={live} />
     </span>
   );
   const cls = `fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}${onTap ? " fd-tap" : ""}`;
