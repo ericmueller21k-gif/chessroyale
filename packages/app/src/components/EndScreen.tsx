@@ -54,10 +54,13 @@ export function EndHeadline({ title, line, tone, plain = false }: { title: Compo
       <h1 class={`boss-title es-title${typeof title === "string" && title.length > 12 ? " es-title-long" : ""}`} data-testid="es-title">
         {title}
       </h1>
-      {/* (One line, always there: an empty one keeps its height.) */}
-      <p class={`es-line${line.length > 22 ? " es-line-long" : ""}`} data-testid="es-line">
-        {line || " "}
-      </p>
+      {/* (The match's line when it has one. A screen whose headline has none (you resigned, out in the crowd) never gets one later, so
+          no blank line is kept: it was a gap three times the one under the title, Nov 25.) */}
+      {line && (
+        <p class={`es-line${line.length > 22 ? " es-line-long" : ""}`} data-testid="es-line">
+          {line}
+        </p>
+      )}
     </div>
   );
 }
