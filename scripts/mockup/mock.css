@@ -1,0 +1,133 @@
+/* MOCKUP (Nov 25): one shared computer layout for every game screen. Injected by scripts/mockup/game-layout.spec.ts over the real
+   screens: a 34 px bar above the board and one under it (chess.com's name bars), the board the rest of the window's height, one 340 px
+   panel on the right from the top bar down, the chat filling what's left of it. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game:not(:has(> .boss-dock)) {
+    --bd-room: 108px !important;
+    row-gap: 8px !important;
+    padding-top: 10px !important;
+    padding-bottom: 14px !important;
+  }
+  .screen.game > .hud-row {
+    height: 34px;
+    min-height: 0;
+    align-items: center;
+  }
+  .screen.game:not(:has(> .boss-dock)) .board-area {
+    grid-row: 2 / 5 !important;
+  }
+  .screen.game:not(:has(> .boss-dock)) .play-footer,
+  .screen.game > .sq-panel {
+    grid-row: 1 / 3 !important;
+    margin-top: 0 !important;
+    align-self: start;
+  }
+  .mk-col {
+    grid-column: 2;
+    grid-row: 1 / 5;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    align-self: stretch;
+  }
+  .mk-col > .under-board,
+  .mk-col > .dv-chat,
+  .mk-col > .mk-chat {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto !important;
+    contain: size;
+  }
+  .mk-col > * {
+    margin: 0 !important;
+  }
+
+  /* 1 v 1: the title and the gear in the top strip, by the clock. */
+  .duel-screen > .hud-row {
+    display: none !important;
+  }
+  .mk-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-left: auto;
+    margin-right: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .mk-title b {
+    color: var(--text);
+    font-size: 14px;
+  }
+  .dv-strip .mm {
+    margin-left: 4px;
+  }
+  .dv-strip .mm-more {
+    height: 34px;
+  }
+
+  /* 50 v 50: the status line is the top bar (its own size); the pick line moves into the panel. */
+  .crowd-50 > .hud-row > .hud {
+    font-size: 17px !important;
+    height: 34px;
+  }
+  .crowd-50 .board-area > .opening-name {
+    display: none;
+  }
+
+  /* Squads: the round line is the top bar; the tiny boards go to the panel's top; the board's line under the board. */
+  .sq-game > .sq-boards {
+    display: none !important;
+  }
+  .mk-col .sq-boards {
+    display: flex !important;
+    justify-content: center;
+    flex: none;
+  }
+  .sq-game .board-area > .sq-status-row {
+    display: none;
+  }
+
+  /* A boss battle: the boss's bar one line, 46 px (portrait, name and level, his meters beside them); the dock's row under the board
+     as before. Room: 6 + 46 + 8 + the board + 6 + 34 + 8 = 108. */
+  .screen.game:has(> .boss-dock) {
+    --bd-room: 108px !important;
+  }
+  .screen.game > .boss-bar {
+    height: 46px !important;
+    min-height: 0 !important;
+  }
+  .screen.game > .boss-bar .boss-main {
+    height: 46px;
+    grid-template-columns: auto minmax(0, 1fr) auto auto !important;
+    grid-template-rows: 46px !important;
+    align-items: center !important;
+    column-gap: 12px !important;
+  }
+  .screen.game > .boss-bar .boss-name {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+  .screen.game > .boss-bar .boss-prop {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    height: 30px;
+  }
+  .screen.game > .boss-bar .boss-move {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+  }
+  .screen.game > .boss-bar .boss-next {
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+  }
+  .screen.game > .boss-bar .boss-portrait {
+    height: 38px !important;
+    width: auto !important;
+  }
+}

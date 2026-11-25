@@ -28758,3 +28758,145 @@ piece.bd-smashed {
     opacity: 0;
   }
 }
+
+/* ---- MOCKUP (Nov 25, claude/game-layout-mockup): the Ranks pop-up (components/RanksPopup.tsx) and the emblem in a 1 v 1 strip ---- */
+.rk-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 45%, transparent);
+}
+.rk-pop {
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(var(--app-h, 100dvh) - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+.rk-head {
+  position: relative;
+}
+.rk-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.rk-x {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 22px;
+  cursor: pointer;
+}
+.rk-sub {
+  margin: 6px 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rk-you {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  font-size: 14px;
+}
+.rk-list {
+  display: grid;
+  gap: 4px;
+}
+.rk-row {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.rk-row.rk-on {
+  border-color: var(--rank);
+  background: color-mix(in srgb, var(--rank) 14%, var(--surface));
+}
+.rk-name {
+  text-align: left;
+  font-weight: 800;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--rank) 70%, var(--text));
+}
+.rk-divs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+}
+.rk-top .rk-divs {
+  justify-content: flex-start;
+  gap: 10px;
+}
+.rk-div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 46px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+}
+.rk-div small {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  line-height: 12px;
+}
+.rk-div.rk-here {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.rk-place {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.rk-em {
+  display: block;
+  zoom: 0.75;
+}
+@media (max-width: 480px) {
+  .rk-row {
+    grid-template-columns: 84px 1fr;
+    padding: 2px 4px;
+  }
+  .rk-name {
+    font-size: 12px;
+  }
+  .rk-div {
+    width: 42px;
+  }
+  .rk-em {
+    zoom: 0.66;
+  }
+}
+.dv-rank-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+.dv-rank-btn .re-box {
+  flex: none;
+  zoom: 0.58;
+}

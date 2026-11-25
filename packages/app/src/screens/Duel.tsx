@@ -232,7 +232,7 @@ function DuelStrip({ p, c, you, ms, running, clockShownNow, away }: { p: DuelSid
       </span>
       <span class="dv-strip-who">
         <PlayerName name={p.name} uid={p.uid ?? undefined} you={you} bot={p.bot} class="dv-name" />
-        <DuelRankPill rank={you ? yourRankShown(p.rank) : p.rank} />
+        <DuelRankPill rank={you ? yourRankShown(p.rank) : p.rank} who={p.name} />
         {away && <span class="dv-away">away</span>}
       </span>
       <span class={`dv-clock${running ? " on" : ""}${low ? " low" : ""}`} aria-label={`${you ? "Your" : `${p.name}'s`} clock: ${clockShownNow ? clockShown(ms, { tenths: true }) : "not set"}`}>
