@@ -503,14 +503,14 @@ test("a computer's 50 v 50 (Eric, Nov 25): the status line centered over the boa
     expect(Math.abs(g.slot!.height - 206), `${size}: the panel one fixed slot (${g.slot!.height})`).toBeLessThanOrEqual(1);
   }
   await ctx.close();
-  // A phone: the line and the panel as before (16 px, the words from the left; the panel the locked screen's --mid-h, 104 px).
+  // A phone: the line and the panel as before (16 px, the words from the left; the panel the locked screen's --mid-h, 151 px since Nov 25: the power-up row, six vote rows and the status line).
   const phone = await touchPage(browser);
   await into(phone.page, "crowd");
   const p = await phone.page.evaluate(() => {
     const hud = document.querySelector(".screen.game > .hud-row > .hud")!;
     return { font: getComputedStyle(hud).fontSize, justify: getComputedStyle(hud).justifyContent, slot: document.querySelector(".screen.game > .play-footer")!.getBoundingClientRect().height };
   });
-  expect(p, "a phone: the status line and the panel as before").toEqual({ font: "16px", justify: "normal", slot: 104 });
+  expect(p, "a phone: the status line and the panel as before").toEqual({ font: "16px", justify: "normal", slot: 151 });
   await phone.ctx.close();
 });
 
