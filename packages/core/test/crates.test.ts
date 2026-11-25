@@ -22,6 +22,9 @@ import {
   purity,
   rollBlemish,
   secondColor,
+  smileyExpression,
+  itemName,
+  SMILEY_EXPRESSIONS,
   rollCrate,
   stackItems,
   shownLook,
@@ -349,6 +352,30 @@ describe("crates", () => {
     const a = tube("red", 1);
     const b = [2, 3, 4, 5, 6, 7, 8].map((s) => tube("red", s)).find((t) => secondColor(t) !== secondColor(a))!;
     const items = [a, b, { ...a, seed: a.seed }].map((t, i) => ({ ...t, id: String(i), blemish: i }));
+    expect(stackItems(items).map((s) => s.items.map((i) => i.id))).toEqual([["0", "2"], ["1"]]);
+  });
+
+  it("a Smiley Face's expression comes from its seed: stable, even odds across the six, named on its card; nothing stored", () => {
+    const smiley = (seed: number) => ({ def: "smiley-face", color: "yellow", seed });
+    const counts = new Map<string, number>();
+    for (let seed = 0; seed < 24000; seed++) {
+      const s = smiley(seed * 104729 + 7);
+      const face = smileyExpression(s)!;
+      expect(smileyExpression(s)).toBe(face);
+      // (The color and purity don't change it: only the seed.)
+      expect(smileyExpression({ ...s, color: "pearl" } as typeof s)).toBe(face);
+      counts.set(face.id, (counts.get(face.id) ?? 0) + 1);
+    }
+    expect([...counts.keys()].sort()).toEqual(SMILEY_EXPRESSIONS.map((e) => e.id).sort());
+    for (const n of counts.values()) expect(n / 24000).toBeCloseTo(1 / 6, 1);
+    // Other items have none; the name says it ("Smiley Face · Wink"), others keep theirs.
+    expect(smileyExpression({ def: "pirate-hat", seed: 5 })).toBeUndefined();
+    const wink = [...Array(50).keys()].map(smiley).find((s) => smileyExpression(s)!.id === "wink")!;
+    expect(itemName(wink)).toBe("Smiley Face · Wink");
+    expect(itemName({ def: "pirate-hat", seed: 5 })).toBe("Pirate Hat");
+    // The locker doesn't stack two expressions together; the same one stacks.
+    const other = [...Array(50).keys()].map(smiley).find((s) => smileyExpression(s)!.id !== "wink")!;
+    const items = [wink, other, { ...wink }].map((t, i) => ({ ...t, id: String(i), blemish: i }));
     expect(stackItems(items).map((s) => s.items.map((i) => i.id))).toEqual([["0", "2"], ["1"]]);
   });
 

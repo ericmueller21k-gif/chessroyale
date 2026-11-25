@@ -278,7 +278,7 @@ export const YourPawn = memo(function YourPawn({ look, side, hopAt, seat }: { lo
       {seat !== undefined && <span class="pt-disc" />}
       <span class="you-pawn-bob" style={{ animationDelay: `-${phase}ms` }}>
         <span key={hop ? hopAt : 0} class={`you-pawn-hop${hop ? " hop" : ""}`} style={hop ? { animationDelay: `-${age}ms` } : undefined}>
-          <Avatar look={look} side={side} />
+          <Avatar look={look} side={side} live />
         </span>
       </span>
     </div>

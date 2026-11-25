@@ -178,7 +178,7 @@ export function DuelVote({ you, picks, looks, voteAt, voteEndsAt, now, onPick }:
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <Avatar look={looks[you] ?? undefined} side={you} />
+          <Avatar look={looks[you] ?? undefined} side={you} live />
         </span>
       </div>
       <VoteHint show={hint && !dragAt} text="Drag your pawn, or tap the speed you want" class="dv-hint" />

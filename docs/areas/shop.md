@@ -94,6 +94,14 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Weapons don't move with the piece: they're drawn where every piece's side (or shoulder) is. Your
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
+- **Item animations and the Smiley's expressions** (Nov 25; [2026-11-25-item-polish.md](../decisions/2026-11-25-item-polish.md)): the Fire & Ice
+  Crown's flames, the Candy Cane's strand, the Gift-Wrap Tube's confetti, the Parrot's flap and the Tommy Gun's key and puff play (CSS `ia-`
+  classes in styles.css, SVG transforms and opacity, no frame loop) only under `.ia-live`: `live` on `ItemArt` / `Avatar`, set where the
+  item is the focus (your pawn on screen, the locker's preview, a crate's reveal, a profile's Wearing rows and tiles), and only inside
+  `prefers-reduced-motion: no-preference`. Grids, lists and the power banner stay still. A Smiley Face's expression (`SMILEY_EXPRESSIONS`:
+  Smile, Wink, Tongue, Cool, Surprised, Laughing) comes from its seed (`smileyExpression`, its own stream; never stored); `itemName(it)`
+  names it ("Smiley Face · Wink") on the reveal card, the locker tile and its label, the delete dialog and the profile; `stackKey` keeps
+  each expression its own stack.
 - **Outfits** (Nov 10; [2026-11-10-outfit-slot.md](../decisions/2026-11-10-outfit-slot.md)): the `outfit` slot. One on, every other worn item is
   hidden (core's `shownLook`: only the outfit, and eyewear, `eyewear: true` (goggles, shades) while `OUTFIT.eyewear`), everywhere a look is
   drawn (`Avatar`, the town, the profiles' rows); the rest stay equipped underneath. **Secret** (Eric's exception to "nothing hidden"): the
@@ -344,6 +352,9 @@ spins (4 s, Nov 24); its other beats are in `crate-open/timeline.ts`.
   shine's clip is its own Region's and no two clips on the page share an id with different shapes).
 - The Transcendent banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
   must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
+- Item polish (Nov 25): unit `crates.test.ts`, "a Smiley Face's expression comes from its seed…"; e2e `public-profile.spec.ts`, "four worn
+  items all fit" (the smiley's tile reads "Smiley Face · Laughing"); `@perf` `perf.spec.ts`, "worn items playing on a slow phone" (local only).
+  The fitting sheet's `live=1` plays the animations, `seeds=1,8,…` sets each card's seed (a smiley's expression), `width=` the page's.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of
   the repo). `sheet=1` gives a short sheet to show a batch (cards, both pawns, `colors=`, `outfits=a+b;c`). `scale=1` or `scale=2`
   renders at that display scale, to look for stray pixels. A ride shows ridden on every skin (`with=pirate-hat` for a hat on the rider).

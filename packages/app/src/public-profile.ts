@@ -1,4 +1,4 @@
-import { CROWD_SETTINGS, DEFAULT_SETTINGS, SLOT_NAMES, bossDef, bossInfo, itemColor, itemDef, secondColor, shownLook, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
+import { CROWD_SETTINGS, DEFAULT_SETTINGS, SLOT_NAMES, bossDef, bossInfo, itemColor, itemDef, itemName, secondColor, shownLook, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
 import type { PublicProfile } from "./account.ts";
 
 /**
@@ -222,6 +222,6 @@ export function wornTiles(look: ItemLook): WornTile[] {
     const first = itemColor(it.color).name;
     const second = secondColor(it);
     const t = tierInfo(d.tier);
-    return [{ slot, def: it.def, finish: it, name: d.name, line: `${SLOT_NAMES[slot]} · ${second ? `${first} & ${itemColor(second).name}` : first}`, tier: { name: t.name, color: t.color } }];
+    return [{ slot, def: it.def, finish: it, name: itemName(it), line: `${SLOT_NAMES[slot]} · ${second ? `${first} & ${itemColor(second).name}` : first}`, tier: { name: t.name, color: t.color } }];
   });
 }
