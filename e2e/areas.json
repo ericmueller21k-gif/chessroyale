@@ -578,6 +578,8 @@
         "packages/app/src/components/ShadeMoves.tsx",
         "packages/app/src/components/Breakdown.tsx",
         "packages/app/src/components/VoteHint.tsx",
+        "packages/app/src/components/VoteZoneTags.tsx",
+        "packages/app/src/components/vote-tags.css",
         "packages/app/src/pick-rows.ts",
         "packages/app/src/looks.ts",
         "packages/app/src/components/StreakFire.tsx"

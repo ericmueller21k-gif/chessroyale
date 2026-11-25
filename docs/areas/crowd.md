@@ -158,6 +158,12 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   1 v 1's) shows "Drag your pawn into a zone to vote" over the board just above the zones until they vote; never again
   on that device (`VoteHint`, `brc.voteHintSeen`; `FirstVoteHint` in `screens/Vote.tsx`, one per vote). e2e
   `vote-hint.spec.ts`.
+- **The zones' name tags** (Eric, Nov 25, look B of the mockup): on every pawn vote on `VoteScreen` (this one's and Squads'), a
+  small dark tag (the `.vote-banner` look, a thin gold rim, a pointer down) names each zone above it as the vote opens: it rises
+  in, bobs gently and lifts away over `VOTE_TAGS.showMs` (3 s) from the vote's start, and fades in `goneMs` (0.3 s) the moment
+  your vote is in. It floats over the board and takes no taps, so nothing moves; long names take two lines; reduced motion:
+  no bob. 1 v 1 keeps its own labels above its zones, no tags. `components/VoteZoneTags.tsx`, `vote-tags.css`; e2e
+  `votes.spec.ts` ("the zones' name tags"). [2026-11-25-vote-labels.md](../decisions/2026-11-25-vote-labels.md).
 - **The endings.** Each leaves `crowdFinalists(format)` players (the lobby less `CROWD_KNOCKOUTS[format]`). Team final:
   `teamFinalSizes` players a side, the weakest out every `teamFinalMovesPerStep`. **The boss final** (Eric, Oct 14):
   always the Hidden Boss, the top 4 against him (the duel's cuts, stopping at four), for everyone, solo and online; his
