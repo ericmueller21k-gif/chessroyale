@@ -1,11 +1,11 @@
 import type { ComponentChildren, RefObject } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { END_SCREEN as FX, RANKED_1V1, XP, XP_NONE_LINES, levelOf, rankView, xpShownParts, type RankChange, type RankView, type XpGrant } from "@chessroyale/core";
+import { END_SCREEN as FX, QUESTS, RANKED_1V1, XP, XP_NONE_LINES, levelOf, rankView, xpShownParts, type RankChange, type RankView, type XpGrant } from "@chessroyale/core";
 import { account, playerName } from "../account.ts";
 import { bossKit, placeFacing } from "../characters/kits.ts";
 import { drawnBox } from "../screens/TowerBar.tsx";
 import { pawnLook } from "../looks.ts";
-import { questsForYou, questsMovedBy, type QuestMoved } from "../quests.ts";
+import { questRowsBy, questsForYou, questsMovedBy, type QuestMoved } from "../quests.ts";
 import { markXpFilled, xpFilled } from "../xp.ts";
 import { SpriteAnim } from "./BossEffect.tsx";
 import { YourPawn } from "./BossDock.tsx";
@@ -54,10 +54,13 @@ export function EndHeadline({ title, line, tone, plain = false }: { title: Compo
       <h1 class={`boss-title es-title${typeof title === "string" && title.length > 12 ? " es-title-long" : ""}`} data-testid="es-title">
         {title}
       </h1>
-      {/* (One line, always there: an empty one keeps its height.) */}
-      <p class={`es-line${line.length > 22 ? " es-line-long" : ""}`} data-testid="es-line">
-        {line || " "}
-      </p>
+      {/* (The match's line when it has one. A screen whose headline has none (you resigned, out in the crowd) never gets one later, so
+          no blank line is kept: it was a gap three times the one under the title, Nov 25.) */}
+      {line && (
+        <p class={`es-line${line.length > 22 ? " es-line-long" : ""}`} data-testid="es-line">
+          {line}
+        </p>
+      )}
     </div>
   );
 }
@@ -139,18 +142,24 @@ export function EndPawn({ hopAt, side = "w" }: { hopAt: number; side?: "w" | "b"
  * "XP EARNED" (or "RP EARNED" / "RP LOST") and its number, in a box of fixed height: the number counts up here, then lobs into its
  * bar. `why`: in place of the number, why there's none ("No XP: test game."). `parts`: what made it, small, under it ("Win +50").
  */
-function EarnedSlot({ kind, slot, down, why, parts }: { kind: "xp" | "rp"; slot: RefObject<HTMLSpanElement>; down: boolean; why: string | null; parts: string }) {
+function EarnedSlot({ kind, slot, down, why, parts, games = false }: { kind: "xp" | "rp"; slot: RefObject<HTMLSpanElement>; down: boolean; why: string | null; parts: string; games?: boolean }) {
   return (
     <div class={`es-earned es-earned-${kind}${down ? " es-down" : ""}${why ? " es-why" : ""}`} data-testid={`es-earned-${kind}`}>
-      <span class="es-earned-label">{kind === "xp" ? "XP EARNED" : down ? "RP LOST" : "RP EARNED"}</span>
+      {/* (Placement games earn no RP, Eric, Nov 25: their slot says what they are.) */}
+      <span class="es-earned-label">{kind === "xp" ? "XP EARNED" : games ? "PLACEMENT" : down ? "RP LOST" : "RP EARNED"}</span>
+      {/* (Keyed: a skip tap before the XP came writes the number's text by hand; the line that comes after must be a new element, or it
+          kept that "+0", Nov 25.) */}
       {why ? (
-        <span class="es-earned-why">{why}</span>
+        <span class="es-earned-why" key="why">
+          {why}
+        </span>
       ) : (
-        <span class="es-earned-num" ref={slot}>
+        <span class="es-earned-num" key="num" ref={slot}>
           {down ? "0" : "+0"}
         </span>
       )}
-      <span class="es-parts">{parts || " "}</span>
+      {/* (What made it, when there's something to say: no blank line kept, Nov 25: one gap between containers.) */}
+      {parts && <span class="es-parts">{parts}</span>}
     </div>
   );
 }
@@ -168,6 +177,8 @@ export interface TrackPlan {
   emblem?: (at: number) => string | null;
   /** A plan that only shows where you are (placements, a top tier): no count, no fill. */
   still?: boolean;
+  /** Placements: the bar counts games ("1 of 5 games"), not RP (Eric, Nov 25). */
+  games?: boolean;
 }
 
 interface TrackRefs {
@@ -206,7 +217,7 @@ function Track({ plan, refs, emblem }: { plan: TrackPlan; refs: TrackRefs; emble
             </span>
           )}
           <span ref={refs.who} data-testid={`es-who-${plan.kind}`}>
-            {plan.kind === "rp" ? lvl : playerName()}
+            {plan.games ? "Placement games" : plan.kind === "rp" ? lvl : playerName()}
           </span>
         </span>
         <span class="es-level" ref={refs.level} data-testid={`es-level-${plan.kind}`}>
@@ -222,7 +233,7 @@ function Track({ plan, refs, emblem }: { plan: TrackPlan; refs: TrackRefs; emble
         <span>0</span>
         <span class="es-now" ref={refs.now} data-testid={`es-now-${plan.kind}`}>
           {fmt(w)}
-          <small> {unit(plan.kind)}</small>
+          <small>{plan.games ? ` of ${fmt(plan.per)} placement games` : ` ${unit(plan.kind)}`}</small>
         </span>
         <span>{fmt(plan.per)}</span>
       </div>
@@ -236,16 +247,32 @@ function Track({ plan, refs, emblem }: { plan: TrackPlan; refs: TrackRefs; emble
  * The quests this match moved (every end screen): a fixed box of END_SCREEN.questRows rows (Eric: "show if your current match
  * impacted any of your current quests"). Each row: its picture, name and goal, a bar at the old count, the count, its reward. None
  * moved (or still asking): one centered line.
+ *
+ * `day` (ranked 1 v 1's end page, Eric, Nov 25: never "No quests moved this game"): every quest you have, the dailies then the weekly
+ * (a box of QUESTS.maxDailies + 1 rows, always), each at its count; the ones this game moved lit (`es-q-lit`) and sliding to theirs.
  */
-function QuestRows({ moves, box, line }: { moves: readonly QuestMoved[] | null; box: RefObject<HTMLDivElement>; line: string }) {
+function QuestRows({ moves, box, line, day = false, reserve = 0 }: { moves: readonly (QuestMoved & { moved?: boolean })[] | null; box: RefObject<HTMLDivElement>; line: string; day?: boolean; reserve?: number }) {
+  // (`reserve`: rows kept from the first frame, a game that earned XP (it nearly always moves one), so the buttons under them never move as
+  // the answer comes. A game with no XP: one line from the first frame. Kept rows the game didn't move: the one line, in their place.)
+  const one = (!moves || moves.length === 0) && !reserve;
   return (
-    <div class="es-quests" ref={box} data-testid="es-quests">
-      <span class="es-quests-head">Quests</span>
+    <div class={`es-quests${one ? " es-quests-one" : ""}`} ref={box} data-testid="es-quests" style={reserve ? { gridTemplateRows: `16px repeat(${reserve}, 42px)` } : undefined}>
+      {/* (None, or still asking: one line, "QUESTS" and why beside it, Eric, Nov 25: "we don't need 800 feet of empty space". Rows: as many
+          as there are, no empty ones kept.) */}
       {!moves || moves.length === 0 ? (
-        <p class="es-quests-none">{line}</p>
+        <p class="es-quests-none" style={reserve ? { gridRow: `1 / ${reserve + 2}`, alignSelf: "center" } : undefined}>
+          <strong class="es-quests-head">{day ? "Your quests" : "Quests"}</strong> {line}
+        </p>
       ) : (
-        moves.slice(0, FX.questRows).map((m) => (
-          <div class="es-q" key={m.quest.id} data-from={m.from} data-to={m.quest.progress} data-target={m.quest.target} data-testid="es-q">
+        <span class="es-quests-head">{day ? "Your quests" : "Quests"}</span>
+      )}
+      {!moves || moves.length === 0 ? null : (
+        moves.slice(0, day ? DAY_ROWS : FX.questRows).map((m) => {
+          // (A quest this game didn't move stands at its count; one already done shows done, still.)
+          const lit = m.moved !== false;
+          const done = !lit && m.quest.progress >= m.quest.target;
+          return (
+          <div class={`es-q${day && lit ? " es-q-lit" : ""}${done ? " es-q-done es-q-still" : ""}`} key={m.quest.id} data-from={m.from} data-to={m.quest.progress} data-target={m.quest.target} data-moved={lit ? "1" : "0"} data-testid="es-q">
             <span class="es-q-pic">
               <QuestPicture icon={m.quest.icon} />
             </span>
@@ -258,14 +285,19 @@ function QuestRows({ moves, box, line }: { moves: readonly QuestMoved[] | null; 
             </span>
             <span class="es-q-count">
               {m.from}/{m.quest.target}
+              {done ? " ✓" : ""}
             </span>
             <span class="es-q-reward">+{fmt(m.quest.reward.xp)} XP</span>
           </div>
-        ))
+          );
+        })
       )}
     </div>
   );
 }
+
+/** The day's quest box: up to QUESTS.maxDailies dailies and the weekly. */
+const DAY_ROWS = QUESTS.maxDailies + 1;
 
 // ---- The plans ----
 
@@ -293,7 +325,7 @@ export function rpPlan(c: RankChange | null, now: RankView | null): TrackPlan {
   // (Still: placements fill by games played; a placed or top-tier rank shows its points.)
   const v = a ?? rankView(null);
   const p = v.placement;
-  return { kind: "rp", before: p ? p.played : Math.min(per, v.points), earned: 0, per: p ? p.of : per, label: () => v.label, emblem: () => v.emblem, still: true };
+  return { kind: "rp", before: p ? p.played : Math.min(per, v.points), earned: 0, per: p ? p.of : per, label: () => v.label, emblem: () => v.emblem, still: true, games: !!p };
 }
 
 // ---- The sequence ----
@@ -534,7 +566,8 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
       await questsIn();
       if (stopped) return;
       questsShown = true;
-      const rows = [...(quests.current?.querySelectorAll<HTMLElement>(".es-q") ?? [])];
+      // (Only the rows this game moved: a day's box shows the others still.)
+      const rows = [...(quests.current?.querySelectorAll<HTMLElement>(".es-q") ?? [])].filter((r) => Number(r.dataset.from) < Number(r.dataset.to));
       for (const row of rows) {
         const from = Number(row.dataset.from);
         const to = Number(row.dataset.to);
@@ -604,11 +637,11 @@ export interface EndRp {
  * time a level was reached: the pawn's hop), the XP bar, the quests. `xp`: the game's grant (undefined: still coming; null: none came,
  * for `none`'s reason). The toast for what the bars and rows don't show (crates, keys) once it has run.
  */
-export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { xp: XpGrant | null | undefined; none?: string; rp?: EndRp; middle?: (hopAt: number) => ComponentChildren }) {
+export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day = false }: { xp: XpGrant | null | undefined; none?: string; rp?: EndRp; middle?: (hopAt: number) => ComponentChildren; day?: boolean }) {
   const root = useRef<HTMLDivElement>(null);
   const qBox = useRef<HTMLDivElement>(null);
   const xpSlot = useRef<HTMLSpanElement>(null);
-  const rpSlot = useRef<HTMLSpanElement>(null);
+  const rpSlotRef = useRef<HTMLSpanElement>(null);
   const xpRefs = useTrackRefs();
   const rpRefs = useTrackRefs();
   const [hopAt, setHopAt] = useState(0);
@@ -620,7 +653,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { 
   if (xp !== undefined && already.current === null) already.current = !!xp && xpFilled(xp);
   const counted = !!xp && !xp.none;
   // The quests this game moved: asked once its XP has come (the server counted them in the same batch).
-  const [moves, setMoves] = useState<QuestMoved[] | null>(null);
+  const [moves, setMoves] = useState<(QuestMoved & { moved?: boolean })[] | null>(null);
   const yours = questsForYou();
   const drawn = useRef<{ p: Promise<void>; done: () => void } | null>(null);
   if (!drawn.current) {
@@ -629,13 +662,14 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { 
   }
   useEffect(() => {
     if (xp === undefined) return;
-    if (!counted || yours === false) {
+    if (yours === false || (!counted && !day)) {
       setMoves([]);
       return;
     }
     let live = true;
-    const give = (m: QuestMoved[]) => live && setMoves((was) => was ?? m);
-    void questsMovedBy(xp!).then(give);
+    const give = (m: (QuestMoved & { moved?: boolean })[]) => live && setMoves((was) => was ?? m);
+    // (A day's box: every quest, a game with no XP too, none of them moved then.)
+    void (day ? questRowsBy(counted ? xp : null) : questsMovedBy(xp!)).then(give);
     const t = setTimeout(() => give([]), FX.questWaitMs);
     return () => {
       live = false;
@@ -649,7 +683,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { 
   const ready = xp !== undefined && (!rp || rp.change !== undefined);
   const xpP = xpPlan(xp, waited);
   const rpP = rp ? rpPlan(rp.change ?? null, rp.now) : null;
-  const steps: Step[] = [...(rpP ? [{ plan: rpP, slot: rpSlot, refs: rpRefs }] : []), { plan: xpP, slot: xpSlot, refs: xpRefs }];
+  const steps: Step[] = [...(rpP ? [{ plan: rpP, slot: rpSlotRef, refs: rpRefs }] : []), { plan: xpP, slot: xpSlot, refs: xpRefs }];
   const [ended, setEnded] = useState(false);
   useEndSequence({
     ready,
@@ -668,19 +702,25 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle }: { 
   const why = xp === undefined ? null : xp === null ? none : xp.none ? XP_NONE_LINES[xp.none] : null;
   const parts = xp === undefined ? "Counting your XP…" : counted ? xpShownParts(xp.parts).map((p) => (p.xp === null ? p.label : `${p.label} +${fmt(p.xp)}`)).join(" · ") : "";
   const rpWhy = rp && rp.change === undefined ? null : rpP?.still ? (rp!.change?.placed ? "Placed!" : rpP.label(0)) : null;
-  const questLine = yours === false ? "Sign in to do quests." : xp === undefined || (counted && !moves) ? "Checking your quests…" : "No quests moved this game.";
+  // (The RP slot only for a rank that counts RP: decided as the screen first draws, from the change if it's here, else your rank now. A
+  // placement game or a top tier has only its card, which says where you are (Nov 25: no "Placement 1/5" line over the same card).)
+  // (The quests' rows kept (FX.questRows) while the game's XP is still coming and once it's counted: the buttons under them never move as
+  // the sequence runs. A game with no XP: one line, from the moment that's known, before anything counts.)
+  const questRows = (xp === undefined || counted) && !day ? FX.questRows : 0;
+  const [rpSlot] = useState(() => !!rp && !(rp.change === undefined ? !rp.now || !!rp.now.placement || rp.now.division === null : rpPlan(rp.change, rp.now).still));
+  const questLine = yours === false ? "Sign in to do quests." : xp === undefined || ((counted || day) && !moves) ? "Checking your quests…" : day ? "No quests right now." : "No quests this game.";
   return (
     <div class="es-rewards" ref={root} data-es="wait" data-testid="es-rewards">
       {rpP && (
         <>
-          <EarnedSlot kind="rp" slot={rpSlot} down={rpP.earned < 0} why={rpWhy} parts={rp!.change === undefined ? "Updating your rank…" : ""} />
+          {rpSlot && <EarnedSlot kind="rp" slot={rpSlotRef} down={rpP.earned < 0} why={rpWhy} parts={rp!.change === undefined ? "Updating your rank…" : ""} games={!!rpP.games} />}
           <Track plan={rpP} refs={rpRefs} emblem={emblem} />
         </>
       )}
       <EarnedSlot kind="xp" slot={xpSlot} down={false} why={why} parts={parts} />
       {middle?.(hopAt)}
       <Track plan={xpP} refs={xpRefs} />
-      <QuestRows moves={moves} box={qBox} line={questLine} />
+      <QuestRows moves={moves} box={qBox} line={questLine} day={day} reserve={questRows} />
       {/* (What the bars and rows don't show, once the sequence has ended: a level's or the daily reward's crates and keys.) */}
       {ended && counted && xp!.rewards && <RewardBox xp={xp!} endScreen />}
     </div>

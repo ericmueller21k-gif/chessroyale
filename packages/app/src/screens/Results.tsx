@@ -156,8 +156,13 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         {resigned ? <FlagIcon size={56} /> : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
       </div>
     );
+  // (A boss battle's review beside the result on a computer, when there's a move of yours to show; without one the result's column is
+  // the page's, centered: never a half-empty page, Nov 25.)
+  const hasReview = !!bossResult && (!!simulBoard || played.some((m) => m.bestMove));
+  // (The 50 v 50's stage table: its rows, or one line when nothing was judged, never an empty table.)
+  const rows = bossResult ? [] : lossRows(match);
   return (
-    <div class={`screen results mm-screen${bossResult ? " boss-results" : ""} es-screen`}>
+    <div class={`screen results mm-screen${bossResult ? ` boss-results${hasReview ? "" : " es-no-review"}` : ""} es-screen`}>
       {/* (The top part: a box of its own only on a computer, where a boss battle's review sits beside it.) */}
       <div class="results-top">
         {!(bossResult && sidebar) && (
@@ -246,24 +251,31 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         {/* (A boss battle has the review below instead: no stage table, no best and worst boards.) */}
         {!bossResult && (
           <>
-            <table class="stage-table">
-              <thead>
-                <tr>
-                  <th>Stage</th>
-                  <th>Average loss per move</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lossRows(match).map((r) => (
-                  <tr key={r.label}>
-                    <td>{r.label}</td>
-                    <td>{r.avg.toFixed(1)} pts</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p class="muted small">Lower is better: 0 means you matched the engine's best move.</p>
-            <div class="best-worst">
+            {rows.length > 0 ? (
+              <>
+                <table class="stage-table">
+                  <thead>
+                    <tr>
+                      <th>Stage</th>
+                      <th>Average loss per move</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.label}>
+                        <td>{r.label}</td>
+                        <td>{r.avg.toFixed(1)} pts</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p class="muted small">Lower is better: 0 means you matched the engine's best move.</p>
+              </>
+            ) : (
+              <p class="muted small" data-testid="no-judged">No moves judged this game.</p>
+            )}
+            {/* (Only with a move to show: an empty box still took a gap, Nov 25, round 2c.) */}
+            {best && <div class="best-worst">
               {best && (
                 <div>
                   <h2>Best move</h2>
@@ -283,7 +295,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
                   </p>
                 </div>
               )}
-            </div>
+            </div>}
             {played.some((m) => m.bestMove) && (
               <button type="button" class="btn btn-secondary btn-wide" onClick={() => setReview(true)}>
                 {elim ? "Why you went out" : "Your game, move by move"}
@@ -305,7 +317,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         </div>}
       </div>
       {/* A boss battle's review: every move, on the page (the first costly move's board open), no tap needed (Eric's brief). */}
-      {bossResult && (simulBoard || played.some((m) => m.bestMove)) && (
+      {hasReview && (
         <div class="results-review">
           {simulBoard ? <BoardReview board={simulBoard} /> : <Breakdown inline moves={match.moves} dp={scoreDp(match.settings)} solo={!match.serverPaced} estRating={me?.rating ?? null} />}
         </div>
