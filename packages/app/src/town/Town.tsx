@@ -72,7 +72,7 @@ import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_PICTURES, adminP
 import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { APP_VERSION, reportTownFallback } from "../problems.ts";
-import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Shelf } from "./keep-pictures.ts";
+import { domPageIO, domSaveIO, idbShelf, pictureKey, restore, save, type Restored, type Shelf } from "./keep-pictures.ts";
 import { domPaintPool, workerCount, type PaintPool } from "./paint-pool.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
@@ -2764,8 +2764,11 @@ function startTown(
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 } };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
-  const hookPictureSum = () => {
+  const hookPictureSum = (each = false) => {
     if (!testSwitchesAllowed() || !r.pics) return null;
+    const gpu = painter.texels?.(r.pics.list) ?? null;
+    // (`each`: each picture's hash of what the GPU holds for it, 0 for none: a test compares them across a lost context.)
+    if (each) return { n: r.pics.list.length, each: gpu ? [...gpu] : null };
     let h = 0x811c9dc5;
     for (const c of r.pics.list) {
       const d = art2d(c).getImageData(0, 0, c.width, c.height).data;
@@ -2773,7 +2776,10 @@ function startTown(
       h = Math.imul(h ^ c.height, 16777619);
       for (let i = 0; i < d.length; i += 4) h = Math.imul(h ^ (d[i]! | (d[i + 1]! << 8) | (d[i + 2]! << 16) | (d[i + 3]! << 24)), 16777619);
     }
-    return { n: r.pics.list.length, hash: (h >>> 0).toString(16) };
+    // (And what the GPU holds for each, Nov 25: a later visit uploads the kept pages whole, so its atlas is checked too.)
+    let g = 0x811c9dc5;
+    for (const k of gpu ?? []) g = Math.imul(g ^ k, 16777619);
+    return { n: r.pics.list.length, hash: (h >>> 0).toString(16), gpu: gpu ? (g >>> 0).toString(16) : null };
   };
   /** (Tests, the stills) What a tap at (x, y) in the box would do now: its key ("home:alfil", "sq:c,r", …), where you'd walk, its card's kind. */
   const hookPick = (x: number, y: number) => {
@@ -2833,7 +2839,11 @@ function startTown(
       // (Not in the dev server, whose code changes under the same name; nor on a 2D painter, which never loads; nor with `?paintall`.)
       const shelf = painter.keep && !import.meta.env.DEV && !TOWN_ASKED.paintAll ? idbShelf() : null;
       const key = pictureKey(APP_VERSION, import.meta.url, r.pictureSig());
-      const from = await restore(shelf, key, domPageIO(art2d));
+      const from = (kept = await restore(shelf, key, domPageIO(art2d)));
+      if (!alive) from?.close();
+      // (Its pages uploaded whole, each picture where its page has it: none cut out or uploaded alone; Nov 25. Kept until the town
+      // closes: a picture's pixels are cut from them only when something asks for them, paint-gl.ts `adopt`.)
+      if (from && alive) painter.adopt?.(from.pages, from.fill);
       pictures.kept = !!from;
       pictures.restoreMs = performance.now() - t0;
       // A first visit paints on the device's other cores too (paint-pool.ts; Nov 23): workers paint the pictures ahead, the main thread
@@ -2849,7 +2859,6 @@ function startTown(
       if (pool) Object.assign(pictures, { byWorkers: pool.made.workers, whileWaiting: pool.made.here, workers: pool.workers });
       pool?.close();
       pool = null;
-      from?.close();
       // (Kept ones that didn't line up with this layout (never expected: the key has the layout): cleared, so the next visit paints.)
       if (from && !r.pics?.matched()) {
         console.warn("town: kept pictures didn't match; painting next time");
@@ -2894,6 +2903,8 @@ function startTown(
   };
   let loadMs = 0;
   let loadPaintMs = 0;
+  /** (`loadTown`) The last visit's pictures, if they were kept: their pages let go as the town closes. */
+  let kept: Restored | null = null;
   /** (Tests, `hookPaint`) The kept pictures: loaded from the last visit; how long reading them took (ms); what this visit kept (bytes;
    * null: nothing; undefined: not yet) and how long that took. */
   const pictures: { kept: boolean; restoreMs: number; saved: number | null | undefined; saveMs: number; workers: number; byWorkers: number; whileWaiting: number } = { kept: false, restoreMs: 0, saved: undefined, saveMs: 0, workers: 0, byWorkers: 0, whileWaiting: 0 };
@@ -3070,6 +3081,8 @@ function startTown(
     },
     stop: () => {
       alive = false;
+      kept?.close();
+      kept = null;
       // (Every rider's frames freed: they'd stay in memory into a game otherwise.)
       r.youRider = r.youSoon = null;
       r.riders.clear();
