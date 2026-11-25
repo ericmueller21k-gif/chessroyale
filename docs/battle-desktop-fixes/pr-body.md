@@ -84,7 +84,7 @@ boss-challenge, shop-hollow and boss-character; typecheck.
 - `hollow-cast-2000x1250-before.png` / `-after.png`, `hollow-cast-1280x800-*`: his darkness, before at the board's top-left (half off
   the window at 2000), after where he stands.
 - `sizes-<w>x<h>-before.png` / `-after.png` for 1280x800, 1440x900, 1920x1080, 2000x1250 and phone: all 17 bosses with the God King and
-  your pawn (one command: `node scripts/screen-stills-battle-desktop.mjs sides <dir>` against `npx wrangler dev --port 8971`).
+  your pawn (one command: `node scripts/stills-battle-desktop.mjs sides <dir>` against `npx wrangler dev --port 8971`).
 - `cave-computer-before/after.png` (1440 × 900), `cave-phone-before/after.png`: Hollow's "Did you leave a light on?".
 
 ## Follow-up (not in this PR)
