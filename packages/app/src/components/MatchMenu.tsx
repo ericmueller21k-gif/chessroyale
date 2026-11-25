@@ -233,6 +233,12 @@ function setOpenNow(o: Open) {
   for (const f of openSeen) f(o);
 }
 
+/** Opens the match's Resign or Leave confirm, as its gear's row does (a screen's own Resign button: the 1 v 1's panel on a computer).
+ * The gear's control shows it, so a screen calling this has a MatchMenu with the same `exit`. */
+export function openExitConfirm() {
+  setOpenNow("confirm");
+}
+
 function useOpen(): [Open, (o: Open) => void] {
   const [open, set] = useState<Open>(openNow);
   useLayoutEffect(() => {

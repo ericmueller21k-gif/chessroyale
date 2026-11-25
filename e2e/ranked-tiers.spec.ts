@@ -68,8 +68,8 @@ test("the versus screen shows both ranks' emblems; the result of a division up s
   const pool = `rt${test.info().project.name.slice(0, 1)}${Math.random().toString(36).slice(2, 9)}`;
   const a = await player(browser, "Ann Tier", GOLD3);
   const b = await player(browser, "Bo Tier", TRANS);
-  // The game's answers to Ann, as two ranked players': Ann Gold 3 · 70 RP, Bo Transcendent; her game's outcome a win
-  // that takes her to Gold 2 · 10 RP (+20).
+  // The game's answers to Ann, as two ranked players': Ann Gold III – 70, Bo Transcendent; her game's outcome a win
+  // that takes her to Gold II – 10 (+20).
   const ranks: Record<string, RankView> = { "Ann Tier": GOLD3, "Bo Tier": TRANS };
   await a.routeWebSocket(/\/api\/1v1\/game\/[A-Z2-9]{5}\/ws/, (ws) => {
     const server = ws.connectToServer();
@@ -129,7 +129,7 @@ test("the versus screen shows both ranks' emblems; the result of a division up s
   await b.getByRole("button", { name: /^Resign/ }).last().click();
   // The result (the end page, Nov 20): RP EARNED counts to +20 and lobs into the division's bar, which fills from 70 of 80 to the end,
   // "Gold 2!", the new division's emblem, and on to 10.
-  await expectRp(a, { label: "RP EARNED", num: "+20", gain: "+20 RP", who: "Gold 2", now: "10 RP", emblem: "gold-d2", from: 70 / 80, to: 10 / 80, wraps: 1 });
+  await expectRp(a, { label: "RP EARNED", num: "+20", gain: "+20 RP", who: "Gold II", now: "10 RP", emblem: "gold-d2", from: 70 / 80, to: 10 / 80, wraps: 1 });
   // Bo's own page keeps the emblem's room too (his outcome as the server has it: a placement game here).
   await expect(b.locator(".es-track-rp .re-box")).toHaveCount(1);
 });
@@ -179,7 +179,7 @@ test("a ranked game lost (Eric, Nov 20): \"RP LOST 14\" counting in red, the bar
   const GOLD4_75 = at(2, 4, 75);
   const a = await player(browser, "Ann Down", GOLD3_9);
   const b = await player(browser, "Bo Down", GOLD3_9);
-  // Ann's game's outcome: a loss from Gold 3 · 9 RP to Gold 4 · 75 RP (−14).
+  // Ann's game's outcome: a loss from Gold III – 9 to Gold IV – 75 (−14).
   await a.routeWebSocket(/\/api\/1v1\/game\/[A-Z2-9]{5}\/ws/, (ws) => {
     const server = ws.connectToServer();
     ws.onMessage((m) => server.send(m));
@@ -215,7 +215,7 @@ test("a ranked game lost (Eric, Nov 20): \"RP LOST 14\" counting in red, the bar
   await expect(a.getByTestId("es-title")).toHaveText("Defeat", { timeout: 20_000 });
   await expect(a.getByTestId("es-line")).toHaveText("You resigned.");
   await expect(a.getByTestId("game-steps").locator(".bm-step-text")).toHaveText("Move 2 of 2 · 1… e5");
-  await expectRp(a, { label: "RP LOST", num: "14", gain: "−14 RP", who: "Gold 4", now: "75 RP", emblem: "gold-d4", from: 9 / 80, to: 75 / 80, wraps: 1 });
+  await expectRp(a, { label: "RP LOST", num: "14", gain: "−14 RP", who: "Gold IV", now: "75 RP", emblem: "gold-d4", from: 9 / 80, to: 75 / 80, wraps: 1 });
   // (Red: the count and the gain.)
   const red = await a.locator(".es-earned-rp .es-earned-num").evaluate((e) => getComputedStyle(e).color);
   expect(red).toBe(await a.locator(".es-track-rp .es-gain").evaluate((e) => getComputedStyle(e).color));
@@ -224,10 +224,10 @@ test("a ranked game lost (Eric, Nov 20): \"RP LOST 14\" counting in red, the bar
 
 test("home's ranked row and the profile show your rank's emblem; the row's panel keeps its size, its words one line each at 320 px", async ({ browser }) => {
   const rad = rankView({ games: 40, ladder: 2815, place: 900 });
-  expect(rad.label).toBe("Radiant 1 · 95 RP");
+  expect(rad.label).toBe("Radiant I – 95");
   const page = await player(browser, "Ann Row", rad, { asPlayer: true });
   await page.getByRole("radio", { name: /1 v 1/ }).click();
-  await expect(page.locator(".fd-rank1v1")).toHaveText("Your rank: Radiant 1 · 95 RP");
+  await expect(page.locator(".fd-rank1v1")).toHaveText("Your rank: Radiant I – 95");
   await expectEmblem(page, ".fd-rank-words", "radiant-d1", 48);
   const sizes = isComputer() ? [{ width: 1280, height: 800 }] : [{ width: 320, height: 568 }, { width: 390, height: 844 }];
   for (const s of sizes) {
@@ -250,7 +250,7 @@ test("home's ranked row and the profile show your rank's emblem; the row's panel
   // The profile's 1 V 1 section: the emblem at 2× beside the pill and the record.
   // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
   await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
-  await expect(page.locator(".dv-profile .dv-rank")).toHaveText("Radiant 1 · 95 RP");
+  await expect(page.locator(".dv-profile .dv-rank")).toHaveText("Radiant I – 95");
   await expectEmblem(page, ".dv-profile", "radiant-d1", 96);
 });
 
@@ -266,13 +266,13 @@ test("?rank= shows that rank on an admin's own screens, and does nothing for a p
   // An admin: Gold 3 on home, on the stage and on their profile; then Transcendent, the loop.
   const a = await player(browser, "Ada Admin", null, { asPlayer: true, admin: () => true, path: "/?nolanding&rank=gold-3" });
   await a.getByRole("radio", { name: /1 v 1/ }).click();
-  await expect(a.locator(".fd-rank1v1")).toHaveText("Your rank: Gold 3 · 45 RP");
+  await expect(a.locator(".fd-rank1v1")).toHaveText("Your rank: Gold III – 45");
   await expectEmblem(a, ".fd-rank-words", "gold-d3", 48);
   await a.getByRole("button", { name: "View profile", exact: true }).or(a.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
-  await expect(a.locator(".dv-profile .dv-rank")).toHaveText("Gold 3 · 45 RP");
+  await expect(a.locator(".dv-profile .dv-rank")).toHaveText("Gold III – 45");
   await expectEmblem(a, ".dv-profile", "gold-d3", 96);
   await a.goto("/1v1?nolanding&rank=transcendent&pool=rtadmin");
-  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Transcendent · 120 RP");
+  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Transcendent – 120");
   await expectEmblem(a, ".dv-st-you", "transcendent", isComputer() ? 96 : 48);
   const loop = a.locator(".dv-st-you .re-art");
   expect(await loop.evaluate((e) => getComputedStyle(e).animationName)).toBe("re-loop");

@@ -13,6 +13,8 @@
  * - Something built but not yet on for players is marked "Being tested"; something only planned, "Planned".
  */
 import {
+  divisionTitle,
+  romanDivision,
   LADDER,
   POWER_TIPS,
   BATTLE_TOWER,
@@ -378,7 +380,7 @@ export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES, P: ty
   const top = rankView({ games: R.placements.games, ladder: R.placements.maxLadder }, R);
   const [lowTop, highTop] = [...R.topTiers].sort((a, b) => b.top - a.top);
   const last = tiers.at(-1)!;
-  // (Where the top tiers' floor sits in the last division: Radiant 1's 80 RP.)
+  // (Where the top tiers' floor sits in the last division: Radiant I's 80 RP.)
   const floorRp = R.topFloor - (divisionsEnd(R) - R.pointsPerDivision);
   const emblems = (ids: readonly string[]) => `!emblems ${ids.join(" ")}`;
   const example = R.tiers[Math.min(2, R.tiers.length - 1)]!.name;
@@ -390,19 +392,19 @@ export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES, P: ty
 - **The clocks:** "${controlLabel(blitz)}" means ${n(blitz.baseSeconds / 60, "minute")} each, plus ${n(blitz.incrementSeconds, "second")} after every move. They start after Black's first move. Each side has ${n(R.firstMoveSeconds, "second")} for its first move, or the game is called off (no result; for the side that didn't move, it's a dodge: leaving early, below).
 - **How a game ends:** checkmate; resigning; running out of time, a loss (but a draw if the other player has only a king, or a king and one knight or one bishop, so they couldn't mate); or a draw, by stalemate, threefold repetition, the 50-move rule, too little material for either side to mate, or agreement. **Offer a draw** is under the board: the other player accepts or declines, and after a decline you can offer again once you've made ${n(R.drawOfferEveryMoves, "more move")}.
 - **Lost your connection?** Your clock keeps running: open the app again (or reload) and you're straight back in the game.
-- **Ranks:** ${tiers.slice(0, -1).join(", ")} and ${last}, each with divisions ${R.divisions} (the lowest) to 1. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} ${R.divisions} with 0 RP. Each tier has its emblem, and each division up adds to it, up to a crown and a glow in division 1:
+- **Ranks:** ${tiers.slice(0, -1).join(", ")} and ${last}, each with divisions ${romanDivision(R.divisions)} (the lowest) to ${romanDivision(1)}. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} ${romanDivision(R.divisions)} with 0 RP. Each tier has its emblem, and each division up adds to it, up to a crown and a glow in division ${romanDivision(1)}:
 
 ${emblems(R.tiers.map((t) => emblemId(t.name, R.divisions)))}
 ${emblems(Array.from({ length: R.divisions }, (_, i) => emblemId(example, R.divisions - i)))}
 
-- **The top two tiers,** with no divisions: **${lowTop!.name}**, the ${num(lowTop!.top)} highest ranks, and above it **${highTop!.name}**, the ${num(highTop!.top)} highest, both from ${floorRp} RP in ${last} 1 (their RP count from there). Equal ranks share a place, and your place is brought up to date within a minute. At ${floorRp} RP or more in ${last} 1 but outside the top ${num(lowTop!.top)}, you stay ${last} 1 and your RP keeps counting past ${floorRp}. Their emblems shimmer:
+- **The top two tiers,** with no divisions: **${lowTop!.name}**, the ${num(lowTop!.top)} highest ranks, and above it **${highTop!.name}**, the ${num(highTop!.top)} highest, both from ${floorRp} RP in ${last} ${romanDivision(1)} (their RP count from there). Equal ranks share a place, and your place is brought up to date within a minute. At ${floorRp} RP or more in ${last} ${romanDivision(1)} but outside the top ${num(lowTop!.top)}, you stay ${last} ${romanDivision(1)} and your RP keeps counting past ${floorRp}. Their emblems shimmer:
 
 ${emblems([emblemId(lowTop!.name, null), emblemId(highTop!.name, null)])}
 
 - **The season ladder:** **LADDER ›** at the end of home's RANKED label (a computer's side menu: **Ladder**) shows the ${num(LADDER.size)} highest ranks this season in one list, with your own place pinned under it wherever you are. Equal ranks share a place. Only 1 v 1 has ranks of its own so far: the 50 v 50 and Squads tabs wait for theirs.
 
 - **Rank points:** about +${num(R.points.perGame)} for a win and −${num(R.points.perGame)} for a loss against a player at your level, about 0 for a draw; more for beating someone stronger, less for beating someone weaker. Behind them is a hidden rating, worked out from your results and whom you played them against: when your rank is lower than it, you gain more and lose less (up to ${n(R.points.maxAdjust, "RP", "RP")} more or less), so your rank settles where your play is. A win never costs you points.
-- **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${top.label.replace(/ · .*/, "")}.
+- **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${divisionTitle(top)}.
 - **Coins:** a ranked game pays coins as every game does ([Coins](#xp)): more for a longer game, ${n(P.bonus.win, "coin")} more for a win and ${n(P.bonus.draw, "coin")} for a draw. A called-off game and a bot game pay nothing.
 - **Quick chat** works as in other online matches, and you can mute the other player.
 

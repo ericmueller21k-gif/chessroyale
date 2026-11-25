@@ -1,6 +1,6 @@
 import type { ComponentChildren, RefObject } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { END_SCREEN as FX, QUESTS, RANKED_1V1, XP, XP_NONE_LINES, levelOf, rankView, xpShownParts, type RankChange, type RankView, type XpGrant } from "@chessroyale/core";
+import { END_SCREEN as FX, QUESTS, RANKED_1V1, XP, XP_NONE_LINES, divisionTitle, levelOf, rankView, xpShownParts, type RankChange, type RankView, type XpGrant } from "@chessroyale/core";
 import { account, playerName } from "../account.ts";
 import { bossKit, placeFacing } from "../characters/kits.ts";
 import { drawnBox } from "../screens/TowerBar.tsx";
@@ -308,9 +308,8 @@ function xpPlan(xp: XpGrant | null | undefined, waited: number): TrackPlan {
   return { kind: "xp", before: ok ? xp.before : (xp?.before ?? waited), earned: ok ? xp.after - xp.before : 0, per: XP.perLevel, label: levelLabel };
 }
 
-/** A ladder count's division ("Gold 3") and emblem. */
+/** A ladder count's division ("Gold III", as the pill names it) and emblem. */
 const ladderView = (at: number): RankView => rankView({ games: RANKED_1V1.placements.games, ladder: Math.max(0, at) });
-const divisionName = (v: RankView) => (v.division === null ? v.tier : `${v.tier} ${v.division}`);
 
 /**
  * A ranked game's plan: its points counted along the ladder, division by division (RANKED_1V1.pointsPerDivision each). Placements, the
@@ -321,7 +320,7 @@ export function rpPlan(c: RankChange | null, now: RankView | null): TrackPlan {
   const b = c?.before;
   const a = c?.after ?? now;
   const counts = !!c && c.points !== null && !c.placed && b!.ladder !== null && a!.ladder !== null && b!.division !== null && a!.division !== null && b!.points < per && a!.points < per;
-  if (counts) return { kind: "rp", before: b!.ladder!, earned: c!.points!, per, label: (at) => divisionName(ladderView(at)), emblem: (at) => ladderView(at).emblem };
+  if (counts) return { kind: "rp", before: b!.ladder!, earned: c!.points!, per, label: (at) => divisionTitle(ladderView(at)), emblem: (at) => ladderView(at).emblem };
   // (Still: placements fill by games played; a placed or top-tier rank shows its points.)
   const v = a ?? rankView(null);
   const p = v.placement;

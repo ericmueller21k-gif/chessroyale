@@ -33,7 +33,7 @@ export interface Profile {
   locker?: Locker;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
-  /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record (missing from an older server). */
+  /** Ranked 1 v 1: the rank ("Gold II – 45", "Placement 2/5") and the record (missing from an older server). */
   ranked1v1?: RankedSummary;
   /**
    * Ranked's leave rules (L1, Nov 9; the server's own reckoning): a lockout, the delayed queue, what a dodge would cost now, and
