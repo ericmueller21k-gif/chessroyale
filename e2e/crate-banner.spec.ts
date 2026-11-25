@@ -28,11 +28,31 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
     await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
     await expect(page.locator(`.spin-tile.present ${box}`).first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator(".reveal-card")).toBeVisible({ timeout: 25_000 });
-    const name = (await page.locator(".reveal-name").textContent())?.trim();
-    expect(crate.items.map((i) => itemDef(i)!.name)).toContain(name);
-    await page.getByRole("button", { name: "▶ Done" }).click();
-    await page.getByRole("button", { name: "‹ Crates" }).click();
+    // Its item's card, and Done the moment it shows, while it's still forming (Nov 25): it's seen all the same, so coming back to the
+    // crates shows the list, not this reveal again (it was marked seen only once the card had formed, and a quick Done left it to resume).
+    const early = await page.evaluate(
+      () =>
+        new Promise<{ name?: string; opacity: number }>((done) => {
+          const tick = () => {
+            const card = document.querySelector<HTMLElement>(".crate-opening .reveal-card");
+            const button = [...(card?.querySelectorAll<HTMLButtonElement>(".reveal-actions button") ?? [])].find((b) => b.textContent?.includes("Done"));
+            if (card && button && getComputedStyle(card).visibility === "visible") {
+              const opacity = Number(getComputedStyle(card).opacity);
+              const name = card.querySelector(".reveal-name")?.textContent?.trim();
+              button.click();
+              done({ name, opacity });
+            } else requestAnimationFrame(tick);
+          };
+          tick();
+        }),
+    );
+    expect(crate.items.map((i) => itemDef(i)!.name)).toContain(early.name);
+    expect(early.opacity, "Done tapped while the card was still forming").toBeLessThan(1);
+    await expect(page.getByTestId("crate-opening")).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("hunchess-crate-unseen")), "seen once Done is tapped").toBeNull();
+    await page.goto("/shop?crates");
+    await expect(page.locator(".series-crate-row")).toHaveCount(2);
+    await expect(page.getByTestId("crate-opening"), "no reveal resumed over the list").toHaveCount(0);
   }
 });
 
