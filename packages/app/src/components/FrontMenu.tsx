@@ -217,13 +217,15 @@ export function GameFrame({ children, nav }: { children: ComponentChildren; nav:
 }
 
 /**
- * The side menu's labels whenever they cost the game nothing (Eric, Nov 25: "Why isn't the names on the left appearing there's plenty of
- * space?"; docs/decisions/2026-11-25-menu-labels.md). Each game screen needs its own room (its strips or bars over the board, a scoreboard or
- * the boss's column beside it), so no one window width says where the labels fit: the frame tries them (`gm-labels`, game-frame.css: 232 px
- * in place of the 80 px icons) and keeps them only where the board is the same size and still inside its own column, and the column beside
- * it (the chat, the panel) is as wide as with icons. From 1800 px wide they stay, as since Nov 1 (round 2), and a screen without a board (a
- * result page) has that rule only. Done before the screen is drawn (a layout effect, a resize, the board resizing or a new screen), so
- * nothing is seen to move.
+ * The side menu's labels wherever the board keeps its size (Eric, Nov 25: "Why isn't the names on the left appearing there's plenty of
+ * space?", then, in this order: "why would this be the case when there's ample room on the right to shrink the chat box in order to make the
+ * left menus their necessary size"; docs/decisions/2026-11-25-menu-labels-2.md). On every game screen with a board: (1) the board never
+ * shrinks for the menu; (2) the labels show; (3) to make their room the column beside the board narrows first, down to its least, 280 px
+ * (board-size.css `--side-w`: every screen's chat lines, emoji row, panel and status still fit there, game-frame.css); (4) icons only where
+ * the board would still shrink or leave its column. So the frame tries the labels (`gm-labels`, game-frame.css: 232 px in place of the 80 px
+ * icons) and keeps them where the board is the same size and still inside its own column, at every width. A screen without a board (a
+ * result page) has the old rule: the labels from 1800 px. Done before the screen is drawn (a layout effect, a resize, the board resizing or
+ * a new screen), so nothing is seen to move.
  */
 function useMenuLabels(frame: { current: HTMLDivElement | null }, on: boolean) {
   useLayoutEffect(() => {
@@ -233,23 +235,21 @@ function useMenuLabels(frame: { current: HTMLDivElement | null }, on: boolean) {
     const fit = () => {
       const wrap = el.querySelector(".board-area .board-row > .board-wrap");
       const area = wrap?.closest(".board-area");
-      const screen = area?.closest(".screen");
-      if (innerWidth >= 1800 || !wrap || !area || !screen) {
+      if (!wrap || !area) {
         el.classList.toggle("gm-labels", innerWidth >= 1800);
         return;
       }
       const read = () => {
         const a = area.getBoundingClientRect();
         const b = wrap.getBoundingClientRect();
-        // (The screen's last column: the panel or the chat beside the board.)
-        const side = parseFloat(getComputedStyle(screen).gridTemplateColumns.split(" ").pop() ?? "") || 0;
-        return { w: b.width, side, inside: b.left >= a.left - 0.5 && b.right <= a.right + 0.5 };
+        return { w: b.width, inside: b.left >= a.left - 0.5 && b.right <= a.right + 0.5 };
       };
       el.classList.remove("gm-labels");
       const icons = read();
       el.classList.add("gm-labels");
       const labels = read();
-      el.classList.toggle("gm-labels", labels.inside && Math.abs(labels.w - icons.w) < 0.5 && labels.side >= icons.side - 0.5);
+      // (The column beside the board takes the labels' room first: its width is free down to its least, `--side-w`'s 280 px.)
+      el.classList.toggle("gm-labels", labels.inside && Math.abs(labels.w - icons.w) < 0.5);
     };
     // (Its board: watched for its size, and found again when the screen changes.)
     const sized = new ResizeObserver(fit);

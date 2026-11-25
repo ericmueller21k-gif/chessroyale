@@ -5,10 +5,11 @@
  * (`display: contents`), and the rules below are for a computer with a mouse only (MOUSE_LAYOUT).
  *
  * - The side menu: the front door's (components/FrontMenu.tsx, SideMenu, `game`), on every game screen with a board. 232 px with its
- *   labels (`gm-labels`) from 1800 px wide (Nov 1, round 2) and wherever else they cost the game nothing: the frame tries them and keeps them
- *   where the board is the same size inside its column and the column beside it as wide (Nov 25, FrontMenu.tsx useMenuLabels). Elsewhere
- *   icons only (80 px), the labels as tooltips and read by screen readers. The screens lay out in what's left (`--win-w`, read by
- *   board-size.css and styles.css).
+ *   labels (`gm-labels`) wherever the board keeps its size: the column beside the board narrows first, down to its least (280 px), and the
+ *   frame keeps the labels where the board is the same size and inside its column (Eric's order, Nov 25: FrontMenu.tsx useMenuLabels).
+ *   Elsewhere icons only (80 px), the labels as tooltips and read by screen readers. A page without a board: the labels from 1800 px. The
+ *   screens lay out in what's left (`--win-w`, read by board-size.css and styles.css).
+ * - The chat beside the board: its emoji in one row whatever the column's width (below), so the column's least keeps every row it has.
  * - A boss battle: no title line. The boss's bar is the top of the screen (its "Move N" left of the status), and the ⚡, the
  *   fish and the gear sit at the top of the column beside the board (Hud.tsx, BossTools), the move list under them.
  */
@@ -91,7 +92,21 @@
   }
 }
 
-/* The labels (232 px) where they cost the game nothing (FrontMenu.tsx useMenuLabels, Nov 25). */
+/* The chat beside the board (Nov 25, round 2): its emoji stay in one row, each as wide as the row allows up to its 34 px, so the column can
+   narrow to its least (280 px) for the side menu's labels without the emoji taking a second row out of the messages (8 of them at 280 px:
+   29 px each). Their lines wrap as before: 4 rows from 340 px down to 280. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .gm-frame .qbuttons.groups .qgroup-lines.emoji {
+    flex-wrap: nowrap;
+  }
+  .gm-frame .qbuttons.groups .qgroup-lines.emoji > .qchip.emoji {
+    flex: 0 1 34px;
+    min-width: 0;
+    padding: 0;
+  }
+}
+
+/* The labels (232 px) wherever the board keeps its size (FrontMenu.tsx useMenuLabels, Nov 25). */
 @media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
   .gm-frame.gm-labels {
     --gm-menu: 232px;
