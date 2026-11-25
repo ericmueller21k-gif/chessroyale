@@ -484,7 +484,7 @@ test("four worn items all fit, nothing cut", async ({ page }) => {
     await page.setViewportSize(vp);
     const tiles = page.locator(".pp-tile");
     await expect(tiles).toHaveCount(4);
-    await expect(tiles.locator("strong")).toHaveText(["Suit and Tie", "Pirate Hat", "Smiley Face", "Gift-Wrap Tube"]);
+    await expect(tiles.locator("strong")).toHaveText(["Suit and Tie", "Pirate Hat", "Smiley Face · Laughing", "Gift-Wrap Tube"]);
     const card = await box(page, ".pp-cosmetics");
     // (Its words and pill, whole: inside the tile and none cut by its own box; the picture's box inside it too. The one allowance, as
     // the brief gave it: the color line, "Weapon · Cobalt & Sage", may end in an ellipsis when it's too long for the tile.)
