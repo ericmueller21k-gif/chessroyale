@@ -554,6 +554,8 @@ class GLPainter implements Painter {
     this.atlas = null;
     this.cap = 0;
     this.pages = [];
+    // (Made again as it's needed: one from before a lost context is dead, and a page started again wasn't cleared through it.)
+    this.readFb = null;
     // (Kept pages not uploaded yet, after a lost context: their pictures are filled and uploaded one by one as they show, `upload`.)
     this.adoptQ = [];
     this.adoptAt = 0;
@@ -1146,12 +1148,12 @@ class GLPainter implements Painter {
 
   /**
    * (Tests, `__townPictureSum`) What the textures hold for each of `list`: a hash of each picture's size and texels (premultiplied, as
-   * uploaded), in its order. Each atlas page is read once. A picture with no texture now counts as none.
+   * uploaded). Each atlas page is read once. A picture with no texture now: 0.
    */
-  texelSum(list: readonly object[]): string {
+  texels(list: readonly object[]): Uint32Array {
     const { gl } = this;
-    if (this.lost) return "lost";
     const each = new Uint32Array(list.length);
+    if (this.lost) return each;
     const byLayer = new Map<number, number[]>();
     const fb = (this.readFb ??= gl.createFramebuffer());
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
@@ -1163,7 +1165,7 @@ class GLPainter implements Painter {
     };
     list.forEach((src, i) => {
       const e = this.reg.get(src);
-      if (!e?.tex?.t || e.gen !== this.gen) return void (each[i] = 0xdead);
+      if (!e?.tex?.t || e.gen !== this.gen) return;
       if (e.tex.layer >= 0) return void byLayer.set(e.tex.layer, [...(byLayer.get(e.tex.layer) ?? []), i]);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, e.tex.t, 0);
       const d = new Uint8Array(e.w * e.h * 4);
@@ -1180,9 +1182,7 @@ class GLPainter implements Painter {
       }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    let h = 0x811c9dc5;
-    for (const k of each) h = Math.imul(h ^ k, 16777619);
-    return (h >>> 0).toString(16);
+    return each;
   }
 
   dispose(): void {

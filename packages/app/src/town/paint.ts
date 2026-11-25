@@ -138,8 +138,8 @@ export interface Painter {
   readonly lost: boolean;
   /** (Tests) The pixels of `x, y, w, h` (device pixels, from the top left) as the last frame drew them; call right after a draw. */
   pixels(x: number, y: number, w: number, h: number): ImageData;
-  /** (Tests, WebGL) A hash of what the textures hold for each of `list` (keep-pictures' pictures): its size and texels, in order. */
-  texelSum?(list: readonly object[]): string;
+  /** (Tests, WebGL) A hash of what the textures hold for each of `list` (keep-pictures' pictures): its size and texels; 0 for none. */
+  texels?(list: readonly object[]): Uint32Array;
   /** Lets go of what it holds (a backend swapped out). */
   dispose(): void;
 }

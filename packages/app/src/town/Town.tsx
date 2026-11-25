@@ -2764,8 +2764,11 @@ function startTown(
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, pictures: { ...pictures, count: r.pics?.list.length ?? 0 } };
   };
   /** (Tests) A hash of every picture the loading screen kept, their pixels in order: a later visit's must be the first's. */
-  const hookPictureSum = () => {
+  const hookPictureSum = (each = false) => {
     if (!testSwitchesAllowed() || !r.pics) return null;
+    const gpu = painter.texels?.(r.pics.list) ?? null;
+    // (`each`: each picture's hash of what the GPU holds for it, 0 for none: a test compares them across a lost context.)
+    if (each) return { n: r.pics.list.length, each: gpu ? [...gpu] : null };
     let h = 0x811c9dc5;
     for (const c of r.pics.list) {
       const d = art2d(c).getImageData(0, 0, c.width, c.height).data;
@@ -2774,7 +2777,9 @@ function startTown(
       for (let i = 0; i < d.length; i += 4) h = Math.imul(h ^ (d[i]! | (d[i + 1]! << 8) | (d[i + 2]! << 16) | (d[i + 3]! << 24)), 16777619);
     }
     // (And what the GPU holds for each, Nov 25: a later visit uploads the kept pages whole, so its atlas is checked too.)
-    return { n: r.pics.list.length, hash: (h >>> 0).toString(16), gpu: painter.texelSum?.(r.pics.list) ?? null };
+    let g = 0x811c9dc5;
+    for (const k of gpu ?? []) g = Math.imul(g ^ k, 16777619);
+    return { n: r.pics.list.length, hash: (h >>> 0).toString(16), gpu: gpu ? (g >>> 0).toString(16) : null };
   };
   /** (Tests, the stills) What a tap at (x, y) in the box would do now: its key ("home:alfil", "sq:c,r", …), where you'd walk, its card's kind. */
   const hookPick = (x: number, y: number) => {
