@@ -118,8 +118,25 @@ test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens 
   await expect.poll(async () => (await seen(page)).partner, { timeout: 30_000 }).not.toBeNull();
   const partner = (await seen(page)).partner!;
   await expect(page.locator(".sq-choice.partner strong")).not.toHaveText("thinking…");
-  // Each squad's same-move tokens, under the board for both squads; Classic has no block points (and no Block button).
-  await expect(page.locator(".sq-clockline .sq-res-tokens")).toHaveText(["×5", "×5"]);
+  // Each squad's same-move tokens, under the board for both squads, as the match has them; Classic has no block points (and no Block
+  // button). (Not always ×5 each by your first pick: a board's opening can leave one move, as the Steinitz Gambit's 5.Ke2, and a pair
+  // of bots then spends a token in the half before yours, as the rules say. Nov 25: "×4" was right, the test's ×5 wasn't.)
+  const tokens = () =>
+    page.evaluate(() => {
+      const s = (window as any).squads;
+      const m = [...s.matches.values()].find((x: any) => x.state !== "over" && x.sides.some((sd: any) => sd.seats.includes(s.myId)));
+      const mine = m.sides.findIndex((sd: any) => sd.seats.includes(s.myId));
+      const shown = (you: boolean) => document.querySelector(`.sq-clockline .sq-clockline-side${you ? ".you" : ":not(.you)"} .sq-res-tokens`)?.textContent ?? null;
+      return { shown: [shown(true), shown(false)], match: [`×${m.tokens[mine]}`, `×${m.tokens[1 - mine]}`] };
+    });
+  await expect
+    .poll(async () => {
+      const t = await tokens();
+      return t.shown.join() === t.match.join() || t;
+    })
+    .toBe(true);
+  expect((await tokens()).match.every((t) => /^×[0-5]$/.test(t))).toBe(true);
+  await expect(page.locator(".sq-clockline .sq-res-tokens")).toHaveCount(2);
   await expect(page.locator(".sq-clockline .sq-res-bank")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Block/ })).toHaveCount(0);
   // Yours, different from theirs (the same move would use a token): tap it, then lock in.
