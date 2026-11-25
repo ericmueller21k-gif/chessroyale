@@ -95,6 +95,10 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   server's room, and the case page shows it under Reports. The automated reviewer's API gets that report without the
   words and refuses to let it clear such a case: a moderator reads the line first. A test account's reports
   (`users.test`, [accounts.md](accounts.md)) never count toward the reporters that put a player in review.
+- **Residents** (Nov 25; [accounts.md](accounts.md)): their matches are recorded as anyone's, with what detection would have done in
+  `fairplay_matches.would`. Detection, reports and evasion never open or move their case (`setCase`, `raiseCase`; a person still can); their
+  own reports are dropped; a report of one is kept, with no case; never pooled; the deep re-check skips them. A real person's crowd
+  (`crowd`, `crowdFound`, `picks` in their judged moves) leaves residents' picks out; a resident's own rows keep everyone.
 - **Deleting an account never gets around fair play** (`account-data.ts`; [accounts.md](accounts.md)). A banned or
   in-review account's case, log, hashed identities and device markers stay under its old id; its judged moves, match
   summaries and appeals go. A new account with one of its identities is banned again, or goes to review (`banCheck`).

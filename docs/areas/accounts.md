@@ -107,6 +107,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   address: 409) and signs a script in as it (not an admin's own browser), GET lists their fair play, DELETE removes them all as any deleted
   account (results re-keyed, ledger kept), fair play's file too. They play as anyone (nothing granted), are left out of the "Top N%" and 1 v
   1's top places, and their reports never count toward a review. `scripts/cheater-demo.ts` plays with them ([fairplay.md](fairplay.md)).
+- **Residents** (Nov 25; `residents.ts`, [the decision](../decisions/2026-11-25-residents-server.md)): `/api/admin/residents` (an admin, the e2e's
+  key, or Access with `RESIDENTS_CLIENT_ID`'s token, or `TEST_ACCOUNTS_CLIENT_ID`'s until PR 3): POST `{name, look?}` makes `<slug>@resident.hunchess`
+  (`users.resident` = 1; new: its look and 0-3 common items, op `resident-seed:<ledger id>`) and signs the program in (its live cookie kept, else a
+  new session ending its others); GET reports; POST `/beat` keeps the heartbeat in `meta`. Unlike test accounts they count on rankings and in search.
 - **Bans** (from [fairplay.md](fairplay.md), "A ban means you can't sign in"; Eric, Nov 13): a banned account can't sign in at all.
   Each sign-in's finish (the emailed code checked, Google's callback, a test account's script) asks `signInBan` before anything is
   made or switched: refused with the ban line, no session. The Worker's ban gate (`ban-gate.ts`) gives a banned session the ban

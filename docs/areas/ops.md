@@ -255,6 +255,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   rules, if they misfire: no dodge or leave is charged or marked, and no lockout or delayed queue applies; games play on;
   [ranked.md](ranked.md), "Leaving early"),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
+  `PAUSE_RESIDENTS` (Nov 25; `residents.ts`): the server's own, never in `/api/status`: a resident's session gets 503 "Residents are paused." on
+  every `/api/*` route, every room (Lobby, DuelGame, SquadsLobby, SquadsParty) refuses its hello and closes its socket on its next message.
   - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
     `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,
     `{ message, paused }`: a refusal, not an error, so error capture never counts it). Matches already running finish normally, and lobbies already made still start and take

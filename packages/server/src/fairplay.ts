@@ -35,6 +35,17 @@ export const REPORT_THANKS = "Thanks, we'll look into it.";
 const DAY = 86_400_000;
 const signedIn = (u: Pick<User, "email" | "google_sub">) => !!(u.email || u.google_sub);
 
+/**
+ * The automatic sources of a case change (setCase's `by`; the automated reviewer's too): never one for a resident (residents.ts). A
+ * person's ("admin:…") still is.
+ */
+const AUTOMATIC: ReadonlySet<string> = new Set(["detection", "reports", "evasion", "reviewer"]);
+
+/** Whether this account is a resident (users.resident; residents.ts). */
+export async function isResident(sql: Sql, userId: string): Promise<boolean> {
+  return (await sql.first<{ resident: number | null }>("SELECT resident FROM users WHERE id = ?", userId))?.resident === 1;
+}
+
 export interface Case {
   user_id: string;
   status: CaseStatus;
@@ -78,6 +89,8 @@ export async function logCase(sql: Sql, userId: string, action: string, by: stri
  * clearing releases everything held. `by`: "detection", "reports", "admin:<email>", "reviewer".
  */
 export async function setCase(sql: Sql, userId: string, status: CaseStatus, by: string, reason: string, now: number): Promise<void> {
+  // (Residents, residents.ts: detection, reports and evasion never open or move a case for one; a person still can.)
+  if (AUTOMATIC.has(by) && (await isResident(sql, userId))) return void console.log(`fair play: ${by} left resident ${userId} alone (${status}: ${reason})`);
   const before = await caseOf(sql, userId);
   const decided = by !== "detection" && by !== "reports" && status !== "watch";
   if (before) {
@@ -248,6 +261,9 @@ export async function banCheck(sql: Sql, user: User | null, device: string | nul
       now,
     );
   }
+  // (A resident, residents.ts: its device is recorded as anyone's, and nothing more. Evasion never bans, reviews or pools one, and it never
+  // plays in the engine pool or its queues. `user.resident` comes with the session: userFromToken.)
+  if (user.resident === 1) return { banned: false };
   for (const [kind, hash] of await identityHashes(user)) {
     // (A banned account's identities, or those of an account deleted while banned or in review, as this account weighs them:
     // identityOwner.)
@@ -358,6 +374,8 @@ export async function decide(
     if (before?.status === "pool" || release) return { ok: false, status: 409, message: "engine pool cases are for a person" };
     // (A deleted account's kept case has no evidence left to weigh: account-data.ts.)
     if (!user) return { ok: false, status: 409, message: "the account was deleted; its case is for a person" };
+    // (A resident's, residents.ts: no automatic source opens or moves one.)
+    if (user.resident === 1) return { ok: false, status: 409, message: "a resident's case is for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
     // (A reported town chat line is for a moderator to read: the reviewer never clears a case with one newer than a
     // person's last decision on it; its own decisions, a "review" say, don't count.)
@@ -404,6 +422,8 @@ export async function decideAppeal(
  * from after the clearing (see reviewIfReported).
  */
 export async function raiseCase(sql: Sql, userId: string, status: "watch" | "review", by: string, reason: string, now: number): Promise<boolean> {
+  // (Residents: never by an automatic source, not even a note: setCase.)
+  if (AUTOMATIC.has(by) && (await isResident(sql, userId))) return false;
   const c = await caseOf(sql, userId);
   if (c?.status === "banned") return false;
   if (c && (c.status === status || (c.status === "review" && status === "watch") || c.status === "pool")) {
@@ -439,7 +459,13 @@ export const LINE_GONE = "That message has gone from the chat. You can still rep
  * account). A guest's report is stored and read, but doesn't count toward a review.
  */
 export async function reportPlayer(sql: Sql, reporter: User, target: unknown, reason: unknown, match: unknown, now: number, line?: ReportedLine | null): Promise<ReportOutcome> {
-  if (typeof target !== "string" || target === reporter.id || !(await sql.first("SELECT id FROM users WHERE id = ?", target))) return { ok: false, message: "No such player." };
+  const about = typeof target === "string" && target !== reporter.id ? await sql.first<{ id: string; resident: number | null }>("SELECT id, resident FROM users WHERE id = ?", target) : null;
+  if (typeof target !== "string" || !about) return { ok: false, message: "No such player." };
+  // (A resident's report never counts (residents.ts): nothing stored, nothing raised. The program never sends one; this is the lock.)
+  if (reporter.resident === 1 || (reporter.resident === undefined && (await isResident(sql, reporter.id)))) {
+    console.log(`fair play: a report from resident ${reporter.id} ignored`);
+    return { ok: true };
+  }
   // A line of the town's chat goes with its own reason (FAIRPLAY.reports.chatReason), and that reason needs the line.
   const chat = reason === FAIRPLAY.reports.chatReason;
   const why = chat ? FAIRPLAY.reports.chatReason : FAIRPLAY.reports.reasons.find((r) => r === reason);
@@ -465,6 +491,8 @@ export async function reportPlayer(sql: Sql, reporter: User, target: unknown, re
     chat ? line!.text : null,
     chat ? line!.at : null,
   );
+  // (A real player's report of a resident is kept as any, for a person to read; it opens no case: residents.ts.)
+  if (about.resident === 1) return { ok: true };
   await raiseCase(sql, target, "watch", "reports", `reported: ${why}`, now);
   if (why === "Cheating") await reviewIfReported(sql, target, now);
   return { ok: true };
@@ -472,7 +500,8 @@ export async function reportPlayer(sql: Sql, reporter: User, target: unknown, re
 
 /**
  * Puts a player in review when enough different signed-in accounts reported them for cheating this week. Test accounts
- * (test-accounts.ts) never count: an admin's script can't put a real player in review (the PR #622 review, finding 2).
+ * (test-accounts.ts) never count: an admin's script can't put a real player in review (the PR #622 review, finding 2). Nor do
+ * residents (residents.ts).
  */
 async function reviewIfReported(sql: Sql, target: string, now: number): Promise<void> {
   const r = FAIRPLAY.reports;
@@ -482,7 +511,7 @@ async function reviewIfReported(sql: Sql, target: string, now: number): Promise<
   const reporters = (
     await sql.all<{ email: string | null; google_sub: string | null }>(
       `SELECT DISTINCT u.id, u.email, u.google_sub FROM reports p JOIN users u ON u.id = p.reporter
-       WHERE p.target = ? AND p.reason = 'Cheating' AND p.at > ? AND u.test IS NOT 1`,
+       WHERE p.target = ? AND p.reason = 'Cheating' AND p.at > ? AND u.test IS NOT 1 AND u.resident IS NOT 1`,
       target,
       since,
     )
@@ -518,7 +547,7 @@ export async function recordFairPlay(
   mail?: CaseMailer,
 ): Promise<FairRecord> {
   const lv = FAIRPLAY.levels;
-  const account = await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId);
+  const account = await sql.first<{ rating: number | null; resident: number | null }>("SELECT rating, resident FROM users WHERE id = ?", userId);
   // An account deleted mid-match (account-data.ts): nothing recorded.
   if (!account) return { summary: matchSignals(match.moves, referenceStrength([], null)), verdict: { level: "none", reasons: [] }, acted: "none" };
   // (`since`: once per lobby, as recordResult's: a lobby writing its end again (a retry, a restart) records nothing more, and weighs the
@@ -536,9 +565,12 @@ export async function recordFairPlay(
   const inputs = [...levelInputs(history, c), { ...summary, at: now }];
   let verdict = playerLevel(inputs, now, lv);
   const flagged = summary.score >= lv.watch || verdict.level !== "none" || (!!c && OPEN.includes(c.status));
+  // (A resident, residents.ts: what detection would have done, kept on the row and done for nobody.)
+  const resident = account.resident === 1;
+  const would = resident ? wouldHave(verdict) : null;
   const added = await sql.first<{ id: number }>(
-    `INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary, moves, keep_until)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    `INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary, moves, keep_until, would)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
      ${once ? "WHERE NOT EXISTS (SELECT 1 FROM fairplay_matches WHERE user_id = ? AND lobby = ? AND played_at >= ?)" : ""} RETURNING id`,
     userId,
     match.lobby,
@@ -551,8 +583,16 @@ export async function recordFairPlay(
     JSON.stringify(summary),
     JSON.stringify(match.moves),
     now + (flagged ? FAIRPLAY.evidenceDays : FAIRPLAY.evidenceDaysUnflagged) * DAY,
+    would,
     ...(once ? [userId, match.lobby, match.since] : []),
   );
+  // Residents (residents.ts): recorded as anyone's, and nothing more. No case opens or moves, no engine pool, no deep re-check; the new
+  // account rule's pool, had it applied, is what the row would have done.
+  if (resident) {
+    if (added && FAIRPLAY.enforcement === "pool" && (await newAccountPoolReason(sql, userId, c))) await sql.run("UPDATE fairplay_matches SET would = 'pool' WHERE id = ?", added.id);
+    await purgeEvidence(sql, now);
+    return { summary, verdict, acted: "none" };
+  }
   // (A retry whose row went in on an earlier try, which stopped before the steps below: the level from what's stored, as relevel's, so a
   // person's decision since counts; then the same steps, both safe to repeat. The review of #610, m1.)
   if (!added) verdict = await levelNow(sql, userId, c, now);
@@ -603,6 +643,8 @@ function levelInputs(history: readonly HistoryRow[], c: Case | null): LevelInput
  */
 export async function relevel(sql: Sql, userId: string, now: number, mail?: CaseMailer): Promise<{ verdict: LevelVerdict; acted: Acted }> {
   const verdict = await levelNow(sql, userId, await caseOf(sql, userId), now);
+  // (A resident: never acted on, residents.ts. The deep re-check skips them anyway: fairplay-deep.ts.)
+  if (await isResident(sql, userId)) return { verdict, acted: "none" };
   const acted = await actOn(sql, userId, verdict, now, mail);
   return { verdict, acted: (await poolNewAccount(sql, userId, now)) ? "pool" : acted };
 }
@@ -616,16 +658,27 @@ async function poolNewAccount(sql: Sql, userId: string, now: number): Promise<bo
   if (FAIRPLAY.enforcement !== "pool") return false;
   const c = await caseOf(sql, userId);
   if (c?.status === "pool" || c?.status === "banned") return false;
+  const why = await newAccountPoolReason(sql, userId, c);
+  if (!why) return false;
+  await setCase(sql, userId, "pool", "detection", why, now);
+  return true;
+}
+
+/** The new-account rule's reason to pool this account now (its first FAIRPLAY.pool.newGames matches since the case's last decision), or null. */
+async function newAccountPoolReason(sql: Sql, userId: string, c: Case | null): Promise<string | null> {
   const first = await sql.all<HistoryRow>(
     "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at, id LIMIT ?",
     userId,
     FAIRPLAY.pool.newGames,
   );
   const since = c?.decided_at ?? 0;
-  const why = newAccountPool(levelInputs(first, null).map((m) => ({ ...m, counts: m.at > since })));
-  if (!why) return false;
-  await setCase(sql, userId, "pool", "detection", why, now);
-  return true;
+  return newAccountPool(levelInputs(first, null).map((m) => ({ ...m, counts: m.at > since })));
+}
+
+/** What actOn would do with this level for an account with no case (residents.ts WouldHave), or null for nothing. */
+export function wouldHave(verdict: LevelVerdict): "watch" | "review" | "pool" | "ban" | null {
+  const aim = aimOf(verdict);
+  return aim ? (ACTED[aim] as "watch" | "review" | "pool" | "ban") : null;
 }
 
 /** A player's level from their stored matches now (since the case's last decision), acting on nothing. */

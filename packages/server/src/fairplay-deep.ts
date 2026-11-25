@@ -122,7 +122,8 @@ interface QueueRow {
  * flagged match or an open case), cases in review first and the rest only off-peak (`all` ignores the hours: an admin asking). Each counted
  * move is searched once; a match is done when all of them are (or can't be). Outside a review, a ban or the engine pool (off-peak,
  * beside watch) a match is checked only as far as a ban could need (FAIRPLAY.levels.banMatchChecked counted moves), then leaves the queue undone: a review queues the rest again
- * (setCase). The player's level is worked out again afterwards. Returns how many searches it made (a position's whole budget).
+ * (setCase). The player's level is worked out again afterwards. Returns how many searches it made (a position's whole budget). A
+ * resident's matches are never searched (residents.ts: they'd spend the engine server's day before a real player's).
  */
 export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, opts: { mail?: CaseMailer; all?: boolean; userId?: string; perRun?: number } = {}): Promise<{ searches: number; matches: number }> {
   const dp = FAIRPLAY.deep;
@@ -130,7 +131,7 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
   const quiet = opts.all || offPeak(now);
   const rows = await sql.all<QueueRow & { status: string | null }>(
     `SELECT m.id, m.user_id, m.played_at, m.moves, c.status FROM fairplay_matches m LEFT JOIN fairplay_cases c ON c.user_id = m.user_id
-     WHERE m.deep_queued = 1 ${opts.userId ? "AND m.user_id = ?" : ""}
+     WHERE m.deep_queued = 1 ${opts.userId ? "AND m.user_id = ?" : ""} AND m.user_id NOT IN (SELECT id FROM users WHERE resident = 1)
      ORDER BY CASE c.status WHEN 'review' THEN 0 WHEN 'watch' THEN 1 WHEN 'pool' THEN 1 ELSE 2 END, m.played_at DESC LIMIT 50`,
     ...(opts.userId ? [opts.userId] : []),
   );

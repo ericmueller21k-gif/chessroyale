@@ -20,6 +20,7 @@ import { BAN_COOKIE, BAN_HEADER, UNMARK, banAnswer, banGate } from "./ban-gate.t
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { handleTestAccounts } from "./test-accounts.ts";
+import { handleResidents, residentGate } from "./residents.ts";
 import { handleFriendBots } from "./friend-bots.ts";
 import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
 import { deepCheckRun, recountDeep } from "./fairplay-deep.ts";
@@ -187,6 +188,13 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     countRoute("banned", Date.now() - t);
     return gate.refused;
   }
+  // The residents' kill switch (PAUSE_RESIDENTS; residents.ts): while it's on, a resident's session gets 503 on every /api/* route (the
+  // rooms' WebSockets too). Off, nothing is read.
+  const residentRefused = !admin && !(rawEnv.E2E_SQL && url.pathname === "/api/e2e/sql") ? await residentGate(rawEnv, request, t) : null;
+  if (residentRefused) {
+    countRoute("residents-paused", Date.now() - t);
+    return residentRefused;
+  }
   const res = await route(request, rawEnv, url, (p) => ctx.waitUntil(p));
   const ms = Date.now() - t;
   countRoute(routeOf(request.method, url.pathname), ms);
@@ -217,6 +225,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Test accounts (admins, a script through Access, the e2e's key: test-accounts.ts): made, listed and deleted.
     const tests = await handleTestAccounts(request, env);
     if (tests) return tests;
+    // Residents (admins, the residents program through Access, the e2e's key: residents.ts): made and signed in, listed, its heartbeat.
+    const residents = await handleResidents(request, env);
+    if (residents) return residents;
     // Friend bots on an admin's own friends list (admins, the e2e's key with a session: friend-bots.ts).
     const bots = await handleFriendBots(request, env);
     if (bots) return bots;

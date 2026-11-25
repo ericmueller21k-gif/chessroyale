@@ -22,9 +22,9 @@ type Msg = ServerMessage;
  * His room's fight (a party battle of four, as the hub makes it: hiddenRoomSettings, PartyLobby.room): `people` (p1 the admin's,
  * the host) and bots in the other seats. `engine`: an engine server (its searches answered by the test: `searches`, `answer`; the
  * host's device's asks for a bot's move by `answerAsks`); `auto`: one that answers every search as time goes on (`advance`), each
- * legal move scored as `answer` does, and a host's device that answers every ask.
+ * legal move scored as `answer` does, and a host's device that answers every ask. `residents`: the people are residents (residents.ts).
  */
-function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: boolean; child?: boolean } = {}) {
+function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: boolean; child?: boolean; residents?: boolean } = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const searches: Phase2SearchRequest[] = [];
@@ -82,7 +82,7 @@ function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: b
     inbox.set("p1", (inbox.get("p1") ?? []).filter((m) => m.t !== "scoreRequest"));
     return true;
   };
-  for (let i = 0; i < people; i++) expect(core.connect(undefined, `M${i}`, i === 0 ? "computer" : "phone", false, 1500, undefined, `u${i}`, null, null, i === 0, { pass: `pass${i}`, seat: i }).ok).toBe(true);
+  for (let i = 0; i < people; i++) expect(core.connect(undefined, `M${i}`, i === 0 ? "computer" : "phone", false, 1500, undefined, `u${i}`, null, null, i === 0, { pass: `pass${i}`, seat: i }, false, !!o.residents).ok).toBe(true);
   const runner = () => (core as unknown as { runner: MatchRunner }).runner;
   /**
    * The host's device answers the bots' moves asked of it (phase2Ask) and not answered yet (`fen`: that position's only), with
@@ -758,6 +758,21 @@ describe("the review of #677, M2: an engine server miss in phase 2 reaches phase
     expect(F.warms).toBe(1);
   });
 
+  it("residents alone (residents.ts): the engine server is never woken or asked in phase 2; his moves are the server's quick ones, as with none set up (the review's m3)", () => {
+    const F = roomFight(1, 3, { engine: true, residents: true });
+    F.beatAdult();
+    expect(F.warms).toBe(0);
+    F.toBoards();
+    for (let i = 0; i < 40; i++) {
+      F.answerAsks();
+      F.advance(1000);
+    }
+    // (Moves were played on his boards, and none was searched on the engine server: a person's fair play neither.)
+    expect(F.p2().state.boards.some((b) => b.board.history.length >= 2)).toBe(true);
+    expect(F.searches).toEqual([]);
+    expect(F.p2().unvouched).toBe("his move was the server's quick move (no engine server here)");
+  });
+
   it("his quick move with no engine server set up: phase 2's result unvouched (its players: not ranked, a solo game's XP, the results say so); the match's flag, its fair play and anyone else's result stand", () => {
     const F = roomFight(2, 2);
     F.beatAdult();
@@ -1085,7 +1100,7 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     const queries: { q: string; args: unknown[] }[] = [];
     const sql = {
       run: async (q: string, ...args: unknown[]) => void queries.push({ q, args }),
-      first: async (q: string, ...args: unknown[]) => (queries.push({ q, args }), q.startsWith("SELECT rating FROM users") ? { rating: null } : null),
+      first: async (q: string, ...args: unknown[]) => (queries.push({ q, args }), q.startsWith("SELECT rating, resident FROM users") ? { rating: null, resident: null } : null),
       all: async (q: string, ...args: unknown[]) => (queries.push({ q, args }), []),
       batch: async (st: readonly { sql: string }[]) => void queries.push(...st.map((x) => ({ q: x.sql, args: [] }))),
     };
@@ -1218,6 +1233,21 @@ describe("his phase 1 move when no device answers (Eric, Nov 13, option 1: \"rep
   };
   /** His tries at this move on the engine server (searches "p1-…"). */
   const tries = (F: ReturnType<typeof roomFight>) => F.searches.filter((s) => s.id.startsWith("p1-"));
+
+  it("residents alone (residents.ts): the host's window passes, his move is the server's quick one, never the engine server's, nor another resident's window (the review's m3; the delta's d-m1: two residents took turns forever)", () => {
+    for (const [devices, more] of [[1, 3], [2, 2]] as const) {
+      const F = roomFight(devices, more, { engine: true, residents: true });
+      F.advance(1000);
+      F.advance(60_000);
+      const req = toHisTurn(F, devices);
+      const ply = boardNow(F).history.length;
+      F.advance(15_000 + 100);
+      expect(F.searches, `${devices} devices`).toEqual([]);
+      expect(F.core.record.recluse1).toBeUndefined();
+      expect(boardNow(F).history, `${devices} devices`).toHaveLength(ply + 1);
+      expect(boardNow(F).lastMove).toBe(quickMove(req.fen));
+    }
+  });
 
   it("the host's window passes: his move from the engine server at the man's level, never a random move; his turn waits for it (nobody's clock runs); a device's late answer isn't heard; his next move is the devices' again", () => {
     const F = roomFight(1, 3, { engine: true });
