@@ -112,6 +112,8 @@ describe("the ladder's top", () => {
     await setCase(sql, banned!, "banned", "admin:x@example.com", "engine", T0);
     await setCase(sql, pooled!, "pool", "admin:x@example.com", "engine", T0);
     await sql.run("UPDATE users SET test = 1 WHERE id = ?", test);
+    // (A resident (residents.ts) is a real-looking player by design: on the ladder like anyone.)
+    await sql.run("UPDATE users SET resident = 1 WHERE id = ?", b);
     const top = await ladderTop(sql);
     expect(top.rows.map((r) => r.uid)).toEqual([a, b]);
     expect(top.rows.map((r) => r.place)).toEqual([1, 2]);
