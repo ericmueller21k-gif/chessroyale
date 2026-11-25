@@ -622,8 +622,11 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
     // Every boss whole inside the stage's width (Wrangler's lasso out to one side, the tallest the Hidden Boss).
     for (const name of ["Ginger", "Boingo the Clown", "Grex", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Moo & Moon", "Puddles", "Babur", "Folio", "Locked boss"]) {
       await tile(page, name).click();
-      // (After its drop, which squashes it a little wider for a moment.)
-      await page.waitForTimeout(500);
+      // (After its drop, which squashes it a little wider for a moment: wait for the drop itself to end, not a fixed time. A 500 ms sleep
+      // measured Boingo mid-squash on a slow runner, 0.9 px past the stage: main's run 45613241002, Nov 25.)
+      await page.locator(".bs-spot:not(.bs-mine) .bs-fig").evaluateAll((es) =>
+        Promise.all(es.flatMap((e) => e.getAnimations()).filter((a) => a.effect?.getComputedTiming().endTime !== Infinity).map((a) => a.finished)),
+      );
       const fig = (await page.locator(".bs-sprite").boundingBox())!;
       expect(fig.x, `${w} ${name}`).toBeGreaterThanOrEqual(stage.x - 1);
       expect(fig.x + fig.width, `${w} ${name}`).toBeLessThanOrEqual(stage.x + stage.width + 1);
