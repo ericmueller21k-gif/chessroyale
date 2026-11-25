@@ -2115,3 +2115,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~22:00 UTC: ERIC liked the 50 v 50 mock ('seems good'); asked labels on the top numbers, a longer row → mock sent: MOVE · NEXT CUT · YOUR PLACE · YOUR POINTS · CUT LINE (gray caps label over each value). Fold into shared-game-frame 50 v 50 build.
 - Nov 25 ~22:15 UTC: ERIC APPROVED 50 v 50 layout (power row + arrows top of right column; labeled top row) → in shared-game-frame.md. Final mock sent (laptop 614, desktop 848).
 - Nov 25 ~22:20 UTC: ERIC: the 50 v 50 status box always visible (gray 'Waiting…' when idle), like the vote box → in shared-game-frame.md.
+- Nov 25 ~22:50 UTC: ERIC: 50 v 50 top row: drop 'Your pick' line → PICKED x/y after MOVE; no circle; row on the timer's line close above the board; screen up; gear near the arrows → mock sent (laptop 621, desktop 856). In shared-game-frame.md.

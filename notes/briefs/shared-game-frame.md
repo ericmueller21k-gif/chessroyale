@@ -35,3 +35,13 @@ Reference: round 1's NOTE and stills (`git show origin/stills/game-layout-mockup
 Stills at 1536x730, 1920x960, 1858x1040 (and the phone unchanged), looked at yourself against the rules above before pushing; the
 `desktop-board.spec` real-screens numbers updated; checks changed old → new; a short decision note; area pages. Push, `.done`, stop.
 Commits end with only `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By).
+
+## 50 v 50 top row, Eric's correction (Nov 25, after the approved mock): the mock to match is the LAST one sent (`notes/tools/mock-crowd-50.spec.ts`)
+- The "Your pick for White · N/50 picked" line over the board is GONE; its count is a labeled number in the top row right after MOVE:
+  MOVE · PICKED (x/y: your team's picks on your turn, the voting team's while you watch) · NEXT CUT · YOUR PLACE · YOUR POINTS · CUT LINE.
+- No team-color circle by MOVE.
+- The row sits on ONE line with the board's timer pill ("2s | 10:00", now at the row's right end), close above the board; the whole screen
+  moves up (no empty band at the top).
+- The gear sits on the right column's first line, beside the arrows + power-ups, which start level with the board's top. The scoreboard's
+  table starts level with the board's top too (its "BLACK TEAM" label above it, in the row's height).
+- Board 621 at 1536x730, 856 at 1920x960 in the mock.
