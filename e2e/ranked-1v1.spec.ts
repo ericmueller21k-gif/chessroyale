@@ -659,12 +659,16 @@ test("real screens (Nov 25): a ranked game and its end page on laptop 1536×730,
     // panel's top and foot the board's, the gear level with the top strip, "Your move" in your strip.
     const f = await white.evaluate(() => {
       const r = (q: string) => document.querySelector(q)!.getBoundingClientRect();
-      return { box: r(".dv-side > .dv-box"), gear: r(".dv-gear .mm-more"), top: r(".dv-strip.dv-them"), chip: !!document.querySelector(".dv-strip.dv-you .dv-status"), title: document.querySelectorAll(".screen.game > .hud-row").length };
+      return { box: r(".dv-side > .dv-box"), gear: r(".dv-gear .mm-more"), top: r(".dv-strip.dv-them"), menu: r(".gm-frame > .fd-side"), chip: !!document.querySelector(".dv-strip.dv-you .dv-status"), title: document.querySelectorAll(".screen.game > .hud-row").length };
     });
     expect(f.title, `${at}, in play: no title line`).toBe(0);
     expect(s.height - 108 - g.board!.h, `${at}, in play: the board (${g.board!.h}) the window's height less 108`).toBeLessThan(8);
-    expect(Math.abs(f.box.top - g.board!.y), `${at}, in play: the panel's top the board's`).toBeLessThanOrEqual(1.5);
-    expect(Math.abs(f.box.bottom - g.board!.b), `${at}, in play: the panel's foot the board's`).toBeLessThanOrEqual(1.5);
+    // (Eric's column rule, Nov 25 round 2: every column on the board's top and bottom lines and the gaps either side of the board equal, ±1 px.
+    // Were ±1.5 for the lines; the gaps were 55 and 70 at 1536 × 730.)
+    expect(Math.abs(f.box.top - g.board!.y), `${at}, in play: the panel's top the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(f.box.bottom - g.board!.b), `${at}, in play: the panel's foot the board's`).toBeLessThanOrEqual(1);
+    const gaps = { left: g.board!.x - f.menu.right, right: f.box.left - g.board!.r };
+    expect(Math.abs(gaps.left - gaps.right), `${at}, in play: the gaps either side of the board equal (${gaps.left} v ${gaps.right})`).toBeLessThanOrEqual(1);
     expect(Math.abs(f.gear.top + f.gear.height / 2 - (f.top.top + f.top.height / 2)), `${at}, in play: the gear level with the top strip`).toBeLessThanOrEqual(1.5);
     expect(f.chip, `${at}, in play: "Your move" in your strip`).toBe(true);
     await resign(white);
@@ -682,12 +686,13 @@ test("real screens (Nov 25): a ranked game and its end page on laptop 1536×730,
       const r = (q: string) => document.querySelector(q)!.getBoundingClientRect();
       const btns = [...document.querySelectorAll(".dv-end-col .dv-result-actions .btn")].map((x) => x.getBoundingClientRect());
       const lines = [...document.querySelectorAll(".dv-end-col .qgroup-lines:not(.emoji) .qchip")].map((x) => x.textContent);
-      return { col: r(".dv-end-col"), area: r(".board-area"), title: r(".es-title"), feed: r(".dv-end-col .qfeed"), btns: btns.map((x) => ({ x: x.left, y: x.top, w: x.width, h: x.height })), lines, steps: !!document.querySelector(".dv-strip.dv-you [data-testid=dv-steps]") };
+      return { col: r(".dv-end-col"), menu: r(".gm-frame > .fd-side"), area: r(".board-area"), title: r(".es-title"), feed: r(".dv-end-col .qfeed"), btns: btns.map((x) => ({ x: x.left, y: x.top, w: x.width, h: x.height })), lines, steps: !!document.querySelector(".dv-strip.dv-you [data-testid=dv-steps]") };
     });
     expect(m.title.top, `${at}, the end page: "Defeat" in view`).toBeGreaterThanOrEqual(0);
     expect(m.col.left, `${at}, the end page: the column right of the board`).toBeGreaterThan(m.area.right);
-    expect(Math.abs(m.col.top - e.board!.y), `${at}, the end page: the column's top the board's`).toBeLessThanOrEqual(1.5);
-    expect(Math.abs(m.col.bottom - e.board!.b), `${at}, the end page: the column's foot the board's`).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(m.col.top - e.board!.y), `${at}, the end page: the column's top the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(m.col.bottom - e.board!.b), `${at}, the end page: the column's foot the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(e.board!.x - m.menu.right - (m.col.left - e.board!.r)), `${at}, the end page: the gaps either side of the board equal`).toBeLessThanOrEqual(1);
     expect(m.steps, `${at}, the end page: the moves' stepper in your strip`).toBe(true);
     expect(m.btns.length).toBe(2);
     expect(m.btns[1]!.y, `${at}, the end page: Play again and Home stacked`).toBeGreaterThan(m.btns[0]!.y + m.btns[0]!.h - 1);

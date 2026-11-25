@@ -258,3 +258,17 @@
     max-width: round(down, min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--bd-h)), var(--bd-step));
   }
 }
+/* (The 1 v 1's frame at 125% and 150% too, Windows' usual scales (Eric's laptop is 1536 × 730 at 125%; Nov 25, round 2): its box rounded down
+   to the board's step, 6.4 and 5.33 px, so the panel's foot is the drawn board's (it was 1.2 px under it at 1536 × 730). The step isn't a
+   whole number of layout units (1/64 px), so 1/64 px more keeps the box from snapping just under a step, which would draw the board a step
+   smaller: the board's size is unchanged.) */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 1.25dppx) {
+  .screen.game.duel-screen.dv-frame {
+    --dv-w: calc(round(down, min(100%, var(--bd-h)), 6.4px) + 1px / 64);
+  }
+}
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 1.5dppx) {
+  .screen.game.duel-screen.dv-frame {
+    --dv-w: calc(round(down, min(100%, var(--bd-h)), 8px / 1.5) + 1px / 64);
+  }
+}

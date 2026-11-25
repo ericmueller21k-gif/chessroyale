@@ -21760,6 +21760,10 @@ button.sq-tiny {
   .screen.game.duel-screen.dv-frame {
     grid-template-rows: auto;
     row-gap: 0;
+    /* (Eric's column rule, Nov 25 round 2: the gaps either side of the board are equal. The board stands in the middle of its column, so the
+       gap to the panel is the screen's left padding, as the menu's side has: 62 px both sides at 1536 × 730, 47 at 1920 × 960; were 55 and
+       70, 40 and 54.) */
+    column-gap: var(--gutter);
   }
   .screen.game.dv-frame > .board-area {
     grid-row: 1;
