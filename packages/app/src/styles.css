@@ -3115,13 +3115,14 @@ button.history-label {
     --status-h: 24px;
     --mid-h: calc(32px + 6px + var(--slots) * 14px - 1px + 6px + var(--status-h));
   }
-  /* Shorter screens: fewer bars, so the scoreboard keeps its rows (at 664 and 667 it keeps four or five with six). */
-  @media (max-height: 639px) {
+  /* Shorter screens: fewer bars, so the scoreboard keeps its three rows' room (MiniTower's floor) under the taller box (Nov 25:
+     measured at 375x667, 360x640, 390x700, 414x736 and 430x740; was 5 under 640 px and 4 under 600 before the box stood). */
+  @media (max-height: 759px) {
     .screen.game.crowd-50 {
       --slots: 5;
     }
   }
-  @media (max-height: 599px) {
+  @media (max-height: 699px) {
     .screen.game.crowd-50 {
       --slots: 4;
     }
@@ -3132,6 +3133,10 @@ button.history-label {
     height: var(--mid-h);
     min-height: 0;
     align-content: start;
+  }
+  /* (The reveal's box as wide as the standing one, so its power-up row and rows don't move sideways: no phone inset, Nov 25.) */
+  .screen.game.crowd-50 > .poll {
+    margin: 0;
   }
   /* Nov 8 (Eric: nothing on the match screen moves): the power-up row sits at the top of the box, right under the board, on
      every phase, and the status slot under it is 42 px on every phase (empty while picking, the waiting line's box in the
@@ -3156,6 +3161,20 @@ button.history-label {
     font-size: 13px;
     line-height: 1;
     white-space: nowrap;
+  }
+  /* (Narrower phones: tighter, 12 px under 390 px and 11 px under 360, so "White is voting. Your team moves next. 50/50" stays
+     one line inside the board's width down to 320 px; measured at 13 px it needs 344 px.) */
+  @media (max-width: 389px) {
+    .screen.game.crowd-50 .play-slot > .waiting-banner {
+      gap: 6px;
+      padding: 0 8px;
+      font-size: 12px;
+    }
+  }
+  @media (max-width: 359px) {
+    .screen.game.crowd-50 .play-slot > .waiting-banner {
+      font-size: 11px;
+    }
   }
   /* The reveal: the power-up row stays on top, greyed (Crowd.tsx, LockedPowerRow), 6 px over the rows. */
   .screen.game.crowd-50 .poll-result-skel {
@@ -3625,8 +3644,12 @@ button.history-label {
   border-radius: 4px;
   background: color-mix(in srgb, var(--text) 12%, transparent);
 }
-/* (An empty result line, a turn you watched: its own fixed 20 px line at the box's foot, a shorter gray bar.) */
+/* (An empty result line, a turn you watched: the box's own foot line in its fixed spot at the box's foot, a row's width and
+   look with a shorter gray bar, not a stray pill: Nov 25, round 2.) */
 .poll-result-skel {
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--surface);
   flex: none;
   display: flex;
   align-items: center;

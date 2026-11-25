@@ -238,10 +238,4 @@
   .screen.game.crowd-50 > .poll .poll-result .round-score {
     font-size: 22px;
   }
-  /* A watched turn's empty result line: the box's own foot line, a row's width and look (Nov 25, round 2), in its fixed spot. */
-  .screen.game.crowd-50 > .poll .poll-result-skel {
-    padding: 0 8px;
-    border-radius: 10px;
-    background: var(--surface);
-  }
 }

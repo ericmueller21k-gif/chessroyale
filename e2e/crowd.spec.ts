@@ -367,15 +367,16 @@ test("50 v 50's vote box is a standing skeleton (Eric, Nov 25): its cap's rows w
       const rows = [...box.querySelectorAll(".poll-row")];
       return { kind: box.className, box: rect(box), nav: rect(box.querySelector(".history-nav")), board: rect(document.querySelector(".board-row")), under: rect(document.querySelector(".screen.game > .under-board")), rows: rows.map((r) => (r.classList.contains("skel") ? "s" : "f") + rect(r)) };
     });
-  // The box waits in the slot as six skeleton rows (a phone's under the power-up row, round 2), the status line under them.
-  await expect.poll(async () => (await geo()).rows.join(" "), { timeout: 10_000 }).toMatch(/^(s\S+ ){5}s\S+$/);
+  // The box waits in the slot as its cap's skeleton rows (four to six by the screen's height; a phone's under the power-up row,
+  // round 2), the status line under them.
+  await expect.poll(async () => (await geo()).rows.join(" "), { timeout: 10_000 }).toMatch(/^(s\S+ ){3,5}s\S+$/);
   const before = await geo();
   await expect.poll(() => phase(page), { timeout: 60_000, intervals: [50] }).toBe("reveal");
   const after = await geo();
   expect(after.kind).toBe("poll");
-  // The cap's six rows, filled top down, the rest skeleton; the box, the board and the scoreboard where they were.
-  expect(after.rows).toHaveLength(6);
-  expect(after.rows.join(" ")).toMatch(/^(f\S+ )+(s\S+ ?)*$/);
+  // The cap's rows, as many as before, filled top down, the rest skeleton; the box, the board and the scoreboard where they were.
+  expect(after.rows).toHaveLength(before.rows.length);
+  expect(after.rows.join(" ")).toMatch(/^f\S+( f\S+)*( s\S+)*$/);
   expect([after.box, after.board, after.under]).toEqual([before.box, before.board, before.under]);
   // The rows at the same places (a computer's and a phone's), and a phone's power-up row on top through the reveal.
   expect(after.rows.map((r) => r.slice(1))).toEqual(before.rows.map((r) => r.slice(1)));
