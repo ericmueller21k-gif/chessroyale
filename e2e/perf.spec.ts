@@ -4,6 +4,7 @@ import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { SAW_SWAP_TEST_CHECK } from "@chessroyale/chess";
 import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
+import { MOCKUP_LOOK, demoProfile, routeProfile } from "./public-profile-data.ts";
 
 /**
  * Lag that grew with the match (.claude/LESSONS.md): a solo boss battle against Ginger, on a phone slowed 4x, stays
@@ -475,6 +476,32 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change, four boards i
     expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }
+});
+
+test("worn items playing on a slow phone: a profile wearing the Fire & Ice Crown, a Smiley Face and the Candy Cane, its pawn and its tiles animating, stays within budget through a whole cycle (Nov 25)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(2 * 60_000);
+  await page.addInitScript(instrument);
+  // (The page with the most items playing at once: the profile's pawn and its Wearing tiles. CSS on the drawings only, no frame loop.)
+  const look = { ...MOCKUP_LOOK, head: { def: "fire-ice-crown", color: "red", blemish: 20, seed: 12 }, face: { def: "smiley-face", color: "yellow", blemish: 20, seed: 8 }, weapon: { def: "candy-cane", color: "red", blemish: 20, seed: 3 } };
+  const profile = demoProfile({ look });
+  await page.goto("/?nolanding");
+  await routeProfile(page, profile);
+  await page.goto(`/profile/${profile.id}?nolanding`);
+  await expect(page.locator(".pp-tile")).toHaveCount(4);
+  const live = await page.locator(".ia-live").count();
+  expect(live, "items playing on the page").toBeGreaterThanOrEqual(3);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.waitForTimeout(500);
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  // (The longest cycle is the cane's, 6.5 s; the crown's 6.)
+  await page.waitForTimeout(7_000);
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`worn items playing (${live} live, slowed phone): ${f(s)}`);
+  expect(s.n, "frames in 7 s").toBeGreaterThan(100);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
 });
 
 test("the end screen on a slow phone: its frames through the count, the lob and the bar's fill, a level-up included (Nov 9; Nov 20)", { tag: "@perf" }, async ({ page }) => {
