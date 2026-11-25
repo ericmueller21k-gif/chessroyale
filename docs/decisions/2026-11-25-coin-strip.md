@@ -15,5 +15,5 @@ Calls made:
 6. **Ranked's coin line and Squads' "+65 coins" are gone**; Squads keeps its crates and the daily cap's words. The bot, town and aborted
    1 v 1 card (no XP box) keeps its own coin words.
 7. **Known gap for the director:** a computer's boss result at 1536 × 730 was already near full (its stack ended at 691 px); with the
-   strip, Home sits about 50 px under the window's foot (the page already scrolls for the review). Fixing it means the boss row or the
-   quests' reserved row on short computer windows (other lanes), so it's left to the director.
+   strip, Home sat about 50 px under the window's foot. Fixed in the same PR: [2026-11-25-coin-strip-fit.md](2026-11-25-coin-strip-fit.md)
+   (the column scales with the window's height; the 1 v 1 column's strip is the compact one).
