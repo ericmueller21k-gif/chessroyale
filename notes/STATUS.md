@@ -2121,3 +2121,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~23:50 UTC: #949 CI NEVER RAN on edb39706 (GitHub outage; PR still shows 8a4ae8d9 as head). Local typecheck + vitest app/core (3,399) PASS on edb39706. full-e2e label added (no run yet). Resync = merge main into it at the next main move (after squads fix). PR body updated with round 2.
 - Nov 25 ~23:55 UTC: #949 labeled full run on stale head 8a4ae8d9: 1 fail [phone] panel.spec:282 (50 v 50 phone scoreboard 3 rows <4 at 390x750; #945 area; passes on main e07ce3f2). Commented. Real check = run on edb39706 after resync. If it fails there too → it's real (likely #945's phone slot + something) → brief a fix.
 - Nov 26 ~00:10 UTC: ERIC: the standing status box missing from the mock → added (gray 'Waiting…' on your turn), stills sent. Rule: mockups show every ask.
+- Nov 26: ERIC APPROVED the 50 v 50 mock (with Waiting box). Builds in shared-game-frame after duel-layout merges.

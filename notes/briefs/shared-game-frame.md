@@ -46,3 +46,6 @@ Commits end with only `Claude-Session: https://claude.ai/code/session_01JuCWRuPp
 - The gear sits on the right column's first line, beside the arrows + power-ups, which start level with the board's top. The scoreboard's
   table starts level with the board's top too (its "BLACK TEAM" label above it, in the row's height).
 - Board 634 at 1536x730, 864 at 1920x960 in the final mock.
+
+## 50 v 50 mock APPROVED Nov 26 (Eric: "It's fine, I see it now")
+Build exactly what `notes/tools/mock-crowd-50.spec.ts` shows, including the standing gray "Waiting…" status box.
