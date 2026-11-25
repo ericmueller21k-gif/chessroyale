@@ -127,12 +127,14 @@ function serviceWorker(): Plugin {
 }
 
 /**
- * This build's commit (Workers Builds gives it as WORKERS_CI_COMMIT_SHA; a local build asks git): the app reports its
+ * This build's commit (Workers Builds gives it as WORKERS_CI_COMMIT_SHA, GitHub Actions as GITHUB_SHA; a local build asks git): the app reports its
  * first 12 characters with every error (src/problems.ts), and dist/version.json tells the Worker and the ops tools
  * which commit is deployed. "dev" when neither knows.
  */
 const COMMIT = (() => {
-  let sha = process.env.WORKERS_CI_COMMIT_SHA ?? "";
+  // (GitHub Actions' GITHUB_SHA too: CI's e2e build runs in a container where git may refuse the checkout ("dubious ownership"), and
+  // a build that called itself "dev" never sees a deploy land: town.spec's "a deploy landed" checks, #942.)
+  let sha = process.env.WORKERS_CI_COMMIT_SHA || process.env.GITHUB_SHA || "";
   if (!sha) {
     try {
       sha = execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();

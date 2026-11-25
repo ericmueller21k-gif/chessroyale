@@ -1214,7 +1214,7 @@ export const TOWER_PARTY = { max: 4, closeCp: 0, crateFloors: [25, 50, 75, 99] a
  * - `silentSec`: a device in the room that hasn't asked for this long has gone (a disconnect): out of the room and the request;
  * - `outcomeSec`: how long the start (or the end) waits for a device to read it;
  * - `bots`: the admin's test bots ("Fill with 3 bots": admins only, server-checked), and `botJoinMs`: each joins a challenge
- * *   this long after the one before, as a player would (longer than `pollMs`, so everyone in the room sees each count);
+ * *   on the admin's first look this long or more after the one before, as a player would (one a look: the admin sees each count);
  * - `joinWaitSec`: the fight waits this long for the four to arrive (the summoning plays first), then begins with those who came.
  */
 export const HIDDEN_ROOM = { players: 4, capSec: 300, pollMs: 1500, silentSec: 20, outcomeSec: 60, bots: 3, botJoinMs: 2000, joinWaitSec: 60, boss: "recluse" } as const;
@@ -3213,7 +3213,14 @@ export function clockAfterVote(clock: number, votes: readonly Augment[], s: Pick
  * that version, so a tab left open across a deploy still opens its rooms. A tab that doesn't say which version it runs (asleep in the
  * background) keeps the newest `keepVersions` versions (this one included) until it does or closes.
  */
-export const APP_CACHE = { keepVersions: 3 } as const;
+export const APP_CACHE = {
+  keepVersions: 3,
+  /**
+   * A file of the game that won't load (app/src/stale.ts): how long the page waits for the server's `/version.json` (ms) to tell a
+   * deploy (another build: the page loads again) from a dropped connection (the same build, or no answer: the load just fails).
+   */
+  staleCheckMs: 5_000,
+} as const;
 
 /**
  * The front door (home, queue, profiles): the live line's timing and the queue's show. (A rating's own names, RATING_RANKS

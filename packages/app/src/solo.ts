@@ -52,7 +52,11 @@ const landedMs = (snap: BossView) => landedEarlyMs(snap) + fullMoonMs(snap) + gi
 let library: readonly Opening[] | null = null;
 let libraryLoad: Promise<readonly Opening[]> | null = null;
 export function loadOpenings(): Promise<readonly Opening[]> {
-  libraryLoad ??= chunk(import("@chessroyale/chess/data/openings.json")).then(
+  // (Asked again at once if it fails: one dropped connection (stale.ts: no deploy, so no reload) never fails a start that joined this
+  // load, the Boss Battle screen's own in the background (main's run 45559755980, Nov 25). An older browser fails the try again without asking (it keeps the failure):
+  // stale.ts then loads the page again, back on Boss Battle: #942.)
+  const load = () => chunk(import("@chessroyale/chess/data/openings.json"));
+  libraryLoad ??= load().catch(load).then(
     (m) => (library = m.default as unknown as Opening[]),
     (e) => {
       // (A failed fetch is tried again next time.)

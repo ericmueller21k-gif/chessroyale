@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SOLO_ABANDON } from "@chessroyale/core";
-import { test, asAdmin, bossAloneFromHome, endBattle, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
+import { test, aDeployLanded, asAdmin, bossAloneFromHome, endBattle, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * XP and levels on the end screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't want it
@@ -458,7 +458,8 @@ test.describe(() => {
     await playOwnMoves(page, 2);
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
     const before = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }));
-    // (The solo game's code fails to load until the page loads again: stale.ts's reload, as for a deploy's missing file.)
+    // (The solo game's code fails to load until the page loads again: stale.ts's reload, for a deploy's missing file.)
+    await aDeployLanded(page);
     const loads = log.loads;
     let failed = 0;
     await page.route(/\/assets\/solo-[^/]*\.js$/, (r) => (log.loads - loads >= 2 ? r.continue() : (failed++, r.abort())));
@@ -470,6 +471,29 @@ test.describe(() => {
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
     await expect(card).toHaveCount(0);
     expect(await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }))).toEqual(before);
+  });
+
+  test("a file dropped with no deploy, and its try again too (main's run 45559755980; #942's older Chromium, Nov 25): the page loads again once, back on Boss Battle, and START plays", { tag: "@phone-only" }, async ({ page }) => {
+    test.setTimeout(3 * 60_000);
+    // (The same build on the server: a dropped connection, not a deploy. One failure is tried again at once (no reload: stale.test.ts);
+    // the try again fails too, refused here, or in Chromium 141 (CI's) by itself, as it keeps a failed import and fails it again
+    // without asking: the page loads again, keeping Boss Battle. Until Nov 25 the first failure loaded the page again, back to home;
+    // on #942's first fix the second stuck on "Couldn't load the game.")
+    let loads = 0;
+    page.on("request", (r) => r.isNavigationRequest() && r.frame() === page.mainFrame() && loads++);
+    let refused = 0;
+    await page.route(/\/assets\/openings-[^/]*\.js$/, (r) => (loads === 1 ? (refused++, r.fulfill({ status: 500, body: "" })) : r.continue()));
+    await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
+    const reloaded = page.waitForEvent("framenavigated", { predicate: (f) => f === page.mainFrame(), timeout: 30_000 });
+    await openSoloBoss(page);
+    // (The new page, not the old one's last frame: START tapped as it unloads goes nowhere.)
+    await reloaded;
+    await page.waitForLoadState("load");
+    await expect(page.getByRole("heading", { name: "Boss Battle", exact: true }), "back on Boss Battle, not home").toBeVisible();
+    await page.getByRole("main").getByRole("button", { name: "START" }).click({ timeout: 20_000 });
+    await expect(page.locator(".results h1")).toHaveText("Defeat", { timeout: 120_000 });
+    expect(refused, "the first page's loads refused").toBeGreaterThan(0);
+    expect(loads, "the page loaded again once").toBe(2);
   });
 });
 
