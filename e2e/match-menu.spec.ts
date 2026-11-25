@@ -68,7 +68,7 @@ test("the gear: a gear at the same 36 px box as before; it opens a list in the m
   await page.keyboard.press("Escape");
 });
 
-test("a computer's title line: the gear sits where the sound button and the flag were; no flag, sound button or separate bug button; its list has every row", async ({ page }) => {
+test("a computer's title line: no flag, sound button or separate bug button; the 50 v 50's gear atop the column beside the board; its list has every row", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   test.skip(phone(), "a computer's title line");
   await matchAt(page);
@@ -77,11 +77,14 @@ test("a computer's title line: the gear sits where the sound button and the flag
   await expect(page.getByRole("button", { name: "Report a bug" })).toHaveCount(0);
   const gear = page.locator(".hud-row").getByRole("button", { name: "Match options" });
   await expect(gear).toHaveCount(1);
-  // (b) At the right end of the title line, over the board's column.
-  const [gb, title, board] = await Promise.all([gear.boundingBox(), page.locator(".hud-row > .hud").boundingBox(), page.locator(".board-area").first().boundingBox()]);
+  // (b) The 50 v 50's frame (Eric, Nov 26, his approved mock): the title line is the labeled top row on the board, and the gear is the column's,
+  // at the right end of its first line, beside the power-ups row and level with it, after the title. (Was: at the title line's right end,
+  // over the board's column.)
+  const [gb, title, board, row] = await Promise.all([gear.boundingBox(), page.locator(".hud-row > .hud").boundingBox(), page.locator(".board-area").first().boundingBox(), page.locator(".screen.game .history-nav").first().boundingBox()]);
   expect(gb!.x, "after the title").toBeGreaterThanOrEqual(title!.x + title!.width - 1);
-  expect(Math.abs(gb!.y + gb!.height / 2 - (title!.y + title!.height / 2)), "on the title's line").toBeLessThanOrEqual(2);
-  expect(gb!.x + gb!.width, "over the board's column").toBeLessThanOrEqual(board!.x + board!.width + 1);
+  expect(gb!.x, "in the column beside the board").toBeGreaterThanOrEqual(board!.x + board!.width);
+  expect(Math.abs(gb!.y + gb!.height / 2 - (row!.y + row!.height / 2)), "level with the power-ups row").toBeLessThanOrEqual(1);
+  expect(Math.abs(gb!.x + gb!.width - (row!.x + row!.width)), "at its right end").toBeLessThanOrEqual(1);
   // (c) Its list: the centered card, with Sound, Animations, Motion trail (a crowd match), Resign or Leave, Report a bug.
   await gear.click();
   const list = page.getByRole("dialog", { name: "Match options" });
