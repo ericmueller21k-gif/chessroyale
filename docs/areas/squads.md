@@ -518,7 +518,7 @@ door's look; every class is `sq-`.
   round sit at the column's top, the replay button and the gear at its right end; a test lobby's "Next round" sits at the strip's left
   end. The column: the tiny boards (two matches a row) on the board's top line, then the panel, a standing box to the board's foot
   (`board-foot.ts`). The panel holds your pick or vote, a gray "Waiting…" (`SlotIdle`) while there's nothing to pick, the rules line,
-  and a Relay's turn order (its rows scroll inside it). The standings: "Squads · team clocks" in the strip, their rows in a box from the
+  and a Relay's turn order (at its top, its own height, so it's one size on every board whatever else the panel shows). The standings: "Squads · team clocks" in the strip, their rows in a box from the
   board's top to its foot (`.sq-standings-rows`, no box elsewhere), scrolling inside it where they're taller (Eric's laptop). The votes
   use the 50 v 50's vote frame (`VoteScreen frame`): its title is the top row, its line and cards are in the column, and then the
   lobby's votes (`VoteSteps`) run to the board's foot. Squads has no chat. Guard: `e2e/desktop-board.spec.ts`, "Eric's column rule…"

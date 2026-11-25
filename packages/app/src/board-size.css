@@ -407,7 +407,7 @@
  * one bottom line, the 50 v 50's one gap (`--cf-gap`) either side of the board, the board's box on its drawing step. No title line: the board
  * line ("Board 2 · starting soon", the line over the board) is the top strip, centered on the board; the score and round at the column's top
  * with the replay button and the gear at its right end, level with it. The column: the tiny boards on the board's top line, then the panel
- * (your pick or vote, a gray "Waiting…" when there's none; a Relay's turn order) to the board's foot (board-foot.ts measures it, as the 50 v
+ * (your pick or vote, a gray "Waiting…" when there's none; a Relay's turn order at its top, its own size) to the board's foot (board-foot.ts measures it, as the 50 v
  * 50's chat). The board's lines are the 50 v 50's: its squares' top, and their foot with the clock's bar under them. The move arrows and
  * both squads' clocks stay under the board. A phone, a tablet and a computer under 1100 px are unchanged. */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
@@ -492,21 +492,6 @@
   }
   .screen.game.sq-game > .sq-panel > .waiting-banner.slot-idle {
     height: 56px;
-  }
-  /* (A Relay: its turn order the rest of the column, its rows scrolling inside it.) */
-  .screen.game.sq-game > .sq-panel > .sq-island-slot {
-    flex: 1 1 0;
-    display: grid;
-  }
-  .screen.game.sq-game > .sq-panel .sq-island,
-  .screen.game.sq-game > .sq-panel .sq-to {
-    display: grid;
-    height: 100%;
-  }
-  .screen.game.sq-game > .sq-panel .sq-to-list {
-    height: 100%;
-    overflow-y: auto;
-    overscroll-behavior: contain;
   }
   /* The standings: "Squads · team clocks" in the strip, then their rows' box from the board's top to its foot (board-foot.ts), the rows
      scrolling inside it where they're taller (Eric's laptop), as the column's panel. */
