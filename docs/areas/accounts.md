@@ -75,6 +75,18 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   `moves` and its XP (`xp_before`, `xp_parts`, `xp_none`); a solo game is timed by the server between `POST /api/xp/solo/start` and its
   `POST /api/results` (table `solo_games`); a solo result it never timed earns nothing, a solo win needs 5 of its minutes, and solo time
   XP is capped at `XP.soloMinutesPerDay` (120) minutes an XP day. A friends' lobby's win pays once an XP day per opponent. A match that rested on one device's word (Nov 10: a host scoring alone, a boss move nobody checked; a Squads lobby of one party) pays as a solo game, under both solo caps; in the Hidden Boss's phase 2 online, a move of his from a device or the server's quick move does so for its board players only (`phase2Unvouched`, Nov 13). Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
+- **Play coins** (Nov 25; [2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md); the rules in core's `play-coins.ts`
+  `gameCoins`, the numbers `PLAY_COINS`; the payments design's section 6): every counted game pays coins with its XP, in `grantXp`'s
+  own batch (`server/play-coins.ts`): `coins:<game>:<ledger id>` (reason `play`: 1.8 of XP's minutes, at least 1 online, until the XP
+  day's 300) and `coinsbonus:<game>:<ledger id>` (reason `play-bonus`: a win 15, a ranked draw 5, a 50 v 50 team's top 3 +10, Squads
+  40/25/15/5, by the day's steps: full to 150 earned, half to 350, a quarter to 550, none past; 600 a day at most). Each op's guard
+  reads the XP day's totals in the same statement (the ledger's own sums, from `xpDayStart`, no table of their own), the play op the
+  day's 300, the bonus op the day's paid bonus as read and, with a win, XP's win op (its friends'-lobby rule); one refused (a game
+  landing at the same moment) is worked out again and tried alone (3 times). XP's eligibility, plus none while fair play holds the
+  player (review or banned: `held`). Solo (and an online game on one device's word): the minutes XP paid under its solo cap, no
+  minimum, no bonus. The grant answers `XpGrant.coins` (core's `PlayCoins`: play, bonus, the bonus's parts as earned, the step, the
+  day's totals, or why none) and the result row keeps it (`results.coins`, JSON; NULL before Nov 25 and while rewards are paused), so
+  `GET /api/xp` answers it. Ranked's own coins and Squads' placement coins are gone ([ranked.md](ranked.md), [squads.md](squads.md)).
 - **The daily reward and level rewards** (Nov 9, phase 2; `server/rewards.ts`, decisions `2026-11-09-xp-phase2-*.md`): the XP day's first
   counted game with `XP.dailyMinMoves` (15) of your own moves (solo: also 3 minutes of the server's time) pays +200 XP ("Daily reward
   +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`). Every other level reached (2, 4, 6, …; `XP.levelRewardEvery`, since Nov 20's levels of 500) pays a Winter Crate and a crate key
@@ -95,9 +107,9 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   win only when its win XP went in), so each quest pays once. Its XP is a part of the box ("Quest +300") and can level you up; the quests are in
   the result's rewards (`XpRewards.quests`). Nothing while `PAUSE_REWARDS` is on. A guest's merge drops the guest's quests; deleting removes
   them; the download has them (store `quests`). The screens: [hub.md](hub.md) (the overlay opens by itself at most once per 12 hours after a close, `QUESTS.autoOpenGapHours`, Nov 24).
-- **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
-  coins into `wallets.coins`, crates (Winter Crates since Nov 9, in `series_crates`; before, counted in `wallets.crates`), both carried over
-  when a guest signs in (`grantReward`).
+- **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward: crates (Winter
+  Crates since Nov 9, in `series_crates`; before, counted in `wallets.crates`), carried over when a guest signs in (`grantReward`). Its
+  coins since Nov 25 are play coins and the placement's bonus, with its XP (above).
 - **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play review
   page (chat moderation included), the boss battle's "Trigger ultimate (testing)" button, and the test switches in the
   address (`?debug`, `?rounds=`, …; [ops.md](ops.md), "Test switches").
@@ -232,6 +244,11 @@ offered, how long each answer lasts).
 - Quests: `packages/core/test/quests.test.ts` (what counts, the pool, seeded picks, the cap, countdowns, the toast's lines),
   `packages/server/test/quests.test.ts` (dealing, resets, carry-over, the reroll, progress per mode, paid once under replays and races,
   the weekly, the pause, merge, download and delete, the API); `e2e/quests.spec.ts`.
+- Play coins: `packages/core/test/play-coins.test.ts` (each rule, the steps, the day's 300, the 600 ceiling, solo, the reasons for none,
+  the stored JSON), `packages/server/test/play-coins.test.ts` (once, replays and races, the day's caps with games at once, the XP day's
+  boundary, held, the bonus's facts and the friends' lobby rule, the 50 v 50 scoreboard's top places), coins in `xp.test.ts`,
+  `ledger.test.ts`, `ledger-do.test.ts` (a Squads lobby's, once after D1 was down), `duel-do.test.ts`; `e2e/xp.spec.ts` (a counted solo
+  game's 22). The report: `npx tsx packages/sim/scripts/coin-report.ts` → `reports/coin-report.md`.
 - XP: `packages/core/test/xp.test.ts` (the rules, the fill), `packages/server/test/xp.test.ts` (granted once, races, the caps, each "No
   XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); your own moves counting God King
   turns: `packages/app/test/tower-keep.test.ts` (solo) and `packages/server/test/boss-powers-lobby.test.ts` (online); `e2e/xp.spec.ts`.

@@ -13,6 +13,15 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Light the free starter) and chat packs (not equipped: you use every pack you own). Prices in coins (God King effects `SHOP.godKing`, 300-400; chat packs `QUICK_CHAT.packPrices`, 100-150; both since Nov 18); `SHOP_FREE` is
   on (its items are free: "Get · Free"; the "free while we test" note is gone since Nov 9). The pawn hats it used to sell are Beta crate items now (Oct 11, 2026); the shop
   is kept for God King packs and, later, things like boss and attack animations.
+- **Earning coins: play coins** (Nov 25; [2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md); the payments design's
+  section 6, PR 2 of its build): every counted game pays coins with its XP, the same rules and the same batch (`PLAY_COINS` in
+  settings.ts, core's `play-coins.ts`, server `play-coins.ts` via `xp.ts grantXp`; the storage and guards: [accounts.md](accounts.md),
+  "Play coins"). 1.8 a counted minute (at most 54 a game) until 300 an XP day; a bonus past that for a win 15, a ranked draw 5, a
+  50 v 50 team's top 3 +10, Squads 1st 40, 2nd 25, 3rd-4th 15, 5th-8th 5, paid by the day's steps (full, half, a quarter, none past
+  550 earned): 600 a day at most. Solo: the minutes XP paid under its solo cap, no bonus. Ranked's and Squads' own coins are gone (Squads'
+  crates stay). Where a result already said its coins (the ranked end page's line, Squads' placement line) it says these; the coin
+  reward strip under the XP box is PR 3. The day's table by player and hours: `reports/coin-report.md`
+  (`npx tsx packages/sim/scripts/coin-report.ts`, from the settings). The FAQ's "Coins" (in "XP and levels") follows the settings.
 - **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
   coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
   at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
@@ -280,6 +289,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Crate page, the opening's flow (`CrateOpening`), reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
 | Boss tokens, crate keys, the boss crate purchase, solo battles, admins' grants | `packages/server/src/boss-tokens.ts`; rules `packages/core/src/boss-tokens.ts`; the crates `BOSS_CRATES` in `crates.ts` |
+| Play coins: the rules (`gameCoins`, the steps); the grant beside XP's; the report | `packages/core/src/play-coins.ts`; `packages/server/src/play-coins.ts`, `xp.ts`; `packages/sim/scripts/coin-report.ts` → `reports/coin-report.md` |
 | The ledger: the only writer of coins, crates, keys, tokens, shop items, items, boss crates and Welcome Crates, each change an op with its legs, append-only (Nov 6; a buy, an open or a grant keyed by the app's request id, so its retry applies once; an open's every attempt answers the item as stored, never its own roll) | `packages/server/src/ledger.ts`; `docs/decisions/2026-11-06-ledger.md`, `2026-11-06-ledger-2.md` |
 | The token pictures, the inventory's tokens, the result box | `packages/app/src/components/tokens/`, `TokenArt.tsx`, `TokenBox.tsx`; `boss-tokens.ts` (the app's asking); `screens/Crates.tsx` (`TokenStock`, `AdminGrants`) |
 | Boingo's claw machine (the play, its log `claw_plays`; the app's machine, flow and sounds) | `packages/server/src/claw.ts`; `packages/app/src/claw/` (`index.ts`: `openClawMachine`; `flow.ts`; `ClawMachine.tsx`; `sounds.ts`) |
@@ -291,7 +301,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 
 `crates.ts` (`ITEM_DEFS`, `CRATES`, `BOSS_CRATES`, `ITEM_COLORS`, `PURITY_BANDS`), `XP` (the crates and keys a level and the daily
 reward give, `rewardCrate`), `BOSS_TOKENS` and
-`BOSS_CRATE_PRICE` and `SHOP` (the Shop page's discount, prices, limited items, the bundle's Mythic chance) in settings.ts, `shop.ts` (`SHOP_ITEMS`,
+`BOSS_CRATE_PRICE` and `SHOP` (the Shop page's discount, prices, limited items, the bundle's Mythic chance) and `PLAY_COINS` (what play pays: Nov 25) in settings.ts, `shop.ts` (`SHOP_ITEMS`,
 `SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts. `CRATE_BONUS.chance` (settings.ts): an opening's chance of a
 bonus crate (0.25, Nov 24). `CRATE_OPEN.spinMs` (settings.ts): how long the crate opening's strip
 spins (4 s, Nov 24); its other beats are in `crate-open/timeline.ts`.
@@ -316,6 +326,9 @@ spins (4 s, Nov 24); its other beats are in `crate-open/timeline.ts`.
   window's first place, which boss, guests where sign-in is set up, 10 moves / 5 minutes, solo timed by the server and counted once,
   the match room's count of picks, buying both ways, not enough, twice at once, admins' grants admin-only, a guest's sign-in), `admin-copies.test.ts` (admins own one of every item, a ride too), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
+- Play coins (Nov 25): unit `packages/core/test/play-coins.test.ts`, `packages/server/test/play-coins.test.ts`,
+  `packages/app/test/squads-reward-line.test.ts`; the FAQ's words `packages/app/test/faq.test.ts`; e2e `e2e/xp.spec.ts` (a counted solo
+  game's coins). The full list: [accounts.md](accounts.md), "Tests".
 - Unit (Nov 6): `packages/server/test/ledger.test.ts` (an op replayed or raced applies once; each path's key; a 500-op reconciliation with merges and deletes; append-only; each request id replayed; an open raced at each step, held by the test's SQL wrapper, answers one stored item byte for byte; the backfill twice is once; the static guard: no balance write outside `ledger.ts`, the claw's TODO); `ledger-do.test.ts` (a match room stopped between D1 and its storage drops once; Squads retried).
 - Unit (Nov 9): `packages/server/test/rewards.test.ts` (a crate's open takes the crate and a key, refused without, two at once with one
   key; old crates to Winter; the boss crate pick); e2e `e2e/xp-rewards.spec.ts` (the Crates tab after a level-up, in the inventory layer over the end screen since Nov 22, an open, the padlock,
