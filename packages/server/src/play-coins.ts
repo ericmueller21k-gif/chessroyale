@@ -1,6 +1,6 @@
 import { PLAY_COINS, XP, bonusMax, bonusStep, coinParts, gameCoins, type CoinDay, type CoinGame, type CoinResult, type GameXp, type PlayCoins } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
-import { applyOp, cond, leg, type LedgerAccount, type Op } from "./ledger.ts";
+import { applyOp, cond, leg, type Cond, type LedgerAccount, type Op } from "./ledger.ts";
 
 /**
  * Play coins on the server (Nov 25; core's play-coins.ts has the rules, PLAY_COINS the numbers; the payments design's section 6;
@@ -13,19 +13,38 @@ import { applyOp, cond, leg, type LedgerAccount, type Op } from "./ledger.ts";
  *   - `coinsbonus:<game>:<ledger id>` (reason "play-bonus"): the game's bonus after the day's steps. Its guard: the XP day's paid bonus
  *     is still what this game's share was worked out from (equal, in the same statement), and, with a win, that the XP win op is there
  *     (XP's win rules, its friends'-lobby once-a-day included).
+ *   - Both: not a game the code before Nov 25 paid coins for already (`oldCoins`: a deploy between its two writes; the review's m3).
  * An op its guard refused (another game of the account's landed between the read and the write, or the win wasn't paid) is worked
- * out again from the ledger as it stands and tried alone, up to RETRIES times, the last held to the day's ceilings only (then logged). The day's totals are the ledger's own, from the XP day's
- * start (core's xpDayStart) to its end: no table of their own.
+ * out again from the ledger as it stands and tried alone: up to STRICT tries in all with the guards above, then one with the bonus held
+ * to the day's ceiling only (then logged). So the day never passes its 300 and 300; in a burst of many games of one account at once,
+ * some may be paid at an earlier step and the last ones may get nothing (the review's m1). The day's totals are the ledger's own, from
+ * the XP day's start (core's xpDayStart) to its end: no table of their own.
  */
 
 /** The ledger reasons of play coins and their bonus (the day's totals sum these). */
 export const PLAY = "play";
 export const PLAY_BONUS = "play-bonus";
 const DAY_MS = 86_400_000;
-const RETRIES = 3;
+/** The tries with the strict guards (the game's batch and the retries after it), before the last, loose one. */
+const STRICT = 4;
 
 /** A game's coin ops' keys. */
 export const coinOpIds = (key: string, account: string) => ({ play: `coins:${key}:${account}`, bonus: `coinsbonus:${key}:${account}` });
+
+/**
+ * The coins the code before Nov 25 paid for this game, if it could have: ranked's own op (`ranked:<duel id>:<color>`, a color each) or
+ * the Squads reward op's coins leg (`squads:<code>:<created>:<ledger id>`; its crates leg is the new code's too, so only a coins leg
+ * says the old code paid). A game half-written by the old code at a deploy (its coins in, the room's note that they were lost) is
+ * then never paid twice: the coin ops' guards need this not there (the review's m3). Null: a game the old code paid no coins for.
+ */
+export function oldCoins(key: string, account: string): Cond | null {
+  if (key.startsWith("duel:")) {
+    const id = key.slice("duel:".length);
+    return cond("NOT EXISTS (SELECT 1 FROM ledger WHERE op_id IN (?, ?) AND account = ?)", `ranked:${id}:w`, `ranked:${id}:b`, account);
+  }
+  if (key.startsWith("squads:")) return cond("NOT EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND asset_kind = 'coins')", `${key}:${account}`);
+  return null;
+}
 
 /** The XP day's sum of one reason's coins, in SQL (its parameters: the ledger id, the day's start and end). */
 const daySum = (reason: string) =>
@@ -68,38 +87,54 @@ export function coinsFor(p: CoinPlan, day: CoinDay, timeXp: number, winPaid: boo
   return gameCoins(g, day);
 }
 
+/** Two conditions, both. */
+const both = (a: Cond, b: Cond | null): Cond => (b ? cond(`${a.sql} AND ${b.sql}`, ...a.params, ...b.params) : a);
+
+/** How a game's coin ops are tried: which (both by default), with what win, and whether this is the last, loose try. */
+export interface CoinTry {
+  /** The win the coins were worked out with (coinsFor's `winPaid`): the bonus op then needs XP's win op there (the review's n6). */
+  won: boolean;
+  play?: boolean;
+  bonus?: boolean;
+  /** The last try: the bonus is held to the day's ceiling only (bonusMax), not to the paid bonus as read. */
+  loose?: boolean;
+}
+
 /**
  * The game's coin ops for `c` (worked out against `day`): only those that pay. Their guards are the module comment's; `loose` (the last
- * retry) holds the bonus to the day's ceiling only (bonusMax), not to the paid bonus as read: a game is never starved by others landing
- * at once, at the cost of a coin or two off the steps' curve, and the day still never passes its 300.
+ * try) holds the bonus to the day's ceiling only, so a game isn't refused for good by others landing at once; the day still never
+ * passes its 300, but its share is then the step as read, maybe an earlier one (the review's m1).
  */
-export function coinOps(me: LedgerAccount, p: CoinPlan, c: PlayCoins, day: CoinDay, which: { play?: boolean; bonus?: boolean } = { play: true, bonus: true }, loose = false): Op[] {
+export function coinOps(me: LedgerAccount, p: CoinPlan, c: PlayCoins, day: CoinDay, t: CoinTry): Op[] {
   const ids = coinOpIds(p.key, me.account);
   const end = p.day + DAY_MS;
+  const old = oldCoins(p.key, me.account);
   const ops: Op[] = [];
-  if (which.play && c.play > 0) {
+  if (t.play !== false && c.play > 0) {
     const time = p.solo ? ` AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)` : "";
     ops.push({
       id: ids.play,
       reason: PLAY,
       now: p.now,
-      when: cond(`${daySum(PLAY)} + ? <= ?${time}`, me.account, p.day, end, c.play, PLAY_COINS.perDay, ...(p.solo ? [p.timeOp] : [])),
+      when: both(cond(`${daySum(PLAY)} + ? <= ?${time}`, me.account, p.day, end, c.play, PLAY_COINS.perDay, ...(p.solo ? [p.timeOp] : [])), old),
       legs: [leg.coins(me.user, c.play, p.key)],
     });
   }
-  if (which.bonus && c.bonus > 0) {
-    const won = c.parts.some((x) => x.label === "Win");
+  if (t.bonus !== false && c.bonus > 0) {
     ops.push({
       id: ids.bonus,
       reason: PLAY_BONUS,
       now: p.now,
-      when: cond(
-        `${daySum(PLAY_BONUS)} ${loose ? "+ ? <=" : "="} ?${won ? ` AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)` : ""}`,
-        me.account,
-        p.day,
-        end,
-        ...(loose ? [c.bonus, bonusMax()] : [day.bonus]),
-        ...(won ? [p.winOp] : []),
+      when: both(
+        cond(
+          `${daySum(PLAY_BONUS)} ${t.loose ? "+ ? <=" : "="} ?${t.won ? ` AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)` : ""}`,
+          me.account,
+          p.day,
+          end,
+          ...(t.loose ? [c.bonus, bonusMax()] : [day.bonus]),
+          ...(t.won ? [p.winOp] : []),
+        ),
+        old,
       ),
       legs: [leg.coins(me.user, c.bonus, p.key)],
     });
@@ -127,25 +162,30 @@ async function xpPaidOf(sql: Sql, p: CoinPlan): Promise<{ timeXp: number; winPai
 
 /**
  * After the game's batch (its coin ops `tried` beside its XP ops): what its coins paid. An op its guard refused is worked out again
- * from the ledger as it stands and applied alone (RETRIES times at most; then it pays nothing). Answers the game's coins as the
- * ledger has them, the parts as earned (the win only if XP paid it) and the day's totals now.
+ * from the ledger as it stands and applied alone: the batch and STRICT - 1 retries with the strict guards, then one loose try (then it
+ * pays what went in, logged). A game the old code paid coins for (oldCoins) isn't tried again. Answers the game's coins as the ledger
+ * has them, the parts as earned (the win only if XP paid it) and the day's totals now. A D1 failure throws (the callers try the whole
+ * grant again: every op in it is keyed, so it pays once).
  */
 export async function settleCoins(sql: Sql, me: LedgerAccount, p: CoinPlan, tried: readonly Op[]): Promise<PlayCoins> {
   const ids = coinOpIds(p.key, me.account);
+  const old = oldCoins(p.key, me.account);
   let paid = await paidOf(sql, me, p.key);
   for (let i = 0; ; i++) {
     const play = tried.some((o) => o.id === ids.play) && paid.play === null;
     const bonus = tried.some((o) => o.id === ids.bonus) && paid.bonus === null;
     if (!play && !bonus) break;
+    // (Paid by the code before Nov 25: refused for that, and always will be.)
+    if (i === 0 && old && !(await sql.first<{ ok: number }>(`SELECT ${old.sql} AS ok`, ...old.params))?.ok) break;
     const x = await xpPaidOf(sql, p);
     const day = await coinDayOf(sql, me.account, p.day);
-    // (The last retry's bonus guard is the day's ceiling only: never starved.)
-    const ops = coinOps(me, p, coinsFor(p, day, x.timeXp, x.winPaid), day, { play, bonus }, i >= RETRIES - 1);
+    // (The last try's bonus guard is the day's ceiling only.)
+    const ops = coinOps(me, p, coinsFor(p, day, x.timeXp, x.winPaid), day, { won: x.winPaid, play, bonus, loose: i >= STRICT - 1 });
     if (!ops.length) break;
-    if (i === RETRIES) {
+    if (i === STRICT) {
       // (Still refused: another of the account's games kept landing between the read and the write, and took the day's ceiling. It
       // pays what went in.)
-      console.log(`coins for ${p.key}: ${ops.map((o) => o.id.split(":")[0]).join(", ")} refused ${RETRIES + 1} times`);
+      console.log(`coins for ${p.key}: ${ops.map((o) => o.id.split(":")[0]).join(", ")} refused ${STRICT + 1} times`);
       break;
     }
     for (const op of ops) await applyOp(sql, me, op);

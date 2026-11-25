@@ -33,6 +33,9 @@ export function memoryDb() {
     }
   }
   const stmt = (q: string, params: unknown[] = []) => ({
+    // (What it runs, for a test's fake failures: a batch of one kind failing, say.)
+    sql: q,
+    params,
     bind: (...p: unknown[]) => stmt(q, p),
     run: async () => (db.prepare(q).run(...(params as never[])), { success: true }),
     first: async () => db.prepare(q).get(...(params as never[])) ?? null,

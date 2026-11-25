@@ -66,11 +66,20 @@ async function runtime(envExtra: Record<string, string> = {}) {
   await ensureSchema(sql);
   const ann = (await createGuest(sql, T0, "Ann")).user;
   const bob = (await createGuest(sql, T0, "Bob")).user;
-  const slow = { hang: false, fail: null as ((e: Error) => void) | null, down: false };
+  const slow = { hang: false, fail: null as ((e: Error) => void) | null, down: false, xpFails: 0 };
   const db = new Proxy(d1 as object, {
     get(t, k) {
       // (`down`: every batch fails at once, as in a D1 outage.)
       if (k === "batch" && slow.down) return () => Promise.reject(new Error("D1 is down"));
+      // (`xpFails`: the next that many XP grants' batches (their ops keyed "xp:duel:…", "coins:duel:…" and so on) fail; the rest go in.)
+      if (k === "batch" && slow.xpFails > 0)
+        return (stmts: { params?: unknown[] }[]) => {
+          if (slow.xpFails > 0 && stmts.some((s) => s.params?.some((p) => typeof p === "string" && /^(xp|xpwin|coins|coinsbonus):duel:/.test(p)))) {
+            slow.xpFails--;
+            return Promise.reject(new Error("D1_ERROR: Network connection lost."));
+          }
+          return (d1.batch as (s: unknown[]) => Promise<unknown>)(stmts);
+        };
       if (k === "batch" && slow.hang)
         return () =>
           new Promise((_, reject) => {
@@ -189,6 +198,63 @@ describe("the 1 v 1 game object", () => {
     expect(w.last("outcome")!.outcome.xp).toEqual({ before: 0, after: 0, levelBefore: 1, levelAfter: 1, parts: [], coins: { play: 1, bonus: 0, parts: [], step: null, today: { play: 1, bonus: 0 } } });
     expect(w.last("outcome")!.outcome.coins).toBe(1);
     expect(await xpOf(d1Sql(rt.d1), rt.bob.id)).toBe(50);
+  });
+
+  it("XP and its coins when D1 fails (Nov 25, the review's M1): a grant refused once is tried again at once and pays once; one still failing keeps the ranks, and the room's next try pays it, never recording the game twice", async () => {
+    // (Two hours before T0: a failed recording reports itself to the ops page, whose module keeps when it last wrote; later tests, at
+    // T0, then find that long past and write at once, never on a timer these fake timers hold.)
+    const base = T0 - 2 * 3_600_000;
+    /** A game of 10 moves each, White resigning (Black's win: 50 XP, 1 play coin and the win's 15). */
+    const play = async (rt: Awaited<ReturnType<typeof runtime>>, code: string) => {
+      vi.setSystemTime(base);
+      const game = await rt.make();
+      await game.create(code, { w: (await duelEntrant(d1Sql(rt.d1), rt.ann)).player, b: (await duelEntrant(d1Sql(rt.d1), rt.bob)).player });
+      const w = rt.socket("w", rt.ann.id);
+      const b = rt.socket("b", rt.bob.id);
+      await game.webSocketMessage(w as never, JSON.stringify({ t: "hello", v: DUEL_PROTOCOL }));
+      await game.webSocketMessage(b as never, JSON.stringify({ t: "hello", v: DUEL_PROTOCOL }));
+      for (const t of [base + RANKED_1V1.versusMs + RANKED_1V1.voteSeconds * 1000, base + RANKED_1V1.versusMs + RANKED_1V1.voteSeconds * 1000 + RANKED_1V1.overlayMs]) {
+        vi.setSystemTime(t);
+        await game.alarm();
+      }
+      const line = "e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 d2d3 f8c5 c2c3 d7d6 b1d2 e8g8 e1g1 a7a6 a2a4 c8e6 f1e1 h7h6 h2h3 f8e8".split(" ");
+      for (const [i, m] of line.entries()) {
+        vi.setSystemTime(Date.now() + 1000);
+        await game.webSocketMessage((i % 2 ? b : w) as never, JSON.stringify({ t: "move", uci: m, ply: i }));
+      }
+      await game.webSocketMessage(w as never, JSON.stringify({ t: "resign" }));
+      await rt.settle();
+      return { game, w, b };
+    };
+    const coins = async (rt: Awaited<ReturnType<typeof runtime>>, uid: string) => (await d1Sql(rt.d1).first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", uid))?.coins ?? 0;
+    // Once: White's first grant fails; tried again at once, it goes in. Each side paid once.
+    const once = await runtime();
+    once.slow.xpFails = 1;
+    const a = await play(once, "FGHJK");
+    expect(once.slow.xpFails).toBe(0);
+    expect(a.b.last("outcome")!.outcome).toMatchObject({ coins: 16, xp: { after: 50 } });
+    expect(a.w.last("outcome")!.outcome).toMatchObject({ coins: 1 });
+    expect([await coins(once, once.bob.id), await coins(once, once.ann.id), await xpOf(d1Sql(once.d1), once.bob.id)]).toEqual([16, 1, 50]);
+    // Three times in a row (all its tries): no outcome yet, the ranks kept on the room's record; the alarm's try goes on from them.
+    const rt = await runtime();
+    rt.slow.xpFails = 3;
+    const { game, w, b } = await play(rt, "FGHJK");
+    expect(w.last("outcome")).toBeUndefined();
+    const stored = rt.store.get("game") as { outcomes: unknown; ranks?: Record<"w" | "b", { change: { before: { label: string }; after: { label: string } } }> };
+    expect(stored.outcomes).toBeNull();
+    expect(stored.ranks!.b.change.after.label).toBe("Placement 1/5");
+    expect(await duelGamesOf(d1Sql(rt.d1), rt.ann.id)).toHaveLength(1);
+    vi.setSystemTime(rt.alarm!);
+    await game.alarm();
+    await rt.settle();
+    // (Its outcome as first recorded: the rank it moved from and to, not "as it stands"; the game recorded once; each side paid once.)
+    const out = b.last("outcome")!.outcome;
+    expect(out).toMatchObject({ coins: 16, xp: { after: 50 }, change: { after: { label: "Placement 1/5" } } });
+    expect(out.change!.before.label).not.toBe(out.change!.after.label);
+    expect(w.last("outcome")!.outcome).toMatchObject({ coins: 1 });
+    expect(await duelGamesOf(d1Sql(rt.d1), rt.ann.id)).toHaveLength(1);
+    expect((await rankedRecordOf(d1Sql(rt.d1), rt.bob.id)).record).toMatchObject({ games: 1, wins: 1 });
+    expect([await coins(rt, rt.bob.id), await coins(rt, rt.ann.id), await xpOf(d1Sql(rt.d1), rt.bob.id)]).toEqual([16, 1, 50]);
   });
 
   it("Cancel just as it paired (abandon): called off before anyone arrives, nothing recorded; a stranger can't", async () => {

@@ -261,6 +261,12 @@ export interface XpGame {
    * placement. The server's own, as the rest. Absent: none (a win still pays its bonus).
    */
   coin?: Omit<CoinResult, "won">;
+  /**
+   * The game's coins rest on one device's word though XP's cap isn't solo's (Nov 25, the review's m2: a Squads squad whose bots only
+   * its own party's devices moved, SquadsRecord.unvouched): its play coins by the solo rule (the minutes XP paid, no minimum of 1, no
+   * bonus), as every other game on one device's word (docs/decisions/2026-11-25-play-coins.md, call 5). XP keeps its own rules.
+   */
+  soloCoins?: boolean;
 }
 
 const newId = (bytes = 9) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -347,7 +353,8 @@ async function winCap(sql: Sql, account: string, game: XpGame, day: number): Pro
 
 /**
  * A finished game's XP for one player: decided by the rules (core's gameXp) from the server's facts, and granted through the ledger
- * once. Answers what the result screen shows. Null: no such account (deleted mid-match). A failed write throws.
+ * once. Answers what the result screen shows. Null: no such account (deleted mid-match). A failed write throws, and so does a failure
+ * settling its coins after the batch (the review's M1): a caller tries the whole grant again, and it pays once (every op is keyed).
  *
  * A solo game's time XP is capped at XP.soloMinutesPerDay minutes an XP day (review M2, Nov 9): its leg's source is "solo", what's
  * left today is read first and paid (the parts say "Daily solo limit" if that trimmed it), and the guard checks the day's sum again
@@ -387,10 +394,10 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   };
   // (Play coins, Nov 25: worked out as if this batch's time and win ops go in; their guards check that they did, and the day's
   // coins in the same statement. One refused is worked out again after the batch: play-coins.ts settleCoins.)
-  const plan: CoinPlan = { key: game.key, now: game.now, day, xp: g, solo, held: !!who.held, result: game.coin ?? {}, timeOp: time.id, winOp: win.id };
+  const plan: CoinPlan = { key: game.key, now: game.now, day, xp: g, solo: solo || !!game.soloCoins, held: !!who.held, result: game.coin ?? {}, timeOp: time.id, winOp: win.id };
   const coinDay = await coinDayOf(sql, me.account, day);
   const coins0 = coinsFor(plan, coinDay, timeXp, g.win > 0);
-  const coinsTried = coins0.none ? [] : coinOps(me, plan, coins0, coinDay);
+  const coinsTried = coins0.none ? [] : coinOps(me, plan, coins0, coinDay, { won: g.win > 0 });
   const nonces = new Map<Op, string>();
   for (const op of [time, win, ...(daily ? [daily] : []), ...coinsTried]) if (op.legs.length) nonces.set(op, newId());
   // (Quests, phase 3: this game's progress and any quest it completes, in the same batch, after the win op: a win quest moves only if
@@ -428,18 +435,12 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
     ...(questXp ? [{ label: questPartLabel(done.length), xp: questXp }] : []),
   ];
   const gained = parts.reduce((s, p) => s + p.xp, 0);
-  // (The coins as the ledger has them: a refused op worked out again. A failure to read them back costs the box its coins line,
-  // never the game's XP, already in.)
-  let coins: PlayCoins | undefined = coins0.none ? coins0 : undefined;
-  if (!coins) {
-    try {
-      coins = await settleCoins(sql, me, plan, coinsTried);
-    } catch (e) {
-      console.error("coins", e);
-    }
-  }
+  // (The coins as the ledger has them: a refused op worked out again. A D1 failure here throws, as the batch's would (the review's M1):
+  // an op refused by a race must be tried again, and the callers try the whole grant again, which pays once: every op is keyed, and
+  // the XP and coins already in answer as they are.)
+  const coins: PlayCoins = coins0.none ? coins0 : await settleCoins(sql, me, plan, coinsTried);
   // (The cap took all of it: say so as the reason, not a box of +0s; its coins too.)
-  if (solo && g.time && !gained) return { ...xpGrant(after?.xp ?? who.xp, [], "limit"), ...(coins ? { coins: coins.play || coins.bonus ? coins : { ...coins, none: "limit" as const } } : {}) };
+  if (solo && g.time && !gained) return { ...xpGrant(after?.xp ?? who.xp, [], "limit"), coins: coins.play || coins.bonus ? coins : { ...coins, none: "limit" as const } };
   // (The levels owed at the XP it reached: paid once each, their legs naming this game, so its result answers them; then this
   // game's rewards as the ledger has them, so a replay answers the same.)
   // (A failure here leaves the levels owed (paid at the next game, never twice) and must not cost the box this game's XP, already in:
@@ -456,7 +457,7 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   } catch (e) {
     console.error("gameRewards", e);
   }
-  return { ...xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts, undefined, rewards), ...(coins ? { coins } : {}) };
+  return { ...xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts, undefined, rewards), coins };
 }
 
 /** A grant as the result row keeps it (results: xp_before, xp_parts, xp_none, xp_rewards, coins). */

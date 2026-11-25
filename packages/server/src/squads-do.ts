@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { SQUADS, SQUADS_LOBBY, modeSettings, pausedLine } from "@chessroyale/core";
+import { MATCH_SAVE, SQUADS, SQUADS_LOBBY, modeSettings, pausedLine } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, PlayerBadge, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
@@ -234,29 +234,24 @@ export class SquadsLobby extends DurableObject<Env> {
     const rec = this.record;
     if (!rec?.rewardQueue.length || !this.env.DB) return true;
     const sql = d1Sql(this.env.DB);
-    let written = 0;
-    let ok = true;
+    let done: Awaited<ReturnType<typeof writeRewardQueue>> = { written: 0, refused: [], failure: null };
     try {
       await ensureSchema(sql, this.env.DB);
       const signedInOnly = signInRequired(await withSecrets(this.env));
-      for (const r of [...rec.rewardQueue]) {
-        const out = await writeReward(sql, rec.code, rec.createdAt, r, Date.now(), signedInOnly, isPaused(this.env, "rewards"));
-        const i = rec.rewardQueue.indexOf(r);
-        if (i >= 0) rec.rewardQueue.splice(i, 1);
-        written++;
-        // (The daily cap took it: kept with the lobby, so a reconnect is told too (m7), and they're told now, in place of the coins.)
-        if (out === "refused") {
-          (rec.capped ??= {})[r.playerId] = true;
-          if (this.record === rec) this.core().rewardCapped(r.playerId);
-        }
-      }
+      done = await writeRewardQueue(sql, rec, signedInOnly, isPaused(this.env, "rewards"));
     } catch (e) {
-      ok = false;
-      console.log(`squads ${rec.code}: ${rec.rewardQueue.length} rewards not written yet, kept to try again (${String(e)})`);
+      done.failure = e;
     }
-    // (Not once the lobby has closed, or a new one has its code. A store that fails: written again next time, paying nothing more.)
-    if (written && this.record === rec) await this.ctx.storage.put("lobby", rec).catch(() => undefined);
-    return ok;
+    // (The daily cap took it: kept with the lobby, so a reconnect is told too (m7), and they're told now, in place of the coins.)
+    for (const id of done.refused) {
+      (rec.capped ??= {})[id] = true;
+      if (this.record === rec) this.core().rewardCapped(id);
+    }
+    if (done.failure) console.log(`squads ${rec.code}: ${rec.rewardQueue.length} rewards not written yet, kept to try again (${String(done.failure)})`);
+    // (Not once the lobby has closed, or a new one has its code. A store that fails: written again next time, paying nothing more. A
+    // failure is stored too: the reward that failed keeps when it first did, its `failedAt`.)
+    if ((done.written || done.failure) && this.record === rec) await this.ctx.storage.put("lobby", rec).catch(() => undefined);
+    return !done.failure;
   }
 
   /** The engine server's verdict on bot work two devices disagreed about. */
@@ -939,17 +934,50 @@ export class SquadsParty extends DurableObject<Env> {
 }
 
 /**
+ * The lobby's rewards waiting (`rewardQueue`), written in order, each taken out once written. The first that fails is marked (its
+ * `failedAt`, the first time) and it and those after it wait for the next try. Answers how many went, the players the daily cap
+ * refused, and the failure (null: none left waiting).
+ */
+export async function writeRewardQueue(
+  sql: Sql,
+  rec: Pick<SquadsRecord, "code" | "createdAt" | "rewardQueue" | "unvouched">,
+  signedInOnly: boolean,
+  paused: boolean,
+): Promise<{ written: number; refused: string[]; failure: unknown }> {
+  let written = 0;
+  const refused: string[] = [];
+  for (const r of [...rec.rewardQueue]) {
+    const now = Date.now();
+    try {
+      const out = await writeReward(sql, rec.code, rec.createdAt, r, now, signedInOnly, paused, !!rec.unvouched?.[r.squadId]);
+      const i = rec.rewardQueue.indexOf(r);
+      if (i >= 0) rec.rewardQueue.splice(i, 1);
+      written++;
+      if (out === "refused") refused.push(r.playerId);
+    } catch (e) {
+      r.failedAt ??= now;
+      return { written, refused, failure: e };
+    }
+  }
+  return { written, refused, failure: null };
+}
+
+/**
  * One reward, written so that writing it again changes nothing: its XP and play coins (keyed by the lobby: server/xp.ts; the
  * placement's bonus, PLAY_COINS.bonus.squads, for someone still in their seat), its results row only if this account has none from
  * this lobby yet (code and creation), the Welcome Crate (once ever), and the crates as a ledger op keyed `squads:<code>:<created>:<ledger
  * id>` (Squads' own placement coins are gone since Nov 25: a reward queued before then pays its crates only). Throws if D1 fails, so the
- * lobby keeps it to try again.
+ * lobby keeps it to try again; its XP and coins (one grant) too, until MATCH_SAVE.strictMinutes after its first failed try (`failedAt`):
+ * then it's written without them (logged), as a 50 v 50 result's are (lobby-do.ts writeResult), so a lasting fault in them never costs
+ * the placement, and a minute or two of D1 trouble never costs the coins (the review's M1). `unvouched`: this squad's bots only its own
+ * party's devices moved (SquadsRecord.unvouched): its coins by the solo rule, no placement bonus (the review's m2).
  */
-export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean, paused = false): Promise<Outcome | null> {
+export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean, paused = false, unvouched = false): Promise<Outcome | null> {
   if (!r.userId) return null;
   if (r.recorded) {
+    const lenient = r.failedAt !== undefined && now - r.failedAt >= MATCH_SAVE.strictMinutes * 60_000;
     // XP (Nov 9): your moves and time as this lobby counted them; a win is your squad winning the lobby (1st). Once: keyed by this
-    // lobby (code and creation). Never in the way of the result.
+    // lobby (code and creation).
     const xp = await grantXp(sql, r.userId, {
       key: `squads:${code}:${created}`,
       facts: { ms: r.playMs ?? 0, moves: r.moves ?? 0, won: r.placement === 1, resigned: !!r.resigned, abandoned: !!r.abandoned },
@@ -957,10 +985,14 @@ export async function writeReward(sql: Sql, code: string, created: number, r: Sq
       now,
       paused,
       quest: "squads",
-      // (Play coins, Nov 25: the placement's bonus for someone still in their seat when it was decided; one who resigned or left gets none.)
+      // (Play coins, Nov 25: the placement's bonus for someone still in their seat when it was decided; one who resigned or left gets
+      // none, and a squad on its own devices' word none either: its coins as solo's.)
       ...(r.resigned || r.abandoned ? {} : { coin: { squads: r.placement } }),
+      ...(unvouched ? { soloCoins: true } : {}),
     }).catch((e: unknown) => {
+      if (!lenient) throw e;
       console.log(`xp for squads ${code}: ${String(e)}`);
+      countCall("squads.xpFailed");
       return null;
     });
     const result = { mode: "squads" as const, online: true, placement: r.placement, players: SQUADS.squadCount, teamWon: r.placement === 1, ranked: false, lobby: code, playMs: r.playMs ?? null, moves: r.moves ?? null, xp };

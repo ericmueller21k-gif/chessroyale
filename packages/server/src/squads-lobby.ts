@@ -296,6 +296,11 @@ export interface SquadsReward {
   playMs?: number;
   resigned?: true;
   abandoned?: true;
+  /**
+   * When a write of it first failed (D1; squads-do.ts writeRewardQueue): its XP and coins hold it up MATCH_SAVE.strictMinutes from
+   * then, then it's written without them (logged), as a 50 v 50 result's are (the review's M1, Nov 25).
+   */
+  failedAt?: number;
 }
 
 export type SquadsTimer = "fill" | "begin" | "voteEnd" | "voteNext" | "bracket";
