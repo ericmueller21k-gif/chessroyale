@@ -6,3 +6,5 @@ mock/: CSS injected over the live vote, counts fixed at 4 / 2 / 6, light and dar
   to compare: the leader is always full, which says less.
 - The pill "Drag your pawn into a zone to vote" now sits under the zones (rank 3 from your side), pointing up: no zone name covered.
 - The phone's vote uses the same cards (shorter), so it gets the same fill.
+
+Build (root): the real fill with the bots' votes, 1536x730 (125%), 1920x960, phone 390x844, light and dark.
