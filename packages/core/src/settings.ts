@@ -5936,3 +5936,94 @@ export const AUTOCHESS: AutoChessSettings = {
   pawnsPerFile: 3,
   bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.7, saveChance: 0.3, saveKeep: 8, follow: { banked: 10, gold: 30, chance: 0.85, lateRound: 7, lowHp: 8 }, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };
+
+/**
+ * Residents (Eric, Nov 25: "have 200 bots made which just sit on the server and play ranked ... so like any time of day I can login
+ * and see games played"; the design: notes/residents-design.md on claude/director-notes; docs/decisions/2026-11-25-residents-program.md).
+ * Real accounts (`users.resident`) played by a headless program outside the game's servers (`scripts/residents/run.ts`), through the
+ * same HTTP and WebSocket paths as the app. Every number the program uses is here; the server's side (the route, PAUSE_RESIDENTS) is
+ * in packages/server.
+ *
+ * - `accounts`, `targetOnline`: how many accounts, and about how many online at once (the program's --accounts, --target-online).
+ *   `wave`: the online target moves with the residents' own daily shapes (more when more of their evenings overlap) and a slow
+ *   swell of `amplitude` every `periodMinutes`, held between `min` and `max` times the target (30: about 15 to 54), so the count
+ *   comes in waves, not a flat line. At most `startsPerMinute` sessions begin in a minute.
+ * - `ratings`: each resident's Maia rating, fixed by its name: the bots' bell curve (BOT_LOBBY.ratings).
+ * - `regions`: home time zones (a share each; whole-hour offsets from UTC, one drawn per resident). `hourWeights`: how likely a
+ *   resident is to be on at each local hour (evening peak 18-23, a lunch bump), `weekend` times more on Saturdays and Sundays.
+ * - `keenness`: each resident's chance of playing on a given day; `sessions` a day (1-3) of `sessionMinutes` (10-60), at least
+ *   `restMinutes` apart, never more than `maxMinutesPerDay`. When too few keen residents are free for the target, the scheduler
+ *   tops up from the rest, within the same daily cap (200 accounts can't hold 30 online on 1-3 sessions each).
+ * - `behaviors`: shares (of 100) of how residents behave; `dropChance`: in any profile, the chance per game of the socket
+ *   dropping and coming back.
+ * - `duel`: ranked 1 v 1. `zones`: the shares of Bullet, Blitz and Rapid as a resident's favorite (a slow resident's is Rapid).
+ *   `queue`: how residents enter the queue (at most `maxWaiting` of them unpaired at once, each `gapSeconds` apart), so one is
+ *   often alone in line and a person who queues meets them within seconds. Think times, resigning and draws: see each field.
+ * - `beatSeconds`: the heartbeat to the server; `summaryMinutes`: the log's summary; `homePollMs` / `gamePollMs`: the live line
+ *   (/api/live) on home and during a game, as the app polls it (FRONT_DOOR.livePollMs, the 30 s heartbeat).
+ */
+export const RESIDENTS = {
+  accounts: 200,
+  targetOnline: 30,
+  wave: { min: 0.5, max: 1.8, amplitude: 0.25, periodMinutes: 90 },
+  startsPerMinute: 3,
+  ratings: { mean: 1150, sd: 250, min: 600, max: 2200, step: 100 },
+  regions: [
+    { name: "americas", share: 55, offsets: [-8, -7, -6, -5, -5, -4, -3] },
+    { name: "europe", share: 25, offsets: [0, 1, 1, 2] },
+    { name: "asia-oceania", share: 15, offsets: [5, 7, 8, 9, 10, 11] },
+    { name: "elsewhere", share: 5, offsets: [-3, 1, 2, 3, 4] },
+  ],
+  hourWeights: [0.5, 0.3, 0.15, 0.08, 0.05, 0.05, 0.1, 0.25, 0.35, 0.4, 0.45, 0.55, 0.8, 0.75, 0.5, 0.55, 0.65, 0.8, 1, 1.15, 1.25, 1.25, 1.05, 0.8],
+  weekend: 1.3,
+  keenness: { min: 0.3, max: 0.9 },
+  sessions: { min: 1, max: 3 },
+  sessionMinutes: { min: 10, max: 60 },
+  restMinutes: 20,
+  maxMinutesPerDay: 360,
+  behaviors: { normal: 70, slow: 8, leaver: 5, afk: 4, chatty: 8, rageQuit: 5 },
+  dropChance: 0.02,
+  duel: {
+    zones: { bullet: 25, blitz: 50, rapid: 25 },
+    queue: { maxWaiting: 3, gapSeconds: [2, 25] as readonly [number, number] },
+    /** A resident's vote comes this long after the vote opens (ms). */
+    pickMs: [800, 3500] as readonly [number, number],
+    /** The first move (White's and Black's): within this long (ms), well inside the 20 s rule. */
+    firstMoveMs: [1200, 6000] as readonly [number, number],
+    /** Later moves: the clock left spread over this many more moves (never fewer than `minMovesLeft`), plus most of the increment. */
+    movesLeft: 35,
+    minMovesLeft: 12,
+    /** The book moves (the first plies): quicker, this fraction of the usual think. */
+    openingPlies: 10,
+    openingFactor: 0.4,
+    /** More thought in check, or when Maia's top two moves are close (within `closeGap` of each other's chance). */
+    checkFactor: 1.5,
+    closeGap: 0.1,
+    closeFactor: 1.6,
+    /** Never less than this (ms), and never closer to the flag than `safetyMs` (a slow resident: sometimes closer, `slowFlagChance`). */
+    minThinkMs: 400,
+    safetyMs: 1500,
+    slowFactor: 2.2,
+    slowFlagChance: 0.01,
+    /** Resigning a lost game: material down by `lostBy` or more, from the `afterMove`th move, this chance a move (a rage-quitter: `rageLostBy`, `rageChance`). */
+    resign: { lostBy: 8, afterMove: 12, chance: 0.12, rageLostBy: 4, rageChance: 0.25 },
+    /** Draw offers: material level within 1, from ply `fromPly`, this chance a move; an offer is taken when level and past `acceptFromPly` (`acceptChance`). */
+    draw: { fromPly: 60, offerChance: 0.02, acceptFromPly: 40, acceptChance: 0.5 },
+    /** A leaver walks away from this share of its games, after 10-30 moves; an AFK resident never makes its first move in `afkNoShow`, and stops moving midgame in `afkStall`. */
+    leaverChance: 0.1,
+    afkNoShow: 0.08,
+    afkStall: 0.08,
+    /** A rage-quitter logs off after a loss with this chance. */
+    rageLogOff: 0.6,
+    /** Quick chat (presets only): a chatty resident greets and says gg this often, and reacts to a capture now and then; others say gg sometimes. */
+    chat: { greet: 0.7, gg: 0.8, react: 0.06, normalGg: 0.15 },
+    /** Between games: this long on home (ms) before queuing again. */
+    homeMs: [5000, 40_000] as readonly [number, number],
+  },
+  /** The icons residents pick from: the free emoji set every account may use (the server's ICONS). */
+  icons: ["♟", "♞", "♝", "♜", "♛", "♚", "🦁", "🦊", "🐺", "🦅", "🐉", "🔥", "⚡", "👑", "🎯", "🧠"] as readonly string[],
+  beatSeconds: 60,
+  summaryMinutes: 5,
+  homePollMs: 5000,
+  gamePollMs: 30_000,
+} as const;
