@@ -102,7 +102,8 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
     drawn.current = t;
     const W = b.clientWidth;
     const H = b.clientHeight;
-    const dpr = Math.min(3, devicePixelRatio || 1);
+    // (The device's pixels per CSS px, a zoomed column's too (a computer's boss result on a short window): coins drawn crisp, not scaled.)
+    const dpr = Math.min(3, (devicePixelRatio || 1) * (b.getBoundingClientRect().height / H || 1));
     if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) {
       c.width = Math.round(W * dpr);
       c.height = Math.round(H * dpr);

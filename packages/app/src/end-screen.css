@@ -1044,6 +1044,12 @@
   }
   .es-screen.boss-results > .results-top {
     gap: var(--es-gap);
+    /* (A short window: the whole column scaled with the window's height, as the 1 v 1's column is, so Play again and Home are whole in
+       it, never scrolled to (nothing hidden; Nov 25, the coin strip's PR: docs/decisions/2026-11-25-coin-strip-fit.md). 870: the
+       tallest boss's stack (the Dragon's, 834 px) and the page's padding; a window that tall or taller: 1. Set from the window, never
+       from what's in the column, so nothing moves as the screen fills. `tan(atan2(a, b))` is a / b as a number: CSS can't divide two
+       lengths yet.) */
+    zoom: clamp(0.68, tan(atan2(var(--app-h), 870px)), 1);
   }
 }
 /* (No move of yours to show: the result's column is the page's, centered in it: never a half-empty page, Nov 25, round 2c.) */

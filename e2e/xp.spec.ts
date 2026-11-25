@@ -63,6 +63,11 @@ async function topRowFits(box: Locator, centered: boolean) {
 
 /** The XP bar's box: 80 px tall, always (END_SCREEN; end-screen.css). */
 const BOX_H = 80;
+/**
+ * The result column's zoom: a computer's boss result on a window under 870 px tall scales its column with the window's height (Nov 25,
+ * docs/decisions/2026-11-25-coin-strip-fit.md), so its sizes on screen are its design sizes times this (1 everywhere else).
+ */
+const colZoom = (page: Page) => page.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".results-top") ?? document.body).zoom) || 1);
 /** The end screen's rewards (data-es: wait, run, done). */
 const rewards = (page: Page) => page.getByTestId("es-rewards");
 
@@ -158,7 +163,7 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   // scroll the page) and sizes from the first frame to the last.
   const shape = (x: Sample) => [x.box[0], x.box[1]! - x.title![1]!, x.box[2], x.box[3], x.earned[1]! - x.title![1]!, x.earned[3], x.quests[1]! - x.title![1]!, x.quests[3], x.actions![1]! - x.title![1]!, x.title![2], x.title![3], x.actions![3]];
   for (const x of all) expect(shape(x), "every part in its place and size").toEqual(shape(all[0]!));
-  expect(all[0]!.box[3], "the bar's fixed height").toBe(BOX_H);
+  expect(all[0]!.box[3]! / (await colZoom(page)), "the bar's fixed height").toBeCloseTo(BOX_H, 0);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/xp-counted-${testInfo.project.name}.png` });
   // Home: the real level and its ring (Level 2, 32% of the way round). (Level 2's reward card first: it waits for OK since Nov 22.)
   await closeRewardCard(page);
@@ -185,11 +190,11 @@ async function sampleCoins(page: Page) {
       if (strip && track) {
         const r = strip.getBoundingClientRect();
         const t = track.getBoundingClientRect();
-        // (Each digit's column: 11 rows (0-9, 0); its translate over a row's height is the digit, rolling.)
+        // (Each digit's column: 11 rows (0-9, 0); its translate over a row's height is the digit, rolling; both in layout px, as a zoomed column's transform is, which comes back a few hundredths of a px short: 0.01 of a row's slack.)
         const cols = [...strip.querySelectorAll<HTMLElement>(".es-cs-col")].reverse();
         const count = cols.reduce((n, c, d) => {
-          const v = -new DOMMatrixReadOnly(getComputedStyle(c).transform === "none" ? undefined : getComputedStyle(c).transform).m42 / (c.getBoundingClientRect().height / 11);
-          return n + (d === 0 ? v : Math.floor(v + 1e-6)) * 10 ** d;
+          const v = -new DOMMatrixReadOnly(getComputedStyle(c).transform === "none" ? undefined : getComputedStyle(c).transform).m42 / (c.offsetHeight / 11);
+          return n + (d === 0 ? v : Math.floor(v + 0.01)) * 10 ** d;
         }, 0);
         const fill = document.querySelector(".es-track-xp .es-fill");
         w.__cs.push({
@@ -208,11 +213,13 @@ async function sampleCoins(page: Page) {
 }
 type CoinSample = { t: number; cs: string; count: number; share: number; box: number[]; parts: boolean[] };
 
-test("the coin strip under the XP box (Nov 25): there from the first frame, the XP box's width, never moving; the grant's coins counted after the fill; the parts; endGaps with it (phone 390×844, laptop 1536×730)", { tag: "@phone-only" }, async ({ browser }) => {
+test("the coin strip under the XP box (Nov 25): there from the first frame, the XP box's width, never moving; the grant's coins counted after the fill; the parts; endGaps with it; a computer's Play again and Home whole in the window (phone 390×844, laptops 1536×730 and 1280×600)", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(5 * 60_000);
   for (const s of [
     { at: "phone 390×844", width: 390, height: 844, scale: 3, phone: true, root: ".screen.es-screen" },
     { at: "laptop 1536×730", width: 1536, height: 730, scale: 1.25, phone: false, root: ".boss-results > .results-top" },
+    // (The shortest computer window: the result's column zoomed to fit it, Nov 25.)
+    { at: "laptop 1280×600", width: 1280, height: 600, scale: 1, phone: false, root: ".boss-results > .results-top" },
   ]) {
     const ctx = await browser.newContext({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: s.scale, isMobile: s.phone, hasTouch: s.phone });
     const page = await ctx.newPage();
@@ -238,10 +245,12 @@ test("the coin strip under the XP box (Nov 25): there from the first frame, the 
     // Its place and size from the first frame to the last: right under the XP box (the one gap), its width and height.
     for (const x of all) expect(x.box, `${s.at}: the strip in its place and size`).toEqual(all[0]!.box);
     const [dx, gap, w, h, trackW] = all[0]!.box as [number, number, number, number, number];
+    // (In design px: the laptop's column is zoomed to fit the window.)
+    const z = await colZoom(page);
     expect(Math.abs(dx), `${s.at}: under the XP box`).toBeLessThanOrEqual(0.5);
     expect(w, `${s.at}: the XP box's width`).toBe(trackW);
-    expect(h, `${s.at}: the XP box's height`).toBe(BOX_H);
-    expect(Math.abs(gap - 12), `${s.at}: the one gap under the XP box (${gap} px)`).toBeLessThanOrEqual(2);
+    expect(h / z, `${s.at}: the XP box's height`).toBeCloseTo(BOX_H, 0);
+    expect(Math.abs(gap / z - 12), `${s.at}: the one gap under the XP box (${gap} px at ${z})`).toBeLessThanOrEqual(2);
     // It counts once the XP fill has ended (0.1 of 0 to 0.12: 60 XP of 500), never down, through many frames.
     const run = all.filter((x) => x.cs === "run");
     expect(run.length, `${s.at}: a count over many frames`).toBeGreaterThan(20);
@@ -261,6 +270,12 @@ test("the coin strip under the XP box (Nov 25): there from the first frame, the 
     expect(g.gaps.some((x) => /es-coin-strip/.test(x.between)), `${s.at}: the strip is in the stack`).toBe(true);
     for (const x of g.gaps) expect(Math.abs(x.px - g.token), `${s.at}: ${x.between}: ${x.px.toFixed(1)} px, not the one gap (${g.token} px)`).toBeLessThanOrEqual(2);
     expect(g.grow, `${s.at}: nothing grows to fill`).toEqual([]);
+    // A computer (Eric: nothing hidden): Play again and Home whole in the window, the page at its top, no scrolling to reach them.
+    if (!s.phone) {
+      const out = await page.evaluate(() => [...document.querySelectorAll(".results-top .actions .btn")].map((b) => ({ t: b.textContent, top: b.getBoundingClientRect().top, bottom: b.getBoundingClientRect().bottom, y: scrollY, h: innerHeight })));
+      expect(out.length, `${s.at}: Play again and Home`).toBe(2);
+      for (const b of out) expect(b.top >= 0 && b.bottom <= b.h && b.y === 0, `${s.at}: ${b.t} whole in the window (${b.top.toFixed(0)} to ${b.bottom.toFixed(0)} of ${b.h})`).toBe(true);
+    }
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/coins-done-${s.width}x${s.height}.png` });
     await ctx.close();
   }
@@ -278,12 +293,13 @@ test('"No XP: test game." in the same box, the same size: a test switch on (?mat
   await expect(box.locator(".es-level")).toHaveText("Level 1");
   await expect(page.locator(".es-quests-none")).toHaveText("Quests No quests this game.");
   await expect(rewards(page)).toHaveAttribute("data-es", "done");
-  expect((await box.boundingBox())!.height).toBe(BOX_H);
+  const z = await colZoom(page);
+  expect((await box.boundingBox())!.height / z).toBeCloseTo(BOX_H, 0);
   // (The coin strip greyed, with why, the XP box's height: Nov 25.)
   const strip = page.getByTestId("es-coin-strip");
   await expect(strip).toHaveClass(/es-cs-off/);
   await expect(strip.getByTestId("es-cs-why")).toHaveText("No coins: test game.");
-  expect((await strip.boundingBox())!.height).toBe(BOX_H);
+  expect((await strip.boundingBox())!.height / z).toBeCloseTo(BOX_H, 0);
   // (The bar stands at your XP: 250 of 500.)
   const share = await box.locator(".es-fill").evaluate((e) => new DOMMatrixReadOnly(getComputedStyle(e).transform).a);
   expect(share).toBeCloseTo(0.5, 2);
@@ -345,7 +361,7 @@ test("each other \"No XP\" line, in the same box and size (the server's answer f
     await expect(why).toHaveText(line, { timeout: 20_000 });
     await expect(box.locator(".es-level")).toHaveText("Level 10");
     const b = (await box.boundingBox())!;
-    expect(b.height, none).toBe(BOX_H);
+    expect(b.height / (await colZoom(page)), none).toBeCloseTo(BOX_H, 0);
     // (Whole on its line: not cut, inside the window.)
     const w = (await why.boundingBox())!;
     expect(w.x, `${none}: the line fits`).toBeGreaterThanOrEqual(0);

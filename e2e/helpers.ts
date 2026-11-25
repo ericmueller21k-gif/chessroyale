@@ -1022,7 +1022,8 @@ export async function realLayout(page: Page) {
  * An end screen's spacing (Eric, Nov 25: "Make things spaced evenly and tight, and then we can always just center the whole thing";
  * docs/decisions/2026-11-25-end-screens-2.md): the containers of its stack (`root`'s children, through `display: contents` wrappers and
  * the rewards' column), each gap between two in a row, the stack's one gap (its row gap: `--es-gap`), and anything set to stretch (a
- * container that grows, a stack that spreads its items).
+ * container that grows, a stack that spreads its items). The gap in the screen's px: a zoomed stack's (a computer's boss result on a
+ * short window, Nov 25) scaled with it.
  */
 export async function endGaps(page: Page, root: string) {
   return page.evaluate((sel) => {
@@ -1040,6 +1041,6 @@ export async function endGaps(page: Page, root: string) {
     const gaps = items.slice(1).map((e, i) => ({ between: `${name(items[i]!)} → ${name(e)}`, px: e.getBoundingClientRect().top - items[i]!.getBoundingClientRect().bottom }));
     const spread = [top, ...top.querySelectorAll(".es-rewards")].map((e) => getComputedStyle(e).justifyContent).filter((j) => /space-|stretch/.test(j));
     const grow = items.filter((e) => Number(getComputedStyle(e).flexGrow) > 0 && !e.classList.contains("results-review")).map(name);
-    return { token: parseFloat(getComputedStyle(top).rowGap), gaps, spread, grow };
+    return { token: parseFloat(getComputedStyle(top).rowGap) * (parseFloat(getComputedStyle(top).zoom) || 1), gaps, spread, grow };
   }, root);
 }
