@@ -3,7 +3,7 @@ import { BOARD_SEL, named, soloFromHome, test } from "./helpers.ts";
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const CSS = `
 @media (min-width: 900px) {
-  .screen.game.crowd-50 { --bd-room: ${process.env.ROOM ?? 104}px; --crowd-slot: 250px !important; --side-w: ${process.env.RW ?? 300}px !important; --gutter: 14px !important;
+  .screen.game.crowd-50 { --bd-room: ${process.env.ROOM ?? 92}px; --crowd-slot: 250px !important; --side-w: ${process.env.RW ?? 300}px !important; --gutter: 14px !important;
     --scr: calc(var(--bd-h) + var(--side-w) + 2 * var(--gutter) + 28px) !important; }
   .arena:not(.sq-arena):has(> .screen.game.crowd-50) > .tower-side { flex: 0 0 ${process.env.LW ?? 340}px !important; }
   .arena:has(> .screen.game.crowd-50) { width: fit-content !important; margin-inline: auto !important; gap: 15px !important; }
@@ -24,9 +24,9 @@ const CSS = `
   .screen.game.crowd-50 { padding-top: 4px !important; margin-top: 0 !important; }
   .screen.game.crowd-50 > .hud-row { margin: 0 0 2px !important; padding: 0 !important; min-height: 0 !important; }
   .arena:not(.sq-arena):has(> .screen.game.crowd-50) > .tower-side { margin-top: 0 !important; }
-  .screen.game.crowd-50 > .hud-row { display: flex !important; align-items: flex-end !important; height: 52px !important; overflow: visible !important; margin-bottom: 8px !important; }
+  .screen.game.crowd-50 > .hud-row { display: flex !important; align-items: flex-end !important; height: 40px !important; overflow: visible !important; margin-bottom: 0 !important; }
   .screen.game.crowd-50 > .hud-row > .hud { flex: 1; align-items: flex-end !important; }
-  .mk-lab { height: 40px; justify-content: flex-end !important; }
+  .mk-lab { height: 36px; justify-content: flex-end !important; }
   .mk-lab > * { line-height: 1 !important; }
   .screen.game.crowd-50 > .hud-row .board-clock { position: static !important; transform: none !important; margin: 0 0 4px 14px !important; align-self: flex-end; }
   .screen.game.crowd-50 > .hud-row > .mm { position: static !important; margin: 0 0 4px 12px !important; align-self: flex-end; }
@@ -37,6 +37,8 @@ const CSS = `
   .screen.game.crowd-50 > .play-footer, .screen.game.crowd-50 > .poll { margin-top: 0 !important; }
   .screen.game.crowd-50 { row-gap: 0 !important; }
   .mk-gear { position: absolute; right: 0; top: 0; }
+  .screen.game.crowd-50 > .hud-row > .hud { padding-bottom: 9px !important; }
+  .screen.game.crowd-50 .board-area { margin-top: 0 !important; padding-top: 0 !important; }
 }`;
 for (const [w, h, sc] of [[1536, 730, 1.25], [1920, 960, 1]] as const)
   test(`mock crowd ${w}x${h}`, async ({ browser }) => {
@@ -67,8 +69,6 @@ for (const [w, h, sc] of [[1536, 730, 1.25], [1920, 960, 1]] as const)
       const r = hud.querySelector(".hud-rank"); if (r) r.innerHTML = r.innerHTML.replace(/^P/, "");
       wrap(hud.querySelector(".hud-score"), "Your points");
       wrap(hud.querySelector(".hud-cut"), "Cut line");
-      const clk = document.querySelector(".screen.game.crowd-50 .board-clock");
-      if (clk) hud.appendChild(clk);
       const mm = document.querySelector(".screen.game.crowd-50 .mm, .gm-tools .mm");
       const slot = document.querySelector(".screen.game.crowd-50 > .play-footer, .screen.game.crowd-50 > .poll") as HTMLElement | null;
       if (mm && slot) { const pw = slot.querySelector(".mk-pw") as HTMLElement | null; if (pw) { pw.style.position = "relative"; pw.style.paddingRight = "44px"; pw.appendChild(mm); (mm as HTMLElement).style.position = "absolute"; (mm as HTMLElement).style.right = "0"; (mm as HTMLElement).style.top = "50%"; (mm as HTMLElement).style.transform = "translateY(-50%)"; } }

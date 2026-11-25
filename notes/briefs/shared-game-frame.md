@@ -40,8 +40,9 @@ Commits end with only `Claude-Session: https://claude.ai/code/session_01JuCWRuPp
 - The "Your pick for White · N/50 picked" line over the board is GONE; its count is a labeled number in the top row right after MOVE:
   MOVE · PICKED (x/y: your team's picks on your turn, the voting team's while you watch) · NEXT CUT · YOUR PLACE · YOUR POINTS · CUT LINE.
 - No team-color circle by MOVE.
-- The row sits on ONE line with the board's timer pill ("2s | 10:00", now at the row's right end), close above the board; the whole screen
+- The row sits RIGHT on the board (no padding; a few px above the board's top bar, never touching it), on the same line as the board's
+  timer pill, which STAYS where it always was (the board's top-right corner: Eric, "I never said to move the timer"); the whole screen
   moves up (no empty band at the top).
 - The gear sits on the right column's first line, beside the arrows + power-ups, which start level with the board's top. The scoreboard's
   table starts level with the board's top too (its "BLACK TEAM" label above it, in the row's height).
-- Board 621 at 1536x730, 856 at 1920x960 in the mock.
+- Board 634 at 1536x730, 864 at 1920x960 in the final mock.
