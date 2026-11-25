@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "@chessroyale/core";
-import { applyMove, blunderCost, fenAfter, gameEnd, keptEnPassant, legalMoves, pickOpenings, sanLineToUci, sideToMove, START_FEN, toSan, type Opening } from "../src/index.ts";
+import { readFileSync } from "node:fs";
+import { applyMove, blunderCost, fenAfter, gameEnd, inCheck, keptEnPassant, legalMoves, pickOpenings, sanLineToUci, sideToMove, START_FEN, startsInCheck, toSan, usableAt, type Opening } from "../src/index.ts";
 
 describe("rules", () => {
   it("lists legal moves in UCI and applies them", () => {
@@ -62,7 +63,7 @@ describe("pickOpenings", () => {
     name: family,
     family,
     unusual,
-    moves: Array(21).fill("e2e4"),
+    moves: Array.from({ length: 21 }, (_, k) => ["g1f3", "g8f6", "f3g1", "f6g8"][k % 4]!),
     namedPlies: 21,
     expected: { 20: e, 21: e },
   });
@@ -78,6 +79,18 @@ describe("pickOpenings", () => {
     expect(picks.filter((p) => p.unusual)).toHaveLength(1);
     expect(new Set(picks.map((p) => p.family)).size).toBe(8);
     expect(picks.some((p) => p.family === "Lopsided")).toBe(false);
+  });
+
+  it("never picks a line that leaves the side to move in check, in any mode (Eric, Nov 26: the Steinitz Gambit's 4...Qh4+)", () => {
+    const library = JSON.parse(readFileSync(new URL("../data/openings.json", import.meta.url), "utf8")) as Opening[];
+    const steinitz = library.find((o) => o.name.includes("Steinitz Gambit") && startsInCheck(o, 8))!;
+    expect(steinitz).toBeTruthy();
+    expect(usableAt(steinitz, 8, [0, 1])).toBe(false);
+    for (const plies of [8, 9, 10, 11, 12]) {
+      for (const o of library) if (usableAt(o, plies, [0, 1])) expect(inCheck(fenAfter(o.moves.slice(0, plies))), `${o.name} at ${plies}`).toBe(false);
+      for (let seed = 1; seed <= 20; seed++)
+        for (const o of pickOpenings(mulberry32(seed), library, { classic: 8, unusual: 1 }, plies, [0.3, 0.7])) expect(startsInCheck(o, plies)).toBe(false);
+    }
   });
 });
 

@@ -150,7 +150,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   `crowdStart` and `openingMoves`; `MatchRunner.patchSettings` then sets the board up before move 1 (`setUpStart`), one
   start for the one board everyone shares. **Normal**: the starting position (nothing drawn: the board as made).
   **Random opening**: a balanced named line from the library, `CROWD_START.randomOpeningMoves` (4) moves a side in, drawn as
-  Classic's boards are (`pickOpenings`, inside `openingBalance`); the board's history holds the opening's moves, so the
+  Classic's boards are (`pickOpenings`, inside `openingBalance`, never in check since Nov 26); the board's history holds the opening's moves, so the
   game's move number (and the opening allowance) starts at 5, and a phone new to the board replays them from the start,
   whether it first watches or plays (`WatchScreen` replays through `useReplay` too, Oct 25; the Animations setting doesn't
   change it: docs/decisions/2026-10-25-opening-with-animations-off.md).
