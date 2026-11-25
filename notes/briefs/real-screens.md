@@ -30,3 +30,6 @@ the top bar by the clock), one right panel width, the chat never collapses; the 
 67 of 80 RP"). Show every main screen at 1536×730, 1920×960 and a 390 phone, side by side, before/after, board px. NOTE.md with build cost.
 Read CLAUDE.md, `.claude/LESSONS.md`, `docs/rules/eric.md`, `docs/areas/board.md`, `ranked.md`, `hub.md`. Commits end with only
 `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By). Never images under docs/. `.done` per branch.
+**Eric, Nov 25:** "don't take those notes and assume that it's for every single device ... the whole point is we've tried to make a point to
+differentiate what screen we're referring to." Every still and every claim in the PR body names its screen size. Look at your own stills at
+each size before reporting.
