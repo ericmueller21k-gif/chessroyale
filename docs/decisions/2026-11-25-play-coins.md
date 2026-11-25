@@ -27,7 +27,7 @@ The per-day table: `reports/coin-report.md`. Calls made in building it (the dire
 8. **The steps, rounded per game:** a game's bonus moves the day's paid total to the steps' value at the earned bonus it stands for
    plus this game's, rounded (half up); the paid total is the only state, and the day can never pass 300. (A win: 15, then 8 for 7.5,
    then 4 for 3.75, then 0.) The rounding isn't carried over, so a day can run a few coins off the steps' exact curve: only wins
-   reach 300 at the 35th, not about the 37th; only draws run up to 16 ahead midway and reach it at the 113th, not the 110th (the
+   reach 300 at the 35th, not about the 37th; only draws run up to 16.5 ahead midway and reach it at the 113th, not the 110th (the
    review's m4 corrected an earlier "never drifts").
 9. **Ranked's `coin_day` and `coin_games`** stay on the row with what they had, no longer read or moved (no destructive migration).
 10. **The FAQ gives no per-minute numbers** for coins either (Eric's XP rule, Nov 9: "we dont want players to know they could just
@@ -50,3 +50,22 @@ The per-day table: `reports/coin-report.md`. Calls made in building it (the dire
     answers a later one); the result row keeps the first answer, so the strip reads the row.
 15. **The day's reads by index (n7):** `ledger_reason (account, reason, created_at)`, made by the schema run as every index is
     (`LEDGER_SCHEMA`), serves play coins' day sums, XP's solo caps and Squads' crate cap (checked with `EXPLAIN QUERY PLAN`).
+
+**The delta review's fixes** (Nov 25; `DELTA-REVIEW.md` on `review/pay-play-coins-delta`; the director's calls,
+`notes/briefs/payments-pr2-delta-fixes.md`):
+
+16. **A game pays at most one daily reward (N1).** The daily op (`daily:<day>:<ledger id>`) was keyed by the day only, so a grant tried
+    again after the XP day rolled over (ranked's retry since M1; a Squads reward written again since Nov 9) paid the new day's too.
+    Its guard now needs no `daily` leg of this account naming this game (`rewards.ts dailyOp`, served by `ledger_reason`), and the
+    grant reads the game's daily reward by the game, so the replay answers the one it paid. Fixed at the cause, for every caller,
+    rather than giving each caller a fixed time.
+17. **Squads' reward queue shares one window (N2, Squads).** A failed write marks every reward still waiting (`failedAt ??= now`), so a
+    lasting grant fault holds the lobby's rewards `MATCH_SAVE.strictMinutes`, not that long for each one after another.
+18. **Known pre-launch limit: ranked has no lenient window (N2, ranked; a follow-up, not this PR).** A grant that fails every time (a bug
+    in `grantXp`, a statement D1 always refuses) fails each recording try for `RANKED_1V1.recordRetryHours` (24): the players get no
+    outcome message (the rank change itself is stored), and at 24 h the room closes saying the game was never recorded, although it
+    was. The fix (stamp the first failed XP try beside `ranks`, then send the outcome from the kept ranks without XP, logged and
+    counted, as `soft()` does) is hold-and-release logic, so it gets its own PR. A short D1 outage isn't affected.
+19. **The ranked old-key guard searches the primary key (N3):** `AND leg = 0` (the old op had one leg), so it no longer reads the
+    account's whole ledger. Left as the review allowed: N4 (solo's settle failure costs the box, call 11), N5 (no test of the 4th
+    strict try).

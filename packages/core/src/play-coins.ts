@@ -110,7 +110,7 @@ export function bonusStep(paid: number, steps = PLAY_COINS.bonusSteps): number {
  * paid total stands, to within half a coin (a win: 15, then 8 for 7.5, then 4 for 3.75), and the day never passes bonusMax. The
  * rounding isn't carried over (the paid total is the only state): over a day the paid total can run a few coins off the steps' exact
  * curve at the bonus earned, most with many small bonuses (only wins: 300 at the 35th, where the exact curve takes about 37; only
- * draws: up to 16 ahead midway, 300 at the 113th, the curve's 110th). The review's m4, Nov 25.
+ * draws: up to 16.5 ahead midway, 300 at the 113th, the curve's 110th). The review's m4, Nov 25.
  */
 export function bonusFor(paid: number, earned: number, steps = PLAY_COINS.bonusSteps): number {
   const max = bonusMax(steps);

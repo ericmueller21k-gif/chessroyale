@@ -74,7 +74,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   account, or a guest where sign-in is set up. Your level is 1 + XP ÷ 500 (`levelOf`; 1,000 until Nov 20: [2026-11-20-levels-500.md](../decisions/2026-11-20-levels-500.md)). Each result row keeps the game's `play_ms`,
   `moves` and its XP (`xp_before`, `xp_parts`, `xp_none`); a solo game is timed by the server between `POST /api/xp/solo/start` and its
   `POST /api/results` (table `solo_games`); a solo result it never timed earns nothing, a solo win needs 5 of its minutes, and solo time
-  XP is capped at `XP.soloMinutesPerDay` (120) minutes an XP day. A friends' lobby's win pays once an XP day per opponent. A match that rested on one device's word (Nov 10: a host scoring alone, a boss move nobody checked; a Squads lobby of one party) pays as a solo game, under both solo caps; in the Hidden Boss's phase 2 online, a move of his from a device or the server's quick move does so for its board players only (`phase2Unvouched`, Nov 13). Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
+  XP is capped at `XP.soloMinutesPerDay` (120) minutes an XP day. A friends' lobby's win pays once an XP day per opponent. A match that rested on one device's word (Nov 10: a host scoring alone, a boss move nobody checked) pays as a solo game, under both solo caps; in the Hidden Boss's phase 2 online, a move of his from a device or the server's quick move does so for its board players only (`phase2Unvouched`, Nov 13). A Squads squad on its own party's devices' word (a lobby of one party and bots) isn't solo-capped for XP: since Nov 25 only its coins go the solo way (the review's m2; Play coins, below). Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
 - **Play coins** (Nov 25; [2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md); the rules in core's `play-coins.ts`
   `gameCoins`, the numbers `PLAY_COINS`; the payments design's section 6): every counted game pays coins with its XP, in `grantXp`'s
   own batch (`server/play-coins.ts`): `coins:<game>:<ledger id>` (reason `play`: 1.8 of XP's minutes, at least 1 online, until the XP
@@ -93,7 +93,9 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   `GET /api/xp` answers it. Ranked's own coins and Squads' placement coins are gone ([ranked.md](ranked.md), [squads.md](squads.md)).
 - **The daily reward and level rewards** (Nov 9, phase 2; `server/rewards.ts`, decisions `2026-11-09-xp-phase2-*.md`): the XP day's first
   counted game with `XP.dailyMinMoves` (15) of your own moves (solo: also 3 minutes of the server's time) pays +200 XP ("Daily reward
-  +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`). Every other level reached (2, 4, 6, …; `XP.levelRewardEvery`, since Nov 20's levels of 500) pays a Winter Crate and a crate key
+  +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`), and a game pays at most one: its guard looks for a
+  daily reward naming the game, so a grant tried again on the next XP day (a ranked room's retry, a Squads reward written again) pays
+  none and answers the one it paid (Nov 25, the delta review's N1). Every other level reached (2, 4, 6, …; `XP.levelRewardEvery`, since Nov 20's levels of 500) pays a Winter Crate and a crate key
   (`XP.levelCrates`, 2 until Nov 18), every 20th (`XP.bossCrateEvery`, 10 before Nov 20) also a boss crate to pick (`wallets.boss_picks`),
   once per level (`lvl:<n>:<ledger id>`), every paying level owed at the next counted game (at most 20 a game). The ledger's older
   `level:<n>` ops are levels of 1,000: counted as today's by reward, the nth crate and key and the nth pick (`paidLevels`), so none is

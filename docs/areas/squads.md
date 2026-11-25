@@ -372,7 +372,9 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   a test lobby or after a test control. At least once (Nov 6): each stays in the record until written (retried every minute;
   the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). Its XP and coins (one
   grant) hold it up too, until `MATCH_SAVE.strictMinutes` (30) after its first failed write (`SquadsReward.failedAt`; `writeRewardQueue`):
-  then it's written without them, logged, as a 50 v 50 result's are (Nov 25, the review's M1). A reward written half by the code before
+  then it's written without them, logged, as a 50 v 50 result's are (Nov 25, the review's M1). A failure marks every reward still
+  waiting, not only the one that failed, so the queue shares one window: a lasting fault holds the lobby's rewards 30 minutes, not 30
+  each one after another (the delta review's N2). A reward written half by the code before
   Nov 25 (its old coins leg in) never pays play coins on top (m3). **One party's word
   (Nov 10):** a squad whose own match's bot work only its own party's devices answered, no other party's up (a lobby of one party
   and bots: all its squads; `SquadsRecord.unvouched`, by squad), is noted in the logs and paid its crates as any (Eric, Nov 10: "If
