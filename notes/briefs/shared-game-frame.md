@@ -22,7 +22,10 @@ Reference: round 1's NOTE and stills (`git show origin/stills/game-layout-mockup
   the status line, LABELED and longer: MOVE · NEXT CUT ("34 v 34" / "in 14 moves" / "now") · YOUR PLACE (1/50) · YOUR POINTS · CUT LINE,
   a small gray caps label over each value, centered over the board, the gear at the top right; the "Your pick for White · N/50 picked" line
   over the board stays. The history arrows + power-ups row moves to the TOP of the right column (Eric chose this over keeping it under
-  the board), then the vote box (standing skeleton), the status/result line, the chat to the board's foot. Board 614 at 1536x730, 848 at
+  the board), then the vote box (standing skeleton), the status/result line, the chat to the board's foot. **The status box ("White is voting… 27/50") always shows** (Eric, Nov 25: "same treatment" as the
+  vote box: always visible, empty or a waiting line when not in use): the same place and size in every phase, gray like the skeleton rows
+  with a quiet "Waiting…" when there's nothing to say (e.g. your own pick turn), never a blank hole; the phone's one-line status likewise.
+  Board 614 at 1536x730, 848 at
   1920x960 (bd-room ~110). Scoreboard 340, right column 300, equal gaps (~29), centered. The phone is unchanged.
 - **Squads:** a real right panel the board's height: the tiny boards on top, the pick line, then the chat; the board line ("Board 2 ·
   starting soon") in the top strip's middle.
