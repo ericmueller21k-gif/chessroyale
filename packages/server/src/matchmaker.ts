@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, CROWD_PARTY_MAX, DEFAULT_SETTINGS, MATCHMAKING } from "@chessroyale/core";
+import { CAPACITY, CROWD_PARTY_MAX, DEFAULT_SETTINGS, MATCHMAKING, firstGetsWhite, type SeatColor } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
@@ -44,8 +44,9 @@ export interface PlayOptions {
    */
   squads?: boolean;
   /**
-   * Ranked 1 v 1: tickets are single players, `info` { uid, rating, rd, player, testSeconds } (read by the
-   * server), paired by rating (PAIR_BY_RATING); each pair gets a game of its own (a DuelGame object).
+   * Ranked 1 v 1: tickets are single players, `info` { uid, rating, rd, player, colors, testSeconds } (read by the
+   * server), paired by rating (PAIR_BY_RATING); each pair gets a game of its own (a DuelGame object), White by their
+   * colors in their last ranked games (core's firstGetsWhite).
    */
   duel?: boolean;
   /**
@@ -371,8 +372,10 @@ export class Matchmaker extends DurableObject<Env> {
   }
 
   /**
-   * Ranked 1 v 1: a pair gets a game of its own, colors drawn at random. A game that couldn't be opened puts them back
-   * in line for the next batch (form does).
+   * Ranked 1 v 1: a pair gets a game of its own, White by each player's colors in their last ranked games, read with the
+   * ticket (core's firstGetsWhite: never a third game in a row on one color when it can be helped, then whoever had Black
+   * more, then whoever had Black last, then a coin flip). A game that couldn't be opened puts them back in line for the
+   * next batch (form does).
    */
   private async seatDuel(tickets: Ticket[]): Promise<boolean> {
     // (Never a game with a seat nobody can take: a ticket without its player is dropped, its partner back in line.)
@@ -384,7 +387,8 @@ export class Matchmaker extends DurableObject<Env> {
     }
     if (tickets.length !== 2) return false;
     const view = (t: Ticket): DuelPlayerView => t.info?.player as DuelPlayerView;
-    const [w, b] = crypto.getRandomValues(new Uint8Array(1))[0]! & 1 ? [tickets[1]!, tickets[0]!] : [tickets[0]!, tickets[1]!];
+    const coin = () => (crypto.getRandomValues(new Uint8Array(1))[0]! & 1) === 1;
+    const [w, b] = firstGetsWhite(colorsOf(tickets[0]!), colorsOf(tickets[1]!), coin) ? [tickets[0]!, tickets[1]!] : [tickets[1]!, tickets[0]!];
     const testSeconds = [w, b].map((t) => Number(t.info?.testSeconds)).find((x) => Number.isFinite(x) && x > 0) ?? null;
     countCall("mm.duel");
     const code = await openLobbyCode(async (c) => this.env.DUELS.get(this.env.DUELS.idFromName(c)).create(c, { w: view(w), b: view(b) }, { testSeconds }));
@@ -415,6 +419,12 @@ function crowdParty(t: Ticket): { size: number; pass: string } | null {
   const pass = t.info?.pass;
   if (typeof pass !== "string" || !pass) return null;
   return { size: Math.max(1, Math.min(CROWD_PARTY_MAX, Math.round(Number(t.info?.size) || 1))), pass };
+}
+
+/** A ranked 1 v 1 ticket's colors in its player's last ranked games, newest first (none, or anything else: no history). */
+function colorsOf(t: Ticket): SeatColor[] {
+  const xs = t.info?.colors;
+  return Array.isArray(xs) ? xs.filter((c): c is SeatColor => c === "w" || c === "b") : [];
 }
 
 /** The earliest Bots-off wait among these tickets (players switching to Default), if any. */

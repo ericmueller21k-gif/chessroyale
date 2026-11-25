@@ -316,6 +316,38 @@ export function pairUp<T extends PairingEntry>(entries: readonly T[], now: numbe
   return pairs;
 }
 
+// ---------------- Colors ----------------
+
+/** A side of the board, as a ranked game stores it (White: "w"). */
+export type SeatColor = "w" | "b";
+
+/** How many of a player's last ranked games pairing reads for their colors (enough for both rules of firstGetsWhite). */
+export const colorHistoryGames = (s: Settings = RANKED_1V1): number => Math.max(s.colors.recentGames, s.colors.maxInRow);
+
+/**
+ * Who gets White as a pair is seated (true: the first player). Each player's colors in their last ranked games, newest first (the
+ * server reads colorHistoryGames with the ticket). In order (Eric, Nov 25; RANKED_1V1.colors):
+ *   1. nobody plays one color more than `maxInRow` games in a row when the other can take it: whoever had Black in each of their last
+ *      `maxInRow` gets White, whoever had White in each gets Black (both in the same bind: one of them has to, so on to 2);
+ *   2. the larger (Black games − White games) over the last `recentGames` gets White;
+ *   3. a tie: the one who had Black in their last game (and someone with no games before someone who had White);
+ *   4. still tied: `coin()`.
+ */
+export function firstGetsWhite(a: readonly SeatColor[], b: readonly SeatColor[], coin: () => boolean, s: Settings = RANKED_1V1): boolean {
+  const { recentGames, maxInRow } = s.colors;
+  const key = (h: readonly SeatColor[]): number[] => {
+    const run = h.slice(0, maxInRow);
+    const stuck = maxInRow > 0 && run.length === maxInRow && run.every((c) => c === run[0]) ? (run[0] === "b" ? 1 : -1) : 0;
+    const recent = h.slice(0, recentGames);
+    const balance = recent.filter((c) => c === "b").length - recent.filter((c) => c === "w").length;
+    const last = h[0] === "b" ? 1 : h[0] === "w" ? -1 : 0;
+    return [stuck, balance, last];
+  };
+  const [ka, kb] = [key(a), key(b)];
+  for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i]! > kb[i]!;
+  return coin();
+}
+
 // ---------------- Coins ----------------
 
 /**

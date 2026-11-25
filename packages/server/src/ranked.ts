@@ -5,7 +5,7 @@
  * the game, never from anything an app sends. The tables, a guest's merge and the profile's read are in
  * ranked-schema.ts (accounts.ts includes them; this file needs accounts.ts).
  */
-import { LEAVES, RANKED_1V1, dodgeCost, dodgeLevelAt, duelCoins, ladderAfterFee, newRankedRecord, rankedGame, ratingNow, type RankChange, type RankedRecord } from "@chessroyale/core";
+import { LEAVES, RANKED_1V1, colorHistoryGames, dodgeCost, dodgeLevelAt, duelCoins, ladderAfterFee, newRankedRecord, rankedGame, ratingNow, type RankChange, type RankedRecord, type SeatColor } from "@chessroyale/core";
 import type { Color, DuelConduct, DuelOutcome, DuelPlayerView, DuelResult, DuelReason } from "@chessroyale/chess/duel";
 import { DELETED_ID, randomToken, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
 import { lockerState } from "./locker.ts";
@@ -70,16 +70,34 @@ export function coinCount(stored: { day: number | null; games: number }, day: nu
 
 /**
  * A player joining the queue, as the server reads them (never the app's word): their account's name (filtered, as a
- * lobby seat's), what they wear (the locker; `admin`: an admin's, admin copies included), their rank, and their hidden
- * rating (and its deviation now) for pairing.
+ * lobby seat's), what they wear (the locker; `admin`: an admin's, admin copies included), their rank, their hidden
+ * rating (and its deviation now) for pairing, and their colors in their last ranked games (`colors`, newest first: who
+ * gets White, core's firstGetsWhite; read with the ticket, so pairing reads nothing).
  */
-export async function duelEntrant(sql: Sql, user: Pick<User, "id" | "name">, now = Date.now(), admin = false): Promise<{ player: DuelPlayerView; rating: number; rd: number }> {
+export async function duelEntrant(
+  sql: Sql,
+  user: Pick<User, "id" | "name">,
+  now = Date.now(),
+  admin = false,
+): Promise<{ player: DuelPlayerView; rating: number; rd: number; colors: SeatColor[] }> {
+  // (The colors' read alongside the others; one that fails is no history: a coin flip, as before Nov 25.)
+  const colors = recentColors(sql, user.id).catch((): SeatColor[] => []);
   const { record } = await rankedRecordOf(sql, user.id);
   const look = await lockerState(sql, user.id, admin)
     .then((l) => l.look)
     .catch(() => ({}));
   const { rating, rd } = ratingNow(record, now);
-  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: await rankOf(sql, record) }, rating, rd: Math.round(rd) };
+  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: await rankOf(sql, record) }, rating, rd: Math.round(rd), colors: await colors };
+}
+
+/** A player's color in each of their last ranked games (colorHistoryGames), newest first: "w" where they had White. */
+export async function recentColors(sql: Sql, userId: string): Promise<SeatColor[]> {
+  const rows = await sql.all<{ white_id: string }>(
+    "SELECT white_id FROM ranked_1v1_games WHERE white_id = ?1 OR black_id = ?1 ORDER BY ended_at DESC, id DESC LIMIT ?2",
+    userId,
+    colorHistoryGames(),
+  );
+  return rows.map((r) => (r.white_id === userId ? "w" : "b"));
 }
 
 /** A finished game, as the game's object hands it over to be recorded. */
