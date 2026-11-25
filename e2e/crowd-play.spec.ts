@@ -270,7 +270,10 @@ test("the scoreboard box is built once: the same element and header, the same bo
   await page.evaluate(() => {
     const w = window as any;
     const b = (w.__box = { els: [] as Element[], heads: [] as Element[], boxes: [] as string[], fewest: Infinity, seq: [] as string[] });
-    const tick = () => {
+    // (A sample now, and again by the loop below before each pick: a turn the test reads and ends within one frame is still recorded.
+    // Nov 25, main's run 45584074647: the first sample waited a frame, the loop read "play" and picked 5 ms after, and the first cut's
+    // turn never showed its "play", so the run never counted as done.)
+    const sample = (w.__boxSample = () => {
       const kind = w.match?.phase.kind ?? "none";
       if (b.seq.at(-1) !== kind) b.seq.push(kind);
       const el = document.querySelector(".screen.game > .under-board");
@@ -283,9 +286,9 @@ test("the scoreboard box is built once: the same element and header, the same bo
         if (!b.boxes.includes(at)) b.boxes.push(at);
         b.fewest = Math.min(b.fewest, el.querySelectorAll(".tower-row").length);
       }
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+    });
+    const tick = () => (sample(), requestAnimationFrame(tick));
+    tick();
   });
   const seq = () => page.evaluate(() => (window as any).__box.seq as string[]);
   // Until the box is back after a cut, having seen your pick, a reveal and the other team's turn.
@@ -297,7 +300,7 @@ test("the scoreboard box is built once: the same element and header, the same bo
   const stopAt = Date.now() + 4 * 60_000;
   while (Date.now() < stopAt && !done(await seq())) {
     if ((await phase(page)) === "play") {
-      const fen: string = await page.evaluate(() => (window as any).match.phase.board?.fen ?? "");
+      const fen: string = await page.evaluate(() => ((window as any).__boxSample(), (window as any).match.phase.board?.fen ?? ""));
       if (fen && fen !== submitted) {
         submitted = fen;
         const pick = await page.evaluate(() => [...((window as any).match.runner.planned?.values() ?? [])][0] as string | undefined);

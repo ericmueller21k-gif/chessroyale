@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { Chess } from "chess.js";
 import { SOLO_ABANDON } from "@chessroyale/core";
 import { test, aDeployLanded, asAdmin, bossAloneFromHome, endBattle, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
 
@@ -324,10 +325,22 @@ async function closeRewardCard(page: Page) {
 const ownSoFar = (page: Page) =>
   page.evaluate(() => (((window as any).match?.moves ?? []) as { move: unknown; abstained?: boolean }[]).filter((m) => m.move !== null || m.abstained).length);
 
+/** `lan` on `fen` ends the game (a mate or a stalemate by the rules of chess; a move they don't know, as a power's, doesn't). */
+const endsGame = (fen: string, lan: string): boolean => {
+  const c = new Chess(fen);
+  try {
+    c.move({ from: lan.slice(0, 2), to: lan.slice(2, 4), promotion: lan[4] });
+  } catch {
+    return false;
+  }
+  return c.isGameOver();
+};
+
 /**
  * Plays your turns in a boss battle alone until `n` are yours, once it's your turn: the engine's best move the boss's powers allow
- * (pickMove's quiet one if none). The game must still be going after `n` (main's run on Nov 22: pickMove's quiet knight and pawn
- * moves only dodge a mate in one, and Ginger mated in a few before the 12th, the battle on its results).
+ * that doesn't end the game (pickMove's quiet one if none). The game must still be going after `n`: main's run on Nov 22, pickMove's
+ * quiet knight and pawn moves only dodged a mate in one, and Ginger mated in a few before the 12th; main's run 45584074647 (Nov 25),
+ * the engine's best move mated Ginger on your 9th, the battle was won (rightly nothing kept), and the reload's card never came.
  */
 async function playOwnMoves(page: Page, n: number) {
   for (let i = 0; i < 3 * n && (await ownSoFar(page)) < n; i++) {
@@ -337,8 +350,10 @@ async function playOwnMoves(page: Page, n: number) {
       return { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null, n: m.moves.length as number };
     });
     const { fen, top } = await engineTop(page);
-    const best = fen === s.fen ? top.map((t) => t.move).find((mv) => !s.allowed || s.allowed.includes(mv)) : undefined;
-    await submitMove(page, best ?? pickMove(s.fen, { allowed: s.allowed }), s.fen);
+    const goesOn = (mv: string) => (!s.allowed || s.allowed.includes(mv)) && !endsGame(s.fen, mv);
+    const best = fen === s.fen ? top.map((t) => t.move).find(goesOn) : undefined;
+    const quiet = new Chess(s.fen).moves({ verbose: true }).map((m) => m.lan).filter(goesOn);
+    await submitMove(page, best ?? pickMove(s.fen, { allowed: quiet.length ? quiet : s.allowed }), s.fen);
     await expect.poll(() => page.evaluate(() => (window as any).match.moves.length), { timeout: 30_000 }).toBeGreaterThan(s.n);
   }
   expect(await ownSoFar(page)).toBe(n);
