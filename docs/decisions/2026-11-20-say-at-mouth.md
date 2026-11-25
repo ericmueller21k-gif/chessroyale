@@ -1,6 +1,0 @@
-# The select stage's speech tail points at the boss's mouth (2026-11-20)
-
-- **Eric, Nov 20** (desktop screenshot of Don Dough's line): "Look at the little kind of pointing down thing on the text box... Where they need to be is pointing at the head or like the mouth or near the mouth of the boss that's talking... they're all in the wrong spot."
-- **Eric, Nov 20** (through the director): "it doesn't mean that the text box needs to actually move... We just want that little pointy part at the bottom to move sometimes." Then: "a little to the right to compensate for the screen size, and that's fine, but the arrow should just also be according to where it needs to be."
-- **What changed:** the bubble stays where it is (same size; a narrow one nudges left only as far as its tail needs, never off the stage). The tail moves along the bottom edge to each boss's mouth (`SAY_AT`, fractions of the art box; a default for anyone not listed) and leans when the mouth is past the edge.
-- **Calls made:** mouth points are estimates read off the stage at 1440 x 900, for the 14 bosses on the select screen; Eric to check them. The tail's tip points at the head's column, not the mouth itself: the bubble sits above the head, so the tip is about 60 px above the mouth on a computer.

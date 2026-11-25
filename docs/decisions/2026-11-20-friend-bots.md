@@ -1,7 +1,0 @@
-# Friend bots on an admin's own friends list (Nov 20, 2026)
-
-- **Eric:** "I want to like have some bots on my friends list that like have random activity showing, so I can ... start simulating more what it actually looks like if there are real people, as real as we can get at least."
-- **What changed:** `/admin/ops` has a **Friend bots** card: Add makes `FRIEND_BOTS.count` (8) test accounts (`users.test`, `fbot-` ids, players' names and icons) and friends them with the admin who tapped it (their session; nobody else's list, search or rankings). Remove deletes them as the test accounts' delete does. Route: `/api/admin/friend-bots` (`friend-bots.ts`). No schema change.
-- **Their presence** comes from the time and each bot's id (`friend-bot-schedule.ts`): its own time zone (US), 2 to 6 sessions a day, 10 to 60 minutes each, evenings busiest; inside a session home, queues, matches, the town, Auto chess. No timers, no writes, no live hub. The friends list and a bot's profile both read it.
-- **Call made:** only the lines a real friend shows (core's `ACTIVITY_LINES`: "In a boss battle", "In a queue", "In Chess Town"…). The brief's "In a Boss Battle vs <boss>" and "Climbing the Battle Tower · floor N" aren't in the real presence, so a bot showing them would look unlike a real friend; adding them for everyone is a separate change (a new presence field and app line).
-- **Not done:** bots never accept invites or send requests; their level stays 1 (XP is the ledger's; nothing granted).
