@@ -367,8 +367,8 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   row (mode "squads", placement 1, 2, 3 or 5 of 8 squads) if signed in, and `SQUADS_LOBBY.rewards` (crates of the newest series
   since Nov 9, each opened with a crate key) if still playing their seat. **Coins since Nov 25** ([2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md)):
   the lobby's play coins and its placement's bonus (`PLAY_COINS.bonus.squads`: 40, 25, 15, 5; never the win's 15 too), paid with its
-  XP in `writeReward` (keys `coins:squads:<code>:<made>:<ledger id>`, `coinsbonus:…`); the end screens show them from the grant
-  (`squadsRewardLine`, "+… coins" until it comes). The "placed" message's `coins` stays 0 (for apps from before). Nothing in
+  XP in `writeReward` (keys `coins:squads:<code>:<made>:<ledger id>`, `coinsbonus:…`); the end screens show them in the coin strip under
+  the XP box (Nov 25: [2026-11-25-coin-strip.md](../decisions/2026-11-25-coin-strip.md)); `squadsRewardLine` says only the crates. The "placed" message's `coins` stays 0 (for apps from before). Nothing in
   a test lobby or after a test control. At least once (Nov 6): each stays in the record until written (retried every minute;
   the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). Its XP and coins (one
   grant) hold it up too, until `MATCH_SAVE.strictMinutes` (30) after its first failed write (`SquadsReward.failedAt`; `writeRewardQueue`):
