@@ -204,6 +204,11 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     (+18)", "Placed: Gold 4 · 25 RP"). With 1 v 1 picked, the home screen's panel under its RANKED row reads
     `ranked1v1Rank()` (`packages/app/src/ranked.ts`): "Your rank: Gold 2 · 45 RP". Each tier's pill color is its
     emblem's main color, 4.5:1 or better on both themes.
+- **The season ladder** (Nov 25, [decision](../decisions/2026-11-25-ladder.md); the page: [hub.md](hub.md)): `GET /api/ladder?mode=1v1` (`server/src/ladder.ts`) answers `{ season, mode, total, rows, you }`
+  (core's `LadderAnswer`, numbers in `LADDER`): the top 200 read in order from `ranked_1v1_board`, places shared by equal ladders, their looks in one read; `total` and your place from
+  `shownAbove` (the top tiers' count). `LEFT_OUT` (banned, under review, the engine pool, test accounts; residents count) is left out of the list, the count and every place, the top tiers'
+  too. The rows and count are kept `LADDER.cacheSeconds` (60) in each Worker instance (a `Map`, as `topPlace`); `ladderFor` puts your fresh row in your copy, so a left-out player's answer is an honest player's in that spot. Someone newly banned, pooled or
+  in review stays in the kept list (and `topPlace`) up to that minute. 50 v 50 and Squads: no ladder yet (404). No seasons are stored: "Season 1" is all.
 - **The emblems** (Eric's set, approved Oct 28: a chess piece in a cut-gem badge; d5 plain, d4 studs, d3 wings, d2 a
   crest, d1 a gem crown and a wide glow; Pearlescent and Transcendent 2 s loops):
   - **The drawing** is `packages/app/src/characters/rank-set.ts` (as drawn on `claude/boss-art`, a8d5aa57; only its
@@ -269,7 +274,7 @@ by the clock (`voteAt`); everything else comes as a message.
 
 | Table / column | What | Kept |
 | --- | --- | --- |
-| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day; the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
+| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28; partial index `ranked_1v1_board` (ladder DESC, user_id DESC) WHERE games >= 5, Nov 25) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day; the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
 | `ranked_conduct` (user_id, match_id, at, mode, kind, games, rp, nonce; PK (user_id, match_id); indexes on (user_id, at) and at; Nov 9) | Each dodge and leave (ranked's leave rules): which game, when, the mode ("1v1"), which kind, the player's ranked games by then (the last-20 window), the rank points it cost, the recording that wrote it | `LEAVES.keepDays` (90), then the 15-minute cron (`purgeConduct`); deleted with the account; in the download (`leaves`: game, at, mode, kind, rp); a guest's move to the account on sign-in |
 | `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce, white_points, black_points) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side; the rank points it moved for each side (from Oct 28) | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
 

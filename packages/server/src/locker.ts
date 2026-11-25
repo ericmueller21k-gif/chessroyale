@@ -126,10 +126,12 @@ export async function lockerState(sql: Sql, userId: string, admin = false, befor
 export async function looksOf(sql: Sql, userIds: readonly string[], admins: ReadonlySet<string> = new Set()): Promise<Map<string, ItemLook>> {
   const out = new Map<string, ItemLook>();
   if (!userIds.length) return out;
+  // (The ids as one bound value, a JSON list: D1 takes at most 100 bound values a query, and the season ladder asks for 200 players'
+  // looks at once (ladder.ts). Each id still finds its rows by the key, never a scan.)
   const rows = await sql.all<{ user_id: string; slot: ItemSlot } & Omit<ItemInstance, "id">>(
     `SELECT e.user_id, e.slot, i.def, i.color, i.color2, i.blemish, i.seed FROM equipped_items e JOIN items i ON i.id = e.item_id AND i.user_id = e.user_id
-     WHERE e.user_id IN (${userIds.map(() => "?").join(", ")})`,
-    ...userIds,
+     WHERE e.user_id IN (SELECT value FROM json_each(?))`,
+    JSON.stringify(userIds),
   );
   for (const r of rows) {
     if (itemDef(r.def)?.slot !== r.slot) continue;

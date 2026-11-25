@@ -222,8 +222,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Your profile (Nov 11):** "View profile" in the card's bottom-right corner (13 px words and its box at the bottom edge on cards under 110 px); `e2e/home-layout.spec.ts`, "View profile never covers your name".
   - **Portrait (Nov 11, Eric: rotation off on phones):** a phone held sideways (landscape, 500 px high or less) is covered by `#rotate-lock` in `index.html`; the installed app is locked by its manifest, and `main.tsx` asks `screen.orientation.lock` where a browser allows it.
-  - **Computer** (1024 px+): a side menu (from the top: **Main menu**, Eric, Nov 22: it was Play, then briefly Home, which clashed with the results screen's Home button; Chess Town, Boss Battle, Play with friends, Daily Quests, Shop & crates, Profile, and Settings at the bottom; in
-    Chess Town the middle four open over the town: [town-square.md](town-square.md)), the play column in the center in the phone's order (Eric, Oct 18): the RANKED
+  - **Computer** (1024 px+): a side menu (from the top: **Main menu**, Eric, Nov 22: it was Play, then briefly Home, which clashed with the results screen's Home button; Chess Town, Boss Battle, Play with friends, Ladder, Daily Quests, Shop & crates, Profile, and Settings at the bottom; in
+    Chess Town the middle five open over the town: [town-square.md](town-square.md)), the play column in the center in the phone's order (Eric, Oct 18): the RANKED
     row, its panel, the line above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side (a little shorter) at the
     bottom; the right column (Nov 7, Eric's mockup; the same place on every framed page: a 62 px slot, TOWN and its tools in the
     town; FRIENDS ›; the live line; the global chat, [chat.md](chat.md)). The pawn hops on a computer too (Oct 24: the hop was phone-only). Nov 11: no pawn or chat button in the top area on a computer.
@@ -241,6 +241,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   hub too (Oct 15) but stay off this line: they count for the overload limit and the ops health view only.
 - **The queue screen:** the lobby's seats fill on screen (people, then bots popping in after the fill time), the wait
   so far, "Switch to Default" in Bots off. The match starts in place.
+- **The season ladder** (`/ladder`, Nov 25, [decision](../decisions/2026-11-25-ladder.md); server: [ranked.md](ranked.md)): home's **LADDER ›** (end of the RANKED label, out of the flow), the side menu's **Ladder** (over the town in Chess Town). Tabs in the RANKED row's order, 1 v 1 picked
+  (50 v 50, Squads greyed, a tap says why); the top `LADDER.size` (200) in one scroll; your row always pinned (your place, placements, or Sign in); greyed rows
+  while it loads; a row opens that profile (yours as others see it), whose own Back (`profile-nav.ts` `profileBack`) returns to the same place in the list (`ladder.ts`
+  `cameBack`; the answer kept a minute, then asked again). Your own row in the list is the server's (fresh). Tests: `test/ladder.test.ts`, `home-ranked.spec.ts`.
 - **Profiles** ([docs/decisions/2026-10-28-public-profile.md](../decisions/2026-10-28-public-profile.md), [2026-10-29-public-profile-fit.md](../decisions/2026-10-29-public-profile-fit.md)). Two screens:
   - **The public profile** (`screens/PublicProfile.tsx`, Eric's mockup of Oct 28): the one page every player has, the same for every
     viewer, opened by a tap on another player's name or face anywhere (`PlayerName`, the queue's pawns, the town card, a lobby; the
@@ -403,6 +407,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 | Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, Chess Town's button, the Other modes cards (Boss Battle, Auto chess), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
 | Friends' pieces (rows, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
+| The season ladder: the page, its answer and words | `screens/Ladder.tsx`, `ladder.ts`, `ladder.css` (`ld-`); home's LADDER in `screens/Home.tsx`; server `packages/server/src/ladder.ts` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |
 | The public profile's words and numbers, shared pieces | `packages/app/src/public-profile.ts` (+ `test/public-profile.test.ts`), `components/ProfileParts.tsx` (what they wear, recent matches, the report sheet), `public-profile.css` |
 | The live line, app side | `packages/app/src/live.ts` |

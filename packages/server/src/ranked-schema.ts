@@ -73,6 +73,10 @@ export const RANKED_SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ranked_conduct_at ON ranked_conduct (at)`,
   // (The top tiers' place, topPlace below: the ladders above one counted from this index, never the table. Oct 28, 2026.)
   `CREATE INDEX IF NOT EXISTS ranked_1v1_ladder ON ranked_1v1 (ladder)`,
+  // (The season ladder's list, ladder.ts: its rows read in order from the top, LADDER.size of them, and its count, from this index
+  // alone. Only players past placements. Nov 25, 2026. A change to RANKED_1V1.placements.games needs a new name here: IF NOT EXISTS
+  // keeps the old index, whose WHERE the new queries would no longer match.)
+  `CREATE INDEX IF NOT EXISTS ranked_1v1_board ON ranked_1v1 (ladder DESC, user_id DESC) WHERE games >= ${RANKED_1V1.placements.games}`,
   `CREATE INDEX IF NOT EXISTS ranked_1v1_games_white ON ranked_1v1_games (white_id, ended_at)`,
   `CREATE INDEX IF NOT EXISTS ranked_1v1_games_black ON ranked_1v1_games (black_id, ended_at)`,
   `CREATE INDEX IF NOT EXISTS ranked_1v1_games_ended ON ranked_1v1_games (ended_at)`,
@@ -91,6 +95,33 @@ export const RANKED_COLUMNS: { table: string; column: string; type: string; then
   { table: "ranked_1v1_games", column: "black_points", type: "INTEGER" },
 ];
 
+/**
+ * SQL: the accounts no ranking shows (a list of ids): banned players, players under fair-play review (fairplay.ts's eligibleForRanked:
+ * "not while they're in review or banned"; the director's call, Nov 25), fair play's engine pool (NOT_POOLED) and test accounts
+ * (test-accounts.ts). Read from their own few rows (fairplay_cases' status, users_test), never a scan. The season ladder (ladder.ts) and
+ * the top tiers' place (topPlace) both leave out exactly these, so a place on the ladder and the tier it gives always agree. A left-out
+ * player still sees their own place, and the ladder, as ever (ladder.ts ladderFor). (Residents count: real-looking players by design.)
+ */
+// (Never a NULL in it: a TEXT primary key may hold one in SQLite, and one NULL would make every `NOT IN` unknown, the ladder empty.)
+export const LEFT_OUT = `(SELECT user_id FROM fairplay_cases WHERE status IN ('banned', 'review', 'pool') AND user_id IS NOT NULL UNION ALL SELECT id FROM users WHERE test = 1 AND id IS NOT NULL)`;
+
+/** SQL: how many shown ladders there are (no bound values): every ladder (placements done), less the few left out (LEFT_OUT's). */
+export const SHOWN_ALL_SQL = `SELECT (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder IS NOT NULL)
+  - (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder IS NOT NULL AND user_id IN ${LEFT_OUT}) AS n`;
+/** SQL: how many shown ladders are higher than ?1. */
+export const SHOWN_ABOVE_SQL = `SELECT (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder > ?1) - (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder > ?1 AND user_id IN ${LEFT_OUT}) AS n`;
+
+/**
+ * How many shown ladders are higher than `ladder` (null: all of them, the season ladder's count). One count on the ladder's index
+ * (ranked_1v1_ladder: its entries, never the table), less the few left-out ladders among them (LEFT_OUT).
+ */
+export async function shownAbove(sql: Sql, ladder: number | null): Promise<number> {
+  return (ladder === null ? await sql.first<{ n: number }>(SHOWN_ALL_SQL) : await sql.first<{ n: number }>(SHOWN_ABOVE_SQL, ladder))?.n ?? 0;
+}
+
+/** A ladder's place among the shown ladders: 1 + how many are higher (equal ladders share a place). The season ladder's and the top tiers'. */
+export const placeOf = async (sql: Sql, ladder: number): Promise<number> => (await shownAbove(sql, ladder)) + 1;
+
 /** How long a ladder's place among the top ladders is kept (in this Worker instance) before it's counted again. */
 export const TOP_PLACE_MS = 60_000;
 /** At most this many ladders' places kept at once (the oldest go first). */
@@ -102,24 +133,16 @@ const topPlaces = new Map<number, { place: number; at: number }>();
  * are higher. Equal ladders share a place (the same ladder is always the same tier). Asked only at
  * RANKED_1V1.topFloor or above (null below: no top tier there), as one count on the ladder's index (ranked_1v1_ladder:
  * the entries above it, never the table), and kept a minute per ladder in this Worker instance (`TOP_PLACE_MS`), so a
- * busy profile or queue costs one count a minute per ladder. Fair play's engine pool is left out of the count (its ladders above,
- * taken away: the pool's few cases, never a scan of the table): a pooled player never takes an honest player's place, and theirs is
- * counted the same way, so it looks as ever. Test accounts (test-accounts.ts) are left out the same way.
+ * busy profile or queue costs one count a minute per ladder (placeOf). Fair play's engine pool is left out of the count (its ladders
+ * above, taken away: the pool's few cases, never a scan of the table): a pooled player never takes an honest player's place, and theirs
+ * is counted the same way, so it looks as ever. Test accounts (test-accounts.ts) and, since the season ladder (Nov 25, 2026), banned
+ * players and players under review are left out the same way (LEFT_OUT): the ladder's places and these tiers come from the same count.
  */
 export async function topPlace(sql: Sql, ladder: number | null | undefined, now = Date.now()): Promise<number | null> {
   if (!mayBeTop(ladder)) return null;
   const kept = topPlaces.get(ladder);
   if (kept && now - kept.at < TOP_PLACE_MS) return kept.place;
-  const above =
-    (
-      await sql.first<{ n: number }>(
-        `SELECT (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder > ?1)
-           - (SELECT COUNT(*) FROM ranked_1v1 r WHERE r.ladder > ?1 AND (r.user_id IN (SELECT user_id FROM fairplay_cases WHERE status = 'pool')
-                OR r.user_id IN (SELECT id FROM users WHERE test = 1))) AS n`,
-        ladder,
-      )
-    )?.n ?? 0;
-  const place = above + 1;
+  const place = await placeOf(sql, ladder);
   topPlaces.delete(ladder);
   if (topPlaces.size >= TOP_PLACES_KEPT) topPlaces.delete(topPlaces.keys().next().value!);
   topPlaces.set(ladder, { place, at: now });
