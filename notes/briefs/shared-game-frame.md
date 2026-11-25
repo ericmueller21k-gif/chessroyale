@@ -58,3 +58,18 @@ Build exactly what `notes/tools/mock-crowd-50.spec.ts` shows, including the stan
 - Stills: 1536x730 and 1920x960 on your own pick turn (the Waiting box) and while watching the other team vote, plus 1858x1040, plus
   the phone 390x844 to show it unchanged. Put them on `stills/crowd-frame`.
 - Squads and Boss are NOT in this job.
+
+## Second job (Nov 26): Squads only, one PR (branch `claude/squads-frame`)
+- Build on main after #953 (1 v 1 frame) and #956 (50 v 50 frame, `--cf-gap`, Eric's column-rule guard in `desktop-board.spec.ts`). Reuse;
+  don't copy. Read #956's PR body and `docs/decisions/2026-11-26-crowd-vote-column.md` first.
+- Squads on a computer (1100 px and up, mouse): no title line; the board line ("Board 2 · starting soon", the format) is the top strip's
+  middle; the gear top right, level with it. Left column: the team clocks / boards list as today, on the board's top and bottom lines.
+  Right column, the board's height: the tiny boards on top, the pick/vote line (standing, gray "Waiting…" when idle, as the 50 v 50's
+  status box), then the chat to the board's foot. Equal gaps either side of the board. The board never shrinks for the menu; labels by
+  #953's rule.
+- Add Squads (in play, and its lobby/vote if it has a board) to the eric.md column-rule guard at 1536x730 and 1920x960, and say so in the
+  rule's text in `docs/rules/eric.md`.
+- BEFORE building: make a quick mockup still (CSS/DOM injected over the live screen, like `notes/tools/mock-crowd-50.spec.ts`) at 1536x730
+  and push it to `stills/squads-frame/mock/`; then build without waiting (the director reviews the mock and the build together).
+- Stills of the build: 1536x730, 1920x960, 1858x1040, plus the phone 390x844 unchanged, on `stills/squads-frame/`.
+- The phone is unchanged.
