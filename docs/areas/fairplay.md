@@ -174,3 +174,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - No invasive fingerprinting; admin emails live in a Worker variable or secret, never in the repo.
 - A ban means you can't sign in (Eric's rule: `docs/rules/eric.md`): a new way to sign in, or a new route outside the Worker's
   `route()`, goes through `signInBan` or the ban gate in the same PR.
+
+- **The ladder and a left-out player (Nov 25, the ladder's delta review D2):** a pooled or reviewed player's ladder is built "as ever" (as an
+  honest player's in their spot), so near the Transcendent or Pearlescent line a row's tier there can differ from that player's own profile
+  (counted without them). Accepted: the alternative is viewer-relative places on every screen with a tier. A third party can also notice a
+  pooled friend missing from the ladder. `docs/decisions/2026-11-25-ladder.md`.

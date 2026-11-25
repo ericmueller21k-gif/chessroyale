@@ -788,6 +788,8 @@ test("the season ladder (Eric, Nov 25): home's LADDER › on a phone, the side m
   await expect(page.getByText("Ladder 199", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Back" }).first().click();
   await expect(rows).toHaveCount(LADDER.size);
+  // (Its address too: the ladder's, not home's, so a reload keeps it. The delta review's D1.)
+  await expect(page).toHaveURL(/\/ladder(\?.*)?$/);
   await expect.poll(belowView).toBeLessThanOrEqual(2);
   expect(await list.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
   expect(asked, "the kept answer").toBe(0);

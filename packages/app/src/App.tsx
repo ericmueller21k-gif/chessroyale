@@ -2929,6 +2929,10 @@ function ProfilePage({
   onShop: () => void;
   onFriends: () => void;
 }) {
+  // (The page under the profile keeps its address after the profile's own Back: /ladder, /friends; anything else is home's. Captured as
+  // the profile first opens, before the effect below replaces it; a profile reached from another profile keeps it. The delta review of
+  // #935, D1: a reload after Back landed on home while the ladder showed.)
+  const [under] = useState(() => (/^\/(ladder|friends)$/.test(location.pathname) ? location.pathname : "/"));
   useEffect(() => {
     // (Yours is /profile; anyone's public profile, yours as others see it included, is /profile/ID.)
     const path = target.you && !target.public ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
@@ -2940,7 +2944,7 @@ function ProfilePage({
       target={target}
       onBack={() => {
         profileBack();
-        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", `/${location.search}`);
+        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", `${under}${location.search}`);
       }}
       onLocker={onLocker}
       onSettings={onSettings}
