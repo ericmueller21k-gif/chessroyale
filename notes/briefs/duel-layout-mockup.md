@@ -1,4 +1,4 @@
-# Ranked 1 v 1 on a computer: a chess.com-size board + rank emblems + "what ranks mean" pop-up (Nov 25). Opus high, MOCKUP (stills)
+# Ranked 1 v 1 on a computer: FIX the broken end page now; MOCKUP a chess.com-size board + rank emblems + a "what ranks mean" pop-up (Nov 25). Opus high
 
 Eric (Nov 25, a ranked 1 v 1 vs a resident, Edge on Windows, window ~1856 × 960): "this size is all fucking wrong. This is not the size that
 chess.com uses. Why the fuck is the board so small? ... that 1v1 rapid and the timer can probably be on the same line ... we have more room.
@@ -14,6 +14,18 @@ Start: `git fetch origin main && git checkout -B claude/duel-layout-mockup origi
 Pearlescent top 500, Transcendent top 100; the emblems `emblems/rank-emblems.ts`), `screens/Duel.tsx`. First: was it bigger before (git log on
 board-size.css / Duel)? Say what changed, if anything.
 
+**Part A, a BUG FIX to ship (no mockup needed): the 1 v 1 end page on a computer is broken.** Eric (Nov 25, same window, after resigning at
+move 2): "Look at this. This is sloppy as hell. Look at this chat. Look at the spacing on the left here. Like, what the fuck happened?" His
+screenshot: the page scrolls sideways (a horizontal scrollbar at the bottom) and down: "Defeat" and "The game, move by move" are cut off at the
+top; the left column (Defeat, You resigned, RP EARNED, the Placement 1/5 card, XP EARNED, the level card, QUESTS, Play again / Home) floats in a
+narrow centered strip with a big gap to the move-by-move board on the right; the gear button floats mid-page; **the chat panel is crushed** to
+its header and input under Play again (no message area); and the placement card reads "Placement 1/5 … 1 RP … 5" (placement games are not RP:
+"1 of 5 games"). Find what broke it (git log on Duel.tsx / EndScreen / board-size.css / chat panel CSS: tonight's crowd layout #927/#930, the
+ladder #935 and the chat changes are suspects) and fix the cause. Nothing scrolls sideways at 1280 × 800 to 2000 × 1100; the chat keeps its
+message area; columns aligned with even gutters; the header never cut. One focused e2e check (no horizontal scroll, chat message area height
+> 0, header in view) in an existing spec. Ship Part A on its own branch `claude/duel-end-fix` with `.pr-body.md` + `.done` FIRST (light/targeted).
+
+**Part B, the MOCKUP** (on `claude/duel-layout-mockup`):
 Mockup (the real 1 v 1 screen with a test switch or a preview page; computer at 1280 × 800, 1440 × 900, 1920 × 1080 and Eric's ~1856 × 960;
 phone 390 unchanged unless you see a clear win; light + dark):
 1. **Board as big as chess.com's**: the board takes nearly the full height (only the two player strips above and below it, and no separate
