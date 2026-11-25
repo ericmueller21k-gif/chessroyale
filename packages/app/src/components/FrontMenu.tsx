@@ -11,6 +11,7 @@ import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
 import { MOUSE_LAYOUT } from "./MatchMenu.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { questsForYou } from "../quests.ts";
+import { TROPHY_PATHS } from "../ladder.ts";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -98,9 +99,9 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
           onClick={() => nav.ladder?.()}
           icon={
             <Icon>
-              <path d="M8 4h8v5a4 4 0 0 1-8 0z" />
-              <path d="M8 6H5.5a2.5 2.5 0 0 0 2.6 3.4M16 6h2.5a2.5 2.5 0 0 1-2.6 3.4" />
-              <path d="M12 13v3M8.5 20h7M9.5 20l.5-4h4l.5 4" />
+              {TROPHY_PATHS.map((d) => (
+                <path key={d} d={d} />
+              ))}
             </Icon>
           }
         />

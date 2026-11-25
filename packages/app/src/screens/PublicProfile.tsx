@@ -30,6 +30,7 @@ import {
   type RecentRow,
 } from "../public-profile.ts";
 import "../public-profile.css";
+import { goLadder, ladderWayIn } from "../ladder.ts";
 
 /**
  * The public profile (docs/decisions/2026-10-28-public-profile.md; Eric's mockup, Oct 28): the one page everyone has, the same
@@ -271,7 +272,14 @@ function RankedCard({ p, own, loading, wide }: { p: PublicProfile | null; own: b
             ))
           }
         </Menu>
-        <span class="pp-season">Season 1</span>
+        {/* (The ladder's way in, mockup option C (Nov 25): the season's words become its link.) */}
+        {ladderWayIn() === "c" ? (
+          <button type="button" class="pp-season pp-ladder-c" onClick={goLadder}>
+            See ladder ›
+          </button>
+        ) : (
+          <span class="pp-season">Season 1</span>
+        )}
       </div>
       {/* (All three layers sit in one cell, so the card is as tall as the tallest in every mode: 1 v 1's, which has the most.) */}
       <div class="pp-body">

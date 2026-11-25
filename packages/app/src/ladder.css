@@ -4,6 +4,7 @@
  */
 .fd-page.ld {
   --ld-row: 60px;
+  color: var(--fd-text);
   --ld-gold: #e2b33c;
   --ld-silver: #b8c0cc;
   --ld-bronze: #c9894d;
@@ -19,13 +20,12 @@
   height: 44px;
   flex: none;
 }
-.ld-head h1 {
+.fd-page.ld .ld-head h1 {
   flex: 1;
+  color: var(--fd-text);
   text-align: center;
-  font-family: "Archivo Black", Archivo, sans-serif;
-  font-weight: 400;
   font-size: 19px;
-  letter-spacing: 0.5px;
+  font-weight: 800;
 }
 
 /* The season and how many are ranked. */
@@ -96,13 +96,13 @@
 .ld-cols,
 .ld-row {
   display: grid;
-  grid-template-columns: 34px 40px minmax(0, 1fr) 48px 64px;
+  grid-template-columns: 30px 40px minmax(0, 1fr) 48px 58px;
   align-items: center;
-  column-gap: 8px;
+  column-gap: 6px;
 }
 .ld-cols {
   flex: none;
-  padding: 0 10px;
+  padding: 0 9px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.8px;
@@ -139,7 +139,7 @@
   flex: none;
   width: 100%;
   min-height: var(--ld-row);
-  padding: 0 10px;
+  padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 12px;
   background: var(--fd-panel);
@@ -176,7 +176,7 @@
   color: var(--fd-sub);
 }
 .ld-place.long {
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: -0.3px;
 }
 .ld-medal {
@@ -201,7 +201,7 @@
 }
 
 /* Their head: the dressed pawn, cropped to the hat and face in a circle (as the profile's recent games). */
-.ld-head {
+.ld-face {
   position: relative;
   display: grid;
   place-items: center;
@@ -211,11 +211,11 @@
   border-radius: 50%;
   background: var(--fd-panel-2);
 }
-.ld-head .fd-pawn-seat {
+.ld-face .fd-pawn-seat {
   transform: scale(1.7);
   transform-origin: 50% 22%;
 }
-.ld-row.you .ld-head {
+.ld-row.you .ld-face {
   background: color-mix(in srgb, var(--fd-gold) 25%, var(--fd-panel-2));
 }
 
@@ -305,11 +305,11 @@
   background: var(--fd-gold-soft);
 }
 .ld-placing {
-  grid-template-columns: 34px 40px minmax(0, 1fr) auto;
+  grid-template-columns: 30px 40px minmax(0, 1fr) auto;
   cursor: default;
 }
-.ld-mine > .ld-placing:first-child:not(:has(.ld-head)) {
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+.ld-mine > .ld-placing:first-child:not(:has(.ld-face)) {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
 }
 .ld-badge {
   display: grid;
@@ -351,12 +351,15 @@
 @media (max-width: 359px) {
   .ld-cols,
   .ld-row {
-    grid-template-columns: 30px 36px minmax(0, 1fr) 48px 56px;
-    column-gap: 6px;
+    grid-template-columns: 26px 34px minmax(0, 1fr) 48px 52px;
+    column-gap: 5px;
   }
-  .ld-head {
-    width: 36px;
-    height: 36px;
+  .ld-face {
+    width: 34px;
+    height: 34px;
+  }
+  .ld-rank {
+    font-size: 11.5px;
   }
 }
 
@@ -370,10 +373,14 @@
   .fd-page.ld {
     --ld-row: 62px;
   }
-  .ld-head h1 {
+  .fd-page.ld .ld-head h1 {
     text-align: left;
     padding-left: 6px;
     font-size: 22px;
+  }
+  .ld-season {
+    justify-content: flex-start;
+    padding-left: 6px;
   }
   .ld-tabs {
     max-width: 480px;
@@ -399,7 +406,7 @@
     grid-column: 2 / 5;
   }
   .ld-placing,
-  .ld-mine > .ld-placing:first-child:not(:has(.ld-head)) {
+  .ld-mine > .ld-placing:first-child:not(:has(.ld-face)) {
     grid-template-columns: 44px 42px minmax(0, 1fr) auto;
   }
   .ld-row:hover:not(.ld-placing) {
@@ -412,4 +419,42 @@
   .ld-note {
     bottom: 40px;
   }
+}
+
+/* -- The mockup's ways in on a phone (?ladderin=a|b|c) -- */
+/* A: at the end of home's RANKED label, out of the flow (the label's line keeps its height). */
+.fd-ranked {
+  position: relative;
+}
+.fd-ladder-a {
+  position: absolute;
+  right: 0;
+  top: -12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-height: 40px;
+  padding: 0 2px 0 10px;
+  border: 0;
+  background: none;
+  color: var(--fd-link);
+  font: 800 12px/1 Archivo, system-ui, sans-serif;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+/* B: your card's bottom-left corner, "View profile"'s mirror (its look and sweep). */
+.fd-hero-profile.fd-ladder-b {
+  right: auto;
+  left: 12px;
+  gap: 4px;
+}
+/* C: the profile's Ranked Standing card, the season's place: a link. */
+.pp-season.pp-ladder-c {
+  border: 0;
+  background: none;
+  color: var(--fd-link);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
 }

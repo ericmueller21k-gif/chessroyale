@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { RankView } from "@chessroyale/core";
-import { account } from "../account.ts";
+import { account, playerName } from "../account.ts";
 import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { LADDER_MODES, ladderMock, ladderSwitch, placeText, placementLine, rankLine, recordLine, winPct, type LadderModeId, type LadderPage, type LadderRow } from "../ladder.ts";
@@ -19,7 +19,7 @@ export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignI
   const [mode, setMode] = useState<LadderModeId>("1v1");
   const [note, setNote] = useState<string | null>(null);
   const me = account().profile;
-  const [page] = useState<LadderPage>(() => ladderMock(ladderSwitch() ?? "off", me?.locker?.look, me?.user.name || "You"));
+  const [page] = useState<LadderPage>(() => ladderMock(ladderSwitch() ?? "off", me?.locker?.look, playerName()));
   useEffect(() => {
     if (location.pathname !== "/ladder") history.replaceState(null, "", `/ladder${location.search}${location.hash}`);
   }, []);
@@ -88,7 +88,8 @@ export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignI
             <Head look={me?.locker?.look} />
             <span class="ld-who">
               <strong class="ld-name">
-                {me?.user.name || "You"} <span class="ld-tag">You</span>
+                <span class="ld-name-text">{playerName()}</span>
+                <span class="ld-tag">You</span>
               </strong>
               <span class="ld-sub">{placementLine(you.placement)}</span>
             </span>
@@ -111,7 +112,7 @@ export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignI
 
 function Head({ look }: { look?: LadderRow["look"] }) {
   return (
-    <span class="ld-head">
+    <span class="ld-face">
       <DressedPawn size="seat" look={look} />
     </span>
   );

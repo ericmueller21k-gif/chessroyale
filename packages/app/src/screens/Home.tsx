@@ -32,6 +32,7 @@ import { questCountdowns, questsForYou, useQuests } from "../quests.ts";
 import { account, mustSignInToPlayOnline } from "../account.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
+import { TROPHY_PATHS, goLadder, ladderWayIn } from "../ladder.ts";
 import { homeRankLine, leavesLine, ranked1v1Rank, rankedLockedUntil, yourLeaves } from "../ranked.ts";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { SwordsIcon } from "../town/CardIcons.tsx";
@@ -919,6 +920,17 @@ export function HomeScreen({
       </div>
       {/* (Eric, Nov 11: "View profile" in the card's top right, a normal blue, a chevron and a light sweep; the same screen the pawn opened.
           Out of the flow (styles.css, `.fd-hero-profile`): nothing else on the card moves.) */}
+      {/* (The ladder's way in, mockup option B (Nov 25): the card's bottom-left corner, the mirror of "View profile".) */}
+      {ladderWayIn() === "b" && (
+        <button type="button" class="fd-hero-profile fd-ladder-b" onClick={goLadder}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            {TROPHY_PATHS.map((d) => (
+              <path key={d} d={d} />
+            ))}
+          </svg>
+          <span class="fd-hero-profile-text">Ladder</span>
+        </button>
+      )}
       <button type="button" class="fd-hero-profile" data-tour="profile" onClick={onProfile}>
         <span class="fd-hero-profile-text">View profile</span>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1110,6 +1122,15 @@ export function HomeScreen({
       <h2 class={`fd-label${off}`} id="fd-ranked-label">
         RANKED
       </h2>
+      {/* (The ladder's way in, mockup option A (Nov 25): at the end of the label's line, out of the flow: nothing moves.) */}
+      {ladderWayIn() === "a" && (
+        <button type="button" class="fd-ladder-a" onClick={goLadder}>
+          LADDER
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+      )}
       {searching ? (
         // (Searching: the same box, the same size, the search in it.)
         <SearchRow search={search!} />

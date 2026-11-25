@@ -137,3 +137,18 @@ export function ladderSwitch(search = typeof location === "undefined" ? "" : loc
   if (v === "mock-guest") return "guest";
   return null;
 }
+
+/**
+ * The mockup's ways in on a phone (Eric, Nov 25: "on mobile not sure where the button belongs yet"), one at a time for the
+ * stills: `?ladderin=a` "LADDER ›" at the end of home's RANKED label (the pick), `b` "Ladder" in your card's bottom-left
+ * corner (the mirror of "View profile"), `c` "See ladder ›" on the profile's Ranked Standing card. None without it.
+ */
+export function ladderWayIn(search = typeof location === "undefined" ? "" : location.search): "a" | "b" | "c" | null {
+  const v = new URLSearchParams(search).get("ladderin");
+  return v === "a" || v === "b" || v === "c" ? v : null;
+}
+/** The mockup's way to the page: a plain load of /ladder, its test switches kept. */
+export const goLadder = () => location.assign(`/ladder${location.search || "?ladder=mock"}`);
+
+/** The ladder's trophy (the computer's side menu, the ways in). */
+export const TROPHY_PATHS = ["M8 4h8v5a4 4 0 0 1-8 0z", "M8 6H5.5a2.5 2.5 0 0 0 2.6 3.4M16 6h2.5a2.5 2.5 0 0 1-2.6 3.4", "M12 13v3M8.5 20h7M9.5 20l.5-4h4l.5 4"];
