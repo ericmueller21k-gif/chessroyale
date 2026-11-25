@@ -21,10 +21,11 @@
  */
 import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type FolioState } from "@chessroyale/core";
 import { Chess, type Square } from "chess.js";
-import { boardEnd } from "../boards.ts";
+import { BOSS_OPENING, boardEnd, newBoard } from "../boards.ts";
 import { marksStop, type EdgeMark } from "../board-layer.ts";
 import { applyMove, baseAt, fenAtPly, legalMoves, matingMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
+import { BALLOON_TEST_MOVES } from "./tiger.ts";
 import { heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, ultCapped, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
 
 /**
@@ -304,7 +305,8 @@ const boardOf = (b: Battle) => b.boards.get(b.state.boards[0]!)!;
 const ULT_MOMENTS = new Set(["warn", "creaseWarn", "crease", "creaseEnd"]);
 
 /**
- * Folio. The test switches: ?power=draft brings the Draft from turn 2, again every turn once a mark is gone; ?power=crease
+ * Folio. The test switches: ?power=draft starts from BALLOON_TEST_MOVES (Folio's queen on d5, already on your a2, d2 and g2) and
+ * brings the Draft from turn 2, again every turn once a mark is gone; ?power=crease
  * warns as the second turn begins (the crease as the third does); ?power=revision brings Revision at the first crowd move
  * it may follow, whatever the evaluation says (its other rules kept).
  */
@@ -418,7 +420,16 @@ export const FOLIO: BossRules = {
   afterBossMove(b, move, extras) {
     folioBattle.afterItsMove(b, move, extras?.crease ?? null, extras?.creaseLoss ?? null);
   },
-  opening: { setUp: (b) => ({ nextPassive: b.settings.bossPowerTest === "draft" ? 2 : BOSS_POWERS.draftFirst, folio: FOLIO_FRESH }) },
+  // (?power=draft's start: from the usual one the Draft has nothing to mark until it attacks a defended piece of yours, so a battle
+  // that kept its pieces home never showed it (main, Nov 25). From this one, after the smoke's first move (Na3) every reply of its
+  // leaves one: the Draft as turn 2 begins, whatever it plays (docs/decisions/2026-11-25-folio-draft-test-start.md).)
+  opening: {
+    setUp(b, at) {
+      const test = b.settings.bossPowerTest === "draft";
+      if (test) b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...BALLOON_TEST_MOVES] }, BALLOON_TEST_MOVES.length, at.generation));
+      return { nextPassive: test ? 2 : BOSS_POWERS.draftFirst, folio: FOLIO_FRESH };
+    },
+  },
   view: (p) => folioView(p),
 };
 
