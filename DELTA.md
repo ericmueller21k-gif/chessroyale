@@ -1,4 +1,26 @@
-# Delta for the re-review: Payments PR 2 (#950), the review's fixes (Nov 25)
+# Delta for the re-review: Payments PR 2 (#950)
+
+## Round 2: the delta review's fixes (Nov 25)
+
+Base: `158d12d` (the head the delta review read). Head: this branch. The director's calls: `notes/briefs/payments-pr2-delta-fixes.md`
+on `claude/director-notes`. The delta review: `DELTA-REVIEW.md` on `review/pay-play-coins-delta`. `git diff 158d12d -- packages docs`
+is the whole delta.
+
+- **N1 (a second daily reward on a replay across the XP day's rollover).** `server/rewards.ts dailyOp`: `when` = no `daily` leg of
+  this account whose source is this game (`ledger_reason (account=? AND reason=?)`). `server/xp.ts grantXp`: the after-read finds the
+  game's daily XP leg by account, reason and source (was: today's op id and source), so a replay on the next day answers the reward
+  the game paid, as a same-day replay does (`gameRewards` already read by source). Test "N1" (ranked replay 15 s after the rollover;
+  the next game that day pays the day's; a Squads reward written before and after). Call 16.
+- **N2, Squads.** `server/squads-do.ts writeRewardQueue`: on a failure, `failedAt ??= now` on every reward still waiting. Test "N2"
+  (3 rewards, a lasting grant fault: all marked at the first wake, all written at the next past the window, once each). Call 17.
+- **N2, ranked: not in this PR** (the director's call). A known pre-launch limit, call 18.
+- **N3.** `server/play-coins.ts oldCoins`: `AND leg = 0`. Test "N3" (its query plan searches the primary key); "m3" unchanged.
+- **N6** `docs/areas/accounts.md` line 77. **N7** "16.5" in core's `bonusFor` comment and call 8. N4, N5 left.
+- Area pages: `accounts.md` (the daily reward, one a game), `squads.md` (the queue's one window).
+- **Checks changed:** none (three tests added). Run: `npm run typecheck` (pass); `npx vitest run packages/core packages/server`: 136
+  files, 1964 tests, all pass. Each new test fails with its file's fix reverted (checked one file at a time).
+
+## Round 1: the review's fixes (Nov 25)
 
 Base: `a4de7fc` (the head the review read). Head: this branch. The director's calls: `notes/briefs/payments-pr2-fixes.md` on
 `claude/director-notes`. The review: `REVIEW.md` on `review/pay-play-coins`. `git diff a4de7fc -- packages docs` is the whole delta.

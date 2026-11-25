@@ -339,7 +339,7 @@ describe("play coins, the review's fixes (Nov 25)", () => {
     const { sql } = await world();
     const users = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com"), await signedIn(sql, "cy@example.com")];
     const broken: Sql = { ...sql, batch: (st) => (grantBatch(st) ? lost() : sql.batch(st)) };
-    const rec = { code: "SQUAD", createdAt: T0, rewardQueue: users.map((u, i) => reward(u.id, { playerId: `p${i}`, squadId: i, placement: i + 1, crates: 1 })) };
+    const rec = { code: "SQUAD", createdAt: T0, rewardQueue: users.map((u, i) => reward(u.id, { playerId: `p${i}`, squadId: i, placement: (i + 1) as SquadsReward["placement"], crates: 1 })) };
     const at = T0 + 20 * MIN;
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
