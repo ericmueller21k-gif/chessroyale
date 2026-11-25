@@ -1,0 +1,103 @@
+/* MOCKUP (Nov 25, round 2): ranked 1 v 1 on a computer, Eric's asks. Injected by scripts/mockup/duel-layout.spec.ts over the real screen
+   (`mk-duel` on it). No title line: the opponent's strip is the top of the screen, "1 v 1 · Blitz 3+2" in it between their name and their
+   clock; the gear at the screen's top right, level with that strip; the board all the height between the two strips; on the right one
+   panel exactly the board's height (its top and foot on the board's), the chat filling it over one row of game actions (Offer a draw,
+   Resign); "Your move" beside your own clock. The end page: the same frame, the panel's content swapped. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game.duel-screen.mk-duel {
+    --bd-room: 108px !important;
+    grid-template-rows: auto !important;
+    row-gap: 0 !important;
+    padding-top: 10px !important;
+    padding-bottom: 14px !important;
+  }
+  .mk-duel > .hud-row,
+  .mk-duel > .play-footer {
+    display: none !important;
+  }
+  .mk-duel > .board-area {
+    grid-row: 1 / 2 !important;
+  }
+  .mk-duel > .mk-side {
+    grid-column: 2;
+    grid-row: 1 / 2;
+    align-self: stretch;
+    contain: size;
+    display: grid;
+    grid-template-rows: 34px minmax(0, 1fr) 34px;
+    row-gap: 8px;
+    min-height: 0;
+  }
+  .mk-gearrow {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .mk-gearrow .mm-more {
+    height: 34px;
+  }
+  .mk-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  }
+  .mk-panel > .dv-chat,
+  .mk-panel > .dv-end-col {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto !important;
+    contain: size;
+    grid-row: auto !important;
+  }
+  .mk-actions {
+    flex: none;
+    display: flex;
+    gap: 8px;
+  }
+  .mk-actions .btn {
+    flex: 1 1 0;
+    min-height: 40px;
+    font-size: 15px;
+    padding: 0 12px;
+  }
+  .mk-actions .dv-draw {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .mk-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-left: auto;
+    margin-right: 12px;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .mk-title b {
+    color: var(--text);
+    font-size: 14px;
+  }
+  .mk-status {
+    margin: 0 10px 0 auto;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+  .mk-status.mine {
+    background: color-mix(in srgb, var(--good) 18%, var(--surface));
+    color: var(--good);
+  }
+  .mk-duel .dv-strip .dv-steps {
+    margin-left: auto;
+  }
+}
