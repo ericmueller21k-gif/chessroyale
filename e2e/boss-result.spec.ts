@@ -197,15 +197,6 @@ test("a boss battle resigned: one gap between every container, nothing stretched
       });
       if (!c.review) expect(Math.abs(c.off), `${s.at}: nothing to review: the column centered in the page (${c.off.toFixed(0)} px off)`).toBeLessThanOrEqual(4);
     }
-    // (A phone: his words beside his head, never over your pawn (round 2c): any bubble's foot over your pawn's top.)
-    if (s.phone) {
-      const b = await page.evaluate(() => {
-        const bub = document.querySelector(".results-duo .bc-bubble")?.getBoundingClientRect();
-        const pawn = document.querySelector(".results-duo .rd-you .you-pawn-bob")!.getBoundingClientRect();
-        return bub ? { foot: bub.bottom, pawn: pawn.top + pawn.height * 0.25 } : null;
-      });
-      if (b) expect(b.foot, `${s.at}: his words clear of your pawn`).toBeLessThanOrEqual(b.pawn);
-    }
     await ctx.close();
   }
 });

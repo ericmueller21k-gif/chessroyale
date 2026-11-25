@@ -685,31 +685,6 @@
   --pk: 1.8;
   --pw: calc(68px * var(--pk));
 }
-/* A phone (Nov 25, round 2c): no band kept over him for his words. They sit beside his head, over your pawn's column, their foot 8 px
-   over your pawn's head (108 px over the base line: the pawn at 1.8), so they never cover your pawn or anything above the duo but a
-   short boss's two-line words (Ginger, Birdie: up to the gap's width). The gap above him is the one gap. Their tail points left at
-   him. A computer keeps them over his head. */
-@media not all and (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
-  .es-screen .results-duo .boss-char.place-results {
-    margin-top: 0;
-  }
-  .es-screen .results-duo .boss-char .bc-bubble {
-    left: calc(100% + 10px);
-    top: auto;
-    bottom: 108px;
-    translate: 0 0;
-    max-width: min(220px, 100vw - 180px);
-  }
-  .es-screen .results-duo .boss-char .bc-bubble::after {
-    left: -9px;
-    right: auto;
-    top: auto;
-    bottom: 8px;
-    margin-left: 0;
-    border-right: 0;
-    border-left: 3px solid #1a1406;
-  }
-}
 /* Squads' middle: your squad's tag and members, in a row. */
 .es-squad {
   display: flex;

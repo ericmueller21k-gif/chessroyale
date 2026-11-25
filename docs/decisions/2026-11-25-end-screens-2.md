@@ -61,9 +61,8 @@ before shipping any change to an end screen.
   is one line, "No moves judged this game."; the best and worst moves only with a move (their empty box took a second gap).
 - A boss result on a computer with no move of yours to review is one column, centered in the page (the mate test and an instant resign);
   a game with moves keeps the move by move beside it.
-- Call: on a phone his words sit beside his head, over your pawn's column, their foot 8 px over your pawn's head, tail pointing at him;
-  no band kept over him. A computer keeps them over his head (the brief named the phone; its 56 px room shows there too: the director's
-  call). Measured at 2.25: every boss is 137 to 205 px tall and your pawn's head about 100 px up, so only the shortest (Ginger, Birdie)
-  could have two-line words reach into the gap above the duo, never the headline.
+- Call (reverted by the director, Nov 25): his words sat beside his head on a phone, which broke the Nov 9 design its checks guard
+  (boss-result.spec.ts: his words start over him, the tail over his middle, above him). A phone keeps the computer's placement, over his
+  head with room kept for two lines; that room is empty only before he speaks.
 - Guard: `endPage` (resign.spec.ts: `endGaps`, buttons stacked, centered) on the 50 v 50 and Squads end pages, phone 390 x 844 and laptop
   1536 x 730; boss-result's resigned check at desktop 1920 x 960 too (the column centered with nothing to review; his words clear of your pawn).

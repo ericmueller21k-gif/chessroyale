@@ -22,7 +22,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `e2e/formats.spec.ts` (after a Last Stand); frames: `node scripts/frames-boss-result.mjs <dir> <boss> <win|loss|draw|resign> [width]`.
   XP's rules and storage: [accounts.md](accounts.md), "XP and levels".
   Nov 25 (round 2c): on a computer, no move of yours to review (resigned at once, the mate test) makes the result's column the page's,
-  centered (`es-no-review`); on a phone, his words sit beside his head over your pawn's column, no band kept above him (end-screen.css).
+  centered (`es-no-review`); his words over his head on every screen, with room kept for two lines (end-screen.css).
 
 - **Music** (Eric, Nov 11; [2026-11-11-boss-music.md](../decisions/2026-11-11-boss-music.md); `packages/app/src/music.ts`): a boss with a
   theme in `packages/app/public/music/themes.json` (Grex, `grex`, so far) has it played from the battle's start (the intro's end,
