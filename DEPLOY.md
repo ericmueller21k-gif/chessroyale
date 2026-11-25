@@ -45,8 +45,10 @@ npx wrangler containers build scripts/residents/container -t chessroyale-residen
 It ends by printing the pushed image's digest (`sha256:…`; `npx wrangler containers images list` shows it again). The digest isn't
 a secret: send it to the director. (Or, with no Docker at hand: add **Account · Containers · Edit** to the API token the director's
 sessions have as `CLOUDFLARE_API_TOKEN`, and the director pushes it from a cloud session, where the same build was tested Nov 25:
-there `docker pull mirror.gcr.io/library/node:22-bookworm` and tag it `public.ecr.aws/docker/library/node:22-bookworm` first, as
-AWS's mirror turns that shared address away.) The director then adds the host's entry to `containers` in `wrangler.jsonc`:
+there AWS's mirror turns that shared address away, so `docker build --build-arg NODE_IMAGE=mirror.gcr.io/library/node:22-bookworm@sha256:<the
+Dockerfile's digest> -t chessroyale-residents:1 scripts/residents/container`, then `npx wrangler containers push chessroyale-residents:1`:
+the same base image, by its digest.) The director then adds the host's entry to `containers` in `wrangler.jsonc`, and in the same PR
+sets `RESIDENTS_HOST_IMAGE` to `"1"` (until then the cron never touches the host, whatever the switches say):
 
 ```jsonc
 { "class_name": "ResidentsHost", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-residents@sha256:<digest>", "instance_type": "standard-2", "max_instances": 1 }
@@ -56,15 +58,23 @@ AWS's mirror turns that shared address away.) The director then adds the host's 
   The next 15-minute cron starts it. That starts the spend: about $52 a month (below).
 - **Stop at once:** `PAUSE_RESIDENTS` = `1` (dashboard, Save and deploy; "Kill switches" below). The server refuses every
   resident within seconds, the program ends its games and exits, and the next cron run (within 15 minutes) stops the container.
-  Delete it to bring them back. `RESIDENTS_HOST_ON` = `"0"`: the cron stops renewing it, and it sleeps within 30 minutes.
+  Delete it to bring them back. `RESIDENTS_HOST_ON` = `"0"`: the next cron run stops it (the program ends its games).
+- **Before a manual run** (`npx tsx scripts/residents/run.ts` from a session): set the host off first and wait for the cron's next
+  run to stop it (a pause stops it too, but no program starts while it's on). Two programs at once sign each other's residents out,
+  so the program won't start while another sent a heartbeat in the last 2 minutes; it names it (`access:residents` is the host,
+  `access:test` the director's token). `--force` starts anyway.
 - **Deploys:** a Worker deploy doesn't restart the container (no container change, no rollout; its Durable Object restarts and finds
-  it running). The program follows deploys itself: it reads `/version.json` every 2 minutes, and after a new version starts nothing
-  new, lets games finish (at most 20 minutes) and exits; the image's script fetches the new `main` and starts it again (installing
-  only when the lockfile changed). A change to the image or the host's `containers` entry is a rollout: SIGTERM, then the new one.
+  it running: from the docs, unchecked; on the first deploy after it's on, look in Observability: if it does, each deploy costs a
+  clean restart). The program follows deploys itself: it reads `/version.json` every 2 minutes, and after a new version (not its own
+  commit: main can be ahead while a merge deploys) starts nothing new, lets games finish (at most 20 minutes) and exits; the image's
+  script fetches the new `main` and starts it again (installing only when the lockfile changed). A change to the image or the host's
+  `containers` entry is a rollout: SIGTERM, then the new one. A new token secret or new `RESIDENTS.host.args`: the cron's next run
+  stops it (it keeps a hash of the environment it started with) and the run after starts it with the new one.
 - **The first start:** Workers & Pages → chessroyale → Observability, lines with `host:` (the container: "installed", "running main
   at …") and `residents:`; `GET /api/admin/residents` shows `host` (the cron's plan) and the program's last heartbeat (`beat`: its
-  commit, the live version it follows, who's online). If Access turns the token away, the program stops at start with "Access turned
-  the service token away": check the token is in the hunchess.com application's Service Auth policy.
+  commit, the live version it follows, who's online). If Access turns the token away, the program stops with "Access turned the
+  service token away" and the container ends (exit 78); each cron run starts a fresh one with the Worker's current secret, so check
+  the token is in the hunchess.com application's Service Auth policy, and that the secret is the token's.
 - **Size and cost (standard-2: 1 vCPU, 6 GiB, 12 GB):** measured in Docker with 40 residents online (18 games at once): CPU 0.25
   vCPU on average, 0.43 at peaks, memory at most 0.6 GiB. standard-1's ½ vCPU would run near its limit when the waves peak
   (about 54 online), and custom sizes can't be checked from here. Memory $38.70, CPU about $11 (billed on use), disk $2.10, egress
@@ -149,6 +159,8 @@ In a terminal, with `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) set:
 3. `npm run rollback -- previous` rolls back with `wrangler rollback`, which asks before it deploys and about any
    secret changed since that version. It runs only in a plain terminal (not one with `CI` set), so nothing is
    answered for you.
+4. With the residents' host on: pause residents (`PAUSE_RESIDENTS` = `1`) until `main` is fixed too. The host runs
+   `main`'s newest program, whose client may not match the older server.
 
 The dashboard does the same: **Workers & Pages → chessroyale → Deployments → a version's ⋯ → Rollback**. A rollback
 lasts until the next merge to `main` deploys again: revert or fix the bad change there first. A version carries its

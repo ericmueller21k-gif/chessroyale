@@ -5979,9 +5979,10 @@ export const AUTOCHESS: AutoChessSettings = {
  *   (/api/live) on home and during a game, as the app polls it (FRONT_DOOR.livePollMs, the 30 s heartbeat).
  * - `host`: the always-on host (the Cloudflare Container `ResidentsHost`, packages/server/src/residents-host.ts; docs/areas/ops.md,
  *   "Residents, the host"). `sleepAfter`: it sleeps after this long without the 15-minute cron's ping (two missed runs). `args`: the
- *   program's options there. With `--follow-deploys` the program reads /version.json every `versionCheckMinutes`; after a deploy it
- *   starts nothing new, lets games in progress finish (at most `drainMinutes`, then resigns what's left) and exits for the host to
- *   start it again on the new main.
+ *   program's options there (a change restarts the host at the cron's next run, games in progress resigned: they're part of its
+ *   environment, whose hash it keeps). With `--follow-deploys` the program reads /version.json every `versionCheckMinutes`; after a
+ *   deploy it starts nothing new, lets games in progress finish (at most `drainMinutes`, then resigns what's left) and exits for the
+ *   host to start it again on the new main.
  */
 export const RESIDENTS = {
   accounts: 200,

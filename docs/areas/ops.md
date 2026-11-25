@@ -287,7 +287,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **A rollback lasts until the next deploy from `main`:** revert or fix the bad change on `main` before anything
     else merges.
   - **A version carries its own variables:** rolling back to a version from before a `PAUSE_` or banner change undoes
-    that change too. Check the switches after a rollback.
+    that change too. Check the switches after a rollback. With the residents' host on, pause residents until `main` is fixed.
   - The database's schema only grows (columns are added, never removed), so an older version still runs on it.
 - **Residents, the program** (Nov 25; Eric: "have 200 bots made which just sit on the server and play ranked ... so like any time of
   day I can login and see games played"; the design: `notes/residents-design.md` on `claude/director-notes`;
@@ -318,10 +318,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     think times, resigning, draws, chat). The names: `scripts/residents/names.json` (200 handles, reviewed: never a real person's
     name or a hint of one, never "bot" or "resident"). Tests: `packages/server/test/residents-program.test.ts` (names, profiles, the
     schedule's waves and caps, think times, behaviors).
-- **Residents, the host** (Nov 25; `residents-host.ts`, `scripts/residents/container/`, DEPLOY.md "Residents"): a Container whose
-  image clones `main`, installs it and runs the program `--follow-deploys` (after a deploy: games finish, exit 75, start again). The
-  cron keeps it up while `RESIDENTS_HOST_ON` (wrangler.jsonc) is "1" and stops it while `PAUSE_RESIDENTS` is on; the token's secret
-  (`RESIDENTS_CLIENT_SECRET`) goes to the program alone, never git or npm. About $52 a month. Tests: `residents-host.test.ts`.
+- **Residents, the host** (Nov 25; `residents-host.ts`, `scripts/residents/container/`, DEPLOY.md "Residents"): a Container that clones
+  `main` and runs the program `--follow-deploys` (a deploy: games finish, exit 75, start again). Once `RESIDENTS_HOST_IMAGE` is "1",
+  the cron keeps it up while `RESIDENTS_HOST_ON` is "1", else stops it; a new secret restarts it; Access refusing it ends the container
+  (exit 78). One program at a time (`--force`). About $52 a month. Tests: `residents-host`, `residents-start`, `residents-program`.
 - **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
   and send feedback and ideas, and admins read them all on `/admin/ops`.
 - **Health** (below): one snapshot of the game for an admin (`/admin/ops`) or a script (`npm run ops:report`).
