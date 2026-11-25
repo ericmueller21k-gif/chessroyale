@@ -739,8 +739,11 @@ test("the season ladder (Eric, Nov 25): home's LADDER › on a phone, the side m
   expect(b.x + b.width).toBeLessThanOrEqual(homeRow.x + homeRow.width + 1);
   // (Its box reaches over Squads' top edge: a tap there is still Squads', never the ladder's. Review m1, Nov 25.)
   const squads = (await page.getByRole("radiogroup", { name: "RANKED" }).getByRole("radio", { name: /^Squads/ }).boundingBox())!;
-  expect(b.y + b.height, "the case this guards: LADDER's box over Squads' edge").toBeGreaterThan(squads.y);
-  const atEdge = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("button")?.textContent ?? "", [squads.x + squads.width - 3, squads.y + 1]);
+  // (A point on Squads' top edge under LADDER's box, past the corners' 10 px round.)
+  const [left, right] = [Math.max(b.x, squads.x + 12), Math.min(b.x + b.width, squads.x + squads.width - 12)];
+  expect(right - left, "the case this guards: LADDER's box over Squads' edge").toBeGreaterThan(2);
+  expect(b.y + b.height).toBeGreaterThan(squads.y + 1);
+  const atEdge = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("button")?.textContent ?? "", [(left + right) / 2, squads.y + 1]);
   expect(atEdge).toContain("Squads");
   if (desktop()) await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Ladder", exact: true }).click();
   else await ladderIn.click();
@@ -776,13 +779,26 @@ test("the season ladder (Eric, Nov 25): home's LADDER › on a phone, the side m
   await page.locator(".ld-list").evaluate((e) => (e.scrollTop = e.scrollHeight));
   await expect(rows.last()).toBeInViewport();
   expect((await pin.boundingBox())!.y).toBeCloseTo(pinBox.y, 0);
-  // A row's tap: that player's profile; its Back, the same list again, scrolled where it was (at its end).
+  // A row's tap: that player's profile; its Back, the same list again (the kept answer, not asked again), scrolled where it was (its end).
+  const list = page.locator(".ld-list");
+  const belowView = () => list.evaluate((e) => e.scrollHeight - e.clientHeight - e.scrollTop);
+  let asked = 0;
+  page.on("request", (r) => void (r.url().includes("/api/ladder") && asked++));
   await rows.last().click();
   await expect(page.getByText("Ladder 199", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Back" }).first().click();
   await expect(rows).toHaveCount(LADDER.size);
-  const list = page.locator(".ld-list");
-  await expect.poll(() => list.evaluate((e) => e.scrollHeight - e.clientHeight - e.scrollTop)).toBeLessThanOrEqual(2);
+  await expect.poll(belowView).toBeLessThanOrEqual(2);
   expect(await list.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+  expect(asked, "the kept answer").toBe(0);
+  // Over a minute on the profile (review m5): Back asks again, and the list still comes back where it was.
+  await rows.last().click();
+  await expect(page.getByText("Ladder 199", { exact: true }).first()).toBeVisible();
+  await page.clock.install();
+  await page.clock.fastForward("01:05");
+  await page.getByRole("button", { name: "Back" }).first().click();
+  await expect.poll(() => asked).toBe(1);
+  await expect(rows).toHaveCount(LADDER.size);
+  await expect.poll(belowView).toBeLessThanOrEqual(2);
   await expect(rows.last()).toBeInViewport();
 });
