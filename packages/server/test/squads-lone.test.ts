@@ -1,10 +1,10 @@
 /**
  * Squads and the outside review of Nov 10 (finding 5; docs/decisions/2026-11-10-boss-and-lone-devices.md): a lobby whose bots one
- * party's devices moved alone is noted, and paid as any (Eric, Nov 10), and a placement's coins and crates have a daily cap
- * (SQUADS_LOBBY.rewardsPerDay), checked as the reward is written.
+ * party's devices moved alone is noted, and its crates paid as any (Eric, Nov 10; its coins by the solo rule since Nov 25:
+ * play-coins.test.ts, m2), and a placement's crates have a daily cap (SQUADS_LOBBY.rewardsPerDay), checked as the reward is written.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, voteResultMs } from "@chessroyale/core";
+import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, XP, voteResultMs } from "@chessroyale/core";
 import { squadsVotes } from "@chessroyale/chess/squads";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { clearTopCache, type SquadsReward } from "../src/squads-lobby.ts";
@@ -30,9 +30,11 @@ describe("Squads: a lobby that rests on one party's devices (noted, paid under t
     const ann = L.core.takeRewards().find((r) => r.playerId === a)!;
     expect(L.core.record.unvouched?.[ann.squadId]).toBe("one party in the lobby");
     const pays = SQUADS_LOBBY.rewards[ann.placement];
-    expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: pays.coins, crates: pays.crates });
+    // (Its coins come with its XP since Nov 25: PLAY_COINS, by the solo rule for a squad on its own devices' word (no placement bonus:
+    // play-coins.test.ts, m2); the reward is the placement's crates, paid as any.)
+    expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: 0, crates: pays.crates });
     expect(ann.why).toBeUndefined();
-    expect(L.last(a, "placed")).toMatchObject({ coins: pays.coins, crates: pays.crates });
+    expect(L.last(a, "placed")).toMatchObject({ coins: 0, crates: pays.crates });
   }, 120_000);
 
   /** A test lobby on its first turn: two people of two parties, `speeds` of them with apps that take bot work. */
@@ -77,29 +79,34 @@ describe("Squads: a lobby that rests on one party's devices (noted, paid under t
     L.core.rewardCapped(a);
     const placed = L.last(a, "placed")!;
     expect(placed).toMatchObject({ coins: 0, crates: 0 });
-    if (SQUADS_LOBBY.rewards[placed.placement].coins) expect(placed.why).toBe("daily");
+    // (The cap takes crates only since Nov 25: a placement with none to take says nothing.)
+    if (SQUADS_LOBBY.rewards[placed.placement].crates) expect(placed.why).toBe("daily");
+    else expect(placed.why).toBeUndefined();
   }, 120_000);
 });
 
 describe("Squads: the daily cap on placement rewards (SQUADS_LOBBY.rewardsPerDay)", () => {
   const signedIn = async (sql: Sql, name: string) => signInWithIdentity(sql, (await createGuest(sql, Date.now(), name)).user, "email", `${name.toLowerCase()}@example.com`, {}, Date.now());
 
-  it("that many lobbies a UTC day pay; the next is refused (nothing paid) whatever its place; the next day pays again; a retry pays nothing more", async () => {
+  it("that many lobbies a UTC day pay their crates; the next is refused (nothing paid) whatever its place; the next day pays again; a retry pays nothing more; a reward's old coins are never paid (Nov 25)", async () => {
     const { sql, db } = memoryDb();
     await ensureSchema(sql);
     const ann = await signedIn(sql, "Ann");
     const coins = () => (db.prepare("SELECT coins FROM wallets WHERE user_id = ?").get(ann.id) as { coins: number } | undefined)?.coins ?? 0;
+    const crates = () => (db.prepare("SELECT n FROM series_crates WHERE user_id = ? AND crate = ?").get(ann.id, XP.rewardCrate) as { n: number } | undefined)?.n ?? 0;
     const day = Date.UTC(2026, 10, 10);
+    // (A reward queued before Nov 25 still carries its placement's coins: only its crates are paid; the coins are PLAY_COINS' now.)
     const won = (): SquadsReward => ({ playerId: "p1", userId: ann.id, squadId: 0, placement: 1, coins: 100, crates: 1, recorded: false });
     for (let i = 0; i < SQUADS_LOBBY.rewardsPerDay; i++) expect(await writeReward(sql, `SQ${i}`, day + i, won(), day + 3_600_000 + i, false)).toBe("applied");
-    expect(coins()).toBe(100 * SQUADS_LOBBY.rewardsPerDay);
+    expect(crates()).toBe(SQUADS_LOBBY.rewardsPerDay);
     // One more today: refused, nothing paid.
     expect(await writeReward(sql, "SQX", day + 99, won(), day + 20 * 3_600_000, false)).toBe("refused");
-    expect(coins()).toBe(100 * SQUADS_LOBBY.rewardsPerDay);
+    expect(crates()).toBe(SQUADS_LOBBY.rewardsPerDay);
     // A retry of one already paid: a replay, nothing more.
     expect(await writeReward(sql, "SQ0", day, won(), day + 21 * 3_600_000, false)).toBe("replay");
     // The next UTC day: pays again.
     expect(await writeReward(sql, "SQY", day + 100, won(), day + 24 * 3_600_000 + 60_000, false)).toBe("applied");
-    expect(coins()).toBe(100 * (SQUADS_LOBBY.rewardsPerDay + 1));
+    expect(crates()).toBe(SQUADS_LOBBY.rewardsPerDay + 1);
+    expect(coins()).toBe(0);
   });
 });

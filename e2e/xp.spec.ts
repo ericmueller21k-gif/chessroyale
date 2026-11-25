@@ -98,6 +98,8 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   await expect(box.locator(".es-gain")).toHaveText("+170 XP");
   await expect(box.locator(".es-level")).toHaveText("Level 2");
   await expect(box.getByTestId("es-now-xp")).toHaveText("160 XP");
+  // Its coins (PLAY_COINS, Nov 25), paid with its XP by the server: 12 counted minutes' 22 play coins; a solo win pays no bonus.
+  expect(await page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { shop?: { coins?: number } }).shop?.coins)).toBe(22);
   // (Never the minutes, Eric, Nov 9: "we dont want players to know they could just stall to get more XP"; the total counts them.)
   await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win +50");
   await expect(page.locator(".es-earned-xp .es-parts")).not.toContainText("min");

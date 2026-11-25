@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { KING_ATTACK } from "@chessroyale/chess";
 import type { GameView } from "../game.ts";
 import { drawnBox } from "../screens/TowerBar.tsx";
-import { bossKit } from "../characters/kits.ts";
+import { bossKit, placeFacing } from "../characters/kits.ts";
 import { turned } from "../characters/sprite-kit.ts";
 import { pawnLook } from "../looks.ts";
 import { BossCharacter } from "./BossCharacter.tsx";
@@ -51,11 +51,15 @@ export function ResultDuo({ match, result, hopAt = 0 }: { match: GameView; resul
   const attacking = stage === "on" && !!ka && !!ch;
   // (The pawn's jolts, by CSS, from the first lash: its delay from its first drawing, decided once, so a redraw never moves it.)
   const [lashIn] = useState(() => at + (KING_ATTACK.lashAt - KING_ATTACK.landAt) - Date.now());
+  // (How far right of his feet he's drawn in any figure the result shows him in, his frame's px: the row's gap keeps 16 px from it to
+  // your pawn, end-screen.css. Mirrored where his place turns him, as BossCharacter draws him.)
+  const fig = kit ? drawnBox(boss.name, kit.ch, [kit.anims.idle ?? "idle", kit.anims.defeat ?? "defeat", kit.anims.victory ?? "victory"]) : null;
+  const reach = kit && fig ? (placeFacing(kit, kit.ch, "results").mirror ? kit.ch.foot[0] - fig.left : fig.right - kit.ch.foot[0]) : 0;
   return (
     <div
       class={`results-duo rd-is-${result}${attacking ? " rd-attacking" : ""}`}
       data-attack={ka ? stage : undefined}
-      style={{ "--rd-below": kit ? kit.ch.h - kit.ch.foot[1] : 0 }}
+      style={{ "--rd-below": kit ? kit.ch.h - kit.ch.foot[1] : 0, "--rd-reach": reach }}
     >
       {/* (`--rd-below`: his frame's rows under his feet, which hang under his box; the end screen keeps room for them under the row.) */}
       {/* (`--rd-top`: the first drawn row of his idle in his frame: the end screen's box starts at his head, not at the frame's empty top,

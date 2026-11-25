@@ -3712,14 +3712,8 @@ export const RANKED_1V1 = {
    * `maxLadder`: Radiant 5 0 RP (2400; it was Diamond 4 0 before the Oct 28 tiers, the same number).
    */
   placements: { games: 5, maxLadder: 2400 },
-  /**
-   * Coins (as Squads pays them), lined up with what a Squads lobby pays per minute played (about 1.8 a minute:
-   * docs/decisions/2026-10-16-ranked-1v1.md): `perMinute` of the game's time from its start to its end, by result, at
-   * least 1 and at most `maxPerGame`; nothing for a game with fewer than `minMoves` moves each, an aborted game, a bot
-   * game, or a player fair play is holding (in review). At most `perDay` paying games a day per account (UTC days; the
-   * director's cap, Oct 16): the next games that day pay nothing.
-   */
-  coins: { perMinute: { win: 2.4, draw: 1.6, loss: 0.8 }, minMoves: 10, maxPerGame: 70, perDay: 20 },
+  // (Ranked's own coins (2.4/1.6/0.8 a minute, 20 games a day) are gone since Nov 25: a ranked game pays PLAY_COINS, as every
+  // counted game does; docs/decisions/2026-11-25-play-coins.md.)
   /** Each ranked game's moves are kept this long (a reported player's games are checked from them), then deleted. */
   gamesKeepDays: 30,
   /**
@@ -3796,16 +3790,17 @@ export const SQUADS_LOBBY = {
   /** The drawn bracket on screen before round 1's matches begin (after the votes). */
   bracketIntroSeconds: 8,
   /**
-   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are crates of the
-   * newest series (XP.rewardCrate since Nov 9), each opened with a crate key. Each person on the squad still playing their seat when its
-   * placement is decided (not one who left, nor a seat a bot has taken over); none in a lobby a test control touched.
+   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th: crates of the newest series (XP.rewardCrate since Nov 9),
+   * each opened with a crate key. Each person on the squad still playing their seat when its placement is decided (not one who left,
+   * nor a seat a bot has taken over); none in a lobby a test control touched. Coins since Nov 25: PLAY_COINS (its play coins and
+   * `bonus.squads`, the placement's), paid with the game's XP; Squads' own placement coins are gone.
    */
   rewards: {
-    1: { coins: 100, crates: 1 },
-    2: { coins: 60, crates: 1 },
-    3: { coins: 40, crates: 0 },
-    5: { coins: 20, crates: 0 },
-  } as Readonly<Record<1 | 2 | 3 | 5, { coins: number; crates: number }>>,
+    1: { crates: 1 },
+    2: { crates: 1 },
+    3: { crates: 0 },
+    5: { crates: 0 },
+  } as Readonly<Record<1 | 2 | 3 | 5, { crates: number }>>,
   /**
    * A reward (and its results row) stays in the lobby's record until it's written (server/squads-do.ts): a failed write is tried again
    * this often, and the lobby waits to close for it up to `rewardRetryHours` past its closing time (then it closes, and says so).
@@ -3813,10 +3808,11 @@ export const SQUADS_LOBBY = {
   rewardRetrySeconds: 60,
   rewardRetryHours: 24,
   /**
-   * The daily cap (the outside review of Nov 10, finding 5; like ranked's, RANKED_1V1.coins.perDay): at most this many lobbies a UTC
-   * day pay an account their placement's coins and crates; the next that day pay none (XP as usual), and the placement says so.
-   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A lobby of only one party and bots pays
-   * none at all (SquadsRecord.unvouched). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   * The daily cap (the outside review of Nov 10, finding 5): at most this many lobbies a UTC day pay an account their placement's
+   * crates; the next that day pay none (XP and coins as usual: PLAY_COINS), and the placement says so.
+   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A squad of one party and bots
+   * (SquadsRecord.unvouched) is paid its crates as any (Eric, Nov 10; docs/decisions/2026-11-10-boss-and-lone-devices.md), its coins by
+   * the solo rule since Nov 25 (no placement bonus: docs/decisions/2026-11-25-play-coins.md).
    */
   rewardsPerDay: 5,
   /**
@@ -4660,6 +4656,35 @@ export const XP = {
   levelsPerGame: 20,
   rewardCrate: "winter-1",
   rewardToastMs: 6000,
+} as const;
+
+/**
+ * Play coins (Eric, Nov 18: "coins from every mode, time-based, capped ... but you can also continue to get more ... if you place
+ * well"; the payments design, docs/decisions/2026-11-17-payments-design.md section 6; core's play-coins.ts has the rules, server
+ * xp.ts pays them with the game's XP, in the same batch). Every counted game, by XP's rules (server-timed minutes, XP.maxMinutes a
+ * game, XP.minMoves of your own moves; nothing for leaving, a test game, a guest, or a player fair play is holding):
+ *   - **Play coins:** `perMinute` of the game's XP minutes (rounded, at least 1 online), until the XP day's `perDay`. A solo game (and
+ *     an online one that rested on one device's word) pays only the minutes XP paid it under XP.soloMinutesPerDay, with no minimum.
+ *   - **The performance bonus** (past `perDay` too): `bonus.win` for XP's win (its friends'-lobby once-a-day rule included; not
+ *     Squads, which pays its placement), `bonus.draw` for a ranked 1 v 1 draw, `bonus.crowdTop3` for a place in the first
+ *     `crowdTopPlaces` of your team's 50 v 50 scoreboard, and `bonus.squads` by placement (keys: 1st, 2nd, 3rd-4th, 5th-8th). Solo
+ *     pays none (the device's word).
+ *   - **Diminishing:** the day's earned bonus is paid by `bonusSteps`: the first 150 in full, the next 200 at half, the next 200 at a
+ *     quarter, none past that (300 paid at most). So the most a day is `perDay` + 300: 600 coins.
+ * The day is XP's (XP.dayStartUtcHour). The day's totals are the ledger's own (reasons "play" and "play-bonus" since the day began).
+ */
+export const PLAY_COINS = {
+  perMinute: 1.8,
+  perDay: 300,
+  bonus: { win: 15, draw: 5, crowdTop3: 10, squads: { 1: 40, 2: 25, 3: 15, 5: 5 } as Readonly<Record<1 | 2 | 3 | 5, number>> },
+  /** How many of your team's 50 v 50 scoreboard's first rows pay `bonus.crowdTop3`. */
+  crowdTopPlaces: 3,
+  /** Earned bonus a day (cumulative, `upTo`) → paid at `rate`; none past the last. */
+  bonusSteps: [
+    { upTo: 150, rate: 1 },
+    { upTo: 350, rate: 0.5 },
+    { upTo: 550, rate: 0.25 },
+  ] as readonly { upTo: number; rate: number }[],
 } as const;
 
 /**

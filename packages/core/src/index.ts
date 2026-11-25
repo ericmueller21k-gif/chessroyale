@@ -25,4 +25,5 @@ export * from "./pauses.ts";
 export * from "./age-gate.ts";
 export * from "./pawn-color.ts";
 export * from "./xp.ts";
+export * from "./play-coins.ts";
 export * from "./quests.ts";

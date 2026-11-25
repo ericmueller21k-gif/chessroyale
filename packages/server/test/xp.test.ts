@@ -50,6 +50,8 @@ describe("granting a game's XP", () => {
       // (Phase 2: a 12-move game is short of the daily reward's 15; the levels owed are paid, every 2nd from 2 to 14 (levels of 500
       // since Nov 20): the test switch's six too.)
       rewards: { crate: XP.rewardCrate, daily: 0, crates: 7 * XP.levelCrates, keys: 7 * XP.levelKeys, bossPicks: 0, levels: [2, 4, 6, 8, 10, 12, 14] },
+      // (Its coins with it, Nov 25: 1.8 of its 12 minutes and the win's 15.)
+      coins: { play: 22, bonus: 15, parts: [{ label: "Win", coins: 15 }], step: 0, today: { play: 22, bonus: 15 } },
     });
     expect(await xpOf(sql, ann.id)).toBe(7_070);
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
@@ -95,7 +97,8 @@ describe("granting a game's XP", () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     expect((await grantXp(sql, ann.id, game("a", {}, { ms: 3 * 3_600_000 })))?.parts).toEqual([{ label: "30 min", xp: XP.maxMinutes * XP.perMinute }]);
-    expect(await grantXp(sql, ann.id, game("b", {}, { ms: 40_000 }))).toEqual({ before: 300, after: 300, levelBefore: 1, levelAfter: 1, parts: [] });
+    // (Its coins: an online counted game's 1 at least, Nov 25.)
+    expect(await grantXp(sql, ann.id, game("b", {}, { ms: 40_000 }))).toEqual({ before: 300, after: 300, levelBefore: 1, levelAfter: 1, parts: [], coins: { play: 1, bonus: 0, parts: [], step: null, today: { play: 55, bonus: 0 } } });
     expect((await grantXp(sql, ann.id, game("c", {}, { ms: 40_000, won: true })))?.parts).toEqual([{ label: "Win", xp: 50 }]);
     expect(await xpOf(sql, ann.id)).toBe(350);
   });
@@ -146,14 +149,19 @@ describe("the solo time cap (review M2): XP.soloMinutesPerDay minutes an XP day"
     // (Four 30-minute games fill 120 minutes.)
     for (let i = 0; i < XP.soloMinutesPerDay / XP.maxMinutes - 1; i++) expect((await solo(`solo:a${i}`, 30))?.parts).toEqual([{ label: "30 min", xp: 300 }]);
     expect((await solo("solo:b", 20))?.parts).toEqual([{ label: "20 min", xp: 200 }]);
-    expect((await solo("solo:c", 25))?.parts).toEqual([{ label: "Daily solo limit", xp: limit - 1_100 }]);
+    // (Its coins, Nov 25: only the 10 minutes XP paid, 18; solo coins stay inside the cap: 216 a day.)
+    const c = await solo("solo:c", 25);
+    expect(c?.parts).toEqual([{ label: "Daily solo limit", xp: limit - 1_100 }]);
+    expect(c?.coins).toEqual({ play: 18, bonus: 0, parts: [], step: null, today: { play: 216, bonus: 0 } });
     expect(await xpOf(sql, ann.id)).toBe(limit);
-    // (Nothing left: the reason, not a box of +0s; with a win, the win alone.)
-    expect(await solo("solo:d", 12)).toEqual({ before: limit, after: limit, levelBefore: 3, levelAfter: 3, parts: [], none: "limit" });
-    expect((await solo("solo:e", 12, true))?.parts).toEqual([
+    // (Nothing left: the reason, not a box of +0s; with a win, the win alone. No coins: none for time, and solo pays no bonus.)
+    expect(await solo("solo:d", 12)).toEqual({ before: limit, after: limit, levelBefore: 3, levelAfter: 3, parts: [], none: "limit", coins: { play: 0, bonus: 0, parts: [], step: null, today: { play: 216, bonus: 0 }, none: "limit" } });
+    const e = await solo("solo:e", 12, true);
+    expect(e?.parts).toEqual([
       { label: "Daily solo limit", xp: 0 },
       { label: "Win", xp: XP.win },
     ]);
+    expect(e?.coins).toMatchObject({ play: 0, bonus: 0 });
     // (Online games aren't capped by it.)
     expect((await grantXp(sql, ann.id, game("lobby:ABCDE:1")))?.parts).toEqual([{ label: "12 min", xp: 120 }]);
     // (The next XP day: again.)
@@ -185,7 +193,15 @@ describe("where the XP is kept", () => {
     expect(await gameXpOf(sql, ann.id, "nope", T0)).toBeNull();
     const none = await grantXp(sql, ann.id, game("lobby:FGHJK:1", {}, { abandoned: true }));
     await recordResult(sql, ann.id, { mode: "crowd", online: true, placement: 9, players: 100, lobby: "FGHJK", xp: none }, T0);
-    expect(await gameXpOf(sql, ann.id, "FGHJK", T0)).toEqual({ before: 170, after: 170, levelBefore: 1, levelAfter: 1, parts: [], none: "left" });
+    expect(await gameXpOf(sql, ann.id, "FGHJK", T0)).toEqual({
+      before: 170,
+      after: 170,
+      levelBefore: 1,
+      levelAfter: 1,
+      parts: [],
+      none: "left",
+      coins: { play: 0, bonus: 0, parts: [], step: null, today: { play: 22, bonus: 15 }, none: "left" },
+    });
   });
 
   it("the solo clock: the server's time between start and result, once; a new start replaces the last; the test switch's minutes", async () => {
@@ -287,12 +303,21 @@ describe("each match room's XP", () => {
     await writeReward(sql, "SQUAD", T0, reward, T0 + MIN, true);
     await writeReward(sql, "SQUAD", T0, reward, T0 + 2 * MIN, true);
     expect(await xpOf(sql, ann.id)).toBe(190);
-    expect(await gameXpOf(sql, ann.id, "SQUAD", T0 + 3 * MIN)).toEqual({ before: 0, after: 190, levelBefore: 1, levelAfter: 1, parts: [{ label: "14 min", xp: 140 }, { label: "Win", xp: 50 }] });
+    // (Its coins, Nov 25: 1.8 of its 14 minutes and 1st place's 40, never the win's 15 too; once, whatever the retries.)
+    expect(await gameXpOf(sql, ann.id, "SQUAD", T0 + 3 * MIN)).toEqual({
+      before: 0,
+      after: 190,
+      levelBefore: 1,
+      levelAfter: 1,
+      parts: [{ label: "14 min", xp: 140 }, { label: "Win", xp: 50 }],
+      coins: { play: 25, bonus: 40, parts: [{ label: "1st place", coins: 40 }], step: 0, today: { play: 25, bonus: 40 } },
+    });
+    expect((await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", ann.id))!.coins).toBe(65);
     const bo = await signedIn(sql, "bo@example.com");
     await writeReward(sql, "SQUAB", T0, { ...reward, userId: bo.id, recorded: false }, T0, true);
     expect(await xpOf(sql, bo.id)).toBe(0);
     await writeReward(sql, "SQUAC", T0, { ...reward, userId: bo.id, placement: 5 as const, resigned: true, moves: 4 }, T0, true);
-    expect(await gameXpOf(sql, bo.id, "SQUAC", T0)).toMatchObject({ none: "resigned" });
+    expect(await gameXpOf(sql, bo.id, "SQUAC", T0)).toMatchObject({ none: "resigned", coins: { play: 0, bonus: 0, none: "resigned" } });
     await writeReward(sql, "SQUAD", T0, { ...reward, userId: bo.id, abandoned: true }, T0, true);
     expect(await gameXpOf(sql, bo.id, "SQUAD", T0)).toMatchObject({ none: "left" });
   });

@@ -5,7 +5,7 @@ import { SERVER_LOST_MS, phase2Unvouched, quickMove, recluseLobby, mateFirst, re
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { CROWD_PARTY, FAIRPLAY, packParties, type FairMove } from "@chessroyale/core";
+import { CROWD_PARTY, FAIRPLAY, PLAY_COINS, packParties, type FairMove } from "@chessroyale/core";
 import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
@@ -268,6 +268,8 @@ export interface PendingResult {
   /** XP's facts (xpSpan), the people against them (xpOpponents: a friends' lobby's win cap; none when matchmade), a boss battle's span. */
   span: { moves: number; ms: number };
   opponents: string[];
+  /** Play coins' 50 v 50 bonus (Nov 25): one of the first rows of their team's scoreboard at the end (LobbyCore.crowdTeamTop). */
+  crowdTop?: true;
   battle: { moves: number; ms: number } | null;
   /** When a try first failed (MATCH_SAVE.strictMinutes counts from it). */
   failedAt?: number;
@@ -4615,6 +4617,21 @@ export class LobbyCore {
     const team = rows.find((s) => s.id === playerId)?.team ?? null;
     const ids = new Set([...rows.map((s) => ({ id: s.id, team: s.team ?? null })), ...(this.r.left ?? []).map((l) => ({ id: l.id, team: l.result?.team ?? null }))].filter((s) => s.id !== playerId && (!team || (s.team && s.team !== team))).map((s) => s.id));
     return [...ids];
+  }
+
+  /**
+   * Play coins' 50 v 50 bonus (PLAY_COINS.bonus.crowdTop3, Nov 25): this person's row is one of the first PLAY_COINS.crowdTopPlaces of
+   * their team's on the scoreboard at the end (the leaderboard's own order, bots' seats included). Only a 50 v 50 (no boss), once over.
+   */
+  crowdTeamTop(playerId: string): boolean {
+    if (this.settings.mode !== "crowd" || this.settings.raid || this.r.phase !== "results" || !this.runner || this.runner.boss) return false;
+    const rows = this.runner.leaderboard();
+    const team = rows.find((s) => s.id === playerId)?.team;
+    if (!team) return false;
+    return rows
+      .filter((s) => s.team === team)
+      .slice(0, PLAY_COINS.crowdTopPlaces)
+      .some((s) => s.id === playerId);
   }
 
   /** Fair play: a person's recorded picks this match (for their fair-play summary once it's over). */
