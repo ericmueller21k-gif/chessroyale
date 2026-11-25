@@ -42,3 +42,8 @@ as big as the game's board (slim one-line header, tight padding); left column a 
 in a tidy row, Play again + Home STACKED, the chat (readable) filling down to the board's bottom; gear top right; no excess padding; columns
 flush with the board. Built directly (bug fix), stills at desktop ~1735×1035, laptop 1536×730, 1920×960.
 **Eric, Nov 25: the PHONE end page is bad too ("fix it everywhere"):** same tight stack in one column, one placement card "3 of 5 placement games", quests with progress, buttons stacked, readable chat, the move-by-move board clear of Safari's bar. Stills at phone 390×844 and 375×667 too.
+**Eric, Nov 25 (phone, Boss Battle vs Birdie, resigned): EVERY end screen.** Fix the shared `EndScreen`/`EndRewards` once: tight vertical
+rhythm, no reserved empty boxes; no quests = one line "QUESTS" bold + "No quests this game"; XP/RP numbers readable (a little bigger); the
+boss + pawn duo bigger and higher. THE CAUSE: a stills script (`npm run stills:end-screens`) rendering every end variant (1v1 win/loss/draw/
+placement, boss win/loss/resign, tower cleared/lost, 50v50, Squads; XP and +0; quests and none) at phone 390×844, laptop 1536×730, desktop
+1920×960 into one labeled sheet: the director reviews it before shipping.
