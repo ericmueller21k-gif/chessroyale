@@ -230,10 +230,13 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
   expect(await leavesOf(black)).toMatchObject({ marks: 0 });
 
   // Play again: both back in the queue (the same pool), a new game; this time White's clock runs out.
+  const hadBlack = black;
   for (const p of [a, b]) await p.getByRole("button", { name: "Play again" }).click();
   await inGame([a, b]);
   await waitForPlay(a, b);
   ({ white, black } = await bySide(a, b));
+  // Colors in turn (Nov 25): who had Black in the first game has White now.
+  expect(white).toBe(hadBlack);
   await tapMove(white, "d2d4");
   await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
   await tapMove(black, "d7d5");
