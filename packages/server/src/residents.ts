@@ -242,7 +242,7 @@ export async function residentsReport(sql: Sql, env: object, now: number): Promi
   const since = Math.floor(now / DAY) * DAY;
   const [users, perUser, byMode, duels, fairCount, would, beat] = await Promise.all([
     sql.all<{ id: string; name: string; created_at: number; last_seen: number | null; rating: number | null; duel: number | null }>(
-      "SELECT u.id, u.name, u.created_at, u.last_seen, u.rating, r.rating AS duel FROM users u LEFT JOIN ranked_1v1 r ON r.user_id = u.id WHERE u.resident = 1 ORDER BY u.created_at, u.id",
+      "SELECT u.id, u.name, u.created_at, u.last_seen, u.rating, r.rating AS duel FROM users u LEFT JOIN ranked_1v1 r ON r.user_id = u.id WHERE u.resident = 1 ORDER BY u.name COLLATE NOCASE, u.id",
     ),
     sql.all<{ user_id: string; n: number }>(`SELECT user_id, COUNT(*) AS n FROM results WHERE online = 1 AND played_at >= ? AND user_id IN (${RESIDENTS}) GROUP BY user_id`, since),
     sql.all<{ mode: string; n: number }>(`SELECT mode, COUNT(*) AS n FROM results WHERE online = 1 AND played_at >= ? AND user_id IN (${RESIDENTS}) GROUP BY mode`, since),
