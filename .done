@@ -1,0 +1,5 @@
+Residents PR 2 (the program + ranked 1 v 1) done, Nov 25. Branch claude/residents-program; PR body in .pr-body.md.
+Needs PR 1 (claude/residents-server) merged first. Proof: 20 unit tests; typecheck clean; local runs against wrangler dev with PR 1
+merged (20 residents on the schedule, games finished, PAUSE_RESIDENTS stopped everyone within 3 s, refused to start while paused,
+SIGTERM clean). Not run against hunchess.com, except one read-only GET /api/admin/residents (404) by mistake while testing the
+option errors (see the PR body).
