@@ -568,6 +568,15 @@ export function cutCountdown(s: CutSettings, stage: number, roundsPlayed: number
   return last && moveNo ? `1 v 1 from move ${moveNo + movesLeft}` : `cut in ${movesLeft}`;
 }
 
+/**
+ * The 50 v 50's NEXT CUT on a computer's labeled top row (Nov 26, Eric's mock): "in 14 moves", "34 v 34" (on the cut's own move: what it
+ * leaves), "now" (no cut schedule: this move is the stage's last), "1 v 1 at move 43", "1 v 1". From cutCountdown's words, or the moves left.
+ */
+export function nextCutValue(countdown: string | null, movesLeft: number): string {
+  if (!countdown) return movesLeft <= 1 ? "now" : `in ${movesLeft} moves`;
+  return countdown.replace(/ next$/, "").replace(/^cut in (\d+)$/, "in $1 moves").replace(/ from move (\d+)$/, " at move $1");
+}
+
 /** cutCountdown's words for a narrow phone's top bar (about 60 px): "to 34v34" (a cut's move), "1v1 at 43", "1v1". */
 export const shortCountdown = (words: string) => words.replace(/ v /g, "v").replace(/^(\S+) next$/, "to $1").replace(" from move ", " at ");
 

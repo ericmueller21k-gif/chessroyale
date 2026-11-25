@@ -7,8 +7,7 @@ import { useLayoutEffect, useRef } from "preact/hooks";
  * or its column's width, whichever is less), so this measures it and writes, on the arena around the screen:
  * - `--side-foot`: from the scoreboard's top (`.tower-side`) to that line; `--side-pad`: its padding, so its table's top is the squares' top
  *   (Eric: "the same height as the chessboard");
- * - `--chat-foot`: from the chat's top (the screen's `.under-board.side`) to it;
- * - `--board-shift`: the board's middle less the title line's, so the status line centers on the board's squares.
+ * - `--chat-foot`: from the chat's top (the screen's `.under-board.side`) to it.
  * board-size.css uses them on a computer only; a phone never reads them. Neither box's height moves its own top, so there is no loop.
  * docs/decisions/2026-11-25-crowd-desktop-flush.md.
  */
@@ -26,9 +25,6 @@ export function measureBoardFoot(arena: HTMLElement) {
     if (arena.style.getPropertyValue(name) !== v) (v ? arena.style.setProperty(name, v) : arena.style.removeProperty(name));
   };
   const to = (el: Element | null) => (el ? `${Math.round(foot - el.getBoundingClientRect().top)}px` : "");
-  // (The status line over the board centers on the squares: the title line keeps its place, only its words move, so this is steady.)
-  const row = arena.querySelector(":scope > .screen.game > .hud-row")?.getBoundingClientRect();
-  put("--board-shift", row ? `${(b.left + b.width / 2 - (row.left + row.width / 2)).toFixed(1)}px` : "");
   // (Eric, Nov 25: the scoreboard "literally the same height as the chessboard": its table's top on the squares' top too. The column's own
   // top never moves (sticky at the screen's top), so its padding is the table's offset from there: what it is now plus the gap left.)
   const side = arena.querySelector<HTMLElement>(":scope > .tower-side");

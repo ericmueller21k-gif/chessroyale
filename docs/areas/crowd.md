@@ -13,18 +13,29 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   ("Win +50": never the minutes) or why there was none in its place. Every box at its size from the first frame; a tap anywhere but a
   button skips to the end; reduced motion: the end at once. Its sounds (Nov 20; [2026-11-20-end-screen-sounds.md](../decisions/2026-11-20-end-screen-sounds.md); `END_SCREEN.ping`, `levelUp`, `ding`): pings whose pitch follows the XP counted so far (`xpPingHz` in core's xp.ts: a smooth rise that a top game holds at its top), a level reached plays the steel pan level-up (shared with auto chess and a finished quest), the fill ends on one soft pan note. The reward card after it (Nov 22, [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md)) shows only crates and keys (`RewardBox endScreen`): centered, in the crate screens' blue window, OK and Go to inventory (your inventory as a layer over the end screen, `InventoryLayer`). The 50 v 50's middle is its podium; Classic's, its trophy. Its stage table is the column's width; with no judged move it is one line, "No moves judged this game." (Nov 25, round 2c), and the best and worst moves only with a move. The headline: "Victory!" / "Defeat" / "A draw" by your team, your place in its line. Its rules and storage: [accounts.md](accounts.md), "XP and levels".
 
-- **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
-  less 170 px (the title line, the line over the board, the row under it), never wider than its column: 904 px at 1920 × 1080
-  (the scoreboard 360 px on the left, the column 340 on the right); width-bound from about 1440 px wide down (456 at
-  1280 × 800, as before). The opening vote's board is the same size, so the game starts with the board where it was.
-- **A computer's 50 v 50** (Nov 25; [2026-11-25-crowd-desktop-flush.md](../decisions/2026-11-25-crowd-desktop-flush.md)): the status line
-  centered on the board, 22 px (a narrow board's as big as it holds); the scoreboard and the chat end on the board's bottom line (its
-  clock bar included; `board-foot.ts` measures it, board-size.css uses it); the panel over the chat is one 206 px slot, what the
-  reveal's six bars need. Guard: `e2e/desktop-board.spec.ts`, "a computer's 50 v 50 (Eric, Nov 25)…".
+- **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md); the 50 v 50's frame since
+  Nov 26, below): the window's height less 92 px, never wider than the window leaves: 984 px at 1920 × 1080, 864 at 1920 × 960; width-bound
+  from about 1440 px wide down (504 at 1280 × 800). The opening vote's board is the same size and place, so the game starts with the board
+  where it was.
+- **A computer's 50 v 50** (Nov 26, Eric's approved mock; [2026-11-26-crowd-frame.md](../decisions/2026-11-26-crowd-frame.md); built on
+  the 1 v 1's frame): at 1100 px and up with a mouse (`CROWD_FRAME` in MatchMenu.tsx; board-size.css, "The 50 v 50's frame") three columns
+  on one top and one bottom line, one 28 px gap between them (`--cf-gap`), centered: the scoreboard (340), the board (the window's height
+  less 92, its box on its drawing step), the column (300, down to 280). The top row is the status line, each number under a small gray
+  label (Hud.tsx `Stat`, `pickCount`; game.ts `nextCutValue`), right on the board and clear of its clock pill; no line over the board. The
+  column: the power-ups row (the phone's `powerInBox`, in every phase: Play, `WatchScreen`, the reveal's `LockedPowerRow`) with the gear at
+  its right end, the vote box's skeleton, the status box (always: `SlotIdle`'s gray "Waiting…" on your own pick), one 250 px slot; then the
+  chat to the board's foot. The scoreboard's table and the chat end on the board's lines (`board-foot.ts`). The opening vote is the same
+  frame (`cf-vote`: Vote.tsx `frame`, the match): its title the top row; its line that says what to do on the column's first line beside
+  the gear (one line, from the column's left edge: every line it can say fits 236 px, the 280 column's); the cards filling the slot; then
+  the game's chat (`UnderBoard`, the same component and place; chat is open from the lobby on), so the board, the scoreboard and the chat
+  don't move as the game begins (round 2, [2026-11-26-crowd-vote-column.md](../decisions/2026-11-26-crowd-vote-column.md)). A phone's
+  vote has no chat, as before. Guards: `e2e/desktop-board.spec.ts`, "a computer's 50 v 50 (Eric, Nov 26)…" and "Eric's column
+  rule (Nov 25)…" (eric.md).
 - **The vote box is a standing skeleton** (Nov 25; [2026-11-25-crowd-poll-skeleton.md](../decisions/2026-11-25-crowd-poll-skeleton.md);
   `SkeletonRows`, `SlotSkeleton` in `screens/Crowd.tsx`): the reveal's box always has its cap's rows (`useBarSlots`), the ones a round
   doesn't fill gray (`.poll-row.skel`), and a watched turn's result line gray (`.poll-result-skel`). A computer's slot shows the
-  skeleton rows between reveals too (Play and `WatchScreen`), the status line at its foot. Since round 2 a phone's does too: its middle box
+  skeleton rows between reveals too (Play and `WatchScreen`), the status box at its foot (since Nov 26 always there: a gray "Waiting…" on
+  your own pick, phone too). Since round 2 a phone's does too: its middle box
   (`--mid-h`, styles.css) is the power-up row (greyed through the reveal: `LockedPowerRow`), the rows, then a one-line 24 px status line
   (the waiting line, then the result line), 151 px with six rows (was 104); `--slots` (four to six, by the screen's height: 6 from 760
   px, 5 from 700, else 4) keeps the scoreboard's three-row room, and `useBarSlots` reads it. The box shows as many of the most-voted

@@ -31,6 +31,7 @@ import { pawnLook } from "../looks.ts";
 import { seenKey, useBoardAnimations, useMotionTrail, useReplay, useStillKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
+import { CROWD_FRAME } from "../components/MatchMenu.tsx";
 import { exitMatch } from "../match-exit.ts";
 import { ordinal } from "./StageBreak.tsx";
 
@@ -123,7 +124,7 @@ export function WatchScreen({
   // The power-up row keeps its place through the other team's vote (Nov 8, Eric: nothing on the match screen moves): your
   // power-ups, all greyed, in the same place as on your own turn (Play), with no history to step through.
   const fifty = isCrowdFifty(match);
-  const lockedPhone = useMedia(LOCKED_PHONE) && fifty;
+  const powerInBox = [useMedia(LOCKED_PHONE), useMedia(CROWD_FRAME)].some(Boolean) && fifty;
   const you = standings.find((s) => s.isYou);
   // (Cut in a 50 v 50 rework: watching to the podium, Spectate on the cut screen; C3.)
   const spectating = !!you?.out;
@@ -146,10 +147,10 @@ export function WatchScreen({
             <OneVOneBanner match={match} />
           </Board>
         </div>
-        {!lockedPhone && powerRow}
+        {!powerInBox && powerRow}
       </div>
       <div class="play-footer">
-        {lockedPhone && powerRow}
+        {powerInBox && powerRow}
         <SlotSkeleton match={match} />
         <div class={fifty ? "play-slot" : undefined}>
           <div class="waiting-banner" role="status">
@@ -217,8 +218,8 @@ export function SkeletonRows({ count }: { count: number }) {
   );
 }
 
-/** Where the 50 v 50's middle box is the computer's fixed 206 px slot (board-size.css, the same query). */
-const COMPUTER_SLOT = "(min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine)";
+/** Where the 50 v 50's middle box is the computer's fixed slot (board-size.css, the same query): its frame. */
+const COMPUTER_SLOT = CROWD_FRAME;
 
 /**
  * Your power-ups, all greyed, with no history to step through: the power-up row in its place while you can't use it (the other
@@ -228,6 +229,19 @@ export function LockedPowerRow({ match }: { match: GameView }) {
   const you = match.standings().find((s) => s.isYou);
   const noHistory = { ply: 0, browsing: false, go: () => {}, live: () => {} } as unknown as ReturnType<typeof useHistoryView>;
   return <HistoryNav view={noHistory} total={0} extra={<PowerUps count={you?.out ? 0 : match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} />;
+}
+
+/**
+ * The 50 v 50's status box on your own pick (Eric, Nov 26: "same treatment" as the vote box): always there, in the same place and
+ * size as "White is voting…", gray like the skeleton rows, with a quiet "Waiting…", never a blank hole.
+ */
+export function SlotIdle() {
+  return (
+    <div class="waiting-banner slot-idle" aria-hidden="true">
+      <i />
+      Waiting…
+    </div>
+  );
 }
 
 /**
@@ -405,7 +419,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // The vote box's bars: how many its height holds (see useBarSlots); yours and the brilliant find's move come first.
   const pollBox = useRef<HTMLDivElement>(null);
   const slots = useBarSlots(pollBox);
-  const lockedPhone = useMedia(LOCKED_PHONE) && isCrowdFifty(match);
+  const powerInBox = [useMedia(LOCKED_PHONE), useMedia(CROWD_FRAME)].some(Boolean) && isCrowdFifty(match);
 
   // The ghosts come in silently; the winner gets three tones as it blinks.
   // (Not when you're the whole crowd: your move was simply played.)
@@ -587,7 +601,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     return (
       <div class="poll" role="status" ref={pollBox}>
         {/* (A phone's 50 v 50: the power-up row stays on top of the box through the reveal, greyed, Nov 25.) */}
-        {lockedPhone && <LockedPowerRow match={match} />}
+        {powerInBox && <LockedPowerRow match={match} />}
         {bars.map((r) => {
           const win = landed && r.move === mine.result.playedMove;
           const marked = !!mark && mark.moves.includes(r.move);

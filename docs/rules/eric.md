@@ -34,6 +34,17 @@ removed (old → new) and says whether any of them guards a rule here.
     closed party: its first tile, its first way to play)", phone and computer: the boxes are equal to 1 px with the note showing and
     after its X, and the note is on top (the element at its middle is inside it).
   - Decision: [2026-11-16-notices-on-top.md](../decisions/2026-11-16-notices-on-top.md).
+- **Every computer game screen: one top line, one bottom line, equal gaps (Eric, Nov 25).** Every column shares the board's top and
+  bottom line: the left column (the 50 v 50's scoreboard, Squads' team clocks), the board (with its strips) and the right column start and
+  end on the same two lines, and the right column's content (status, buttons, chat) fits inside that height: the chat shrinks to fit, never
+  runs past the board. The gap between the left column and the board equals the gap between the board and the right column (with no left
+  column, the side menu's edge to the board), each ±1 px.
+  - Eric, Nov 25: "chat ... still too low, needs to be shrunk to match the left black box same height as I've said many times, it's below
+    the board"; "the padding on the left and right of the chessboard aren't equal".
+  - Guard: `e2e/desktop-board.spec.ts`, "Eric's column rule (Nov 25): every column on the board's top and bottom lines, the gaps either
+    side of the board equal: …", at 1536 × 730 (125%) and 1920 × 960: the 50 v 50 (its opening vote, your pick and watching; the vote's
+    board, scoreboard and chat where move 1's are) and the 1 v 1 now; Squads and Boss join it in their own PRs.
+  - Decision: [2026-11-26-crowd-frame.md](../decisions/2026-11-26-crowd-frame.md).
 - **No platform named means both.** When Eric doesn't say "phone" or "computer", a change is for both. When unsure, ask.
   (Eric, Oct 25.)
 - **Simple beats flashy** (Eric, Oct 14): the least code, the least lag on a phone, the fewest ways to break.

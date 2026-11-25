@@ -8,7 +8,7 @@ import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool, warmEngine } from "./engine.ts";
-import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
+import { bossAlone, cutLabel, elimination, isCrowd, isCrowdFifty, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
@@ -2863,7 +2863,7 @@ export function App() {
     case "final":
       return <FinalScreen match={match} final={p.final} />;
     case "vote":
-      return <VoteScreen match={match} vote={p.vote} menu={<MatchMenu exit={exitFor(match)} crowd={isCrowd(match)} />} />;
+      return <VoteScreen match={match} vote={p.vote} frame={isCrowdFifty(match) ? match : undefined} menu={<MatchMenu exit={exitFor(match)} crowd={isCrowd(match)} />} />;
     case "boss":
       // (The loading step, then the intro on a screen of its own: the intro's timeline starts as it mounts.)
       return (

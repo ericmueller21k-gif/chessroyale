@@ -276,7 +276,7 @@ test("time's up: whoever didn't vote (you, and a few bots) walks to the winner, 
   expect(atEnd.joined.map((j) => j.id)).toContain("you");
   expect(atEnd.joined.length).toBeGreaterThan(1);
   expect(atEnd.joined.every((j) => j.option === atEnd.result)).toBe(true);
-  await expect(page.locator(".vote-hint")).toHaveText("You didn't vote, so you're with the crowd.");
+  await expect(page.locator(".vote-hint")).toHaveText("No vote: you're with the crowd.");
   // Everyone walks there: your pawn lands in the winning zone (on your half), and so does each bot that didn't vote.
   const win = (await page.locator(".vote-zone.win").boundingBox())!;
   const inside = (c: { x: number; y: number }) => c.x > win.x && c.x < win.x + win.width && c.y > win.y && c.y < win.y + win.height;
