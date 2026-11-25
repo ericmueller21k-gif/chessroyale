@@ -1,5 +1,5 @@
 import { SQUADS, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
-import { START_FEN, fenAfter, inCheck } from "../rules.ts";
+import { START_FEN, fenAfter } from "../rules.ts";
 import { pickOpenings, usableAt, type Opening } from "../openings.ts";
 import {
   boardPoints,
@@ -188,7 +188,7 @@ export function openingStart(o: Opening, s: SquadsSettings = SQUADS): BoardStart
  */
 export function squadsOpenings(library: readonly Opening[], s: SquadsSettings = SQUADS): Opening[] {
   const plies = 2 * s.openingMoves;
-  return library.filter((o) => usableAt(o, plies, s.openingBalance) && !inCheck(fenAfter(o.moves.slice(0, plies))));
+  return library.filter((o) => usableAt(o, plies, s.openingBalance));
 }
 
 /** `count` different balanced openings (classic lines, distinct families where the library allows), none starting in check. */
