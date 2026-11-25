@@ -228,6 +228,16 @@ const NAME_LINE = 3.5;
 /** The sizes a home's name shows at (drawNames' clamp) and a tag (`tag`'s): the loading screen makes each (`makeLabels`). */
 const NAME_SIZES = [12, 20] as const;
 const TAG_SIZES = [8, 12] as const;
+/** Device pixels round the speech bubble's pictures for their shadow; how many lines' bubbles are kept. */
+const BUBBLE_PAD = 17;
+const BUBBLE_MAX = 8;
+/** The speech bubble's shadow (in the canvas's pixels, whatever the transform, as on the town's canvas). */
+function bubbleShadow(g: CanvasRenderingContext2D): void {
+  g.shadowColor = "rgba(0,0,0,.25)";
+  g.shadowBlur = 8;
+  g.shadowOffsetY = 2;
+  g.fillStyle = "#fff";
+}
 /** The tables' clock's characters (TABLE_DIGITS), and the digits by value. */
 const CLOCK_CHARS = "0123456789:";
 const DIGIT = "0123456789".split("");
@@ -848,7 +858,7 @@ export class Renderer {
   /** Where each place's name floats this frame (drawn over everything, after the homes): x, the building's top, its fade. */
   private readonly names: { x: number; y: number; a: number; k: number; eave: number; dz: number }[];
   private readonly tops: number[] = [];
-  private readonly bubbles = new Map<string, { lines: string[]; w: number }>();
+  private readonly bubbles = new Map<string, { cv: HTMLCanvasElement; w: number; h: number }>();
   private readonly drawSquare: (c: number, r: number, cu: number, ru: number, q: Quad) => void;
   /** This frame's squares: corners, faces' corners, colors; and a counting sort of them by color. */
   private readonly sqQuad = new Float64Array(SQ_MAX * 8);
@@ -1027,7 +1037,12 @@ export class Renderer {
     this.H = H;
     this.DPR = DPR;
     this.sky.resize(W, H, DPR);
-    if (this.nameDpr !== DPR) this.nameArt.length = 0;
+    // (The labels' pictures are drawn at the device's pixel ratio: a new one, they're drawn again as they show.)
+    if (this.labelDpr !== DPR) {
+      this.labelDpr = DPR;
+      this.nameArt.length = 0;
+      this.bubbles.clear();
+    }
   }
 
   /** The sky's look changed (the clock, or `?sky=`): the sky, the horizon's colors and the world's tint follow. */
@@ -3248,7 +3263,6 @@ export class Renderer {
     const had = row[size];
     if (had && (had.fonts === -2 || had.fonts === fontsLoaded)) return had;
     const { DPR } = this;
-    this.nameDpr = DPR;
     const text = this.places[i]!.name;
     const font = NAME_FONT[size]!;
     const cv = had?.cv ?? document.createElement("canvas");
@@ -3280,7 +3294,7 @@ export class Renderer {
     return a;
   }
   private readonly nameArt: (NameArt | undefined)[][] = [];
-  private nameDpr = 0;
+  private labelDpr = 0;
 
   /** A home's sign's lettering at its font's own pixels (sign-font.ts), made once: drawn `s` times over (writeSign, writeSignT). */
   private signArt(sg: (typeof this.signs)[number]): HTMLCanvasElement {
@@ -3290,8 +3304,8 @@ export class Renderer {
   /**
    * (The loading screen, Nov 25: Eric's laptop, "1063 uploads" in 15 s of walking.) The labels, made here and kept (`keep`), so walking
    * and zooming make and upload none: every home's sign and its name at every size it can show (NAME_SIZES), the tags of everyone in
-   * the town now at every size (TAG_SIZES, as `tag` sizes them), the sky's clouds and sun, the tables' clock digits. Someone arriving
-   * later has theirs made as they show (a few small pictures, once).
+   * the town now at every size (TAG_SIZES, as `tag` sizes them), the sky's clouds and sun, the tables' clock digits, the bubble's tail.
+   * Someone arriving later has theirs made as they show (a few small pictures, once), and a line said its bubble (one).
    */
   private makeLabels(keep: (c: HTMLCanvasElement) => void): void {
     for (const sg of this.signs) keep(this.signArt(sg));
@@ -3306,6 +3320,7 @@ export class Renderer {
     }
     this.sky.warm(keep);
     keep(this.clockStrip());
+    keep(this.tailArt());
   }
 
   /** (The loading screen) Whether the labels' fonts are in (asked for the first time it's called): their pictures wait for them. */
@@ -3683,55 +3698,97 @@ export class Renderer {
     this.paint.changed(cv);
   }
 
-  /** The speech bubble: white, rounded, its tail pointing down at the speaker's head. */
+  /**
+   * The speech bubble: white, rounded, its tail pointing down at the speaker's head. Its body and words are one picture a line
+   * (`bubbleArt`), its tail one picture (`tailArt`, made on the loading screen), each laid on whole device pixels (Nov 25: drawn as
+   * shapes, the shadowed body and tail were drawn again into new pictures, and uploaded, every frame the speaker glided a fraction
+   * of a pixel).
+   */
   private drawBubble(text: string, ax: number, ay: number): void {
-    const { ctx, W } = this;
-    ctx.font = BUBBLE_FONT;
-    let b = this.bubbles.get(text);
-    if (!b) {
-      const words = text.split(" ");
-      const lines: string[] = [];
-      let line = "";
-      for (const w of words) {
-        const t = line ? `${line} ${w}` : w;
-        if (ctx.measureText(t).width > 176 && line) {
-          lines.push(line);
-          line = w;
-        } else line = t;
-      }
-      if (line) lines.push(line);
-      b = { lines, w: Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20 };
-      this.bubbles.set(text, b);
-    }
-    const lh = 16;
-    const h = b.lines.length * lh + 10;
-    // (On whole device pixels, Nov 25: its shadowed shape is drawn once a shape (paint-gl.ts `bakeFill`), and a speaker gliding a
-    // fraction of a pixel made a new one, and an upload, every frame.)
-    const { DPR } = this;
-    const bx = Math.round(clamp(ax - b.w / 2, 6, W - b.w - 6) * DPR) / DPR;
-    const by = Math.round(Math.max(6, ay - h - 9) * DPR) / DPR;
-    this.keepFree(bx, by, b.w, h + 7);
-    ctx.save();
+    const { ctx, W, DPR } = this;
+    const b = this.bubbleArt(text);
+    const bx = Math.round(clamp(ax - b.w / 2, 6, W - b.w - 6) * DPR);
+    const by = Math.round(Math.max(6, ay - b.h - 9) * DPR);
+    this.keepFree(bx / DPR, by / DPR, b.w, b.h + 7);
     ctx.globalAlpha = 1;
-    ctx.shadowColor = "rgba(0,0,0,.25)";
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetY = 2;
-    ctx.fillStyle = "#fff";
-    roundRect(ctx, bx, by, b.w, h, 12);
-    ctx.fill();
-    const tx = Math.round(clamp(ax, bx + 14, bx + b.w - 14) * DPR) / DPR;
-    ctx.beginPath();
-    ctx.moveTo(tx - 6, by + h - 1);
-    ctx.lineTo(tx + 6, by + h - 1);
-    ctx.lineTo(tx, by + h + 7);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = "#1d1b19";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    for (let i = 0; i < b.lines.length; i++) ctx.fillText(b.lines[i]!, bx + b.w / 2, by + 5 + lh / 2 + i * lh);
+    ctx.drawImage(b.cv, (bx - BUBBLE_PAD) / DPR, (by - BUBBLE_PAD) / DPR, b.cv.width / DPR, b.cv.height / DPR);
+    const tail = this.tailArt();
+    const tx = Math.round((clamp(ax, bx / DPR + 14, bx / DPR + b.w - 14) - 6) * DPR);
+    const ty = Math.round(by + (b.h - 1) * DPR);
+    ctx.drawImage(tail, (tx - BUBBLE_PAD) / DPR, (ty - BUBBLE_PAD) / DPR, tail.width / DPR, tail.height / DPR);
   }
+
+  /** A line's bubble (`drawBubble`): its body, shadow and words, BUBBLE_PAD device pixels round it; the last BUBBLE_MAX lines kept. */
+  private bubbleArt(text: string): { cv: HTMLCanvasElement; w: number; h: number } {
+    const had = this.bubbles.get(text);
+    if (had) return had;
+    const { DPR } = this;
+    let cv: HTMLCanvasElement | undefined;
+    if (this.bubbles.size >= BUBBLE_MAX) {
+      const [oldest, old] = this.bubbles.entries().next().value!;
+      this.bubbles.delete(oldest);
+      cv = old.cv;
+    }
+    cv ??= document.createElement("canvas");
+    const g = art2d(cv);
+    g.font = BUBBLE_FONT;
+    const words = text.split(" ");
+    const lines: string[] = [];
+    let line = "";
+    for (const w of words) {
+      const t = line ? `${line} ${w}` : w;
+      if (g.measureText(t).width > 176 && line) {
+        lines.push(line);
+        line = w;
+      } else line = t;
+    }
+    if (line) lines.push(line);
+    const lh = 16;
+    const w = Math.max(...lines.map((l) => g.measureText(l).width)) + 20;
+    const h = lines.length * lh + 10;
+    cv.width = Math.ceil(w * DPR) + 2 * BUBBLE_PAD;
+    cv.height = Math.ceil(h * DPR) + 2 * BUBBLE_PAD;
+    g.setTransform(DPR, 0, 0, DPR, BUBBLE_PAD, BUBBLE_PAD);
+    bubbleShadow(g);
+    roundRect(g, 0, 0, w, h, 12);
+    g.fill();
+    g.shadowColor = "transparent";
+    g.shadowBlur = 0;
+    g.shadowOffsetY = 0;
+    g.font = BUBBLE_FONT;
+    g.fillStyle = "#1d1b19";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    // (Each line's middle on a whole device pixel, as the town's text is laid.)
+    for (let i = 0; i < lines.length; i++) g.fillText(lines[i]!, Math.round((w / 2) * DPR) / DPR, Math.round((5 + lh / 2 + i * lh) * DPR) / DPR);
+    const b = { cv, w, h };
+    this.bubbles.set(text, b);
+    this.paint.changed(cv);
+    return b;
+  }
+
+  /** The bubble's tail (a 12 x 8 triangle, its top left at BUBBLE_PAD device pixels in) with its shadow, made once a pixel ratio. */
+  private tailArt(): HTMLCanvasElement {
+    const { DPR } = this;
+    if (this.tail && this.tailDpr === DPR) return this.tail;
+    const cv = (this.tail ??= document.createElement("canvas"));
+    this.tailDpr = DPR;
+    cv.width = Math.ceil(12 * DPR) + 2 * BUBBLE_PAD;
+    cv.height = Math.ceil(8 * DPR) + 2 * BUBBLE_PAD;
+    const g = art2d(cv);
+    g.setTransform(DPR, 0, 0, DPR, BUBBLE_PAD, BUBBLE_PAD);
+    bubbleShadow(g);
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.lineTo(12, 0);
+    g.lineTo(6, 8);
+    g.closePath();
+    g.fill();
+    this.paint.changed(cv);
+    return cv;
+  }
+  private tail: HTMLCanvasElement | null = null;
+  private tailDpr = 0;
 
   // ---- Taps: the pressed square; what a finger landed on; where a card stands.
 
