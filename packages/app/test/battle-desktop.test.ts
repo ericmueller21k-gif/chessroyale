@@ -62,7 +62,7 @@ describe("the figures beside the board on a computer (sideSizes)", () => {
     expect(right(swung) + 6 * swung.s).toBeLessThanOrEqual(346 + 760 * SIDE_FEEL.over + 0.1);
     expect(right(rest) + 6 * rest.s).toBeGreaterThan(346 + 760 * SIDE_FEEL.over);
   });
-  // Rooms as measured at 2× (scripts/stills-battle-desktop.mjs sides, Boss alone, no eval bar): the board, the empty column's left edge;
+  // Rooms as measured at 2× (scripts/screen-stills-battle-desktop.mjs sides, Boss alone, no eval bar): the board, the empty column's left edge;
   // Hollow and Folio (Folio's drawing the widest), his box's middle 86 px left of the board; your pawn's middle 86 px right of it, its
   // drawing 57 px either side, the God King's drawing's right edge 188 px past its middle.
   const rooms: Record<string, { board: number; left: number; bottom: number; limit: number; win: number }> = {

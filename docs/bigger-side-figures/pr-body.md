@@ -64,7 +64,7 @@ line not seen; his intro card not found on the phone) and passed on their own (4
 ## Stills (`docs/bigger-side-figures/`)
 
 `sizes-<w>x<h>-before.png` / `-after.png` for 1280x800, 1440x900, 1920x1080, 2000x1250 and phone: every boss (17) with your pawn and the
-God King; before is main (#482). One command: `node scripts/stills-battle-desktop.mjs sides <dir> 1280x800,1440x900,1920x1080,2000x1250,phone "" http://localhost:<port>`.
+God King; before is main (#482). One command: `node scripts/screen-stills-battle-desktop.mjs sides <dir> 1280x800,1440x900,1920x1080,2000x1250,phone "" http://localhost:<port>`.
 
 ## Lane
 

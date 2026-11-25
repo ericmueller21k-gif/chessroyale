@@ -987,7 +987,7 @@ below):
   their room. Babur leans to the board (`SIDE_FEEL.lean`), his pump in front of him over his edge (`PUMP_OVER`), in everyone's column.
   Guard: `e2e/side-same-size.spec.ts`. Decision: [2026-11-07-one-side-size.md](../decisions/2026-11-07-one-side-size.md).
 - **Eric's rule (Nov 4):** every figure whole on screen at rest and where each beat ends (docs/rules/eric.md); guard
-  `e2e/boss-side.spec.ts`. Stills: `scripts/stills-battle-desktop.mjs` (sides, cast, cave). Decision:
+  `e2e/boss-side.spec.ts`. Stills: `scripts/screen-stills-battle-desktop.mjs` (sides, cast, cave). Decision:
   [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 
 ### The result page (Nov 2, 2026)

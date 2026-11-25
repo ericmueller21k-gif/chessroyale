@@ -8,7 +8,7 @@ during the game".
 
 ## The cause, and its fix
 End screens were built and looked at one mode and one size at a time, so the gaps and duplicates only showed on Eric's devices.
-`npm run stills:end-screens` (scripts/stills/) plays every case for real (Boss alone won, lost, resigned; the 50 v 50 resigned; Squads
+`npm run stills:end-screens` (scripts/screen-stills/) plays every case for real (Boss alone won, lost, resigned; the 50 v 50 resigned; Squads
 resigned; a 1 v 1 placement game lost and won, with XP, a draw) at phone 390 × 844 (the screen and the whole page), laptop 1536 × 730 and
 desktop 1920 × 960 (the 1 v 1 also at 375 × 667 and Eric's 1735 × 1035), into one labeled sheet. Run it, and look at the whole sheet,
 before shipping any change to an end screen.
