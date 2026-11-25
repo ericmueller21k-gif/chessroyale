@@ -68,23 +68,23 @@ describe("the top tiers: place among the top ladders (Oct 28, 2026)", () => {
     await ladders(sql, Array.from({ length: 600 }, (_, i) => 3400 - i));
     await ladders(sql, [2799, 2500, 100], 600);
     const label = async (ladder: number) => (await rankOf(sql, { games: 40, ladder })).label;
-    expect(await label(3400)).toBe("Transcendent · 600 RP");
-    expect(await label(3301)).toBe("Transcendent · 501 RP"); // 100th
-    expect(await label(3300)).toBe("Pearlescent · 500 RP"); // 101st
-    expect(await label(2901)).toBe("Pearlescent · 101 RP"); // 500th
-    expect(await label(2900)).toBe("Radiant 1 · 180 RP"); // 501st
-    expect(await label(2815)).toBe("Radiant 1 · 95 RP");
+    expect(await label(3400)).toBe("Transcendent – 600");
+    expect(await label(3301)).toBe("Transcendent – 501"); // 100th
+    expect(await label(3300)).toBe("Pearlescent – 500"); // 101st
+    expect(await label(2901)).toBe("Pearlescent – 101"); // 500th
+    expect(await label(2900)).toBe("Radiant I – 180"); // 501st
+    expect(await label(2815)).toBe("Radiant I – 95");
     // Below the floor nobody is counted: the divisions as ever.
-    expect(await label(2799)).toBe("Radiant 1 · 79 RP");
-    expect(await label(2500)).toBe("Radiant 4 · 20 RP");
+    expect(await label(2799)).toBe("Radiant I – 79");
+    expect(await label(2500)).toBe("Radiant IV – 20");
     expect(await topPlace(sql, 2799)).toBeNull();
   });
 
   it("the floor: with few players everyone at 2800 or more is in the top 100, and nobody below it", async () => {
     const { sql } = await setup();
     await ladders(sql, [2800, 2799, 1500]);
-    expect((await rankOf(sql, { games: 40, ladder: 2800 })).label).toBe("Transcendent · 0 RP");
-    expect((await rankOf(sql, { games: 40, ladder: 2799 })).label).toBe("Radiant 1 · 79 RP");
+    expect((await rankOf(sql, { games: 40, ladder: 2800 })).label).toBe("Transcendent – 0");
+    expect((await rankOf(sql, { games: 40, ladder: 2799 })).label).toBe("Radiant I – 79");
   });
 
   it("ties share the better place: equal ladders are the same tier", async () => {
@@ -128,19 +128,19 @@ describe("the top tiers: place among the top ladders (Oct 28, 2026)", () => {
     await ladders(sql, [3500, 3400]);
     await sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 2450, 60, 40, 20, 20, 0, 2805, ?)", a.id, T0);
     await sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 2450, 60, 40, 20, 20, 0, 2790, ?)", b.id, T0);
-    expect((await rankedSummary(sql, a.id)).rank.label).toBe("Transcendent · 5 RP");
-    expect((await duelEntrant(sql, a)).player.rank.label).toBe("Transcendent · 5 RP");
-    expect((await duelEntrant(sql, b)).player.rank.label).toBe("Radiant 1 · 70 RP");
+    expect((await rankedSummary(sql, a.id)).rank.label).toBe("Transcendent – 5");
+    expect((await duelEntrant(sql, a)).player.rank.label).toBe("Transcendent – 5");
+    expect((await duelEntrant(sql, b)).player.rank.label).toBe("Radiant I – 70");
     // Bob beats Ann: he crosses the floor (a place counted with the game in), she may drop under it.
     const out = await recordDuel(sql, game(b.id, a.id, "1-0"), notHeld);
     const bob = out!.w.change!;
-    expect(bob.before.label).toBe("Radiant 1 · 70 RP");
+    expect(bob.before.label).toBe("Radiant I – 70");
     const bobNow = (await rankedRecordOf(sql, b.id)).record.ladder!;
     expect(bobNow).toBeGreaterThanOrEqual(2800);
-    expect(bob.after.label).toBe(`Transcendent · ${bobNow - 2800} RP`);
+    expect(bob.after.label).toBe(`Transcendent – ${bobNow - 2800}`);
     expect(bob.after.emblem).toBe("transcendent");
     const ann = out!.b.change!;
-    expect(ann.before.label).toBe("Transcendent · 5 RP");
+    expect(ann.before.label).toBe("Transcendent – 5");
     const annNow = (await rankedRecordOf(sql, a.id)).record.ladder!;
     expect(ann.after.label).toBe((await rankOf(sql, { games: 41, ladder: annNow })).label);
   });
@@ -267,7 +267,7 @@ describe("the public profile's numbers (Oct 28, 2026): peak, streak, each game's
     const { sql, a, b } = await setup();
     await settledAt(sql, a.id, 1270);
     await settledAt(sql, b.id, 1270);
-    expect((await rankedSummary(sql, a.id)).peak!.label).toBe("Paragon 5 · 70 RP");
+    expect((await rankedSummary(sql, a.id)).peak!.label).toBe("Paragon V – 70");
     await recordDuel(sql, game(a.id, b.id, "1-0"), notHeld);
     const up = (await rankedRecordOf(sql, a.id)).record.ladder!;
     expect(up).toBeGreaterThan(1270);

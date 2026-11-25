@@ -1005,7 +1005,7 @@ export interface Profile {
   locker: LockerState;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
   rating: number | null;
-  /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record. */
+  /** Ranked 1 v 1: the rank ("Gold II – 45", "Placement 2/5") and the record. */
   ranked1v1: RankedSummary;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
   /** Your chat ban in force and a moderator's notice you haven't seen (chat-mod.ts); missing when neither. */

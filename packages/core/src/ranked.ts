@@ -120,11 +120,25 @@ export interface RankView {
   color: string;
   /** The emblem's id in the baked set ("gold-d3", "transcendent"); null in placements (and for a bot). */
   emblem: string | null;
-  /** "Gold 2 · 45 RP", "Radiant 1 · 95 RP", "Transcendent · 120 RP", "Placement 2/5". */
+  /**
+   * The rank pill's words, everywhere it shows (Eric, Nov 25: "remove RP next to names and use Roman ... like Paragon IV - 50"): the tier,
+   * its division in Roman numerals, an en dash and the points: "Gold II – 45", "Radiant I – 95"; a top tier "Transcendent – 120";
+   * "Placement 2/5". (Was "Gold 2 · 45 RP".)
+   */
   label: string;
 }
 
 const PLACEMENT_COLOR = "#9aa0aa";
+
+/** A division in Roman numerals, as every rank shows it (Eric, Nov 25: "remove RP next to names and use Roman"): 5 → "V", 4 → "IV". */
+export function romanDivision(n: number): string {
+  let out = "";
+  for (const [v, r] of [[10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]] as const) for (; n >= v; n -= v) out += r;
+  return out;
+}
+
+/** A rank's tier and division, as shown: "Gold III", "Transcendent" (a top tier has no division), "Placement" (in placements). */
+export const divisionTitle = (v: Pick<RankView, "tier" | "division">) => (v.division === null ? v.tier : `${v.tier} ${romanDivision(v.division)}`);
 
 /** A tier's emblem id: "gold-d3" (a tier with divisions), "transcendent" (a top tier). */
 export const emblemId = (tier: string, division: number | null) => (division === null ? tier.toLowerCase() : `${tier.toLowerCase()}-d${division}`);
@@ -147,7 +161,7 @@ export function rankView(row: { games: number; ladder: number | null; place?: nu
     const top = [...s.topTiers].sort((a, b) => a.top - b.top).find((t) => place <= t.top);
     if (top) {
       const points = ladder - s.topFloor;
-      return { placement: null, tier: top.name, division: null, points, ladder, color: top.color, emblem: emblemId(top.name, null), label: `${top.name} · ${points} RP` };
+      return { placement: null, tier: top.name, division: null, points, ladder, color: top.color, emblem: emblemId(top.name, null), label: `${top.name} – ${points}` };
     }
   }
   const perTier = s.divisions * s.pointsPerDivision;
@@ -159,7 +173,7 @@ export function rankView(row: { games: number; ladder: number | null; place?: nu
   const division = s.divisions - Math.floor(within / s.pointsPerDivision);
   const points = within % s.pointsPerDivision + (ladder - at);
   const tier = s.tiers[t]!;
-  return { placement: null, tier: tier.name, division, points, ladder, color: tier.color, emblem: emblemId(tier.name, division), label: `${tier.name} ${division} · ${points} RP` };
+  return { placement: null, tier: tier.name, division, points, ladder, color: tier.color, emblem: emblemId(tier.name, division), label: `${divisionTitle({ tier: tier.name, division })} – ${points}` };
 }
 
 /**

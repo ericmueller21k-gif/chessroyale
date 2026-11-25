@@ -47,7 +47,7 @@ export function yourRankShown(real: RankView | null): RankView | null {
   return RANK_ASKED && real && testSwitchesAllowed() ? RANK_ASKED : real;
 }
 
-/** Your rank as it shows: "Gold 2 · 45 RP", "Transcendent · 120 RP", "Placement 2/5" (null: no account loaded yet). */
+/** Your rank as it shows: "Gold II – 45", "Transcendent – 120", "Placement 2/5" (null: no account loaded yet). */
 export function ranked1v1Label(): string | null {
   return ranked1v1Rank()?.label ?? null;
 }

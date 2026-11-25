@@ -46,14 +46,14 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   }
   await page.reload();
   // Home names your 1 v 1 rank under your name, the tier in its color; no rating rank's name (retired Oct 28).
-  await expect(page.locator(".fd-hero-sub")).toHaveText("Paragon 5 · 45 RP");
-  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 5");
+  await expect(page.locator(".fd-hero-sub")).toHaveText("Paragon V – 45");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon V");
   // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
   await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await expect(page.getByRole("heading", { name: "Eric" })).toBeVisible();
   await expect(page.getByText("Online now")).toBeVisible();
   // The card: the 1 v 1 rank's pill, then the rating's number alone.
-  await expect(page.locator(".fd-pills .fd-card-rank")).toHaveText("Paragon 5 · 45 RP");
+  await expect(page.locator(".fd-pills .fd-card-rank")).toHaveText("Paragon V – 45");
   await expect(page.locator(".fd-pills")).toContainText("Rating 1612");
   await expect(page.locator(".fd-pills")).not.toContainText(/Weighty|Novice|Expert/);
   // No coins pill in that row (Eric, Nov 17: "a random coin thing in the profile… just remove that"): the shop shows them.

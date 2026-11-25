@@ -1,0 +1,7 @@
+# The side menu's labels wherever they cost the game nothing (Nov 25, 2026)
+
+(Round 2 the same day reverses the "column as wide" call, by Eric's order: [2026-11-25-menu-labels-2.md](2026-11-25-menu-labels-2.md).)
+
+- Eric (Nov 25): "Why isn't the names on the left appearing there's plenty of space?" They showed only from a fixed 1800 px (Nov 1, round 2), set when the labels cost the board 152 px; since that day's flexible column (280 to 340 px) they often cost nothing, but the fixed width never asked.
+- Measured every framed game screen at 1536 × 730, 1280 × 600, 1366 × 650, 1920 × 960, 1858 × 1040, 1440 × 900, 1280 × 800 (and 1920 × 1080, 1366 × 768), labels against icons (table in the PR, #duel-layout). Labels never change the board's size, but they can push it over the column beside it, or narrow that column (the 50 v 50's chat on Eric's laptop went from 119 to 85 px of messages: the real-screens check caught it). No one width or aspect ratio separates the cases (Boss alone takes them at 1366 × 650, the 50 v 50 can't), so the rule is a per-screen check: `GameFrame` tries the labels and keeps them where the board is the same size inside its column and the column beside it is as wide (`useMenuLabels`).
+- Calls: "nothing" includes the column beside the board (its chat or panel), not only the board; from 1800 px the labels stay as since Nov 1, so no screen loses them; a page without a board keeps that 1800 px rule. Eric's laptop: labels on 1 v 1 and Squads.
