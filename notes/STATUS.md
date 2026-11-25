@@ -2142,3 +2142,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: vote-card-fill head 6c9e4451 = 8d9420ab's tree (v3, final). Helper archived. stills branch's NOTE.md may still say v2: the v3 stills Eric saw are in $S/vf4. Merge after #959 + Eric's OK.
 - Nov 26: Eric asked Stripe status (answered: PR1-2 done, PR3 coin strip paused at 98c2a8cc, PR4-12 not started; Stripe checkout = PR8, needs 5 storage first; test key saved Nov 25). Eric's ideas noted in notes/briefs/eric-ideas-nov26.md (settings→Handbook + left menu tab; engine wording; chess-integrity statement).
 - Nov 26: #959 (Squads frame) MERGED 1c9d60ee. Main run watched. Running: pay-coin-strip finish (session_01JuCWRrjsrCbKQyK4tbCnyF, high). vote-card-fill waits for Eric's OK (merge main into it first: #959 touched Vote.tsx).
+- Nov 26: main 1c9d60ee GREEN + LIVE (Squads frame).
