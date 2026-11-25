@@ -24,8 +24,12 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 - **The vote box is a standing skeleton** (Nov 25; [2026-11-25-crowd-poll-skeleton.md](../decisions/2026-11-25-crowd-poll-skeleton.md);
   `SkeletonRows`, `SlotSkeleton` in `screens/Crowd.tsx`): the reveal's box always has its cap's rows (`useBarSlots`), the ones a round
   doesn't fill gray (`.poll-row.skel`), and a watched turn's result line gray (`.poll-result-skel`). A computer's slot shows the
-  skeleton rows between reveals too (Play and `WatchScreen`), the status line at its foot; a phone's slot keeps the power-up row and the
-  status line until the reveal. Guard: `e2e/crowd.spec.ts`, "50 v 50's vote box is a standing skeleton".
+  skeleton rows between reveals too (Play and `WatchScreen`), the status line at its foot. Since round 2 a phone's does too: its middle box
+  (`--mid-h`, styles.css) is the power-up row (greyed through the reveal: `LockedPowerRow`), the rows, then a one-line 24 px status line
+  (the waiting line, then the result line), 151 px with six rows (was 104); `--slots` (four to six, by the screen's height: 6 from 760
+  px, 5 from 700, else 4) keeps the scoreboard's three-row room, and `useBarSlots` reads it. The box shows as many of the most-voted
+  moves as it has rows. The played move is the pick rule's (Strong by default: the judge's best of the top three), not always the most
+  voted. Guard: `e2e/crowd.spec.ts`, "50 v 50's vote box is a standing skeleton" (phone and computer).
 - **A mode is a preset over one engine.** `modeSettings()` and `CROWD_SETTINGS` / `RAID_SETTINGS` in settings.ts
   patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
