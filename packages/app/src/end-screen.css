@@ -659,9 +659,15 @@
    `--rd-k`) and your pawn at 1.8 (was 1.6); the room over him for his words 76 px (was 100), the row's gap wider for the 16 px between them. */
 .es-screen .rd-boss {
   margin-bottom: 12px;
-  --rd-k: 2.25;
 }
-.es-screen .rd-boss:has(.ch-recluse) {
+/* (`--rd-k` on the row, so the room under it below can use it too.) Nov 25, round 2d: his frame keeps rows under his feet (his shadow,
+   a jump's landing: `--rd-below`, ResultDuo, 4 to 8 of them), which hang under his box, and the rewards' gap under the row (12 px) was
+   less than that for most bosses at 2.25 (Big Boy's 6 rows, 13.5 px, crossed the XP bar's top). The row keeps the rest under it. */
+.es-screen .results-duo {
+  --rd-k: 2.25;
+  padding-bottom: max(0px, calc(var(--rd-below, 0) * var(--rd-k) * 1px - var(--es-gap)));
+}
+.es-screen .results-duo:has(.ch-recluse) {
   --rd-k: 1.25;
 }
 .es-screen .results-duo .boss-char.place-results:not(.ch-recluse) {

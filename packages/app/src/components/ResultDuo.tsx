@@ -52,7 +52,12 @@ export function ResultDuo({ match, result, hopAt = 0 }: { match: GameView; resul
   // (The pawn's jolts, by CSS, from the first lash: its delay from its first drawing, decided once, so a redraw never moves it.)
   const [lashIn] = useState(() => at + (KING_ATTACK.lashAt - KING_ATTACK.landAt) - Date.now());
   return (
-    <div class={`results-duo rd-is-${result}${attacking ? " rd-attacking" : ""}`} data-attack={ka ? stage : undefined}>
+    <div
+      class={`results-duo rd-is-${result}${attacking ? " rd-attacking" : ""}`}
+      data-attack={ka ? stage : undefined}
+      style={{ "--rd-below": kit ? kit.ch.h - kit.ch.foot[1] : 0 }}
+    >
+      {/* (`--rd-below`: his frame's rows under his feet, which hang under his box; the end screen keeps room for them under the row.) */}
       {/* (`--rd-top`: the first drawn row of his idle in his frame: the end screen's box starts at his head, not at the frame's empty top,
           Nov 25. His frame stays anchored at his feet.) */}
       <div class="rd-boss" style={{ "--rd-top": kit ? drawnBox(boss.name, kit.ch, kit.anims.idle ?? "idle").top : 0 }}>
