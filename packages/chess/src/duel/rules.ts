@@ -4,7 +4,8 @@ import { START_FEN } from "../rules.ts";
 
 /**
  * Ranked 1 v 1's game (pure: the server's game object and the app's bot game both play by it; docs/areas/ranked.md).
- * Normal chess between two players with real clocks, after a five-second vote on the time control:
+ * Normal chess between two players with real clocks, after a ten-second vote on the time control (it closes a beat after both
+ * have picked, RANKED_1V1.voteBothPickedMs):
  *   - vote → overlay ("Timer: Blitz 3+2") → play → over;
  *   - each first move has RANKED_1V1.firstMoveSeconds, untimed (the clocks start after Black's first move, as on the
  *     big chess sites); a first move that doesn't come aborts the game: no result, no rank change;
@@ -79,6 +80,8 @@ export interface DuelState {
 
 export interface DuelRules {
   voteMs: number;
+  /** Both picks in: the vote closes this long after the second, if that's sooner than its end. */
+  bothPickedMs: number;
   overlayMs: number;
   firstMoveMs: number;
   drawOfferEveryMoves: number;
@@ -86,6 +89,7 @@ export interface DuelRules {
 
 export const duelRules = (s = RANKED_1V1): DuelRules => ({
   voteMs: s.voteSeconds * 1000,
+  bothPickedMs: s.voteBothPickedMs,
   overlayMs: s.overlayMs,
   firstMoveMs: s.firstMoveSeconds * 1000,
   drawOfferEveryMoves: s.drawOfferEveryMoves,
@@ -204,12 +208,19 @@ export function nextDeadline(s: DuelState, rules: DuelRules = duelRules()): numb
 export type Refusal = "phase" | "turn" | "illegal" | "over";
 export type Acted = { ok: true; state: DuelState } | { ok: false; reason: Refusal; state: DuelState };
 
-/** A pick in the vote (it can change until time's up). Anything but a zone is ignored. */
+/**
+ * A pick in the vote (it can change until the vote closes). Anything but a zone is ignored. Once both have picked, the vote closes
+ * `bothPickedMs` after the pick that made it two (never later than its own end): a change in that beat counts, and doesn't put the
+ * close back.
+ */
 export function pick(s0: DuelState, c: Color, zone: unknown, now: number, rules: DuelRules = duelRules()): Acted {
   const s = tick(s0, now, rules);
   if (s.phase !== "vote") return { ok: false, reason: "phase", state: s };
   if (!isDuelZone(zone)) return { ok: false, reason: "illegal", state: s };
-  return { ok: true, state: { ...s, picks: { ...s.picks, [c]: zone } } };
+  const picks = { ...s.picks, [c]: zone };
+  const both = picks.w !== null && picks.b !== null;
+  const voteEndsAt = both ? Math.min(s.voteEndsAt, Math.max(now, s.voteAt) + rules.bothPickedMs) : s.voteEndsAt;
+  return { ok: true, state: { ...s, picks, voteEndsAt } };
 }
 
 /**

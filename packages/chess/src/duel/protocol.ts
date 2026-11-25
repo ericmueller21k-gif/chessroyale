@@ -100,7 +100,8 @@ export type DuelServerMessage = (
   | { t: "draw"; drawOffer: Color | null; canOffer: Record<Color, boolean> }
   | { t: "presence"; connected: Record<Color, boolean> }
   | { t: "outcome"; outcome: DuelOutcome }
-  | { t: "chat"; line: NetChatLine }
+  /** `note`: to the one who typed it, when the other player doesn't see typed messages (their chat is off, or a quick-lines-only device). */
+  | { t: "chat"; line: NetChatLine; note?: string }
   | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
   /** `block`: your chat ban (reason "mod", chat moderation). */
   | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock; message?: string }

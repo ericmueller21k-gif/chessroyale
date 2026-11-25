@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, ENGINE_MAX_ELO, ENGINE_MIN_ELO, RANKED_1V1, botLook, rankView, type DuelZone, type ItemLook, type RankView } from "@chessroyale/core";
+import { BOSS_BRAIN, ENGINE_MAX_ELO, ENGINE_MIN_ELO, RANKED_1V1, RESIDENTS, botLook, rankView, type DuelZone, type ItemLook, type RankView } from "@chessroyale/core";
 import { applyMove, toSan, type ClientMessage, type HumanUciEngine } from "@chessroyale/chess";
 import {
   DUEL_PROTOCOL,
@@ -156,9 +156,13 @@ export class NetDuel implements DuelSession {
   readonly chat = new MatchChat({
     code: () => `1v1-${this.code}`,
     me: () => this.you,
+    // The chat's messages as they are, only `to` left off (a 1 v 1 has no teams). (Nov 25: this copied the fields by name and so dropped
+    // the typed text and the typed-chat opt-in added on Nov 7: a typed "hello" went as an empty line the server refused, silently.)
     send: (m: ClientMessage) => {
-      if (m.t === "chat") this.send({ t: "chat", say: m.say });
-      else if (m.t === "chatPrefs") this.send({ t: "chatPrefs", ...(m.off !== undefined ? { off: m.off } : {}), ...(m.muted ? { muted: m.muted } : {}) });
+      if (m.t === "chat") {
+        const { to: _to, ...line } = m;
+        this.send(line);
+      } else if (m.t === "chatPrefs") this.send(m);
     },
     emit: () => this.emit(),
     local: (t) => this.local(t),
@@ -331,6 +335,7 @@ export class NetDuel implements DuelSession {
         break;
       case "chat":
         this.chat.onLine(msg.line);
+        if (msg.note) this.chat.notice(msg.note);
         break;
       case "chatLog":
         this.chat.onLog(msg.lines, msg.packs);
@@ -544,11 +549,11 @@ export class BotDuel implements DuelSession {
     });
   }
 
-  /** A new game whose vote opens at `voteAt`, and the bot's pick in it: a zone at random, 0.8-3.5 s into the vote. */
+  /** A new game whose vote opens at `voteAt`, and the bot's pick in it: a zone at random, as a resident's (RESIDENTS.duel.pickMs) into the vote. */
   private begin(voteAt: number): DuelState {
     const test = Number(testParams().get("clock"));
     const zones: DuelZone[] = ["bullet", "blitz", "rapid"];
-    setTimeout(() => this.botPick(zones[Math.floor(Math.random() * 3)]!), voteAt - Date.now() + rnd(800, 3500));
+    setTimeout(() => this.botPick(zones[Math.floor(Math.random() * 3)]!), voteAt - Date.now() + rnd(RESIDENTS.duel.pickMs[0], RESIDENTS.duel.pickMs[1]));
     return newDuel(voteAt, { testSeconds: Number.isFinite(test) && test > 0 ? test : null });
   }
 

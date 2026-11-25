@@ -24,7 +24,7 @@ import {
 import type { ChatBlock, ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
 import { chatBlockNow, mutes, setChatBlock } from "./chat-mod.ts";
 import { account, tooYoung } from "./account.ts";
-import { chatOn, onChatOn } from "./chat-on.ts";
+import { chatOn, chatOnSaved, onChatOn } from "./chat-on.ts";
 import { chatOff, onPrefsChange, setChatOff } from "./prefs.ts";
 import { play } from "./sound.ts";
 
@@ -159,11 +159,15 @@ export class MatchChat {
     const typed = this.readsTyped();
     if (chatOff() || muted.length || typed) this.host.send({ t: "chatPrefs", ...(chatOff() ? { off: true } : {}), ...(muted.length ? { muted } : {}), ...(typed ? { typed } : {}) });
     // (Chat turned on or off later, here or elsewhere: the server sends typed lines, or stops.)
+    // (Sent once the account's switch is saved: the server reads chat_on to let you type, so a word sent before the save left typing
+    // refused for the rest of the match, Nov 25.)
     this.offTyped ??= onChatOn(() => {
       const now = this.readsTyped();
       if (now === this.typedSent) return;
       this.typedSent = now;
-      this.host.send({ t: "chatPrefs", typed: now });
+      void chatOnSaved().then(() => {
+        if (this.offTyped && this.typedSent === now) this.host.send({ t: "chatPrefs", typed: now });
+      });
       this.host.emit();
     });
     this.typedSent = typed;
@@ -198,6 +202,12 @@ export class MatchChat {
     this.wakeAt(this.typedReadyAt());
     this.host.emit();
     return true;
+  }
+
+  /** A note under the field for a moment (the server's: "Bo doesn't see typed messages…"). */
+  notice(message: string) {
+    this.setNote(message);
+    this.host.emit();
   }
 
   private setNote(message: string) {
