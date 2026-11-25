@@ -73,7 +73,7 @@ describe("residents: who may use the route", () => {
   it("is Not found to anyone but an admin, the e2e's key, or Access with the residents' or the test accounts' token", async () => {
     const { sql, call } = await world();
     const player = await signedIn(sql, "player@example.com");
-    for (const headers of [{}, { cookie: player.cookie }, { authorization: "Bearer anything" }]) {
+    for (const headers of [{}, { cookie: player.cookie }, { authorization: "Bearer anything" }] as Record<string, string>[]) {
       for (const [method, path] of [["GET", ""], ["POST", ""], ["POST", "/beat"]] as const) expect((await call(method, headers, method === "POST" ? { name: "Mossy" } : undefined, { path }))!.status).toBe(404);
     }
     // Another token Access issued (the health view's, say): not this route's.

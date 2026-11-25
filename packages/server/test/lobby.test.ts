@@ -171,6 +171,32 @@ describe("lobby", () => {
     expect(L.last("p1", "reveal")).toBeTruthy();
   });
 
+  it("residents (residents.ts): a real person's device hosts whenever one is connected, a resident only while none is", () => {
+    const L = setup({ firstStageRounds: 3 });
+    L.core.connect(undefined, "Mossy", "computer");
+    L.core.markResident("p1", true);
+    L.core.connect(undefined, "Eric", "phone");
+    L.core.message("p1", { t: "start" });
+    L.advance(6000);
+    L.advance(DEFAULT_SETTINGS.moveClockSeconds * 1000 + 400);
+    // (The first one in held it till the first host work: then the person, though the resident's device is the computer.)
+    expect(L.core.record.phase).toBe("scoring");
+    expect(L.core.record.hostId).toBe("p2");
+    expect(L.last("p1", "scoreRequest")).toBeUndefined();
+    expect(L.hostScores("p2")).toBe(true);
+    // The person drops: the resident hosts, nobody else being here. Back, the person takes it again at the next host work.
+    L.core.disconnect("p2");
+    expect(L.core.record.hostId).toBe("p1");
+    L.core.connect(L.core.record.humans[1]!.token, undefined);
+    expect(L.core.record.hostId).toBe("p1");
+    L.take("p1");
+    for (let i = 0; i < 200 && L.core.record.phase !== "scoring"; i++) L.advance(1000);
+    expect(L.core.record.phase).toBe("scoring");
+    expect(L.core.record.hostId).toBe("p2");
+    expect(L.last("p1", "scoreRequest")).toBeUndefined();
+    expect(L.last("p2", "scoreRequest")).toBeTruthy();
+  });
+
   it("keeps going without any scorer (all picks treated equal) rather than stalling", () => {
     const L = setup();
     L.core.connect(undefined, "Ann", "computer");

@@ -605,6 +605,21 @@ describe("the best move is the highest-scored pick (docs/decisions/2026-10-16-th
     consistent(rev);
   });
 
+  it("residents alone (residents.ts): the engine server is never asked; a real person connected turns it back on", async () => {
+    for (const people of [[], ["p3"], ["p3 away"]]) {
+      const L = setup({ server: true });
+      const { worst } = start(L);
+      for (const id of ["p1", "p2", "p3"]) L.core.markResident(id, !people.some((p) => p.startsWith(id)));
+      if (people.includes("p3 away")) L.core.disconnect("p3");
+      for (const id of L.judgesOf()) await answerWith(L, id, inflated);
+      // (With a person here, the close call goes to the engine server as ever; with residents alone the judges' numbers stand.)
+      expect(L.serverAsks, people.join()).toHaveLength(people.includes("p3") ? 1 : 0);
+      if (people.includes("p3")) L.serve(true);
+      expect(L.core.record.phase).toBe("reveal");
+      expect(L.last("p1", "reveal")!.bestMove).toBe(worst);
+    }
+  });
+
   it("the engine server's re-check weighs the first line against it, like for like: the better one is the best", async () => {
     const L = setup({ server: true });
     const { fen, first, worst } = start(L);

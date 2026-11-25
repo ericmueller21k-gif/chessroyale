@@ -1085,7 +1085,7 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     const queries: { q: string; args: unknown[] }[] = [];
     const sql = {
       run: async (q: string, ...args: unknown[]) => void queries.push({ q, args }),
-      first: async (q: string, ...args: unknown[]) => (queries.push({ q, args }), q.startsWith("SELECT rating FROM users") ? { rating: null } : null),
+      first: async (q: string, ...args: unknown[]) => (queries.push({ q, args }), q.startsWith("SELECT rating, resident FROM users") ? { rating: null, resident: null } : null),
       all: async (q: string, ...args: unknown[]) => (queries.push({ q, args }), []),
       batch: async (st: readonly { sql: string }[]) => void queries.push(...st.map((x) => ({ q: x.sql, args: [] }))),
     };
