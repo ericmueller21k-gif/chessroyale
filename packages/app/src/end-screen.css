@@ -80,9 +80,10 @@
   }
 }
 
-/* "XP EARNED" and its number: a fixed box; the number counts here, then lobs into its bar. */
+/* "XP EARNED" and its number: a fixed box; the number counts here, then lobs into its bar. (Nov 25: the label and the number a size
+   bigger, Eric: "I need a magnifying glass to read XP EARNED +0".) */
 .es-earned {
-  height: 78px;
+  height: 84px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -92,10 +93,10 @@
 }
 /* Why there's none ("No XP: test game."), in the number's place, the same height. */
 .es-earned-why {
-  height: 38px;
+  height: 44px;
   display: flex;
   align-items: center;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--muted);
 }
@@ -110,7 +111,7 @@
 }
 .es-earned-label {
   font-family: "Press Start 2P", ui-monospace, monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1px;
   color: var(--accent);
   text-shadow: 1px 1px 0 color-mix(in srgb, #000 35%, transparent);
@@ -124,8 +125,8 @@
   display: inline-block;
   font-family: inherit;
   font-weight: 900;
-  font-size: 36px;
-  line-height: 38px;
+  font-size: 42px;
+  line-height: 44px;
   letter-spacing: -0.5px;
   color: var(--good);
   text-shadow: 0 2px 0 color-mix(in srgb, var(--good) 30%, #000 35%);
@@ -478,15 +479,18 @@
   color: var(--muted);
 }
 
-/* The quests this match moved: a fixed box of two rows. */
+/* The quests this match moved: their rows, as many as there are (Nov 25: no empty rows kept); none (or still asking) one line. */
 .es-quests {
   box-sizing: border-box;
   width: min(340px, 100%);
-  height: 112px;
   margin: 0 auto;
   display: grid;
-  grid-template-rows: 16px 42px 42px;
+  grid-template-rows: 16px;
+  grid-auto-rows: 42px;
   row-gap: 4px;
+}
+.es-quests.es-quests-one {
+  display: block;
 }
 .es-quests-head {
   font-size: 11px;
@@ -496,13 +500,20 @@
   color: var(--muted);
   text-align: center;
 }
+/* "QUESTS  No quests this game": one line, the word bold. */
 .es-quests-none {
-  grid-row: 2 / 4;
-  align-self: center;
   margin: 0;
+  height: 20px;
+  line-height: 20px;
   text-align: center;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.es-quests-none .es-quests-head {
+  margin-right: 6px;
+  font-size: 12px;
+  color: var(--text);
 }
 .es-q {
   display: grid;
@@ -634,9 +645,30 @@
   width: 72px;
   height: 72px;
 }
-/* (A boss battle's ResultDuo as the rewards' middle: nothing under your pawn now, so he stands on its base line.) */
+/* (A boss battle's ResultDuo as the rewards' middle: nothing under your pawn now, so he stands on its base line.) Nov 25 (Eric: "the
+   character models are small here ... they can be bigger or just moved up"): the boss at 2.5 (was 2; his attack at the same scale,
+   `--rd-k`) and your pawn at 2 (was 1.6); the room over him for his words 76 px (was 100), the row's gap wider for the 16 px between them. */
 .es-screen .rd-boss {
   margin-bottom: 12px;
+  --rd-k: 2.5;
+}
+.es-screen .rd-boss:has(.ch-recluse) {
+  --rd-k: 1.25;
+}
+.es-screen .results-duo .boss-char.place-results:not(.ch-recluse) {
+  --bc-scale: 2.5;
+  --bc-box: 150px;
+  width: 112px;
+}
+.es-screen .results-duo .boss-char.place-results {
+  margin-top: 76px;
+}
+.es-screen .results-duo {
+  gap: 40px;
+}
+.es-screen .rd-you .you-pawn {
+  --pk: 2;
+  --pw: calc(68px * var(--pk));
 }
 /* Squads' middle: your squad's tag and members, in a row. */
 .es-squad {
@@ -662,20 +694,9 @@
 .dv-end .dv-chat {
   width: min(380px, 100%);
 }
-/* (The computer's columns, below; a phone keeps its one column: these wrappers lay out nothing there.) */
-.dv-end-cols,
-.dv-end-rewards {
-  display: contents;
-}
+
 /* Quests on ranked 1 v 1's end page (`day`, Eric, Nov 25): every quest you have, dailies then the weekly, in a box of four rows; the ones
    this game moved lit, the others still at their counts. Never "No quests moved this game". */
-.es-quests.es-quests-day {
-  height: calc(16px + 4 * 42px + 4 * 4px);
-  grid-template-rows: 16px repeat(4, 42px);
-}
-.es-quests-day .es-quests-none {
-  grid-row: 2 / 6;
-}
 .es-q.es-q-lit {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
@@ -684,195 +705,171 @@
   animation: none;
 }
 
-/* ---- Ranked 1 v 1's end page on a computer (Eric, Nov 25; docs/decisions/2026-11-25-real-screens.md) ----
- * The page is the window: nothing scrolls, either way (a page taller than the window showed Windows' scrollbar, and the 100vw widths
- * then scrolled sideways too). The headline over the left half; under it your rewards (the bars, your quests, your coins, Play again and
- * Home) beside the chat; the move-by-move on the right, its board as tall as the window allows. A laptop is the desktop, smaller: every
- * size here is in `--es-u`, one design pixel, the window's height over 800 (between 0.75 and 1 px), so 1280 × 600, 1536 × 730 and
- * 1920 × 960 show the same arrangement, scaled. The chat takes the height that's left and never collapses. A phone: as before. */
-@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
-  .screen.results.boss-results.dv-end {
-    --es-u: clamp(0.75px, calc(var(--app-h) / 800), 1px);
-    --dv-gap: calc(28 * var(--es-u));
-    /* (The move-by-move's board: the window's height less the page's padding, the heading and the stepper; never so wide that the
-       left half is under two 300-design-pixel columns.) */
-    --dv-board: max(240px, min(calc(var(--app-h) - 2 * var(--dv-gap) - 51 * var(--es-u) - 36px), calc(var(--win-w) - 3 * var(--dv-gap) - 624 * var(--es-u))));
-    box-sizing: border-box;
-    height: var(--app-h);
-    min-height: 0;
-    overflow: hidden;
-    padding: var(--dv-gap);
-    grid-template-columns: minmax(0, 1fr) var(--dv-board);
-    grid-template-rows: minmax(0, 1fr);
-    column-gap: var(--dv-gap);
-    align-items: stretch;
-    gap: 0 var(--dv-gap);
-  }
-  .dv-end > .results-top {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    align-items: stretch;
-    justify-items: stretch;
-    gap: calc(10 * var(--es-u));
-    min-height: 0;
-  }
-  /* (The gear at the top right of the left half, in the headline's row, over the chat's column.) */
-  .dv-end > .results-top > .mm-corner {
-    top: calc(4 * var(--es-u));
-  }
-  .dv-end-cols {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: var(--dv-gap);
-    min-height: 0;
-  }
-  .dv-end-rewards {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: calc(10 * var(--es-u));
-    min-width: 0;
-    min-height: 0;
+/* ---- Ranked 1 v 1's end page (Eric, Nov 25; docs/decisions/2026-11-25-end-screens-2.md) ----
+ * Play again and Home stacked, the column's width; the chat with its post-game lines. A phone: one tight column, the chat with a message
+ * area, the move by move clear of Safari's bar. A computer: the game's own screen (Duel.tsx `dv-ended`), its right column's content
+ * swapped: below. */
+.dv-result-actions.dv-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  width: min(340px, 100%);
+  margin: 0 auto;
+  gap: 8px;
+}
+.dv-result-actions.dv-stacked .btn {
+  flex: none;
+  min-height: 46px;
+  font-size: 17px;
+}
+.dv-steps {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.dv-steps .nav-btn {
+  width: 32px;
+  height: 30px;
+  min-height: 0;
+}
+.dv-steps-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 899px), (max-height: 599px) {
+  .screen.dv-end {
+    gap: 10px;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 40px);
   }
   .dv-end .dv-chat {
-    width: auto;
-    height: 100%;
-    min-height: 0;
+    flex: none;
+    width: min(380px, 100%);
+    height: 290px;
+    margin: 0 auto;
   }
-  .dv-end .dv-chat > .qchat {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-  .dv-end > .results-review {
-    min-width: 0;
-  }
-  .dv-end .breakdown.inline {
-    width: 100%;
-    gap: calc(10 * var(--es-u));
-  }
-  .dv-end .breakdown.inline .breakdown-head h2 {
-    font-size: calc(26 * var(--es-u));
-    line-height: calc(31 * var(--es-u));
-  }
+}
 
-  /* Every box of the rewards, in design pixels (end-screen.css' sizes above, scaled). */
-  .dv-end .es-title {
-    margin: calc(6 * var(--es-u)) 0 calc(4 * var(--es-u));
+/* A computer: the right column, the play panel's width, from the top strip's top to the bottom strip's foot; its content never makes
+   the rows taller (`contain: size`). Its sizes in design pixels (`--es-u`: the window's height over 800, 0.75 to 1 px), so a laptop shows
+   the desktop's column, smaller; the chat takes what's left (a shorter chat on a short window, never a scrolling page). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game.dv-ended .dv-end-col {
+    --es-u: clamp(0.75px, calc(var(--app-h) / 800), 1px);
+    grid-column: 2;
+    grid-row: 3 / 5;
+    align-self: stretch;
+    contain: size;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: calc(8 * var(--es-u));
+    min-height: 0;
+  }
+  .dv-end-col > .es-head {
+    flex: none;
+  }
+  .dv-end-col .es-rewards {
+    flex: none;
+    gap: calc(8 * var(--es-u));
+  }
+  .dv-end-col .dv-result-actions.dv-stacked {
+    width: 100%;
+    gap: calc(6 * var(--es-u));
+  }
+  .dv-end-col .dv-result-actions.dv-stacked .btn {
+    min-height: calc(40 * var(--es-u));
+    font-size: calc(16 * var(--es-u));
+    border-radius: calc(12 * var(--es-u));
+  }
+  .dv-end-col > .dv-chat {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    width: auto;
+  }
+  .dv-end-col .es-title {
+    margin: 0 0 calc(2 * var(--es-u));
     font-size: calc(22 * var(--es-u));
-    text-shadow: calc(3 * var(--es-u)) calc(3 * var(--es-u)) 0 var(--es-shadow, #e8b84a);
   }
-  .dv-end .es-loss .es-title {
-    --es-shadow: #e06a6a;
-  }
-  :root:not([data-theme="light"]) .dv-end .es-title {
-    --es-shadow: #a8741a;
-  }
-  :root:not([data-theme="light"]) .dv-end .es-loss .es-title {
-    --es-shadow: #9c2f2f;
-  }
-  .dv-end .es-line,
-  .dv-end .es-head.es-plain .es-line {
-    height: calc(22 * var(--es-u));
-    line-height: calc(22 * var(--es-u));
+  .dv-end-col .es-line,
+  .dv-end-col .es-head.es-plain .es-line {
+    height: calc(20 * var(--es-u));
+    line-height: calc(20 * var(--es-u));
     font-size: calc(14 * var(--es-u));
   }
-  .dv-end .es-rewards {
-    gap: calc(10 * var(--es-u));
+  .dv-end-col .es-earned {
+    height: calc(76 * var(--es-u));
+    gap: calc(3 * var(--es-u));
   }
-  .dv-end .es-earned {
-    height: calc(78 * var(--es-u));
-    gap: calc(4 * var(--es-u));
+  .dv-end-col .es-earned-label {
+    font-size: calc(11 * var(--es-u));
   }
-  .dv-end .es-earned-label {
-    font-size: calc(10 * var(--es-u));
-  }
-  .dv-end .es-earned-num {
+  .dv-end-col .es-earned-num {
     font-size: calc(36 * var(--es-u));
     line-height: calc(38 * var(--es-u));
   }
-  .dv-end .es-earned-why {
+  .dv-end-col .es-earned-why {
     height: calc(38 * var(--es-u));
-    font-size: calc(14 * var(--es-u));
+    font-size: calc(15 * var(--es-u));
   }
-  .dv-end .es-parts {
+  .dv-end-col .es-parts {
     height: calc(15 * var(--es-u));
     line-height: calc(15 * var(--es-u));
     font-size: calc(12 * var(--es-u));
   }
-  .dv-end .es-track,
-  .dv-end .es-quests {
+  .dv-end-col .es-track,
+  .dv-end-col .es-quests {
     width: 100%;
   }
-  .dv-end .es-track {
-    height: calc(80 * var(--es-u));
-    padding: calc(8 * var(--es-u)) calc(12 * var(--es-u)) calc(7 * var(--es-u));
+  .dv-end-col .es-track {
+    height: calc(76 * var(--es-u));
+    padding: calc(7 * var(--es-u)) calc(12 * var(--es-u)) calc(6 * var(--es-u));
     grid-template-rows: calc(20 * var(--es-u)) calc(12 * var(--es-u)) calc(16 * var(--es-u));
-    row-gap: calc(6 * var(--es-u));
+    row-gap: calc(5 * var(--es-u));
   }
-  .dv-end .es-gain {
+  .dv-end-col .es-gain {
     font-size: calc(14 * var(--es-u));
   }
-  .dv-end .es-who,
-  .dv-end .es-level {
+  .dv-end-col .es-who,
+  .dv-end-col .es-level {
     font-size: calc(13 * var(--es-u));
   }
-  .dv-end .es-ends {
+  .dv-end-col .es-ends {
     font-size: calc(12 * var(--es-u));
     line-height: calc(16 * var(--es-u));
   }
-  .dv-end .es-now small {
+  .dv-end-col .es-now small {
     font-size: calc(11 * var(--es-u));
   }
-  .dv-end .es-quests.es-quests-day {
-    height: calc(16 * var(--es-u) + 4 * 42 * var(--es-u) + 4 * 4 * var(--es-u));
-    grid-template-rows: calc(16 * var(--es-u)) repeat(4, calc(42 * var(--es-u)));
+  .dv-end-col .es-quests {
+    grid-template-rows: calc(16 * var(--es-u));
+    grid-auto-rows: calc(40 * var(--es-u));
     row-gap: calc(4 * var(--es-u));
   }
-  .dv-end .es-quests-head,
-  .dv-end .es-q-goal,
-  .dv-end .es-q-reward {
+  .dv-end-col .es-quests-head,
+  .dv-end-col .es-q-goal,
+  .dv-end-col .es-q-reward {
     font-size: calc(11 * var(--es-u));
   }
-  .dv-end .es-quests-none,
-  .dv-end .es-q-text strong {
+  .dv-end-col .es-quests-none,
+  .dv-end-col .es-q-text strong {
     font-size: calc(13 * var(--es-u));
   }
-  .dv-end .es-q {
+  .dv-end-col .es-q {
     grid-template-columns: calc(32 * var(--es-u)) minmax(0, 1fr) calc(56 * var(--es-u)) calc(36 * var(--es-u)) auto;
     column-gap: calc(8 * var(--es-u));
-    padding: 0 calc(10 * var(--es-u)) 0 calc(6 * var(--es-u));
   }
-  .dv-end .es-q-pic,
-  .dv-end .es-q-pic .qo-boss {
-    width: calc(32 * var(--es-u));
-    height: calc(32 * var(--es-u));
-  }
-  .dv-end .es-q-pic .qo-pieces piece {
-    width: calc(26 * var(--es-u));
-    height: calc(26 * var(--es-u));
-  }
-  .dv-end .es-q-text {
-    line-height: calc(15 * var(--es-u));
-  }
-  .dv-end .es-q-count {
-    font-size: calc(12 * var(--es-u));
-  }
-  .dv-end .es-coins {
+  .dv-end-col .es-coins {
+    flex: none;
     height: calc(18 * var(--es-u));
     font-size: calc(13 * var(--es-u));
   }
-  /* Play again and Home: the size of a normal button, side by side (Eric, Nov 25: "the play again and home button are huge"). */
-  .dv-end .dv-result-actions {
-    width: auto;
-    margin: 0;
-    gap: calc(10 * var(--es-u));
-  }
-  .dv-end .dv-result-actions .btn {
-    flex: none;
-    min-width: calc(132 * var(--es-u));
-    min-height: calc(42 * var(--es-u));
-    padding: 0 calc(20 * var(--es-u));
-    border-radius: calc(12 * var(--es-u));
-    font-size: calc(16 * var(--es-u));
+  /* (Your strip: the moves' ◀ ▶ in your clock's place; the opponent's clock as it ended.) */
+  .dv-ended .dv-strip .dv-steps {
+    margin-left: auto;
   }
 }

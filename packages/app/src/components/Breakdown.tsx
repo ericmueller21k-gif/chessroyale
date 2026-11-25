@@ -230,6 +230,43 @@ function InlineReview({ moves, dp, solo, estRating }: { moves: readonly MoveReco
  * move-by-move below"): the game's board, stepped with ◀ ▶ (and ← → on a computer), from the last position. No engine's words: a 1 v 1
  * isn't judged. Its stepper row and board keep their places from move to move, as InlineReview's.
  */
+/**
+ * A game's moves stepped one at a time (from the last; ← and → step too): the position after the move shown, and its words. Ranked 1 v 1's
+ * end page on a computer draws it on the game's own board (Duel.tsx, Nov 25); GameSteps draws it under a heading.
+ */
+export function useSteps(moves: readonly string[]) {
+  const fens = useMemo(() => {
+    const out = [START_FEN];
+    for (const m of moves) out.push(applyMove(out[out.length - 1]!, m));
+    return out;
+  }, [moves]);
+  const last = moves.length - 1;
+  const [at, setAt] = useState(last);
+  const step = (d: number) => setAt((p) => Math.min(last, Math.max(0, p + d)));
+  useStepKeys(last, setAt);
+  const before = fens[Math.max(0, at)]!;
+  const words = last < 0 ? "" : `${moveNo(before)}${before.split(" ")[1] === "w" ? "." : "…"} ${toSan(before, moves[at]!)}`;
+  return { at, last, step, fen: fens[at + 1] ?? START_FEN, lastMove: moves[at], words };
+}
+
+/** The stepper alone: ◀ "Move 2 of 2 · 1… e5" ▶, one line (a 1 v 1 end page's strip, Nov 25). */
+export function StepNav({ s, class: cls = "" }: { s: ReturnType<typeof useSteps>; class?: string }) {
+  if (s.last < 0) return <span class={`dv-steps ${cls}`} />;
+  return (
+    <span class={`dv-steps ${cls}`} data-testid="dv-steps">
+      <button type="button" class="nav-btn" aria-label="Previous move" disabled={s.at === 0} onClick={() => s.step(-1)}>
+        <Chevrons back />
+      </button>
+      <span class="dv-steps-text">
+        Move {s.at + 1} of {s.last + 1} · {s.words}
+      </span>
+      <button type="button" class="nav-btn" aria-label="Next move" disabled={s.at === s.last} onClick={() => s.step(1)}>
+        <Chevrons />
+      </button>
+    </span>
+  );
+}
+
 export function GameSteps({ moves, orientation }: { moves: readonly string[]; orientation: "white" | "black" }) {
   const fens = useMemo(() => {
     const out = [START_FEN];

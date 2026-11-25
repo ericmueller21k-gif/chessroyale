@@ -4004,6 +4004,11 @@ export const QUICK_CHAT = {
   /** Everyone's picks until they choose their own (new and existing players alike): free lines and emoji only. */
   defaultLines: ["good-luck", "have-fun", "nice-move", "wow", "oops", "trust-crowd", "defend-king", "go-mate", "gg", "thanks"] as readonly string[],
   defaultEmoji: ["e-thumbs", "e-clap", "e-laugh", "e-wow", "e-grimace", "e-fire", "e-skull", "e-party"] as readonly string[],
+  /**
+   * The lines a finished game's chat offers (ranked 1 v 1's end page, Nov 25: Eric, "do you think this chat box makes any sense?", its
+   * mid-game lines, "Good luck!" and "Defend the king!", after the game). The free pack's sporting lines; your emoji picks stay.
+   */
+  postGameLines: ["gg", "well-played", "thanks", "rematch"] as readonly string[],
   /** Shop prices of the packs, in coins (everything is free while SHOP_FREE is on). Nov 18: halved, 200-300 to 100-150 (the payments design). */
   packPrices: {
     godking: 150,

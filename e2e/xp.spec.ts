@@ -178,7 +178,7 @@ test('"No XP: test game." in the same box, the same size: a test switch on (?mat
   await expect(page.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: test game.", { timeout: 20_000 });
   await expect(box.locator(".es-gain")).toHaveText("");
   await expect(box.locator(".es-level")).toHaveText("Level 1");
-  await expect(page.locator(".es-quests-none")).toHaveText("No quests moved this game.");
+  await expect(page.locator(".es-quests-none")).toHaveText("Quests No quests this game.");
   await expect(rewards(page)).toHaveAttribute("data-es", "done");
   expect((await box.boundingBox())!.height).toBe(BOX_H);
   // (The bar stands at your XP: 250 of 500.)
@@ -247,7 +247,7 @@ test("each other \"No XP\" line, in the same box and size (the server's answer f
     const w = (await why.boundingBox())!;
     expect(w.x, `${none}: the line fits`).toBeGreaterThanOrEqual(0);
     expect(w.x + w.width, `${none}: the line fits`).toBeLessThanOrEqual(page.viewportSize()!.width);
-    expect(w.height, `${none}: one line`).toBeLessThanOrEqual(38);
+    expect(w.height, `${none}: one line`).toBeLessThanOrEqual(44);
   }
 });
 
