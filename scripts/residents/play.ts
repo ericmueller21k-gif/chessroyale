@@ -70,11 +70,12 @@ export function thinkMs(x: ThinkInput, rng: Rng, s: ResidentSettings = RESIDENTS
   return Math.floor(Math.max(Math.min(d.minThinkMs, Math.max(0, latest)), Math.min(ms, latest)));
 }
 
-/** Whether to resign now: well behind in material, past the opening (a rage-quitter: sooner). */
-export function shouldResign(edge: number, myMoves: number, behavior: Behavior, rng: Rng, s: ResidentSettings = RESIDENTS): boolean {
+/** Whether to resign now: well behind in material, well into the game, by the resident's rating (weaker ones play on longer; a rage-quitter: sooner). */
+export function shouldResign(edge: number, myMoves: number, behavior: Behavior, rating: number, rng: Rng, s: ResidentSettings = RESIDENTS): boolean {
   const r = s.duel.resign;
-  if (behavior === "rageQuit" && edge <= -r.rageLostBy && myMoves >= 4) return rng() < r.rageChance;
-  return edge <= -r.lostBy && myMoves >= r.afterMove && rng() < r.chance;
+  if (behavior === "rageQuit" && edge <= -r.rageLostBy && myMoves >= r.rageAfterMove) return rng() < r.rageChance;
+  const band = r.bands.find((b) => rating <= b.upTo) ?? r.bands[r.bands.length - 1]!;
+  return edge <= -band.lostBy && myMoves >= band.afterMove && rng() < band.chance;
 }
 
 /** Whether to offer a draw with this move: level material, a long game, rarely. */

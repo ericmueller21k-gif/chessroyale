@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   DUEL_ZONES,
   RANKED_1V1,
+  colorHistoryGames,
   divisionsEnd,
   controlLabel,
   duelCoins,
   duelControl,
   expectedScore,
+  firstGetsWhite,
   glickoUpdate,
   ladderRating,
   mayBeTop,
+  mulberry32,
   newRankedRecord,
   pairRange,
   pairUp,
@@ -23,6 +26,7 @@ import {
   zoneControl,
   type DuelZone,
   type RankedRecord,
+  type SeatColor,
 } from "../src/index.ts";
 
 const DAY = 86_400_000;
@@ -362,6 +366,103 @@ describe("pairing by the hidden rating", () => {
     expect(pairUp([on("a", "u1", null), on("b", "u2", null)], now)).toHaveLength(1);
     // An odd one out waits.
     expect(pairUp([e("a", "u1", 1500, now), e("b", "u2", 1500, now), e("c", "u3", 1500, now)], now)).toHaveLength(1);
+  });
+});
+
+describe("colors: who gets White as a pair is seated (Eric, Nov 25)", () => {
+  /** A player's colors in their last games, newest first ("wb": White last time, Black the time before). */
+  const h = (s: string) => [...s] as SeatColor[];
+  const heads = () => true;
+  const tails = () => false;
+  const noCoin = () => {
+    throw new Error("decided without the coin");
+  };
+
+  it("whoever had Black more over their last 10 gets White, whichever of the two is first", () => {
+    expect(firstGetsWhite(h("bwb"), h("wbw"), noCoin)).toBe(true);
+    expect(firstGetsWhite(h("wbw"), h("bwb"), noCoin)).toBe(false);
+    // A new player (no games) against one who has had White more: the new player gets White; against Black more, Black.
+    expect(firstGetsWhite([], h("wbw"), noCoin)).toBe(true);
+    expect(firstGetsWhite([], h("bwb"), noCoin)).toBe(false);
+    // Only the last 10 count: Ann's six older Blacks don't, so it's even, and Bob had Black last.
+    expect(firstGetsWhite(h("wb".repeat(5) + "bbbbbb"), h("bw".repeat(5)), noCoin)).toBe(false);
+  });
+
+  it("a tie: the one who had Black in their last game; still tied, a coin flip", () => {
+    expect(firstGetsWhite(h("wb"), h("bw"), noCoin)).toBe(false);
+    expect(firstGetsWhite(h("bw"), h("wb"), noCoin)).toBe(true);
+    expect(firstGetsWhite(h("bw"), h("bw"), heads)).toBe(true);
+    expect(firstGetsWhite(h("bw"), h("bw"), tails)).toBe(false);
+    expect(firstGetsWhite([], [], heads)).toBe(true);
+    expect(firstGetsWhite([], [], tails)).toBe(false);
+  });
+
+  it("never a third game in a row on one color when the other player can take it, even against the balance", () => {
+    // Ann had White in her last two but Black far more before; Bob is even. The balance alone would give Ann a third White.
+    expect(firstGetsWhite(h("wwbbbbbbbb"), h("bwbwbwbwbw"), noCoin)).toBe(false);
+    // Bob had Black in his last two: White, though Ann has had Black more.
+    expect(firstGetsWhite(h("bwbbbbbbbb"), h("bbwwwwwwww"), noCoin)).toBe(false);
+    // One due White, the other due Black: both get theirs.
+    expect(firstGetsWhite(h("ww"), h("bb"), noCoin)).toBe(false);
+    expect(firstGetsWhite(h("bb"), h("ww"), noCoin)).toBe(true);
+    // Two in a row is fine: Ann had White once, then Black more: White again.
+    expect(firstGetsWhite(h("wbb"), h("bww"), noCoin)).toBe(true);
+  });
+
+  it("both in the same bind (one of them has to play a third in a row): the longer run switches, then the balance, the last game, the coin", () => {
+    // Ann's third White in a row couldn't be helped last time: she gets Black now, though the balance alone says White (a fourth).
+    expect(firstGetsWhite(h("wwwbbbbbbb"), h("wwbwbw"), noCoin)).toBe(false);
+    expect(firstGetsWhite(h("bbwbwb"), h("bbbwwwwwww"), noCoin)).toBe(false);
+    // The same run: the balance.
+    expect(firstGetsWhite(h("wwbbb"), h("wwb"), noCoin)).toBe(true);
+    expect(firstGetsWhite(h("bbw"), h("bbwww"), noCoin)).toBe(true);
+    expect(firstGetsWhite(h("ww"), h("ww"), heads)).toBe(true);
+    expect(firstGetsWhite(h("ww"), h("ww"), tails)).toBe(false);
+  });
+
+  it("the numbers come from the settings", () => {
+    const S = { ...RANKED_1V1, colors: { recentGames: 16, maxInRow: 3 } };
+    // Three in a row allowed: Ann's balance gives her a third White; never a fourth.
+    expect(firstGetsWhite(h("wwbbbbbbbb"), h("bwbwbwbwbw"), noCoin, S)).toBe(true);
+    expect(firstGetsWhite(h("wwwbbbbbbbbb"), h("bwbwbwbwbw"), noCoin, S)).toBe(false);
+    // The last 16: Ann's older Blacks count now.
+    expect(firstGetsWhite(h("wb".repeat(5) + "bbbbbb"), h("bw".repeat(5)), noCoin, S)).toBe(true);
+    // How many games the server reads: enough for both rules.
+    expect(colorHistoryGames()).toBe(RANKED_1V1.colors.recentGames);
+    expect(colorHistoryGames({ ...RANKED_1V1, colors: { recentGames: 1, maxInRow: 2 } })).toBe(2);
+  });
+
+  it("played out: the same two players alternate; in a pool paired at random, colors stay even and runs short", () => {
+    const rng = mulberry32(25);
+    const coin = () => rng() < 0.5;
+    // Two players, again and again: White and Black in turn.
+    const two: SeatColor[][] = [[], []];
+    for (let g = 0; g < 8; g++) {
+      const aWhite = firstGetsWhite(two[0]!.slice(0, 10), two[1]!.slice(0, 10), coin);
+      two[0]!.unshift(aWhite ? "w" : "b");
+      two[1]!.unshift(aWhite ? "b" : "w");
+    }
+    expect(two[0]!.join("")).toMatch(/^(wb){4}$|^(bw){4}$/);
+    // Twelve players, 300 rounds of random pairs.
+    const all: SeatColor[][] = Array.from({ length: 12 }, () => []);
+    for (let round = 0; round < 300; round++) {
+      const order = [...all.keys()].sort(() => rng() - 0.5);
+      for (let i = 0; i < order.length; i += 2) {
+        const [a, b] = [all[order[i]!]!, all[order[i + 1]!]!];
+        const aWhite = firstGetsWhite(a.slice(0, 10), b.slice(0, 10), coin);
+        a.unshift(aWhite ? "w" : "b");
+        b.unshift(aWhite ? "b" : "w");
+      }
+    }
+    // (Measured over 40 seeds, Nov 25: in any 10 games in a row, Whites and Blacks at most 4 apart, the longest run 3; a coin flip's: 10 and 16.)
+    for (const p of all) {
+      for (let i = 0; i + 10 <= p.length; i++) {
+        const whites = p.slice(i, i + 10).filter((c) => c === "w").length;
+        expect(Math.abs(2 * whites - 10), `games ${i}-${i + 9}`).toBeLessThanOrEqual(4);
+      }
+      // A third in a row only when both were in the same bind; never a fourth.
+      expect(p.join("")).not.toMatch(/wwww|bbbb/);
+    }
   });
 });
 

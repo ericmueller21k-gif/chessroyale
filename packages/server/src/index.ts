@@ -541,14 +541,14 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       }
       if (leaves?.delaySec) countCall("ranked.delayed");
       const delay = leaves?.delaySec ? { notBefore: now + leaves.delaySec * 1000 } : {};
-      const { player, rating, rd } = await duelEntrant(sql, me, now, isAdmin(env, me));
+      const { player, rating, rd, colors } = await duelEntrant(sql, me, now, isAdmin(env, me));
       const clock = Number(url.searchParams.get("clock"));
       const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
       // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)
       // (The device's marker, hashed: two accounts on one device never meet. Fair play's device cookie.)
       const deviceCookie = readCookie(request, DEVICE_COOKIE);
       const device = deviceCookie ? (await sha256(`1v1:${deviceCookie}`)).slice(0, 24) : null;
-      const first = await (await queue(may.pooled)).duelNext(null, { uid: me.id, rating, rd, player, device, ...delay, ...(testSeconds ? { testSeconds } : {}) });
+      const first = await (await queue(may.pooled)).duelNext(null, { uid: me.id, rating, rd, player, device, colors, ...delay, ...(testSeconds ? { testSeconds } : {}) });
       return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);

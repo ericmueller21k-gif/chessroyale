@@ -319,7 +319,7 @@ export class DuelGameClient {
     }
     this.thinking = ply;
     const edge = materialEdge(v.fen, me);
-    if (ply >= 2 && shouldResign(edge, mine, this.profile.behavior, this.rng)) {
+    if (ply >= 2 && shouldResign(edge, mine, this.profile.behavior, this.profile.rating, this.rng)) {
       this.log(`${this.profile.name}: resigns (${edge} in material, ${this.code})`);
       this.send({ t: "resign" });
       return;
