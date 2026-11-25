@@ -11,3 +11,6 @@ Build (root): the real fill with the bots' votes, 1536x730 (125%), 1920x960, pho
 
 mock/*-v2-*: after the director's review, built: the fill at the bar's color 35% (40% dark) with a 2 px top edge; the card's text has a halo
 of the card's color where the edge crosses it.
+
+Root *-build-* overwritten after the director's second round: the fill at the bar's orange 40% (42% dark), no top edge; the blurb a step
+darker (light) / the text color (dark), so the count is AA and the blurb at least 5:1 over the fill. (mock/*-v2-* was the 2 px edge try.)
