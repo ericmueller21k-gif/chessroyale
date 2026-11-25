@@ -28,7 +28,10 @@
       { "name": "SQUADS", "class_name": "SquadsLobby" },
       { "name": "PARTIES", "class_name": "SquadsParty" },
       // Ranked 1 v 1: one object per game (duel-do.ts).
-      { "name": "DUELS", "class_name": "DuelGame" }
+      { "name": "DUELS", "class_name": "DuelGame" },
+      // The residents' always-on host (residents-host.ts): one object, the Container running the residents program. Its
+      // `containers` entry below comes with its image (DEPLOY.md, "Residents"); until then the cron never touches it.
+      { "name": "RESIDENTS_HOST", "class_name": "ResidentsHost" }
     ]
   },
   // The engine server: one vCPU (Stockfish is single-threaded here), asleep after 3 idle minutes. Its image is the one
@@ -41,7 +44,8 @@
     { "tag": "v3", "new_sqlite_classes": ["EngineServer"] },
     { "tag": "v4", "new_sqlite_classes": ["LiveHub"] },
     { "tag": "v5", "new_sqlite_classes": ["SquadsLobby", "SquadsParty"] },
-    { "tag": "v6", "new_sqlite_classes": ["DuelGame"] }
+    { "tag": "v6", "new_sqlite_classes": ["DuelGame"] },
+    { "tag": "v7", "new_sqlite_classes": ["ResidentsHost"] }
   ],
   // Accounts, profiles and match results (tables are created by the Worker on first use: see accounts.ts).
   "d1_databases": [{ "binding": "DB", "database_name": "hunchess", "database_id": "103097fd-f61b-4296-8b89-bd967ac33142" }],
@@ -66,10 +70,16 @@
     // identifier, not a secret) whose scripts may make, sign in to and delete test accounts. Empty: no token gets in (an admin's
     // session and the e2e's key still do). Before launch: `cheater-demo.ts --delete`, then back to "" (ROADMAP.md).
     "TEST_ACCOUNTS_CLIENT_ID": "52123888a4a289d33abe0914337ccd90.access",
-    // Residents (packages/server/src/residents.ts; the residents program): its own service token's client ID (an identifier, not a
-    // secret), set once Eric makes the "residents" token. Empty: no token gets in through it (the test accounts' token above does,
-    // for the first runs, until PR 3). Before launch: purge the residents, then back to "" and the token deleted (ROADMAP.md).
-    "RESIDENTS_CLIENT_ID": ""
+    // Residents (packages/server/src/residents.ts; the residents program): the "residents" service token's client ID (an identifier,
+    // not a secret; its secret is the Worker secret RESIDENTS_CLIENT_SECRET, never here). The test accounts' token above also gets in,
+    // for the director's own runs. Before launch: purge the residents, then back to "" and the token deleted (ROADMAP.md).
+    "RESIDENTS_CLIENT_ID": "4bea329adb64a99cfe4f020046bb9bd4.access",
+    // The residents' always-on host (residents-host.ts; DEPLOY.md, "Residents"): "1" and the 15-minute cron keeps it running (about
+    // $36-56 a month). Set here, not in the dashboard (a deploy would put this value back). To stop it at once: PAUSE_RESIDENTS.
+    "RESIDENTS_HOST_ON": "0",
+    // The health view's one service token (access.ts; the review of the residents' server, m6): the ops scripts' token, the same one
+    // as TEST_ACCOUNTS_CLIENT_ID. Without it any service token Access admits could read the view, the residents' included.
+    "OPS_ACCESS_CLIENT_ID": "52123888a4a289d33abe0914337ccd90.access"
   },
   // Fair play's deep re-check of flagged players' moves (packages/server/src/fairplay-deep.ts), and old errors and
   // player reports deleted (problems.ts).

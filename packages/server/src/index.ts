@@ -21,6 +21,7 @@ import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { handleTestAccounts } from "./test-accounts.ts";
 import { handleResidents, residentGate } from "./residents.ts";
+import { residentsHostTick, type ResidentsHostEnv } from "./residents-host.ts";
 import { handleFriendBots } from "./friend-bots.ts";
 import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
 import { deepCheckRun, recountDeep } from "./fairplay-deep.ts";
@@ -43,6 +44,7 @@ import { RANGED_ASSETS, rangedAsset } from "./ranged.ts";
 
 export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub, DuelGame };
 export { EngineServer } from "./engine.ts";
+export { ResidentsHost } from "./residents-host.ts";
 
 // The Durable Objects' entry points (their fetch, WebSocket handlers, alarm and the methods the Worker calls): an
 // error in one is logged and counted (problems.ts), then thrown on as before.
@@ -53,7 +55,7 @@ guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
 guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "abandon"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv, E2eSqlEnv, AlertEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv, E2eSqlEnv, AlertEnv, ResidentsHostEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -103,7 +105,7 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
-   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), alerts to Discord (alerts.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), alerts to Discord (alerts.ts), the residents' host kept up or stopped (residents-host.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
    * server (cases in review at once, the rest off-peak; fairplay-deep.ts), after its catch-up of summaries older than the near-best count (recountDeep). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
@@ -112,6 +114,12 @@ export default {
     const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
     // Alerts to Discord (alerts.ts): apart from the jobs below, so a database that doesn't answer still pages.
     ctx.waitUntil(checkAlerts(rawEnv, d1Sql(db), Date.now()).catch(failed("alerts")));
+    // The residents' host (residents-host.ts): kept up while RESIDENTS_HOST_ON is "1", stopped while PAUSE_RESIDENTS is on. Apart too.
+    ctx.waitUntil(
+      residentsHostTick(rawEnv)
+        .then((did) => did && console.log(`residents host: ${did}`))
+        .catch(failed("residents-host")),
+    );
     ctx.waitUntil(
       (async () => {
         const sql = d1Sql(db);
