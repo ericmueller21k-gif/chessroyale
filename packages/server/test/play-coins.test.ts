@@ -1,21 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import { PLAY_COINS, XP, modeSettings, xpDayStart } from "@chessroyale/core";
-import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
+import { MATCH_SAVE, PLAY_COINS, XP, modeSettings, xpDayStart } from "@chessroyale/core";
+import { createGuest, ensureSchema, grantReward, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { setCase } from "../src/fairplay.ts";
-import { ledgerAccount, ledgerMismatches } from "../src/ledger.ts";
+import { applyOp, leg, ledgerAccount, ledgerMismatches, opKeys } from "../src/ledger.ts";
 import { PLAY, PLAY_BONUS, coinDayOf } from "../src/play-coins.ts";
-import { grantXp, type XpGame } from "../src/xp.ts";
+import type { SquadsReward } from "../src/squads-lobby.ts";
+import { gameXpOf, grantXp, xpOf, type XpGame } from "../src/xp.ts";
 import { setup as lobbySetup } from "./lobby-fixture.ts";
 import { memoryDb } from "./memory-db.ts";
 
 // (The engine server is a Container, which needs the Workers runtime: the match rooms import it.)
 vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, serverRecheck: async () => null, serverScoreAt: async () => null, warmEngine: async () => false }));
+const { writeReward, writeRewardQueue } = await import("../src/squads-do.ts");
 
 /**
  * Play coins on the server (Nov 25; server/play-coins.ts, paid by xp.ts grantXp; core's play-coins.ts has the rules): a game pays
  * once (replays, races, retries), in the same batch as its XP; the XP day's totals are the ledger's own and roll at the XP day's
  * start; the day's 300 and the bonus steps hold when games land at once; nothing for a player fair play holds; the friends' lobby
- * win rule holds the win's bonus back with its XP; the 50 v 50 scoreboard's top places.
+ * win rule holds the win's bonus back with its XP; the 50 v 50 scoreboard's top places. And the review's fixes (Nov 25): a failed D1
+ * call never costs a Squads reward its coins (M1; ranked's: duel-do.test.ts), a squad on its own devices' word pays as solo (m2), a
+ * game the old code paid never pays twice (m3), a Squads member who resigned late pays play coins only.
  */
 const T0 = Date.UTC(2026, 10, 25, 12, 0);
 const MIN = 60_000;
@@ -82,12 +86,18 @@ describe("play coins, paid with a game's XP", () => {
     expect(bonuses.at(-1)).toBe(0);
     expect(bonuses.reduce((a, b) => a + b, 0)).toBe(300);
     expect(await coinsOf(sql, ann.id)).toBe(600);
-    // (At once: each refused share worked out again (the last try held to the day's ceiling only): none starved, 300 bonus exactly.)
+    // (At once, mid-day: Bo's 12 wins in a row (166 bonus), then 50 more landing together. Each refused share is worked out again (four
+    // strict tries, then one held to the day's ceiling only): the day never passes 300 and 300; in a burst of many games of one account
+    // at once, some may be paid at an earlier step and the last ones may get nothing (the review's m1), so only the cap is checked.)
     const bo = await signedIn(sql, "bo@example.com");
-    await Promise.all(Array.from({ length: 50 }, (_, i) => grantXp(sql, bo.id, game(`v${i}`, 5, {}, { won: true }))));
-    const day = await coinDayOf(sql, (await ledgerAccount(sql, bo.id))!.account, xpDayStart(T0));
-    expect(day.bonus).toBe(300);
-    expect(day.play).toBe(300);
+    const boAcct = (await ledgerAccount(sql, bo.id))!.account;
+    for (let i = 0; i < 12; i++) await grantXp(sql, bo.id, game(`u${i}`, 5, {}, { won: true }));
+    expect((await coinDayOf(sql, boAcct, xpDayStart(T0))).bonus).toBe(166);
+    const burst = await Promise.all(Array.from({ length: 50 }, (_, i) => grantXp(sql, bo.id, game(`v${i}`, 5, {}, { won: true }))));
+    const day = await coinDayOf(sql, boAcct, xpDayStart(T0));
+    expect(day.bonus).toBeLessThanOrEqual(300);
+    expect(day.play).toBeLessThanOrEqual(300);
+    for (const x of burst) expect(x!.coins!.bonus).toBeLessThanOrEqual(PLAY_COINS.bonus.win);
     expect(await coinsOf(sql, bo.id)).toBe(day.play + day.bonus);
     expect(await ledgerMismatches(sql, bo.id)).toEqual([]);
   });
@@ -181,5 +191,118 @@ describe("play coins, paid with a game's XP", () => {
     (C.core as unknown as { runner: unknown }).runner = { leaderboard: () => rows, boss: null };
     C.core.record.phase = "results";
     expect(C.core.crowdTeamTop("w1")).toBe(false);
+  });
+});
+
+describe("play coins, the review's fixes (Nov 25)", () => {
+  /** A Squads reward of a 14-minute lobby, 12 moves: 1st place by default (25 play coins, 40 bonus: 65). */
+  const reward = (userId: string, over: Partial<SquadsReward> = {}): SquadsReward => ({ playerId: "p1", userId, squadId: 0, placement: 1, coins: 0, crates: 0, recorded: true, moves: 12, playMs: 14 * MIN, ...over });
+  /** A grant's batch (its XP and coin ops: keyed "xp:squads:…", "coins:squads:…" and so on). */
+  const grantBatch = (st: readonly { params: unknown[] }[]) => st.some((x) => x.params.some((p) => typeof p === "string" && /^(xp|xpwin|coins|coinsbonus):squads:/.test(p)));
+  const lost = () => Promise.reject(new Error("D1_ERROR: Network connection lost."));
+
+  it("M1, Squads: one failed XP batch keeps the reward queued (when it first failed) and the next write pays 65 once; past MATCH_SAVE.strictMinutes it's written without its XP and coins", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    let fails = 1;
+    const flaky: Sql = { ...sql, batch: (st) => (fails > 0 && grantBatch(st) ? (fails--, lost()) : sql.batch(st)) };
+    const rec = { code: "SQUAD", createdAt: T0, rewardQueue: [reward(ann.id)] };
+    const first = await writeRewardQueue(flaky, rec, true, false);
+    expect(first).toMatchObject({ written: 0, refused: [] });
+    expect(String(first.failure)).toContain("Network connection lost");
+    expect(rec.rewardQueue).toHaveLength(1);
+    expect(rec.rewardQueue[0]!.failedAt).toBeTypeOf("number");
+    expect([await coinsOf(sql, ann.id), await xpOf(sql, ann.id)]).toEqual([0, 0]);
+    expect(await writeRewardQueue(flaky, rec, true, false)).toEqual({ written: 1, refused: [], failure: null });
+    expect(rec.rewardQueue).toEqual([]);
+    // (Written again (a store that failed): nothing more.)
+    await writeReward(sql, "SQUAD", T0, reward(ann.id), Date.now(), true);
+    expect([await coinsOf(sql, ann.id), await xpOf(sql, ann.id)]).toEqual([65, 190]);
+    expect((await gameXpOf(sql, ann.id, "SQUAD", T0))!.coins).toMatchObject({ play: 25, bonus: 40 });
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+    // (A reward whose grant still fails MATCH_SAVE.strictMinutes after its first failed write: written without them, logged.)
+    const bo = await signedIn(sql, "bo@example.com");
+    fails = 1;
+    const late = { code: "SQUAB", createdAt: T0, rewardQueue: [reward(bo.id, { failedAt: Date.now() - (MATCH_SAVE.strictMinutes + 1) * MIN })] };
+    expect(await writeRewardQueue(flaky, late, true, false)).toEqual({ written: 1, refused: [], failure: null });
+    expect([await coinsOf(sql, bo.id), await xpOf(sql, bo.id)]).toEqual([0, 0]);
+  });
+
+  it("M1: settling the coins failing partway (a share refused by a race, its retry's write lost) throws, and the grant tried again pays once", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    // (The day's coins read once as if another game's bonus had landed (1): the batch's bonus op is refused, so it's worked out again
+    // and written alone; that write is lost.)
+    let race = true;
+    let fails = 1;
+    const racy: Sql = {
+      ...sql,
+      first: async (q, ...p) => {
+        const row = await sql.first<Record<string, unknown>>(q, ...p);
+        if (race && q.includes("AS bonus")) {
+          race = false;
+          return { ...row, bonus: 1 } as never;
+        }
+        return row as never;
+      },
+      // (The bonus op written alone: its own batch, whose first statement is its first leg.)
+      batch: (st) => (fails > 0 && st[0]?.params[0] === `coinsbonus:squads:SQUAD:${T0}:${acct}` ? (fails--, lost()) : sql.batch(st)),
+    };
+    const acct = (await ledgerAccount(sql, ann.id))!.account;
+    const rec = { code: "SQUAD", createdAt: T0, rewardQueue: [reward(ann.id)] };
+    expect(String((await writeRewardQueue(racy, rec, true, false)).failure)).toContain("Network connection lost");
+    expect([race, fails]).toEqual([false, 0]);
+    // (The XP and the play coins went in with the batch; the bonus didn't.)
+    expect([await coinsOf(sql, ann.id), await xpOf(sql, ann.id), rec.rewardQueue.length]).toEqual([25, 190, 1]);
+    expect((await writeRewardQueue(racy, rec, true, false)).failure).toBeNull();
+    expect([await coinsOf(sql, ann.id), await xpOf(sql, ann.id)]).toEqual([65, 190]);
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
+
+  it("m2: a squad whose bots only its own party's devices moved (unvouched) pays its play coins by the solo rule, no placement bonus; XP as before", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    const bo = await signedIn(sql, "bo@example.com");
+    // (Ann's squad 0 rests on its own party's word; Bo's squad 1 doesn't.)
+    const rec = { code: "SQUAD", createdAt: T0, unvouched: { 0: "one party in the lobby" }, rewardQueue: [reward(ann.id), reward(bo.id, { playerId: "p2", squadId: 1 })] };
+    expect(await writeRewardQueue(sql, rec, true, false)).toEqual({ written: 2, refused: [], failure: null });
+    expect((await gameXpOf(sql, ann.id, "SQUAD", T0))!.coins).toMatchObject({ play: 25, bonus: 0, parts: [], step: null });
+    expect([await coinsOf(sql, ann.id), await xpOf(sql, ann.id)]).toEqual([25, 190]);
+    expect([await coinsOf(sql, bo.id), await xpOf(sql, bo.id)]).toEqual([65, 190]);
+  });
+
+  it("a Squads member who resigned after 10 or more moves: play coins for their time, no placement bonus", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await writeReward(sql, "SQUAD", T0, reward(ann.id, { placement: 5, resigned: true }), T0 + MIN, true);
+    const x = await gameXpOf(sql, ann.id, "SQUAD", T0);
+    expect(x!.none).toBeUndefined();
+    expect(x!.coins).toMatchObject({ play: 25, bonus: 0, parts: [], step: null });
+    expect(await coinsOf(sql, ann.id)).toBe(25);
+  });
+
+  it("m3: a game the code before Nov 25 paid coins for (its ranked op, or its Squads reward's coins leg) pays none again; the other side, and its XP, as usual", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    const bo = await signedIn(sql, "bo@example.com");
+    // (Ranked: the old code's `ranked:<duel id>:w` paid Ann 30; the room's note of it was lost at a deploy, so the new code writes again.)
+    const me = (await ledgerAccount(sql, ann.id))!;
+    await applyOp(sql, me, { id: "ranked:G1:w", reason: "ranked", now: T0, legs: [leg.coins(ann.id, 30, "G1")] });
+    const a = await grantXp(sql, ann.id, game("duel:G1", 15, {}, { won: true }));
+    expect(a!.coins).toMatchObject({ play: 0, bonus: 0 });
+    expect(a!.parts).toEqual([
+      { label: "15 min", xp: 150 },
+      { label: "Win", xp: XP.win },
+    ]);
+    expect(await coinsOf(sql, ann.id)).toBe(30);
+    // (Bo, Black, had no old op of his own: paid as usual.)
+    expect((await grantXp(sql, bo.id, game("duel:G1", 15)))!.coins).toMatchObject({ play: 27 });
+    // (Squads: the old reward op paid 100 coins and a crate; written again, its XP goes in, no coins, no second crate.)
+    const cy = await signedIn(sql, "cy@example.com");
+    expect(await grantReward(sql, cy.id, 100, 1, opKeys.squadsReward("SQOLD", T0), T0)).toBe("applied");
+    expect(await writeReward(sql, "SQOLD", T0, reward(cy.id, { coins: 100, crates: 1 }), T0 + MIN, true)).toBe("replay");
+    expect([await coinsOf(sql, cy.id), await xpOf(sql, cy.id)]).toEqual([100, 190]);
+    expect((await gameXpOf(sql, cy.id, "SQOLD", T0))!.coins).toMatchObject({ play: 0, bonus: 0 });
+    for (const u of [ann, bo, cy]) expect(await ledgerMismatches(sql, u.id)).toEqual([]);
   });
 });

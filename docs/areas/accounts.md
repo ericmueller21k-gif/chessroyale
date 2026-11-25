@@ -82,9 +82,13 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   40/25/15/5, by the day's steps: full to 150 earned, half to 350, a quarter to 550, none past; 600 a day at most). Each op's guard
   reads the XP day's totals in the same statement (the ledger's own sums, from `xpDayStart`, no table of their own), the play op the
   day's 300, the bonus op the day's paid bonus as read and, with a win, XP's win op (its friends'-lobby rule); one refused (a game
-  landing at the same moment) is worked out again and tried alone (3 times, the last held to the day's 300 bonus only: never starved). XP's eligibility, plus none while fair play holds the
-  player (review or banned: `held`). Solo (and an online game on one device's word): the minutes XP paid under its solo cap, no
-  minimum, no bonus. The grant answers `XpGrant.coins` (core's `PlayCoins`: play, bonus, the bonus's parts as earned, the step, the
+  landing at the same moment) is worked out again and tried alone (up to 4 tries in all with these guards, then one more with the bonus
+  held to the day's 300 only, then logged): never past 300; in a burst of many games of one account at once, some may be paid at an
+  earlier step and the last ones may get nothing. A D1 failure settling them throws, so the room tries the grant again, paying once
+  (ranked: 3 tries at once, then the room's retry from its kept ranks; Squads and 50 v 50: held up to `MATCH_SAVE.strictMinutes`). A
+  game the code before Nov 25 paid coins for (`ranked:<duel id>:<color>`, a Squads reward's coins leg) pays none again. XP's eligibility, plus none while fair play holds the
+  player (review or banned: `held`). Solo (and an online game on one device's word, a Squads squad on its own party's devices' word
+  too): the minutes XP paid under its solo cap, no minimum, no bonus. The grant answers `XpGrant.coins` (core's `PlayCoins`: play, bonus, the bonus's parts as earned, the step, the
   day's totals, or why none) and the result row keeps it (`results.coins`, JSON; NULL before Nov 25 and while rewards are paused), so
   `GET /api/xp` answers it. Ranked's own coins and Squads' placement coins are gone ([ranked.md](ranked.md), [squads.md](squads.md)).
 - **The daily reward and level rewards** (Nov 9, phase 2; `server/rewards.ts`, decisions `2026-11-09-xp-phase2-*.md`): the XP day's first

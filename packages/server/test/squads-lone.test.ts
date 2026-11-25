@@ -1,7 +1,7 @@
 /**
  * Squads and the outside review of Nov 10 (finding 5; docs/decisions/2026-11-10-boss-and-lone-devices.md): a lobby whose bots one
- * party's devices moved alone is noted, and paid as any (Eric, Nov 10), and a placement's coins and crates have a daily cap
- * (SQUADS_LOBBY.rewardsPerDay), checked as the reward is written.
+ * party's devices moved alone is noted, and its crates paid as any (Eric, Nov 10; its coins by the solo rule since Nov 25:
+ * play-coins.test.ts, m2), and a placement's crates have a daily cap (SQUADS_LOBBY.rewardsPerDay), checked as the reward is written.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FRONT_DOOR, SQUADS, SQUADS_LOBBY, XP, voteResultMs } from "@chessroyale/core";
@@ -30,7 +30,8 @@ describe("Squads: a lobby that rests on one party's devices (noted, paid under t
     const ann = L.core.takeRewards().find((r) => r.playerId === a)!;
     expect(L.core.record.unvouched?.[ann.squadId]).toBe("one party in the lobby");
     const pays = SQUADS_LOBBY.rewards[ann.placement];
-    // (Its coins come with its XP since Nov 25: PLAY_COINS; the reward is the placement's crates.)
+    // (Its coins come with its XP since Nov 25: PLAY_COINS, by the solo rule for a squad on its own devices' word (no placement bonus:
+    // play-coins.test.ts, m2); the reward is the placement's crates, paid as any.)
     expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: 0, crates: pays.crates });
     expect(ann.why).toBeUndefined();
     expect(L.last(a, "placed")).toMatchObject({ coins: 0, crates: pays.crates });

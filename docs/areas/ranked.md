@@ -240,8 +240,12 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
 - **Coins** (since Nov 25: [2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md)): a ranked game pays play coins as
   every counted game does (`PLAY_COINS`, paid with its XP by `duel-do.ts withXp` → `server/xp.ts grantXp`; [shop.md](shop.md), "Play
   coins"), plus the bonus's win (15) or ranked draw (5); none for an aborted or a bot game, nor for a player fair play holds. The
-  outcome's `coins` (the end page's line) is the grant's play coins and bonus. Ranked's own coins (`duelCoins`, 2.4/1.6/0.8 a minute,
-  20 paying games a UTC day) are gone; the row's `coin_day` and `coin_games` keep what they had and are no longer moved.
+  outcome's `coins` (the end page's line) is the grant's play coins and bonus. A grant D1 fails is tried again at once (3 tries); still
+  failing, the recording's try fails after `recordDuel` and the room keeps its answer (`DuelRecord.ranks`): the next try (as below) goes
+  on from it, never recording the game twice, and pays once (the grant is keyed by the game); the players hear their outcome once it's
+  all in (Nov 25, the review's M1). A game whose old `ranked:<id>:<color>` coins went in before a deploy pays no play coins on top
+  (m3). Ranked's own coins (`duelCoins`, 2.4/1.6/0.8 a minute, 20 paying games a UTC day) are gone; the row's `coin_day` and
+  `coin_games` keep what they had and are no longer moved.
 - **Recording** (`ranked.ts`, `recordDuel`): one D1 batch per finished game: the game's row, both players' ranks (from
   both records as they stand now); no coins of its own since Nov 25. The game's row goes in only if neither player's record changed since it
   was read (another game of theirs ending at the same moment), and everything else applies only if that row is this

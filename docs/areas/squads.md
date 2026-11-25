@@ -370,10 +370,14 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   XP in `writeReward` (keys `coins:squads:<code>:<made>:<ledger id>`, `coinsbonus:…`); the end screens show them from the grant
   (`squadsRewardLine`, "+… coins" until it comes). The "placed" message's `coins` stays 0 (for apps from before). Nothing in
   a test lobby or after a test control. At least once (Nov 6): each stays in the record until written (retried every minute;
-  the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). **One party's word
+  the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). Its XP and coins (one
+  grant) hold it up too, until `MATCH_SAVE.strictMinutes` (30) after its first failed write (`SquadsReward.failedAt`; `writeRewardQueue`):
+  then it's written without them, logged, as a 50 v 50 result's are (Nov 25, the review's M1). A reward written half by the code before
+  Nov 25 (its old coins leg in) never pays play coins on top (m3). **One party's word
   (Nov 10):** a squad whose own match's bot work only its own party's devices answered, no other party's up (a lobby of one party
-  and bots: all its squads; `SquadsRecord.unvouched`, by squad), is noted in the logs and paid as any (Eric, Nov 10: "If you play
-  with just all bots, you still get rewards from that"; the daily cap bounds it); a late answer is still compared (the server's verdict strikes the one further; no server: a referee device of another party, as in time); at most `SQUADS_LOBBY.rewardsPerDay` (5)
+  and bots: all its squads; `SquadsRecord.unvouched`, by squad), is noted in the logs and paid its crates as any (Eric, Nov 10: "If
+  you play with just all bots, you still get rewards from that"; the daily cap bounds it), and since Nov 25 its coins by the solo rule
+  (the minutes XP paid, no placement bonus: `XpGame.soloCoins`; the review's m2: the old 5-a-day coin cap that bounded it is gone); a late answer is still compared (the server's verdict strikes the one further; no server: a referee device of another party, as in time); at most `SQUADS_LOBBY.rewardsPerDay` (5)
   paying lobbies a UTC day per account pay crates (checked as it's written; past it the placement is sent again with none; its coins
   still pay). The placement says why (`placed.why` "daily", `NO_REWARD` in Squads.tsx: "No crates: …"). docs/decisions/2026-11-10-boss-and-lone-devices.md.
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and

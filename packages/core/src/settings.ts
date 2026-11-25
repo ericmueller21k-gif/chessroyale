@@ -3810,8 +3810,9 @@ export const SQUADS_LOBBY = {
   /**
    * The daily cap (the outside review of Nov 10, finding 5): at most this many lobbies a UTC day pay an account their placement's
    * crates; the next that day pay none (XP and coins as usual: PLAY_COINS), and the placement says so.
-   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A lobby of only one party and bots pays
-   * none at all (SquadsRecord.unvouched). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A squad of one party and bots
+   * (SquadsRecord.unvouched) is paid its crates as any (Eric, Nov 10; docs/decisions/2026-11-10-boss-and-lone-devices.md), its coins by
+   * the solo rule since Nov 25 (no placement bonus: docs/decisions/2026-11-25-play-coins.md).
    */
   rewardsPerDay: 5,
   /**
