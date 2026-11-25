@@ -501,6 +501,12 @@ export interface GameView {
  */
 export const bossAlone = (m: Pick<GameView, "settings" | "totalPlayers">) => !!m.settings.raid && m.totalPlayers === 1;
 
+/**
+ * Boss alone and a raid (solo or online) take the shared game frame on a computer (`bf-frame`, board-size.css; Nov 26): every screen of the
+ * battle, so nothing moves between them. A Battle Tower floor keeps its own layout.
+ */
+export const bossFramed = (m: Pick<GameView, "settings" | "boss" | "tower" | "towerParty">) => !!m.boss && !!m.settings.raid && !m.tower && !m.towerParty;
+
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */
 export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
   return m.standings().find((s) => s.isYou)?.team ?? null;

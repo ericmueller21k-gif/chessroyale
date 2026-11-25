@@ -153,23 +153,30 @@
  * chat does (board-foot.ts measures that line: the board's frame, its clock's bar under it included). A phone and a tablet are unchanged. */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
   /* (The opening vote's screen too, `cf-vote`: the same frame, so the board is where the game's is when the game begins.) */
+  /* (Boss alone and a raid too, `bf-frame` (Nov 26, the third job): the same sizes, gap and step, their own rows and room below.) */
   .screen.game.crowd-50,
   .screen.game.cf-vote,
-  .screen.game.sq-game {
+  .screen.game.sq-game,
+  .screen.game.bf-frame {
     --cf-gap: 28px;
     /* (The least room either side of the block, as the old layout had at 1280 × 800: every board is at least its old size.) */
     --cf-edge: 10px;
+    /* (The board and the column share what the left column (`--cf-left`: the scoreboard's 340 px; Boss alone's boss column), the gaps and
+       the edges leave. The column up to 300 px, or `--cf-side-most`.) */
+    --cf-free: calc(var(--win-w) - 2 * var(--cf-edge) - var(--cf-left, 340px) - 2 * var(--cf-gap));
+    --cf-bw: calc(round(down, min(var(--bd-h), var(--cf-free) - 280px), var(--cf-step, 1px)) + var(--cf-snap, 0px));
+    --side-w: clamp(280px, calc(var(--cf-free) - var(--cf-bw)), var(--cf-side-most, 300px));
+    width: calc(2 * var(--cf-gap) + var(--cf-bw) + var(--side-w));
+    grid-template-columns: var(--cf-bw) var(--side-w);
+    column-gap: var(--cf-gap);
+  }
+  .screen.game.crowd-50,
+  .screen.game.cf-vote,
+  .screen.game.sq-game {
     --bd-room: 92px;
     --crowd-slot: 250px;
-    /* (The board and the column share what the scoreboard, the gaps and the edges leave.) */
-    --cf-free: calc(var(--win-w) - 2 * var(--cf-edge) - 340px - 2 * var(--cf-gap));
-    --cf-bw: calc(round(down, min(var(--bd-h), var(--cf-free) - 280px), var(--cf-step, 1px)) + var(--cf-snap, 0px));
-    --side-w: clamp(280px, calc(var(--cf-free) - var(--cf-bw)), 300px);
-    width: calc(2 * var(--cf-gap) + var(--cf-bw) + var(--side-w));
     padding: 4px 0 0 var(--cf-gap);
-    grid-template-columns: var(--cf-bw) var(--side-w);
     grid-template-rows: 40px auto auto 1fr;
-    column-gap: var(--cf-gap);
     row-gap: 0;
   }
   .screen.game.crowd-50:has(.board-row > .eval-bar),
@@ -177,7 +184,7 @@
     --cf-bw: calc(round(down, min(var(--bd-h), var(--cf-free) - 280px - 48px), var(--cf-step, 1px)) + var(--cf-snap, 0px));
     grid-template-columns: calc(var(--cf-bw) + 48px) var(--side-w);
   }
-  .screen.game:is(.crowd-50, .cf-vote, .sq-game) .board-area .board-wrap,
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game, .bf-frame) .board-area .board-wrap,
   .screen.game:is(.crowd-50, .cf-vote) .board-row .eval-bar ~ .board-wrap {
     width: var(--cf-bw);
     flex: none;
@@ -588,26 +595,84 @@
     color: #fff;
   }
 }
+/* ---- Boss alone and a raid on a computer (Nov 26, the shared frame's third job: the 50 v 50's frame above, reused;
+ * docs/decisions/2026-11-26-boss-frame.md) ----
+ * Eric's column rule (docs/rules/eric.md): the left column (a raid's scoreboard; Boss alone's boss column, `.tower-space`, where he stands),
+ * the board with its strips (the boss's two-line bar over it, Eric, Nov 26: "I like the boss bar bigger"; the dock's row under it) and the
+ * column beside it on one top and one bottom line, the frame's one gap (`--cf-gap`) either side of the board, the three centered as one
+ * block, the board's box on its drawing step. The board keeps the size the bar allows (`--bd-room`, 123 px: game-frame.css). The column:
+ * the gear (and the admins' ⚡ and 🐟) level with the bar; the Moves panel from the board's top down to the figures who stand on its foot
+ * (the God King, and your pawn in Boss alone: they keep their places and sizes, placed from the board), 12 px over their heads; an online
+ * raid's chat under the moves as before, down to the God King's room (`--gk-zone`). The board's lines: its squares' top, their foot with
+ * the clock's bar under it (the 50 v 50's). A phone, a tablet, a computer under 1100 px, a Battle Tower floor and the Hidden Boss's phase
+ * change and phase 2 are unchanged. */
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game.bf-frame {
+    /* (The boss's room by the window's edge is the left column's now: the board gives none of its width for him.) */
+    --bs-need: 0px;
+    padding-left: var(--cf-gap);
+    padding-right: 0;
+  }
+  /* (Boss alone: the boss's column, as wide as before (`--ts-w`: 240 px, Babur's his own), and room for your pawn and the God King beside
+     the board: the column up to 340 px, as before.) */
+  .arena:has(> .tower-space) > .screen.game.bf-frame {
+    --cf-left: var(--ts-w, 196px);
+    --cf-side-most: 340px;
+  }
+  .arena:has(> .screen.game.bf-frame) > .tower-space {
+    flex: 0 0 var(--ts-w, 196px);
+  }
+  /* The gear row: level with the bar, at the column's right end (no shift: the column starts one gap off the board). */
+  .screen.game.bf-frame > .gm-tools {
+    left: 0;
+  }
+  /* The Moves panel: the board's top line down to 12 px over the figures' heads (their box: 120 px times their size, `--king-k`), its
+     left edge one gap off the board. */
+  .screen.game.bf-frame > .mv-side {
+    translate: none;
+    align-self: stretch;
+    height: auto;
+    margin-bottom: calc(120px * var(--king-k, 1) + 12px);
+  }
+  /* (An online raid's chat: under the moves (their old half height), 12 px between, down to the God King's room, as before.) */
+  .screen.game.bf-frame:has(> .under-board.side) > .mv-side {
+    align-self: start;
+    height: var(--mv-h);
+    margin-bottom: 0;
+  }
+  .screen.game.bf-frame > .under-board.side {
+    translate: none;
+    align-self: stretch;
+    height: auto;
+    margin-bottom: var(--gk-zone);
+  }
+  /* (A raid's scoreboard: its table's top on the board's top, its foot the board's, as the 50 v 50's: board-foot.ts.) */
+  .arena:has(> .screen.game.bf-frame) > .tower-side {
+    max-height: var(--side-foot, var(--app-h));
+    padding-top: var(--side-pad, 14px);
+    padding-bottom: 0;
+  }
+}
 /* (The board's drawing step: 8 device pixels, as game-frame.css rounds the boss screens' and the 1 v 1's boxes. At 125% and 150% the step
    isn't a whole number of layout units (1/64 px), so 1/64 px more keeps the box from snapping just under a step: the 1 v 1's fix.) */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (max-resolution: 1dppx) {
-  .screen.game:is(.crowd-50, .cf-vote, .sq-game) {
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game, .bf-frame) {
     --cf-step: 8px;
   }
 }
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 2dppx) {
-  .screen.game:is(.crowd-50, .cf-vote, .sq-game) {
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game, .bf-frame) {
     --cf-step: 4px;
   }
 }
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 1.25dppx) {
-  .screen.game:is(.crowd-50, .cf-vote, .sq-game) {
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game, .bf-frame) {
     --cf-step: 6.4px;
     --cf-snap: calc(1px / 64);
   }
 }
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 1.5dppx) {
-  .screen.game:is(.crowd-50, .cf-vote, .sq-game) {
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game, .bf-frame) {
     --cf-step: calc(8px / 1.5);
     --cf-snap: calc(1px / 64);
   }
