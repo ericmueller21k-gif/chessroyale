@@ -199,11 +199,11 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     (+18)", "Placed: Gold 4 · 25 RP"). With 1 v 1 picked, the home screen's panel under its RANKED row reads
     `ranked1v1Rank()` (`packages/app/src/ranked.ts`): "Your rank: Gold 2 · 45 RP". Each tier's pill color is its
     emblem's main color, 4.5:1 or better on both themes.
-- **The season ladder** (Nov 25, [decision](../decisions/2026-11-25-ladder.md); the page: [hub.md](hub.md)): `GET /api/ladder?mode=1v1` (`server/src/ladder.ts`)
-  answers `{ season, mode, total, rows, you }` (core's `LadderAnswer`, numbers in `LADDER`): the top 200 read in order from `ranked_1v1_board`, places
-  shared by equal ladders, their looks in one read; `total` and your place from `shownAbove` (the top tiers' count). `LEFT_OUT` (banned, the engine
-  pool, test accounts; residents count) is left out of the list, the count and every place, the top tiers' too since Nov 25. The rows and count are kept
-  `LADDER.cacheSeconds` (60) at the edge; your row is read for you. 50 v 50 and Squads: no ladder yet (404). No seasons are stored: "Season 1" is all.
+- **The season ladder** (Nov 25, [decision](../decisions/2026-11-25-ladder.md); the page: [hub.md](hub.md)): `GET /api/ladder?mode=1v1` (`server/src/ladder.ts`) answers `{ season, mode, total, rows, you }`
+  (core's `LadderAnswer`, numbers in `LADDER`): the top 200 read in order from `ranked_1v1_board`, places shared by equal ladders, their looks in one read; `total` and your place from
+  `shownAbove` (the top tiers' count). `LEFT_OUT` (banned, under review, the engine pool, test accounts; residents count) is left out of the list, the count and every place, the top tiers'
+  too. The rows and count are kept `LADDER.cacheSeconds` (60) in each Worker instance (a `Map`, as `topPlace`); `ladderFor` puts your fresh row in your copy, so a left-out player's answer is an honest player's in that spot. Someone newly banned, pooled or
+  in review stays in the kept list (and `topPlace`) up to that minute. 50 v 50 and Squads: no ladder yet (404). No seasons are stored: "Season 1" is all.
 - **The emblems** (Eric's set, approved Oct 28: a chess piece in a cut-gem badge; d5 plain, d4 studs, d3 wings, d2 a
   crest, d1 a gem crown and a wide glow; Pearlescent and Transcendent 2 s loops):
   - **The drawing** is `packages/app/src/characters/rank-set.ts` (as drawn on `claude/boss-art`, a8d5aa57; only its

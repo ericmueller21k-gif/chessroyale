@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { rankView, type LadderAnswer, type LadderRow } from "@chessroyale/core";
-import { LADDER_KEEP_MS, forgetLadder, keepLadderScroll, keptLadder, loadLadder, placeText, placementLine, recordLine, rowsWithYou, totalLine, winPct } from "../src/ladder.ts";
+import { LADDER_KEEP_MS, cameBack, forgetLadder, keptLadder, loadLadder, openFromLadder, placeText, placementLine, recordLine, totalLine, winPct } from "../src/ladder.ts";
+import { closeProfile, openProfile, profileBack, profileTarget } from "../src/profile-nav.ts";
 
 /**
- * The season ladder's page helpers (ladder.ts; docs/decisions/2026-11-25-ladder.md): you in your place when the shared list
- * leaves you out, the words a row shows, and the answer asked once more on a failure and kept a minute for a profile's Back.
+ * The season ladder's page helpers (ladder.ts; docs/decisions/2026-11-25-ladder.md): the words a row shows, the answer asked once
+ * more on a failure and kept a minute, and the list's place kept for the Back of the profile a row opened (and only that Back).
+ * (Your own row in the list, the engine pool's "as ever" view included, is the server's: server/test/ladder.test.ts.)
  */
 
 const row = (uid: string, place: number, ladder = 3000 - place): LadderRow => ({
@@ -17,23 +19,6 @@ const row = (uid: string, place: number, ladder = 3000 - place): LadderRow => ({
   losses: 5,
   draws: 1,
   streak: 0,
-});
-
-describe("rowsWithYou", () => {
-  const rows = [row("a", 1), row("b", 2), row("c", 2), row("d", 4)];
-  it("you in the list already: the list as it is", () => {
-    expect(rowsWithYou({ rows, you: row("c", 2) }).map((r) => r.uid)).toEqual(["a", "b", "c", "d"]);
-  });
-  it("a place within the list the shared list doesn't have you at (the engine pool, a test account): you at your place, after your ties", () => {
-    expect(rowsWithYou({ rows, you: row("me", 2) }).map((r) => r.uid)).toEqual(["a", "b", "c", "me", "d"]);
-    expect(rowsWithYou({ rows, you: row("me", 4) }).map((r) => r.uid)).toEqual(["a", "b", "c", "d", "me"]);
-  });
-  it("below the list, in placements, signed out, or an empty list: never added", () => {
-    expect(rowsWithYou({ rows, you: row("me", 5) })).toBe(rows);
-    expect(rowsWithYou({ rows, you: { placement: { played: 2, of: 5 } } })).toBe(rows);
-    expect(rowsWithYou({ rows, you: null })).toBe(rows);
-    expect(rowsWithYou({ rows: [], you: row("me", 1) })).toEqual([]);
-  });
 });
 
 describe("a row's words", () => {
@@ -54,13 +39,12 @@ describe("loadLadder", () => {
   beforeEach(() => forgetLadder());
   afterEach(() => vi.unstubAllGlobals());
 
-  it("asks once more after a failure, then keeps the answer a minute (with how far the list was scrolled)", async () => {
+  it("asks once more after a failure, then keeps the answer a minute", async () => {
     let calls = 0;
     vi.stubGlobal("fetch", async () => (++calls === 1 ? Response.json({ message: "busy" }, { status: 503 }) : Response.json(ANSWER)));
     expect(await loadLadder("1v1", () => 1000)).toEqual(ANSWER);
     expect(calls).toBe(2);
-    keepLadderScroll("1v1", 640);
-    expect(keptLadder("1v1", 1000 + LADDER_KEEP_MS - 1)).toEqual({ at: 1000, answer: ANSWER, scroll: 640 });
+    expect(keptLadder("1v1", 1000 + LADDER_KEEP_MS - 1)).toEqual(ANSWER);
     expect(keptLadder("1v1", 1000 + LADDER_KEEP_MS)).toBeNull();
   });
 
@@ -70,5 +54,37 @@ describe("loadLadder", () => {
     vi.stubGlobal("fetch", async () => Response.json({ season: 1 }));
     await expect(loadLadder("1v1")).rejects.toThrow("The ladder didn't load.");
     expect(keptLadder("1v1")).toBeNull();
+  });
+});
+
+describe("Back from the profile a row opened (the same list, at the same place)", () => {
+  const anna = { uid: "a", name: "Anna" };
+  afterEach(() => closeProfile());
+
+  it("that profile's own Back: the list's place, however long the profile was open (the answer may be asked again; the place stays)", () => {
+    openFromLadder(anna, 640);
+    expect(profileTarget()).toBe(anna);
+    profileBack();
+    expect(profileTarget()).toBeNull();
+    expect(cameBack()).toBe(640);
+    // (Asked once: the next time here is a fresh list from the top.)
+    expect(cameBack()).toBeNull();
+  });
+
+  it("the profile closed any other way (the side menu, another page): the next ladder starts at the top, even after another profile's Back", () => {
+    openFromLadder(anna, 640);
+    closeProfile();
+    expect(cameBack()).toBeNull();
+    // (Left by the side menu, then any profile's Back elsewhere, then the ladder again from the menu: still the top.)
+    openFromLadder(anna, 640);
+    closeProfile();
+    openProfile({ uid: "b", name: "Bea" });
+    profileBack();
+    expect(cameBack()).toBeNull();
+    // (From the profile a row opened, on to another player's: that one's Back isn't the row's.)
+    openFromLadder(anna, 640);
+    openProfile({ uid: "b", name: "Bea" });
+    profileBack();
+    expect(cameBack()).toBeNull();
   });
 });

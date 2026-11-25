@@ -729,16 +729,21 @@ test("the season ladder (Eric, Nov 25): home's LADDER › on a phone, the side m
   const me = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
   await localSql(page, `INSERT OR REPLACE INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at, streak) VALUES ('${me}', 1500, 80, 12, 7, 5, 0, 1000, 1, 0)`);
   const homeRow = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
+  // (Out of the flow at the end of the RANKED label's line: the row under it where it was, the label's gap (6 px) below the label.)
+  const label = (await page.locator("#fd-ranked-label").boundingBox())!;
+  expect(homeRow.y).toBeCloseTo(label.y + label.height + 6, 0);
+  const ladderIn = page.getByTestId("home-ladder");
+  await expect(ladderIn).toHaveText("LADDER");
+  const b = (await ladderIn.boundingBox())!;
+  expect(b.height, "a full tap target").toBeGreaterThanOrEqual(40);
+  expect(b.x + b.width).toBeLessThanOrEqual(homeRow.x + homeRow.width + 1);
+  // (Its box reaches over Squads' top edge: a tap there is still Squads', never the ladder's. Review m1, Nov 25.)
+  const squads = (await page.getByRole("radiogroup", { name: "RANKED" }).getByRole("radio", { name: /^Squads/ }).boundingBox())!;
+  expect(b.y + b.height, "the case this guards: LADDER's box over Squads' edge").toBeGreaterThan(squads.y);
+  const atEdge = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("button")?.textContent ?? "", [squads.x + squads.width - 3, squads.y + 1]);
+  expect(atEdge).toContain("Squads");
   if (desktop()) await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Ladder", exact: true }).click();
-  else {
-    // (Out of the flow at the end of the RANKED label's line: the row under it where it was.)
-    const ladderIn = page.getByTestId("home-ladder");
-    await expect(ladderIn).toHaveText("LADDER");
-    const b = (await ladderIn.boundingBox())!;
-    expect(b.height, "a full tap target").toBeGreaterThanOrEqual(40);
-    expect(b.x + b.width).toBeLessThanOrEqual(homeRow.x + homeRow.width + 1);
-    await ladderIn.click();
-  }
+  else await ladderIn.click();
   await expect(page).toHaveURL(/\/ladder$/);
   await expect(page.getByRole("heading", { name: "Ladder" })).toBeVisible();
   // 50 v 50 · 1 v 1 · Squads, as home's row; 1 v 1 in the middle, picked; the others greyed, not hidden, and a tap says why.
@@ -748,17 +753,19 @@ test("the season ladder (Eric, Nov 25): home's LADDER › on a phone, the side m
   // (A finger taps a greyed tab as any: `force`, since Playwright won't click what's aria-disabled.)
   await tabs.nth(0).click({ force: true });
   await expect(page.locator(".ld-note")).toHaveText("50 v 50 has no ranks of its own yet. Its ladder starts when its ranks do.");
-  // The top 200, one list: no "next" button, the places in order from 1.
-  const rows = page.locator(".ld-list [role=listitem]");
+  // The top 200, one list: nothing in it but its rows (no "next" button), each a listitem holding the row's button, the places in order from 1.
+  const rows = page.locator(".ld-list > [role=listitem]");
   await expect(rows).toHaveCount(LADDER.size);
-  await expect(page.locator(".ld-list button:not([role=listitem])")).toHaveCount(0);
+  await expect(page.locator(".ld-list > :not([role=listitem])")).toHaveCount(0);
+  await expect(page.locator(".ld-list > [role=listitem] > button")).toHaveCount(LADDER.size);
   await expect(rows.first()).toContainText("Ladder 0");
   const places = await rows.evaluateAll((els) => els.map((e) => Number(e.querySelector(".ld-place")!.textContent!.replace(/,/g, ""))));
   expect(places[0]).toBe(1);
   expect(places).toEqual([...places].sort((a, b) => a - b));
-  // Your row, pinned at the foot: your place (past the 230 above you), You, your rank.
+  // Your row, pinned at the foot: your place (past the 230 above you), You (its label too), your rank.
   const pin = page.locator(".ld-mine .ld-row.you");
   await expect(pin).toContainText("Laddie");
+  await expect(pin).toHaveAttribute("aria-label", /^#[\d,]+ Laddie \(You\), Gold 3/);
   await expect(pin.locator(".ld-tag")).toHaveText("You");
   await expect(pin.locator(".ld-rank")).toHaveText("Gold 3 · 40 RP");
   expect(Number((await pin.locator(".ld-place").textContent())!.replace(/,/g, ""))).toBeGreaterThan(230);
@@ -769,9 +776,13 @@ test("the season ladder (Eric, Nov 25): home's LADDER › on a phone, the side m
   await page.locator(".ld-list").evaluate((e) => (e.scrollTop = e.scrollHeight));
   await expect(rows.last()).toBeInViewport();
   expect((await pin.boundingBox())!.y).toBeCloseTo(pinBox.y, 0);
-  // A row's tap: that player's profile; its Back, the same list again.
+  // A row's tap: that player's profile; its Back, the same list again, scrolled where it was (at its end).
   await rows.last().click();
   await expect(page.getByText("Ladder 199", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Back" }).first().click();
   await expect(rows).toHaveCount(LADDER.size);
+  const list = page.locator(".ld-list");
+  await expect.poll(() => list.evaluate((e) => e.scrollHeight - e.clientHeight - e.scrollTop)).toBeLessThanOrEqual(2);
+  expect(await list.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+  await expect(rows.last()).toBeInViewport();
 });

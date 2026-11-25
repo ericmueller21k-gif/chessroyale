@@ -136,6 +136,10 @@
   border-radius: 14px;
   scrollbar-width: thin;
 }
+/* (A list row's listitem: the row's own box, never shrunk by the list.) */
+.ld-item {
+  flex: none;
+}
 .ld-row {
   flex: none;
   width: 100%;

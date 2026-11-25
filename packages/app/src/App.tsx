@@ -20,7 +20,7 @@ import { QuestsLayer } from "./components/QuestsOverlay.tsx";
 import { QueueLine, QueueScreen } from "./screens/Queue.tsx";
 import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
+import { closeProfile, openProfile, profileBack, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
 import { PageLayer, layerTakesPop } from "./components/PageLayer.tsx";
 import { KEPT_ELSEWHERE, KEPT_ENDED, account, askAgeAgain, askAgeForGoogle, askForfeitFirst, keptSoloOpen, leftSoloLive, loadAccount, mustSignInToPlayOnline, offerKeptSolo, playerName, recordSoloResult, reofferKeptSolo, setTestXp, takeKeptSolo } from "./account.ts";
@@ -2203,7 +2203,7 @@ export function App() {
     const overlayD = profileOpen && (
       <div class="fd-overlay">
         <FrontFrame>
-          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} match={duel?.snapshot().code ?? undefined} />
+          <PlayerProfileScreen target={profileOpen} onBack={profileBack} match={duel?.snapshot().code ?? undefined} />
         </FrontFrame>
       </div>
     );
@@ -2238,7 +2238,7 @@ export function App() {
     const overlayS = profileOpen && (
       <div class="fd-overlay">
         <FrontFrame>
-          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+          <PlayerProfileScreen target={profileOpen} onBack={profileBack} />
         </FrontFrame>
       </div>
     );
@@ -2304,7 +2304,7 @@ export function App() {
   const townLayerNode = (l: NonNullable<typeof townLayer>) => {
     const label = { friends: "Play with friends", quests: "Daily Quests", shop: "Shop & crates", profile: "Profile", ladder: "Ladder" }[l.page];
     const page = profileOpen ? (
-      <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+      <PlayerProfileScreen target={profileOpen} onBack={profileBack} />
     ) : l.page === "shop" ? (
       <ShopScreen key={l.tab ?? "shop"} initial={l.tab} onBack={closeTownLayer} />
     ) : l.page === "profile" ? (
@@ -2359,7 +2359,7 @@ export function App() {
     const overlayT = profileOpen && !townLayer && (
       <div class="fd-overlay">
         <FrontFrame>
-          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+          <PlayerProfileScreen target={profileOpen} onBack={profileBack} />
         </FrontFrame>
       </div>
     );
@@ -2693,7 +2693,7 @@ export function App() {
   const overlay = profileOpen && (
     <div class="fd-overlay">
       <FrontFrame>
-        <PlayerProfileScreen target={profileOpen} onBack={closeProfile} match={match instanceof NetMatch ? match.code : undefined} />
+        <PlayerProfileScreen target={profileOpen} onBack={profileBack} match={match instanceof NetMatch ? match.code : undefined} />
       </FrontFrame>
     </div>
   );
@@ -2939,7 +2939,7 @@ function ProfilePage({
     <PlayerProfileScreen
       target={target}
       onBack={() => {
-        closeProfile();
+        profileBack();
         if (location.pathname.startsWith("/profile")) history.replaceState(null, "", `/${location.search}`);
       }}
       onLocker={onLocker}

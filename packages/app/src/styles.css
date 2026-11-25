@@ -10686,6 +10686,12 @@ button.fd-logo {
   letter-spacing: 1px;
   cursor: pointer;
 }
+/* (LADDER's 40 px box reaches a few px over the mode row's top edge: the row is painted over it, so a tap there is the mode's, never
+   the ladder's. Searching, its search row in the same place.) */
+.fd-ranked > .fd-modes {
+  position: relative;
+  z-index: 1;
+}
 /* (Oct 24: centered over the three buttons.) */
 .fd-ranked .fd-label {
   font-size: 12px;

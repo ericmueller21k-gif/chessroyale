@@ -3,8 +3,7 @@ import { LADDER, type LadderAnswer, type LadderRow, type RankView } from "@chess
 import { account, playerName } from "../account.ts";
 import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { RankEmblem } from "../components/RankEmblem.tsx";
-import { SIGN_IN_LINE, keepLadderScroll, keptLadder, loadLadder, placeText, placementLine, recordLine, rowsWithYou, totalLine, winPct } from "../ladder.ts";
-import { openProfile, type ProfileTarget } from "../profile-nav.ts";
+import { SIGN_IN_LINE, cameBack, keptLadder, loadLadder, openFromLadder, placeText, placementLine, recordLine, totalLine, winPct } from "../ladder.ts";
 import { MODES } from "./Home.tsx";
 import "../ladder.css";
 
@@ -15,27 +14,21 @@ import "../ladder.css";
  * middle and picked; a mode with no ranks of its own yet greyed, its reason on a tap, never hidden), the columns' names. Then the
  * list, the only part that scrolls: the top LADDER.size, one scroll, place (the top three a medal), their head, name and rank (the
  * tier's color), the emblem, W – L and win %; on a computer also games and streak. At the foot, always: your own row (your exact
- * place, wherever it is), or how many placement games are left, or Sign in. A row's tap opens that player's profile. While it loads:
- * greyed rows in the rows' places, so nothing moves when they come. Classes start with `ld-`.
+ * place, wherever it is), or how many placement games are left, or Sign in. A row's tap opens that player's profile (yours too, as
+ * others see it), whose Back comes to the same list at the same place (ladder.ts cameBack). While it loads: greyed rows in the rows'
+ * places, so nothing moves when they come. Classes start with `ld-`.
  */
 
 /** Greyed rows while the list loads (enough to fill a tall phone). */
 const GHOST_ROWS = 10;
 
-/** A profile opened from a row: its Back comes to this list again, at the same place, without asking the server (ladder.ts keeps it). */
-let backFromProfile = false;
-const openFromLadder = (t: ProfileTarget) => {
-  backFromProfile = true;
-  openProfile(t);
-};
-
 /** Why a ranked mode's tab is greyed: it has no ranks of its own yet. */
 const soonLine = (label: string) => `${label} has no ranks of its own yet. Its ladder starts when its ranks do.`;
 
 export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignIn: () => void }) {
-  const [kept] = useState(() => (backFromProfile ? keptLadder("1v1") : null));
-  backFromProfile = false;
-  const [answer, setAnswer] = useState<LadderAnswer | null>(kept?.answer ?? null);
+  // (Back from a profile a row opened: how far down the list was, and the answer it showed if that's under a minute old, else asked again.)
+  const [back] = useState(cameBack);
+  const [answer, setAnswer] = useState<LadderAnswer | null>(() => (back === null ? null : keptLadder("1v1")));
   const [failed, setFailed] = useState(false);
   const [asks, setAsks] = useState(0);
   const [note, setNote] = useState<string | null>(null);
@@ -52,10 +45,14 @@ export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignI
       live = false;
     };
   }, [asks]);
-  // (Back from a profile: the list where it was, on its first frame.)
+  // (Back from a profile: the list where it was, on the rows' first frame, whether they were kept or asked again.)
+  const scrollTo = useRef(back);
   useLayoutEffect(() => {
-    if (kept && list.current) list.current.scrollTop = kept.scroll;
-  }, []);
+    if (answer && scrollTo.current !== null && list.current) {
+      list.current.scrollTop = scrollTo.current;
+      scrollTo.current = null;
+    }
+  }, [answer]);
   useEffect(() => {
     if (!note) return;
     const t = setTimeout(() => setNote(null), 3500);
@@ -63,7 +60,10 @@ export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignI
   }, [note]);
   const you = answer?.you ?? null;
   const mine = you && !("placement" in you) ? you.uid : null;
-  const rows = answer ? rowsWithYou(answer) : null;
+  // (Your own row is already in the list, fresh, wherever you are in it: the server's ladderFor.)
+  const rows = answer?.rows ?? null;
+  // (Yours as others see it, like anyone's: its Back comes here, not to your own profile page.)
+  const open = (r: LadderRow) => openFromLadder({ uid: r.uid, name: r.name }, list.current?.scrollTop ?? 0);
   return (
     <div class="fd-page ld">
       <header class="fd-page-head ld-head">
@@ -109,11 +109,14 @@ export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignI
         role="list"
         aria-label={`Season ${answer?.season ?? LADDER.season} ladder, 1 v 1`}
         aria-busy={rows ? undefined : true}
-        onScroll={(e) => keepLadderScroll("1v1", (e.currentTarget as HTMLDivElement).scrollTop)}
       >
         {rows ? (
           rows.length ? (
-            rows.map((r) => <Row key={r.uid} r={r} you={r.uid === mine} />)
+            rows.map((r) => (
+              <div key={r.uid} class="ld-item" role="listitem">
+                <Row r={r} you={r.uid === mine} onOpen={open} />
+              </div>
+            ))
           ) : (
             <p class="ld-empty">Nobody is on the ladder yet. Finish your placement games in 1 v 1 to be the first.</p>
           )
@@ -158,7 +161,7 @@ export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignI
             </span>
           </div>
         ) : (
-          <Row r={you} you pin />
+          <Row r={you} you pin onOpen={open} />
         )}
       </div>
       {note && (
@@ -188,16 +191,16 @@ function Place({ n }: { n: number }) {
   return <span class={`ld-place${n >= 1000 ? " long" : ""}`}>{n.toLocaleString("en-US")}</span>;
 }
 
-function Row({ r, you = false, pin = false }: { r: LadderRow; you?: boolean; pin?: boolean }) {
+/** A player's row: a button (it opens their profile), in the list inside its `listitem`, pinned on its own. */
+function Row({ r, you = false, pin = false, onOpen }: { r: LadderRow; you?: boolean; pin?: boolean; onOpen: (r: LadderRow) => void }) {
   const games = r.wins + r.losses + r.draws;
   return (
     <button
       type="button"
-      role={pin ? undefined : "listitem"}
       class={`ld-row${r.place <= 3 ? ` top t${r.place}` : ""}${you ? " you" : ""}${pin ? " ld-pin" : ""}`}
       data-uid={r.uid}
-      aria-label={`${placeText(r.place)} ${r.name}, ${r.rank.label}, ${recordLine(r)}`}
-      onClick={() => openFromLadder(you ? { you: true, public: true, name: r.name } : { uid: r.uid, name: r.name })}
+      aria-label={`${placeText(r.place)} ${r.name}${you ? " (You)" : ""}, ${r.rank.label}, ${recordLine(r)}`}
+      onClick={() => onOpen(r)}
     >
       <Place n={r.place} />
       <Head look={r.look} />

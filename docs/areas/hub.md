@@ -243,7 +243,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   so far, "Switch to Default" in Bots off. The match starts in place.
 - **The season ladder** (`/ladder`, Nov 25, [decision](../decisions/2026-11-25-ladder.md); server: [ranked.md](ranked.md)): home's **LADDER ›** (end of the RANKED label, out of the flow), the side menu's **Ladder** (over the town in Chess Town). Tabs in the RANKED row's order, 1 v 1 picked
   (50 v 50, Squads greyed, a tap says why); the top `LADDER.size` (200) in one scroll; your row always pinned (your place, placements, or Sign in); greyed rows
-  while it loads; a row opens that profile, whose Back returns to the same list and place (`ladder.ts` keeps it a minute). Tests: `test/ladder.test.ts`, `home-ranked.spec.ts`.
+  while it loads; a row opens that profile (yours as others see it), whose own Back (`profile-nav.ts` `profileBack`) returns to the same place in the list (`ladder.ts`
+  `cameBack`; the answer kept a minute, then asked again). Your own row in the list is the server's (fresh). Tests: `test/ladder.test.ts`, `home-ranked.spec.ts`.
 - **Profiles** ([docs/decisions/2026-10-28-public-profile.md](../decisions/2026-10-28-public-profile.md), [2026-10-29-public-profile-fit.md](../decisions/2026-10-29-public-profile-fit.md)). Two screens:
   - **The public profile** (`screens/PublicProfile.tsx`, Eric's mockup of Oct 28): the one page every player has, the same for every
     viewer, opened by a tap on another player's name or face anywhere (`PlayerName`, the queue's pawns, the town card, a lobby; the

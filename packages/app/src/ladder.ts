@@ -1,32 +1,28 @@
 import { type LadderAnswer, type LadderMode, type LadderRow, type RankView } from "@chessroyale/core";
 import { api } from "./account.ts";
+import { backFrom, openProfile, type ProfileTarget } from "./profile-nav.ts";
 
 /**
  * The season ladder (/ladder; Eric, Nov 25: "a ladder board for all rank modes for the current season"; "scrollable to the top 200";
- * docs/decisions/2026-11-25-ladder.md): its answer from `GET /api/ladder` (server/src/ladder.ts; core's `LadderAnswer`), kept a moment
- * so a profile opened from a row comes back to the same list at the same place, and the words its rows show. The page is
- * screens/Ladder.tsx.
+ * docs/decisions/2026-11-25-ladder.md): its answer from `GET /api/ladder` (server/src/ladder.ts; core's `LadderAnswer`, your own row
+ * already in its list), kept a moment so a profile opened from a row comes back to the same list, the list's place kept for that
+ * profile's Back, and the words its rows show. The page is screens/Ladder.tsx.
  */
 
-/** How long a loaded ladder is shown again without asking (Back from a profile, the page opened again soon): the server's own minute. */
+/** How long a loaded ladder is shown again without asking (Back from a profile a row opened): the server's own minute. */
 export const LADDER_KEEP_MS = 60_000;
 /** A request that hasn't answered in this long has failed (tried once more, then "The ladder didn't load."). */
 const LADDER_TIMEOUT_MS = 10_000;
 
-/** The last answer for each mode, when it came, and how far down its list you had scrolled. */
-const kept = new Map<LadderMode, { at: number; answer: LadderAnswer; scroll: number }>();
+/** The last answer for each mode, and when it came. */
+const kept = new Map<LadderMode, { at: number; answer: LadderAnswer }>();
 
 /** A kept answer still fresh enough to show at once (null: ask). */
-export function keptLadder(mode: LadderMode, now = Date.now()): { answer: LadderAnswer; scroll: number } | null {
+export function keptLadder(mode: LadderMode, now = Date.now()): LadderAnswer | null {
   const k = kept.get(mode);
-  return k && now - k.at < LADDER_KEEP_MS ? k : null;
+  return k && now - k.at < LADDER_KEEP_MS ? k.answer : null;
 }
-/** Where the list was scrolled to (kept with its answer, for Back from a profile). */
-export function keepLadderScroll(mode: LadderMode, scroll: number): void {
-  const k = kept.get(mode);
-  if (k) k.scroll = scroll;
-}
-/** Forgets every kept answer (tests; signing in or out changes your row). */
+/** Forgets every kept answer (tests). */
 export const forgetLadder = () => kept.clear();
 
 /** The ladder for `mode`: asked once more if the first ask fails, then the failure is thrown (the page says so, with Retry). */
@@ -35,22 +31,28 @@ export async function loadLadder(mode: LadderMode, now = () => Date.now()): Prom
     api<LadderAnswer>(`/api/ladder?mode=${mode}`, typeof AbortSignal.timeout === "function" ? { signal: AbortSignal.timeout(LADDER_TIMEOUT_MS) } : undefined);
   const answer = await ask().catch(ask);
   if (!Array.isArray(answer.rows)) throw new Error("The ladder didn't load.");
-  kept.set(mode, { at: now(), answer, scroll: 0 });
+  kept.set(mode, { at: now(), answer });
   return answer;
 }
 
+/** The profile a row opened, and how far down the list was scrolled then (apart from the answer's age: a minute on a profile is normal). */
+let left: { target: ProfileTarget; scroll: number } | null = null;
+
+/** A row's tap: that player's profile, with the list's place kept for its Back. */
+export function openFromLadder(target: ProfileTarget, scroll: number): void {
+  left = { target, scroll };
+  openProfile(target);
+}
+
 /**
- * The list as the page shows it: the answer's rows, and you in your place among them when your place is within them but the
- * shared list doesn't have you (an account rankings leave out sees its own place as ever: the engine pool is quiet).
+ * Asked once as the page opens: how far down the list was when a row opened the profile whose own Back brought you here (profile-nav's
+ * backFrom), or null for any other way here (the menu, home's LADDER, that profile closed by anything but its Back): the list from the top.
+ * Forgets either way.
  */
-export function rowsWithYou(answer: Pick<LadderAnswer, "rows" | "you">): LadderRow[] {
-  const you = answer.you;
-  const rows = answer.rows;
-  if (!you || "placement" in you || rows.some((r) => r.uid === you.uid)) return rows;
-  const last = rows.at(-1);
-  if (!last || you.place > last.place) return rows;
-  const at = rows.findIndex((r) => r.place > you.place);
-  return at < 0 ? [...rows, you] : [...rows.slice(0, at), you, ...rows.slice(at)];
+export function cameBack(): number | null {
+  const l = left;
+  left = null;
+  return l && backFrom() === l.target ? l.scroll : null;
 }
 
 /** "142 – 88" (draws left out, as the profile's W / L). */
