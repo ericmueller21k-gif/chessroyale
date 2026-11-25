@@ -1,0 +1,195 @@
+{
+  "base": "http://localhost:8787",
+  "players": 1000,
+  "rampS": 30,
+  "opts": {
+    "base": "http://localhost:8787",
+    "mode": "crowd",
+    "pool": "loadmuyq4h1t",
+    "homeDwellMs": 5000,
+    "chatChance": 0.1,
+    "maxSessionMs": 180000,
+    "heartbeatMs": 30000
+  },
+  "generatorCpuMax": 0.1795338274006113,
+  "minutes": 3.930066666666667,
+  "startedAt": 1791414808913,
+  "seconds": 235.865,
+  "timings": {
+    "http me": {
+      "n": 1000,
+      "p50": 5491.656831,
+      "p90": 13257.950523,
+      "p99": 14324.200166000002,
+      "max": 14574.308672,
+      "mean": 5764.101056898994
+    },
+    "server me": {
+      "n": 1000,
+      "p50": 1404,
+      "p90": 2103,
+      "p99": 3542,
+      "max": 3543,
+      "mean": 1302.568
+    },
+    "http live": {
+      "n": 1331,
+      "p50": 2002.1651039999997,
+      "p90": 8843.680676999997,
+      "p99": 13416.487664999997,
+      "max": 14149.022670999995,
+      "mean": 3617.083299054847
+    },
+    "server live": {
+      "n": 1331,
+      "p50": 661,
+      "p90": 2927,
+      "p99": 3501,
+      "max": 3502,
+      "mean": 1149.977460555973
+    },
+    "http play": {
+      "n": 1000,
+      "p50": 2327.661651000002,
+      "p90": 9201.475592000003,
+      "p99": 11790.108772000003,
+      "max": 12686.798757000004,
+      "mean": 3593.410982290002
+    },
+    "server play": {
+      "n": 771,
+      "p50": 1072,
+      "p90": 3752,
+      "p99": 3857,
+      "max": 3866,
+      "mean": 1456.9442282749676
+    },
+    "playToCode": {
+      "n": 771,
+      "p50": 4192.635383000001,
+      "p90": 9236.055567000003,
+      "p99": 11858.313938,
+      "max": 12686.831506999999,
+      "mean": 4458.104181704278
+    },
+    "wsOpen": {
+      "n": 771,
+      "p50": 3717.7406249999985,
+      "p90": 6809.3845949999995,
+      "p99": 9655.303417,
+      "max": 14900.083682000004,
+      "mean": 3475.2194054085608
+    },
+    "playToLobby": {
+      "n": 406,
+      "p50": 6673.480745000001,
+      "p90": 22095.298463000003,
+      "p99": 24773.698167000002,
+      "max": 25239.545349,
+      "mean": 8467.531081261079
+    },
+    "queueWait": {
+      "n": 406,
+      "p50": 5307,
+      "p90": 10149,
+      "p99": 57879,
+      "max": 57883,
+      "mean": 6180.283251231527
+    },
+    "http heartbeat": {
+      "n": 2035,
+      "p50": 177.36602499999572,
+      "p90": 6007.945868999996,
+      "p99": 15573.888102999997,
+      "max": 16245.230329000005,
+      "mean": 1719.7193540442206
+    },
+    "server heartbeat": {
+      "n": 2035,
+      "p50": 14,
+      "p90": 767,
+      "p99": 3514,
+      "max": 3516,
+      "mean": 321.64226044226046
+    },
+    "pickRtt": {
+      "n": 1559,
+      "p50": 82.77986700000474,
+      "p90": 2165.9753800000035,
+      "p99": 4938.395901999997,
+      "max": 8060.361720000001,
+      "mean": 483.61817681013645
+    },
+    "chatRtt": {
+      "n": 159,
+      "p50": 46.02053799999703,
+      "p90": 1855.5939419999995,
+      "p99": 5251.444059999994,
+      "max": 6452.214669000001,
+      "mean": 442.8791080817602
+    }
+  },
+  "counts": {
+    "msgsOut": 3446,
+    "msgsIn": 390153,
+    "end error": 365,
+    "playersFailed": 229,
+    "hostScores": 58,
+    "chatNo repeat": 2,
+    "end timeUp": 406
+  },
+  "errors": {
+    "lobby error: This match has already started.": 365,
+    "play 500 ": 229
+  },
+  "server": {
+    "since": 1791414808956,
+    "d1": {
+      "INSERT users": 1000,
+      "INSERT sessions": 1000,
+      "SELECT users": 3599,
+      "SELECT results": 1000,
+      "SELECT inventory": 1771,
+      "SELECT equipped": 1771,
+      "SELECT wallets": 1771,
+      "SELECT chat_picks": 1771,
+      "SELECT items": 1000,
+      "SELECT equipped_items": 1000,
+      "SELECT sessions": 4137,
+      "UPDATE users": 4137,
+      "DELETE live_lobbies": 1,
+      "DELETE queue_waits": 1,
+      "SELECT live_lobbies": 2114,
+      "SELECT queue_waits": 2114,
+      "INSERT live_lobbies": 886,
+      "INSERT queue_waits": 5
+    },
+    "d1Reads": 22048,
+    "d1Writes": 7030,
+    "routes": {
+      "GET /api/me": {
+        "n": 1000,
+        "ms": 1302568
+      },
+      "GET /api/live": {
+        "n": 3366,
+        "ms": 2185162
+      },
+      "POST /api/play": {
+        "n": 771,
+        "ms": 1123304
+      },
+      "GET /api/lobby/:code/ws": {
+        "n": 771,
+        "ms": 517718
+      }
+    },
+    "calls": {
+      "mm.next": 771,
+      "mm.serialised": 771,
+      "lobby.persist": 3677,
+      "lobby.persistBytes": 8549868192,
+      "live.report": 886
+    }
+  }
+}

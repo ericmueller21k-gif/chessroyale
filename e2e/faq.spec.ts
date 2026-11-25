@@ -1,0 +1,80 @@
+import { expect, type Page } from "@playwright/test";
+import { test } from "./helpers.ts";
+
+/**
+ * The FAQ, "How HunChess works" (Eric, Oct 11): reached from Settings, its contents jump to each section, it reads
+ * at a phone's width without sideways scroll, a link to a heading opens there, and back goes to Settings.
+ */
+
+/** How far a heading's top is from the top of the window (it should be near 0 once jumped to). */
+const topOf = (page: Page, id: string) => page.evaluate((x) => document.getElementById(x)?.getBoundingClientRect().top ?? -1e9, id);
+
+test("Settings → FAQ: the contents jump to a section and it comes into view; back goes to Settings", async ({ page }) => {
+  await page.goto("/settings");
+  await page.getByRole("button", { name: /HunChess Handbook/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "HunChess Handbook" })).toBeVisible();
+  await expect(page).toHaveURL(/\/faq$/);
+
+  // Every link in the contents points at something on the page.
+  const toc = page.getByRole("navigation", { name: "Contents" });
+  const hrefs = await toc.locator("a").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
+  expect(hrefs.length).toBeGreaterThan(8);
+  for (const h of hrefs) expect(await page.locator(h).count(), h).toBe(1);
+
+  // A sub-heading: the handover from Maia to Stockfish.
+  await toc.getByRole("link", { name: "The handover: from Maia to Stockfish" }).click();
+  await expect(page.locator("#faq-handover")).toBeInViewport();
+  await expect.poll(() => topOf(page, "faq-handover"), { timeout: 5000 }).toBeLessThan(80);
+  await expect.poll(() => topOf(page, "faq-handover")).toBeGreaterThan(-5);
+  await expect(page).toHaveURL(/#faq-handover$/);
+
+  // Back to the contents, then a whole section: the God King.
+  await page.locator("#faq-boss-brain").locator("..").getByRole("link", { name: "↑ Contents" }).click();
+  await expect(toc).toBeInViewport();
+  await toc.getByRole("link", { name: "The God King", exact: true }).click();
+  const king = page.getByRole("heading", { level: 2, name: "The God King" });
+  await expect(king).toBeInViewport();
+  await expect.poll(() => topOf(page, "faq-god-king"), { timeout: 5000 }).toBeLessThan(80);
+
+  // Readable at this width: nothing wider than the window (wide tables scroll inside their own box).
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+
+  await page.getByRole("button", { name: "Back to Settings" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await expect(page).toHaveURL(/\/settings$/);
+});
+
+test("Settings → Handbook → contents: Copyright, credits and licenses comes into view, with the Stockfish and Maia links", async ({ page }) => {
+  await page.goto("/settings");
+  await page.getByRole("button", { name: /HunChess Handbook/ }).click();
+  const toc = page.getByRole("navigation", { name: "Contents" });
+  await toc.getByRole("link", { name: "Copyright, credits and licenses", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Copyright, credits and licenses" })).toBeInViewport();
+  // (The Handbook is long: the last section is a long smooth scroll away, so this waits longer than the others do.)
+  await expect.poll(() => topOf(page, "faq-credits"), { timeout: 15_000 }).toBeLessThan(80);
+  await expect(page).toHaveURL(/#faq-credits$/);
+  // The section's notices, with their links.
+  const section = page.locator("section").filter({ has: page.locator("#faq-credits") });
+  await expect(section.getByRole("link", { name: "stockfishchess.org", exact: true })).toHaveAttribute("href", "https://stockfishchess.org");
+  await expect(section.getByRole("link", { name: "Maia-3", exact: true })).toHaveAttribute("href", "https://github.com/CSSLab/maia3");
+  await expect(section.getByRole("link", { name: "source code", exact: true })).toHaveAttribute("href", "/engine/maia/maia-box-source.tar.gz");
+  await expect(section.getByRole("link", { name: "its source", exact: true }).first()).toHaveAttribute("href", "/engine/stockfish-source.tar.gz");
+});
+
+test("a link to a heading in the FAQ opens at that heading", async ({ page }) => {
+  await page.goto("/faq#faq-last-stand");
+  await expect(page.getByRole("heading", { level: 3, name: "His save: the Last Stand" })).toBeInViewport();
+  await expect.poll(() => topOf(page, "faq-last-stand"), { timeout: 5000 }).toBeLessThan(80);
+});
+
+test("the FAQ's Your rating says when your ranking changes (the sentence home's ⓘ used to carry, Eric, Oct 28)", async ({ page }) => {
+  await page.goto("/faq#faq-rating");
+  const line = page.getByText("Your ranking changes only in a match with at least 30 real players (15 in a group Boss Battle). Solo games never change it.");
+  await expect(line).toBeVisible();
+  // Under the Your rating heading, not another entry's.
+  const under = await line.evaluate((el) => {
+    const heads = [...document.querySelectorAll("h2, h3")].filter((h) => h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+    return heads.pop()?.textContent?.trim();
+  });
+  expect(under).toBe("Your rating");
+});

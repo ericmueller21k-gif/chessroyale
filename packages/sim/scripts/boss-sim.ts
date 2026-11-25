@@ -1,0 +1,1121 @@
+/**
+ * Calibrates the boss battle: a crowd of 10 bots (voting, the most popular pick
+ * played) as White against Stockfish at UCI_Elo = the crowd's weighted rating +
+ * an offset, with the boss striking down the worst recent mover every 3 crowd
+ * moves (down to 3). Crowds of three strengths (expert, club and casual players,
+ * modeled as bots that sometimes play a random move). The goal is a boss that's hard but beatable.
+ *
+ *   npx tsx packages/sim/scripts/boss-sim.ts run <expert|club|casual|beginner> <offsets,comma> <games> <seed> [stumble][,snack][,split]
+ *
+ * `snack`: Big Boy's opening, the crowd's d- or e-pawn eaten before move 1 (a coin flip per game).
+ * `split`: Sawyer's opening, his first move a pawn move and that pawn sawn in two (a second pawn beside it: splitSquare;
+ *   from the starting position he has all 8, so it comes on his first pawn move once one of his pawns is gone).
+ *   npx tsx packages/sim/scripts/boss-sim.ts summary
+ *   npx tsx packages/sim/scripts/boss-sim.ts raid <boss,ids|all> <games> <seed> <strikes> <tag> [patch]
+ *   npx tsx packages/sim/scripts/boss-sim.ts raid-summary <tags>
+ *
+ * `raid`'s `patch` (JSON, for tuning runs): `powers`, numbers put over BOSS_POWERS for the run (rageSpeed merged);
+ * `offset`, a boss's Elo offset by id; `counter`, the crowd takes one of Alfil's marked pawns when the best such capture
+ * costs at most that many pawns against its best move (the bots' own picks read the judge, which doesn't know about the
+ * fusion: a crowd that knows the rule plays the counter when it's cheaper than what the fusion gives him).
+ * Big Boy (id bigboy): each row logs his towers' topples (after which crowd turn; by the crowd's move, his piece, or by itself
+ * at towerMax; its height and the blocks that scattered), his tallest tower, and the crowd turns with his toys up (`toyTurns`) and
+ * those where they took a legal move away (`limitedTurns`: fair play's question). Half the blocks scattering:
+ * `{"powers": {"towerScatterShare": 0.5}}`.
+ * Chub & Chirp's Leapfrog (id hopper): each row logs the hops and, for every turn of his with a pawn nose to nose that
+ * couldn't hop, why (hopOptions; `cap`: out of hops). (The hop as his move, the variant the sim turned down, can't be
+ * run from here: its switch went with it. It ran on commit eb678d7 only, checked out: reports/hopper-sim.md.)
+ * Their Carrot Patch: each row logs the cast (after which crowd move, the carrots and each one's lead for him as the
+ * cast saw it), every pull, how the race ended, his spin, and what his race brain did. `cast` ([from, to]): a forced cast
+ * (the admins' trigger) at a crowd turn drawn from that range, the battle stopped once the race and the spin are over
+ * (the carrot counts' extra samples: reports/hopper-carrots-sim.md). Tuning the placement: `{"powers": {"carrotLeads": [...]}}`.
+ * `tier` and `difficulty`: the boss's strength as a player rated under that tier meets him on Solo's Hard (250) or
+ * Hardest (500); the bots stay the raid's own. Leapfrog alone (the meter never filling): `{"powers": {"rageSpeed": {"hopper": 0.0001}}}`.
+ *
+ * Smudgy (id smudgy): each row logs his Camouflage (the side of his forced moves, turns they waited, whether it was given
+ * up, the swap: after which crowd move and the squares; how the hidden rook was revealed and when, `strikeAfter` the crowd
+ * moves from the swap to it) and every Repaint tried (after which crowd move, the pairs he could paint, the pick's gain
+ * in pawns, or none in the band: `waits`).
+ *
+ * Moo & Moon (id moo): each row logs his Moonbeams (how many landed), each flurry's stunned count, and each Full Moon
+ * (after which crowd move it came, the crowd's material lead, in pawns, as it came and after his last move at full
+ * strength; null when the battle ended first) and his moves at full strength.
+ *
+ * The hippo gardener (id gardener): his seeds come by real time, so the sim keeps a clock of its own: each crowd turn
+ * passes the crowd's pick (`pickSec` in the patch: 10 by default, 5 a fast crowd, 20 one that runs the raid's clock out),
+ * the reveal, his thinking and his move's show (GARDEN_TURN_SEC) and the turn's moments. Each row logs every watering
+ * (after which crowd move, the seeds, what they rolled, what came up, what was dropped, his gain by the engine, the
+ * positions searched and the ms, his own pieces eaten, the jackpot) and every one that waited (the pass guard).
+ *
+ * The circus tiger (id tiger): his balloons blow up on the sim's clock (as the hippo gardener's seeds: `pickSec`). Each
+ * row logs every balloon's end (after which crowd move, its shape as shown, landed or popped, why a pop: a dud or `nine`,
+ * his gain by the engine, in the shape's band or not), how many went on, every cast of his hoops after his move (after
+ * which crowd move, the blocks, his gain, the ms of his whole turn) and every one that waited (his move gave check, or none
+ * fitted), and each crowd turn with hoops standing:
+ * whether the walls took away the engine's best move.
+ *
+ * Folio (id folio): each row logs its Draft marks, folds and marks answered in time (the attack ended after a crowd move),
+ * every Crease (as it landed, the line and what it cost the crowd as it fell, and by the engine that picked it on the
+ * warning's position), the warned creases that didn't land (the guard refusing them as they fell) and its Revision (after
+ * which crowd move, what its move cost it and what the crowd's reply found, in pawns).
+ *
+ * Timber (id timber): his scraps come by real time (the sim's clock, as the hippo gardener's seeds: `pickSec`). Each row
+ * logs every drop (after which crowd move, the piece, the square), every Gnaw (after which crowd move, the pawn's square or
+ * none) and the scraps landed in all (the clock's, captures', the Gnaw's).
+ *
+ * Dash (id dash): his Clock Slap and Time Scramble take the player's time, so the sim keeps a player's clock (Boss Battle's
+ * bank of 10 + 10, his slaps taking from it) and a time model (`pickSec`, `rushSec`: RaidPatch): a move the player's drawn
+ * time runs past is nobody's pick, and his rules play a random legal move for the crowd. Each row logs his slaps and the time
+ * they took, the scrambles and the scrambled moves, the moves the player ran out of time on (of them, scrambled) and the
+ * player's lowest bank.
+ *
+ * Don Dough (id zebra): each row logs his dough (every drop: after which crowd move, the kind, the square; every rise: after
+ * which crowd move, at the end of whose move, the kind; every squash, and the ones the crowd's squash rule played), the material
+ * risen, and each Gold Plate (after which crowd move, the piece gilded). `squash` (RaidPatch): the crowd squashes a lump when the
+ * best move landing on it costs at most that share of the lump's value in pawns against its best move (the bots' own picks read
+ * the judge, which doesn't know about the dough: a crowd that knows the rule squashes when it's cheap enough).
+ *
+ * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
+ */
+import { BOSS_ALONE_SCORING, BOSS_CLOCK, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS } from "@chessroyale/core";
+import { MatchRunner, PASS_WAIT, attackedSquares, capturedSquare, exchangeNet, fenAtPly, lockAge, locksAfter, shotTarget, darkSquares, touchesDark, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, isHop, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { createNodeEngine } from "@chessroyale/chess/node";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const root = fileURLToPath(new URL("../../../", import.meta.url));
+const settings = DEFAULT_SETTINGS;
+const CROWD_NODES = 150_000;
+const MAX_MOVES = 60;
+const KILL_EVERY = 3;
+const MIN_SURVIVORS = 3;
+/** Crowds of 10: each member's skill temperature, and how often they play a random legal move (human-like blunders). */
+const spread = (lo: number, hi: number) => Array.from({ length: 10 }, (_, i) => lo * Math.pow(hi / lo, i / 9));
+const CROWDS: Record<string, { skills: number[]; random: number }> = {
+  expert: { skills: spread(1, 4), random: 0.02 },
+  club: { skills: spread(6, 20), random: 0.06 },
+  casual: { skills: spread(15, 40), random: 0.12 },
+  beginner: { skills: spread(30, 90), random: 0.25 },
+};
+
+async function run(kind: string, offsets: number[], games: number, seed: number, stumble: boolean, snack = false, split = false) {
+  const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
+  const engine = await createNodeEngine({ nodes: CROWD_NODES, hashMb: 16 });
+  const boss = await createNodeEngine({ nodes: settings.bossNodes, hashMb: 16 });
+  const rng = mulberry32(seed);
+  const { skills, random } = CROWDS[kind]!;
+  const pickSettings = { ...settings, botRandomMoveChance: random };
+  const candidates = async (fen: string) => {
+    const top = await engine.topMoves(fen, settings.botCandidateMoves);
+    const best = top[0]!.expected;
+    return { top, list: top.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) })) };
+  };
+  // The crowd's rating before the battle, from picks in positions like the game's.
+  const warm: number[][] = skills.map(() => []);
+  const positions = shuffle(rng, library.filter((o) => o.moves.length >= 10)).slice(0, 30);
+  for (const o of positions) {
+    const fen = fenAfter(o.moves.slice(0, 8 + Math.floor(rng() * 3)));
+    const { list } = await candidates(fen);
+    skills.forEach((skill, i) => {
+      const move = botPick(rng, list, skill, legalMoves(fen), pickSettings);
+      warm[i]!.push(list.find((c) => c.move === move)?.loss ?? 30);
+    });
+  }
+  const rating = bossElo(warm.map((l) => estimateRating(l)), { bossEloOffset: 0, bossEloRange: [0, 9999] });
+  console.log(`${kind} crowd rating ${rating}`);
+  mkdirSync(root + "reports/boss-sim", { recursive: true });
+  for (const offset of offsets) {
+    for (let g = 0; g < games; g++) {
+      // As the game does: the target strength (down to 800), Stockfish at no less than 1320, stumbling below 1700.
+      const elo = stumble ? Math.max(settings.bossEloRange[0], Math.min(3190, rating + offset)) : Math.max(1320, Math.min(3190, rating + offset));
+      const chance = stumble ? bossStumbleChance(elo, settings) : 0;
+      // (Big Boy's snack: the crowd's d- or e-pawn gone before move 1.)
+      const start = snack ? withoutPiece(START_FEN, rng() < 0.5 ? "d2" : "e2") : START_FEN;
+      const splitSeed = Math.floor(rng() * 2 ** 32);
+      const result = await battle(rng, skills, pickSettings, candidates, (fen, allowed) => bossMoveFrom(boss, fen, elo, settings.bossNodes, rng() < chance, rng, undefined, undefined, allowed), start, split ? splitSeed : null);
+      const row = { kind, rating, offset, elo, stumble, ...(snack ? { snack } : {}), ...(split ? { split } : {}), ...result };
+      appendFileSync(root + `reports/boss-sim/${kind}-${seed}${snack ? "-snack" : ""}${split ? "-split" : ""}.jsonl`, JSON.stringify(row) + "\n");
+      console.log(JSON.stringify(row));
+    }
+  }
+  engine.close();
+  boss.close();
+}
+
+async function battle(
+  rng: Rng,
+  skills: number[],
+  pickSettings: typeof settings,
+  candidates: (fen: string) => Promise<{ top: { move: string; expected: number }[]; list: { move: string; loss: number }[] }>,
+  bossMove: (fen: string, allowed: string[] | null) => Promise<string>,
+  start: string = START_FEN,
+  split: number | null = null,
+) {
+  let history: string[] = [];
+  let fen = start;
+  // (Sawyer's split: the position changes after his first move, a base there.)
+  const bases: Base[] = [{ ply: 0, fen: start }];
+  let splitState: "first" | "waiting" | "done" = "first";
+  let splitAt: number | null = null;
+  const gameEnd = (_start: string, h: readonly string[]) => gameEndWith(h, bases);
+  let alive = skills.map((skill, i) => ({ i, skill, recent: [] as number[] }));
+  let moves = 0;
+  let lastExpected = 0.5;
+  while (moves < MAX_MOVES && !gameEnd(start, history)) {
+    const { top, list } = await candidates(fen);
+    lastExpected = top[0]!.expected;
+    const legal = legalMoves(fen);
+    const picks = alive.map((p) => {
+      const move = botPick(rng, list, p.skill, legal, pickSettings);
+      p.recent.push(list.find((c) => c.move === move)?.loss ?? 30);
+      return move;
+    });
+    const count = (m: string) => picks.filter((x) => x === m).length;
+    const most = Math.max(...picks.map(count));
+    const tied = [...new Set(picks.filter((m) => count(m) === most))];
+    const played = tied[Math.floor(rng() * tied.length)]!;
+    history = [...history, played];
+    fen = applyMove(fen, played);
+    moves++;
+    if (moves % KILL_EVERY === 0 && alive.length > MIN_SURVIVORS) {
+      const sum = (p: (typeof alive)[number]) => p.recent.slice(-KILL_EVERY).reduce((s, x) => s + x, 0);
+      const victim = [...alive].sort((a, b) => sum(b) - sum(a))[0]!;
+      alive = alive.filter((p) => p !== victim);
+    }
+    if (gameEnd(start, history)) break;
+    // (Sawyer: his first move a pawn move, then that pawn sawn in two; with no room yet for another pawn of his, his
+    // first pawn move once there is: as the game's rules, bosses/sawyer.ts.)
+    const first = split !== null && history.length === 1;
+    const pawnMoves = first ? legalMoves(fen).filter((m) => pieceAt(fen, m.slice(0, 2))?.type === "p") : [];
+    const reply = await bossMove(fen, pawnMoves.length ? pawnMoves : null);
+    history = [...history, reply];
+    fen = applyMove(fen, reply);
+    if (split !== null && splitState !== "done") {
+      const pawn = pieceAt(fen, reply.slice(2, 4))?.type === "p" && reply.length === 4;
+      const pick = pawn && splitRoom(fen, "b") ? chooseSplit(fen, reply.slice(2, 4), "w", split, moves + 1) : null;
+      if (pick) {
+        fen = withPiece(fen, pick.square, { color: "b", type: "p" });
+        bases.push({ ply: history.length, fen });
+        splitState = "done";
+        splitAt = moves;
+      } else if (first) splitState = pawn ? "waiting" : "done";
+    }
+  }
+  const end = gameEnd(start, history);
+  let result: "crowd" | "boss" | "draw";
+  if (end === "checkmate") result = fen.split(" ")[1] === "b" ? "crowd" : "boss";
+  else if (end) result = "draw";
+  else {
+    // The move cap: the engine's verdict (White's expected score from the last crowd search).
+    result = lastExpected >= 0.6 ? "crowd" : lastExpected <= 0.4 ? "boss" : "draw";
+  }
+  return { result, moves, ended: end ?? "cap", ...(split !== null ? { splitAt } : {}) };
+}
+
+function summary() {
+  const dir = root + "reports/boss-sim";
+  const rows = readdirSync(dir).flatMap((f) =>
+    readFileSync(`${dir}/${f}`, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { kind: string; rating: number; offset: number; elo: number; result: string; moves: number; ended: string; stumble?: boolean; snack?: boolean; split?: boolean }),
+  );
+  const groups = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const key = `${r.kind}|${r.offset}|${r.stumble ? "s" : ""}${r.snack ? "+snack" : ""}${r.split ? "+split" : ""}`;
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  const lines = [
+    "# Boss battle calibration",
+    "",
+    `A crowd of 10 bots (the most popular pick played, ${CROWD_NODES.toLocaleString("en-US")}-node candidate search) as White against Stockfish at UCI_Elo = the crowd's weighted rating + offset (${settings.bossNodes.toLocaleString("en-US")} nodes), with the boss striking down the worst recent mover every ${KILL_EVERY} crowd moves down to ${MIN_SURVIVORS}, capped at ${MAX_MOVES} crowd moves (then the engine's verdict: 60%+ wins). Generated by \`packages/sim/scripts/boss-sim.ts\`.`,
+    "",
+    "Rows marked *stumbles* use the game's boss: the target strength can go down to 800; Stockfish plays at 1320 or more, and below 2100 the boss sometimes plays a random legal move instead (chance (2100 − target) / 1000, at most 40% in these runs; the game ships with at most 25%, since weak crowds still won 6–7 of 8 at 40%). Earlier tries, replaced here: a random top-5 move below 1700, and a random legal move below 1900, still lost nearly every game for these crowds; a random legal move below 2300 (chance / 800, at most 50%) went too far the other way (club and casual crowds won 7 of 8, beginners 4 of 8).",
+    "",
+    "| Crowd | Crowd rating | Offset | Boss | Boss Elo | Games | Crowd wins | Draws | Boss wins | Avg moves |",
+    "|---|---|---|---|---|---|---|---|---|---|",
+  ];
+  const order = ["expert", "club", "casual", "beginner"];
+  for (const [key, rs] of [...groups].sort(([a], [b]) => {
+    const [ka, oa] = a.split("|");
+    const [kb, ob] = b.split("|");
+    return order.indexOf(ka!) - order.indexOf(kb!) || a.split("|")[2]!.localeCompare(b.split("|")[2]!) || Number(oa) - Number(ob);
+  })) {
+    const [kind, offset, st] = key.split("|");
+    const n = rs.length;
+    const pct = (k: string) => `${Math.round((100 * rs.filter((r) => r.result === k).length) / n)}%`;
+    const avg = Math.round(rs.reduce((s, r) => s + r.moves, 0) / n);
+    lines.push(`| ${kind} | ${rs[0]!.rating} | ${Number(offset) >= 0 ? "+" : ""}${offset} | ${st?.startsWith("s") ? "stumbles" : "plain"}${st?.includes("+snack") ? ", snack (a center pawn eaten)" : ""}${st?.includes("+split") ? ", split (his first pawn sawn in two)" : ""} | ${Math.round(rs.reduce((s, r) => s + r.elo, 0) / n)} | ${n} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${avg} |`);
+  }
+  writeFileSync(root + "reports/boss-calibration.md", lines.join("\n") + "\n");
+  console.log(lines.join("\n"));
+}
+
+// ---------------- Raids with every power (the rage meter's tuning) ----------------
+
+/** The judge's and the boss's search in the raid sims (a little under the game's 250,000, for time). */
+const RAID_NODES = 120_000;
+/** Each boss's ultimate, as the raid sim sees it come: a moment as a turn begins, or one the match runner plays. */
+const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw", "crease", "scramble"]);
+
+/**
+ * A Solo raid with every power, as solo plays one with nobody watching (simulateRest): 50 bots (the Solo raid's own
+ * roster) against the boss at its usual raid strength, through the match runner, so the rage meter, the passives and
+ * the ultimates are the game's own. `strikes`: the God King's strikes the crowd calls (at random crowd turns 6 to 30,
+ * from a source of its own so the games stay paired across settings). Rows go to reports/boss-sim/raid-<tag>.jsonl.
+ */
+/** A raid run's tuning patch (see the top of this file). */
+interface RaidPatch {
+  powers?: Record<string, unknown>;
+  offset?: Record<string, number>;
+  counter?: number;
+  /** Chub & Chirp: a forced Carrot Patch (the admins' trigger) at a crowd turn in this range; the battle stops after the race. */
+  cast?: [number, number];
+  /** Start at this game (a run picked up where it stopped: the games before it are already in its rows). */
+  skip?: number;
+  /** The boss's tier (bossFixedElo: a player rated just under it; the usual is 1600) and Solo's difficulty (bossDifficulty: Hard 250, Hardest 500). */
+  tier?: number;
+  difficulty?: number;
+  /**
+   * The hippo gardener's seeds come by real time: how long the crowd takes to pick, in seconds (the default 10, half the
+   * raid's 20 s move clock: a crowd of thinkers; 5 a fast crowd, 20 one that runs the clock out every turn). Each crowd
+   * turn plus his turn passes that, the reveal (revealSeconds), his thinking and his move's show (GARDEN_TURN_SEC) and the
+   * turn's power moments (powerMomentMs) on the sim's clock.
+   */
+  pickSec?: number;
+  /**
+   * Dash (id dash): the player's time model on Boss Battle's clock (the bank of 10 + 10, his slaps taking from it). A move's
+   * thinking time is drawn from a log-normal with its median `pickSec` (10 s) and spread 0.6; a scrambled move's from one with its
+   * median `rushSec` (2.2 s: a phone player taps a move in about two seconds when they must) and spread 0.35. When it's longer than
+   * the move's time (the bank and the increment, or a scrambled move's 3 s), nobody picked: his flag, a random legal move.
+   */
+  rushSec?: number;
+  /**
+   * Hollow (id hollow): Boss alone instead of a Solo raid: one bot (its tier's) against him alone, on Boss alone's settings
+   * (BOSS_ALONE_SCORING, no boss strikes) and his solo bulbs (`hollowBulbs`: docs/decisions/2026-11-05-hollow-bulbs.md).
+   */
+  alone?: boolean;
+  /** Hollow alone: false turns his bulbs off (today's points: a wrong try never decides the battle), for a run to compare. */
+  bulbs?: boolean;
+  /**
+   * Hollow: a player in the dark. The bots know the board, so on their own they never try a move into the dark. With
+   * `darkMiss`, each crowd turn whose planned pick touches a dark square, that player first tries a wrong move into the
+   * dark with this chance, and again after each wrong one (so 0.3 averages about 0.43 wrong tries a dark-touching turn):
+   * a stand-in for a person who misremembers what the dark hides. Alone only (in a crowd a wrong try costs points and
+   * never the battle).
+   */
+  darkMiss?: number;
+  /**
+   * Don Dough (id zebra): the crowd squashes a lump of his dough when the best move landing on it costs at most this share of
+   * the lump's value (pawn 1 … queen 9), in pawns, against the crowd's best move. Left out: the bots never aim for it.
+   */
+  squash?: number;
+  /** A test switch (`?power=`), as solo's link sets it: Chandy's `dodge` gives him all five moves from the start (reports/chandy-sim.md, run E). */
+  test?: string;
+  /**
+   * Chandy (Nov 24, reports/chandy-sim.md, run H): the crowd heeds his crosshairs as a person does (the bots can't see them). With a
+   * locked piece of the crowd's he can win (a capture of it netting him material by the exchange check), the whole crowd plays its best
+   * move after which none can be won, when it costs at most this many pawns against its best move; with the Lock-on Shot aimed, the best
+   * move that puts a piece in front of its target, when it costs less than the target is worth.
+   */
+  heed?: number;
+  /** The crowd's bots around this rating (Settings.botLevel: BOT_LOBBY's mean 1150 otherwise): a stronger crowd plays longer games. */
+  botLevel?: number;
+  /**
+   * The whole crowd plays the engine's best move (the sim's engine, RAID_NODES), where heeding (patch.heed) doesn't pick: a player who
+   * doesn't blunder. With a `tier` that makes him its match, games run deep, as Eric's did (Chandy, Nov 24, run H).
+   */
+  best?: boolean;
+}
+
+/** His best capture of the piece on `sq` (`fen`: him to move), by the exchange check (pawns), or null: none. */
+function bestNetOn(fen: string, sq: string): number | null {
+  let best: number | null = null;
+  for (const m of legalMoves(fen)) {
+    if (capturedSquare(fen, m) !== sq) continue;
+    const net = exchangeNet(fen, m);
+    if (net !== null && (best === null || net > best)) best = net;
+  }
+  return best;
+}
+
+/**
+ * The crowd heeding Chandy's crosshairs (patch.heed): the Lock-on Shot's target shielded, else every locked piece he could win made
+ * safe, by the whole crowd's pick (as counterTusks). Returns what it did (null: nothing to heed).
+ */
+async function heedChandy(runner: MatchRunner, engine: EngineLike, heed: number): Promise<{ kind: "aim" | "lock"; cost: number | null } | null> {
+  const c = runner.boss?.powers?.chandy;
+  if (!c) return null;
+  const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+  const crowd = runner.boss!.crowdSide;
+  const allowed = runner.crowdAllowed() ?? legalMoves(fen);
+  const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  const play = (move: string) => {
+    for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, move);
+  };
+  const pick = async (ok: (m: string) => boolean, extra: readonly string[], max: number) => {
+    const top = (await engine.topMoves(fen, 8)).filter((m) => allowed.includes(m.move));
+    const more = extra.filter((m) => allowed.includes(m) && !top.some((t) => t.move === m));
+    const scored = [...top, ...(more.length ? await engine.scoreMoves(fen, more) : [])].sort((a, b) => b.expected - a.expected);
+    const best = scored[0];
+    const fit = scored.find((m) => ok(m.move));
+    if (!best || !fit) return null;
+    const cost = Math.max(0, slamPawnsLost(best.expected, fit.expected));
+    if (cost > max) return null;
+    play(fit.move);
+    return Math.round(cost * 100) / 100;
+  };
+  if (c.aim) {
+    const target = c.aim.square;
+    const shape = pieceAt(fen, target)?.type ?? "q";
+    const saves = allowed.filter((m) => {
+      try {
+        const now = m.slice(0, 2) === target ? m.slice(2, 4) : target;
+        const hit = shotTarget(applyMove(fen, m), now, crowd);
+        return !!hit && hit !== now;
+      } catch {
+        return false;
+      }
+    });
+    if (saves.length) return { kind: "aim", cost: await pick((m) => saves.includes(m), saves, VALUE[shape]! - 1) };
+  }
+  const locks = c.locks.filter((l) => pieceAt(fen, l.square)?.color === crowd);
+  if (!locks.length) return null;
+  const winnable = (f: string, sqs: readonly string[]) => sqs.some((sq) => (bestNetOn(f, sq) ?? 0) > 0);
+  if (!winnable(passTurn(fen) ?? fen, locks.map((l) => l.square))) return null;
+  const safe = (m: string) => {
+    try {
+      return !winnable(applyMove(fen, m), locksAfter(fen, m, locks).map((l) => l.square));
+    } catch {
+      return false;
+    }
+  };
+  return { kind: "lock", cost: await pick(safe, allowed.filter((m) => locks.some((l) => l.square === m.slice(0, 2))), heed) };
+}
+
+/** A wrong move into the dark: from a dark square to one it can't legally go to (the first such, for the sim's model). */
+function wrongDarkTry(fen: string, dark: readonly string[]): string | null {
+  const legal = new Set(legalMoves(fen));
+  for (const d of dark)
+    for (const f of "abcdefgh")
+      for (let r = 1; r <= 8; r++) {
+        const m = `${d}${f}${r}`;
+        if (`${f}${r}` !== d && !legal.has(m) && !legal.has(`${m}q`)) return m;
+      }
+  return null;
+}
+
+/**
+ * The crowd's squash of Don Dough's dough (patch.squash): of the moves landing on a lump, the best by the engine, played by the
+ * whole crowd when it costs at most `share` of that lump's value in pawns against the best move. Returns the lump's kind and the
+ * cost (null: no move lands on one, or none cheap enough).
+ */
+async function squashDough(runner: MatchRunner, engine: EngineLike, share: number): Promise<{ piece: string; cost: number } | null> {
+  const lumps = runner.boss?.powers?.zebra?.lumps ?? [];
+  if (!lumps.length) return null;
+  const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+  const allowed = runner.crowdAllowed() ?? legalMoves(fen);
+  const onto = allowed.filter((m) => lumps.some((l) => l.square === m.slice(2, 4)));
+  if (!onto.length) return null;
+  const [best] = await engine.topMoves(fen, 1);
+  const scored = (await engine.scoreMoves(fen, onto)).map((m) => ({ ...m, lump: lumps.find((l) => l.square === m.move.slice(2, 4))! }));
+  const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  const fit = scored.map((m) => ({ ...m, cost: Math.max(0, slamPawnsLost(best!.expected, m.expected)) })).filter((m) => m.cost <= share * VALUE[m.lump.piece]!);
+  if (!fit.length) return null;
+  const pick = fit.sort((a, b) => VALUE[b.lump.piece]! - VALUE[a.lump.piece]! || a.cost - b.cost)[0]!;
+  for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, pick.move);
+  return { piece: pick.lump.piece, cost: Math.round(pick.cost * 100) / 100 };
+}
+
+/** His thinking (bossThinkMs, at least 1.2 s) and his move on screen (bossShowMs, 1.8 s) each turn, for the sim's clock. */
+const GARDEN_TURN_SEC = 3;
+
+/**
+ * The crowd's counter to Alfil's cast (patch.counter): with two of his pawns marked, the captures that take one; the
+ * best of them by the engine, played by the whole crowd when it costs at most `max` pawns against the best move.
+ * Returns that cost (null: no capture there).
+ */
+async function counterTusks(runner: MatchRunner, engine: EngineLike, max: number): Promise<number | null> {
+  const p = runner.boss?.powers;
+  if (!p?.tusks) return null;
+  const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+  const his = runner.boss!.crowdSide === "w" ? "b" : "w";
+  const caps = legalMoves(fen).filter((m) => p.tusks!.pawns.some((sq) => pieceAt(applyMove(fen, m), sq)?.color !== his));
+  if (!caps.length) return null;
+  const [best] = await engine.topMoves(fen, 1);
+  const [top] = (await engine.scoreMoves(fen, caps)).sort((a, b) => b.expected - a.expected);
+  const cost = Math.max(0, slamPawnsLost(best!.expected, top!.expected));
+  // (Every bot's pick, as one crowd: the runner's planned picks.)
+  if (cost <= max) for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, top!.move);
+  return Math.round(cost * 100) / 100;
+}
+
+async function raid(bosses: string[], games: number, seed: number, strikes: number, tag: string, patch: RaidPatch = {}) {
+  const { rageSpeed, ...powers } = (patch.powers ?? {}) as { rageSpeed?: Record<string, number> };
+  Object.assign(BOSS_POWERS as Record<string, unknown>, powers, rageSpeed ? { rageSpeed: { ...BOSS_POWERS.rageSpeed, ...rageSpeed } } : {});
+  // (A player who doesn't blunder (patch.best) finds Chandy's Dodge's safe square too: his Dodge never ends the battle early.)
+  if (patch.best) (BOSS_POWERS.chandy as { dodgeBotHit: number }).dodgeBotHit = 1;
+  for (const [id, offset] of Object.entries(patch.offset ?? {})) (BOSS_ROSTER.find((d) => d.id === id) as { offset: number }).offset = offset;
+  const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
+  const engines = [await createNodeEngine({ nodes: RAID_NODES, hashMb: 16 })];
+  mkdirSync(root + "reports/boss-sim", { recursive: true });
+  for (const bossId of bosses) {
+    for (let g = patch.skip ?? 0; g < games; g++) {
+      const rng = mulberry32(seed * 7919 + g);
+      const strikeRng = mulberry32(seed * 104729 + g);
+      const strikeTurns = new Set<number>();
+      while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
+      // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
+      // (Dash: Boss Battle's clock, the bank his slaps take from: the player's time model below.)
+      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, ...(patch.test ? { bossPowerTest: patch.test } : {}), bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}), ...(patch.alone ? { ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: patch.bulbs !== false } : {}), ...(patch.botLevel ? { botLevel: patch.botLevel } : {}) } as Settings;
+      // (The clock for the hippo gardener's seeds: the crowd's pick (patch.pickSec), the reveal, his turn and the moments.)
+      let clockMs = 0;
+      const pickSec = patch.pickSec ?? 10;
+      const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, patch.alone ? 1 : s.lobbySize, s), clock: () => clockMs });
+      // (Hollow, a player in the dark: patch.darkMiss. The wrong tries, the bulbs out, the forced moves (each one's loss
+      // against the best, in points) and a blackout.)
+      const darkRng = mulberry32(seed * 49157 + g);
+      const hollow = { darkTurns: 0, wrong: 0, bulbsOut: 0, forced: [] as { at: number; move: string; loss: number | null }[], blackout: null as number | null, blocks: [] as { turn: number; size: number; squares: number }[] };
+      const ults: { kind: string; turn: number }[] = [];
+      // (Folio: each Crease as it landed, its line, what it cost the crowd as it fell (this engine, the position it fell on)
+      // and by the engine that picked it on the warning's position; and each warned crease that didn't land, the guard
+      // refusing it as it fell.)
+      const creases: { at: number; line: string; loss: number | null; warned: number | null }[] = [];
+      const creasesOff: number[] = [];
+      let seen = -1;
+      // (Big Boy: each tower's topple (after which crowd turn, by whom: the crowd's move, his piece, or by itself at towerMax; its
+      // height and how many blocks scattered), from his scattered blocks as each turn is looked at; and his tallest tower.)
+      // (And for fair play: the crowd turns with a tower or blocks up, and those where one actually takes a legal move away: since Nov 18
+      // only these are power turns (powerTurn, Eric's (b)); the rest count.)
+      const bigboy = { topples: [] as { at: number; by: "crowd" | "piece" | "self"; height: number; blocks: number }[], tallest: 0, toyTurns: 0, limitedTurns: 0 };
+      const toppleSeen = new Set<string>();
+      // (Grex: what his fire did to the crowd's pieces: the sparkler's burns; the Roman candle's chars (Eric, Nov 20: a piece
+      // its fire reaches is charred the first time) and its burns, and of those the material in pawns.)
+      const grex = { sparkBurnt: 0, charred: 0, candleBurnt: 0, fizzled: 0, lost: 0 };
+      const burnSeen = new Set<string>();
+      const look = () => {
+        const p = runner.boss?.powers;
+        if (bossId === "grex" && p)
+          for (const e of p.burnt ?? []) {
+            const key = `${e.turn}:${e.square}`;
+            if (burnSeen.has(key) || !(e.piece || e.charred || e.fizzled)) continue;
+            burnSeen.add(key);
+            if (e.charred) grex.charred++;
+            else if (e.fizzled) grex.fizzled++;
+            else {
+              grex[e.hits ? "candleBurnt" : "sparkBurnt"]++;
+              grex.lost += ({ p: 1, n: 3, b: 3, r: 5, q: 9 } as Record<string, number>)[e.piece!] ?? 0;
+            }
+          }
+        if (bossId === "bigboy" && p) {
+          bigboy.tallest = Math.max(bigboy.tallest, p.tower?.height ?? 0);
+          const sc = p.scatter;
+          const key = sc && `${sc.at}:${sc.from}:${sc.by}`;
+          if (sc && key && !toppleSeen.has(key)) {
+            toppleSeen.add(key);
+            bigboy.topples.push({ at: sc.at, by: sc.by === "crowd" ? "crowd" : sc.height < BOSS_POWERS.towerMax ? "piece" : "self", height: sc.height, blocks: sc.squares.length });
+          }
+        }
+        if (!p || p.turn === seen) return;
+        seen = p.turn;
+        if (bossId === "bigboy" && (p.tower || p.scatter) && !runner.bossToMove()) {
+          bigboy.toyTurns++;
+          if (runner.crowdAllowed()) bigboy.limitedTurns++;
+        }
+        for (const e of p.events) if (ULT_EVENTS.has(e.kind)) ults.push({ kind: e.kind, turn: e.turn });
+        for (const e of p.events) if ((e.kind as string) === "darkBlock") hollow.blocks.push({ turn: e.turn, size: (e as { size?: number }).size ?? 2, squares: e.squares?.length ?? 0 });
+      };
+      look();
+      let struck = 0;
+      let result: string | null = null;
+      // (Alfil: his casts, the fusions they came to (or the crowd's counters), his slams: each lift's swing and the ones weighed.)
+      // (And the landing guard: each move of his it judged with the Slam's pieces down, and each fusion weighed that way.)
+      const alfil = { casts: 0, fused: 0, taken: 0, nowhere: 0, gains: [] as number[], slams: [] as { at: number; n: number; loss: number | null; weighed: (number | "mate")[] }[], early: 0, counters: [] as number[], landing: [] as { at: number; pick: string; move: string; searched: number; ms: number }[], fuseLanding: 0, waits: [] as { at: number; gain: number }[] };
+      // (The hopper: his hops (after which crowd move, the pawn's squares, how many he could choose from), his turns with
+      // a pawn of his nose to nose with one of the crowd's, and each such pawn that couldn't hop, by why: hopOptions's
+      // reasons, and `cap` once his hops are spent.)
+      const hopper = { max: BOSS_POWERS.hopMax, hops: [] as { at: number; from: string; over: string; to: string; of: number }[], noseTurns: 0, refused: {} as Record<string, number> };
+      // (Their Carrot Patch: the cast, each carrot's lead for him and fewest moves each side as it saw them, the pulls,
+      // the end, the spin, and his race brain's looks: how many, how many changed his move, his last carrots taken.)
+      const castAt = patch.cast ? patch.cast[0] + Math.floor(mulberry32(seed * 31 + g)() * (patch.cast[1] - patch.cast[0] + 1)) : null;
+      const carrots = {
+        forced: castAt,
+        cast: null as null | { at: number; squares: string[]; leads: number[]; his: number[]; crowd: number[] },
+        pulls: [] as { square: string; by: string; at: number; hop?: true }[],
+        over: null as string | null,
+        his: 0,
+        crowd: 0,
+        spin: null as unknown,
+        brain: { looks: 0, changed: 0, won: 0, ms: 0 },
+        // (The pass guard: each turn the cast waited, after which crowd move.)
+        waits: [] as number[],
+      };
+      // (Smudgy: every Repaint tried, and the turns none fitted.)
+      const smudgy = { repaints: [] as { at: number; of: number; gain: number; pawn: string; piece: string; gains: number[] }[], waits: [] as { at: number; of: number; gains: number[] }[] };
+      // (The hippo gardener: every watering (after which crowd move, the seeds and their rolls, what came up, his gain by the
+      // engine, the positions searched and the time, his own pieces eaten, the jackpot) and every one that waited.)
+      const garden = {
+        pickSec,
+        waterings: [] as { at: number; seeds: number; rolled: Record<string, number>; placed: Record<string, number>; dropped: Record<string, number>; gain: number | null; looks: number; ms: number; own: number; jackpot: boolean }[],
+        waits: [] as { at: number; seeds: number; gain: number | null; answer: string }[],
+        plants: 0,
+      };
+      // (The circus tiger: every balloon's end, every cast and the turns it waited, the walls against the crowd's best move.)
+      const tiger = {
+        pickSec,
+        balloons: [] as { at: number; shape: string; outcome: string; nine: boolean; gain: number | null; inBand: boolean | null }[],
+        placed: 0,
+        casts: [] as { at: number; blocks: string[]; gain: number | null; ms: number }[],
+        waits: [] as { at: number; check: boolean }[],
+        walled: { turns: 0, changed: 0 },
+      };
+      const tigerBalloon = () => {
+        const last = runner.boss!.powers?.balloon?.last;
+        if (!last || tiger.balloons.some((x) => x.at === last.at)) return;
+        const band = BOSS_POWERS.balloonBands[last.shape];
+        tiger.balloons.push({ at: last.at, shape: last.shape, outcome: last.outcome, nine: !!last.nine, gain: last.gain, inBand: last.gain === null ? null : last.gain >= band[0] && last.gain <= band[1] });
+      };
+      // (Dash: the player's bank (the sim's own, as the player thinks: the bots' banks are theirs), his slaps, the scrambles, the
+      // moves the player ran out of time on (a random one played) and how many of them were scrambled.)
+      const timeRng = mulberry32(seed * 15485863 + g);
+      const lognormal = (median: number, spread: number) => {
+        const u = Math.max(1e-9, timeRng());
+        const v = timeRng();
+        return median * Math.exp(spread * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
+      };
+      const dash = { pickSec, rushSec: patch.rushSec ?? 2.2, bankMs: BOSS_CLOCK.bankSeconds * 1000, minBankMs: BOSS_CLOCK.bankSeconds * 1000, slaps: 0, stolenMs: 0, scrambles: 0, scrambled: 0, flags: 0, scrambleFlags: 0, slapSeen: -1 };
+      // (Chandy: each lock (after which crowd move, its square), each upgrade (after which crowd move), the moves his meter fired,
+      // each queen lock aimed (or the turn it waited) and its shot, and each Dodge's rounds.)
+      // (Nov 24, run H: the hunt. `hunt`: each of his ordinary moves with a hunting lock up: the locks, his legal captures of them and
+      // the best one's net by the exchange check (pawns), whether one was in his top lockLines lines and within takeMargin there, the
+      // best capture's loss against his best move by the engine (pawns), whether his move took one or attacked one it didn't before.
+      // `crowd`: each crowd move with a hunting lock he could win (a capture netting him material): the piece moved away, guarded so it
+      // can't be won, or left. `ended`: each lock as it went: taken (an upgrade), shot, too old (liveTurns) or escaped (past its hunt and
+      // not gettable), and the first captures' marks (`first`). `heeds`: the heeding crowd's picks (patch.heed).)
+      const chandy = { locks: [] as { at: number; square: string; first?: true }[], upgrades: [] as number[], fired: [] as { at: number; move: string }[], aims: [] as number[], aimWaits: [] as number[], shots: [] as { at: number; piece: string | null; square?: string | null }[], dodges: [] as { at: number; rounds: number; hit: boolean; hits: number; won: boolean; random: number; last: boolean; upgrades: number }[], hunt: [] as { at: number; locks: number; caps: number; net: number | null; inLines: boolean; inMargin: boolean; capLoss: number | null; took: boolean; chased: boolean }[], crowd: { moved: 0, guarded: 0, left: 0 }, ended: { taken: 0, shot: 0, old: 0, escaped: 0, first: 0 }, heeds: [] as { at: number; kind: string; cost: number | null }[] };
+      const chandySeen = new Set<string>();
+      // (Every lock seen, by when it came (`at`, his move count), and those his moves took.)
+      const liveLocks = new Map<number, string>();
+      const takenLocks = new Set<number>();
+      const shotSquares = new Set<string>();
+      const CHANDY_FIRED: Record<string, string> = { scatterShot: "scatter", beam: "beam", shields: "shields", rapidFire: "rapidfire", queenAim: "queenlock" };
+      const chandyLook = () => {
+        const p = runner.boss?.powers;
+        const c = p?.chandy;
+        if (!p || !c) return;
+        while (chandy.upgrades.length < c.upgrades) chandy.upgrades.push(runner.boss!.crowdMoves);
+        for (const e of p.events) {
+          const key = `${e.kind}@${e.turn}@${e.square ?? ""}`;
+          if (chandySeen.has(key)) continue;
+          chandySeen.add(key);
+          if (e.kind === "lockOn") chandy.locks.push({ at: e.turn, square: e.square ?? "", ...(e.first ? { first: true as const } : {}) });
+          else if (CHANDY_FIRED[e.kind]) chandy.fired.push({ at: e.turn, move: CHANDY_FIRED[e.kind]! });
+          else if (e.kind === "queenShot") {
+            chandy.shots.push({ at: e.turn, piece: (e as { shape?: string }).shape ?? null, square: (e as { shape?: string }).shape ? (e.square ?? null) : null });
+            if ((e as { shape?: string }).shape && e.square) shotSquares.add(`${e.turn}:${e.square}`);
+          }
+        }
+        // (The locks that went since the last look, and why.)
+        const now = new Set(c.locks.map((l) => l.at));
+        for (const [at, sq] of liveLocks) {
+          if (now.has(at)) continue;
+          liveLocks.delete(at);
+          if (takenLocks.has(at)) chandy.ended.taken++;
+          else if (chandy.locks.find((l) => l.at === at || l.square === sq)?.first && !c.taught) chandy.ended.first++;
+          else if ([...shotSquares].some((k) => k.endsWith(`:${sq}`))) chandy.ended.shot++;
+          else if (lockAge(c, { at }) >= BOSS_POWERS.chandy.liveTurns) chandy.ended.old++;
+          else chandy.ended.escaped++;
+        }
+        for (const l of c.locks) liveLocks.set(l.at, l.square);
+      };
+      /** Chandy's locks now with what they're on (the crowd's pieces only). */
+      const chandyLocks = () => (runner.boss?.powers?.chandy?.locks ?? []).map((l) => ({ ...l }));
+      const boardFen = () => runner.boards.get(runner.state.boards[0]!)!.fen;
+      // (Birdie: each warning (after which crowd move, the piece), each ride (smashed, spared, missed: the piece saved, or your king), his
+      // fall, and the material he had lost by then.)
+      const birdie = { warns: [] as { at: number; piece: string }[], rides: [] as { at: number; piece: string; spared?: true; king?: true; missed?: true }[], fell: null as number | null, lostAtFall: null as number | null };
+      const birdieLook = () => {
+        const bd = runner.boss?.powers?.birdie;
+        if (!bd) return;
+        if (bd.warn && !birdie.warns.some((w) => w.at === bd.warn!.turn)) birdie.warns.push({ at: bd.warn.turn, piece: bd.warn.piece });
+        if (bd.ride && !birdie.rides.some((x) => x.at === bd.ride!.at)) birdie.rides.push({ at: bd.ride.at, piece: bd.ride.piece, ...(bd.ride.spared ? { spared: true as const } : {}), ...(bd.ride.king ? { king: true as const } : {}), ...(bd.ride.missed ? { missed: true as const } : {}) });
+        if (bd.fell && birdie.fell === null) {
+          birdie.fell = runner.boss!.crowdMoves;
+          ults.push({ kind: "fall", turn: runner.boss!.crowdMoves });
+          // (As his fall counted it: the most he'd lost, the crowd's capture that brought it included.)
+          const p = runner.boss!.powers!;
+          birdie.lostAtFall = Math.max(p.lost, p.material - materialOf(runner.boards.get(runner.state.boards[0]!)!.fen, runner.boss!.crowdSide === "w" ? "b" : "w"));
+        }
+      };
+      // (Timber: every drop and every Gnaw, and his bonus scraps.)
+      const timber = { drops: [] as { at: number; piece: string; square: string }[], gnaws: [] as { at: number; square: string | null }[], bonus: 0 };
+      const timberLook = () => {
+        const w = runner.boss!.powers?.workshop;
+        if (!w) return;
+        if (w.last && !timber.drops.some((x) => x.at === w.last!.at)) timber.drops.push({ ...w.last });
+        if (w.gnaw && !timber.gnaws.some((x) => x.at === w.gnaw!.at)) {
+          timber.gnaws.push({ at: w.gnaw.at, square: w.gnaw.square });
+          ults.push({ kind: "gnaw", turn: w.gnaw.at });
+        }
+        if (w.bonus && w.bonus.at === runner.boss!.crowdMoves) timber.bonus += w.bonus.scraps;
+      };
+      // (Don Dough: the squashes the crowd's squash rule played, with what they cost.)
+      const zebraPlans: { at: number; piece: string; cost: number }[] = [];
+      // (Moo & Moon: his beams, each flurry's size, each Full Moon with the crowd's material lead as it came and after it.)
+      const moo = { beams: 0, flurries: [] as number[], moons: [] as { at: number; before: number; after: number | null }[], best: 0 };
+      const lead = () => {
+        const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+        const crowd = runner.boss!.crowdSide;
+        return materialOf(fen, crowd) - materialOf(fen, crowd === "w" ? "b" : "w");
+      };
+      /** Hollow's dark for the player (patch.darkMiss): true when the bulbs ran out (the battle is over). */
+      const hollowDark = async (): Promise<boolean> => {
+        const picks = await runner.planBotPicks();
+        const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+        const dark = darkSquares(runner.boss);
+        for (const pl of runner.alive()) {
+          const move = picks.get(pl.id);
+          if (!move || !touchesDark(move, dark, fen)) continue;
+          hollow.darkTurns++;
+          while (darkRng() < patch.darkMiss!) {
+            const wrong = wrongDarkTry(fen, dark);
+            if (!wrong) break;
+            const out = runner.darkTry(pl.id, wrong) as { kind: string; out?: boolean; bulbs?: number; forced?: boolean; blackout?: boolean };
+            if (out.kind !== "wrong") break;
+            hollow.wrong++;
+            hollow.bulbsOut = out.bulbs ?? hollow.bulbsOut;
+            if (out.blackout) {
+              hollow.blackout = runner.boss!.crowdMoves;
+              return true;
+            }
+            if (out.forced) {
+              const forced = await runner.playDarkForced(engines[0]);
+              (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, forced);
+              const [best] = await engines[0]!.topMoves(fen, 1);
+              const both = best ? await engines[0]!.scoreMoves(fen, [best.move, forced]) : [];
+              const b = both.find((m) => m.move === best?.move)?.expected;
+              const f = both.find((m) => m.move === forced)?.expected;
+              hollow.forced.push({ at: runner.boss!.crowdMoves, move: forced, loss: b === undefined || f === undefined ? null : Math.round(Math.max(0, b - f) * 1000) / 10 });
+              break;
+            }
+            if (out.out) break;
+          }
+        }
+        return false;
+      };
+      const t0 = Date.now();
+      while (!runner.isOver()) {
+        if (bossId === "chandy") chandyLook();
+        if (bossId === "birdie") birdieLook();
+        if (runner.stageComplete()) {
+          result = runner.finishBossBattle();
+          break;
+        }
+        if (runner.bossToMove()) {
+          if (bossId === "chandy" && runner.queenLockDue()) {
+            // (Chandy's queen lock: his whole turn, unless the pass guard has it wait: then his move.)
+            const at = runner.boss!.crowdMoves;
+            await runner.playQueenLock(engines).catch(() => runner.applyQueenLock(null));
+            (runner.bossToMove() ? chandy.aimWaits : chandy.aims).push(at);
+            chandyLook();
+          }
+          if (runner.lightsOutDue()) {
+            ults.push({ kind: "lightsout", turn: runner.boss!.crowdMoves });
+            runner.startLightsOut();
+            runner.finishLightsOut({});
+          }
+          if (runner.bounceDue()) {
+            ults.push({ kind: "bounce", turn: runner.boss!.crowdMoves });
+            await runner.playBounce(engines).catch(() => runner.applyBounce(null));
+          }
+          for (let step = runner.alfilStep(); step; step = runner.alfilStep()) {
+            if (step === "slam") {
+              // (Every Slam tried is logged; one that lifts nothing keeps the meter and comes again on his next turn, so
+              // only one that lifts counts as an ultimate.)
+              const at = runner.boss!.crowdMoves;
+              const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+              const scored = await slamScores(engines, fen, runner.alfilCandidates());
+              const pick = scored ? pickSlam(scored.before, scored.outs) : null;
+              const lifted = runner.applyAlfil(pick?.fen ?? null, pick?.loss ?? null, step);
+              const p = runner.boss!.powers!;
+              if (lifted) ults.push({ kind: "slam", turn: at });
+              alfil.slams.push({ at, n: lifted ? p.slam!.pieces.length : 0, loss: lifted ? p.slam!.loss : null, weighed: (scored?.outs ?? []).map((o) => (o.mate ? "mate" : Math.round(slamPawnsLost(scored!.before, o.crowd) * 100) / 100)) });
+              continue;
+            }
+            if (step === "tusks") alfil.casts++;
+            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const ahead = runner.alfilFusionAhead();
+            if (ahead) alfil.fuseLanding++;
+            const pick = await fuseFrom(engines, fen, runner.alfilCandidates(), undefined, ahead);
+            // (His fusion spends his whole turn: the pass guard may have it wait, logged with what it would have cost.)
+            const answer = step === "fuse" ? passAnswer(pick) : (pick?.fen ?? null);
+            if (answer === PASS_WAIT) alfil.waits.push({ at: runner.boss!.crowdMoves, gain: pick!.gain });
+            runner.applyAlfil(answer, null, step);
+            const f = runner.boss!.powers!.fusion;
+            if (step === "fuse" && answer !== PASS_WAIT) f?.to ? alfil.fused++ : alfil.nowhere++;
+            if (step === "fuse" && answer !== PASS_WAIT && f?.to && pick) alfil.gains.push(pick.gain);
+          }
+          if (bossId === "hopper" && runner.carrotDue()) {
+            // (The Carrot Patch's cast: his whole turn, unless the pass guard has it wait: then his turn goes on.)
+            const at = runner.boss!.crowdMoves;
+            const before = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const passed = passTurn(before)!;
+            const spots = carrotSpots(passed, runner.boss!.crowdSide);
+            const answer = await castAnswer(engines, before);
+            runner.applyCarrots(answer);
+            const c = runner.boss!.powers!.carrots;
+            if (!c) {
+              carrots.waits.push(at);
+              continue;
+            }
+            const spot = (sq: string) => spots.find((x) => x.square === sq)!;
+            const round = (x: number) => (Number.isFinite(x) ? Math.round(x * 1000) / 1000 : -1);
+            carrots.cast = { at, squares: c.squares, leads: c.squares.map((sq) => spot(sq).lead), his: c.squares.map((sq) => round(spot(sq).his)), crowd: c.squares.map((sq) => round(spot(sq).crowd)) };
+            ults.push({ kind: "carrots", turn: at });
+            look();
+            continue;
+          }
+          if (bossId === "smudgy" && runner.repaintDue()) {
+            // (His Repaint: his whole turn, unless no pair fits the band: then his move.)
+            const at = runner.boss!.crowdMoves;
+            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const candidates = runner.repaintCandidates();
+            // (repaintFrom's own steps, every pair's gain kept for the log.)
+            const scores = (await passScores(engines, fen, candidates, BOSS_POWERS.repaintNodes)) ?? [];
+            const gains = scores.map((x) => Math.round(x.gain * 100) / 100).sort((a, b) => a - b);
+            const pick = repaintPick(scores, runner.repaintAny());
+            const done = runner.applyRepaint(pick?.fen ?? null, pick?.gain ?? null);
+            if (done) {
+              smudgy.repaints.push({ at, of: candidates.length, gain: pick!.gain, pawn: done.pawn, piece: done.piece, gains });
+              ults.push({ kind: "repaint", turn: at });
+              look();
+              continue;
+            }
+            smudgy.waits.push({ at, of: candidates.length, gains });
+          }
+          if (bossId === "gardener" && runner.waterDue()) {
+            // (His watering: his whole turn, unless the pass guard has it wait (or no answer): then his move.)
+            const at = runner.boss!.crowdMoves;
+            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const ask = runner.waterAsk()!;
+            const tw = Date.now();
+            const { answer, pick } = await waterAnswer(engines, fen, ask, runner.waterAny());
+            const ms = Date.now() - tw;
+            const done = runner.applyWater(answer, pick?.gain ?? null);
+            const tally = (ks: readonly string[]) => ks.reduce<Record<string, number>>((t, k) => ((t[k] = (t[k] ?? 0) + 1), t), {});
+            if (done) {
+              garden.waterings.push({
+                at,
+                seeds: done.seeds,
+                rolled: tally(done.rolled),
+                placed: tally(done.growth.map((x) => x.kind)),
+                dropped: tally(done.growth.flatMap((x) => (x.dropped ? [x.dropped] : []))),
+                gain: done.gain,
+                looks: pick?.looks ?? 0,
+                ms,
+                own: done.growth.filter((x) => x.own).length,
+                jackpot: !!done.jackpot,
+              });
+              garden.plants += done.growth.filter((x) => x.kind === "plant").length;
+              ults.push({ kind: "water", turn: at });
+              look();
+              continue;
+            }
+            garden.waits.push({ at, seeds: ask.kinds.length, gain: pick?.gain ?? null, answer: answer === PASS_WAIT ? "wait" : answer || "none" });
+          }
+          if (bossId === "hopper") {
+            const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+            const his = runner.boss!.crowdSide === "w" ? "b" : "w";
+            const race = runner.boss!.powers!.carrots;
+            const { options, refused } = hopOptions(fen, his, raceOn(race) ? { open: carrotsOpen(race), his: carrotsOf(race, "boss") } : null);
+            if (options.length || refused.length) hopper.noseTurns++;
+            const spent = (runner.boss!.powers!.hops ?? 0) >= BOSS_POWERS.hopMax;
+            for (const r of refused) hopper.refused[r.why] = (hopper.refused[r.why] ?? 0) + 1;
+            if (spent) hopper.refused.cap = (hopper.refused.cap ?? 0) + options.length;
+            if (runner.hopDue()) {
+              const candidates = runner.hopCandidates();
+              const pick = candidates.length > 1 ? await hopFrom(engines, fen, candidates) : null;
+              const h = runner.applyHop(pick?.fen ?? null)!;
+              // (Their Pawn Bounce comes first when due: one a turn. Not a hop.)
+              if (isHop(h)) hopper.hops.push({ at: h.at, from: h.from, over: h.over, to: h.to, of: candidates.length });
+            }
+          }
+          // (Alfil's fusion is his move: then his turn is over.)
+          if (runner.bossToMove()) {
+            const at = runner.boss!.crowdMoves;
+            // (Moo: his Full Moon came as the crowd's move landed; his move at full strength.)
+            if (bossId === "moo" && runner.boss!.powers?.moo?.full?.at === at && !moo.moons.some((m) => m.at === at)) {
+              moo.moons.push({ at, before: lead(), after: null });
+              ults.push({ kind: "fullMoon", turn: at });
+            }
+            if (bossId === "moo" && runner.bossBestReply() && !runner.boss!.staggerNext) moo.best++;
+            // (The circus tiger's hoops come after his move, with it: asked with it, cast at its end.)
+            const hoopsAsked = bossId === "tiger" && !!runner.hoopsAsk();
+            const ultsBefore = runner.boss!.powers?.ults ?? 0;
+            const tw = Date.now();
+            // (Chandy's hunt: what his move could do with the hunting locks up, before it, and what it did.)
+            const huntLocks = bossId === "chandy" ? runner.bossLocks() : null;
+            const locksBefore = bossId === "chandy" ? chandyLocks() : [];
+            const fen0 = boardFen();
+            const ply0 = runner.boards.get(runner.state.boards[0]!)!.history.length;
+            let huntRow: (typeof chandy.hunt)[number] | null = null;
+            if (huntLocks) {
+              const ok = runner.bossAllowed() ?? legalMoves(fen0);
+              const caps = ok.filter((m) => huntLocks.includes(capturedSquare(fen0, m) ?? ""));
+              const top = (await engines[0]!.topMoves(fen0, 8)).filter((m) => ok.includes(m.move)).sort((a, b) => b.expected - a.expected);
+              const lines = top.slice(0, BOSS_POWERS.chandy.lockLines);
+              const best = top[0]?.expected;
+              const loss = (e: number) => (best === undefined ? null : Math.round(Math.max(0, slamPawnsLost(best, e)) * 100) / 100);
+              const capScores = caps.length ? await engines[0]!.scoreMoves(fen0, caps) : [];
+              const nets = caps.map((m) => exchangeNet(fen0, m)).filter((x): x is number => x !== null);
+              const losses = capScores.map((m) => loss(m.expected)).filter((x): x is number => x !== null);
+              huntRow = { at: runner.boss!.crowdMoves, locks: huntLocks.length, caps: caps.length, net: nets.length ? Math.max(...nets) : null, inLines: lines.some((m) => caps.includes(m.move)), inMargin: lines.some((m) => caps.includes(m.move) && (loss(m.expected) ?? 99) <= BOSS_POWERS.chandy.takeMargin), capLoss: losses.length ? Math.min(...losses) : null, took: false, chased: false };
+            }
+            // (Chandy's first capture: its lock is marked as his move is about to show, so it's looked at then, as solo shows it.)
+            await runner.playBoss(engines[0], bossId === "chandy" ? async () => chandyLook() : undefined);
+            if (bossId === "chandy") {
+              const hist = runner.boards.get(runner.state.boards[0]!)!.history;
+              const mv = hist.length > ply0 ? hist[ply0]! : null;
+              const took = mv ? capturedSquare(fen0, mv) : null;
+              for (const l of [...locksBefore, ...chandyLocks()]) if (took && l.square === took) takenLocks.add(l.at);
+              if (huntRow && huntLocks && mv) {
+                const his = runner.boss!.crowdSide === "w" ? "b" : "w";
+                const before = attackedSquares(fen0, his);
+                const after = attackedSquares(applyMove(fen0, mv), his);
+                huntRow.took = !!took && huntLocks.includes(took);
+                huntRow.chased = huntLocks.some((sq) => !before.has(sq) && after.has(sq));
+                chandy.hunt.push(huntRow);
+              }
+              chandyLook();
+            }
+            if (bossId === "timber") timberLook();
+            if (bossId === "dash") {
+              const slap = runner.boss!.powers?.dash?.slap;
+              if (slap && slap.at === runner.boss!.crowdMoves && slap.at !== dash.slapSeen) {
+                dash.slapSeen = slap.at;
+                dash.slaps++;
+                const ms = Math.min(dash.bankMs, BOSS_POWERS.slapBankSeconds * 1000);
+                dash.bankMs -= ms;
+                dash.stolenMs += ms;
+                dash.minBankMs = Math.min(dash.minBankMs, dash.bankMs);
+              }
+            }
+            if (bossId === "tiger") {
+              tigerBalloon();
+              const h = runner.boss!.powers?.hoops;
+              if ((runner.boss!.powers?.ults ?? 0) > ultsBefore && h) {
+                tiger.casts.push({ at, blocks: h.blocks, gain: h.gain, ms: Date.now() - tw });
+                ults.push({ kind: "hoops", turn: at });
+              } else if (hoopsAsked) tiger.waits.push({ at, check: inCheck(runner.boards.get(runner.state.boards[0]!)!.fen) });
+            }
+            if (bossId === "moo") {
+              const m = runner.boss!.powers?.moo;
+              if (m?.stun?.flurry) moo.flurries.push(m.stun.squares.length);
+              else if (m?.stun) moo.beams++;
+              if (runner.boss!.powers?.events.some((e) => e.kind === "dazed") && moo.moons.length) moo.moons[moo.moons.length - 1]!.after = lead();
+            }
+            const c = runner.landingCheck;
+            if (c) alfil.landing.push({ at, pick: c.pick, move: c.move, searched: c.searched, ms: Math.round(c.ms) });
+            const rc = runner.raceCheck;
+            if (rc) {
+              carrots.brain.looks++;
+              if (rc.move !== rc.pick) carrots.brain.changed++;
+              if (rc.won) carrots.brain.won++;
+              carrots.brain.ms += Math.round(rc.ms);
+            }
+          }
+          // (A forced cast: once the race and his spin are over, or the battle his by his last carrot, the sample is in.)
+          const done = runner.boss!.powers?.carrots;
+          if (castAt !== null && done && (done.spin || done.over === "won")) break;
+          look();
+          continue;
+        }
+        // (Chandy's Dodge, as the crowd's turn begins: the bots' votes, round by round; the second hit ends the battle.)
+        if (runner.dodgeDue()) {
+          const p0 = runner.boss!.powers!;
+          const d0 = p0.chandy!.dodge!;
+          ults.push({ kind: "dodge", turn: runner.boss!.crowdMoves });
+          while (runner.dodgeDue()) runner.finishDodgeRound({});
+          const d = runner.boss!.powers!.chandy!.dodge!;
+          // (`last`: the last chance, the crowd's mate in one, warned and come on one turn.)
+          const hits = d.results.filter((r) => r.hit).length;
+          chandy.dodges.push({ at: d0.at, rounds: d.results.length, hit: hits > 0, hits, won: hits >= BOSS_POWERS.chandy.dodgeHits, random: d.results.filter((r) => r.random).length, last: p0.warnAt === p0.ultAt, upgrades: p0.chandy!.upgrades });
+          continue;
+        }
+        if (runner.extraMoveDue()) {
+          await runner.playExtraMove(engines[0]);
+          continue;
+        }
+        if (runner.funhouseDue()) {
+          ults.push({ kind: "funhouse", turn: runner.boss!.crowdMoves + 1 });
+          await runner.playFunhouse(engines[0]);
+          continue;
+        }
+        runner.deal();
+        // (A forced Carrot Patch: the admins' trigger, as this crowd turn begins: the cast at the start of his turn after it.)
+        if (castAt !== null && bossId === "hopper" && runner.boss!.crowdMoves + 1 === castAt && !runner.boss!.powers?.carrots) runner.triggerUltimate();
+        // (Alfil's marked pawns: a crowd that knows the rule takes one when it's cheap enough: patch.counter.)
+        if (patch.counter !== undefined && bossId === "alfil") {
+          const cost = await counterTusks(runner, engines[0]!, patch.counter);
+          if (cost !== null) alfil.counters.push(cost);
+        }
+        // (The crowd calls the God King's strike: bots call until more than half of the crowd has.)
+        if (strikeTurns.has(runner.boss!.crowdMoves + 1) && (runner.boss!.kingCharges ?? 0) > 0) {
+          for (const p of runner.alive()) {
+            if (runner.callStrike(p.id).struck) {
+              struck++;
+              break;
+            }
+          }
+        }
+        // (Don Dough's dough: a crowd that knows the rule squashes a lump when it's cheap enough: patch.squash.)
+        if (patch.squash !== undefined && bossId === "zebra") {
+          const plan = await squashDough(runner, engines[0]!, patch.squash);
+          if (plan) zebraPlans.push({ at: runner.boss!.crowdMoves + 1, ...plan });
+        }
+        // (The circus tiger's walls: does the engine's best move for the crowd cross one?)
+        if (bossId === "tiger" && runner.boss!.powers?.hoops) {
+          const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+          const allowed = runner.crowdAllowed();
+          const [best] = await engines[0]!.topMoves(fen, 1);
+          tiger.walled.turns++;
+          if (best && allowed && !allowed.includes(best.move)) tiger.walled.changed++;
+        }
+        if (bossId === "folio") {
+          const p = runner.boss!.powers!;
+          const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+          const round = (x: number | null | undefined) => (x === null || x === undefined ? null : Math.round(x * 100) / 100);
+          if (p.crease && p.crease.at === p.turn && p.events.some((e) => e.kind === "crease")) creases.push({ at: p.turn, line: p.crease.line, loss: round(await creaseCost(engines[0]!, fen, p.crease.line)), warned: round(p.crease.loss) });
+          else if (!p.crease && p.ultAt === p.turn && p.events.some((e) => e.kind === "creaseEnd")) creasesOff.push(p.turn);
+        }
+        // (Chandy: a crowd that heeds his crosshairs, as a person does (patch.heed); and what the crowd's move did to the hunting locks.)
+        let heeded = false;
+        if (patch.heed !== undefined && bossId === "chandy") {
+          const h = await heedChandy(runner, engines[0]!, patch.heed);
+          if (h) chandy.heeds.push({ at: runner.boss!.crowdMoves + 1, ...h });
+          heeded = !!h && h.cost !== null;
+        }
+        if (patch.best && !heeded) {
+          const fen = boardFen();
+          const ok = runner.crowdAllowed() ?? legalMoves(fen);
+          const top = (await engines[0]!.topMoves(fen, 8)).filter((m) => ok.includes(m.move)).sort((a, b) => b.expected - a.expected)[0];
+          if (top) for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, top.move);
+        }
+        const crowdFen = bossId === "chandy" ? boardFen() : "";
+        const crowdPly = runner.boards.get(runner.state.boards[0]!)!.history.length;
+        const crowdLocks = bossId === "chandy" && runner.boss!.powers?.chandy?.taught ? chandyLocks().filter((l) => pieceAt(crowdFen, l.square)?.color === runner.boss!.crowdSide) : [];
+        const passed = crowdLocks.length ? passTurn(crowdFen) : null;
+        const winnable = passed ? crowdLocks.filter((l) => (bestNetOn(passed, l.square) ?? 0) > 0) : [];
+        const tusksBefore = runner.boss!.powers?.tusks;
+        // (The sim's clock: this crowd turn's moments, the crowd's pick, the reveal, then his turn.)
+        clockMs += powerMomentMs(runner.boss!.powers?.events) + (pickSec + (s.revealSeconds ?? 0) + GARDEN_TURN_SEC) * 1000;
+        if (bossId === "dash") {
+          // (The player's time on this move against what it has: the bank and the increment, or the scramble's 3 s.)
+          const p = runner.boss!.powers!;
+          const scrambled = scrambleOn(p, runner.boss!.crowdMoves + 1);
+          if (scrambled) dash.scrambled++;
+          if (p.events.some((e) => e.kind === "scramble")) dash.scrambles++;
+          const allowed = Math.min(runner.moveClock() * 1000, dash.bankMs + BOSS_CLOCK.incrementSeconds * 1000);
+          const think = (scrambled ? lognormal(dash.rushSec, 0.35) : lognormal(pickSec, 0.6)) * 1000;
+          dash.bankMs = Math.max(0, dash.bankMs + BOSS_CLOCK.incrementSeconds * 1000 - Math.min(think, allowed));
+          dash.minBankMs = Math.min(dash.minBankMs, dash.bankMs);
+          if (think > allowed) {
+            // (Out of time: nobody picked; his rules play a random legal move for the crowd.)
+            dash.flags++;
+            if (scrambled) dash.scrambleFlags++;
+            const id = runner.state.boards[0]!;
+            const ids = runner.groups.get(id)!;
+            const top = await runner.topMovesFor(runner.boards.get(id)!.fen);
+            const evaluation = { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter: Object.fromEntries(top.map((m) => [m.move, m.expected])) };
+            const round = runner.resolveBoard(id, ids, Object.fromEntries(ids.map((x) => [x, null])), evaluation);
+            runner.finishRound([round], Object.fromEntries(ids.map((x) => [x, allowed])));
+          } else await runner.score(new Map());
+        } else {
+          // (Hollow, a player in the dark: wrong tries before the pick; a forced move played for them; the blackout ends it.)
+          if (patch.darkMiss && bossId === "hollow" && (await hollowDark())) continue;
+          await runner.score(new Map());
+        }
+        if (bossId === "chandy" && winnable.length) {
+          const mv = runner.boards.get(runner.state.boards[0]!)!.history[crowdPly];
+          if (mv)
+            for (const l of winnable) {
+              if (mv.slice(0, 2) === l.square) chandy.crowd.moved++;
+              else if (!((bestNetOn(applyMove(crowdFen, mv), l.square) ?? 0) > 0)) chandy.crowd.guarded++;
+              else chandy.crowd.left++;
+            }
+        }
+        if (bossId === "chandy") chandyLook();
+        if (bossId === "birdie") birdieLook();
+        if (tusksBefore && runner.boss!.powers?.fusion?.why === "taken" && runner.boss!.powers.fusion.at === runner.boss!.crowdMoves) alfil.taken++;
+        if (runner.boss!.powers?.landed?.early && runner.boss!.powers.landed.at === runner.boss!.crowdMoves) alfil.early++;
+        if (runner.bossKillDue()) runner.bossKill();
+      }
+      const b = runner.boss!;
+      const pc = b.powers?.carrots;
+      if (pc) Object.assign(carrots, { pulls: pc.pulls, over: pc.over ?? null, his: carrotsOf(pc, "boss"), crowd: carrotsOf(pc, "crowd"), spin: pc.spin ?? null });
+      const camo = b.powers?.camo;
+      const camoRow = camo ? { side: camo.side, missed: camo.missed, off: !!camo.off, swap: camo.swap ?? null, reveal: camo.reveal ?? null, hidden: camo.square, strikeAfter: camo.swap && camo.reveal ? camo.reveal.at - camo.swap.at : null } : null;
+      // (Folio: its marks, folds and marks answered in time; every Crease; its Revision, what its move cost it and what the crowd's reply would have won.)
+      const fo = b.powers?.folio;
+      const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, creasesOff, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
+      // (Don Dough: his drops, rises, squashes, the material risen, his Gold Plates.)
+      const zs = b.powers?.zebra;
+      const DV: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+      const zebraRow = zs
+        ? {
+            squash: patch.squash ?? null,
+            drops: zs.drops,
+            risen: zs.rises.reduce((t, r) => t + DV[r.piece]!, 0),
+            rises: zs.rises.map((r) => ({ at: r.at, side: r.side, piece: r.piece })),
+            squashes: zs.squashes.map((r) => ({ at: r.at, side: r.side, piece: r.piece })),
+            plans: zebraPlans,
+            left: zs.lumps.map((l) => ({ piece: l.piece, left: l.left })),
+            gilds: zs.gilds,
+            talk: zs.talk?.name ?? null,
+          }
+        : null;
+      if (zs) for (const g of zs.gilds) ults.push({ kind: "goldPlate", turn: g.at });
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "bigboy" ? { bigboy } : {}), ...(bossId === "grex" ? { grex: { ...grex, hitsToBurn: BOSS_POWERS.candleHitsToBurn } } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "birdie" ? { birdie } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
+      appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
+      console.log(JSON.stringify(row));
+    }
+  }
+  engines.forEach((e) => e.close());
+}
+
+/** The raid sims' table: ultimates per game and crowd results, by boss and run (tag). */
+function raidSummary(tags: string[]): string[] {
+  const dir = root + "reports/boss-sim";
+  type Row = { boss: string; tag: string; strikes: number; result: string; moves: number; ults: number; ultTurns: number[] };
+  const rows: Row[] = readdirSync(dir)
+    .filter((f) => f.startsWith("raid-") && tags.includes(f.slice(5, -6)))
+    .flatMap((f) => readFileSync(`${dir}/${f}`, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Row));
+  const out: string[] = [
+    "| Boss | Run | Games | Strikes a game | Ultimates a game | Games with 0 / 1 / 2 / 3+ | First at (median turn) | Crowd wins | Draws | Boss wins | Avg crowd moves |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
+  ];
+  const median = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! : "-");
+  for (const def of BOSS_ROSTER.filter((d) => d.powers)) {
+    for (const tag of tags) {
+      const rs = rows.filter((r) => r.boss === def.id && r.tag === tag);
+      if (!rs.length) continue;
+      const n = rs.length;
+      const pct = (k: string) => `${Math.round((100 * rs.filter((r) => r.result === k).length) / n)}%`;
+      const dist = [0, 1, 2].map((k) => rs.filter((r) => r.ults === k).length).concat(rs.filter((r) => r.ults >= 3).length).join(" / ");
+      const avg = (f: (r: Row) => number) => (rs.reduce((t, r) => t + f(r), 0) / n).toFixed(1);
+      out.push(`| ${def.name} | ${tag} | ${n} | ${avg((r) => r.strikes)} | ${avg((r) => r.ults)} | ${dist} | ${median(rs.filter((r) => r.ults).map((r) => r.ultTurns[0]!))} | ${pct("crowd")} | ${pct("draw")} | ${pct("boss")} | ${Math.round(rs.reduce((t, r) => t + r.moves, 0) / n)} |`);
+    }
+  }
+  console.log(out.join("\n"));
+  return out;
+}
+
+const [cmd, kind, offsets, games, seed, mode, patchArg] = process.argv.slice(2);
+if (cmd === "summary") summary();
+else if (cmd === "raid") {
+  // npx tsx packages/sim/scripts/boss-sim.ts raid <boss,ids|all> <games> <seed> <strikes> <tag>
+  const ids = !kind || kind === "all" ? BOSS_ROSTER.filter((d) => d.powers && d.kit).map((d) => d.id) : kind.split(",");
+  await raid(ids, Number(offsets ?? 4), Number(games ?? 1), Number(seed ?? 2), mode ?? "test", patchArg ? (JSON.parse(patchArg) as RaidPatch) : {});
+} else if (cmd === "raid-summary") raidSummary((kind ?? "").split(","));
+else await run(kind ?? "club", (offsets ?? "0").split(",").map(Number), Number(games ?? 4), Number(seed ?? 1), !!mode?.split(",").includes("stumble"), !!mode?.split(",").includes("snack"), !!mode?.split(",").includes("split"));

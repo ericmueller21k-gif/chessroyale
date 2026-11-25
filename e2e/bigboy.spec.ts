@@ -1,0 +1,299 @@
+import { expect, type Page } from "@playwright/test";
+import { Chess } from "chess.js";
+import { POWER_FX } from "@chessroyale/chess";
+import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
+
+/**
+ * Big Boy, the baby boss, played alone on a phone and a computer with real taps: his snack before move 1 (he waddles
+ * over and eats the crowd's d- or e-pawn), your move's knock first after a real think, his toy-block tower (TOY BLOCK!,
+ * the first block on an empty square of your half, no move dots onto it; one more block each turn; the test switch's tall
+ * tower knocked over or falling by itself, its blocks scattered, blocking a turn, then gone and a new tower), and the Big Bounce from the
+ * admins' test trigger (BIG BOUNCE!, pieces knocked into the air, the crash, every piece settling into the new position,
+ * then his move), its sounds through the mute switch. Each banner is off the board before its power plays (Oct 16).
+ */
+const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
+const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
+const soundsHeard = (p: Page) => p.evaluate(() => ((window as any).__soundLog ?? []) as string[]);
+
+async function squareAt(page: Page, square: string) {
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
+  const flip = (await page.evaluate(() => (window as any).match.boss?.crowdSide)) === "b";
+  const f = square.charCodeAt(0) - 97;
+  const r = Number(square[1]) - 1;
+  return { x: board.x + ((flip ? 7 - f : f) + 0.5) * (board.width / 8), y: board.y + ((flip ? r : 7 - r) + 0.5) * (board.height / 8) };
+}
+const tap = async (page: Page, square: string) => {
+  const q = await squareAt(page, square);
+  await page.mouse.click(q.x, q.y);
+};
+async function yourMove(page: Page) {
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
+}
+async function play(page: Page, move: string) {
+  await yourMove(page);
+  for (let i = 0; i < 5 && (await phase(page)) === "play"; i++) {
+    await tap(page, move.slice(0, 2));
+    await tap(page, move.slice(2, 4));
+    await page.waitForTimeout(300);
+  }
+  await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+}
+/** An allowed move once it's your move (the toy blocks' limits), preferring `want`; never onto his tower (that knocks it over). */
+async function allowedMove(page: Page, want: string[] = []): Promise<string> {
+  await yourMove(page);
+  const { fen, allowed, tower } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: (window as any).match.boss?.powers?.allowed as string[] | null, tower: ((window as any).match.boss?.powers?.tower?.square ?? null) as string | null }));
+  const legal = (allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""))).filter((m) => m.slice(2, 4) !== tower);
+  // (A quiet move: nothing that gives a piece away, so the battle goes on.)
+  return want.find((m) => legal.includes(m)) ?? legal.filter((m) => m.length === 4).sort()[0]!;
+}
+/** How opaque a canvas over the board is at a square's middle. */
+const covered = (page: Page, square: string, canvas: string) =>
+  squareAt(page, square).then((q) =>
+    page
+      .locator(canvas)
+      .first()
+      .evaluate((c: HTMLCanvasElement, [x, y]) => {
+        const r = c.getBoundingClientRect();
+        return c.getContext("2d")!.getImageData(Math.floor(((x! - r.left) / r.width) * c.width), Math.floor(((y! - r.top) / r.height) * c.height), 1, 1).data[3];
+      }, [q.x, q.y]),
+  );
+
+test("Big Boy's snack before move 1, your move's knock, and his tower's first block (no dots onto it), one more each turn", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=bigboy&laststand=0");
+  const snackSeen = await watchFor(page, { snack: { selector: ".pm-snack .bb-snack" }, nom: { selector: ".bc-bubble", text: /Nom nom\.|Yummy pawn!|Snack time!/ } });
+  await bossAloneFromHome(page);
+  await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
+  const boss = await page.evaluate(() => (window as any).match.boss);
+  expect(boss.name).toBe("Big Boy");
+  expect(boss.crowdSide).toBe("w");
+  expect(boss.board.history).toEqual([]);
+  const snack: string = boss.powers.snack;
+  expect(["d2", "e2"]).toContain(snack);
+  // The pawn is on the board during his card, until he grabs it.
+  await expect(page.locator(`${BOARD_SEL.piece}.white.pawn`)).toHaveCount(8);
+  await expect.poll(async () => (await snackSeen.seen()).snack, { timeout: 15_000 }).toBe(true);
+  await expect(page.locator(`${BOARD_SEL.piece}.white.pawn`)).toHaveCount(7, { timeout: 5000 });
+  await expect.poll(async () => (await snackSeen.seen()).nom, { timeout: 5000 }).toBe(true);
+  expect(new Chess(boss.board.fen).get(snack as never)).toBeFalsy();
+
+  // Move 1, after a real think: your move's knock is the first sound heard (no boss sound in its place).
+  await yourMove(page);
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  const banner = await watchFor(page, { block: { selector: ".fight-banner.power-cut", text: /TOY BLOCK!/ } });
+  // (Its banner off the board before he throws it: Eric, Oct 16, "he threw it and we couldn't even see".)
+  const order = await watchSpans(page, { banner: { selector: ".fight-banner.power-cut", text: /TOY BLOCK!/ }, flight: { selector: ".pw-flight.blockFly" } });
+  await play(page, await allowedMove(page, ["g1f3", "b1c3"]));
+  await expect.poll(async () => (await soundsHeard(page)).map((s) => s.split(":")[0]), { timeout: 10_000 }).toContain("move");
+  expect((await soundsHeard(page))[0]!.split(":")[0]).toBe("move");
+
+  // His reply; the 2nd turn begins with his toy block on an empty square of your half.
+  await expect.poll(async () => (await banner.seen()).block, { timeout: 30_000 }).toBe(true);
+  await yourMove(page);
+  const thrown = await order.spans();
+  expect(thrown.flight).not.toBeNull();
+  expect(thrown.banner!.last).toBeLessThan(thrown.flight!.first);
+  const p2 = await powers(page);
+  const sq: string = p2.tower.square;
+  expect(p2.tower.height).toBe(1);
+  expect(Number(sq[1])).toBeLessThanOrEqual(4);
+  expect(new Chess(await page.evaluate(() => (window as any).match.phase.board.fen)).get(sq as never)).toBeFalsy();
+  await expect(page.locator(`.pw-tower[data-square="${sq}"]`)).toHaveAttribute("data-height", "1");
+  // (The tower is drawn under the pieces, its block on its square.)
+  await expect(page.locator(`.bb-tower[data-square="${sq}"]`)).toHaveAttribute("data-anim", "stand1", { timeout: 5000 });
+  await expect.poll(() => covered(page, sq, ".bb-tower canvas"), { timeout: 5000 }).toBeGreaterThan(0);
+  expect(p2.allowed.some((m: string) => m.slice(2, 4) === sq)).toBe(false);
+  // A piece that could have gone there: picked up, no dot on the block.
+  const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+  // (One that has somewhere else to go, so it shows its dots.)
+  const onto = new Chess(fen).moves({ verbose: true }).find((m) => m.to === sq && p2.allowed.some((a: string) => a.startsWith(m.from)));
+  if (onto) {
+    await tap(page, onto.from);
+    await expect(page.locator(`${BOARD_SEL.square}.move-dest`).first()).toBeVisible();
+    const dots = await page.locator(`${BOARD_SEL.square}.move-dest`).count();
+    expect(dots).toBeGreaterThan(0);
+    const blocked = await squareAt(page, sq);
+    const dotsThere = await page.locator(`${BOARD_SEL.square}.move-dest`).evaluateAll(
+      (els, [x, y]) => els.filter((e) => { const r = e.getBoundingClientRect(); return x! > r.left && x! < r.right && y! > r.top && y! < r.bottom; }).length,
+      [blocked.x, blocked.y],
+    );
+    expect(dotsThere).toBe(0);
+    await tap(page, onto.from);
+  }
+  // One more block each turn (his toss, the block dropping onto the top), on the same square.
+  for (let h = 2; h <= 4; h++) {
+    await play(page, await allowedMove(page, ["h2h3", "a2a3", "h3h4", "a3a4", "b1c3", "g1f3"]));
+    await yourMove(page);
+    // (His piece may topple it too, rarely: on a turn it's open to him and his engine picks that move. Then the stacking ends here.)
+    const now = await powers(page);
+    if (!now.tower && now.scatter?.by === "boss" && h > 2) {
+      expect(now.scatter).toMatchObject({ from: sq, height: h - 1 });
+      break;
+    }
+    expect(now.tower).toMatchObject({ square: sq, height: h });
+    await expect(page.locator(`.pw-tower[data-square="${sq}"]`)).toHaveAttribute("data-height", String(h));
+    await expect(page.locator(`.bb-tower[data-square="${sq}"]`)).toHaveAttribute("data-anim", `stand${h}`, { timeout: 5000 });
+  }
+  expect(errors).toEqual([]);
+});
+
+test("Big Boy's tall tower (?power=tower): knocked over (or falling by itself), its blocks land near it and block a turn, then vanish and a new tower starts", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await asAdmin(page);
+  await page.goto("/?debug&clock=60&boss=bigboy&power=tower&laststand=0");
+  await bossAloneFromHome(page);
+  const seen = await watchFor(page, { tip: { selector: '.bb-tower[data-anim^="tip"]' }, flight: { selector: ".pm-topple .pw-flight.blockFly" } });
+  await play(page, await allowedMove(page, ["g1f3", "b1c3"]));
+  await yourMove(page);
+  const tower = (await powers(page)).tower;
+  expect(tower.height).toBe(8);
+  await expect(page.locator(`.bb-tower[data-square="${tower.square}"]`)).toHaveAttribute("data-anim", "stand8", { timeout: 5000 });
+  // Your piece onto it when one can go there (it's 2 blocks or more); else it grows to 10 and falls by itself.
+  let scatter: any = null;
+  for (let i = 0; i < 5 && !scatter; i++) {
+    await yourMove(page);
+    const p = await powers(page);
+    if (p.scatter) {
+      scatter = p.scatter;
+      break;
+    }
+    const onto = (p.allowed ?? []).filter((m: string) => m.slice(2, 4) === p.tower.square).sort();
+    if (onto.length) {
+      // (The Big Bounce on the same turn, by the admins' trigger: your topple plays out in full before it, as online.)
+      await page.locator(".ult-test").click();
+      await expect(page.locator(".ult-test")).toHaveAccessibleName("Ultimate next turn (testing)");
+      // The move dot on the tower's square shows over it (the square marks over the under-layer; review of #784): with the tower
+      // made hit-testable for a moment, the top element at the dot is the square, not the tower.
+      await tap(page, onto[0].slice(0, 2));
+      const dot = page.locator(`${BOARD_SEL.squares} square.move-dest`);
+      await expect(dot.first()).toBeVisible({ timeout: 5000 });
+      const at = await squareAt(page, p.tower.square);
+      const top = await page.evaluate(([x, y]) => {
+        const s = document.createElement("style");
+        s.textContent = ".bb-under, .bb-under * { pointer-events: auto !important; }";
+        document.head.append(s);
+        const e = document.elementFromPoint(x!, y!);
+        s.remove();
+        return `${e?.tagName.toLowerCase()}.${e?.className}`;
+      }, [at.x, at.y]);
+      expect(top).toMatch(/^square\..*move-dest/);
+      const order = await watchSpans(page, { topple: { selector: ".pm-topple" }, tip: { selector: '.bb-tower[data-anim^="tip"]' }, bounce: { selector: ".pm-bounce" } });
+      await tap(page, onto[0].slice(2, 4));
+      await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+      await expect.poll(async () => (await order.spans()).bounce, { timeout: 30_000 }).not.toBeNull();
+      const o = await order.spans();
+      expect(o.tip!.last).toBeLessThan(o.bounce!.first);
+      expect(o.bounce!.first - o.topple!.first).toBeGreaterThanOrEqual(POWER_FX.topple - 100);
+      // Knocked over with your move: it falls while he thinks.
+      await expect.poll(async () => (await powers(page)).scatter?.by ?? null, { timeout: 30_000 }).toBe("crowd");
+      scatter = (await powers(page)).scatter;
+    } else await play(page, await allowedMove(page, ["h2h3", "a2a3", "h3h4", "a3a4"]));
+  }
+  expect(scatter).not.toBeNull();
+  await expect.poll(async () => (await seen.seen()).tip, { timeout: 15_000 }).toBe(true);
+  await expect.poll(async () => (await seen.seen()).flight, { timeout: 15_000 }).toBe(true);
+  expect(scatter.squares.length).toBeGreaterThan(0);
+  // Each block on an empty square near where the tower stood; nothing of yours onto one or through one.
+  await yourMove(page);
+  const p = await powers(page);
+  const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+  for (const sq of p.scatter.squares) {
+    expect(new Chess(fen).get(sq as never)).toBeFalsy();
+    expect(Math.max(Math.abs(sq.charCodeAt(0) - scatter.from.charCodeAt(0)), Math.abs(Number(sq[1]) - Number(scatter.from[1])))).toBeLessThanOrEqual(3);
+    await expect(page.locator(`.pw-block[data-square="${sq}"]`)).toHaveCount(1);
+    expect((p.allowed ?? []).some((m: string) => m.slice(2, 4) === sq)).toBe(false);
+  }
+  expect(p.tower).toBeNull();
+  await expect(page.locator(".bb-tower")).toHaveCount(0);
+  // Then they vanish, and a new tower starts at once.
+  for (let i = 0; i < 3 && (await powers(page)).scatter; i++) {
+    await play(page, await allowedMove(page, ["h2h3", "a2a3", "h3h4", "a3a4", "b1c3"]));
+    await yourMove(page);
+  }
+  const z = await powers(page);
+  expect(z.scatter).toBeNull();
+  expect(z.tower).toMatchObject({ height: 1 });
+  // (Only the scattered blocks: the new tower's own mark, `.pw-block.pw-tower`, may stand on a square one of them had: Nov 18, main.)
+  for (const sq of scatter.squares) await expect(page.locator(`.pw-block:not(.pw-tower)[data-square="${sq}"]`)).toHaveCount(0, { timeout: 5000 });
+  expect(errors).toEqual([]);
+});
+
+/** Your profile says you're an admin (as /api/me does for an email in ADMIN_EMAILS). */
+async function asAdmin(page: Page) {
+  await page.route("**/api/me*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const res = await route.fetch();
+    const body = await res.json().catch(() => null);
+    await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+  });
+}
+
+test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, the new position, then his move; his sounds through mute", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await asAdmin(page);
+  // Muted on this device: his sounds are still asked for (the log), and every one stays silent.
+  await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
+  await page.goto("/?debug&clock=60&boss=bigboy&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const btn = page.locator(".ult-test");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
+  await btn.click();
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
+  const seen = await watchFor(page, {
+    banner: { selector: ".fight-banner.power-cut", text: /BIG BOUNCE!/ },
+    boy: { selector: ".bb-layer .bb-boy" },
+    piece: { selector: ".bb-layer piece.bb-piece" },
+    crash: { selector: ".bb-layer .bb-crash" },
+    jolt: { selector: ".board-area.pw-crash" },
+    settled: { selector: '.bb-layer[data-bounce="settled"]' },
+  });
+  // (Its banner off the board before he leaps: Eric, Oct 16, "they are ulting while the banner is still up".)
+  const order = await watchSpans(page, { banner: { selector: ".fight-banner.power-cut", text: /BIG BOUNCE!/ }, boy: { selector: ".bb-layer .bb-boy" } });
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  await play(page, await allowedMove(page, ["g1f3", "b1c3"]));
+  // At the start of his turn, before his move: the bounce.
+  await expect.poll(() => page.evaluate(() => !!(window as any).match.boss?.powers?.bounce), { timeout: 30_000 }).toBe(true);
+  const b = (await powers(page)).bounce;
+  expect(b.at).toBe(1);
+  expect(b.spots).toHaveLength(3);
+  expect(await page.evaluate(() => (window as any).match.boss.board.history.length)).toBe(1);
+  // It plays out, then he moves: your turn again.
+  await yourMove(page);
+  const s = await seen.seen();
+  expect(s).toEqual({ banner: true, boy: true, piece: true, crash: true, jolt: true, settled: true });
+  const leap = await order.spans();
+  expect(leap.banner!.last).toBeLessThan(leap.boy!.first);
+  const end = await page.evaluate(() => (window as any).match.boss);
+  // Not a move: the crowd's one and his one.
+  expect(end.board.history.length).toBe(2);
+  // Every piece it threw is on its new square (unless his move took it).
+  const c = new Chess(end.board.fen);
+  for (const m of b.moves as { from: string; to: string; piece: string }[]) {
+    if (end.board.history[1].slice(2, 4) === m.to) continue;
+    // (Unless he has moved it on since: his move's piece is his own, so a thrown piece of yours stays put.)
+    expect(c.get(m.to as never), `${m.from}-${m.to}`).toMatchObject({ color: "w", type: m.piece });
+  }
+  // The board shows it: its pieces are the position's.
+  await page.waitForTimeout(500);
+  const shown = await page.locator(`${BOARD_SEL.piece}:not(.ghost):not(.fading)`).count();
+  expect(shown).toBe(c.board().flat().filter(Boolean).length);
+  // The meter spent: empty, filling again for the next; the trigger ready again for it.
+  expect((await powers(page)).rage).toBe(0);
+  expect((await powers(page)).ults).toBe(1);
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
+  // His sounds came (the boing, the crash), and through the mute switch, silent.
+  const log = await soundsHeard(page);
+  const his = log.filter((x) => x.startsWith("bigboy"));
+  expect(his.map((x) => x.split(":")[0])).toEqual(expect.arrayContaining(["bigboyBoing", "bigboyCrash"]));
+  for (const x of his) expect(x).toMatch(/:muted$/);
+  expect(errors).toEqual([]);
+});

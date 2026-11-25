@@ -1,0 +1,903 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { FAIRPLAY, TOWN_CHAT } from "@chessroyale/core";
+import { createGuest, createSession, ensureSchema, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
+import { forgetSecrets, handleAccountApi } from "../src/api.ts";
+import { handleAdmin } from "../src/admin.ts";
+import { CHAT_OFF, decideChat } from "../src/chat-mod.ts";
+import { LINE_GONE } from "../src/fairplay.ts";
+import { LiveHub } from "../src/live-hub.ts";
+import { CHAT_NOT_ALLOWED, CHAT_NO_CONTACT, rot13 } from "../src/text-filter.ts";
+import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, TOWN_CHAT_PAUSED, expireTownCache, forgetTownCache, townRemoveResponse, townSlice, type TownHub } from "../src/town-chat-api.ts";
+import { TOWN_COLOR_LIMIT, TOWN_EMPTY, TOWN_REPEAT, TOWN_TOO_LONG, TownChat, challengeText, charCount, endsChallenge, enterOnly, enterText, tidyColor, tidyMessage, townSince, townWait, type TownSender } from "../src/town-chat.ts";
+import { caseDetail } from "../src/admin.ts";
+import { decide } from "../src/fairplay.ts";
+import { memoryDb } from "./memory-db.ts";
+
+/**
+ * The town square's typed chat on the server (town-chat.ts, town-chat-api.ts, the live hub's room;
+ * docs/decisions/2026-10-28-town-chat-typing.md): the limits, the room's keep and expiry, who may read and send, the
+ * switch, a chat ban, a moderator taking a line out, and a report carrying the line. The filter's own cases are in
+ * text-filter.test.ts. Slurs and swear words are written ROT13, as in the list.
+ */
+const T0 = 1_800_000_000_000;
+const ann: TownSender = { id: "ann", name: "Ann" };
+const bo: TownSender = { id: "bo", name: "Bo" };
+const slur = rot13("avttre");
+const swear = rot13("shpx");
+
+describe("town chat: the room", () => {
+  it("a message: tidied, at most 80 characters after trimming (an emoji is one), through the filter", () => {
+    const c = new TownChat();
+    expect(c.post(ann, "  Good   game,\n\tthanks!  ", T0)).toMatchObject({ ok: true, line: { n: 1, from: "ann", name: "Ann", text: "Good game, thanks!", at: T0 } });
+    // Invisible and direction-flipping characters go; a pile of accents on one letter is cut to two.
+    expect(c.post(bo, "hi\u200b\u202ethere", T0)).toMatchObject({ ok: true, line: { text: "hithere" } });
+    const z = new TownChat();
+    expect(z.post(ann, `q${"\u0301".repeat(40)}!`, T0)).toMatchObject({ ok: true, line: { text: `q${"\u0301".repeat(2)}!` } });
+    const d = new TownChat();
+    expect(d.post(ann, `   ${"a".repeat(TOWN_CHAT.maxChars)}   `, T0)).toMatchObject({ ok: true });
+    expect(d.post(bo, "a".repeat(TOWN_CHAT.maxChars + 1), T0)).toEqual({ ok: false, reason: "text", message: TOWN_TOO_LONG });
+    expect(d.post(bo, "😀".repeat(TOWN_CHAT.maxChars), T0)).toMatchObject({ ok: true });
+    expect(TOWN_TOO_LONG).toBe("Messages are at most 80 characters.");
+    for (const empty of ["", "   ", "\u200b", 7, null, undefined, { text: "hi" }]) {
+      expect(new TownChat().post(ann, empty, T0)).toEqual({ ok: false, reason: "text", message: TOWN_EMPTY });
+    }
+  });
+
+  it("the filter: a slur or a swear word refused alike, a link or contact details with their own reason; nothing refused reaches anyone", () => {
+    const c = new TownChat();
+    expect(c.post(ann, `you ${slur}`, T0)).toEqual({ ok: false, reason: "text", message: "That message isn't allowed." });
+    expect(c.post(ann, `${swear.split("").join(" ")} off`, T0)).toEqual({ ok: false, reason: "text", message: CHAT_NOT_ALLOWED });
+    expect(c.post(ann, `${swear.replace("u", "ü")}`, T0)).toMatchObject({ message: CHAT_NOT_ALLOWED });
+    expect(c.post(ann, "find me at example.com", T0)).toEqual({ ok: false, reason: "text", message: "No links or contact details in chat." });
+    expect(c.post(ann, "ann@example.org", T0)).toMatchObject({ message: CHAT_NO_CONTACT });
+    expect(c.post(ann, "call 555 123 4567", T0)).toMatchObject({ message: CHAT_NO_CONTACT });
+    expect(c.snapshot(T0).lines).toEqual([]);
+    // A refused message doesn't start the wait.
+    expect(c.post(ann, "gg", T0)).toMatchObject({ ok: true });
+  });
+
+  it("one message per account every 15 s; not the same message again within a minute; others aren't held up", () => {
+    const c = new TownChat();
+    expect(c.post(ann, "gg", T0)).toMatchObject({ ok: true });
+    expect(c.post(ann, "rematch?", T0 + 1_000)).toEqual({ ok: false, reason: "rate", message: townWait(TOWN_CHAT.gapMs), retryMs: 14_000 });
+    expect(townWait(TOWN_CHAT.gapMs)).toBe("One message every 15 s.");
+    expect(c.post(ann, "rematch?", T0 + 14_999)).toMatchObject({ ok: false, reason: "rate", retryMs: 1 });
+    expect(c.post(bo, "gg", T0 + 2_000)).toMatchObject({ ok: true });
+    expect(c.readyAt("ann", T0 + 5_000)).toBe(T0 + 15_000);
+    // The same message (case, spaces and punctuation aside) waits out the minute; a new one goes.
+    expect(c.post(ann, "GG!!", T0 + 15_000)).toEqual({ ok: false, reason: "repeat", message: TOWN_REPEAT, retryMs: 45_000 });
+    expect(c.post(ann, "rematch?", T0 + 15_000)).toMatchObject({ ok: true });
+    expect(c.post(ann, "g g", T0 + 59_999)).toMatchObject({ ok: false, reason: "repeat", retryMs: 1 });
+    expect(c.post(ann, "gg", T0 + 60_000)).toMatchObject({ ok: true });
+  });
+
+  it("carries the name color a sender's device picked (a small whole number) on the line, and ignores anything else; no color, none on the line (Oct 28, Eric's phone)", () => {
+    const c = new TownChat();
+    expect(TOWN_COLOR_LIMIT).toBe(32);
+    expect(c.post({ ...ann, color: 7 }, "gg", T0)).toMatchObject({ ok: true, line: { name: "Ann", text: "gg", color: 7 } });
+    for (const good of [0, 9, 31]) expect(tidyColor(good)).toBe(good);
+    for (const bad of [-1, 32, 1.5, Number.NaN, Infinity, "3", null, undefined, {}, [3], true]) expect(tidyColor(bad)).toBeUndefined();
+    const refused = c.post({ ...bo, color: 99 }, "hi", T0 + 1);
+    expect(refused.ok && "color" in refused.line, "a bad number is dropped, the message still goes").toBe(false);
+    const none = c.post({ id: "cy", name: "Cy" }, "yo", T0 + 2);
+    expect(none.ok && "color" in none.line).toBe(false);
+    // Readers get it with the line.
+    expect(townSince(c.snapshot(T0 + 3), 0).lines.map((l) => l.color)).toEqual([7, undefined, undefined]);
+  });
+
+  it("holds each line 5 minutes (Eric, Oct 28); a newcomer gets the last 12; readers get only what's new; a restart starts over", () => {
+    const c = new TownChat();
+    for (let i = 0; i < 20; i++) expect(c.post({ id: `p${i}`, name: `P${i}` }, `hello ${i}`, T0 + i * 1_000)).toMatchObject({ ok: true });
+    const snap = c.snapshot(T0 + 20_000);
+    expect(snap.lines).toHaveLength(20);
+    const newcomer = townSince(snap, 0);
+    expect(newcomer.lines.map((l) => l.text)).toEqual(Array.from({ length: TOWN_CHAT.keep }, (_, i) => `hello ${i + 8}`));
+    expect(newcomer.n).toBe(20);
+    expect(townSince(snap, 18).lines.map((l) => l.n)).toEqual([19, 20]);
+    expect(townSince(snap, 20).lines).toEqual([]);
+    // The room counted fewer than the reader has: it restarted, so the reader takes what's there afresh.
+    expect(townSince(new TownChat().snapshot(T0), 20)).toMatchObject({ n: 0, lines: [], reset: true });
+    // Five minutes after each was said, it's gone (a minute after it, it's still there).
+    expect(TOWN_CHAT.lineMs).toBe(300_000);
+    expect(c.snapshot(T0 + 60_000).lines).toHaveLength(20);
+    expect(c.snapshot(T0 + 300_000).lines.map((l) => l.n)).toEqual(Array.from({ length: 19 }, (_, i) => i + 2));
+    expect(c.snapshot(T0 + 318_999).lines.map((l) => l.n)).toEqual([20]);
+    expect(c.line(20, T0 + 318_999)).toMatchObject({ text: "hello 19" });
+    expect(c.snapshot(T0 + 319_000).lines).toEqual([]);
+    expect(c.line(20, T0 + 319_000)).toBeNull();
+  });
+
+  it("a line said 4 minutes ago is still held and can be read back (a report reads it from here); gone at 5 minutes (Eric, Oct 28)", () => {
+    const c = new TownChat();
+    c.post(ann, "four minutes ago", T0);
+    c.post(bo, "a minute ago", T0 + 180_000);
+    const at4 = T0 + 240_000;
+    expect(c.line(1, at4)).toMatchObject({ n: 1, from: "ann", text: "four minutes ago" });
+    expect(townSince(c.snapshot(at4), 0).lines.map((l) => l.text)).toEqual(["four minutes ago", "a minute ago"]);
+    expect(c.line(1, T0 + 299_999)).not.toBeNull();
+    expect(c.line(1, T0 + 300_000)).toBeNull();
+    expect(c.line(2, T0 + 300_000)).toMatchObject({ text: "a minute ago" });
+  });
+
+  it("holds at most the newest 300 lines in a 5-minute window, and the device's 100 are within them", () => {
+    expect(TOWN_CHAT.holdMax).toBe(300);
+    expect(TOWN_CHAT.deviceMax).toBe(100);
+    expect(TOWN_CHAT.holdMax).toBeGreaterThan(TOWN_CHAT.deviceMax);
+    const c = new TownChat();
+    for (let i = 0; i < 350; i++) c.post({ id: `p${i}`, name: `P${i}` }, `line ${i}`, T0 + i * 100);
+    const lines = c.snapshot(T0 + 40_000).lines;
+    expect(lines).toHaveLength(300);
+    expect(lines[0]!.text).toBe("line 50");
+    expect(lines.at(-1)!.text).toBe("line 349");
+  });
+
+  it("holds at most TOWN_CHAT.holdMax lines, the oldest going first", () => {
+    const c = new TownChat({ ...TOWN_CHAT, holdMax: 5 });
+    for (let i = 0; i < 8; i++) c.post({ id: `p${i}`, name: "P" }, `hi ${i}`, T0);
+    expect(c.snapshot(T0).lines.map((l) => l.n)).toEqual([4, 5, 6, 7, 8]);
+  });
+
+  it("a moderator takes one line out: it leaves the room, and every reader's log is told for 5 minutes", () => {
+    const c = new TownChat();
+    c.post(ann, "hello", T0);
+    c.post(bo, "rude thing", T0 + 1_000);
+    expect(c.remove(2, T0 + 2_000)).toBe(true);
+    expect(c.remove(2, T0 + 2_000)).toBe(false);
+    expect(c.remove(99, T0 + 2_000)).toBe(false);
+    const snap = c.snapshot(T0 + 3_000);
+    expect(snap.lines.map((l) => l.n)).toEqual([1]);
+    expect(townSince(snap, 2)).toEqual({ room: c.room, n: 2, lines: [], gone: [2] });
+    expect(c.line(2, T0 + 3_000)).toBeNull();
+    expect(c.snapshot(T0 + 62_000).gone).toEqual([2]);
+    expect(c.snapshot(T0 + 2_000 + TOWN_CHAT.lineMs - 1).gone).toEqual([2]);
+    expect(c.snapshot(T0 + 2_000 + TOWN_CHAT.lineMs).gone).toEqual([]);
+  });
+
+  it("a player's lines leave together (a name reset, a deleted account); a reset keeps their wait, a deletion doesn't", () => {
+    const c = new TownChat();
+    c.post(ann, "one", T0);
+    c.post(bo, "two", T0);
+    expect(c.dropAccount("ann", T0 + 1_000)).toBe(true);
+    expect(c.snapshot(T0 + 1_000)).toMatchObject({ lines: [{ from: "bo" }], gone: [1] });
+    expect(c.post(ann, "three", T0 + 2_000)).toMatchObject({ ok: false, reason: "rate" });
+    expect(c.dropAccount("bo", T0 + 2_000, true)).toBe(true);
+    expect(c.post(bo, "four", T0 + 3_000)).toMatchObject({ ok: true });
+  });
+});
+
+/** A live hub with in-memory storage (the same storage across "restarts"). */
+function hubWith(store = new Map<string, unknown>()) {
+  const storage = {
+    get: async (k: string) => store.get(k),
+    put: async (k: string, v: unknown) => void store.set(k, structuredClone(v)),
+    delete: async (k: string | string[]) => {
+      for (const x of Array.isArray(k) ? k : [k]) store.delete(x);
+    },
+    list: async ({ prefix }: { prefix: string }) => new Map([...store].filter(([k]) => k.startsWith(prefix))),
+    getAlarm: async () => alarm.at,
+    setAlarm: async (at: number) => void (alarm.at = at),
+  };
+  const alarm: { at: number | null } = { at: null };
+  let ready: Promise<unknown> = Promise.resolve();
+  const ctx = { storage, blockConcurrencyWhile: (fn: () => Promise<unknown>) => (ready = fn()) };
+  const hub = new LiveHub(ctx as unknown as DurableObjectState, {} as never);
+  return { hub, store, alarm, ready: () => ready };
+}
+
+describe("town chat: \"Ann has entered the town.\" (Eric, Nov 12: \"we have to wait for someone to say something… when you join… it should say… has entered the town\")", () => {
+  const cy = { id: "cy", name: "Cy" };
+  const enters = (c: TownChat, now: number) => c.snapshot(now).lines.filter((l) => l.sys === "enter").map((l) => l.text);
+
+  it("the words: one, two, three, and a crowd", () => {
+    expect(enterText(["Ann"])).toBe("Ann has entered the town.");
+    expect(enterText(["Ann", "Bo"])).toBe("Ann and Bo entered the town.");
+    expect(enterText(["Ann", "Bo", "Cy"])).toBe("Ann, Bo and Cy entered the town.");
+    expect(enterText(["Ann", "Bo", "Cy", "Di", "Ed"])).toBe("Ann, Bo and 3 others entered the town.");
+    expect(TOWN_CHAT.enterRejoinMs).toBe(120_000);
+    expect(TOWN_CHAT.enterBurstMs).toBe(6_000);
+  });
+
+  it("once per visit: a fresh pawn gets a line at once (the server's: no one behind it), later beats none", () => {
+    const c = new TownChat();
+    expect(c.arrive(ann, T0, true)).toMatchObject({ n: 1, from: "", name: "", text: "Ann has entered the town.", sys: "enter" });
+    for (let t = 5_000; t <= 60_000; t += 5_000) expect(c.arrive(ann, T0 + t, false)).toBeNull();
+    expect(enters(c, T0 + 60_000)).toEqual(["Ann has entered the town."]);
+  });
+
+  it("a quick reconnect (back within 2 minutes of the last beat) is the same visit: no line; back later, a new line", () => {
+    const c = new TownChat();
+    c.arrive(ann, T0, true);
+    c.arrive(ann, T0 + 10_000, false);
+    // A reload, a trip home: the pawn comes back fresh, 1 minute 59 after its last beat.
+    expect(c.arrive(ann, T0 + 10_000 + 119_000, true)).toBeNull();
+    // Gone 2 minutes or more: a new visit.
+    expect(c.arrive(ann, T0 + 129_000 + 120_000, true)).toMatchObject({ text: "Ann has entered the town." });
+    expect(enters(c, T0 + 250_000)).toEqual(["Ann has entered the town.", "Ann has entered the town."]);
+  });
+
+  it("a burst is one line: arrivals within 6 s of an \"entered\" line wait and go out together when it's up", () => {
+    const c = new TownChat();
+    expect(c.arrive(ann, T0, true)).not.toBeNull();
+    expect(c.arrive(bo, T0 + 1_000, true)).toBeNull();
+    expect(c.arrive(cy, T0 + 2_000, true)).toBeNull();
+    expect(c.holdsEntering).toBe(true);
+    expect(c.nextExpiry()).toBe(T0 + 6_000);
+    expect(enters(c, T0 + 5_999)).toEqual(["Ann has entered the town."]);
+    expect(enters(c, T0 + 6_000)).toEqual(["Ann has entered the town.", "Bo and Cy entered the town."]);
+    expect(c.holdsEntering).toBe(false);
+    // A crowd in the next window: one line, two names and a count; at most one "entered" line every 6 s.
+    for (const [i, id] of ["di", "ed", "fy", "gu"].entries()) expect(c.arrive({ id, name: id.toUpperCase() }, T0 + 7_000 + i * 100, true)).toBeNull();
+    expect(enters(c, T0 + 12_000)).toHaveLength(3);
+    expect(enters(c, T0 + 12_000).at(-1)).toBe("DI, ED and 2 others entered the town.");
+    // Quiet for a while: the next one goes out at once.
+    expect(c.arrive({ id: "hal", name: "Hal" }, T0 + 30_000, true)).toMatchObject({ text: "Hal has entered the town." });
+  });
+
+  it("the lines are the room's: held 5 minutes like any line, numbered with the players' lines; the ids it keeps go after 2 minutes", () => {
+    const c = new TownChat();
+    c.post(ann, "hi", T0);
+    expect(c.arrive(bo, T0 + 1_000, true)).toMatchObject({ n: 2 });
+    expect(c.snapshot(T0 + TOWN_CHAT.lineMs + 1_000).lines).toEqual([]);
+    expect(c.empty).toBe(true);
+  });
+
+  it("a device marked too young reads the \"entered\" lines alone: no one's typed words, no challenge lines", () => {
+    const c = new TownChat();
+    c.post(ann, "hello", T0);
+    c.arrive(bo, T0, true);
+    c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b1" }, T0);
+    expect(enterOnly(townSince(c.snapshot(T0), 0)).lines.map((l) => l.text)).toEqual(["Bo has entered the town."]);
+  });
+});
+
+describe("town chat: the live hub holds it in memory only", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("relays lines to readers, never writes them to storage, and forgets them on a restart", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const { hub, store, ready } = hubWith();
+    await ready();
+    expect((await hub.townPost(ann, "hello town")).post).toMatchObject({ ok: true, line: { n: 1, text: "hello town" } });
+    vi.setSystemTime(T0 + 1_000);
+    expect((await hub.townPost(bo, "hi Ann")).town.lines.map((l) => l.text)).toEqual(["hello town", "hi Ann"]);
+    expect((await hub.townRead()).lines).toHaveLength(2);
+    expect(store.size).toBe(0);
+    const again = hubWith(store);
+    await again.ready();
+    expect((await again.hub.townRead()).lines).toEqual([]);
+    vi.setSystemTime(T0 + TOWN_CHAT.lineMs + 1_000);
+    expect((await hub.townRead()).lines).toEqual([]);
+  });
+
+  it("a pawn coming into a town posts \"entered\" in the chat room of the same name (the town's own, a test's), once per visit; the alarm is set for the line's 5 minutes and a burst's line", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const { hub, alarm, ready } = hubWith();
+    await ready();
+    const beat = { c: 3, r: 4, idleMs: 0, hidden: false, shop: null };
+    await hub.townHere("ann", "Ann", "town", beat);
+    await hub.townHere("bo", "Bo", "test:chat9", beat);
+    vi.setSystemTime(T0 + 1_000);
+    await hub.townHere("ann", "Ann", "town", beat);
+    await hub.townHere("cy", "Cy", "town", beat);
+    expect(alarm.at).toBe(T0 + 6_000);
+    expect((await hub.townRead()).lines.map((l) => l.text)).toEqual(["Ann has entered the town."]);
+    expect((await hub.townRead("test:chat9")).lines.map((l) => l.text)).toEqual(["Bo has entered the town."]);
+    vi.setSystemTime(T0 + 6_000);
+    expect((await hub.townRead()).lines.map((l) => l.text)).toEqual(["Ann has entered the town.", "Cy has entered the town."]);
+    // Left and back within 2 minutes: no line.
+    await hub.townHere("ann", "", "town", null);
+    vi.setSystemTime(T0 + 60_000);
+    await hub.townHere("ann", "Ann", "town", beat);
+    expect((await hub.townRead()).lines).toHaveLength(2);
+  });
+
+  it("a test's own room keeps its lines apart from the town's (each test its own chat, where the test switches are on)", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const { hub, ready } = hubWith();
+    await ready();
+    await hub.townPost(ann, "in the town");
+    await hub.townPost(bo, "in a test's room", "test:chat1");
+    expect((await hub.townRead("test:chat1")).lines.map((l) => l.text)).toEqual(["in a test's room"]);
+    expect((await hub.townRead()).lines.map((l) => l.text)).toEqual(["in the town"]);
+    // A moderator's Remove and a Report's line number go to the room they name.
+    expect(await hub.townLine(1, "test:chat1")).toMatchObject({ text: "in a test's room" });
+    expect(await hub.townLine(1)).toMatchObject({ text: "in the town" });
+    expect((await hub.townRemove(1, "test:chat1")).removed).toBe(true);
+    expect((await hub.townRead("test:chat1")).lines).toEqual([]);
+    expect((await hub.townRead()).lines).toHaveLength(1);
+  });
+
+  it("a deleted account's lines and a reset player's lines leave the town too", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const { hub, ready } = hubWith();
+    await ready();
+    await hub.townPost(ann, "one");
+    await hub.townPost(bo, "two");
+    await hub.dropChatLines(ann.id);
+    expect((await hub.townRead()).lines.map((l) => l.from)).toEqual([bo.id]);
+    await hub.forgetAccount(bo.id);
+    expect((await hub.townRead())).toMatchObject({ lines: [], gone: [1, 2] });
+  });
+});
+
+async function player(sql: Sql, name: string, now = Date.now()): Promise<User> {
+  const g = await createGuest(sql, now, name);
+  return signInWithIdentity(sql, g.user, "email", `${name.toLowerCase()}@example.com`, {}, now);
+}
+
+describe("town chat: the API", () => {
+  afterEach(() => {
+    forgetTownCache();
+    forgetSecrets();
+    vi.useRealTimers();
+  });
+
+  async function setup(vars: Record<string, string> = {}) {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql);
+    const { hub, ready } = hubWith();
+    await ready();
+    const env = { DB: d1, LIVE: { idFromName: () => "global", get: () => hub }, GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret", ADMIN_EMAILS: "mod@example.com", ...vars };
+    const call = async (path: string, token: string | null, body?: unknown, cookie = "") => {
+      const res = await handleAccountApi(
+        new Request(`https://hunchess.test${path}`, {
+          method: body === undefined ? "GET" : "POST",
+          headers: { "content-type": "application/json", cookie: `${token ? `hc_session=${token}` : ""}${cookie}` },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+        env as never,
+      );
+      return res!;
+    };
+    const signedIn = async (name: string) => {
+      const u = await player(sql, name);
+      return { user: u, token: await createSession(sql, u.id, Date.now()) };
+    };
+    return { sql, d1, env, hub, call, signedIn };
+  }
+  type Live = { town?: { n: number; lines: { n: number; from: string; name: string; text: string; at: number }[]; gone?: number[]; paused?: true } };
+  const live = async (res: Response) => (await res.json()) as Live;
+
+  it("a boss challenged from the town: its battle's start and finish post the server's lines (no spam); a guest's post none", async () => {
+    const { sql, call, signedIn, hub } = await setup();
+    const a = await signedIn("Ann");
+    const guest = await createGuest(sql, Date.now(), "Guesty");
+    const texts = async () => (await hub.townRead()).lines.map((l) => l.text);
+    const start = async (token: string, town?: string) => ((await (await call("/api/boss/solo/start", token, town ? { town } : {})).json()) as { battle: string | null }).battle!;
+    const finish = (token: string, battle: string, end: object) => call("/api/boss/solo/finish", token, { battle, ...end });
+    // A plain Boss alone (no `town`) posts nothing; a challenge's start does.
+    await start(a.token);
+    expect(await texts()).toEqual([]);
+    const b1 = await start(a.token, "alfil");
+    expect(await texts()).toEqual(["Ann challenged Alfil!"]);
+    // A surrender before 10 moves is a quit: no line, and the next start posts none.
+    expect((await finish(a.token, b1, { outcome: "surrendered", moves: 4 })).status).toBe(200);
+    const b2 = await start(a.token, "alfil");
+    expect(await texts()).toEqual(["Ann challenged Alfil!"]);
+    // Its finish: how it went, your moves (the device's word); the answer is as before (no extra fields).
+    const done = await finish(a.token, b2, { outcome: "lost", moves: 21 });
+    expect(await done.json()).toEqual({ counted: false, token: null });
+    expect(await texts()).toEqual(["Ann challenged Alfil!", "Alfil beat Ann in 21 moves."]);
+    // Once: finishing it again posts nothing; a made-up outcome posts nothing.
+    await finish(a.token, b2, { outcome: "won", moves: 99 });
+    const b3 = await start(a.token, "alfil");
+    await finish(a.token, b3, { outcome: "champion", moves: 3 });
+    expect(await texts()).toEqual(["Ann challenged Alfil!", "Alfil beat Ann in 21 moves.", "Ann challenged Alfil!"]);
+    // A guest's challenge: nothing in the town's chat.
+    await start(guest.token, "alfil");
+    expect((await texts()).length).toBe(3);
+    // A boss in the game for admins first (Timber, BOSS_ADMIN_FIRST): his challenge and its finish post nothing (Nov 3).
+    const b4 = await start(a.token, "timber");
+    await finish(a.token, b4, { outcome: "won", moves: 30 });
+    expect((await texts()).length).toBe(3);
+    // Dash's too (admins first; his challenge from his home since Nov 3).
+    const b5 = await start(a.token, "dash");
+    await finish(a.token, b5, { outcome: "lost", moves: 25 });
+    expect((await texts()).length).toBe(3);
+    // The lines read as the server's own: no account, no name.
+    const read = await live(await call("/api/live?town=0", a.token));
+    expect(read.town!.lines.every((l) => l.from === "" && l.name === "")).toBe(true);
+  });
+
+  it("signed-in players send and read each other's lines with the live poll; a guest reads them too (Eric, on #542) but can't send", async () => {
+    const { sql, call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const b = await signedIn("Bo");
+    const guest = await createGuest(sql, Date.now(), "Guesty");
+    const sent = await call("/api/town/chat", a.token, { text: "  hello   town  ", since: 0 });
+    expect(sent.status).toBe(200);
+    const body = (await sent.json()) as { ok: true; line: { n: number }; town: { lines: unknown[] }; waitMs: number };
+    expect(body).toMatchObject({ ok: true, line: { name: "Ann", text: "hello town", from: a.user.id }, waitMs: TOWN_CHAT.gapMs });
+    expect(body.town.lines).toHaveLength(1);
+    // Bo reads it with the live line.
+    const read = await live(await call("/api/live?town=0", b.token));
+    expect(read.town!.lines).toMatchObject([{ name: "Ann", text: "hello town", from: a.user.id }]);
+    expect(JSON.stringify(read.town)).not.toMatch(/example\.com|email/);
+    expect((await live(await call(`/api/live?town=${read.town!.n}`, b.token))).town!.lines).toEqual([]);
+    // The guest reads the same lines (Eric, on #542: "they should be able to see the chat. They just can't type in it"); sending is refused.
+    expect((await live(await call("/api/live?town=0", guest.token))).town!.lines).toMatchObject([{ name: "Ann", text: "hello town", from: a.user.id }]);
+    const g = await call("/api/town/chat", guest.token, { text: "hi" });
+    expect(g.status).toBe(401);
+    expect(await g.json()).toEqual({ message: SIGN_IN_TO_TOWN_CHAT });
+    expect(SIGN_IN_TO_TOWN_CHAT).toBe("Sign in to chat with other players.");
+    // Without ?town, nothing of the town's.
+    expect("town" in (await live(await call("/api/live", b.token)))).toBe(false);
+  });
+
+  it("a message carries the name color its device sent, to every reader; a bad one is ignored, not refused (Oct 28, Eric's phone)", async () => {
+    const { call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const b = await signedIn("Bo");
+    const sent = await call("/api/town/chat", a.token, { text: "hello town", since: 0, color: 4 });
+    expect(sent.status).toBe(200);
+    expect(((await sent.json()) as { line: { color?: number } }).line.color).toBe(4);
+    expect((await live(await call("/api/live?town=0", b.token))).town!.lines).toMatchObject([{ name: "Ann", text: "hello town", color: 4 }]);
+    const bad = await call("/api/town/chat", b.token, { text: "hi Ann", since: 1, color: -3 });
+    expect(bad.status).toBe(200);
+    expect("color" in ((await bad.json()) as { line: object }).line).toBe(false);
+  });
+
+  it("a guest reads but can't send even where signing in isn't set up (local runs): sending is for accounts", async () => {
+    const { sql, call, signedIn } = await setup({ GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "" });
+    const a = await signedIn("Ann");
+    const guest = await createGuest(sql, Date.now(), "Guesty");
+    expect((await call("/api/town/chat", a.token, { text: "hello" })).status).toBe(200);
+    expect((await live(await call("/api/live?town=0", guest.token))).town!.lines).toHaveLength(1);
+    expect((await call("/api/town/chat", guest.token, { text: "hi" })).status).toBe(401);
+  });
+
+  it("a device the age gate marked too young gets no one's typed words (only the server's \"entered the town\" lines: Nov 12) and can't send, even signed in from before", async () => {
+    const { call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const b = await signedIn("Bo");
+    expect((await call("/api/town/chat", a.token, { text: "hello" })).status).toBe(200);
+    expect((await call("/api/town/here", a.token, { c: 3, r: 4, idleMs: 0, hidden: false })).status).toBe(200);
+    forgetTownCache(); // (this Worker's copy of the room is up to TOWN_CHAT.readCacheMs old: the line shows on the next read)
+    expect((await live(await call("/api/live?town=0", b.token))).town!.lines.map((l) => l.text)).toEqual(["hello", "Ann has entered the town."]);
+    expect((await live(await call("/api/live?town=0", b.token, undefined, "; hc_age=under"))).town!.lines).toMatchObject([{ text: "Ann has entered the town.", sys: "enter", from: "", name: "" }]);
+    const r = await call("/api/town/chat", b.token, { text: "hi" }, "; hc_age=under");
+    expect(r.status).toBe(403);
+    expect(await r.json()).toEqual({ message: TOWN_CHAT_AGE });
+  });
+
+  it("the server's limits: the 15 s wait, 80 characters, the filter's reasons; names from the account, filtered", async () => {
+    const { sql, call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    expect((await call("/api/town/chat", a.token, { text: "gg" })).status).toBe(200);
+    const again = await call("/api/town/chat", a.token, { text: "rematch?" });
+    expect(again.status).toBe(429);
+    const wait = (await again.json()) as { message: string; retryMs: number };
+    expect(wait.message).toBe("One message every 15 s.");
+    expect(wait.retryMs).toBeGreaterThan(10_000);
+    expect(Number(again.headers.get("retry-after"))).toBeGreaterThan(10);
+    const b = await signedIn("Bo");
+    for (const [text, message] of [
+      ["x".repeat(81), TOWN_TOO_LONG],
+      [`you ${slur}`, CHAT_NOT_ALLOWED],
+      [`${swear}!`, CHAT_NOT_ALLOWED],
+      ["www.example.org", CHAT_NO_CONTACT],
+      ["", TOWN_EMPTY],
+    ]) {
+      const r = await call("/api/town/chat", b.token, { text });
+      expect(r.status, text).toBe(400);
+      expect(((await r.json()) as { message: string }).message).toBe(message);
+    }
+    // A name from before the name filter that it refuses goes out as "Player".
+    await sql.run("UPDATE users SET name = ? WHERE id = ?", `${slur}99`, b.user.id);
+    expect(await (await call("/api/town/chat", b.token, { text: "hello" })).json()).toMatchObject({ ok: true, line: { name: "Player" } });
+  });
+
+  it("a moderator's chat ban stops typing with its reason; so does a fair-play ban; they still read", async () => {
+    const { sql, call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const troll = await signedIn("Troll");
+    await decideChat(sql, troll.user.id, { action: "ban", days: 7, reason: "spamming the town" }, "admin:mod@example.com", Date.now());
+    const r = await call("/api/town/chat", troll.token, { text: "hello" });
+    expect(r.status).toBe(403);
+    expect(await r.json()).toMatchObject({ message: CHAT_OFF, block: { until: expect.any(Number) } });
+    expect((await call("/api/town/chat", a.token, { text: "hello" })).status).toBe(200);
+    expect((await live(await call("/api/live?town=0", troll.token))).town!.lines).toHaveLength(1);
+    const cheat = await signedIn("Cheat");
+    const now = Date.now();
+    await sql.run("INSERT INTO fairplay_cases (user_id, status, reason, opened_at, updated_at) VALUES (?, 'banned', 'test', ?, ?)", cheat.user.id, now, now);
+    const c = await call("/api/town/chat", cheat.token, { text: "hello" });
+    expect(c.status).toBe(403);
+    expect(await c.json()).toMatchObject({ banned: true });
+  });
+
+  it("the switch (PAUSE_TOWN_CHAT): nobody sends, readers hear it's paused and get no players' lines", async () => {
+    const { call, signedIn } = await setup({ PAUSE_TOWN_CHAT: "1" });
+    const a = await signedIn("Ann");
+    const r = await call("/api/town/chat", a.token, { text: "hello" });
+    expect(r.status).toBe(503);
+    expect(await r.json()).toEqual({ message: TOWN_CHAT_PAUSED, paused: "town-chat" });
+    expect(TOWN_CHAT_PAUSED).toBe("Chat is paused.");
+    expect((await live(await call("/api/live?town=0", a.token))).town).toEqual({ paused: true });
+    // On by default.
+    const on = await setup();
+    const b = await on.signedIn("Bo");
+    expect((await on.call("/api/town/chat", b.token, { text: "hello" })).status).toBe(200);
+  });
+
+  it("a moderator takes a line out: it leaves everyone's log; nobody else can", async () => {
+    const { sql, call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const troll = await signedIn("Troll");
+    const mod = await signedIn("Mod");
+    await sql.run("UPDATE users SET email = ? WHERE id = ?", "mod@example.com", mod.user.id);
+    expect((await call("/api/town/chat", a.token, { text: "hello" })).status).toBe(200);
+    const line = ((await (await call("/api/town/chat", troll.token, { text: "something mean" })).json()) as { line: { n: number } }).line;
+    expect((await call("/api/town/chat/remove", troll.token, { n: line.n })).status).toBe(403);
+    expect((await call("/api/town/chat/remove", a.token, { n: line.n })).status).toBe(403);
+    expect((await call("/api/town/chat/remove", mod.token, { n: line.n })).status).toBe(200);
+    const read = await live(await call(`/api/live?town=${line.n}`, a.token));
+    expect(read.town).toMatchObject({ lines: [], gone: [line.n] });
+    expect((await live(await call("/api/live?town=0", a.token))).town!.lines.map((l) => l.text)).toEqual(["hello"]);
+    expect((await call("/api/town/chat/remove", mod.token, { n: line.n })).status).toBe(404);
+    expect((await call("/api/town/chat/remove", mod.token, { n: "x" })).status).toBe(400);
+  });
+
+  it("Report on a line: fair play's report with \"Offensive chat\", carrying the line's text and time from the room", async () => {
+    const { sql, d1, env, call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const troll = await signedIn("Troll");
+    const sent = (await (await call("/api/town/chat", troll.token, { text: "you play like a potato" })).json()) as { line: { n: number; at: number } };
+    expect((await call("/api/town/chat", a.token, { text: "hello" })).status).toBe(200);
+    const mine = ((await live(await call("/api/live?town=0", a.token))).town!.lines.find((l) => l.from === a.user.id))!;
+    const report = (body: unknown) => call("/api/report", a.token, body);
+    const reason = FAIRPLAY.reports.chatReason;
+    expect(reason).toBe("Offensive chat");
+    // Not a line of theirs, no line, a line that isn't there: refused, so a report only carries words they really sent.
+    for (const body of [{ target: troll.user.id, reason, line: mine.n }, { target: troll.user.id, reason }, { target: troll.user.id, reason, line: 999 }]) {
+      const r = await report(body);
+      expect(r.status).toBe(400);
+      expect(((await r.json()) as { message: string }).message).toBe(LINE_GONE);
+    }
+    const r = await report({ target: troll.user.id, reason, line: sent.line.n, text: "something made up" });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true });
+    const row = await sql.first<{ reason: string; line: string; line_at: number; match: string | null }>("SELECT reason, line, line_at, match FROM reports WHERE target = ?", troll.user.id);
+    expect(row).toEqual({ reason: "Offensive chat", line: "you play like a potato", line_at: sent.line.at, match: null });
+    // It opens a watch case, as reports do; the same line again is "already".
+    expect(await sql.first("SELECT status FROM fairplay_cases WHERE user_id = ?", troll.user.id)).toEqual({ status: "watch" });
+    expect(await (await report({ target: troll.user.id, reason, line: sent.line.n })).json()).toMatchObject({ ok: true, already: true });
+    // The profile sheet's reasons are unchanged, and a profile report the same day still goes (it's not a line's).
+    expect(FAIRPLAY.reports.reasons).toEqual(["Cheating", "Offensive name or icon", "Something else"]);
+    expect(await (await report({ target: troll.user.id, reason: "Offensive name or icon" })).json()).toMatchObject({ ok: true });
+    expect(await (await report({ target: troll.user.id, reason: "Offensive name or icon" })).json()).toMatchObject({ ok: true, already: true });
+    // A moderator sees what was said, and when, on fair play's page.
+    const mod = await signedIn("Mod");
+    await sql.run("UPDATE users SET email = ? WHERE id = ?", "mod@example.com", mod.user.id);
+    const page = await (await handleAdmin(new Request(`https://x/admin/fairplay/case/${troll.user.id}`, { headers: { cookie: `hc_session=${mod.token}` } }), { ...env, DB: d1 } as never))!.text();
+    expect(page).toContain("Offensive chat");
+    expect(page).toContain("“you play like a potato”");
+    expect(page).toContain("in the town square");
+    // Deleting either account deletes the report, line and all (account-data.ts, as before).
+  });
+
+  it("Report and a moderator's Remove work on a line 4 minutes old (Eric, Oct 28: the app scrolls back 5 minutes); at 5 minutes it has gone", async () => {
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date"] });
+    const { sql, call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const troll = await signedIn("Troll");
+    const bo = await signedIn("Bo");
+    const mod = await signedIn("Mod");
+    await sql.run("UPDATE users SET email = ? WHERE id = ?", "mod@example.com", mod.user.id);
+    const t0 = Date.now();
+    const one = ((await (await call("/api/town/chat", troll.token, { text: "an old rude line" })).json()) as { line: { n: number } }).line;
+    const two = ((await (await call("/api/town/chat", bo.token, { text: "an old fine line" })).json()) as { line: { n: number } }).line;
+    const reason = FAIRPLAY.reports.chatReason;
+    // Four minutes on, a reader still gets both lines (a newcomer: the last 12), the report finds the line, and so does Remove.
+    vi.setSystemTime(t0 + 4 * 60_000);
+    forgetTownCache();
+    expect((await live(await call("/api/live?town=0", a.token))).town!.lines.map((l) => l.text)).toEqual(["an old rude line", "an old fine line"]);
+    const r = await call("/api/report", a.token, { target: troll.user.id, reason, line: one.n });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true });
+    expect(await sql.first("SELECT line FROM reports WHERE target = ?", troll.user.id)).toEqual({ line: "an old rude line" });
+    expect((await call("/api/town/chat/remove", mod.token, { n: one.n })).status).toBe(200);
+    // Five minutes after it was said it's gone from the room: a report is refused as a line that has gone, as before.
+    vi.setSystemTime(t0 + TOWN_CHAT.lineMs + 1_000);
+    forgetTownCache();
+    expect((await live(await call("/api/live?town=0", a.token))).town!.lines).toEqual([]);
+    const gone = await call("/api/report", a.token, { target: bo.user.id, reason, line: two.n });
+    expect(gone.status).toBe(400);
+    expect(((await gone.json()) as { message: string }).message).toBe(LINE_GONE);
+  });
+});
+
+/** The independent review's findings (Oct 28), one test each. */
+describe("town chat: after the review", () => {
+  afterEach(() => {
+    forgetTownCache();
+    forgetSecrets();
+    vi.useRealTimers();
+  });
+
+  it("look-alike letters don't carry a swear word or a slur into the room (finding 1)", () => {
+    const c = new TownChat();
+    for (const text of [rot13("fuvg").replace("h", "һ"), rot13("avttre").replace("i", "ı"), `sh\u6f22t`]) {
+      expect(c.post(ann, text, T0), text).toEqual({ ok: false, reason: "text", message: CHAT_NOT_ALLOWED });
+    }
+  });
+
+  it("a split or masked swear word, and contact details in new shapes, are refused; rating talk goes (findings 2, 3)", () => {
+    const c = new TownChat();
+    expect(c.post(ann, `go ${swear.split("").join(" ")} yourself`, T0)).toMatchObject({ message: CHAT_NOT_ALLOWED });
+    expect(c.post(ann, rot13("s*pxvat"), T0)).toMatchObject({ message: CHAT_NOT_ALLOWED });
+    expect(c.post(ann, "t.me/someone", T0)).toMatchObject({ message: CHAT_NO_CONTACT });
+    expect(c.post(ann, "555,123,4567", T0)).toMatchObject({ message: CHAT_NO_CONTACT });
+    expect(c.post(ann, "I'm 1500, rated 1-0 there", T0)).toMatchObject({ ok: true });
+  });
+
+  it("fillers that show as nothing are taken out: a message of only them is empty (finding 3, and a nit)", () => {
+    for (const filler of ["\u3164", "\u2800", "\u115F", "\uFFA0", "\u3164 \u2800"]) {
+      expect(new TownChat().post(ann, filler, T0)).toEqual({ ok: false, reason: "text", message: TOWN_EMPTY });
+    }
+    expect(tidyMessage("exam\u3164ple")).toBe("example");
+  });
+
+  it("a joined emoji keeps its joiner and counts as one, a skin tone too; a joiner between letters goes (a nit)", () => {
+    expect(tidyMessage("coding 👩\u200D💻 now")).toBe("coding 👩\u200D💻 now");
+    expect(tidyMessage("🏳\uFE0F\u200D🌈")).toBe("🏳\uFE0F\u200D🌈");
+    expect(tidyMessage("ni\u200Dce")).toBe("nice");
+    expect(charCount("👍🏽")).toBe(1);
+    expect(charCount("👩\u200D💻")).toBe(1);
+    expect(new TownChat().post(ann, "👍🏽".repeat(TOWN_CHAT.maxChars), T0)).toMatchObject({ ok: true });
+    expect(new TownChat().post(ann, "👍🏽".repeat(TOWN_CHAT.maxChars + 1), T0)).toMatchObject({ ok: false, message: TOWN_TOO_LONG });
+  });
+
+  it("one huge \"character\" can't beat the 80: a long joined chain, a pile of skin tones, a run of jamo count their parts (R4)", () => {
+    const chain = Array.from({ length: 200 }, () => "👩").join("\u200D");
+    const tones = `👍${"🏽".repeat(300)}`;
+    const jamo = "\u1100".repeat(300) + "\u1161".repeat(300);
+    for (const t of [chain, tones, jamo]) {
+      expect(charCount(t), t.slice(0, 8)).toBeGreaterThan(TOWN_CHAT.maxChars);
+      expect(new TownChat().post(ann, t, T0)).toMatchObject({ ok: false, message: TOWN_TOO_LONG });
+    }
+    // At most 240 code points in all: 80 family emoji (7 each) are 80 characters but too many parts; 80 skin-toned ones fit.
+    const family = "👨\u200D👩\u200D👧\u200D👦";
+    expect(new TownChat().post(ann, family.repeat(TOWN_CHAT.maxChars), T0)).toMatchObject({ ok: false, message: TOWN_TOO_LONG });
+    expect(new TownChat().post(ann, `${family} ${"👍🏽".repeat(TOWN_CHAT.maxChars - 2)}`, T0)).toMatchObject({ ok: true });
+    // Ordinary emoji still count as one each: a skin tone, a family of four, a flag.
+    expect(charCount("👍🏽👨\u200D👩\u200D👧\u200D👦🏳\uFE0F\u200D🌈")).toBe(3);
+  });
+
+  it("an instance's stale copy never makes a reader start over: it reads the room again when the reader is ahead (finding 4)", async () => {
+    const room = new TownChat();
+    let reads = 0;
+    const hub = { townRead: async () => (reads++, room.snapshot(Date.now())) } as unknown as TownHub;
+    const now = Date.now();
+    room.post(ann, "one", now);
+    expect((await townSlice(hub, 0, now)).lines.map((l) => l.n)).toEqual([1]);
+    // Bo sends through another instance; Ann's app saw it in its own answer (n = 2) and asks this instance, whose copy is n = 1.
+    room.post(bo, "two", now);
+    const s = await townSlice(hub, 2, now + 500, room.room);
+    expect(s.reset).toBeUndefined();
+    expect(s.lines).toEqual([]);
+    expect(reads).toBe(2);
+    // A new room (a restart): the reader is told to start over, with the new room's lines.
+    const restarted = new TownChat();
+    restarted.post(bo, "after", now);
+    const hub2 = { townRead: async () => restarted.snapshot(Date.now()) } as unknown as TownHub;
+    forgetTownCache();
+    expect(await townSlice(hub2, 1, now + 600, room.room)).toMatchObject({ room: restarted.room, reset: true, lines: [{ text: "after" }] });
+    expect(restarted.room).not.toBe(room.room);
+  });
+
+  it("a reader ahead of the copy makes it read the room again at most every 250 ms; meanwhile it hears nothing new (N1)", async () => {
+    const room = new TownChat();
+    room.post(ann, "one", T0);
+    let reads = 0;
+    const hub = { townRead: async () => (reads++, room.snapshot(T0)) } as unknown as TownHub;
+    await townSlice(hub, 0, T0);
+    expect(await townSlice(hub, 99, T0 + 10)).toMatchObject({ n: 1, reset: true });
+    expect(reads).toBe(2);
+    // Again within 250 ms, with a bogus count or room: no read of the hub, and nothing that makes the reader start over.
+    expect(await townSlice(hub, 99, T0 + 100)).toEqual({ room: room.room, n: 99, lines: [] });
+    expect(await townSlice(hub, 1, T0 + 200, "not-a-room")).toEqual({ room: "not-a-room", n: 1, lines: [] });
+    expect(reads).toBe(2);
+    await townSlice(hub, 99, T0 + 300);
+    expect(reads).toBe(3);
+  });
+
+  it("a moderator's Remove keeps the instance's copy on the same timer (N2)", async () => {
+    const room = new TownChat();
+    room.post(ann, "rude", T0);
+    const hub = { townRemove: async (n: number) => ({ removed: room.remove(n, T0), town: room.snapshot(T0) }) } as unknown as TownHub;
+    const kept: Promise<unknown>[] = [];
+    const r = await townRemoveResponse(new Request("https://x", { method: "POST", body: JSON.stringify({ n: 1 }) }), hub, true, T0, (p) => kept.push(p));
+    expect(r.status).toBe(200);
+    expect(kept).toHaveLength(1);
+  });
+
+  it("nothing outlives its 5 minutes: the wait and the repeat keep a hash, not the words, and the hub's alarm sweeps an empty town (finding 5)", async () => {
+    const c = new TownChat();
+    c.post(ann, "a secret message", T0);
+    expect(JSON.stringify([...(c as unknown as { sent: Map<string, unknown> }).sent])).not.toContain("secret");
+    // (The wait and the repeat's hash goes first, at the repeat's minute; the words themselves at their 5 minutes.)
+    expect(c.nextExpiry()).toBe(T0 + TOWN_CHAT.repeatMs);
+    c.sweep(T0 + TOWN_CHAT.repeatMs);
+    expect(c.nextExpiry()).toBe(T0 + TOWN_CHAT.lineMs);
+    expect(c.empty).toBe(false);
+    c.sweep(T0 + TOWN_CHAT.lineMs);
+    expect(c.empty).toBe(true);
+    // The hub: a post sets the alarm for the hash's minute and then the line's 5 minutes, and the alarm takes it out with nobody reading.
+    vi.useFakeTimers({ now: T0 });
+    const { hub, alarm, ready } = hubWith();
+    await ready();
+    await hub.townPost(ann, "gone in five minutes");
+    expect(alarm.at).toBe(T0 + TOWN_CHAT.repeatMs);
+    vi.setSystemTime(T0 + TOWN_CHAT.repeatMs);
+    await hub.alarm();
+    expect((hub as unknown as { towns: Map<string, TownChat> }).towns.get("town")!.empty).toBe(false);
+    expect(alarm.at).toBe(T0 + TOWN_CHAT.lineMs);
+    vi.setSystemTime(T0 + TOWN_CHAT.lineMs);
+    await hub.alarm();
+    expect((hub as unknown as { towns: Map<string, TownChat> }).towns.get("town")!.empty).toBe(true);
+    expect(alarm.at).toBe(T0 + TOWN_CHAT.lineMs); // (nothing left to ring for, and nobody online)
+    // An instance's copy of the room goes once it's a moment old.
+    const room = new TownChat();
+    room.post(ann, "cached", T0);
+    await townSlice({ townRead: async () => room.snapshot(T0) } as unknown as TownHub, 0, T0);
+    expireTownCache(T0 + TOWN_CHAT.readCacheMs + 1);
+    let read = false;
+    await townSlice({ townRead: async () => ((read = true), room.snapshot(T0)) } as unknown as TownHub, 1, T0 + TOWN_CHAT.readCacheMs + 2);
+    expect(read).toBe(true);
+    // …and by a timer the request keeps (waitUntil), with no request after it.
+    forgetTownCache();
+    const kept: Promise<unknown>[] = [];
+    await townSlice({ townRead: async () => room.snapshot(T0) } as unknown as TownHub, 0, T0, null, (p) => kept.push(p));
+    expect(kept).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(TOWN_CHAT.readCacheMs + 100);
+    await Promise.all(kept);
+    let again = false;
+    await townSlice({ townRead: async () => ((again = true), room.snapshot(T0)) } as unknown as TownHub, 1, T0 + 10);
+    expect(again, "the copy was let go").toBe(true);
+  });
+});
+
+describe("town chat: the API after the review", () => {
+  afterEach(() => {
+    forgetTownCache();
+    forgetSecrets();
+  });
+
+  async function setup() {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql);
+    const { hub, ready } = hubWith();
+    await ready();
+    const posted: unknown[] = [];
+    const spy = new Proxy(hub, { get: (t, k) => (k === "townPost" || k === "chatPost" ? (...a: unknown[]) => (posted.push(a[1]), (t as never as Record<string, (...x: unknown[]) => unknown>)[k as string]!(...a)) : (t as never as Record<string | symbol, unknown>)[k]) });
+    const env = { DB: d1, LIVE: { idFromName: () => "global", get: () => spy }, GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret", ADMIN_EMAILS: "mod@example.com", FAIRPLAY_REVIEW_TOKEN: "review-token-0123456789" };
+    const call = async (path: string, token: string | null, body?: string, headers: Record<string, string> = {}) =>
+      (await handleAccountApi(
+        new Request(`https://hunchess.test${path}`, { method: body === undefined ? "GET" : "POST", headers: { "content-type": "application/json", ...(token ? { cookie: `hc_session=${token}` } : {}), ...headers }, body }),
+        env as never,
+      ))!;
+    const signedIn = async (name: string) => {
+      const u = await player(sql, name);
+      return { user: u, token: await createSession(sql, u.id, Date.now()) };
+    };
+    return { sql, d1, env, call, signedIn, posted };
+  }
+
+  it("a huge message never reaches the shared hub; the global chat's line id is cut too (finding 7)", async () => {
+    const { sql, call, signedIn, posted } = await setup();
+    const a = await signedIn("Ann");
+    const big = JSON.stringify({ text: "x".repeat(50_000) });
+    const r = await call("/api/town/chat", a.token, big, { "content-length": String(big.length) });
+    expect(r.status).toBe(413);
+    expect(await call("/api/town/chat", a.token, big).then((x) => x.status)).toBe(413);
+    expect(posted).toEqual([]);
+    const ok = await call("/api/town/chat", a.token, JSON.stringify({ text: `${"y".repeat(900)}` }));
+    expect(ok.status).toBe(400);
+    expect((posted[0] as string).length).toBeLessThanOrEqual(1024);
+    // (The global chat: chat on first, its opt-in; a line's id goes cut to 64, typed text to 1,024, and a huge body not at all.)
+    await sql.run("UPDATE users SET chat_on = 1 WHERE id = ?", a.user.id);
+    await call("/api/chat", a.token, JSON.stringify({ say: "z".repeat(5000) }));
+    expect((posted[1] as { say: string }).say.length).toBeLessThanOrEqual(64);
+    expect((await call("/api/chat", a.token, big)).status).toBe(413);
+    expect(posted).toHaveLength(2);
+    await call("/api/chat", a.token, JSON.stringify({ text: "w".repeat(5000) }));
+    expect((posted[2] as { text: string }).text.length).toBeLessThanOrEqual(1024);
+  });
+
+  it("a guest or a too-young device can't report a line (a nit); the reviewer's API leaves the line out and can't clear a chat report (finding 6)", async () => {
+    const { sql, d1, env, call, signedIn } = await setup();
+    const troll = await signedIn("Troll");
+    const ann = await signedIn("Ann");
+    const sent = (await (await call("/api/town/chat", troll.token, JSON.stringify({ text: "you play like a potato" }))).json()) as { line: { n: number } };
+    const guest = await createGuest(sql, Date.now(), "Guesty");
+    const report = { target: troll.user.id, reason: "Offensive chat", line: sent.line.n };
+    const g = await call("/api/report", guest.token, JSON.stringify(report));
+    expect(g.status).toBe(403);
+    expect(await g.json()).toEqual({ message: SIGN_IN_TO_TOWN_CHAT });
+    const y = await call("/api/report", ann.token, JSON.stringify(report), { cookie: `hc_session=${ann.token}; hc_age=under` });
+    expect(y.status).toBe(403);
+    expect(await y.json()).toEqual({ message: TOWN_CHAT_AGE });
+    expect((await call("/api/report", ann.token, JSON.stringify(report))).status).toBe(200);
+    // The reviewer (its token): the report, without the words; an admin sees them.
+    expect(JSON.stringify(await caseDetail(sql, troll.user.id, { email: false }))).not.toContain("potato");
+    expect(JSON.stringify(await caseDetail(sql, troll.user.id, { email: true, lines: true }))).toContain("potato");
+    const api = await handleAdmin(new Request(`https://x/api/admin/fairplay/cases/${troll.user.id}`, { headers: { authorization: "Bearer review-token-0123456789" } }), { ...env, DB: d1 } as never);
+    const body = await api!.text();
+    expect(body).toContain("Offensive chat");
+    expect(body).not.toContain("potato");
+    // The reviewer can't clear that case, not even after moving it itself (review, then clear); a person can.
+    const t = Date.now();
+    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 1)).toMatchObject({ ok: false, status: 409 });
+    expect(await decide(sql, troll.user.id, "review", "reviewer", "a person should look", t + 2)).toMatchObject({ ok: true });
+    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 3)).toMatchObject({ ok: false, status: 409 });
+    expect(await decide(sql, troll.user.id, "clear", "admin:mod@example.com", "read the line: a joke", t + 4)).toMatchObject({ ok: true });
+    // After a person's decision the reviewer may clear again, until a newer chat report: clear → review → clear refused.
+    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 5)).toMatchObject({ ok: true });
+    await sql.run("INSERT INTO reports (reporter, target, reason, at, match, line, line_at) VALUES (?, ?, ?, ?, NULL, ?, ?)", ann.user.id, troll.user.id, "Offensive chat", t + 6, "again", t + 6);
+    expect(await decide(sql, troll.user.id, "review", "reviewer", "a new report", t + 7)).toMatchObject({ ok: true });
+    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 8)).toMatchObject({ ok: false, status: 409 });
+  });
+});
+
+describe("town chat: a boss challenged from the town (the server's lines; Eric, Nov 2)", () => {
+  const won = (battle: string, moves: number | null = 34, token: string | null = null) => ({ kind: "finish" as const, battle, outcome: "won" as const, moves, token });
+
+  it("the words: the start, each way it ends with your moves, a surrender after enough moves, a token dropped on the end", () => {
+    expect(challengeText("Ann", "Alfil")).toBe("Ann challenged Alfil!");
+    expect(challengeText("Ann", "Alfil", { outcome: "won", moves: 34, token: null })).toBe("Ann beat Alfil in 34 moves!");
+    expect(challengeText("Ann", "Alfil", { outcome: "lost", moves: 21, token: null })).toBe("Alfil beat Ann in 21 moves.");
+    expect(challengeText("Ann", "Alfil", { outcome: "drew", moves: 40, token: null })).toBe("Ann drew with Alfil in 40 moves.");
+    expect(challengeText("Ann", "Alfil", { outcome: "surrendered", moves: 15, token: null })).toBe("Ann surrendered to Alfil after 15 moves.");
+    expect(challengeText("Ann", "Alfil", { outcome: "lost", moves: 1, token: null })).toBe("Alfil beat Ann in 1 move.");
+    expect(challengeText("Ann", "Alfil", { outcome: "won", moves: null, token: null })).toBe("Ann beat Alfil!");
+    expect(challengeText("Ann", "Alfil", { outcome: "lost", moves: 0, token: null })).toBe("Alfil beat Ann.");
+    expect(challengeText("Ann", "Alfil", { outcome: "won", moves: 34, token: "Babur" })).toBe("Ann beat Alfil in 34 moves! + Babur token");
+    expect(endsChallenge({ outcome: "surrendered", moves: TOWN_CHAT.challengeSurrenderMoves - 1, token: null })).toBe(false);
+    expect(endsChallenge({ outcome: "surrendered", moves: TOWN_CHAT.challengeSurrenderMoves, token: null })).toBe(true);
+    expect(TOWN_CHAT.challengeSurrenderMoves).toBe(10);
+  });
+
+  it("a start posts its line, the server's own (no account, no name); its battle's finish posts how it went and closes it", () => {
+    const c = new TownChat();
+    const start = c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b1" }, T0);
+    expect(start).toMatchObject({ n: 1, from: "", name: "", text: "Ann challenged Alfil!", sys: "challenge" });
+    expect(c.challengeOpen("ann")).toBe(true);
+    // (Another battle's finish, or a finish with nothing open, posts nothing.)
+    expect(c.challenge(ann, "", won("other"), T0 + 1)).toBeNull();
+    expect(c.challenge(bo, "", won("b1"), T0 + 1)).toBeNull();
+    expect(c.challenge(ann, "", won("b1"), T0 + 2)).toMatchObject({ n: 2, text: "Ann beat Alfil in 34 moves!", sys: "challenge" });
+    expect(c.challengeOpen("ann")).toBe(false);
+    // Once only: the same finish again is nothing.
+    expect(c.challenge(ann, "", won("b1"), T0 + 3)).toBeNull();
+    expect(c.snapshot(T0 + 3).lines.map((l) => l.text)).toEqual(["Ann challenged Alfil!", "Ann beat Alfil in 34 moves!"]);
+  });
+
+  it("no spam: a quit posts nothing and leaves it open, and the next start posts no line until one of their challenges finishes", () => {
+    const c = new TownChat();
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b1" }, T0)).not.toBeNull();
+    // Quit: a leave never finishes; a surrender before 10 moves is a quit too.
+    expect(c.challenge(ann, "", { kind: "finish", battle: "b1", outcome: "surrendered", moves: 9, token: null }, T0 + 1)).toBeNull();
+    expect(c.challengeOpen("ann")).toBe(true);
+    // Again, and again: no new start line.
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b2" }, T0 + 2)).toBeNull();
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b3" }, T0 + 3)).toBeNull();
+    // Only the newest battle's finish counts; it ends the challenge with its line (a surrender after enough moves counts).
+    expect(c.challenge(ann, "", won("b2"), T0 + 4)).toBeNull();
+    expect(c.challenge(ann, "", { kind: "finish", battle: "b3", outcome: "surrendered", moves: 15, token: null }, T0 + 5)).toMatchObject({ text: "Ann surrendered to Alfil after 15 moves." });
+    // Finished: the next start posts its line again. Someone else's challenges are their own.
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b4" }, T0 + 6)).toMatchObject({ text: "Ann challenged Alfil!" });
+    expect(c.challenge(bo, "Alfil", { kind: "start", boss: "alfil", battle: "x1" }, T0 + 6)).toMatchObject({ text: "Bo challenged Alfil!" });
+    const texts = c.snapshot(T0 + 7).lines.map((l) => l.text);
+    expect(texts.filter((t) => t === "Ann challenged Alfil!")).toHaveLength(2);
+  });
+
+  it("an unfinished challenge is forgotten after a day (memory only), and the lines go after 5 minutes as any line", () => {
+    const c = new TownChat();
+    c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b1" }, T0);
+    expect(c.snapshot(T0 + TOWN_CHAT.lineMs).lines).toEqual([]);
+    expect(c.challengeOpen("ann")).toBe(true);
+    c.sweep(T0 + TOWN_CHAT.challengeOpenMs);
+    expect(c.challengeOpen("ann")).toBe(false);
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b2" }, T0 + TOWN_CHAT.challengeOpenMs + 1)).not.toBeNull();
+  });
+});

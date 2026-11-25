@@ -1,0 +1,937 @@
+/* ---- The end screen of every match (Eric, Nov 20; components/EndScreen.tsx; docs/decisions/2026-11-20-end-screen.md). Every box has
+   its size from the first frame; the sequence only sets transforms, opacity and texts. Centered, cards and all. ---- */
+/* One spacing rule on every end screen (Eric, Nov 25: "Make things spaced evenly and tight, and then we can always just center the whole
+   thing"): one gap between every container (`--es-gap`), half of it inside a group (the headline and its line, a number and its label);
+   nothing stretched to fill height; a stack shorter than the screen centered as one block. Guard: `endGaps` (e2e/helpers.ts) in
+   ranked-1v1.spec.ts and boss-result.spec.ts. */
+.es-screen {
+  --es-gap: 12px;
+  --es-gap-in: 6px;
+  text-align: center;
+}
+.screen.es-screen {
+  gap: var(--es-gap);
+  justify-content: safe center;
+}
+.es-rewards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--es-gap);
+  width: 100%;
+}
+
+/* The headline: the title in the God King's pixel type, the match's line under it in the same type. */
+.es-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--es-gap-in, 6px);
+  text-align: center;
+}
+.results .es-title,
+.es-title {
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 22px;
+  line-height: 1.4;
+  color: #1a1406;
+  text-shadow: 3px 3px 0 #e8b84a;
+  margin: 0;
+}
+:root:not([data-theme="light"]) .es-title {
+  color: #fff3d1;
+  text-shadow: 3px 3px 0 #a8741a;
+}
+.es-loss .es-title {
+  text-shadow: 3px 3px 0 #e06a6a;
+}
+:root:not([data-theme="light"]) .es-loss .es-title {
+  color: #ffe1e1;
+  text-shadow: 3px 3px 0 #9c2f2f;
+}
+.results .es-title.es-title-long,
+.es-title.es-title-long {
+  font-size: 15px;
+}
+.es-line {
+  margin: 0;
+  height: 22px;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.es-line.es-line-long {
+  font-size: 10px;
+}
+.es-win .es-line {
+  color: var(--good);
+  text-shadow: 0 0 0 transparent;
+  animation: es-blink 1.8s ease-in-out infinite;
+}
+.es-loss .es-line {
+  color: var(--bad);
+}
+.es-head.es-plain .es-line {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--muted);
+  animation: none;
+}
+/* The soft blink: a gentle dim and glow, never off. */
+@keyframes es-blink {
+  0%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 8px color-mix(in srgb, var(--good) 55%, transparent);
+  }
+  50% {
+    opacity: 0.6;
+    text-shadow: 0 0 0 transparent;
+  }
+}
+
+/* "XP EARNED" and its number: a fixed box; the number counts here, then lobs into its bar. (Nov 25: the label and the number a size
+   bigger, Eric: "I need a magnifying glass to read XP EARNED +0".) */
+.es-earned {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--es-gap-in, 6px);
+  text-align: center;
+}
+/* Why there's none ("No XP: test game."), in the number's place, the same height. */
+.es-earned-why {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+}
+/* What made it ("Win +50 · Daily reward +200"): one small line, always there. */
+.es-parts {
+  height: 15px;
+  font-size: 12px;
+  line-height: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.es-earned-label {
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-shadow: 1px 1px 0 color-mix(in srgb, #000 35%, transparent);
+}
+:root[data-theme="light"] .es-earned-label {
+  color: #a8741a;
+  text-shadow: none;
+}
+/* (The number in the normal UI font, Eric, Nov 20: "we don't need to make the big xp number so pixelated I think normal is fine".) */
+.es-earned-num {
+  display: inline-block;
+  font-family: inherit;
+  font-weight: 900;
+  font-size: 42px;
+  line-height: 44px;
+  letter-spacing: -0.5px;
+  color: var(--good);
+  text-shadow: 0 2px 0 color-mix(in srgb, var(--good) 30%, #000 35%);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+  transform-origin: center;
+  will-change: transform;
+  position: relative;
+  z-index: 5;
+}
+.es-earned-rp .es-earned-num {
+  color: var(--accent);
+  text-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 35%, #000 40%);
+}
+.es-earned-rp.es-down .es-earned-label {
+  color: var(--bad);
+}
+.es-earned-rp.es-down .es-earned-num {
+  color: var(--bad);
+}
+.es-live .es-earned-num {
+  opacity: 1;
+}
+.es-earned-num.es-settled {
+  opacity: 0.75;
+  animation: es-settle 320ms ease-out both;
+}
+@keyframes es-settle {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.75;
+  }
+}
+
+/* The bosses (1-2-1) and your pawn, one row of a fixed height. */
+.es-duo {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 22px;
+  height: 108px;
+  margin: 0 auto;
+}
+.es-lineup {
+  position: relative;
+  width: 220px;
+  height: 104px;
+  flex: none;
+}
+.es-front,
+.es-back {
+  position: absolute;
+  bottom: 0;
+  display: block;
+  line-height: 0;
+}
+.es-front {
+  left: 50%;
+  translate: -50% 0;
+  z-index: 2;
+}
+.es-back {
+  bottom: 14px;
+  z-index: 1;
+  filter: brightness(0.7) saturate(0.85);
+}
+.es-back-0 {
+  left: 0;
+}
+.es-back-1 {
+  right: 0;
+}
+/* (Two bosses: the one behind on the left, the front one a little right of the middle.) */
+.es-n2 .es-front {
+  left: 58%;
+}
+.es-fig {
+  position: relative;
+  display: inline-block;
+}
+.es-fig-cv {
+  position: absolute;
+  image-rendering: pixelated;
+}
+.es-mirror {
+  transform: scaleX(-1);
+}
+.es-pawn {
+  position: relative;
+  flex: none;
+  width: 70px;
+  height: 92px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+.es-pawn .you-pawn {
+  --pk: 1.45;
+  --pw: calc(68px * var(--pk));
+}
+/* A level reached: a gold ring bursts from your pawn as it hops. */
+.es-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  width: 80px;
+  height: 80px;
+  margin-left: -40px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 14px var(--accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.es-pawn.es-lvl-on .es-ring {
+  animation: es-ring 900ms ease-out both;
+}
+.es-pawn.es-lvl-on .you-pawn {
+  animation: es-glow 1400ms ease-out both;
+}
+@keyframes es-ring {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.35);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+@keyframes es-glow {
+  0%,
+  100% {
+    filter: none;
+  }
+  25% {
+    filter: drop-shadow(0 0 6px var(--accent)) brightness(1.25);
+  }
+}
+
+/* The bar: the landing slot, your name, your level; the bar; 0, where you are, the level's end. */
+.es-track {
+  box-sizing: border-box;
+  width: min(340px, 100%);
+  height: 80px;
+  margin: 0 auto;
+  padding: 8px 12px 7px;
+  display: grid;
+  grid-template-rows: 20px 12px 16px;
+  row-gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  contain: layout paint;
+  overflow: visible;
+  font-variant-numeric: tabular-nums;
+}
+.es-track-top {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, max-content) 1fr;
+  align-items: center;
+  column-gap: 8px;
+  white-space: nowrap;
+}
+.es-gain {
+  justify-self: start;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--good);
+  opacity: 0;
+}
+.es-track-rp .es-gain {
+  color: var(--accent);
+}
+.es-track-rp.es-down .es-gain,
+:root[data-theme="light"] .es-track-rp.es-down .es-gain {
+  color: var(--bad);
+}
+:root[data-theme="light"] .es-track-rp .es-gain {
+  color: #a8741a;
+}
+.es-gain.on {
+  animation: es-land 380ms ease-out both;
+}
+@keyframes es-land {
+  0% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.es-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 800;
+}
+.es-who > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.es-emblem {
+  flex: none;
+  transform: scale(0.75);
+  margin: -6px -4px;
+}
+.es-level {
+  justify-self: end;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.es-bar {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+}
+.es-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--good) 75%, #fff) 0%, var(--good) 55%);
+  transform-origin: left center;
+  will-change: transform;
+}
+.es-track-rp .es-fill {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 70%, #fff) 0%, var(--accent) 55%);
+}
+.es-landed {
+  animation: es-box-land 420ms ease-out;
+}
+@keyframes es-box-land {
+  30% {
+    border-color: var(--good);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 30%, transparent);
+  }
+}
+/* A level reached: the bar flashes full and a shine sweeps it; "Level 3!" pops over its end. */
+.es-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.es-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -30%;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  opacity: 0;
+}
+.es-lvl .es-shine::after {
+  animation: es-sweep 600ms ease-out both;
+}
+.es-lvl .es-fill {
+  animation: es-flash 650ms ease-out both;
+}
+.es-lvl .es-bar {
+  animation: es-bar-glow 900ms ease-out both;
+}
+@keyframes es-sweep {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(440%);
+  }
+}
+@keyframes es-flash {
+  0%,
+  100% {
+    filter: none;
+  }
+  30% {
+    filter: brightness(1.6) saturate(1.2);
+  }
+}
+@keyframes es-bar-glow {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  30% {
+    box-shadow: 0 0 12px var(--accent);
+  }
+}
+.es-pop {
+  position: absolute;
+  right: 0;
+  bottom: 21px;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--accent);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.es-lvl .es-pop {
+  animation: xp-pop 1100ms ease-out both;
+}
+/* (The label steps aside while "Level 3!" stands in its place.) */
+.es-lvl .es-level {
+  animation: es-aside 1100ms step-end both;
+}
+@keyframes es-aside {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.es-ends {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.es-now {
+  font-weight: 800;
+  color: var(--text);
+}
+.es-now small {
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* The quests this match moved: their rows, as many as there are (Nov 25: no empty rows kept); none (or still asking) one line. */
+.es-quests {
+  box-sizing: border-box;
+  width: min(340px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-rows: 16px;
+  grid-auto-rows: 42px;
+  row-gap: 4px;
+}
+.es-quests.es-quests-one {
+  display: block;
+}
+.es-quests-head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+}
+/* "QUESTS  No quests this game": one line, the word bold. */
+.es-quests-none {
+  margin: 0;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.es-quests-none .es-quests-head {
+  margin-right: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+.es-q {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 56px 36px auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 0 10px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+.es-q-pic {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+.es-q-pic .qo-boss {
+  width: 32px;
+  height: 32px;
+}
+.es-q-pic .qo-pieces piece {
+  width: 26px;
+  height: 26px;
+}
+.es-q-text {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 15px;
+}
+.es-q-text strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.es-q-goal {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.es-q-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+}
+.es-q-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left center;
+}
+.es-q-count {
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+.es-q-reward {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.es-q-moving {
+  border-color: var(--accent);
+}
+.es-q-done {
+  border-color: var(--good);
+  animation: es-q-pop 520ms ease-out both;
+}
+.es-q-done .es-q-fill {
+  background: var(--good);
+}
+.es-q-done .es-q-count,
+.es-q-done .es-q-reward {
+  color: var(--good);
+}
+@keyframes es-q-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.04);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--good) 55%, transparent);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The review's estimate (Eric: "tuck it in as est. rating below YOUR GAME, MOVE BY MOVE and the small move line"). */
+.bm-est {
+  margin: 2px 0 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .es-win .es-line,
+  .es-gain.on,
+  .es-landed,
+  .es-lvl .es-fill,
+  .es-lvl .es-bar,
+  .es-lvl .es-shine::after,
+  .es-lvl .es-pop,
+  .es-pawn.es-lvl-on .es-ring,
+  .es-pawn.es-lvl-on .you-pawn,
+  .es-q-done,
+  .es-earned-num.es-settled {
+    animation: none;
+  }
+  .es-gain.on {
+    opacity: 1;
+  }
+}
+/* A boss without a character's art: his portrait in the front's place. */
+.es-portrait {
+  width: 72px;
+  height: 72px;
+}
+/* (A boss battle's ResultDuo as the rewards' middle: nothing under your pawn now, so he stands on its base line.) Nov 25 (Eric: "the
+   character models are small here ... they can be bigger or just moved up"): the boss at 2.25 (was 2; his attack at the same scale,
+   `--rd-k`) and your pawn at 1.8 (was 1.6); the room over him for his words 76 px (was 100), the row's gap wider for the 16 px between them. */
+.es-screen .rd-boss {
+  margin-bottom: 12px;
+}
+/* (`--rd-k` on the row, so the room under it below can use it too.) Nov 25, round 2d: his frame keeps rows under his feet (his shadow,
+   a jump's landing: `--rd-below`, ResultDuo, 4 to 8 of them), which hang under his box, and the rewards' gap under the row (12 px) was
+   less than that for most bosses at 2.25 (Big Boy's 6 rows, 13.5 px, crossed the XP bar's top). The row keeps the rest under it. */
+.es-screen .results-duo {
+  --rd-k: 2.25;
+  padding-bottom: max(0px, calc(var(--rd-below, 0) * var(--rd-k) * 1px - var(--es-gap)));
+}
+.es-screen .results-duo:has(.ch-recluse) {
+  --rd-k: 1.25;
+  --rd-bw: 96px;
+}
+.es-screen .results-duo .boss-char.place-results:not(.ch-recluse) {
+  --bc-scale: 2.25;
+  width: var(--rd-bw);
+  /* (From his head to his feet: his frame's empty rows above his idle's first drawn one (`--rd-top`, ResultDuo) left out of the box.) */
+  height: calc((var(--bc-fy) - var(--rd-top, 0)) * var(--bc-scale) * 1px);
+}
+/* (Room over him for his words, only what a two-line line needs over his head: his box is as tall as his figure, nothing reserved.) */
+.es-screen .results-duo .boss-char.place-results {
+  margin-top: 56px;
+}
+.es-screen .rd-boss {
+  margin-bottom: 0;
+}
+/* The row's gap: 48 px, or more where a boss's drawing reaches further right than that leaves room for (Nov 25, main's retry-passes:
+   Smudgy's defeat came to 14.3 px of your pawn at 2.25). `--rd-reach` (ResultDuo): how far right of his feet he's drawn in any figure
+   the result shows him in (his idle, defeat and victory), in his frame's px; his feet are his box's middle (`--rd-bw`: 104, the Hidden
+   Boss's 96), and your pawn's art box stands (176 - 68 × 1.8) / 2 px into its column. So 16 px between them for every boss, worked out
+   from his drawing, not a number tuned by hand to the bosses of the day (it went stale at each new scale: Nov 9, Nov 11, Nov 25). */
+.es-screen .results-duo {
+  --rd-bw: 104px;
+  gap: max(48px, round(up, calc(var(--rd-reach, 0) * var(--rd-k) * 1px - var(--rd-bw) / 2 - (176px - 68px * 1.8) / 2 + 16px), 1px));
+  padding-left: 24px;
+}
+.es-screen .rd-you .you-pawn {
+  --pk: 1.8;
+  --pw: calc(68px * var(--pk));
+}
+/* Squads' middle: your squad's tag and members, in a row. */
+.es-squad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 64px;
+  justify-content: center;
+}
+/* Ranked 1 v 1's coins line, under the quests: one line, always there. */
+.es-coins {
+  margin: 0;
+  height: 18px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dv-end .dv-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.dv-end .dv-chat {
+  width: min(380px, 100%);
+}
+
+/* Quests on ranked 1 v 1's end page (`day`, Eric, Nov 25): every quest you have, dailies then the weekly, in a box of four rows; the ones
+   this game moved lit, the others still at their counts. Never "No quests moved this game". */
+.es-q.es-q-lit {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.es-q.es-q-still {
+  animation: none;
+}
+
+/* Every end screen's buttons stacked, the column's width, Play again on top (Eric, Nov 25). */
+.es-screen .actions {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  width: min(340px, 100%);
+  margin: 0 auto;
+  gap: var(--es-gap-in, 6px);
+}
+.es-screen .actions .btn {
+  min-height: 46px;
+}
+
+/* ---- Ranked 1 v 1's end page (Eric, Nov 25; docs/decisions/2026-11-25-end-screens-2.md) ----
+ * Play again and Home stacked, the column's width; the chat with its post-game lines. A phone: one tight column, the chat with a message
+ * area, the move by move clear of Safari's bar. A computer: the game's own screen (Duel.tsx `dv-ended`), its right column's content
+ * swapped: below. */
+.dv-result-actions.dv-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  width: min(340px, 100%);
+  margin: 0 auto;
+  gap: var(--es-gap-in, 6px);
+}
+.dv-result-actions.dv-stacked .btn {
+  flex: none;
+  min-height: 46px;
+  font-size: 17px;
+}
+.dv-steps {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.dv-steps .nav-btn {
+  width: 32px;
+  height: 30px;
+  min-height: 0;
+}
+.dv-steps-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 899px), (max-height: 599px) {
+  .screen.dv-end {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 40px);
+  }
+  /* (A small chat, Eric, Nov 25: "fit a small one with a few lines visible": about four lines of messages, its lines in one row.) */
+  .dv-end .dv-chat {
+    flex: none;
+    width: min(380px, 100%);
+    height: 240px;
+    margin: 0 auto;
+  }
+}
+
+/* A computer: the right column, the play panel's width, from the top strip's top to the bottom strip's foot; its content never makes
+   the rows taller (`contain: size`). Its sizes in design pixels (`--es-u`: the window's height over 800, 0.75 to 1 px), so a laptop shows
+   the desktop's column, smaller; the chat takes what's left (a shorter chat on a short window, never a scrolling page). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game.dv-ended .dv-end-col {
+    --es-u: clamp(0.75px, calc(var(--app-h) / 800), 1px);
+    grid-column: 2;
+    grid-row: 3 / 5;
+    align-self: stretch;
+    --es-gap: calc(12 * var(--es-u));
+    --es-gap-in: calc(6 * var(--es-u));
+    contain: size;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: safe center;
+    gap: var(--es-gap);
+    min-height: 0;
+  }
+  .dv-end-col > .es-head {
+    flex: none;
+  }
+  .dv-end-col .es-rewards {
+    flex: none;
+  }
+  .dv-end-col .dv-result-actions.dv-stacked {
+    width: 100%;
+  }
+  .dv-end-col .dv-result-actions.dv-stacked .btn {
+    min-height: calc(40 * var(--es-u));
+    font-size: calc(16 * var(--es-u));
+    border-radius: calc(12 * var(--es-u));
+  }
+  /* (Small: about four lines of messages, Eric, Nov 25; shorter only if the column hasn't the room.) */
+  .dv-end-col > .dv-chat {
+    flex: 0 1 236px;
+    min-height: 120px;
+    height: auto;
+    width: auto;
+  }
+  .dv-end-col .es-title {
+    font-size: calc(22 * var(--es-u));
+  }
+  .dv-end-col .es-line,
+  .dv-end-col .es-head.es-plain .es-line {
+    height: calc(20 * var(--es-u));
+    line-height: calc(20 * var(--es-u));
+    font-size: calc(14 * var(--es-u));
+  }
+
+  .dv-end-col .es-earned-label {
+    font-size: calc(12 * var(--es-u));
+  }
+  .dv-end-col .es-earned-num {
+    font-size: calc(40 * var(--es-u));
+    line-height: calc(42 * var(--es-u));
+  }
+  .dv-end-col .es-earned-why {
+    height: calc(38 * var(--es-u));
+    font-size: calc(15 * var(--es-u));
+  }
+  .dv-end-col .es-parts {
+    height: calc(15 * var(--es-u));
+    line-height: calc(15 * var(--es-u));
+    font-size: calc(12 * var(--es-u));
+  }
+  .dv-end-col .es-track,
+  .dv-end-col .es-quests {
+    width: 100%;
+  }
+  .dv-end-col .es-track {
+    height: calc(76 * var(--es-u));
+    padding: calc(7 * var(--es-u)) calc(12 * var(--es-u)) calc(6 * var(--es-u));
+    grid-template-rows: calc(20 * var(--es-u)) calc(12 * var(--es-u)) calc(16 * var(--es-u));
+    row-gap: calc(5 * var(--es-u));
+  }
+  .dv-end-col .es-gain {
+    font-size: calc(14 * var(--es-u));
+  }
+  .dv-end-col .es-who,
+  .dv-end-col .es-level {
+    font-size: calc(13 * var(--es-u));
+  }
+  .dv-end-col .es-ends {
+    font-size: calc(12 * var(--es-u));
+    line-height: calc(16 * var(--es-u));
+  }
+  .dv-end-col .es-now small {
+    font-size: calc(11 * var(--es-u));
+  }
+  .dv-end-col .es-quests {
+    grid-template-rows: calc(16 * var(--es-u));
+    grid-auto-rows: calc(40 * var(--es-u));
+    row-gap: calc(4 * var(--es-u));
+  }
+  .dv-end-col .es-quests-head,
+  .dv-end-col .es-q-goal,
+  .dv-end-col .es-q-reward {
+    font-size: calc(11 * var(--es-u));
+  }
+  .dv-end-col .es-quests-none,
+  .dv-end-col .es-q-text strong {
+    font-size: calc(13 * var(--es-u));
+  }
+  .dv-end-col .es-q {
+    grid-template-columns: calc(32 * var(--es-u)) minmax(0, 1fr) calc(56 * var(--es-u)) calc(36 * var(--es-u)) auto;
+    column-gap: calc(8 * var(--es-u));
+  }
+  .dv-end-col .es-coins {
+    flex: none;
+    height: calc(18 * var(--es-u));
+    font-size: calc(13 * var(--es-u));
+  }
+  /* (Your strip: the moves' ◀ ▶ in your clock's place; the opponent's clock as it ended.) */
+  .dv-ended .dv-strip .dv-steps {
+    margin-left: auto;
+  }
+}
+
+/* The 50 v 50's stage table: the column's width (the bar's and the buttons'), never the page's. */
+.es-screen .stage-table {
+  width: min(340px, 100%);
+  margin: 0 auto;
+}
+
+/* A computer's boss result page: its two columns (the result, the review) centered down the window as one block when shorter than it; the
+   result's own stack in the one gap. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.results.boss-results.es-screen {
+    align-content: safe center;
+  }
+  .es-screen.boss-results > .results-top {
+    gap: var(--es-gap);
+  }
+}
+/* (No move of yours to show: the result's column is the page's, centered in it: never a half-empty page, Nov 25, round 2c.) */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.results.boss-results.es-no-review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

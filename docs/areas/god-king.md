@@ -1,0 +1,189 @@
+# The God King and the boss battle's presentation
+
+Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
+
+## How it works today
+
+- **Who he is.** The crowd's champion in every boss battle (the raid, the Crowd's boss final, solo's "Boss alone"). He
+  stands in the dock under the board (a computer: by the board's bottom-right corner, mirroring the boss by its
+  bottom-left, his words and menu opening outwards; Eric, Oct 11; from 1100 px wide he and your pawn grow toward twice their size as far as
+  the room right of the board lets them, over its corner a little where needed, `--king-k`, Nov 4: bosses.md, "A boss battle on a computer"; in Boss alone, **your own pawn** stands there and he
+  to its right, a phone's strip has it just left of him, Oct 28, or under him where the strip is tall enough, the two bigger, Nov 11: see [bosses.md](bosses.md), "Your pawn"; a phone upright: at the far right of the strip under the
+  dock's row, the scoreboard / move list panel to his left, his menu opening above the row and his words to his left,
+  Eric, Oct 25; a phone on its side: beside the row where the screen's column has room right of the board, Eric, Oct 15:
+  see [bosses.md](bosses.md), "The dock under the board"), talks now and then, and can be called to act. He is
+  secondary to the chess: big moments are rare and short, and there is no instruction text on screen.
+- **Charges.** He has up to `kingChargesMax` (3) charges. Power-ups convert to charges (`kingPowerUpsPerCharge`).
+  Tapping him opens his command menu: **play this move** (he plays the best move for the crowd, with his bolt) or
+  **strike the boss** (three bolts and slashes on the boss's king: the boss's next move is weakened by
+  `kingStrikeLoss`, and the boss's rage meter gains `BOSS_POWERS.rageStrike`, a quarter of it, at the boss's
+  `rageSpeed`: Eric, Oct 11, "like a video game"; nothing while an ultimate's effect runs; `strikeRage` in
+  `boss-powers.ts`, from `callStrike` in the runner). Bots in the crowd follow him (`kingBotLoss`, `kingBotFollow`).
+- **His word after Ginger's blizzard** names what the storm left free: the queen's lines, the king's
+  (`blizzardKing`), or another piece's (`blizzardOne`), from the moves allowed.
+- **His warning when Chandy's Lock-on Shot is aimed** (Eric, Nov 24: "the god king should say something about like, you know, move
+  your queen behind safety"): `shotQueen` or `shotRook` (the aim's `shape`), as the aim's banner fires (Boss.tsx): put a piece in
+  front of it (never "out of the line": the round follows its target down whatever file it ends on). Quiet when no move you may play
+  can put one there (`shotSaves` over the turn's allowed moves), as he's quiet about threats you can't heed (Wrangler's duel).
+  docs/decisions/2026-11-24-chandy-upgrades.md.
+- **No charges left** (Eric, Oct 15): a tap on him gets his soft "can't" (two quick, muffled low notes falling,
+  synthesized: `characters/god-king-sounds.ts`, made ahead in the sound worker's table as the bosses' are, `kingCant`)
+  and a tiny shake, dimmed a moment (`.gk-unit.nope`, 0.4 s); nothing else (no menu, nothing spent).
+- **Drawn when he changes** (Oct 15; DECISIONS.md, "The boss screen draws only what changed"): his unit in the dock
+  (`GodKingUnit`) is memoized, and draws again every frame only while he commands from his spot or shakes his "can't";
+  his figure animates on its own canvas loop, his words in their own box (`VoiceBubble` on `kingVoice`), so a screen
+  drawn every frame doesn't draw him with it.
+- **The clock stands still** while he acts, for everyone, solo and online: a move lengthens the reveal by
+  `KING_COMMAND.moveMs`, a strike stops every deadline for `kingStrikeMs`. Nothing he does costs anyone time. His
+  cut-in (2.5 s) and the Last Stand's (3.1 s) carry the banners' extra since Oct 24 (`BANNER_PLUS_MS`, 0.75 s), and
+  everything after each comes that much later (his bolt and slashes, the slide and the blows; `moveMs`, `kingStrikeMs`
+  and `lastStandMs()` with them): docs/decisions/2026-10-24-banner-and-speech-time.md.
+- **His Last Stand.** Always armed, once per game. If the crowd's played move gives away at least the bar (in points
+  of expected score against the best move, by the judge's own numbers), he dives onto the board, takes the blow and
+  falls; the move is undone and the crowd picks again with a fresh clock, the move he took back barred. The bar starts
+  at `lastStandLoss` (plus `lastStandChargedExtra` while he has charges) and falls to `lastStandLossFloor` over
+  `lastStandDecayMoves` crowd moves. In a weak position (the best move worth under `lastStandShareBelow`, 40%) it's
+  `lastStandShare` (half) of the chances left, when that's lower. Never when the best move is worth under
+  `lastStandFrom` (20%: a lost position). Charges he falls with go to the crowd as power-ups. The round's scores
+  stand.
+- **Not on the crowd's first five moves** (Eric, Nov 2: "always hard set each side five moves in no matter what before
+  it will even look to make a save"; docs/decisions/2026-11-02-last-stand-from-move-6.md). `lastStandFromMove` (5):
+  `lastStandDue` says no while the battle's `crowdMoves` (moves already played, the judged one not yet counted) is under
+  it, so the 5th move stands and the 6th is the first he can save, with the bar as it falls from move 1. It counts the
+  battle's own moves, whatever the opening (Random opening, Freestyle, a battle picking up a game in progress), solo,
+  online and in the sims alike. The test switch `?laststand=1` still calls him on any move.
+- **Never on a board a boss has changed** (Eric, Oct 24: inside Babur's hoop it took back his queen's capture, fearing
+  a recapture the hoop's walls forbid; docs/decisions/2026-10-24-king-save-off-on-altered-boards.md). The judge's numbers
+  are plain chess's, so while a boss's power has changed the board the Last Stand sits out: the move stands, nothing is
+  spent, no word; once the board is plain again he saves as before. One rule for every boss (`boardAltered` in
+  `boss-powers.ts`, from the runner's `lastStandFor`): a power touches the turn (`powerTurn`, fair play's own test),
+  something stops his moves (`bossStops`, or a mark on the board layer that binds him), something stops any of the crowd's
+  (the board layer's marks, `crowdFilter`), or something else of his
+  is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows, the carrots). Big Boy's toy blocks are the
+  one exception (`standAltered`, Eric's (b), Nov 18: his tower stands nearly every turn, which kept the save off for good):
+  they keep him off only when they take away the boss's reply the judge fears, as the blocks will stand for that reply (a
+  topple's scattered blocks too), or when that reply isn't known; docs/decisions/2026-11-18-bigboy-powerturn.md. The test
+  switch `?laststand=1` still calls him on any board.
+- **The Last Stand on screen** (`LAST_STAND` in `boss-timing.ts`, `LastStand.tsx`): the warning, the freeze, his dive
+  onto the piece's square, his cut-in, the piece sliding back, the blow meant for it, his stagger, collapse and fade.
+  The blow is 25 red slashes with red numbers; against a boss whose kit has a `kingAttack` (Hollow, Eric, Oct 10;
+  Alfil, Oct 17; Boingo, Sawyer and Wrangler, then Big Boy, Ginger and Grex, Oct 18: `KING_ATTACKERS`, every
+  playable boss but the Hidden Boss) it is the boss's attack instead: from
+  `LAST_STAND.attackAt` (as the piece slides back) the boss drops in beside him and hits him ten times (`KingAttack.tsx`, on the shared `KING_ATTACK` beats), a gold "−N" off him each lash in his own
+  strike style (`ks-hp`), his blows on its lashes (his `lastStandAttacked` frames), then it leaps off as he staggers (facing him from the side toward the board's middle; drawn smaller on the
+  board's top rows, so it never rises over the boss bar: `kingAttackPlace`).
+  It fits between the slide and the stagger, so the Last Stand takes no longer and nothing changed on the server. See
+  [bosses.md](bosses.md), "A boss's attack on a king".
+- **Not on the result screen** (Eric, Nov 9: "get rid of the king in the victory and defeat screen entirely"): a boss battle's
+  result shows the boss and your pawn only, after a Last Stand too ([bosses.md](bosses.md), "The result screen").
+  `GodKingEpilogue` stays in `LastStand.tsx` for the dev preview.
+- **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.
+- **Against the Hidden Boss his help doesn't work** (Eric, Oct 14; the boss's passive, `BossRules.blocksKing`): his
+  move, his strike and his Last Stand never come (the runner's `kingDecision`, `callStrike`, `lastStandFor`). His menu
+  still opens; picking "Play move" or "Strike" has the boss slam his book shut and mock it, and the God King says his
+  help won't take hold (`mockKingHelp` in `components/Recluse.tsx`). Each try spends its charge as if it had worked
+  (Eric, Oct 14: "using the king's move doesn't draw down on the usage vs him like it should"; the runner's
+  `kingTried`, solo's `callKing`, in phase 1): the crowns go down one a try, and with none left he can't be called,
+  as against any boss. Online (the Crowd's boss final, Oct 14) the same: `NetMatch.callKing` sends the try and shows
+  the crown gone at once, the lobby spends it (`kingTried`; never a turn, a strike or a tally); the mock plays on the
+  device that tried, and the others see the crown gone with the move's reveal. Your move goes on (he played nothing);
+  the Last Stand, which nobody calls, spends nothing. In
+  this fight he opens with his own line as "START!" comes ("I sense a tremendous power within this foe.", Eric's;
+  `foeIntro`, said by the boss screen's intro), and his
+  lines about calling him (the nudge, "spent", "A charge might turn it") are left out (`turnCues`' `noHelp`). His
+  lines for this fight are in the Hidden Boss's table, `characters/recluse-lines.ts`.
+- **The Hidden Boss's phase change and phase 2** (Eric, Nov 14: "the king will still be with you, but you can't use him
+  anymore"; docs/decisions/2026-11-14-recluse-transformation.md): no absorption since Nov 14 (it was Oct 14's, in
+  docs/history). From the phase change on he stays in his place in the dock, greyed and never to be called
+  (BossDock's `king="benched"`: a disabled button, his bubble hidden), and says nothing (his phase 2 lines are gone).
+- **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
+  power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). His praise of
+  a move ("Masterful! Even I'd play that.", `greatMove`; "A fine move.", `goodMove`) never comes in a game's first 10 moves
+  (Eric, Nov 2: `KING_SPEECH.praiseFromMove` 11, the move's number in the game, the FEN's; `crowdMoveCues`). Each
+  line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
+  readable for 2.2 s plus 35 ms a character (at most 4.5 s); a critical line cuts in on a remark or small talk, but
+  waits for another critical line to have its time; the others wait their turn and lapse after 5 s.
+- **Power tips** (Nov 24, a pilot of five): the first time you see some bosses' powers (Birdie's train, Hollow's dark, Sawyer's split,
+  Chandy's lock, Boingo's pie), the boss says a line to him and he answers, explaining it (`packages/app/src/power-tips.ts`, one row a
+  tip). Again in the 3rd and 8th battle with that power, then every 5th (`POWER_TIPS` in settings.ts), counted per account on this
+  device. His reply comes once the boss's line has typed out (`replyMs`), at the critical priority, each line keeping its own
+  time (`e2e/boss-speech.spec.ts`); his other lines are held until it has had its time (`holdKing`): no double talk. Mid-line as the tip comes,
+  the exchange starts later, so his reply comes as that line ends. `?tip=all` plays them every battle. docs/decisions/2026-11-24-power-tips.md.
+- **How he judges a blunder** (Eric, Oct 10: option 3 of the Last Stand proposals). He judges the crowd's move as
+  it's played, before the boss replies, by how much it lowers the crowd's chances (the judge's expected score, the eval
+  bar's number), not by the material: players sometimes sacrifice on purpose, and a sacrifice the engine likes gives
+  nothing away. From 40% up, one move must throw away the plain bar (35 points from the first move with charges, 31.1 on
+  move 6, the first he can save, easing to 18 by move 22): a hung queen from an even position costs 50 to 70 points. From 20% to 40%, half of the chances
+  left is enough (from 30%, 15 points; from 25%, 12.5), or the plain bar if that's lower. Under 20% the game counts as
+  already lost. Charges only raise the plain bar by 5; solo and online are the same; it never waits for the boss to
+  take the piece. Eric's two games, replayed in Solo by `scripts/repro-last-stand.ts`: losing on purpose (moves giving
+  away 4 to 21 points, none a disaster for where they were played) and then the queen hung from 12% (in Eric's own game,
+  19%): no Last Stand, the game being lost by then; the queen hung on move 1 (55% to 4%): Last Stand (since Nov 2,
+  the first five moves stand: the same queen hung there is played).
+- **Looks.** Pixel art in the boss characters' format, in white and black versions (a recolor of the armor only,
+  in the crowd's color). SNES/Fire Emblem style: pixel portraits, slanted cut-in banners, retro sounds, a Press
+  Start 2P speech bubble. Drama yes, gore no (cracks, sparks and a few stylized red drops are the limit).
+- **The boss battle's presentation:** the intro (the boss's card, the game so far replayed, "START!"), the fight
+  banners (`FightBanner`), the boss's move and its banner when it takes your queen, the dock. The queen banners
+  (QUEEN DOWN!, QUEEN SLAIN!) are silent for now (Eric, Oct 11: the gasp sounded wrong; its file is kept, unused).
+
+## Where the code is
+
+| What | Where |
+| --- | --- |
+| His powers' rules, charges, the Last Stand (`lastStandBar`, `lastStandDue`) | `packages/chess/src/runner.ts` (the boss battle), `packages/core/src/boss.ts` |
+| Timings the server and the screens share | `packages/chess/src/boss-timing.ts` (`KING_COMMAND`, `KING_SUMMON`, `LAST_STAND`, `BOSS_INTRO`, `bossShowMs`, `bossThinkMs`) |
+| Online: the server's side and the messages | `packages/server/src/lobby.ts`, `packages/chess/src/protocol.ts`, `packages/app/src/net.ts` |
+| Solo | `packages/app/src/solo.ts`, `packages/app/src/game.ts` |
+| His pixel art (parts, poses, looks, portraits) | `packages/app/src/characters/god-king.ts` |
+| Where he's drawn, his on-board animations | `packages/app/src/components/GodKing.tsx`, `LastStand.tsx`, his sections of `styles.css` |
+| Banners | `packages/app/src/components/FightBanner.tsx`, cut-ins in `GodKing.tsx` and `LastStand.tsx` |
+| The dock and his command menu | `packages/app/src/components/BossDock.tsx` |
+| His lines | `packages/app/src/godKing.ts` (against the Hidden Boss: `characters/recluse-lines.ts`) |
+| Power tips (the boss and he explaining a power) | `packages/app/src/power-tips.ts`, said from `useMomentSpeech` in `components/BossPowers.tsx` |
+| The boss screens | `packages/app/src/screens/Boss.tsx`, the boss parts of `Crowd.tsx` and `Play.tsx` |
+| Sounds | `packages/app/public/sounds/god-king/`, `public/sounds/banner/` (CC0, credited in `CREDITS.md`), `src/sound.ts`; synthesized (his "can't"): `src/characters/god-king-sounds.ts` |
+
+## Settings
+
+`packages/core/src/settings.ts`: the `king*` keys (`kingChargesMax`, `kingPowerUpsPerCharge`, `kingStrikeLoss`,
+`kingStrikeMs`, `kingBotLoss`, `kingBotFollow`, `kingOnBoard`: the old summon-onto-the-board style, kept off), the
+`lastStand*` keys, `KING_SPEECH`, and `POWER_TIPS` (the tips' schedule and his reply's beat).
+
+## Tests and tools
+
+- His "can't" (no charges left): unit `packages/app/test/god-king.test.ts` (under a move's loudness, the same every
+  time, in the sound worker's table); e2e `e2e/recluse.spec.ts` (the sound and the shake, no menu).
+- Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked; a try spends its charge, the Last Stand
+  nothing), `packages/app/test/recluse-boss.test.ts` (the mocks, his cues, solo's `callKing` spending),
+  `packages/app/test/recluse-phase2.test.ts` (no lines of his in the phase change or phase 2; silent in phase 2); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; greyed in
+  his place, never to be called, through the phase change and phase 2). (The Crowd's final against him: unreached since C2, its tests
+  retired in C4.)
+- On a board a boss has changed: unit `packages/chess/test/king-save-altered.test.ts` (Eric's hoop; every boss's states,
+  audited from the roster; a stub boss's new filter); e2e `e2e/king-save-altered.spec.ts` (Babur's hoops).
+- Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
+  `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
+- e2e: `e2e/boss-powers.spec.ts`.
+- Frames in the game: `npm run frames:god-king -- <dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]`;
+  a boss's attack in his Last Stand: `npm run frames:king-attack -- <dir> hollow [phone|desktop|both] laststand`.
+- e2e for a boss's attack in his Last Stand: `e2e/king-attack.spec.ts`. Unit: `packages/app/test/king-attack.test.ts`
+  (his blows on its lashes), `packages/chess/test/king-attack.test.ts` (it fits the Last Stand).
+- Sheets and GIFs: `npm run preview:characters -- <dir> only=god-king`, `node scripts/preview-god-king.mjs out.png banner=1`.
+- Sims: `packages/sim/scripts/last-stand-sim.ts`, `last-stand-blunders.ts` (`reports/last-stand.md`).
+- Replays in the real Solo app, the runner's own numbers logged move by move: `npx tsx scripts/repro-last-stand.ts
+  [phone|desktop] [boss] [hang=35]` (a slow slide, then the queen hung once the crowd's chances are under `hang`%:
+  no Last Stand from under 20%; a queen hung on move 1: Last Stand until Nov 2, none since: the first five moves stand).
+- e2e for his lines' time: `e2e/boss-speech.spec.ts` (his opening line held for its full time; each boss's line gone
+  on time). Unit:
+  `packages/app/test/speech.test.ts`.
+
+## Rules for this area
+
+- Everything he shows comes in white and black versions.
+- Tunables in `settings.ts`; timings the server and the screens must agree on in `boss-timing.ts`.
+- The FAQ explains his charges, strike and Last Stand to players (`packages/app/src/faq/content.ts`, "The God King"):
+  a change to his rules changes its words in the same PR.
+- Add a test switch (a `?query` flag) that forces any new moment in solo, so Eric can see it on demand.
+- His words go through his voice (`kingSay`), held by the speech rule; never draw a line in a box a screen owns.
+- Watch every moment frame by frame on a phone (`npm run frames:god-king`), in light and dark mode
+  (`.claude/LESSONS.md`).

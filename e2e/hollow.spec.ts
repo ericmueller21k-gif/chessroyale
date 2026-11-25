@@ -1,0 +1,558 @@
+import { expect, type Page } from "@playwright/test";
+import { Chess } from "chess.js";
+import { BOARD_SEL, createLobbyFromHome, test, watchFor, bossAloneFromHome } from "./helpers.ts";
+
+/**
+ * Hollow, the Darkness boss, played alone on a phone and a computer with real taps: his first cover of the dark (the
+ * square of the piece he moved), a dark square selected (the glow, no dots), Boss alone's ten bulbs (Eric, Nov 5: a wrong
+ * move attempt into the dark puts one out, with his taunt; a legal move out of the dark; the 3rd out, the dark moves for
+ * you; a 2 x 2 block; the 10th out, total darkness and the loss), and Lights out from the admins' test trigger: the
+ * night over every square, a piece found, a wrong square, the misses costing 10 each, the lights back. Online (a crowd)
+ * a wrong attempt still costs -5 (only for you), with his taunt.
+ */
+const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
+const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
+const fenNow = (p: Page) => p.evaluate(() => (window as any).match.phase.board.fen as string);
+const myPoints = (p: Page) => p.evaluate(() => (window as any).match.standings().find((s: { isYou: boolean }) => s.isYou).points as number);
+
+/** A square's middle on screen. */
+async function squareAt(page: Page, square: string) {
+  const board = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
+  const flip = (await page.evaluate(() => (window as any).match.boss?.crowdSide)) === "b";
+  const f = square.charCodeAt(0) - 97;
+  const r = Number(square[1]) - 1;
+  return { x: board.x + ((flip ? 7 - f : f) + 0.5) * (board.width / 8), y: board.y + ((flip ? r : 7 - r) + 0.5) * (board.height / 8) };
+}
+const tap = async (page: Page, square: string) => {
+  const q = await squareAt(page, square);
+  await page.mouse.click(q.x, q.y);
+};
+
+/** Your move's clock has started (the board takes taps). */
+async function yourMove(page: Page) {
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  await expect.poll(() => page.evaluate(() => Date.now() >= (window as any).match.phase.startsAt + 300), { timeout: 10_000 }).toBe(true);
+}
+
+/** Plays a move with two taps (again if the board wasn't taking moves yet). */
+async function play(page: Page, move: string) {
+  await yourMove(page);
+  for (let i = 0; i < 5 && (await phase(page)) === "play"; i++) {
+    await tap(page, move.slice(0, 2));
+    await tap(page, move.slice(2, 4));
+    await page.waitForTimeout(300);
+  }
+  await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+}
+
+/** How opaque a canvas over the board is at a square's middle (255: it hides what's under it). */
+const covered = (page: Page, square: string, canvas: string) =>
+  squareAt(page, square).then((q) =>
+    page
+      .locator(canvas)
+      .first()
+      .evaluate((c: HTMLCanvasElement, [x, y]) => {
+        const r = c.getBoundingClientRect();
+        return c.getContext("2d")!.getImageData(Math.floor(((x! - r.left) / r.width) * c.width), Math.floor(((y! - r.top) / r.height) * c.height), 1, 1).data[3];
+      }, [q.x, q.y]),
+  );
+
+const empties = (fen: string, squares: string[]) => squares.filter((s) => !new Chess(fen).get(s as never));
+
+/** The sounds played since the log was started (sound.ts logs every play()), by name. */
+const soundsHeard = (p: Page) => p.evaluate(() => ((window as any).__soundLog ?? []).map((s: string) => s.split(":")[0]) as string[]);
+
+/** His line in his speech bubble now (its whole text), or null. */
+const bubbleLine = (p: Page) => p.evaluate(() => document.querySelector(".bc-bubble")?.getAttribute("aria-label") ?? null).catch(() => null);
+/**
+ * His bubble's line clipped, or "" when it shows whole: its text's scroll size within its box, and every box of the text inside
+ * the bubble (its rows never cut by the box's edge).
+ */
+const bubbleClipped = (p: Page) =>
+  p.evaluate(() => {
+    const el = document.querySelector<HTMLElement>(".bc-bubble");
+    if (!el) return "no bubble";
+    const label = el.getAttribute("aria-label") ?? "";
+    if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) return `${label}: scroll ${el.scrollWidth}x${el.scrollHeight} in ${el.clientWidth}x${el.clientHeight}`;
+    const box = el.getBoundingClientRect();
+    const rg = document.createRange();
+    rg.selectNodeContents(el);
+    const out = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5).find((q) => q.left < box.left - 0.5 || q.right > box.right + 0.5 || q.top < box.top - 0.5 || q.bottom > box.bottom + 0.5);
+    if (out) return `${label}: a row at ${Math.round(out.left)},${Math.round(out.top)}-${Math.round(out.right)},${Math.round(out.bottom)} past the box ${Math.round(box.left)},${Math.round(box.top)}-${Math.round(box.right)},${Math.round(box.bottom)}`;
+    if (box.left < 0 || box.top < 0 || box.right > innerWidth + 0.5 || box.bottom > innerHeight + 0.5) return `${label}: the box off screen`;
+    return "";
+  });
+/** Every taunt and the dark's move line (characters/hollow.ts HOLLOW_LINES.misplay; components/Hollow.tsx HOLLOW_BULB_LINES). */
+const TAUNT_LINES = ["Nice try.", "What, can't play in the dark?", "Something was there. Wasn't it?", "You reached for nothing.", "Feeling around, are we?", "The dark remembers. You don't.", "Not there. Never there.", "Wrong. And it's getting darker."];
+/** His taunts on a misplay (characters/hollow.ts HOLLOW_LINES.misplay). */
+const TAUNTS = /^(Nice try\.|What, can't play in the dark\?|Something was there\. Wasn't it\?|You reached for nothing\.|Feeling around, are we\?|The dark remembers\. You don't\.|Not there\. Never there\.|Wrong\. And it's getting darker\.)$/;
+/** HOLLOW_STILLS=<folder>: the stills for docs/hollow-bulbs/, written there. */
+const STILLS = process.env.HOLLOW_STILLS ?? "";
+const still = (p: Page, name: string) => p.screenshot({ path: `${STILLS}/${name}-${test.info().project.name}.png` });
+
+/** An element's box is wholly on screen, and below the boss bar (nothing over it). */
+const onScreen = (p: Page, selector: string) =>
+  p.locator(selector).first().evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const bar = document.querySelector(".boss-bar")?.getBoundingClientRect();
+    return r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth && (!bar || r.top >= bar.bottom);
+  });
+
+test("Hollow's dark, Boss alone: his first cover, a dark square selected, his ten bulbs, a wrong attempt (a bulb out and a taunt), a legal move out of the dark, the dark's move at the 3rd bulb", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
+  await bossAloneFromHome(page);
+  await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
+  const boss = await page.evaluate(() => (window as any).match.boss);
+  expect(boss.name).toBe("Hollow");
+  // Always Black, from the starting position.
+  expect(boss.crowdSide).toBe("w");
+  expect(boss.board.history).toEqual([]);
+  await expect(page.locator(".boss-intro")).toContainText("starting position");
+
+  // Move 1; he replies and covers the square of the piece he moved (DARKNESS!), his bulbs relit.
+  const seen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /DARKNESS!/ } });
+  // Your move knocks as it lands, before any sound of his (Eric, Oct 10: a new sound instead of the move's). A real
+  // player thinks a while, so the engine's search is done and the move is scored at once: the screen it went in on is
+  // replaced before it paints, which had taken its knock with it.
+  await yourMove(page);
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  await play(page, "e2e4");
+  await expect.poll(() => soundsHeard(page), { timeout: 10_000 }).toContain("move");
+  const heard = await soundsHeard(page);
+  expect(heard[0], heard.join(", ")).toBe("move");
+  await expect.poll(async () => (await seen.seen()).banner, { timeout: 30_000 }).toBe(true);
+  await yourMove(page);
+  const p2 = await powers(page);
+  expect(p2.dark).toHaveLength(1);
+  const sq: string = p2.dark[0].square;
+  expect(await page.evaluate(() => (window as any).match.boss.board.lastMove.slice(2, 4))).toBe(sq);
+  expect(p2.bulbs).toBe(3);
+  await expect(page.locator(`.power-board .pw-dark[data-square="${sq}"]`)).toHaveAttribute("data-state", "dark");
+  // His piece there is hidden: the dark is opaque over the square's middle.
+  await expect.poll(() => covered(page, sq, ".pw-dark-board"), { timeout: 5000 }).toBe(255);
+
+  // Tapped, the dark square is selected: the green glow round it, no move dots, nothing picked up.
+  await tap(page, sq);
+  await expect(page.locator(".board-wrap").first()).toHaveAttribute("data-dark-sel", sq);
+  await expect(page.locator(`${BOARD_SEL.square}.selected`)).toHaveCount(1);
+  await expect(page.locator(`${BOARD_SEL.square}.move-dest`)).toHaveCount(0);
+  // Boss alone: his strand of ten bulbs, all lit, in the boss bar (Eric, Nov 5).
+  await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "10");
+  expect(
+    await page.locator(".life-strip").first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      // (Inside the bar's free room, under the status: e2e/boss-bar.spec.ts keeps that room's place.)
+      const slot = el.closest(".boss-prop")!.getBoundingClientRect();
+      const inSlot = r.left >= slot.left - 0.5 && r.right <= slot.right + 0.5 && r.top >= slot.top - 0.5 && r.bottom <= slot.bottom + 0.5;
+      return r.width > 0 && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && inSlot;
+    }),
+  ).toBe(true);
+  // A move from it that isn't legal (it's his piece): a bulb goes out (no points), his taunt, and you pick again.
+  const before = await myPoints(page);
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  await tap(page, empties(await fenNow(page), ["a3", "h3", "a4", "h4"])[0]!);
+  await expect(page.locator(".dark-note")).toContainText("Bulb out · 9 left");
+  await expect(page.locator(".pw-cost")).toHaveCount(0);
+  await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "9");
+  await expect.poll(() => soundsHeard(page), { timeout: 5000 }).toContain("hollowFizz");
+  await expect.poll(() => bubbleLine(page), { timeout: 15_000 }).toMatch(TAUNTS);
+  // (Typed out in full: the still shows the whole line.)
+  await expect.poll(() => page.evaluate(() => document.querySelector(".bc-bubble .speech-rest")?.textContent ?? ""), { timeout: 8000 }).toBe("");
+  await expect.poll(() => bubbleClipped(page), { timeout: 3000 }).toBe("");
+  if (STILLS) await still(page, "bulbs-taunt");
+  expect(await phase(page)).toBe("play");
+  // A legal move out of the dark. (For the test, the dark falls on your knight: covers land on his pieces or yours at
+  // random.) Tap it: no dots; then f3.
+  await page.evaluate(() => {
+    const m = (window as any).match;
+    const p = m.runner.state.boss.powers;
+    m.runner.state = { ...m.runner.state, boss: { ...m.runner.state.boss, powers: { ...p, dark: [...p.dark, { square: "g1", at: p.turn, until: p.turn + 9 }] } } };
+  });
+  await expect(page.locator('.power-board .pw-dark[data-square="g1"]')).toHaveCount(1);
+  await tap(page, "g1");
+  await expect(page.locator(".board-wrap").first()).toHaveAttribute("data-dark-sel", "g1");
+  await expect(page.locator(`${BOARD_SEL.square}.move-dest`)).toHaveCount(0);
+  await tap(page, "f3");
+  await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+  await expect.poll(() => page.evaluate(() => (window as any).match.moves.at(-1)?.move), { timeout: 30_000 }).toBe("g1f3");
+  // The bulb cost no points (alone, a move's own score is 0).
+  expect(await page.evaluate(() => (window as any).match.moves.at(-1).roundScore)).toBe(0);
+  expect(await myPoints(page)).toBe(before);
+
+  // Next turn: two more wrong attempts, and the 3rd bulb out: the dark moves for you (a short dark flash, his line), a bad
+  // move the rules picked, played as yours. No 5-a-turn cutoff alone: the bulbs replace it.
+  await yourMove(page);
+  const fen = await fenNow(page);
+  // (From a dark square that isn't yours, nothing is legal: his piece's, or an empty one.)
+  const his = ((await powers(page)).dark as { square: string }[]).map((d) => d.square).find((s) => new Chess(fen).get(s as never)?.color !== "w")!;
+  const empty = empties(fen, ["a3", "a4", "a5", "a6", "h3", "h4", "h5", "h6"]);
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  for (let i = 0; i < 2; i++) {
+    await tap(page, his);
+    await tap(page, empty[i]!);
+    await expect.poll(() => page.evaluate(() => (window as any).match.darkNote?.bulbs ?? 0), { timeout: 5000 }).toBe(i + 2);
+  }
+  expect(await page.evaluate(() => (window as any).match.darkNote.forced ?? false)).toBe(true);
+  await expect(page.locator(".pw-dark-forced")).toBeVisible();
+  await expect(page.locator(".dark-note")).toContainText("The dark moves for you");
+  await expect.poll(() => bubbleLine(page), { timeout: 5000 }).toBe("The dark moves for you.");
+  if (STILLS) await still(page, "bulbs-forced");
+  await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "7");
+  // Taps do nothing meanwhile.
+  await tap(page, "a2");
+  await tap(page, "a3");
+  await expect.poll(() => page.evaluate(() => (window as any).match.moves.length), { timeout: 30_000 }).toBe(3);
+  const forced = await page.evaluate(() => (window as any).match.runner.state.boss.powers.forced);
+  expect(forced.at).toBe(3);
+  expect(await page.evaluate(() => (window as any).match.moves.at(-1).move)).toBe(forced.move);
+  expect(await soundsHeard(page)).toContain("hollowForced");
+  expect(errors).toEqual([]);
+});
+
+test("Hollow's taunts and \"The dark moves for you.\" show whole in his bubble, typed out: nothing clipped (a phone 390 wide, a computer 1440)", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  await page.setViewportSize(test.info().project.name === "phone" ? { width: 390, height: 844 } : { width: 1440, height: 900 });
+  await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const bad: string[] = [];
+  for (const line of [...TAUNT_LINES, "The dark moves for you."]) {
+    await page.evaluate((t) => (globalThis as { sayBoss?: (t: string) => boolean }).sayBoss!(t), line);
+    await expect.poll(() => bubbleLine(page), { timeout: 5000 }).toBe(line);
+    await expect.poll(() => page.evaluate(() => document.querySelector(".bc-bubble .speech-rest")?.textContent ?? "x"), { timeout: 8000 }).toBe("");
+    // (Its box settles to the line, in the pixel font, a frame or two after it shows.)
+    await page.waitForTimeout(150);
+    const clipped = await bubbleClipped(page);
+    if (clipped) bad.push(clipped);
+  }
+  expect(bad).toEqual([]);
+});
+
+test("Hollow's bulbs (Boss alone): a 2 x 2 block of the dark drawn, then the 10th bulb out: total darkness, his line, the loss", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (Test switches: 9 bulbs already out; his first cover brings a 2 x 2 block too.)
+  await page.goto("/?debug&clock=60&boss=hollow&laststand=0&bulbs=9&darkblock=2");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "1");
+  const seen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /DEEPER DARK!/ } });
+  await play(page, "e2e4");
+  await expect.poll(async () => (await seen.seen()).banner, { timeout: 30_000 }).toBe(true);
+  await yourMove(page);
+  // The block: four squares in a 2 x 2, each dark and hiding what's there.
+  const block = await page.evaluate(() => (window as any).match.boss.powers.events.find((e: { kind: string }) => e.kind === "darkBlock"));
+  expect(block.size).toBe(2);
+  const f = block.square.charCodeAt(0);
+  const r = Number(block.square[1]);
+  const squares = [0, 1].flatMap((dr) => [0, 1].map((df) => `${String.fromCharCode(f + df)}${r + dr}`));
+  for (const sq of squares) await expect(page.locator(`.power-board .pw-dark[data-square="${sq}"]`)).toHaveAttribute("data-state", "dark");
+  for (const sq of squares) await expect.poll(() => covered(page, sq, ".pw-dark-board"), { timeout: 5000 }).toBe(255);
+  if (STILLS) await still(page, "bulbs-block2");
+  // The last bulb: a wrong move into the dark.
+  const fen = await fenNow(page);
+  const dark = ((await powers(page)).dark as { square: string }[]).map((d) => d.square);
+  const from = dark.find((s) => new Chess(fen).get(s as never)?.color !== "w")!;
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  await tap(page, from);
+  await tap(page, empties(fen, ["a3", "h3", "a4", "h4", "a5", "h5"]).find((s) => s !== from)!);
+  // Total darkness: the screen goes black, his line, why; then the loss, and why.
+  await expect(page.locator(".hollow-blackout")).toBeVisible();
+  await expect(page.locator(".hollow-blackout")).toHaveAttribute("aria-label", "Hollow: Lights out. Forever. Your last bulb went out.");
+  await expect(page.locator(".hollow-blackout .hb-why.on")).toBeVisible({ timeout: 5000 });
+  const cover = await page.locator(".hollow-blackout").evaluate((el) => {
+    const b = el.getBoundingClientRect();
+    return [b.left, b.top, b.right - innerWidth, b.bottom - innerHeight].map(Math.round);
+  });
+  expect(cover).toEqual([0, 0, 0, 0]);
+  if (STILLS) await still(page, "bulbs-blackout");
+  expect(await soundsHeard(page)).toContain("hollowBlackout");
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe("results");
+  await expect(page.locator(".results h1")).toHaveText("Defeat");
+  await expect(page.locator(".team-result.bad")).toContainText("won: the last of your ten bulbs went out.");
+  expect(await page.evaluate(() => (window as any).match.phase.blackout)).toBe(true);
+  if (STILLS) await still(page, "bulbs-result");
+  expect(errors).toEqual([]);
+});
+
+test("Hollow's bulbs, Nov 12: his six under his bar count every move, yours and his, as wide as it; your ten bigger, at the card's right", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const strip = page.locator(".bulb-strip");
+  const lit = () => strip.getAttribute("data-lit");
+  // Before his first cover: your first move and his (which brings it).
+  await expect(strip).toHaveAttribute("data-of", "6");
+  expect(await lit()).toBe("2");
+  const box = await page.evaluate(() => {
+    const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+    const [s, m, life, card, next] = [r(".bulb-strip"), r(".boss-bar .rage-meter"), r(".life-strip"), r(".boss-prop"), r(".boss-next")];
+    return { s: [s.left, s.right, s.top], m: [m.left, m.right, m.bottom], life: [life.left, life.right, life.width], card: [card.left, card.right], next: next.right };
+  });
+  // The six: as wide as his rage meter above it (within 2 px), under it.
+  expect(Math.abs(box.s[0]! - box.m[0]!), JSON.stringify(box)).toBeLessThanOrEqual(2);
+  expect(Math.abs(box.s[1]! - box.m[1]!), JSON.stringify(box)).toBeLessThanOrEqual(2);
+  expect(box.s[2]!).toBeGreaterThanOrEqual(box.m[2]! - 0.5);
+  // Your ten (Eric, Nov 12: "way bigger"): a computer's at least 1.6x its old 110 px, a phone's past its old 95; at the card's
+  // right, under the status, inside the room (never over his name).
+  const computer = test.info().project.name === "desktop";
+  expect(box.life[2]!, JSON.stringify(box)).toBeGreaterThanOrEqual(computer ? 1.6 * 110 : 1.15 * 95);
+  expect(Math.abs(box.life[1]! - box.next), JSON.stringify(box)).toBeLessThanOrEqual(3);
+  expect(box.life[0]!).toBeGreaterThanOrEqual(box.card[0]! - 0.5);
+  // A bulb out with your move, another with his; his cover relights all six. (Your move's count shows only while he thinks,
+  // which can be a few frames when his reply comes quickly: main's run 43250918402 polled past it. So every value the strip
+  // shows is recorded each frame, and the order is checked.)
+  await page.evaluate(() => {
+    const w = window as unknown as { __lits: string[] };
+    w.__lits = [];
+    const look = () => {
+      const v = document.querySelector(".bulb-strip")?.getAttribute("data-lit") ?? "";
+      if (v && w.__lits.at(-1) !== v) w.__lits.push(v);
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  const lits = () => page.evaluate(() => (window as unknown as { __lits: string[] }).__lits);
+  await play(page, "e2e4");
+  await yourMove(page);
+  expect((await powers(page)).dark).toHaveLength(1);
+  await expect.poll(lit, { timeout: 10_000 }).toBe("6");
+  expect(await lits()).toEqual(["2", "1", "6"]);
+  await play(page, "d2d4");
+  await yourMove(page);
+  expect(await lit()).toBe("4");
+  expect(await lits()).toEqual(["2", "1", "6", "5", "4"]);
+  expect(await strip.getAttribute("data-bulbs")).toBe("2");
+  if (STILLS) await still(page, "bulbs-six");
+  expect(errors).toEqual([]);
+});
+
+/**
+ * Watches his speech box through Lights out, every frame, round by round (Eric, Oct 10: on a computer it showed for a
+ * moment and was gone). Every frame of a round, from its first to the end of its answers, must show the box on screen
+ * with that round's line (the dock's sentence, when the dock shows it whole), and its last frame the whole line typed.
+ */
+async function watchLine(page: Page) {
+  await page.evaluate(() => {
+    type Seen = { frames: number; bad: string | null; text: string | null; lastTyped: boolean; lastBox: number[] | null };
+    const rounds: Record<number, Seen> = ((window as any).__loLine = {});
+    let began = false;
+    const loop = () => {
+      const marks = document.querySelector(".lo-marks");
+      if (began && !marks) return;
+      began ||= !!marks;
+      const round = Number(marks?.getAttribute("data-round") ?? -1);
+      if (round >= 0) {
+        const r = (rounds[round] ??= { frames: 0, bad: null, text: null, lastTyped: false, lastBox: null });
+        r.frames++;
+        const el = document.querySelector<HTMLElement>(".lo-line");
+        const b = el?.getBoundingClientRect();
+        const text = el?.getAttribute("aria-label") ?? null;
+        const dock = document.querySelector('.lo-dock .lo-prompt[data-fit="0"] strong')?.textContent ?? null;
+        const why =
+          !el || !b ? "no box"
+          : getComputedStyle(el).visibility !== "visible" ? "hidden"
+          : b.height === 0 || b.top < 0 || b.left < 0 || b.right > innerWidth || b.bottom > innerHeight ? `off screen ${[b.left, b.top, b.right, b.bottom].map(Math.round)}`
+          : r.text !== null && text !== r.text ? `"${r.text}" became "${text}"`
+          : dock !== null && dock !== text ? `"${text}", the dock "${dock}"`
+          : null;
+        if (why && !r.bad) r.bad = `frame ${r.frames}: ${why}`;
+        r.text ??= text;
+        r.lastTyped = !!el && el.querySelector(".speech-rest")?.textContent === "";
+        r.lastBox = b ? [b.left, b.top, b.width, b.height].map(Math.round) : null;
+      }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  });
+  return () => page.evaluate(() => (window as any).__loLine as Record<number, { frames: number; bad: string | null; text: string | null; lastTyped: boolean; lastBox: number[] | null }>);
+}
+
+/** Your profile says you're an admin (as /api/me does for an email in ADMIN_EMAILS). */
+async function asAdmin(page: Page) {
+  await page.route("**/api/me*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const res = await route.fetch();
+    const body = await res.json().catch(() => null);
+    await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+  });
+}
+
+test("Hollow's Lights out (the admins' trigger): the night over every square, a piece found, a wrong square, 10 a miss, the lights back", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await asAdmin(page);
+  await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  // Pressed during your turn: it comes at the start of his turn, after your move.
+  const btn = page.locator(".ult-test");
+  await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
+  await btn.click();
+  await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
+  const banner = await watchFor(page, { lights: { selector: ".fight-banner.power-cut", text: /LIGHTS OUT!/ } });
+  await play(page, "e2e4");
+  await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.lights), { timeout: 20_000 }).toBe(true);
+  const line = await watchLine(page);
+  const lights = await page.evaluate(() => (window as any).match.phase.lights);
+  expect(lights.rounds.map((r: { pieces: string[] }) => r.pieces.length)).toEqual([1, 2, 3]);
+  // The clocks stopped: he hasn't moved yet.
+  expect(await page.evaluate(() => (window as any).match.boss.board.history.length)).toBe(1);
+  const before = await myPoints(page);
+  const c = new Chess(await page.evaluate(() => (window as any).match.boss.board.fen as string));
+  // The squares answering a target: his pieces of its type (a pawn: on its file).
+  const his = (t: { type: string; file?: string }) => "abcdefgh".split("").flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).filter((s) => c.get(s as never)?.color === "b" && c.get(s as never)?.type === t.type && (!t.file || s[0] === t.file));
+  // Round 1 opens: night over every square (opaque at each middle), his prompt; every square takes a tap.
+  await expect(page.locator('.lo-marks[data-round="0"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
+  expect((await banner.seen()).lights).toBe(true);
+  for (const s of ["a1", "h8", "e4", "d5"]) expect(await covered(page, s, ".lo-board canvas"), s).toBe(255);
+  await expect(page.locator(".boss-dock")).toContainText(/Find (my|one of my|:)/);
+  // The round's prompt sits in the dock, whole and in view, below the boss bar; the crowd's meter beside the line
+  // (70%) it must hold, nothing settled yet.
+  await expect(page.locator(".lo-dock .lo-prompt")).toContainText(/Find/);
+  expect(await onScreen(page, ".lo-dock .lo-prompt")).toBe(true);
+  const meter = page.locator(".lo-meter[role=meter]");
+  await expect(meter).toBeVisible();
+  await expect(meter).toHaveAttribute("data-settled", "0");
+  const target = his(lights.rounds[0].targets[0])[0]!;
+  await tap(page, target);
+  await expect(page.locator(`.lo-found[data-square="${target}"][data-round="0"]`)).toHaveCount(1);
+  // The meter moves with it: 1 of 1.
+  await expect(meter).toHaveAttribute("aria-valuenow", "100");
+  // One piece, one try: the round is over at once, its answers show.
+  await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[0].answers?.length ?? 0), { timeout: 5000 }).toBeGreaterThan(0);
+  // Round 2: a wrong square (an empty one), then nothing more. The tap gives a second more: the bar bumps, "+1s".
+  await expect(page.locator('.lo-marks[data-round="1"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
+  // Its prompt is the new round's, and stays whole and in view through the round (not typed out and gone).
+  const prompt2 = await page.locator(".lo-dock .lo-prompt strong").textContent();
+  expect(prompt2).not.toBe(null);
+  const failed = await watchFor(page, { twice: { selector: ".fight-banner.power-cut", text: /TWICE!/ } });
+  const bump = await watchFor(page, { plus: { selector: ".lo-plus", text: /\+1s/ } });
+  const empty = empties(await page.evaluate(() => (window as any).match.boss.board.fen as string), ["e5", "e4", "a5", "h5"])[0]!;
+  await tap(page, empty);
+  await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.mine[1].wrong), { timeout: 5000 }).toEqual([empty]);
+  expect((await bump.seen()).plus).toBe(true);
+  let checks = 0;
+  for (let i = 0; i < 4 && (await page.locator('.lo-marks[data-round="1"][data-open="1"]').count()) === 1; i++, checks++) {
+    expect(await page.locator(".lo-dock .lo-prompt strong").textContent()).toBe(prompt2);
+    expect(await onScreen(page, ".lo-dock .lo-prompt")).toBe(true);
+    await page.waitForTimeout(1000);
+  }
+  expect(checks).toBeGreaterThanOrEqual(2);
+  // Its answers show as it ends; the lights come back, his move follows, and the misses cost 10 each. 1 found of 6
+  // is under the line (70%): after his move, he moves again (TWICE!), a quiet move, before your turn.
+  await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[1].answers?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  expect((await failed.seen()).twice).toBe(true);
+  // His speech box: up with each round's line, on screen, every frame of the round, and the whole line still there as
+  // the round ends (its answers' last frame); each round's line replaced the one before.
+  const said = await line();
+  for (const i of [0, 1, 2]) {
+    expect(said[i]?.frames ?? 0, `round ${i + 1}: frames watched`).toBeGreaterThan(30);
+    expect(said[i]!.bad, `round ${i + 1}: his box`).toBeNull();
+    expect(said[i]!.text, `round ${i + 1}: his line`).toMatch(/^Find /);
+    expect(said[i]!.lastTyped, `round ${i + 1}: the whole line at its end (box ${said[i]!.lastBox})`).toBe(true);
+  }
+  expect(new Set([0, 1, 2].map((i) => said[i]!.text)).size).toBe(3);
+  const end = await page.evaluate(() => (window as any).match.boss);
+  expect(end.board.history.length).toBe(3);
+  expect(end.powers.lightsExtra).toBe("played");
+  expect(end.lastMove.move).toBe(end.board.history[2]);
+  expect(new Chess(end.board.fen).turn()).toBe("w");
+  // 1 found of 6: 5 missed.
+  expect(await myPoints(page)).toBe(before - 50);
+  const p = await powers(page);
+  expect(p.lightsAt).toBe(1);
+  // The meter spent: empty, held so through this turn (his extra move belonged to the ultimate), then filling again.
+  expect(p.rage).toBe(0);
+  expect(p.paused).toBe(true);
+  await expect(page.locator(".rage-meter.paused")).toBeVisible();
+  await expect(btn).toHaveAccessibleName("Ultimate under way (testing)");
+  expect(errors).toEqual([]);
+});
+
+test("Hollow online: the server judges an attempt into the dark (-5, only for you) and runs Lights out", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  test.skip(test.info().project.name !== "desktop", "one run is enough");
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // What this device, the host, answers when the server asks for his extra move (a "bossMove" for an "x-" key).
+  let extraAnswer: string | null = null;
+  page.on("websocket", (ws) =>
+    ws.on("framesent", (f) => {
+      try {
+        const m = JSON.parse(String(f.payload));
+        if (m.t === "bossMove" && String(m.key).startsWith("x-")) extraAnswer = m.move;
+      } catch {
+        // (Not JSON: not ours.)
+      }
+    }),
+  );
+  await page.goto("/?debug&pace=quick&mode=raid&boss=hollow&power=lightsout&bossMoves=6&clock=40");
+  await createLobbyFromHome(page);
+  await page.getByRole("button", { name: /^Start with 1 player$/ }).click();
+  await yourMove(page);
+  expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Hollow");
+  await play(page, "e2e4");
+  // His first cover, sent to everyone with the battle.
+  await yourMove(page);
+  const sq: string = (await powers(page)).dark[0].square;
+  await tap(page, sq);
+  await expect(page.locator(".board-wrap").first()).toHaveAttribute("data-dark-sel", sq);
+  await tap(page, empties(await fenNow(page), ["a3", "h3", "a4", "h4"])[0]!);
+  // The server's answer: wrong, -5, pick again.
+  await expect(page.locator(".pw-cost")).toHaveText("−5");
+  await expect(page.locator(".dark-note")).toContainText("4 tries left");
+  // His taunt in a crowd too; and no bulbs online (a crowd keeps the points: Eric, Nov 5).
+  await expect.poll(() => bubbleLine(page), { timeout: 15_000 }).toMatch(TAUNTS);
+  expect((await powers(page)).strand).toBeUndefined();
+  await expect(page.locator(".life-strip")).toHaveCount(0);
+  expect(await phase(page)).toBe("play");
+  await play(page, "d2d4");
+  // Lights out at the start of his turn (the meter full as this turn began): the server's rounds.
+  await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.lights), { timeout: 60_000 }).toBe(true);
+  const lights = await page.evaluate(() => (window as any).match.phase.lights);
+  const c = new Chess(await page.evaluate(() => (window as any).match.boss.board.fen as string));
+  const t0 = lights.rounds[0].targets[0];
+  const target = "abcdefgh".split("").flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`)).find((s) => c.get(s as never)?.color === "b" && c.get(s as never)?.type === t0.type && (!t0.file || s[0] === t0.file))!;
+  await expect(page.locator('.lo-marks[data-round="0"][data-open="1"]')).toHaveCount(1, { timeout: 15_000 });
+  // The crowd's count comes from the server: the meter shows it, against the line.
+  expect(lights.crowd).toMatchObject({ found: 0, settled: 0 });
+  await expect(page.locator(".lo-meter[role=meter]")).toBeVisible();
+  await tap(page, target);
+  await expect(page.locator(`.lo-found[data-square="${target}"][data-round="0"]`)).toHaveCount(1);
+  await expect(page.locator(".lo-meter[role=meter]")).toHaveAttribute("data-found", "1");
+  // The round's answers come from the server as it ends; then the lights, his move, your turn.
+  await expect.poll(() => page.evaluate(() => (window as any).match.phase.lights?.rounds[0].answers?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as any).match.phase.lights.mine[0].found)).toEqual([target]);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  // -5 for the wrong attempt, -50 for the five pieces not found.
+  expect(await myPoints(page)).toBe(-55);
+  expect((await powers(page)).lightsAt).toBe(2);
+  // 1 of 6 is under the line: after his move, the server asked the host's engine for his extra one, before your turn,
+  // and played what it answered. The engine finds one in most positions, but not in all: with no quiet move within
+  // the cap he skips it (extraMoveFrom; after 1.e4 e5 2.d4 Nf6, for one). His replies are his brain's, so the position
+  // isn't the test's to choose: the outcome must be the host's answer (docs/decisions/2026-10-15-flaky-e2e-batch.md).
+  // (The solo test above checks a played one, after 1.e4.)
+  expect(extraAnswer, "the host answered the extra move's request").not.toBeNull();
+  const end = await page.evaluate(() => (window as any).match.boss);
+  if (extraAnswer) {
+    expect(end.powers.lightsExtra).toBe("played");
+    expect(end.board.history.length).toBe(5);
+    expect(end.board.history[4]).toBe(extraAnswer);
+  } else {
+    expect(end.powers.lightsExtra).toBe("skipped");
+    expect(end.board.history.length).toBe(4);
+  }
+  expect(new Chess(end.board.fen).turn()).toBe("w");
+  expect(errors).toEqual([]);
+});

@@ -1,0 +1,249 @@
+# Putting Battle Royale Chess online (one time, about 3 minutes, free)
+
+You already have a Cloudflare account from Word Trap, so this is just importing a second repository.
+
+1. In the Cloudflare dashboard, open **Workers & Pages** and select **Create application**.
+2. Next to **Import a repository**, select **Get started**, and pick `chessroyale` (allow access to it on GitHub if
+   asked).
+3. On the settings screen:
+   - **Project name:** `chessroyale`
+   - **Build command:** `npm run build`
+   - Leave the deploy command as `npx wrangler deploy` and everything else as it is.
+4. Select **Save and Deploy**. After a minute or two you get a link like `https://chessroyale.<your-name>.workers.dev`.
+
+Every push to `main` redeploys it. Everything runs on the free plan: the chess engine runs in each player's browser.
+
+## The engine server (Workers Paid, from Oct 5, 2026)
+
+The account is on **Workers Paid** ($5/month), which Containers need. `wrangler.jsonc` declares the engine server: `engine/Dockerfile` (native Stockfish 17.1 behind a small Node API), class `EngineServer`, binding `ENGINE`. Its image is pinned by digest in `wrangler.jsonc` (the one built from `engine/Dockerfile` by the Oct 26, 17:20 UTC
+deploy), so a deploy needs no Docker: on Oct 26 Workers Builds stopped being able to start Docker, and every deploy that
+built the image failed (`docs/decisions/2026-10-26-deploy-pinned-engine-image.md`). Nothing to do by hand while the
+engine server doesn't change. **To change it:** edit `engine/`, build and push the image from a machine with Docker
+(`npx wrangler containers build ./engine -t chessroyale-engineserver:<new tag> --push`), then point `image` at what
+it pushed; or, once Workers Builds runs Docker again, put `"./engine/Dockerfile"` back and let each deploy build it.
+
+- **What it does:** re-checks the close calls before cuts (online in the lobby Durable Object, solo through `POST /api/engine/score`). Routine scoring still runs on players' devices.
+- **Cost guard:** at most `ENGINE_DAILY_SEARCHES` re-checks a day (default 3000), counted in the D1 table `engine_usage`. Past it, or with no server, players' devices' numbers stand. To change the cap, set `ENGINE_DAILY_SEARCHES` as a variable on the Worker (Settings → Variables).
+- **Locally:** `npx wrangler dev` builds and runs the container with Docker; `--enable-containers=false --var ENGINE_OFF:1` runs without it (the e2e suite does, to test the device fallback). Add `--var TEST_SWITCHES:1` for the test switches in the address (`?debug`, `?rounds=`, `?pool=`, …: docs/areas/ops.md, "Test switches"); never set `TEST_SWITCHES` on the production Worker.
+- **Budget alert:** Billing → Add Budget Alert in the Cloudflare dashboard (suggested: $20/month).
+
+## Residents: the always-on host (Nov 25, 2026)
+
+The residents program (`scripts/residents/`, docs/areas/ops.md "Residents") runs around the clock in a Cloudflare Container: class
+`ResidentsHost` (`packages/server/src/residents-host.ts`), binding `RESIDENTS_HOST`. Its image (`scripts/residents/container/`) is
+only Node and git: at each start it clones `main` (the repository is public), installs it and runs the program, so code changes
+reach it with no new image. It signs in with the Access service token "residents": client ID `RESIDENTS_CLIENT_ID` (wrangler.jsonc),
+secret the Worker secret `RESIDENTS_CLIENT_SECRET` (type **Secret**; never in the repository or a chat).
+
+**Once (Eric, from a computer with Docker running, about 5 minutes):** in a terminal in the repository, signed in to Cloudflare
+(`npx wrangler login`):
+
+```sh
+npx wrangler containers build scripts/residents/container -t chessroyale-residents:1 --push
+```
+
+It ends by printing the pushed image's digest (`sha256:…`; `npx wrangler containers images list` shows it again). The digest isn't
+a secret: send it to the director. (Or, with no Docker at hand: add **Account · Containers · Edit** to the API token the director's
+sessions have as `CLOUDFLARE_API_TOKEN`, and the director pushes it from a cloud session, where the same build was tested Nov 25:
+there AWS's mirror turns that shared address away, so `docker build --build-arg NODE_IMAGE=mirror.gcr.io/library/node:22-bookworm@sha256:<the
+Dockerfile's digest> -t chessroyale-residents:1 scripts/residents/container`, then `docker tag chessroyale-residents:1 registry.cloudflare.com/<account>/chessroyale-residents:1` and `npx wrangler containers push registry.cloudflare.com/<account>/chessroyale-residents:1` (the full registry name: a bare local tag goes to Docker Hub and is refused):
+the same base image, by its digest.) The director then adds the host's entry to `containers` in `wrangler.jsonc`, and in the same PR
+sets `RESIDENTS_HOST_IMAGE` to `"1"` (until then the cron never touches the host, whatever the switches say):
+
+```jsonc
+{ "class_name": "ResidentsHost", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-residents@sha256:<digest>", "instance_type": "standard-2", "max_instances": 1 }
+```
+
+- **On:** `RESIDENTS_HOST_ON` = `"1"` in `wrangler.jsonc` (a PR; not the dashboard, where a deploy would put the file's value back).
+  The next 15-minute cron starts it. That starts the spend: about $52 a month (below).
+- **Stop at once:** `PAUSE_RESIDENTS` = `1` (dashboard, Save and deploy; "Kill switches" below). The server refuses every
+  resident within seconds, the program ends its games and exits, and the next cron run (within 15 minutes) stops the container.
+  Delete it to bring them back. `RESIDENTS_HOST_ON` = `"0"`: the next cron run stops it (the program ends its games).
+- **Before a manual run** (`npx tsx scripts/residents/run.ts` from a session): set the host off first and wait for the cron's next
+  run to stop it (a pause stops it too, but no program starts while it's on). Two programs at once sign each other's residents out,
+  so the program won't start while another sent a heartbeat in the last 2 minutes; it names it (`access:residents` is the host,
+  `access:test` the director's token). `--force` starts anyway.
+- **Deploys:** a Worker deploy doesn't restart the container (no container change, no rollout; its Durable Object restarts and finds
+  it running: from the docs, unchecked; on the first deploy after it's on, look in Observability: if it does, each deploy costs a
+  clean restart). The program follows deploys itself: it reads `/version.json` every 2 minutes, and after a new version (not its own
+  commit: main can be ahead while a merge deploys) starts nothing new, lets games finish (at most 20 minutes) and exits; the image's
+  script fetches the new `main` and starts it again (installing only when the lockfile changed). A change to the image or the host's
+  `containers` entry is a rollout: SIGTERM, then the new one. A new token secret or new `RESIDENTS.host.args`: the cron's next run
+  stops it (it keeps a hash of the environment it started with) and the run after starts it with the new one.
+- **The first start:** Workers & Pages → chessroyale → Observability, lines with `host:` (the container: "installed", "running main
+  at …") and `residents:`; `GET /api/admin/residents` shows `host` (the cron's plan) and the program's last heartbeat (`beat`: its
+  commit, the live version it follows, who's online). If Access turns the token away, the program stops with "Access turned the
+  service token away" and the container ends (exit 78); each cron run starts a fresh one with the Worker's current secret, so check
+  the token is in the hunchess.com application's Service Auth policy, and that the secret is the token's.
+- **Size and cost (standard-2: 1 vCPU, 6 GiB, 12 GB):** measured in Docker with 40 residents online (18 games at once): CPU 0.25
+  vCPU on average, 0.43 at peaks, memory at most 0.6 GiB. standard-1's ½ vCPU would run near its limit when the waves peak
+  (about 54 online), and custom sizes can't be checked from here. Memory $38.70, CPU about $11 (billed on use), disk $2.10, egress
+  nothing (1 TB included): about **$52 a month**. Its Durable Object stays awake while the container runs (about 330k GB-s a
+  month: inside the 400k included, or up to about $4 more if other objects use it up).
+
+## Fair play: the review page, the reviewer's key and the deep re-check
+
+Two settings, both added by Eric in the Cloudflare dashboard. **Neither is ever pasted in a chat or put in the
+repository.**
+
+1. **Who may open the review page** (`https://hunchess.com/admin/fairplay`): open **Workers & Pages → chessroyale →
+   Settings → Variables and Secrets → Add**. Use the **Variables and Secrets** section near the top of Settings, not
+   the "Variables and secrets" box under **Build** further down: build variables only reach the build, never the
+   running site (Oct 8: the page said "Not found" until the setting moved). Name: `ADMIN_EMAILS`. Value: the email you
+   sign in to HunChess with (several, separated by commas, if others should review too). Type: Secret (or Text). Save
+   and deploy. Then sign in to HunChess with that email and open the page; everyone else gets "Not found". Chat
+   moderation is on the same page (a player's page, "Chat"): nothing more to add.
+2. **The automated reviewer's key** (only when the scheduled reviewer is set up): the same screen, name
+   `FAIRPLAY_REVIEW_TOKEN`, type **Secret**, value at least 16 random characters (for example the output of
+   `openssl rand -hex 24`). Give the same value to the reviewer's scheduled task in its own secret settings, not in a
+   message. `docs/fairplay-reviewer.md` describes what it can do.
+
+A Worker Secret stays through every deploy, so this is done once. (The Worker would also read either from the
+account's Secrets Store, like the sign-in secrets, but that needs a binding in `wrangler.jsonc` added only after the
+secret exists, or the deploy fails; the plain Secret above is simpler.)
+
+**The deep re-check** runs from the Worker's schedule (`triggers.crons` in wrangler.jsonc, every 15 minutes; deployed
+with the Worker, nothing to set up). It uses the engine server on an instance of its own (`fairplay-1`, inside
+`max_instances`), within `FAIRPLAY.deep.dailySearches` searches a day (default 500, about 25 minutes of one standard-2
+instance: well under $0.10 a day), counted in the D1 table `fairplay_budget`. Without the engine server nothing is
+re-checked, and nobody is auto-banned (a ban needs the deep re-check).
+
+**Emails** about bans and clearings go through Resend with the sign-in key, from `fairplay@` the domain of `EMAIL_FROM`
+(default hunchess.com). Nothing to set up if sign-in codes already send.
+
+## Kill switches and the maintenance banner
+
+To rest one part of the game for a while (a bug in Squads, a boss misbehaving, the shop), or to show everyone a short
+message, without a code change: each is a Worker variable (docs/areas/ops.md, "Kill switches").
+
+1. Open **Workers & Pages → chessroyale → Settings → Variables and Secrets → Add**: the section near the top of
+   Settings, not the build variables under **Build**.
+2. **To rest a part:** name `PAUSE_SQUADS` (or another below), type **Text**, value `1`. **Save and deploy.**
+   - `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_CLASSIC`: that mode online (its PLAY and new lobbies).
+   - `PAUSE_SQUADS`: Squads' PLAY and new parties.
+   - `PAUSE_RANKED1V1`: ranked 1 v 1's queue (games already running finish; the bot game is reached only from the queue).
+   - `PAUSE_SOLO`: Solo and Boss alone.
+   - `PAUSE_SHOP`: getting shop items and opening crates (the locker stays).
+   - `PAUSE_FRIENDS`: friends and invites.
+   - `PAUSE_REWARDS`: XP, the daily reward and level rewards (games play on; the result's XP box says "Rewards are paused for
+     a moment."; levels reached meanwhile are paid at the next game after it).
+   - `PAUSE_LEAVE_PENALTIES`: ranked's leave rules (dodges and leaves: no rank points taken, nothing marked, and no lockout or
+     delayed queue applies while it's on). Games play as usual. For when the rules misfire.
+   - `PAUSE_TOWN_CHAT`: typing in the town square's chat, everywhere at once (the field says "Chat is paused."; players'
+     messages stop showing, the bosses' chatter goes on).
+   - `PAUSE_RESIDENTS`: every resident turned away (their games end as anyone's who leaves), and their host stopped within 15
+     minutes ("Residents" above).
+   - One boss, never met while it's set (its id, from `BOSS_ROSTER` in `packages/core/src/boss.ts`, isn't always its
+     name): Ginger `PAUSE_BOSS_GINGERBREAD`, Boingo the Clown `PAUSE_BOSS_CLOWN`, Jefferson `PAUSE_BOSS_GREX`, Hollow
+     `PAUSE_BOSS_HOLLOW`, Big Boy `PAUSE_BOSS_BIGBOY`, Sawyer `PAUSE_BOSS_SAWYER`, Wrangler `PAUSE_BOSS_PIG`, the
+     Hidden Boss `PAUSE_BOSS_RECLUSE` (the Crowd's boss final then meets another boss).
+3. **To bring it back:** delete the variable (or set it to `0`), then Save and deploy.
+4. **The banner:** name `MAINTENANCE_BANNER`, type Text, value the message (at most 200 characters, e.g. "Maintenance
+   tonight at 10 pm UTC. Matches already running will finish."). Delete it to take the banner down.
+
+**How fast:** Save and deploy puts out a new version of the Worker, just as a code deploy does, so the change is live
+within seconds; as with any deploy, players in a match reconnect for a moment and play on. Open apps update their
+buttons within a minute.
+Matches already running finish normally; the server refuses only new ones, with "Squads is resting for a bit. Back
+soon." (or that part's own line). Variables set here stay through every deploy from `main` (`keep_vars`). A
+**rollback** to an older version brings back that version's variables, so check them after one.
+
+## Rolling back a bad deploy
+
+In a terminal, with `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) set:
+
+1. `npm run rollback` lists the Worker's latest versions: → live now, • was live, and whether each is a code upload
+   or a settings change (saving a variable makes a new version of the same code).
+2. `npm run rollback -- previous --dry-run` says which version "previous" is and why: the one live just before the
+   live code went out, never the bad code under a pause you set to contain it. Flags go after `--`.
+3. `npm run rollback -- previous` rolls back with `wrangler rollback`, which asks before it deploys and about any
+   secret changed since that version. It runs only in a plain terminal (not one with `CI` set), so nothing is
+   answered for you.
+4. With the residents' host on: pause residents (`PAUSE_RESIDENTS` = `1`) until `main` is fixed too. The host runs
+   `main`'s newest program, whose client may not match the older server.
+
+The dashboard does the same: **Workers & Pages → chessroyale → Deployments → a version's ⋯ → Rollback**. A rollback
+lasts until the next merge to `main` deploys again: revert or fix the bad change there first. A version carries its
+own variables, so check the `PAUSE_` variables and the banner after (docs/areas/ops.md, "Rolling back").
+
+## Load testing (staging only, never production)
+
+Simulated players (`scripts/load/`) speak the app's real protocol: a guest account, the home screen's live line, PLAY,
+the lobby's WebSocket, votes, legal moves within the clock, the odd quick-chat line, the 30 s heartbeat, then leave.
+One of them is faked as each lobby's host with made-up scores, so the test measures the servers, not Stockfish.
+Results go to `reports/load/`. See DECISIONS.md, "Capacity: built", for what was measured and fixed.
+
+**Locally** (finds code-level choke points; one machine runs everything, so absolute numbers are low):
+
+```sh
+npm run build
+npx wrangler dev --port 8787 --enable-containers=false --var ENGINE_OFF:1 --var OPS_STATS:local --var LOAD_TEST:1 --var TEST_SWITCHES:1
+npx tsx scripts/load/run.ts --url http://localhost:8787 --players 500 --ramp 20 --session 200 --ops-key local --name local-500
+npx tsx scripts/load/burst.ts --url http://localhost:8787 --players 1000 --ops-key local   # the matchmaker alone
+```
+
+Run wrangler from a copy of the repo you aren't editing: it reloads the Worker on every file change, which drops
+every connection mid-test.
+
+**Staging** (the real numbers). One-time, Eric:
+1. Cloudflare dashboard → **My Profile → API Tokens → Create Token → Custom token**, with: Account · Workers Scripts ·
+   Edit; Account · D1 · Edit; Account · Account Analytics · Read; Account · Workers Observability · Read; User ·
+   Memberships · Read; Zone: none. Copy it.
+2. Give it to the session as the environment variable `CLOUDFLARE_API_TOKEN` (claude.ai → the environment's
+   settings → environment variables/secrets). Never paste it into a chat or a file.
+
+Then (any session with the token):
+
+```sh
+scripts/load/staging.sh up                    # creates D1 "hunchess-staging", deploys chessroyale-staging, a stats key
+scripts/load/staging.sh run 1000 60 300       # players, ramp seconds, seconds each stays
+scripts/load/staging.sh run 5000 120 300
+scripts/load/staging.sh run 10000 180 300     # spreads over Node processes, ~1,500 players each
+scripts/load/staging.sh down                  # deletes the staging Worker, its Durable Objects and its database
+```
+
+- Staging is `env.staging` in `wrangler.jsonc`: its own Worker (on workers.dev, no hunchess.com route), Durable
+  Objects and D1; no engine server, no sign-in (guests play online), `LOAD_TEST=1` (the per-address rate limit is off,
+  since every simulated player comes from one machine). `OPS_STATS` is set as a secret by the script.
+- **Cost:** usage-based on Workers Paid. A 10,000-player run of 10 minutes is roughly 1-2 million Worker and Durable
+  Object requests and ~150k GB-s of Durable Object time: about $1-3. Idle, a deployed staging Worker costs nothing,
+  but `down` deletes it anyway.
+- **The generator's limits:** one Node process handles about 1,500 players (one core); this container has 4 cores,
+  so about 5,000-6,000 players is the most it can drive at once. For 10,000, run `staging.sh run 5000` from two
+  machines at the same time with the same `--pool` (or a bigger machine).
+
+## Monitoring and alerts
+
+What to watch in the Cloudflare dashboard (the names move around; search the dashboard if one isn't where it says):
+
+- **Workers & Pages → chessroyale → Metrics:** requests, errors (exceptions), CPU time (p50/p99). Healthy: errors
+  well under 0.1% of requests; CPU p99 under 50 ms.
+- **Workers & Pages → chessroyale → Observability (Logs):** search for `matchmaker:`, `live hub:` and
+  `closing without D1` (each means something degraded), and `Error`.
+- **Durable Objects (Workers & Pages → chessroyale → Durable Objects, or Storage & Databases → Durable Objects):**
+  per class: requests, CPU, wall time, active objects, storage. Watch:
+  - `Lobby`: one object per match; CPU per object should stay well under a second per second.
+  - `Matchmaker` and `LiveHub`: one object each (per queue for Matchmaker), so they're the ones to watch at scale.
+    Healthy: under ~500 requests/s each (a single object handles roughly 1,000 simple requests a second).
+- **Storage & Databases → D1 → hunchess → Metrics:** read and write queries, rows written, query latency, size.
+  After the capacity work, writes are about one per player per hour plus match results; reads about one per page
+  view. Healthy: write latency p90 under 10 ms, and no "overloaded" errors in the logs.
+- **The live line itself:** `https://hunchess.com/api/live` answers with online / matches / queue; an uptime monitor
+  on it is the simplest health check.
+
+**Alerts to set (Eric, about 10 minutes):**
+1. **Billing (do this first):** Manage Account → **Billing → Billable usage / Budget alerts → Add budget alert**:
+   one at **$25/month** (normal use stays well under it) and one at **$100/month** (something is up).
+2. **Usage notifications:** account home → **Notifications → Add → Usage Based Billing**: for Workers requests over
+   **50 million a month** and Durable Objects duration over **5 million GB-s a month** (roughly the $25 mark each).
+3. **Errors:** Workers & Pages → chessroyale → Observability → **Alerts** (if offered on the plan): error rate over
+   1% for 5 minutes, emailed. If alerts aren't offered, the weekly Workers summary email (Notifications →
+   Add → Workers) plus the uptime check below cover it.
+4. **Uptime:** a free external monitor (e.g. UptimeRobot) on `https://hunchess.com/api/live` every 5 minutes, emailed
+   when it fails twice. (Cloudflare Health Checks need a Pro zone plan, $20/month; not needed.)
+5. **Discord (the game's own alerts, alerts.ts; docs/areas/ops.md, "Alerts"):** in Discord, a private channel (e.g.
+   `#hunchess-alerts`) → **Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL**. Then in Cloudflare,
+   Workers & Pages → chessroyale → Settings → Variables and Secrets → **Add**: name `ALERT_WEBHOOK`, type **Secret**, value the
+   URL; Save and deploy. Optional: `ALERT_PING` (Text), your Discord user id (Discord → Settings → Advanced → Developer Mode,
+   then right-click your name → Copy User ID), so a page pings you rather than `@everyone`. `PAUSE_ALERTS` = `1` turns them off.
+   The ops page's Health says "Alerts: on" once it's set.

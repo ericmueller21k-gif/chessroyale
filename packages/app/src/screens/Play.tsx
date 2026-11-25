@@ -1,0 +1,487 @@
+import { SideFigures, TowerBoardLives } from "./TowerBar.tsx";
+import { onSide, partOf, partsOf, sideOf } from "../boss-side.ts";
+import { useEffect, useMemo, useState } from "preact/hooks";
+import { BOSS_POWERS } from "@chessroyale/core";
+import { applyMove, fenAtPly, legalMoves, sideToMove } from "@chessroyale/chess";
+import { Board, type Arrow } from "../components/Board.tsx";
+import { seatKey } from "../board/yours.ts";
+import { partyBrush } from "../board/logic.ts";
+import { seenFen, seenSan } from "../camo.ts";
+import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
+import { BoardClock } from "../components/BoardClock.tsx";
+import { EvalBar, knownEval } from "../components/EvalBar.tsx";
+import { kingTurn, turnCues } from "../godKing.ts";
+import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
+import { isCrowdFifty } from "../game.ts";
+import type { BoardView, GameView, StallState, StrikeState } from "../game.ts";
+import { LOCKED_PHONE, UnderBoard, useMedia } from "../components/QuickChat.tsx";
+import { CROWD_FRAME } from "../components/MatchMenu.tsx";
+import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
+import { PowerUps } from "../components/PowerUpButton.tsx";
+import { BossDock, Dots } from "../components/BossDock.tsx";
+import { BossFace } from "../components/BossCharacter.tsx";
+import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
+import { LiveGhosts, OneVOneBanner, SlotIdle, SlotSkeleton } from "./Crowd.tsx";
+import { DarkCost, PowerBoard, battleDecor, crowdView } from "../components/BossPowers.tsx";
+import { goldClink, zebraGold } from "../components/Zebra.tsx";
+import { DarkForced, HOLLOW_BULB_LINES, HollowBlackout, hollowTaunt } from "../components/Hollow.tsx";
+import { bossKit } from "../characters/kits.ts";
+import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
+import { play } from "../sound.ts";
+import { ScrambleCount } from "../components/Dash.tsx";
+import { DashStall, frozenWindow, stallBoard, stallHolding, stallOn } from "../components/DashStall.tsx";
+import { duelCount, duelTurn } from "../components/Pig.tsx";
+import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
+import { WipPreview, wipPower } from "../components/WipPreview.tsx";
+import { useReplay } from "../hooks.ts";
+import { REFUSED_MS, refusedLine, swapLine, throughLine, trainLine } from "../refused.ts";
+import { Hud } from "./Hud.tsx";
+
+const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
+const DARK_COST = BOSS_POWERS.darkTryCost;
+const DARK_TRIES = BOSS_POWERS.darkTries;
+
+/** Re-renders every `ms` and returns the time. */
+function useNow(ms = 200) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+  return now;
+}
+
+/** The last move clock each match showed you (to tell when it goes up). */
+const clockSeen = new WeakMap<object, number>();
+
+/**
+ * This move's clock, above the board ("⏱ 15 s"). When it has gone up since your last move (a rising schedule,
+ * moveClockSteps, or the cut's clock vote; neither is on today), it's lit for that move, with a ▲, so the change is
+ * noticed without anything over the board.
+ */
+export function ClockNote({ match, seconds }: { match: GameView; seconds: number }) {
+  const [up] = useState(() => {
+    const before = clockSeen.get(match);
+    clockSeen.set(match, seconds);
+    return before !== undefined && seconds > before;
+  });
+  return (
+    <span class={`clock-note${up ? " up" : ""}`} title={up ? `More time now: ${seconds} s a move` : `${seconds} s a move`}>
+      ⏱ {seconds} s{up ? " ▲" : ""}
+    </span>
+  );
+}
+
+/** In the final: whose side you're moving for, and with whom. */
+function FinalTurnLabel({ match, side }: { match: GameView; side: "w" | "b" }) {
+  const f = match.final!;
+  const team = f.teams.find((t) => t.some((id) => match.isYou(id))) ?? [];
+  const mates = team.filter((id) => !match.isYou(id)).map((id) => match.nameOf(id));
+  return (
+    <>
+      <strong>{f.format === "duel" ? "DUEL" : "FINAL"}</strong> · your move for {side === "w" ? "White" : "Black"}
+      {mates.length ? ` (with ${mates.join(", ")})` : ""}
+    </>
+  );
+}
+
+export function PlayScreen({
+  match,
+  board,
+  startsAt = 0,
+  deadline,
+  allowedMs,
+  clock,
+  picked,
+  strike,
+  stall,
+}: {
+  match: GameView;
+  board: BoardView;
+  startsAt?: number;
+  deadline: number;
+  allowedMs?: number;
+  /** This move's clock in seconds (see ClockNote). */
+  clock?: number;
+  picked?: string | null;
+  strike?: StrikeState;
+  /** Dash's stall skit on this move (DashStall.tsx). */
+  stall?: StallState;
+}) {
+  const side = sideToMove(board.fen);
+  const waiting = picked !== undefined;
+  const now = useNow();
+  const layout = useBossLayout();
+  const [mountedAt] = useState(Date.now());
+  // A new board: a short countdown while the last few moves replay, then the clock starts.
+  const intro = !waiting && now < startsAt;
+  const introLeft = Math.ceil((startsAt - now) / 1000);
+  const shown = useReplay(match, board, Math.max(0, startsAt - mountedAt));
+  const history = useHistoryView(board.history, board.bases);
+  // The same 3-2-1 (with a tick each second) opens the round and closes it.
+  useTicks(introLeft, COUNT_FROM_SECONDS, intro);
+  const total = allowedMs ?? match.settings.moveClockSeconds * 1000;
+  const secsLeft = Math.ceil((deadline - now) / 1000);
+  // (Dash's Time Scramble: its own 3-2-1 stands in for the round's end count, ScrambleCount.)
+  // (A floor of several: each boss's own things from his own part of the view, whoever is to move: audit 2, finding 1. Else the boss.)
+  const own = (id: string) => (match.boss ? partOf(match.boss, id) : null);
+  const dash = own("dash");
+  const hollow = own("hollow");
+  const scrambled = dash?.id === "dash" && !!dash.powers?.dash?.scramble;
+  const ending = !waiting && !intro && deadline > 0 && secsLeft > 0 && secsLeft <= COUNT_FROM_SECONDS && !scrambled;
+
+  const hint = match.hint;
+  // Power-ups you hold (one in use this move already counts as spent).
+  const standings = match.standings();
+  const you = standings.find((s) => s.isYou);
+  const held = match.practice ? Infinity : (you?.powerUps ?? 0);
+  const powerUps = hint !== null ? Math.max(0, held - 1) : held;
+  // (A phone's locked screen: the power-up row goes in the middle box, with the status line, so the scoreboard under it
+  // keeps its place through every phase; a computer keeps the row under the board.)
+  // (50 v 50 only: a boss raid and the boss final keep the power-up row under the board, as on main.)
+  const fifty = isCrowdFifty(match);
+  // (The power-up row in the box beside or under the board: a phone's middle box, and a computer's column in the 50 v 50's frame, Nov 26.)
+  const powerInBox = [useMedia(LOCKED_PHONE), useMedia(CROWD_FRAME)].some(Boolean) && fifty;
+  const powerRow = match.boss ? null : (
+    <HistoryNav view={history} total={board.history.length} extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />} />
+  );
+  // Crowd 50 v 50: only your team is picking this turn.
+  const alive = standings.filter((s) => !s.out && (s.team == null || s.team === side));
+  // Once you've moved, your move stays on the board while the others finish.
+  // (Crowd keeps the position on screen and shows everyone's picks over it instead, unless you're the whole crowd,
+  // as in a solo boss raid: then your pick is the move, so it stays where you put it.)
+  const crowd = match.settings.mode === "crowd" && alive.length > 1;
+  const alone = !!match.boss && alive.length === 1;
+  const moved = waiting && picked && !crowd ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
+  const doneCount = alive.filter((s) => match.done.has(s.id)).length;
+  // A Boss Battle party's battle: the seats (colors) and your pick this turn, which can still change.
+  const partySeats = match.party?.seats ?? null;
+  const partyPick = partySeats ? (match.myPick ?? null) : null;
+  // Boss battle, the re-pick after the God King's Last Stand: the move he took back is grayed out and can't be played.
+  const barred = match.boss?.barred && legalMoves(board.fen).includes(match.boss.barred) ? match.boss.barred : null;
+  // A boss power limits the moves this turn (a frozen piece, a pie, the blizzard): only those can be played.
+  const powerAllowed = match.boss?.powers?.allowed ?? null;
+  const allowed = useMemo(
+    () => (powerAllowed ? powerAllowed.filter((m) => m !== barred) : barred ? legalMoves(board.fen).filter((m) => m !== barred) : undefined),
+    [board.fen, barred, powerAllowed?.join()],
+  );
+  // Smudgy's hidden rook: the board draws it as a pawn, so the moves it offers (the dots) are the ones legal there, and a
+  // move legal there that the real board refuses (your king into the rook's line, a piece it pins) is tried like any
+  // other and stopped on the spot, the dock saying why ("A painted piece stops that move."), never played and snapped
+  // back. If the board it draws had no move at all, the real one is drawn and played (a mate or a stalemate on it is
+  // the game's to end; the rules reveal the rook before that, `unmask` "stuck").
+  const painted = useMemo(() => {
+    const seen = seenFen(board.fen);
+    if (seen === board.fen) return null;
+    const offered = legalMoves(seen).filter((m) => m !== barred);
+    const real = new Set(allowed ?? legalMoves(board.fen));
+    return { offered, noMove: !offered.length, stopped: (m: string) => !real.has(m) };
+  }, [board.fen, allowed?.join(), barred]);
+  const drawnTrue = !!painted?.noMove;
+  const offeredMoves = painted && !painted.noMove ? painted.offered : allowed;
+  const stoppedMove = painted && !painted.noMove ? painted.stopped : undefined;
+  // The crowd's view of the board: its own side, or turned in Boingo's funhouse (upside down, or a quarter turn).
+  const view = match.boss ? crowdView(match.boss, side) : { orientation: side === "w" ? ("white" as const) : ("black" as const), turn: 0 as const };
+  const orientation = view.orientation;
+  const arrows: Arrow[] = [
+    ...(!waiting && hint && !history.browsing ? hint.map((h, i) => ({ move: h.move, brush: HINT_BRUSHES[i]!, label: (h.expected * 100).toFixed(1) })) : []),
+    ...(barred && !waiting && !history.browsing ? [{ move: barred, brush: "paleGrey" as const, label: "✕" }] : []),
+    // A Boss Battle party: everyone's pick this turn, live, an arrow in each one's color (yours too).
+    ...(partySeats && !waiting && !history.browsing ? (match.livePicks() ?? []).filter((p) => p.at <= now && partySeats[p.playerId] !== undefined).map((p) => ({ move: p.move, brush: partyBrush(partySeats[p.playerId]!) })) : []),
+  ];
+  // (Dash's stall skit: his fake second move on the board, until it slides back. DashStall.tsx.)
+  const faked = history.browsing ? null : stallBoard(board.fen, stall, now);
+  const fen = history.fen ?? faked?.fen ?? moved?.fen ?? shown.fen;
+  const lastMove = history.browsing ? history.lastMove : (faked?.lastMove ?? moved?.lastMove ?? shown.lastMove);
+  // (The move's clock stands still through the King's strike and Dash's stall beats: the window it's in, or was last.)
+  const frozen = frozenWindow(strike, stall);
+  const stalling = stallOn(stall, now);
+  // Boss battle: the God King striking the boss. The clock stands still and nobody moves until he's gone.
+  const striking = !!strike?.at && now < strike.until!;
+  // Hollow's dark: the squares covered (their pieces hidden), and how your last attempt into it went.
+  const dark = useMemo(() => (hollow?.powers?.dark ?? []).map((d) => d.square), [hollow?.powers?.dark?.map((d) => d.square).join()]);
+  const note = match.darkNote;
+  // (Boss alone, his bulbs: no move of yours while the dark moves for you, nor once the last bulb is out.)
+  const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !stallHolding(stall, now) && !note?.pending && !note?.forced && !note?.blackout;
+  // His word on each wrong move into the dark (a taunt at random, never the same twice running; Eric, Nov 5), and in Boss
+  // alone the dark's move for you and the blackout, each with its sound.
+  const strand = hollow?.powers?.strand;
+  useEffect(() => {
+    if (!note || note.pending || !match.boss) return;
+    if (note.blackout) return void play("hollowBlackout");
+    if (note.forced) {
+      play("hollowForced");
+      return void bossVoice.say(HOLLOW_BULB_LINES.forced, `hollow:forced:${note.at}`, CRITICAL);
+    }
+    // (Keyed by his id: on a floor of several, his own bubble says it, TowerBar speakerOf.)
+    bossVoice.say(hollowTaunt(bossKit((hollow ?? match.boss).name)?.lines.misplay), `hollow:misplay:${note.at}`, NORMAL);
+  }, [note?.at]);
+  // Premoves (chess.com's; docs/areas/board.md): kept by the match, this board and your side through the boss's and the
+  // other team's screens; the first plays as soon as you can move (after the opening and the countdown). Not in Classic's
+  // rounds (you move every round, then on another board: there's no turn of the other side's to move ahead of) nor in a
+  // final (its turns go round the team), nor while you look back through the moves.
+  const premove = !history.browsing && !match.final && match.settings.mode === "crowd" ? { key: seatKey(match, board.id, side), side } : undefined;
+  // A move a boss power refuses (legal in chess: across Sawyer's saw, onto a pie…) stays put: why, in the dock, for a
+  // few seconds (refused.ts; Eric, Oct 17: it "glitched"). And the boss's last move, if it went through a power (his
+  // only move: the limit lifted for it), says so through your turn.
+  const [refused, setRefused] = useState<{ line: string; fen: string; at: number } | null>(null);
+  const refusedNow = refused && refused.fen === board.fen && now - refused.at < REFUSED_MS ? refused.line : null;
+  // (Sawyer's Saw Swap before his last move: said the same way, through your turn: swapLine. Birdie's train's warning: trainLine.)
+  const through = match.boss ? (throughLine(match.boss) ?? swapLine(match.boss) ?? trainLine(match.boss)) : null;
+  // The God King strikes from his spot (or, the old way behind settings.kingOnBoard, summoned onto your king's square).
+  const onBoardKing = !!match.settings.kingOnBoard;
+  const command = useMemo(() => {
+    if (!strike?.at || onBoardKing) return null;
+    const target = kingSquare(board.fen, side === "w" ? "b" : "w");
+    if (!target) return null;
+    const hp = Math.round((match.settings.kingStrikeLoss[0] + match.settings.kingStrikeLoss[1]) / 2);
+    return { side, orientation, target, mode: "strike" as const, hp, startAt: strike.at, bossIcon: match.boss ? <BossFace boss={match.boss} /> : undefined };
+  }, [strike?.at, board.fen]);
+  const godKing = useMemo(() => {
+    if (!strike?.at || !onBoardKing) return null;
+    const boss = side === "w" ? "b" : "w";
+    const mine = kingSquare(board.fen, side);
+    const target = kingSquare(board.fen, boss);
+    if (!mine || !target) return null;
+    const hp = Math.round((match.settings.kingStrikeLoss[0] + match.settings.kingStrikeLoss[1]) / 2);
+    return {
+      side,
+      orientation,
+      kingBefore: mine,
+      kingAfter: mine,
+      target,
+      mode: "strike" as const,
+      hp,
+      startAt: strike.at,
+      moveAt: strike.at,
+      exitAt: strike.until! - 900,
+      bossIcon: match.boss ? <BossFace boss={match.boss} /> : undefined,
+    };
+  }, [strike?.at, board.fen]);
+  // What the God King might say about the position: danger first, then how it's going, then small talk.
+  const kingCues = useMemo(() => {
+    if (!match.boss || waiting) return [];
+    // (The God King speaks of the board you see: a hidden rook's threat isn't one he warns of.)
+    const seen = seenFen(board.fen);
+    kingTurn(seen);
+    const w = knownEval(board.fen);
+    const prevFen = board.history.length >= 2 ? seenFen(fenAtPly(board.history, board.history.length - 2, board.bases)) : undefined;
+    const cues = turnCues({ fen: seen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen, noHelp: kingBlocked(match.boss) });
+    // (Wrangler's forced duel: the move must be a duel, so "move your queen" or "shield the king" can't be heeded.)
+    return duelTurn(own("pig")!) ? cues.filter((c) => c.cue !== "queenDanger" && c.cue !== "mateThreat") : cues;
+  }, [board.fen, strike?.at, waiting]);
+
+  return (
+    <div class={fifty ? "screen game crowd-50" : "screen game"}>
+      <Hud match={match} />
+      <div class="board-area">
+        {/* (A boss battle has no line above its board: its dock says what's happening, and "N/M picked" is in it, Eric, Oct 24.) */}
+        {(!match.boss || match.final) && (
+        <div class="opening-name">
+          {match.final ? (
+            <FinalTurnLabel match={match} side={side} />
+          ) : match.settings.mode === "crowd" ? (
+            <>
+              {/* (On a phone, dropped while the lit "▲" note is in the line, to leave room for the clock at the board's
+                  top right.) */}
+              <span class="pick-for">Your pick for </span>
+              <strong>{side === "w" ? "White" : "Black"}</strong> ·{" "}
+              {clock !== undefined && !waiting && (
+                // (Beside the board's own clock, only the lit "more time now" note shows: see styles.css.)
+                <span class="clock-part">
+                  <ClockNote match={match} seconds={clock} /> ·{" "}
+                </span>
+              )}
+              <span class="pick-count">
+                {doneCount}/{alive.length} picked
+              </span>
+            </>
+          ) : (
+            <span class="opening-title" title={board.openingName}>{board.openingName}</span>
+          )}
+        </div>
+        )}
+        <div class="board-row">
+          {match.boss && <SideFigures match={match} />}
+          <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
+          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => (setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }), goldClink(own("zebra"), board.fen, m)) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing || !match.boss ? undefined : onSide(match.boss, (b) => b.powers?.elephants)} gold={history.browsing ? undefined : zebraGold(own("zebra"))} decor={history.browsing ? undefined : battleDecor(match.boss, { pending: moved ? { move: moved.lastMove, fen: moved.fen } : null })}>
+            {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
+            {/* (A floor of several: every boss's marks, each from his own part of the view: audit 2, finding 1.) */}
+            {match.boss?.powers && (!history.browsing || dark.length > 0) && partsOf(match.boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} fen={fen} />)}
+            {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} points={!strand} />}
+            {note?.forced && <DarkForced since={note.at} now={now} />}
+            {match.boss && wipPower() && <WipPreview fen={fen} orientation={orientation} crowd={match.boss.crowdSide} />}
+            {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={frozen} />}
+            {/* (Dash's Time Scramble: a scrambled move's big 3-2-1 over the board, taking no taps.) */}
+            {dash?.id === "dash" && !waiting && deadline > 0 && <ScrambleCount boss={dash} startsAt={startsAt} deadline={deadline} />}
+            {match.settings.mode === "crowd" && !match.boss && deadline > 0 && <BoardClock match={match} you={you} turn={{ startsAt, deadline, yours: true, done: waiting }} />}
+            {intro && (
+              <CenterCount
+                label="Round start"
+                n={introLeft <= COUNT_FROM_SECONDS ? introLeft : null}
+                note={shown.replaying ? (shown.fromStart ? "New board: replaying it from the start" : "Replaying the moves you missed") : null}
+              />
+            )}
+            {ending && !striking && !stalling && <CenterCount label="Round end" n={secsLeft} />}
+            {dash?.id === "dash" && <DashStall boss={dash} stall={stall} />}
+            {godKing && <KingSummon {...godKing} />}
+            {command && <KingCommand {...command} />}
+            {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
+            <OneVOneBanner match={match} />
+            <TowerBoardLives match={match} />
+          </Board>
+        </div>
+        {/* (On a phone the power-up row is in the middle box below, with the status line: see the footer.) */}
+        {!match.boss && !powerInBox && powerRow}
+      </div>
+      {match.boss ? (
+        <BossDock
+          match={match}
+          side={side}
+          cues={kingCues}
+          away={striking && onBoardKing}
+          command={command ? { mode: "strike", startAt: command.startAt } : undefined}
+          nav={{ view: history, total: board.history.length }}
+          panel={layout.strip ? <BossPanel match={match} /> : undefined}
+          canCall={!waiting && !intro && !shown.replaying && !striking && !stallHolding(stall, now)}
+          strike={strike}
+          // After his Last Stand: the power-ups he left you (the engine's top 3 moves, as in Crowd).
+          powerUp={{ enabled: canMove, inUse: hint !== null }}
+          // Your clock, at the status box's right: running on your move; once it's in, it holds (DockClock).
+          clock={!waiting && deadline > 0 ? { startsAt, deadline, frozen } : undefined}
+          status={
+            striking ? (
+              <span>
+                <strong>👑 He strikes the boss!</strong> <span class="muted">Clock stopped.</span>
+              </span>
+            ) : stalling ? (
+              // (Dash's stall skit: the clock stands still for it; DashStall.tsx.)
+              <span>
+                <strong>{stall!.beat === "slam" ? "Hurry up!" : "He moved again?!"}</strong> <span class="muted">Clock stopped.</span>
+              </span>
+            ) : waiting && alone && picked ? (
+              // Alone, your move is simply played: the boss is already thinking about its reply. (A floor of several: the boss to move
+              // next, by name: audit 2, finding 1.)
+              <span>
+                <Dots /> <strong>{sideOf(match.boss) ? match.boss.name : "The boss"}</strong> is thinking…
+              </span>
+            ) : waiting ? (
+              <span>
+                {/* (How many have picked: a raid's crowd, "16/50 picked", as the line above the board said.) */}
+                <Dots /> <strong>{picked ? "Move in." : note?.out ? "Out of tries." : "Time's up."}</strong>{" "}
+                {!alone && <span class="muted">{doneCount}/{alive.length} picked</span>}
+                {alive.length > 1 && <span class="muted"> · Waiting for the others</span>}
+              </span>
+            ) : intro ? (
+              <span class="muted">Get ready…</span>
+            ) : strike?.mine && !match.boss.staggerNext ? (
+              <span>
+                <strong>Strike called.</strong>{" "}
+                <span class="muted">
+                  {strike.calls}/{strike.needed} needed. Pick your move.
+                </span>
+              </span>
+            ) : duelTurn(own("pig")!) ? (
+              // Wrangler's showdown: the rule the player must play by, whole, for the whole turn. (Not the power's
+              // name: its banners said it.)
+              <span class="duel-note">
+                <strong>Take one of his {duelCount(own("pig")!) === 2 ? "two" : "three"} duels.</strong>
+              </span>
+            ) : refusedNow ? (
+              // A move of yours a power refused: why, the dock's whole line for a moment (refused.ts; the box around
+              // it is the dock's live region, read out as it changes).
+              <span class="refused-note">{refusedNow}</span>
+            ) : through && hint === null && !barred && !match.boss.staggerNext ? (
+              // The boss's only move went through a power: said through your turn, in place of "Your move." (as the
+              // duel's line is), so it's whole on a narrow phone. Until the God King's strike lands: then "Your move.
+              // Boss staggered.", the newer news (there's no room for both at 320 px).
+              <span class="through-note">{through}</span>
+            ) : partyPick ? (
+              // A party: your pick is your arrow, and can change until the last pick resolves the turn.
+              <span>
+                <strong>Your pick is in.</strong> <span class="muted">{doneCount}/{alive.length} picked</span>
+              </span>
+            ) : strand && (note?.forced || note?.blackout) ? (
+              // Boss alone: the 3rd or 7th bulb out, the dark moves for you; the last, the battle is his. The whole line.
+              <span class="dark-note" role="status">
+                {note.blackout ? "Your last bulb is out." : "The dark moves for you."}
+              </span>
+            ) : (
+              <span>
+                <strong>Your move.</strong>{" "}
+                {!alone && <span class="muted">{doneCount}/{alive.length} picked </span>}
+                {note && !note.pending && strand ? (
+                  // Boss alone: your own attempt into the dark wasn't legal: a bulb out, and how many are left.
+                  <span class="dark-note" role="status">
+                    Bulb out · {strand.of - strand.out} left
+                  </span>
+                ) : note && !note.pending ? (
+                  // Your own attempt into the dark wasn't legal: what it cost, and the tries you have left.
+                  <span class="dark-note" role="status">
+                    −{DARK_COST} · {DARK_TRIES - note.tries} {DARK_TRIES - note.tries === 1 ? "try" : "tries"} left
+                  </span>
+                ) : note?.pending ? (
+                  <span class="muted">Into the dark…</span>
+                ) : hint !== null ? (
+                  <span class="muted">{hint.length ? "⚡ Top 3" : "⚡ Asking the engine…"}</span>
+                ) : barred ? (
+                  <span class="muted barred-note">✕ {seenSan(board.fen, barred)}</span>
+                ) : bulletOn(match.boss) ? (
+                  // (The Hidden Boss's bullet clock, on every move to the end; once he has added time per move, the time
+                  // control too: "Bullet 1+10". What's left in your bank is the dock's clock, at the box's right.)
+                  <span class="bullet-note">
+                    <strong>Bullet{bulletIncrementOn(match.boss) ? `\u00a0${bulletControl(bulletIncrementOn(match.boss))}` : ""}</strong>
+                  </span>
+                ) : (
+                  match.boss.staggerNext && <span class="muted">Boss staggered.</span>
+                )}
+              </span>
+            )
+          }
+        />
+      ) : (
+        <div class="play-footer">
+        {powerInBox && powerRow}
+        {/* (A computer's 50 v 50: the vote box's skeleton rows wait in the slot between reveals, Nov 25: Crowd.tsx.) */}
+        <SlotSkeleton match={match} />
+        {/* (A 50 v 50's status slot: one fixed height in every phase, empty while picking, so nothing below moves: styles.css.) */}
+        <div class={fifty ? "play-slot" : undefined}>
+        {waiting ? (
+          <div class="waiting-banner" role="status">
+            <span class="waiting-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span>
+              <strong>{picked ? "Move in." : "Time's up."}</strong> Waiting for other players
+            </span>
+            {/* (How many have picked: the line above the board says it, "16/50 picked".) */}
+          </div>
+        ) : (
+          <>
+            {hint && hint.length > 0 && (
+              <ol class="hints">
+                {hint.map((h, i) => (
+                  <li key={h.move} class={`hint-${HINT_BRUSHES[i]}`}>
+                    <strong>{h.san}</strong>
+                    <span>{(h.expected * 100).toFixed(1)}%</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {hint && hint.length === 0 && <p class="muted small hints-wait">Asking the engine…</p>}
+            {/* (A 50 v 50's status box always shows, Eric, Nov 26: on your own pick, a quiet gray "Waiting…" in its place.) */}
+            {fifty && !hint && <SlotIdle />}
+          </>
+        )}
+        </div>
+      </div>
+      )}
+      {match.boss ? besideBoard(match, layout, <UnderBoard match={match} />) : <UnderBoard match={match} />}
+      {/* Boss alone, the last bulb out: the whole screen goes black, his line, then the loss screen. */}
+      {note?.blackout && match.boss && <HollowBlackout since={note.at} boss={hollow ?? match.boss} />}
+    </div>
+  );
+}
+

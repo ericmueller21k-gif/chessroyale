@@ -1,0 +1,1677 @@
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
+import { AUTOCHESS, bannerPlusMs, botLook, mulberry32, type AutoChessSettings } from "@chessroyale/core";
+import { account } from "../account.ts";
+import { useAccount } from "./Profile.tsx";
+import { Board } from "../components/Board.tsx";
+import type { PieceDecor } from "../board/types.ts";
+import { createPortal } from "preact/compat";
+import { COUNT_FROM_SECONDS } from "../components/Countdown.tsx";
+import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
+import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
+import { useBoardAnimations } from "../hooks.ts";
+import { Avatar } from "../components/Items.tsx";
+import { StarArt } from "../components/AcStarArt.tsx";
+import { cellOf, dragStarted, squareAtPoint } from "../board/logic.ts";
+import { play, unlockAudio, warmSounds } from "../sound.ts";
+import { FLOAT_MS, FloatGold, type FloatAt } from "../components/FloatGold.tsx";
+import { testParams } from "../test-switches.ts";
+import {
+  adjustBlock,
+  adjustMarks,
+  adjustMove,
+  adjustSecondsFor,
+  adjustTargets,
+  adjustWords,
+  botMoveSeed,
+  movedSquares,
+  movesUsed,
+  pickTargets,
+  starTargets,
+  startAdjust,
+  startMove,
+  startStars,
+  stepAfterBuy,
+  undoAction,
+  undoBlock,
+  undoWords,
+  youMoveSeed,
+  type Adjusted,
+} from "../autochess/adjust.ts";
+import { botAdjust, botBenchAt, botMove, botPlan, botStarMoves } from "../autochess/bot.ts";
+import {
+  buyBlock,
+  buyOffer,
+  buyWords,
+  carryBench,
+  emptyArmy,
+  heldBlock,
+  heldStars,
+  heldWords,
+  holdBlock,
+  inHalf,
+  kingSquares,
+  offerPrice,
+  placeHeld,
+  priceOf,
+  sellHeld,
+  sellPiece,
+  sellValue,
+  starUpTarget,
+  starsAt,
+  withStars,
+  type StarTarget,
+} from "../autochess/army.ts";
+import {
+  beginRound,
+  goldBreakdown,
+  incomeFor,
+  matchWinner,
+  newMatch,
+  roundSeed,
+  settleRound,
+  youColor,
+  type GoldBreakdown,
+  type MatchState,
+  type RoundResult,
+} from "../autochess/economy.ts";
+import { botEvaluator, enginePick, newFight, stallEngine, warmEngine } from "../autochess/engine.ts";
+import { addXp, buyXp, xpBlock, xpToNext, xpWords } from "../autochess/level.ts";
+import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
+import { firstHopMs, hopWaitMs } from "../autochess/hop.ts";
+import { BOT_OPENER, QUICK_CHAT, chatLine, replyMs } from "../autochess/chat.ts";
+import { boardChanges, botSeen, type BoardChange } from "../autochess/reveal.ts";
+import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, rerollPrice, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
+import { moveStars, playFight, thinFight, withPiece } from "../autochess/fight.ts";
+import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn, starUpsByColor } from "../autochess/position.ts";
+import { KIND_NAME, KINDS, other, type Army, type Color, type Held, type Kind, type Offer, type StarCount } from "../autochess/types.ts";
+import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, incomeLines, matchWords, moveCount, moveWords, type EndDetail, type EndKind } from "../autochess/words.ts";
+
+/**
+ * Auto chess, the demo (/autochess; docs/decisions/2026-10-19-autochess-demo.md, docs/areas/autochess.md): you against a
+ * bot, all in this browser. Each round the game puts both kings down; the shop offers pieces, each with a square of your half
+ * (30 s, the last 3 locked) while the bot's pieces show as plain circles, revealed piece for piece by kind every 3 s; then their real pieces show and you get
+ * one move (7 s: one legal chess move with the piece picked for you, on your half); then the engine plays both armies out. The rules are
+ * in `autochess/` (pure, tested); this draws them. Nothing is recorded, rewarded or sent anywhere.
+ *
+ * v8 (docs/decisions/2026-10-22-autochess-stars.md) adds stars: a piece but a pawn or the king can have 2 or 3 (small gold stars drawn on it, on the board, the benches,
+ * their revealed pieces and the shop cards), a star-up offer is a card with a gold glow (a rainbow one for a third star) that costs `starUpCost` (1) and merges into the piece, and the
+ * move step is for the starred pieces only: each moves once (a 2-star one legal move, a 3-star to any empty square of your half), in 5 s plus 3 s a starred piece of
+ * the side with more.
+ *
+ * The screen is v7's (docs/decisions/2026-10-21-autochess-v7.md), as v7.1 changed it (docs/decisions/2026-10-22-autochess-v7-1.md): their bench at the
+ * top left and their pawn (name, level, thin HP and XP bars) at the top right, the board in its frame with the move clock's bars along its edges, your
+ * pawn under it at the left and your bench at the right (each bench's outer edge on the board's), then a dock of gold, income, the clock (small, with the
+ * step's name under it), the shop's odds in a pill, Buy XP, Reroll and the four cards. The Sell button sits in the gap beside your bench and a short
+ * message under the bench's row. Both pawns hop now and then (hop.ts). The step's name comes as a banner on the board ("ACTION PHASE", the 3-2-1, "MOVE PHASE", "BATTLE PHASE").
+ *
+ * The meeting (v9, Eric Oct 24) comes first: before round 1 both custom pawns stand in the middle of the board, you and the bot trade a few quick lines
+ * (chat.ts) over a countdown (`introSeconds`), then they puff away to their corners and the buying begins. Phase "meet": nothing of the game runs; the corner
+ * pawns, names and bars wait out of sight and fade in as the middle pawns go.
+ */
+
+/** How often the clock is read: the countdown, the reveals and the end of each step. Nothing is drawn per frame but the move clock's bars (their own small component). */
+const TICK_MS = 120;
+/** How long a message under the board stays. */
+const SAY_MS = 4200;
+/** At the end of the adjust step the fight waits at most this long for the bot's last look. */
+const BOT_WAIT_MS = 2500;
+/** A pawn that cashes in stands on the last rank this long (its move's slide), then leaves the board. */
+const CASH_LEAVE_MS = 220;
+/** A press on a silhouette on the board is a tap while the pointer stays this close to where it went down (a finger always wobbles); farther, it is neither a tap nor a drag, and does nothing. */
+const TAP_SLOP_PX = 10;
+/**
+ * A phase banner ("ACTION PHASE", "MOVE PHASE", "BATTLE PHASE") stays this long: its pop's length (styles.css, `.ac-phase`, its
+ * `--ac-banner-ms`), 1.6 s and the banners' extra since Oct 24 (bannerPlusMs). The step's clock runs under it, as before.
+ */
+const bannerMs = () => 1600 + bannerPlusMs();
+/** A merge (a star-up) pops and flashes its piece this long, and its new star pops in (styles.css, `.ac-merge`). */
+const MERGE_MS = 700;
+/** The meeting's pawns puff away, and the corner ones fade in, over this long (styles.css, `.ac-meet.out`, and the corners' transitions). */
+const MEET_OUT_MS = 400;
+
+type Phase = "meet" | "buy" | "adjust" | "fight" | "result" | "over";
+
+type BotPlan = ReturnType<typeof botPlan>;
+
+/** Everything that belongs to one round (a new one every round: nothing carries over but gold, HP and the streak). */
+interface RoundState {
+  you: Army;
+  /** The shop's offers (new every round, free). */
+  shop: Shop;
+  /** Lock in (end your buying, first gets the bonus; off since v7): when you locked, and who got the bonus. */
+  locks: Locks;
+  /** Your adjust step: where your pieces stand, the piece picked for you (the v7 move step) and what you did (one move; in the stars mode one for each starred piece). */
+  adj: Adjusted | null;
+  /** How long this round's move step lasts, in ms: the stars mode's 5 s and 3 s for each starred piece of the side with more (known when the buying ends), else the setting's. */
+  adjustMs: number;
+  /** The bot's army when buying ended. */
+  botStart: Army | null;
+  /** What the bot held when the round began (its bench, with the squares turned to this round's colors); its holds and placings come on top, by time. */
+  botBench: Offer[];
+  plan: BotPlan;
+  /** Your board's changes while buying (what you put down or sold, and when), for the reveals (reveal.ts). */
+  log: BoardChange[];
+  /** The bot's army after its adjust step (hidden until the fight). */
+  botFinal: Army | null;
+  gold: { you: GoldBreakdown; bot: GoldBreakdown };
+}
+
+interface Outcome {
+  result: RoundResult;
+  end: EndKind;
+  /** Who won the fight, your color and, for a stall or "too far ahead", what White gained during it (for the result's words). */
+  detail: EndDetail;
+  /** Next round's gold, line by line (null when the match is over). */
+  next: GoldBreakdown | null;
+}
+
+interface Game {
+  match: MatchState;
+  phase: Phase;
+  /** When this step began (performance.now), and the same moment on the wall clock (the move clock's bars read it). */
+  phaseStart: number;
+  wallStart: number;
+  round: RoundState;
+  /** The fight: the position, the last move, the plies so far and the stars on the board by square (they move with their pieces; a star changes nothing in the fight). */
+  fight: { fen: string; last: string | null; plies: number; stars: Record<string, StarCount> } | null;
+  outcome: Outcome | null;
+}
+
+/** A speech bubble in the meeting: a new line gets a new id (it pops), and a bubble's timer clears only its own. */
+interface Say {
+  id: number;
+  text: string;
+}
+
+/** The bot's adjust step in progress: told to stop at the fight, and the army it has so far. */
+interface BotRun {
+  stop: boolean;
+  done: Promise<void> | null;
+  latest: Army;
+}
+
+/** A piece being held: picked up for a drag, or selected by a tap; an offer pressed; or a piece on the bench pressed. */
+interface Hold {
+  kind: Kind | "k";
+  at: { offer: number } | { square: string } | { held: number };
+  /** Only ever tapped, never picked up, dragged or dropped: an offer's silhouette on the board (Eric, Oct 21), or a piece of yours the move step doesn't let you move. */
+  tapOnly?: boolean;
+}
+type Target = { square: string } | { shop: true } | { bench: true } | null;
+
+const sameHold = (a: Hold | null, b: Hold | null) => !!a && !!b && JSON.stringify(a.at) === JSON.stringify(b.at);
+const isSquare = (h: Hold): h is Hold & { at: { square: string } } => "square" in h.at;
+const isOffer = (h: Hold): h is Hold & { at: { offer: number } } => "offer" in h.at;
+const isHeld = (h: Hold): h is Hold & { at: { held: number } } => "held" in h.at;
+
+/** The two moments a step began: on the clock the screen reads (`performance.now`) and on the wall clock. */
+const stamp = () => ({ phaseStart: performance.now(), wallStart: Date.now() });
+
+function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchState; round: RoundState } {
+  const { match, gold } = beginRound(prev, cfg);
+  const mine = youColor(match.round);
+  const theirs = other(mine);
+  const seed = roundSeed(match);
+  const kings = kingSquares(seed, cfg);
+  // (What each side held comes into the round on the same squares turned with the colors.)
+  const botBench = carryBench(match.bot.bench);
+  // (From round 2 the bot reads your gold and what you banked, to save when you save: Eric, Nov 10. Round 1 has nothing to read.)
+  const read = match.round > 1 ? { gold: gold.you.total, banked: gold.you.saved, hp: match.you.hp, ownHp: match.bot.hp } : undefined;
+  const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg, botBench, { level: match.bot.level, xp: match.bot.xp }, read);
+  const you = emptyArmy(mine, kings[mine], carryBench(match.you.bench));
+  // (The shop rolls by the level you have now, the free XP of this round's start counted.)
+  return { match, round: { you, shop: newShop(shopSeed(seed), you, cfg, match.you.level), locks: noLocks, adj: null, adjustMs: cfg.adjustSeconds * 1000, botStart: null, botBench, plan, log: [], botFinal: null, gold } };
+}
+
+/** Pieces a test starts with (`?stars=`, `?benchstars=`, `?botbench=`): a kind, the square it stands on or is held for, and its stars (1: plain). */
+interface Preset {
+  kind: Kind;
+  square: string;
+  stars: 1 | StarCount;
+}
+type Presets = { board: Preset[]; bench: Preset[]; bot: Preset[] };
+
+/** `n@c2:2,r@e3:3` (kind, `@`, square, `:`, stars 1 to 3), skipping anything that isn't one. */
+function parsePresets(text: string | null): Preset[] {
+  const out: Preset[] = [];
+  for (const part of (text ?? "").split(",")) {
+    const m = /^([nbrq])@([a-h][1-8]):([123])$/.exec(part.trim());
+    if (m) out.push({ kind: m[1] as Kind, square: m[2]!, stars: Number(m[3]) as 1 | StarCount });
+  }
+  return out;
+}
+
+function newGame(seed: number, cfg: AutoChessSettings, presets?: Presets): Game {
+  // (A game opens with the meeting, unless its introSeconds is 0.)
+  const first: Phase = cfg.introSeconds > 0 ? "meet" : "buy";
+  let start = newMatch(seed, cfg);
+  // (The bot's presets are held pieces it places for nothing as the round begins: stored turned, so they come in on the squares given.)
+  if (presets?.bot.length) start = { ...start, bot: { ...start.bot, bench: presets.bot.slice(0, cfg.benchSlots).map((p) => ({ kind: p.kind, square: `${p.square[0]}${9 - Number(p.square[1])}`, ...(p.stars > 1 ? { stars: p.stars as StarCount } : {}) })) } };
+  const { match, round } = startRound(start, cfg);
+  if (presets && (presets.board.length || presets.bench.length)) {
+    let you = round.you;
+    for (const p of presets.board) {
+      if (!inHalf(p.square, you.color) || p.square === you.king || you.board[p.square]) continue;
+      you = buyOffer(you, { kind: p.kind, square: p.square });
+      if (p.stars > 1) you = withStars(you, { ...you.stars, [p.square]: p.stars as StarCount });
+    }
+    const bench: Held[] = presets.bench.filter((p) => inHalf(p.square, you.color)).slice(0, cfg.benchSlots).map((p) => ({ kind: p.kind, square: p.square, ...(p.stars > 1 ? { stars: p.stars as StarCount } : {}) }));
+    you = { ...you, bench };
+    // (The shop rolls again for the army it has now, so a test can find the seed that shows a star-up. The pieces were put down as the step began.)
+    return { match, phase: first, ...stamp(), round: { ...round, you, log: boardChanges("you", {}, you.board, 0), shop: newShop(shopSeed(roundSeed(match)), you, cfg, match.you.level) }, fight: null, outcome: null };
+  }
+  return { match, phase: first, ...stamp(), round, fight: null, outcome: null };
+}
+
+/**
+ * A phone's short steps for tests (`?quick=1`, a test switch): the same game in a few seconds a step. `?gold=N`: N more gold at the
+ * start of round 1, to try a big army; `?adjust=0`: no adjust step, straight to the fight; `?lockin=1`: lock-in on (off since v7);
+ * `?adjustmode=legal` (v7's move step: one piece lit at random, 7 s) or `=teleport` (the v6 step) in place of the stars step; `?level=N` (5 to 10): both sides
+ * start at level N (to see rooks and queens in the shop at once: the XP to each next level shifts with it). `?stars=n@c2:2,r@e3:3` puts those pieces on your
+ * board at the start of round 1 (kind, square, stars 1 to 3; 1 is a plain piece), `?benchstars=b@f2:2` holds them for you on your bench, `?botbench=n@c7:2` holds
+ * them for the bot (it places them for nothing as the round begins): the shop then rolls for that army, so a seed can be found that shows a star-up. `?fightglow=1`: the stars'
+ * outlines stay on through the fight and the result (`fightGlow`; off by default: only the tiny stars stay). `?intro=0`: no meeting before round 1 (`introSeconds` 0);
+ * `?quick=1` makes the meeting 2 s, and the bot answers in 0.3 to 0.6 s so it still answers within it.
+ */
+function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, mode: AutoChessSettings["adjustMode"] | null, level: number, fightGlow: boolean, introOff: boolean): AutoChessSettings {
+  // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
+  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, revealSeconds: 1.5, fightMoveMs: 60, fightFastMoveMs: 30, introSeconds: 2, introReplyMs: [300, 600] as const } : AUTOCHESS;
+  let out = gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
+  if (!adjust) out = { ...out, adjustStep: false };
+  if (lockIn) out = { ...out, lockIn: true };
+  if (mode) out = { ...out, adjustMode: mode };
+  if (fightGlow) out = { ...out, fightGlow: true };
+  if (introOff) out = { ...out, introSeconds: 0 };
+  if (level > out.levels.start && level <= out.levels.max) out = { ...out, levels: { ...out.levels, start: level, xpToNext: out.levels.xpToNext.slice(level - out.levels.start) } };
+  return out;
+}
+
+/** Each step's name: the hexagon timer's word (upper case there) and the computer's right column ("Round 2 · Planning phase"). */
+const PHASE_NAME: Record<Phase, string> = { meet: "Meeting", buy: "Planning", adjust: "Move", fight: "Battle", result: "Result", over: "Result" };
+/** The sounds this screen plays, made ahead (off the page's thread) once the audio is awake. */
+const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal", "acCash", "acStar2", "acStar3"] as const;
+/** What the opponent is called: the same word as a bot in a 1 v 1. */
+const BOT_NAME = "Bot";
+/** Whether a square is a dark one (a bench tile takes the color of the square its piece keeps). */
+const squareDark = (square: string) => (square.charCodeAt(0) - 96 + Number(square[1])) % 2 === 0;
+const capital = (s: string) => s[0]!.toUpperCase() + s.slice(1);
+
+/**
+ * A piece's picture: the board's own art, in a box that sizes it. A starred piece (`n` 2 or 3) has its tiny stars and, while `ring` is on, its outline (components/AcStarArt.tsx), which
+ * draws the whole piece then; `shift`: the prismatic outline's colors move (the shop card's).
+ */
+function PieceIcon({ color, kind, n = 1, ring = false, shift = false }: { color: Color; kind: Kind | "k"; n?: number; ring?: boolean; shift?: boolean }) {
+  return (
+    <span class="hb-pieces ac-pc" aria-hidden="true">
+      {!(n >= 2 && ring) && <piece class={`${color === "w" ? "white" : "black"} ${KIND_NAME[kind]}`} />}
+      {n >= 2 && <StarArt color={color} kind={kind} n={n} outline={ring} shift={shift} />}
+    </span>
+  );
+}
+
+/**
+ * A custom pawn (v7: the dressed pawn, big, with its shadow) that hops now and then: a crouch, a rise, a squash on landing and a settle, the
+ * shadow shrinking and fading as it rises (CSS animations of transforms and opacity on two boxes, run once each time the `hopping` class is
+ * put on; none under reduced motion). v7.1 (Eric Oct 22: "The bouncing is too much, should be randomly once every 7-10 seconds"): one hop,
+ * then a random wait (`AUTOCHESS.hopEvery`, hop.ts) from its start to the next one's, each pawn on its own draws so the two never fall into
+ * step. The dressed pawn's own ground shadow (a skin's art draws one) is hidden here: `.ac-shadow` is the one shadow. `badge`: the level, on yours.
+ */
+function HopPawn({ look, side, cfg, badge, live }: { look?: Parameters<typeof Avatar>[0]["look"]; side: Color; cfg: AutoChessSettings; badge?: ComponentChildren; live?: boolean }) {
+  const pawn = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    // (Reduced motion: the pawn stays still.)
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let next: ReturnType<typeof setTimeout>;
+    let land: ReturnType<typeof setTimeout>;
+    const hop = () => {
+      pawn.current?.classList.add("hopping");
+      land = setTimeout(() => pawn.current?.classList.remove("hopping"), cfg.hopSeconds * 1000);
+      next = setTimeout(hop, hopWaitMs(Math.random, cfg));
+    };
+    next = setTimeout(hop, firstHopMs(Math.random, cfg));
+    return () => {
+      clearTimeout(next);
+      clearTimeout(land);
+    };
+  }, []);
+  return (
+    <span ref={pawn} class="fd-pawn ac-pawn" style={{ "--dur": `${cfg.hopSeconds}s` } as Record<string, string>}>
+      <span class="ac-shadow" aria-hidden="true" />
+      <span class="ac-hop">
+        <span class="fd-pawn-box">
+          <Avatar look={look} side={side} live={live} />
+        </span>
+      </span>
+      {badge}
+    </span>
+  );
+}
+
+/** Your level, a round gold badge on your pawn; the number pops (and a chime sounds, with the badge) when the level goes up. */
+function LevelBadge({ level, xp, cfg }: { level: number; xp: number; cfg: AutoChessSettings }) {
+  const last = useRef(level);
+  const [pops, setPops] = useState(0);
+  // (In a layout effect: the chime and the pop come with the number changing, not a paint later.)
+  useLayoutEffect(() => {
+    if (level > last.current) {
+      setPops((n) => n + 1);
+      play("acLevel");
+    }
+    last.current = level;
+  }, [level]);
+  const need = xpToNext(level, cfg);
+  return (
+    <i key={pops} class={`ac-badge${pops ? " pop" : ""}`} data-level={level} role="img" aria-label={`Your level ${level}${need === null ? ", the top level" : `, ${xp} of ${need} XP`}`}>
+      {level}
+    </i>
+  );
+}
+
+/** A thin bar with its label and number: HP (green fading to red, as the move clock's) or XP. */
+function Bar({ kind, frac, text, label, cls }: { kind: "hp" | "xp"; frac: number; text: string; label: string; cls: string }) {
+  return (
+    <div class={`ac-bar ${kind} ${cls}`} style={{ "--f": Math.max(0, Math.min(1, frac)) } as Record<string, number>} role="group" aria-label={label}>
+      <small>{kind.toUpperCase()}</small>
+      <i />
+      <b>{text}</b>
+    </div>
+  );
+}
+
+/**
+ * The screen waits for the app's answer about test switches (a moment, never an account: a failed one answers too), so
+ * `?quick=1` and `?seed=` are read once they are known.
+ */
+export function AutoChessScreen({ onBack }: { onBack: () => void }) {
+  const { config } = useAccount();
+  if (!config) return <div class="fd-splash" />;
+  return <AutoChessGame onBack={onBack} />;
+}
+
+function AutoChessGame({ onBack }: { onBack: () => void }) {
+  const params = testParams();
+  // (Settings → Board, "Animations": off, the board's pieces jump to their squares instead of gliding; the gear's row too.)
+  const animOn = useBoardAnimations();
+  // (The gear's Leave: the back button's action, asked first. Nothing is kept: this game is client-only.)
+  const leave: MatchExit = { kind: "leave", note: "You go home, and this game ends. Nothing is recorded.", go: onBack, row: "Leave", ask: "Leave this game?" };
+  const quick = params.get("quick") === "1";
+  const extraGold = Math.max(0, Math.floor(Number(params.get("gold")) || 0));
+  const modeParam = params.get("adjustmode");
+  const cfg = useMemo(
+    () => settingsFor(quick, extraGold, params.get("adjust") !== "0", params.get("lockin") === "1", modeParam === "legal" || modeParam === "teleport" || modeParam === "stars" ? modeParam : null, Math.floor(Number(params.get("level")) || 0), params.get("fightglow") === "1", params.get("intro") === "0"),
+    [],
+  );
+  const legal = cfg.adjustMode === "legal";
+  /** The stars mode (v8, the default): only starred pieces move; no piece is picked for you. */
+  const starMode = cfg.adjustMode === "stars";
+  const seedParam = Number(params.get("seed"));
+  // (Test switches for the fight: `?stall=1` the engine never answers, so stand-in moves play; `?fightfen=` the fight starts from that position.)
+  stallEngine(params.get("stall") === "1");
+  const fightFen = params.get("fightfen");
+  const presets: Presets = { board: parsePresets(params.get("stars")), bench: parsePresets(params.get("benchstars")), bot: parsePresets(params.get("botbench")) };
+  const [game, setGame] = useState<Game>(() => newGame(Number.isFinite(seedParam) && params.get("seed") ? seedParam : (Math.random() * 2 ** 31) | 0, cfg, presets));
+  const gref = useRef(game);
+  const commit = (next: Game) => {
+    const prev = gref.current;
+    let g = next;
+    // (Your board changed while buying, in this round: logged with the moment, for the reveals.)
+    if (g.phase === "buy" && prev.phase === "buy" && g.round.log === prev.round.log && g.round.you.board !== prev.round.you.board) {
+      const changes = boardChanges("you", prev.round.you.board, g.round.you.board, Math.max(0, performance.now() - g.phaseStart) / 1000);
+      if (changes.length) g = { ...g, round: { ...g.round, log: [...g.round.log, ...changes] } };
+    }
+    gref.current = g;
+    setGame(g);
+  };
+  const [now, setNow] = useState(() => performance.now());
+  const [sel, setSelState] = useState<Hold | null>(null);
+  const selRef = useRef<Hold | null>(null);
+  const setSel = (h: Hold | null) => {
+    selRef.current = h;
+    setSelState(h);
+  };
+  const [drag, setDrag] = useState<Hold | null>(null);
+  /** One of their bench pieces tapped (v7: a red ring on it, and its landing square lights red on their half): which one. Theirs never drag. */
+  const [theirTap, setTheirTap] = useState<{ index: number; kind: Kind; square: string } | null>(null);
+  /** A star-up just made (v8): the piece pops and flashes where it is and its new star pops in, for `MERGE_MS`. `at`: the board's square or the bench's slot. */
+  const [merged, setMerged] = useState<{ id: number; at: { square: string } | { held: number }; kind: Kind; stars: StarCount } | null>(null);
+  const mergeId = useRef(0);
+  const mergeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [floats, setFloats] = useState<{ id: number; amount: number; at: FloatAt }[]>([]);
+  const floatId = useRef(0);
+  const floatTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [msg, setMsg] = useState("");
+  // The Income breakdown, opened by its button in the action box (closed again by a tap on it or a new step).
+  const [incomeOpen, setIncomeOpen] = useState(false);
+  // A computer's right column: its top slot says the round and the step (FrontMenu.tsx RightPanel, "AUTO CHESS").
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => setSlot(document.getElementById(RIGHT_SLOT_TOOLS)), []);
+  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const say = (text: string) => {
+    setMsg(text);
+    if (msgTimer.current) clearTimeout(msgTimer.current);
+    msgTimer.current = setTimeout(() => setMsg(""), SAY_MS);
+  };
+  // The meeting's speech bubbles (at most one a side) and the bot's one line in it: its answer to your first line, else its opening line when that is due.
+  const [says, setSays] = useState<{ you: Say | null; them: Say | null }>({ you: null, them: null });
+  const sayTimers = useRef<{ you: ReturnType<typeof setTimeout> | null; them: ReturnType<typeof setTimeout> | null }>({ you: null, them: null });
+  const sayId = useRef(0);
+  const meetBot = useRef<{ said: boolean; replyAt: number | null }>({ said: false, replyAt: null });
+  /** A bubble over a pawn: a new line replaces the one up, and it goes after `introBubbleMs`. */
+  const sayOver = (side: "you" | "them", text: string) => {
+    const id = ++sayId.current;
+    const old = sayTimers.current[side];
+    if (old) clearTimeout(old);
+    setSays((s) => ({ ...s, [side]: { id, text } }));
+    sayTimers.current[side] = setTimeout(() => {
+      sayTimers.current[side] = null;
+      setSays((s) => (s[side]?.id === id ? { ...s, [side]: null } : s));
+    }, cfg.introBubbleMs);
+  };
+  const cancelled = useRef(false);
+  /** The first tap wakes the audio (browsers need a tap), and the sounds are made ahead. */
+  const wake = () => {
+    unlockAudio();
+    warmSounds(SOUNDS_USED);
+  };
+  const botRun = useRef<BotRun>({ stop: false, done: null, latest: game.round.plan.army });
+  const layerRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
+  const ghostAt = useRef({ x: 0, y: 0 });
+  /** The press in progress: the pointer, the element that captured it, what was pressed, where, whether it became a drag (or, for a tap-only press, wandered off). */
+  const press = useRef<{ id: number; el: Element; hold: Hold; x: number; y: number; started: boolean; wandered: boolean } | null>(null);
+
+  /** The latest `endPress` and `cancelGesture` (the window's listeners are set once, and the board's turn each round: a stale copy would read the wrong way up). */
+  const latest = useRef({ endPress: (_e: PointerEvent, _cancel?: boolean) => {}, cancelGesture: () => {} });
+
+  const g = game;
+  // The two avatars (v6): your pawn as home and your profile dress it (your name and items), and the bot's own, a plain look seeded by the match.
+  const profile = account().profile;
+  const myName = profile?.user.name || "You";
+  const myLook = profile?.locker?.look;
+  const theirLook = useMemo(() => botLook(`autochess:${game.match.seed}`).look, [game.match.seed]);
+  const mine = youColor(g.match.round);
+  const theirs = other(mine);
+  const orientation = mine === "w" ? "white" : "black";
+  // (Never negative: the clock was read a moment before this step began.)
+  const elapsed = Math.max(0, now - g.phaseStart);
+  // Frozen: the step's last seconds, or you locked in (your board, bench and shop stay as they are).
+  const youLocked = g.phase === "buy" && g.round.locks.you !== null;
+  const locked = g.phase === "buy" && buyFreeze(g.round.locks, elapsed, cfg) !== null;
+  const botIsLocked = g.phase === "buy" && botLocked(g.round.plan.lockAt, elapsed, cfg);
+  // (The bonus is still to be had while nobody has locked in.)
+  const bonusOpen = cfg.lockIn && g.phase === "buy" && g.round.locks.bonus === null && !botIsLocked;
+
+  useEffect(() => {
+    warmEngine();
+    const id = setInterval(() => {
+      const cur = gref.current;
+      const t = performance.now();
+      setNow(t);
+      if (cur.phase === "meet") {
+        // The meeting: the bot's one line (its answer to your first, else its opening line once it is due), then the buying begins with the countdown's end.
+        const at = t - cur.phaseStart;
+        const bot = meetBot.current;
+        if (!bot.said && (bot.replyAt !== null ? t >= bot.replyAt : at >= cfg.introOpenMs)) {
+          bot.said = true;
+          sayOver("them", bot.replyAt !== null ? chatLine(Math.random) : BOT_OPENER);
+        }
+        if (at >= cfg.introSeconds * 1000) commit({ ...cur, phase: "buy", ...stamp() });
+      } else if (cur.phase === "buy") {
+        // With lock-in on, the bot locks in when its time comes (the first to lock gets the bonus), and both locked ends the step; the time up always does.
+        const at = t - cur.phaseStart;
+        const locks = tickLocks(cur.round.locks, at, cur.round.plan.lockAt, cfg);
+        if (locks !== cur.round.locks) commit({ ...cur, round: { ...cur.round, locks } });
+        if (at >= cfg.buySeconds * 1000 || bothLocked(locks, at, cur.round.plan.lockAt, cfg)) toAdjust();
+      } else if (cur.phase === "adjust" && t - cur.phaseStart >= cur.round.adjustMs) void toFight();
+    }, TICK_MS);
+    // A press ends with its pointer, whatever the element it began on has become (a card that left the screen with its step, a layer that stopped taking taps): the
+    // pointer let go, cancelled, or lost its capture (a drag then ends with no action), and the window losing the pointer ends it too.
+    const pointerEnd = (e: PointerEvent) => {
+      const p = press.current;
+      if (!p || e.pointerId !== p.id) return;
+      // (The capture lost by its element being taken off the screen reaches the document; a capture lost on another element isn't this press's.)
+      if (e.type === "lostpointercapture" && e.target !== p.el && p.el.isConnected) return;
+      latest.current.endPress(e, e.type !== "pointerup");
+    };
+    const blurred = () => latest.current.cancelGesture();
+    const types = ["pointerup", "pointercancel", "lostpointercapture"] as const;
+    for (const t of types) window.addEventListener(t, pointerEnd);
+    window.addEventListener("blur", blurred);
+    return () => {
+      clearInterval(id);
+      for (const t of types) window.removeEventListener(t, pointerEnd);
+      window.removeEventListener("blur", blurred);
+      cancelled.current = true;
+      botRun.current.stop = true;
+      if (msgTimer.current) clearTimeout(msgTimer.current);
+      if (mergeTimer.current) clearTimeout(mergeTimer.current);
+      floatTimers.current.forEach(clearTimeout);
+      for (const t of Object.values(sayTimers.current)) if (t) clearTimeout(t);
+    };
+  }, []);
+
+  // ---------------- The steps ----------------
+
+  /**
+   * The buying is over: their real pieces show (as they were when it locked), and you make your move (the move step: the piece picked
+   * for you, or in the v6 step any piece). With the adjust step off, or no piece on either side able to move, straight to the fight.
+   */
+  function toAdjust() {
+    const cur = gref.current;
+    if (cur.phase !== "buy") return;
+    cancelGesture();
+    setMsg("");
+    const you = cur.round.you;
+    const botStart = cur.round.plan.army;
+    // (What the bot spent is paid now, and its lock-in bonus if it locked first, with lock-in on; it sells nothing.)
+    const locks = tickLocks(cur.round.locks, performance.now() - cur.phaseStart, cur.round.plan.lockAt, cfg);
+    // (Both benches go into the match: what is held stays for the next round. The bot's plan was made with its bench already.)
+    const match: MatchState = {
+      ...cur.match,
+      you: { ...cur.match.you, bench: you.bench },
+      bot: { ...cur.match.bot, gold: cur.match.bot.gold - cur.round.plan.spent + bonusFor(locks, "bot", cfg), bench: botStart.bench, level: cur.round.plan.level.level, xp: cur.round.plan.level.xp },
+    };
+    const seed = roundSeed(match);
+    const botColor = other(youColor(match.round));
+    // The stars step (v8): every starred piece may move once, for 5 s and 3 s a starred piece of the side with more; the v7 step picks a piece at random for each side (seeded by the round), out of
+    // sight of the other (none that can move, no move for that side).
+    const adj = starMode ? startStars(you, botStart) : legal ? startMove(you, botStart, youMoveSeed(seed), cfg) : startAdjust(you);
+    const botCanMove = !legal || !!startMove(botStart, you, botMoveSeed(seed), cfg).pick;
+    commit({ ...cur, match, phase: "adjust", ...stamp(), round: { ...cur.round, locks, adj, botStart, adjustMs: adjustSecondsFor(you, botStart, cfg) * 1000 } });
+    // The bot moves out of sight, from your army as it stood when it locked, and its move shows at the fight.
+    const run: BotRun = { stop: false, done: null, latest: botStart };
+    botRun.current = run;
+    if (stepAfterBuy(cfg) === "fight" || (legal && !adj.pick && !botCanMove)) {
+      void toFight();
+      return;
+    }
+    if (legal && !adj.pick) say(adjustWords("nomove"));
+    else if (!legal && !starMode) say("Tap a piece, then a square");
+    const evaluate = botEvaluator(you, botColor, cfg);
+    const stop = () => run.stop || cancelled.current;
+    const onChange = (army: Army) => (run.latest = army);
+    const look = starMode
+      ? botStarMoves(botStart, you, botMoveSeed(seed), evaluate, stop, cfg, onChange)
+      : legal
+        ? botMove(botStart, you, botMoveSeed(seed), evaluate, stop, cfg, onChange)
+        : botAdjust(botStart, evaluate, mulberry32(seed ^ 0x51ed270b), stop, cfg, onChange);
+    run.done = look.then(
+      () => undefined,
+      () => undefined,
+    );
+  }
+
+  /** The adjust step is over: the bot's moves show, and the engine plays both armies out. */
+  async function toFight() {
+    const cur = gref.current;
+    if (cur.phase !== "adjust") return;
+    cancelGesture();
+    const run = botRun.current;
+    run.stop = true;
+    commit({ ...cur, phase: "fight", ...stamp() });
+    // (It stops at its next look; a slow engine gets a moment, then the bot keeps what it had.)
+    await Promise.race([run.done, new Promise((r) => setTimeout(r, BOT_WAIT_MS))]);
+    if (cancelled.current) return;
+    const botFinal = run.latest;
+    const at = gref.current;
+    const you = at.round.adj?.army ?? at.round.you;
+    const color = youColor(at.match.round);
+    const start = fightFen ? { fen: fightFen, mover: "w" as Color, draw: false } : color === "w" ? fightStart(you, botFinal) : fightStart(botFinal, you);
+    // (The stars on the board, both sides' on their squares, go with their pieces through the fight: drawn on them, and counted in the survivors' refund.)
+    commit({ ...at, round: { ...at.round, botFinal }, fight: { fen: start.fen, last: null, plies: 0, stars: fightFen ? {} : { ...you.stars, ...botFinal.stars } } });
+    if (start.draw) return finish(null, "both_checked", start.fen);
+    newFight();
+    const res = await playFight(start.fen, {
+      pick: (game, allowed) => enginePick(game, allowed, cfg),
+      rng: mulberry32(roundSeed(at.match) ^ 0x2545f491),
+      cancelled: () => cancelled.current,
+      onStep: (s) => {
+        const stars = moveStars(gref.current.fight?.stars ?? {}, s.move);
+        if (!s.cashIn) return commit({ ...gref.current, fight: { fen: s.fen, last: s.move, plies: s.ply, stars } });
+        // A cash-in: the pawn lands on the last rank, a coin sounds and "+5" floats up from the square; then it leaves the board.
+        const square = s.move.slice(2, 4);
+        commit({ ...gref.current, fight: { fen: withPiece(s.fen, square, s.cashIn === "w" ? "P" : "p"), last: s.move, plies: s.ply, stars } });
+        play("acCash");
+        // (From the round's own colors: this runs from the timer made on the first render, whose `orientation` is round 1's.)
+        addFloat(cfg.cashInGold, cellOf(square, color === "w" ? "white" : "black"));
+        setTimeout(() => {
+          const now = gref.current;
+          if (now.fight?.plies === s.ply) commit({ ...now, fight: { ...now.fight, fen: s.fen } });
+        }, CASH_LEAVE_MS);
+      },
+      cfg,
+    });
+    if (res) finish(res.winner, res.end, res.fen, res.cashIns, res.gain);
+  }
+
+  /** The fight is over: the loser loses HP, the refunds (and the cash-ins' gold) wait for the next round, and the result shows. */
+  function finish(winner: Color | null, end: EndKind, fen: string, cashIns: { w: number; b: number } = { w: 0, b: 0 }, gain?: number) {
+    const cur = gref.current;
+    const color = youColor(cur.match.round);
+    const on = piecesOn(fen);
+    const who = winner === null ? "draw" : winner === color ? "you" : "bot";
+    // (What was paid for the survivors' stars counts in their refund.)
+    const ups = starUpsByColor(fen, cur.fight?.stars ?? {});
+    const { match, result } = settleRound(cur.match, who, { you: on[color], bot: on[other(color)] }, cfg, { you: cashIns[color], bot: cashIns[other(color)] }, { you: ups[color], bot: ups[other(color)] });
+    const won = matchWinner(match);
+    const next = won ? null : goldBreakdown(match.round + 1, match.you, cfg);
+    setTheirTap(null);
+    commit({ ...cur, match, phase: won ? "over" : "result", ...stamp(), outcome: { result, end, next, detail: { winner, you: color, ...(gain !== undefined ? { gain } : {}) } } });
+  }
+
+  function nextRound() {
+    const cur = gref.current;
+    if (cur.phase !== "result") return;
+    const { match, round } = startRound(cur.match, cfg);
+    cancelGesture();
+    setMsg("");
+    setTheirTap(null);
+    commit({ match, phase: "buy", ...stamp(), round, fight: null, outcome: null });
+  }
+
+  function playAgain() {
+    cancelGesture();
+    setMsg("");
+    setTheirTap(null);
+    resetMeet();
+    commit(newGame((Math.random() * 2 ** 31) | 0, cfg));
+  }
+
+  /** A new game's meeting starts clean: no bubbles, the bot not yet spoken. */
+  function resetMeet() {
+    for (const side of ["you", "them"] as const) {
+      const t = sayTimers.current[side];
+      if (t) clearTimeout(t);
+      sayTimers.current[side] = null;
+    }
+    meetBot.current = { said: false, replyAt: null };
+    setSays({ you: null, them: null });
+  }
+
+  /** A quick-chat line of yours in the meeting: its bubble over your pawn, and (your first line) the bot's answer on its way. */
+  function quickChat(line: string) {
+    if (gref.current.phase !== "meet") return;
+    sayOver("you", line);
+    if (meetBot.current.replyAt === null) meetBot.current.replyAt = performance.now() + replyMs(Math.random, cfg.introReplyMs);
+  }
+
+  // ---------------- Buying, selling ----------------
+
+  /** Whether the buy step takes an action now (not locked, not over). Read from the clock, not from the last tick. */
+  const buying = () => {
+    const cur = gref.current;
+    if (cur.phase !== "buy") return false;
+    const freeze = buyFreeze(cur.round.locks, performance.now() - cur.phaseStart, cfg);
+    if (freeze) {
+      say(freezeWords(freeze));
+      return false;
+    }
+    return true;
+  };
+
+  /** A gold amount floating up from a square or a bench slot (FloatGold), gone after its time. */
+  function addFloat(amount: number, at: FloatAt) {
+    const id = ++floatId.current;
+    setFloats((f) => [...f, { id, amount, at }]);
+    floatTimers.current.push(setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), FLOAT_MS + 150));
+  }
+
+  /** How many pieces your board may hold now: your level. */
+  const boardRoom = () => gref.current.match.you.level;
+  const withGold = (gold: number, army: Army) => {
+    const cur = gref.current;
+    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold } }, round: { ...cur.round, you: army } });
+  };
+
+  /** Buys the offer in a shop slot: the piece lands on its square, and a new offer is rolled into the slot (at your level). */
+  function buySlot(slot: number) {
+    if (!buying()) return;
+    const cur = gref.current;
+    const offer = cur.round.shop.slots[slot];
+    if (!offer) return;
+    const bought = buyFromSlot({ army: cur.round.you, gold: cur.match.you.gold, shop: cur.round.shop, level: boardRoom() }, slot, shopSeed(roundSeed(cur.match)), cfg, boardRoom());
+    if ("block" in bought) {
+      const line = buyWords(bought.block, offer, cur.match.you.gold, cfg, boardRoom(), offerPrice(cur.round.you, offer, cfg)).line;
+      // (A board with no room still takes it on the bench: say so.)
+      return say(bought.block === "limit" && !holdBlock(cur.round.you, cur.match.you.gold, offer, cfg) ? "Board full. Drag to bench" : line);
+    }
+    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: bought.gold } }, round: { ...cur.round, you: bought.army, shop: bought.shop } });
+    setSel(null);
+    // (Another offer that could no longer use its square rolled again: the player is told, so an offer doesn't change under their finger unexplained.)
+    if (bought.replaced) say(`${bought.from[0]} rolled again`);
+    else setMsg("");
+    if (bought.starUp) return merge(bought.starUp, offer);
+    play("acPlace");
+  }
+
+  /** A star-up was bought: the piece pops and flashes where it is, its new star pops in, a level-up sound plays (a bigger one for the third star), and a short line says the stars. */
+  function merge(target: StarTarget, offer: Offer) {
+    const id = ++mergeId.current;
+    setMerged({ id, at: target.where === "board" ? { square: target.square } : { held: target.index }, kind: offer.kind, stars: target.becomes });
+    if (mergeTimer.current) clearTimeout(mergeTimer.current);
+    mergeTimer.current = setTimeout(() => setMerged((m) => (m?.id === id ? null : m)), MERGE_MS);
+    play(target.becomes === 3 ? "acStar3" : "acStar2");
+    say(`${offer.square} is ${target.becomes} stars`);
+  }
+
+  /** Buys the offer in a shop slot to hold it on the bench: it keeps its square, and a new offer is rolled into the slot. */
+  function holdSlot(slot: number) {
+    if (!buying()) return;
+    const cur = gref.current;
+    const offer = cur.round.shop.slots[slot];
+    if (!offer) return;
+    const held = holdFromSlot({ army: cur.round.you, gold: cur.match.you.gold, shop: cur.round.shop, level: boardRoom() }, slot, shopSeed(roundSeed(cur.match)), cfg);
+    if ("block" in held) return say(buyWords(held.block, offer, cur.match.you.gold, cfg, boardRoom(), offerPrice(cur.round.you, offer, cfg)).line);
+    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: held.gold } }, round: { ...cur.round, you: held.army, shop: held.shop } });
+    setSel(null);
+    say(`Held ${offer.square}`);
+    play("acHold");
+  }
+
+  /** Places a held piece on the square it kept, when that square is free and the board has room. */
+  function placeHeldAt(index: number) {
+    if (!buying()) return;
+    const cur = gref.current;
+    const held = cur.round.you.bench[index];
+    if (!held) return;
+    const block = heldBlock(cur.round.you, index, cfg, boardRoom());
+    if (block) return say(heldWords(block, held.square, cfg, boardRoom()));
+    const army = placeHeld(cur.round.you, index);
+    // (Offers on that square roll again, as when an offer is bought onto it.)
+    const { shop, replaced, from } = replaceTaken(cur.round.shop, shopSeed(roundSeed(cur.match)), army, cfg, boardRoom());
+    commit({ ...cur, round: { ...cur.round, you: army, shop } });
+    setSel(null);
+    if (replaced) say(`${from[0]} rolled again`);
+    else setMsg("");
+    play("acPlace");
+  }
+
+  /** Buys XP for gold: a level when there is enough, which is room for another piece. */
+  function buyXpNow() {
+    if (!buying()) return;
+    const cur = gref.current;
+    const you = cur.match.you;
+    const block = xpBlock(you, you.gold, cfg);
+    if (block) return say(xpWords(block, you.gold, cfg));
+    const next = buyXp(you, you.gold, cfg);
+    commit({ ...cur, match: { ...cur.match, you: { ...you, level: next.level, xp: next.xp, gold: next.gold } } });
+    say(next.level > you.level ? `Level ${next.level}: ${next.level} pieces` : `+${cfg.levels.buyXp} XP`);
+    play("acXp");
+  }
+
+  /** Lock in (off since v7): your buying is over (your board and shop freeze); the first side to do it gets the bonus, and both locked ends the step. */
+  function lockIn() {
+    if (!cfg.lockIn || !buying()) return;
+    const cur = gref.current;
+    const at = performance.now() - cur.phaseStart;
+    const locks = youLock(cur.round.locks, at, cur.round.plan.lockAt, cfg);
+    const bonus = bonusFor(locks, "you", cfg);
+    cancelGesture();
+    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: cur.match.you.gold + bonus } }, round: { ...cur.round, locks } });
+    play("acLock");
+    if (bothLocked(locks, at, cur.round.plan.lockAt, cfg)) return toAdjust();
+    say(bonus ? `First: +${bonus} gold` : "You locked in");
+  }
+
+  /** Rolls the whole shop again for gold (at your level). */
+  function reroll() {
+    if (!buying()) return;
+    const cur = gref.current;
+    const next = rerollFor({ gold: cur.match.you.gold, shop: cur.round.shop, army: cur.round.you, level: boardRoom() }, shopSeed(roundSeed(cur.match)), cfg);
+    if ("block" in next) return say(rerollWords(cur.match.you.gold, cur.round.shop.rerolls, cfg));
+    commit({ ...cur, match: { ...cur.match, you: { ...cur.match.you, gold: next.gold } }, round: { ...cur.round, shop: next.shop } });
+    setMsg("");
+    play("acReroll");
+  }
+
+  /**
+   * Sells a piece standing on your board, or one held on your bench: 75% of its price back. Only a piece of yours that is there now, of the kind the
+   * hold says, is sold (a hold can go stale: the piece was sold some other way while it was held): no gold for anything else, never for the king or an offer.
+   */
+  function sell(hold: Hold) {
+    if ((!isSquare(hold) && !isHeld(hold)) || !buying()) return;
+    const cur = gref.current;
+    const sold = isSquare(hold) ? sellPiece(cur.round.you, hold.at.square, hold.kind, cfg) : sellHeld(cur.round.you, hold.at.held, hold.kind, cfg);
+    setSel(null);
+    if (!sold) return;
+    const { army, gold } = sold;
+    withGold(cur.match.you.gold + gold, army);
+    play("sell");
+    say(`Sold for ${gold}`);
+    // The gold floats up from where the piece stood: its square, or its slot on the bench.
+    addFloat(gold, isSquare(hold) ? cellOf(hold.at.square, orientation) : { slot: hold.at.held, of: cfg.benchSlots });
+  }
+
+  /** A piece let go on a target, while buying: the shop takes a piece of yours (a sale), the bench takes an offer (you hold it). */
+  function dropWhileBuying(hold: Hold, target: Target) {
+    if (!target || !buying()) return;
+    if ("shop" in target && !isOffer(hold)) return sell(hold);
+    if ("bench" in target && isOffer(hold)) return holdSlot(hold.at.offer);
+    setSel(null);
+  }
+
+  // ---------------- Adjusting ----------------
+
+  const adjusting = () => gref.current.phase === "adjust" && performance.now() - gref.current.phaseStart < gref.current.round.adjustMs;
+
+  /** Your change: a starred piece's move (a 2-star one legal chess move, a 3-star any empty square of your half; the stars step), the lit piece one legal chess move (v7), or (the v6 step) a piece of yours to any legal empty square of your half. */
+  function adjustTo(from: string, to: string) {
+    if (!adjusting()) return;
+    const cur = gref.current;
+    const adj = cur.round.adj!;
+    if (from === to) return setSel(null);
+    const block = adjustBlock(adj, from, to, cfg);
+    if (block) return say(adjustWords(block, cfg));
+    commit({ ...cur, round: { ...cur.round, adj: adjustMove(adj, from, to) } });
+    setSel(null);
+    setMsg("");
+    play("move");
+  }
+
+  /** Takes your move back. */
+  function takeBack(at: string) {
+    if (!adjusting()) return;
+    const cur = gref.current;
+    const adj = cur.round.adj!;
+    const block = undoBlock(adj, at, cfg);
+    if (block === "needed") return say(undoWords(block));
+    if (block) return;
+    commit({ ...cur, round: { ...cur.round, adj: undoAction(adj, at, cfg) } });
+    setSel(null);
+    setMsg("");
+  }
+
+  // ---------------- Taps and drags ----------------
+
+  /** What one of your pieces stands on this square, in this step (the king too, while adjusting). */
+  function pieceOf(square: string): Kind | "k" | null {
+    const cur = gref.current;
+    if (cur.phase === "buy") return square === cur.round.you.king ? "k" : (cur.round.you.board[square] ?? null);
+    if (cur.phase === "adjust" && cur.round.adj) {
+      const a = cur.round.adj.army;
+      return square === a.king ? "k" : (a.board[square] ?? null);
+    }
+    return null;
+  }
+
+  function tapPiece(hold: Hold) {
+    const phase = gref.current.phase;
+    if (phase === "buy") {
+      if (!buying()) return;
+      if (isOffer(hold)) return buySlot(hold.at.offer);
+      // (Your bench, v5: a first tap picks the piece, lighting its tile and the square it goes to; a second tap, on the tile or that square, places it.)
+      if (isHeld(hold)) {
+        if (sameHold(selRef.current, hold)) return placeHeldAt(hold.at.held);
+        setSel(hold);
+        const cur = gref.current;
+        const h = cur.round.you.bench[hold.at.held];
+        const block = h && heldBlock(cur.round.you, hold.at.held, cfg, boardRoom());
+        if (h && block) say(heldWords(block, h.square, cfg, boardRoom()));
+        return;
+      }
+      if (hold.kind === "k") return say("King: set by game");
+    } else if (!adjusting()) return;
+    if (phase === "adjust" && hold.kind === "k") return say(adjustWords("kingfixed", cfg));
+    if (phase === "adjust") {
+      const adj = gref.current.round.adj!;
+      // (A piece you moved takes its move back when tapped.)
+      if (isSquare(hold) && adjustMarks(adj).some((m) => m.square === (hold.at as { square: string }).square)) return takeBack(hold.at.square);
+      // (The stars step: a starred piece is selected, with its squares lit; any other piece says it isn't starred.)
+      if (starMode && isSquare(hold) && starsAt(adj.army, hold.at.square) < 2) return say(adjustWords("plain", cfg));
+      // (The move step: the lit piece is already the one to move, and any other piece of yours says so.)
+      if (legal) return isSquare(hold) && adj.pick?.square === hold.at.square ? undefined : say(adjustWords(adj.pick ? "notpicked" : "nomove", cfg));
+    }
+    if (sameHold(selRef.current, hold)) return setSel(null);
+    setSel(hold);
+  }
+
+  function tapSquare(square: string) {
+    if (gref.current.phase === "adjust" && legal) {
+      // The move step: a tap on a square plays the lit piece there if that is a legal move (and says why not if it isn't).
+      const adj = gref.current.round.adj!;
+      if (adj.pick) adjustTo(adj.pick.square, square);
+      else if (adjusting()) say(adjustWords("nomove", cfg));
+      return;
+    }
+    const hold = selRef.current;
+    if (!hold) return;
+    if (gref.current.phase === "buy" && isHeld(hold) && gref.current.round.you.bench[hold.at.held]?.square === square) return placeHeldAt(hold.at.held);
+    if (gref.current.phase === "buy") setSel(null);
+    else if (isSquare(hold)) adjustTo(hold.at.square, square);
+  }
+
+  function dropped(hold: Hold, target: Target) {
+    if (gref.current.phase === "buy") dropWhileBuying(hold, target);
+    else if (target && "square" in target && isSquare(hold)) adjustTo(hold.at.square, target.square);
+    else setSel(null);
+  }
+
+  const boxOf = () => layerRef.current!.getBoundingClientRect();
+
+  /** Where a point is: a square of the board, the shop or the bench. */
+  function targetAt(x: number, y: number): Target {
+    const square = squareAtPoint(x, y, boxOf(), orientation);
+    if (square) return { square };
+    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ac-drop]");
+    if (el?.dataset.acDrop === "shop") return { shop: true };
+    if (el?.dataset.acDrop === "bench") return { bench: true };
+    return null;
+  }
+
+  function startPress(e: PointerEvent, hold: Hold) {
+    if (press.current || !e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const el = e.currentTarget as Element;
+    press.current = { id: e.pointerId, el, hold, x: e.clientX, y: e.clientY, started: false, wandered: false };
+    el.setPointerCapture?.(e.pointerId);
+  }
+
+  /**
+   * A gesture is over with no action, whatever it was: the press is let go (and its pointer capture released), the drag's ghost goes, and nothing stays selected.
+   * Every step's end does this (the lock, lock in, the reveal, the adjust step's end, the result, the next round), so a finger still down across one
+   * can't carry a drag into the next.
+   */
+  function cancelGesture() {
+    const p = press.current;
+    press.current = null;
+    if (p) {
+      try {
+        p.el.releasePointerCapture?.(p.id);
+      } catch {
+        // (The pointer is already gone.)
+      }
+    }
+    setDrag(null);
+    setSel(null);
+  }
+
+  function movePress(e: PointerEvent) {
+    const p = press.current;
+    if (!p || e.pointerId !== p.id) return;
+    if (p.hold.tapOnly) {
+      // (A tap-only press (a silhouette on the board, a piece the move step won't let you move) picks nothing up, drags nothing and drops nothing: a pointer that wanders off does nothing.)
+      if (!p.wandered && (e.clientX - p.x) ** 2 + (e.clientY - p.y) ** 2 >= TAP_SLOP_PX ** 2) p.wandered = true;
+      return;
+    }
+    ghostAt.current = { x: e.clientX, y: e.clientY };
+    // (While buying you drag an offer from the shop to the bench to hold it, and a piece of yours (on the board or the bench) to the shop to sell it; the king stays put.)
+    // (Nothing is picked up in the last seconds or once you've locked in: a press there is a tap, and says why nothing happens.)
+    const cur = gref.current;
+    const frozen = cur.phase === "buy" && buyFreeze(cur.round.locks, performance.now() - cur.phaseStart, cfg) !== null;
+    const dragsNow = !frozen && (cur.phase === "adjust" || isOffer(p.hold) || isHeld(p.hold) || (isSquare(p.hold) && p.hold.kind !== "k"));
+    if (!p.started && dragStarted(e.clientX - p.x, e.clientY - p.y) && dragsNow) {
+      p.started = true;
+      // (A piece picked up to drag is the selected one too.)
+      setSel(p.hold);
+      setDrag(p.hold);
+    }
+    if (p.started) placeGhost();
+  }
+
+  function placeGhost() {
+    const el = ghostRef.current;
+    if (!el) return;
+    const half = el.offsetWidth / 2;
+    el.style.transform = `translate(${ghostAt.current.x - half}px, ${ghostAt.current.y - half}px)`;
+  }
+
+  function endPress(e: PointerEvent, cancel = false) {
+    const p = press.current;
+    if (!p || e.pointerId !== p.id) return;
+    press.current = null;
+    if (p.started) {
+      setDrag(null);
+      if (!cancel) dropped(p.hold, targetAt(e.clientX, e.clientY));
+      else setSel(null);
+    } else if (!cancel && !p.wandered) tapPiece(p.hold);
+  }
+
+  /** The offer on a square (a shop slot), or -1: one offer to a square, and never on a square one of your pieces stands on. A star-up has no silhouette (nothing lands): it is bought from its card. */
+  const offerOn = (square: string) => (pieceOf(square) ? -1 : gref.current.round.shop.slots.findIndex((o) => o.square === square && !starUpTarget(gref.current.round.you, o, cfg)));
+
+  function layerDown(e: PointerEvent) {
+    const cur = gref.current;
+    if (cur.phase !== "buy" && cur.phase !== "adjust") return;
+    if ((e.target as Element).closest("button")) return;
+    const box = boxOf();
+    const square = squareAtPoint(e.clientX, e.clientY, box, orientation);
+    if (!square) return;
+    // An offer's silhouette: a tap buys it, and that is all it does: it is never picked up, dragged or sold.
+    const slot = cur.phase === "buy" ? offerOn(square) : -1;
+    if (slot >= 0) return startPress(e, { kind: cur.round.shop.slots[slot]!.kind, at: { offer: slot }, tapOnly: true });
+    const kind = pieceOf(square);
+    if (kind) {
+      // In the move step only the lit piece (while its move is unused) is picked up and dragged; any other piece is only tapped (it says so), and a piece you moved is tapped to take the move back.
+      const adj = cur.phase === "adjust" ? cur.round.adj : null;
+      const movable = starMode ? !adj || (starsAt(adj.army, square) >= 2 && !movedSquares(adj).has(square)) : !legal || !adj || (adj.pick?.square === square && movesUsed(adj) < cfg.adjustMoves);
+      return startPress(e, { kind, at: { square }, ...(movable ? {} : { tapOnly: true }) });
+    }
+    tapSquare(square);
+  }
+
+  function offerDown(e: PointerEvent, slot: number, kind: Kind) {
+    const cur = gref.current;
+    if (cur.phase !== "buy") return;
+    // (A star-up merges where the piece is: its card is only tapped, never dragged to the bench.)
+    const offer = cur.round.shop.slots[slot];
+    startPress(e, { kind, at: { offer: slot }, ...(offer && starUpTarget(cur.round.you, offer, cfg) ? { tapOnly: true } : {}) });
+  }
+
+  function heldDown(e: PointerEvent, index: number, kind: Kind) {
+    if (gref.current.phase !== "buy") return;
+    startPress(e, { kind, at: { held: index } });
+  }
+
+  latest.current = { endPress, cancelGesture };
+
+  // The dragged piece's first place, before the pointer moves again.
+  useLayoutEffect(() => {
+    if (drag) placeGhost();
+  }, [drag]);
+
+  // ---------------- What to draw ----------------
+
+  const you = g.phase === "adjust" || g.phase === "fight" ? (g.round.adj?.army ?? g.round.you) : g.round.you;
+  const botArmy = g.round.botFinal && g.phase !== "buy" && g.phase !== "adjust" ? g.round.botFinal : g.phase === "buy" ? g.round.plan.army : (g.round.botStart ?? g.round.plan.army);
+  const botKing = g.round.plan.army.king;
+  // While buying you see every piece of theirs (pawns too) as a plain circle, live; every 3 s a piece is revealed, piece for piece by kind (one of theirs, then a match
+  // of yours, or the other way round: reveal.ts). Your pieces they haven't seen yet are slightly grayed, and the next of yours to be revealed has a thin yellow border.
+  // (Read at the latest of the clock and your last change: the clock is read every 120 ms, and a piece you just put down is grayed from its first frame, not a tick later.)
+  const seenAt = Math.max(elapsed / 1000, g.round.log.at(-1)?.at ?? 0);
+  const seen = g.phase === "buy" ? botSeen(g.round.plan.events, g.round.log, seenAt, cfg) : null;
+  const unseen = new Set(seen?.unseen ?? []);
+  // Their bench shows real pieces, each with the square it keeps (Eric, Oct 21: intentional): what it came in with and what it has held since, live as the circles are.
+  const theirBench: Held[] = g.phase === "buy" ? botBenchAt(g.round.plan.events, g.round.botBench, Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds)) : g.phase === "meet" ? botBenchAt(g.round.plan.events, g.round.botBench, 0) : (g.round.botStart ?? g.round.plan.army).bench;
+  // (A tap on one of their bench pieces holds only while that piece is still there, in that slot.)
+  const theirTapped = theirTap && theirBench[theirTap.index]?.kind === theirTap.kind && theirBench[theirTap.index]?.square === theirTap.square && (g.phase === "buy" || g.phase === "adjust") ? theirTap : null;
+
+  // A piece of theirs revealed: a ping as its circle turns into the piece (a layout effect: it comes with the piece, whatever the screen does next).
+  const revealCount = seen?.revealed.length ?? 0;
+  const lastReveals = useRef(0);
+  useLayoutEffect(() => {
+    if (revealCount > lastReveals.current) play("acReveal");
+    lastReveals.current = revealCount;
+  }, [revealCount, g.match.round]);
+
+  let fen: string;
+  let lastMove: string | null = null;
+  if ((g.phase === "fight" || g.phase === "result" || g.phase === "over") && g.fight) {
+    fen = g.fight.fen;
+    lastMove = g.fight.last;
+  } else if (g.phase === "buy" || g.phase === "meet") fen = fenFrom([...armyPieces(you), { square: botKing, color: theirs, kind: "k" }, ...(seen?.revealed ?? []).map((r) => ({ square: r.square, color: theirs, kind: r.kind }))]);
+  else fen = mine === "w" ? armiesFen(you, botArmy) : armiesFen(botArmy, you);
+
+  const sq = (square: string) => {
+    const { col, row } = cellOf(square, orientation);
+    return { "--sq-x": col, "--sq-y": row } as Record<string, number>;
+  };
+
+  // The squares to light in the adjust step: where the tapped starred piece may go (the stars step), the lit piece's legal moves (v7's move step), or where the tapped piece may go (the v6 step).
+  const adj = g.phase === "adjust" ? g.round.adj : null;
+  const adjOver = g.phase === "adjust" && elapsed >= g.round.adjustMs;
+  const selSquare = sel && isSquare(sel) ? sel.at.square : null;
+  // (A 2-star's squares are the fight's moves in the position as it is now: found once for the position and the piece, not at every tick.)
+  const starDots = useMemo(() => (starMode && adj && selSquare && !adjOver && !movedSquares(adj).has(selSquare) ? starTargets(adj, selSquare, cfg) : []), [adj, selSquare, adjOver]);
+  const dots: string[] = [];
+  if (adj && !adjOver) {
+    if (starMode) dots.push(...starDots);
+    else if (legal) dots.push(...pickTargets(adj, cfg));
+    else if (sel && isSquare(sel) && movesUsed(adj) < cfg.adjustMoves) dots.push(...adjustTargets(adj.army, sel.at.square));
+  }
+  // The piece picked for you glows while its move is still to make (v7). (In the stars step the starred pieces carry their own outline instead: no box.)
+  const lit = legal && adj && !adjOver && adj.pick && movesUsed(adj) < cfg.adjustMoves ? adj.pick.square : null;
+
+  // The offers: each a glowing silhouette on its own square (one offer to a square).
+  const offers = g.phase === "buy" ? g.round.shop.slots : [];
+  const offerBlocks = offers.map((o) => buyBlock(g.round.you, g.match.you.gold, o, cfg, g.match.you.level));
+  // (An offer the board has no room for can still be held: its card isn't greyed, it says why it can't be tapped.)
+  const holdOnly = offers.map((o, slot) => offerBlocks[slot] === "limit" && !holdBlock(g.round.you, g.match.you.gold, o, cfg));
+
+  const interactiveLayer = (g.phase === "buy" && !locked) || (g.phase === "adjust" && elapsed < g.round.adjustMs);
+  // A press, drag or selection never outlives the moment it can act: when the step changes, the round turns, or the board stops taking presses (the last seconds of buying locked, the adjust step's time up) it is over, with no action.
+  useLayoutEffect(() => {
+    if (!interactiveLayer) cancelGesture();
+  }, [interactiveLayer]);
+  useLayoutEffect(() => {
+    cancelGesture();
+    setIncomeOpen(false);
+  }, [g.phase, g.match.round]);
+  const goldNow = g.match.you.gold;
+
+  // The clock's numbers in the gold row (v7.1, Eric Oct 22: "the clock moves down between the income and odds"), and the step's name under them.
+  // (The result's box takes the gold row's room, so there is no clock then.)
+  const remaining = g.phase === "buy" ? cfg.buySeconds * 1000 - elapsed : g.phase === "adjust" ? g.round.adjustMs - elapsed : 0;
+  let clock = "";
+  let label = "";
+  let clockWordsFull = "";
+  if (g.phase === "buy") {
+    clock = clockWords(remaining);
+    label = youLocked ? "Locked in" : locked ? "Locked" : "Planning";
+    clockWordsFull = `${label}, ${clock} left`;
+  } else if (g.phase === "adjust") {
+    clock = clockWords(remaining);
+    label = "Move";
+    clockWordsFull = `Move step, ${clock} left`;
+  } else if (g.phase === "fight") {
+    // (The fight's counter is short here: "12/60"; the full words, with "twice as fast", are the clock's spoken label.)
+    clock = moveCount(g.fight?.plies ?? 0, cfg);
+    label = "Battle";
+    clockWordsFull = moveWords(g.fight?.plies ?? 0, cfg, !!g.fight && thinFight(g.fight.fen, cfg));
+  }
+
+  // The banner on the board's middle: "ACTION PHASE" as buying begins, the big 3-2-1 for its last seconds, "MOVE PHASE", "BATTLE PHASE".
+  let banner: { words: string } | { n: number } | null = null;
+  if (g.phase === "buy") {
+    if (remaining > 0 && remaining <= COUNT_FROM_SECONDS * 1000) banner = { n: Math.ceil(remaining / 1000) };
+    else if (elapsed < bannerMs()) banner = { words: "ACTION PHASE" };
+  } else if (g.phase === "adjust" && elapsed < bannerMs()) banner = { words: "MOVE PHASE" };
+  else if (g.phase === "fight" && elapsed < bannerMs()) banner = { words: "BATTLE PHASE" };
+
+  const held = sel ?? null;
+  // A bench piece of yours picked (v5): its tile and the square it goes to light up.
+  const aim = g.phase === "buy" && held && isHeld(held) ? (g.round.you.bench[held.at.held]?.square ?? null) : null;
+  // What is being dragged while buying: an offer (to the bench) or a piece of yours (to the shop, to sell it).
+  const dragOffer = g.phase === "buy" && drag && isOffer(drag) ? (g.round.shop.slots[drag.at.offer] ?? null) : null;
+  const dragPiece = g.phase === "buy" && drag && drag.kind !== "k" && !isOffer(drag) ? drag : null;
+  // The stars of the piece being dragged (a piece of yours, on the board or the bench).
+  const dragStars = drag ? (isSquare(drag) ? starsAt(you, drag.at.square) : isHeld(drag) ? heldStars(g.round.you.bench[drag.at.held] ?? { kind: "p", square: "" }) : 1) : 1;
+
+  const outcome = g.outcome;
+  const matchEnd = g.phase === "over" && outcome ? matchWords(outcome.result.outcome === "you") : null;
+
+  // The opponent's level, as far as you see it: while you buy, the XP it has bought so far (live, as its pieces are).
+  const botLevelNow = seen ? addXp({ level: g.match.bot.level, xp: g.match.bot.xp }, seen.xpBuys * cfg.levels.buyXp, cfg) : { level: g.match.bot.level, xp: g.match.bot.xp };
+  const xpOff = locked || !!xpBlock(g.match.you, goldNow, cfg);
+  const botHp = Math.max(0, g.match.bot.hp);
+  const myHp = Math.max(0, g.match.you.hp);
+  const myNeed = xpToNext(g.match.you.level, cfg);
+  const botNeed = xpToNext(botLevelNow.level, cfg);
+  // The stars on the board (v8), drawn in their pieces' own elements (so they slide with them): yours, and theirs once shown (the pieces revealed while you buy, all of them in the move
+  // step, and through the fight).
+  const starMap: Record<string, number> = {};
+  if (g.phase === "buy" || g.phase === "meet" || g.phase === "adjust") {
+    for (const [square, n] of Object.entries(you.stars ?? {})) starMap[square] = n;
+    if (g.phase === "buy") for (const r of seen?.revealed ?? []) if (r.stars) starMap[r.square] = r.stars;
+    if (g.phase === "adjust") for (const [square, n] of Object.entries(botArmy.stars ?? {})) starMap[square] = n;
+  } else if (g.fight) for (const [square, n] of Object.entries(g.fight.stars)) starMap[square] = n;
+  // (The fight has begun but waits a moment for the bot's last look: the stars are where the armies are.)
+  else if (g.phase === "fight") for (const [square, n] of Object.entries({ ...you.stars, ...(g.round.botFinal ?? botArmy).stars })) starMap[square] = n as number;
+  // The star-ups on offer (their cards say what they merge into: nothing is drawn on the board for one).
+  const upTargets = offers.map((o) => starUpTarget(g.round.you, o, cfg));
+  // The outlines of the starred pieces show while you buy, place and move; through the fight and the result only the tiny stars stay (`fightGlow`, `?fightglow=1`, keeps the outlines).
+  const ringOn = g.phase === "buy" || g.phase === "meet" || g.phase === "adjust" || cfg.fightGlow;
+  // (A piece of yours the opponent hasn't seen yet, while you buy, is drawn slightly grayed: `ac-unseen`.)
+  const starDecor: PieceDecor = {
+    key: `${ringOn ? "o" : "s"}${Object.entries(starMap).map(([sq, n]) => `${sq}${n}`).join(",")}|${[...unseen].join(",")}`,
+    of: (square, code) => {
+      const n = starMap[square];
+      const dim = code[0] === mine && unseen.has(square);
+      if (!n && !dim) return null;
+      const cls = [n && ringOn ? "ac-drawn" : "", dim ? "ac-unseen" : ""].filter(Boolean).join(" ");
+      return { cls: cls || undefined, kids: n ? <StarArt color={code[0] as Color} kind={code[1] as Kind} n={n} outline={ringOn} /> : null };
+    },
+  };
+  // The shop's odds at your level (v7): each kind's percent, in a small pill in the gold row.
+  const odds = oddsFor(g.match.you.level, cfg);
+  const oddsWordsLine = KINDS.map((k) => `${KIND_NAME[k]} ${odds[k]}%`).join(", ");
+  const shopShut = g.phase !== "buy" || locked;
+  // The meeting (v9): before round 1 both pawns stand in the middle of the board; they puff away at the start of the buying (`meetOut`, the first MEET_OUT_MS).
+  const meetOut = g.phase === "buy" && cfg.introSeconds > 0 && g.match.round === 1 && elapsed < MEET_OUT_MS;
+  const meeting = g.phase === "meet" || meetOut;
+  const introLeft = Math.max(1, Math.ceil((cfg.introSeconds * 1000 - elapsed) / 1000));
+  // This round's income, line by line (the Income button's breakdown).
+  const income = incomeLines(g.round.gold.you, g.match.you.wins, g.match.you.losses, cfg);
+  // The next reroll's price (Nov 10: free, then 1, then 2 and it stays 2; free again each round).
+  const rerollNow = rerollPrice(g.round.shop.rerolls, cfg);
+
+  return (
+    <div
+      class="ac-root"
+      onPointerDownCapture={wake}
+      data-phase={g.phase}
+      data-round={g.match.round}
+      data-you-locked={youLocked ? "1" : undefined}
+      data-bot-locked={botIsLocked ? "1" : undefined}
+      data-bonus={cfg.lockIn ? (g.round.locks.bonus ?? undefined) : undefined}
+      data-lockin={cfg.lockIn ? "1" : undefined}
+      data-move={cfg.adjustMode}
+      data-you={mine}
+      data-king={g.round.you.king}
+      data-bot-king={botKing}
+    >
+      <div class="ac-col">
+        {/* The top line (a phone's): "Auto chess" and the round at the left, the gear at the right (it has Leave). On a computer the
+            right column's slot says the mode and the round instead (portal below), and only the gear shows here. */}
+        <header class="ac-head">
+          <div class="ac-title">
+            <strong>Auto chess</strong>
+            <span>Round {g.match.round}</span>
+          </div>
+          <MatchMenu exit={leave} />
+        </header>
+        {slot && createPortal(<p class="rc-sub ac-slot-line">Round {g.match.round} · {PHASE_NAME[g.phase]} phase</p>, slot)}
+          <div class="ac-bench them" aria-label="Their bench">
+            {Array.from({ length: cfg.benchSlots }, (_, i) => {
+              const h = theirBench[i];
+              if (!h) return <div key={`empty${i}`} class="ac-slot empty" aria-hidden="true" />;
+              const tapped = theirTapped?.index === i;
+              return (
+                <button
+                  key={`${i}${h.kind}${h.square}`}
+                  type="button"
+                  class={`ac-slot has ${squareDark(h.square) ? "d" : "l"}${tapped ? " tapped" : ""}`}
+                  data-kind={h.kind}
+                  data-square={h.square}
+                  aria-pressed={tapped}
+                  aria-label={`Their ${KIND_NAME[h.kind]}${heldStars(h) > 1 ? `, ${heldStars(h)} stars,` : ""} held for ${h.square}. Tap to light ${h.square}`}
+                  onClick={() => {
+                    if (g.phase !== "buy" && g.phase !== "adjust") return;
+                    setTheirTap(tapped ? null : { index: i, kind: h.kind, square: h.square });
+                  }}
+                >
+                  <PieceIcon color={theirs} kind={h.kind} n={heldStars(h)} ring={ringOn} />
+                  <em>{h.square}</em>
+                </button>
+              );
+            })}
+          </div>
+          <div class="ac-players">
+          <div class="ac-side ac-opp" aria-label="Your opponent">
+            <div class="ac-stage">
+              <HopPawn look={theirLook} side={theirs} cfg={cfg} />
+            </div>
+            <div class="ac-info ac-who">
+              <strong class="ac-name">{BOT_NAME}</strong>
+              <span class="ac-lv" data-level={botLevelNow.level} aria-label={`${BOT_NAME}'s level ${botLevelNow.level}`}>
+                Lv <b>{botLevelNow.level}</b>
+              </span>
+              {botIsLocked && (
+                <span class="ac-tag ac-bot-locked" aria-label="Opponent locked in">
+                  Locked in
+                </span>
+              )}
+              <div class="ac-bars">
+                <Bar kind="hp" cls="ac-hp-bot" frac={botHp / cfg.hp} text={String(botHp)} label="Opponent's HP" />
+                <Bar kind="xp" cls="ac-xp-bot" frac={botNeed === null ? 1 : botLevelNow.xp / botNeed} text={botNeed === null ? "max" : `${botLevelNow.xp}/${botNeed}`} label="Opponent's XP" />
+              </div>
+            </div>
+          </div>
+          <div class="ac-side ac-me" aria-label="You">
+            <div class="ac-stage">
+              <HopPawn look={myLook} side={mine} cfg={cfg} live />
+            </div>
+            <div class="ac-info" title={myName}>
+              <strong class="ac-name">{myName}</strong>
+              <span class="ac-lv">
+                Lv <LevelBadge level={g.match.you.level} xp={g.match.you.xp} cfg={cfg} />
+              </span>
+              <div class="ac-bars">
+                <Bar kind="hp" cls="ac-hp-you" frac={myHp / cfg.hp} text={String(myHp)} label="Your HP" />
+                <Bar kind="xp" cls="ac-xp-you" frac={myNeed === null ? 1 : g.match.you.xp / myNeed} text={myNeed === null ? "max" : `${g.match.you.xp}/${myNeed}`} label="Your XP" />
+              </div>
+            </div>
+          </div>
+          </div>
+
+        <div class="ac-frame">
+          <div class="ac-board">
+            <Board fen={fen} orientation={orientation} lastMove={lastMove} animate={animOn && (g.phase === "adjust" || g.phase === "fight")} silent={g.phase !== "fight"} decor={starDecor}>
+              <div
+                ref={layerRef}
+                class={`ac-layer${interactiveLayer ? " live" : ""}`}
+                onPointerDown={layerDown}
+                onPointerMove={movePress}
+                onPointerUp={(e) => endPress(e)}
+                onPointerCancel={(e) => endPress(e, true)}
+                onLostPointerCapture={(e) => endPress(e, true)}
+              >
+                {(g.phase === "buy" || g.phase === "adjust") && <div class="ac-theirs" />}
+                {(seen?.circles ?? []).map((square) => (
+                  <span key={square} class={`ac-circle ${theirs}`} data-square={square} style={sq(square)} />
+                ))}
+                {(seen?.revealed ?? []).map((r) => (
+                  <span key={r.square} class="ac-ping" data-square={r.square} style={sq(r.square)} />
+                ))}
+                {seen?.next && <span class="ac-cell ac-next" data-square={seen.next} style={sq(seen.next)} />}
+                {theirTapped && <span class="ac-cell ac-red" data-square={theirTapped.square} style={sq(theirTapped.square)} />}
+                {offers.map((o, slot) =>
+                  // (A star-up lands nowhere and shows nothing on the board: its card is where it is.)
+                  upTargets[slot] ? null : (
+                    <span key={`${slot}${o.kind}${o.square}`} class="ac-offers" data-square={o.square} style={sq(o.square)}>
+                      <span class={`ac-sil${offerBlocks[slot] || locked ? " off" : ""}`} data-slot={slot} data-kind={o.kind}>
+                        <i class={`ac-sil-shape ${KIND_NAME[o.kind]}`} />
+                      </span>
+                    </span>
+                  ),
+                )}
+                {merged && "square" in merged.at && (
+                  <span key={merged.id} class="ac-cell ac-merge" data-square={merged.at.square} data-stars={merged.stars} style={sq(merged.at.square)}>
+                    <PieceIcon color={mine} kind={merged.kind} />
+                  </span>
+                )}
+                {lit && <span class="ac-cell ac-pick" data-square={lit} style={sq(lit)} />}
+                {held && isSquare(held) && (g.phase === "buy" || !legal) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
+                {aim && <span class="ac-cell ac-aim" data-square={aim} style={sq(aim)} />}
+                {floats.filter((f) => "col" in f.at).map((f) => (
+                  <FloatGold key={f.id} amount={f.amount} at={f.at} />
+                ))}
+                {dots.map((square) => (
+                  <span key={square} class="ac-cell ac-dot" data-square={square} style={sq(square)} />
+                ))}
+                {adj &&
+                  adjustMarks(adj).map(({ square, action }) => (
+                    <span key={square} class="ac-cell ac-moved" data-square={square} data-action={action} style={sq(square)}>
+                      <i aria-hidden="true">↩</i>
+                    </span>
+                  ))}
+              </div>
+              {meeting && (
+                <div class={`ac-meet${meetOut ? " out" : ""}`}>
+                  <div class="ac-meet-row">
+                    <div class="ac-meet-side you">
+                      <span class="fd-pawn ac-pawn ac-meet-pawn">
+                        <span class="ac-shadow" aria-hidden="true" />
+                        <span class="ac-hop">
+                          <span class="fd-pawn-box">
+                            <Avatar look={myLook} side={mine} live />
+                          </span>
+                        </span>
+                      </span>
+                      {says.you && (
+                        <span key={says.you.id} class="ac-say">
+                          {says.you.text}
+                        </span>
+                      )}
+                    </div>
+                    <div class="ac-meet-side them">
+                      <span class="fd-pawn ac-pawn ac-meet-pawn">
+                        <span class="ac-shadow" aria-hidden="true" />
+                        <span class="ac-hop">
+                          <span class="fd-pawn-box">
+                            <Avatar look={theirLook} side={theirs} />
+                          </span>
+                        </span>
+                      </span>
+                      {says.them && (
+                        <span key={says.them.id} class="ac-say">
+                          {says.them.text}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {g.phase === "meet" && (
+                    <>
+                      <p class="ac-meet-count">
+                        Starting in <b>{introLeft}</b>
+                      </p>
+                      <div class="ac-meet-chat" role="group" aria-label="Quick chat">
+                        {QUICK_CHAT.map((line) => (
+                          <button key={line} type="button" class="ac-chat" onClick={() => quickChat(line)}>
+                            {line}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {banner && (
+                <div class="center-count ac-banner" role="status" aria-live="polite" data-banner={"words" in banner ? "words" : "count"}>
+                  {"words" in banner ? (
+                    <div class="cc-num ac-phase" key={banner.words} style={{ "--ac-banner-ms": `${bannerMs()}ms` }}>
+                      {banner.words}
+                    </div>
+                  ) : (
+                    <div class="cc-num" key={banner.n}>
+                      {banner.n}
+                    </div>
+                  )}
+                </div>
+              )}
+            </Board>
+          </div>
+          {/* A short message, for a moment, over the board's foot (the box under it never grows for one). */}
+          {msg && (
+            <span class="ac-msg" role="status" aria-live="polite">
+              {msg}
+            </span>
+          )}
+        </div>
+
+          <div class={`ac-bench you${dragOffer ? " lit" : ""}`} data-ac-drop="bench" aria-label="Bench">
+            {Array.from({ length: cfg.benchSlots }, (_, i) => {
+              const h = g.round.you.bench[i];
+              if (!h) return <div key={`empty${i}`} class="ac-slot empty" aria-hidden="true" />;
+              const tone = squareDark(h.square) ? "d" : "l";
+              const popping = !!merged && "held" in merged.at && merged.at.held === i;
+              if (g.phase !== "buy")
+                return (
+                  <div
+                    key={`${i}${h.kind}${h.square}`}
+                    class={`ac-slot has ${tone}`}
+                    data-held={i}
+                    data-kind={h.kind}
+                    data-square={h.square}
+                    data-stars={heldStars(h)}
+                    aria-label={`Held ${KIND_NAME[h.kind]}${heldStars(h) > 1 ? `, ${heldStars(h)} stars,` : ""} for ${h.square}`}
+                  >
+                    <PieceIcon color={mine} kind={h.kind} n={heldStars(h)} ring={ringOn} />
+                    <em>{h.square}</em>
+                  </div>
+                );
+              const block = heldBlock(g.round.you, i, cfg, g.match.you.level);
+              const lifted = !!drag && isHeld(drag) && drag.at.held === i;
+              return (
+                <button
+                  key={`${i}${h.kind}${h.square}`}
+                  type="button"
+                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}${popping ? " merged" : ""}${aim && held && isHeld(held) && held.at.held === i ? " aimed" : ""}`}
+                  data-held={i}
+                  data-kind={h.kind}
+                  data-square={h.square}
+                  data-stars={heldStars(h)}
+                  aria-disabled={!!block || locked}
+                  aria-label={`Place the ${KIND_NAME[h.kind]}${heldStars(h) > 1 ? ` (${heldStars(h)} stars)` : ""} held for ${h.square}${locked ? ", locked" : block ? `, ${heldWords(block, h.square, cfg, g.match.you.level)}` : ""}`}
+                  onPointerDown={(e) => heldDown(e, i, h.kind)}
+                  onPointerMove={movePress}
+                  onPointerUp={(e) => endPress(e)}
+                  onPointerCancel={(e) => endPress(e, true)}
+                  onLostPointerCapture={(e) => endPress(e, true)}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), placeHeldAt(i))}
+                >
+                  <PieceIcon color={mine} kind={h.kind} n={heldStars(h)} ring={ringOn} />
+                  <em>{h.square}</em>
+                </button>
+              );
+            })}
+            {floats.filter((f) => "slot" in f.at).map((f) => (
+              <FloatGold key={f.id} amount={f.amount} at={f.at} />
+            ))}
+          </div>
+
+        <section class="ac-dock" aria-label="Shop">
+          {/* (The result's box takes the gold row's room too: its line says the next round's gold.) */}
+          {g.phase !== "result" && g.phase !== "over" && (
+          <div class="ac-goldrow">
+            <span class="ac-gold-you" aria-label="Your gold">
+              <i class="ac-coin" />
+              <b>{goldNow}</b>
+            </span>
+            <button type="button" class={`ac-income${incomeOpen ? " on" : ""}`} aria-expanded={incomeOpen} aria-label={`This round's income: +${income.total}. Show where it comes from`} onClick={() => setIncomeOpen((o) => !o)}>
+              <span class="ac-income-word">Income</span> <b>+{income.total}</b>
+            </button>
+            {/* The hexagon timer (Nov 8): the step's name over the time, centered on the box; no bars. */}
+            <div class={`ac-clock${locked ? " low" : ""}${g.phase === "fight" ? " quiet" : ""}`} role="timer" aria-label={clockWordsFull}>
+              <span class="ac-clock-in">
+                <span class="ac-step">{label}</span>
+                <b>{clock}</b>
+              </span>
+            </div>
+            <div class="ac-odds" role="img" aria-label={`Chance of each piece in the shop at level ${g.match.you.level}: ${oddsWordsLine}`} data-level={g.match.you.level}>
+              {KINDS.map((k) => (
+                <span key={k} class={`ac-od${odds[k] === 0 ? " none" : ""}`} data-kind={k} data-odds={odds[k]}>
+                  <PieceIcon color="w" kind={k} />
+                  <b>{odds[k]}%</b>
+                </span>
+              ))}
+            </div>
+          </div>
+          )}
+          {incomeOpen && g.phase !== "result" && g.phase !== "over" && (
+            <div class="ac-income-box" role="group" aria-label="Income this round">
+              <p class="ac-income-head">Income this round</p>
+              {income.lines.map((l) => (
+                <p key={l.label} class="ac-income-line">
+                  <span>{l.label}</span>
+                  <b>+{l.gold}</b>
+                </p>
+              ))}
+              <p class="ac-income-line ac-income-total">
+                <span>Total</span>
+                <b>+{income.total}</b>
+              </p>
+            </div>
+          )}
+
+          {g.phase === "buy" || g.phase === "adjust" || g.phase === "meet" ? (
+            <div class={`ac-shop${shopShut ? " shut" : ""}${dragPiece ? " selling" : ""}`} data-ac-drop="shop">
+              <div class="ac-btns">
+                <button type="button" class={`ac-btn ac-xp${xpOff || shopShut ? " off" : ""}`} aria-disabled={xpOff || shopShut} aria-label={`Buy ${cfg.levels.buyXp} XP, ${cfg.levels.buyXpCost} gold`} onClick={buyXpNow}>
+                  <span>Buy XP</span>
+                  <span class="ac-cost">
+                    <i class="ac-coin" />
+                    <b>{cfg.levels.buyXpCost}</b>
+                  </span>
+                  <svg class="ac-btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 9l6-5 6 5M6 15l6-5 6 5M6 21l6-5 6 5" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class={`ac-btn ac-reroll${shopShut || goldNow < rerollNow ? " off" : ""}`}
+                  aria-disabled={shopShut || goldNow < rerollNow}
+                  aria-label={`Reroll the shop, ${rerollNow} gold`}
+                  onClick={reroll}
+                >
+                  <span>Reroll</span>
+                  <span class="ac-cost">
+                    <i class="ac-coin" />
+                    <b>{rerollNow}</b>
+                  </span>
+                  <svg class="ac-btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M19 12a7 7 0 1 1-2.1-5M19 3.5v4h-4" />
+                  </svg>
+                </button>
+              </div>
+              <div class="ac-cards">
+                {g.round.shop.slots.map((offer, slot) => {
+                  const block = g.phase === "buy" ? (offerBlocks[slot] ?? null) : null;
+                  // A star-up (v8): a gold card for a second star, a rainbow one for a third, at the flat price, its piece drawn with the stars it will have.
+                  const up = starUpTarget(g.round.you, offer, cfg);
+                  const price = up ? cfg.starUpCost : priceOf(offer.kind);
+                  const words = block ? buyWords(block, offer, goldNow, cfg, g.match.you.level, price) : null;
+                  const dim = (!!block && !holdOnly[slot]) || shopShut;
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      class={`ac-buy${dim ? " off" : ""}${holdOnly[slot] && !shopShut ? " hold-only" : ""}${up ? ` up up${up.becomes}` : ""}`}
+                      data-slot={slot}
+                      data-kind={offer.kind}
+                      data-square={offer.square}
+                      data-up={up ? up.becomes : undefined}
+                      data-price={price}
+                      aria-disabled={!!block || shopShut}
+                      aria-label={`${up ? `Star up your ${KIND_NAME[offer.kind]} on ${offer.square} to ${up.becomes} stars` : `Buy a ${KIND_NAME[offer.kind]} on ${offer.square}`}, ${price} gold${shopShut ? (locked ? ", locked" : "") : words ? `, ${words.short}` : ""}`}
+                      onPointerDown={(e) => offerDown(e, slot, offer.kind)}
+                      onPointerMove={movePress}
+                      onPointerUp={(e) => endPress(e)}
+                      onPointerCancel={(e) => endPress(e, true)}
+                      onLostPointerCapture={(e) => endPress(e, true)}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), buySlot(slot))}
+                    >
+                      <span class={`ac-tile ${squareDark(offer.square) ? "d" : "l"}`}>
+                        <PieceIcon color={mine} kind={offer.kind} n={up ? up.becomes : 1} ring shift />
+                      </span>
+                      <span class="ac-nm">
+                        {capital(KIND_NAME[offer.kind])} <em>{offer.square}</em>
+                      </span>
+                      <span class="ac-cost">
+                        <i class="ac-coin" />
+                        <b>{price}</b>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Sell (a piece of yours selected on the board): over the cards, where a dragged piece is dropped to sell. */}
+              {g.phase === "buy" && !locked && held && isSquare(held) && held.kind !== "k" && g.round.you.board[held.at.square] === held.kind && (
+                <button type="button" class="ac-sell" onClick={() => sell(held)}>
+                  Sell {sellValue(held.kind, cfg, starsAt(g.round.you, held.at.square))}
+                </button>
+              )}
+              {dragPiece && <div class="ac-sell-drop">Drop to sell for {sellValue(dragPiece.kind as Kind, cfg, isSquare(dragPiece) ? starsAt(g.round.you, dragPiece.at.square) : isHeld(dragPiece) ? heldStars(g.round.you.bench[dragPiece.at.held] ?? { kind: "p", square: "" }) : 1)}</div>}
+            </div>
+          ) : (
+            <div class={`ac-card ac-card-${g.phase}`}>
+              {g.phase === "fight" && <p class="ac-card-text">{fightRulesWords(cfg)}</p>}
+              {(g.phase === "result" || g.phase === "over") && outcome && (
+                <>
+                  <div class="ac-card-buttons">
+                    {g.phase === "result" ? (
+                      <button type="button" class="ac-go" onClick={nextRound}>
+                        Next round
+                      </button>
+                    ) : (
+                      <>
+                        <button type="button" class="ac-go" onClick={playAgain}>
+                          Play again
+                        </button>
+                        <button type="button" class="ac-go ac-go-2" onClick={onBack}>
+                          Home
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div class="ac-card-body">
+                    <p class="ac-card-head">{matchEnd ? matchEnd.head : headline(outcome.result)}</p>
+                    <p class="ac-card-text">
+                      {endWords(outcome.end, outcome.result.outcome === "draw", cfg, outcome.detail)} {damageWords(outcome.result)}
+                      {matchEnd ? ` ${matchEnd.sub}` : ""}
+                    </p>
+                    {outcome.next && <p class="ac-card-gold">{goldWords(outcome.next)}</p>}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {cfg.lockIn && g.phase === "buy" && (
+            <button
+              type="button"
+              class={`ac-lock${youLocked ? " done" : locked ? " off" : ""}${bonusOpen && !locked ? " bonus" : ""}`}
+              aria-disabled={locked}
+              aria-label={youLocked ? "Locked in" : `Lock in${bonusOpen ? `, the first to lock in gets ${cfg.lockInBonus} gold` : ""}`}
+              onClick={lockIn}
+            >
+              {youLocked ? (
+                "Locked in"
+              ) : (
+                <>
+                  Lock in {bonusOpen && <small>+{cfg.lockInBonus} gold</small>}
+                </>
+              )}
+            </button>
+          )}
+        </section>
+      </div>
+      {drag && (g.phase === "buy" || g.phase === "adjust") && (
+        <div ref={ghostRef} class="hb-pieces ac-ghost" style={{ width: `${boxOf().width / 8}px`, height: `${boxOf().width / 8}px` }} aria-hidden="true">
+          {/* (A starred piece carries its stars and, while outlines are on, its outline; the piece it left behind stays as it was, as a plain piece's does.) */}
+          {dragStars >= 2 && ringOn ? <StarArt color={mine} kind={drag.kind} n={dragStars} outline /> : <piece class={`${mine === "w" ? "white" : "black"} ${KIND_NAME[drag.kind]}`} />}
+          {dragStars >= 2 && !ringOn && <StarArt color={mine} kind={drag.kind} n={dragStars} outline={false} />}
+        </div>
+      )}
+    </div>
+  );
+}

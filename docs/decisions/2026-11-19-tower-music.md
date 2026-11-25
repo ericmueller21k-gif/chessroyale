@@ -1,0 +1,7 @@
+# The Battle Tower's music (Nov 19)
+
+- Eric, on the final version: "this is the one, nice work"; his brief: "keep the sound more muted overall, it's the background battle tower music".
+- Eric's correction for a floor's battle: "It picks a random track between all the bosses, and then it just sticks with it the whole time. ... the battle tower one is just for when you're idling in the tower, or you're on the floors ... during the game ... it should just pick one. And then ideally, though, it doesn't reuse the same one for, 5 or 6 rounds. If the same boss shows up again, it would pick the other one."
+- So: `tower-loop.mp3` (themes.json `tower`, a loop with no intro, `pad` 0.5, 160 s) plays in the lobby and the floor room. A floor's battle plays one of its bosses' themes, picked at random as it starts, kept for the whole match whoever is to move (no switching with the focus) and across a reload (`KeptFloor.music`), never one of the last `MUSIC.towerRecent` (5) floors' on this device unless all are: then the least recently played.
+- Call made: the handoff's 192 kbps MP3 re-encoded to 128 kbps (Eric, Nov 16: "128 is fine for the game"; every theme is 128), checked same length and aligned at 0, `pad` and `pad + loopSeconds`. No `.ogg` (no other theme ships one).
+- Call made: 5, the low end of Eric's "5 or 6"; the list of recent themes lives on the device (`brc.tower.music`), not the account.

@@ -1,0 +1,434 @@
+import { DurableObject } from "cloudflare:workers";
+import { CAPACITY, CROWD_PARTY_MAX, DEFAULT_SETTINGS, MATCHMAKING, firstGetsWhite, type SeatColor } from "@chessroyale/core";
+import type { LobbyRecord } from "./lobby.ts";
+import { openLobbyCode } from "./codes.ts";
+import type { Env } from "./index.ts";
+import { countCall } from "./ops.ts";
+import { serverError } from "./problems.ts";
+import { FILL_IN_ORDER, PAIR_BY_RATING, QueueCore, duelTicketComplete, type MatchRules, type Ticket } from "./queue.ts";
+import type { DuelPlayerView } from "@chessroyale/chess/duel";
+
+export { queueName } from "./queue.ts";
+import { liveHub } from "./live-hub.ts";
+
+/** What POST /api/play answers: a lobby, or "busy, you're in line" with the ticket to ask again with. */
+export type PlayAnswer =
+  | { code: string; ticket?: string }
+  | { busy: true; ticket: string; position: number; waitSeconds: number; retryMs: number; message: string };
+
+/**
+ * Ranked 1 v 1's answer: a game, busy, or still looking for an opponent (ask again with the ticket at once: each ask
+ * waits up to holdMs); or `expired`: the queue doesn't know that ticket (it went while the app was asleep, or it never
+ * was one): ask again without it.
+ */
+/** `delayMs`: ranked's delayed queue (L1): how long until this ticket can be paired (missing: it can be now). */
+export type DuelPlayAnswer = PlayAnswer | { searching: true; ticket: string; waitedMs: number; delayMs?: number } | { expired: true };
+
+/** Ranked's leave rules read again as a ticket asks (L1; queue.ts restrict): the asking account, a lockout, the delayed queue's time. */
+export type DuelRecheck = { uid: string; drop: boolean; notBefore: number | null };
+
+export const busyMessage = (seconds: number) => `Servers are busy, you're in line: about ${seconds} s`;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** How a queue's lobbies start (the same for every press to one queue), and a switcher's wait so far. */
+export interface PlayOptions {
+  /** Bots off: people only (a raid may begin after the fill time with enough people; a 50 v 50 waits until full). */
+  botsOff?: boolean;
+  crowdWaitsForFull?: boolean;
+  /** Bots off → Default: waiting since then, so bots fill a minute after that at the latest (never sooner than switchMinWaitMs). */
+  since?: number;
+  /**
+   * Squads: this queue's lobbies are Squads lobbies (SquadsLobby objects, 32 seats in squads of 4). Each ticket is a
+   * group, `info` { size, pass }: a party of `size` under its pass (a solo player: size 1, no pass), seated whole.
+   */
+  squads?: boolean;
+  /**
+   * Ranked 1 v 1: tickets are single players, `info` { uid, rating, rd, player, colors, testSeconds } (read by the
+   * server), paired by rating (PAIR_BY_RATING); each pair gets a game of its own (a DuelGame object), White by their
+   * colors in their last ranked games (core's firstGetsWhite).
+   */
+  duel?: boolean;
+  /**
+   * The engine pool's queue (an account fair play pooled: set by the Worker from the account, never the browser): its lobbies say so, and
+   * seat no one else who has their code (lobby-do.ts, squads-do.ts). The #618 review, m4.
+   */
+  engine?: boolean;
+}
+
+/**
+ * PLAY: one Durable Object per queue (mode and matchmaking type, and region when CAPACITY.queue.byRegion is on).
+ * Default: players join the lobby that's filling until it's full or a minute has passed since it opened, then it
+ * starts with bots in the empty seats and the next players get a new lobby. Bots off: it waits until full (a raid: see
+ * MATCHMAKING). Solo never comes here. Unranked; ranked queues plug their rules into `rules` (queue.ts).
+ *
+ * Built for surges (DECISIONS.md, "Capacity: built"): PLAY presses are tickets in memory, seated in batches with one
+ * seat reservation per lobby per batch, never one cross-object call per player inside a lock. A surge past the
+ * admission rate, or past the overload limit, waits in line and is told about how long.
+ */
+export class Matchmaker extends DurableObject<Env> {
+  protected q = new QueueCore();
+  /** How long a PLAY request waits for a seat before "busy" (CAPACITY.queue.holdMs; tests shorten it). */
+  protected holdMs: number = CAPACITY.queue.holdMs;
+  /** Players whose request is waiting for a seat. */
+  private waiters = new Map<string, (code: string) => void>();
+  /** The lobby filling up, per group of the rules ("all" for unranked). */
+  private current = new Map<string, string>();
+  private forming: Promise<void> | null = null;
+  private again: ReturnType<typeof setTimeout> | null = null;
+  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean; squads: boolean; duel: boolean; engine: boolean } = {
+    overrides: {},
+    fillMs: 60_000,
+    botsOff: false,
+    crowdWaitsForFull: false,
+    squads: false,
+    duel: false,
+    engine: false,
+  };
+  private players: { at: number; n: number } = { at: 0, n: 0 };
+  /** The matching rules (ranked replaces these). */
+  protected rules: MatchRules = FILL_IN_ORDER;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    void ctx.blockConcurrencyWhile(async () => {
+      const stored = await ctx.storage.get<Record<string, string> | string>("current");
+      // (Before batches, one code was stored as a plain string.)
+      if (typeof stored === "string") this.current.set("all", stored);
+      else if (stored) for (const [k, v] of Object.entries(stored)) this.current.set(k, v);
+    });
+  }
+
+  /** PLAY (or a player in line asking again with their ticket). `info`: for matching rules (ranked). */
+  async next(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions = {}, ticketId?: string | null, info?: Record<string, unknown>): Promise<PlayAnswer> {
+    return (await this.ask(overrides, fillMs, { ...opts, duel: false }, ticketId, info)) as PlayAnswer;
+  }
+
+  /**
+   * Ranked 1 v 1's PLAY (or a player still looking asking again with their ticket): `info` as PlayOptions.duel says.
+   * A ticket is only ever made with its player: an ask with a ticket this queue doesn't know is `expired` (never a new,
+   * empty ticket), and a first ask without the player is refused.
+   */
+  async duelNext(ticketId: string | null, info?: Record<string, unknown>, recheck?: DuelRecheck): Promise<DuelPlayAnswer> {
+    if (ticketId ? !this.q.known(ticketId) : !info || !duelTicketComplete({ id: "", at: 0, seenAt: 0, info })) return { expired: true };
+    // (Ranked's leave rules read again for a ticket already in line, L1: a lockout takes it out; the delayed queue holds it.)
+    if (ticketId && recheck && this.q.restrict(ticketId, recheck.uid, recheck)) return { expired: true };
+    return this.ask({}, 0, { duel: true }, ticketId, ticketId ? undefined : info);
+  }
+
+  private async ask(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions, ticketId?: string | null, info?: Record<string, unknown>): Promise<DuelPlayAnswer> {
+    countCall("mm.next");
+    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull, squads: !!opts.squads, duel: !!opts.duel, engine: !!opts.engine };
+    const now = Date.now();
+    const t = this.q.enqueue(ticketId, now, opts.since !== undefined ? { ...info, since: opts.since } : info);
+    const done = this.q.placedIn(t.id);
+    if (done) return { code: await this.told(t.id, done, opts), ticket: t.id };
+    const seated = new Promise<string>((resolve) => this.waiters.set(t.id, resolve));
+    this.kick();
+    const code = await Promise.race([seated, sleep(this.holdMs).then(() => null)]);
+    this.waiters.delete(t.id);
+    if (code) return { code: await this.told(t.id, code, opts), ticket: t.id };
+    // Placed just now, after the wait ran out?
+    const late = this.q.placedIn(t.id);
+    if (late) return { code: await this.told(t.id, late, opts), ticket: t.id };
+    // Ranked 1 v 1: no opponent yet (unless the servers are full: then busy, as every queue).
+    if (opts.duel && this.players.n < this.q.cfg.maxPlayers && this.q.position(t.id) > 0) {
+      const delayMs = Math.max(0, Number(t.info?.notBefore ?? 0) - Date.now());
+      return { searching: true, ticket: t.id, waitedMs: Math.max(0, Date.now() - t.at), ...(delayMs > 0 ? { delayMs } : {}) };
+    }
+    countCall("mm.busy");
+    const waitSeconds = this.q.estimateSeconds(t.id, Date.now(), this.players.n);
+    return { busy: true, ticket: t.id, position: this.q.position(t.id), waitSeconds, retryMs: CAPACITY.queue.retryMs, message: busyMessage(waitSeconds) };
+  }
+
+  /**
+   * An ask is answered with its game's code: ranked 1 v 1's game hears (once) that this player was told (ranked's leave rules,
+   * L1: a no-show is a dodge only then). A call that fails leaves it untold: the player is never charged for the server's slip.
+   */
+  private async told(ticketId: string, code: string, opts: PlayOptions): Promise<string> {
+    const d = opts.duel ? this.q.deliver(ticketId) : null;
+    if (d?.uid) {
+      try {
+        await this.env.DUELS.get(this.env.DUELS.idFromName(d.code)).delivered(d.uid);
+      } catch {
+        countCall("mm.toldFailed");
+      }
+    }
+    return code;
+  }
+
+  /** Ranked 1 v 1's Cancel: the ticket leaves the line. Answers its game if it was paired already (the app then leaves it). */
+  async cancel(ticketId: string): Promise<{ code?: string }> {
+    const code = this.q.cancel(ticketId);
+    return code ? { code } : {};
+  }
+
+  /** Starts a batch now, unless one is running (it picks up whoever arrived meanwhile when it's done). */
+  private kick() {
+    if (this.forming) return;
+    let held = false;
+    this.forming = this.form()
+      .then((h) => void (held = h))
+      .catch((e: unknown) => {
+        // (Anything that escapes a batch waits like one held back, never a retry at once: it can't spin.)
+        held = true;
+        this.formFailed(e);
+      })
+      .finally(() => {
+        this.forming = null;
+        if (!this.q.waiting) return;
+        // Arrived as the batch finished: at once. Held back by the rate or the player cap: again shortly.
+        if (!held) return this.kick();
+        if (!this.again) {
+          this.again = setTimeout(() => {
+            this.again = null;
+            this.kick();
+          }, CAPACITY.queue.formEveryMs);
+        }
+      });
+  }
+
+  /** People in lobbies now (for the overload limit), from the live hub, at most every 2 s. */
+  private async playersNow(now: number): Promise<number> {
+    if (this.env.LIVE && now - this.players.at > 2_000) {
+      this.players = { at: now, n: await liveHub(this.env).players().catch(() => this.players.n) };
+    }
+    return this.players.n;
+  }
+
+  /**
+   * Seats everyone admissible, in batches, until the line is empty (false) or held back (true). A seating that fails
+   * (a lobby or game that couldn't be opened, or a call that threw) stops the batch: everyone in it still being seated
+   * goes back to the front of the line, in order (anyone placed already keeps their seat), and the next batch tries
+   * again after formEveryMs, or sooner if someone asks (docs/decisions/2026-10-17-seating-throw-puts-back.md).
+   */
+  private async form(): Promise<boolean> {
+    for (;;) {
+      const now = Date.now();
+      const groups = this.q.admit(now, await this.playersNow(now), this.lobbyOptions.duel ? PAIR_BY_RATING : this.rules);
+      if (!groups.length) return this.q.waiting > 0;
+      countCall("mm.batch");
+      for (const g of groups) {
+        const seated = await this.seat(g.key, g.tickets).catch((e: unknown) => {
+          countCall("mm.seatThrew");
+          this.formFailed(e);
+          return false;
+        });
+        if (!seated) {
+          this.q.putBack(groups.flatMap((x) => x.tickets));
+          return true;
+        }
+      }
+    }
+  }
+
+  private formFailed(e: unknown) {
+    serverError(this.env, { kind: "Matchmaker.form", route: "Matchmaker.form" }, e, (p) => this.ctx.waitUntil(p));
+  }
+
+  /**
+   * Seats a group: the seats left in its filling lobby first, then new lobbies. False: not all of them (form puts the
+   * rest back).
+   */
+  private async seat(key: string, tickets: Ticket[]): Promise<boolean> {
+    if (this.lobbyOptions.squads) return this.seatSquads(key, tickets);
+    if (this.lobbyOptions.duel) return this.seatDuel(tickets);
+    // A 50 v 50 party's ticket is seated whole (seatParty); the players between parties as before, in the order they pressed.
+    if (!tickets.some(crowdParty)) return this.seatSingles(key, tickets);
+    let run: Ticket[] = [];
+    for (const t of tickets) {
+      if (!crowdParty(t)) {
+        run.push(t);
+        continue;
+      }
+      if (run.length && !(await this.seatSingles(key, run))) return false;
+      run = [];
+      if (!(await this.seatParty(key, t))) return false;
+    }
+    return run.length ? this.seatSingles(key, run) : true;
+  }
+
+  /**
+   * A 50 v 50 party (docs/decisions/2026-11-16-crowd-party.md): all its seats in one lobby under its pass, so its members play on
+   * one team: the filling lobby if they fit there (with every party in it still whole on a team), else a new one. False: not
+   * seated (form puts it back in line).
+   */
+  private async seatParty(key: string, t: Ticket): Promise<boolean> {
+    const party = crowdParty(t)!;
+    const code = this.current.get(key);
+    if (code) {
+      countCall("mm.reserve");
+      if (await this.lobby(code).reserveParty(party.size, party.pass, CAPACITY.queue.reservationMs).catch(() => false)) {
+        this.placeAll([t], code);
+        return true;
+      }
+    }
+    const { overrides, fillMs, botsOff, crowdWaitsForFull, engine } = this.lobbyOptions;
+    countCall("mm.create");
+    const fillAt = botsOff && crowdWaitsForFull ? null : Date.now() + fillMs;
+    const made = { held: false as boolean | number };
+    const fresh = await openLobbyCode(async (c) => {
+      made.held = await this.lobby(c).create(c, overrides, { fillAt, botsOff, party, reserveMs: CAPACITY.queue.reservationMs, ...(engine ? { engine } : {}) });
+      return made.held !== false;
+    });
+    if (!fresh || made.held !== true) {
+      countCall("mm.createFailed");
+      return false;
+    }
+    this.current.set(key, fresh);
+    await this.ctx.storage.put("current", Object.fromEntries(this.current));
+    this.placeAll([t], fresh);
+    return true;
+  }
+
+  /** Single players (a 50 v 50's or a raid's): the seats left in the group's filling lobby first, then new lobbies. */
+  private async seatSingles(key: string, tickets: Ticket[]): Promise<boolean> {
+    let rest = tickets;
+    const code = this.current.get(key);
+    if (code) {
+      countCall("mm.reserve");
+      const got = await this.lobby(code)
+        .reserve(rest.length, CAPACITY.queue.reservationMs)
+        .catch(() => 0);
+      if (got > 0) {
+        const placed = rest.slice(0, got);
+        // Someone switching from Bots off: bots fill a minute after they first joined, at the latest.
+        const since = earliestSince(placed);
+        if (since !== undefined) await this.lobby(code).hurry(since + this.lobbyOptions.fillMs).catch(() => undefined);
+        this.placeAll(placed, code);
+        rest = rest.slice(got);
+      }
+    }
+    while (rest.length) {
+      const { overrides, fillMs, botsOff, crowdWaitsForFull, engine } = this.lobbyOptions;
+      let granted: number | boolean = false;
+      countCall("mm.create");
+      const want = rest.length;
+      // When bots fill (Default), or when a raid may begin with fewer (Bots off); a Bots off 50 v 50 waits until full.
+      // A switcher among those it will seat brings the fill time forward (their wait counts).
+      const now = Date.now();
+      const since = earliestSince(rest.slice(0, Number(overrides?.lobbySize ?? DEFAULT_SETTINGS.lobbySize)));
+      const fillAt = botsOff
+        ? crowdWaitsForFull
+          ? null
+          : now + fillMs
+        : since !== undefined
+          ? Math.min(now + fillMs, Math.max(now + MATCHMAKING.switchMinWaitMs, since + fillMs))
+          : now + fillMs;
+      // A fresh code: one whose lobby is still open (a match, or its results) is never handed out.
+      const fresh = await openLobbyCode(async (c) => {
+        granted = await this.lobby(c).create(c, overrides, { fillAt, botsOff, reserve: want, reserveMs: CAPACITY.queue.reservationMs, ...(engine ? { engine } : {}) });
+        return granted !== false;
+      });
+      if (!fresh || !granted) {
+        // Couldn't open one: they wait in line for the next batch.
+        countCall("mm.createFailed");
+        return false;
+      }
+      this.current.set(key, fresh);
+      await this.ctx.storage.put("current", Object.fromEntries(this.current));
+      const n = granted === true ? want : granted;
+      this.placeAll(rest.slice(0, n), fresh);
+      rest = rest.slice(n);
+    }
+    return true;
+  }
+
+  /**
+   * Squads: each ticket is a party (or one player) seated whole. The filling lobby takes the ones that still fit its
+   * squads (one call for the batch); the rest open new lobbies.
+   */
+  private async seatSquads(key: string, tickets: Ticket[]): Promise<boolean> {
+    const groups = (ts: Ticket[]) => ts.map((t) => ({ size: Math.max(1, Math.round(Number(t.info?.size) || 1)), pass: typeof t.info?.pass === "string" ? t.info.pass : "" }));
+    let rest = tickets;
+    const code = this.current.get(key);
+    if (code) {
+      countCall("mm.reserve");
+      const took = new Set(await this.squadsLobby(code).reserve(groups(rest), CAPACITY.queue.reservationMs).catch(() => [] as number[]));
+      if (took.size) {
+        this.placeAll(rest.filter((_, i) => took.has(i)), code);
+        rest = rest.filter((_, i) => !took.has(i));
+      }
+    }
+    while (rest.length) {
+      countCall("mm.create");
+      const fillAt = Date.now() + this.lobbyOptions.fillMs;
+      let took: number[] | false = false;
+      const fresh = await openLobbyCode(async (c) => {
+        took = await this.squadsLobby(c).create(c, { fillAt, reserve: groups(rest), reserveMs: CAPACITY.queue.reservationMs, ...(this.lobbyOptions.engine ? { engine: true } : {}) });
+        return took !== false;
+      });
+      const placed = fresh && took ? rest.filter((_, i) => (took as number[]).includes(i)) : [];
+      if (!fresh || !placed.length) {
+        countCall("mm.createFailed");
+        return false;
+      }
+      this.current.set(key, fresh);
+      await this.ctx.storage.put("current", Object.fromEntries(this.current));
+      this.placeAll(placed, fresh);
+      rest = rest.filter((t) => !placed.includes(t));
+    }
+    return true;
+  }
+
+  /**
+   * Ranked 1 v 1: a pair gets a game of its own, White by each player's colors in their last ranked games, read with the
+   * ticket (core's firstGetsWhite: never a third game in a row on one color when it can be helped, then whoever had Black
+   * more, then whoever had Black last, then a coin flip). A game that couldn't be opened puts them back in line for the
+   * next batch (form does).
+   */
+  private async seatDuel(tickets: Ticket[]): Promise<boolean> {
+    // (Never a game with a seat nobody can take: a ticket without its player is dropped, its partner back in line.)
+    const whole = tickets.filter(duelTicketComplete);
+    if (whole.length !== tickets.length) {
+      this.q.forget(tickets.filter((t) => !whole.includes(t)));
+      this.q.putBack(whole);
+      return true;
+    }
+    if (tickets.length !== 2) return false;
+    const view = (t: Ticket): DuelPlayerView => t.info?.player as DuelPlayerView;
+    const coin = () => (crypto.getRandomValues(new Uint8Array(1))[0]! & 1) === 1;
+    const [w, b] = firstGetsWhite(colorsOf(tickets[0]!), colorsOf(tickets[1]!), coin) ? [tickets[0]!, tickets[1]!] : [tickets[1]!, tickets[0]!];
+    const testSeconds = [w, b].map((t) => Number(t.info?.testSeconds)).find((x) => Number.isFinite(x) && x > 0) ?? null;
+    countCall("mm.duel");
+    const code = await openLobbyCode(async (c) => this.env.DUELS.get(this.env.DUELS.idFromName(c)).create(c, { w: view(w), b: view(b) }, { testSeconds }));
+    if (!code) {
+      countCall("mm.createFailed");
+      return false;
+    }
+    this.placeAll(tickets, code);
+    return true;
+  }
+
+  private squadsLobby(code: string) {
+    return this.env.SQUADS.get(this.env.SQUADS.idFromName(code));
+  }
+
+  private placeAll(tickets: Ticket[], code: string) {
+    this.q.place(tickets, code, Date.now());
+    for (const t of tickets) this.waiters.get(t.id)?.(code);
+  }
+
+  private lobby(code: string) {
+    return this.env.LOBBIES.get(this.env.LOBBIES.idFromName(code));
+  }
+}
+
+/** A 50 v 50 party's ticket (its Durable Object asks with `info` { size, pass }): its seats and pass, else null (one player). */
+function crowdParty(t: Ticket): { size: number; pass: string } | null {
+  const pass = t.info?.pass;
+  if (typeof pass !== "string" || !pass) return null;
+  return { size: Math.max(1, Math.min(CROWD_PARTY_MAX, Math.round(Number(t.info?.size) || 1))), pass };
+}
+
+/** A ranked 1 v 1 ticket's colors in its player's last ranked games, newest first (none, or anything else: no history). */
+function colorsOf(t: Ticket): SeatColor[] {
+  const xs = t.info?.colors;
+  return Array.isArray(xs) ? xs.filter((c): c is SeatColor => c === "w" || c === "b") : [];
+}
+
+/** The earliest Bots-off wait among these tickets (players switching to Default), if any. */
+function earliestSince(tickets: Ticket[]): number | undefined {
+  const xs = tickets.map((t) => t.info?.since).filter((x): x is number => typeof x === "number");
+  return xs.length ? Math.min(...xs) : undefined;
+}

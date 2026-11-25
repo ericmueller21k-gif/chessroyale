@@ -1,0 +1,76 @@
+{
+  "25000": {
+    "node": {
+      "mean": 33,
+      "median": 39,
+      "p95": 57,
+      "max": 74
+    },
+    "chromium x1": {
+      "mean": 32,
+      "median": 38,
+      "p95": 58,
+      "max": 129,
+      "over350": 0,
+      "over175": 0
+    },
+    "chromium x4": {
+      "mean": 148,
+      "median": 173,
+      "p95": 252,
+      "max": 389,
+      "over350": 1,
+      "over175": 137
+    }
+  },
+  "30000": {
+    "node": {
+      "mean": 39,
+      "median": 49,
+      "p95": 61,
+      "max": 72
+    },
+    "chromium x1": {
+      "mean": 37,
+      "median": 45,
+      "p95": 59,
+      "max": 99,
+      "over350": 0,
+      "over175": 0
+    },
+    "chromium x4": {
+      "mean": 174,
+      "median": 213,
+      "p95": 282,
+      "max": 338,
+      "over350": 0,
+      "over175": 194
+    }
+  },
+  "35000": {
+    "node": {
+      "mean": 45,
+      "median": 56,
+      "p95": 71,
+      "max": 94
+    },
+    "chromium x1": {
+      "mean": 45,
+      "median": 56,
+      "p95": 77,
+      "max": 115,
+      "over350": 0,
+      "over175": 0
+    },
+    "chromium x4": {
+      "mean": 201,
+      "median": 248,
+      "p95": 326,
+      "max": 389,
+      "over350": 2,
+      "over175": 209
+    }
+  },
+  "positions": 283,
+  "fights": 8
+}
