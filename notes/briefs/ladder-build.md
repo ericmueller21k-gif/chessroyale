@@ -14,6 +14,7 @@ switch for e2e if needed). Read CLAUDE.md, `.claude/LESSONS.md`, `docs/rules/eri
   partial index `ranked_1v1_board (ladder DESC, user_id DESC) WHERE games >= 5`, places with ties shared (as `topPlace`), one batched read
   of the 200 players' looks (no per-row `lockerState`), banned/engine-pool/test accounts left out (residents are IN: they're real-looking
   players by design). Edge cache 60 s for the rows; `you` per player, uncached. Tests in the server package.
+- **Tab order mirrors home's RANKED row (Eric, Nov 25): 50 v 50 · 1 v 1 · Squads, with 1 v 1 in the CENTER and selected when the page opens.**
 - **50 v 50 and Squads tabs:** greyed "No ranks yet", a tap says why (as the mockup). Not hidden.
 - **App:** loading as greyed rows (nothing shifts), the profile tap, the town's and a match's menus' "Ladder" wired, `e2e/areas.json`
   places the new files, one e2e check (the page opens from home's A and the computer's panel; rows ≤ 200; your row pinned).
