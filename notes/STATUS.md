@@ -2004,3 +2004,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~07:10: vote labels B DONE → #928 (ca56d85b), CI watched, helper archived. #927 green (70a27015), waiting for the town fix to
   merge first (main red). Town fix helper still running.
 - Nov 25 ~00:20 UTC: town arrowStep flake FIXED at the cause (test stepped onto a bot spot square; test-only) → #929 MERGED (c317f07), helper archived; main full run watcher b243tydzo. #928 vote tags GREEN (ca56d85b). NEXT: main green → merge #927 (70a27015) → watch main → merge #928 → watch main. Waiting on Eric: item polish go, desktop crate size, power tips feel.
+- Nov 25 ~00:40 UTC: #929 main GREEN. #927 MERGED (3f082b5) → main RED: [desktop] match-menu.spec:71 both tries (status line box under the gear). Fixed by director (CSS margins + one-side padding; match-menu.spec added to board-size area) → #930 (367613e), CI bws3tr2i3. Then main green → #928.
