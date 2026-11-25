@@ -13,6 +13,15 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Light the free starter) and chat packs (not equipped: you use every pack you own). Prices in coins (God King effects `SHOP.godKing`, 300-400; chat packs `QUICK_CHAT.packPrices`, 100-150; both since Nov 18); `SHOP_FREE` is
   on (its items are free: "Get · Free"; the "free while we test" note is gone since Nov 9). The pawn hats it used to sell are Beta crate items now (Oct 11, 2026); the shop
   is kept for God King packs and, later, things like boss and attack animations.
+- **Earning coins: play coins** (Nov 25; [2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md); the payments design's
+  section 6, PR 2 of its build): every counted game pays coins with its XP, the same rules and the same batch (`PLAY_COINS` in
+  settings.ts, core's `play-coins.ts`, server `play-coins.ts` via `xp.ts grantXp`; the storage and guards: [accounts.md](accounts.md),
+  "Play coins"). 1.8 a counted minute (at most 54 a game) until 300 an XP day; a bonus past that for a win 15, a ranked draw 5, a
+  50 v 50 team's top 3 +10, Squads 1st 40, 2nd 25, 3rd-4th 15, 5th-8th 5, paid by the day's steps (full, half, a quarter, none past
+  550 earned): 600 a day at most. Solo: the minutes XP paid under its solo cap, no bonus. Ranked's and Squads' own coins are gone (Squads'
+  crates stay). Where a result already said its coins (the ranked end page's line, Squads' placement line) it says these; the coin
+  reward strip under the XP box is PR 3. The day's table by player and hours: `reports/coin-report.md`
+  (`npx tsx packages/sim/scripts/coin-report.ts`, from the settings). The FAQ's "Coins" (in "XP and levels") follows the settings.
 - **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
   coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
   at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
@@ -43,7 +52,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   **Winter Crate · Series 1**. Each lists its items once; an item's tier says where it is.
   Every drop rolls three things independently:
   1. **its tier**, which decides the item: the opening strip lands on a tier's box (Common to Epic, color-coded:
-     Winter's presents, Beta's supply boxes), which opens to one of that tier's items evenly, or on **Fischer Random**
+     Winter's presents, Beta's supply boxes), which opens to one of that tier's items evenly, or on **Transcendent** (called
+     Fischer Random until Nov 24; still `FISCHER` / `fischer` in the code; its tile a prismatic crate, `TranscendentArt`)
      (Legendary and Mythic items only, by tier: Legendary 80, Mythic 20, shared evenly). Both crates: 40/26/18/14/2.
      A tier with no items is left off the strip, and a test keeps every live crate's tiers filled;
   2. **its color** (red and yellow common, Pearl the rarest; some items roll a second color, and the Gift-Wrap Tube's
@@ -57,6 +67,26 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Crate as the locker was read. The Crates tab shows each series crate's count and a padlock while it can't open; its Open is greyed
   without both. `?fischer=1` / `?shiny=1` only where `TEST_SWITCHES` is "1". Every 20th level's boss crate (every 10th until Nov 20) is picked in the Crates tab's
   "Boss crate choice" (`POST /api/locker/pick`; [2026-11-09-xp-phase2-boss-pick.md](../decisions/2026-11-09-xp-phase2-boss-pick.md)).
+- **The bonus crate** (Eric, Nov 24: "like League of Legends does this ... 25% of the time ... every crate possible that exists, even ones
+  that have been retired, just evenly spread"; [2026-11-24-bonus-crate.md](../decisions/2026-11-24-bonus-crate.md); `CRATE_BONUS` in
+  settings, core's `bonus-crate.ts`): every crate opening (a series crate's; a boss crate's, bought, picked or won) has
+  `CRATE_BONUS.chance` (25%) of a bonus crate, any crate in `CRATES` or `BOSS_CRATES`, each as likely (`bonusPool`: not the Welcome
+  Crate, whose own opening rolls none either; not an admins-first boss's crate, except for admins), into the inventory unopened, with a
+  crate key when it opens with one (`opensWithKey`: series crates). Rolled by the server with the item's own roll, in the open's one
+  ledger op (`bonusLegs`; a retry answers the stored item and bonus, `openedBonus`). **A bonus crate never rolls a bonus** (Eric: "you
+  can't just keep crating into other crates"): it's held under its crate's id with a `bonus:` prefix (`series_crates` "bonus:winter-1",
+  a `boss_crates` row "bonus:boss-tiger"; no migration: the ledger, a guest's sign-in, erasing and the download carry it as any crate);
+  holding both kinds, the ordinary ones open first. The locker counts it with its crate's and lists `bonusCrates`; the crate's page:
+  "You have 2 (1 bonus)". **Shown:** a beat after the item's card, a second card over it on a short gold beam (`BonusStage` in
+  `crate-open/`, `BonusCard` in Crates.tsx; its beats `BONUS` in `timeline.ts`): "BONUS!", the crate (a boss crate's with its token),
+  its name, "+1 crate key", OK (back to the item's card; the item's stage dims and its buttons are inert meanwhile and `BONUS.calmMs`,
+  300 ms, after OK, so a double tap on OK, which sits over "Open another", opens nothing; the dialog takes the focus and gives it back to
+  the item's first button). It can't be skipped: Done or Open another before its beat shows it first, and the crate stays unseen (comes
+  back on return) until its OK (the review, Nov 25). Each crate's odds panel and the FAQ (`bonusOddsLine`, N and each share from
+  `bonusPool()`): "Opening a series or boss crate: 25% chance of a bonus crate, one of N crates chosen evenly (about X% each, so about Y%
+  of openings for each), with its key if it needs one. The Welcome Crate and crates of bosses not yet released aren't in it. Opening a
+  bonus crate never gives another." An empty pool gives none. Where `TEST_SWITCHES` is on, only when asked (`?bonus=1`,
+  `?bonus=<crate>`, the "Bonus crate" box; `?bonus=0` or empty: none).
 - **Items** have a slot (head, face, skin, weapon, ride, outfit: `ITEM_SLOTS`, the server's check too), are drawn on the pawn's 100 × 100 square, and fit by anchors
   (head, face, eyes, neck, mouth: each piece's own lines; a mustache sits at the mouth, under a snowman's carrot).
   Every face item is tagged above or below a hat (`faceLayer` in crates.ts; Eric, Oct 30): goggles and shades are drawn
@@ -64,6 +94,14 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Weapons don't move with the piece: they're drawn where every piece's side (or shoulder) is. Your
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
+- **Item animations and the Smiley's expressions** (Nov 25; [2026-11-25-item-polish.md](../decisions/2026-11-25-item-polish.md)): the Fire & Ice
+  Crown's flames, the Candy Cane's strand, the Gift-Wrap Tube's confetti, the Parrot's flap and the Tommy Gun's key and puff play (CSS `ia-`
+  classes in styles.css, SVG transforms and opacity, no frame loop) only under `.ia-live`: `live` on `ItemArt` / `Avatar`, set where the
+  item is the focus (your pawn on screen, the locker's preview, a crate's reveal, a profile's Wearing rows and tiles), and only inside
+  `prefers-reduced-motion: no-preference`. Grids, lists and the power banner stay still. A Smiley Face's expression (`SMILEY_EXPRESSIONS`:
+  Smile, Wink, Tongue, Cool, Surprised, Laughing) comes from its seed (`smileyExpression`, its own stream; never stored); `itemName(it)`
+  names it ("Smiley Face · Wink") on the reveal card, the locker tile and its label, the delete dialog and the profile; `stackKey` keeps
+  each expression its own stack.
 - **Outfits** (Nov 10; [2026-11-10-outfit-slot.md](../decisions/2026-11-10-outfit-slot.md)): the `outfit` slot. One on, every other worn item is
   hidden (core's `shownLook`: only the outfit, and eyewear, `eyewear: true` (goggles, shades) while `OUTFIT.eyewear`), everywhere a look is
   drawn (`Avatar`, the town, the profiles' rows); the rest stay equipped underneath. **Secret** (Eric's exception to "nothing hidden"): the
@@ -146,8 +184,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     [2026-11-12-boss-crate-bought.md](../decisions/2026-11-12-boss-crate-bought.md)).
   - **Boss crates you hold** (Eric, Nov 2: "Buying a boss crate from shopkeepers adds the crate to your inventory … they open and shuffle
     the same way normal crate animations work"; [2026-11-02-nov2-fixes-b.md](../decisions/2026-11-02-nov2-fixes-b.md)): the Crates tab
-    lists every boss crate under **"Boss crates"**, below the others, its boss's token on the crate's corner, its blurb and **"You have
-    2"** (greyed with **"You have none"**: shown, not hidden; a tap still shows what's inside). Its page says **"You have 2."** or
+    lists the boss crates under **"Boss crates"**, below the others, its boss's token on the crate's corner, its blurb and **"You have
+    2"**. Beside the title, **"Show unowned"** (Eric, Nov 24, his exception to "nothing hidden"; [decision](../decisions/2026-11-24-quests-gap.md),
+    `boss-crate-rows.ts`): unchecked by default, only the ones you hold (none: "You have no boss crates yet. Check Show unowned to see them
+    all."); checked, every one, greyed with **"You have none"** at none (a tap still shows what's inside); remembered on this device. Its page says **"You have 2."** or
     **"You have none. Babur's shop in the town sells it."**; **"▶ Open"** (greyed at none; no test switches for these) opens it with the
     Crates tab's own strip, unwrap, Fischer Random and reveal, from the crate's own pool (`BOSS_CRATES`); "▶ Open another" greys when none
     is left. The locker's `bossCrates` (crate id → how many). **Opening** (`POST /api/locker/open {crate}` with a boss crate's id:
@@ -156,8 +196,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     haven't got ("You have no Babur's Boss Crate to open."). The roll is the server's, never a test switch's. The shop's kill switch
     refuses it too.
   - **Admins' test grants** (the Crates tab's "Admin: test grants", admins only: "+1 crate key", "+100 crate keys" (Nov 9); a boss,
-    "+1 token", "+3 tokens"; `POST /api/locker/grant`, "Not found" for anyone else; at most `keysGrantMax` (100) keys and `grantMax` (10)
-    tokens at once). Never a drop: the window doesn't count them. Every admin-only ability: [2026-11-09-admin-abilities.md](../decisions/2026-11-09-admin-abilities.md).
+    "+1 token", "+3 tokens"; and a crate, any series or boss crate, "+5 crates" (Nov 25: [2026-11-25-admin-crate-grant.md](../decisions/2026-11-25-admin-crate-grant.md)); `POST /api/locker/grant`, "Not found" for anyone else; at most `keysGrantMax` (100) keys and `grantMax` (10)
+    tokens at once, `cratesGrantMax` (10) crates). Never a drop: the window doesn't count them. Every admin-only ability: [2026-11-09-admin-abilities.md](../decisions/2026-11-09-admin-abilities.md).
   - **Stored** (each an account's: `account-data.ts`, "bossTokens"; the privacy page's "Boss tokens"): `boss_tokens` (counts),
     `boss_token_drops` (each drop: when, which battle; kept 30 days, the Worker's schedule clears older), `solo_battles` (the open one),
     `boss_crates` (Nov 2: each crate bought and not opened yet, its crate id and when; a new table, so older data reads as none), and
@@ -165,6 +205,14 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     counts the drops).
 - **Boingo's claw machine** (Nov 6; [2026-11-06-claw-machine.md](../decisions/2026-11-06-claw-machine.md); `CLAW`): its coin slot in his Funhouse opens `openClawMachine()`. One boss
   token in, 25% of the time that boss's Boss Crate, unopened: `POST /api/shop/claw {boss, request}` rolls it through the ledger (`clawOp`, keyed by `request`).
+- **The Crates tab's order** (Eric, Nov 25: "refactor this page a bit ... put the admin stuff all the way at the bottom";
+  [2026-11-25-crates-page-tidy.md](../decisions/2026-11-25-crates-page-tidy.md)), top to bottom: Keys × N and Crates × N; **Ready to
+  open** (a ready Welcome Crate, "Choose your boss crate" when one waits, the series and boss crates you hold; none: "Nothing to open right
+  now."); **Boss tokens**; **More crates** with "Show unowned" beside its title (Welcome Crates still to earn, with their meters; the series
+  crates you don't hold, greyed with a padlock; "Boss crate choice" greyed with none to choose; with the box checked, the boss crates you
+  don't hold); and, admins only, **Admin: test grants** last. Each crate is in one place: Ready to open while you hold it. **A used
+  Welcome Crate's row is gone** (Eric's own exception to "nothing hidden": `welcomeRowsShown` in `welcome-rows.ts`): once opened and its
+  reveal seen; its page and its ride stay.
 - **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
   `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
   - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
@@ -213,19 +261,43 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **The icon builder** (the profile): a 48 × 48 pixel drawing with a paint bucket and undo (`UNDO_STEPS`), saved as a
   small PNG data URL (at most 16 KB, checked by the server).
 
+- **The crate opening** (Nov 24; [2026-11-24-crate-open-build.md](../decisions/2026-11-24-crate-open-build.md); `crate-open/`): every
+  crate opens the same way (its page's Open, the Welcome Crate, a boss crate's "Open now" in its shop, Boingo's claw machine), on its own
+  layer over the screen it came from (`OpenLayer`): the whole phone screen, or a computer's middle column, top to bottom, on a blue-black
+  background; the screen under it stays as it was. On a computer the stage (its phone layout, 430 × 540) is scaled up whole to the
+  column's width and height, at most 1.5× (Nov 25, Eric: "on the desktop, the present is too small"); the phone's is as it was (scaled
+  down only on a short window). The bonus card's OK takes a tap only once it has faded in (`data-ready`). The strip (46 tiles, landing on the 39th) spins `CRATE_OPEN.spinMs` (4 s) with a
+  cubic slowdown, a blurred copy fading as it slows, and stops just past the winning tile's near edge, runs a few pixels over and settles.
+  Then the winning tier's box drops in, shakes (light leaking from its lid), and its lid bursts off with a beam in the item's tier color;
+  the item rises out of the beam into the reveal card, which forms round it (Legendary and Mythic: more rays, light over the whole stage,
+  a flash, a jolt). Transcendent: its banner ("TRANSCENDENT!") with its own sound, then a second strip among its items, whose winner's beam comes up without a box. All of it
+  is Web Animations on transform and opacity, set up while "Opening…" waits for the server and started together two frames after the
+  answer; reduced motion drops the blur, shake and jolt and fades the beam. The sound (made in code: `crate-open/sounds.ts`; Eric's
+  mix, Nov 24: the mockup's slot reel spinning, its "card in the spokes" ending) is made ahead in the sound worker as a crate's page opens
+  and as Open is tapped, and laid on the audio clock (`timeline.ts` `cues`, sound.ts `playCrateCues`): a metal tick at each tile edge
+  crossing, heavier as it slows, and a clunk as the reel locks (no swell, no charge: Eric); the box's thud and knocks, then a glassy
+  chord, each tier its own (Nov 24, [2026-11-24-crate-tier-stings.md](../decisions/2026-11-24-crate-tier-stings.md): Common and
+  Uncommon one shared; Rare a shimmer; Epic a rising arpeggio; Legendary bright, a choir above and a chime run; Mythic a fanfare's
+  chord change and a sparkle cascade), and Transcendent's own as its banner comes up (`T.bannerAt`). Every ending plays a few dB
+  under the ticks (Eric: they "hurt my ears"): `ENDING_DB` in sounds.ts, measured with EBU R128; `scripts/render-crate-stings.ts`
+  renders each tier's opening as audio to listen to and re-measure. The roll, the odds and what's won are the server's, unchanged.
+
 ## Where the code is
 
 | What | Where |
 | --- | --- |
 | Item list, tiers, colors, crate odds, rolls | `packages/core/src/crates.ts` |
+| The bonus crate: its pool, roll and odds line; its legs, storage and stored answer; its card | `packages/core/src/bonus-crate.ts`; `server/src/ledger.ts` (`bonusLegs`, `openedBonus`, `foldBonus`), `locker.ts` (`openCrate`, `BonusMode`), `boss-tokens.ts` (`openBossCrate`); `crate-open/CrateOpenStage.tsx` (`BonusStage`), `screens/Crates.tsx` (`BonusCard`) |
 | The Welcome Crate: the crate, its roll, `tradeable`, its text; the grant, opening and notice | `packages/core/src/welcome.ts`; `packages/server/src/welcome.ts`; `components/WelcomeNotice.tsx`; the colorway `components/rides/hunchess.tsx` |
 | Shop cosmetics | `packages/core/src/shop.ts`; drawn by `packages/app/src/components/Cosmetics.tsx` |
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`; the shop page's `BossCrateArt`, `MythicCrateArt`, `BundleArt`) | `packages/app/src/components/Items.tsx` |
 | The paint every item uses (color, shine, `Region`, `LINE`) and its blemish's blotches | `packages/app/src/components/item-paint.tsx` and `blotches.ts` (moved out of Items.tsx, Oct 31) |
 | Rides' drawings (`RIDES`) | `packages/app/src/components/rides/` (`draw.tsx`: one layer as SVG); their town cells: `scripts/measure-rides.ts` |
-| Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
+| The crate opening's picture, layer, timeline and sounds | `packages/app/src/crate-open/` (`CrateOpenStage.tsx`, `timeline.ts`, `sounds.ts`, `crate-open.css`); its preview `/crate-open-preview.html` (`dev/crate-open-preview.tsx`); `scripts/crate-open-frames.ts` (stills, frames, an MP4 with sound), `scripts/crate-open-perf.mjs` (frame times at 4x) |
+| Crate page, the opening's flow (`CrateOpening`), reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
 | Boss tokens, crate keys, the boss crate purchase, solo battles, admins' grants | `packages/server/src/boss-tokens.ts`; rules `packages/core/src/boss-tokens.ts`; the crates `BOSS_CRATES` in `crates.ts` |
+| Play coins: the rules (`gameCoins`, the steps); the grant beside XP's; the report | `packages/core/src/play-coins.ts`; `packages/server/src/play-coins.ts`, `xp.ts`; `packages/sim/scripts/coin-report.ts` → `reports/coin-report.md` |
 | The ledger: the only writer of coins, crates, keys, tokens, shop items, items, boss crates and Welcome Crates, each change an op with its legs, append-only (Nov 6; a buy, an open or a grant keyed by the app's request id, so its retry applies once; an open's every attempt answers the item as stored, never its own roll) | `packages/server/src/ledger.ts`; `docs/decisions/2026-11-06-ledger.md`, `2026-11-06-ledger-2.md` |
 | The token pictures, the inventory's tokens, the result box | `packages/app/src/components/tokens/`, `TokenArt.tsx`, `TokenBox.tsx`; `boss-tokens.ts` (the app's asking); `screens/Crates.tsx` (`TokenStock`, `AdminGrants`) |
 | Boingo's claw machine (the play, its log `claw_plays`; the app's machine, flow and sounds) | `packages/server/src/claw.ts`; `packages/app/src/claw/` (`index.ts`: `openClawMachine`; `flow.ts`; `ClawMachine.tsx`; `sounds.ts`) |
@@ -237,16 +309,34 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 
 `crates.ts` (`ITEM_DEFS`, `CRATES`, `BOSS_CRATES`, `ITEM_COLORS`, `PURITY_BANDS`), `XP` (the crates and keys a level and the daily
 reward give, `rewardCrate`), `BOSS_TOKENS` and
-`BOSS_CRATE_PRICE` and `SHOP` (the Shop page's discount, prices, limited items, the bundle's Mythic chance) in settings.ts, `shop.ts` (`SHOP_ITEMS`,
-`SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts.
+`BOSS_CRATE_PRICE` and `SHOP` (the Shop page's discount, prices, limited items, the bundle's Mythic chance) and `PLAY_COINS` (what play pays: Nov 25) in settings.ts, `shop.ts` (`SHOP_ITEMS`,
+`SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts. `CRATE_BONUS.chance` (settings.ts): an opening's chance of a
+bonus crate (0.25, Nov 24). `CRATE_OPEN.spinMs` (settings.ts): how long the crate opening's strip
+spins (4 s, Nov 24); its other beats are in `crate-open/timeline.ts`.
 
 ## Tests and tools
+
+- The bonus crate (Nov 24): unit `packages/core/test/bonus-crate.test.ts` (the pool, built from the lists, its exclusions; 25% and
+  evenness over seeded rolls; the key; the switch), `packages/server/test/bonus-crate.test.ts` (one op's legs; series and boss crates;
+  2,000 seeded openings at about 25%; crypto's own; a bonus crate never rolls and opens last; retries and opens at once; a guest's
+  sign-in, the download, erasing; the API: production rolls, `TEST_SWITCHES` only when asked, the kill switch),
+  `packages/app/test/bonus-crate.test.ts` (the card's words, key and token; its OK; the odds line and the FAQ's from the setting); e2e
+  `e2e/crate-banner.spec.ts`, "crates: a bonus crate's card after the item's…" (`?bonus=winter-1`: the card over the item's, the locker
+  at once, OK, "You have 1 (1 bonus)", its own opening gives none) and "crates: the bonus card can't be skipped by a fast Done, and a
+  double tap on its OK opens no other crate" (the review's M1 and M2, the focus).
+- The crate opening (Nov 24): unit `packages/app/test/crate-open.test.ts` (the clicks' times, the cues, every sound piece made and
+  level, every ending's loudness K-weighted under the ticks', the stings climbing); e2e `e2e/crate-banner.spec.ts`, "the opening covers the whole phone screen or the computer's middle column…" (the layer's box,
+  phone and computer, on top at its corners, the side columns uncovered; Done leaves the page under it where it was; `CRATE_SHOTS=<dir>`
+  saves its stills); the crate specs wait for `.crate-opening .cox-reel` and `.reveal-card` on the layer.
 
 - Unit: `packages/core/test/crates.test.ts` (rides: their slot, no crate, a look keeping its ride), `bot-looks.test.ts`, `packages/server/test/accounts.test.ts` (a ride in the ride slot only),
   `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `claw.test.ts` (the claw machine: one token a play, refused with none, about 25%, the crate on a win, a retry, plays at once, guests, the seed only with TEST_SWITCHES, the admins' grant), `boss-tokens.test.ts` (the drop rule and its window, a race for the
   window's first place, which boss, guests where sign-in is set up, 10 moves / 5 minutes, solo timed by the server and counted once,
   the match room's count of picks, buying both ways, not enough, twice at once, admins' grants admin-only, a guest's sign-in), `admin-copies.test.ts` (admins own one of every item, a ride too), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
+- Play coins (Nov 25): unit `packages/core/test/play-coins.test.ts`, `packages/server/test/play-coins.test.ts`,
+  `packages/app/test/squads-reward-line.test.ts`; the FAQ's words `packages/app/test/faq.test.ts`; e2e `e2e/xp.spec.ts` (a counted solo
+  game's coins). The full list: [accounts.md](accounts.md), "Tests".
 - Unit (Nov 6): `packages/server/test/ledger.test.ts` (an op replayed or raced applies once; each path's key; a 500-op reconciliation with merges and deletes; append-only; each request id replayed; an open raced at each step, held by the test's SQL wrapper, answers one stored item byte for byte; the backfill twice is once; the static guard: no balance write outside `ledger.ts`, the claw's TODO); `ledger-do.test.ts` (a match room stopped between D1 and its storage drops once; Squads retried).
 - Unit (Nov 9): `packages/server/test/rewards.test.ts` (a crate's open takes the crate and a key, refused without, two at once with one
   key; old crates to Winter; the boss crate pick); e2e `e2e/xp-rewards.spec.ts` (the Crates tab after a level-up, in the inventory layer over the end screen since Nov 22, an open, the padlock,
@@ -260,8 +350,11 @@ reward give, `rewardCrate`), `BOSS_TOKENS` and
   riding in boxes that don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds,
   straight in the local database; Nov 15, "a shiny ride's shine stays inside its own shapes": a shiny pogo and crown worn, every
   shine's clip is its own Region's and no two clips on the page share an id with different shapes).
-- The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
+- The Transcendent banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
   must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
+- Item polish (Nov 25): unit `crates.test.ts`, "a Smiley Face's expression comes from its seed…"; e2e `public-profile.spec.ts`, "four worn
+  items all fit" (the smiley's tile reads "Smiley Face · Laughing"); `@perf` `perf.spec.ts`, "worn items playing on a slow phone" (local only).
+  The fitting sheet's `live=1` plays the animations, `seeds=1,8,…` sets each card's seed (a smiley's expression), `width=` the page's.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of
   the repo). `sheet=1` gives a short sheet to show a batch (cards, both pawns, `colors=`, `outfits=a+b;c`). `scale=1` or `scale=2`
   renders at that display scale, to look for stray pixels. A ride shows ridden on every skin (`with=pirate-hat` for a hat on the rider).

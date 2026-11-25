@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { crateDef, itemDef } from "@chessroyale/core";
+import { bonusOddsLine, crateDef, itemDef } from "@chessroyale/core";
 import { giveCrates, named, test } from "./helpers.ts";
 
 /**
@@ -22,17 +22,37 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
     const crate = crateDef(id)!;
     await page.locator(`.crate-row[data-crate="${id}"]`).click();
     await expect(page.locator(".crate-hero strong")).toHaveText(crate.name.replace(" · ", " ")); // (the series on its own line)
-    // A box for each of the four tiers, then Fischer Random, then every item with its chance.
+    // A box for each of the four tiers, then Transcendent, then every item with its chance.
     await expect(page.locator(`.odds-row ${box}`)).toHaveCount(4);
     await expect(page.locator(".odds-row")).toHaveCount(5 + crate.items.length);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
     await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
     await expect(page.locator(`.spin-tile.present ${box}`).first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator(".reveal-card")).toBeVisible({ timeout: 25_000 });
-    const name = (await page.locator(".reveal-name").textContent())?.trim();
-    expect(crate.items.map((i) => itemDef(i)!.name)).toContain(name);
-    await page.getByRole("button", { name: "▶ Done" }).click();
-    await page.getByRole("button", { name: "‹ Crates" }).click();
+    // Its item's card, and Done the moment it shows, while it's still forming (Nov 25): it's seen all the same, so coming back to the
+    // crates shows the list, not this reveal again (it was marked seen only once the card had formed, and a quick Done left it to resume).
+    const early = await page.evaluate(
+      () =>
+        new Promise<{ name?: string; opacity: number }>((done) => {
+          const tick = () => {
+            const card = document.querySelector<HTMLElement>(".crate-opening .reveal-card");
+            const button = [...(card?.querySelectorAll<HTMLButtonElement>(".reveal-actions button") ?? [])].find((b) => b.textContent?.includes("Done"));
+            if (card && button && getComputedStyle(card).visibility === "visible") {
+              const opacity = Number(getComputedStyle(card).opacity);
+              const name = card.querySelector(".reveal-name")?.textContent?.trim();
+              button.click();
+              done({ name, opacity });
+            } else requestAnimationFrame(tick);
+          };
+          tick();
+        }),
+    );
+    expect(crate.items.map((i) => itemDef(i)!.name)).toContain(early.name);
+    expect(early.opacity, "Done tapped while the card was still forming").toBeLessThan(1);
+    await expect(page.getByTestId("crate-opening")).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("hunchess-crate-unseen")), "seen once Done is tapped").toBeNull();
+    await page.goto("/shop?crates");
+    await expect(page.locator(".series-crate-row")).toHaveCount(2);
+    await expect(page.getByTestId("crate-opening"), "no reveal resumed over the list").toHaveCount(0);
   }
 });
 
@@ -110,12 +130,12 @@ test("crates: the gambling warning's red ring is always at the top of the crate 
 });
 
 /**
- * The crate opening's "FISCHER RANDOM!" banner fits its words at every width (DECISIONS.md, "The computer's play
+ * The crate opening's "TRANSCENDENT!" banner (once "FISCHER RANDOM!") fits its words at every width (DECISIONS.md, "The computer's play
  * column, your icon, no sun"): on a computer it was cut off at both ends and top and bottom. Measured every animation
  * frame while it's up: the face and the words within the stage's width, the words within the band (its slanted edges
  * too), the band within the stage; and the words big enough to read.
  */
-test("crates: the Fischer Random banner fits its words, phone and computer, with readable text", async ({ page }) => {
+test("crates: the Transcendent banner fits its words, phone and computer, with readable text", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Crate Opener");
   await page.addInitScript(() => {
@@ -137,11 +157,13 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
         const tan = Math.tan((7 * Math.PI) / 180);
         const cx = (b.left + b.right) / 2;
         const cy = (b.top + b.bottom) / 2;
+        // (In the stage's own pixels: on a computer the stage is scaled up whole since Nov 25, so the band's own sizes times its scale.)
+        const k = stage.getBoundingClientRect().width / stage.offsetWidth || 1;
         const clear = (e: HTMLElement) => {
           const t = e.getBoundingClientRect();
-          const top = cy - band.offsetHeight / 2 + parseFloat(cs.borderTopWidth) - tan * (t.left - cx);
-          const bottom = cy + band.offsetHeight / 2 - parseFloat(cs.borderBottomWidth) - tan * (t.right - cx);
-          return Math.min(t.top - top, bottom - t.bottom);
+          const top = cy - (k * band.offsetHeight) / 2 + k * parseFloat(cs.borderTopWidth) - tan * (t.left - cx);
+          const bottom = cy + (k * band.offsetHeight) / 2 - k * parseFloat(cs.borderBottomWidth) - tan * (t.right - cx);
+          return Math.min(t.top - top, bottom - t.bottom) / k;
         };
         const settled = ["1", "none"].includes(getComputedStyle(text).scale);
         log.push({
@@ -167,7 +189,7 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
     await page.goto("/shop?crates&fischer=1");
     await page.locator('.crate-row[data-crate="beta-001"]').click();
     // (The test switch applies once your account says you may: this server's TEST_SWITCHES.)
-    await expect(page.getByLabel("Land on Fischer Random")).toBeChecked();
+    await expect(page.getByLabel("Land on Transcendent")).toBeChecked();
     await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
     await expect(page.locator(".fischer-stage")).toBeVisible({ timeout: 20_000 });
     await page.evaluate(() => ((window as any).__fb.length = 0));
@@ -190,4 +212,253 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
     expect(least("sub"), `${width}: line px`).toBeGreaterThanOrEqual(11);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   }
+});
+
+/**
+ * The crate opening's own layer (Eric, Nov 24: "the full phone screen takes over ... using this blue and black background ... on desktop,
+ * it can take up that middle space"; docs/decisions/2026-11-24-crate-open-build.md): on a phone the whole window, on a computer the
+ * middle column between the side menu and the right column, top to bottom; the crate's page under it stays mounted and doesn't move,
+ * so Done leaves it exactly as it was. CRATE_SHOTS=<dir> saves the stills (the spin, the open, the card).
+ */
+test("crates: the opening covers the whole phone screen or the computer's middle column, and Done leaves the page under it as it was", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  const shots = process.env.CRATE_SHOTS;
+  const name = test.info().project.name;
+  await named(page, "Layer Opener");
+  // (Two, so its "You have" line keeps its length: the page under it changes only by the one opened.)
+  await giveCrates(page, "beta-001", 2, 2);
+  await page.goto("/shop?crates");
+  await page.locator('.crate-row[data-crate="beta-001"]').click();
+  const open = page.getByRole("button", { name: /Open · uses 1 key/ });
+  await open.scrollIntoViewIfNeeded();
+  const where = () =>
+    page.evaluate(() => {
+      const r = document.querySelector(".crate-hero")!.getBoundingClientRect();
+      return { y: scrollY, box: [r.left, r.top, r.width, r.height] };
+    });
+  const before = await where();
+  await open.click();
+  const layer = page.getByTestId("crate-opening");
+  await expect(layer).toBeVisible();
+  await expect(layer.locator(".cox-reel")).toBeVisible();
+  const cover = await page.evaluate(() => {
+    const r = document.querySelector('[data-testid="crate-opening"]')!.getBoundingClientRect();
+    const frame = document.querySelector<HTMLElement>(".fd-root.framed");
+    const px = (v: string) => parseFloat(getComputedStyle(frame!).getPropertyValue(v)) || 0;
+    const wide = innerWidth >= 1024;
+    // (What's on top at points across the layer, and just outside it on a computer: the side menu and the right column, uncovered.)
+    const top = (x: number, y: number) => !!document.elementFromPoint(x, y)?.closest('[data-testid="crate-opening"]');
+    return {
+      rect: [r.left, r.top, r.right, r.bottom].map(Math.round),
+      want: [wide ? px("--fd-menu") : 0, 0, innerWidth - (wide ? px("--fd-rail") : 0), innerHeight].map(Math.round),
+      inside: [top(r.left + 2, r.top + 2), top(r.right - 2, r.top + 2), top(r.left + 2, r.bottom - 2), top(r.right - 2, r.bottom - 2), top((r.left + r.right) / 2, (r.top + r.bottom) / 2)],
+      sides: wide ? [top(r.left - 4, innerHeight / 2), top(r.right + 4, innerHeight / 2)] : [],
+      wide,
+    };
+  });
+  expect(cover.rect, "the layer's box").toEqual(cover.want);
+  if (cover.wide) expect(cover.want[0], "a side menu's width").toBeGreaterThan(100);
+  expect(cover.inside, "the layer on top at its corners and middle").toEqual([true, true, true, true, true]);
+  expect(cover.sides, "the side columns uncovered").toEqual(cover.wide ? [false, false] : []);
+  // Its size (Eric, Nov 25: "on the desktop, the present is too small ... the phone looks great"): on a computer the stage scaled up
+  // whole to the middle column (the strip at least 60% of its width, the box half as big again as the phone's); on a phone as it was.
+  const size = await page.evaluate(() => {
+    const layer = document.querySelector<HTMLElement>('[data-testid="crate-opening"]')!;
+    const stage = layer.querySelector<HTMLElement>(".cox-stage")!;
+    const k = stage.getBoundingClientRect().width / stage.offsetWidth;
+    return { k, strip: layer.querySelector(".cox-reel-window")!.getBoundingClientRect().width / layer.clientWidth, box: layer.querySelector<HTMLElement>(".cox-box")!.offsetWidth * k };
+  });
+  if (cover.wide) {
+    expect(size.strip, "the strip's share of the column").toBeGreaterThanOrEqual(0.6);
+    expect(size.box, "the box's width (px)").toBeGreaterThanOrEqual(1.25 * 150);
+  } else expect(size.k, "the phone's stage at its own size").toBe(1);
+  if (shots) {
+    await expect(layer.locator(".cox-status")).toHaveText("");
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${shots}/${name}-1-spin.png` });
+    // (The box shaking, then the beam: about 4.9 s and 5.3 s from the spin's start.)
+    await page.waitForTimeout(3300);
+    await page.screenshot({ path: `${shots}/${name}-2-open.png` });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${shots}/${name}-3-beam.png` });
+  }
+  const card = layer.locator(".reveal-card");
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  if (shots) {
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${shots}/${name}-4-card.png` });
+  }
+  await card.getByRole("button", { name: "▶ Done" }).click();
+  await expect(layer).toHaveCount(0);
+  // The page under it as it was: in the same place, scrolled the same, its count gone down by the one opened.
+  expect(await where()).toEqual(before);
+  await expect(page.locator(".crate-held")).toHaveText("You have 1, and 1 key.");
+});
+
+/**
+ * The bonus crate (Eric, Nov 24; docs/decisions/2026-11-24-bonus-crate.md): forced here with the test switch ?bonus=winter-1 (the server
+ * honors it only where TEST_SWITCHES is on; elsewhere its own 25% roll decides, and here none comes unless asked). After the item's card,
+ * a beat, the BONUS! card over it (the item's card under it takes no tap) with the Winter Crate and "+1 crate key"; its OK goes back to
+ * the item's card. The inventory has the crate, a bonus one, and its key at once; that crate's own opening gives no bonus, even asked.
+ * CRATE_SHOTS=<dir> saves its still.
+ */
+test("crates: a bonus crate's card after the item's, the crate and its key in the inventory at once, and its own opening gives none", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  const shots = process.env.CRATE_SHOTS;
+  const name = test.info().project.name;
+  await named(page, "Bonus Opener");
+  await giveCrates(page, "beta-001", 1, 1);
+  await page.goto("/shop?crates&bonus=winter-1");
+  await page.locator('.crate-row[data-crate="beta-001"]').click();
+  // Every crate's odds panel says it in one plain line.
+  await expect(page.locator(".crate-bonus-odds")).toHaveText(bonusOddsLine());
+  await expect(page.getByLabel("Bonus crate")).toBeChecked();
+  await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
+  const layer = page.getByTestId("crate-opening");
+  const item = layer.locator(".reveal-card:not(.cox-bonus-card)");
+  await expect(item).toBeVisible({ timeout: 30_000 });
+  const bonus = page.getByTestId("crate-bonus");
+  await expect(bonus.getByRole("dialog", { name: "Bonus crate" })).toBeVisible({ timeout: 10_000 });
+  await expect(bonus).toContainText("BONUS!");
+  await expect(bonus.locator(".reveal-name")).toHaveText(crateDef("winter-1")!.name.replace(" · ", " ")); // (the series on its own line)
+  await expect(bonus.locator(".cox-bonus-key")).toHaveText("+1 crate key");
+  // Already in the inventory: the locker the opening answered (the Beta Crate and its key spent, the Winter Crate and its key in).
+  type LockerNow = { seriesCrates: Record<string, number>; bonusCrates: Record<string, number>; keys: number };
+  const locker = () => page.evaluate(async () => (await (await fetch("/api/locker")).json()) as LockerNow);
+  expect(await locker()).toMatchObject({ seriesCrates: { "winter-1": 1 }, bonusCrates: { "winter-1": 1 }, keys: 1 });
+  // While it's up, the item's card under it takes no tap.
+  const covered = await page.evaluate(() => {
+    const b = document.querySelector(".reveal-card:not(.cox-bonus-card) .reveal-actions button")!.getBoundingClientRect();
+    return !!document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest('[data-testid="crate-bonus"]');
+  });
+  expect(covered, "the item's buttons under the bonus").toBe(true);
+  if (shots) {
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${shots}/${name}-5-bonus.png` });
+  }
+  // A reload before its OK: the crate's reveal comes back (unseen), and the bonus card after it, the same crate (#923's re-review).
+  await page.reload();
+  await expect(item).toBeVisible({ timeout: 15_000 });
+  await expect(bonus.getByRole("dialog", { name: "Bonus crate" })).toBeVisible({ timeout: 10_000 });
+  await expect(bonus.locator(".reveal-name")).toHaveText(crateDef("winter-1")!.name.replace(" · ", " "));
+  expect(await locker()).toMatchObject({ seriesCrates: { "winter-1": 1 }, bonusCrates: { "winter-1": 1 }, keys: 1 });
+  await bonus.getByRole("button", { name: "▶ OK" }).click();
+  await expect(bonus).toHaveCount(0);
+  // Back to the item's card: no Beta Crate left (the bonus is a Winter Crate), so "Open another" is greyed.
+  await expect(item.getByRole("button", { name: "▶ Open another" })).toBeDisabled();
+  await item.getByRole("button", { name: "▶ Done" }).click();
+  await expect(layer).toHaveCount(0);
+  await page.getByRole("button", { name: "‹ Crates" }).click();
+  await expect(page.locator('.crate-row[data-crate="winter-1"]')).toContainText("You have 1");
+  await expect(page.getByText("Keys × 1")).toBeVisible();
+  // The bonus Winter Crate: "1 bonus"; its own opening gives none, even with the switch on.
+  await page.locator('.crate-row[data-crate="winter-1"]').click();
+  await expect(page.locator(".crate-held")).toHaveText("You have 1 (1 bonus), and 1 key.");
+  if (shots) await page.screenshot({ path: `${shots}/${name}-6-bonus-page.png`, fullPage: true });
+  await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
+  await expect(layer.locator(".reveal-card")).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(1500);
+  await expect(bonus).toHaveCount(0);
+  await layer.getByRole("button", { name: "▶ Done" }).click();
+  expect(await locker()).toMatchObject({ seriesCrates: {}, bonusCrates: {}, keys: 0 });
+});
+
+/**
+ * The bonus card can't be skipped or tapped through (the review, Nov 25). M2: "Done" tapped as the item's card forms (before the bonus
+ * card's beat) shows the bonus card instead of closing, and the crate stays unseen until its OK. M1: a double tap on OK (it sits over
+ * "Open another") closes the bonus card and opens nothing: the item's buttons stay inert a beat; then the focus is back on them.
+ */
+test("crates: the bonus card can't be skipped by a fast Done, and a double tap on its OK opens no other crate", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await named(page, "Fast Opener");
+  await giveCrates(page, "beta-001", 2, 2);
+  await page.goto("/shop?crates&bonus=winter-1");
+  await page.locator('.crate-row[data-crate="beta-001"]').click();
+  await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
+  const layer = page.getByTestId("crate-opening");
+  const item = layer.locator(".reveal-card:not(.cox-bonus-card)");
+  const bonus = page.getByTestId("crate-bonus");
+  // M2: Done the moment the item's card has formed (in the page, on the frame it does: well inside the bonus card's 700 ms beat).
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const tick = () => {
+          const card = document.querySelector<HTMLElement>(".crate-opening .reveal-card:not(.cox-bonus-card)");
+          const button = [...(card?.querySelectorAll<HTMLButtonElement>(".reveal-actions button") ?? [])].find((b) => b.textContent?.includes("Done"));
+          if (card && button && getComputedStyle(card).visibility === "visible" && getComputedStyle(card).opacity === "1" && !document.querySelector('[data-testid="crate-bonus"]')) {
+            button.click();
+            done();
+          } else requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+  );
+  // Its OK takes no tap until the card has faded in (#923's re-review, Nov 25: a double tap on Done landed on it while see-through): every
+  // frame from the card's first to its data-ready, what's under the OK's middle is never the OK.
+  const frames = await page.evaluate(
+    () =>
+      new Promise<{ opacity: number; hit: boolean }[]>((done) => {
+        const out: { opacity: number; hit: boolean }[] = [];
+        const tick = () => {
+          const card = document.querySelector<HTMLElement>(".cox-bonus-card");
+          const ok = card?.querySelector("button");
+          if (card && ok && getComputedStyle(card).visibility === "visible") {
+            if (card.dataset.ready !== undefined) return done(out);
+            const r = ok.getBoundingClientRect();
+            out.push({ opacity: Number(getComputedStyle(card).opacity), hit: document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest("button") === ok });
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+  );
+  expect(frames.length, "frames of its fade-in seen").toBeGreaterThan(3);
+  expect(frames.filter((f) => f.hit), "the OK took no tap while fading in").toEqual([]);
+  await expect(bonus.getByRole("dialog", { name: "Bonus crate" })).toBeVisible();
+  await expect(layer, "Done showed the bonus first, not closing").toBeVisible();
+  // (Unseen until its OK: leave now and both wait for you.)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("hunchess-crate-unseen") ?? "null")?.bonus)).toEqual({ crate: "winter-1", key: true });
+  const ok = bonus.getByRole("button", { name: "▶ OK" });
+  await expect(ok, "the dialog takes the focus").toBeFocused();
+  // M1: OK, then at once a second tap on "Open another" (a Beta Crate and a key are left, so it's live). OK sits over it or over Done
+  // (as the item's words wrap them), so a double tap on OK lands there.
+  await bonus.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((x) => x.finished)));
+  const [o, a] = [(await ok.boundingBox())!, (await item.getByRole("button", { name: "▶ Open another" }).boundingBox())!];
+  const name = await item.locator(".reveal-name").textContent();
+  await page.mouse.click(o.x + o.width / 2, o.y + o.height / 2);
+  await page.mouse.click(a.x + a.width / 2, a.y + a.height / 2);
+  await expect(bonus).toHaveCount(0);
+  await page.waitForTimeout(1000);
+  await expect(item.locator(".reveal-name"), "the same item's card, no new opening").toHaveText(name!);
+  await expect(layer.locator(".cox-status")).toHaveText("");
+  type LockerNow = { seriesCrates: Record<string, number>; bonusCrates: Record<string, number>; keys: number };
+  expect(await page.evaluate(async () => (await (await fetch("/api/locker")).json()) as LockerNow)).toMatchObject({
+    seriesCrates: { "beta-001": 1, "winter-1": 1 },
+    bonusCrates: { "winter-1": 1 },
+    keys: 2,
+  });
+  expect(await page.evaluate(() => localStorage.getItem("hunchess-crate-unseen")), "seen once its OK is tapped").toBeNull();
+  // The focus back on the item's card (its first button), which works again.
+  await expect(item.getByRole("button", { name: "▶ Wear" })).toBeFocused();
+  await item.getByRole("button", { name: "▶ Done" }).click();
+  await expect(layer).toHaveCount(0);
+});
+
+/** The client's ?bonus=0 (#923's re-review, Nov 25): the Bonus crate box unchecked, the opening asks for none, and none comes. */
+test("crates: ?bonus=0 leaves the Bonus crate box unchecked and the opening gives no bonus card", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await named(page, "No Bonus");
+  await giveCrates(page, "beta-001", 1, 1);
+  await page.goto("/shop?crates&bonus=0");
+  await page.locator('.crate-row[data-crate="beta-001"]').click();
+  await expect(page.getByLabel("Bonus crate")).not.toBeChecked();
+  const asked = page.waitForRequest((r) => r.url().endsWith("/api/locker/open"));
+  await page.getByRole("button", { name: /Open · uses 1 key/ }).click();
+  expect(((await asked).postDataJSON() as { bonus?: unknown }).bonus, "no bonus asked for").toBeUndefined();
+  const layer = page.getByTestId("crate-opening");
+  await expect(layer.locator(".reveal-card")).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(1500);
+  await expect(page.getByTestId("crate-bonus")).toHaveCount(0);
+  await layer.getByRole("button", { name: "▶ Done" }).click();
+  await expect(layer).toHaveCount(0);
 });

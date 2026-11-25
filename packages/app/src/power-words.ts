@@ -57,7 +57,7 @@ export const POWER_WORDS: Record<PowerId, string> = {
   beam: "Beam",
   shields: "Shields",
   rapidfire: "Rapid Fire",
-  queenlock: "Queen Lock",
+  queenlock: "Lock-on Shot",
   train: "smashes a piece left on his line, The Train",
   fall: "The Fall",
 };

@@ -32,7 +32,8 @@
       "packages/app/src/prefs.ts",
       "packages/app/src/test-switches.ts",
       "packages/app/src/screens/Hud.tsx",
-      "packages/app/src/components/EvalBar.tsx"
+      "packages/app/src/components/EvalBar.tsx",
+      "packages/app/src/components/SlotIdle.tsx"
     ],
     "hubs": ["packages/app/src/App.tsx"],
     "hubsAbout": "A traced change that reaches a hub runs everything: App.tsx makes the matches and the account and hands them to every screen, so what it imports reaches every area, not only home's (a change to App.tsx's own code still runs home's specs, as before)."
@@ -108,6 +109,7 @@
     "packages/app/src/components/BoardClock.tsx",
     "packages/app/src/components/Countdown.tsx",
     "packages/app/src/components/EvalBar.tsx",
+    "packages/app/src/components/SlotIdle.tsx",
     "packages/app/src/components/HistoryNav.tsx",
     "packages/app/src/components/LiveNumber.tsx",
     "packages/app/src/components/MuteButton.tsx",
@@ -132,6 +134,8 @@
     "packages/chess/data/sources/**",
     "packages/chess/src/node.ts",
     "packages/server/src/test-accounts.ts",
+    "packages/server/src/residents.ts",
+    "packages/server/src/residents-host.ts",
     "packages/app/scripts/**",
     "packages/app/stockfish-source/**",
     "packages/app/public/licenses/**",
@@ -140,6 +144,7 @@
     "packages/app/items-preview.html",
     "packages/app/rides-measure.html",
     "packages/app/chandy-preview.html",
+    "packages/app/crate-open-preview.html",
     "packages/app/src/dev/**",
     "packages/maia-worker/LICENSE",
     "packages/maia-worker/licenses/**",
@@ -160,7 +165,7 @@
   ],
   "areas": {
     "XP and levels (Nov 9): the XP box on every result screen, the level on home and the profiles; the server's grant": {
-      "paths": ["packages/server/src/xp.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/PageLayer.tsx"],
+      "paths": ["packages/server/src/xp.ts", "packages/server/src/play-coins.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/PageLayer.tsx"],
       "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/quests.spec.ts", "e2e/tower-party.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
     },
     "A solo boss battle kept on the device (Nov 22, step 2): the reload's card, Resume or Forfeit, and another start asking first": {
@@ -207,6 +212,7 @@
         "e2e/boss-powers.spec.ts",
         "e2e/boss-select.spec.ts",
         "e2e/boss-speech.spec.ts",
+        "e2e/birdie.spec.ts",
         "e2e/formats.spec.ts",
         "e2e/grex.spec.ts",
         "e2e/hollow.spec.ts",
@@ -321,6 +327,10 @@
         "e2e/king-save-altered.spec.ts",
         "e2e/recluse.spec.ts"
       ]
+    },
+    "Power tips (docs/decisions/2026-11-24-power-tips.md: a tip replaces its boss's line for that moment, so every tipped boss's spec)": {
+      "paths": ["packages/app/src/power-tips.ts"],
+      "specs": ["e2e/boss-speech.spec.ts", "e2e/birdie.spec.ts", "e2e/hollow.spec.ts", "e2e/sawyer.spec.ts", "e2e/chandy.spec.ts", "e2e/boss-powers.spec.ts", "e2e/boss-character.spec.ts"]
     },
     "Alfil": {
       "paths": [
@@ -571,6 +581,9 @@
         "packages/app/src/components/ShadeMoves.tsx",
         "packages/app/src/components/Breakdown.tsx",
         "packages/app/src/components/VoteHint.tsx",
+        "packages/app/src/components/VoteZoneTags.tsx",
+        "packages/app/src/components/VoteZoneHits.tsx",
+        "packages/app/src/components/vote-tags.css",
         "packages/app/src/pick-rows.ts",
         "packages/app/src/looks.ts",
         "packages/app/src/components/StreakFire.tsx"
@@ -608,6 +621,10 @@
       ],
       "specs": ["e2e/crowd.spec.ts", "e2e/crowd-play.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
     },
+    "the season ladder (Nov 25): /ladder, its endpoint, home's LADDER and the side menu's Ladder (the check lives in home-ranked.spec)": {
+      "paths": ["packages/app/src/screens/Ladder.tsx", "packages/app/src/ladder.ts", "packages/app/src/ladder.css", "packages/server/src/ladder.ts"],
+      "specs": ["e2e/home-ranked.spec.ts"]
+    },
     "home and the front door": {
       "paths": [
         "packages/app/src/App.tsx",
@@ -640,7 +657,7 @@
       ]
     },
     "a computer's board size, every game screen (board-size.css)": {
-      "paths": ["packages/app/src/board-size.css", "packages/app/src/game-frame.css"],
+      "paths": ["packages/app/src/board-size.css", "packages/app/src/game-frame.css", "packages/app/src/board-foot.ts"],
       "specs": [
         "e2e/desktop-board.spec.ts",
         "e2e/board-layout.spec.ts",
@@ -648,6 +665,7 @@
         "e2e/boss-side.spec.ts",
         "e2e/side-same-size.spec.ts",
         "e2e/eval-bar.spec.ts",
+        "e2e/match-menu.spec.ts",
         "e2e/match-screen.spec.ts",
         "e2e/recluse.spec.ts",
         "e2e/tiger.spec.ts"
@@ -819,6 +837,7 @@
         "packages/app/src/screens/Shop.tsx",
         "packages/app/src/screens/Crates.tsx",
         "packages/app/src/welcome-rows.ts",
+        "packages/app/src/boss-crate-rows.ts",
         "packages/app/src/components/blotches.ts",
         "packages/app/src/components/GamblingWarning.tsx",
         "packages/app/src/components/Cosmetics.tsx",
@@ -835,7 +854,8 @@
         "packages/app/src/components/tokens/**",
         "packages/app/src/components/WelcomeNotice.tsx",
         "packages/server/src/welcome.ts",
-        "packages/app/src/claw/**"
+        "packages/app/src/claw/**",
+        "packages/app/src/crate-open/**"
       ],
       "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts", "e2e/shop.spec.ts", "e2e/welcome-crate.spec.ts", "e2e/claw.spec.ts", "e2e/xp-rewards.spec.ts"]
     },
@@ -853,6 +873,7 @@
         "packages/server/src/global-chat-api.ts",
         "packages/server/src/text-filter.ts",
         "packages/server/src/town-chat.ts",
+        "packages/server/src/typed-chat.ts",
         "packages/server/src/town-chat-api.ts"
       ],
       "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/global-chat.spec.ts", "e2e/panel.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts"]
@@ -898,6 +919,7 @@
         "packages/app/src/components/DuelRankPill.tsx",
         "packages/app/src/components/DuelStage.tsx",
         "packages/app/src/components/DuelVote.tsx",
+        "packages/app/src/components/VoteZoneHits.tsx",
         "packages/app/src/components/RankEmblem.tsx",
         "packages/app/src/emblems/**",
         "packages/app/src/characters/rank-set.ts",

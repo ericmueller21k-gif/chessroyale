@@ -49,7 +49,7 @@ async function world() {
   return { sql, db };
 }
 const signedIn = async (sql: Sql, email: string, now: number) => signInWithIdentity(sql, (await createGuest(sql, now, "Player")).user, "email", email, {}, now);
-/** Coins through the ledger: a test's own op (the coin paths moved so far are ranked games and the shop's spending). */
+/** Coins through the ledger: a test's own op. */
 let gifts = 0;
 async function giveCoins(sql: Sql, userId: string, n: number, now: number, id = `test:coins:${++gifts}`) {
   return applyOp(sql, (await ledgerAccount(sql, userId))!, { id, reason: "test", now, legs: [leg.coins(userId, n)] });
@@ -123,7 +123,7 @@ describe("an op", () => {
 });
 
 describe("each path, keyed by its event: replayed or raced, it changes a balance once", () => {
-  it("the coin shop (shop:<ledger id>:<item>), ranked coins (ranked:<game>:<color>), a solo drop (drop:solo:<battle>)", async () => {
+  it("the coin shop (shop:<ledger id>:<item>), play coins (coins:<game>:<ledger id>, coinsbonus:…; Nov 25), a solo drop (drop:solo:<battle>)", async () => {
     const { sql, db } = await world();
     const a = await signedIn(sql, "a@example.com", T0);
     const b = await signedIn(sql, "b@example.com", T0);
@@ -136,15 +136,18 @@ describe("each path, keyed by its event: replayed or raced, it changes a balance
       { leg: 0, asset_kind: "shop", asset_id: "king-storm", delta: 1 },
       { leg: 1, asset_kind: "coins", asset_id: "", delta: -STORM },
     ]);
-    // Ranked: a game recorded twice (a retry whose answer was lost) pays once.
+    // Ranked: a game recorded twice (a retry whose answer was lost) pays no coins of its own; its play coins come with its XP, granted
+    // once however often it's tried, three of them at once.
     const g = duel(a.id, b.id, "1-0", T0 + 10 * MIN);
-    const first = await recordDuel(sql, g, notHeld);
     await recordDuel(sql, g, notHeld);
-    expect(coinsOf(db, a.id)).toBe(1000 - STORM + first!.w.coins);
-    expect(legsOf(db, `ranked:${g.id}:`)).toEqual([
-      { leg: 0, asset_kind: "coins", asset_id: "", delta: first!.w.coins },
-      { leg: 0, asset_kind: "coins", asset_id: "", delta: first!.b.coins },
-    ]);
+    await recordDuel(sql, g, notHeld);
+    expect(coinsOf(db, a.id)).toBe(1000 - STORM);
+    const won = { key: `duel:${g.id}`, facts: { ms: 15 * MIN, moves: 30, won: true }, signedInOnly: true, now: T0 + 16 * MIN, coin: { draw: false } };
+    const grants = [await grantXp(sql, a.id, won), ...(await Promise.all([grantXp(sql, a.id, won), grantXp(sql, a.id, won)]))];
+    for (const x of grants) expect(x!.coins).toMatchObject({ play: 27, bonus: 15, parts: [{ label: "Win", coins: 15 }], today: { play: 27, bonus: 15 } });
+    expect(coinsOf(db, a.id)).toBe(1000 - STORM + 42);
+    expect(legsOf(db, `coins:duel:${g.id}:`)).toEqual([{ leg: 0, asset_kind: "coins", asset_id: "", delta: 27 }]);
+    expect(legsOf(db, `coinsbonus:duel:${g.id}:`)).toEqual([{ leg: 0, asset_kind: "coins", asset_id: "", delta: 15 }]);
     // A solo battle's drop, counted twice and three times at once: one token, and every answer names its boss.
     const lucky = () => () => 0.01;
     const drop = (n: number) => countBossBattle(sql, a.id, T0 + 20 * MIN + n, { battle: "0123456789abcdef01", op: "drop:solo:0123456789abcdef01", rng: lucky() });
@@ -525,7 +528,11 @@ describe("reconciliation: each balance is its ledger's sum", () => {
       (u) => openWelcomeCrate(sql, u.id, now, rand),
       (u) => {
         const other = pick(people.filter((p) => p.id !== u.id));
-        return recordDuel(sql, duel(u.id, other.id, pick(["1-0", "0-1", "1/2-1/2"] as const), now), notHeld);
+        const g = duel(u.id, other.id, pick(["1-0", "0-1", "1/2-1/2"] as const), now);
+        // (Its coins come with its XP since Nov 25: PLAY_COINS, play-coins.ts.)
+        return recordDuel(sql, g, notHeld).then(() =>
+          grantXp(sql, u.id, { key: `duel:${g.id}`, facts: { ms: g.endedAt - g.startedAt, moves: 30, won: g.result === "1-0" }, signedInOnly: true, now, coin: { draw: g.result === "1/2-1/2" } }),
+        );
       },
     ];
     for (let step = 0; step < 500; step++) {
@@ -567,7 +574,8 @@ describe("reconciliation: each balance is its ledger's sum", () => {
         "erase",
         "level",
         "merge",
-        "ranked",
+        "play",
+        "play-bonus",
         "reward",
         "shop",
         "welcome",

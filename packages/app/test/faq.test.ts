@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, SOLO_ABANDON, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, PLAY_COINS, RANKED_1V1, SOLO_ABANDON, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, num, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -469,7 +469,7 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("your first counted battle always gives you a boss's token");
     expect(t).toContain("25% of the time, up to 3");
     expect(t).toContain("its crate for 3 tokens of that boss, or 1 token and 1 crate key");
-    expect(t).toContain("Babur's Boss Crate holds Balloon Pup (2% of the time: the only item behind its Fischer Random) and 24 Common to Epic items");
+    expect(t).toContain("Babur's Boss Crate holds Balloon Pup (2% of the time: the only item behind its Transcendent) and 24 Common to Epic items");
     expect(t).toContain("Puddles' Boss Crate holds Puddles's Mower");
     const moved = section("crates", { ...FAQ_DEFAULTS, bossTokens: { ...FAQ_DEFAULTS.bossTokens, moves: 12, cap: 4 }, bossCratePrice: { tokens: 5, withKey: { tokens: 2, keys: 1 } } });
     expect(moved).toContain("reaches 12 of your moves");
@@ -500,6 +500,20 @@ describe("the FAQ's numbers come from the settings", () => {
     }
     expect(moved).toContain("from your 8th move");
     expect(moved).toContain("3 wins a day");
+  });
+
+  it("coins (Nov 25, PLAY_COINS), from the settings: play coins, the day's cap, the bonus and its steps, the most a day; no minutes", () => {
+    const t = section("xp");
+    expect(t).toContain("Coins: every game that earns XP also earns coins, by the same rules");
+    expect(t).toContain("Play coins: more for a longer game, up to 54 a game, until 300 a day.");
+    expect(t).toContain("15 for a win (the same wins as XP's, the friends' lobby rule too), 5 for a draw in ranked 1 v 1, 10 for finishing in your team's top 3 in a 50 v 50, and in Squads by your squad's place: 40 for 1st, 25 for 2nd, 15 for 3rd-4th and 5 for 5th-8th.");
+    expect(t).toContain("the first 150 bonus coins of a day pay in full, the next 200 at half, the next 200 at a quarter, then none: at most 300 bonus coins and 600 coins a day in all.");
+    const moved = section("xp", { ...FAQ_DEFAULTS, playCoins: { ...PLAY_COINS, perMinute: 2, perDay: 400, bonus: { ...PLAY_COINS.bonus, win: 20 }, bonusSteps: [{ upTo: 100, rate: 1 }, { upTo: 300, rate: 0.5 }] } });
+    expect(moved).toContain("up to 60 a game, until 400 a day.");
+    expect(moved).toContain("20 for a win");
+    expect(moved).toContain("the first 100 bonus coins of a day pay in full, the next 200 at half, then none: at most 200 bonus coins and 600 coins a day in all.");
+    // (No per-minute numbers, as XP's: Eric, Nov 9, "we dont want players to know they could just stall".)
+    expect(moved).not.toMatch(/\bminutes?\b|per minute|a minute/i);
   });
 
   it("level-up rewards (Nov 20: every other level, a boss crate every 20th), from the settings, in the XP and the crates sections", () => {
@@ -751,8 +765,8 @@ describe("the FAQ's text format", () => {
 
   it("a row of rank emblems by id, each captioned with its tier and division", () => {
     const [b] = parse("!emblems gold-d3 transcendent");
-    expect(b).toEqual({ kind: "emblems", items: [{ id: "gold-d3", caption: "Gold 3" }, { id: "transcendent", caption: "Transcendent" }] });
-    expect(plainText([b!])).toBe("[Emblems: Gold 3, Transcendent]");
+    expect(b).toEqual({ kind: "emblems", items: [{ id: "gold-d3", caption: "Gold III" }, { id: "transcendent", caption: "Transcendent" }] });
+    expect(plainText([b!])).toBe("[Emblems: Gold III, Transcendent]");
   });
 
   it("a heading without an id gets one from its words", () => {
@@ -768,25 +782,38 @@ describe("the FAQ: 1 v 1", () => {
     expect(t).toContain("Bullet and Blitz make Bullet 2+1, Blitz and Rapid Blitz 5+3. Bullet against Rapid makes Blitz 3+2.");
     expect(t).toContain(`you both have ${RANKED_1V1.voteSeconds} seconds to drag your pawn`);
     expect(t).toContain(`Each side has ${RANKED_1V1.firstMoveSeconds} seconds for its first move`);
-    expect(t).toContain("Wood, Silver, Gold, Paragon, Illustrious, Sublime and Radiant, each with divisions 5 (the lowest) to 1. A division is 80 rank points (RP)");
-    expect(t).toContain("nobody goes below Wood 5 with 0 RP");
-    expect(t).toContain("Pearlescent, the 500 highest ranks, and above it Transcendent, the 100 highest, both from 80 RP in Radiant 1");
-    expect(t).toContain("outside the top 500, you stay Radiant 1 and your RP keeps counting past 80");
+    expect(t).toContain("Wood, Silver, Gold, Paragon, Illustrious, Sublime and Radiant, each with divisions V (the lowest) to I. A division is 80 rank points (RP)");
+    expect(t).toContain("nobody goes below Wood V with 0 RP");
+    expect(t).toContain("Pearlescent, the 500 highest ranks, and above it Transcendent, the 100 highest, both from 80 RP in Radiant I");
+    expect(t).toContain("outside the top 500, you stay Radiant I and your RP keeps counting past 80");
     expect(ranked1v1(RANKED_1V1)).not.toMatch(/\b(Iron|Bronze|Platinum|Emerald|Diamond|Master|Grandmaster|Champion)\b/);
     // Each tier's emblem, a division's steps, and the top two's.
-    expect(t).toContain("[Emblems: Wood 5, Silver 5, Gold 5, Paragon 5, Illustrious 5, Sublime 5, Radiant 5]");
-    expect(t).toContain("[Emblems: Gold 5, Gold 4, Gold 3, Gold 2, Gold 1]");
+    expect(t).toContain("[Emblems: Wood V, Silver V, Gold V, Paragon V, Illustrious V, Sublime V, Radiant V]");
+    expect(t).toContain("[Emblems: Gold V, Gold IV, Gold III, Gold II, Gold I]");
     expect(t).toContain("[Emblems: Pearlescent, Transcendent]");
     expect(t).toContain(`your first ${RANKED_1V1.placements.games} games show "Placement 1/${RANKED_1V1.placements.games}"`);
-    expect(t).toContain("at most Radiant 5.");
+    expect(t).toContain("at most Radiant V."); // (Named as the pill names it: it cut the old label at " · ", Nov 25.)
     expect(t).toContain(`about +${RANKED_1V1.points.perGame} for a win and −${RANKED_1V1.points.perGame} for a loss against a player at your level`);
-    expect(t).toContain(`${RANKED_1V1.coins.perMinute.win} coins a minute for a win`);
-    expect(t).toContain(`Up to ${RANKED_1V1.coins.perDay} games a day pay coins`);
+    // (Coins since Nov 25: PLAY_COINS, as every game; ranked's own per-minute coins are gone.)
+    expect(t).toContain(`a ranked game pays coins as every game does (Coins): more for a longer game, ${PLAY_COINS.bonus.win} coins more for a win and ${PLAY_COINS.bonus.draw} coins for a draw.`);
+    expect(ranked1v1(RANKED_1V1)).not.toMatch(/coins a minute|games a day pay coins/);
+    // Colors (Eric, Nov 25): in turn, as evenly as it can; no White edge in the rating.
+    expect(t).toContain("Colors: the game gives each player White and Black in turn, as evenly as it can, so nobody is stuck on one color.");
+    expect(t).toContain(
+      `Nobody gets the same color more than ${RANKED_1V1.colors.maxInRow} games in a row unless it can't be helped; otherwise White goes to whichever of you has had Black more often in your last ${RANKED_1V1.colors.recentGames} ranked games (if that's even, whoever had Black last).`,
+    );
+    expect(t).toContain("Your rating doesn't change by color: over many games each color evens out.");
     // Changed numbers change the words.
-    const R = { ...RANKED_1V1, voteSeconds: 7, controls: RANKED_1V1.controls.map((c) => (c.id === "blitz-rapid" ? { ...c, baseSeconds: 240 } : c)) };
+    const R = {
+      ...RANKED_1V1,
+      voteSeconds: 7,
+      controls: RANKED_1V1.controls.map((c) => (c.id === "blitz-rapid" ? { ...c, baseSeconds: 240 } : c)),
+      colors: { recentGames: 20, maxInRow: 3 },
+    };
     const changed = text({ ...FAQ_DEFAULTS, ranked: R });
     expect(changed).toContain("you both have 7 seconds");
     expect(changed).toContain("Blitz and Rapid Blitz 4+3");
+    expect(changed).toContain("more than 3 games in a row unless it can't be helped; otherwise White goes to whichever of you has had Black more often in your last 20 ranked games");
   });
 });
 

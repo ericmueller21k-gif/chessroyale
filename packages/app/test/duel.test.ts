@@ -147,6 +147,17 @@ describe("the 1 v 1 queue and game in the app", () => {
     d.onMessage({ t: "welcome", you: "w", game: view(["e2e4"]), v: 1 });
     expect(sent).toHaveLength(2);
   });
+  it("the chat's messages go as they are (Nov 25: a typed line went without its text, an empty line the server refused unseen)", async () => {
+    const { NetDuel } = await import("../src/duel.ts");
+    const sent: unknown[] = [];
+    const d = new NetDuel("ABCDE") as unknown as NetDuelInside & { chat: { host: { send(m: unknown): void } } };
+    d.send = (m: unknown) => void sent.push(m);
+    d.chat.host.send({ t: "chat", say: "", text: "hello", to: "team" });
+    d.chat.host.send({ t: "chat", say: "gg", to: "all" });
+    d.chat.host.send({ t: "chatPrefs", typed: true });
+    d.chat.host.send({ t: "chatPrefs", off: true, muted: ["b"] });
+    expect(sent).toEqual([{ t: "chat", say: "", text: "hello" }, { t: "chat", say: "gg" }, { t: "chatPrefs", typed: true }, { t: "chatPrefs", off: true, muted: ["b"] }]);
+  });
 });
 
 /** NetDuel's insides a test drives (its socket's messages, and what it sends). */
@@ -215,7 +226,7 @@ describe("the 1 v 1 screens' words and clocks", () => {
     expect(ranked1v1Label()).toBeNull();
     const state = acc.account() as { profile: unknown };
     state.profile = { user: { id: "u", name: "Ann" }, ranked1v1: { rank: rankView({ games: 9, ladder: 1245 }), games: 9, wins: 5, losses: 4, draws: 0 } };
-    expect(ranked1v1Label()).toBe("Paragon 5 · 45 RP");
+    expect(ranked1v1Label()).toBe("Paragon V – 45");
     state.profile = { user: { id: "u", name: "Ann" } };
     expect(ranked1v1Label()).toBe("Placement 0/5");
   });

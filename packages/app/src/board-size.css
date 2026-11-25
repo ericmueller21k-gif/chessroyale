@@ -92,6 +92,11 @@
     --bd-room: 170px;
     --dv-w: min(100%, var(--bd-h));
   }
+  /* (Its computer frame, in play and on the end page (Duel.tsx DuelWide, Nov 25: no title line): the two 34 px strips, their 8 px gaps
+     and the screen's 10 and 14 px padding: 108.) */
+  .screen.game.duel-screen.dv-frame {
+    --bd-room: 108px;
+  }
 }
 
 /* Beside a leaderboard (1100 px and up): the screen is the window less the leaderboard's column, as before, up to what its
@@ -129,5 +134,481 @@
   }
   .arena .screen.game:has(> .boss-dock) {
     --gk-screen: var(--scr);
+  }
+}
+
+/* ---- The 50 v 50's frame on a computer (Eric, Nov 26: his approved mock, notes/tools/mock-crowd-50.spec.ts; built on the 1 v 1's frame,
+ * docs/decisions/2026-11-26-crowd-frame.md; Nov 25's flush line: 2026-11-25-crowd-desktop-flush.md) ----
+ * Three columns on one top and one bottom line (Eric's column rule, docs/rules/eric.md): the scoreboard (340 px), the board and the column
+ * beside it (300 px where there's room, down to its 280 least first, FrontMenu.tsx useMenuLabels), one gap between them (`--cf-gap`, the
+ * screen's column gap), the three centered as one block in the window.
+ * - The top row is the status line, labeled (MOVE · PICKED · NEXT CUT · YOUR PLACE · YOUR POINTS · CUT LINE: Hud.tsx), right on the board,
+ *   centered on it and clear of the board's own clock pill at its top right (which stays where it always was). No line over the board.
+ * - The column: the power-ups row (the history arrows and the power-ups) on the board's top line with the gear beside it, then the vote
+ *   box (its standing skeleton), the status box (always there: "Waiting…" on your own pick), then the chat to the board's foot.
+ * - The board: the window's height less 92 px (the 44 px row over it, its clock's bar under it and the room the mock keeps), as wide as
+ *   the window leaves once the scoreboard, the column's least and the gaps have theirs; its box on the board's own drawing step, so the
+ *   drawn board is the box and the gaps either side are equal.
+ * The scoreboard's table starts on the board's top (its "BLACK TEAM" label in the row's height) and it ends on the board's foot, as the
+ * chat does (board-foot.ts measures that line: the board's frame, its clock's bar under it included). A phone and a tablet are unchanged. */
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  /* (The opening vote's screen too, `cf-vote`: the same frame, so the board is where the game's is when the game begins.) */
+  .screen.game.crowd-50,
+  .screen.game.cf-vote,
+  .screen.game.sq-game {
+    --cf-gap: 28px;
+    /* (The least room either side of the block, as the old layout had at 1280 × 800: every board is at least its old size.) */
+    --cf-edge: 10px;
+    --bd-room: 92px;
+    --crowd-slot: 250px;
+    /* (The board and the column share what the scoreboard, the gaps and the edges leave.) */
+    --cf-free: calc(var(--win-w) - 2 * var(--cf-edge) - 340px - 2 * var(--cf-gap));
+    --cf-bw: calc(round(down, min(var(--bd-h), var(--cf-free) - 280px), var(--cf-step, 1px)) + var(--cf-snap, 0px));
+    --side-w: clamp(280px, calc(var(--cf-free) - var(--cf-bw)), 300px);
+    width: calc(2 * var(--cf-gap) + var(--cf-bw) + var(--side-w));
+    padding: 4px 0 0 var(--cf-gap);
+    grid-template-columns: var(--cf-bw) var(--side-w);
+    grid-template-rows: 40px auto auto 1fr;
+    column-gap: var(--cf-gap);
+    row-gap: 0;
+  }
+  .screen.game.crowd-50:has(.board-row > .eval-bar),
+  .screen.game.cf-vote:has(.board-row > .eval-bar) {
+    --cf-bw: calc(round(down, min(var(--bd-h), var(--cf-free) - 280px - 48px), var(--cf-step, 1px)) + var(--cf-snap, 0px));
+    grid-template-columns: calc(var(--cf-bw) + 48px) var(--side-w);
+  }
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game) .board-area .board-wrap,
+  .screen.game:is(.crowd-50, .cf-vote) .board-row .eval-bar ~ .board-wrap {
+    width: var(--cf-bw);
+    flex: none;
+  }
+  .screen.game:is(.crowd-50, .cf-vote) > .board-area {
+    grid-row: 3 / 5;
+  }
+  /* (The line over the board is gone: its count is the top row's PICKED, the voting team in the status box, your team the scoreboard's.) */
+  .screen.game.crowd-50 > .board-area > .opening-name {
+    display: none;
+  }
+
+  /* The top row: each number under a small gray label, bottom-aligned 9 px over the board's top (its clock's bar under them), centered on
+     the board. The board's clock pill keeps the row's right end (`--cf-pill`): the row starts that much in from the left too, so it stays
+     centered, and when the numbers need more than that leaves (a narrow board) the room on the left goes first, then the size. */
+  .screen.game.crowd-50 > .cf-row {
+    --cf-pill: 96px;
+    grid-column: 1;
+    grid-row: 1;
+    position: relative;
+    height: 40px;
+    margin: 0;
+    container-type: inline-size;
+  }
+  .screen.game.crowd-50 > .cf-row > .hud {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 0;
+    min-height: 0;
+    height: 40px;
+    margin: 0 var(--cf-pill) 0 0;
+    padding: 0 0 9px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    font-size: clamp(14px, calc((100cqi - var(--cf-pill)) / 24), 20px);
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .screen.game.crowd-50 > .cf-row > .hud::before,
+  .screen.game.crowd-50 > .cf-row > .hud::after {
+    content: "";
+  }
+  .screen.game.crowd-50 > .cf-row > .hud::before {
+    flex: 1 1 var(--cf-pill);
+  }
+  .screen.game.crowd-50 > .cf-row > .hud::after {
+    flex: 1 0 0;
+  }
+  .cf-stat {
+    flex: none;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    margin: 0 clamp(4px, calc((100cqi - var(--cf-pill)) / 60), 10px);
+    font-weight: 800;
+  }
+  .cf-stat > i {
+    font: 700 9px/1 Archivo, system-ui, sans-serif;
+    font-style: normal;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .cf-val {
+    display: inline-flex;
+    align-items: baseline;
+    line-height: 1;
+  }
+  .cf-val.hud-score {
+    font-size: 1.15em;
+  }
+  .cf-val.hud-cut {
+    padding: 0 0.3em;
+    font-size: 1em;
+  }
+  /* The gear: the column's first line, at its right end, beside the power-ups row (as tall as the row, 32 px). */
+  .screen.game.crowd-50 > .cf-row > .mm,
+  .screen.game.cf-vote > .vote-hud > .mm {
+    position: absolute;
+    top: 100%;
+    right: calc(-1 * (var(--cf-gap) + var(--side-w)));
+    display: flex;
+  }
+  .screen.game.crowd-50 > .cf-row > .mm .mm-more,
+  .screen.game.cf-vote > .vote-hud > .mm .mm-more {
+    height: 32px;
+    min-height: 32px;
+  }
+
+  /* The column: the slot (power-ups, the vote box, the status box) on the board's top line, the chat under it to the board's foot. */
+  .screen.game.crowd-50 > .play-footer,
+  .screen.game.crowd-50 > .poll {
+    grid-column: 2;
+    grid-row: 3;
+    height: var(--crowd-slot);
+    min-height: 0;
+    margin: 0;
+  }
+  .screen.game.crowd-50 > .play-footer > .history-nav,
+  .screen.game.crowd-50 > .poll > .history-nav {
+    flex: none;
+    margin: 0 0 4px;
+    padding-right: 44px;
+  }
+  .arena > .screen.game:is(.crowd-50, .cf-vote):not(:has(> .boss-dock)) > :is(.under-board.side, .sq-votes) {
+    grid-column: 2;
+    grid-row: 4;
+    align-self: start;
+    height: var(--chat-foot, auto);
+    min-height: 0;
+    margin-top: 8px;
+  }
+  /* (The scoreboard: the 50 v 50 only, a raid keeps its own column, board-layout.spec.ts. Its table's top on the board's top, its foot the
+     board's: board-foot.ts.) */
+  .arena:not(.sq-arena):has(> .screen.game:is(.crowd-50, .cf-vote)) > .tower-side {
+    max-height: var(--side-foot, var(--app-h));
+    padding-top: var(--side-pad, 14px);
+    padding-bottom: 0;
+  }
+  .screen.game.crowd-50 > .poll {
+    gap: 3px;
+  }
+  .screen.game.crowd-50 > .poll .poll-row,
+  .screen.game.crowd-50 > .play-footer .poll-row {
+    padding: 1px 8px;
+    font-size: 15px;
+    line-height: 20px;
+  }
+  /* (Nov 25, Eric: the vote box sits in the slot between reveals as skeleton rows, filled in place by the reveal: the same rows at
+     the same places, 22 px each, a filled one's height; the status box at the slot's foot, where the result line goes.) */
+  .screen.game.crowd-50 .poll-row.skel {
+    height: 22px;
+  }
+  .screen.game.crowd-50 .poll-row.skel .poll-move i {
+    height: 10px;
+    border-radius: 5px;
+  }
+  .screen.game.crowd-50 > .play-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .screen.game.crowd-50 > .play-footer > .poll-skel {
+    display: grid;
+    gap: 3px;
+  }
+  .screen.game.crowd-50 > .play-footer > .play-slot {
+    flex: none;
+    margin-top: auto;
+  }
+  .screen.game.crowd-50 > .poll .poll-result .round-score {
+    font-size: 22px;
+  }
+}
+/* The opening vote in the frame: its title ("VOTE 1 OF 3" over "How are moves picked?") the top row, centered on the board as the game's
+   numbers are; the gear where the game's is; the line that says what to do on the column's first line, where the game's power-ups row
+   goes (one line, from the column's left edge); the cards under it, filling the game's slot to its foot; then the game's chat, in its
+   place and size (the rule above), to the board's foot (Eric's column rule; the director's round 2, Nov 26). Nothing moves as the game
+   begins: the board, the scoreboard and the chat are where the game's are. */
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game.cf-vote > .vote-hud {
+    grid-column: 1;
+    grid-row: 1;
+    position: relative;
+    height: 40px;
+    margin: 0;
+  }
+  .screen.game.cf-vote > .vote-hud > .vote-title {
+    flex: 1 1 auto;
+    height: 40px;
+    min-height: 0;
+    align-content: end;
+    justify-items: center;
+    gap: 3px;
+    padding: 0 0 9px;
+    border: 0;
+    background: none;
+    text-align: center;
+  }
+  .screen.game.cf-vote > .vote-hud > .vote-title .vote-step {
+    font: 700 9px/1 Archivo, system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .screen.game.cf-vote > .vote-hud > .vote-title h1 {
+    font-size: 20px;
+    line-height: 1;
+  }
+  .screen.game.cf-vote > .board-area {
+    position: relative;
+  }
+  .screen.game.cf-vote > .board-area > .vote-hint {
+    position: absolute;
+    top: 0;
+    left: calc(100% + var(--cf-gap));
+    width: calc(var(--side-w) - 44px);
+    height: 32px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 13px;
+    line-height: 15px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .screen.game.cf-vote > .vote-cards {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    height: calc(var(--crowd-slot) - 36px);
+    margin-top: 36px;
+  }
+  /* (A card as tall as the slot: its name and blurb at the top, its bar and count at the foot.) */
+  .screen.game.cf-vote > .vote-cards > .vote-card {
+    grid-template-rows: auto 1fr auto auto;
+  }
+}
+/* ---- Squads' frame on a computer (Nov 26, the shared frame's second job: the 50 v 50's frame above, reused; docs/decisions/2026-11-26-squads-frame.md) ----
+ * Eric's column rule (docs/rules/eric.md): the standings (the team clocks, `.tower-side`), the board and the column beside it on one top and
+ * one bottom line, the 50 v 50's one gap (`--cf-gap`) either side of the board, the board's box on its drawing step. No title line: the board
+ * line ("Board 2 · starting soon", the line over the board) is the top strip, centered on the board; the score and round at the column's top
+ * with the replay button and the gear at its right end, level with it. The column: the tiny boards on the board's top line, then the panel
+ * (your pick or vote, a gray "Waiting…" when there's none; a Relay's turn order at its top, its own size) to the board's foot (board-foot.ts measures it, as the 50 v
+ * 50's chat). The board's lines are the 50 v 50's: its squares' top, and their foot with the clock's bar under them. The move arrows and
+ * both squads' clocks stay under the board. A phone, a tablet and a computer under 1100 px are unchanged. */
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game.sq-game,
+  .screen.game.sq-game.sq-relay {
+    --bd-room: 92px;
+    grid-template-rows: 40px auto 1fr;
+    row-gap: 8px;
+  }
+  .screen.game.sq-game.sq-relay .board-area .board-wrap {
+    width: var(--cf-bw);
+  }
+  .screen.game.sq-game > .board-area {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    row-gap: 8px;
+  }
+  /* (The board line: the strip's 40 px, its words on its foot, 9 px over the board.) */
+  .screen.game.sq-game > .board-area > .sq-status-row {
+    height: 40px;
+    align-items: flex-end;
+    padding-bottom: 1px;
+    box-sizing: border-box;
+  }
+  .screen.game.sq-game > .hud-row {
+    grid-column: 2;
+    grid-row: 1;
+    position: relative;
+    height: 40px;
+    margin: 0;
+    gap: 4px;
+    align-items: center;
+  }
+  /* (The score in what the replay button and the gear leave: at the column's least, 280 px, the widest two squads and score, "Bishops
+     2½–1½ Knights", whole. A test lobby's "Next round" at the strip's left end, over the board's left edge.) */
+  .screen.game.sq-game > .hud-row > .sq-next {
+    position: absolute;
+    top: 6px;
+    left: calc(-1 * (var(--cf-gap) + var(--cf-bw)));
+  }
+  .screen.game.sq-game > .hud-row > .hud {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+  }
+  .screen.game.sq-game > .hud-row > .hud .sq-hud-vs {
+    gap: 4px;
+  }
+  .screen.game.sq-game > .hud-row > .rp-btn {
+    width: 32px;
+  }
+  .screen.game.sq-game > .sq-boards {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    --tb: calc((var(--side-w) - 32px) / 4);
+  }
+  /* (A Relay's twelve: two matches of three a row.) */
+  .screen.game.sq-game > .sq-boards:is(.n9, .n10, .n11, .n12, .n13, .n14, .n15, .n16) {
+    --tb: calc((var(--side-w) - 36px) / 6);
+  }
+  .screen.game.sq-game > .sq-panel {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: var(--chat-foot, auto);
+    min-height: 0;
+    margin: 0;
+    padding: 8px;
+    box-sizing: border-box;
+    overflow: auto;
+    overscroll-behavior: contain;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .screen.game.sq-game > .sq-panel > * {
+    flex: none;
+  }
+  .screen.game.sq-game > .sq-panel > .waiting-banner.slot-idle {
+    height: 56px;
+  }
+  /* The standings: "Squads · team clocks" in the strip, then their rows' box from the board's top to its foot (board-foot.ts), the rows
+     scrolling inside it where they're taller (Eric's laptop), as the column's panel. */
+  .sq-arena:has(> .screen.game:is(.sq-game, .cf-vote)) > .tower-side {
+    height: var(--side-foot, var(--app-h));
+    max-height: none;
+    padding-top: var(--side-pad, 14px);
+    padding-bottom: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .sq-arena:has(> .screen.game:is(.sq-game, .cf-vote)) > .tower-side > .sq-standings {
+    height: 100%;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .sq-arena:has(> .screen.game:is(.sq-game, .cf-vote)) > .tower-side > .sq-standings > .sq-standings-rows {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    min-height: 0;
+    padding: 8px;
+    box-sizing: border-box;
+    overflow: auto;
+    overscroll-behavior: contain;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  /* Its votes (VoteScreen's frame, no chat): the replay button and the gear at the column's top right, level with the title, as the match's;
+     the test-only "Skip votes" at the column's top left; under the cards, the lobby's votes to the board's foot. */
+  .sq-arena > .screen.game.cf-vote > .vote-hud > .mm {
+    top: 4px;
+  }
+  .sq-arena > .screen.game.cf-vote > .vote-hud > .rp-btn {
+    position: absolute;
+    top: 4px;
+    right: calc(-1 * (var(--cf-gap) + var(--side-w)) + 40px);
+  }
+  .sq-arena > .screen.game.cf-vote > .vote-hud > .sq-next {
+    position: absolute;
+    white-space: nowrap;
+    top: 8px;
+    left: calc(100% + var(--cf-gap));
+    width: auto;
+    padding: 0 6px;
+  }
+  .sq-arena > .screen.game.cf-vote > .board-area > .vote-hint {
+    width: var(--side-w);
+  }
+  .sq-votes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    overflow: auto;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .sq-votes-list {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .sq-votes-list > li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+  }
+  .sq-votes-list > li > i {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    font-style: normal;
+    font-size: 12px;
+  }
+  .sq-votes-list > li.on {
+    color: var(--text);
+  }
+  .sq-votes-list > li.on > i {
+    background: var(--accent);
+    color: #fff;
+  }
+}
+/* (The board's drawing step: 8 device pixels, as game-frame.css rounds the boss screens' and the 1 v 1's boxes. At 125% and 150% the step
+   isn't a whole number of layout units (1/64 px), so 1/64 px more keeps the box from snapping just under a step: the 1 v 1's fix.) */
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (max-resolution: 1dppx) {
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game) {
+    --cf-step: 8px;
+  }
+}
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 2dppx) {
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game) {
+    --cf-step: 4px;
+  }
+}
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 1.25dppx) {
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game) {
+    --cf-step: 6.4px;
+    --cf-snap: calc(1px / 64);
+  }
+}
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 1.5dppx) {
+  .screen.game:is(.crowd-50, .cf-vote, .sq-game) {
+    --cf-step: calc(8px / 1.5);
+    --cf-snap: calc(1px / 64);
   }
 }

@@ -59,6 +59,91 @@ async function markQuestsSeen(context: import("@playwright/test").BrowserContext
 }
 let questsSeenDefault = true;
 
+/**
+ * The renderer watchdog (Nov 24; docs/decisions/2026-11-24-renderer-watchdog.md). Twice in CI (moo.spec Nov 20, boss-bar.spec Nov 24) a
+ * 5 s expect ran for minutes, to the test's timeout, with no trace: Playwright's expect makes its first check without any timeout, so a
+ * page whose main thread never answers holds it until the test times out. This names the code: the test's page is pinged every
+ * `HANG_PING_MS`; a ping unanswered for `HANG_AFTER_MS` pauses the page's script (Debugger.pause reaches a busy main thread, where an
+ * evaluate can't), and its stack, with the code around each place, is attached to the test ("renderer-hang") and printed to the log.
+ * The session and its Debugger domain are opened with the page: once the page hangs, a new one gets no answer. A test that times
+ * out with the page still answering says so too (then it was Playwright's wait, not the page). Nothing is checked or failed here, and
+ * the `@perf` specs aren't watched (nothing extra in the frames they time).
+ */
+const HANG_PING_MS = 10_000;
+const HANG_AFTER_MS = 30_000;
+async function watchRenderer(page: Page, testInfo: import("@playwright/test").TestInfo): Promise<() => Promise<void>> {
+  // (Not the frame-budget specs: nothing extra in the page they time.)
+  if (testInfo.tags.includes("@perf") || /@perf\b/.test(testInfo.titlePath.join(" "))) return async () => {};
+  let cdp: import("@playwright/test").CDPSession;
+  try {
+    cdp = await page.context().newCDPSession(page);
+    await cdp.send("Debugger.enable");
+  } catch {
+    return async () => {};
+  }
+  /** The unanswered ping's time (null: none out), the last answer, and the hang once seen (its start; `pausing` while its stack is read). */
+  let waiting: number | null = null;
+  let answered = Date.now();
+  let hung: number | null = null;
+  let pausing = false;
+  let recovered = false;
+  let stopped = false;
+  const report = (text: string) => {
+    console.error(`[renderer-hang] ${testInfo.titlePath.join(" › ")}\n${text}`);
+    void testInfo.attach("renderer-hang", { body: text, contentType: "text/plain" }).catch(() => {});
+  };
+  type Paused = { callFrames: { functionName: string; url: string; location: { scriptId: string; lineNumber: number; columnNumber?: number } }[] };
+  const snapshot = async (since: number) => {
+    pausing = true;
+    const head = `The page didn't answer for ${Math.round((Date.now() - since) / 1000)} s (${page.url()}).`;
+    const paused = new Promise<Paused>((r) => cdp.once("Debugger.paused", r));
+    const got = await Promise.race([cdp.send("Debugger.pause").then(() => paused), new Promise<null>((r) => setTimeout(() => r(null), 10_000))]).catch(() => null);
+    if (stopped) return;
+    if (!got) report(`${head} It didn't pause either: no script running (stuck in the browser's own work: layout, painting, decoding), or the browser itself stuck.`);
+    else {
+      const lines = [`${head} Its script's stack:`];
+      const sources = new Map<string, Promise<string[]>>();
+      for (const f of got.callFrames.slice(0, 12)) {
+        const { scriptId, lineNumber: ln, columnNumber: col = 0 } = f.location;
+        if (!sources.has(scriptId)) sources.set(scriptId, cdp.send("Debugger.getScriptSource", { scriptId }).then((x) => x.scriptSource.split("\n"), () => []));
+        const src = (await sources.get(scriptId)!)[ln] ?? "";
+        lines.push(`  at ${f.functionName || "(anonymous)"} ${f.url || "(no url)"}:${ln + 1}:${col + 1}`, `     ${src.slice(Math.max(0, col - 160), col)}⟦here⟧${src.slice(col, col + 160)}`);
+      }
+      await cdp.send("Debugger.resume").catch(() => {});
+      report(lines.join("\n"));
+    }
+    // (Pings again from here: the one out was answered by the pause, not by the page.)
+    pausing = false;
+    waiting = null;
+  };
+  const tick = setInterval(() => {
+    if (pausing) return;
+    if (waiting === null) {
+      const at = (waiting = Date.now());
+      // (An answer, or an error (a page loading again has no context for a moment): either way the renderer answered.)
+      const back = () => {
+        if (stopped || pausing || waiting !== at) return;
+        answered = Date.now();
+        waiting = null;
+        // (A hang that ends: how long it lasted, so a slow stretch reads apart from an endless one.)
+        if (hung !== null && !recovered) (recovered = true), report(`The page answered again ${Math.round((answered - hung) / 1000)} s after it stopped answering.`);
+      };
+      void cdp.send("Runtime.evaluate", { expression: "0" }).then(back, back);
+    } else if (hung === null && Date.now() - waiting >= HANG_AFTER_MS) {
+      hung = waiting;
+      void snapshot(waiting);
+    }
+  }, HANG_PING_MS);
+  return async () => {
+    stopped = true;
+    clearInterval(tick);
+    if (testInfo.status === "timedOut" && hung === null)
+      report(`The test timed out with the page still answering (its last answer ${Math.round((Date.now() - answered) / 1000)} s before the end; ${page.url()}): not a renderer hang.`);
+    // (Not waited on past a moment: a hung page may never let the session go.)
+    await Promise.race([cdp.detach().catch(() => {}), new Promise((r) => setTimeout(r, 2000))]);
+  };
+}
+
 export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenDefaultForTest: void; seenWalkthrough: void; questsSeen: boolean; questsSeenForTest: void; seenQuests: void }>({
   tutorialSeen: [true, { option: true }],
   // Sets the default for this test's contexts, then puts it back.
@@ -110,6 +195,13 @@ export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean;
     },
     { scope: "worker" },
   ],
+  // (The test's page, watched for a hang: watchRenderer.)
+  // (Opened alongside the test, not before it: nothing waits on it.)
+  page: async ({ page }, use, testInfo) => {
+    const watching = watchRenderer(page, testInfo);
+    await use(page);
+    await (await watching)();
+  },
   closeOwnContexts: [
     async ({ browser, context }, use) => {
       const before = new Set(browser.contexts());
@@ -653,6 +745,16 @@ export async function openSoloBoss(page: Page) {
 }
 
 /**
+ * A deploy landed (as the page will find out): the server's `/version.json` names another build than the page's. With a file of the game
+ * refused, this stages a deploy's missing file; a file refused without it is a dropped connection, which loads the page again only if
+ * its try again fails too, keeping the screen (stale.ts, Nov 25: the Boss Battle screen thrown back to home by one, main's run
+ * 45559755980; older Chromium's kept failure, #942).
+ */
+export async function aDeployLanded(page: Page) {
+  await page.route(/\/version\.json$/, (r) => r.fulfill({ json: { version: "0123456789ab", commit: null, built: new Date().toISOString() } }));
+}
+
+/**
  * Home → Boss Battle → (the boss's tile, `boss`: its name, as its tile is named) → START: the battle at once, with that boss, or a
  * random one without `boss`, at the screen's difficulty (Oct 29: START skips the old Boss alone menu).
  */
@@ -856,4 +958,88 @@ export async function settled<T>(page: Page, read: () => Promise<T>, ms = 300, t
     } else if (Date.now() - since >= ms) return now;
     if (Date.now() > until) throw new Error(`settled: still changing after ${timeout} ms (last: ${key.slice(0, 200)})`);
   }
+}
+
+/**
+ * Real computer screens (Nov 25; docs/decisions/2026-11-25-real-screens.md). Computer layouts were built and checked at 1280 × 800,
+ * 1440 × 900 and 1920 × 1080 only; a 1080p laptop at Windows' recommended 125% (Eric's) gives a window about 1536 × 730, shorter than any
+ * of them, so boards sized "height − 170" shrank and pages laid out for 800 px scrolled. Every computer layout check runs at these too,
+ * each with its own device scale (the board's size is a whole number of device pixels). Named by what they are: never "a computer".
+ */
+export const REAL_SCREENS = [
+  { name: "laptop 1536×730", width: 1536, height: 730, scale: 1.25, what: "a 1080p laptop at Windows' recommended 125% (Eric's)" },
+  { name: "laptop 1280×600", width: 1280, height: 600, scale: 1.5, what: "a 1080p laptop at 150%" },
+  { name: "laptop 1366×650", width: 1366, height: 650, scale: 1, what: "a 768p laptop at 100%" },
+  { name: "desktop 1920×960", width: 1920, height: 960, scale: 1, what: "a 1080p desktop at 100%, a maximized browser" },
+] as const;
+export type RealScreen = (typeof REAL_SCREENS)[number];
+
+/** A chess.com-style name bar's height (the 1 v 1's strip over and under the board): the board-size target counts two of them. */
+export const NAME_BAR_PX = 34;
+/** The board's target on a real screen (Nov 25 brief): the window's height less two name bars and 40 px. */
+export const boardTarget = (s: RealScreen) => s.height - 2 * NAME_BAR_PX - 40;
+
+/** A window on a real screen: its size and device scale, a computer's mouse. */
+export const realScreenContext = (browser: import("@playwright/test").Browser, s: RealScreen) =>
+  browser.newContext({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: s.scale, isMobile: false, hasTouch: false });
+
+/**
+ * One screen's layout, measured: how far the page scrolls each way, every element of the screen cut off at the window's top (its
+ * selector-ish name), each chat's message area (`.qfeed`: its height), the game's board and the end page's move-by-move board (boxes).
+ */
+export async function realLayout(page: Page) {
+  return page.evaluate(() => {
+    const box = (e: Element | null) => {
+      if (!e) return null;
+      const b = e.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 ? { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height } : null;
+    };
+    const shown = (e: Element) => {
+      const s = getComputedStyle(e);
+      return s.visibility !== "hidden" && s.display !== "none" && Number(s.opacity) > 0;
+    };
+    const name = (e: Element) => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
+    const screen = document.querySelector(".screen");
+    const cut = screen
+      ? [screen, ...screen.querySelectorAll("*")].filter((e) => {
+          const b = e.getBoundingClientRect();
+          return b.width > 0 && b.height > 0 && b.top < -1 && shown(e) && getComputedStyle(e).position !== "fixed";
+        })
+      : [];
+    return {
+      scrollX: document.documentElement.scrollWidth - innerWidth,
+      scrollY: document.documentElement.scrollHeight - innerHeight,
+      cut: cut.slice(0, 6).map(name),
+      feeds: [...document.querySelectorAll(".qchat .qfeed")].filter(shown).map((e) => e.getBoundingClientRect().height),
+      board: box(document.querySelector(".board-area .board-row > .board-wrap .hb-container")),
+      review: box(document.querySelector(".results-review .hb-container")),
+      reviewCol: box(document.querySelector(".results-review")),
+    };
+  });
+}
+
+/**
+ * An end screen's spacing (Eric, Nov 25: "Make things spaced evenly and tight, and then we can always just center the whole thing";
+ * docs/decisions/2026-11-25-end-screens-2.md): the containers of its stack (`root`'s children, through `display: contents` wrappers and
+ * the rewards' column), each gap between two in a row, the stack's one gap (its row gap: `--es-gap`), and anything set to stretch (a
+ * container that grows, a stack that spreads its items).
+ */
+export async function endGaps(page: Page, root: string) {
+  return page.evaluate((sel) => {
+    const top = document.querySelector(sel)!;
+    const flat = (e: Element): Element[] =>
+      [...e.children].flatMap((c) => {
+        const s = getComputedStyle(c);
+        if (s.display === "contents" || c.classList.contains("es-rewards")) return flat(c);
+        if (s.display === "none" || s.position === "absolute" || s.position === "fixed") return [];
+        const b = c.getBoundingClientRect();
+        return b.height > 0 && b.width > 0 ? [c] : [];
+      });
+    const items = flat(top);
+    const name = (e: Element) => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
+    const gaps = items.slice(1).map((e, i) => ({ between: `${name(items[i]!)} → ${name(e)}`, px: e.getBoundingClientRect().top - items[i]!.getBoundingClientRect().bottom }));
+    const spread = [top, ...top.querySelectorAll(".es-rewards")].map((e) => getComputedStyle(e).justifyContent).filter((j) => /space-|stretch/.test(j));
+    const grow = items.filter((e) => Number(getComputedStyle(e).flexGrow) > 0 && !e.classList.contains("results-review")).map(name);
+    return { token: parseFloat(getComputedStyle(top).rowGap), gaps, spread, grow };
+  }, root);
 }

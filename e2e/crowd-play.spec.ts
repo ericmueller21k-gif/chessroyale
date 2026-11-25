@@ -185,7 +185,7 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
 });
 
 test("the match screen's rows never move (Nov 8, Eric: nothing on the match screen moves): the power-up row, the status slot and the table keep one place through picking, move in and the other team's vote, at 390×844, 360×740 and a computer", async ({ page }) => {
-  // One game, three sizes: each size plays a turn through picking ("Your pick for …": the status slot empty), move in
+  // One game, three sizes: each size plays a turn through picking ("Your pick for …": the status slot's gray "Waiting…"), move in
   // ("Move in. Waiting for other players") and the other team's vote ("… is voting"), and the row tops, the status slot's
   // top and height, and the table's top must be the same (within 1 px) in all three phases.
   test.setTimeout(10 * 60_000);
@@ -201,7 +201,8 @@ test("the match screen's rows never move (Nov 8, Eric: nothing on the match scre
         const r = el.getBoundingClientRect();
         return { top: r.top, h: r.height };
       };
-      const banner = document.querySelector(".screen.game .play-slot .waiting-banner");
+      // (Your own pick shows the status box's gray "Waiting…" since Nov 26: still picking.)
+      const banner = document.querySelector(".screen.game .play-slot .waiting-banner:not(.slot-idle)");
       const text = banner?.textContent ?? "";
       const kind = (m?.phase.kind ?? "none") as string;
       const state = banner ? (/is voting/.test(text) ? "voting" : /Waiting for other players/.test(text) ? "move in" : "other") : kind === "play" ? "picking" : "other";
@@ -270,7 +271,10 @@ test("the scoreboard box is built once: the same element and header, the same bo
   await page.evaluate(() => {
     const w = window as any;
     const b = (w.__box = { els: [] as Element[], heads: [] as Element[], boxes: [] as string[], fewest: Infinity, seq: [] as string[] });
-    const tick = () => {
+    // (A sample now, and again by the loop below before each pick: a turn the test reads and ends within one frame is still recorded.
+    // Nov 25, main's run 45584074647: the first sample waited a frame, the loop read "play" and picked 5 ms after, and the first cut's
+    // turn never showed its "play", so the run never counted as done.)
+    const sample = (w.__boxSample = () => {
       const kind = w.match?.phase.kind ?? "none";
       if (b.seq.at(-1) !== kind) b.seq.push(kind);
       const el = document.querySelector(".screen.game > .under-board");
@@ -283,9 +287,9 @@ test("the scoreboard box is built once: the same element and header, the same bo
         if (!b.boxes.includes(at)) b.boxes.push(at);
         b.fewest = Math.min(b.fewest, el.querySelectorAll(".tower-row").length);
       }
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+    });
+    const tick = () => (sample(), requestAnimationFrame(tick));
+    tick();
   });
   const seq = () => page.evaluate(() => (window as any).__box.seq as string[]);
   // Until the box is back after a cut, having seen your pick, a reveal and the other team's turn.
@@ -297,7 +301,7 @@ test("the scoreboard box is built once: the same element and header, the same bo
   const stopAt = Date.now() + 4 * 60_000;
   while (Date.now() < stopAt && !done(await seq())) {
     if ((await phase(page)) === "play") {
-      const fen: string = await page.evaluate(() => (window as any).match.phase.board?.fen ?? "");
+      const fen: string = await page.evaluate(() => ((window as any).__boxSample(), (window as any).match.phase.board?.fen ?? ""));
       if (fen && fen !== submitted) {
         submitted = fen;
         const pick = await page.evaluate(() => [...((window as any).match.runner.planned?.values() ?? [])][0] as string | undefined);

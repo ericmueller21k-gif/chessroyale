@@ -1,6 +1,6 @@
 import { XP, bossCrateDef, isPickableBossCrate, levelOf, levelReward, type QuestPaid, type XpRewards } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
-import { applyOp, cond, keyFor, leg, ledgerAccount, opKeys, opStatements, type LedgerAccount, type Op } from "./ledger.ts";
+import { applyOp, cond, foldBonus, keyFor, leg, ledgerAccount, opKeys, opStatements, type LedgerAccount, type Op } from "./ledger.ts";
 
 /**
  * XP phase 2's rewards (Eric, Nov 9: "go with phase two"; the approved design's sections 2 and 4; XP in settings.ts;
@@ -9,7 +9,8 @@ import { applyOp, cond, keyFor, leg, ledgerAccount, opKeys, opStatements, type L
  *
  *   - **The daily reward** (op `daily:<XP day's start>:<ledger id>`, reason "daily"): your first counted game of the XP day with
  *     XP.dailyMinMoves of your own moves: XP.dailyBonus XP and XP.dailyCrates crates of XP.rewardCrate. One op a day: a second game,
- *     a retry or two rooms at once pay it once. Its legs' source is the game that paid it, so that game's result answers it.
+ *     a retry or two rooms at once pay it once. Its legs' source is the game that paid it, so that game's result answers it; and a
+ *     game pays at most one (its guard), even granted again on another XP day (the delta review's N1, Nov 25).
  *   - **Level rewards** (op `lvl:<level>:<ledger id>`, reason "level"): every XP.levelRewardEvery-th level reached, XP.levelCrates
  *     crates and XP.levelKeys keys, every XP.bossCrateEvery-th also a boss crate to pick (the wallet's `boss_picks`). Paid at a counted
  *     game for every paying level up to your level now that isn't paid yet (at most XP.levelsPerGame a game), so a level reached
@@ -38,12 +39,17 @@ export const levelOpId = (level: number, account: string) => `lvl:${level}:${acc
  */
 const OLD_LEVELS = { prefix: "level", bossCrateEvery: 10 } as const;
 
-/** The daily reward's op (its legs' source: the game paying it). */
+/**
+ * The daily reward's op (its legs' source: the game paying it). Its guard: no daily reward of this account names this game already, so
+ * a game pays at most one, whatever day it's granted on: a grant tried again after the XP day rolled over (a ranked room's retry, a
+ * Squads reward written again) finds the first day's and pays nothing (the delta review's N1, Nov 25). The ledger_reason index serves it.
+ */
 export function dailyOp(me: LedgerAccount, day: number, game: string, now: number): Op {
   return {
     id: dailyOpId(day, me.account),
     reason: "daily",
     now,
+    when: cond("NOT EXISTS (SELECT 1 FROM ledger WHERE account = ? AND reason = 'daily' AND source_id = ?)", me.account, game),
     legs: [
       ...(XP.dailyBonus ? [leg.xp(me.user, XP.dailyBonus, game)] : []),
       ...(XP.dailyCrates ? [leg.seriesCrates(me.user, XP.rewardCrate, XP.dailyCrates, game)] : []),
@@ -161,12 +167,14 @@ export async function gameRewards(sql: Sql, me: LedgerAccount, game: string, que
 }
 
 /** Your series crates, by crate id (only those you hold some of), and your boss crates to pick. */
-export async function seriesHoldings(sql: Sql, userId: string): Promise<{ seriesCrates: Record<string, number>; bossPicks: number }> {
+export async function seriesHoldings(sql: Sql, userId: string): Promise<{ seriesCrates: Record<string, number>; seriesBonus: Record<string, number>; bossPicks: number }> {
   const [rows, wallet] = await Promise.all([
     sql.all<{ crate: string; n: number }>("SELECT crate, n FROM series_crates WHERE user_id = ? AND n > 0 ORDER BY crate", userId),
     sql.first<{ boss_picks: number | null }>("SELECT boss_picks FROM wallets WHERE user_id = ?", userId),
   ]);
-  return { seriesCrates: Object.fromEntries(rows.map((r) => [r.crate, r.n])), bossPicks: wallet?.boss_picks ?? 0 };
+  // (Bonus crates, Nov 24: counted with their crate's, and how many of them are bonus ones: ledger.ts foldBonus.)
+  const { all, bonus } = foldBonus(Object.fromEntries(rows.map((r) => [r.crate, r.n])));
+  return { seriesCrates: all, seriesBonus: bonus, bossPicks: wallet?.boss_picks ?? 0 };
 }
 
 /**

@@ -1,8 +1,24 @@
-import { ITEM_SLOTS, adminCopies, adminCopyDef, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import {
+  ITEM_SLOTS,
+  adminCopies,
+  adminCopyDef,
+  crateDef,
+  isAdminCopy,
+  itemDef,
+  mulberry32,
+  rollBonus,
+  rollCrate,
+  type BonusRoll,
+  type CrateRoll,
+  type ItemInstance,
+  type ItemLook,
+  type ItemSlot,
+  type Rng,
+} from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
-import { bossCrateHoldings, tokenHoldings } from "./boss-tokens.ts";
+import { bossCrateStock, tokenHoldings } from "./boss-tokens.ts";
 import { welcomeState, type WelcomeState } from "./welcome.ts";
-import { applyOp, cond, deleteItems, keyFor, leg, ledgerAccount, opKeys } from "./ledger.ts";
+import { applyOp, bonusAsset, bonusLegs, cond, deleteItems, keyFor, leg, ledgerAccount, openedBonus, opKeys } from "./ledger.ts";
 import { seriesFromWallet, seriesHoldings } from "./rewards.ts";
 
 /**
@@ -57,6 +73,11 @@ export interface LockerState {
   tokens: Record<string, number>;
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger": only those you have some of; Nov 2): boss-tokens.ts. */
   bossCrates: Record<string, number>;
+  /**
+   * How many of the crates above (`seriesCrates`, `bossCrates`) are bonus ones, by crate id (Nov 24: an opening's bonus; only those you
+   * have some of). Each opens as any crate, after the ordinary ones of its kind, and never rolls a bonus itself.
+   */
+  bonusCrates: Record<string, number>;
   /** The HunChess Welcome Crate (Nov 6): earned or not, opened or not, its one-time notice, the finished games so far (welcome.ts). */
   welcome: WelcomeState;
 }
@@ -86,14 +107,15 @@ export async function lockerState(sql: Sql, userId: string, admin = false, befor
     look[r.slot] = { def: it.def, color: it.color, blemish: it.blemish, seed: it.seed, ...(it.color2 ? { color2: it.color2 } : {}) };
   }
   for (const it of items) if (!it.color2) delete it.color2;
-  const [{ seriesCrates, bossPicks }, { tokens, keys }, bossCrates, welcome] = await Promise.all([
+  const [{ seriesCrates, seriesBonus, bossPicks }, { tokens, keys }, boss, welcome] = await Promise.all([
     seriesHoldings(sql, userId),
     tokenHoldings(sql, userId),
-    bossCrateHoldings(sql, userId),
+    bossCrateStock(sql, userId),
     welcomeState(sql, userId),
   ]);
   const crates = Object.values(seriesCrates).reduce((s, n) => s + n, 0);
-  return { items, equipped, look, crates, seriesCrates, keys, bossPicks, tokens, bossCrates, welcome };
+  const bonusCrates = { ...seriesBonus, ...boss.bonus };
+  return { items, equipped, look, crates, seriesCrates, keys, bossPicks, tokens, bossCrates: boss.all, bonusCrates, welcome };
 }
 
 /**
@@ -104,10 +126,12 @@ export async function lockerState(sql: Sql, userId: string, admin = false, befor
 export async function looksOf(sql: Sql, userIds: readonly string[], admins: ReadonlySet<string> = new Set()): Promise<Map<string, ItemLook>> {
   const out = new Map<string, ItemLook>();
   if (!userIds.length) return out;
+  // (The ids as one bound value, a JSON list: D1 takes at most 100 bound values a query, and the season ladder asks for 200 players'
+  // looks at once (ladder.ts). Each id still finds its rows by the key, never a scan.)
   const rows = await sql.all<{ user_id: string; slot: ItemSlot } & Omit<ItemInstance, "id">>(
     `SELECT e.user_id, e.slot, i.def, i.color, i.color2, i.blemish, i.seed FROM equipped_items e JOIN items i ON i.id = e.item_id AND i.user_id = e.user_id
-     WHERE e.user_id IN (${userIds.map(() => "?").join(", ")})`,
-    ...userIds,
+     WHERE e.user_id IN (SELECT value FROM json_each(?))`,
+    JSON.stringify(userIds),
   );
   for (const r of rows) {
     if (itemDef(r.def)?.slot !== r.slot) continue;
@@ -124,11 +148,34 @@ export async function looksOf(sql: Sql, userIds: readonly string[], admins: Read
 }
 
 /**
+ * An opening's bonus crate (Nov 24; core bonus-crate.ts): `"roll"`, the server's roll (CRATE_BONUS.chance); `"off"`, none; `force`, one
+ * for sure (`true`, its crate rolled; a crate's id, that one). The API rolls in production; where TEST_SWITCHES is "1" (local, e2e,
+ * staging) only when the test asks (`force`), so a test's counts stay what it set. A direct call (a test's) has none unless it asks.
+ */
+export type BonusMode = "roll" | "off" | { force: true | string };
+/** What an opening's options are besides the crate: its bonus (BonusMode) and its randomness (a test's own; the server's by default). */
+export interface OpenOptions {
+  bonus?: BonusMode;
+  rng?: Rng;
+}
+/** The bonus an opening gives, from its own roll (`rng`, already used for the item). */
+export function bonusOf(rng: Rng, mode: BonusMode = "off", admin = false): BonusRoll | null {
+  if (mode === "off") return null;
+  return rollBonus(rng, { admin, ...(mode === "roll" ? {} : { force: mode.force }) });
+}
+/** The server's own randomness for an opening: a crypto seed's stream (the item's roll, then its bonus's). */
+export const openingRng = (): Rng => mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!);
+const newItemId = () => [...crypto.getRandomValues(new Uint8Array(9))].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+/**
  * Opens a series crate you hold (Nov 9, XP phase 2: for everyone, admins too, it takes one of that crate and one crate key; Eric: "get
  * rid of all that. Make it actually ready to go"). `force` (?fischer, ?shiny): the API passes it only where TEST_SWITCHES is "1".
- * `admin`: as lockerState's. One ledger op: the crate and the key out, the item in, applied only if both are there (checked in the same
- * transaction), keyed by the app's request id for the open (`open:<ledger id>:<request>`): a retry of it opens nothing more and
- * answers the first open's item, and two opens at once with one key open one. (An older app's open, with none: a fresh key.)
+ * `admin`: as lockerState's (and the bonus's pool). One ledger op: the crate and the key out, the item in, and (Nov 24) the bonus crate
+ * and its key in when the roll gives one, applied only if the crate and the key are there (checked in the same transaction), keyed by
+ * the app's request id for the open (`open:<ledger id>:<request>`): a retry of it opens nothing more, rolls nothing more and answers the
+ * first open's item and bonus, and two opens at once with one key open one. (An older app's open, with none: a fresh key.)
+ * Holding ordinary and bonus crates of a kind, an ordinary one opens first (it rolls a bonus: you keep your chance), the bonus ones
+ * after (they never roll one). Another open that took the one picked first: the other kind, if you hold it.
  */
 export async function openCrate(
   sql: Sql,
@@ -138,48 +185,74 @@ export async function openCrate(
   now: number,
   admin = false,
   request: string | null = null,
-): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
+  opts: OpenOptions = {},
+): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; bonus?: BonusRoll; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? crateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
   const me = await ledgerAccount(sql, userId);
   if (!me) return { ok: false, message: "No such crate." };
-  const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
-  const roll = rollCrate(mulberry32(seed), crate, force);
-  const id = [...crypto.getRandomValues(new Uint8Array(9))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const op = request ? keyFor(opKeys.request("open", request), me) : `open:${id}`;
-  const done = await applyOp(sql, me, {
-    id: op,
-    reason: "crate open",
-    now,
-    when: cond(
-      "EXISTS (SELECT 1 FROM series_crates WHERE user_id = ? AND crate = ? AND n >= 1) AND EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND crate_keys >= 1)",
-      userId,
-      crate.id,
-      userId,
-    ),
-    legs: [leg.item(userId, { ...roll, id }, crate.id, now), leg.seriesCrates(userId, crate.id, -1, id), leg.keys(userId, -1, id)],
-  });
+  const keyed = request ? keyFor(opKeys.request("open", request), me) : null;
   // Every attempt answers the item as stored (this one's, or on a replay the first's), never its own roll, so every answer to one
   // request is the same whichever attempt applied it.
-  const opened = done === "refused" ? null : await openedItem(sql, userId, op);
-  if (!opened) return { ok: false, message: needToOpen(crate.name) };
-  return { ok: true, ...opened, locker: await lockerState(sql, userId, admin) };
+  const answer = async (op: string) => {
+    const opened = await openedItem(sql, userId, op);
+    return opened ? { ok: true as const, ...opened, locker: await lockerState(sql, userId, admin) } : null;
+  };
+  let tried: string | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const held = await sql.all<{ crate: string }>("SELECT crate FROM series_crates WHERE user_id = ? AND crate IN (?, ?) AND n >= 1", userId, crate.id, bonusAsset(crate.id));
+    const take = held.some((h) => h.crate === crate.id) ? crate.id : held.length ? bonusAsset(crate.id) : null;
+    // (None, or the same one refused again: no key, or none left.)
+    if (!take || take === tried) break;
+    tried = take;
+    const rng = opts.rng ?? openingRng();
+    const roll = rollCrate(rng, crate, force);
+    const bonus = take === crate.id ? bonusOf(rng, opts.bonus, admin) : null;
+    const id = newItemId();
+    const op = keyed ?? `open:${id}`;
+    const done = await applyOp(sql, me, {
+      id: op,
+      reason: "crate open",
+      now,
+      when: cond(
+        "EXISTS (SELECT 1 FROM series_crates WHERE user_id = ? AND crate = ? AND n >= 1) AND EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND crate_keys >= 1)",
+        userId,
+        take,
+        userId,
+      ),
+      legs: [
+        leg.item(userId, { ...roll, id }, crate.id, now),
+        leg.seriesCrates(userId, take, -1, id),
+        leg.keys(userId, -1, id),
+        ...(bonus ? bonusLegs(userId, bonus, id, newItemId(), now) : []),
+      ],
+    });
+    if (done !== "refused") return (await answer(op)) ?? { ok: false, message: needToOpen(crate.name) };
+  }
+  // (A retry of an open made already, of your last crate: its item.)
+  return (keyed ? await answer(keyed) : null) ?? { ok: false, message: needToOpen(crate.name) };
 }
 
 /** Why a series crate couldn't be opened: "You need a Winter Crate and a crate key to open it." */
 export const needToOpen = (name: string) => `You need a ${name.split(" · ")[0]} and a crate key to open it.`;
 
-/** The item an open (op `opId`) put in your locker, as stored: every attempt at the open answers this. Null: none, or gone since. */
-export async function openedItem(sql: Sql, userId: string, opId: string): Promise<{ roll: CrateRoll; item: ItemInstance } | null> {
-  const r = await sql.first<ItemInstance & { fischer: number }>(
-    `SELECT i.id, i.def, i.color, i.color2, i.blemish, i.seed, i.fischer FROM ledger l JOIN items i ON i.id = l.asset_id AND i.user_id = ?
-     WHERE l.op_id = ? AND l.asset_kind = 'item' AND l.delta > 0 LIMIT 1`,
-    userId,
-    opId,
-  );
+/**
+ * The item an open (op `opId`) put in your locker, as stored, and the bonus crate it gave (Nov 24: from the ledger, as stored): every
+ * attempt at the open answers this. Null: none, or the item gone since.
+ */
+export async function openedItem(sql: Sql, userId: string, opId: string): Promise<{ roll: CrateRoll; item: ItemInstance; bonus?: BonusRoll } | null> {
+  const [r, bonus] = await Promise.all([
+    sql.first<ItemInstance & { fischer: number }>(
+      `SELECT i.id, i.def, i.color, i.color2, i.blemish, i.seed, i.fischer FROM ledger l JOIN items i ON i.id = l.asset_id AND i.user_id = ?
+       WHERE l.op_id = ? AND l.asset_kind = 'item' AND l.delta > 0 LIMIT 1`,
+      userId,
+      opId,
+    ),
+    openedBonus(sql, opId),
+  ]);
   if (!r) return null;
   const look = { def: r.def, color: r.color, ...(r.color2 ? { color2: r.color2 } : {}), blemish: r.blemish, seed: r.seed };
-  return { roll: { fischer: r.fischer === 1, ...look }, item: { id: r.id, ...look } };
+  return { roll: { fischer: r.fischer === 1, ...look }, item: { id: r.id, ...look }, ...(bonus ? { bonus } : {}) };
 }
 
 /**

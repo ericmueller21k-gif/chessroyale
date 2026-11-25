@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
-import { RANKED_1V1, rankView } from "@chessroyale/core";
-import { named, openBossRaid, switchesOff, test, watchFor, pickMode } from "./helpers.ts";
+import { LADDER, RANKED_1V1, rankView } from "@chessroyale/core";
+import { localSql, named, openBossRaid, switchesOff, test, watchFor, pickMode } from "./helpers.ts";
 
 /**
  * Home's RANKED row and the Boss raid's own card and screen (Eric, Oct 16;
@@ -116,7 +116,7 @@ test("1 v 1's rank line at its widest (a top tier with four-digit points, its em
     await page.setViewportSize({ width, height: 740 });
     await page.goto("/?mode=1v1");
     const line = page.locator(".fd-rank1v1");
-    await expect(line).toHaveText("Your rank: Transcendent · 1234 RP");
+    await expect(line).toHaveText("Your rank: Transcendent – 1234");
     await expect(page.locator(".fd-rank-words .re-box")).toHaveAttribute("data-emblem", "transcendent");
     expect(await line.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
     expect((await line.boundingBox())!.height, `${width}: one line`).toBeLessThan(26);
@@ -574,9 +574,9 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
   }
 });
 
-test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's home reads their ?rank= (\"Gold 3 · 45 RP\"); everyone's has their real level, a green ring at 3/4 round the icon and LVL 38 over it (18,875 XP: levels of 500 since Nov 20); a player sees their real rank, and nothing moves", async ({ page }) => {
+test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's home reads their ?rank= (\"Gold III – 45\"); everyone's has their real level, a green ring at 3/4 round the icon and LVL 38 over it (18,875 XP: levels of 500 since Nov 20); a player sees their real rank, and nothing moves", async ({ page }) => {
   await named(page, "Leveled");
-  // A ranked account (Paragon 4 · 30 RP: reaching it takes many games, so the server's answer carries it), an admin once
+  // A ranked account (Paragon IV – 30: reaching it takes many games, so the server's answer carries it), an admin once
   // `admin` is set (as /api/me says for an email in ADMIN_EMAILS). The admin's address asks for Gold 3.
   let isAdmin = false;
   const real = rankView({ games: 40, ladder: 3 * 400 + 80 + 30 });
@@ -604,9 +604,9 @@ test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's
 
   // A player: their real rank (the ?rank= ignored) and their real level (Nov 9: from their XP); no rating rank's name (retired Oct 28).
   await page.goto("/?rank=gold-3");
-  await expect(sub).toHaveText("Paragon 4 · 30 RP");
+  await expect(sub).toHaveText("Paragon IV – 30");
   await settled();
-  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 4");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon IV");
   await expect(page.locator(".fd-level")).toHaveText("LVL 38");
   await expect(page.locator(".fd-level-ring")).toHaveCount(1);
   const player = await measure();
@@ -614,11 +614,11 @@ test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's
   // An admin: the same page, the test rank in the rank's place, the same ring and level; every box where it was.
   isAdmin = true;
   await page.reload();
-  await expect(sub).toHaveText("Gold 3 · 45 RP");
+  await expect(sub).toHaveText("Gold III – 45");
   await settled();
   await expect(page.locator(".fd-level")).toHaveCount(1);
   await expect(page.locator(".fd-level-ring")).toHaveCount(1);
-  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Gold 3");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Gold III");
   const admin = await measure();
   // (The tag is as wide as its words and centered, so a different rank ("Gold 3" for "Paragon 4") moves it sideways by half
   // the difference, and your pawn too when it stands beside the tag on a short card: those sideways boxes aren't compared,
@@ -714,4 +714,93 @@ test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's
       }
     }
   }
+});
+
+test("the season ladder (Eric, Nov 25): home's LADDER › on a phone, the side menu's Ladder on a computer; tabs in the RANKED row's order, 1 v 1 picked; the top 200 in one scroll; your row pinned with your place below them", async ({ page }) => {
+  await named(page, "Laddie");
+  // (Home first: its account, and the server's tables, made before the test writes to them.)
+  await page.goto("/");
+  await expect(page.getByRole("radiogroup", { name: "RANKED" })).toBeVisible();
+  // 230 players above anyone the other specs place (ids ld-e2e-…, made once per local database, the same every run).
+  const values = Array.from({ length: 230 }, (_, i) => `('ld-e2e-${i}', 'Ladder ${i}', 1, 1)`).join(", ");
+  const ranks = Array.from({ length: 230 }, (_, i) => `('ld-e2e-${i}', 2000, 60, 40, 24, 15, 1, ${9000 - i}, 1, 2)`).join(", ");
+  await localSql(page, `INSERT OR IGNORE INTO users (id, name, created_at, last_seen) VALUES ${values}; INSERT OR IGNORE INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at, streak) VALUES ${ranks}`);
+  // You: placed, low on the ladder (Gold), so your place is under the list's 200.
+  const me = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  await localSql(page, `INSERT OR REPLACE INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at, streak) VALUES ('${me}', 1500, 80, 12, 7, 5, 0, 1000, 1, 0)`);
+  const homeRow = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
+  // (Out of the flow at the end of the RANKED label's line: the row under it where it was, the label's gap (6 px) below the label.)
+  const label = (await page.locator("#fd-ranked-label").boundingBox())!;
+  expect(homeRow.y).toBeCloseTo(label.y + label.height + 6, 0);
+  const ladderIn = page.getByTestId("home-ladder");
+  await expect(ladderIn).toHaveText("LADDER");
+  const b = (await ladderIn.boundingBox())!;
+  expect(b.height, "a full tap target").toBeGreaterThanOrEqual(40);
+  expect(b.x + b.width).toBeLessThanOrEqual(homeRow.x + homeRow.width + 1);
+  // (Its box reaches over Squads' top edge: a tap there is still Squads', never the ladder's. Review m1, Nov 25.)
+  const squads = (await page.getByRole("radiogroup", { name: "RANKED" }).getByRole("radio", { name: /^Squads/ }).boundingBox())!;
+  // (A point on Squads' top edge under LADDER's box, past the corners' 10 px round.)
+  const [left, right] = [Math.max(b.x, squads.x + 12), Math.min(b.x + b.width, squads.x + squads.width - 12)];
+  expect(right - left, "the case this guards: LADDER's box over Squads' edge").toBeGreaterThan(2);
+  expect(b.y + b.height).toBeGreaterThan(squads.y + 1);
+  const atEdge = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("button")?.textContent ?? "", [(left + right) / 2, squads.y + 1]);
+  expect(atEdge).toContain("Squads");
+  if (desktop()) await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Ladder", exact: true }).click();
+  else await ladderIn.click();
+  await expect(page).toHaveURL(/\/ladder$/);
+  await expect(page.getByRole("heading", { name: "Ladder" })).toBeVisible();
+  // 50 v 50 · 1 v 1 · Squads, as home's row; 1 v 1 in the middle, picked; the others greyed, not hidden, and a tap says why.
+  const tabs = page.getByRole("tablist", { name: "Ranked mode" }).getByRole("tab");
+  await expect(tabs).toHaveText(["50 v 50No ranks yet", "1 v 1Ranked", "SquadsNo ranks yet"]);
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  // (A finger taps a greyed tab as any: `force`, since Playwright won't click what's aria-disabled.)
+  await tabs.nth(0).click({ force: true });
+  await expect(page.locator(".ld-note")).toHaveText("50 v 50 has no ranks of its own yet. Its ladder starts when its ranks do.");
+  // The top 200, one list: nothing in it but its rows (no "next" button), each a listitem holding the row's button, the places in order from 1.
+  const rows = page.locator(".ld-list > [role=listitem]");
+  await expect(rows).toHaveCount(LADDER.size);
+  await expect(page.locator(".ld-list > :not([role=listitem])")).toHaveCount(0);
+  await expect(page.locator(".ld-list > [role=listitem] > button")).toHaveCount(LADDER.size);
+  await expect(rows.first()).toContainText("Ladder 0");
+  const places = await rows.evaluateAll((els) => els.map((e) => Number(e.querySelector(".ld-place")!.textContent!.replace(/,/g, ""))));
+  expect(places[0]).toBe(1);
+  expect(places).toEqual([...places].sort((a, b) => a - b));
+  // Your row, pinned at the foot: your place (past the 230 above you), You (its label too), your rank.
+  const pin = page.locator(".ld-mine .ld-row.you");
+  await expect(pin).toContainText("Laddie");
+  await expect(pin).toHaveAttribute("aria-label", /^#[\d,]+ Laddie \(You\), Gold III/);
+  await expect(pin.locator(".ld-tag")).toHaveText("You");
+  await expect(pin.locator(".ld-rank")).toHaveText("Gold III – 40");
+  expect(Number((await pin.locator(".ld-place").textContent())!.replace(/,/g, ""))).toBeGreaterThan(230);
+  // Only the list scrolls: the page never does, and scrolling the list to its end keeps your row where it was.
+  const pinBox = (await pin.boundingBox())!;
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight)).toBeLessThanOrEqual(0);
+  expect(await sideways(page)).toBe(0);
+  await page.locator(".ld-list").evaluate((e) => (e.scrollTop = e.scrollHeight));
+  await expect(rows.last()).toBeInViewport();
+  expect((await pin.boundingBox())!.y).toBeCloseTo(pinBox.y, 0);
+  // A row's tap: that player's profile; its Back, the same list again (the kept answer, not asked again), scrolled where it was (its end).
+  const list = page.locator(".ld-list");
+  const belowView = () => list.evaluate((e) => e.scrollHeight - e.clientHeight - e.scrollTop);
+  let asked = 0;
+  page.on("request", (r) => void (r.url().includes("/api/ladder") && asked++));
+  await rows.last().click();
+  await expect(page.getByText("Ladder 199", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).first().click();
+  await expect(rows).toHaveCount(LADDER.size);
+  // (Its address too: the ladder's, not home's, so a reload keeps it. The delta review's D1.)
+  await expect(page).toHaveURL(/\/ladder(\?.*)?$/);
+  await expect.poll(belowView).toBeLessThanOrEqual(2);
+  expect(await list.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+  expect(asked, "the kept answer").toBe(0);
+  // Over a minute on the profile (review m5): Back asks again, and the list still comes back where it was.
+  await rows.last().click();
+  await expect(page.getByText("Ladder 199", { exact: true }).first()).toBeVisible();
+  await page.clock.install();
+  await page.clock.fastForward("01:05");
+  await page.getByRole("button", { name: "Back" }).first().click();
+  await expect.poll(() => asked).toBe(1);
+  await expect(rows).toHaveCount(LADDER.size);
+  await expect.poll(belowView).toBeLessThanOrEqual(2);
+  await expect(rows.last()).toBeInViewport();
 });

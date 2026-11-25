@@ -1250,6 +1250,10 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   await expect(babur).toHaveClass(/none/);
   // The admin's test grants: a key, then Babur's tokens.
   const grants = page.getByRole("region", { name: "Admin test grants" });
+  // (The page in its order, Nov 25: keys and crates, Ready to open, Boss tokens, More crates, and the admin's grants last of all, so the
+  // page above them is what every player sees.)
+  expect(await crates.evaluate((el) => [...el.children].filter((c) => c.matches("section")).map((c) => c.getAttribute("aria-label")))).toEqual(["Ready to open", "Boss tokens", "More crates", "Admin test grants"]);
+  expect(await grants.evaluate((el) => el === el.parentElement!.lastElementChild)).toBe(true);
   await grants.getByRole("button", { name: "+1 crate key" }).click();
   await expect(crates.getByText("Keys × 1")).toBeVisible();
   await grants.getByRole("combobox", { name: "Boss" }).selectOption("tiger");
@@ -1306,24 +1310,38 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   expect(mine(locker)).toHaveLength(0);
   expect([locker.tokens, locker.keys, locker.bossCrates]).toEqual([{}, 0, { "boss-tiger": 2 }]);
 
-  // The inventory (the Crates tab): Babur's crate with the other crates, "You have 2"; Puddles' greyed, "You have none".
+  // The inventory (the Crates tab): Babur's crate with the other crates, "You have 2". "Show unowned" unchecked (Eric, Nov 24): only the
+  // boss crates you hold; checked, every one (Puddles' greyed, "You have none"), and remembered on this device.
   await page.goto("/shop?crates");
   const row = page.locator('.boss-crate-row[data-crate="boss-tiger"]');
   await expect(row).toContainText("Babur's Boss Crate");
   await expect(row).toContainText("You have 2");
   await expect(row).not.toHaveClass(/none/);
-  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toContainText("You have none");
-  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toHaveClass(/none/);
+  const unowned = page.getByRole("checkbox", { name: "Show unowned" });
+  await expect(unowned).not.toBeChecked();
+  await expect(page.locator(".boss-crate-row")).toHaveCount(1);
   if (SHOTS) {
-    await row.scrollIntoViewIfNeeded();
+    await unowned.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/inventory-boss-crates-${test.info().project.name}.png` });
   }
+  await unowned.check();
+  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toContainText("You have none");
+  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toHaveClass(/none/);
+  expect(await page.locator(".boss-crate-row").count()).toBeGreaterThan(1);
+  if (SHOTS) {
+    await row.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}/inventory-boss-crates-unowned-${test.info().project.name}.png` });
+  }
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "Show unowned" })).toBeChecked();
+  await page.getByRole("checkbox", { name: "Show unowned" }).uncheck();
+  await expect(page.locator(".boss-crate-row")).toHaveCount(1);
   // Open it as any crate opens: the strip spins, then the reveal (an item from Babur's crate).
   await row.click();
   await expect(page.locator(".crate-held")).toHaveText("You have 2.");
   const open = page.getByRole("button", { name: /^▶ Open$/ });
   await open.click();
-  await expect(page.locator(".crate-opening .spin")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".crate-opening .cox-reel")).toBeVisible({ timeout: 15_000 });
   const reveal = page.locator(".reveal-card");
   await expect(reveal).toBeVisible({ timeout: 30_000 });
   const again = reveal.getByRole("button", { name: "▶ Open another" });
@@ -1331,7 +1349,7 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/boss-crate-reveal-${test.info().project.name}.png` });
   // The second, the last: then "Open another" is greyed (none left), and the page says so, its Open greyed.
   await again.click();
-  await expect(page.locator(".crate-opening .spin")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".crate-opening .cox-reel")).toBeVisible({ timeout: 15_000 });
   await expect(reveal).toBeVisible({ timeout: 30_000 });
   await expect(reveal.getByRole("button", { name: "▶ Open another" })).toBeDisabled();
   await reveal.getByRole("button", { name: "▶ Done" }).click();
@@ -1527,7 +1545,7 @@ test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words,
   expect(await held()).toBe(2);
   await got.getByRole("button", { name: "Open now" }).click();
   await expect(got).toBeHidden();
-  const opening = page.locator(".shop-opening .crate-opening");
+  const opening = page.getByTestId("crate-opening");
   await expect(opening).toBeVisible();
   await expect(opening.getByRole("heading", { level: 2 })).toHaveText("Boingo's Boss Crate");
   await expect.poll(held, { message: "opened: one fewer held" }).toBe(1);

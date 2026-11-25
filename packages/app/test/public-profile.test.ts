@@ -63,8 +63,8 @@ describe("Ranked Standing", () => {
     expect(RANKED_MODES.map((m) => m.label)).toEqual(["1v1", "50 v 50", "Squads"]);
   });
   it("the tier, the way the card names it", () => {
-    expect(tierTitle(rankAt("gold", 3))).toBe("Gold 3");
-    expect(tierTitle(rankAt("wood", 5, 0))).toBe("Wood 5");
+    expect(tierTitle(rankAt("gold", 3))).toBe("Gold III");
+    expect(tierTitle(rankAt("wood", 5, 0))).toBe("Wood V");
     expect(tierTitle(rankView({ games: 5, ladder: RANKED_1V1.topFloor + 120, place: 300 }, RANKED_1V1))).toBe("Pearlescent");
     expect(tierTitle(rankView({ games: 5, ladder: RANKED_1V1.topFloor + 120, place: 50 }, RANKED_1V1))).toBe("Transcendent");
     expect(tierTitle(rankView({ games: 2, ladder: null }, RANKED_1V1))).toBe("Placement 2/5");
@@ -76,7 +76,7 @@ describe("Ranked Standing", () => {
     expect(top.division).toBeNull();
   });
   it("peak rank: the tier and division, or a dash when there's none yet (placements not done)", () => {
-    expect(peakLine(rankAt("paragon", 4))).toBe("Peak rank: Paragon 4");
+    expect(peakLine(rankAt("paragon", 4))).toBe("Peak rank: Paragon IV");
     expect(peakLine(null)).toBe("Peak rank: —");
     expect(peakLine(rankView({ games: 2, ladder: null }, RANKED_1V1))).toBe("Peak rank: —");
   });

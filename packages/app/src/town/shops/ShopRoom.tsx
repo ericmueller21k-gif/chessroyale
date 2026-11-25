@@ -96,6 +96,13 @@ export interface RoomArt {
   poolBlend?: "multiply";
   /** Deep pieces that stand up at their foot, as any upright piece (Big Boy's airplane, flying round over three squares by three), not laid flat as a plan. */
   upright?: readonly string[];
+  /**
+   * Deep pieces that stand up along their depth, as a counter (Birdie's bar arms, 1 x 3, Nov 23): the picture's bottom card (its height
+   * less `d - 1` squares) stands at its south row as any upright piece; the rows above it recede north a square every 37, each thin slice
+   * standing at its own depth as a card would, so its top runs on as one straight edge at a card's height. Sorted with its north row's
+   * pieces, so what stands on it or against it draws over it.
+   */
+  counters?: readonly string[];
   /** Its battle circle's drawn start marks, when its art exports them (Big Boy's rug: the boss's west, yours east). */
   marks?: DrawnMarks;
   /** A room that isn't a box (Hollow's cave): its floor's shape, `.` floor and `#` rock (room.ts makeRoom blocks the rock). */
@@ -128,6 +135,16 @@ export interface RoomArt {
    * move) and its canvas drawn over the piece.
    */
   flaps?: { readonly piece: string; readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly board: { readonly canvas: HTMLCanvasElement; tick(now: number): boolean; text(): { title: string; rows: string[] } } };
+  /**
+   * A table standing in the room as its piece (Birdie's Station, Nov 23): its flat top, the renderer's slab and board (`paintTable`, no
+   * pieces, in `palette`), drawn over the piece, as every boss's battle table's lies flat. In a challenge the intro stands in for it.
+   */
+  tableTop?: { readonly piece: string; readonly palette: Readonly<Record<string, string>> };
+  /**
+   * Pieces that play for a challenge (Birdie's crossing gates, Nov 23): from you both on your marks, its `lower` once, then its `down` on
+   * and on until the battle takes the screen; their idle as the room stands. Each a piece of the room's own.
+   */
+  plays?: Readonly<Record<string, { readonly lower: string; readonly down: string }>>;
   /**
    * Its people (Rolling Dough's, Nov 11: the door guards, Don Dough and his crew), drawn from their art: each one's character and the
    * animations the room plays (drawn once as the room loads); who does what is its `scene`'s (shops/zebra-scene.ts).
@@ -260,8 +277,11 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
       lights: m.SHOP_BIRDIE_ROOM_LIGHTS,
       pools: m.SHOP_BIRDIE_ROOM_POOLS,
       upright: m.SHOP_BIRDIE_UPRIGHT,
+      counters: m.SHOP_BIRDIE_COUNTERS,
       marks: m.SHOP_BIRDIE_MARKS,
       flaps: m.birdieFlaps(performance.now()),
+      tableTop: m.SHOP_BIRDIE_TABLE_TOP,
+      plays: m.SHOP_BIRDIE_GATE_PLAYS,
     })),
   // (The Battle Tower's lobby, Nov 19: a 10 x 10 box room seen whole, its side walls one surface each (its scene, shops/tower-scene.ts,
   // the room's `fx`: Town.tsx); the empty "Best floors" board's head written by the game.)
@@ -778,13 +798,8 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
           </div>
         </div>
       )}
-      {got && opening && (
-        <div class="shop-bought-veil shop-opening-veil">
-          <div class="shop-opening crates" role="dialog" aria-label={got.name}>
-            <CrateOpening crate={got} force={{}} onClose={later} />
-          </div>
-        </div>
-      )}
+      {/* (The opening on its own layer, over the room: crate-open/, Nov 24.) */}
+      {got && opening && <CrateOpening crate={got} force={{}} onClose={later} />}
     </div>
   );
 }
@@ -856,6 +871,8 @@ interface Up {
   cut: number;
   /** How far into its loop it stands (ms; ShopPlace `t0`). */
   t0?: number;
+  /** A counter's squares deep (RoomArt `counters`): drawn in slices along its depth. */
+  deep?: number;
 }
 
 /** Runs the room in `box` on `cv`: the loop, the camera, the input and the cards. Returns its controls and its stop. */
@@ -1125,6 +1142,10 @@ function startRoom(
     const d = p.d ?? 1;
     const ch = art.pieces[p.name]!;
     const to = doorOf(p);
+    if (d > 1 && art.counters?.includes(p.name)) {
+      ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row, z: p.row - d + 1, ox: 0, oy: 0, flip: false, cut: 0, deep: d });
+      continue;
+    }
     if (d > 1 && !art.upright?.includes(p.name)) {
       // The plan lies flat on its w x d squares; the strip above its north row (its plants' tops) stands up there.
       flats.push(p);
@@ -2619,8 +2640,17 @@ function startRoom(
     // (Hollow's intro: a lantern going out, bulbs gone dark, the tree draining: its own frame, and its lit pixels for over the dark.)
     // (Ginger's intro: the stockroom door open while the board carriers come out.)
     // (The Battle Tower's floor: its elevator open, the scene's `swap`.)
-    const img = darkPiece(u, now) ?? frameAt(roomFx?.swap?.(u.name) ?? (iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name), now + (u.t0 ?? 0));
-    const ch = frames[u.name]!.ch;
+    // (Birdie's crossing gates: their `lower`, then their `down`, from you both on your marks: `plays`.)
+    const play = playing(u.name, now);
+    const img = play ? frameAt(play.name, play.t) : (darkPiece(u, now) ?? frameAt(roomFx?.swap?.(u.name) ?? (iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name), now + (u.t0 ?? 0)));
+    const ch = frames[play?.name ?? u.name]!.ch;
+    if (u.deep) {
+      g.globalAlpha = upAlpha(pt.depth, false, false);
+      upsN++;
+      drawCounter(u, img, ch);
+      g.globalAlpha = 1;
+      return;
+    }
     const s = pt.k / SQ;
     const fx = u.flip ? ch.w - 1 - ch.foot[0] : ch.foot[0];
     const h = u.cut || img.height;
@@ -2657,7 +2687,98 @@ function startRoom(
       g.drawImage(fl.board.canvas, x + fl.x * s, y + fl.y * s, fl.w * s, fl.h * s);
       g.imageSmoothingEnabled = false;
     }
+    // (A table's flat top over its leg: `tableTop`.)
+    if (art.tableTop && u.name === art.tableTop.piece) paintTable(g, v, u.c - camX, camY - u.r, art.tableTop.palette, "across", g.globalAlpha, 0);
     g.globalAlpha = 1;
+  };
+  /**
+   * A counter (RoomArt `counters`), its slices far to near: each `COUNTER_STEP` rows of its receding top, standing at its own depth with
+   * its top as far over its foot as the bottom card's is; where the camera sees past a side (the next, nearer slice's edge further in),
+   * that edge's columns up to the next slice's go down a card's height, as its side face. Then the bottom card, whole, at its south row.
+   * Its picture never changes, so as the back is (`still`), the second frame the view is the same its slices are drawn once into a
+   * canvas of its own, on the screen's pixels, and drawn from it while the view stays: one draw, not dozens. A view that moves draws
+   * them straight onto the room.
+   */
+  const COUNTER_STEP = 4;
+  const cX = new Float64Array(64);
+  const cY = new Float64Array(64);
+  const cS = new Float64Array(64);
+  const counterKept = new Map<Up, { cv: HTMLCanvasElement | null; key: Float64Array; prev: Float64Array; x: number; y: number; w: number; h: number }>();
+  const drawCounter = (u: Up, img: HTMLCanvasElement, ch: Character) => {
+    let k = counterKept.get(u);
+    if (!k) counterKept.set(u, (k = { cv: null, key: new Float64Array(7).fill(NaN), prev: new Float64Array(7).fill(NaN), x: 0, y: 0, w: 0, h: 0 }));
+    if (k.cv && sameBg(bgNow, k.key)) {
+      if (k.w > 0) g.drawImage(k.cv, 0, 0, k.w, k.h, k.x, k.y, k.w / DPR, k.h / DPR);
+      return;
+    }
+    const rec = (u.deep! - 1) * SQ;
+    const card = img.height - rec;
+    const [fx, fy] = ch.foot;
+    const iw = img.width;
+    // (Each slice's place first, the bottom card's last: its top row's left end on screen and its scale; NaN: not drawn.)
+    const n = Math.min(cX.length, Math.ceil(rec / COUNTER_STEP) + 1);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const a = Math.min(rec, i * COUNTER_STEP);
+      const ok = P(u.c, u.r - (rec - a) / SQ) && pt.depth > S.nearGone;
+      const s = pt.k / SQ;
+      cS[i] = ok ? s : NaN;
+      cX[i] = pt.x - fx * s;
+      cY[i] = pt.y + (rec - fy) * s;
+      if (!ok) continue;
+      x0 = Math.min(x0, cX[i]!);
+      y0 = Math.min(y0, cY[i]!);
+      x1 = Math.max(x1, cX[i]! + iw * s);
+      y1 = Math.max(y1, cY[i]! + card * s);
+    }
+    const rest = sameBg(bgNow, k.prev);
+    k.prev.set(bgNow);
+    let c: CanvasRenderingContext2D = g;
+    if (rest) {
+      // (The view rests: its own canvas, the part on screen, on whole device pixels.)
+      const X0 = Math.floor(Math.max(0, x0) * DPR);
+      const Y0 = Math.floor(Math.max(0, y0) * DPR);
+      const w = Math.max(0, Math.ceil(Math.min(W, x1) * DPR) - X0);
+      const h = Math.max(0, Math.ceil(Math.min(H, y1) * DPR) - Y0);
+      if (!k.cv) k.cv = document.createElement("canvas");
+      if (k.cv.width < w || k.cv.height < h) ((k.cv.width = Math.max(k.cv.width, w)), (k.cv.height = Math.max(k.cv.height, h)));
+      Object.assign(k, { x: X0 / DPR, y: Y0 / DPR, w, h });
+      k.key.set(bgNow);
+      c = k.cv.getContext("2d")!;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, k.cv.width, k.cv.height);
+      c.setTransform(DPR, 0, 0, DPR, -X0, -Y0);
+      c.imageSmoothingEnabled = false;
+      if (w === 0 || h === 0) return;
+    }
+    for (let i = 0; i < n; i++) {
+      const s = cS[i]!;
+      if (Number.isNaN(s)) continue;
+      const a = Math.min(rec, i * COUNTER_STEP);
+      const x = cX[i]!;
+      const y = cY[i]!;
+      if (i === n - 1) {
+        c.drawImage(img, 0, rec, iw, card, x, y, iw * s, card * s);
+        break;
+      }
+      const h = Math.min(COUNTER_STEP + 1, rec - a);
+      c.drawImage(img, 0, a, iw, h, x, y, iw * s, h * s);
+      const ns = cS[i + 1]!;
+      if (Number.isNaN(ns)) continue;
+      const wl = Math.min(iw, Math.ceil((cX[i + 1]! - x) / s) + 1);
+      if (wl > 1) c.drawImage(img, 0, a, wl, card, x, y, wl * s, card * s);
+      const wr = Math.min(iw, Math.ceil((x + iw * s - (cX[i + 1]! + iw * ns)) / s) + 1);
+      if (wr > 1) c.drawImage(img, iw - wr, a, wr, card, x + (iw - wr) * s, y, wr * s, card * s);
+    }
+    if (rest) g.drawImage(k.cv!, 0, 0, k.w, k.h, k.x, k.y, k.w / DPR, k.h / DPR);
+  };
+  /** A piece's play for the challenge now (`plays`: its `lower`, then its `down`, from you both on your marks), or null: its idle. */
+  const playing = (name: string, now: number): { name: string; t: number } | null => {
+    const pl = art.plays?.[name];
+    if (!pl || onMarksAt < 0 || now < onMarksAt) return null;
+    const t = now - onMarksAt;
+    const lower = frames[pl.lower]!.loop;
+    return t < lower ? { name: pl.lower, t } : { name: pl.down, t: t - lower };
   };
   /**
    * A sign's words (Boingo's price sign: "BOINGO'S POGO", "3 Boingo tokens"), written on its face in the room's own font, sized to fit
@@ -3549,7 +3670,7 @@ function startRoom(
     for (const [who, p] of Object.entries(ca.data.props)) {
       const a = c[who];
       if (!!p.over !== over || !a?.on) continue;
-      if (who === "board") {
+      if (who === "board" || who === "top") {
         if (!P(marks.table.c, marks.table.r)) continue;
         const dx = marks.table.c - camX;
         const dz = camY - marks.table.r;
@@ -3567,7 +3688,8 @@ function startRoom(
           g.save();
           g.translate(0, -up);
         }
-        paintTable(g, v, dx, dz, T.palette, marks.layout);
+        // ("top": the slab and board alone, no pieces, standing from the walk in: Birdie's table as his room has it.)
+        paintTable(g, v, dx, dz, T.palette, marks.layout, 1, who === "top" ? 0 : 1);
         if (up) g.restore();
         if (wet) g.restore();
         continue;
@@ -4912,6 +5034,8 @@ function startRoom(
       looks: bossLooks,
       mirrored: bossMirrored,
       line: !!introNow?.line && bossHead.on,
+      // (Birdie's crossing gates: what each plays now, "idle", "lower" or "down": `plays`.)
+      plays: art.plays ? Object.fromEntries(Object.entries(art.plays).map(([n, pl]) => [n, playing(n, now)?.name === pl.lower ? "lower" : playing(n, now) ? "down" : "idle"])) : null,
       // (Ginger's own: his move, the blast, the icicle, the table, the crack, the door, the carriers, the board, the light, the pieces.)
       ice: iceNow
         ? {

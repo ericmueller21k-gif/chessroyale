@@ -34,6 +34,10 @@ export const COMPUTER_LAYOUT = "(min-width: 900px) and (min-height: 600px)";
 /** A computer with a mouse (not a touch screen: a tablet on its side keeps its layout, Nov 1): the screens of Nov 1's
  * computer layout (the side menu, the boss bar at the top, the column's tools). */
 export const MOUSE_LAYOUT = "(min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine)";
+/** The 50 v 50's computer frame (Nov 26, Eric's approved mock; board-size.css, "The 50 v 50's frame"): a computer with a mouse wide
+ * enough for the scoreboard beside the board. Its top row is labeled, and the power-ups, the gear, the vote box and the chat are the
+ * column beside the board. */
+export const CROWD_FRAME = "(min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine)";
 
 /** A flag (resign), drawn so it looks the same everywhere (an emoji flag doesn't). */
 export function FlagIcon({ size = 18 }: { size?: number }) {
@@ -231,6 +235,12 @@ const openSeen = new Set<(o: Open) => void>();
 function setOpenNow(o: Open) {
   openNow = o;
   for (const f of openSeen) f(o);
+}
+
+/** Opens the match's Resign or Leave confirm, as its gear's row does (a screen's own Resign button: the 1 v 1's panel on a computer).
+ * The gear's control shows it, so a screen calling this has a MatchMenu with the same `exit`. */
+export function openExitConfirm() {
+  setOpenNow("confirm");
 }
 
 function useOpen(): [Open, (o: Open) => void] {

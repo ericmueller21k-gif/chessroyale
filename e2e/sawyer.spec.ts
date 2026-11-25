@@ -124,7 +124,8 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
     saw: { selector: '.sw-layer[data-split="saw"]' },
     crack: { selector: ".sw-layer .sw-crack" },
     apart: { selector: `.sw-layer[data-split="apart"] ${inAir}` },
-    line: { selector: ".bc-bubble", text: /Two for one!|Half off!|Double trouble!/ },
+    // (Or, in a first battle with the split, its power tip in his place (power-tips.ts, Nov 24).)
+    line: { selector: ".bc-bubble", text: /Two for one!|Half off!|Double trouble!|Measure once, cut twice!/ },
   });
   // (A quiet move: its knock is the plain move's.)
   await play(page, await allowedMove(page, ["g1f3", "b1c3", "g8f6", "b8c6", "h2h3", "h7h6"], { quiet: true }));

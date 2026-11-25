@@ -325,7 +325,7 @@ function dashed(): Cv {
 }
 one("aim", dashed);
 /** The queen lock's aim: one square of the dashed cyan line down her file (`on`, then the `aim` loop; `fade`). */
-export const QUEEN_AIM = fx("chandy-queen-aim", "The queen lock's aim", {
+export const QUEEN_AIM = fx("chandy-queen-aim", "The Lock-on Shot's aim", {
   on: () => ({ loop: false, frames: [{ ms: 80, layers: [L("aim", 1)], cue: "aim" }] }),
   aim: () => ({
     loop: true,
@@ -386,7 +386,7 @@ const sparks = (tick: number): Speck[] => {
  * The queen lock's round on one square: `pass` (it flies through, shedding sparks that cool and fade) and `hit` (the square it stops
  * on: its head reaches the piece's middle half a square in, where SHATTER takes over).
  */
-export const PIERCING_ROUND = fx("chandy-round", "The queen lock's piercing round", {
+export const PIERCING_ROUND = fx("chandy-round", "The Lock-on Shot's piercing round", {
   pass: () => {
     const q = BOSS_POWERS.chandy.shotStepMs / 4;
     return {

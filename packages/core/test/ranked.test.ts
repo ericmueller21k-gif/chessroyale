@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  divisionTitle,
+  romanDivision,
   DUEL_ZONES,
   RANKED_1V1,
+  colorHistoryGames,
   divisionsEnd,
   controlLabel,
-  duelCoins,
   duelControl,
   expectedScore,
+  firstGetsWhite,
   glickoUpdate,
   ladderRating,
   mayBeTop,
+  mulberry32,
   newRankedRecord,
   pairRange,
   pairUp,
@@ -23,6 +27,7 @@ import {
   zoneControl,
   type DuelZone,
   type RankedRecord,
+  type SeatColor,
 } from "../src/index.ts";
 
 const DAY = 86_400_000;
@@ -107,22 +112,27 @@ describe("the hidden rating (Glicko-1)", () => {
 });
 
 describe("the ladder", () => {
+  it("a division in Roman numerals, as the pill shows it (Eric, Nov 25): V to I; a top tier has none", () => {
+    expect([1, 2, 3, 4, 5].map(romanDivision)).toEqual(["I", "II", "III", "IV", "V"]);
+    expect(divisionTitle({ tier: "Gold", division: 3 })).toBe("Gold III");
+    expect(divisionTitle({ tier: "Transcendent", division: null })).toBe("Transcendent");
+  });
   it("tiers with divisions 5 → 1 of 80 RP (Wood 5 the lowest), at every edge", () => {
     const at = (ladder: number) => {
       const v = rankView({ games: 9, ladder });
       return [v.tier, v.division, v.points, v.label, v.emblem];
     };
-    expect(at(0)).toEqual(["Wood", 5, 0, "Wood 5 · 0 RP", "wood-d5"]);
-    expect(at(79)).toEqual(["Wood", 5, 79, "Wood 5 · 79 RP", "wood-d5"]);
-    expect(at(80)).toEqual(["Wood", 4, 0, "Wood 4 · 0 RP", "wood-d4"]);
-    expect(at(399)).toEqual(["Wood", 1, 79, "Wood 1 · 79 RP", "wood-d1"]);
-    expect(at(400)).toEqual(["Silver", 5, 0, "Silver 5 · 0 RP", "silver-d5"]);
-    expect(at(1245)).toEqual(["Paragon", 5, 45, "Paragon 5 · 45 RP", "paragon-d5"]);
-    expect(at(2399)).toEqual(["Sublime", 1, 79, "Sublime 1 · 79 RP", "sublime-d1"]);
-    expect(at(2400)).toEqual(["Radiant", 5, 0, "Radiant 5 · 0 RP", "radiant-d5"]);
-    expect(at(2799)).toEqual(["Radiant", 1, 79, "Radiant 1 · 79 RP", "radiant-d1"]);
+    expect(at(0)).toEqual(["Wood", 5, 0, "Wood V – 0", "wood-d5"]);
+    expect(at(79)).toEqual(["Wood", 5, 79, "Wood V – 79", "wood-d5"]);
+    expect(at(80)).toEqual(["Wood", 4, 0, "Wood IV – 0", "wood-d4"]);
+    expect(at(399)).toEqual(["Wood", 1, 79, "Wood I – 79", "wood-d1"]);
+    expect(at(400)).toEqual(["Silver", 5, 0, "Silver V – 0", "silver-d5"]);
+    expect(at(1245)).toEqual(["Paragon", 5, 45, "Paragon V – 45", "paragon-d5"]);
+    expect(at(2399)).toEqual(["Sublime", 1, 79, "Sublime I – 79", "sublime-d1"]);
+    expect(at(2400)).toEqual(["Radiant", 5, 0, "Radiant V – 0", "radiant-d5"]);
+    expect(at(2799)).toEqual(["Radiant", 1, 79, "Radiant I – 79", "radiant-d1"]);
     // (No place known: the top tiers need one. Radiant 1, the RP counting on past 79.)
-    expect(at(2800)).toEqual(["Radiant", 1, 80, "Radiant 1 · 80 RP", "radiant-d1"]);
+    expect(at(2800)).toEqual(["Radiant", 1, 80, "Radiant I – 80", "radiant-d1"]);
     expect(divisionsEnd()).toBe(2800);
     expect(RANKED_1V1.topFloor).toBe(divisionsEnd());
     const tiers = new Set<string>();
@@ -139,15 +149,15 @@ describe("the ladder", () => {
   it("the top tiers: from 2800 ladder points, Pearlescent in the top 500, Transcendent in the top 100", () => {
     const top = (ladder: number, place: number | null) => rankView({ games: 9, ladder, place }).label;
     // The floor: below 2800 no place counts.
-    expect(top(2799, 1)).toBe("Radiant 1 · 79 RP");
-    expect(top(2800, 1)).toBe("Transcendent · 0 RP");
-    expect(top(3120, 100)).toBe("Transcendent · 320 RP");
-    expect(top(3120, 101)).toBe("Pearlescent · 320 RP");
-    expect(top(2900, 500)).toBe("Pearlescent · 100 RP");
+    expect(top(2799, 1)).toBe("Radiant I – 79");
+    expect(top(2800, 1)).toBe("Transcendent – 0");
+    expect(top(3120, 100)).toBe("Transcendent – 320");
+    expect(top(3120, 101)).toBe("Pearlescent – 320");
+    expect(top(2900, 500)).toBe("Pearlescent – 100");
     // Outside the top 500: Radiant 1, the RP counting on past 80.
-    expect(top(2815, 501)).toBe("Radiant 1 · 95 RP");
-    expect(top(4000, 501)).toBe("Radiant 1 · 1280 RP");
-    expect(top(2815, null)).toBe("Radiant 1 · 95 RP");
+    expect(top(2815, 501)).toBe("Radiant I – 95");
+    expect(top(4000, 501)).toBe("Radiant I – 1280");
+    expect(top(2815, null)).toBe("Radiant I – 95");
     const t = rankView({ games: 9, ladder: 3000, place: 7 });
     expect([t.tier, t.division, t.points, t.emblem, t.color]).toEqual(["Transcendent", null, 200, "transcendent", RANKED_1V1.topTiers[1]!.color]);
     expect(rankView({ games: 9, ladder: 3000, place: 300 }).emblem).toBe("pearlescent");
@@ -200,10 +210,10 @@ describe("the ladder", () => {
     expect(ladderRating(0)).toBe(800);
     expect(ladderRating(2800)).toBeCloseTo(2400, 9);
     expect(placeLadder(1500)).toBe(1225);
-    expect(rankView({ games: 5, ladder: placeLadder(1500) }).label).toBe("Paragon 5 · 25 RP");
+    expect(rankView({ games: 5, ladder: placeLadder(1500) }).label).toBe("Paragon V – 25");
     expect(placeLadder(500)).toBe(0);
     expect(placeLadder(2390)).toBe(2400);
-    expect(rankView({ games: 5, ladder: placeLadder(3000) }).label).toBe("Radiant 5 · 0 RP");
+    expect(rankView({ games: 5, ladder: placeLadder(3000) }).label).toBe("Radiant V – 0");
   });
 
   it("rank points: ±20 between equals at par; more when the hidden rating is above the rank (within ±10)", () => {
@@ -284,8 +294,8 @@ describe("a rated game", () => {
 
   it("promotion and demotion are the 80s crossed, the excess carried", () => {
     const up = rankedGame(settled(1270), settled(1270), 1, DAY);
-    expect(up.change.before.label).toBe("Paragon 5 · 70 RP");
-    expect(up.change.after.label).toBe(`Paragon 4 · ${70 + up.change.points! - 80} RP`);
+    expect(up.change.before.label).toBe("Paragon V – 70");
+    expect(up.change.after.label).toBe(`Paragon IV – ${70 + up.change.points! - 80}`);
     expect(up.change.after.emblem).toBe("paragon-d4");
     const down = rankedGame(settled(1205), settled(1205), 0, DAY);
     expect(down.change.after.tier).toBe("Gold");
@@ -295,14 +305,14 @@ describe("a rated game", () => {
     const past = rankedGame(settled(2795), settled(2795), 1, DAY).change.after;
     expect([past.tier, past.division]).toEqual(["Radiant", 1]);
     expect(past.points).toBeGreaterThan(79);
-    expect(rankedGame(settled(2805), settled(2805), 0, DAY).change.after.label).toMatch(/^Radiant 1 · \d+ RP$/);
+    expect(rankedGame(settled(2805), settled(2805), 0, DAY).change.after.label).toMatch(/^Radiant I – \d+$/);
   });
 
   it("the floor: never below Wood 5 0", () => {
     const r = rankedGame(settled(5), settled(5), 0, DAY);
     expect(r.change.points).toBeLessThan(-5);
     expect(r.next.ladder).toBe(0);
-    expect(r.change.after.label).toBe("Wood 5 · 0 RP");
+    expect(r.change.after.label).toBe("Wood V – 0");
     expect(rankedGame(r.next, settled(0), 0, DAY).next.ladder).toBe(0);
   });
 
@@ -365,13 +375,99 @@ describe("pairing by the hidden rating", () => {
   });
 });
 
-describe("coins", () => {
-  it("by the minute, by result, at least 1 and at most the cap; nothing under 10 moves each", () => {
-    expect(duelCoins("win", 6 * 60_000, 30)).toBe(14);
-    expect(duelCoins("draw", 6 * 60_000, 30)).toBe(10);
-    expect(duelCoins("loss", 6 * 60_000, 30)).toBe(5);
-    expect(duelCoins("loss", 20_000, 10)).toBe(1);
-    expect(duelCoins("win", 3 * 60 * 60_000, 80)).toBe(70);
-    expect(duelCoins("win", 6 * 60_000, 9)).toBe(0);
+describe("colors: who gets White as a pair is seated (Eric, Nov 25)", () => {
+  /** A player's colors in their last games, newest first ("wb": White last time, Black the time before). */
+  const h = (s: string) => [...s] as SeatColor[];
+  const heads = () => true;
+  const tails = () => false;
+  const noCoin = () => {
+    throw new Error("decided without the coin");
+  };
+
+  it("whoever had Black more over their last 10 gets White, whichever of the two is first", () => {
+    expect(firstGetsWhite(h("bwb"), h("wbw"), noCoin)).toBe(true);
+    expect(firstGetsWhite(h("wbw"), h("bwb"), noCoin)).toBe(false);
+    // A new player (no games) against one who has had White more: the new player gets White; against Black more, Black.
+    expect(firstGetsWhite([], h("wbw"), noCoin)).toBe(true);
+    expect(firstGetsWhite([], h("bwb"), noCoin)).toBe(false);
+    // Only the last 10 count: Ann's six older Blacks don't, so it's even, and Bob had Black last.
+    expect(firstGetsWhite(h("wb".repeat(5) + "bbbbbb"), h("bw".repeat(5)), noCoin)).toBe(false);
+  });
+
+  it("a tie: the one who had Black in their last game; still tied, a coin flip", () => {
+    expect(firstGetsWhite(h("wb"), h("bw"), noCoin)).toBe(false);
+    expect(firstGetsWhite(h("bw"), h("wb"), noCoin)).toBe(true);
+    expect(firstGetsWhite(h("bw"), h("bw"), heads)).toBe(true);
+    expect(firstGetsWhite(h("bw"), h("bw"), tails)).toBe(false);
+    expect(firstGetsWhite([], [], heads)).toBe(true);
+    expect(firstGetsWhite([], [], tails)).toBe(false);
+  });
+
+  it("never a third game in a row on one color when the other player can take it, even against the balance", () => {
+    // Ann had White in her last two but Black far more before; Bob is even. The balance alone would give Ann a third White.
+    expect(firstGetsWhite(h("wwbbbbbbbb"), h("bwbwbwbwbw"), noCoin)).toBe(false);
+    // Bob had Black in his last two: White, though Ann has had Black more.
+    expect(firstGetsWhite(h("bwbbbbbbbb"), h("bbwwwwwwww"), noCoin)).toBe(false);
+    // One due White, the other due Black: both get theirs.
+    expect(firstGetsWhite(h("ww"), h("bb"), noCoin)).toBe(false);
+    expect(firstGetsWhite(h("bb"), h("ww"), noCoin)).toBe(true);
+    // Two in a row is fine: Ann had White once, then Black more: White again.
+    expect(firstGetsWhite(h("wbb"), h("bww"), noCoin)).toBe(true);
+  });
+
+  it("both in the same bind (one of them has to play a third in a row): the longer run switches, then the balance, the last game, the coin", () => {
+    // Ann's third White in a row couldn't be helped last time: she gets Black now, though the balance alone says White (a fourth).
+    expect(firstGetsWhite(h("wwwbbbbbbb"), h("wwbwbw"), noCoin)).toBe(false);
+    expect(firstGetsWhite(h("bbwbwb"), h("bbbwwwwwww"), noCoin)).toBe(false);
+    // The same run: the balance.
+    expect(firstGetsWhite(h("wwbbb"), h("wwb"), noCoin)).toBe(true);
+    expect(firstGetsWhite(h("bbw"), h("bbwww"), noCoin)).toBe(true);
+    expect(firstGetsWhite(h("ww"), h("ww"), heads)).toBe(true);
+    expect(firstGetsWhite(h("ww"), h("ww"), tails)).toBe(false);
+  });
+
+  it("the numbers come from the settings", () => {
+    const S = { ...RANKED_1V1, colors: { recentGames: 16, maxInRow: 3 } };
+    // Three in a row allowed: Ann's balance gives her a third White; never a fourth.
+    expect(firstGetsWhite(h("wwbbbbbbbb"), h("bwbwbwbwbw"), noCoin, S)).toBe(true);
+    expect(firstGetsWhite(h("wwwbbbbbbbbb"), h("bwbwbwbwbw"), noCoin, S)).toBe(false);
+    // The last 16: Ann's older Blacks count now.
+    expect(firstGetsWhite(h("wb".repeat(5) + "bbbbbb"), h("bw".repeat(5)), noCoin, S)).toBe(true);
+    // How many games the server reads: enough for both rules.
+    expect(colorHistoryGames()).toBe(RANKED_1V1.colors.recentGames);
+    expect(colorHistoryGames({ ...RANKED_1V1, colors: { recentGames: 1, maxInRow: 2 } })).toBe(2);
+  });
+
+  it("played out: the same two players alternate; in a pool paired at random, colors stay even and runs short", () => {
+    const rng = mulberry32(25);
+    const coin = () => rng() < 0.5;
+    // Two players, again and again: White and Black in turn.
+    const two: SeatColor[][] = [[], []];
+    for (let g = 0; g < 8; g++) {
+      const aWhite = firstGetsWhite(two[0]!.slice(0, 10), two[1]!.slice(0, 10), coin);
+      two[0]!.unshift(aWhite ? "w" : "b");
+      two[1]!.unshift(aWhite ? "b" : "w");
+    }
+    expect(two[0]!.join("")).toMatch(/^(wb){4}$|^(bw){4}$/);
+    // Twelve players, 300 rounds of random pairs.
+    const all: SeatColor[][] = Array.from({ length: 12 }, () => []);
+    for (let round = 0; round < 300; round++) {
+      const order = [...all.keys()].sort(() => rng() - 0.5);
+      for (let i = 0; i < order.length; i += 2) {
+        const [a, b] = [all[order[i]!]!, all[order[i + 1]!]!];
+        const aWhite = firstGetsWhite(a.slice(0, 10), b.slice(0, 10), coin);
+        a.unshift(aWhite ? "w" : "b");
+        b.unshift(aWhite ? "b" : "w");
+      }
+    }
+    // (Measured over 40 seeds, Nov 25: in any 10 games in a row, Whites and Blacks at most 4 apart, the longest run 3; a coin flip's: 10 and 16.)
+    for (const p of all) {
+      for (let i = 0; i + 10 <= p.length; i++) {
+        const whites = p.slice(i, i + 10).filter((c) => c === "w").length;
+        expect(Math.abs(2 * whites - 10), `games ${i}-${i + 9}`).toBeLessThanOrEqual(4);
+      }
+      // A third in a row only when both were in the same bind; never a fourth.
+      expect(p.join("")).not.toMatch(/wwww|bbbb/);
+    }
   });
 });

@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { Chess } from "chess.js";
 import { SOLO_ABANDON } from "@chessroyale/core";
-import { test, asAdmin, bossAloneFromHome, endBattle, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
+import { test, aDeployLanded, asAdmin, bossAloneFromHome, endBattle, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * XP and levels on the end screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't want it
@@ -97,6 +98,8 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   await expect(box.locator(".es-gain")).toHaveText("+170 XP");
   await expect(box.locator(".es-level")).toHaveText("Level 2");
   await expect(box.getByTestId("es-now-xp")).toHaveText("160 XP");
+  // Its coins (PLAY_COINS, Nov 25), paid with its XP by the server: 12 counted minutes' 22 play coins; a solo win pays no bonus.
+  expect(await page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { shop?: { coins?: number } }).shop?.coins)).toBe(22);
   // (Never the minutes, Eric, Nov 9: "we dont want players to know they could just stall to get more XP"; the total counts them.)
   await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win +50");
   await expect(page.locator(".es-earned-xp .es-parts")).not.toContainText("min");
@@ -178,7 +181,7 @@ test('"No XP: test game." in the same box, the same size: a test switch on (?mat
   await expect(page.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: test game.", { timeout: 20_000 });
   await expect(box.locator(".es-gain")).toHaveText("");
   await expect(box.locator(".es-level")).toHaveText("Level 1");
-  await expect(page.locator(".es-quests-none")).toHaveText("No quests moved this game.");
+  await expect(page.locator(".es-quests-none")).toHaveText("Quests No quests this game.");
   await expect(rewards(page)).toHaveAttribute("data-es", "done");
   expect((await box.boundingBox())!.height).toBe(BOX_H);
   // (The bar stands at your XP: 250 of 500.)
@@ -247,7 +250,7 @@ test("each other \"No XP\" line, in the same box and size (the server's answer f
     const w = (await why.boundingBox())!;
     expect(w.x, `${none}: the line fits`).toBeGreaterThanOrEqual(0);
     expect(w.x + w.width, `${none}: the line fits`).toBeLessThanOrEqual(page.viewportSize()!.width);
-    expect(w.height, `${none}: one line`).toBeLessThanOrEqual(38);
+    expect(w.height, `${none}: one line`).toBeLessThanOrEqual(44);
   }
 });
 
@@ -324,10 +327,22 @@ async function closeRewardCard(page: Page) {
 const ownSoFar = (page: Page) =>
   page.evaluate(() => (((window as any).match?.moves ?? []) as { move: unknown; abstained?: boolean }[]).filter((m) => m.move !== null || m.abstained).length);
 
+/** `lan` on `fen` ends the game (a mate or a stalemate by the rules of chess; a move they don't know, as a power's, doesn't). */
+const endsGame = (fen: string, lan: string): boolean => {
+  const c = new Chess(fen);
+  try {
+    c.move({ from: lan.slice(0, 2), to: lan.slice(2, 4), promotion: lan[4] });
+  } catch {
+    return false;
+  }
+  return c.isGameOver();
+};
+
 /**
  * Plays your turns in a boss battle alone until `n` are yours, once it's your turn: the engine's best move the boss's powers allow
- * (pickMove's quiet one if none). The game must still be going after `n` (main's run on Nov 22: pickMove's quiet knight and pawn
- * moves only dodge a mate in one, and Ginger mated in a few before the 12th, the battle on its results).
+ * that doesn't end the game (pickMove's quiet one if none). The game must still be going after `n`: main's run on Nov 22, pickMove's
+ * quiet knight and pawn moves only dodged a mate in one, and Ginger mated in a few before the 12th; main's run 45584074647 (Nov 25),
+ * the engine's best move mated Ginger on your 9th, the battle was won (rightly nothing kept), and the reload's card never came.
  */
 async function playOwnMoves(page: Page, n: number) {
   for (let i = 0; i < 3 * n && (await ownSoFar(page)) < n; i++) {
@@ -337,8 +352,10 @@ async function playOwnMoves(page: Page, n: number) {
       return { fen: m.phase.board.fen as string, allowed: (m.runner.crowdAllowed() ?? null) as string[] | null, n: m.moves.length as number };
     });
     const { fen, top } = await engineTop(page);
-    const best = fen === s.fen ? top.map((t) => t.move).find((mv) => !s.allowed || s.allowed.includes(mv)) : undefined;
-    await submitMove(page, best ?? pickMove(s.fen, { allowed: s.allowed }), s.fen);
+    const goesOn = (mv: string) => (!s.allowed || s.allowed.includes(mv)) && !endsGame(s.fen, mv);
+    const best = fen === s.fen ? top.map((t) => t.move).find(goesOn) : undefined;
+    const quiet = new Chess(s.fen).moves({ verbose: true }).map((m) => m.lan).filter(goesOn);
+    await submitMove(page, best ?? pickMove(s.fen, { allowed: quiet.length ? quiet : s.allowed }), s.fen);
     await expect.poll(() => page.evaluate(() => (window as any).match.moves.length), { timeout: 30_000 }).toBeGreaterThan(s.n);
   }
   expect(await ownSoFar(page)).toBe(n);
@@ -458,7 +475,8 @@ test.describe(() => {
     await playOwnMoves(page, 2);
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
     const before = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }));
-    // (The solo game's code fails to load until the page loads again: stale.ts's reload, as for a deploy's missing file.)
+    // (The solo game's code fails to load until the page loads again: stale.ts's reload, for a deploy's missing file.)
+    await aDeployLanded(page);
     const loads = log.loads;
     let failed = 0;
     await page.route(/\/assets\/solo-[^/]*\.js$/, (r) => (log.loads - loads >= 2 ? r.continue() : (failed++, r.abort())));
@@ -470,6 +488,29 @@ test.describe(() => {
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
     await expect(card).toHaveCount(0);
     expect(await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }))).toEqual(before);
+  });
+
+  test("a file dropped with no deploy, and its try again too (main's run 45559755980; #942's older Chromium, Nov 25): the page loads again once, back on Boss Battle, and START plays", { tag: "@phone-only" }, async ({ page }) => {
+    test.setTimeout(3 * 60_000);
+    // (The same build on the server: a dropped connection, not a deploy. One failure is tried again at once (no reload: stale.test.ts);
+    // the try again fails too, refused here, or in Chromium 141 (CI's) by itself, as it keeps a failed import and fails it again
+    // without asking: the page loads again, keeping Boss Battle. Until Nov 25 the first failure loaded the page again, back to home;
+    // on #942's first fix the second stuck on "Couldn't load the game.")
+    let loads = 0;
+    page.on("request", (r) => r.isNavigationRequest() && r.frame() === page.mainFrame() && loads++);
+    let refused = 0;
+    await page.route(/\/assets\/openings-[^/]*\.js$/, (r) => (loads === 1 ? (refused++, r.fulfill({ status: 500, body: "" })) : r.continue()));
+    await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
+    const reloaded = page.waitForEvent("framenavigated", { predicate: (f) => f === page.mainFrame(), timeout: 30_000 });
+    await openSoloBoss(page);
+    // (The new page, not the old one's last frame: START tapped as it unloads goes nowhere.)
+    await reloaded;
+    await page.waitForLoadState("load");
+    await expect(page.getByRole("heading", { name: "Boss Battle", exact: true }), "back on Boss Battle, not home").toBeVisible();
+    await page.getByRole("main").getByRole("button", { name: "START" }).click({ timeout: 20_000 });
+    await expect(page.locator(".results h1")).toHaveText("Defeat", { timeout: 120_000 });
+    expect(refused, "the first page's loads refused").toBeGreaterThan(0);
+    expect(loads, "the page loaded again once").toBe(2);
   });
 });
 

@@ -386,6 +386,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A test that pulls the test trigger (`triggerUltimate`) states that it took (`powers.ultNext`): it's refused while an ultimate is
     warned-and-coming or under way, and a later one from the meter then passes for it. The test sets its moment up only when nothing is
     pending (`powers.warned`, `powers.ultAt`), never counting on the meter staying low.
+- **A zzz read cleared while the last frame still drew it** (Nov 25, `docs/decisions/2026-11-25-town-afk-drawn-race.md`): a hook's "drawn"
+  (`__townHere().drawn`, `tag`, `dressed` and the like) is what the last frame drew; the state it follows (a server's answer, a timer)
+  changes between frames. Poll the state and what was drawn together, in one read (`[zzz, drawn]`), never one then the other: the
+  second read can come before the next frame.
 
 ## Eric's rules hold
 
@@ -455,3 +459,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **A test never waits to catch a moment live** (Nov 22, main's run on d30c64b: a shared floor's test polled for Grex's turn and
   it passed between two polls): a phase that can last under a second (a boss's quick turn, a reveal, a banner) is recorded every frame
   by an init script and read afterward; poll only for states that hold until the player acts.
+
+- **A typed "hello" that never left** (Nov 25, [story](../docs/history/lessons.md#a-typed-hello-that-never-left-nov-25-2026)):
+  - Code that passes a message between two protocols forwards it whole (spread it, leave off only what the other side can't take),
+    never rebuilt field by field: a field added later is dropped silently.
+  - A feature added to every mode gets one real use in each mode's e2e (a typed line in a lobby, a team match, a 1 v 1), not only in one.
+
+- **Folio's Draft that never came in the smoke** (Nov 25, [story](../docs/history/lessons.md#folios-draft-that-never-came-in-the-smoke-nov-25-2026)):
+  - A passive's test switch (`?power=<passive>`) makes its condition certain from its start, whatever the engine plays: a fixed start
+    position where needed (BALLOON_TEST_MOVES, REPAINT_TEST_MOVES), proved over every reply in a unit test. A crowd line in the smoke
+    that bets on the engine's choice (SMOKE_FIRST) is a patch, not the fix.

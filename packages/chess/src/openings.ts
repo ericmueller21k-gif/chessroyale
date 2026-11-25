@@ -1,5 +1,6 @@
 import type { Rng } from "@chessroyale/core";
 import { shuffle } from "@chessroyale/core";
+import { fenAfter, inCheck } from "./rules.ts";
 
 /**
  * The opening library: positions reached by named lines from the Lichess
@@ -24,10 +25,23 @@ export interface Opening {
   expected: Record<number, number>;
 }
 
-/** True if the line can be played to `plies` and lands inside the balance window. */
+const checkStarts = new Map<string, boolean>();
+
+/**
+ * True if the line, played to `plies`, leaves the side to move in check: a forced first move, e.g. the Steinitz Gambit's
+ * 4...Qh4+ (Eric, Nov 25-26: no opening of any mode starts in check). Worked out once per line and length.
+ */
+export function startsInCheck(o: Opening, plies: number): boolean {
+  const key = `${o.id}|${o.moves.slice(0, plies).join(" ")}`;
+  let c = checkStarts.get(key);
+  if (c === undefined) checkStarts.set(key, (c = inCheck(fenAfter(o.moves.slice(0, plies)))));
+  return c;
+}
+
+/** True if the line can be played to `plies`, lands inside the balance window and doesn't leave the side to move in check. */
 export function usableAt(o: Opening, plies: number, window: readonly [number, number]): boolean {
   const e = o.expected[plies];
-  return e !== undefined && o.moves.length >= plies && e >= window[0] && e <= window[1];
+  return e !== undefined && o.moves.length >= plies && e >= window[0] && e <= window[1] && !startsInCheck(o, plies);
 }
 
 /**

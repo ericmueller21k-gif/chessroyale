@@ -362,7 +362,7 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   // winner, their pawns in its zone, and a line above the board says so.
   expect(await pages[0]!.evaluate(() => (window as any).match.phase.vote.until - (window as any).match.phase.vote.startsAt)).toBe(8000);
   for (const p of pages) {
-    await expect(p.locator(".vote-hint")).toHaveText("You didn't vote, so you're with the crowd.", { timeout: 15_000 });
+    await expect(p.locator(".vote-hint")).toHaveText("No vote: you're with the crowd.", { timeout: 15_000 });
     const end = await p.evaluate(() => {
       const m = (window as any).match;
       const v = m.phase.vote;

@@ -62,7 +62,10 @@ export type KingCue =
   | "rushAsk"
   | "rushWell"
   // Don Dough's dough landing on the board (Nov 11).
-  | "dough";
+  | "dough"
+  // Chandy's Lock-on Shot aimed (Nov 24): at your queen, or at a rook.
+  | "shotQueen"
+  | "shotRook";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   // One of these as the battle begins (Eric, Oct 9: one opening line, from a much bigger pool).
@@ -149,6 +152,11 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   ],
   // Don Dough's lump landing on the board (Nov 11): once a drop.
   dough: ["Squash it before it rises!"],
+  // Chandy's Lock-on Shot, as its aim shows (Eric, Nov 24: "the god king should say something about like, you know, move your queen
+  // behind safety"). The round follows its target down whatever file it ends on, so the way out is a piece in front of it (his words
+  // say so: never "out of the line"). Quiet when no move of yours can put one there.
+  shotQueen: ["He's aiming down our queen's file. Put a piece in front of her!", "That rifle's on our queen. Get her behind a pawn!", "Lock-on! Block the line to our queen!"],
+  shotRook: ["He's aiming down our rook's file. Put a piece in front of it!", "That rifle's on our rook. Get it behind a pawn!", "Lock-on! Block the line to our rook!"],
   // Dash's Scramble Rush (Eric, Nov 6): after his sweep, and the crowd putting enough of the pieces back. Said whether he has
   // fallen or not (his Last Stand spent): the test needs his word.
   rushAsk: ["Put the pieces back where they came from. Hurry!", "Every piece to its own square. Quickly now!", "You saw the board. Set it right, fast!"],
@@ -199,6 +207,8 @@ const KIND: Record<KingCue, Kind> = {
   rushAsk: "critical",
   rushWell: "critical",
   dough: "critical",
+  shotQueen: "critical",
+  shotRook: "critical",
 };
 
 /** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */
@@ -216,6 +226,21 @@ let fallen = false;
 export function setKingFallen(on: boolean) {
   fallen = on;
 }
+export const kingFallen = () => fallen;
+
+/**
+ * A power tip's exchange (power-tips.ts) is his word for its moment (Nov 24: no double talk): his other lines are held until his part
+ * of it is over, but for those that answer your own call or his fall (`THROUGH_HOLD`). `battle`: a new number at each reset, so a tip
+ * is decided once a battle.
+ */
+let heldUntil = 0;
+let battle = 0;
+/** His other lines held until `until` (set again as the tip goes on: once his part is said, to the end of its time). */
+export function holdKing(until: number) {
+  heldUntil = until;
+}
+export const kingBattle = () => battle;
+const THROUGH_HOLD: ReadonlySet<KingCue> = new Set(["struck", "kingPlays", "lastStand", "lastWords", "rise", "rushAsk", "rushWell"]);
 
 /** The line in his Last Stand's banner: the same on every screen for the same move. */
 export function lastStandLine(seed: string): string {
@@ -243,6 +268,8 @@ export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => 
   // Fallen, he stays silent (Eric, Oct 9: the blizzard's word too), but for his last words and his return.
   // (Dash's Scramble Rush: his word with it, fallen or not.)
   if (fallen && cue !== "lastWords" && cue !== "rise" && cue !== "rushAsk" && cue !== "rushWell") return null;
+  // (A power tip's exchange is his word just now.)
+  if (now < heldUntil && !THROUGH_HOLD.has(cue)) return null;
   if (spoken.has(key)) return null;
   spoken.add(key);
   if (spoken.size > 300) spoken.clear();
@@ -278,6 +305,8 @@ export function kingLine(now = Date.now()): Spoken | null {
 export function resetKingSpeech() {
   kingVoice.reset();
   fallen = false;
+  heldUntil = 0;
+  battle++;
   lastAt = 0;
   quietMoves = 0;
   moveNo = 0;

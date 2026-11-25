@@ -15,12 +15,13 @@ import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import { isCrowdFifty } from "../game.ts";
 import type { BoardView, GameView, StallState, StrikeState } from "../game.ts";
 import { LOCKED_PHONE, UnderBoard, useMedia } from "../components/QuickChat.tsx";
+import { CROWD_FRAME } from "../components/MatchMenu.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
-import { LiveGhosts, OneVOneBanner } from "./Crowd.tsx";
+import { LiveGhosts, OneVOneBanner, SlotIdle, SlotSkeleton } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, battleDecor, crowdView } from "../components/BossPowers.tsx";
 import { goldClink, zebraGold } from "../components/Zebra.tsx";
 import { DarkForced, HOLLOW_BULB_LINES, HollowBlackout, hollowTaunt } from "../components/Hollow.tsx";
@@ -139,7 +140,8 @@ export function PlayScreen({
   // keeps its place through every phase; a computer keeps the row under the board.)
   // (50 v 50 only: a boss raid and the boss final keep the power-up row under the board, as on main.)
   const fifty = isCrowdFifty(match);
-  const lockedPhone = useMedia(LOCKED_PHONE) && fifty;
+  // (The power-up row in the box beside or under the board: a phone's middle box, and a computer's column in the 50 v 50's frame, Nov 26.)
+  const powerInBox = [useMedia(LOCKED_PHONE), useMedia(CROWD_FRAME)].some(Boolean) && fifty;
   const powerRow = match.boss ? null : (
     <HistoryNav view={history} total={board.history.length} extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />} />
   );
@@ -330,7 +332,7 @@ export function PlayScreen({
           </Board>
         </div>
         {/* (On a phone the power-up row is in the middle box below, with the status line: see the footer.) */}
-        {!match.boss && !lockedPhone && powerRow}
+        {!match.boss && !powerInBox && powerRow}
       </div>
       {match.boss ? (
         <BossDock
@@ -439,7 +441,9 @@ export function PlayScreen({
         />
       ) : (
         <div class="play-footer">
-        {lockedPhone && powerRow}
+        {powerInBox && powerRow}
+        {/* (A computer's 50 v 50: the vote box's skeleton rows wait in the slot between reveals, Nov 25: Crowd.tsx.) */}
+        <SlotSkeleton match={match} />
         {/* (A 50 v 50's status slot: one fixed height in every phase, empty while picking, so nothing below moves: styles.css.) */}
         <div class={fifty ? "play-slot" : undefined}>
         {waiting ? (
@@ -467,6 +471,8 @@ export function PlayScreen({
               </ol>
             )}
             {hint && hint.length === 0 && <p class="muted small hints-wait">Asking the engine…</p>}
+            {/* (A 50 v 50's status box always shows, Eric, Nov 26: on your own pick, a quiet gray "Waiting…" in its place.) */}
+            {fifty && !hint && <SlotIdle />}
           </>
         )}
         </div>

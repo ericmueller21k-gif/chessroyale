@@ -1,0 +1,5 @@
+# Folio's `?power=draft` starts with its queen on d5 (Nov 25, 2026)
+
+- Main's run 45680679144 (f9caf55, after #953) went red: boss-smoke's Folio, `{ passive: false, ultimate: true }`; passed on its retry, both runs near the 70 s deadline.
+- Cause: the Draft marks only a defended piece of yours that Folio attacks with nothing cheaper. From the usual start the smoke's knight shuffle (Na3, Nb1, Na3…) keeps your pieces home, so the Draft came only when Folio happened to open its f8 bishop onto a3 while the knight stood there: turn 4 or later, sometimes never. No line of yours can force it from the usual start: Folio can keep its own pieces home too (checked over every reply).
+- Fix (my call, boss lane): `?power=draft` now starts from BALLOON_TEST_MOVES (1.e4 d5 2.exd5 Qxd5), as Don Dough's `?power=dough` and Smudgy's `?power=repaint` do. After the smoke's first move (Na3), all 47 of Folio's replies leave a mark, so the Draft comes as turn 2 begins (unit test in folio.test.ts). The smoke and its assertion are unchanged. Play is unchanged: only the test link's start moves.

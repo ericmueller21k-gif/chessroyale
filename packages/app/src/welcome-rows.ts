@@ -81,3 +81,12 @@ export function welcomeResumeRow(rows: readonly WelcomeRowView[]): number {
   const opened = rows.filter((r) => r.state === "opened");
   return opened.length ? opened[opened.length - 1]!.n : 1;
 }
+
+/**
+ * The Welcome Crate rows the Crates tab lists (Eric, Nov 25: "these welcome crates go away once they've been used ... they just shouldn't
+ * even appear"; his own exception to "nothing hidden"): every row still to open (locked with its meter, or ready), and an opened one only
+ * while its reveal hasn't been seen (`unseenRow`: the row an unseen Welcome Crate's reveal resumes on, else null). Order kept.
+ */
+export function welcomeRowsShown(rows: readonly WelcomeRowView[], unseenRow: number | null = null): WelcomeRowView[] {
+  return rows.filter((r) => r.state !== "opened" || r.n === unseenRow);
+}

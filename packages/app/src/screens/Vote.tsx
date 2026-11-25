@@ -30,6 +30,10 @@ import { play } from "../sound.ts";
 import { useBoardAnimations } from "../hooks.ts";
 import { pausedBosses, useServerStatus } from "../status.ts";
 import { VoteHint, useVoteHint } from "../components/VoteHint.tsx";
+import { VoteZoneTags } from "../components/VoteZoneTags.tsx";
+import { VoteZoneHits } from "../components/VoteZoneHits.tsx";
+import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
+import { CROWD_FRAME } from "../components/MatchMenu.tsx";
 
 /** No pieces while the votes run: only everyone's pawns. */
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
@@ -41,7 +45,7 @@ const RESET_MS = 650;
 const LEAVE_MS = 950;
 /** …and the real pieces drop into the starting position (they're down by the time the game's screen takes over). */
 const DROP_MS = 700;
-/** Time's up: "Didn't vote? You're with the crowd" shows above the board this long after the last of them lands. */
+/** Time's up: "No vote? You're with the crowd" shows above the board this long after the last of them lands. */
 const CROWD_LINE_MS = 1100;
 
 type Orientation = "white" | "black";
@@ -105,7 +109,7 @@ export interface VoteHost {
  * White's scattered over ranks 1-2 and Black's over ranks 7-8. Yours is solid and a little bigger (voteYouScale);
  * everyone else's is a faint ghost. Drag your pawn into one of the three zones (or tap a zone, or tap a card) to vote
  * (a tap on a zone takes your pawn there: Eric, Nov 2). Everyone's pawn glides into the zone they vote for as the votes come in, and each zone's count pops
- * as it goes up. When time's up the winning zone lights up and everyone who didn't vote walks into it ("Didn't vote?
+ * as it goes up. When time's up the winning zone lights up and everyone who didn't vote walks into it ("No vote?
  * You're with the crowd"), then the banner names the winner; between the votes everyone walks back to their spot,
  * and after the last one the pawns fade and the real pieces drop into place for the game.
  */
@@ -132,6 +136,7 @@ export function VoteScreen({
   evalBar = true,
   extra,
   below,
+  frame,
   chime = true,
   menu,
 }: {
@@ -147,6 +152,12 @@ export function VoteScreen({
   extra?: ComponentChildren;
   /** Under the cards (Squads' standings on a phone). */
   below?: ComponentChildren;
+  /**
+   * The 50 v 50's opening vote (its match): its computer frame, the game's (board-size.css, "The 50 v 50's frame"), so nothing moves when
+   * the game begins. On a computer the column ends in the game's chat, the same component in the same place (UnderBoard). `true`: the
+   * frame without a chat (Squads' votes, Nov 26: their column ends in `below`'s list of the votes).
+   */
+  frame?: GameView | true;
   /** The result's three tones and the timer's ticks (Crowd's); Squads has neither. */
   chime?: boolean;
   /** At the top line's end: the match's control (Sound, and Leave: MatchMenu); without one, the sound button. */
@@ -161,6 +172,7 @@ export function VoteScreen({
       ? { ...given, options: given.options.map((o) => (o.id === "boss" ? { ...bossFinalOption(rosterWithout(off)), ...(o.disabled ? { disabled: true } : {}) } : o)) }
       : given;
   const now = useFrameNow();
+  const computerFrame = useMedia(CROWD_FRAME) && !!frame;
   const animate = useBoardAnimations();
   const side = match.standings().find((s) => s.isYou)?.team ?? "w";
   const orientation: Orientation = side === "w" ? "white" : "black";
@@ -303,21 +315,21 @@ export function VoteScreen({
   const hint = winner
     ? joined.length && now < Math.max(walkedAt, vote.until) + CROWD_LINE_MS
       ? youJoined
-        ? "You didn't vote, so you're with the crowd."
-        : "Didn't vote? You're with the crowd."
+        ? "No vote: you're with the crowd."
+        : "No vote? You're with the crowd."
       : `${nextLabel}${nextIn ? ` in ${nextIn}…` : "…"}`
     : !open
       ? "Counting the votes…"
       : mine
         ? vote.changeAllowed
-          ? "Vote in. Drag your pawn again to change it."
+          ? "Vote in. Drag to change it."
           : "Vote in. Watch the crowd decide."
         : selected
           ? "Now tap a zone."
-          : "Drag your pawn into a zone, or tap a card.";
+          : "Drag your pawn or tap a card.";
 
   return (
-    <div class={`screen game vote-screen${towerClosed ? " tower-closed" : ""}`}>
+    <div class={`screen game vote-screen${towerClosed ? " tower-closed" : ""}${frame ? " cf-vote" : ""}`}>
       {/* The same frame as the game's screens (the top line, the line above the board, the board beside its eval
           bar), so the board stays exactly where it is when the game begins. */}
       <div class="hud-row vote-hud">
@@ -382,26 +394,22 @@ export function VoteScreen({
                   );
                 })}
               </div>
-              {/* A tap on a zone puts your pawn there: your vote (Eric, Nov 2: "Tapping on an augment area puts your piece there"),
-                  whether or not you picked your pawn up first. The zone takes the tap, so the board under it never gets one. */}
-              {canAct &&
-                def.options.map((o, i) => {
-                  const box = zoneOnScreen(zoneOf(i), orientation);
-                  if (o.disabled) return null;
-                  return (
-                    <button
-                      type="button"
-                      key={o.id}
-                      class="vote-zone-hit"
-                      aria-label={`Vote ${o.label}`}
-                      style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height}%` }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        cast(i, voteZoneCentre(zoneOf(i), side));
-                      }}
-                    />
-                  );
-                })}
+              {/* Each zone's name as a tag for 3 s as the vote opens, gone once your vote is in (Eric, Nov 25, VOTE_TAGS). */}
+              {counting && (
+                <VoteZoneTags
+                  tags={def.options.map((o, i) => ({ key: o.id, label: o.label, box: zoneOnScreen(zoneOf(i), orientation) }))}
+                  startsAt={vote.startsAt}
+                  now={now}
+                  voted={!!mine}
+                />
+              )}
+              {/* A tap on a zone puts your pawn there: your vote (Eric's rule, every pawn vote: VoteZoneHits). */}
+              {canAct && (
+                <VoteZoneHits
+                  zones={def.options.map((o, i) => ({ key: o.id, label: `Vote ${o.label}`, box: zoneOnScreen(zoneOf(i), orientation), disabled: o.disabled }))}
+                  onTap={(i) => cast(i, voteZoneCentre(zoneOf(i), side))}
+                />
+              )}
               {myAt && (
                 <span
                   class={`vote-pawn vote-me${dragAt ? " lifted" : ""}${selected ? " selected" : ""}${canAct ? " can" : ""}${mine && !home ? " in" : ""}`}
@@ -414,7 +422,7 @@ export function VoteScreen({
                   onPointerCancel={onCancel}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Avatar look={myLook.look} side={side} />
+                  <Avatar look={myLook.look} side={side} live />
                 </span>
               )}
             </div>
@@ -456,6 +464,7 @@ export function VoteScreen({
           );
         })}
       </div>
+      {computerFrame && frame !== true && <UnderBoard match={frame!} />}
       {below}
     </div>
   );

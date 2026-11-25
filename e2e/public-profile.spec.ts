@@ -86,9 +86,9 @@ test("every card's content, as in the mockup: the header, Ranked Standing, Recen
   await expect(ranked.getByRole("button", { name: /^Ranked mode/ })).toHaveText("1v1");
   await expect(ranked.locator(".pp-season")).toHaveText("Season 1");
   await expect(ranked.locator(".pp-cap")).toHaveText("CURRENT TIER");
-  await expect(ranked.locator(".pp-tier")).toHaveText("Gold 3");
+  await expect(ranked.locator(".pp-tier")).toHaveText("Gold III");
   await expect(ranked.locator(".pp-rp")).toHaveText("45 RP");
-  await expect(ranked.locator(".pp-peak")).toHaveText("Peak rank: Paragon 4");
+  await expect(ranked.locator(".pp-peak")).toHaveText("Peak rank: Paragon IV");
   await expect(ranked.locator(".pp-stat strong")).toHaveText(["58%", "34 – 25", "3"]);
   await expect(ranked.locator(".pp-stat span")).toHaveText(["Win rate", "W / L", "Win streak"]);
   // Their rating is never shown: the 1v1 rating stays hidden.
@@ -341,7 +341,7 @@ test("the Ranked Standing menu: 1v1, 50 v 50, Squads; the others say Coming soon
     }
     // Back to 1v1; Escape closes a menu; a tap outside does too.
     await menu.getByRole("menuitemradio", { name: "1v1" }).click();
-    await expect(ranked.locator(".pp-tier")).toHaveText("Gold 3");
+    await expect(ranked.locator(".pp-tier")).toHaveText("Gold III");
     await trigger.click();
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
@@ -484,7 +484,7 @@ test("four worn items all fit, nothing cut", async ({ page }) => {
     await page.setViewportSize(vp);
     const tiles = page.locator(".pp-tile");
     await expect(tiles).toHaveCount(4);
-    await expect(tiles.locator("strong")).toHaveText(["Suit and Tie", "Pirate Hat", "Smiley Face", "Gift-Wrap Tube"]);
+    await expect(tiles.locator("strong")).toHaveText(["Suit and Tie", "Pirate Hat", "Smiley Face · Laughing", "Gift-Wrap Tube"]);
     const card = await box(page, ".pp-cosmetics");
     // (Its words and pill, whole: inside the tile and none cut by its own box; the picture's box inside it too. The one allowance, as
     // the brief gave it: the color line, "Weapon · Cobalt & Sage", may end in an ellipsis when it's too long for the tile.)
@@ -707,7 +707,7 @@ test("an admin's ?rank= shows on their own public page, as on their profile", { 
   await expect(page.locator(".fd-hero-name")).toHaveText("Rank Admin");
   await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await page.getByRole("button", { name: "View public profile" }).click();
-  await expect(page.locator(".pp-tier")).toHaveText("Gold 3");
+  await expect(page.locator(".pp-tier")).toHaveText("Gold III");
   await expect(page.locator('.pp-ranked [data-emblem="gold-d3"]')).toHaveCount(1);
 });
 

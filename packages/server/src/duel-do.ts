@@ -8,7 +8,7 @@ import { eligibleForRanked } from "./fairplay.ts";
 import { chatBlock } from "./chat-mod.ts";
 import { recordDuel, type FinishedDuel } from "./ranked.ts";
 import { grantXp } from "./xp.ts";
-import { isPaused } from "./kill-switches.ts";
+import { isPaused, RESIDENTS_PAUSED, residentsPaused } from "./kill-switches.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
@@ -21,6 +21,8 @@ interface Attached {
   /** Typed chat (typed-chat.ts): a signed-in account (may type once its chat is on), or a device the age gate marked too young. */
   typer?: boolean;
   young?: boolean;
+  /** A resident's (residents.ts): refused while PAUSE_RESIDENTS is on. */
+  resident?: boolean;
 }
 
 /**
@@ -104,16 +106,35 @@ export class DuelGame extends DurableObject<Env> {
       } else if (this.env.DB) {
         const sql = d1Sql(this.env.DB);
         await ensureSchema(sql, this.env.DB);
+        // (A recording that got this far before: its answer, kept, never asked of recordDuel again (its replay answers no rank-point change).)
+        const kept = this.record?.ranks ?? null;
         // (A player fair play is holding, in review, keeps their rank as it is, and earns nothing.)
         // (Ranked's leave rules, a dodge or a leave charged once: off while PAUSE_LEAVE_PENALTIES is on.)
-        outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)), finished.endedAt, {
-          penalties: !isPaused(this.env, "leave-penalties"),
-        });
+        outcomes =
+          kept ??
+          (await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)), finished.endedAt, {
+            penalties: !isPaused(this.env, "leave-penalties"),
+          }));
         const played = finished.result !== "aborted";
         // (Ops' counts, /admin/ops: dodges and leaves charged.)
-        if (outcomes) for (const o of [outcomes.w, outcomes.b]) if (o.conduct) countCall(`ranked.${o.conduct.kind}`);
-        // XP (Nov 9; server/xp.ts): each side's moves and the game's length as this room kept them; once, keyed by the game.
-        if (outcomes && played) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)), isPaused(this.env, "rewards"));
+        if (outcomes && !kept) for (const o of [outcomes.w, outcomes.b]) if (o.conduct) countCall(`ranked.${o.conduct.kind}`);
+        // XP (Nov 9; server/xp.ts): each side's moves and the game's length as this room kept them; once, keyed by the game. Its coins
+        // with it (Nov 25): a grant that still fails after withXp's tries throws, and recordDuel's answer is kept on the room's record
+        // (`ranks`), so the next try (the alarm: RECORD_RETRY_MS, then every recordRetrySeconds, for recordRetryHours) goes on from it:
+        // ranks are never recorded twice, and each grant is keyed by the game, so a side already granted pays nothing more and answers
+        // as before. The players hear their outcome once it's all in, as when recordDuel itself fails (the review's M1).
+        if (outcomes && played) {
+          const ranks = outcomes;
+          try {
+            outcomes = await withXp(sql, finished, ranks, signInRequired(await withSecrets(this.env)), isPaused(this.env, "rewards"));
+          } catch (e) {
+            if (this.record && !this.record.ranks) {
+              this.record.ranks = ranks;
+              await this.ctx.storage.put("game", this.record);
+            }
+            throw e;
+          }
+        }
         // (A finished ranked game: maybe the Welcome Crate for either player, once ever: welcome.ts.)
         if (outcomes && played) for (const uid of [finished.players.w, finished.players.b]) await grantWelcomeCrate(sql, uid, Date.now()).catch(() => false);
       }
@@ -210,7 +231,13 @@ export class DuelGame extends DurableObject<Env> {
     const [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
     const young = ageAnswer(request) === "under";
-    server.serializeAttachment({ color, uid: account!.id, ...(isSignedIn(account) && !young ? { typer: true } : {}), ...(young ? { young } : {}) } satisfies Attached);
+    server.serializeAttachment({
+      color,
+      uid: account!.id,
+      ...(isSignedIn(account) && !young ? { typer: true } : {}),
+      ...(young ? { young } : {}),
+      ...(account!.resident === 1 ? { resident: true } : {}),
+    } satisfies Attached);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -226,6 +253,9 @@ export class DuelGame extends DurableObject<Env> {
     const attached = ws.deserializeAttachment() as Attached | null;
     const color = attached?.color;
     if (!color) return;
+    // The residents' kill switch (PAUSE_RESIDENTS; residents.ts): a resident's hello is refused, and any other message of theirs closes
+    // their socket, a disconnect as anyone's (their clock runs on, or the abort rule applies).
+    if (attached.resident && residentsPaused(this.env)) return this.refuseResident(ws, color, msg.t !== "hello");
     const sql = this.env.DB && attached.uid ? d1Sql(this.env.DB) : null;
     const now = Date.now();
     if (msg.t === "hello") {
@@ -275,6 +305,28 @@ export class DuelGame extends DurableObject<Env> {
     });
   }
 
+  /**
+   * PAUSE_RESIDENTS (residents.ts): a resident's socket is told "Residents are paused." and closed; one that had said hello
+   * (`connected`) disconnects as anyone's does, unless another of its sockets is still here. Its attachment loses its side first, so
+   * its close does nothing more.
+   */
+  private async refuseResident(ws: WebSocket, color: Color, connected: boolean) {
+    try {
+      ws.send(JSON.stringify({ t: "error", message: RESIDENTS_PAUSED, now: Date.now() }));
+    } catch {
+      // Already gone.
+    }
+    ws.serializeAttachment({ color: null, resident: true } satisfies Attached);
+    try {
+      ws.close(1008, RESIDENTS_PAUSED);
+    } catch {
+      // Already gone.
+    }
+    if (!connected || !this.record || this.socketsOf(color).some((s) => s !== ws)) return;
+    const core = this.core(ws);
+    await this.change(core, () => core.disconnect(color));
+  }
+
   async webSocketClose(ws: WebSocket) {
     const color = (ws.deserializeAttachment() as Attached | null)?.color;
     if (!color || !this.record) return;
@@ -297,27 +349,43 @@ function validPlayer(p: DuelPlayerView | undefined): p is DuelPlayerView {
   return !!p && typeof p.uid === "string" && !!p.uid && typeof p.name === "string";
 }
 
+/** How many times withXp tries a side's grant at once before it gives the try up to the room's retry. */
+const XP_TRIES = 3;
+
 /**
  * Each side's XP for a finished ranked game (server/xp.ts): your own moves (White the odd plies, Black the even), the game's length
- * by this room's clock, a win; a resign before the minimum says so; a test's clock earns none. Never in the way of the outcome.
+ * by this room's clock, a win; a resign before the minimum says so; a test's clock earns none. Its play coins are paid with it (Nov 25):
+ * a grant that fails is tried again at once, XP_TRIES times in all (it's keyed by the game, so it pays once); still failing, this
+ * throws, and the room tries the recording again from its kept ranks (recordFinished; the review's M1).
  */
 async function withXp(sql: ReturnType<typeof d1Sql>, f: FinishedDuel, outcomes: Record<Color, DuelOutcome>, signedInOnly: boolean, paused = false): Promise<Record<Color, DuelOutcome>> {
   const out = { ...outcomes };
   for (const c of ["w", "b"] as const) {
     const won = f.result === (c === "w" ? "1-0" : "0-1");
     const lost = f.result === (c === "w" ? "0-1" : "1-0");
-    const xp = await grantXp(sql, f.players[c], {
-      key: `duel:${f.id}`,
-      facts: { ms: f.endedAt - f.startedAt, moves: c === "w" ? Math.ceil(f.moves.length / 2) : Math.floor(f.moves.length / 2), won, resigned: f.reason === "resign" && lost, test: !!f.testSeconds },
-      signedInOnly,
-      now: Date.now(),
-      paused,
-      quest: "duel",
-    }).catch((e: unknown) => {
-      console.log(`xp for duel ${f.id}: ${String(e)}`);
-      return null;
-    });
-    if (xp) out[c] = { ...out[c], xp };
+    const grant = () =>
+      grantXp(sql, f.players[c], {
+        key: `duel:${f.id}`,
+        facts: { ms: f.endedAt - f.startedAt, moves: c === "w" ? Math.ceil(f.moves.length / 2) : Math.floor(f.moves.length / 2), won, resigned: f.reason === "resign" && lost, test: !!f.testSeconds },
+        signedInOnly,
+        now: Date.now(),
+        paused,
+        quest: "duel",
+        // (Play coins, Nov 25: a draw's bonus; a win's comes from XP's own win.)
+        coin: { draw: f.result === "1/2-1/2" },
+      });
+    let xp: Awaited<ReturnType<typeof grantXp>> = null;
+    for (let i = 1; ; i++) {
+      try {
+        xp = await grant();
+        break;
+      } catch (e) {
+        console.log(`xp for duel ${f.id} (${c}), try ${i} of ${XP_TRIES}: ${String(e)}`);
+        if (i >= XP_TRIES) throw e;
+      }
+    }
+    // (The game's coins are its play coins and bonus, paid with its XP (PLAY_COINS since Nov 25; ranked's own coins are gone).)
+    if (xp) out[c] = { ...out[c], xp, coins: xp.coins ? xp.coins.play + xp.coins.bonus : 0 };
   }
   return out;
 }

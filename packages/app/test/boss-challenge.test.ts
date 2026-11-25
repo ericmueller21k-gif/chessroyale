@@ -30,6 +30,9 @@ import { SHOP_FEEL, TOWN_FEEL } from "../src/town/feel.ts";
 import { BOSS_ART, PAWN_PATH } from "../src/town/render.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import type { Character } from "../src/characters/sprite.ts";
+import { artFacing } from "../src/characters/sprites.ts";
+import { mirrorFor } from "../src/characters/sprite-kit.ts";
+import { SHOP_BIRDIE_MARKS, SHOP_BIRDIE_ROOM_LAYOUT } from "../src/town/shops/birdie-art.ts";
 
 /**
  * A boss challenged from the town, Pokémon-gym style (Nov 2; town/shops/challenge.ts): the flow from the card's Fight to the battle,
@@ -132,6 +135,17 @@ describe("the battle circle's marks", () => {
       expect(m.youClear, id).toEqual({ c: c + CHALLENGE_FEEL.clear.you, r });
       expect(m.bossClear, id).toEqual({ c: c - CHALLENGE_FEEL.clear.boss, r });
     }
+  });
+
+  // (Nov 23, Eric: "He's facing the wrong way in the building." Birdie's town figure, `birdie-town`, faces as his art does: left.)
+  it("Birdie faces the table on his mark: his town figure's art faces left, so facing east he's mirrored", () => {
+    const m = marksOf(SHOP_BIRDIE_ROOM_LAYOUT, "across", SHOP_BIRDIE_MARKS)!;
+    expect(m.boss.c).toBeLessThan(m.table.c);
+    expect(m.bossFace).toBe(1);
+    expect(artFacing(BOSS_ART.birdie.id)).toBe("left");
+    expect(mirrorFor(artFacing(BOSS_ART.birdie.id)!, "right")).toBe(true);
+    // Every boss's town figure faces as its character's art does, where that's known.
+    for (const [id, ch] of Object.entries(BOSS_ART)) if (artFacing(id)) expect(artFacing(ch.id), id).toBe(artFacing(id));
   });
 
   it("the table stands clear of the room's pieces (Babur's pedestal, in his ring's middle, stays behind it)", () => {

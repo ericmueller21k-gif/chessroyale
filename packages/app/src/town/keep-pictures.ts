@@ -4,9 +4,12 @@
  * The loading screen paints every picture the town can show (render.ts `warm`) before the first frame (Eric's rule: nothing painted
  * while you walk). On the first visit on a build, that's as before; then the pictures are packed into pages, encoded as PNG off the
  * main thread (keep-pictures.worker.ts) and kept in IndexedDB with a manifest: each picture's place on its page, in the order the
- * loading screen keeps them, and each roof's pieces. A later visit on the same build and layout (`pictureKey`) decodes the pages and
- * cuts each picture out into a canvas of its own, put where its painting would have gone (render.ts `plan`): the town draws exactly
- * what it drew before, from the same canvases.
+ * loading screen keeps them, and each roof's pieces. A later visit on the same build and layout (`pictureKey`) decodes the pages, and
+ * since Nov 25 hands them to the painter whole (`Painter.adopt`): they're packed as the WebGL atlas packs (paint.ts `ATLAS`), so each is
+ * uploaded as one layer, never cut up and uploaded a picture at a time (1,912 of them: 3.3 s and 0.55 s of a slowed phone's 7 s). Each
+ * picture is a canvas standing in for it, put where its painting would have gone (render.ts `plan`) and drawn by as before; it's empty
+ * until something asks for its pixels (its 2D context: a tap's hit test, a statue's mask; a 2D context drawing from it: a chip's face,
+ * `cutBeforeDraw`; or the painter uploading it alone), then cut from its page. The town draws exactly what it drew before.
  *
  * It never breaks the town: no storage, a quota error, a missing, partial, corrupt or other build's entry, a decode failure or a slow
  * read (`TOWN_PICTURES.waitMs`) paints as before, silently, and the entry is cleared. Only one entry is ever kept (the last build's).
@@ -14,6 +17,7 @@
  */
 import { TOWN_PICTURES } from "@chessroyale/core";
 import type { Piece, RoofArt } from "./box-draw.ts";
+import { ATLAS, type AtlasPage } from "./paint.ts";
 
 /** A decoded page (an ImageBitmap in the browser). */
 export interface Page {
@@ -24,7 +28,8 @@ export interface Page {
 
 /** What's kept: the manifest and its pages' PNGs. */
 export interface Manifest {
-  v: 1;
+  /** 2 since Nov 25: packed as the atlas packs (`ATLAS`). */
+  v: 2;
   key: string;
   /** Each page's width and height, two numbers a page. */
   pages: number[];
@@ -50,16 +55,26 @@ export interface Shelf {
 export interface Restored {
   readonly count: number;
   readonly roofs: readonly (readonly (readonly number[])[])[];
-  /** Picture `i`, cut from its page the first time it's asked for. */
+  /** Picture `i`: the canvas standing in for it (empty until its pixels are asked for, `PageIO.standIn`). */
   pic(i: number): HTMLCanvasElement;
-  /** Lets go of the decoded pages. */
+  /** The pages and the pictures on each, for the painter to upload whole (`Painter.adopt`). */
+  readonly pages: readonly AtlasPage[];
+  /** Puts a picture's pixels on its canvas now, if they aren't yet (the painter's `fill`). */
+  fill(c: HTMLCanvasElement): void;
+  /** Lets go of the decoded pages (the town closing: a picture still empty stays so). */
   close(): void;
 }
 
 /** The browser's part (tests pass their own). */
 export interface PageIO {
   decode(b: Blob): Promise<Page>;
-  cut(page: Page, x: number, y: number, w: number, h: number): HTMLCanvasElement;
+  /**
+   * A w x h canvas for the picture at (x, y) on `page`: empty until its 2D context is asked for, a 2D context draws from it, or `fill`,
+   * then cut from the page.
+   */
+  standIn(page: Page, x: number, y: number, w: number, h: number): HTMLCanvasElement;
+  /** Cuts a stand-in's picture onto it now, if it isn't yet (anything else: nothing). */
+  fill(c: HTMLCanvasElement): void;
 }
 
 /**
@@ -129,43 +144,52 @@ export function pictureKey(version: string, code: string, sig: string): string {
   return `${version}|${code}|${hash(sig)}`;
 }
 
+/** A picture the atlas gives a texture of its own (paint-gl.ts): on a page of its own, at its top left. */
+const bigPic = (w: number, h: number) => w > ATLAS.big || h > ATLAS.big;
+
 /**
- * Pictures of these sizes packed onto pages `side` px wide (shelves, tallest first; one wider than a page has a page its width): each
- * picture's page, x and y, and each page's size (as tall as it's filled).
+ * Pictures of these sizes packed onto pages as the WebGL atlas holds them (`ATLAS`, Nov 25): `ATLAS.page` px square, shelves, tallest
+ * first, each picture with `ATLAS.pad` clear pixels round it; one bigger than `ATLAS.big` either way alone on a page its size. Each
+ * picture's page, x and y (its top left), and each page's size (as tall as it's filled).
  */
-export function packPictures(sizes: readonly (readonly [number, number])[], side: number): { at: [number, number, number][]; pages: [number, number][] } {
+export function packPictures(sizes: readonly (readonly [number, number])[]): { at: [number, number, number][]; pages: [number, number][] } {
+  const { page: side, pad } = ATLAS;
   const at: [number, number, number][] = sizes.map(() => [0, 0, 0]);
-  const pages: { w: number; h: number; shelves: { y: number; h: number; x: number }[] }[] = [];
+  const pages: { w: number; h: number; own: boolean; shelves: { y: number; h: number; x: number }[] }[] = [];
   const order = sizes.map((_, i) => i).sort((a, b) => sizes[b]![1] - sizes[a]![1] || sizes[b]![0] - sizes[a]![0]);
   for (const i of order) {
     const [w, h] = sizes[i]!;
+    if (bigPic(w, h)) {
+      at[i] = [pages.length, 0, 0];
+      pages.push({ w, h, own: true, shelves: [] });
+      continue;
+    }
+    const W = w + 2 * pad;
+    const H = h + 2 * pad;
     let placed = false;
     for (let p = 0; p < pages.length && !placed; p++) {
       const pg = pages[p]!;
-      let s = pg.shelves.find((sh) => sh.h >= h && pg.w - sh.x >= w);
-      if (!s && pg.h + h <= side && w <= pg.w) pg.shelves.push((s = { y: pg.h, h, x: 0 })), (pg.h += h);
+      if (pg.own) continue;
+      let s = pg.shelves.find((sh) => sh.h >= H && side - sh.x >= W);
+      if (!s && pg.h + H <= side) pg.shelves.push((s = { y: pg.h, h: H, x: 0 })), (pg.h += H);
       if (s) {
-        at[i] = [p, s.x, s.y];
-        s.x += w;
+        at[i] = [p, s.x + pad, s.y + pad];
+        s.x += W;
         placed = true;
       }
     }
     if (!placed) {
-      const pg = { w: Math.max(side, w), h, shelves: [{ y: 0, h, x: w }] };
-      at[i] = [pages.length, 0, 0];
-      pages.push(pg);
+      at[i] = [pages.length, pad, pad];
+      pages.push({ w: side, h: H, own: false, shelves: [{ y: 0, h: H, x: W }] });
     }
   }
   return { at, pages: pages.map((p) => [p.w, Math.max(1, p.h)]) };
 }
 
 /** The manifest for these pictures, packed (`packPictures`). */
-export function manifestOf(key: string, pics: Pictures, side: number): Manifest {
-  const { at, pages } = packPictures(
-    pics.list.map((c) => [c.width, c.height] as const),
-    side,
-  );
-  return { v: 1, key, pages: pages.flat(), pics: at.flatMap(([p, x, y], i) => [p, x, y, pics.list[i]!.width, pics.list[i]!.height]), roofs: pics.roofs };
+export function manifestOf(key: string, pics: Pictures): Manifest {
+  const { at, pages } = packPictures(pics.list.map((c) => [c.width, c.height] as const));
+  return { v: 2, key, pages: pages.flat(), pics: at.flatMap(([p, x, y], i) => [p, x, y, pics.list[i]!.width, pics.list[i]!.height]), roofs: pics.roofs };
 }
 
 const isInt = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0;
@@ -173,7 +197,7 @@ const isInt = (n: unknown): n is number => typeof n === "number" && Number.isInt
 export function entryFor(e: unknown, key: string): Entry | null {
   const x = e as Partial<Entry> | null;
   const m = x?.manifest;
-  if (!m || m.v !== 1 || m.key !== key || !Array.isArray(x!.blobs) || !Array.isArray(m.pages) || !Array.isArray(m.pics) || !Array.isArray(m.roofs)) return null;
+  if (!m || m.v !== 2 || m.key !== key || !Array.isArray(x!.blobs) || !Array.isArray(m.pages) || !Array.isArray(m.pics) || !Array.isArray(m.roofs)) return null;
   const nPages = m.pages.length / 2;
   if (!Number.isInteger(nPages) || nPages !== x!.blobs.length || !m.pages.every(isInt)) return null;
   if (!x!.blobs.every((b) => typeof Blob !== "undefined" && b instanceof Blob && b.size > 0)) return null;
@@ -182,6 +206,10 @@ export function entryFor(e: unknown, key: string): Entry | null {
   for (let i = 0; i < n; i++) {
     const [p, px, py, w, h] = m.pics.slice(i * 5, i * 5 + 5) as [number, number, number, number, number];
     if (p >= nPages || !w || !h || px + w > m.pages[p * 2]! || py + h > m.pages[p * 2 + 1]!) return null;
+    // (As the atlas holds it: a big one alone at its page's top left, its page its size; any other on a page no bigger than the atlas's.)
+    const pw = m.pages[p * 2]!;
+    const ph = m.pages[p * 2 + 1]!;
+    if (bigPic(w, h) ? px || py || pw !== w || ph !== h : pw > ATLAS.page || ph > ATLAS.page) return null;
   }
   for (const r of m.roofs) {
     // (A roof may have no faces: a box with none drawn from above.)
@@ -248,25 +276,26 @@ export async function restore(shelf: Shelf | null, key: string, io: PageIO | nul
       return null;
     }
     const n = m.pics.length / 5;
-    const cut: (HTMLCanvasElement | undefined)[] = new Array(n);
-    let left = n;
-    const close = () => {
-      for (const p of pages) p.close();
-      pages = [];
-    };
+    const on: AtlasPage["pics"][number][][] = pages.map(() => []);
+    const pics: HTMLCanvasElement[] = [];
+    for (let i = 0; i < n; i++) {
+      const [p, x, y, w, h] = m.pics.slice(i * 5, i * 5 + 5) as [number, number, number, number, number];
+      const src = io.standIn(pages[p]!, x, y, w, h);
+      pics.push(src);
+      on[p]!.push({ src, x, y });
+    }
     return {
       count: n,
       roofs: m.roofs,
       pic: (i: number) => {
-        let c = cut[i];
-        if (c) return c;
-        if (i >= n || !pages.length) throw new Error("kept pictures: past the end");
-        const [p, x, y, w, h] = m.pics.slice(i * 5, i * 5 + 5) as [number, number, number, number, number];
-        c = cut[i] = io.cut(pages[p]!, x, y, w, h);
-        if (--left === 0) close();
-        return c;
+        if (i >= n) throw new Error("kept pictures: past the end");
+        return pics[i]!;
       },
-      close,
+      pages: pages.map((pg, i) => ({ img: pg as unknown as TexImageSource, width: pg.width, height: pg.height, pics: on[i]! })),
+      fill: (c) => io.fill(c),
+      close: () => {
+        for (const p of pages) p.close();
+      },
     };
   };
   return within(go(), waitMs, (r) => r?.close());
@@ -285,7 +314,7 @@ export interface SaveIO {
 export async function save(shelf: Shelf | null, key: string, pics: Pictures, io: SaveIO | null): Promise<number | null> {
   if (!TOWN_PICTURES.on || !shelf || !io || pics.from || !pics.list.length) return null;
   try {
-    const m = manifestOf(key, pics, TOWN_PICTURES.pagePx);
+    const m = manifestOf(key, pics);
     const blobs: Blob[] = [];
     let bytes = 0;
     for (let p = 0; p < m.pages.length / 2; p++) {
@@ -340,19 +369,65 @@ export function idbShelf(): Shelf | null {
   };
 }
 
-/** Decoding and cutting pages in the browser (null: it can't). */
+/** (`domPageIO`) Each stand-in not cut yet: what cuts it. */
+const uncut = new WeakMap<object, () => void>();
+let cutOnDraw = false;
+/**
+ * (Nov 25, round 2) A 2D context drawing FROM a stand-in (or making a pattern of one) cuts it first. Drawing from a canvas never asks
+ * for its context, so a picture drawn anywhere but the WebGL painter (which cuts one before uploading it alone, paint-gl.ts `upload`)
+ * copied an empty canvas: the chips' and the large map's boss faces were blank on a repeat visit (render.ts `chipFace`). One place for
+ * every 2D reader there is or will be, rather than a cut at each. Set once, as the first stand-in is made (never on a first visit or a
+ * 2D painter); a draw from anything else costs one WeakMap look.
+ */
+function cutBeforeDraw(): void {
+  if (cutOnDraw || typeof CanvasRenderingContext2D === "undefined") return;
+  cutOnDraw = true;
+  const P = CanvasRenderingContext2D.prototype;
+  const draw = P.drawImage as (...a: unknown[]) => void;
+  const pattern = P.createPattern;
+  P.drawImage = function (this: CanvasRenderingContext2D, img: CanvasImageSource) {
+    uncut.get(img)?.();
+    return draw.apply(this, arguments as unknown as unknown[]);
+  } as typeof P.drawImage;
+  P.createPattern = function (this: CanvasRenderingContext2D, img: CanvasImageSource, rep: string | null) {
+    uncut.get(img)?.();
+    return pattern.call(this, img, rep);
+  };
+}
+
+/** Decoding pages, and cutting their pictures as they're asked for, in the browser (null: it can't). */
 export function domPageIO(art2d: (c: HTMLCanvasElement) => CanvasRenderingContext2D): PageIO | null {
   if (typeof createImageBitmap !== "function") return null;
+  const fill = (c: HTMLCanvasElement) => uncut.get(c)?.();
+  const own = HTMLCanvasElement.prototype.getContext as (...a: unknown[]) => RenderingContext | null;
   return {
-    // (Its pixels as they are: no color space conversion, alpha as the canvas keeps it, so a cut is the painted canvas exactly.)
+    // (Its pixels as they are: no color space conversion, alpha as the browser keeps a canvas's (premultiplied), so a cut is the painted
+    // canvas exactly and the atlas holds what the painted canvas gave it: every texel of every page the same, measured Nov 25 (Chromium),
+    // and twice as quick to upload as one made "premultiply", 11 ms a page against 27.)
     decode: (b) => createImageBitmap(b, { colorSpaceConversion: "none", premultiplyAlpha: "default" }),
-    cut: (page, x, y, w, h) => {
+    standIn: (page, x, y, w, h) => {
+      cutBeforeDraw();
       const c = document.createElement("canvas");
       c.width = w;
       c.height = h;
-      art2d(c).drawImage(page as ImageBitmap, x, y, w, h, 0, 0, w, h);
+      // (Its 2D context asked for (anything reading or drawing on its pixels), or a 2D context drawing from it (`cutBeforeDraw`): cut
+      // first. No canvas is made for the picture until then.)
+      c.getContext = function (this: HTMLCanvasElement, ...a: Parameters<HTMLCanvasElement["getContext"]>) {
+        fill(c);
+        return own.apply(this, a);
+      } as HTMLCanvasElement["getContext"];
+      uncut.set(c, () => {
+        uncut.delete(c);
+        delete (c as { getContext?: unknown }).getContext;
+        try {
+          art2d(c).drawImage(page as ImageBitmap, x, y, w, h, 0, 0, w, h);
+        } catch {
+          // (Its page let go: the town closed. It stays empty.)
+        }
+      });
       return c;
     },
+    fill,
   };
 }
 

@@ -17,11 +17,12 @@ import { TokenBreakdown } from "../components/SquadsBlocks.tsx";
 import { MercenaryShop } from "../components/MercenaryShop.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { SIDE_PANEL } from "../components/SquadsParts.tsx";
-import { FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
+import { CROWD_FRAME, FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
+import { BoardFoot } from "../board-foot.ts";
 import { ReplayButton } from "../components/MoveReplay.tsx";
 import { useGameXp } from "../components/XpResult.tsx";
 import { EndHeadline, EndRewards } from "../components/EndScreen.tsx";
-import { XP_NONE_LINES } from "@chessroyale/core";
+import { XP_NONE_LINES, type XpGrant } from "@chessroyale/core";
 
 /**
  * Squads' screens (docs/areas/squads.md, "The screens"), by the lobby's phase: the waiting room (the queue's seats, 32 of
@@ -33,34 +34,38 @@ import { XP_NONE_LINES } from "@chessroyale/core";
 export { squadsExit, squadsWaiting, type SquadsActions } from "./squads-exit.ts";
 import { squadsExit, type SquadsActions } from "./squads-exit.ts";
 
-/** You resigned: what went on your record, and where to go next (the lobby goes on without you). */
+/**
+ * You resigned: what went on your record, and where to go next (the lobby goes on without you). Every end screen's rules (Eric, Nov 25;
+ * end-screen.css): the headline, its line, the flag, the buttons stacked (the next game on top), one gap between them, a block centered
+ * in the page.
+ */
 function SquadsResigned({ client, actions }: { client: SquadsClient; actions: SquadsActions }) {
   const r = client.resigned;
   const sq = client.mySquad;
   return (
-    <div class="screen results sq-results sq-resigned">
-      <div class="trophy resigned" aria-hidden="true">
-        <FlagIcon size={56} />
-      </div>
-      <h1>You resigned</h1>
-      <p class="muted">
+    <div class="screen results sq-results sq-resigned es-screen">
+      <EndHeadline title="You resigned" line="" tone="loss" />
+      <p class="muted left-line">
         {!r ? "Leaving the lobby…" : client.lobby?.test ? "Test lobby: nothing goes on your record." : `On your record: ${placementText(r.placement)} of ${r.players} squads.`}
         {sq ? ` A bot plays your seat for the ${squadName(sq.id)}.` : ""}
       </p>
+      <div class="trophy resigned" aria-hidden="true">
+        <FlagIcon size={56} />
+      </div>
       {r && !client.lobby?.test && <p class="team-result bad">It counts as a loss.</p>}
-      <div class="sq-card-actions">
-        <button type="button" class="fd-btn primary" onClick={actions.onAgain}>
-          {actions.party ? "Back to your party" : "Queue again"}
-        </button>
-        <button type="button" class="fd-btn" onClick={actions.onHome}>
+      {/* (Stacked, Play again's place on top: `.es-screen .actions` lays them out bottom-up.) */}
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" onClick={actions.onHome}>
           Home
+        </button>
+        <button type="button" class="btn btn-primary" onClick={actions.onAgain}>
+          {actions.party ? "Back to your party" : "Queue again"}
         </button>
       </div>
     </div>
   );
 }
 
-/** The waiting room: "12 / 32", the seconds until bots fill, and the 32 seats (your party's together), then the squads. */
 export function SquadsQueue({ client, onCancel, onAway }: { client: SquadsClient; onCancel: () => void; onAway?: () => void }) {
   const now = useNow(250);
   const lobby = client.lobby;
@@ -148,6 +153,9 @@ export function SquadsQueue({ client, onCancel, onAway }: { client: SquadsClient
 }
 
 /** The pre-game votes on Crowd's vote board: everyone's pawn on your side of an empty board, three zones, three cards. */
+/** What comes after the last vote. */
+const AFTER_VOTES = "The bracket is drawn";
+
 function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vote: NonNullable<SquadsClient["vote"]>; onLeave: () => void; exit: MatchExit | null }) {
   const lobby = client.lobby!;
   // The votes this lobby holds (a test lobby whose mode is set has no Mode vote), each found by its id, never by its
@@ -165,6 +173,8 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
     }),
     [lobby, client.myId],
   );
+  // (A computer's frame, Nov 26: the column under the cards is the lobby's votes, to the board's foot.)
+  const framed = useMedia(CROWD_FRAME);
   const view: VoteView = { ...vote, votes: vote.votes.map((v) => ({ playerId: v.playerId, option: v.option, at: v.at, side: "w" as const, ...(v.joined ? { joined: true as const } : {}) })) };
   return (
     <VoteScreen
@@ -173,7 +183,7 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
       def={def}
       evalBar={false}
       chime={false}
-      next={(i) => (i < defs.length ? defs[i]!.title : "The bracket is drawn")}
+      next={(i) => (i < defs.length ? defs[i]!.title : AFTER_VOTES)}
       extra={
         client.test ? (
           <button type="button" class="sq-next" onClick={() => client.nextRound()}>
@@ -181,7 +191,13 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
           </button>
         ) : undefined
       }
-      below={<StandingsStrip client={client} onLeave={onLeave} exit={exit} />}
+      frame
+      below={
+        <>
+          <StandingsStrip client={client} onLeave={onLeave} exit={exit} />
+          {framed && <VoteSteps titles={defs.map((d) => d.title)} at={vote.index} end={AFTER_VOTES} />}
+        </>
+      }
       menu={
         <>
           {/* Move replay's button by the gear, as in a match (Eric, Nov 5; its tips: the match's coach marks). */}
@@ -193,23 +209,61 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
   );
 }
 
-/** Why a placement that pays had no coins or crates (the outside review of Nov 10): the day's paying lobbies used (SQUADS_LOBBY.rewardsPerDay). */
+/**
+ * The lobby's votes, in order (a computer's frame, Nov 26: the vote's column under its cards, to the board's foot, Eric's column rule): the
+ * ones done ticked, this one lit, then what comes after them.
+ */
+function VoteSteps({ titles, at, end }: { titles: string[]; at: number; end: string }) {
+  return (
+    <section class="sq-votes" aria-label="The votes">
+      <ol class="sq-votes-list">
+        {titles.map((t, i) => (
+          <li key={t} class={i < at ? "done" : i === at ? "on" : ""}>
+            <i aria-hidden="true">{i < at ? "✓" : i + 1}</i>
+            {t}
+          </li>
+        ))}
+        <li class="end">
+          <i aria-hidden="true">→</i>
+          {end}
+        </li>
+      </ol>
+    </section>
+  );
+}
+
+/** Why a placement that pays crates had none (the outside review of Nov 10): the day's paying lobbies used (SQUADS_LOBBY.rewardsPerDay). */
 export const NO_REWARD: Record<"daily", string> = {
-  daily: `No coins or crates: today's ${SQUADS_LOBBY.rewardsPerDay} paying lobbies are used. More tomorrow.`,
+  daily: `No crates: today's ${SQUADS_LOBBY.rewardsPerDay} paying lobbies are used. More tomorrow.`,
 };
+
+/**
+ * Your placement's reward words (Nov 25): the lobby's coins (PLAY_COINS: its play coins and its placement's bonus, paid with its XP;
+ * `xp` undefined while they're coming, "+… coins"), its crates (`sep` between), or why there were none.
+ */
+export function squadsRewardLine(p: { crates: number; recorded: boolean; why?: "daily" }, xp: XpGrant | null | undefined, test: boolean, sep: string): string {
+  if (test) return "Test lobby: no rewards.";
+  const coins = xp?.coins ? xp.coins.play + xp.coins.bonus : 0;
+  const words = [xp === undefined && p.recorded ? "+… coins" : coins > 0 ? `+${coins} coins` : "", p.crates ? `${p.crates} crate` : ""].filter(Boolean).join(sep);
+  const why = p.why ? NO_REWARD[p.why] : "";
+  return words && why ? `${words}. ${why}` : words || why;
+}
 
 /**
  * Your squad is out: where it placed, your reward, and what next: watch the rest of the bracket, or queue again.
  */
 function OutCard({ client, actions, onSpectate }: { client: SquadsClient; actions: SquadsActions; onSpectate: () => void }) {
   const p = client.placed!;
+  const test = !!client.lobby?.test;
+  // (The lobby's coins come with its XP, Nov 25: the same answer the XP box shows.)
+  const xp = useGameXp(client.placed ?? client, { code: test ? null : client.code });
   return (
     <div class="fd-sheet-scrim sq-out-scrim">
     <div class="fd-sheet sq-out" role="dialog" aria-modal="true" aria-label="Knocked out">
       <div class="sq-card-title">Knocked out · {placementText(p.placement)}</div>
       <p class="muted small">
         {squadName(p.squadId)} placed {placementText(p.placement)} of 8 squads.{" "}
-        {p.coins || p.crates ? `+${p.coins} coins${p.crates ? ` · ${p.crates} crate` : ""}` : client.lobby?.test ? "Test lobby: no rewards." : p.why ? NO_REWARD[p.why] : ""}
+        {squadsRewardLine(p, xp, test, " · ")}
       </p>
       <SquadsXp client={client} />
       <div class="sq-card-actions">
@@ -297,6 +351,8 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
   const placed = client.placed;
   const order = standingsOrder(lobby);
   const won = placed?.placement === 1;
+  // (The lobby's coins come with its XP, Nov 25: the same answer the XP box below shows.)
+  const xp = useGameXp(client.placed ?? client, { code: lobby.test ? null : client.code });
   return (
     <div class="screen results sq-results es-screen">
       {/* (The end screen's headline, Nov 20: "Victory!" for the champions; your squad's place otherwise.) */}
@@ -308,7 +364,10 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
       {placed && (
         <p class="muted">
           {won ? `${squadName(placed.squadId)} won the Squads final.` : `${squadName(placed.squadId)} placed ${placementText(placed.placement)}.`}{" "}
-          {placed.coins || placed.crates ? `+${placed.coins} coins${placed.crates ? ` and ${placed.crates} crate` : ""}.` : lobby.test ? "Test lobby: no rewards." : placed.why ? NO_REWARD[placed.why] : ""}
+          {(() => {
+            const line = squadsRewardLine(placed, xp, !!lobby.test, " and ");
+            return line && !/[.]$/.test(line) ? `${line}.` : line;
+          })()}
         </p>
       )}
       {/* (The rewards' middle: your squad, its tag and its members.) */}
@@ -346,12 +405,13 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
       </ol>
       <MyTokens client={client} />
       <Bracket lobby={lobby} mine={mine} />
-      <div class="sq-card-actions">
-        <button type="button" class="fd-btn primary" onClick={actions.onAgain}>
-          {actions.party ? "Back to your party" : "Play again"}
-        </button>
-        <button type="button" class="fd-btn" onClick={actions.onHome}>
+      {/* (Stacked, Play again on top, as on every end screen: `.es-screen .actions` lays them out bottom-up.) */}
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" onClick={actions.onHome}>
           Home
+        </button>
+        <button type="button" class="btn btn-primary" onClick={actions.onAgain}>
+          {actions.party ? "Back to your party" : "Play again"}
         </button>
       </div>
     </div>
@@ -387,6 +447,8 @@ export function SquadsScreen({ client, actions }: { client: SquadsClient; action
         </aside>
       )}
       {body}
+      {/* (A computer: the standings and the column end on the board's bottom line. board-foot.ts.) */}
+      {side && <BoardFoot />}
     </div>
   );
 }

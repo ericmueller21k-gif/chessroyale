@@ -119,15 +119,18 @@ export function StandingsPanel({ client, onLeave, exit = null }: { client: Squad
       <h2 class="sq-standings-head">
         Squads <span class="muted">· team clocks</span>
       </h2>
-      {/* (Your own squad first, pinned: then a thicker line, then the whole table as it stands, you in your place too.) */}
-      {mine !== null && (
-        <>
-          {row(mine)}
-          <hr class="sq-pin" aria-hidden="true" />
-        </>
-      )}
-      {standingsOrder(lobby).map(row)}
-      {onLeave && <LeaveButton client={client} onLeave={onLeave} exit={exit} />}
+      {/* (Your own squad first, pinned: then a thicker line, then the whole table as it stands, you in your place too. The rows' box: a
+          computer's frame only, from the board's top to its foot, Nov 26; elsewhere no box of its own.) */}
+      <div class="sq-standings-rows">
+        {mine !== null && (
+          <>
+            {row(mine)}
+            <hr class="sq-pin" aria-hidden="true" />
+          </>
+        )}
+        {standingsOrder(lobby).map(row)}
+        {onLeave && <LeaveButton client={client} onLeave={onLeave} exit={exit} />}
+      </div>
     </section>
   );
 }

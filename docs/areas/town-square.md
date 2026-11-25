@@ -271,6 +271,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   you, waits** (a soft green ring pulses on the ground under the free stool); otherwise the pieces stand set up. You at a
   table aren't playing or searching yet (Casual and Ranked come with the tables' matchmaking). While nothing on a board
   moves and the camera holds still, its slab, board and pieces are one cached picture (`boardCache`): frame rates as main.
+  (Canvas 2D only since Nov 25: WebGL draws the board as it is, as it does while you walk, as the cached picture was an upload each
+  time the camera came to rest. The clock's digits are one picture made on the loading screen, each second drawn from it.)
   Its top is lifted onto the table's picture in the camera's true perspective (`tableLift` in `camera.ts`); low on the
   phone's screen, where that would draw it more than `tableBoardGrow` (1.2) times its foot's scale (Oct 28, Eric's warped
   boards: twice the table and more, skewed), it's worked out a little farther off and drawn at the picture's place and
@@ -916,7 +918,8 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
     scene's summoning plays (`HIDDEN_ROOM_FEEL.summon`, about 7 s, to black); a black cover holds while his fight opens (the app's
     `hiddenFight` → `joinLobby`, `NetMatch.hiddenRoom`). Its result's "Back to town" brings you to his door.
   - **Eric's test kit (admins only, server-checked):** "Fill with 3 bots" on his card: three bots stand at the board's places, count
-    toward the four, join a request one by one (`botJoinMs`, so each count shows), go through the summoning and play as the fight's bot
+    toward the four, join a request one by one (one on each of the admin's looks `botJoinMs` or more after the last, so the admin's answers carry
+    every count; Nov 25), go through the summoning and play as the fight's bot
     members; they leave with the admin. A player's "fill" is refused ("Admins only."). The fight's 🏆: see bosses.md, "Win this form".
   - **The fight plays through** (Nov 13): the child first (beaten, a new match against the man), his adult form beaten, his phase change
     and the four boards online, to the result (bosses.md, "His child form", "Phase 2 online").
@@ -951,8 +954,10 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 ## Birdie's Station (Nov 23; an admin's town only, as Birdie is admins first; [decision](../decisions/2026-11-23-birdie-home.md))
 
 - **Front** (`houses/birdie.ts`, the art as drawn, 144 × 250): a little train station, a big nest on its roof; Meadow Street 16-19 (the lamp at 20 moved to 21). Birdie roams out front (`BIRDIE_TOWN`); a tap plays his `hello`.
-- **Lobby** (`shops/birdie-art.ts`): the art's one 12 × 12 picture (`birdie-lobby-art.ts`) cut into the room's pieces at their feet, drawn back pixel for pixel (`shop-birdie.test.ts`); the bartender pigeon (`birdiebartender`) behind the bar's front run, his scoop dipping in the vat beside him and pouring into a counter feeder (both moved for it). The split-flap board is written by the game (`shops/flap-board.ts`, `RoomArt.flaps`, `SHOP_FEEL.flaps`): this town's buildings, never the walk-up; a row flips every 7 s, the page every 30 s, only the moving flaps drawn (`__shopFlaps()`).
-- **Challenge** (`shops/intros/birdie.ts`): the middle table and its stools (`ring-` floor) are the battle spot; his hello with his line, the board's pop, the default wipe (his toot). e2e `birdie-home.spec.ts`.
+- **Lobby** (`shops/birdie-art.ts`; round 4 since Nov 23, [decision](../decisions/2026-11-23-birdie-lobby-4.md)): the art's one 12 × 12 picture (`birdie-lobby-art.ts`, round 4 as drawn) cut into the room's pieces at their feet, drawn back pixel for pixel but where the room moved things (`shop-birdie.test.ts`). Floor tiles: the art's floor and the crossing's tracks (row 7, cols 2-9, under the table). The bar's raised top is cut into its two arms (`counter-arm-w`, `counter-arm-e`: one piece each, 1 × 3, rows 1-3) and the front run (`counter`). An arm is a counter (`RoomArt.counters`, `SHOP_BIRDIE_COUNTERS`; ShopRoom `drawCounter`): its bottom card stands at its south row like any piece, and the rows above recede north a square every 37, in 4-row slices each standing at its own depth, so it reads as one counter with one straight top edge at the run's height and one side face, from every camera. A side the camera sees past gets each slice's edge columns down a card's height as its face. Its slices are drawn once into a canvas of its own the second frame the view rests, then drawn from it while the view stays (as the room's back is). It is sorted with its north row's pieces, so the stools against it and the feeders on it draw over it, as the art drew them (fix round, Nov 23: cut a piece a row, the arms showed as three stepped slabs). The bartender pigeon (`birdiebartender`) behind the run, his scoop dipping in the vat beside him (moved up beside him so its heap shows) and pouring into the run's feeder (moved under the pour). The split-flap board is written by the game (`shops/flap-board.ts`, `RoomArt.flaps`, `SHOP_FEEL.flaps`): this town's buildings, never the walk-up; a row flips every 7 s, the page every 30 s, only the moving flaps drawn (`__shopFlaps()`).
+- **The table** (`match-table`, `SHOP_BIRDIE_TABLE`): the town's table's geometry (park.ts PARK_TABLE), its leg in his wood, the art's two bar stools either side; its top the renderer's flat slab and board, no pieces, in the art's table colors (`SHOP_BIRDIE_TABLE_PALETTE`, `RoomArt.tableTop`), so it lies flat like every boss's table.
+- **The crossing gates** (`gate-w` at (4, 6), `gate-e` at (9, 8): the art's, the east one a square east, clear of your mark): idle arm up, lights dark; in his challenge, from you both on your marks, `lower` (4 beats of 160 ms) then `down` (lights in turn, 500 ms) until the battle takes the screen (`RoomArt.plays`, the room's own piece frames; `__shopIntro().plays`).
+- **Challenge** (`shops/intros/birdie.ts`): the table and its stools (`ring-` floor) are the battle spot, the table and its flat top there from the walk in (the `top` prop: `paintTable` without pieces); his hello with his line, the pieces' pop, the default wipe (his toot). e2e `birdie-home.spec.ts`.
 - **His crate** (Nov 23, [decision](../decisions/2026-11-23-birdie-ride-crate.md)): the bartender's Talk opens Birdie's Boss Crate, his Train first, as every Shopkeeper's. Since Nov 23 the crate stands on the bar's run before his talk squares, the room's own (`SHOP_BIRDIE_CRATE`, `SHOP_BIRDIE_CRATE_AT` in `birdie-art.ts`; ShopRoom's `crateAt` as Babur's on his counter; [decision](../decisions/2026-11-23-birdie-crate-bar.md)): the houses kit's crate in his navy, burgundy and gold, a gold diamond on its front, his feather on the lid, the same slow glint; the card and its pop-up show it, in the same 90 × 81 box. Unit `shop-birdie.test.ts`; e2e `shop.spec.ts`.
 
 ## Challenging a boss (Nov 2: Pokémon-gym style)
@@ -1305,14 +1310,33 @@ town's pictures…" while it paints (and waits for the sidekicks' sheets), "Buil
 (`paint-gl.ts` `keep`, `kept`: tallest first, the atlas made once as deep as they need, plus 2 spare pages for tags, boards, the
 bubble, signs and text, the only ones that start again). Then the frames start. Measured headless at 1x: 4.5 s (painting 4.3,
 uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After it, 30 s of walking and turning: 0 painted,
-0 uploads, 0 resets. A building in and out uploads nothing of the town. The town's 2D pictures are made in memory (`paint.ts`
+0 uploads, 0 resets. A building in and out uploads nothing of the town. **The labels too (Nov 25; [decision](../decisions/2026-11-25-town-hitches.md)):**
+Eric's laptop's report showed 1,063 uploads in 15 s of walking, every worst frame one with uploads. The labels were made as they first
+showed at each size: a home's name at each size it came to, a sign at each scale, a tag at each size, a cloud, a table clock's every second,
+and the speech bubble every frame its speaker glided a fraction of a pixel. Now `makeLabels` (render.ts, after the fonts are in,
+`fontsIn`) makes and keeps every home's name at sizes 12 to 20 (`NAME_SIZES`; two rows, outline and white), every sign once at its font's
+own pixels (drawn `s` times over, nearest), everyone's tag at sizes 8 to 12 (`TAG_SIZES`), the clouds and sun of the sky now, the clock's
+digits and the bubble's tail. The bubble is one picture a line (body, shadow and words; the last 8 kept), laid on whole device pixels.
+A picture drawn in its own font is never drawn again when another font loads (tags, names, the WebGL text). What's left to make while
+walking: someone arriving later (their tag's sizes, once) and a boss's new line (one picture). About 55 ms more on the loading screen;
+one more atlas page at 1.25x, two at 3x (16 MB each). The town's 2D pictures are made in memory (`paint.ts`
 `art2d`): uploading a GPU canvas waits for the GPU. Hooks: `__townPaint()`'s `loading`, `loadMs`, `loadPaintMs`, `atlas`. Tests:
-`packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…").
+`packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…": walking, a full turn and zooming
+in and out after it upload nothing, on a first visit and a second, Nov 25).
 **Kept between visits (Nov 23; [decision](../decisions/2026-11-23-town-keep-pictures.md)):** after a first visit's first frame its pictures are
 packed into PNG pages (a worker encodes them; 5.8 MB) and kept in IndexedDB (`town/keep-pictures.ts`, `TOWN_PICTURES`). A later visit on the
-same build and layout (`pictureKey`: version, the town chunk's hashed name, `render.ts` `pictureSig`) cuts them back out instead of painting:
-4x slowed, 18.5 s → 5.9 s. Anything odd paints as before and clears the entry. `?paintall` skips it. Hooks: `__townPaint().pictures`,
-`__townPictureSum()`. Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second visit…").
+same build and layout (`pictureKey`: version, the town chunk's hashed name, `render.ts` `pictureSig`) loads them instead of painting:
+4x slowed, 18.5 s → 5.9 s. **Uploaded whole (Nov 25; [decision](../decisions/2026-11-25-town-atlas-pages.md)):** the pages are packed as the
+atlas packs (`paint.ts` `ATLAS`: 2048 px, 2 px padding, a picture over 1024 px alone), so a later visit uploads each page as one atlas layer
+(`paint-gl.ts` `adopt`) instead of cutting 1,912 pictures out and uploading each. Each picture is a stand-in canvas, cut from its page only
+when something reads it (its 2D context: hit tests, statue masks; a 2D context drawing from it: the chips' and the large map's faces,
+`cutBeforeDraw`, Nov 25 round 2) or it must be uploaded alone (a lost context). The pages stay decoded
+until the town closes. Headless, repeat visit at 4x: 5.47 → 4.52 s to the first frame (a page upload is about 50 to 65 ms at 4x here).
+Anything odd paints as before and clears the entry. `?paintall` skips it. Hooks: `__townPaint().pictures`, `__townPictureSum()` (its `gpu`:
+what the atlas holds for each picture; `(true)`: each one's hash). Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second
+visit…": canvas and GPU hashes the same on all three visits), `e2e/town-street.spec.ts` ("the town's loading screen…": a lost context on
+either visit gives back the same texels), `e2e/town-controls.spec.ts` ("the minimap…": its reload is a repeat visit; every chip's face and
+the map's portraits drawn).
 **Painted on more cores (Nov 23; [decision](../decisions/2026-11-23-town-paint-workers.md)):** a first visit's pictures are painted ahead by a
 pool of workers (`town/paint-pool.ts`, `paint.worker.ts`; the cores less one, at most 3, `TOWN_PAINT_WORKERS`) with the main thread's own
 code (`town/paint-jobs.ts`), their art sent once as JSON (a character's idle frames and parts, a roof's geometry: `box-geom.ts`); the main
@@ -1401,6 +1425,10 @@ noted wherever a slice changed one.
 
 ## Tests
 
+- **A test's walk or arrow step needs a square no bot stands on (Nov 25):** the bots pick spots in columns 14 to 29, rows 21 to 34
+  (world.ts `freeSpot`). A bot standing on the square claims it (`taken`), so a step onto it waits as long as the bot stays, sometimes
+  over a minute. Walk and step outside that area, as town-controls' minimap test does since Nov 25
+  ([2026-11-25-town-arrowstep-bots.md](../decisions/2026-11-25-town-arrowstep-bots.md)).
 - **Tapping in the street town from a spec (Nov 13):** `tapInTown(page, kind, id, card)` in `e2e/helpers.ts` opens a figure's or a
   place's card. It waits until the view holds still over 3 drawn frames (`townTapPoint`), glides there once if the target is off the screen
   or covered, and taps with the press and release together (`quickTap`). Read a point mid-glide, or a separate `page.mouse.click`, and

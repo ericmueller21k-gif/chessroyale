@@ -714,10 +714,12 @@ export function splashMusic(boss: string): Promise<void> {
     try {
       cutEnding(boss);
       const p = startPlan(bus.ctx, bus.out, plan, got.intro, got.loop, level());
-      // (Late, the battle already picked: it's the battle's now.)
-      if (battle && themeOf(battle) === boss) playing = { ...p, key: battle.key, boss: battle.boss, theme: boss };
-      else carried = { ...p, boss };
       log(`music:splash:${boss}`);
+      // (Decoded late, the battle already picked (a slow device: CI, Nov 24): the battle carries it on from here, as bossMusic does.)
+      if (battle && themeOf(battle) === boss) {
+        playing = { ...p, key: battle.key, boss: battle.boss, theme: boss };
+        log(`music:carry:${battle.boss}`);
+      } else carried = { ...p, boss };
     } catch {
       // Ignore audio errors: the challenge goes on in silence.
     }

@@ -20,6 +20,8 @@ import { BAN_COOKIE, BAN_HEADER, UNMARK, banAnswer, banGate } from "./ban-gate.t
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { handleTestAccounts } from "./test-accounts.ts";
+import { handleResidents, residentGate } from "./residents.ts";
+import { residentsHostTick, type ResidentsHostEnv } from "./residents-host.ts";
 import { handleFriendBots } from "./friend-bots.ts";
 import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
 import { deepCheckRun, recountDeep } from "./fairplay-deep.ts";
@@ -28,6 +30,7 @@ import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { chatRoomOf, expireTownCache, signedInReader, townOpenParties } from "./town-chat-api.ts";
 import { handleFriendsApi } from "./friends-api.ts";
+import { handleLadder } from "./ladder.ts";
 import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
@@ -42,6 +45,7 @@ import { RANGED_ASSETS, rangedAsset } from "./ranged.ts";
 
 export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub, DuelGame };
 export { EngineServer } from "./engine.ts";
+export { ResidentsHost } from "./residents-host.ts";
 
 // The Durable Objects' entry points (their fetch, WebSocket handlers, alarm and the methods the Worker calls): an
 // error in one is logged and counted (problems.ts), then thrown on as before.
@@ -52,7 +56,7 @@ guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
 guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "abandon"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv, E2eSqlEnv, AlertEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv, E2eSqlEnv, AlertEnv, ResidentsHostEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -102,7 +106,7 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
-   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), alerts to Discord (alerts.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), alerts to Discord (alerts.ts), the residents' host kept up or stopped (residents-host.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
    * server (cases in review at once, the rest off-peak; fairplay-deep.ts), after its catch-up of summaries older than the near-best count (recountDeep). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
@@ -111,6 +115,12 @@ export default {
     const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
     // Alerts to Discord (alerts.ts): apart from the jobs below, so a database that doesn't answer still pages.
     ctx.waitUntil(checkAlerts(rawEnv, d1Sql(db), Date.now()).catch(failed("alerts")));
+    // The residents' host (residents-host.ts): kept up while RESIDENTS_HOST_ON is "1", stopped while off or paused. Apart too.
+    ctx.waitUntil(
+      residentsHostTick(rawEnv)
+        .then((did) => did && console.log(`residents host: ${did}`))
+        .catch(failed("residents-host")),
+    );
     ctx.waitUntil(
       (async () => {
         const sql = d1Sql(db);
@@ -187,6 +197,13 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     countRoute("banned", Date.now() - t);
     return gate.refused;
   }
+  // The residents' kill switch (PAUSE_RESIDENTS; residents.ts): while it's on, a resident's session gets 503 on every /api/* route (the
+  // rooms' WebSockets too). Off, nothing is read.
+  const residentRefused = !admin && !(rawEnv.E2E_SQL && url.pathname === "/api/e2e/sql") ? await residentGate(rawEnv, request, t) : null;
+  if (residentRefused) {
+    countRoute("residents-paused", Date.now() - t);
+    return residentRefused;
+  }
   const res = await route(request, rawEnv, url, (p) => ctx.waitUntil(p));
   const ms = Date.now() - t;
   countRoute(routeOf(request.method, url.pathname), ms);
@@ -217,6 +234,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Test accounts (admins, a script through Access, the e2e's key: test-accounts.ts): made, listed and deleted.
     const tests = await handleTestAccounts(request, env);
     if (tests) return tests;
+    // Residents (admins, the residents program through Access, the e2e's key: residents.ts): made and signed in, listed, its heartbeat.
+    const residents = await handleResidents(request, env);
+    if (residents) return residents;
     // Friend bots on an admin's own friends list (admins, the e2e's key with a session: friend-bots.ts).
     const bots = await handleFriendBots(request, env);
     if (bots) return bots;
@@ -232,6 +252,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Friends and invites: /api/friends (friends-api.ts).
     const friends = await handleFriendsApi(request, env, waitUntil);
     if (friends) return friends;
+    // GET /api/ladder?mode=1v1: the season ladder's top 200 and your place (ladder.ts; the rows kept a minute in this Worker).
+    const ladder = await handleLadder(request, env);
+    if (ladder) return ladder;
     // POST /api/engine/score {fen, moves} → {moves}: the engine server's deeper look at a few moves (solo games'
     // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself). A position
     // Stockfish refuses is a bad request, turned away before the budget (it would end the server's Stockfish: engine.ts).
@@ -526,14 +549,14 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       }
       if (leaves?.delaySec) countCall("ranked.delayed");
       const delay = leaves?.delaySec ? { notBefore: now + leaves.delaySec * 1000 } : {};
-      const { player, rating, rd } = await duelEntrant(sql, me, now, isAdmin(env, me));
+      const { player, rating, rd, colors } = await duelEntrant(sql, me, now, isAdmin(env, me));
       const clock = Number(url.searchParams.get("clock"));
       const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
       // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)
       // (The device's marker, hashed: two accounts on one device never meet. Fair play's device cookie.)
       const deviceCookie = readCookie(request, DEVICE_COOKIE);
       const device = deviceCookie ? (await sha256(`1v1:${deviceCookie}`)).slice(0, 24) : null;
-      const first = await (await queue(may.pooled)).duelNext(null, { uid: me.id, rating, rd, player, device, ...delay, ...(testSeconds ? { testSeconds } : {}) });
+      const first = await (await queue(may.pooled)).duelNext(null, { uid: me.id, rating, rd, player, device, colors, ...delay, ...(testSeconds ? { testSeconds } : {}) });
       return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);

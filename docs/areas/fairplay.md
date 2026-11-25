@@ -95,6 +95,10 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   server's room, and the case page shows it under Reports. The automated reviewer's API gets that report without the
   words and refuses to let it clear such a case: a moderator reads the line first. A test account's reports
   (`users.test`, [accounts.md](accounts.md)) never count toward the reporters that put a player in review.
+- **Residents** (Nov 25; [accounts.md](accounts.md)): their matches are recorded as anyone's, with what detection would have done in
+  `fairplay_matches.would`. Detection, reports and evasion never open or move their case (`setCase`, `raiseCase`; a person still can); their
+  own reports are dropped; a report of one is kept, with no case; never pooled; the deep re-check skips them. A real person's crowd
+  (`crowd`, `crowdFound`, `picks` in their judged moves) leaves residents' picks out; a resident's own rows keep everyone.
 - **Deleting an account never gets around fair play** (`account-data.ts`; [accounts.md](accounts.md)). A banned or
   in-review account's case, log, hashed identities and device markers stay under its old id; its judged moves, match
   summaries and appeals go. A new account with one of its identities is banned again, or goes to review (`banCheck`).
@@ -170,3 +174,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - No invasive fingerprinting; admin emails live in a Worker variable or secret, never in the repo.
 - A ban means you can't sign in (Eric's rule: `docs/rules/eric.md`): a new way to sign in, or a new route outside the Worker's
   `route()`, goes through `signInBan` or the ban gate in the same PR.
+
+- **The ladder and a left-out player (Nov 25, the ladder's delta review D2):** a pooled or reviewed player's ladder is built "as ever" (as an
+  honest player's in their spot), so near the Transcendent or Pearlescent line a row's tier there can differ from that player's own profile
+  (counted without them). Accepted: the alternative is viewer-relative places on every screen with a tier. A third party can also notice a
+  pooled friend missing from the ladder. `docs/decisions/2026-11-25-ladder.md`.

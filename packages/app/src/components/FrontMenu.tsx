@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useLayoutEffect, useRef } from "preact/hooks";
 import { account } from "../account.ts";
 import { friendsBadge, useFriends } from "../friends.ts";
 import { useLive } from "../live.ts";
@@ -11,6 +12,7 @@ import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
 import { MOUSE_LAYOUT } from "./MatchMenu.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { questsForYou } from "../quests.ts";
+import { TROPHY_PATHS } from "../ladder.ts";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -27,11 +29,13 @@ export interface FrontNav {
   settings: () => void;
   /** Your friends list (the live panel's Friends section, the phone home's line). */
   friendsList: () => void;
+  /** The season ladder (/ladder; Eric, Nov 25: "visible from the left panel on desktop"); over the town in the town, as the shop. */
+  ladder: () => void;
   /** Sign in (the global chat's guests). */
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess" | "quests";
+export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess" | "quests" | "ladder";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -84,6 +88,20 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
               <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
               <circle cx="17" cy="9" r="2.6" />
               <path d="M16 13.6c2.8.2 5 2.2 5 5" />
+            </Icon>
+          }
+        />
+        {/* (The season ladder (Eric, Nov 25: "visible from the left panel on desktop"): the ranked modes' standings this season.) */}
+        <Item
+          tip={tip}
+          label="Ladder"
+          on={page === "ladder"}
+          onClick={nav.ladder}
+          icon={
+            <Icon>
+              {TROPHY_PATHS.map((d) => (
+                <path key={d} d={d} />
+              ))}
             </Icon>
           }
         />
@@ -188,12 +206,73 @@ export function GameFrame({ children, nav }: { children: ComponentChildren; nav:
   // tablet's screen, so it isn't drawn there. The frame is the same element either way (no box of its own on a phone or a
   // tablet: game-frame.css), so a window that crosses the line keeps its screen mounted.)
   const mouse = useMedia(MOUSE_LAYOUT);
+  const frame = useRef<HTMLDivElement>(null);
+  useMenuLabels(frame, mouse);
   return (
-    <div class="gm-frame">
+    <div class="gm-frame" ref={frame}>
       {mouse && <SideMenu nav={nav} game />}
       <div class="gm-main">{children}</div>
     </div>
   );
+}
+
+/**
+ * The side menu's labels wherever the board keeps its size (Eric, Nov 25: "Why isn't the names on the left appearing there's plenty of
+ * space?", then, in this order: "why would this be the case when there's ample room on the right to shrink the chat box in order to make the
+ * left menus their necessary size"; docs/decisions/2026-11-25-menu-labels-2.md). On every game screen with a board: (1) the board never
+ * shrinks for the menu; (2) the labels show; (3) to make their room the column beside the board narrows first, down to its least, 280 px
+ * (board-size.css `--side-w`: every screen's chat lines, emoji row, panel and status still fit there, game-frame.css); (4) icons only where
+ * the board would still shrink or leave its column. So the frame tries the labels (`gm-labels`, game-frame.css: 232 px in place of the 80 px
+ * icons) and keeps them where the board is the same size and still inside its own column, at every width. A screen without a board (a
+ * result page) has the old rule: the labels from 1800 px. Done before the screen is drawn (a layout effect, a resize, the board resizing or
+ * a new screen), so nothing is seen to move.
+ */
+function useMenuLabels(frame: { current: HTMLDivElement | null }, on: boolean) {
+  useLayoutEffect(() => {
+    const el = frame.current;
+    if (!on || !el) return;
+    let board: Element | null = null;
+    const fit = () => {
+      const wrap = el.querySelector(".board-area .board-row > .board-wrap");
+      const area = wrap?.closest(".board-area");
+      if (!wrap || !area) {
+        el.classList.toggle("gm-labels", innerWidth >= 1800);
+        return;
+      }
+      const read = () => {
+        const a = area.getBoundingClientRect();
+        const b = wrap.getBoundingClientRect();
+        return { w: b.width, inside: b.left >= a.left - 0.5 && b.right <= a.right + 0.5 };
+      };
+      el.classList.remove("gm-labels");
+      const icons = read();
+      el.classList.add("gm-labels");
+      const labels = read();
+      // (The column beside the board takes the labels' room first: its width is free down to its least, `--side-w`'s 280 px.)
+      el.classList.toggle("gm-labels", labels.inside && Math.abs(labels.w - icons.w) < 0.5);
+    };
+    // (Its board: watched for its size, and found again when the screen changes.)
+    const sized = new ResizeObserver(fit);
+    const look = () => {
+      const now = el.querySelector(".board-area .board-row > .board-wrap");
+      if (now === board) return;
+      board = now;
+      sized.disconnect();
+      if (now) sized.observe(now);
+      fit();
+    };
+    const changed = new MutationObserver(look);
+    changed.observe(el, { childList: true, subtree: true });
+    addEventListener("resize", fit);
+    look();
+    fit();
+    return () => {
+      sized.disconnect();
+      changed.disconnect();
+      removeEventListener("resize", fit);
+      el.classList.remove("gm-labels");
+    };
+  }, [on]);
 }
 
 /**

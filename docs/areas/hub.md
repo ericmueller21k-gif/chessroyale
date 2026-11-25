@@ -31,7 +31,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   (review of #575, m3). **After a game that moved a quest** (Nov 10, [decision](../decisions/2026-11-10-quest-progress.md)): home compares the counts
   with the ones this device last saw (`hunchess.quests.shown`, per account) and opens it by itself (same "never over" rules), each moved bar sliding to
   its new count in turn (`QUESTS.show`); one it finishes glows, pops, says "Done!" and bursts its reward; sounds by name (`questSound` in sound.ts,
-  placeholders until Eric's pack: `QUEST_SOUND_FILES`; "done" is the shared steel pan level-up, `END_SCREEN.levelUp`, since Nov 20). e2e sets `hunchess.quests.noPop` unless `questsSeen: false`. The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
+  placeholders until Eric's pack: `QUEST_SOUND_FILES`; "done" is the shared steel pan level-up, `END_SCREEN.levelUp`, since Nov 20). e2e sets `hunchess.quests.noPop` unless `questsSeen: false`. **12 hours between auto-opens** (Eric, Nov 24, [decision](../decisions/2026-11-24-quests-gap.md)): once closed (any way, Chess Town's layer too), neither kind opens it by itself for `QUESTS.autoOpenGapHours` (12), per account on this device (`hunchess.quests.closedAt`); the Quests button always opens it, sliding any moves held back. The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
   every button keeps 40 px) and a computer's **Daily Quests** in its side menu, between Play with friends and Shop & crates (`nav.quests`: home with the
   overlay open, via `intent`; in Chess Town the same card over the town, `QuestsLayer`, from the side menu or, on a phone, the town bar's own Quests (the town bar has home's Quests, Shop & crates and Friends since Nov 22), [town-square.md](town-square.md); Eric, Nov 10, [decision](../decisions/2026-11-10-desktop-quests.md); nothing on the card); for everyone, greyed ("Sign in
   for quests") for a guest where sign-in is set up. A game that finishes a quest says so in its result's toast ("Quest done: Boss Hunter +300 XP").
@@ -82,9 +82,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     Nov 9; a stored "botsoff", a test's, still queues people only); Squads' **Solo queue**, **Party** ([squads.md](squads.md); Party
     opens the party sheet at once, and PLAY opens it again while Party is picked; its line "Queue with up to 3 friends") and **Bots**, greyed ("Soon") until its server part;
     for 1 v 1 (always people) your rank's emblem (48 px, its box
-    there before your profile loads; none in placements) beside your rank, "Your rank: Gold 2 · 45 RP" or "Your rank:
+    there before your profile loads; none in placements) beside your rank, "Your rank: Gold II – 45" or "Your rank:
     Placement 2/5" (`ranked1v1Rank`, from your profile; whole on one line at 320 px at its widest, "Your rank:
-    Transcendent · 1234 RP"), over "Win to climb, lose to drop" (Nov 9; what 1 v 1 is, "Ranked chess vs one player near your level", is
+    Transcendent – 1234"), over "Win to climb, lose to drop" (Nov 9; what 1 v 1 is, "Ranked chess vs one player near your level", is
     the line above PLAY). Then **the line above PLAY** (Oct 28, Eric: "swap the line
     of text below Play and put it above play") and PLAY. The line is exactly one line whatever it says, phone and computer (Nov 9,
     [2026-11-09-home-modes-hint-line.md](../decisions/2026-11-09-home-modes-hint-line.md): ellipsized if ever too long, every line
@@ -181,8 +181,12 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
   - Your icon (no coins at the top: the shop shows them, Eric, Oct 18; the profile's coins pill went Nov 17), and the live line ("214 online · 9 matches running · 31 in queue") with the typical
   - **On a game's screen** (Nov 1, Eric: "the side menu… on the desktop still"; docs/decisions/2026-11-01-game-screens-computer.md):
-    a computer with a mouse has the same side menu beside every game screen (`GameFrame`, `game-frame.css`): 232 px with labels from
-    1800 px wide (round 2; 1366 before), icons only below it (labels as tooltips). An item leaves the match through the gear's own Resign or Leave confirm,
+    a computer with a mouse has the same side menu beside every game screen (`GameFrame`, `game-frame.css`): 232 px with labels
+    wherever the board keeps its size (Eric's order, Nov 25 round 2, [decision](../decisions/2026-11-25-menu-labels-2.md): the board never
+    shrinks for the menu; the labels show; the column beside the board narrows first, to its least, 280 px; icons only where the board would
+    still shrink). The frame tries them and keeps them where the board is the same size inside its column (`useMenuLabels`), at every width;
+    a page without a board, from 1800 px. Eric's laptop, 1536 × 730: labels on every game screen. The chat beside the board keeps its emoji
+    in one row at any width (`game-frame.css`), so the narrower column costs it no row. Elsewhere icons only (labels as tooltips). An item leaves the match through the gear's own Resign or Leave confirm,
     then goes to its page. A phone and a touch tablet have none.
     wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
@@ -193,7 +197,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     Boss Battle form has none).
   - **The rank line under your name** (Oct 28, Eric: "get rid of the novice weighty … we're going with the new ranking
     system"): your ranked 1 v 1 rank (`RankLine`, `homeRankLine()` in `ranked.ts`): the tier and division in the tier's
-    color, then the RP ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked game (a blank line of the
+    color, then the RP ("Gold III – 45"), "Placement 2/5", or "Unranked" before your first ranked game (a blank line of the
     same height while your account loads). No rating rank's name: `RATING_RANKS` is retired
     ([2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)).
   - **An admin's test rank** (Oct 28: `?rank=gold-3`, only where `testSwitchesAllowed()`) shows in the rank line; a player sees their real
@@ -213,7 +217,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, the line
     above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side, at the bottom. Your pawn's card takes the room
-    left: your tag (icon, name, "Gold 3 · 45 RP"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
+    left: your tag (icon, name, "Gold III – 45"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
     (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
     640 px phone, or a 740 px one (measured at 320, 375 and 430 px wide), since the options panel is there from the first view, Oct 25)
     the tag stands beside the pawn instead, as it did when the room was short (Oct 18), so home fits with no scrolling
@@ -222,8 +226,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Your profile (Nov 11):** "View profile" in the card's bottom-right corner (13 px words and its box at the bottom edge on cards under 110 px); `e2e/home-layout.spec.ts`, "View profile never covers your name".
   - **Portrait (Nov 11, Eric: rotation off on phones):** a phone held sideways (landscape, 500 px high or less) is covered by `#rotate-lock` in `index.html`; the installed app is locked by its manifest, and `main.tsx` asks `screen.orientation.lock` where a browser allows it.
-  - **Computer** (1024 px+): a side menu (from the top: **Main menu**, Eric, Nov 22: it was Play, then briefly Home, which clashed with the results screen's Home button; Chess Town, Boss Battle, Play with friends, Daily Quests, Shop & crates, Profile, and Settings at the bottom; in
-    Chess Town the middle four open over the town: [town-square.md](town-square.md)), the play column in the center in the phone's order (Eric, Oct 18): the RANKED
+  - **Computer** (1024 px+): a side menu (from the top: **Main menu**, Eric, Nov 22: it was Play, then briefly Home, which clashed with the results screen's Home button; Chess Town, Boss Battle, Play with friends, Ladder, Daily Quests, Shop & crates, Profile, and Settings at the bottom; in
+    Chess Town the middle five open over the town: [town-square.md](town-square.md)), the play column in the center in the phone's order (Eric, Oct 18): the RANKED
     row, its panel, the line above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side (a little shorter) at the
     bottom; the right column (Nov 7, Eric's mockup; the same place on every framed page: a 62 px slot, TOWN and its tools in the
     town; FRIENDS ›; the live line; the global chat, [chat.md](chat.md)). The pawn hops on a computer too (Oct 24: the hop was phone-only). Nov 11: no pawn or chat button in the top area on a computer.
@@ -241,6 +245,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   hub too (Oct 15) but stay off this line: they count for the overload limit and the ops health view only.
 - **The queue screen:** the lobby's seats fill on screen (people, then bots popping in after the fill time), the wait
   so far, "Switch to Default" in Bots off. The match starts in place.
+- **The season ladder** (`/ladder`, Nov 25, [decision](../decisions/2026-11-25-ladder.md); server: [ranked.md](ranked.md)): home's **LADDER ›** (end of the RANKED label, out of the flow), the side menu's **Ladder** (over the town in Chess Town). Tabs in the RANKED row's order, 1 v 1 picked
+  (50 v 50, Squads greyed, a tap says why); the top `LADDER.size` (200) in one scroll; your row always pinned (your place, placements, or Sign in); greyed rows
+  while it loads; a row opens that profile (yours as others see it), whose own Back (`profile-nav.ts` `profileBack`) returns to the same place in the list (`ladder.ts`
+  `cameBack`; the answer kept a minute, then asked again). Your own row in the list is the server's (fresh). Tests: `test/ladder.test.ts`, `home-ranked.spec.ts`.
 - **Profiles** ([docs/decisions/2026-10-28-public-profile.md](../decisions/2026-10-28-public-profile.md), [2026-10-29-public-profile-fit.md](../decisions/2026-10-29-public-profile-fit.md)). Two screens:
   - **The public profile** (`screens/PublicProfile.tsx`, Eric's mockup of Oct 28): the one page every player has, the same for every
     viewer, opened by a tap on another player's name or face anywhere (`PlayerName`, the queue's pawns, the town card, a lobby; the
@@ -403,6 +411,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 | Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, Chess Town's button, the Other modes cards (Boss Battle, Auto chess), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
 | Friends' pieces (rows, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
+| The season ladder: the page, its answer and words | `screens/Ladder.tsx`, `ladder.ts`, `ladder.css` (`ld-`); home's LADDER in `screens/Home.tsx`; server `packages/server/src/ladder.ts` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |
 | The public profile's words and numbers, shared pieces | `packages/app/src/public-profile.ts` (+ `test/public-profile.test.ts`), `components/ProfileParts.tsx` (what they wear, recent matches, the report sheet), `public-profile.css` |
 | The live line, app side | `packages/app/src/live.ts` |

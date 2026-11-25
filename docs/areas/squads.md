@@ -24,8 +24,9 @@ move.
   button skips to the end; reduced motion: the end at once. The reward card after it (Nov 22, [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md)) shows only crates and keys (`RewardBox endScreen`): centered, in the crate screens' blue window, OK and Go to inventory (your inventory as a layer over the end screen, `InventoryLayer`). The results' middle: your squad (its tag and members); the headline "Victory!" (champions) or your place. The card's run plays once: the results show its end. Its rules and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
-  less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column: 848 px at
-  1920 × 1080, width-bound at 1280 × 800 (504, as before).
+  less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column. Since Nov 26, at 1100 px
+  and up with a mouse, the 50 v 50's frame (below, "On a computer"): the window's height less 92, as wide as the standings, the column's
+  least (280) and the gaps leave: 634 at 1536 × 730 (125%), 864 at 1920 × 960, 984 at 1920 × 1080, 504 at 1280 × 800.
 - **Its kill switch** (`PAUSE_SQUADS`, [ops.md](ops.md) "Kill switches"): no new queue or party (503 with "Squads is
   resting for a bit. Back soon."); a party already in line waits with that line and goes in once it's back; lobbies
   already running finish; admins' test lobbies stay open.
@@ -40,6 +41,10 @@ move.
   `noteActions` logs every miss; `noShowsBeforeBot` (3) in a row hands the seat to a bot (`replacedByBot`).
 - **Seeded randomness**: `squadsRng(seed, ...names)` gives each decision its own stream (match, turn, half, board,
   what's drawn), so the server can replay any decision from the lobby's seed, and adding a draw never moves others.
+- **Opening starts** (`squadsOpenings`, `drawOpenings` in match.ts): a board starts `openingMoves` (4) moves per side
+  into a library line, balanced (`openingBalance`) and never with the side to move in check (Eric, Nov 25: the
+  Steinitz Gambit's forced Ke2 dropped; docs/decisions/2026-11-25-squads-no-check-starts.md). Since Nov 26 the check
+  filter is `usableAt` itself (openings.ts), so every mode's draw skips such starts; `data/openings.json` is unchanged. Test: squads-match.test.ts, "no opening start leaves the side to move in check".
 - **Votes** (`votes.ts`): Mode, Start and Clock as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
   `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: Classic, the normal start, the
   Blitz clock, each named by its option's id (`optionIndex`, `clockDefault: "blitz"`), never by its place. Every vote's
@@ -364,15 +369,24 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   may watch any board once they've moved (ROADMAP.md keeps the question of limiting a teammate's board open for
   players).
 - **Placements and rewards** (unranked). When the bracket decides a squad's placement, each person on it gets a results
-  row (mode "squads", placement 1, 2, 3 or 5 of 8 squads) if signed in, and `SQUADS_LOBBY.rewards` (coins into the
-  wallet, crates of the newest series since Nov 9, each opened with a crate key) if still playing their seat. Nothing in
+  row (mode "squads", placement 1, 2, 3 or 5 of 8 squads) if signed in, and `SQUADS_LOBBY.rewards` (crates of the newest series
+  since Nov 9, each opened with a crate key) if still playing their seat. **Coins since Nov 25** ([2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md)):
+  the lobby's play coins and its placement's bonus (`PLAY_COINS.bonus.squads`: 40, 25, 15, 5; never the win's 15 too), paid with its
+  XP in `writeReward` (keys `coins:squads:<code>:<made>:<ledger id>`, `coinsbonus:…`); the end screens show them from the grant
+  (`squadsRewardLine`, "+… coins" until it comes). The "placed" message's `coins` stays 0 (for apps from before). Nothing in
   a test lobby or after a test control. At least once (Nov 6): each stays in the record until written (retried every minute;
-  the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). **One party's word
+  the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). Its XP and coins (one
+  grant) hold it up too, until `MATCH_SAVE.strictMinutes` (30) after its first failed write (`SquadsReward.failedAt`; `writeRewardQueue`):
+  then it's written without them, logged, as a 50 v 50 result's are (Nov 25, the review's M1). A failure marks every reward still
+  waiting, not only the one that failed, so the queue shares one window: a lasting fault holds the lobby's rewards 30 minutes, not 30
+  each one after another (the delta review's N2). A reward written half by the code before
+  Nov 25 (its old coins leg in) never pays play coins on top (m3). **One party's word
   (Nov 10):** a squad whose own match's bot work only its own party's devices answered, no other party's up (a lobby of one party
-  and bots: all its squads; `SquadsRecord.unvouched`, by squad), is noted in the logs and paid as any (Eric, Nov 10: "If you play
-  with just all bots, you still get rewards from that"; the daily cap bounds it); a late answer is still compared (the server's verdict strikes the one further; no server: a referee device of another party, as in time); at most `SQUADS_LOBBY.rewardsPerDay` (5)
-  paying lobbies a UTC day per account (checked as it's written; past it the placement is sent again with nothing). The
-  placement says why (`placed.why` "daily", `NO_REWARD` in Squads.tsx). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+  and bots: all its squads; `SquadsRecord.unvouched`, by squad), is noted in the logs and paid its crates as any (Eric, Nov 10: "If
+  you play with just all bots, you still get rewards from that"; the daily cap bounds it), and since Nov 25 its coins by the solo rule
+  (the minutes XP paid, no placement bonus: `XpGame.soloCoins`; the review's m2: the old 5-a-day coin cap that bounded it is gone); a late answer is still compared (the server's verdict strikes the one further; no server: a referee device of another party, as in time); at most `SQUADS_LOBBY.rewardsPerDay` (5)
+  paying lobbies a UTC day per account pay crates (checked as it's written; past it the placement is sent again with none; its coins
+  still pay). The placement says why (`placed.why` "daily", `NO_REWARD` in Squads.tsx: "No crates: …"). docs/decisions/2026-11-10-boss-and-lone-devices.md.
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
   e2e, never production), while `SQUADS_LOBBY.testControls` is on (`squadsTestAllowed`): `nextRound` in a lobby (the
   rules' `endByMaterial` on the earliest round's matches, the next round 3 s later; in the votes: they close), and a
@@ -496,7 +510,19 @@ door's look; every class is `sq-`.
   standings' foot has "Leave the lobby" (it asks again while your squad still plays: "Resign: a
   loss, and a bot takes your seat"). The match's top line ends in the match's control as in every mode
   (`MatchMenu`: the gear, with Sound, Animations and Resign, on a phone and a computer; `squadsExit` says what it offers), and the
-  votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home.
+  votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home: an end screen since Nov 25 (round 2c: the headline, the flag, the buttons stacked, one gap, centered; the results' buttons stacked too).
+- **On a computer** (1100 px and up with a mouse; Nov 26, [2026-11-26-squads-frame.md](../decisions/2026-11-26-squads-frame.md);
+  `board-size.css`, "Squads' frame"): the 50 v 50's frame, reused. Eric's column rule ([eric.md](../rules/eric.md)): the standings,
+  the board and the column beside it start and end on the board's two lines (its squares' top, and their foot with the clock's bar),
+  with one 28 px gap either side of the board. No title line: the board line is the top strip, centered on the board. The score and
+  round sit at the column's top, the replay button and the gear at its right end; a test lobby's "Next round" sits at the strip's left
+  end. The column: the tiny boards (two matches a row) on the board's top line, then the panel, a standing box to the board's foot
+  (`board-foot.ts`). The panel holds your pick or vote, a gray "Waiting…" (`SlotIdle`) while there's nothing to pick, the rules line,
+  and a Relay's turn order (at its top, its own height, so it's one size on every board whatever else the panel shows). The standings: "Squads · team clocks" in the strip, their rows in a box from the
+  board's top to its foot (`.sq-standings-rows`, no box elsewhere), scrolling inside it where they're taller (Eric's laptop). The votes
+  use the 50 v 50's vote frame (`VoteScreen frame`): its title is the top row, its line and cards are in the column, and then the
+  lobby's votes (`VoteSteps`) run to the board's foot. Squads has no chat. Guard: `e2e/desktop-board.spec.ts`, "Eric's column rule…"
+  (the votes, Pairs and Relay at 1536 × 730 and 1920 × 960). A phone, a tablet and a computer under 1100 px are unchanged.
 - **A match** (`screens/SquadsMatch.tsx`): the score and round on top, the strip, every board in the lobby as tiny
   boards (`TinyBoard`, match by match, your squad's ringed, YOU on your board and NEXT on the next board you'll move on (Relay skips a finished one, as the quick jump does: Nov 18); tappable only once
   you've moved or locked in: one opens full size with "Back to my board"; a new half that asks something of you brings

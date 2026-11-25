@@ -358,19 +358,22 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   else expect(share, "smaller on a computer").toBeLessThan(0.16);
   expect(Number(await small.evaluate((el) => getComputedStyle(el).opacity)), "partly see-through").toBeCloseTo(0.7, 2);
   // The dot: where the plan's square is (54 columns across the map's width), moving as you walk.
-  await walkTo(page, [8, 28]);
+  // (West of the park, outside the squares the town's bots stand on, world.ts freeSpot (columns 14 to 29, rows 21 to 34): a bot standing
+  // on the square an arrow steps to takes it, and the step waits for as long as it stands there: main 025406c, Nov 25.)
+  await walkTo(page, [2, 28]);
   await page.waitForTimeout(200);
   const s = (await small.locator("canvas").boundingBox())!.width / 54;
   const d0 = await dot(page);
   const cv0 = (await small.locator("canvas").boundingBox())!;
-  expect(Math.abs(d0.x - (cv0.x + 8.5 * s)), "your column").toBeLessThan(1.5);
+  expect(Math.abs(d0.x - (cv0.x + 2.5 * s)), "your column").toBeLessThan(1.5);
   expect(d0.deg, "the arrow north").toBe(0);
-  await walkTo(page, [14, 28]);
+  await walkTo(page, [8, 28]);
   await page.waitForTimeout(200);
   const d1 = await dot(page);
   expect(Math.abs(d1.x - d0.x - 6 * s), "six squares east").toBeLessThan(1.5);
   expect(Math.abs(d1.y - d0.y), "the same row").toBeLessThan(0.6);
-  await walkTo(page, [14, 23]);
+  // (Row 23 is walled from column 3 east: the row's west end, five squares south of row 28.)
+  await walkTo(page, [1, 23]);
   await page.waitForTimeout(200);
   expect(Math.abs((await dot(page)).y - d1.y - 5 * s), "five squares south: down the map").toBeLessThan(1.5);
   // The arrow turns with the camera: a look round a quarter to the right points it east.
@@ -387,9 +390,31 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   await btn.click();
   await expect(small).toHaveCount(0);
   await expect(btn).toHaveAttribute("aria-pressed", "false");
+  // (Nov 25, round 2: the reload is a repeat visit, its pictures from the first visit's kept pages, each empty until something reads
+  // it. The first visit's are on the shelf before it reloads.)
+  type Kept = { __townPaint: () => { pictures: { kept: boolean; saved: number | null | undefined } } };
+  await expect.poll(() => page.evaluate(() => (window as unknown as Kept).__townPaint().pictures.saved), { timeout: 60_000 }).toBeGreaterThan(0);
   await page.reload();
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  expect(await page.evaluate(() => (window as unknown as Kept).__townPaint().pictures.kept), "a repeat visit: its pictures kept").toBe(true);
   await expect(small, "still off after a reload").toHaveCount(0);
+  // The chips' faces drawn on it: each shown chip's canvas has pixels (a 2D draw from a kept picture cuts it first).
+  await expect
+    .poll(
+      () =>
+        page.locator(".town-chip").evaluateAll((els) => {
+          const shown = els.filter((e) => (e as HTMLElement).style.display !== "none");
+          const drawn = shown.filter((e) => {
+            const c = e.querySelector("canvas")!;
+            const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+            for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) return true;
+            return false;
+          });
+          return `${drawn.length} of ${shown.length}`;
+        }),
+      { timeout: 5000, message: "every chip shown has its face drawn" },
+    )
+    .toMatch(/^([1-9]\d*) of \1$/);
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(small).toBeVisible();
 

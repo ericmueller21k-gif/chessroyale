@@ -1214,7 +1214,7 @@ export const TOWER_PARTY = { max: 4, closeCp: 0, crateFloors: [25, 50, 75, 99] a
  * - `silentSec`: a device in the room that hasn't asked for this long has gone (a disconnect): out of the room and the request;
  * - `outcomeSec`: how long the start (or the end) waits for a device to read it;
  * - `bots`: the admin's test bots ("Fill with 3 bots": admins only, server-checked), and `botJoinMs`: each joins a challenge
- * *   this long after the one before, as a player would (longer than `pollMs`, so everyone in the room sees each count);
+ * *   on the admin's first look this long or more after the one before, as a player would (one a look: the admin sees each count);
  * - `joinWaitSec`: the fight waits this long for the four to arrive (the summoning plays first), then begins with those who came.
  */
 export const HIDDEN_ROOM = { players: 4, capSec: 300, pollMs: 1500, silentSec: 20, outcomeSec: 60, bots: 3, botJoinMs: 2000, joinWaitSec: 60, boss: "recluse" } as const;
@@ -2239,9 +2239,13 @@ export const BOSS_POWERS = {
    *   crosshair locks onto the piece he takes (his engine's own move; any piece but the king) right before it shows, an upgrade; then at
    *   the end of each of his turns he locks your most capturable
    *   piece, `maxLocks` at most, a second once the first is `secondAfter` of his turns old. A lock hunts for `huntTurns` of his turns,
-   *   and lives on to `liveTurns` while the piece is still gettable. His engine is steered within the margins (L3): of its top
-   *   `lockLines` moves, one taking a locked piece within `takeMargin` pawns of his best is played; else one attacking a locked piece
-   *   (or adding an attacker) within `chaseMargin`.
+   *   and lives on to `liveTurns` while the piece is still gettable. His engine is steered within the margins (L3): a capture of a
+   *   locked piece within `takeMargin` pawns of his best (by his engine) is played: one of its top `lockLines` moves, or (the hunt,
+   *   Eric, Nov 24: "aggressively trying to capture a piece and upgrade, even if it ... is a detriment to him, but not a super
+   *   detriment") any trade for one that nets him at least −`huntLoss` pawns by the exchange check, scored against his best; else one
+   *   of the top `lockLines` attacking a locked piece (or adding an attacker) within `chaseMargin`. A locked piece that got away (he
+   *   can't take it within `huntLoss`) while another can be hunted: its lock goes and the next most gettable piece is locked.
+   *   docs/decisions/2026-11-24-chandy-upgrades.md.
    * - **The rifle:** each locked piece he takes is an upgrade (`upgradesMax`), each unlocking one of his five moves at random (the
    *   queen lock first while it could come right then, a queen of yours it can aim at, or with none your best rook (Nov 19):
    *   `queenLockFirst`, Eric, Nov 18); the upgrade window holds everything `upgradeMs` (Eric: 2 s).
@@ -2250,8 +2254,11 @@ export const BOSS_POWERS = {
    *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter; one the pass guard refuses, with
    *   nothing else unlocked, is checked again on his next turn). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
-   * - **The queen lock's shot** (Eric, Nov 20: the piece goes when the round reaches it): the round flies down the file from his edge,
-   *   `shotStepMs` a square; the piece it hits stays on the board until the round's head reaches its square's middle, then shatters.
+   * - **The Lock-on Shot** (code name `queenlock`; "Queen lock" until Nov 24: it may aim at a rook): as he aims, the piece its round
+   *   will most likely hit (the one in front of the target, or the cheapest you can put there) is locked too; the round shattering a
+   *   locked piece or the target is an upgrade, as a capture (Nov 24). Its shot (Eric, Nov 20: the piece goes when the round reaches
+   *   it): the round flies down the file from his edge, `shotStepMs` a square; the piece it hits stays on the board until the round's
+   *   head reaches its square's middle, then shatters.
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
@@ -2275,6 +2282,7 @@ export const BOSS_POWERS = {
     lockLines: 5,
     takeMargin: 2,
     chaseMargin: 0.75,
+    huntLoss: 1,
     upgradesMax: 5,
     upgradeMs: 2000,
     teachCaptures: 2,
@@ -2325,7 +2333,8 @@ export const BOSS_POWERS = {
    */
   birdie: {
     trainFrom: 2,
-    trainEvery: 3,
+    // (Eric, Nov 25: "Birdie's normal move is coming too often ... about double it ... maybe once every 4 to 5 turns": was 3.)
+    trainEvery: 5,
     trainPawnLogit: 1,
     fallLost: 9,
     armoredTrainEvery: 3,
@@ -2625,6 +2634,13 @@ export const MOO_CINEMATIC = {
 export const BIRDIE_RIDE = { rideMs: 1950 } as const;
 
 /**
+ * Birdie's warning sign on the marked piece (components/Birdie.tsx WarnSign, `.bd-sign`): how long one blink takes, ms, shown half of it
+ * and hidden half, hard on and off with no fade. Eric, Nov 24: "it simply like blinks on and off ... it doesn't need to do a fade even.
+ * It just blinks every like ... second or second and a half" (docs/decisions/2026-11-24-birdie-train-miss.md): 0.6 s on, 0.6 s off.
+ */
+export const BIRDIE_SIGN = { blinkMs: 1200 } as const;
+
+/**
  * Birdie's fall (Eric, Nov 23: "A cinematic like Moo's Full Moon: it takes the same space on screen as Moo's, about 6 to 7 s long. A cut
  * to a close-up: he falls out of his spot on the board… he tumbles through the air like a bird falling from a great height… the
  * background is blurred, with wind and speed lines… a train track comes into view below, and his own train barrels toward him…
@@ -2687,14 +2703,14 @@ export const BIRDIE_CINEMATIC = {
 export const BIRDIE_ULT = { theme: "birdie-ult", pieceAt: 300, introMs: 14815, lineAt: 1780, soloMoveLeadMs: 2500 } as const;
 
 /**
- * How often Birdie's ordinary moves are heard (Eric, Nov 23: "the train sounds happen too often and the chirping in game for birdie, make
- * it only like every 3-4 of his moves, you hear those"; docs/decisions/2026-11-23-birdie-cadence-warning.md). His move's whistle and the
- * chirp over it sound on his first move, then this many of his moves apart, in turn (3, 4, 3, 4 ...: his 1st, 4th, 8th, 11th, 15th ...),
- * counted by his move's number, so every device hears the same moves; his idle chirps on your turn only after a move of his that was
- * heard. The other moves: only the board's own move sound. A capture or a check is heard every time (its toot-long and his chirp), and his
- * entrance, his power, his ride and his fall are unchanged (kits.ts, birdieCue).
+ * How often Birdie chirps (Eric, Nov 24: "I think he's doing a little too much chirping and the train noises. Let's really make it so he
+ * can chirp at the start of the game, and I would say cap the chirping to, you know, maybe once every 5 of his moves at most";
+ * docs/decisions/2026-11-24-birdie-train-miss.md; was [3, 4], Nov 23). His hello at the battle's start, then one chirp on his first move and
+ * then this many of his moves apart, in turn (5: his 1st, 6th, 11th ...), counted by his move's number, so every device hears the same
+ * moves. On such a move, one chirp: his move's own (a capture's trill, a check's teeoo, else the nod). The other moves: only the board's
+ * own move sound. His train's whistles and horns only on his ride; his victory, defeat and fall unchanged (kits.ts, birdieCue).
  */
-export const BIRDIE_SOUND_EVERY: readonly number[] = [3, 4];
+export const BIRDIE_SOUND_EVERY: readonly number[] = [5];
 
 /**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards
@@ -2925,6 +2941,21 @@ export const SPEECH = {
   minReadMs: 1500,
   fadeMs: 260,
   waitMs: 5000,
+} as const;
+
+/**
+ * Power tips (packages/app/src/power-tips.ts): the first time you see a boss's power, he and the God King trade a line or two
+ * explaining it. Eric, Nov 24: "it says it once always the first time, but then maybe it comes up again in a game or two, and then
+ * maybe in like 5 or 6 games, and then after that just every like 5 games against that boss, so you don't really see it too often.
+ * But we can keep that pattern strict for all the bosses ... just like one number." Counted per account on this device: the battles
+ * in which that power was seen (a battle counts once, as the power first comes). The tip plays in a battle whose count is in `at`,
+ * then every `every` battles after the last of them (1, 3, 8, then 13, 18, ...). Once a battle at most.
+ */
+export const POWER_TIPS = {
+  at: [1, 3, 8],
+  every: 5,
+  /** The next line of the exchange starts this long after the one before has typed out (ms): the God King answers. */
+  replyMs: 700,
 } as const;
 
 /**
@@ -3182,7 +3213,14 @@ export function clockAfterVote(clock: number, votes: readonly Augment[], s: Pick
  * that version, so a tab left open across a deploy still opens its rooms. A tab that doesn't say which version it runs (asleep in the
  * background) keeps the newest `keepVersions` versions (this one included) until it does or closes.
  */
-export const APP_CACHE = { keepVersions: 3 } as const;
+export const APP_CACHE = {
+  keepVersions: 3,
+  /**
+   * A file of the game that won't load (app/src/stale.ts): how long the page waits for the server's `/version.json` (ms) to tell a
+   * deploy (another build: the page loads again) from a dropped connection (the same build, or no answer: the load just fails).
+   */
+  staleCheckMs: 5_000,
+} as const;
 
 /**
  * The front door (home, queue, profiles): the live line's timing and the queue's show. (A rating's own names, RATING_RANKS
@@ -3571,8 +3609,14 @@ export const RANKED_1V1 = {
   ] as readonly DuelControl[],
   /** Neither player picks a zone: this control. */
   defaultControl: "blitz",
-  /** How long both players have to drag their pawn into a zone. */
-  voteSeconds: 5,
+  /**
+   * How long both players have to drag their pawn into a zone (Eric, Nov 25: "needs to be like 10s, or when both pick then it
+   * instantly ends"; it was 5). Once both have picked, the vote closes `voteBothPickedMs` later (a changed pick still counts until
+   * then), if that's sooner. docs/decisions/2026-11-25-duel-vote-and-chat.md.
+   */
+  voteSeconds: 10,
+  /** Both picks in: the vote closes this long after the second (a beat to see both pawns land), never later than its own end. */
+  voteBothPickedMs: 1_000,
   /** The "found" moment (the versus screen's), before the vote starts on the board. */
   versusMs: 2_500,
   /** "Timer: Blitz 3+2" over the board after the vote, before White's first move. */
@@ -3601,6 +3645,13 @@ export const RANKED_1V1 = {
    * says nothing, so it shouldn't keep two players apart.)
    */
   match: { startRange: 100, perSecond: 10, perRd: 1, maxRange: 1000 },
+  /**
+   * Colors (Eric, Nov 25: "Color balance seems good"; docs/decisions/2026-11-25-duel-color-balance.md; core's firstGetsWhite): as a
+   * pair is seated, nobody gets one color more than `maxInRow` games in a row when the other player can take it instead; then White
+   * goes to the larger (Black games − White games) over each player's last `recentGames` ranked games; a tie, to the one who had
+   * Black last; still tied, a coin flip. The rating has no White edge (expectedScore ignores color).
+   */
+  colors: { recentGames: 10, maxInRow: 2 },
   /**
    * The hidden rating: Glicko-1, each game its own rating period. A new player starts at their account's rating (from
    * other modes, clamped to `seedMin`-`seedMax`) or `start`, with `startRd`; the deviation shrinks with each game to
@@ -3661,14 +3712,8 @@ export const RANKED_1V1 = {
    * `maxLadder`: Radiant 5 0 RP (2400; it was Diamond 4 0 before the Oct 28 tiers, the same number).
    */
   placements: { games: 5, maxLadder: 2400 },
-  /**
-   * Coins (as Squads pays them), lined up with what a Squads lobby pays per minute played (about 1.8 a minute:
-   * docs/decisions/2026-10-16-ranked-1v1.md): `perMinute` of the game's time from its start to its end, by result, at
-   * least 1 and at most `maxPerGame`; nothing for a game with fewer than `minMoves` moves each, an aborted game, a bot
-   * game, or a player fair play is holding (in review). At most `perDay` paying games a day per account (UTC days; the
-   * director's cap, Oct 16): the next games that day pay nothing.
-   */
-  coins: { perMinute: { win: 2.4, draw: 1.6, loss: 0.8 }, minMoves: 10, maxPerGame: 70, perDay: 20 },
+  // (Ranked's own coins (2.4/1.6/0.8 a minute, 20 games a day) are gone since Nov 25: a ranked game pays PLAY_COINS, as every
+  // counted game does; docs/decisions/2026-11-25-play-coins.md.)
   /** Each ranked game's moves are kept this long (a reported player's games are checked from them), then deleted. */
   gamesKeepDays: 30,
   /**
@@ -3678,6 +3723,15 @@ export const RANKED_1V1 = {
    */
   bot: { maiaMin: 600, maiaMax: 2500, thinkMs: [600, 2600] as readonly [number, number], clockShare: 0.05 },
 };
+
+/**
+ * The season ladder (Eric, Nov 25: "a ladder board for all rank modes for the current season"; "scrollable to the top 200";
+ * docs/decisions/2026-11-25-ladder.md). `season`: the season shown (none is stored yet: "Season 1" is everything so far). `size`:
+ * the list's rows, one scroll, never a "next" page; your own row is pinned below it with your exact place wherever you are.
+ * `cacheSeconds`: how long each Worker instance keeps a mode's rows and count (at most one read of them a minute per instance, however
+ * busy); your own row is read for you every time and put in your copy of the list.
+ */
+export const LADDER = { season: 1, size: 200, cacheSeconds: 60 };
 
 /**
  * Leaving ranked games early (phase L1, 1 v 1; Eric, Nov 9: "Quitting during time control. Yeah, that's fine. Quitting
@@ -3736,16 +3790,17 @@ export const SQUADS_LOBBY = {
   /** The drawn bracket on screen before round 1's matches begin (after the votes). */
   bracketIntroSeconds: 8,
   /**
-   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are crates of the
-   * newest series (XP.rewardCrate since Nov 9), each opened with a crate key. Each person on the squad still playing their seat when its
-   * placement is decided (not one who left, nor a seat a bot has taken over); none in a lobby a test control touched.
+   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th: crates of the newest series (XP.rewardCrate since Nov 9),
+   * each opened with a crate key. Each person on the squad still playing their seat when its placement is decided (not one who left,
+   * nor a seat a bot has taken over); none in a lobby a test control touched. Coins since Nov 25: PLAY_COINS (its play coins and
+   * `bonus.squads`, the placement's), paid with the game's XP; Squads' own placement coins are gone.
    */
   rewards: {
-    1: { coins: 100, crates: 1 },
-    2: { coins: 60, crates: 1 },
-    3: { coins: 40, crates: 0 },
-    5: { coins: 20, crates: 0 },
-  } as Readonly<Record<1 | 2 | 3 | 5, { coins: number; crates: number }>>,
+    1: { crates: 1 },
+    2: { crates: 1 },
+    3: { crates: 0 },
+    5: { crates: 0 },
+  } as Readonly<Record<1 | 2 | 3 | 5, { crates: number }>>,
   /**
    * A reward (and its results row) stays in the lobby's record until it's written (server/squads-do.ts): a failed write is tried again
    * this often, and the lobby waits to close for it up to `rewardRetryHours` past its closing time (then it closes, and says so).
@@ -3753,10 +3808,11 @@ export const SQUADS_LOBBY = {
   rewardRetrySeconds: 60,
   rewardRetryHours: 24,
   /**
-   * The daily cap (the outside review of Nov 10, finding 5; like ranked's, RANKED_1V1.coins.perDay): at most this many lobbies a UTC
-   * day pay an account their placement's coins and crates; the next that day pay none (XP as usual), and the placement says so.
-   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A lobby of only one party and bots pays
-   * none at all (SquadsRecord.unvouched). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   * The daily cap (the outside review of Nov 10, finding 5): at most this many lobbies a UTC day pay an account their placement's
+   * crates; the next that day pay none (XP and coins as usual: PLAY_COINS), and the placement says so.
+   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A squad of one party and bots
+   * (SquadsRecord.unvouched) is paid its crates as any (Eric, Nov 10; docs/decisions/2026-11-10-boss-and-lone-devices.md), its coins by
+   * the solo rule since Nov 25 (no placement bonus: docs/decisions/2026-11-25-play-coins.md).
    */
   rewardsPerDay: 5,
   /**
@@ -3846,6 +3902,31 @@ export const GOD_KING_SHOP = false;
 export const CHAT_PACKS_SHOP = false;
 
 /**
+ * The crate opening (Nov 24; docs/decisions/2026-11-24-crate-open-build.md; app `crate-open/`). Presentation only: the roll, the odds
+ * and what's won are the server's.
+ */
+export const CRATE_OPEN = {
+  /**
+   * How long the strip spins (ms), each strip (a crate's, and Fischer Random's second). 4 s: the director's call from the mockup's
+   * recommendation (Nov 24; it was 6.2 s, 4.8 s for the second): "2.7 s is a little quick for a crate, and 6.2 s with the open's extra
+   * 3 s makes the whole thing long." One number, so Eric can change it.
+   */
+  spinMs: 4000,
+} as const;
+
+/**
+ * The bonus crate (Eric, Nov 24: "like League of Legends does this ... a crate and key combo in addition to whatever item you get ...
+ * it's a 25% chance, and then every crate possible that exists, even ones that have been retired, just evenly spread ... And if it
+ * requires a key, though, then we need to give it a key as well"; docs/decisions/2026-11-24-bonus-crate.md; core `bonus-crate.ts`,
+ * the server's opens). Every crate opening (a series crate's, a boss crate's) rolls it on the server, in the same op as the item; a
+ * bonus crate's own opening never does (Eric: "you can't just keep crating into other crates").
+ */
+export const CRATE_BONUS = {
+  /** The chance an opening also gives a bonus crate (and its key, if it opens with one). */
+  chance: 0.25,
+} as const;
+
+/**
  * The Shop tab's page (Eric, Nov 9: his mockup, our art; docs/decisions/2026-11-09-shop-page.md). Look only for now: no purchase is
  * wired (a tapped price says "Buying opens soon"); Stripe and coin purchases come next.
  */
@@ -3932,6 +4013,11 @@ export const QUICK_CHAT = {
   /** Everyone's picks until they choose their own (new and existing players alike): free lines and emoji only. */
   defaultLines: ["good-luck", "have-fun", "nice-move", "wow", "oops", "trust-crowd", "defend-king", "go-mate", "gg", "thanks"] as readonly string[],
   defaultEmoji: ["e-thumbs", "e-clap", "e-laugh", "e-wow", "e-grimace", "e-fire", "e-skull", "e-party"] as readonly string[],
+  /**
+   * The lines a finished game's chat offers (ranked 1 v 1's end page, Nov 25: Eric, "do you think this chat box makes any sense?", its
+   * mid-game lines, "Good luck!" and "Defend the king!", after the game). The free pack's sporting lines; your emoji picks stay.
+   */
+  postGameLines: ["gg", "well-played", "thanks", "rematch"] as readonly string[],
   /** Shop prices of the packs, in coins (everything is free while SHOP_FREE is on). Nov 18: halved, 200-300 to 100-150 (the payments design). */
   packPrices: {
     godking: 150,
@@ -4336,7 +4422,7 @@ export const ALERTS = {
  * Chess Town's pictures kept between visits (Nov 23, Eric: "the drawn pictures between visits ... it seems like just smart"; the app's
  * town/keep-pictures.ts): the first visit on a build paints every picture on the loading screen, as before, then keeps them on the device
  * (IndexedDB, as PNG pages); a later visit on the same build and layout loads them instead of painting. Anything odd paints as before.
- * `on`: the switch. `maxMB`: the most it keeps (more, and nothing is kept). `pagePx`: a page's side. `waitMs`: how long the loading
+ * `on`: the switch. `maxMB`: the most it keeps (more, and nothing is kept). (Its pages' size is the WebGL atlas's, Nov 25: the app's town/paint.ts `ATLAS`.) `waitMs`: how long the loading
  * screen waits for the kept pictures to be read and decoded before it paints instead. `afterMs`: how long after the first visit's first
  * frame they're kept (composed a page at a time, up to `sliceMs` a frame, encoded in a worker).
  * docs/decisions/2026-11-23-town-keep-pictures.md.
@@ -4344,7 +4430,6 @@ export const ALERTS = {
 export const TOWN_PICTURES = {
   on: true,
   maxMB: 24,
-  pagePx: 2048,
   waitMs: 4000,
   afterMs: 1500,
   sliceMs: 3,
@@ -4489,7 +4574,9 @@ export const BOSS_CRATE_PRICE = {
  * Where sign-in is set up, only signed-in accounts earn them (a guest's would move on signing in: many guests into one account).
  * `shortNames`: a boss whose token says a shorter name than the boss's own ("Boingo token", as its picture is named).
  * `grantMax`: the most an admin's test grant gives at once of one boss's tokens; `keysGrantMax` of crate keys (Eric, Nov 9: an admin
- * grants themselves up to 100 keys at once, now that crates take one: docs/decisions/2026-11-09-xp-phase2-keys.md).
+ * grants themselves up to 100 keys at once, now that crates take one: docs/decisions/2026-11-09-xp-phase2-keys.md); `cratesGrantMax` of one
+ * crate, a series crate or a boss crate (Eric, Nov 25: "how do I get more crates? ... I'm literally out of crates and I don't see a way to
+ * generate more").
  */
 export const BOSS_TOKENS = {
   moves: 10,
@@ -4500,6 +4587,7 @@ export const BOSS_TOKENS = {
   shortNames: { clown: "Boingo" } as Readonly<Record<string, string>>,
   grantMax: 10,
   keysGrantMax: 100,
+  cratesGrantMax: 10,
 } as const;
 
 /**
@@ -4568,6 +4656,35 @@ export const XP = {
   levelsPerGame: 20,
   rewardCrate: "winter-1",
   rewardToastMs: 6000,
+} as const;
+
+/**
+ * Play coins (Eric, Nov 18: "coins from every mode, time-based, capped ... but you can also continue to get more ... if you place
+ * well"; the payments design, docs/decisions/2026-11-17-payments-design.md section 6; core's play-coins.ts has the rules, server
+ * xp.ts pays them with the game's XP, in the same batch). Every counted game, by XP's rules (server-timed minutes, XP.maxMinutes a
+ * game, XP.minMoves of your own moves; nothing for leaving, a test game, a guest, or a player fair play is holding):
+ *   - **Play coins:** `perMinute` of the game's XP minutes (rounded, at least 1 online), until the XP day's `perDay`. A solo game (and
+ *     an online one that rested on one device's word) pays only the minutes XP paid it under XP.soloMinutesPerDay, with no minimum.
+ *   - **The performance bonus** (past `perDay` too): `bonus.win` for XP's win (its friends'-lobby once-a-day rule included; not
+ *     Squads, which pays its placement), `bonus.draw` for a ranked 1 v 1 draw, `bonus.crowdTop3` for a place in the first
+ *     `crowdTopPlaces` of your team's 50 v 50 scoreboard, and `bonus.squads` by placement (keys: 1st, 2nd, 3rd-4th, 5th-8th). Solo
+ *     pays none (the device's word).
+ *   - **Diminishing:** the day's earned bonus is paid by `bonusSteps`: the first 150 in full, the next 200 at half, the next 200 at a
+ *     quarter, none past that (300 paid at most). So the most a day is `perDay` + 300: 600 coins.
+ * The day is XP's (XP.dayStartUtcHour). The day's totals are the ledger's own (reasons "play" and "play-bonus" since the day began).
+ */
+export const PLAY_COINS = {
+  perMinute: 1.8,
+  perDay: 300,
+  bonus: { win: 15, draw: 5, crowdTop3: 10, squads: { 1: 40, 2: 25, 3: 15, 5: 5 } as Readonly<Record<1 | 2 | 3 | 5, number>> },
+  /** How many of your team's 50 v 50 scoreboard's first rows pay `bonus.crowdTop3`. */
+  crowdTopPlaces: 3,
+  /** Earned bonus a day (cumulative, `upTo`) → paid at `rate`; none past the last. */
+  bonusSteps: [
+    { upTo: 150, rate: 1 },
+    { upTo: 350, rate: 0.5 },
+    { upTo: 550, rate: 0.25 },
+  ] as readonly { upTo: number; rate: number }[],
 } as const;
 
 /**
@@ -4682,6 +4799,13 @@ export const QUESTS = {
   rerollsPerDaily: 1,
   weekStartDay: 1,
   soloMinMinutes: 3,
+  /**
+   * Hours after the quests overlay is closed (Got it, ×, Escape, a tap outside) before it may open by itself again, either way (the
+   * day's first visit, a game that moved a quest), per account on this device; the Quests button opens it any time. Eric, Nov 24: "once
+   * you hit got it, it shouldn't appear again. Let's put it on a 12-hour timer so it only reappears for every person every 12 hours unless
+   * they manually go to the quest button".
+   */
+  autoOpenGapHours: 12,
   show: { startMs: 450, slideMs: 750, gapMs: 250, finishMs: 1100, tickGapMs: 70 },
   daily: [
     { id: "boss-hunter", name: "Boss Hunter", goal: "Win a Boss Battle", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
@@ -5459,6 +5583,16 @@ export const MUSIC_SWITCH: Readonly<Record<string, { readonly fadeMs: number; re
  */
 export const AREA_BANNER = { inMs: 400, holdMs: 1800, outMs: 600 } as const;
 
+/**
+ * The vote zones' name tags (Eric, Nov 25, look B of the mockup: "the center one of the three, the best"; asked for as "when you
+ * actually put your vote in, then they go away because you know what they are"; docs/decisions/2026-11-25-vote-labels.md). On every
+ * pawn vote (50 v 50, Squads), a small dark tag above each zone names it as the vote opens: it rises in, bobs gently and lifts away.
+ * Gone the moment your vote is in. Reduced motion: no bob, shown for the same time.
+ * - `showMs`: how long the tags show from the vote's start (ms).
+ * - `goneMs`: your vote in: they fade this fast (ms).
+ */
+export const VOTE_TAGS = { showMs: 3000, goneMs: 300 } as const;
+
 /** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
 export type HapticPattern = number | readonly number[];
 
@@ -5861,3 +5995,118 @@ export const AUTOCHESS: AutoChessSettings = {
   pawnsPerFile: 3,
   bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.7, saveChance: 0.3, saveKeep: 8, follow: { banked: 10, gold: 30, chance: 0.85, lateRound: 7, lowHp: 8 }, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };
+
+/**
+ * Residents (Eric, Nov 25: "have 200 bots made which just sit on the server and play ranked ... so like any time of day I can login
+ * and see games played"; the design: notes/residents-design.md on claude/director-notes; docs/decisions/2026-11-25-residents-program.md).
+ * Real accounts (`users.resident`) played by a headless program outside the game's servers (`scripts/residents/run.ts`), through the
+ * same HTTP and WebSocket paths as the app. Every number the program uses is here; the server's side (the route, PAUSE_RESIDENTS) is
+ * in packages/server.
+ *
+ * - `accounts`, `targetOnline`: how many accounts, and about how many online at once (the program's --accounts, --target-online).
+ *   `wave`: the online target moves with the residents' own daily shapes (more when more of their evenings overlap) and a slow
+ *   swell of `amplitude` every `periodMinutes`, held between `min` and `max` times the target (30: about 15 to 54), so the count
+ *   comes in waves, not a flat line. At most `startsPerMinute` sessions begin in a minute.
+ * - `ratings`: each resident's Maia rating, fixed by its name: the bots' bell curve (BOT_LOBBY.ratings).
+ * - `regions`: home time zones (a share each; whole-hour offsets from UTC, one drawn per resident). `hourWeights`: how likely a
+ *   resident is to be on at each local hour (evening peak 18-23, a lunch bump), `weekend` times more on Saturdays and Sundays.
+ * - `keenness`: each resident's chance of playing on a given day; `sessions` a day (1-3) of `sessionMinutes` (10-60), at least
+ *   `restMinutes` apart, never more than `maxMinutesPerDay`. When too few keen residents are free for the target, the scheduler
+ *   tops up from the rest, within the same daily cap (200 accounts can't hold 30 online on 1-3 sessions each).
+ * - `behaviors`: shares (of 100) of how residents behave; `dropChance`: in any profile, the chance per game of the socket
+ *   dropping and coming back.
+ * - `duel`: ranked 1 v 1. `zones`: the shares of Bullet, Blitz and Rapid as a resident's favorite (a slow resident's is Rapid).
+ *   `queue`: how residents enter the queue (at most `maxWaiting` of them unpaired at once, each `gapSeconds` apart), so one is
+ *   often alone in line and a person who queues meets them within seconds. Think times, resigning and draws: see each field.
+ * - `beatSeconds`: the heartbeat to the server; `summaryMinutes`: the log's summary; `homePollMs` / `gamePollMs`: the live line
+ *   (/api/live) on home and during a game, as the app polls it (FRONT_DOOR.livePollMs, the 30 s heartbeat).
+ * - `host`: the always-on host (the Cloudflare Container `ResidentsHost`, packages/server/src/residents-host.ts; docs/areas/ops.md,
+ *   "Residents, the host"). `sleepAfter`: it sleeps after this long without the 15-minute cron's ping (two missed runs). `args`: the
+ *   program's options there (a change restarts the host at the cron's next run, games in progress resigned: they're part of its
+ *   environment, whose hash it keeps). With `--follow-deploys` the program reads /version.json every `versionCheckMinutes`; after a
+ *   deploy it starts nothing new, lets games in progress finish (at most `drainMinutes`, then resigns what's left) and exits for the
+ *   host to start it again on the new main.
+ */
+export const RESIDENTS = {
+  accounts: 200,
+  targetOnline: 30,
+  wave: { min: 0.5, max: 1.8, amplitude: 0.25, periodMinutes: 90 },
+  startsPerMinute: 3,
+  ratings: { mean: 1150, sd: 250, min: 600, max: 2200, step: 100 },
+  regions: [
+    { name: "americas", share: 55, offsets: [-8, -7, -6, -5, -5, -4, -3] },
+    { name: "europe", share: 25, offsets: [0, 1, 1, 2] },
+    { name: "asia-oceania", share: 15, offsets: [5, 7, 8, 9, 10, 11] },
+    { name: "elsewhere", share: 5, offsets: [-3, 1, 2, 3, 4] },
+  ],
+  hourWeights: [0.5, 0.3, 0.15, 0.08, 0.05, 0.05, 0.1, 0.25, 0.35, 0.4, 0.45, 0.55, 0.8, 0.75, 0.5, 0.55, 0.65, 0.8, 1, 1.15, 1.25, 1.25, 1.05, 0.8],
+  weekend: 1.3,
+  keenness: { min: 0.3, max: 0.9 },
+  sessions: { min: 1, max: 3 },
+  sessionMinutes: { min: 10, max: 60 },
+  restMinutes: 20,
+  maxMinutesPerDay: 360,
+  behaviors: { normal: 70, slow: 8, leaver: 5, afk: 4, chatty: 8, rageQuit: 5 },
+  dropChance: 0.02,
+  duel: {
+    zones: { bullet: 25, blitz: 50, rapid: 25 },
+    queue: { maxWaiting: 3, gapSeconds: [2, 25] as readonly [number, number] },
+    /**
+     * A resident's vote comes this long after the vote opens (ms): as a person's, so the other player sees its pawn move (Nov 25: the
+     * vote now closes a beat after both have picked, RANKED_1V1.voteBothPickedMs). The app's bot game picks the same way.
+     */
+    pickMs: [1500, 5000] as readonly [number, number],
+    /** The first move (White's and Black's): within this long (ms), well inside the 20 s rule. */
+    firstMoveMs: [1200, 6000] as readonly [number, number],
+    /** Later moves: the clock left spread over this many more moves (never fewer than `minMovesLeft`), plus most of the increment. */
+    movesLeft: 35,
+    minMovesLeft: 12,
+    /** The book moves (the first plies): quicker, this fraction of the usual think. */
+    openingPlies: 10,
+    openingFactor: 0.4,
+    /** More thought in check, or when Maia's top two moves are close (within `closeGap` of each other's chance). */
+    checkFactor: 1.5,
+    closeGap: 0.1,
+    closeFactor: 1.6,
+    /** Never less than this (ms), and never closer to the flag than `safetyMs` (a slow resident: sometimes closer, `slowFlagChance`). */
+    minThinkMs: 400,
+    safetyMs: 1500,
+    slowFactor: 2.2,
+    slowFlagChance: 0.01,
+    /**
+     * Resigning a lost game, by the resident's rating (Eric, Nov 25: "can't we just make them not forfeit for a bit longer?"): the first
+     * band whose `upTo` holds: material down by `lostBy` or more, from its own `afterMove`th move, this `chance` a move. Players under
+     * about 1200 mostly play on to the end, stronger ones resign a clearly lost game. A rage-quitter: down `rageLostBy` from move
+     * `rageAfterMove`, `rageChance` a move.
+     */
+    resign: {
+      bands: [
+        { upTo: 1199, lostBy: 15, afterMove: 30, chance: 0.04 },
+        { upTo: 1599, lostBy: 10, afterMove: 25, chance: 0.08 },
+        { upTo: 9999, lostBy: 7, afterMove: 20, chance: 0.12 },
+      ],
+      rageLostBy: 6,
+      rageAfterMove: 12,
+      rageChance: 0.25,
+    },
+    /** Draw offers: material level within 1, from ply `fromPly`, this chance a move; an offer is taken when level and past `acceptFromPly` (`acceptChance`). */
+    draw: { fromPly: 60, offerChance: 0.02, acceptFromPly: 40, acceptChance: 0.5 },
+    /** A leaver walks away from this share of its games, after 10-30 moves; an AFK resident never makes its first move in `afkNoShow`, and stops moving midgame in `afkStall`. */
+    leaverChance: 0.1,
+    afkNoShow: 0.08,
+    afkStall: 0.08,
+    /** A rage-quitter logs off after a loss with this chance. */
+    rageLogOff: 0.6,
+    /** Quick chat (presets only): a chatty resident greets and says gg this often, and reacts to a capture now and then; others say gg sometimes. */
+    chat: { greet: 0.7, gg: 0.8, react: 0.06, normalGg: 0.15 },
+    /** Between games: this long on home (ms) before queuing again. */
+    homeMs: [5000, 40_000] as readonly [number, number],
+  },
+  /** The icons residents pick from: the free emoji set every account may use (the server's ICONS). */
+  icons: ["♟", "♞", "♝", "♜", "♛", "♚", "🦁", "🦊", "🐺", "🦅", "🐉", "🔥", "⚡", "👑", "🎯", "🧠"] as readonly string[],
+  beatSeconds: 60,
+  summaryMinutes: 5,
+  homePollMs: 5000,
+  gamePollMs: 30_000,
+  host: { sleepAfter: "30m", args: ["--follow-deploys"], versionCheckMinutes: 2, drainMinutes: 20 },
+} as const;

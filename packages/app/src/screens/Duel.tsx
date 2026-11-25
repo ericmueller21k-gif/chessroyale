@@ -1,5 +1,5 @@
 import { EndHeadline, EndRewards } from "../components/EndScreen.tsx";
-import { GameSteps } from "../components/Breakdown.tsx";
+import { GameSteps, StepNav, useSteps } from "../components/Breakdown.tsx";
 import { XP_NONE_LINES } from "@chessroyale/core";
 import type { ComponentChildren, VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -9,7 +9,7 @@ import { Board } from "../components/Board.tsx";
 import { seatKey } from "../board/yours.ts";
 import { Avatar } from "../components/Items.tsx";
 import { BrainLoadingCard } from "../components/BrainLoading.tsx";
-import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
+import { MatchMenu, MOUSE_LAYOUT, openExitConfirm, type MatchExit } from "../components/MatchMenu.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { ChatPanel, useMedia, type ChatPeople } from "../components/QuickChat.tsx";
@@ -202,7 +202,7 @@ function rankAfter(snap: DuelSnapshot): RankView | null {
   return c ? yourRankShown(c.after) : null;
 }
 
-/** Your rank's change, in a line ("Gold 2 · 45 RP (+18)", "Placement 2/5", "Placed: Gold 4 · 25 RP"). */
+/** Your rank's change, in a line ("Gold II – 45 (+18)", "Placement 2/5", "Placed: Gold IV – 25"). */
 function rankLine(snap: DuelSnapshot): string | null {
   if (snap.town) return "Casual game";
   if (snap.bot) return "Unranked game";
@@ -222,8 +222,11 @@ function rankLine(snap: DuelSnapshot): string | null {
   return `${after.label} (${c.points >= 0 ? "+" : "−"}${Math.abs(c.points)})`;
 }
 
-/** A player's strip: pawn, name, rank, and their clock (always in the same place, readable at a glance). */
-function DuelStrip({ p, c, you, ms, running, clockShownNow, away }: { p: DuelSide; c: Color; you: boolean; ms: number; running: boolean; clockShownNow: boolean; away: boolean }) {
+/**
+ * A player's strip: pawn, name, rank, and their clock (always in the same place, readable at a glance). `lead`: what sits just before the
+ * clock on a computer (the mode and time control in the opponent's strip, "Your move" in yours).
+ */
+function DuelStrip({ p, c, you, ms, running, clockShownNow, away, lead, tail }: { p: DuelSide; c: Color; you: boolean; ms: number; running: boolean; clockShownNow: boolean; away: boolean; lead?: ComponentChildren; tail?: ComponentChildren }) {
   const low = clockShownNow && ms < 20_000;
   return (
     <div class={`dv-strip${you ? " dv-you" : " dv-them"}`} data-side={c}>
@@ -235,9 +238,12 @@ function DuelStrip({ p, c, you, ms, running, clockShownNow, away }: { p: DuelSid
         <DuelRankPill rank={you ? yourRankShown(p.rank) : p.rank} />
         {away && <span class="dv-away">away</span>}
       </span>
-      <span class={`dv-clock${running ? " on" : ""}${low ? " low" : ""}`} aria-label={`${you ? "Your" : `${p.name}'s`} clock: ${clockShownNow ? clockShown(ms, { tenths: true }) : "not set"}`}>
-        {clockShownNow ? clockShown(ms, { tenths: true }) : "–:––"}
-      </span>
+      {lead}
+      {tail ?? (
+        <span class={`dv-clock${running ? " on" : ""}${low ? " low" : ""}`} aria-label={`${you ? "Your" : `${p.name}'s`} clock: ${clockShownNow ? clockShown(ms, { tenths: true }) : "not set"}`}>
+          {clockShownNow ? clockShown(ms, { tenths: true }) : "–:––"}
+        </span>
+      )}
     </div>
   );
 }
@@ -313,8 +319,44 @@ export function DuelFront({
   return gameFrame ? gameFrame(board) : board;
 }
 
+/**
+ * The game's frame on a computer with a mouse (Eric, Nov 25, mockup round 2: docs/decisions/2026-11-25-duel-layout.md): no title line; the
+ * opponent's strip at the top of the screen ("1 v 1 · Blitz 3+2" just before their clock), the board all the height between the two strips,
+ * and beside it the gear at the top right, level with the top strip, over one panel whose top and foot are the board's. In play the panel
+ * is the chat over one row of actions; on the end page it's the result's column (the same frame, the board unchanged). A phone and a touch
+ * tablet keep their layouts.
+ */
+function DuelWide({ top, bottom, board, panel, exit, class: cls }: { top: VNode; bottom: VNode; board: VNode; panel: ComponentChildren; exit: MatchExit | null; class: string }) {
+  return (
+    <div class={`screen game duel-screen dv-frame${cls}`}>
+      <div class="board-area">
+        {top}
+        <div class="board-row">{board}</div>
+        {bottom}
+      </div>
+      <div class="dv-side">
+        <div class="dv-box">{panel}</div>
+        {/* (After the panel in the page, before it on screen: the gear's confirm is the page's last Resign button.) */}
+        <div class="dv-gear">
+          <MatchMenu exit={exit} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The mode and its time control, in the opponent's strip on a computer: "1 v 1 · Blitz 3+2". */
+const modeLine = (line: string | null) => (
+  <span class="dv-mode">
+    <h1>1 v 1</h1>
+    <span aria-hidden="true">·</span>
+    <span class="dv-control">{line ?? "Classic chess"}</span>
+  </span>
+);
+
 function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; now: number; onHome: () => void; onAgain: () => void }) {
   const computer = useMedia(COMPUTER_LAYOUT);
+  const wide = useMedia(MOUSE_LAYOUT);
   const you = snap.you;
   const them = other(you);
   const orientation = you === "w" ? "white" : "black";
@@ -390,7 +432,63 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
   );
   // (A ranked game that was played (not aborted): its own end page, as the boss battles' (Eric, Nov 20), its move-by-move below.)
   if (over && snap.end && !snap.town && !snap.bot && snap.end.result !== "aborted")
-    return <DuelEndPage session={session} snap={snap} people={people} computer={computer} onHome={onHome} onAgain={onAgain} />;
+    return <DuelEndPage session={session} snap={snap} people={people} computer={computer} wide={wide} title={clockLine} exit={exit} onHome={onHome} onAgain={onAgain} />;
+  const chat = session.chat && session.chat.enabled && (
+    <div class="lchat dv-chat">
+      <ChatPanel people={people} chat={session.chat} variant={computer ? "side" : "full"} />
+    </div>
+  );
+  if (wide) {
+    // (The vote's line in your strip is short; the zones on the board say the rest.)
+    const chip = status && (
+      <span class={`dv-status dv-chip${myTurn ? " mine" : ""}`} role="status">
+        {snap.phase === "vote" ? "Drag your pawn to vote" : status}
+      </span>
+    );
+    // One row under the chat: Offer a draw and Resign (greyed until they apply); a draw offer's Accept and Decline take the row. Once it's
+    // over (an aborted game, a bot's or the town's), the result in its place.
+    const row = over ? (
+      snap.end && <DuelResult snap={snap} onHome={onHome} onAgain={onAgain} />
+    ) : snap.drawOffer === them ? (
+      <div class="dv-actions dv-draw" role="alert">
+        <span class="dv-draw-words">{theirName} offers a draw</span>
+        <button type="button" class="btn btn-primary dv-small" onClick={() => session.draw()}>
+          Accept
+        </button>
+        <button type="button" class="btn btn-secondary dv-small" onClick={() => session.drawNo()}>
+          Decline
+        </button>
+      </div>
+    ) : (
+      <div class="dv-actions">
+        {snap.drawOffer === you ? (
+          <p class="muted dv-draw-sent">Draw offered</p>
+        ) : (
+          <button type="button" class="btn btn-secondary dv-small dv-offer" disabled={snap.phase !== "play" || !!snap.loading || !snap.canOffer[you]} onClick={() => session.draw()}>
+            Offer a draw
+          </button>
+        )}
+        <button type="button" class="btn btn-secondary dv-small dv-resign" disabled={!exit} onClick={openExitConfirm}>
+          {exit?.kind === "leave" ? "Leave" : "Resign"}
+        </button>
+      </div>
+    );
+    return (
+      <DuelWide
+        class={over ? " over" : ""}
+        exit={exit}
+        top={<DuelStrip p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, now)} running={snap.running && toMove === them && !over} clockShownNow={set} away={!snap.bot && !snap.connected[them] && !over} lead={modeLine(clockLine)} />}
+        board={board}
+        bottom={<DuelStrip p={snap.players[you]} c={you} you ms={clockAt(snap, you, now)} running={snap.running && toMove === you && !over} clockShownNow={set} away={false} lead={chip} />}
+        panel={
+          <>
+            {chat}
+            {row}
+          </>
+        }
+      />
+    );
+  }
   return (
     <div class={`screen game duel-screen${over ? " over" : ""}`}>
       <div class="hud-row">
@@ -430,11 +528,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
         )}
         {over && snap.end && <DuelResult snap={snap} onHome={onHome} onAgain={onAgain} />}
       </div>
-      {session.chat && session.chat.enabled && (
-        <div class="lchat dv-chat">
-          <ChatPanel people={people} chat={session.chat} variant={computer ? "side" : "full"} />
-        </div>
-      )}
+      {chat}
     </div>
   );
 }
@@ -444,47 +538,106 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
  * over the board): "Victory!" / "Defeat" / "A draw" and why, then RP EARNED (or RP LOST) counting up and lobbing into the division's bar,
  * then XP EARNED and its bar, the quests, your coins, Play again and Home; the game's moves under it (GameSteps).
  */
-function DuelEndPage({ session, snap, people, computer, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; people: ChatPeople; computer: boolean; onHome: () => void; onAgain: () => void }) {
+function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; people: ChatPeople; computer: boolean; wide: boolean; title: string | null; exit: MatchExit | null; onHome: () => void; onAgain: () => void }) {
   const end = snap.end!;
   const you = snap.you;
-  const title = resultTitle(end, you);
-  const tone = title === "You won" ? "win" : title === "You lost" ? "loss" : "draw";
+  const them = other(you);
+  const tone = resultTitle(end, you) === "You won" ? "win" : resultTitle(end, you) === "You lost" ? "loss" : "draw";
   const o = snap.outcome;
   const coins = o?.coins ?? 0;
   // (The rank's change: coming until the outcome; none for an unranked game or one fair play holds: your rank as it stands.)
   const change = o ? (o.unranked ? null : o.change) : undefined;
   const now = o?.unranked ? null : ranked1v1Rank();
+  const steps = useSteps(snap.moves);
+  const orientation = you === "w" ? "white" : "black";
+  const head = <EndHeadline title={tone === "win" ? "Victory!" : tone === "loss" ? "Defeat" : "A draw"} line={resultReason(end, you, snap.players[other(you)].name, snap.left, o)} tone={tone} plain />;
+  const rewards = (
+    <EndRewards
+      xp={o ? (o.xp ?? null) : undefined}
+      none={o?.unranked ? XP_NONE_LINES.test : undefined}
+      rp={{ change: change === undefined ? undefined : change && { ...change, before: yourRankShown(change.before), after: yourRankShown(change.after) }, now: o?.unranked ? null : now }}
+    />
+  );
+  const tail = (
+    <>
+      <p class="es-coins muted" data-testid="es-coins">
+        {o?.unranked ? "Unranked game" : coins > 0 ? `+${coins} coins` : "No coins this game"}
+      </p>
+      {/* (Stacked, the column's width: Eric, Nov 25.) */}
+      <div class="dv-result-actions dv-stacked">
+        <button type="button" class="btn btn-primary" onClick={onAgain}>
+          Play again
+        </button>
+        <button type="button" class="btn btn-secondary" onClick={onHome}>
+          Home
+        </button>
+      </div>
+    </>
+  );
+  const chat = session.chat && session.chat.enabled && (
+    <div class="lchat dv-chat">
+      <ChatPanel people={people} chat={session.chat} variant={computer ? "side" : "full"} post />
+    </div>
+  );
+  const endCol = (
+    <div class="dv-end-col es-screen">
+      {head}
+      {rewards}
+      {tail}
+      {chat}
+    </div>
+  );
+  // A computer with a mouse: the game's own frame (DuelWide), the panel's content swapped for the result's column.
+  if (wide)
+    return (
+      <DuelWide
+        class=" over dv-ended"
+        exit={exit}
+        top={<DuelStrip p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, Date.now())} running={false} clockShownNow={snap.clock !== null} away={false} lead={modeLine(title)} />}
+        board={<Board fen={steps.fen} orientation={orientation} lastMove={steps.lastMove} small animate={false} />}
+        bottom={<DuelStrip p={snap.players[you]} c={you} you ms={0} running={false} clockShownNow={false} away={false} tail={<StepNav s={steps} />} />}
+        panel={endCol}
+      />
+    );
+  if (computer)
+    // A computer (Eric, Nov 25: "the chat box on the end game screen should not now suddenly be to the left of the board when it's to the
+    // right during the game"): the game's own screen, its right column's content swapped. The board where the game's was, the same size,
+    // stepping through the moves (its ◀ ▶ in your strip, in your clock's place); the right column, flush with the board's strips: the
+    // result, the rewards, the quests, your coins, Play again and Home stacked, then the chat to the foot with its post-game lines.
+    return (
+      <div class="screen game duel-screen over dv-ended">
+        <div class="hud-row">
+          <div class="hud dv-title">
+            <h1>1 v 1</h1>
+            <span class="dv-control">{title ?? "Classic chess"}</span>
+          </div>
+          <MatchMenu exit={exit} />
+        </div>
+        <div class="board-area">
+          <DuelStrip p={snap.players[them]} c={them} you={false} ms={clockAt(snap, them, Date.now())} running={false} clockShownNow={snap.clock !== null} away={false} />
+          <div class="board-row">
+            <Board fen={steps.fen} orientation={orientation} lastMove={steps.lastMove} small animate={false} />
+          </div>
+          <DuelStrip p={snap.players[you]} c={you} you ms={0} running={false} clockShownNow={false} away={false} tail={<StepNav s={steps} />} />
+        </div>
+        {endCol}
+      </div>
+    );
+  // A phone: one column, tight (Nov 25): the result, the rewards, coins, Play again and Home stacked, the chat with its message area, then
+  // the move by move, clear of Safari's bar.
   return (
     <div class="screen results mm-screen boss-results es-screen dv-end">
       <div class="results-top">
         <div class="mm-corner">
           <MatchMenu exit={null} />
         </div>
-        <EndHeadline title={tone === "win" ? "Victory!" : tone === "loss" ? "Defeat" : "A draw"} line={resultReason(end, you, snap.players[other(you)].name, snap.left, o)} tone={tone} plain />
-        <EndRewards
-          xp={o ? (o.xp ?? null) : undefined}
-          none={o?.unranked ? XP_NONE_LINES.test : undefined}
-          rp={{ change: change === undefined ? undefined : change && { ...change, before: yourRankShown(change.before), after: yourRankShown(change.after) }, now: o?.unranked ? null : now }}
-        />
-        <p class="es-coins muted" data-testid="es-coins">
-          {o?.unranked ? "Unranked game" : coins > 0 ? `+${coins} coins` : " "}
-        </p>
-        <div class="dv-result-actions">
-          <button type="button" class="btn btn-primary" onClick={onAgain}>
-            Play again
-          </button>
-          <button type="button" class="btn btn-secondary" onClick={onHome}>
-            Home
-          </button>
-        </div>
-        {session.chat && session.chat.enabled && (
-          <div class="lchat dv-chat">
-            <ChatPanel people={people} chat={session.chat} variant={computer ? "side" : "full"} />
-          </div>
-        )}
+        {head}
+        {rewards}
+        {tail}
+        {chat}
       </div>
       <div class="results-review">
-        <GameSteps moves={snap.moves} orientation={you === "w" ? "white" : "black"} />
+        <GameSteps moves={snap.moves} orientation={orientation} />
       </div>
     </div>
   );

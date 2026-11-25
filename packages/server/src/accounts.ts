@@ -289,6 +289,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // What the game paid beside its XP (Nov 9, 2026, XP phase 2): JSON {crate, daily, crates, keys, bossPicks, levels} (core's
   // XpRewards), for the result screen's rewards box. NULL: nothing (and every result from before).
   { table: "results", column: "xp_rewards", type: "TEXT" },
+  // A game's coins (Nov 25, 2026; PLAY_COINS, play-coins.ts): JSON {play, bonus, parts, step, today, none?} (core's PlayCoins), paid
+  // with its XP, for the result screen. NULL on every result from before, and when rewards were paused.
+  { table: "results", column: "coins", type: "TEXT" },
   // A solo result's game (Nov 22, 2026; xp.ts): its id from POST /api/xp/solo/start, so a game is recorded once: as its result, or as
   // a loss when it was left after SOLO_ABANDON.minMoves (then `abandoned` = 1). NULL online, for a solo game never timed, and before.
   { table: "results", column: "solo_game", type: "TEXT" },
@@ -314,6 +317,12 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // Test accounts (Nov 10, 2026; test-accounts.ts): 1 for an account an admin's script made (a dummy email at test.hunchess), left out
   // of public rankings; NULL for everyone else.
   { table: "users", column: "test", type: "INTEGER" },
+  // Residents (Nov 25, 2026; residents.ts): 1 for an account the residents program plays (a dummy email at resident.hunchess). Unlike
+  // `test`, it counts on rankings and in name search; fair play records it but never opens a case for it (fairplay.ts). NULL for everyone else.
+  { table: "users", column: "resident", type: "INTEGER" },
+  // What detection would have done about a resident's match (residents.ts WouldHave: "watch", "review", "pool", "ban"), done for
+  // nobody (fairplay.ts recordFairPlay). NULL for anyone else's match, and for a resident's that would have done nothing.
+  { table: "fairplay_matches", column: "would", type: "TEXT" },
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
@@ -324,6 +333,8 @@ const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_name_signed ON users (name COLLATE NOCASE) WHERE ${SIGNED_IN}`,
   // (The few test accounts, so 1 v 1's top places leave them out without scanning the table: ranked-schema.ts, topPlace.)
   `CREATE INDEX IF NOT EXISTS users_test ON users (id) WHERE test = 1`,
+  // (The residents (a few hundred at most), so their report and the purge never scan the table: residents.ts.)
+  `CREATE INDEX IF NOT EXISTS users_resident ON users (id) WHERE resident = 1`,
   // (The deep re-check's queue: only the matches waiting, so the scheduled run never scans the whole table.)
   `CREATE INDEX IF NOT EXISTS fairplay_matches_deep ON fairplay_matches (deep_queued) WHERE deep_queued = 1`,
   // Solo results stopped counting for ranking (Oct 16, 2026: their rating is the browser's word, and the ones from
@@ -563,6 +574,8 @@ export interface User {
   created_at: number;
   /** The default pawn color (users.pawn_color; NULL: white). */
   pawn_color?: string | null;
+  /** 1 for a resident (users.resident; residents.ts), read with the session and by getUser; NULL or absent for anyone else. */
+  resident?: number | null;
 }
 
 // ---------------- Users and sessions ----------------
@@ -586,7 +599,7 @@ export async function endSession(sql: Sql, token: string): Promise<void> {
 }
 
 export const getUser = (sql: Sql, id: string) =>
-  sql.first<User>("SELECT id, name, icon, email, google_sub, created_at, pawn_color FROM users WHERE id = ?", id);
+  sql.first<User>("SELECT id, name, icon, email, google_sub, created_at, pawn_color, resident FROM users WHERE id = ?", id);
 
 /** The user a session token belongs to (null if unknown or expired). */
 /**
@@ -597,7 +610,7 @@ export async function userFromToken(sql: Sql, token: string | null | undefined, 
   if (!token) return null;
   // (The session and its account in one read, Nov 10: each D1 read is a round trip, and every signed-in request starts here.)
   const s = await sql.first<User & { expires_at: number }>(
-    "SELECT u.id, u.name, u.icon, u.email, u.google_sub, u.created_at, u.pawn_color, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
+    "SELECT u.id, u.name, u.icon, u.email, u.google_sub, u.created_at, u.pawn_color, u.resident, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
     await sha256(token),
   );
   if (!s || s.expires_at < now) return null;
@@ -914,8 +927,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     stmt(
       `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
          brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
-         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, solo_game)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
        ${since !== null ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}
        ${soloGame !== null ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND solo_game = ?)" : ""}`,
       userId,
@@ -992,7 +1005,7 @@ export interface Profile {
   locker: LockerState;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
   rating: number | null;
-  /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record. */
+  /** Ranked 1 v 1: the rank ("Gold II – 45", "Placement 2/5") and the record. */
   ranked1v1: RankedSummary;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
   /** Your chat ban in force and a moderator's notice you haven't seen (chat-mod.ts); missing when neither. */

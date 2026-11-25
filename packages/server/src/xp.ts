@@ -1,6 +1,7 @@
-import { BOSS_TIERS, SOLO_ABANDON, XP, XP_DAILY, bossDef, gameXp, isXpNone, questPartLabel, readRewards, xpDayStart, xpGrant, xpParts, type QuestGame, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
+import { BOSS_TIERS, SOLO_ABANDON, XP, XP_DAILY, bossDef, gameCoins, gameXp, isXpNone, questPartLabel, readPlayCoins, readRewards, xpDayStart, xpGrant, xpParts, type CoinResult, type PlayCoins, type QuestGame, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 import { cond, ledgerAccount, leg, opStatements, type Cond, type Op } from "./ledger.ts";
+import { coinDayOf, coinOps, coinsFor, settleCoins, type CoinPlan } from "./play-coins.ts";
 import { questStatements, questsPaidBy } from "./quests.ts";
 import { dailyOp, gameRewards, payLevels } from "./rewards.ts";
 
@@ -16,7 +17,9 @@ import { dailyOp, gameRewards, payLevels } from "./rewards.ts";
  *     a friends' lobby pays it once an XP day per opponent (`vs`: none of them beaten yet today), solo `XP.soloWinsPerDay` times
  *     an XP day (the leg's source says which: `vs:<their ledger ids>` or `solo`).
  *   - A solo game's time leg has source `solo`: capped at XP.soloMinutesPerDay minutes an XP day, its guard in the same statement.
- * Both go in one batch, with phase 2's daily reward (rewards.ts: `daily:<XP day>:<ledger id>`, once a day, for a game of
+ *   - Play coins (Nov 25; play-coins.ts, PLAY_COINS): `coins:<game>:<ledger id>` and `coinsbonus:<game>:<ledger id>`, worked out by
+ *     core's gameCoins from the same facts (XP's minutes, its win as paid) and the XP day's coins so far, in the same batch.
+ * They all go in one batch, with phase 2's daily reward (rewards.ts: `daily:<XP day>:<ledger id>`, once a day, for a game of
  * XP.dailyMinMoves of your own moves); then the level rewards owed at the XP it reached (rewards.ts payLevels: `lvl:<n>:<ledger id>`,
  * once per level; every 2nd level pays since Nov 20). Nothing at all while rewards are paused (PAUSE_REWARDS: `paused`). What the screen shows is answered (`XpGrant`) and kept on the game's result row (results.xp_before,
  * xp_parts, xp_none: `xpColumns`), so an online result screen can ask for it (GET /api/xp?game=CODE).
@@ -253,6 +256,17 @@ export interface XpGame {
   paused?: boolean;
   /** Quests (Nov 9, phase 3; quests.ts): the game's mode for them ("solo" for a solo game). Absent: it moves no quest. */
   quest?: QuestGame["mode"];
+  /**
+   * Play coins' bonus facts beside XP's win (Nov 25; PLAY_COINS.bonus): a ranked draw, a 50 v 50 team's top places, a Squads
+   * placement. The server's own, as the rest. Absent: none (a win still pays its bonus).
+   */
+  coin?: Omit<CoinResult, "won">;
+  /**
+   * The game's coins rest on one device's word though XP's cap isn't solo's (Nov 25, the review's m2: a Squads squad whose bots only
+   * its own party's devices moved, SquadsRecord.unvouched): its play coins by the solo rule (the minutes XP paid, no minimum of 1, no
+   * bonus), as every other game on one device's word (docs/decisions/2026-11-25-play-coins.md, call 5). XP keeps its own rules.
+   */
+  soloCoins?: boolean;
 }
 
 const newId = (bytes = 9) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -266,13 +280,15 @@ export async function xpOf(sql: Sql, userId: string): Promise<number> {
 const SOLO = "solo";
 
 /**
- * Who this is, for the rules: a guest (no sign-in identity), banned, their XP now, their ledger id (null: none yet) and, for the
- * solo cap, the solo time XP already paid this XP day: one read. Null: no such account (deleted).
+ * Who this is, for the rules: a guest (no sign-in identity), banned, held by fair play (in review or banned: no coins, as ranked's
+ * coins before them), their XP now, their ledger id (null: none yet) and, for the solo cap, the solo time XP already paid this XP
+ * day: one read. Null: no such account (deleted).
  */
 async function standing(sql: Sql, userId: string, day: number) {
-  return sql.first<{ signed: number; banned: number; xp: number; account: string | null; solo: number }>(
+  return sql.first<{ signed: number; banned: number; held: number; xp: number; account: string | null; solo: number }>(
     `SELECT (u.email IS NOT NULL OR u.google_sub IS NOT NULL) AS signed,
        EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id = u.id AND c.status = 'banned') AS banned,
+       EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id = u.id AND c.status IN ('review', 'banned')) AS held,
        COALESCE((SELECT w.xp FROM wallets w WHERE w.user_id = u.id), 0) AS xp,
        a.account AS account,
        COALESCE((SELECT SUM(l.delta) FROM ledger l WHERE l.account = a.account AND l.asset_kind = 'xp' AND l.reason = 'xp' AND l.source_id = '${SOLO}' AND l.created_at >= ?), 0) AS solo
@@ -337,7 +353,8 @@ async function winCap(sql: Sql, account: string, game: XpGame, day: number): Pro
 
 /**
  * A finished game's XP for one player: decided by the rules (core's gameXp) from the server's facts, and granted through the ledger
- * once. Answers what the result screen shows. Null: no such account (deleted mid-match). A failed write throws.
+ * once. Answers what the result screen shows. Null: no such account (deleted mid-match). A failed write throws, and so does a failure
+ * settling its coins after the batch (the review's M1): a caller tries the whole grant again, and it pays once (every op is keyed).
  *
  * A solo game's time XP is capped at XP.soloMinutesPerDay minutes an XP day (review M2, Nov 9): its leg's source is "solo", what's
  * left today is read first and paid (the parts say "Daily solo limit" if that trimmed it), and the guard checks the day's sum again
@@ -348,8 +365,9 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   const who = await standing(sql, userId, day);
   if (!who) return null;
   const g = gameXp({ ...game.facts, guest: game.signedInOnly && !who.signed, banned: !!who.banned });
-  if (g.none) return xpGrant(who.xp, [], g.none);
-  if (game.paused) return xpGrant(who.xp, [], "paused");
+  if (game.paused) return xpGrant(who.xp, [], g.none ?? "paused");
+  // (No XP minutes: no coins either, for the same reason; the day's coins so far as they stand.)
+  if (g.none) return { ...xpGrant(who.xp, [], g.none), coins: gameCoins({ xp: g }, who.account ? await coinDayOf(sql, who.account, day) : { play: 0, bonus: 0 }) };
   const me = who.account ? { user: userId, account: who.account } : await ledgerAccount(sql, userId);
   if (!me) return null;
   const solo = game.cap === "solo";
@@ -374,8 +392,14 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
     ...(capped?.when ? { when: capped.when } : {}),
     legs: g.win ? [leg.xp(userId, g.win, capped!.source)] : [],
   };
+  // (Play coins, Nov 25: worked out as if this batch's time and win ops go in; their guards check that they did, and the day's
+  // coins in the same statement. One refused is worked out again after the batch: play-coins.ts settleCoins.)
+  const plan: CoinPlan = { key: game.key, now: game.now, day, xp: g, solo: solo || !!game.soloCoins, held: !!who.held, result: game.coin ?? {}, timeOp: time.id, winOp: win.id };
+  const coinDay = await coinDayOf(sql, me.account, day);
+  const coins0 = coinsFor(plan, coinDay, timeXp, g.win > 0);
+  const coinsTried = coins0.none ? [] : coinOps(me, plan, coins0, coinDay, { won: g.win > 0 });
   const nonces = new Map<Op, string>();
-  for (const op of [time, win, ...(daily ? [daily] : [])]) if (op.legs.length) nonces.set(op, newId());
+  for (const op of [time, win, ...(daily ? [daily] : []), ...coinsTried]) if (op.legs.length) nonces.set(op, newId());
   // (Quests, phase 3: this game's progress and any quest it completes, in the same batch, after the win op: a win quest moves only if
   // the win's XP went in. A failure to read them costs the quests, never the game's XP.)
   const quests = game.quest
@@ -388,14 +412,15 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
     : [];
   if (nonces.size || quests.length) await sql.batch([...[...nonces].flatMap(([op, nonce]) => opStatements(me, op, nonce)), ...quests]);
   // (What went in, and the wallet after, in one read. A replay: its first attempt's leg, so the same parts. The daily reward is this
-  // game's if its first leg names this game: another game today paid it otherwise.)
+  // game's if its XP leg names this game: another game today paid it otherwise. Read by the game, not today's op: a replay on the
+  // next XP day answers the one the game paid (its op's guard: one a game; the delta review's N1).)
   const after = await sql.first<{ time: number | null; win: string | null; daily: number | null; xp: number }>(
     `SELECT (SELECT delta FROM ledger WHERE op_id = ? AND leg = 0) AS time, (SELECT nonce FROM ledger WHERE op_id = ? AND leg = 0) AS win,
-       (SELECT delta FROM ledger WHERE op_id = ? AND asset_kind = 'xp' AND source_id = ?) AS daily,
+       (SELECT delta FROM ledger WHERE account = ? AND reason = 'daily' AND asset_kind = 'xp' AND source_id = ?) AS daily,
        COALESCE((SELECT xp FROM wallets WHERE user_id = ?), 0) AS xp`,
     time.id,
     win.id,
-    daily?.id ?? "",
+    me.account,
     game.key,
     userId,
   );
@@ -411,8 +436,12 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
     ...(questXp ? [{ label: questPartLabel(done.length), xp: questXp }] : []),
   ];
   const gained = parts.reduce((s, p) => s + p.xp, 0);
-  // (The cap took all of it: say so as the reason, not a box of +0s.)
-  if (solo && g.time && !gained) return xpGrant(after?.xp ?? who.xp, [], "limit");
+  // (The coins as the ledger has them: a refused op worked out again. A D1 failure here throws, as the batch's would (the review's M1):
+  // an op refused by a race must be tried again, and the callers try the whole grant again, which pays once: every op is keyed, and
+  // the XP and coins already in answer as they are.)
+  const coins: PlayCoins = coins0.none ? coins0 : await settleCoins(sql, me, plan, coinsTried);
+  // (The cap took all of it: say so as the reason, not a box of +0s; its coins too.)
+  if (solo && g.time && !gained) return { ...xpGrant(after?.xp ?? who.xp, [], "limit"), coins: coins.play || coins.bonus ? coins : { ...coins, none: "limit" as const } };
   // (The levels owed at the XP it reached: paid once each, their legs naming this game, so its result answers them; then this
   // game's rewards as the ledger has them, so a replay answers the same.)
   // (A failure here leaves the levels owed (paid at the next game, never twice) and must not cost the box this game's XP, already in:
@@ -429,19 +458,22 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   } catch (e) {
     console.error("gameRewards", e);
   }
-  return xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts, undefined, rewards);
+  return { ...xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts, undefined, rewards), coins };
 }
 
-/** A grant as the result row keeps it (results: xp_before, xp_parts, xp_none, xp_rewards). */
-export function xpColumns(x: XpGrant | null | undefined): [number | null, string | null, string | null, string | null] {
-  if (!x) return [null, null, null, null];
-  return [x.before, x.none ? null : JSON.stringify(x.parts), x.none ?? null, x.rewards ? JSON.stringify(x.rewards) : null];
+/** A grant as the result row keeps it (results: xp_before, xp_parts, xp_none, xp_rewards, coins). */
+export function xpColumns(x: XpGrant | null | undefined): [number | null, string | null, string | null, string | null, string | null] {
+  if (!x) return [null, null, null, null, null];
+  return [x.before, x.none ? null : JSON.stringify(x.parts), x.none ?? null, x.rewards ? JSON.stringify(x.rewards) : null, x.coins ? JSON.stringify(x.coins) : null];
 }
 
 /** A result row's grant again (for GET /api/xp): null if it has none (a result from before XP, or one the server never decided). */
-export function xpFromRow(r: { xp_before: number | null; xp_parts: string | null; xp_none: string | null; xp_rewards?: string | null }): XpGrant | null {
+export function xpFromRow(r: { xp_before: number | null; xp_parts: string | null; xp_none: string | null; xp_rewards?: string | null; coins?: string | null }): XpGrant | null {
   if (r.xp_before === null) return null;
-  if (isXpNone(r.xp_none)) return xpGrant(r.xp_before, [], r.xp_none as XpNone);
+  // (Its coins (Nov 25): absent on a row from before them.)
+  const coins = readPlayCoins(r.coins);
+  const withCoins = (x: XpGrant): XpGrant => (coins ? { ...x, coins } : x);
+  if (isXpNone(r.xp_none)) return withCoins(xpGrant(r.xp_before, [], r.xp_none as XpNone));
   let parts: XpPart[] = [];
   try {
     const p = JSON.parse(r.xp_parts ?? "[]") as unknown;
@@ -449,7 +481,7 @@ export function xpFromRow(r: { xp_before: number | null; xp_parts: string | null
   } catch {
     // (Unreadable: no parts.)
   }
-  return xpGrant(r.xp_before, parts, undefined, readRewards(r.xp_rewards));
+  return withCoins(xpGrant(r.xp_before, parts, undefined, readRewards(r.xp_rewards)));
 }
 
 /** How long a result screen may ask for its game's XP. */
@@ -458,8 +490,8 @@ const ASK_WITHIN_MS = 2 * 3_600_000;
 /** Your XP from an online game (its lobby's code), as its result row keeps it: the result screen asks. Null: not written yet. */
 export async function gameXpOf(sql: Sql, userId: string, code: unknown, now: number): Promise<XpGrant | null> {
   if (typeof code !== "string" || !/^[A-Z2-9]{5}$/.test(code)) return null;
-  const row = await sql.first<{ xp_before: number | null; xp_parts: string | null; xp_none: string | null; xp_rewards: string | null }>(
-    "SELECT xp_before, xp_parts, xp_none, xp_rewards FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at > ? ORDER BY played_at DESC, id DESC LIMIT 1",
+  const row = await sql.first<{ xp_before: number | null; xp_parts: string | null; xp_none: string | null; xp_rewards: string | null; coins: string | null }>(
+    "SELECT xp_before, xp_parts, xp_none, xp_rewards, coins FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at > ? ORDER BY played_at DESC, id DESC LIMIT 1",
     userId,
     code,
     now - ASK_WITHIN_MS,

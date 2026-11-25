@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { RANKED_1V1, rankView } from "@chessroyale/core";
-import { BOARD_SEL, named, test, watchFor, watchSpans } from "./helpers.ts";
+import { BOARD_SEL, REAL_SCREENS, asSignedIn, endGaps, named, realLayout, realScreenContext, test, watchFor, watchSpans } from "./helpers.ts";
 
 /**
  * Ranked 1 v 1 through the real server (docs/areas/ranked.md), two players on emulated phones (and computers): both
@@ -50,6 +50,15 @@ async function player(browser: Browser, name: string): Promise<Page> {
   return page;
 }
 
+/** Eric's spacing rule on an end page (Nov 25): every gap between two containers the stack's one gap, to 2 px; nothing set to stretch. */
+async function expectEvenGaps(page: Page, root: string, at: string) {
+  const g = await endGaps(page, root);
+  expect(g.token, `${at}: the stack's gap`).toBeGreaterThanOrEqual(8);
+  for (const x of g.gaps) expect(Math.abs(x.px - g.token), `${at}: ${x.between}: ${x.px.toFixed(1)} px, not the one gap (${g.token} px)`).toBeLessThanOrEqual(2);
+  expect(g.spread, `${at}: nothing spread apart`).toEqual([]);
+  expect(g.grow, `${at}: nothing grows to fill`).toEqual([]);
+}
+
 /** A pool of this test's own. */
 const poolName = () => `d${test.info().project.name.slice(0, 1)}${Math.random().toString(36).slice(2, 9)}`;
 
@@ -83,7 +92,7 @@ async function tapMove(page: Page, uci: string) {
 
 /**
  * Each page's game is on its board (the vote, the "Timer" line or play) and not over: a state that lasts from the vote to the
- * result. (The versus moment lasts 2.5 s and the vote 5: a test process slowed for longer missed them, the page went on, and the
+ * result. (The versus moment lasts 2.5 s and the vote up to 10: a test process slowed for longer missed them, the page went on, and the
  * wait timed out on a game that was fine. The versus moment has its own test, "the stage", below.)
  */
 async function inGame(pages: Page[], timeout = 30_000) {
@@ -117,7 +126,7 @@ async function bySide(a: Page, b: Page): Promise<{ white: Page; black: Page }> {
 
 /** Waits for play: the overlay gone, the first move due. */
 async function waitForPlay(...pages: Page[]) {
-  for (const p of pages) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 15_000 });
+  for (const p of pages) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 25_000 });
 }
 
 /** Resign (or Leave: an abort) from the match's gear and its list, on a phone or a computer; then confirm. */
@@ -154,26 +163,30 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
   }
   const boardBefore = (await a.locator(`.board-area ${BOARD_SEL.wrap}`).boundingBox())!;
 
-  // Ann drags hers into Rapid; Bo picks up his with a tap, then taps Bullet. The other's pawn moves live.
+  // Bo taps Bullet, his pawn not picked up first, and it goes there (Eric's rule, every pawn vote, Nov 25: docs/rules/eric.md); Ann sees
+  // it move live. Then Ann drags hers into Rapid: both in, the vote closes a beat later (RANKED_1V1.voteBothPickedMs), not at its 10 s.
   const overlay = await watchFor(a, { timer: { selector: ".dv-overlay", text: /^Timer: Blitz 3\+2$/ } });
+  await expect(b.locator(".vote-me.selected")).toHaveCount(0);
+  await b.getByRole("button", { name: "Pick Bullet 1+1" }).click();
+  await expect(b.locator(".dv-label.mine")).toHaveText("Bullet 1+1");
+  const inZone = async (p: Page, pawn: string, zone: number) => {
+    const z = (await p.locator(".vote-zone").nth(zone).boundingBox())!;
+    const q = (await p.locator(pawn).boundingBox())!;
+    const [x, y] = [q.x + q.width / 2, q.y + q.height * 0.55];
+    return x > z.x && x < z.x + z.width && y > z.y && y < z.y + z.height;
+  };
+  await expect.poll(() => inZone(b, ".vote-me", 0), { message: "Bo's pawn stands in the zone he tapped" }).toBe(true);
+  // Ann sees Bo's pawn in Bullet (the zone on her left).
+  await expect.poll(() => inZone(a, ".dv-pawn:not(.vote-me)", 0)).toBe(true);
   const zone = (await a.locator(".vote-zone").nth(2).boundingBox())!;
   const mine = (await a.locator(".vote-me").boundingBox())!;
   await a.mouse.move(mine.x + mine.width / 2, mine.y + mine.height / 2);
   await a.mouse.down();
   await a.mouse.move(zone.x + zone.width / 2, zone.y + zone.height * 0.7, { steps: 8 });
   await a.mouse.up();
-  await b.locator(".vote-me").click();
-  await b.getByRole("button", { name: "Pick Bullet 1+1" }).click();
-  await expect(a.locator(".dv-label.mine")).toHaveText("Rapid 10+5");
-  await expect(b.locator(".dv-label.mine")).toHaveText("Bullet 1+1");
-  // Ann sees Bo's pawn in Bullet (the zone on her left).
-  const bullet = (await a.locator(".vote-zone").nth(0).boundingBox())!;
-  await expect
-    .poll(async () => {
-      const p = (await a.locator(".dv-pawn:not(.vote-me)").boundingBox())!;
-      return p.x + p.width / 2 > bullet.x && p.x + p.width / 2 < bullet.x + bullet.width;
-    })
-    .toBe(true);
+  const both = Date.now();
+  await expect(a.locator(".dv-overlay")).toHaveText("Timer: Blitz 3+2", { timeout: 8_000 });
+  expect(Date.now() - both, "the vote closed a beat after both picks, well before its 10 s").toBeLessThan(RANKED_1V1.voteBothPickedMs + 4_000);
 
   // Rapid and Bullet meet on Blitz: "Timer: Blitz 3+2" over the board, then the game on the same board.
   await waitForPlay(a, b);
@@ -200,11 +213,40 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
   await expect(black.getByTestId("es-line")).toHaveText("Checkmate.");
   await expect(white.getByTestId("es-title")).toHaveText("Defeat");
   // The ranks moved: one placement game each (the server's record).
-  for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  for (const p of [white, black]) await expect(p.getByTestId("es-now-rp")).toHaveText("1 of 5 placement games", { timeout: 15_000 });
   // XP (Nov 9): the end page's XP (Nov 20: a ranked game's own page), from the outcome: 2 moves each is too few for anyone.
   for (const p of [white, black]) await expect(p.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: the game ended before move 10.");
   expect(await record(black)).toMatchObject({ games: 1, wins: 1, losses: 0, rank: { label: "Placement 1/5" } });
   expect(await record(white)).toMatchObject({ games: 1, wins: 0, losses: 1 });
+});
+
+test("typed chat in a 1 v 1 (Eric, Nov 25: \"i said hello, it never appeared, twice\"): your own line shows; told when the other doesn't see typed messages; they turn it on mid-game, read it and answer", { tag: "@phone-only" }, async ({ browser }) => {
+  test.setTimeout(3 * 60_000);
+  const a = await player(browser, "Ann Typed");
+  const b = await player(browser, "Bo Typed");
+  // Both signed in (typing is for accounts); Ann's chat on, Bo's still off.
+  for (const p of [a, b]) await asSignedIn(p);
+  expect((await a.request.patch("/api/me", { data: { chatOn: true } })).status()).toBe(200);
+  await meet(a, b, poolName());
+  const field = (p: Page) => p.locator(".dv-chat").getByRole("textbox", { name: "Send a message" });
+  await field(a).fill("hello");
+  await field(a).press("Enter");
+  await expect(a.locator(".dv-chat .qline.you", { hasText: "hello" })).toBeVisible();
+  await expect(a.locator(".dv-chat .qtype-note")).toHaveText("Bo Typed doesn't see typed messages, only the quick lines.");
+  // Bo turns typed chat on in the match's chat options (the notice once): Ann's line comes, and he can type back.
+  await expect(field(b)).toHaveCount(0);
+  await b.locator(".dv-chat").getByRole("button", { name: "Chat options" }).click();
+  await b.getByRole("checkbox", { name: "Typed chat (players' messages)" }).click();
+  await b.getByRole("button", { name: "Turn on chat", exact: true }).click();
+  await expect(b.getByRole("checkbox", { name: "Typed chat (players' messages)" })).toBeChecked();
+  await b.locator(".dv-chat").getByRole("button", { name: "Chat options" }).click();
+  await expect(b.locator(".dv-chat .qline", { hasText: "hello" }).filter({ hasText: "Ann Typed" })).toBeVisible();
+  await expect(field(b)).toBeVisible();
+  await field(b).fill("hi Ann");
+  await field(b).press("Enter");
+  await expect(b.locator(".dv-chat .qline.you", { hasText: "hi Ann" })).toBeVisible();
+  await expect(a.locator(".dv-chat .qline", { hasText: "hi Ann" }).filter({ hasText: "Bo Typed" })).toBeVisible();
+  await expect(b.locator(".dv-chat .qtype-note")).toHaveCount(0);
 });
 
 test("resigning, then a flag: Play again queues both again; each game counts", { tag: "@phone-only" }, async ({ browser }) => {
@@ -225,15 +267,27 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
   await expect(black.getByTestId("es-title")).toHaveText("Victory!");
   await expect(black.getByTestId("es-line")).toHaveText(/ resigned\.$/);
   await expect(white.getByTestId("es-line")).toHaveText("You resigned.");
-  for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  for (const p of [white, black]) await expect(p.getByTestId("es-now-rp")).toHaveText("1 of 5 placement games", { timeout: 15_000 });
+  // (Nov 25: a placement counts games, not RP; no quests moved: one line, "Quests  No quests this game".)
+  for (const p of [white, black]) {
+    // (No RP slot over the placement card: the card alone says it, Nov 25; resigned at move 2, no quests moved: one line.)
+    await expect(p.getByTestId("es-earned-rp")).toHaveCount(0);
+    await expect(p.getByTestId("es-quests")).toHaveText("Quests No quests this game.", { timeout: 10_000 });
+    await expect(p.locator(".dv-result-actions .btn").nth(1)).toHaveText("Home");
+  }
+  // Eric's spacing rule (Nov 25), phone 390 × 844: one gap between every container of the page, nothing stretched.
+  await expectEvenGaps(white, ".screen.dv-end", "phone 390×844");
   expect(await leavesOf(white)).toMatchObject({ marks: 1 });
   expect(await leavesOf(black)).toMatchObject({ marks: 0 });
 
   // Play again: both back in the queue (the same pool), a new game; this time White's clock runs out.
+  const hadBlack = black;
   for (const p of [a, b]) await p.getByRole("button", { name: "Play again" }).click();
   await inGame([a, b]);
   await waitForPlay(a, b);
   ({ white, black } = await bySide(a, b));
+  // Colors in turn (Nov 25): who had Black in the first game has White now.
+  expect(white).toBe(hadBlack);
   await tapMove(white, "d2d4");
   await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
   await tapMove(black, "d7d5");
@@ -241,7 +295,7 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
   await expect(white.getByTestId("es-title")).toHaveText("Defeat", { timeout: 20_000 });
   await expect(white.getByTestId("es-line")).toHaveText("You ran out of time.");
   await expect(black.getByTestId("es-line")).toHaveText(/ ran out of time\.$/);
-  for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 2/5", { timeout: 15_000 });
+  for (const p of [white, black]) await expect(p.getByTestId("es-now-rp")).toHaveText("2 of 5 placement games", { timeout: 15_000 });
 });
 
 test("every change is drawn, even in the same millisecond as the last draw (the clock held still from the last move): the result, then the rank", { tag: "@phone-only" }, async ({ browser }) => {
@@ -262,7 +316,7 @@ test("every change is drawn, even in the same millisecond as the last draw (the 
   await resign(white);
   await expect(black.getByTestId("es-title")).toHaveText("Victory!");
   await expect(white.getByTestId("es-line")).toHaveText("You resigned.");
-  for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  for (const p of [white, black]) await expect(p.getByTestId("es-now-rp")).toHaveText("1 of 5 placement games", { timeout: 15_000 });
 });
 
 test("a first move that never comes: the game is aborted, a dodge for the one who didn't move (L1), nothing for the other", { tag: "@phone-only" }, async ({ browser }) => {
@@ -323,7 +377,7 @@ test("a reload mid-game comes back to the same game, its clocks running; a decli
   for (const p of [white, black]) {
     await expect(p.getByTestId("es-title")).toHaveText("A draw");
     await expect(p.getByTestId("es-line")).toHaveText("Draw agreed.");
-    await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
+    await expect(p.getByTestId("es-now-rp")).toHaveText("1 of 5 placement games", { timeout: 15_000 });
   }
   expect(await record(white)).toMatchObject({ games: 1, draws: 1 });
 });
@@ -474,11 +528,11 @@ test("the stage: your pawn on the left platform while searching; the opponent's 
 
 test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longest names and ranks, no sideways scroll", async ({ browser }) => {
   test.setTimeout(2 * 60_000);
-  // The widest a name (16 characters) and a rank can be ("Transcendent · 1199 RP", with its emblem), for both players:
+  // The widest a name (16 characters) and a rank can be ("Transcendent – 1199", with its emblem), for both players:
   // your own from the server's answer, the opponent's (and the game's timing, held in the versus moment) from the game's.
   const WIDE = "WWWWWWWWWWWWWWWW";
   const gm = rankView({ games: 40, ladder: RANKED_1V1.topFloor + 1199, place: 1 });
-  expect(gm.label).toBe("Transcendent · 1199 RP");
+  expect(gm.label).toBe("Transcendent – 1199");
   const a = await player(browser, "Ann Fit");
   const b = await player(browser, "Bo Fit");
   await a.route(/\/api\/me(\?|$)/, async (route) => {
@@ -547,7 +601,7 @@ test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longe
   // Searching, with "Few players online right now" (after 1 s here) above Cancel: the tallest the search gets.
   await a.goto(`/1v1?nolanding&pool=${pool}&fewAfter=1`);
   await expect(a.locator(".dv-st-you .dv-st-name")).toHaveText(WIDE);
-  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Transcendent · 1199 RP");
+  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Transcendent – 1199");
   await expect(a.locator(".dv-few")).toBeVisible({ timeout: 10_000 });
   await fits("searching");
   // Found (held in the versus moment): both pawns, names and ranks at their widest, VS between.
@@ -560,4 +614,94 @@ test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longe
     [...document.querySelectorAll(".dv-stage, .dv-stage *")].filter((e) => getComputedStyle(e).animationName !== "none").map((e) => e.className),
   );
   expect(moving).toEqual([]);
+});
+
+/**
+ * Real screens (Nov 25; docs/decisions/2026-11-25-real-screens.md, 2026-11-25-end-screens-2.md; e2e/helpers.ts REAL_SCREENS): a ranked
+ * game and its end page on a 1080p laptop at 125% (Eric's, 1536 × 730), at 150% (1280 × 600), a 768p laptop (1366 × 650) and a desktop
+ * (1920 × 960), each at its own device scale. In play: nothing scrolls, the chat beside the board shows at least 120 px of messages. The
+ * end page is the game's own screen with its right column swapped (Eric, Nov 25: "the chat box on the end game screen should not now
+ * suddenly be to the left of the board when it's to the right during the game"): nothing scrolls either way, the board where it was and
+ * the same size, the moves' stepper in your strip; the right column flush with the board (its top and foot the board's, Nov 25's frame),
+ * holding the result ("Defeat" in view),
+ * the placement card ("1 of 5 placement games", no RP slot over it), the quests in one line, Play again and Home stacked the column's
+ * width, then the chat to the foot with its post-game lines ("GG", "Well played", "Thanks!", "Rematch?").
+ */
+test("real screens (Nov 25): a ranked game and its end page on laptop 1536×730, 1280×600, 1366×650 and desktop 1920×960", async ({ browser }) => {
+  test.skip(!isComputer(), "a computer only; it opens its own windows");
+  test.setTimeout(8 * 60_000);
+  for (const s of REAL_SCREENS) {
+    const at = `the ${s.name}`;
+    const open = async (name: string) => {
+      const page = await (await realScreenContext(browser, s)).newPage();
+      players.push([name, page]);
+      await named(page, name);
+      await page.goto("/?nolanding");
+      await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+      return page;
+    };
+    const a = await open(`Ann ${s.width}`);
+    const b = await open(`Bo ${s.width}`);
+    await meet(a, b, poolName());
+    await waitForPlay(a, b);
+    const { white, black } = await bySide(a, b);
+    await tapMove(white, "e2e4");
+    await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
+    await tapMove(black, "e7e5");
+    await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
+    const g = await realLayout(white);
+    expect(g.scrollX, `${at}, in play: no scrolling across`).toBeLessThanOrEqual(0);
+    expect(g.scrollY, `${at}, in play: no scrolling down`).toBeLessThanOrEqual(0);
+    expect(g.cut, `${at}, in play: nothing cut off at the top`).toEqual([]);
+    expect(g.feeds.length, `${at}, in play: the chat`).toBe(1);
+    expect(g.feeds[0], `${at}, in play: the chat's messages`).toBeGreaterThanOrEqual(120);
+    // The frame (Nov 25, mockup round 2): no title line, the board the window's height less the two strips (to its 8 device pixel step), the
+    // panel's top and foot the board's, the gear level with the top strip, "Your move" in your strip.
+    const f = await white.evaluate(() => {
+      const r = (q: string) => document.querySelector(q)!.getBoundingClientRect();
+      return { box: r(".dv-side > .dv-box"), gear: r(".dv-gear .mm-more"), top: r(".dv-strip.dv-them"), menu: r(".gm-frame > .fd-side"), chip: !!document.querySelector(".dv-strip.dv-you .dv-status"), title: document.querySelectorAll(".screen.game > .hud-row").length };
+    });
+    expect(f.title, `${at}, in play: no title line`).toBe(0);
+    expect(s.height - 108 - g.board!.h, `${at}, in play: the board (${g.board!.h}) the window's height less 108`).toBeLessThan(8);
+    // (Eric's column rule, Nov 25 round 2: every column on the board's top and bottom lines and the gaps either side of the board equal, ±1 px.
+    // Were ±1.5 for the lines; the gaps were 55 and 70 at 1536 × 730.)
+    expect(Math.abs(f.box.top - g.board!.y), `${at}, in play: the panel's top the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(f.box.bottom - g.board!.b), `${at}, in play: the panel's foot the board's`).toBeLessThanOrEqual(1);
+    const gaps = { left: g.board!.x - f.menu.right, right: f.box.left - g.board!.r };
+    expect(Math.abs(gaps.left - gaps.right), `${at}, in play: the gaps either side of the board equal (${gaps.left} v ${gaps.right})`).toBeLessThanOrEqual(1);
+    expect(Math.abs(f.gear.top + f.gear.height / 2 - (f.top.top + f.top.height / 2)), `${at}, in play: the gear level with the top strip`).toBeLessThanOrEqual(1.5);
+    expect(f.chip, `${at}, in play: "Your move" in your strip`).toBe(true);
+    await resign(white);
+    await expect(white.getByTestId("es-title")).toHaveText("Defeat");
+    await expect(white.getByTestId("es-now-rp")).toHaveText("1 of 5 placement games", { timeout: 15_000 });
+    await expect(white.getByTestId("es-quests")).toHaveText("Quests No quests this game.", { timeout: 10_000 });
+    await white.waitForTimeout(500);
+    const e = await realLayout(white);
+    expect(e.scrollX, `${at}, the end page: no scrolling across`).toBeLessThanOrEqual(0);
+    expect(e.scrollY, `${at}, the end page: no scrolling down`).toBeLessThanOrEqual(0);
+    expect(e.cut, `${at}, the end page: nothing cut off at the top`).toEqual([]);
+    expect(Math.abs(e.board!.h - g.board!.h), `${at}, the end page: the board the game's size (${e.board!.h} v ${g.board!.h})`).toBeLessThanOrEqual(1);
+    expect(Math.abs(e.board!.y - g.board!.y) + Math.abs(e.board!.x - g.board!.x), `${at}, the end page: the board where the game's was`).toBeLessThanOrEqual(2);
+    const m = await white.evaluate(() => {
+      const r = (q: string) => document.querySelector(q)!.getBoundingClientRect();
+      const btns = [...document.querySelectorAll(".dv-end-col .dv-result-actions .btn")].map((x) => x.getBoundingClientRect());
+      const lines = [...document.querySelectorAll(".dv-end-col .qgroup-lines:not(.emoji) .qchip")].map((x) => x.textContent);
+      return { col: r(".dv-end-col"), menu: r(".gm-frame > .fd-side"), area: r(".board-area"), title: r(".es-title"), feed: r(".dv-end-col .qfeed"), btns: btns.map((x) => ({ x: x.left, y: x.top, w: x.width, h: x.height })), lines, steps: !!document.querySelector(".dv-strip.dv-you [data-testid=dv-steps]") };
+    });
+    expect(m.title.top, `${at}, the end page: "Defeat" in view`).toBeGreaterThanOrEqual(0);
+    expect(m.col.left, `${at}, the end page: the column right of the board`).toBeGreaterThan(m.area.right);
+    expect(Math.abs(m.col.top - e.board!.y), `${at}, the end page: the column's top the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(m.col.bottom - e.board!.b), `${at}, the end page: the column's foot the board's`).toBeLessThanOrEqual(1);
+    expect(Math.abs(e.board!.x - m.menu.right - (m.col.left - e.board!.r)), `${at}, the end page: the gaps either side of the board equal`).toBeLessThanOrEqual(1);
+    expect(m.steps, `${at}, the end page: the moves' stepper in your strip`).toBe(true);
+    expect(m.btns.length).toBe(2);
+    expect(m.btns[1]!.y, `${at}, the end page: Play again and Home stacked`).toBeGreaterThan(m.btns[0]!.y + m.btns[0]!.h - 1);
+    expect(Math.abs(m.btns[0]!.w - m.col.width), `${at}, the end page: the column's width`).toBeLessThanOrEqual(1);
+    expect(m.lines, `${at}, the end page: the post-game lines`).toEqual(["GG", "Well played", "Thanks!", "Rematch?"]);
+    expect(m.feed.height, `${at}, the end page: the chat's messages`).toBeGreaterThanOrEqual(40);
+    await expect(white.getByTestId("es-earned-rp")).toHaveCount(0);
+    // Eric's spacing rule (Nov 25): one gap between every container of the right column, nothing stretched, the block centered.
+    await expectEvenGaps(white, ".dv-end-col", s.name);
+    for (const p of [a, b]) await p.context().close();
+  }
 });

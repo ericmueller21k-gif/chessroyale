@@ -240,6 +240,28 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     expect(g.testSeconds).toBe(9);
   });
 
+  it("colors (Nov 25): White to whoever had Black more in their last ranked games, whichever asked first; no colors read: still a game", async () => {
+    for (const [annColors, bobColors, white] of [
+      [["b", "w", "b"], ["w", "b", "w"], "ann"],
+      [["w", "b", "w"], ["b", "w", "b"], "bob"],
+      // Ann had White in her last two: Black now, though she has had Black more overall.
+      [["w", "w", "b", "b", "b", "b"], ["b", "w"], "bob"],
+    ] as const) {
+      const D = duels();
+      const mm = matchmaker(D.ns);
+      const first = await mm.duelNext(null, { ...info("ann", 1500), colors: annColors });
+      await Promise.all([mm.duelNext(ticketOf(first)), mm.duelNext(null, { ...info("bob", 1500), colors: bobColors })]);
+      const [g] = [...D.made.values()];
+      expect(g!.w.uid, `${annColors.join("")} v ${bobColors.join("")}`).toBe(white);
+    }
+    const D = duels();
+    const mm = matchmaker(D.ns);
+    const first = await mm.duelNext(null, { ...info("ann", 1500), colors: "garbage" });
+    await Promise.all([mm.duelNext(ticketOf(first)), mm.duelNext(null, info("bob", 1500))]);
+    const [g] = [...D.made.values()];
+    expect([g!.w.uid, g!.b.uid].sort()).toEqual(["ann", "bob"]);
+  });
+
   it("the delayed queue (L1): still looking, with how long until the ticket can be paired, even beside a player close in rating", async () => {
     const D = duels();
     const mm = matchmaker(D.ns);

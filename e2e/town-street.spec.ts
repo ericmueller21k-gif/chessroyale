@@ -425,8 +425,8 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
   expect(errors).toEqual([]);
 });
 
-test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking and a full turn paint nothing new and start no atlas page again", { tag: "@phone-only" }, async ({ page }) => {
-  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number } } };
+test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking, a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (its pictures kept)", { tag: "@phone-only" }, async ({ page }) => {
+  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { kept: boolean; saved: number | null | undefined } } };
   const errors = watchErrors(page);
   const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Loading Chess Town" });
   // The bar's share as it shows (sampled every frame until it goes): it only goes up. And the step named under it (Nov 14), each new one.
@@ -455,31 +455,78 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   expect(paint.loading).toBe(false);
   expect(paint.atlas.kept, "the town's pictures kept").toBeGreaterThan(1000);
   expect(paint.atlas.unkept, "all of them").toBe(0);
-  // Walking, then a full turn on the spot (360° in about 2 s): nothing painted, no page started again.
-  await page.evaluate(() => (window as unknown as R).__townWalk([4, 25]));
-  await page.waitForTimeout(1500);
-  await page.evaluate(() => {
-    const w = window as unknown as R & { __spin?: boolean };
-    let h = 0;
-    let last = performance.now();
-    w.__spin = true;
-    const f = (now: number) => {
-      if (!w.__spin) return;
-      h += (180 * (now - last)) / 1000;
-      last = now;
-      w.__townHeading(h);
+  // Walking, then a full turn on the spot (360° in about 2 s), then zooming in and out: nothing painted, nothing uploaded (Eric's laptop,
+  // Nov 25: "1063 uploads" in 15 s of walking, every worst frame one with uploads), no page started again. (The bosses hushed: a line
+  // said is a new picture, its bubble, the one thing made as it comes.)
+  const roam = async (visit: string) => {
+    await page.evaluate(() => (window as unknown as R).__townHush(true));
+    await page.evaluate(() => (window as unknown as R).__townWalk([4, 25]));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => {
+      const w = window as unknown as R & { __spin?: boolean };
+      let h = 0;
+      let last = performance.now();
+      w.__spin = true;
+      const f = (now: number) => {
+        if (!w.__spin) return;
+        h += (180 * (now - last)) / 1000;
+        last = now;
+        w.__townHeading(h);
+        requestAnimationFrame(f);
+      };
       requestAnimationFrame(f);
-    };
-    requestAnimationFrame(f);
-  });
-  await page.waitForTimeout(2200);
-  await page.locator(".tfr-pill").getByRole("button", { name: "Done" }).click();
-  await page.evaluate(() => ((window as unknown as { __spin: boolean }).__spin = false));
-  const s = (await page.evaluate(() => (window as unknown as R).__townReport()))!.summary!;
-  expect(s.frames, "frames recorded").toBeGreaterThan(10);
-  expect(s.bakes, "pictures painted after the loading screen").toBe(0);
-  expect(s.resets, "atlas pages started again").toBe(0);
-  expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
+    });
+    await page.waitForTimeout(2200);
+    await page.evaluate(() => ((window as unknown as { __spin: boolean }).__spin = false));
+    await page.evaluate(() => (window as unknown as R).__townHeading(null));
+    for (const z of ["Zoom in", "Zoom out", "Zoom in"]) {
+      await page.getByRole("button", { name: z, exact: true }).click();
+      await page.waitForTimeout(900);
+    }
+    await page.locator(".tfr-pill").getByRole("button", { name: "Done" }).click();
+    const s = (await page.evaluate(() => (window as unknown as R).__townReport()))!.summary!;
+    expect(s.frames, `${visit}: frames recorded`).toBeGreaterThan(10);
+    expect(s.bakes, `${visit}: pictures painted after the loading screen`).toBe(0);
+    expect(s.uploads, `${visit}: pictures uploaded after the loading screen`).toBe(0);
+    expect(s.resets, `${visit}: atlas pages started again`).toBe(0);
+    expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
+  };
+  // (Nov 25) The context lost and back: every picture on screen uploaded again (on the second visit, each cut from its kept page as it
+  // is): what the GPU holds for each the same as before.
+  const lossCheck = async (visit: string) => {
+    type S = { __townPictureSum: (each: boolean) => { each: number[] | null } };
+    const sums = () => page.evaluate(() => (window as unknown as S).__townPictureSum(true).each!);
+    await page.evaluate(() => (window as unknown as { __townHold: (on: boolean) => void }).__townHold(true));
+    const before = await sums();
+    expect(before.every((k) => k !== 0), `${visit}: every kept picture on the GPU`).toBe(true);
+    await page.evaluate(async () => {
+      const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!;
+      const ext = (cv.getContext("webgl2") as WebGL2RenderingContext).getExtension("WEBGL_lose_context")!;
+      const lost = new Promise((ok) => cv.addEventListener("webglcontextlost", ok, { once: true }));
+      ext.loseContext();
+      await lost;
+      await new Promise((ok) => setTimeout(ok, 50));
+      const back = new Promise((ok) => cv.addEventListener("webglcontextrestored", ok, { once: true }));
+      ext.restoreContext();
+      await back;
+      // (A frame drawn: what's on screen uploaded again.)
+      cv.getContext("2d")!.getImageData(0, 0, 1, 1);
+    });
+    const after = await sums();
+    await page.evaluate(() => (window as unknown as { __townHold: (on: boolean) => void }).__townHold(false));
+    const again = after.flatMap((k, i) => (k ? [[k, before[i]]] : []));
+    expect(again.length, `${visit}: pictures uploaded again after the context came back`).toBeGreaterThan(10);
+    expect(again.filter(([a, b]) => a !== b).length, `${visit}: pictures not as they were before the context was lost`).toBe(0);
+  };
+  await roam("the first visit");
+  await lossCheck("the first visit");
+  // The second visit: its pictures' pages uploaded whole (keep-pictures.ts, paint-gl.ts `adopt`, Nov 25), and the labels made again; the same.
+  await expect.poll(() => page.evaluate(() => (window as unknown as R).__townPaint().pictures.saved), { timeout: 60_000 }).not.toBeUndefined();
+  await page.goto("/town?sky=day&report");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  expect((await page.evaluate(() => (window as unknown as R).__townPaint())).pictures.kept, "the second visit's pictures were kept").toBe(true);
+  await roam("the second visit");
+  await lossCheck("the second visit");
   expect(errors).toEqual([]);
 });
 

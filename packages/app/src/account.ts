@@ -3,7 +3,7 @@ import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
 import { loadStep } from "./loadbar.ts";
 import { KEPT_KEY, askForfeit, claimKeptSolo, clearKeptSolo, keptReal, keptSoloFor, keptStale, loadKeptSolo, type KeptSolo } from "./solo-kept.ts";
 import { gateAnswered, noteSiteReached, noteSiteSignedOut, onSiteGate, siteSignedOut } from "./site-gate.ts";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
+import type { BonusRoll, CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -33,7 +33,7 @@ export interface Profile {
   locker?: Locker;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
-  /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record (missing from an older server). */
+  /** Ranked 1 v 1: the rank ("Gold II – 45", "Placement 2/5") and the record (missing from an older server). */
   ranked1v1?: RankedSummary;
   /**
    * Ranked's leave rules (L1, Nov 9; the server's own reckoning): a lockout, the delayed queue, what a dodge would cost now, and
@@ -133,7 +133,11 @@ export function onAccountChange(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * A request to our API, its answer read: an error with the server's words and its status when it isn't ok, the site's gate read as
+ * being signed out of the site, and an answer that can't be read a failure (never `{}`). Exported for the season ladder (ladder.ts).
+ */
+export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // (`redirect: "manual"`: our API never redirects a script's request, so a redirect is the site's gate, read as such: followed, its
   // login page on another origin failed like being offline, and nothing knew why. site-gate.ts.)
   const res = await fetch(path, { credentials: "same-origin", redirect: "manual", ...init, headers: { "content-type": "application/json", ...init?.headers } });
@@ -582,6 +586,11 @@ export interface Locker {
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger"; only those you have some of; missing from an older server). */
   bossCrates?: Record<string, number>;
   /**
+   * How many of the crates above (series and boss) are bonus ones, by crate id (Nov 24: an opening's bonus crate; it opens after the
+   * ordinary ones of its kind and never gives a bonus itself; missing from an older server).
+   */
+  bonusCrates?: Record<string, number>;
+  /**
    * The HunChess Welcome Crates (Nov 6, at 5 and 25 finished games; server/welcome.ts): the finished games so far, the next milestone
    * not earned yet (null: both are), how many wait to be opened, "ready" (one waits), "opened" (all earned are) or "locked" (none
    * earned yet), whether a one-time notice is due, and the latest one's ride. Missing from an older server.
@@ -662,8 +671,8 @@ export async function playClawOnServer(boss: string, request: string, seed?: num
 /** How many of a boss crate ("boss-tiger") you hold, unopened, as your locker has it now. */
 export const bossCrateCount = (crate: string): number => state.profile?.locker?.bossCrates?.[crate] ?? 0;
 
-/** An admin's test grant to themselves: crate keys, and a boss's tokens (once: postOnce). Your locker comes back with it. */
-export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number }): Promise<void> {
+/** An admin's test grant to themselves: crate keys, a boss's tokens, crates (once: postOnce). Your locker comes back with it. */
+export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number; crate?: string; crates?: number }): Promise<void> {
   const locker = await postOnce<Locker>("/api/locker/grant", body);
   if (state.profile) set({ profile: { ...state.profile, locker } });
 }
@@ -711,14 +720,20 @@ export async function refreshProfile(): Promise<void> {
   if (state.profile) set({ profile: await api<Profile>(meUrl()) });
 }
 
+/** What a crate's opening can be asked for in a test (the test switches): Fischer Random, a shiny, a bonus crate (any, or that one). */
+export type OpenForce = { fischer?: boolean; shiny?: boolean; bonus?: true | string };
+/** A crate's opening, as the server answers it: the item, and (Nov 24) the bonus crate it gave, if any. */
+export type Opened = { roll: CrateRoll; item: ItemInstance; bonus?: BonusRoll };
+
 /**
- * Opens a crate on the server, once (postOnce: a retry answers the same item). `force`: the test switches (?fischer=1, ?shiny=1),
- * honored only for those allowed them (test-switches.ts; the server checks too) and while crates are free.
+ * Opens a crate on the server, once (postOnce: a retry answers the same item and bonus). `force`: the test switches (?fischer=1,
+ * ?shiny=1, ?bonus=1 or ?bonus=<crate>), honored only for those allowed them (test-switches.ts; the server checks too). The locker it
+ * answers (the bonus crate and its key in it) is yours at once.
  */
-export async function openCrate(crate: string, force: { fischer?: boolean; shiny?: boolean } = {}): Promise<{ roll: CrateRoll; item: ItemInstance }> {
-  const r = await postOnce<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { crate, ...force });
+export async function openCrate(crate: string, force: OpenForce = {}): Promise<Opened> {
+  const r = await postOnce<Opened & { locker: Locker }>("/api/locker/open", { crate, ...force });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
-  return { roll: r.roll, item: r.item };
+  return { roll: r.roll, item: r.item, ...(r.bonus ? { bonus: r.bonus } : {}) };
 }
 
 /** Picks a level's boss crate (Nov 9): into your boss crates, unopened. Answers the crate's id. */

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SQUADS, mulberry32, type SquadsSettings } from "@chessroyale/core";
-import { START_FEN, gameEnd, legalMoves, type Opening } from "../src/index.ts";
+import { START_FEN, gameEnd, inCheck, legalMoves, type Opening } from "../src/index.ts";
 import {
   NO_INPUTS,
   allowsMateInOne,
@@ -11,6 +11,7 @@ import {
   choose,
   createSquadsMatch,
   decideByMaterial,
+  drawOpenings,
   endByMaterial,
   formSquads,
   halfDuties,
@@ -22,6 +23,7 @@ import {
   matchResultOf,
   newSquadsBoard,
   noteActions,
+  openingStart,
   planLobby,
   planMatch,
   playOnBoard,
@@ -29,6 +31,7 @@ import {
   settleTeamClocks,
   squadBotThinkMs,
   squadsLegalMoves,
+  squadsOpenings,
   squadsRng,
   startTeamClocks,
   teamClocks,
@@ -145,6 +148,19 @@ describe("Squads boards", () => {
 });
 
 describe("Squads starts and setup", () => {
+  it("no opening start leaves the side to move in check (Eric, Nov 25: the Steinitz Gambit's forced Ke2 dropped)", () => {
+    const pool = squadsOpenings(library);
+    const steinitz = "4-vienna-gambit-with-max-lange-defense-steinitz-gambit-main-line-d8h4e1e2";
+    expect(library.some((o) => o.id === steinitz)).toBe(true);
+    expect(pool.some((o) => o.id === steinitz)).toBe(false);
+    for (const o of pool) expect(inCheck(openingStart(o).fen), o.name).toBe(false);
+    // Enough distinct classic families left for the most boards a match draws (two openings, Relay's three boards).
+    expect(new Set(pool.filter((o) => !o.unusual).map((o) => o.family)).size).toBeGreaterThan(20);
+    for (let seed = 0; seed < 200; seed++) {
+      for (const st of drawOpenings(library, 2, mulberry32(seed))) expect(inCheck(st.fen)).toBe(false);
+    }
+  });
+
   it("random openings: each opening on two boards of a match, colors swapped (Relay's third board its own)", () => {
     const plan = planLobby(5, rules("random"), library);
     const squads = startTeamClocks(bots32(), NORMAL);

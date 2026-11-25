@@ -3,11 +3,12 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact
 import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, towerPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, ownMoves, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
+import { BoardFoot } from "./board-foot.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool, warmEngine } from "./engine.ts";
-import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
+import { bossAlone, cutLabel, elimination, isCrowd, isCrowdFifty, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
@@ -19,7 +20,7 @@ import { QuestsLayer } from "./components/QuestsOverlay.tsx";
 import { QueueLine, QueueScreen } from "./screens/Queue.tsx";
 import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
+import { closeProfile, openProfile, profileBack, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
 import { PageLayer, layerTakesPop } from "./components/PageLayer.tsx";
 import { KEPT_ELSEWHERE, KEPT_ENDED, account, askAgeAgain, askAgeForGoogle, askForfeitFirst, keptSoloOpen, leftSoloLive, loadAccount, mustSignInToPlayOnline, offerKeptSolo, playerName, recordSoloResult, reofferKeptSolo, setTestXp, takeKeptSolo } from "./account.ts";
@@ -39,6 +40,7 @@ import { FloorPlay, askFloor, forgetPartyFloor, keepPartyFloor, loadKept, onEnte
 import { joinTowerParty, onEnterPartyFloor, towerParty, type PartyFloorEntry } from "./tower-party.ts";
 import type { TowerBack } from "./town/Town.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
+import { LadderScreen } from "./screens/Ladder.tsx";
 import { FrontFrame, GameFrame, type FrontNav, type FrontPage } from "./components/FrontMenu.tsx";
 import { showAwayNote } from "./components/AwayNote.tsx";
 import { useAccount } from "./screens/Profile.tsx";
@@ -68,6 +70,7 @@ import { noteFloorGame, noteSoloGame, postingSoloResult, resumeSoloGame, settleS
 import { isPaused, pausedBosses } from "./status.ts";
 import { kingSay, type KingCue } from "./godKing.ts";
 import { game } from "./lazy-game.ts";
+import { dropPlace, setPlace, takePlace } from "./stale.ts";
 
 // Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
 // near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
@@ -454,13 +457,15 @@ export function App() {
   const [showFaq, setShowFaq] = useState(() => location.pathname === "/faq");
   /** Your friends list (/friends: screens/Friends.tsx). */
   const [showFriends, setShowFriends] = useState(() => location.pathname === "/friends");
+  /** The season ladder (/ladder: screens/Ladder.tsx; Eric, Nov 25). */
+  const [showLadder, setShowLadder] = useState(() => location.pathname === "/ladder");
   /**
    * Open the home screen's boss menu or Play with friends: the computer's side menu, or the hidden /bosses (Eric's way
    * straight to the solo boss picker, unlisted, not admin-gated; Oct 16). Used once: a match started clears it.
    */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends" | "quests"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
   /** The Boss raid screen (the Solo Boss Mode card on home, the side menu's Solo Boss Mode, ?mode=raid). */
-  const [raidOpen, setRaidOpen] = useState(() => raidInUrl() || !!bossPartyLinkCode);
+  const [raidOpen, setRaidOpen] = useState(() => raidInUrl() || !!bossPartyLinkCode || takePlace("raid") === true);
   /** That screen is the full one (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form (Eric, Oct 26). */
   const [raidFull, setRaidFull] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
@@ -500,7 +505,7 @@ export function App() {
    * profile without exiting out of Chesttown"): the side menu's page open over the town's middle column (PageLayer.tsx), the town under
    * it as it was (your pawn, the chat, a party). `tab`: the shop's (from your profile's locker or chat packs); `you`: your profile's.
    */
-  const [townLayer, setTownLayer] = useState<{ page: "friends" | "quests" | "shop" | "profile"; tab?: "locker" | "chat"; you?: ProfileTarget } | null>(null);
+  const [townLayer, setTownLayer] = useState<{ page: "friends" | "quests" | "shop" | "profile" | "ladder"; tab?: "locker" | "chat"; you?: ProfileTarget } | null>(null);
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -1461,9 +1466,10 @@ export function App() {
     // (A solo boss battle kept on this device (step 2): "Forfeit your game in progress?" first, never recorded as left unasked.)
     if (!(await askForfeitFirst(account().profile?.user.id))) return;
     setLoading(true);
-    // (Solo's code, its opening library and the match's screens, each fetched once: usually here already, play was near.)
-    const [engines, soloCode] = await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
-    if (!soloCode) {
+    // (Solo's code, its opening library and the match's screens, each fetched once: usually here already, play was near. One that won't
+    // load says so, never a screen stuck loading: Nov 25.)
+    const [engines, soloCode] = (await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]).catch(() => null)) ?? [];
+    if (!soloCode || !engines) {
       setLoading(false);
       return setError("Couldn't load the game. Check your connection and try again.");
     }
@@ -1553,6 +1559,14 @@ export function App() {
   useEffect(() => {
     if (raidOpen && !match) reofferKeptSolo();
   }, [raidOpen, !!match]);
+  // (The Boss Battle screen is a place (stale.ts): should the page load again for a file that won't load (a deploy, or an older
+  // browser's kept failure), it comes back on Boss Battle, never home: #942, Nov 25.)
+  useEffect(() => {
+    if (!raidOpen || match) return;
+    const here = () => ({ raid: true });
+    setPlace(here);
+    return () => dropPlace(here);
+  }, [raidOpen, !!match]);
 
   /**
    * Into a Battle Tower floor (tower.ts enterTowerFloor, the only way in): Boss alone's battle with the floor's bosses at its strength
@@ -1562,9 +1576,9 @@ export function App() {
   const startTowerFloor = async (e: FloorEntry) => {
     unlockAudio();
     setLoading(true);
-    const [engines, soloCode] = await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
+    const [engines, soloCode] = (await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]).catch(() => null)) ?? [];
     setLoading(false);
-    if (!soloCode) return setError("Couldn't load the game. Check your connection and try again.");
+    if (!soloCode || !engines) return setError("Couldn't load the game. Check your connection and try again.");
     // (The floor's own strength: no difficulty, no Maia of your pick, no boss avoided or resting: the server dealt them.)
     const settings: Settings = { ...DEFAULT_SETTINGS, ...overridesFromUrl("raid"), bossDifficulty: 0, bossAloneMaia: 0, bossHidden: false, bossUnfinished: false, bossesOff: undefined, ...e.start.settings };
     const m = new soloCode.SoloMatch(engines, playerName(), settings, false, false);
@@ -1902,8 +1916,9 @@ export function App() {
     setShowFaq(false);
     setShowShop(false);
     setShowFriends(false);
-    // (From /friends, the page's query and hash stay: a test switch or tour link, as the pop-up kept them before, Nov 11.)
-    if (location.pathname !== "/") history.replaceState(null, "", location.pathname === "/friends" ? `/${location.search}${location.hash}` : "/");
+    setShowLadder(false);
+    // (From /friends or /ladder, the page's query and hash stay: a test switch or tour link, as the pop-up kept them before, Nov 11.)
+    if (location.pathname !== "/") history.replaceState(null, "", location.pathname === "/friends" || location.pathname === "/ladder" ? `/${location.search}${location.hash}` : "/");
   };
   const nav: FrontNav = {
     home: () => {
@@ -1952,6 +1967,12 @@ export function App() {
       setShowFriends(true);
       history.replaceState(null, "", `/friends${location.search}${location.hash}`);
     },
+    // (The season ladder: Eric, Nov 25, "visible from the left panel on desktop"; a phone's way in is home's "LADDER ›".)
+    ladder: () => {
+      goHome();
+      setShowLadder(true);
+      history.replaceState(null, "", `/ladder${location.search}${location.hash}`);
+    },
     signIn: () => chooseGuest(false),
   };
   /**
@@ -1969,7 +1990,7 @@ export function App() {
       }
       setSideAsk({ exit: { ...e, go: () => { setSideNext({ page: k, from }); e.go(); } }, then: k });
     };
-    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), quests: page("quests"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
+    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), quests: page("quests"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList"), ladder: page("ladder") };
   };
   // The town's side menu (and its panel, and the global chat's sign-in): each page that leaves asks first. Chess Town itself doesn't.
   // Play with friends, Daily Quests, Shop & crates and Profile open over the town instead (townLayer; another of them switches it, Chess
@@ -1991,6 +2012,9 @@ export function App() {
     quests: () => openTownLayer({ page: "quests" }),
     shop: () => openTownLayer({ page: "shop" }),
     profile: () => openTownLayer({ page: "profile", you: { you: true, name: account().profile?.user.name ?? "" } }),
+    // (The ladder over the town too, as the shop and your profile: a page to look at, nothing to leave the town for. A player's row opens
+    // their profile in the same layer, and its Back comes back to the list.)
+    ladder: () => openTownLayer({ page: "ladder" }),
     settings: () => askLeave("Settings", nav.settings),
     friendsList: () => askLeave("your friends", nav.friendsList),
     signIn: () => askLeave("Sign in", nav.signIn!),
@@ -2159,7 +2183,7 @@ export function App() {
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["chessTown", "soloBoss", "friends", "quests", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["chessTown", "soloBoss", "friends", "quests", "shop", "settings", "friendsList", "ladder"] as const).map((k) => [
         k,
         () => {
           if (keepInQueue() && stepOutOfLobby()) {
@@ -2189,7 +2213,7 @@ export function App() {
     const overlayD = profileOpen && (
       <div class="fd-overlay">
         <FrontFrame>
-          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} match={duel?.snapshot().code ?? undefined} />
+          <PlayerProfileScreen target={profileOpen} onBack={profileBack} match={duel?.snapshot().code ?? undefined} />
         </FrontFrame>
       </div>
     );
@@ -2224,7 +2248,7 @@ export function App() {
     const overlayS = profileOpen && (
       <div class="fd-overlay">
         <FrontFrame>
-          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+          <PlayerProfileScreen target={profileOpen} onBack={profileBack} />
         </FrontFrame>
       </div>
     );
@@ -2280,7 +2304,7 @@ export function App() {
   }
   /** The side menu item lit while a town layer is open: its page's (none for someone else's profile shown in it). */
   const townLayerPage = (page: NonNullable<typeof townLayer>["page"], other: ProfileTarget | null): FrontPage | undefined =>
-    other && !other.you ? undefined : ({ friends: "lobby", quests: "quests", shop: "shop", profile: "profile" } as const)[page];
+    other && !other.you ? undefined : ({ friends: "lobby", quests: "quests", shop: "shop", profile: "profile", ladder: "ladder" } as const)[page];
   /**
    * The town layer's page: each page's own component, as the main menu opens it (Eric, Nov 22: "we should do the same thing for all these
    * other stuff"). The shop and your profile in the page's own column; Daily Quests and Play with friends are home's cards, over the town
@@ -2288,9 +2312,9 @@ export function App() {
    * menu does.
    */
   const townLayerNode = (l: NonNullable<typeof townLayer>) => {
-    const label = { friends: "Play with friends", quests: "Daily Quests", shop: "Shop & crates", profile: "Profile" }[l.page];
+    const label = { friends: "Play with friends", quests: "Daily Quests", shop: "Shop & crates", profile: "Profile", ladder: "Ladder" }[l.page];
     const page = profileOpen ? (
-      <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+      <PlayerProfileScreen target={profileOpen} onBack={profileBack} />
     ) : l.page === "shop" ? (
       <ShopScreen key={l.tab ?? "shop"} initial={l.tab} onBack={closeTownLayer} />
     ) : l.page === "profile" ? (
@@ -2302,6 +2326,8 @@ export function App() {
         onSettings={townNav.settings}
         onFriends={townNav.friendsList}
       />
+    ) : l.page === "ladder" ? (
+      <LadderScreen onBack={closeTownLayer} onSignIn={townNav.signIn!} />
     ) : l.page === "quests" ? (
       <QuestsLayer onClose={closeTownLayer} />
     ) : (
@@ -2343,7 +2369,7 @@ export function App() {
     const overlayT = profileOpen && !townLayer && (
       <div class="fd-overlay">
         <FrontFrame>
-          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+          <PlayerProfileScreen target={profileOpen} onBack={profileBack} />
         </FrontFrame>
       </div>
     );
@@ -2486,6 +2512,19 @@ export function App() {
       </FrontFrame>
     );
   }
+  if (!match && showLadder) {
+    return (
+      <FrontFrame page="ladder" nav={nav}>
+        <LadderScreen
+          onBack={() => {
+            setShowLadder(false);
+            if (location.pathname === "/ladder") history.replaceState(null, "", `/${location.search}${location.hash}`);
+          }}
+          onSignIn={() => chooseGuest(false)}
+        />
+      </FrontFrame>
+    );
+  }
   if (!match && showFriends) {
     return (
       <FrontFrame page="friends" nav={nav}>
@@ -2614,6 +2653,7 @@ export function App() {
         onInventory={() => setShowShop("locker")}
         onSettings={() => setShowSettings(true)}
         onShop={() => setShowShop("shop")}
+        onLadder={nav.ladder}
       />
     </FrontFrame>
     );
@@ -2663,7 +2703,7 @@ export function App() {
   const overlay = profileOpen && (
     <div class="fd-overlay">
       <FrontFrame>
-        <PlayerProfileScreen target={profileOpen} onBack={closeProfile} match={match instanceof NetMatch ? match.code : undefined} />
+        <PlayerProfileScreen target={profileOpen} onBack={profileBack} match={match instanceof NetMatch ? match.code : undefined} />
       </FrontFrame>
     </div>
   );
@@ -2736,6 +2776,8 @@ export function App() {
           </aside>
           )}
           {screen}
+          {/* (A computer: the scoreboard and the chat end on the board's bottom line. board-foot.ts.) */}
+          <BoardFoot />
           {/* (Dash's clock tap: beside the match's screens, so his crawl finishes as your move goes in. DashStall.tsx.) */}
           {(match as GameView).boss?.id === "dash" && <DashTap match={match as GameView} />}
         </div>
@@ -2821,7 +2863,7 @@ export function App() {
     case "final":
       return <FinalScreen match={match} final={p.final} />;
     case "vote":
-      return <VoteScreen match={match} vote={p.vote} menu={<MatchMenu exit={exitFor(match)} crowd={isCrowd(match)} />} />;
+      return <VoteScreen match={match} vote={p.vote} frame={isCrowdFifty(match) ? match : undefined} menu={<MatchMenu exit={exitFor(match)} crowd={isCrowd(match)} />} />;
     case "boss":
       // (The loading step, then the intro on a screen of its own: the intro's timeline starts as it mounts.)
       return (
@@ -2897,6 +2939,10 @@ function ProfilePage({
   onShop: () => void;
   onFriends: () => void;
 }) {
+  // (The page under the profile keeps its address after the profile's own Back: /ladder, /friends; anything else is home's. Captured as
+  // the profile first opens, before the effect below replaces it; a profile reached from another profile keeps it. The delta review of
+  // #935, D1: a reload after Back landed on home while the ladder showed.)
+  const [under] = useState(() => (/^\/(ladder|friends)$/.test(location.pathname) ? location.pathname : "/"));
   useEffect(() => {
     // (Yours is /profile; anyone's public profile, yours as others see it included, is /profile/ID.)
     const path = target.you && !target.public ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
@@ -2907,8 +2953,8 @@ function ProfilePage({
     <PlayerProfileScreen
       target={target}
       onBack={() => {
-        closeProfile();
-        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", `/${location.search}`);
+        profileBack();
+        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", `${under}${location.search}`);
       }}
       onLocker={onLocker}
       onSettings={onSettings}

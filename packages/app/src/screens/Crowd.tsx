@@ -28,9 +28,12 @@ import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { pawnLook } from "../looks.ts";
+// (The status box on your own pick: its own module since Nov 26, Squads' frame shows it too.)
+export { SlotIdle } from "../components/SlotIdle.tsx";
 import { seenKey, useBoardAnimations, useMotionTrail, useReplay, useStillKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
+import { CROWD_FRAME } from "../components/MatchMenu.tsx";
 import { exitMatch } from "../match-exit.ts";
 import { ordinal } from "./StageBreak.tsx";
 
@@ -123,12 +126,11 @@ export function WatchScreen({
   // The power-up row keeps its place through the other team's vote (Nov 8, Eric: nothing on the match screen moves): your
   // power-ups, all greyed, in the same place as on your own turn (Play), with no history to step through.
   const fifty = isCrowdFifty(match);
-  const lockedPhone = useMedia(LOCKED_PHONE) && fifty;
+  const powerInBox = [useMedia(LOCKED_PHONE), useMedia(CROWD_FRAME)].some(Boolean) && fifty;
   const you = standings.find((s) => s.isYou);
   // (Cut in a 50 v 50 rework: watching to the podium, Spectate on the cut screen; C3.)
   const spectating = !!you?.out;
-  const noHistory = { ply: 0, browsing: false, go: () => {}, live: () => {} } as unknown as ReturnType<typeof useHistoryView>;
-  const powerRow = fifty ? <HistoryNav view={noHistory} total={0} extra={<PowerUps count={spectating ? 0 : match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} /> : null;
+  const powerRow = fifty ? <LockedPowerRow match={match} /> : null;
   return (
     <div class={`screen game crowd${isCrowdFifty(match) ? " crowd-50" : ""}`}>
       <Hud match={match} />
@@ -147,10 +149,11 @@ export function WatchScreen({
             <OneVOneBanner match={match} />
           </Board>
         </div>
-        {!lockedPhone && powerRow}
+        {!powerInBox && powerRow}
       </div>
       <div class="play-footer">
-        {lockedPhone && powerRow}
+        {powerInBox && powerRow}
+        <SlotSkeleton match={match} />
         <div class={fifty ? "play-slot" : undefined}>
           <div class="waiting-banner" role="status">
             <span class="waiting-dots" aria-hidden="true">
@@ -180,18 +183,73 @@ const BAR_PX = 14;
 const RESULT_PX = 20;
 
 /** How many bars the vote box holds, from its height (the box's height is set by the screen: styles.css, --mid-h). */
-function useBarSlots(ref: { current: HTMLElement | null }): number {
+export function useBarSlots(ref: { current: HTMLElement | null }, parent = false): number {
   const [slots, setSlots] = useState(6);
   useLayoutEffect(() => {
-    const el = ref.current;
+    const el = parent ? (ref.current?.parentElement ?? null) : ref.current;
     if (!el) return;
-    const fit = () => setSlots(Math.max(4, Math.min(6, Math.floor((el.clientHeight - RESULT_PX) / BAR_PX))));
+    // (A phone's box says its rows itself, --slots: its height also holds the power-up row and the status line, Nov 25.)
+    const fit = () => {
+      const set = parseInt(getComputedStyle(el).getPropertyValue("--slots"));
+      setSlots(Math.max(4, Math.min(6, set > 0 ? set : Math.floor((el.clientHeight - RESULT_PX) / BAR_PX))));
+    };
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     fit();
     return () => ro.disconnect();
   }, []);
   return slots;
+}
+
+/**
+ * The vote box's empty rows (Eric, Nov 25: "a skeleton container ... grayed out waiting to be filled"): a gray bar where the
+ * move goes and the bar's gray track, in the rows' own grid, so a round's results fill them in place and nothing moves.
+ */
+export function SkeletonRows({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: Math.max(0, count) }, (_, i) => (
+        <div key={`skel-${i}`} class="poll-row skel" aria-hidden="true">
+          <span class="poll-move">
+            <i />
+          </span>
+          <span class="poll-bar" />
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** Where the 50 v 50's middle box is the computer's fixed slot (board-size.css, the same query): its frame. */
+const COMPUTER_SLOT = CROWD_FRAME;
+
+/**
+ * Your power-ups, all greyed, with no history to step through: the power-up row in its place while you can't use it (the other
+ * team's vote; on a phone, the reveal too), so it never comes and goes (Nov 8 and Nov 25, Eric: nothing on the match screen moves).
+ */
+export function LockedPowerRow({ match }: { match: GameView }) {
+  const you = match.standings().find((s) => s.isYou);
+  const noHistory = { ply: 0, browsing: false, go: () => {}, live: () => {} } as unknown as ReturnType<typeof useHistoryView>;
+  return <HistoryNav view={noHistory} total={0} extra={<PowerUps count={you?.out ? 0 : match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} />;
+}
+
+
+/**
+ * A 50 v 50 between reveals (Eric, Nov 25: "do that also on mobile and desktop"): the vote box's skeleton rows wait in the slot, as
+ * many as the reveal's box holds, the status line at the slot's foot where the result line goes; the reveal then fills the same
+ * rows in place. A computer's slot is the 206 px box above the chat; a phone's is taller for it, the power-up row on top (styles.css).
+ */
+export function SlotSkeleton({ match }: { match: GameView }) {
+  const computer = useMedia(COMPUTER_SLOT);
+  const phone = useMedia(LOCKED_PHONE);
+  const on = (computer || phone) && isCrowdFifty(match);
+  const ref = useRef<HTMLDivElement>(null);
+  const slots = useBarSlots(ref, true);
+  return on ? (
+    <div class="poll-skel" ref={ref}>
+      <SkeletonRows count={slots} />
+    </div>
+  ) : null;
 }
 
 /**
@@ -351,6 +409,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // The vote box's bars: how many its height holds (see useBarSlots); yours and the brilliant find's move come first.
   const pollBox = useRef<HTMLDivElement>(null);
   const slots = useBarSlots(pollBox);
+  const powerInBox = [useMedia(LOCKED_PHONE), useMedia(CROWD_FRAME)].some(Boolean) && isCrowdFifty(match);
 
   // The ghosts come in silently; the winner gets three tones as it blinks.
   // (Not when you're the whole crowd: your move was simply played.)
@@ -517,10 +576,11 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // result line; the brilliant find is a mark on its bar; the result is one line, the score then your move and the best.)
   const poll = useMemo(() => {
     if (match.boss) return null;
-    // The bars the box holds: yours and the brilliant find's move always, then the most voted (five, as before).
+    // The bars the box holds: yours and the brilliant find's move always, then the most voted (as many as it holds, Nov 25: the
+    // 50 v 50's standing rows fill before any stays skeleton).
     const yourRow = rows.find((r) => r.you) ?? null;
     const brilRow = shout ? (rows.find((r) => shout.moves.includes(r.move)) ?? null) : null;
-    const cand = rows.filter((r, i) => i < 5 || r === yourRow || r === brilRow);
+    const cand = rows.filter((r, i) => i < (isCrowdFifty(match) ? slots : 5) || r === yourRow || r === brilRow);
     const must = [...new Set([yourRow, brilRow].filter((r) => !!r))];
     const keep = new Set([...must, ...cand.filter((r) => !must.includes(r))].slice(0, slots));
     const bars = cand.filter((r) => keep.has(r));
@@ -530,6 +590,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     const miss = me ? missLine(me, match.settings.crowdMisses?.allowed) : null;
     return (
       <div class="poll" role="status" ref={pollBox}>
+        {/* (A phone's 50 v 50: the power-up row stays on top of the box through the reveal, greyed, Nov 25.) */}
+        {powerInBox && <LockedPowerRow match={match} />}
         {bars.map((r) => {
           const win = landed && r.move === mine.result.playedMove;
           const marked = !!mark && mark.moves.includes(r.move);
@@ -558,6 +620,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             </div>
           );
         })}
+        {/* (50 v 50: the box keeps its cap's rows; the rows this round didn't fill stay skeleton, Eric, Nov 25.) */}
+        {isCrowdFifty(match) && <SkeletonRows count={slots - bars.length - (mine.king !== undefined && (mine.kingCalls ?? 0) > 0 ? 1 : 0)} />}
         {mine.king !== undefined && (mine.kingCalls ?? 0) > 0 && (
           <div class={`poll-row king-row${landed && mine.king ? " win" : ""}`}>
             <span class="poll-move">👑 King</span>
@@ -577,7 +641,12 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             </span>
           </div>
         )}
-        {/* (Only for your own pick: a turn you watched has no result line.) */}
+        {/* (Only for your own pick: a turn you watched has no result line, its line a skeleton in the 50 v 50.) */}
+        {!me && isCrowdFifty(match) && (
+          <div class="poll-result-skel" aria-hidden="true">
+            <i />
+          </div>
+        )}
         {me && (
           <div class="poll-result">
             <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>

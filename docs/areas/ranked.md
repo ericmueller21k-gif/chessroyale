@@ -10,11 +10,18 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   counting from 0 (`END_SCREEN` in settings.ts), lobbing into the XP bar (`XP.perLevel` a bar), which fills from your old XP to the new
   (a level: it flashes, "Level 3!", on from 0), then the quests the game moved sliding to their counts; what made it under the number
   ("Win +50": never the minutes) or why there was none in its place. Every box at its size from the first frame; a tap anywhere but a
-  button skips to the end; reduced motion: the end at once. The reward card after it (Nov 22, [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md)) shows only crates and keys (`RewardBox endScreen`): centered, in the crate screens' blue window, OK and Go to inventory (your inventory as a layer over the end screen, `InventoryLayer`). RP first: "RP EARNED" (or "RP LOST 14", counting in red, the bar draining) along the ladder, `RANKED_1V1.pointsPerDivision` a bar, a division crossed: the bar flashes, the new division's name and emblem; placements, the placing game and the top tiers show the rank still ("Placement 2/5"). Then XP. "Victory!" / "Defeat" / "A draw" and why, your coins, Play again and Home, and the game's moves under it (`GameSteps`, from the last). An aborted game, a bot's and the town's keep the card under the board (no XP). Its rules and storage: [accounts.md](accounts.md), "XP and levels".
+  button skips to the end; reduced motion: the end at once. The reward card after it (Nov 22, [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md)) shows only crates and keys (`RewardBox endScreen`): centered, in the crate screens' blue window, OK and Go to inventory (your inventory as a layer over the end screen, `InventoryLayer`). RP first: "RP EARNED" (or "RP LOST 14", counting in red, the bar draining) along the ladder, `RANKED_1V1.pointsPerDivision` a bar, a division crossed: the bar flashes, the new division's name and emblem; placements, the placing game and the top tiers show the rank still ("Placement 2/5"). Then XP. "Victory!" / "Defeat" / "A draw" and why, your coins, Play again and Home, and the game's moves under it (`GameSteps`, from the last). On a computer (Nov 25, round 2: [2026-11-25-end-screens-2.md](../decisions/2026-11-25-end-screens-2.md)) it is the game's own screen with its right column swapped: the board where it was, the same size, stepping through the moves (◀ ▶ in your strip); the right column (flush with the board since Nov 25's frame; its sizes from its own height) holds the result, the rewards, the quests, coins, Play again and Home stacked, then the chat with post-game lines (`QUICK_CHAT.postGameLines`). A phone: one tight column, buttons stacked, the chat with a message area. Placements count games ("1 of 5 placement games", no RP slot over the card); quests none: one line. Checked at the real screens (`ranked-1v1.spec.ts`, "real screens"); every end screen at every size: `npm run stills:end-screens`. An aborted game, a bot's and the town's keep the card under the board (no XP). Its rules and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
-  less 170 px (the title, the two players' strips), never wider than its column: 904 px at 1920 × 1080, 624 at 1280 × 800
-  (was 704 and 544). Its vote happens on the same board.
+  less the room over and under it, never wider than its column. Its vote happens on the same board. **Its frame on a computer with a
+  mouse** (Nov 25, mockup round 2: [2026-11-25-duel-layout.md](../decisions/2026-11-25-duel-layout.md); `Duel.tsx` `DuelWide`): no title
+  line; the opponent's strip is the top ("1 v 1 · Blitz 3+2" just before their clock), the gear top right level with it, the board the
+  window's height less 108 (the two strips: 621 px at 1536 × 730, 848 at 1920 × 960, 928 at 1858 × 1040, 968 at 1920 × 1080), and one
+  panel beside it whose top and foot are the board's (to the pixel at 100%, 125%, 150% and 200%: at 125% and 150% the box is rounded to the
+  board's step too), the gaps either side of the board equal (Eric's column rule, Nov 25 round 2: the gap to the panel is the screen's left
+  padding; 62 px both sides at 1536 × 730, 47 at 1920 × 960 and 1858 × 1040): the chat over one row (Offer a draw | Resign, greyed until they apply; a draw
+  offer's words, Accept and Decline take the row); "Your move" a chip by your clock. The end page is the same frame. A phone and a touch
+  tablet keep their layouts (the title line, the panel under the board).
 - **The mode** (Eric, Oct 16): "1 v 1 · Classic chess". Normal chess between two signed-in players: checkmate wins, real
   clocks, no power-ups, no engine scoring. One tap queues (`/1v1`, or `startRanked1v1()` from any screen); no
   settings. Online needs an account wherever sign-in is set up (`mayPlay`, as every mode), so guests and under-13
@@ -38,6 +45,11 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   comes); a ticket paired already ends that game for its player (`DuelGame.abandon`): called off and nobody's dodge if they
   never connected to it (pressed the moment it was found), else their own Abort or Resign ("Leaving early", below). After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and
   Play a bot (unranked).
+- **Colors** (Eric, Nov 25; [2026-11-25-duel-color-balance.md](../decisions/2026-11-25-duel-color-balance.md)): as a pair is seated, core's
+  `firstGetsWhite` from each player's colors in their last ranked games (`recentColors`, read with the ticket): never a third in a row on one
+  color when the other can take it (both stuck: the longer run switches), then more Black over the last `colors.recentGames` (10), then
+  Black last, then a coin. No White edge in the rating. Bot and town games keep theirs and don't count. Tests: core `ranked.test.ts`,
+  `duel-queue.test.ts`, `ranked-store.test.ts`, the e2e's second game.
 - **The stage** (Eric, Oct 16: "your character's sitting there, and then there's like kind of this empty platform thing
   like waiting, and then when your opponent joins, like their pawn loads up next to you"; `components/DuelStage.tsx`,
   styles `dv-st-`; why: [docs/decisions/2026-10-16-ranked-1v1-versus-screen.md](../decisions/2026-10-16-ranked-1v1-versus-screen.md)).
@@ -84,9 +96,13 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   - **waiting** for both players' sockets (seats by account: a reload or another device of theirs goes straight back
     in), at most `joinSeconds` (10), or it's called off ("no_show", nothing recorded);
   - **versus** (`versusMs`, 2.5 s): the "found" moment on the stage (above): both players' pawns, names and ranks;
-  - **the vote** (`voteSeconds`, 5): three zones on the game's own board (ranks 4 and 5; Bullet, Blitz, Rapid left to
+  - **the vote** (`voteSeconds`, 10; Eric, Nov 25, was 5): three zones on the game's own board (ranks 4 and 5; Bullet, Blitz, Rapid left to
     right from either side), each player's dressed pawn off the grid on their own side's line between their second and
-    third ranks. Drag it into a zone, or tap it and then a zone; it can change until time's up; the other's moves live.
+    third ranks. Drag it into a zone, or tap a zone (your pawn glides there, picked up first or not: `VoteZoneHits`, Eric's rule
+    for every pawn vote); it can change until the vote closes; the other's moves live. Once both have picked it closes
+    `voteBothPickedMs` (1 s) after the second pick, never later than its own end (a change in that beat counts and doesn't put the
+    close back); the room sends both the game with its new close. Residents and the bot pick 1.5-5 s in (`RESIDENTS.duel.pickMs`).
+    [docs/decisions/2026-11-25-duel-vote-and-chat.md](../decisions/2026-11-25-duel-vote-and-chat.md);
     The control is halfway between the two picks (`votedControl`): the same pick, that control; neighbors, the one
     between (Bullet 2+1, Blitz 5+3); Bullet against Rapid, Blitz 3+2; one pick counts alone; none: Blitz 3+2;
   - **the overlay** (`overlayMs`, 1.5 s): "Timer: Blitz 3+2" over the board (a line, not a banner); the pawns are gone;
@@ -161,8 +177,11 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   - **Its kill switch:** `PAUSE_LEAVE_PENALTIES` ([ops.md](ops.md)): nothing charged or marked, no lockout or delayed queue,
     `/api/me`'s `leaves` null (the confirms' words as before);
   - **The other player:** loses nothing, and goes back to the queue as ever (Play again).
-- **Quick chat** as in other online matches (`MatchChat`, `ChatPanel`), one channel (no teams: every line a player
-  owns goes to both), the limits of `QUICK_CHAT`, mute by account on the device (`chat-mod.ts` in the app) and on the
+- **Quick chat** as in other online matches (`MatchChat`, `ChatPanel`; typed chat for a signed-in player with chat on, as in every
+  match since Nov 7), one channel (no teams: every line a player owns goes to both). The app's bridge (`duel.ts`) forwards the chat's
+  messages whole, only `to` left off (Nov 25: it copied fields by name and dropped the typed text). Your own typed line always shows;
+  when the other player won't see it (their chat off, or typed lines off there) the field's note says so (`typedUnseen`, never for a
+  mute); the limits of `QUICK_CHAT`, mute by account on the device (`chat-mod.ts` in the app) and on the
   server (`chatPrefs`), and #252's chat bans (read as each player connects, again at most every `CHAT_MOD.recheckMs` as
   they chat: "mod" refusals).
 - **Ranks** (core's `ranked.ts`; Eric, Oct 28: Puzzle Pirates' names, "each tier has numbers 1-5 within it wood 5 being
@@ -175,8 +194,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     extra carried), below 0 the one before; no promotion series, no demotion shields; never below Wood 5 0.
   - **The top two tiers** (`topTiers`, `topFloor`), no divisions: **Pearlescent** at `topFloor` (2800, Radiant 1's 80 RP)
     or more and among the 500 highest ladders, **Transcendent** among the 100 highest; their RP count from the floor
-    ("Transcendent · 120 RP"). At the floor or more but outside the top 500 a player stays Radiant 1, the RP counting on
-    past 80 ("Radiant 1 · 95 RP"). The place is 1 + how many ladders are higher (equal ladders share a place), counted
+    ("Transcendent – 120"). At the floor or more but outside the top 500 a player stays Radiant 1, the RP counting on
+    past 80 ("Radiant I – 95"). The place is 1 + how many ladders are higher (equal ladders share a place), counted
     by the server (`topPlace` in `ranked-schema.ts`): only for a ladder at the floor or more, one `COUNT(*)` on the
     `ranked_1v1_ladder` index (the entries above it, never the table), less fair play's engine pool's ladders above it
     ([fairplay.md](fairplay.md)), kept a minute per ladder in each Worker instance. Falling below the floor is Radiant 1 again.
@@ -193,12 +212,19 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     (`ranked_1v1.peak`, only ever up), the current win streak (`ranked_1v1.streak`), each game's points by side
     (`ranked_1v1_games.white_points`, `black_points`), and the last 5 kept games (`recent`: when, the opponent by id, name
     and look, the result, your points). Never the hidden rating.
-  - **Shown as** `RankView.label` and its emblem (`RankView.emblem`, below): "Gold 2 · 45 RP", "Radiant 1 · 95 RP",
-    "Transcendent · 120 RP", "Placement 2/5"; on the profile (your own: a "1 V 1" section; anyone's, yours as others see it
-    included: the public profile's Ranked Standing card, [hub.md](hub.md), "Profiles"; null for a banned player), in the game's strips (the pill only) and the versus moment, and on the result card ("Gold 2 · 45 RP
-    (+18)", "Placed: Gold 4 · 25 RP"). With 1 v 1 picked, the home screen's panel under its RANKED row reads
-    `ranked1v1Rank()` (`packages/app/src/ranked.ts`): "Your rank: Gold 2 · 45 RP". Each tier's pill color is its
+  - **Shown as** `RankView.label` and its emblem (`RankView.emblem`, below), the tier, its division in Roman numerals, an en dash and the
+    points, no "RP" (Eric, Nov 25: "remove RP next to names and use Roman ... like Paragon IV - 50"; [decision](../decisions/2026-11-25-rank-pill.md);
+    core's `divisionTitle` names a division alone, "Gold III", for the profile card, the end page's bar and the FAQ): "Gold II – 45", "Radiant I – 95",
+    "Transcendent – 120", "Placement 2/5"; on the profile (your own: a "1 V 1" section; anyone's, yours as others see it
+    included: the public profile's Ranked Standing card, [hub.md](hub.md), "Profiles"; null for a banned player), in the game's strips (the pill only) and the versus moment, and on the result card ("Gold II – 45
+    (+18)", "Placed: Gold IV – 25"). With 1 v 1 picked, the home screen's panel under its RANKED row reads
+    `ranked1v1Rank()` (`packages/app/src/ranked.ts`): "Your rank: Gold II – 45". Each tier's pill color is its
     emblem's main color, 4.5:1 or better on both themes.
+- **The season ladder** (Nov 25, [decision](../decisions/2026-11-25-ladder.md); the page: [hub.md](hub.md)): `GET /api/ladder?mode=1v1` (`server/src/ladder.ts`) answers `{ season, mode, total, rows, you }`
+  (core's `LadderAnswer`, numbers in `LADDER`): the top 200 read in order from `ranked_1v1_board`, places shared by equal ladders, their looks in one read; `total` and your place from
+  `shownAbove` (the top tiers' count). `LEFT_OUT` (banned, under review, the engine pool, test accounts; residents count) is left out of the list, the count and every place, the top tiers'
+  too. The rows and count are kept `LADDER.cacheSeconds` (60) in each Worker instance (a `Map`, as `topPlace`); `ladderFor` puts your fresh row in your copy, so a left-out player's answer is an honest player's in that spot. Someone newly banned, pooled or
+  in review stays in the kept list (and `topPlace`) up to that minute. 50 v 50 and Squads: no ladder yet (404). No seasons are stored: "Season 1" is all.
 - **The emblems** (Eric's set, approved Oct 28: a chess piece in a cut-gem badge; d5 plain, d4 studs, d3 wings, d2 a
   crest, d1 a gem crown and a wide glow; Pearlescent and Transcendent 2 s loops):
   - **The drawing** is `packages/app/src/characters/rank-set.ts` (as drawn on `claude/boss-art`, a8d5aa57; only its
@@ -220,13 +246,17 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     `?rank=transcendent` shows that rank (45 RP into a division; 120 RP for a top tier) in place of your own on your own
     screens (home, the stage, your strip, the result, your profile, even before a game), only where
     `testSwitchesAllowed()`; read once as the page opens. A player's is ignored.
-- **Coins** (`duelCoins`): per minute of the game's length by result (win 2.4, draw 1.6, loss 0.8), at least 1, at
-  most 70, only when both sides made 10 moves; none for an aborted or a bot game, nor for a player fair play holds (in
-  review). At most `coins.perDay` (20) paying games a UTC day per account (`coin_day`, `coin_games` on their
-  `ranked_1v1` row, written in the game's batch); later games still count for the rank. Lined up with what a Squads
-  lobby pays per minute (the decision file has the table and the farming numbers).
+- **Coins** (since Nov 25: [2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md)): a ranked game pays play coins as
+  every counted game does (`PLAY_COINS`, paid with its XP by `duel-do.ts withXp` → `server/xp.ts grantXp`; [shop.md](shop.md), "Play
+  coins"), plus the bonus's win (15) or ranked draw (5); none for an aborted or a bot game, nor for a player fair play holds. The
+  outcome's `coins` (the end page's line) is the grant's play coins and bonus. A grant D1 fails is tried again at once (3 tries); still
+  failing, the recording's try fails after `recordDuel` and the room keeps its answer (`DuelRecord.ranks`): the next try (as below) goes
+  on from it, never recording the game twice, and pays once (the grant is keyed by the game); the players hear their outcome once it's
+  all in (Nov 25, the review's M1). A game whose old `ranked:<id>:<color>` coins went in before a deploy pays no play coins on top
+  (m3). Ranked's own coins (`duelCoins`, 2.4/1.6/0.8 a minute, 20 paying games a UTC day) are gone; the row's `coin_day` and
+  `coin_games` keep what they had and are no longer moved.
 - **Recording** (`ranked.ts`, `recordDuel`): one D1 batch per finished game: the game's row, both players' ranks (from
-  both records as they stand now), their coins. The game's row goes in only if neither player's record changed since it
+  both records as they stand now); no coins of its own since Nov 25. The game's row goes in only if neither player's record changed since it
   was read (another game of theirs ending at the same moment), and everything else applies only if that row is this
   recording's (its nonce), so a game is recorded once; a row that didn't go in is read again and retried. The object
   starts a try at the end and again on any wake while no outcome has come back (15 s after the last try started for 4
@@ -264,7 +294,7 @@ by the clock (`voteAt`); everything else comes as a message.
 
 | Table / column | What | Kept |
 | --- | --- | --- |
-| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day; the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
+| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28; partial index `ranked_1v1_board` (ladder DESC, user_id DESC) WHERE games >= 5, Nov 25) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day (until Nov 25; no longer moved); the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
 | `ranked_conduct` (user_id, match_id, at, mode, kind, games, rp, nonce; PK (user_id, match_id); indexes on (user_id, at) and at; Nov 9) | Each dodge and leave (ranked's leave rules): which game, when, the mode ("1v1"), which kind, the player's ranked games by then (the last-20 window), the rank points it cost, the recording that wrote it | `LEAVES.keepDays` (90), then the 15-minute cron (`purgeConduct`); deleted with the account; in the download (`leaves`: game, at, mode, kind, rp); a guest's move to the account on sign-in |
 | `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce, white_points, black_points) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side; the rank points it moved for each side (from Oct 28) | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
 
@@ -275,7 +305,7 @@ entry says the same.
 
 | What | Where |
 | --- | --- |
-| The vote's rule, Glicko-1, the ladder, rank points, placements, pairing, coins (pure) | `packages/core/src/ranked.ts`; numbers `RANKED_1V1` |
+| The vote's rule, Glicko-1, the ladder, rank points, placements, pairing (pure); coins: `packages/core/src/play-coins.ts` (`PLAY_COINS`) | `packages/core/src/ranked.ts`; numbers `RANKED_1V1` |
 | The game's rules and the protocol (pure, shared with the app) | `packages/chess/src/duel/` (`@chessroyale/chess/duel`) |
 | The game's room (pure) and object | `packages/server/src/duel-room.ts`, `duel-do.ts` (binding `DUELS`, migration v6) |
 | Ranks and games in D1; the schema, a guest's merge, the profile's read | `packages/server/src/ranked.ts`, `ranked-schema.ts` |
@@ -319,7 +349,7 @@ decay, the last-20 window, the delayed queue's waits, the 8-mark lock, the quick
   mode; a game whose opening throws: the pair back in line in order and seated next, the batch's other pairs too, a
   throw every time tried once a second, never at once; putBack leaving placed tickets placed; an account's other
   device while its ticket is being seated), `ranked-store.test.ts` (recording:
-  placements, ranks, coins, the daily cap, once (and the answer to a repeat), a race with another game, aborted games,
+  placements, ranks, no coins of its own (the old daily count left as it was), once (and the answer to a repeat), a race with another game, aborted games,
   fair play's hold (no rank change, no coins), a deleted account; the purge by fair play's rule; the profile; the
   download, deleting, a guest's merge), `fairplay-duel.test.ts` (the engine check within the engine server's 8 moves
   a search), `kill-switches.test.ts` (the 1 v 1 queue resting), `account-data.test.ts` (the tables pinned and covered);

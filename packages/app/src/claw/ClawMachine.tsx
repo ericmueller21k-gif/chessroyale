@@ -93,10 +93,9 @@ export function ClawMachine({ onClose }: { onClose: () => void }) {
 
   if (s.stage === "opening" && won) {
     return (
+      // (The opening on its own layer, over the machine's veil: crate-open/, Nov 24.)
       <div class="claw-veil" role="dialog" aria-label="Claw machine">
-        <div class="claw-machine claw-opening crates">
-          <CrateOpening crate={won} force={{}} onClose={() => dispatch({ kind: "again" })} />
-        </div>
+        <CrateOpening crate={won} force={{}} onClose={() => dispatch({ kind: "again" })} />
       </div>
     );
   }

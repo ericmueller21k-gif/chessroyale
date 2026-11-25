@@ -1,4 +1,4 @@
-import { OPS, type CrateRoll } from "@chessroyale/core";
+import { OPS, crateDef, type BonusRoll, type CrateRoll } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
@@ -39,6 +39,9 @@ export const LEDGER_SCHEMA = [
     PRIMARY KEY (op_id, leg)
   )`,
   `CREATE INDEX IF NOT EXISTS ledger_account ON ledger (account, asset_kind, asset_id)`,
+  // An account's legs of one reason since a time (Nov 25, the review's n7): the daily caps each grant reads (play coins' day,
+  // play-coins.ts; XP's solo minutes and wins, xp.ts; Squads' crates a UTC day), by this, never the account's whole history.
+  `CREATE INDEX IF NOT EXISTS ledger_reason ON ledger (account, reason, created_at)`,
   // Series crates you hold, unopened, by crate (Nov 9, XP phase 2: the daily reward's and each level's; Squads' placements' since): a
   // count per crate, as boss tokens are. Each takes a crate key to open (locker.ts openCrate). A new table: older data has none.
   `CREATE TABLE IF NOT EXISTS series_crates (
@@ -238,6 +241,49 @@ export const leg = {
     ],
   }),
 };
+
+/**
+ * Bonus crates (Nov 24; core bonus-crate.ts): held where their crate is (a series crate's count in `series_crates`, a boss crate's row in
+ * `boss_crates`) under their crate's id with this prefix ("bonus:winter-1", "bonus:boss-tiger"). So each is a count of its own and the
+ * ledger's asset, and it moves with a guest's sign-in, closes with an erased account and shows in the account's download as every crate
+ * does, with no new column and no migration. Its opening takes it as any crate, and never rolls a bonus (locker.ts openCrate,
+ * boss-tokens.ts openBossCrate).
+ */
+export const BONUS_PREFIX = "bonus:";
+/** A bonus crate's stored id: "bonus:winter-1". */
+export const bonusAsset = (crate: string) => `${BONUS_PREFIX}${crate}`;
+/** Holdings by stored id, as every crate held by its own id (`all`, bonus ones included) and how many of those are bonus ones (`bonus`). */
+export function foldBonus(held: Record<string, number>): { all: Record<string, number>; bonus: Record<string, number> } {
+  const all: Record<string, number> = {};
+  const bonus: Record<string, number> = {};
+  for (const [stored, n] of Object.entries(held)) {
+    const crate = stored.startsWith(BONUS_PREFIX) ? stored.slice(BONUS_PREFIX.length) : stored;
+    all[crate] = (all[crate] ?? 0) + n;
+    if (crate !== stored) bonus[crate] = (bonus[crate] ?? 0) + n;
+  }
+  return { all, bonus };
+}
+
+/**
+ * An opening's bonus (`b`), as legs of the opening's own op: the crate, as a bonus one, into your series crates (a new boss_crates row
+ * `row` for a boss's crate), and its crate key when it opens with one. `source`: what the opening gave (its item's id).
+ */
+export function bonusLegs(user: string, b: BonusRoll, source: string, row: string, now: number): Leg[] {
+  return [
+    crateDef(b.crate) ? leg.seriesCrates(user, bonusAsset(b.crate), 1, source) : leg.bossCrateIn(user, row, bonusAsset(b.crate), now),
+    ...(b.key ? [leg.keys(user, 1, source)] : []),
+  ];
+}
+
+/** The bonus an opening (op `opId`) gave, as stored (every attempt at the opening answers this). Null: none. */
+export async function openedBonus(sql: Sql, opId: string): Promise<BonusRoll | null> {
+  const legs = await sql.all<{ asset_kind: string; asset_id: string }>(
+    "SELECT asset_kind, asset_id FROM ledger WHERE op_id = ? AND delta > 0 AND asset_kind IN ('series_crate', 'boss_crate', 'keys') ORDER BY leg",
+    opId,
+  );
+  const crate = legs.find((l) => l.asset_kind !== "keys" && l.asset_id.startsWith(BONUS_PREFIX));
+  return crate ? { crate: crate.asset_id.slice(BONUS_PREFIX.length), key: legs.some((l) => l.asset_kind === "keys") } : null;
+}
 
 /** One event: its key, why, its guard, its legs (one account's), and any rows that go with it that aren't balances. */
 export interface Op {

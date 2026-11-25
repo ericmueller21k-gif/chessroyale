@@ -13,6 +13,10 @@
  * - Something built but not yet on for players is marked "Being tested"; something only planned, "Planned".
  */
 import {
+  divisionTitle,
+  romanDivision,
+  LADDER,
+  POWER_TIPS,
   BATTLE_TOWER,
   BOT_LEVELS,
   CROWD_PARTY,
@@ -22,7 +26,12 @@ import {
   BOSS_CRATES,
   BOSS_CRATE_PRICE,
   BOSS_TOKENS,
+  CRATE_BONUS,
+  bonusOddsLine,
   XP,
+  PLAY_COINS,
+  bonusMax,
+  playCoinsFor,
   everyLevel,
   QUESTS,
   BOSS_PARTY,
@@ -123,7 +132,11 @@ export interface FaqSources {
   /** Boss crates (sold in the bosses' shops for their tokens), boss tokens' rules and a boss crate's price. */
   bossCrates: readonly BossCrateDef[];
   bossTokens: typeof BOSS_TOKENS;
+  /** The bonus crate (Nov 24): an opening's chance of one (CRATE_BONUS). */
+  crateBonus: { chance: number };
   xp: typeof XP;
+  /** Play coins (Nov 25): what every counted game pays (PLAY_COINS). */
+  playCoins: typeof PLAY_COINS;
   /** Quests (Nov 9, phase 3): how many, the carry-over, the reroll, the pool. */
   quests: typeof QUESTS;
   bossCratePrice: typeof BOSS_CRATE_PRICE;
@@ -175,7 +188,9 @@ export const FAQ_DEFAULTS: FaqSources = {
   // (Not the crate of a boss in the game for admins first, Timber's: his block shows once he's live for everyone.)
   bossCrates: BOSS_CRATES.filter((c) => !adminFirst({ id: c.boss })),
   bossTokens: BOSS_TOKENS,
+  crateBonus: CRATE_BONUS,
   xp: XP,
+  playCoins: PLAY_COINS,
   quests: QUESTS,
   bossCratePrice: BOSS_CRATE_PRICE,
   colors: ITEM_COLORS,
@@ -321,7 +336,7 @@ ${finalBoss ? `- **${capitalFirst(bossInText(finalBoss.name, false, src.roster))
 
 ${mercenary(Q)}
 
-${ranked1v1(src.ranked, src.leaves)}
+${ranked1v1(src.ranked, src.leaves, src.playCoins)}
 
 ${leaving(src)}
 
@@ -352,10 +367,11 @@ function squadsClocks(Q: SquadsSettings): string {
 }
 
 /**
- * Ranked 1 v 1 (Eric, Oct 16; RANKED_1V1): the mode, the time-control vote and its rule (every pair of picks worked out
- * by the game's own rule, votedControl), the clocks, how a game ends, ranks, rank points, placements and coins.
+ * Ranked 1 v 1 (Eric, Oct 16; RANKED_1V1): the mode, colors (Eric, Nov 25: core's firstGetsWhite), the time-control vote and its
+ * rule (every pair of picks worked out by the game's own rule, votedControl), the clocks, how a game ends, ranks, rank points,
+ * placements and coins.
  */
-export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES): string {
+export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES, P: typeof PLAY_COINS = PLAY_COINS): string {
   const z = (id: "bullet" | "blitz" | "rapid") => controlLabel(zoneControl(id, R));
   const meet = (a: "bullet" | "blitz" | "rapid", b: "bullet" | "blitz" | "rapid") => `**${controlLabel(votedControl(a, b, R))}**`;
   const def = R.controls.find((c) => c.id === R.defaultControl) ?? R.controls[0]!;
@@ -364,30 +380,32 @@ export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES): stri
   const top = rankView({ games: R.placements.games, ladder: R.placements.maxLadder }, R);
   const [lowTop, highTop] = [...R.topTiers].sort((a, b) => b.top - a.top);
   const last = tiers.at(-1)!;
-  // (Where the top tiers' floor sits in the last division: Radiant 1's 80 RP.)
+  // (Where the top tiers' floor sits in the last division: Radiant I's 80 RP.)
   const floorRp = R.topFloor - (divisionsEnd(R) - R.pointsPerDivision);
   const emblems = (ids: readonly string[]) => `!emblems ${ids.join(" ")}`;
   const example = R.tiers[Math.min(2, R.tiers.length - 1)]!.name;
-  const C = R.coins;
   return `### 1 v 1 · Classic chess {#mode-1v1}
 
 - **Normal chess against one other person, ranked.** Checkmate wins, the clocks are real, and nothing else: no power-ups, no scoring of your moves. One tap on **1 v 1** finds you an opponent near your strength; the longer you wait, the wider the search. If nobody turns up within ${n(R.fewPlayersSeconds, "second")}, you can keep waiting or **play a bot** (unranked: nothing on your record, no coins).
-- **The time control, voted on the board:** before move 1, three zones appear in the middle of the board, **${z("bullet")}** on the left, **${z("blitz")}** in the middle and **${z("rapid")}** on the right, and you both have ${n(R.voteSeconds, "second")} to drag your pawn into one. The same pick plays that control. Picks next to each other meet in between: Bullet and Blitz make ${meet("bullet", "blitz")}, Blitz and Rapid ${meet("blitz", "rapid")}. Bullet against Rapid makes ${meet("bullet", "rapid")}. If only one of you picks, that pick counts; if neither does, it's **${controlLabel(def)}**.
+- **Colors:** the game gives each player White and Black in turn, as evenly as it can, so nobody is stuck on one color. Nobody gets the same color more than ${n(R.colors.maxInRow, "game")} in a row unless it can't be helped; otherwise White goes to whichever of you has had Black more often in your last ${n(R.colors.recentGames, "ranked game")} (if that's even, whoever had Black last). Your rating doesn't change by color: over many games each color evens out.
+- **The time control, voted on the board:** before move 1, three zones appear in the middle of the board, **${z("bullet")}** on the left, **${z("blitz")}** in the middle and **${z("rapid")}** on the right, and you both have ${n(R.voteSeconds, "second")} to drag your pawn into one (or tap one); once you've both picked, the vote ends a moment later, and you can still change your pick until then. The same pick plays that control. Picks next to each other meet in between: Bullet and Blitz make ${meet("bullet", "blitz")}, Blitz and Rapid ${meet("blitz", "rapid")}. Bullet against Rapid makes ${meet("bullet", "rapid")}. If only one of you picks, that pick counts; if neither does, it's **${controlLabel(def)}**.
 - **The clocks:** "${controlLabel(blitz)}" means ${n(blitz.baseSeconds / 60, "minute")} each, plus ${n(blitz.incrementSeconds, "second")} after every move. They start after Black's first move. Each side has ${n(R.firstMoveSeconds, "second")} for its first move, or the game is called off (no result; for the side that didn't move, it's a dodge: leaving early, below).
 - **How a game ends:** checkmate; resigning; running out of time, a loss (but a draw if the other player has only a king, or a king and one knight or one bishop, so they couldn't mate); or a draw, by stalemate, threefold repetition, the 50-move rule, too little material for either side to mate, or agreement. **Offer a draw** is under the board: the other player accepts or declines, and after a decline you can offer again once you've made ${n(R.drawOfferEveryMoves, "more move")}.
 - **Lost your connection?** Your clock keeps running: open the app again (or reload) and you're straight back in the game.
-- **Ranks:** ${tiers.slice(0, -1).join(", ")} and ${last}, each with divisions ${R.divisions} (the lowest) to 1. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} ${R.divisions} with 0 RP. Each tier has its emblem, and each division up adds to it, up to a crown and a glow in division 1:
+- **Ranks:** ${tiers.slice(0, -1).join(", ")} and ${last}, each with divisions ${romanDivision(R.divisions)} (the lowest) to ${romanDivision(1)}. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} ${romanDivision(R.divisions)} with 0 RP. Each tier has its emblem, and each division up adds to it, up to a crown and a glow in division ${romanDivision(1)}:
 
 ${emblems(R.tiers.map((t) => emblemId(t.name, R.divisions)))}
 ${emblems(Array.from({ length: R.divisions }, (_, i) => emblemId(example, R.divisions - i)))}
 
-- **The top two tiers,** with no divisions: **${lowTop!.name}**, the ${num(lowTop!.top)} highest ranks, and above it **${highTop!.name}**, the ${num(highTop!.top)} highest, both from ${floorRp} RP in ${last} 1 (their RP count from there). Equal ranks share a place, and your place is brought up to date within a minute. At ${floorRp} RP or more in ${last} 1 but outside the top ${num(lowTop!.top)}, you stay ${last} 1 and your RP keeps counting past ${floorRp}. Their emblems shimmer:
+- **The top two tiers,** with no divisions: **${lowTop!.name}**, the ${num(lowTop!.top)} highest ranks, and above it **${highTop!.name}**, the ${num(highTop!.top)} highest, both from ${floorRp} RP in ${last} ${romanDivision(1)} (their RP count from there). Equal ranks share a place, and your place is brought up to date within a minute. At ${floorRp} RP or more in ${last} ${romanDivision(1)} but outside the top ${num(lowTop!.top)}, you stay ${last} ${romanDivision(1)} and your RP keeps counting past ${floorRp}. Their emblems shimmer:
 
 ${emblems([emblemId(lowTop!.name, null), emblemId(highTop!.name, null)])}
 
+- **The season ladder:** **LADDER ›** at the end of home's RANKED label (a computer's side menu: **Ladder**) shows the ${num(LADDER.size)} highest ranks this season in one list, with your own place pinned under it wherever you are. Equal ranks share a place. Only 1 v 1 has ranks of its own so far: the 50 v 50 and Squads tabs wait for theirs.
+
 - **Rank points:** about +${num(R.points.perGame)} for a win and −${num(R.points.perGame)} for a loss against a player at your level, about 0 for a draw; more for beating someone stronger, less for beating someone weaker. Behind them is a hidden rating, worked out from your results and whom you played them against: when your rank is lower than it, you gain more and lose less (up to ${n(R.points.maxAdjust, "RP", "RP")} more or less), so your rank settles where your play is. A win never costs you points.
-- **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${top.label.replace(/ · .*/, "")}.
-- **Coins:** a game pays ${num(C.perMinute.win)} coins a minute for a win, ${num(C.perMinute.draw)} for a draw and ${num(C.perMinute.loss)} for a loss, at least 1 and at most ${num(C.maxPerGame)}, once both sides have made ${n(C.minMoves, "move")}. Up to ${n(C.perDay, "game")} a day pay coins; after that they still count for your rank. A called-off game and a bot game pay nothing.
+- **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${divisionTitle(top)}.
+- **Coins:** a ranked game pays coins as every game does ([Coins](#xp)): more for a longer game, ${n(P.bonus.win, "coin")} more for a win and ${n(P.bonus.draw, "coin")} for a draw. A called-off game and a bot game pay nothing.
 - **Quick chat** works as in other online matches, and you can mute the other player.
 
 ${rankedLeaving(L)}`;
@@ -941,9 +959,9 @@ Your time is the clock at the right of the box under the board: alone or in a pa
     return `
 Plays from the game so far. A special-ops alligator with an energy rifle that grows. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."}
 
-- **Lock-on** (passive): nothing is locked until he takes your pieces: on each of his first ${n(c.teachCaptures, "capture")} his crosshair snaps onto the piece (any but your king, your queen too) just before he takes it, and each of those captures is an upgrade. After that, at the end of his turns he locks your most capturable piece (never your king or queen), up to ${n(c.maxLocks, "lock")} at once, and he leans toward taking locked pieces: a capture of one he plays if it's within ${num(c.takeMargin)} pawns of his best move, a move that attacks one if it's within ${num(c.chaseMargin)}. The pips under a crosshair count the turns it has left: get the piece to safety for ${n(c.huntTurns, "of his turns", "of his turns")} and he moves on.
-- **Upgrades:** each locked piece he takes adds a part to his rifle (${num(c.upgradesMax)} in all) and unlocks one of his five moves at random${c.queenLockFirst ? " (the queen lock first, if it could come right then: your queen, or your best rook if your queen is gone)" : ""}. The game pauses ${n(c.upgradeMs / 1000, "second")} to show it.
-- **His move meter**, from his first upgrade, fills over ${n(c.meterEvery, "of your moves", "of your moves")}; full, he uses one of his unlocked moves (a new one first; then the one he has used least, at random among equals, never the one he used last while another can come)${c.fireOnUnlock ? ". A move he has just unlocked he uses at once, on his turn after the upgrade, however full the meter (it starts over after; a queen lock that can't come then waits for the meter)" : ""}: **Scatter shot** (${n(c.scatterSquares, "empty square")} around a spot blocked for your turn: nobody lands there, a slide passes through), **Beam** (a rank and a file, never your king's: your pieces in it can't move and nothing lands on or slides through it this turn; what's under it is hidden, but it still blocks, defends and gives check), **Shields** (${n(c.shieldCount, "piece")} of his you attack can't be taken this turn, never one giving check), **Rapid fire** (${n(c.rapidCount, "piece")} of yours can't move this turn), and **Queen lock** (he aims at your queen, or your best rook if your queen is gone: the one most open to capture; only when a pawn, knight or bishop can get between it and his side of the board, and not when skipping his move would cost him real material: then the meter picks another move, or with no other he tries again on his next turn; he spends his turn aiming down its file; your move is free; then he fires down the file it's on: the first of your pieces from his side shatters, or it does if nothing's in the way; your king stops it). None of them ever leaves you without a legal move.
+- **Lock-on** (passive): nothing is locked until he takes your pieces: on each of his first ${n(c.teachCaptures, "capture")} his crosshair snaps onto the piece (any but your king, your queen too) just before he takes it, and each of those captures is an upgrade. After that, at the end of his turns he locks your most capturable piece (never your king or queen), up to ${n(c.maxLocks, "lock")} at once, and he leans toward taking locked pieces: a capture of one he plays if it's within ${num(c.takeMargin)} pawns of his best move, a move that attacks one if it's within ${num(c.chaseMargin)}. Once those first ${n(c.teachCaptures, "upgrade")} are in, he hunts: he'll trade for a locked piece even at a small loss (up to ${n(c.huntLoss, "pawn")}, never a big one), and keeps after it. The pips under a crosshair count the turns it has left: get the piece where he can't take it and, if he can trade for another piece, he locks that one instead (otherwise the crosshair stays until its turns run out).
+- **Upgrades:** each locked piece he takes adds a part to his rifle (${num(c.upgradesMax)} in all) and unlocks one of his five moves at random${c.queenLockFirst ? " (the Lock-on Shot first, if it could come right then: your queen, or your best rook if your queen is gone)" : ""}. The game pauses ${n(c.upgradeMs / 1000, "second")} to show it.
+- **His move meter**, from his first upgrade, fills over ${n(c.meterEvery, "of your moves", "of your moves")}; full, he uses one of his unlocked moves (a new one first; then the one he has used least, at random among equals, never the one he used last while another can come)${c.fireOnUnlock ? ". A move he has just unlocked he uses at once, on his turn after the upgrade, however full the meter (it starts over after; a Lock-on Shot that can't come then waits for the meter)" : ""}: **Scatter shot** (${n(c.scatterSquares, "empty square")} around a spot blocked for your turn: nobody lands there, a slide passes through), **Beam** (a rank and a file, never your king's: your pieces in it can't move and nothing lands on or slides through it this turn; what's under it is hidden, but it still blocks, defends and gives check), **Shields** (${n(c.shieldCount, "piece")} of his you attack can't be taken this turn, never one giving check), **Rapid fire** (${n(c.rapidCount, "piece")} of yours can't move this turn), and the **Lock-on Shot** (he aims at your queen, or your best rook if your queen is gone: the one most open to capture; only when a pawn, knight or bishop can get between it and his side of the board, and not when skipping his move would cost him real material: then the meter picks another move, or with no other he tries again on his next turn; he spends his turn aiming down its file, and locks the piece his round will most likely hit too: the one already in front, or the cheapest you can put there; your move is free; then he fires down the file it's on: the first of your pieces from his side shatters, or it does if nothing's in the way; your king stops it. A locked piece or the target shattered is an upgrade, as a capture). None of them ever leaves you without a legal move.
 - **Dodge** (ultimate, ${(p.maxUltimates["chandy"] ?? 1) === 1 ? "once a battle" : `at most ${n(p.maxUltimates["chandy"] ?? 0, "time")} a battle`}): his rage meter is dimmed until his rifle is whole, then fills over ${n(c.dodgeAfterMoves, "of your moves", "of your moves")}; nothing else fills it. After the warning, as your next turn begins: a blank board, your king in the middle of the 3 x 3 around e4 (White) or e5 (Black). First a warning shot: his clones fire once and miss (no vote). Then ${n(c.dodgeRounds, "round")}, his clones on the board's edges aiming along two ranks and two files, so exactly one square is safe: ${n(c.dodgeVoteMs / 1000, "second")} each to vote where your king stands (the most votes wins; if nobody votes, a random square); the clones teleport mid-round (once, twice, then three times), moving the safe square. Their beams then hold for a few seconds. ${c.dodgeHits === 2 ? "The first hit cracks your king; a second hit and you lose the battle" : `${n(c.dodgeHits, "hit")} and you lose the battle`} (the God King can't save you from it). Survive and the board comes back as it was. **Last chance:** if he hasn't used it and you have a move that checkmates him, it comes at once as your turn begins, whatever his rifle or meter; survive it and the mate is still yours to play.`;
   },
   birdie: (p, b) => {
@@ -951,8 +969,8 @@ Plays from the game so far. A special-ops alligator with an energy rifle that gr
     return `
 Plays from the game so far. A young mourning dove in a conductor's cap, riding his yellow toy train. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."}
 
-- **The Train** (passive): at the end of his reply to your ${s.trainFrom <= 2 ? "first move" : `move ${s.trainFrom - 1}`}, and then every ${n(s.trainEvery, "of your turns", "of your turns")}, he signals a rank or file where exactly one of your pieces stands (any piece, your king too): a railroad crossing flashes on every square of it, and a yellow warning sign glows over that piece. Move that piece on your next move (any move of it saves it) or, at the start of his turn, his train rides the line and smashes it; his own pieces on the line step aside. If it's your king, the battle is his. He only picks a piece you can save: one with a move, not the last thing shielding your king, and not standing where his pawn is about to promote. If no line fits, he waits a turn and looks again. If the smash would leave a position no game can have, the train passes and spares the piece. Leaving the piece there counts as losing it when your move is scored, so saving it is never a mistake.
-- **The Fall** (ultimate, once a battle): his meter is the material he has lost (pawn 1, knight 3, bishop 3, rook 5, queen 9). Once he's down ${n(s.fallLost, "point")} from the start, he falls off his train at the start of his turn, it runs into him, and he's **Armored Birdie** for the rest of the battle. If a warned piece is smashed that same turn, the train comes first.
+- **The Train** (passive): at the end of his reply to your ${s.trainFrom <= 2 ? "first move" : `move ${s.trainFrom - 1}`}, and then every ${n(s.trainEvery, "of your turns", "of your turns")}, he signals a rank or file where exactly one of your pieces stands (any piece, your king too): a railroad crossing flashes on every square of it, and a yellow warning sign blinks in the corner of that piece's square. At the start of his turn his train rides that line either way. Move that piece on your next move (any move of it saves it) and the train misses: every piece on the line steps aside. Leave it there and the train smashes it; his own pieces on the line step aside. If it's your king, the battle is his. He only picks a piece you can save: one with a move, not the last thing shielding your king, and not standing where his pawn is about to promote. If no line fits, he waits a turn and looks again. If the smash would leave a position no game can have, the train passes and spares the piece. Leaving the piece there counts as losing it when your move is scored, so saving it is never a mistake.
+- **The Fall** (ultimate, once a battle): his meter is the material he has lost (pawn 1, knight 3, bishop 3, rook 5, queen 9). Once he's down ${n(s.fallLost, "point")} from the start, he falls off his train at the start of his turn, it runs into him, and he's **Armored Birdie** for the rest of the battle. If his train rides that same turn, the train comes first.
 - **Armored Birdie** keeps the train (the same rule, every ${n(s.armoredTrainEvery, "of your turns", "of your turns")}) and plays much stronger: ${n(s.armoredMaiaBoost, "rating point")} higher, up to the strongest human-style play we have; if he was already there (Very hard), he plays the engine's own moves, a little stronger still.`;
   },
 };
@@ -1068,7 +1086,7 @@ function godKing(src: FaqSources): FaqSection {
     body: `
 ### Who he is {#king-who}
 
-The crowd's champion in every Boss Battle (alone, in a party or in a group). He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}) once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.` : ""}
+The crowd's champion in every Boss Battle (alone, in a party or in a group). He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you. The first time you meet some of the bosses' powers, the boss and he trade a line or two explaining it, and again in the ${andList(POWER_TIPS.at.slice(1).map(ordinal))} battles in which you see that power, then every ${ordinal(POWER_TIPS.every)} (the ${ordinal(POWER_TIPS.at.at(-1)! + POWER_TIPS.every)}, the ${ordinal(POWER_TIPS.at.at(-1)! + 2 * POWER_TIPS.every)} and so on), counted for your account on this device.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}) once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.` : ""}
 
 ### Strike or play: his charges {#king-charges}
 
@@ -1108,7 +1126,7 @@ He also sits out while a boss's power has changed the board (hoops, blocks, plan
 }
 
 function crates(src: FaqSources): FaqSection {
-  const name = (id: string) => (id === "fischer" ? "Fischer Random" : (src.itemTiers.find((t) => t.id === id)?.name ?? id));
+  const name = (id: string) => (id === "fischer" ? "Transcendent" : (src.itemTiers.find((t) => t.id === id)?.name ?? id));
   const strips = src.crates.map((c) => {
     const live = liveStrip(c);
     const total = sum(live.map((x) => x.weight)) || 1;
@@ -1144,7 +1162,7 @@ function crates(src: FaqSources): FaqSection {
     return (live.find((x) => x.tier === "fischer")?.weight ?? 0) / (sum(live.map((x) => x.weight)) || 1);
   };
   const bossCrates = src.bossCrates
-    .map((c) => `**${c.name}** holds ${itemDef(c.ride)?.name ?? c.ride} (${pct(fischerShare(c), 0)} of the time: the only item behind its Fischer Random) and ${c.items.length - 1} Common to Epic items`)
+    .map((c) => `**${c.name}** holds ${itemDef(c.ride)?.name ?? c.ride} (${pct(fischerShare(c), 0)} of the time: the only item behind its Transcendent) and ${c.items.length - 1} Common to Epic items`)
     .join("; ");
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
   return {
@@ -1157,7 +1175,7 @@ function crates(src: FaqSources): FaqSection {
 
 Every item from a crate rolls three things, each on its own:
 
-1. **Its tier, which decides the item.** The strip lands on a tier's box, which opens to one of that tier's items, each as likely as the others. Or it lands on **Fischer Random**, a second spin for the rarest items: ${fischerWords}.
+1. **Its tier, which decides the item.** The strip lands on a tier's box, which opens to one of that tier's items, each as likely as the others. Or it lands on **Transcendent**, a second spin for the rarest items: ${fischerWords}.
 2. **Its color.**
 3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**.
 
@@ -1179,6 +1197,8 @@ ${purity}
 
 **Boss tokens and boss crates.** A boss battle, won or lost, counts once it reaches ${bt.moves} of your moves or ${bt.minutes} minutes. In any ${bt.windowHours} hours, your first counted battle always gives you a boss's token (one of the bosses you can meet, each as likely), and each one after that gives one ${pct(bt.chance, 0)} of the time, up to ${bt.cap}. Our server decides, never your device, and it times a solo battle itself (${bt.minutes} minutes from its start to its end). A boss's shop in the town sells its crate for ${n(bp.tokens, "token")} of that boss, or ${n(bp.withKey.tokens, "token")} and ${n(bp.withKey.keys, "crate key")}: ${bossCrates}, in the same boxes at the same odds as above. A crate you buy goes into your inventory (the Crates tab), where you open it like any crate, once.
 
+**Bonus crates.** ${bonusOddsLine(src.crateBonus.chance)} The crates it can be: every series crate, retired ones too, and the crate of every boss out for everyone, each as likely. It goes into your inventory unopened, with a crate key when it opens with one (a boss crate doesn't). Our server rolls it with the item. A bonus crate opens like any crate, after your other crates of that kind, so you never lose a chance at one.
+
 Shiny comes about 1 time in ${num(1 / (shiny || 1), 0)}. Crates are opened by the game's server, never by your device, so nobody can roll themselves a Pearl crown. The shop sells God King effects (the color of his bolts, beam and halo) and quick-chat packs.
 `,
   };
@@ -1192,6 +1212,11 @@ export function xpAndLevels(src: FaqSources): FaqSection {
   const X = src.xp;
   const Q = src.quests;
   const most = X.maxMinutes * X.perMinute + X.win;
+  const P = src.playCoins;
+  const coinsMost = playCoinsFor(X.maxMinutes, false, P);
+  const steps = P.bonusSteps;
+  const bonusTop = bonusMax(steps);
+  const squadsBonus = `${P.bonus.squads[1]} for 1st, ${P.bonus.squads[2]} for 2nd, ${P.bonus.squads[3]} for 3rd-4th and ${P.bonus.squads[5]} for 5th-8th`;
   const nth = (k: number) => `${k}${k % 100 >= 11 && k % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][k % 10] ?? "th")}`;
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
   const things = (q: { xp: number; crates?: number; keys?: number }) =>
@@ -1223,7 +1248,13 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 - **New dailies** come each day at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC; the weekly resets on Mondays at the same time. **Unfinished dailies stay**, up to ${Q.maxDailies} waiting, so missing a day doesn't waste them. A new weekly replaces the old one, finished or not.
 - **One free reroll a day for each daily:** the arrows on a daily you haven't finished swap it for another quest (only that one). The new quest's arrows come back the next day.
 
-After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level that pays, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
+**Coins:** every game that earns XP also earns coins, by the same rules (your own game as our server measured it, from your ${nth(X.minMoves)} move; nothing for leaving, a test game, a guest, or an account fair play is reviewing).
+- **Play coins:** more for a longer game, up to ${coinsMost} a game, until **${P.perDay} a day**.
+- **A bonus for playing well,** even past the day's ${P.perDay}: **${P.bonus.win}** for a win (the same wins as XP's, the friends' lobby rule too), **${P.bonus.draw}** for a draw in ranked 1 v 1, **${P.bonus.crowdTop3}** for finishing in your team's top ${P.crowdTopPlaces} in a 50 v 50, and in Squads by your squad's place: ${squadsBonus}.
+- **The bonus slows through the day:** the first ${steps[0]?.upTo ?? 0} bonus coins of a day pay in full, ${steps.slice(1).map((st, i) => `the next ${st.upTo - steps[i]!.upTo} ${st.rate === 0.5 ? "at half" : st.rate === 0.25 ? "at a quarter" : `at ${Math.round(st.rate * 100)}%`}`).join(", ")}, then none: at most ${bonusTop} bonus coins and **${P.perDay + bonusTop} coins a day** in all.
+- **Games on your device** pay play coins for the time that earned XP under their daily limit, and no bonus.
+
+After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level that pays, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, coins, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
 `,
   };
 }

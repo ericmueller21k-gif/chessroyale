@@ -877,7 +877,7 @@ export interface SuperFreezeState {
 export interface BirdieState {
   next: number;
   warn: { turn: number; line: string; squares: string[]; square: string; piece: string } | null;
-  ride?: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true } | null;
+  ride?: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true; missed?: true } | null;
   fell?: { at: number } | null;
 }
 
@@ -1118,6 +1118,11 @@ export interface ChandyLock {
   piece: string;
   /** His moves played when it came (its age is his moves since). */
   at: number;
+  /**
+   * The Lock-on Shot's lock (Nov 24): the piece his aimed round will most likely hit (chandy.ts shotVictim), locked as the aim shows and
+   * gone as the shot fires. Not one he hunts: it doesn't count toward chandy.maxLocks, never steers his move and never wears off.
+   */
+  shot?: true;
 }
 
 /**
@@ -1169,8 +1174,9 @@ export interface ChandyDodge {
  * - `meter`: the crowd's moves toward his next move (full at chandy.meterEvery), counting from the first upgrade; `due`: the move
  *   the full meter picked, landing as the crowd's turn begins (the queen lock: his whole turn, at its start); `used`: moves fired.
  * - This crowd turn's effects: `scatter` (the shot's spot and its blocked squares), `beam` (a rank and a file), `shields` (his
- *   pieces), `dizzy` (the crowd's), each for crowd turn `turn`; `aim`: the queen lock's aim, at the crowd's queen, fired at the
- *   start of his turn after crowd turn `turn` (the turn the aim is for); `shot`: its last shot (the crowd move it came after, the square hit; none: it
+ *   pieces), `dizzy` (the crowd's), each for crowd turn `turn`; `aim`: the Lock-on Shot's aim (its code name `queenlock`;
+ *   Nov 24: renamed from the queen lock, as it may aim at a rook), at the crowd's queen (or best rook), fired at the start of his turn
+ *   after crowd turn `turn` (the turn the aim is for); `shot`: its last shot (the crowd move it came after, the square hit; none: it
  *   stopped on the king or found nothing to hit).
  * - `dodge`: his Dodge under way or played (once a battle). `passWait`: the crowd move after which the queen lock waited (the pass
  *   guard). `whole`: the crowd turn the rifle came whole.
@@ -1195,7 +1201,8 @@ export interface ChandyState {
   beam?: { rank: number; file: string; squares: string[]; turn: number } | null;
   shields?: { squares: string[]; turn: number } | null;
   dizzy?: { squares: string[]; turn: number } | null;
-  aim?: { square: string; turn: number } | null;
+  /** `victim`: the piece the shot will most likely hit, decided as he aims (shotVictim) and locked as the aim shows (Nov 24). */
+  aim?: { square: string; turn: number; victim?: string | null } | null;
   shot?: { at: number; square: string | null; piece: string | null } | null;
   dodge?: ChandyDodge | null;
   passWait?: number;
@@ -1831,8 +1838,9 @@ export type PowerEventKind =
   | "dodge"
   | "dodgeWin"
   // Birdie (Nov 23): his train's warning on a line (as the crowd's turn after his move begins: `square` the piece, `squares` the line
-  // in the order the train rides it); the train, at the start of his turn when the crowd's move left the piece there (`trainSmash`:
-  // `fizzled` [the square] when it spared it, the smash not legal); his train on your king (`trainWin`: the battle his); and his fall
+  // in the order the train rides it); the train, at the start of his turn whenever the warning comes due (`trainSmash`: the piece left
+  // there smashed; `fizzled` [the square] when it spared it, the smash not legal; `missed` when the crowd's move saved it, Eric Nov 24:
+  // the same ride, nothing hit); his train on your king (`trainWin`: the battle his); and his fall
   // (`birdieFall`, at the start of his turn: the cutscene, then Armored Birdie).
   | "trainSignal"
   | "trainSmash"
@@ -1847,6 +1855,8 @@ export interface PowerEvent {
   squares?: string[];
   /** Of those, the ones that fizzled as they landed (the crowd's king stood there): no fire tile. */
   fizzled?: string[];
+  /** Birdie's train rode a warned line whose piece your move saved (Nov 24): the same ride, nothing hit. */
+  missed?: true;
   /** Hollow's first cover of the dark (the square of the piece he just moved, with his first-cover line). */
   first?: true;
   /** Hollow's block of the dark: 2 (a 2 x 2) or 3 (his 3 x 3). */

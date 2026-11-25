@@ -57,9 +57,9 @@ const DAY = 86_400_000;
 
 /** A result's columns in the download (not `held`, which would say fair play is looking at the account). */
 const RESULT_COLUMNS =
-  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, solo_game";
+  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game";
 /** A kept result's columns (every column but its id and account: a test pins the table's columns, so a new one is seen). */
-const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, solo_game";
+const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game";
 
 export const ACCOUNT_STORES: AccountStore[] = [
   {
@@ -81,7 +81,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
         `INSERT INTO results (user_id, ${KEPT_RESULT})
          SELECT ?, mode, online, placement, players, team, team_won, avg_score, NULL, played_at - played_at % ${DAY}, brilliant, NULL,
            cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL, abandoned,
-           play_ms, moves, NULL, xp_parts, xp_none, xp_rewards, NULL
+           play_ms, moves, NULL, xp_parts, xp_none, xp_rewards, coins, NULL
          FROM results WHERE user_id = ? ORDER BY random()`,
         DELETED_ID,
         u.id,
@@ -114,7 +114,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
   {
     // Boss tokens (boss-tokens.ts): how many of each boss's tokens the player has, the tokens their battles dropped (when, and
     // the battle: an online match's lobby code or a solo battle's id), a solo boss battle they have open (when it began), and the
-    // boss crates they bought and haven't opened (which, and when: Nov 2).
+    // boss crates they bought and haven't opened (which, and when: Nov 2; a bonus one's crate starts "bonus:", Nov 24: ledger.ts BONUS_PREFIX).
     name: "bossTokens",
     tables: ["boss_tokens", "boss_token_drops", "solo_battles", "boss_crates"],
     export: async (sql, u) => ({
@@ -130,7 +130,8 @@ export const ACCOUNT_STORES: AccountStore[] = [
     // XP (xp.ts, Nov 9): the solo game the server is timing (when it began, and a test's minutes; since Nov 22, when it became real
     // past SOLO_ABANDON.minMoves and what its loss would record: the mode, players, team, boss and tier). The XP itself is the wallet's
     // (above, with its ledger rows below), and each game's is on its result (its time, moves, XP and rewards). Phase 2 (Nov 9): the
-    // series crates you hold (the daily reward's and levels'; the boss crates to pick are the wallet's `boss_picks`, above).
+    // series crates you hold (the daily reward's and levels'; a bonus one's crate starts "bonus:", Nov 24; the boss crates to pick are the
+    // wallet's `boss_picks`, above).
     name: "xp",
     tables: ["solo_games", "series_crates"],
     export: async (sql, u) => ({

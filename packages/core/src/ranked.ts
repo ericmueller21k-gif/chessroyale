@@ -120,11 +120,25 @@ export interface RankView {
   color: string;
   /** The emblem's id in the baked set ("gold-d3", "transcendent"); null in placements (and for a bot). */
   emblem: string | null;
-  /** "Gold 2 · 45 RP", "Radiant 1 · 95 RP", "Transcendent · 120 RP", "Placement 2/5". */
+  /**
+   * The rank pill's words, everywhere it shows (Eric, Nov 25: "remove RP next to names and use Roman ... like Paragon IV - 50"): the tier,
+   * its division in Roman numerals, an en dash and the points: "Gold II – 45", "Radiant I – 95"; a top tier "Transcendent – 120";
+   * "Placement 2/5". (Was "Gold 2 · 45 RP".)
+   */
   label: string;
 }
 
 const PLACEMENT_COLOR = "#9aa0aa";
+
+/** A division in Roman numerals, as every rank shows it (Eric, Nov 25: "remove RP next to names and use Roman"): 5 → "V", 4 → "IV". */
+export function romanDivision(n: number): string {
+  let out = "";
+  for (const [v, r] of [[10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]] as const) for (; n >= v; n -= v) out += r;
+  return out;
+}
+
+/** A rank's tier and division, as shown: "Gold III", "Transcendent" (a top tier has no division), "Placement" (in placements). */
+export const divisionTitle = (v: Pick<RankView, "tier" | "division">) => (v.division === null ? v.tier : `${v.tier} ${romanDivision(v.division)}`);
 
 /** A tier's emblem id: "gold-d3" (a tier with divisions), "transcendent" (a top tier). */
 export const emblemId = (tier: string, division: number | null) => (division === null ? tier.toLowerCase() : `${tier.toLowerCase()}-d${division}`);
@@ -147,7 +161,7 @@ export function rankView(row: { games: number; ladder: number | null; place?: nu
     const top = [...s.topTiers].sort((a, b) => a.top - b.top).find((t) => place <= t.top);
     if (top) {
       const points = ladder - s.topFloor;
-      return { placement: null, tier: top.name, division: null, points, ladder, color: top.color, emblem: emblemId(top.name, null), label: `${top.name} · ${points} RP` };
+      return { placement: null, tier: top.name, division: null, points, ladder, color: top.color, emblem: emblemId(top.name, null), label: `${top.name} – ${points}` };
     }
   }
   const perTier = s.divisions * s.pointsPerDivision;
@@ -159,7 +173,7 @@ export function rankView(row: { games: number; ladder: number | null; place?: nu
   const division = s.divisions - Math.floor(within / s.pointsPerDivision);
   const points = within % s.pointsPerDivision + (ladder - at);
   const tier = s.tiers[t]!;
-  return { placement: null, tier: tier.name, division, points, ladder, color: tier.color, emblem: emblemId(tier.name, division), label: `${tier.name} ${division} · ${points} RP` };
+  return { placement: null, tier: tier.name, division, points, ladder, color: tier.color, emblem: emblemId(tier.name, division), label: `${divisionTitle({ tier: tier.name, division })} – ${points}` };
 }
 
 /**
@@ -316,13 +330,40 @@ export function pairUp<T extends PairingEntry>(entries: readonly T[], now: numbe
   return pairs;
 }
 
-// ---------------- Coins ----------------
+// ---------------- Colors ----------------
+
+/** A side of the board, as a ranked game stores it (White: "w"). */
+export type SeatColor = "w" | "b";
+
+/** How many of a player's last ranked games pairing reads for their colors (enough for both rules of firstGetsWhite). */
+export const colorHistoryGames = (s: Settings = RANKED_1V1): number => Math.max(s.colors.recentGames, s.colors.maxInRow);
 
 /**
- * The coins a finished ranked game pays one player: perMinute of its length (from its start to its end) by their
- * result, at least 1 and at most maxPerGame; nothing when either side made fewer than minMoves moves.
+ * Who gets White as a pair is seated (true: the first player). Each player's colors in their last ranked games, newest first (the
+ * server reads colorHistoryGames with the ticket). In order (Eric, Nov 25; RANKED_1V1.colors):
+ *   1. nobody plays one color more than `maxInRow` games in a row when the other can take it: whoever had Black in each of their last
+ *      `maxInRow` gets White, whoever had White in each gets Black (both in the same bind: one of them has to; the longer run
+ *      switches first, so a run that couldn't be helped ends next time; the same length: on to 2);
+ *   2. the larger (Black games − White games) over the last `recentGames` gets White;
+ *   3. a tie: the one who had Black in their last game (and someone with no games before someone who had White);
+ *   4. still tied: `coin()`.
  */
-export function duelCoins(result: "win" | "draw" | "loss", gameMs: number, fewestMoves: number, s: Settings = RANKED_1V1): number {
-  if (fewestMoves < s.coins.minMoves) return 0;
-  return Math.max(1, Math.min(s.coins.maxPerGame, Math.round((s.coins.perMinute[result] * Math.max(0, gameMs)) / 60_000)));
+export function firstGetsWhite(a: readonly SeatColor[], b: readonly SeatColor[], coin: () => boolean, s: Settings = RANKED_1V1): boolean {
+  const { recentGames, maxInRow } = s.colors;
+  const key = (h: readonly SeatColor[]): number[] => {
+    // (The run of one color up to the last game: + for Black, − for White, counted once it reaches maxInRow.)
+    const end = h.findIndex((c) => c !== h[0]);
+    const run = end === -1 ? h.length : end;
+    const stuck = maxInRow > 0 && run >= maxInRow ? (h[0] === "b" ? run : -run) : 0;
+    const recent = h.slice(0, recentGames);
+    const balance = recent.filter((c) => c === "b").length - recent.filter((c) => c === "w").length;
+    const last = h[0] === "b" ? 1 : h[0] === "w" ? -1 : 0;
+    return [stuck, balance, last];
+  };
+  const [ka, kb] = [key(a), key(b)];
+  for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i]! > kb[i]!;
+  return coin();
 }
+
+// (Ranked's own coins (duelCoins: 2.4/1.6/0.8 a minute, 20 games a day) are gone since Nov 25: a ranked game pays PLAY_COINS with
+// its XP, as every counted game does: play-coins.ts, server/xp.ts.)

@@ -29,6 +29,7 @@ import {
   itemColor,
   bannerPlusMs,
   itemDef,
+  itemName,
   purity,
   rollBlemish,
   secondColor,
@@ -47,6 +48,9 @@ import {
   isWelcomeCrate,
   showsPurity,
   pickableBossCrates,
+  bonusOddsLine,
+  bonusPool,
+  type BonusRoll,
   type BossCrateDef,
   type CrateDef,
   type CrateLook,
@@ -57,17 +61,20 @@ import {
   type PawnColor,
   type PresentTier,
 } from "@chessroyale/core";
-import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor } from "../account.ts";
+import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor, type OpenForce, type Opened } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
-import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
+import { Avatar, BetaCrateArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, TranscendentArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
-import { play, unlockAudio } from "../sound.ts";
+import { crateSoundsReady, play, unlockAudio, warmCrateSounds } from "../sound.ts";
+import { BonusStage, CrateStage, OpenLayer } from "../crate-open/CrateOpenStage.tsx";
+import { BONUS, STRIPS } from "../crate-open/timeline.ts";
 import { useAccount } from "./Profile.tsx";
 import { testParams } from "../test-switches.ts";
 import { haptic } from "../haptics.ts";
-import { welcomeResumeRow, welcomeRows, type WelcomeRowView } from "../welcome-rows.ts";
+import { welcomeResumeRow, welcomeRows, welcomeRowsShown, type WelcomeRowView } from "../welcome-rows.ts";
+import { bossCratesShown, NO_BOSS_CRATES_LINE, readShowUnowned, saveShowUnowned } from "../boss-crate-rows.ts";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
 const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
@@ -98,17 +105,18 @@ export function NotTradeable() {
  * How each crate looks: its own box on the crate page, and the box each tier comes in on the strip (Winter's
  * presents, Beta's supply boxes; Eric, Oct 11: only the container is new, everything else is reused).
  */
-const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { color: string }) => JSX.Element; box: string; boxes: string }> = {
-  winter: { Crate: WinterCrateArt, Box: PresentArt, box: "present", boxes: "Presents" },
-  beta: { Crate: BetaCrateArt, Box: SupplyBoxArt, box: "supply box", boxes: "Supply boxes" },
-  hunchess: { Crate: HunchessCrateArt, Box: HunchessBoxArt, box: "box", boxes: "Boxes" },
+const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { color: string }) => JSX.Element; box: string; boxes: string; lid: number }> = {
+  // (`lid`: where the box's lid ends, as a share of its drawing's height: the opening's lid flies off there. The mockup's, measured.)
+  winter: { Crate: WinterCrateArt, Box: PresentArt, box: "present", boxes: "Presents", lid: 0.46 },
+  beta: { Crate: BetaCrateArt, Box: SupplyBoxArt, box: "supply box", boxes: "Supply boxes", lid: 0.36 },
+  hunchess: { Crate: HunchessCrateArt, Box: HunchessBoxArt, box: "box", boxes: "Boxes", lid: 0.38 },
 };
 
 /**
  * A crate opened but not seen yet: the server rolled it, but you left during the spin (Eric, Oct 8). Kept on the
  * device (and in memory, if storage is off) until its reveal shows; coming back to the crates opens straight to it.
  */
-type Unseen = { crate: string; roll: CrateRoll; item: ItemInstance };
+type Unseen = { crate: string } & Opened;
 const UNSEEN_KEY = "hunchess-crate-unseen";
 let unseenHere: Unseen | null = null;
 function setUnseen(u: Unseen | null) {
@@ -183,12 +191,31 @@ export function CratesPanel() {
   }, [open, welcomeOpen]);
   const count = (n: number | null | undefined) => String(n ?? 0);
   const [picking, setPicking] = useState(false);
+  const [showUnowned, setShowUnowned] = useState(readShowUnowned);
   if (picking) return <BossPickPage onBack={() => setPicking(false)} />;
   if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
   if (welcomeOpen !== null) {
     const row = welcome.find((r) => r.n === welcomeOpen)!;
     return <WelcomePage row={row} resume={resumeRow !== null && welcomeOpen === resumeRow ? (resume ?? undefined) : undefined} onBack={() => setWelcomeOpen(null)} />;
   }
+  // The page, top to bottom (Eric, Nov 25: "refactor this page a bit"; docs/decisions/2026-11-25-crates-page-tidy.md): your keys and
+  // crates; Ready to open (every crate you can open now: Welcome Crates still to open, the crates you hold, a boss crate to choose); your
+  // boss tokens; More crates (the rest: each opens its page, odds and contents); and, admins only, the test grants at the very bottom.
+  // Each crate is in one place: Ready to open while you hold it, More crates otherwise.
+  const unseen = getUnseen();
+  const welcomeShown = welcomeRowsShown(welcome, unseen && isWelcomeCrate(unseen.crate) ? welcomeResumeRow(welcome) : null);
+  const bosses = BOSS_CRATES.filter((c) => profile?.admin || heldOf(locker, c) > 0 || !adminFirst({ id: c.boss }));
+  const heldBoss = bossCratesShown(bosses, (c) => heldOf(locker, c), false);
+  // ("Show unowned" (Nov 24) now covers the boss crates you don't hold, in More crates: the ones you hold are under Ready to open.)
+  const moreBoss = showUnowned ? bosses.filter((c) => heldOf(locker, c) === 0) : [];
+  const picks = locker?.bossPicks ?? 0;
+  const pickRow = <BossPickRow picks={picks} onOpen={() => setPicking(true)} />;
+  const readyWelcome = welcomeShown.filter((r) => r.state === "ready");
+  const heldSeries = CRATES.filter((c) => heldOf(locker, c) > 0);
+  const nothingReady = !readyWelcome.length && !heldSeries.length && !heldBoss.length && !picks;
+  const welcomeRow = (row: WelcomeRowView) => <WelcomeRow key={`w${row.n}`} row={row} onOpen={() => setWelcomeOpen(row.n)} />;
+  const seriesRow = (c: CrateDef) => <SeriesCrateRow key={c.id} crate={c} held={heldOf(locker, c)} keys={keysOf(locker)} onOpen={() => setOpen(c)} />;
+  const bossRow = (c: BossCrateDef) => <BossCrateRow key={c.id} crate={c} held={heldOf(locker, c)} onOpen={() => setOpen(c)} />;
   return (
     <div class="crates">
       <GamblingWarning />
@@ -201,69 +228,100 @@ export function CratesPanel() {
         </span>
         <span class="stock">Crates × {count(locker?.crates)}</span>
       </div>
-      {welcome.map((row) => (
-        <WelcomeRow key={row.n} row={row} onOpen={() => setWelcomeOpen(row.n)} />
-      ))}
-      <BossPickRow picks={locker?.bossPicks ?? 0} onOpen={() => setPicking(true)} />
+      <section class="crates-section crates-ready" aria-label="Ready to open">
+        <h3 class="ff-title">Ready to open</h3>
+        {readyWelcome.map(welcomeRow)}
+        {picks > 0 && pickRow}
+        {heldSeries.map(seriesRow)}
+        {heldBoss.map(bossRow)}
+        {nothingReady && <p class="small muted crates-none">Nothing to open right now.</p>}
+      </section>
       <TokenStock tokens={locker?.tokens ?? {}} admin={!!profile?.admin} />
+      <section class="crates-section crates-more" aria-label="More crates">
+        {/* "More crates" and its "Show unowned" box on one line (Nov 24's box, Nov 25's section). */}
+        <div class="boss-crates-head">
+          <h3 class="ff-title">More crates</h3>
+          <label class="show-unowned">
+            <input
+              type="checkbox"
+              checked={showUnowned}
+              onChange={(e) => {
+                const on = e.currentTarget.checked;
+                setShowUnowned(on);
+                saveShowUnowned(on);
+              }}
+            />
+            Show unowned
+          </label>
+        </div>
+        {/* Welcome Crates still to earn (their meters filling), then the series crates you don't hold (greyed, a padlock: shown, not
+            hidden, their pages still show what's inside), the boss crate choice with none to choose (greyed), and with "Show unowned"
+            every boss crate you don't hold. */}
+        {welcomeShown.filter((r) => r.state !== "ready").map(welcomeRow)}
+        {CRATES.filter((c) => heldOf(locker, c) === 0).map(seriesRow)}
+        {picks === 0 && pickRow}
+        {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
+        {moreBoss.map(bossRow)}
+        {!showUnowned && <p class="small muted no-boss-crates">{heldBoss.length ? MORE_BOSS_CRATES_LINE : NO_BOSS_CRATES_LINE}</p>}
+        <p class="small muted crates-how">Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward, and an opening sometimes gives a bonus crate (with its key if it needs one).</p>
+      </section>
+      {/* (Admins only, at the very bottom: the page above it is what every player sees. Eric, Nov 25.) */}
       {profile?.admin && <AdminGrants />}
-      {/* The series crates (Nov 9): each with how many you hold; a padlock while it can't be opened (none held, or no key), greyed at
-          none (shown, not hidden: its page still shows what's inside). */}
-      {CRATES.map((c) => {
-        const { Crate } = CRATE_LOOKS[c.look];
-        const n = heldOf(locker, c);
-        const locked = !n || !keysOf(locker);
-        return (
-          <button type="button" key={c.id} class={`ff-window crate-row series-crate-row${n ? "" : " none"}${locked ? " locked" : ""}`} data-crate={c.id} data-held={n} onClick={() => setOpen(c)}>
-            <span class="crate-row-art">
-              <Crate />
-              {locked && (
-                <span class="welcome-lock crate-lock">
-                  <Padlock />
-                </span>
-              )}
-            </span>
-            <span class="crate-row-text">
-              <strong>
-                <CrateName name={c.name} />
-              </strong>
-              <span class="crate-row-blurb">{c.blurb}</span>
-              <span class="crate-row-held">{n ? `You have ${n} · ${c.items.length} items` : `You have none · ${c.items.length} items`}</span>
-            </span>
-            <span class="ff-cursor" aria-hidden="true">
-              ▶
-            </span>
-          </button>
-        );
-      })}
-      <p class="small muted crates-how">Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward.</p>
-      {/* The boss crates (Eric, Nov 2: a buy in a boss's shop "adds the crate to your inventory"): each with how many you hold,
-          greyed at none (shown, not hidden: its page still shows what's inside); opened here as any crate. */}
-      <h3 class="ff-title">Boss crates</h3>
-      {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
-      {BOSS_CRATES.filter((c) => profile?.admin || heldOf(locker, c) > 0 || !adminFirst({ id: c.boss })).map((c) => {
-        const { Crate } = CRATE_LOOKS[c.look];
-        const n = heldOf(locker, c);
-        return (
-          <button type="button" key={c.id} class={`ff-window crate-row boss-crate-row${n ? "" : " none"}`} data-crate={c.id} data-held={n} onClick={() => setOpen(c)}>
-            <span class="crate-row-art">
-              <Crate />
-              <span class="crate-row-token">
-                <TokenArt boss={c.boss} />
-              </span>
-            </span>
-            <span class="crate-row-text">
-              <strong>{c.name}</strong>
-              <span class="crate-row-blurb">{c.blurb}</span>
-              <span class="crate-row-held">{n ? `You have ${n}` : "You have none"}</span>
-            </span>
-            <span class="ff-cursor" aria-hidden="true">
-              ▶
-            </span>
-          </button>
-        );
-      })}
     </div>
+  );
+}
+
+/** "Check Show unowned" when the boss crates you hold are all under Ready to open. */
+const MORE_BOSS_CRATES_LINE = "Check Show unowned to see the boss crates you don't have.";
+
+/** A series crate's row (Nov 9): how many you hold; a padlock while it can't be opened (none held, or no key), greyed at none. */
+function SeriesCrateRow({ crate: c, held: n, keys, onOpen }: { crate: CrateDef; held: number; keys: number; onOpen: () => void }) {
+  const { Crate } = CRATE_LOOKS[c.look];
+  const locked = !n || !keys;
+  return (
+    <button type="button" class={`ff-window crate-row series-crate-row${n ? "" : " none"}${locked ? " locked" : ""}`} data-crate={c.id} data-held={n} onClick={onOpen}>
+      <span class="crate-row-art">
+        <Crate />
+        {locked && (
+          <span class="welcome-lock crate-lock">
+            <Padlock />
+          </span>
+        )}
+      </span>
+      <span class="crate-row-text">
+        <strong>
+          <CrateName name={c.name} />
+        </strong>
+        <span class="crate-row-blurb">{c.blurb}</span>
+        <span class="crate-row-held">{n ? `You have ${n} · ${c.items.length} items` : `You have none · ${c.items.length} items`}</span>
+      </span>
+      <span class="ff-cursor" aria-hidden="true">
+        ▶
+      </span>
+    </button>
+  );
+}
+
+/** A boss crate's row (Eric, Nov 2: bought in its boss's shop, held until opened here): its boss's token on the corner, greyed at none. */
+function BossCrateRow({ crate: c, held: n, onOpen }: { crate: BossCrateDef; held: number; onOpen: () => void }) {
+  const { Crate } = CRATE_LOOKS[c.look];
+  return (
+    <button type="button" class={`ff-window crate-row boss-crate-row${n ? "" : " none"}`} data-crate={c.id} data-held={n} onClick={onOpen}>
+      <span class="crate-row-art">
+        <Crate />
+        <span class="crate-row-token">
+          <TokenArt boss={c.boss} />
+        </span>
+      </span>
+      <span class="crate-row-text">
+        <strong>{c.name}</strong>
+        <span class="crate-row-blurb">{c.blurb}</span>
+        <span class="crate-row-held">{n ? `You have ${n}` : "You have none"}</span>
+      </span>
+      <span class="ff-cursor" aria-hidden="true">
+        ▶
+      </span>
+    </button>
   );
 }
 
@@ -434,9 +492,11 @@ const levelNow = () => levelOf(account().profile?.xp ?? 0);
 /** Admins only: test grants to yourself (crate keys, any boss's tokens), for trying the boss crates (the server checks it's you). */
 function AdminGrants() {
   const [boss, setBoss] = useState("tiger");
+  // (Nov 25, Eric: "how do I get more crates?": any series crate or boss crate, 5 at a time.)
+  const [crate, setCrate] = useState(CRATES[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const give = (body: { keys?: number; boss?: string; tokens?: number }) => {
+  const give = (body: { keys?: number; boss?: string; tokens?: number; crate?: string; crates?: number }) => {
     setBusy(true);
     setError(null);
     void grantTestItems(body)
@@ -470,6 +530,18 @@ function AdminGrants() {
           +3 tokens
         </button>
       </div>
+      <div class="admin-grants-row">
+        <select aria-label="Crate" value={crate} onChange={(e) => setCrate((e.target as HTMLSelectElement).value)}>
+          {[...CRATES, ...BOSS_CRATES].map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy || !crate} onClick={() => give({ crate, crates: 5 })}>
+          +5 crates
+        </button>
+      </div>
       {error && <p class="shop-error">{error}</p>}
     </section>
   );
@@ -478,7 +550,10 @@ function AdminGrants() {
 function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
   // A boss crate opens only one you hold (the server's, once each), never with a test switch; a series crate one you hold, with a key.
   const boss = isBossCrate(crate) ? crate : null;
-  const locker = useAccount().profile?.locker;
+  const { profile } = useAccount();
+  const locker = profile?.locker;
+  // (An admin's bonus pool has the bosses not yet released too, as the server rolls it: bonusPool(admin). #923's review, Nov 25.)
+  const admin = !!profile?.admin;
   const held = heldOf(locker, crate);
   const keys = keysOf(locker);
   const canOpen = boss ? held > 0 : held > 0 && keys > 0;
@@ -488,14 +563,38 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   const [shinySet, setForceShiny] = useState<boolean | null>(null);
   const forceFischer = crateSwitchesHere() && (fischerSet ?? testParams().get("fischer") === "1");
   const forceShiny = crateSwitchesHere() && (shinySet ?? testParams().get("shiny") === "1");
+  // (?bonus=1: a bonus crate for sure, its crate rolled; ?bonus=<crate id>: that one; ?bonus=0 or none: no bonus. Nov 24.)
+  const [bonusSet, setForceBonus] = useState<boolean | null>(null);
+  const bonusParam = testParams().get("bonus") === "0" ? null : testParams().get("bonus");
+  const forceBonus: true | string | undefined = !crateSwitchesHere()
+    ? undefined
+    : bonusSet === false
+      ? undefined
+      : bonusSet === true
+        ? (bonusParam && bonusParam !== "1" ? bonusParam : true)
+        : bonusParam === "1"
+          ? true
+          : bonusParam || undefined;
+  const bonusHeld = locker?.bonusCrates?.[crate.id] ?? 0;
+  // (How many of them are bonus ones: "You have 2 (1 bonus)". Nov 24.)
+  const heldWords = `${held}${bonusHeld ? ` (${bonusHeld} bonus)` : ""}`;
   const [opening, setOpening] = useState(!!resume);
+  // (The opening's sounds made ahead in the sound worker as its page opens, once sound is on: before the Open's tap.)
+  useEffect(() => warmCrateSounds(), []);
   const look = CRATE_LOOKS[crate.look];
   // Commonest first; Legendary and Mythic (Fischer Random) last.
   const items = [...crate.items].sort((a, b) => tierIndex(a) - tierIndex(b));
-  if (opening)
-    return <CrateOpening crate={crate} force={boss ? {} : { fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />;
   return (
     <div class="crate-page">
+      {/* (The opening on its own layer over this page, which stays as it is under it: Nov 24.) */}
+      {opening && (
+        <CrateOpening
+          crate={crate}
+          force={boss ? {} : { fischer: forceFischer, shiny: forceShiny, ...(forceBonus ? { bonus: forceBonus } : {}) }}
+          resume={resume}
+          onClose={() => setOpening(false)}
+        />
+      )}
       <GamblingWarning />
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
@@ -510,15 +609,15 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         <span class="small">{crate.blurb}</span>
         {boss ? (
           <span class="small crate-held" data-held={held}>
-            {held ? `You have ${held}.` : `You have none. ${possessive(tokenBossName(boss.boss))} shop in the town sells it.`}
+            {held ? `You have ${heldWords}.` : `You have none. ${possessive(tokenBossName(boss.boss))} shop in the town sells it.`}
           </span>
         ) : (
           <span class="small crate-held" data-held={held} data-keys={keys}>
             {!held
               ? "You have none. Leveling up and the daily reward give you crates."
               : !keys
-                ? `You have ${held}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
-                : `You have ${held}, and ${keys} ${keys === 1 ? "key" : "keys"}.`}
+                ? `You have ${heldWords}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
+                : `You have ${heldWords}, and ${keys} ${keys === 1 ? "key" : "keys"}.`}
           </span>
         )}
       </div>
@@ -532,10 +631,10 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
             return (
               <div key={tier} class="odds-row" style={{ "--tier": "#fbbf24" }}>
                 <span class="odds-art">
-                  <FischerArt />
+                  <TranscendentArt />
                 </span>
                 <span class="odds-text">
-                  <strong>Fischer Random</strong>
+                  <strong>Transcendent</strong>
                   <span class="odds-tier">A second spin: Legendary or Mythic</span>
                 </span>
                 <span class="odds-pct">{pct(presentChance(crate, tier))}</span>
@@ -559,6 +658,8 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           );
         })}
       </div>
+      {/* The bonus crate (Nov 24): one plain line, the same as the FAQ's (core bonusOddsLine). */}
+      <p class="small muted crate-bonus-odds">{bonusOddsLine(undefined, bonusPool(admin).length)}</p>
       <h3 class="ff-title">Possible items</h3>
       <div class="odds-list">
         {items.map((def) => {
@@ -574,7 +675,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
                 <strong>{d.name}</strong>
                 <span class="odds-tier">
                   {t.name} · {SLOT_NAMES[d.slot]}
-                  {special ? " · Fischer Random only" : ""}
+                  {special ? " · Transcendent only" : ""}
                 </span>
               </span>
               <span class="odds-pct">{pct(itemChance(crate, def))}</span>
@@ -605,10 +706,13 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         <div class="test-switches">
           <span class="muted small">Testing:</span>
           <label class="check small">
-            <input type="checkbox" checked={forceFischer} onChange={(e) => setForceFischer(e.currentTarget.checked)} /> Land on Fischer Random
+            <input type="checkbox" checked={forceFischer} onChange={(e) => setForceFischer(e.currentTarget.checked)} /> Land on Transcendent
           </label>
           <label class="check small">
             <input type="checkbox" checked={forceShiny} onChange={(e) => setForceShiny(e.currentTarget.checked)} /> Shiny
+          </label>
+          <label class="check small">
+            <input type="checkbox" checked={!!forceBonus} onChange={(e) => setForceBonus(e.currentTarget.checked)} /> Bonus crate
           </label>
         </div>
       )}
@@ -637,9 +741,10 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
  */
 function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Unseen; onBack: () => void }) {
   const [opening, setOpening] = useState(!!resume);
-  if (opening) return <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />;
+  useEffect(() => warmCrateSounds(), []);
   return (
     <div class="crate-page welcome-page">
+      {opening && <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />}
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
       </button>
@@ -737,8 +842,8 @@ function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
   if (tile.kind === "fischer") {
     return (
       <span class="spin-tile fischer">
-        <FischerArt />
-        <span class="spin-tile-name">Fischer Random</span>
+        <TranscendentArt />
+        <span class="spin-tile-name">Transcendent</span>
       </span>
     );
   }
@@ -762,50 +867,6 @@ function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
 }
 
 /**
- * The strip: it races past a center marker, slows (ease-out) and lands on the result, with a click for every
- * tile that passes (fast, then slower and slower).
- */
-function Spin({ tiles, land, ms, look, onDone }: { tiles: Tile[]; land: number; ms: number; look: CrateLook; onDone: () => void }) {
-  const box = useRef<HTMLDivElement>(null);
-  const track = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = track.current!;
-    const first = el.children[0] as HTMLElement;
-    const step = first.offsetWidth + 6;
-    const width = box.current!.offsetWidth;
-    // Land somewhere inside the tile (not dead center), like a real wheel.
-    const target = land * step + step / 2 - width / 2 + (Math.random() - 0.5) * step * 0.6;
-    const start = performance.now();
-    let last = -1;
-    let raf = 0;
-    const frame = (now: number) => {
-      const t = Math.min(1, (now - start) / ms);
-      const x = target * (1 - Math.pow(1 - t, 4));
-      el.style.transform = `translateX(${-x}px)`;
-      const idx = Math.floor((x + width / 2) / step);
-      if (idx !== last) {
-        if (last >= 0) play("reel");
-        last = idx;
-      }
-      if (t < 1) raf = requestAnimationFrame(frame);
-      else setTimeout(onDone, 450);
-    };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return (
-    <div class="spin" ref={box}>
-      <div class="spin-marker" aria-hidden="true" />
-      <div class="spin-track" ref={track}>
-        {tiles.map((t, i) => (
-          <TileView key={i} tile={t} look={look} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
  * Opening a crate: the server rolls, the strip spins to a tier's present, which unwraps straight to the reveal; or
  * to Fischer Random, which gets its banner and a second spin among its items before the reveal.
  */
@@ -822,37 +883,133 @@ export function BossCrateArt({ crate }: { crate: BossCrateDef }) {
   );
 }
 
-/** A crate opening: the strip, the unwrap, Fischer Random and the reveal (the Crates tab's; Boingo's claw machine's Open now, Nov 6). */
+/**
+ * A crate opening (the Crates tab's, the Welcome Crate's, a boss crate's: from its page, its shop's "Open now" or Boingo's claw machine):
+ * the server rolls, then on the opening's own layer (Nov 24: the whole phone screen, a computer's middle column; crate-open/) the strip
+ * spins to a tier's box, which drops in, shakes and bursts open with a beam in the item's tier color, the item rising into the reveal
+ * card; or to Fischer Random, which gets its banner, then a second strip among its items whose winner's beam comes up without a box.
+ * What's rolled, how and what's shown as won are unchanged: only the picture and the sound are new.
+ */
 export function CrateOpening({
   crate,
   force,
   resume,
   onClose,
+  opener = openCrate,
 }: {
   crate: CrateDef;
-  force: { fischer?: boolean; shiny?: boolean };
+  force: OpenForce;
   /** A crate already opened but not seen (you left during the spin): straight to its reveal. */
   resume?: Unseen;
   onClose: () => void;
+  /** The roll (the server's; the dev preview page's own fake one, for its frames). */
+  opener?: (crate: string, force: OpenForce) => Promise<Opened>;
 }) {
-  const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
+  const [result, setResult] = useState<Opened | null>(resume ?? null);
   // "Open another": only while you hold one more (greyed at none), a series crate also a key (Nov 9). (A Welcome Crate: another only
   // while a second waits.)
   const lockerNow = useAccount().profile?.locker;
   const welcomeLeft = lockerNow?.welcome?.unopened ?? 0;
   const more = isWelcomeCrate(crate.id) ? welcomeLeft > 0 : heldOf(lockerNow, crate) > 0 && (isBossCrate(crate) || keysOf(lockerNow) > 0);
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">(resume ? "reveal" : "spin");
+  // The strip (and, for a present, its box and the card), Fischer Random's banner, its second strip.
+  const [stage, setStage] = useState<"spin" | "fischer" | "spin2">("spin");
+  // The card has formed (the reveal is shown: the crate is seen).
+  const [shown, setShown] = useState(!!resume);
   const [round, setRound] = useState(0);
+  // The bonus crate's card (Nov 24): up a beat after the item's card has formed, until its OK (`bonusSeen`: its OK tapped).
+  const [bonusUp, setBonusUp] = useState<BonusRoll | null>(null);
+  const [bonusSeen, setBonusSeen] = useState(false);
+  // The ~300 ms after its OK (the review, Nov 25): the item's buttons stay inert, so a double tap on OK (over "Open another") opens
+  // nothing; then the focus goes back to the item's first button.
+  const [calming, setCalming] = useState(false);
+  const stages = useRef<HTMLDivElement>(null);
+  const refocus = useRef(false);
+  // "Open another": everything back to the start in the same update as the new round, so the new strip never mounts with the last
+  // answer (it would start on it, then be stopped as the answer cleared, and wait for ever: its card never shown).
+  const again = () => {
+    setResult(null);
+    setError(null);
+    setStage("spin");
+    setShown(false);
+    setBonusUp(null);
+    setBonusSeen(false);
+    setCalming(false);
+    setRound((r) => r + 1);
+  };
+  const showBonus = (bonus: BonusRoll) => {
+    setBonusUp(bonus);
+    play("bannerStart");
+  };
   useEffect(() => {
-    if (round === 0 && resume) return;
+    const bonus = shown ? result?.bonus : undefined;
+    if (!bonus || bonusUp || bonusSeen) return;
+    const t = setTimeout(() => showBonus(bonus), BONUS.afterCardMs);
+    return () => clearTimeout(t);
+  }, [shown, result, bonusUp, bonusSeen]);
+  // A bonus not seen yet comes first (the review, Nov 25): Done or Open another tapped before its card is up shows it at once, and does
+  // nothing else; its OK goes back to the item's card, as always.
+  const bonusFirst = (): boolean => {
+    const bonus = result?.bonus;
+    if (!bonus || bonusSeen) return false;
+    if (!bonusUp) showBonus(bonus);
+    return true;
+  };
+  // It's seen once its card has formed and, with a bonus, the bonus's card has had its OK (leave before that, and both wait for you);
+  // and the moment Done, Wear or Open another is tapped (Nov 25): they can be tapped while the card is still forming, before its timer
+  // (`shown`) fires, and the next visit to the crates then resumed this reveal over the list.
+  const seen = () => {
+    if (result && (!result.bonus || bonusSeen)) setUnseen(null);
+  };
+  useEffect(() => {
+    if (shown) seen();
+  }, [shown, result, bonusSeen]);
+  const onAgain = () => {
+    if (bonusFirst()) return;
+    seen();
+    again();
+  };
+  const onDone = () => {
+    if (bonusFirst()) return;
+    seen();
+    onClose();
+  };
+  const bonusOk = () => {
+    setBonusUp(null);
+    setBonusSeen(true);
+    setCalming(true);
+    refocus.current = true;
+  };
+  useEffect(() => {
+    if (calming) {
+      const t = setTimeout(() => setCalming(false), BONUS.calmMs);
+      return () => clearTimeout(t);
+    }
+    // (Inert no more: the focus back to the item's card, its first button that takes one.)
+    if (!refocus.current) return;
+    refocus.current = false;
+    stages.current?.querySelector<HTMLElement>(".reveal-actions button:not(:disabled)")?.focus({ preventScroll: true });
+  }, [calming]);
+  // The item's buttons: inert while the bonus card is up and the ~300 ms after (not reachable by tap or keyboard).
+  const quiet = !!bonusUp || calming;
+  const still = round === 0 && !!resume;
+  useEffect(() => {
+    if (still) return;
     let here = true;
     setResult(null);
+    setError(null);
     setStage("spin");
-    openCrate(crate.id, force)
-      .then((r) => {
+    setShown(false);
+    // (Its sounds made ahead in the sound worker, while the server answers: none is made on the opening's frames.)
+    warmCrateSounds();
+    // (Under "Opening…": the server's answer, and the strip's first sounds made in the worker, up to a short wait.)
+    const ready = crateSoundsReady(1500);
+    opener(crate.id, force)
+      .then(async (r) => {
         // It's yours now: if you leave before the reveal, it waits for you (the reveal clears it).
         setUnseen({ crate: crate.id, ...r });
+        warmCrateSounds(itemDef(r.item.def)!.tier);
+        await ready;
         if (here) setResult(r);
       })
       .catch((e) => here && setError(e instanceof Error ? e.message : "Couldn't open the crate."));
@@ -860,97 +1017,199 @@ export function CrateOpening({
       here = false;
     };
   }, [round]);
+  // The first strip's decoys, drawn as the opening starts (so the strip is set up while the server answers); its winner once it has.
+  const decoys = useMemo(() => stripTiles(presentTile(crate), { kind: "present", tier: "common" }, STRIPS.crate.tiles, STRIPS.crate.land), [round]);
   const strips = useMemo(() => {
     if (!result) return null;
     const { roll, item } = result;
     const finish = { color: item.color, color2: item.color2 ?? undefined, blemish: item.blemish, seed: item.seed };
     const tier = itemDef(item.def)!.tier as PresentTier;
+    const one = decoys.slice();
+    one[STRIPS.crate.land] = roll.fischer ? { kind: "fischer" } : { kind: "present", tier };
     return {
       tier,
-      one: stripTiles(presentTile(crate), roll.fischer ? { kind: "fischer" } : { kind: "present", tier }, 46, 38),
+      one,
       // Only Fischer Random spins again; a present opens straight to its item (Eric, Oct 7).
-      two: roll.fischer ? stripTiles(itemTile(fischerOdds(crate)), { kind: "item", def: item.def, finish }, 30, 24) : [],
+      two: roll.fischer ? stripTiles(itemTile(fischerOdds(crate)), { kind: "item", def: item.def, finish }, STRIPS.fischer.tiles, STRIPS.fischer.land) : [],
     };
   }, [result]);
-  const afterFirst = () => {
-    if (!strips) return;
-    if (result?.roll.fischer) {
-      // (Its banner's 2.5 s and a beat: every banner a second longer, Eric, Oct 15; and the banners' extra, Oct 24.)
-      setStage("fischer");
-      setTimeout(() => setStage("spin2"), fischerBannerMs() + 200);
-    } else {
-      setStage("unwrap");
-      setTimeout(() => setStage("reveal"), 1150);
-    }
-  };
-  return (
-    <div class="crate-opening">
-      <h2 class="ff-title">
-        <CrateName name={crate.name} />
-      </h2>
-      {error && <p class="shop-error">{error}</p>}
-      {!result && !error && <p class="muted">Opening…</p>}
-      {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} look={crate.look} onDone={afterFirst} />}
-      {strips && stage === "fischer" && (
-        <div class="fischer-stage">
-          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub={isWelcomeCrate(crate.id) ? "A HunChess ride" : "Legendary or Mythic"} sound="bannerStart" ms={fischerBannerMs()} />
-        </div>
-      )}
-      {strips && stage === "unwrap" && <Unwrap tier={strips.tier} look={crate.look} />}
-      {strips && stage === "spin2" && (
-        <Spin key={`b${round}`} tiles={strips.two} land={24} ms={4800} look={crate.look} onDone={() => setStage("reveal")} />
-      )}
-      {result && stage === "reveal" && (
-        <Reveal
-          item={result.item}
-          again={more}
-          onAgain={() => setRound((r) => r + 1)}
-          onClose={onClose}
-        />
-      )}
-    </div>
-  );
-}
-
-/** A present (or a supply box) opening: it shakes, then bursts open. */
-function Unwrap({ tier, look }: { tier: PresentTier; look: CrateLook }) {
-  const t = tierInfo(tier);
-  const { Box, box } = CRATE_LOOKS[look];
+  const look = CRATE_LOOKS[crate.look];
+  const fischer = !!result?.roll.fischer;
+  // Fischer Random's second strip is set up out of sight while the first spins (its setup off the banner's first frames).
+  const [ahead, setAhead] = useState(false);
   useEffect(() => {
-    play("select");
-  }, []);
+    setAhead(false);
+    if (!fischer) return;
+    const t = setTimeout(() => setAhead(true), 1500);
+    return () => clearTimeout(t);
+  }, [result]);
+  const tier = (result ? itemDef(result.item.def)!.tier : null) as PresentTier | null;
+  const art = result && <ItemArt def={result.item.def} finish={result.item} live />;
+  const details = result && <RevealDetails item={result.item} again={more} quiet={quiet} onAgain={onAgain} onClose={onDone} onWear={seen} />;
+  const one = strips?.one ?? decoys;
   return (
-    <div class="present-stage" style={{ "--tier": t.color }}>
-      <span class="present-stage-art">
-        <Box color={t.color} />
-      </span>
-      <strong>
-        {t.name} {box}
-      </strong>
-    </div>
+    <OpenLayer label={crate.name}>
+      <div class="cox-head">
+        <h2 class="ff-title">
+          <CrateName name={crate.name} />
+        </h2>
+        <p class={`cox-status${error ? " error" : ""}`} aria-live="polite">
+          {error ?? (!result ? "Opening…" : "")}
+        </p>
+      </div>
+      <div class="cox-room">
+        <div class="cox-stages" ref={stages}>
+          {still && result && <Reveal item={result.item} again={more} quiet={quiet} onAgain={onAgain} onClose={onDone} onWear={seen} />}
+          {!still && stage !== "spin2" && (
+            <CrateStage
+              key={`a${round}`}
+              tiles={STRIPS.crate.tiles}
+              land={STRIPS.crate.land}
+              tile={(i) => <TileView tile={one[i]!} look={crate.look} />}
+              ending={result ? (fischer ? "none" : "box") : null}
+              tier={result && !fischer ? tier : null}
+              Box={look.Box}
+              lid={look.lid}
+              item={fischer ? null : art}
+              cardClass={result ? revealClass(result.item) : ""}
+              cardBody={fischer ? null : details}
+              go={!!strips}
+              onStop={
+                fischer
+                  ? () => {
+                      // (Its banner's 2.5 s and a beat: every banner a second longer, Eric, Oct 15; and the banners' extra, Oct 24.)
+                      setStage("fischer");
+                      setTimeout(() => setStage("spin2"), fischerBannerMs() + 200);
+                    }
+                  : undefined
+              }
+              onCard={() => setShown(true)}
+            />
+          )}
+          {/* Fischer Random's second strip: set up under its banner, then spun; its winner's beam comes up without a box. */}
+          {!still && strips && fischer && (ahead || stage !== "spin") && (
+            <CrateStage
+              key={`b${round}`}
+              tiles={STRIPS.fischer.tiles}
+              land={STRIPS.fischer.land}
+              tile={(i) => <TileView tile={strips.two[i]!} look={crate.look} />}
+              ending="beam"
+              tier={tier}
+              Box={look.Box}
+              lid={look.lid}
+              item={art}
+              cardClass={revealClass(result!.item)}
+              cardBody={details}
+              go={stage === "spin2"}
+              hidden={stage !== "spin2"}
+              onCard={() => setShown(true)}
+            />
+          )}
+          {stage === "fischer" && (
+            <div class="fischer-stage">
+              <FightBanner tone="hero" face={<TranscendentArt />} text="TRANSCENDENT!" sub={isWelcomeCrate(crate.id) ? "A HunChess ride" : "Legendary or Mythic"} ms={fischerBannerMs()} />
+            </div>
+          )}
+          {error && (
+            <button type="button" class="ff-button cox-done" onClick={onClose}>
+              ▶ Done
+            </button>
+          )}
+          {bonusUp && (
+            <BonusStage key={`c${round}`}>
+              <BonusCard bonus={bonusUp} onOk={bonusOk} />
+            </BonusStage>
+          )}
+        </div>
+      </div>
+    </OpenLayer>
   );
 }
 
-/** The reveal: an FF-style window with the item, its tier, color, purity and (if so) its shine. */
-function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; again?: boolean; onAgain: () => void; onClose: () => void }) {
+/**
+ * The bonus crate's card's words and buttons (Nov 24; docs/decisions/2026-11-24-bonus-crate.md), under "BONUS!": the crate's art (a boss
+ * crate's with its boss's token), its name, "+1 crate key" with the key when one came with it, where it is, and OK (back to the item's
+ * card). It's in your inventory already: the opening's answer brought it.
+ */
+export function BonusCard({ bonus, onOk }: { bonus: BonusRoll; onOk: () => void }) {
+  const crate = anyCrate(bonus.crate);
+  const { Crate } = CRATE_LOOKS[crate?.look ?? "beta"];
+  return (
+    <>
+      <span class="reveal-tier">BONUS!</span>
+      <span class="reveal-art cox-bonus-art">
+        <Crate />
+        {crate && isBossCrate(crate) && (
+          <span class="crate-row-token">
+            <TokenArt boss={crate.boss} />
+          </span>
+        )}
+      </span>
+      <strong class="reveal-name">
+        <CrateName name={crate?.name ?? bonus.crate} />
+      </strong>
+      {bonus.key && (
+        <span class="cox-bonus-key">
+          <span class="stock-art">
+            <KeyArt />
+          </span>
+          +1 crate key
+        </span>
+      )}
+      <span class="reveal-desc">A bonus crate{bonus.key ? " and its key" : ""}, in your inventory's Crates.</span>
+      <div class="reveal-actions">
+        <button type="button" class="ff-button small" onClick={onOk}>
+          ▶ OK
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** The reveal card's classes: shiny (a high purity), special (Legendary and Mythic). (A HunChess ride: no purity, so no shine; Eric, Nov 6.) */
+function revealClass(item: ItemInstance) {
+  const d = itemDef(item.def)!;
+  const shiny = !isHunchess(item.def) && isShiny(item.blemish);
+  const special = d.tier === "legendary" || d.tier === "mythic";
+  return `${shiny ? "shiny" : ""}${special ? `${shiny ? " " : ""}special` : ""}`;
+}
+
+/**
+ * The reveal card already opened and not seen (you left during the spin, Oct 8): the card alone, at once, with the game's reveal sound.
+ */
+function Reveal({ item, again = true, quiet = false, onAgain, onClose, onWear }: { item: ItemInstance; again?: boolean; quiet?: boolean; onAgain: () => void; onClose: () => void; onWear?: () => void }) {
   const d = itemDef(item.def)!;
   const t = tierInfo(d.tier);
-  // (A HunChess ride: no purity, so no shine named either; Eric, Nov 6.)
-  const hc = isHunchess(item.def);
-  const shiny = !hc && isShiny(item.blemish);
-  const special = d.tier === "legendary" || d.tier === "mythic";
-  const [worn, setWorn] = useState(false);
+  const cls = revealClass(item);
   useEffect(() => {
-    setUnseen(null);
-    play(special || shiny ? "bannerStart" : "select");
+    play(cls ? "bannerStart" : "select");
   }, []);
   return (
-    <div class={`ff-window reveal-card${shiny ? " shiny" : ""}${special ? " special" : ""}`} style={{ "--tier": t.color }}>
+    <div class={`ff-window reveal-card cox-card-still${cls ? ` ${cls}` : ""}`} style={{ "--tier": t.color }}>
       <span class="reveal-tier">{t.name}</span>
       <span class="reveal-art">
-        <ItemArt def={item.def} finish={item} />
+        <ItemArt def={item.def} finish={item} live />
       </span>
-      <strong class="reveal-name">{d.name}</strong>
+      <RevealDetails item={item} again={again} quiet={quiet} onAgain={onAgain} onClose={onClose} onWear={onWear} />
+    </div>
+  );
+}
+
+/**
+ * The reveal's words and buttons, under its picture: the item, its tier, color, purity and (if so) its shine; Wear, Open another, Done.
+ * `quiet`: its buttons inert (the bonus card over it, and a beat after: CrateOpening). (Its opening clears the unseen record: CrateOpening.)
+ */
+function RevealDetails({ item, again, quiet, onAgain, onClose, onWear }: { item: ItemInstance; again: boolean; quiet: boolean; onAgain: () => void; onClose: () => void; onWear?: () => void }) {
+  const d = itemDef(item.def)!;
+  const hc = isHunchess(item.def);
+  const shiny = !hc && isShiny(item.blemish);
+  const [worn, setWorn] = useState(false);
+  // (Quiet: no tap or key does anything, also where `inert` isn't known (Safari before 15.5): the class takes no tap, and each button's
+  // own check. #923's re-review, Nov 25.)
+  const unlessQuiet = (f: () => void) => () => void (quiet || f());
+  return (
+    <>
+      <strong class="reveal-name">{itemName(item)}</strong>
       <span class="reveal-finish">
         {finishLine(item)}
         {shiny ? " ✨" : ""}
@@ -958,26 +1217,27 @@ function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; 
       {shiny && <span class="reveal-shiny">Shiny!</span>}
       {hc && <NotTradeable />}
       <span class="reveal-desc">{d.description}</span>
-      <div class="reveal-actions">
+      <div class={`reveal-actions${quiet ? " quiet" : ""}`} inert={quiet}>
         <button
           type="button"
           class="ff-button small"
           disabled={worn}
-          onClick={() => {
+          onClick={unlessQuiet(() => {
+            onWear?.();
             void equipLockerItem(d.slot, item.id).then(() => setWorn(true));
             play("menuSelect");
-          }}
+          })}
         >
           {worn ? "Wearing it" : "▶ Wear"}
         </button>
-        <button type="button" class="ff-button small" disabled={!again} onClick={onAgain}>
+        <button type="button" class="ff-button small" disabled={!again} onClick={unlessQuiet(onAgain)}>
           ▶ Open another
         </button>
-        <button type="button" class="ff-button small" onClick={onClose}>
+        <button type="button" class="ff-button small" onClick={unlessQuiet(onClose)}>
           ▶ Done
         </button>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1022,7 +1282,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
     <div class="locker">
       <div class="ff-window locker-preview">
         <span class="locker-avatar">
-          <Avatar look={locker.look} side={sideOfPawn(pawn)} ride outlined />
+          <Avatar look={locker.look} side={sideOfPawn(pawn)} ride outlined live />
         </span>
         <div class="locker-pawn-pick" role="group" aria-label="Your default pawn color">
           {PAWN_COLORS.map((c) => (
@@ -1064,7 +1324,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                 key={s.key}
                 class={`locker-item${worn ? " worn" : ""}${covered ? " covered" : ""}${!hc && isShiny(it.blemish) ? " shiny" : ""}${hc ? " hunchess-item" : ""}`}
                 style={{ "--tier": tierInfo(d.tier).color }}
-                label={`${d.name}${covered ? ", hidden by your outfit" : ""}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
+                label={`${itemName(it)}${covered ? ", hidden by your outfit" : ""}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
                 onTap={() => {
                   play("menuSelect");
                   void equipLockerItem(d.slot, worn ? null : it.id);
@@ -1079,7 +1339,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                 }
               >
                 <ItemArt def={it.def} finish={it} />
-                <strong>{d.name}</strong>
+                <strong>{itemName(it)}</strong>
                 {hc ? (
                   <>
                     <span class="small">HunChess</span>
@@ -1246,7 +1506,7 @@ function DeleteDialog({ stack, wornId, onClose }: { stack: ItemStack; wornId: st
           <ItemArt def={top.def} finish={top} />
         </span>
         <strong id="locker-dialog-title">
-          Delete {d.name}
+          Delete {itemName(top)}
           {n > 1 ? ` ×${n}` : ""}?
         </strong>
         <span class="small">{n > 1 && showsPurity(top.def) ? `${colorName(top)} · the best is ${purity(top.blemish).toFixed(1)}%` : finishLine(top)}</span>

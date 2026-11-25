@@ -32,7 +32,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   A file under `/assets/` is answered from any kept version (its name is its contents'), any other file from this version only.
   Not covered: a picture changed by the deploy and not shown yet (pictures aren't precached), and a page no worker answers (a first
   visit before it's ready): `stale.ts` reloads it once a minute at most, back where it was (the town's square and facing, and the
-  room or challenge your tap was opening). Tests: `sw-versions.test.ts`, `stale.test.ts`, town.spec's two "a deploy landed" describes
+  room or challenge your tap was opening), and only for a deploy: it asks `/version.json` first, and a file that failed with the same
+  build on the server (a dropped connection) just fails, for its caller to try again (Nov 25,
+  [decision](../decisions/2026-11-25-stale-reload-only-for-a-deploy.md); it had thrown the Boss Battle screen back to home). A second
+  failure on the same build reloads too (older Chromium, CI's 141, and Safari keep a failed import, so a try again never loads it), and
+  Boss Battle is a place, so that reload lands on it ([decision](../decisions/2026-11-25-stale-second-failure-reloads.md)). Tests: `sw-versions.test.ts`, `stale.test.ts`, town.spec's two "a deploy landed" describes
   (the e2e server's `/api/e2e/sw.js`, `e2e-sql.ts`, serves the next deploy's worker).
 - **A page the network answered is never replaced by the saved app** (Nov 20, [decision](../decisions/2026-11-20-account-load-fail.md)):
   the worker's `navigate` branch passes on whatever the network answers (an error page, the site's gate's redirect to its login, which
@@ -121,6 +125,13 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     main", Nov 10, audit F1): fix it at its cause from its trace, never with a longer wait or a retry. A PR isn't held
     up by one. The summary's title says which red it is (Nov 12, audit Q3): "red: flaky only (N)" (fix the flakes) or
     "red: N failed" (a real failure: find its cause or revert). A red run with no failed test (GitHub dropped shards): "Re-run failed jobs" once.
+  - **A page that stops answering names its code** (Nov 24, `docs/decisions/2026-11-24-renderer-watchdog.md`): Playwright's `expect`
+    makes its first check with no timeout, so a hung page holds a 5 s expect until the test's 5-minute timeout, with no trace (moo.spec
+    Nov 20, boss-bar.spec Nov 24). `watchRenderer` in `e2e/helpers.ts` watches every test's `page`: a ping every 10 s, and one unanswered
+    for 30 s pauses the page's script (`Debugger.pause`) and prints its stack, with the code at each place, to the log as
+    `[renderer-hang]` and attaches it to the test (the HTML report, kept for a failed or flaky run). "It didn't pause either" means no
+    script was running (layout, painting, decoding, or the browser stuck); "timed out with the page still answering" means the wait
+    was Playwright's, not the page's. It only reports: no test fails because of it.
   - **A test of what comes after a battle ends it with the hook** (Nov 23, `docs/decisions/2026-11-23-e2e-end-hook.md`): `endBattle(page,
     "win" | "loss" | "draw")` in `e2e/helpers.ts` (the admins' 🏆 path, `asAdmin` first), through the battle's real end; only a test of
     playing a battle plays it to its end. A spec that played moves to reach a screen assumed how long the battle lasts ("play" vs "results").
@@ -198,14 +209,16 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     idle on purpose; also with a test `pool` on `/api/play`), a boss's fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
     own `pool` (`/api/play`, `/api/squads/play`, `/api/squads/party`, `/api/1v1/play`: `testPool` in `index.ts`); a 1 v 1
     game's own `clock=SECONDS` (each side's clock, no increment: `/api/1v1/play`); a crate's forced
-    `fischer` and `shiny` (`/api/locker/open`: since Nov 9 only where `TEST_SWITCHES` is "1", never an admin's on production). One check,
+    `fischer` and `shiny` (`/api/locker/open`: since Nov 9 only where `TEST_SWITCHES` is "1", never an admin's on production), and its
+    `bonus` (Nov 24: `true` or a crate's id; where `TEST_SWITCHES` is "1" an opening gives a bonus crate only when asked, so tests' counts
+    stay put; production always rolls its own and ignores it: shop.md, "The bonus crate"). One check,
     `testSwitchesOn` (`admin.ts`). And the Worker variable `CUTSCENE_HOLD_MS` (1 000 to 120 000, only with `TEST_SWITCHES` "1"; the e2e
     server's is 12 000): the Hidden Boss's cutscene's hold online instead of `RECLUSE_CUTSCENE.holdMs`, the scene sped up to fit it.
   - **The app's** (read only through `testParams()` in `packages/app/src/test-switches.ts`; `/api/auth/config` says
     `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
     `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `cutscene=SECONDS` (1 to 120: the Hidden Boss's
     cutscene sped up into that long, solo), `laststand`, `side`, `wip` and
-    `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes, and 1 v 1's `fewAfter=SECONDS` (the "Few players
+    `kit`, a crate page's `fischer`, `shiny` and `bonus` (`bonus=1` or `bonus=<crate id>`) and its "Testing:" boxes, and 1 v 1's `fewAfter=SECONDS` (the "Few players
     online" choice sooner) and `clock` (the bot game's clock too), and `quests=mock|done|entry` (the daily quests overlay mockup over home with fake data, Nov 9: `quests-mock.ts`), and `cardMs=MS` (home's Boss Battle card turns to the
   next boss this often instead of every 30 s), and `town=A` or `town=B` (home's Chess Town button shows that picture instead of a random one: not gated, anyone's address), and `barslot=1` (the boss bar's free room for a boss's own prop drawn with a
   dashed outline, so a screenshot shows it; nothing else changes), and `bannerplus=SECONDS` (0 to 3: the extra time on
@@ -246,6 +259,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   rules, if they misfire: no dodge or leave is charged or marked, and no lockout or delayed queue applies; games play on;
   [ranked.md](ranked.md), "Leaving early"),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
+  `PAUSE_RESIDENTS` (Nov 25; `residents.ts`): the server's own, never in `/api/status`: a resident's session gets 503 "Residents are paused." on
+  every `/api/*` route, every room (Lobby, DuelGame, SquadsLobby, SquadsParty) refuses its hello and closes its socket on its next message.
   - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
     `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,
     `{ message, paused }`: a refusal, not an error, so error capture never counts it). Matches already running finish normally, and lobbies already made still start and take
@@ -276,8 +291,41 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **A rollback lasts until the next deploy from `main`:** revert or fix the bad change on `main` before anything
     else merges.
   - **A version carries its own variables:** rolling back to a version from before a `PAUSE_` or banner change undoes
-    that change too. Check the switches after a rollback.
+    that change too. Check the switches after a rollback. With the residents' host on, pause residents until `main` is fixed.
   - The database's schema only grows (columns are added, never removed), so an older version still runs on it.
+- **Residents, the program** (Nov 25; Eric: "have 200 bots made which just sit on the server and play ranked ... so like any time of
+  day I can login and see games played"; the design: `notes/residents-design.md` on `claude/director-notes`;
+  [2026-11-25-residents-program.md](../decisions/2026-11-25-residents-program.md)). `scripts/residents/` (Node, run with tsx) plays
+  resident accounts (`users.resident`, made and signed in through `/api/admin/residents`) as people with browsers, through the same
+  routes and sockets as the app. Ranked 1 v 1 only so far (50 v 50 is the design's PR 5).
+  - **Run it:** `npx tsx scripts/residents/run.ts [--base https://hunchess.com] [--accounts 200] [--target-online 30] [--hours 0]
+    [--modes 1v1] [--flat]`. The live site takes the residents' Access service token from `CF_ACCESS_CLIENT_ID` and
+    `CF_ACCESS_CLIENT_SECRET` (headers on every request and socket, never printed); its client ID must be the one
+    `RESIDENTS_CLIENT_ID` names. A local server (`npx wrangler dev --var E2E_SQL:<a key of 32+ characters>`) takes that key as
+    `E2E_SQL_KEY`. Any other host is refused, so the token never goes elsewhere. `--flat` drops the schedule and keeps the first
+    `--target-online` residents on all the time (a local test).
+  - **What it does:** signs every account in at the start, four at a time (each its own cookie jar: the session and fair play's
+    device cookie, as separate browsers; the look, pawn color and a free icon, is given when an account is made, and its seeded
+    items are put on then, once). A schedule keeps about `--target-online` on, in waves; each online resident sits on home (the
+    live line every 5 s, so it's on the online count), queues for 1 v 1 (`/api/1v1/play` with its ticket; a gate lets residents in a
+    few at a time so one is often alone in line and a person who queues meets them within seconds), votes, plays moves drawn from
+    Maia at its own rating after a clock-aware think, now and then offers or takes a draw, resigns lost games, says quick-chat
+    presets, and goes back home. Its behavior (normal, slow, leaver, AFK, chatty, rage-quit; 2% of games drop the socket and come
+    back) goes through ranked's leaving rules for real. One Maia process for all of them; no Stockfish (1 v 1 has no judging).
+  - **The switch:** `PAUSE_RESIDENTS` (the server's; PR 1). While it's on the program won't start; when it comes on (any answer
+    "Residents are paused.", or a game's socket refused and the route saying so) every resident stops and the program exits.
+    SIGTERM or Ctrl-C stops them cleanly too (out of the queue, games in progress resigned, a last heartbeat).
+  - **What it reports:** a heartbeat each minute to `POST /api/admin/residents/beat` (online by state, games and their results,
+    games against people, moves, errors by kind, Maia's state, the queue gate), and on stdout one line per event (sessions, games
+    and how they ended, rank changes, lockouts) and a summary every 5 minutes. Never a cookie or a token.
+  - **Settings:** `RESIDENTS` in `settings.ts` (accounts, target and waves, time zones and daily shape, sessions, behaviors' shares,
+    think times, resigning, draws, chat). The names: `scripts/residents/names.json` (200 handles, reviewed: never a real person's
+    name or a hint of one, never "bot" or "resident"). Tests: `packages/server/test/residents-program.test.ts` (names, profiles, the
+    schedule's waves and caps, think times, behaviors).
+- **Residents, the host** (Nov 25; `residents-host.ts`, `scripts/residents/container/`, DEPLOY.md "Residents"): a Container that clones
+  `main` and runs the program `--follow-deploys` (a deploy: games finish, exit 75, start again). Once `RESIDENTS_HOST_IMAGE` is "1",
+  the cron keeps it up while `RESIDENTS_HOST_ON` is "1", else stops it; a new secret restarts it; Access refusing it ends the container
+  (exit 78). One program at a time (`--force`). About $52 a month. Tests: `residents-host`, `residents-start`, `residents-program`.
 - **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
   and send feedback and ideas, and admins read them all on `/admin/ops`.
 - **Health** (below): one snapshot of the game for an admin (`/admin/ops`) or a script (`npm run ops:report`).
@@ -432,9 +480,10 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
   in the Worker against the team's public keys (RS256, cached an hour; Access's endpoint asked at most once a minute
   whatever the cache, even while it fails), its audience (`ACCESS_AUD`), issuer, expiry and not-before (30 s for
   clocks), and its `common_name` must be a service token's client ID (a person's login, which carries an email instead,
-  never opens it, whoever the application lets in). If the Worker has `OPS_ACCESS_CLIENT_ID` (optional, set in
-  Cloudflare as a secret, never in the repository), only that client ID does (`packages/server/src/access.ts`). The
-  team domain and the AUD tag are public (in `wrangler.jsonc`, `vars`). Anyone else: "Not found".
+  never opens it, whoever the application lets in). Only the client ID `OPS_ACCESS_CLIENT_ID` names does (since Nov 25 in
+  `wrangler.jsonc` `vars`: the ops scripts' token, an identifier, not a secret; unset, any service token Access admits would,
+  the residents' included: `packages/server/src/access.ts`). The team domain and the AUD tag are public (in `wrangler.jsonc`,
+  `vars`). Anyone else: "Not found".
 - **`npm run ops:report`** (`scripts/ops-report.mjs`): reads the view from hunchess.com with the Access service token
   in `CF_ACCESS_CLIENT_ID2` / `CF_ACCESS_CLIENT_SECRET2` (sent as headers, never printed) and prints a short summary,
   "Needs attention" first: D1 failing, no live hub, errors up (20 or more this hour, or 3 times the hour before),

@@ -9,8 +9,8 @@
  *   it unlocked (ChandyUpgrade), front and center over the board.
  * - **His meter's moves** (each with its banner, your pawn on it, and his shot from the board's corner): scatter shot's burst and
  *   its four blocked squares; the beam's cover over a rank and a file (the squares hidden); the shields' bubbles; rapid fire's hits
- *   and dizzy stars; the queen lock's aim (the crosshair on your queen, or your best rook if your queen is gone, and the line down its
- *   file from his side), and its shot at the start of his
+ *   and dizzy stars; the Lock-on Shot's aim (the crosshair on your queen, or your best rook if your queen is gone, and the line down
+ *   its file from his side; a second crosshair on the piece its round will most likely hit, Nov 24), and its shot at the start of his
  *   next turn (one round flying down the file, the piece in its way on the board until the round reaches it, then shattered).
  * - **His bar:** the rifle's pips (n of 5) and the move meter, greyed until his first upgrade (nothing hidden, nothing shifts); his
  *   rage meter dimmed until the fifth ("Rage: unlocks at 5 upgrades").
@@ -28,8 +28,8 @@ import { ChandyDodge, type DodgeView } from "./ChandyDodge.tsx";
 import { ChandyUpgrade } from "./ChandyUpgrade.tsx";
 import type { BoardLayerProps, BossUi, Moment, MomentProps, MomentUi } from "./PowerParts.tsx";
 
-/** His moves' names, as the upgrade window and his banners say them. */
-export const CHANDY_MOVE_NAMES: Record<ChandyMove, string> = { scatter: "Scatter shot", beam: "Beam", shields: "Shields", rapidfire: "Rapid fire", queenlock: "Queen lock" };
+/** His moves' names, as the upgrade window and his banners say them (the queen lock is the Lock-on Shot since Nov 24: it may aim at a rook). */
+export const CHANDY_MOVE_NAMES: Record<ChandyMove, string> = { scatter: "Scatter shot", beam: "Beam", shields: "Shields", rapidfire: "Rapid fire", queenlock: "Lock-on Shot" };
 
 /** The words under his banners and in the dock (placeholders, short, for Eric to change: docs/decisions/2026-11-16-chandy-rules.md). */
 export const CHANDY_WORDS = {
@@ -38,7 +38,8 @@ export const CHANDY_WORDS = {
   shields: "Two of his pieces shielded.",
   rapid: "Three of your pieces dizzy.",
   aim: (shape?: string) => (shape === "r" ? "He fires at your rook next. Block its file!" : "He fires at your queen next. Block her file!"),
-  shot: (piece: string | null | undefined, stopped: boolean) => (stopped ? "Queen lock: the shot was stopped." : piece === "q" ? "Queen lock: your queen fell." : `Queen lock: your ${PIECES[piece ?? "p"] ?? "piece"} took it.`),
+  // (Never "queen" unless the piece is one: the shot may aim at a rook, Nov 24.)
+  shot: (piece: string | null | undefined, stopped: boolean) => (stopped ? "Lock-on Shot: the shot was stopped." : piece === "q" ? "Lock-on Shot: your queen fell." : `Lock-on Shot: your ${PIECES[piece ?? "p"] ?? "piece"} took it.`),
 } as const;
 const PIECES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 
@@ -207,7 +208,7 @@ const MOMENTS: Record<"lockOn" | "upgrade" | "scatterShot" | "beam" | "shields" 
   beam: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("BEAM!", (m) => CHANDY_WORDS.beam(m.square)) },
   shields: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("SHIELDS!", () => CHANDY_WORDS.shields) },
   rapidFire: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("RAPID FIRE!", () => CHANDY_WORDS.rapid) },
-  queenAim: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("QUEEN LOCK!", (m) => CHANDY_WORDS.aim(m.shape)) },
+  queenAim: { order: 1, kit: "power", lineAt: FIRE_AT, view: moveMoment("LOCK-ON SHOT!", (m) => CHANDY_WORDS.aim(m.shape)) },
   lockOn: { order: 2, kit: "powerHit", view: lockMoment },
   // (At the start of his turn: the dock says what the shot did.)
   queenShot: { order: 0, kit: "power", dock: (m) => CHANDY_WORDS.shot(m.shape, !!m.fizzled?.length), view: shotMoment },

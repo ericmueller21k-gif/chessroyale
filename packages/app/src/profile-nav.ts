@@ -21,17 +21,32 @@ export interface ProfileTarget {
 }
 
 let target: ProfileTarget | null = null;
+/** The profile its own Back closed last (null once a profile opens or closes any other way): `backFrom`. */
+let backed: ProfileTarget | null = null;
 const listeners = new Set<() => void>();
 
 export function openProfile(t: ProfileTarget) {
   target = t;
+  backed = null;
   listeners.forEach((l) => l());
 }
 
+/** Closes the profile some other way than its Back (another page opened, the side menu, a match). */
 export function closeProfile() {
+  target = null;
+  backed = null;
+  listeners.forEach((l) => l());
+}
+
+/** A profile's own Back: closes it as closeProfile does, and remembers which one it was, so the page it came from can come back as it was. */
+export function profileBack() {
+  backed = target;
   target = null;
   listeners.forEach((l) => l());
 }
+
+/** The profile its own Back just closed (null: none, or it closed another way since): the season ladder's "same list, same place". */
+export const backFrom = () => backed;
 
 export const profileTarget = () => target;
 

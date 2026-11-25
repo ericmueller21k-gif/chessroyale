@@ -5,11 +5,10 @@
  * the game, never from anything an app sends. The tables, a guest's merge and the profile's read are in
  * ranked-schema.ts (accounts.ts includes them; this file needs accounts.ts).
  */
-import { LEAVES, RANKED_1V1, dodgeCost, dodgeLevelAt, duelCoins, ladderAfterFee, newRankedRecord, rankedGame, ratingNow, type RankChange, type RankedRecord } from "@chessroyale/core";
+import { LEAVES, RANKED_1V1, colorHistoryGames, dodgeCost, dodgeLevelAt, ladderAfterFee, newRankedRecord, rankedGame, ratingNow, type RankChange, type RankedRecord, type SeatColor } from "@chessroyale/core";
 import type { Color, DuelConduct, DuelOutcome, DuelPlayerView, DuelResult, DuelReason } from "@chessroyale/chess/duel";
 import { DELETED_ID, randomToken, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
 import { lockerState } from "./locker.ts";
-import { cond, leg, ledgerAccount, opStatements, type LedgerAccount } from "./ledger.ts";
 import { marksOf, rankOf } from "./ranked-schema.ts";
 export { marksOf, rankedLeaves } from "./ranked-schema.ts";
 import { seatName } from "./text-filter.ts";
@@ -23,30 +22,24 @@ export interface RankedRow {
   draws: number;
   ladder: number | null;
   last_at: number | null;
-  coin_day: number | null;
-  coin_games: number;
   peak: number | null;
   streak: number | null;
 }
 
 const DAY = 86_400_000;
-/** A time's UTC day (the daily coin cap's day). */
-const dayOf = (t: number) => Math.floor(t / DAY);
 
 const fromRow = (r: RankedRow): RankedRecord => ({ rating: r.rating, rd: r.rd, games: r.games, wins: r.wins, losses: r.losses, draws: r.draws, ladder: r.ladder, lastAt: r.last_at });
 
 /**
- * A player's ranked record, or a new one (seeded from their account's rating from other modes) if they have none; and
- * the daily coin cap's count as stored (`coins`: the UTC day of their last paying game and how many paid that day).
+ * A player's ranked record, or a new one (seeded from their account's rating from other modes) if they have none. (Its row's
+ * `coin_day` and `coin_games`, ranked's own daily coin cap until Nov 25, are no longer read or moved: a ranked game pays PLAY_COINS
+ * with its XP, server/xp.ts.)
  */
-export async function rankedRecordOf(
-  sql: Sql,
-  userId: string,
-): Promise<{ record: RankedRecord; stored: boolean; coins: { day: number | null; games: number }; peak: number | null; streak: number }> {
-  const row = await sql.first<RankedRow>("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games, peak, streak FROM ranked_1v1 WHERE user_id = ?", userId);
-  if (row) return { record: fromRow(row), stored: true, coins: { day: row.coin_day, games: row.coin_games ?? 0 }, peak: row.peak ?? row.ladder, streak: row.streak ?? 0 };
+export async function rankedRecordOf(sql: Sql, userId: string): Promise<{ record: RankedRecord; stored: boolean; peak: number | null; streak: number }> {
+  const row = await sql.first<RankedRow>("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, peak, streak FROM ranked_1v1 WHERE user_id = ?", userId);
+  if (row) return { record: fromRow(row), stored: true, peak: row.peak ?? row.ladder, streak: row.streak ?? 0 };
   const u = await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId);
-  return { record: newRankedRecord(u?.rating ?? null), stored: false, coins: { day: null, games: 0 }, peak: null, streak: 0 };
+  return { record: newRankedRecord(u?.rating ?? null), stored: false, peak: null, streak: 0 };
 }
 
 /** The highest ladder reached after a game: the stored peak (or, from before peaks were kept, the ladder), or the new ladder if higher. */
@@ -56,30 +49,35 @@ export const peakAfter = (peak: number | null, ladder: number | null): number | 
 export const streakAfter = (streak: number, score: number): number => (score >= 1 ? streak + 1 : 0);
 
 /**
- * The daily coin cap for a game that ended on `day`, against the stored count: the paying games so far that day, and
- * the count to store after it (paying or not). A game recorded after one of a later day (a retry across midnight)
- * leaves the later day's count as it is, and isn't held to its own day's (that count is gone): it pays as usual.
- */
-export function coinCount(stored: { day: number | null; games: number }, day: number, pays: (paidSoFar: number) => boolean): { pays: boolean; store: { day: number | null; games: number } } {
-  if (stored.day !== null && stored.day > day) return { pays: pays(0), store: stored };
-  const paid = stored.day === day ? stored.games : 0;
-  const ok = paid < RANKED_1V1.coins.perDay && pays(paid);
-  const games = ok ? paid + 1 : paid;
-  return { pays: ok, store: games > 0 ? { day, games } : { day: null, games: 0 } };
-}
-
-/**
  * A player joining the queue, as the server reads them (never the app's word): their account's name (filtered, as a
- * lobby seat's), what they wear (the locker; `admin`: an admin's, admin copies included), their rank, and their hidden
- * rating (and its deviation now) for pairing.
+ * lobby seat's), what they wear (the locker; `admin`: an admin's, admin copies included), their rank, their hidden
+ * rating (and its deviation now) for pairing, and their colors in their last ranked games (`colors`, newest first: who
+ * gets White, core's firstGetsWhite; read with the ticket, so pairing reads nothing).
  */
-export async function duelEntrant(sql: Sql, user: Pick<User, "id" | "name">, now = Date.now(), admin = false): Promise<{ player: DuelPlayerView; rating: number; rd: number }> {
+export async function duelEntrant(
+  sql: Sql,
+  user: Pick<User, "id" | "name">,
+  now = Date.now(),
+  admin = false,
+): Promise<{ player: DuelPlayerView; rating: number; rd: number; colors: SeatColor[] }> {
+  // (The colors' read alongside the others; one that fails is no history: a coin flip, as before Nov 25.)
+  const colors = recentColors(sql, user.id).catch((): SeatColor[] => []);
   const { record } = await rankedRecordOf(sql, user.id);
   const look = await lockerState(sql, user.id, admin)
     .then((l) => l.look)
     .catch(() => ({}));
   const { rating, rd } = ratingNow(record, now);
-  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: await rankOf(sql, record) }, rating, rd: Math.round(rd) };
+  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: await rankOf(sql, record) }, rating, rd: Math.round(rd), colors: await colors };
+}
+
+/** A player's color in each of their last ranked games (colorHistoryGames), newest first: "w" where they had White. */
+export async function recentColors(sql: Sql, userId: string): Promise<SeatColor[]> {
+  const rows = await sql.all<{ white_id: string }>(
+    "SELECT white_id FROM ranked_1v1_games WHERE white_id = ?1 OR black_id = ?1 ORDER BY ended_at DESC, id DESC LIMIT ?2",
+    userId,
+    colorHistoryGames(),
+  );
+  return rows.map((r) => (r.white_id === userId ? "w" : "b"));
 }
 
 /** A finished game, as the game's object hands it over to be recorded. */
@@ -101,16 +99,13 @@ export interface FinishedDuel {
 }
 
 const scoreFor = (result: DuelResult, c: Color): number => (result === "1/2-1/2" ? 0.5 : (result === "1-0") === (c === "w") ? 1 : 0);
-const resultWord = (score: number) => (score >= 1 ? "win" : score <= 0 ? "loss" : "draw") as "win" | "draw" | "loss";
 
 /**
  * Records a finished game and moves both players' ranks, in one batch (one transaction), once:
  *   - an aborted game records nothing;
  *   - each player's new record from both records as they stand now (core's rankedGame), unless fair play is holding
  *     them (`held`: in review): their rank stays as it is and they earn nothing; the opponent's game counts;
- *   - coins (duelCoins) to each player's wallet, at most RANKED_1V1.coins.perDay paying games a UTC day per account
- *     (the count is kept on their ranked_1v1 row, written in the same batch), each a ledger op (`ranked:<game>:<color>`,
- *     ledger.ts), so a game pays a player once even if its row were ever written again;
+ *   - no coins here since Nov 25: a ranked game pays PLAY_COINS with its XP (duel-do.ts withXp, server/xp.ts), keyed by the game;
  *   - the game's row goes in only if neither player's record changed since it was read (another game of theirs ending
  *     at the same moment, or a dodge's fee off their ladder): then everything else in the batch applies only if that row is this recording's (its
  *     nonce), so a game recorded twice changes nothing the second time. A row that didn't go in is read again and
@@ -118,8 +113,8 @@ const resultWord = (score: number) => (score >= 1 ? "win" : score <= 0 ? "loss" 
  *   - ranked's leave rules (L1, `g.conduct`; off with `penalties: false`, the kill switch PAUSE_LEAVE_PENALTIES): a leaver's
  *     loss counts as ever, then LEAVES.leaveRp more rank points, and a mark (ranked_conduct) in the same batch, only with this
  *     recording's game row. An aborted game that someone dodged records the dodge (recordDodges); any other records nothing.
- * Returns what it did for each player (null: an aborted game nobody dodged). A game recorded before (a try whose answer was
- * lost) answers each player's rank as it stands, with no points or coins named.
+ * Returns what it did for each player (null: an aborted game nobody dodged; its `coins` 0: the caller's XP grant fills them in). A
+ * game recorded before (a try whose answer was lost) answers each player's rank as it stands, with no points named.
  */
 export async function recordDuel(
   sql: Sql,
@@ -129,12 +124,7 @@ export async function recordDuel(
   { penalties = true }: { penalties?: boolean } = {},
 ): Promise<Record<Color, DuelOutcome> | null> {
   if (g.result === "aborted") return penalties && g.conduct && Object.values(g.conduct).includes("dodge") ? recordDodges(sql, g, held) : null;
-  // (Black's count: never more than White's.)
-  const fewest = Math.floor(g.moves.length / 2);
   const isHeld: Record<Color, boolean> = { w: await held(g.players.w), b: await held(g.players.b) };
-  const day = dayOf(g.endedAt);
-  // (Each player's ledger id, read once: null for an account deleted since, which is paid nothing.)
-  const ledgerIds: Partial<Record<Color, LedgerAccount | null>> = {};
   for (let attempt = 0; attempt < 4; attempt++) {
     const before = { w: await rankedRecordOf(sql, g.players.w), b: await rankedRecordOf(sql, g.players.b) };
     const nonce = randomToken(9);
@@ -150,10 +140,6 @@ export async function recordDuel(
       const me = before[c].record;
       const opp = before[c === "w" ? "b" : "w"].record;
       const score = scoreFor(g.result, c);
-      // (Nothing while fair play holds them, nor past the day's paying games.)
-      const earned = isHeld[c] ? 0 : duelCoins(resultWord(score), g.endedAt - g.startedAt, fewest);
-      const count = coinCount(before[c].coins, day, () => earned > 0);
-      const coins = count.pays ? earned : 0;
       let change: RankChange | null = null;
       // Ranked's leave rules (L1): a leave is the loss, then LEAVES.leaveRp more rank points (none in placements, the game that
       // completes them included: it only goes on the record; nor while held).
@@ -172,11 +158,11 @@ export async function recordDuel(
         after[c] = n;
         writes.push(
           stmt(
-            `INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak)
-             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?) AND ${mine}
+            `INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, peak, streak)
+             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?) AND ${mine}
              ON CONFLICT (user_id) DO UPDATE SET rating = excluded.rating, rd = excluded.rd, games = excluded.games, wins = excluded.wins,
                losses = excluded.losses, draws = excluded.draws, ladder = excluded.ladder, last_game = excluded.last_game, last_at = excluded.last_at,
-               coin_day = excluded.coin_day, coin_games = excluded.coin_games, peak = excluded.peak, streak = excluded.streak`,
+               peak = excluded.peak, streak = excluded.streak`,
             g.players[c],
             n.rating,
             n.rd,
@@ -187,8 +173,6 @@ export async function recordDuel(
             n.ladder,
             g.id,
             n.lastAt,
-            count.store.day,
-            count.store.games,
             peakAfter(before[c].peak, n.ladder),
             streakAfter(before[c].streak, score),
             g.players[c],
@@ -215,13 +199,7 @@ export async function recordDuel(
           ),
         );
       }
-      if (coins > 0 && !(c in ledgerIds)) ledgerIds[c] = await ledgerAccount(sql, g.players[c]);
-      const payee = coins > 0 ? ledgerIds[c] : null;
-      if (payee) {
-        // (Paid only if this recording's game row went in: `mine`.)
-        writes.push(...opStatements(payee, { id: `ranked:${g.id}:${c}`, reason: "ranked", now: g.endedAt, when: cond(mine, g.id, nonce), legs: [leg.coins(g.players[c], coins, g.id)] }, nonce));
-      }
-      outcome[c] = { change, coins, ...(leaving ? { conduct: { kind: "leave" as const, rp: fee } } : {}) };
+      outcome[c] = { change, coins: 0, ...(leaving ? { conduct: { kind: "leave" as const, rp: fee } } : {}) };
     }
     // (A player whose account was deleted during the game is the shared id "deleted" in it, as in their other games.)
     const who = "CASE WHEN EXISTS (SELECT 1 FROM users WHERE id = ?) THEN ? ELSE '" + DELETED_ID + "' END";

@@ -4,14 +4,15 @@ import type { Color } from "@chessroyale/chess/duel";
 import { Avatar } from "./Items.tsx";
 import { TimerBar } from "./Countdown.tsx";
 import { VoteHint, useVoteHint } from "./VoteHint.tsx";
+import { VoteZoneHits } from "./VoteZoneHits.tsx";
 import { useBoardAnimations } from "../hooks.ts";
 
 /**
  * 1 v 1's time-control vote, drawn over the game's own board (Eric, Oct 16: "we don't want to move that board"):
  * three zones in the empty middle of the starting position, Bullet on the left, Blitz in the middle, Rapid on the
  * right (the same order from either side: voteZoneFor), and each player's dressed pawn standing off the grid on their
- * own side, on the line between their second and third ranks, so it's plainly out of place. Drag yours into a zone
- * (or tap it, then a zone); the other player's glides live to theirs. Five seconds; then "Timer: Blitz 3+2" over the
+ * own side, on the line between their second and third ranks, so it's plainly out of place. Drag yours into a zone,
+ * or tap a zone (VoteZoneHits); the other player's glides live to theirs. Ten seconds, or a beat after both have picked; then "Timer: Blitz 3+2" over the
  * board (`DuelOverlay`) and the pawns are gone. The board's own squares and pieces stay exactly where they are.
  */
 
@@ -155,24 +156,13 @@ export function DuelVote({ you, picks, looks, voteAt, voteEndsAt, now, onPick }:
         <span class={`vote-pawn dv-pawn${picks[them] ? " in" : ""}`} data-side={them} style={{ left: `${pos(theirAt).left}%`, top: `${pos(theirAt).top}%` }}>
           <Avatar look={looks[them] ?? undefined} side={them} />
         </span>
-        {/* Zones to tap, once your pawn is picked up with a tap. */}
-        {selected &&
-          DUEL_ZONES.map((z, i) => {
-            const box = zoneOnScreen(zoneOf(i), orientation);
-            return (
-              <button
-                type="button"
-                key={z}
-                class="vote-zone-hit"
-                aria-label={`Pick ${controlLabel(zoneControl(z))}`}
-                style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height}%` }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  cast(z, voteZoneCentre(zoneOf(i), you));
-                }}
-              />
-            );
-          })}
+        {/* A tap on a zone puts your pawn there, picked up first or not (Eric's rule, every pawn vote: VoteZoneHits). */}
+        {open && (
+          <VoteZoneHits
+            zones={DUEL_ZONES.map((z, i) => ({ key: z, label: `Pick ${controlLabel(zoneControl(z))}`, box: zoneOnScreen(zoneOf(i), orientation) }))}
+            onTap={(i) => cast(DUEL_ZONES[i]!, voteZoneCentre(zoneOf(i), you))}
+          />
+        )}
         <span
           class={`vote-pawn vote-me dv-pawn${dragAt ? " lifted" : ""}${selected ? " selected" : ""}${open ? " can" : ""}${mine ? " in" : ""}`}
           data-side={you}
@@ -188,10 +178,10 @@ export function DuelVote({ you, picks, looks, voteAt, voteEndsAt, now, onPick }:
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <Avatar look={looks[you] ?? undefined} side={you} />
+          <Avatar look={looks[you] ?? undefined} side={you} live />
         </span>
       </div>
-      <VoteHint show={hint && !dragAt} text="Drag your pawn into the speed you want" class="dv-hint" />
+      <VoteHint show={hint && !dragAt} text="Drag your pawn, or tap the speed you want" class="dv-hint" />
     </>
   );
 }

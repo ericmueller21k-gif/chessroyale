@@ -27,6 +27,60 @@ it pushed; or, once Workers Builds runs Docker again, put `"./engine/Dockerfile"
 - **Locally:** `npx wrangler dev` builds and runs the container with Docker; `--enable-containers=false --var ENGINE_OFF:1` runs without it (the e2e suite does, to test the device fallback). Add `--var TEST_SWITCHES:1` for the test switches in the address (`?debug`, `?rounds=`, `?pool=`, …: docs/areas/ops.md, "Test switches"); never set `TEST_SWITCHES` on the production Worker.
 - **Budget alert:** Billing → Add Budget Alert in the Cloudflare dashboard (suggested: $20/month).
 
+## Residents: the always-on host (Nov 25, 2026)
+
+The residents program (`scripts/residents/`, docs/areas/ops.md "Residents") runs around the clock in a Cloudflare Container: class
+`ResidentsHost` (`packages/server/src/residents-host.ts`), binding `RESIDENTS_HOST`. Its image (`scripts/residents/container/`) is
+only Node and git: at each start it clones `main` (the repository is public), installs it and runs the program, so code changes
+reach it with no new image. It signs in with the Access service token "residents": client ID `RESIDENTS_CLIENT_ID` (wrangler.jsonc),
+secret the Worker secret `RESIDENTS_CLIENT_SECRET` (type **Secret**; never in the repository or a chat).
+
+**Once (Eric, from a computer with Docker running, about 5 minutes):** in a terminal in the repository, signed in to Cloudflare
+(`npx wrangler login`):
+
+```sh
+npx wrangler containers build scripts/residents/container -t chessroyale-residents:1 --push
+```
+
+It ends by printing the pushed image's digest (`sha256:…`; `npx wrangler containers images list` shows it again). The digest isn't
+a secret: send it to the director. (Or, with no Docker at hand: add **Account · Containers · Edit** to the API token the director's
+sessions have as `CLOUDFLARE_API_TOKEN`, and the director pushes it from a cloud session, where the same build was tested Nov 25:
+there AWS's mirror turns that shared address away, so `docker build --build-arg NODE_IMAGE=mirror.gcr.io/library/node:22-bookworm@sha256:<the
+Dockerfile's digest> -t chessroyale-residents:1 scripts/residents/container`, then `docker tag chessroyale-residents:1 registry.cloudflare.com/<account>/chessroyale-residents:1` and `npx wrangler containers push registry.cloudflare.com/<account>/chessroyale-residents:1` (the full registry name: a bare local tag goes to Docker Hub and is refused):
+the same base image, by its digest.) The director then adds the host's entry to `containers` in `wrangler.jsonc`, and in the same PR
+sets `RESIDENTS_HOST_IMAGE` to `"1"` (until then the cron never touches the host, whatever the switches say):
+
+```jsonc
+{ "class_name": "ResidentsHost", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-residents@sha256:<digest>", "instance_type": "standard-2", "max_instances": 1 }
+```
+
+- **On:** `RESIDENTS_HOST_ON` = `"1"` in `wrangler.jsonc` (a PR; not the dashboard, where a deploy would put the file's value back).
+  The next 15-minute cron starts it. That starts the spend: about $52 a month (below).
+- **Stop at once:** `PAUSE_RESIDENTS` = `1` (dashboard, Save and deploy; "Kill switches" below). The server refuses every
+  resident within seconds, the program ends its games and exits, and the next cron run (within 15 minutes) stops the container.
+  Delete it to bring them back. `RESIDENTS_HOST_ON` = `"0"`: the next cron run stops it (the program ends its games).
+- **Before a manual run** (`npx tsx scripts/residents/run.ts` from a session): set the host off first and wait for the cron's next
+  run to stop it (a pause stops it too, but no program starts while it's on). Two programs at once sign each other's residents out,
+  so the program won't start while another sent a heartbeat in the last 2 minutes; it names it (`access:residents` is the host,
+  `access:test` the director's token). `--force` starts anyway.
+- **Deploys:** a Worker deploy doesn't restart the container (no container change, no rollout; its Durable Object restarts and finds
+  it running: from the docs, unchecked; on the first deploy after it's on, look in Observability: if it does, each deploy costs a
+  clean restart). The program follows deploys itself: it reads `/version.json` every 2 minutes, and after a new version (not its own
+  commit: main can be ahead while a merge deploys) starts nothing new, lets games finish (at most 20 minutes) and exits; the image's
+  script fetches the new `main` and starts it again (installing only when the lockfile changed). A change to the image or the host's
+  `containers` entry is a rollout: SIGTERM, then the new one. A new token secret or new `RESIDENTS.host.args`: the cron's next run
+  stops it (it keeps a hash of the environment it started with) and the run after starts it with the new one.
+- **The first start:** Workers & Pages → chessroyale → Observability, lines with `host:` (the container: "installed", "running main
+  at …") and `residents:`; `GET /api/admin/residents` shows `host` (the cron's plan) and the program's last heartbeat (`beat`: its
+  commit, the live version it follows, who's online). If Access turns the token away, the program stops with "Access turned the
+  service token away" and the container ends (exit 78); each cron run starts a fresh one with the Worker's current secret, so check
+  the token is in the hunchess.com application's Service Auth policy, and that the secret is the token's.
+- **Size and cost (standard-2: 1 vCPU, 6 GiB, 12 GB):** measured in Docker with 40 residents online (18 games at once): CPU 0.25
+  vCPU on average, 0.43 at peaks, memory at most 0.6 GiB. standard-1's ½ vCPU would run near its limit when the waves peak
+  (about 54 online), and custom sizes can't be checked from here. Memory $38.70, CPU about $11 (billed on use), disk $2.10, egress
+  nothing (1 TB included): about **$52 a month**. Its Durable Object stays awake while the container runs (about 330k GB-s a
+  month: inside the 400k included, or up to about $4 more if other objects use it up).
+
 ## Fair play: the review page, the reviewer's key and the deep re-check
 
 Two settings, both added by Eric in the Cloudflare dashboard. **Neither is ever pasted in a chat or put in the
@@ -77,6 +131,8 @@ message, without a code change: each is a Worker variable (docs/areas/ops.md, "K
      delayed queue applies while it's on). Games play as usual. For when the rules misfire.
    - `PAUSE_TOWN_CHAT`: typing in the town square's chat, everywhere at once (the field says "Chat is paused."; players'
      messages stop showing, the bosses' chatter goes on).
+   - `PAUSE_RESIDENTS`: every resident turned away (their games end as anyone's who leaves), and their host stopped within 15
+     minutes ("Residents" above).
    - One boss, never met while it's set (its id, from `BOSS_ROSTER` in `packages/core/src/boss.ts`, isn't always its
      name): Ginger `PAUSE_BOSS_GINGERBREAD`, Boingo the Clown `PAUSE_BOSS_CLOWN`, Jefferson `PAUSE_BOSS_GREX`, Hollow
      `PAUSE_BOSS_HOLLOW`, Big Boy `PAUSE_BOSS_BIGBOY`, Sawyer `PAUSE_BOSS_SAWYER`, Wrangler `PAUSE_BOSS_PIG`, the
@@ -103,6 +159,8 @@ In a terminal, with `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) set:
 3. `npm run rollback -- previous` rolls back with `wrangler rollback`, which asks before it deploys and about any
    secret changed since that version. It runs only in a plain terminal (not one with `CI` set), so nothing is
    answered for you.
+4. With the residents' host on: pause residents (`PAUSE_RESIDENTS` = `1`) until `main` is fixed too. The host runs
+   `main`'s newest program, whose client may not match the older server.
 
 The dashboard does the same: **Workers & Pages → chessroyale → Deployments → a version's ⋯ → Rollback**. A rollback
 lasts until the next merge to `main` deploys again: revert or fix the bad change there first. A version carries its

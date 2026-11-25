@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
-import { LobbyCore, MATCH_STARTED, atTheDoor, hostBoardOk, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type PendingResult, type ServerScoreRequest } from "./lobby.ts";
+import { LobbyCore, MATCH_STARTED, atTheDoor, hostBoardOk, lobbyClosing, newLobbyRecord, residentsOnly, type LobbyRecord, type PartyLobby, type PendingResult, type ServerScoreRequest } from "./lobby.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, ageAnswer, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, grantReward, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { partyFloorWrite, towerCrateKey } from "./tower.ts";
@@ -17,7 +17,7 @@ import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
-import { isPaused, pausedBosses } from "./kill-switches.ts";
+import { isPaused, pausedBosses, RESIDENTS_PAUSED, residentsPaused } from "./kill-switches.ts";
 import { countBossBattle } from "./boss-tokens.ts";
 import { opKeys } from "./ledger.ts";
 import { grantXp, type XpGame } from "./xp.ts";
@@ -207,6 +207,8 @@ export class Lobby extends DurableObject<Env> {
         // (Only a friends' lobby caps the win by opponent: lobbyXpGame.)
         opponents: rec.auto ? [] : core.xpOpponents(r.playerId),
         battle: core.bossBattleSpan(r.playerId),
+        // (Play coins' 50 v 50 bonus: a place among the first of their team's scoreboard at the end; Nov 25.)
+        ...(over && core.crowdTeamTop(r.playerId) ? { crowdTop: true as const } : {}),
       });
     }
   }
@@ -616,7 +618,9 @@ export class Lobby extends DurableObject<Env> {
     // Typed chat (typed-chat.ts): a signed-in account may type, never from a device the age gate marked too young.
     const young = ageAnswer(request) === "under";
     const typer = !!account && isSignedIn(account) && !young;
-    server.serializeAttachment({ userId: account?.id, guest, banned, ...(apart ? { apart } : {}), ...(admin ? { admin } : {}), ...(typer ? { typer } : {}), ...(young ? { young } : {}) });
+    // (A resident (residents.ts): its sockets are refused while PAUSE_RESIDENTS is on, and its hello never wakes the engine server.)
+    const resident = account?.resident === 1;
+    server.serializeAttachment({ userId: account?.id, guest, banned, ...(apart ? { apart } : {}), ...(admin ? { admin } : {}), ...(typer ? { typer } : {}), ...(young ? { young } : {}), ...(resident ? { resident } : {}) });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -629,10 +633,13 @@ export class Lobby extends DurableObject<Env> {
       return;
     }
     if (!atTheDoor(msg)) return;
-    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; apart?: boolean; admin?: boolean; typer?: boolean; young?: boolean } | null;
+    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; apart?: boolean; admin?: boolean; typer?: boolean; young?: boolean; resident?: boolean } | null;
+    // The residents' kill switch (PAUSE_RESIDENTS; residents.ts): a resident's hello is refused, and any other message of theirs
+    // closes their socket (their seat goes to a bot by LEAVING.awayMs, as anyone's who leaves).
+    if (attached?.resident && residentsPaused(this.env)) return this.refuseResident(ws, attached.playerId);
     // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
     // nothing changes under it while it waits), and its numbers are the ones used.
-    if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
+    if (msg.t === "scores" && this.engineUp && !residentsOnly(this.record!) && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
       msg = { ...msg, boards: await this.recheckOnServer(msg.boards) };
     }
     // Who's joining (their name, icon, chat packs, stored rating and any chat ban), read before the lobby is touched, as above.
@@ -646,8 +653,9 @@ export class Lobby extends DurableObject<Env> {
     if (!this.record) return;
     const core = this.core(this.record.code);
     if (msg.t === "hello") {
-      // Someone's joining: wake the engine server so it's up by the first re-check.
-      this.ctx.waitUntil(warmEngine(this.env).then((up) => void (this.engineUp = up)));
+      // Someone's joining: wake the engine server so it's up by the first re-check. (Not for a resident: a lobby of residents alone never
+      // asks it, lobby.ts residentsOnly; a real person's hello wakes it.)
+      if (!attached?.resident) this.ctx.waitUntil(warmEngine(this.env).then((up) => void (this.engineUp = up)));
       if (attached?.guest) {
         ws.send(JSON.stringify({ t: "error", message: SIGN_IN_TO_PLAY, now: Date.now() }));
         ws.close(1008, "Sign in to play online");
@@ -670,8 +678,10 @@ export class Lobby extends DurableObject<Env> {
       // request is ignored, so nobody plays a ranked or fair-played match with the engine's moves on tap.
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
-      // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
-      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat }, msg.seeded === true);
+      // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md). A resident's seat is marked
+      // from its session as it's taken (residents.ts): the host rule passes over it while a real person is here, and a lobby of
+      // residents alone never asks the engine server (lobby.ts).
+      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat }, msg.seeded === true, !!attached?.resident);
       // A new player took a seat: one held for the players on their way is theirs (the oldest). (A party's member had their own.)
       if (result.ok && this.record.humans.length > before && !core.inCrowdParty(result.playerId)) this.reservations.shift();
       if (!result.ok) {
@@ -679,7 +689,7 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, result.message);
         return;
       }
-      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}), ...(attached?.typer ? { typer: true } : {}), ...(attached?.young ? { young: true } : {}) });
+      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}), ...(attached?.typer ? { typer: true } : {}), ...(attached?.young ? { young: true } : {}), ...(attached?.resident ? { resident: true } : {}) });
       core.chatTyping(result.playerId, { may: !!attached?.typer && !!joining?.chatOn, young: !!attached?.young });
       if (joining) {
         if (joining.owned) core.chatOwned(result.playerId, joining.owned);
@@ -735,6 +745,28 @@ export class Lobby extends DurableObject<Env> {
     core.revokePartyMember(member, party);
     await this.persist(core);
     await this.tellParty(core);
+  }
+
+  /**
+   * PAUSE_RESIDENTS (residents.ts): a resident's socket is told "Residents are paused." and closed. Seated, it leaves its seat as a
+   * disconnect does (bots take it by LEAVING.awayMs); its attachment loses the seat first, so its close does nothing more.
+   */
+  private async refuseResident(ws: WebSocket, playerId: string | undefined) {
+    try {
+      ws.send(JSON.stringify({ t: "error", message: RESIDENTS_PAUSED, now: Date.now() }));
+    } catch {
+      // Socket already closed.
+    }
+    ws.serializeAttachment({ resident: true });
+    try {
+      ws.close(1008, RESIDENTS_PAUSED);
+    } catch {
+      // Already gone.
+    }
+    if (!playerId || !this.record || this.socketsOf(playerId).some((s) => s !== ws)) return;
+    const core = this.core(this.record.code);
+    core.disconnect(playerId);
+    await this.persist(core, ws);
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -877,7 +909,12 @@ export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingRe
   const held = !(await eligibleForRanked(c.sql, p.userId));
   // XP (Nov 9): decided from this room's own count and clock, granted once (keyed by this match), kept on the result row for the result
   // screen to ask for (server/xp.ts).
-  const xp = await soft("xp", grantXp(c.sql, p.userId, { ...lobbyXpGame(rec, p.result, p.userId, p.span, c.mode, p.opponents, c.signedInOnly, p.at), paused: c.paused }), null);
+  // (Play coins (Nov 25) are paid with it, in the same batch: the 50 v 50 top places' bonus as the room saw it at the end.)
+  const xp = await soft(
+    "xp",
+    grantXp(c.sql, p.userId, { ...lobbyXpGame(rec, p.result, p.userId, p.span, c.mode, p.opponents, c.signedInOnly, p.at), paused: c.paused, ...(p.crowdTop ? { coin: { crowdTop: true } } : {}) }),
+    null,
+  );
   await recordResult(c.sql, p.userId, { ...p.result, mode: c.mode, online: true, lobby: rec.code, held, playMs: p.span.ms, moves: p.span.moves, xp }, p.at, { since });
   // The Welcome Crate (Nov 6): a finished game may earn it, once ever (welcome.ts; an abandoned one isn't counted).
   await soft("welcome", grantWelcomeCrate(c.sql, p.userId, p.at), []);

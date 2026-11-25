@@ -281,7 +281,7 @@ function RankedCard({ p, own, loading, wide }: { p: PublicProfile | null; own: b
             <span class="pp-emblem">{loading ? null : state === "ranked" ? <RankEmblem rank={rank} scale={wide ? 3 : 2} /> : <PlainBadge text={state === "placement" ? `${rank.placement!.played}/${rank.placement!.of}` : "?"} />}</span>
             <div class="pp-rk-words">
               <span class="pp-cap">CURRENT TIER</span>
-              <strong class={`pp-tier${sk}`}>{loading ? "Platinum 3" : title}</strong>
+              <strong class={`pp-tier${sk}`}>{loading ? "Platinum III" : title}</strong>
               <span class={`pp-rp${sk}`}>
                 {(loading || rp) && (
                   <>
@@ -292,7 +292,7 @@ function RankedCard({ p, own, loading, wide }: { p: PublicProfile | null; own: b
                   </>
                 )}
               </span>
-              <span class={`pp-peak${sk}`}>{loading ? "Peak rank: Platinum 3" : peakLine(r?.peak)}</span>
+              <span class={`pp-peak${sk}`}>{loading ? "Peak rank: Platinum III" : peakLine(r?.peak)}</span>
             </div>
           </div>
           <div class="pp-stats">
@@ -424,7 +424,7 @@ function CosmeticsCard({ p, loading, onAll }: { p: PublicProfile | null; loading
         {tiles.map((t) => (
           <div key={t.slot} class="pp-tile" style={`--w:${tileWeight(t.line)}`}>
             <span class="pp-tile-art" aria-hidden="true">
-              <ItemArt def={t.def} finish={t.finish} />
+              <ItemArt def={t.def} finish={t.finish} live />
             </span>
             <span class="pp-tile-text">
               <strong>{t.name}</strong>

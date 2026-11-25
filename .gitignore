@@ -19,3 +19,4 @@ frames/
 
 # Generated boss art (scripts/boss-art): kept on the art branch claude/boss-art, never on main (bloat sweep, Nov 12)
 scripts/boss-art/out/
+stills-out/

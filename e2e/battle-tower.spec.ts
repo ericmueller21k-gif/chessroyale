@@ -166,7 +166,7 @@ test("the clerk's Start, the elevator, floor 1 won, back in the room, up to floo
   await expect(page.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: test game.", { timeout: 20_000 });
   await page.getByTestId("es-title").click();
   await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 10_000 });
-  await expect(page.locator(".es-quests-none")).toHaveText("No quests moved this game.");
+  await expect(page.locator(".es-quests-none")).toHaveText("Quests No quests this game.");
   await expect(won).toContainText("Next: floor 2");
   const back = won.getByRole("button", { name: "Back to the Battle Tower" });
   await expect(back).toBeEnabled({ timeout: 20_000 });
