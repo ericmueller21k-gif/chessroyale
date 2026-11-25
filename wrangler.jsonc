@@ -38,7 +38,7 @@
   // The engine server: one vCPU (Stockfish is single-threaded here), asleep after 3 idle minutes. Its image is the one
   // built from engine/Dockerfile and pushed by the Oct 26, 17:20 UTC deploy, pinned by digest, so a deploy needs no
   // Docker (Workers Builds stopped being able to start it that evening). To change the engine server: DEPLOY.md.
-  "containers": [{ "class_name": "EngineServer", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-engineserver@sha256:7ebd716c0837096245ddb783fc8713c5aace7e7ae9b41715aef83dd5b464e3d0", "instance_type": "standard-2", "max_instances": 2 }],
+  "containers": [{ "class_name": "EngineServer", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-engineserver@sha256:7ebd716c0837096245ddb783fc8713c5aace7e7ae9b41715aef83dd5b464e3d0", "instance_type": "standard-2", "max_instances": 2 }, { "class_name": "ResidentsHost", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-residents@sha256:6a79bb7605d22b5b90a5a88e1c10fc96847b05657c2521c2ee6586732d25293a", "instance_type": "standard-2", "max_instances": 1 }],
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Lobby"] },
     { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] },
@@ -79,8 +79,8 @@
     // host's `containers` entry (its image); until then the cron never touches the host, whatever the switches below say.
     // RESIDENTS_HOST_ON: "1" and the 15-minute cron keeps it running (about $52 a month); anything else and each run stops it. Set
     // here, not in the dashboard (a deploy would put this value back). To stop it at once: PAUSE_RESIDENTS.
-    "RESIDENTS_HOST_IMAGE": "0",
-    "RESIDENTS_HOST_ON": "0",
+    "RESIDENTS_HOST_IMAGE": "1",
+    "RESIDENTS_HOST_ON": "1",
     // The health view's one service token (access.ts; the review of the residents' server, m6): the ops scripts' token, the same one
     // as TEST_ACCOUNTS_CLIENT_ID. Without it any service token Access admits could read the view, the residents' included.
     "OPS_ACCESS_CLIENT_ID": "52123888a4a289d33abe0914337ccd90.access"

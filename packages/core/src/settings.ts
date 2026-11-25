@@ -2333,7 +2333,8 @@ export const BOSS_POWERS = {
    */
   birdie: {
     trainFrom: 2,
-    trainEvery: 3,
+    // (Eric, Nov 25: "Birdie's normal move is coming too often ... about double it ... maybe once every 4 to 5 turns": was 3.)
+    trainEvery: 5,
     trainPawnLogit: 1,
     fallLost: 9,
     armoredTrainEvery: 3,

@@ -46,7 +46,7 @@ It ends by printing the pushed image's digest (`sha256:…`; `npx wrangler conta
 a secret: send it to the director. (Or, with no Docker at hand: add **Account · Containers · Edit** to the API token the director's
 sessions have as `CLOUDFLARE_API_TOKEN`, and the director pushes it from a cloud session, where the same build was tested Nov 25:
 there AWS's mirror turns that shared address away, so `docker build --build-arg NODE_IMAGE=mirror.gcr.io/library/node:22-bookworm@sha256:<the
-Dockerfile's digest> -t chessroyale-residents:1 scripts/residents/container`, then `npx wrangler containers push chessroyale-residents:1`:
+Dockerfile's digest> -t chessroyale-residents:1 scripts/residents/container`, then `docker tag chessroyale-residents:1 registry.cloudflare.com/<account>/chessroyale-residents:1` and `npx wrangler containers push registry.cloudflare.com/<account>/chessroyale-residents:1` (the full registry name: a bare local tag goes to Docker Hub and is refused):
 the same base image, by its digest.) The director then adds the host's entry to `containers` in `wrangler.jsonc`, and in the same PR
 sets `RESIDENTS_HOST_IMAGE` to `"1"` (until then the cron never touches the host, whatever the switches say):
 
