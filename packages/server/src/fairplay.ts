@@ -35,8 +35,11 @@ export const REPORT_THANKS = "Thanks, we'll look into it.";
 const DAY = 86_400_000;
 const signedIn = (u: Pick<User, "email" | "google_sub">) => !!(u.email || u.google_sub);
 
-/** The automatic sources of a case change (setCase's `by`): never one for a resident (residents.ts). A person's ("admin:…") still is. */
-const AUTOMATIC: ReadonlySet<string> = new Set(["detection", "reports", "evasion"]);
+/**
+ * The automatic sources of a case change (setCase's `by`; the automated reviewer's too): never one for a resident (residents.ts). A
+ * person's ("admin:…") still is.
+ */
+const AUTOMATIC: ReadonlySet<string> = new Set(["detection", "reports", "evasion", "reviewer"]);
 
 /** Whether this account is a resident (users.resident; residents.ts). */
 export async function isResident(sql: Sql, userId: string): Promise<boolean> {
@@ -371,6 +374,8 @@ export async function decide(
     if (before?.status === "pool" || release) return { ok: false, status: 409, message: "engine pool cases are for a person" };
     // (A deleted account's kept case has no evidence left to weigh: account-data.ts.)
     if (!user) return { ok: false, status: 409, message: "the account was deleted; its case is for a person" };
+    // (A resident's, residents.ts: no automatic source opens or moves one.)
+    if (user.resident === 1) return { ok: false, status: 409, message: "a resident's case is for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
     // (A reported town chat line is for a moderator to read: the reviewer never clears a case with one newer than a
     // person's last decision on it; its own decisions, a "review" say, don't count.)

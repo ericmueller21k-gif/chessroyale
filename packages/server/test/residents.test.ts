@@ -4,7 +4,7 @@ import { DUEL_PROTOCOL } from "@chessroyale/chess/duel";
 import { SQUADS_PROTOCOL } from "@chessroyale/chess/squads";
 import { forgetAccessKeys } from "../src/access.ts";
 import { createGuest, createSession, ensureSchema, getUser, publicProfile, recordResult, signInWithIdentity, userFromToken, type Sql, type User } from "../src/accounts.ts";
-import { banCheck, caseOf, raiseCase, recordFairPlay, relevel, reportPlayer, setCase } from "../src/fairplay.ts";
+import { banCheck, caseOf, decide, raiseCase, recordFairPlay, relevel, reportPlayer, setCase } from "../src/fairplay.ts";
 import { deepCheckRun } from "../src/fairplay-deep.ts";
 import { searchPlayers } from "../src/friends.ts";
 import { RESIDENTS_PAUSED, residentsPaused } from "../src/kill-switches.ts";
@@ -485,11 +485,12 @@ describe("residents: fair play records them and never acts", () => {
     expect(await caseOf(sql, res.id)).toBeNull();
   });
 
-  it("detection, reports and evasion never open or move a resident's case; a person still can", async () => {
+  it("detection, reports, evasion and the automated reviewer never open or move a resident's case; a person still can", async () => {
     const { sql, make } = await world();
     const id = (await make("Mossy Bishop")).body.id;
-    for (const by of ["detection", "reports", "evasion"]) await setCase(sql, id, "review", by, "a test", T0);
+    for (const by of ["detection", "reports", "evasion", "reviewer"]) await setCase(sql, id, "review", by, "a test", T0);
     expect(await raiseCase(sql, id, "watch", "detection", "a test", T0)).toBe(false);
+    expect(await decide(sql, id, "review", "reviewer", "the reviewer's look", T0)).toEqual({ ok: false, status: 409, message: "a resident's case is for a person" });
     expect(await caseOf(sql, id)).toBeNull();
     await setCase(sql, id, "watch", `admin:${ADMIN}`, "Eric looked", T0);
     expect((await caseOf(sql, id))?.status).toBe("watch");
