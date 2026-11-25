@@ -8,7 +8,7 @@ import { eligibleForRanked } from "./fairplay.ts";
 import { chatBlock } from "./chat-mod.ts";
 import { recordDuel, type FinishedDuel } from "./ranked.ts";
 import { grantXp } from "./xp.ts";
-import { isPaused } from "./kill-switches.ts";
+import { isPaused, RESIDENTS_PAUSED, residentsPaused } from "./kill-switches.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
@@ -21,6 +21,8 @@ interface Attached {
   /** Typed chat (typed-chat.ts): a signed-in account (may type once its chat is on), or a device the age gate marked too young. */
   typer?: boolean;
   young?: boolean;
+  /** A resident's (residents.ts): refused while PAUSE_RESIDENTS is on. */
+  resident?: boolean;
 }
 
 /**
@@ -210,7 +212,13 @@ export class DuelGame extends DurableObject<Env> {
     const [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
     const young = ageAnswer(request) === "under";
-    server.serializeAttachment({ color, uid: account!.id, ...(isSignedIn(account) && !young ? { typer: true } : {}), ...(young ? { young } : {}) } satisfies Attached);
+    server.serializeAttachment({
+      color,
+      uid: account!.id,
+      ...(isSignedIn(account) && !young ? { typer: true } : {}),
+      ...(young ? { young } : {}),
+      ...(account!.resident === 1 ? { resident: true } : {}),
+    } satisfies Attached);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -226,6 +234,9 @@ export class DuelGame extends DurableObject<Env> {
     const attached = ws.deserializeAttachment() as Attached | null;
     const color = attached?.color;
     if (!color) return;
+    // The residents' kill switch (PAUSE_RESIDENTS; residents.ts): a resident's hello is refused, and any other message of theirs closes
+    // their socket, a disconnect as anyone's (their clock runs on, or the abort rule applies).
+    if (attached.resident && residentsPaused(this.env)) return this.refuseResident(ws, color, msg.t !== "hello");
     const sql = this.env.DB && attached.uid ? d1Sql(this.env.DB) : null;
     const now = Date.now();
     if (msg.t === "hello") {
@@ -273,6 +284,28 @@ export class DuelGame extends DurableObject<Env> {
       }
       core.message(color, msg);
     });
+  }
+
+  /**
+   * PAUSE_RESIDENTS (residents.ts): a resident's socket is told "Residents are paused." and closed; one that had said hello
+   * (`connected`) disconnects as anyone's does, unless another of its sockets is still here. Its attachment loses its side first, so
+   * its close does nothing more.
+   */
+  private async refuseResident(ws: WebSocket, color: Color, connected: boolean) {
+    try {
+      ws.send(JSON.stringify({ t: "error", message: RESIDENTS_PAUSED, now: Date.now() }));
+    } catch {
+      // Already gone.
+    }
+    ws.serializeAttachment({ color: null, resident: true } satisfies Attached);
+    try {
+      ws.close(1008, RESIDENTS_PAUSED);
+    } catch {
+      // Already gone.
+    }
+    if (!connected || !this.record || this.socketsOf(color).some((s) => s !== ws)) return;
+    const core = this.core(ws);
+    await this.change(core, () => core.disconnect(color));
   }
 
   async webSocketClose(ws: WebSocket) {

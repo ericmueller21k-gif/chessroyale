@@ -217,7 +217,19 @@ export interface Human {
   maiaReady?: true;
   /** Maia's files are saved on it (its speed report): a phone may then be told to load Maia to check his moves (BOSS_CHECK.loaders). */
   maiaSaved?: true;
+  /**
+   * A resident's seat (users.resident, as the Durable Object found on its hello; residents.ts): the host rule passes over it while a
+   * real person is connected (pickHost), and a lobby of residents alone never asks the engine server (residentsOnly).
+   */
+  resident?: true;
 }
+
+/**
+ * The lobby's people are residents alone (residents.ts): it has a resident's seat and nobody else connected. Then the engine server is
+ * never asked (LobbyCore.serverOn, the host's re-check in lobby-do.ts): the judges re-check close calls themselves, as with no engine
+ * server (ENGINE_OFF). A real person connecting turns it back on from the next ask. A lobby with no resident is never this.
+ */
+export const residentsOnly = (r: Pick<LobbyRecord, "humans">): boolean => r.humans.some((h) => h.resident) && !r.humans.some((h) => h.connected && !h.resident);
 
 /**
  * A person's result in a match, for their profile (humanResults; a resign's is taken as they leave). `noResult`: the match ended with
@@ -1093,21 +1105,38 @@ export class LobbyCore {
     return this.r.humans.filter((h) => alive.has(h.id));
   }
 
-  /** The host scores rounds; prefer a connected computer. */
+  /**
+   * The host scores rounds; prefer a connected computer. Not a device benched for wrong scores, while there's anyone else; and a
+   * resident (residents.ts) only while no real person's trusted device is connected: a real person's device hosts whenever one is here
+   * (residents still judge).
+   */
   private pickHost(exclude?: string): string | null {
-    const all = this.r.humans.filter((h) => h.connected && h.id !== exclude);
-    // (Not a device benched for wrong scores, while there's anyone else.)
-    const trusted = all.filter((h) => !this.benched(h.id));
-    const candidates = trusted.length ? trusted : all;
+    const here = this.r.humans.filter((h) => h.connected && h.id !== exclude);
+    const trusted = (h: Human) => !this.benched(h.id);
+    // (Trusted people first, then trusted residents, then anyone: with no resident here, as ever, the trusted, else anyone.)
+    const tiers = [here.filter((h) => trusted(h) && !h.resident), here.filter((h) => trusted(h) && h.resident), here.filter((h) => !h.resident), here];
+    const candidates = tiers.find((t) => t.length) ?? [];
     const computer = candidates.find((h) => h.device === "computer");
     return (computer ?? candidates[0])?.id ?? null;
   }
 
-  /** The host for the engine work now: the current one, unless it's gone or was benched for wrong scores. */
+  /**
+   * The host for the engine work now: the current one, unless it's gone, was benched for wrong scores, or is a resident while a real
+   * person's trusted device is connected (pickHost).
+   */
   private hostNow(): string | null {
     const h = this.r.hostId;
-    if (h && this.human(h)?.connected && !this.benched(h)) return h;
+    const passedOver = !!this.human(h ?? "")?.resident && this.r.humans.some((p) => p.connected && !p.resident && !this.benched(p.id));
+    if (h && this.human(h)?.connected && !this.benched(h) && !passedOver) return h;
     return this.pickHost() ?? (h && this.human(h)?.connected ? h : null);
+  }
+
+  /** The Durable Object's word on a seat, from its account as it said hello (lobby-do.ts): a resident's, or not. */
+  markResident(playerId: string, resident: boolean) {
+    const h = this.human(playerId);
+    if (!h) return;
+    if (resident) h.resident = true;
+    else delete h.resident;
   }
 
   // ---------------- Connections ----------------
@@ -3686,9 +3715,9 @@ export class LobbyCore {
     return (this.r.judges?.devices[id]?.strikes ?? 0) >= this.jcfg.strikes;
   }
 
-  /** The engine server can be asked now. */
+  /** The engine server can be asked now: it's there, and the lobby isn't residents alone (residentsOnly). */
   private get serverOn(): boolean {
-    return !!this.io.serverEngine && !!this.io.serverScore;
+    return !!this.io.serverEngine && !!this.io.serverScore && !residentsOnly(this.r);
   }
 
   /** Devices that can judge now: connected, speed known (an up-to-date app), not benched. */

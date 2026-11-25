@@ -61,3 +61,6 @@ export const pausedResponse = (what: Pausable): Response =>
  * Read straight from the variables each time (a dashboard change is a deploy, whose instances start afresh, as CACHE_MS says).
  */
 export const residentsPaused = (env: object): boolean => on((env as Record<string, unknown>).PAUSE_RESIDENTS);
+
+/** The refusal's line while PAUSE_RESIDENTS is on (the residents route's POSTs, a resident's requests and sockets). */
+export const RESIDENTS_PAUSED = "Residents are paused.";

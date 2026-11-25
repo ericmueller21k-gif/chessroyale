@@ -20,7 +20,7 @@ import { serverScoreAt } from "./engine.ts";
 import { countCall } from "./ops.ts";
 import { LiveReporter } from "./live.ts";
 import { liveHub } from "./live-hub.ts";
-import { isPaused, pausedBosses } from "./kill-switches.ts";
+import { isPaused, pausedBosses, RESIDENTS_PAUSED, residentsPaused } from "./kill-switches.ts";
 import { TOWER_LINES, commitPartyFloor, preparePartyFloor, type LobbyGone, type PartyFloorPrep, type PartyRefusal } from "./tower.ts";
 import { partyOpenText } from "./town-chat.ts";
 import { chatRoomOf, townPartyPoster } from "./town-chat-api.ts";
@@ -48,6 +48,8 @@ interface Attached {
   pooled?: boolean | null;
   /** May use the test controls (an admin, or SQUADS_TEST on). */
   test?: boolean;
+  /** A resident's (residents.ts): refused while PAUSE_RESIDENTS is on. */
+  resident?: boolean;
   /** Their badge in the turn order (a lobby's sockets only). */
   badge?: PlayerBadge;
 }
@@ -77,7 +79,28 @@ async function whoIsAsking(request: Request, env: Env, waitUntil: (p: Promise<un
   const banned = !!check?.banned;
   const pooled = account ? (check ? !!check.pooled : null) : false;
   const test = !guest && (env.SQUADS_TEST === "1" || isAdmin(secrets, account));
-  return { userId: account?.id, ...(account?.name ? { name: account.name } : {}), guest, banned, pooled, ...(test ? { test: true } : {}) };
+  return { userId: account?.id, ...(account?.name ? { name: account.name } : {}), guest, banned, pooled, ...(test ? { test: true } : {}), ...(account?.resident === 1 ? { resident: true } : {}) };
+}
+
+/**
+ * PAUSE_RESIDENTS (residents.ts): a resident's socket is told "Residents are paused." and closed. Seated (`playerId`: it had said
+ * hello), it then disconnects as anyone's does (`gone`), unless another of its sockets is still here. Its attachment loses its seat
+ * first, so its close does nothing more.
+ */
+function refuseResident(ws: WebSocket, attached: Attached, others: (playerId: string) => WebSocket[], gone: (playerId: string) => Promise<void>): Promise<void> {
+  try {
+    ws.send(JSON.stringify({ t: "error", message: RESIDENTS_PAUSED, now: Date.now() }));
+  } catch {
+    // Already gone.
+  }
+  ws.serializeAttachment({ resident: true } satisfies Attached);
+  try {
+    ws.close(1008, RESIDENTS_PAUSED);
+  } catch {
+    // Already gone.
+  }
+  const id = attached.playerId;
+  return id && !others(id).some((s) => s !== ws) ? gone(id) : Promise.resolve();
 }
 
 /**
@@ -345,6 +368,14 @@ export class SquadsLobby extends DurableObject<Env> {
     }
     if (!msg || typeof msg !== "object" || typeof msg.t !== "string") return;
     const attached = (ws.deserializeAttachment() as Attached | null) ?? {};
+    // The residents' kill switch (PAUSE_RESIDENTS; residents.ts): a resident's hello is refused, and any other message of theirs closes
+    // their socket (their seat goes on as anyone's who leaves).
+    if (attached.resident && residentsPaused(this.env))
+      return refuseResident(ws, attached, (id) => this.socketsOf(id), async (id) => {
+        const core = this.core();
+        core.disconnect(id);
+        await this.persist(core, ws);
+      });
     const refuse = (message: string, extra: Record<string, unknown> = {}) => {
       ws.send(JSON.stringify({ t: "error", message, ...extra, now: Date.now() }));
       ws.close(1008, message.slice(0, 100));
@@ -550,6 +581,14 @@ export class SquadsParty extends DurableObject<Env> {
     }
     if (!msg || typeof msg !== "object" || typeof msg.t !== "string") return;
     const attached = (ws.deserializeAttachment() as Attached | null) ?? {};
+    // The residents' kill switch (PAUSE_RESIDENTS; residents.ts), as the lobby's above.
+    if (attached.resident && residentsPaused(this.env))
+      return refuseResident(ws, attached, (id) => this.socketsOf(id), async (id) => {
+        const core = this.core();
+        core.disconnect(id);
+        await this.persist(core, ws);
+        await this.towerUpkeep();
+      });
     if (msg.t === "hello") {
       const refuse = (message: string, extra: Record<string, unknown> = {}) => {
         ws.send(JSON.stringify({ t: "error", message, ...extra, now: Date.now() }));

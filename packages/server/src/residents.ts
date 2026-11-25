@@ -24,9 +24,11 @@ import { SESSION_COOKIE, readCookie, sessionCookie } from "./api.ts";
 import { banAnswer } from "./ban-gate.ts";
 import { caseOf } from "./fairplay.ts";
 import { e2eSqlAllowed, type E2eSqlEnv } from "./e2e-sql.ts";
-import { residentsPaused } from "./kill-switches.ts";
+import { RESIDENTS_PAUSED, residentsPaused } from "./kill-switches.ts";
 import { applyOp, keyFor, leg, ledgerAccount } from "./ledger.ts";
 import { openingRng } from "./locker.ts";
+
+export { RESIDENTS_PAUSED };
 
 /** POST /api/admin/residents: make the resident named `name` (or find it), and sign in as it. */
 export interface ResidentRequest {
@@ -100,8 +102,6 @@ export interface ResidentsReport {
   residents: ResidentRow[];
 }
 
-/** The refusal while PAUSE_RESIDENTS is on (the route's POSTs; every /api/* request of a resident's session; their sockets). */
-export const RESIDENTS_PAUSED = "Residents are paused.";
 
 /** The heartbeat's largest body: the program's counts, errors by kind and judge times fit in a few kilobytes. */
 export const BEAT_MAX_BYTES = 16_384;
