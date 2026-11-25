@@ -11,6 +11,9 @@ Reference: round 1's NOTE and stills (`git show origin/stills/game-layout-mockup
    its strips) and the right column all start and end on the same two lines; the right column's content (status, buttons, chat) fits
    INSIDE that height: the chat shrinks to fit, never runs past the board. Add this to `docs/rules/eric.md` (at Eric's request) with ONE
    guard test that checks it on every mode at 1536x730 and 1920x960 (± 1 px).
+   **And equal gaps:** the gap between the left column and the board equals the gap between the board and the right column (± 1 px;
+   Eric, Nov 25: "the padding on the left and right of the chessboard aren't equal": 32 vs 43 px in the 50 v 50 mockup). Where there's no
+   left column, the board-to-panel gap is the frame's one gap. The same guard test checks it.
 2. The board never shrinks for the menu; labels show; the right column narrows to a working minimum first (the 1 v 1 PR's rule).
 3. No title line: the mode's status line is the top strip; the gear top right, level with it.
 4. Nothing hidden, nothing shifts; one gap token; nothing stretched.
