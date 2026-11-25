@@ -654,6 +654,7 @@
         "e2e/boss-side.spec.ts",
         "e2e/side-same-size.spec.ts",
         "e2e/eval-bar.spec.ts",
+        "e2e/match-menu.spec.ts",
         "e2e/match-screen.spec.ts",
         "e2e/recluse.spec.ts",
         "e2e/tiger.spec.ts"
