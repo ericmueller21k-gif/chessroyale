@@ -245,6 +245,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   "‹ Back" returns to the pick. The reveal has no "your team watched" line any more. The box is one element for the
   whole match (Nov 1: each phase's screen used to build it anew, and its rows wiped in; `KeptBox`, QuickChat.tsx;
   docs/decisions/2026-11-01-crowd-steady-box.md); "Black" starts in line with "POS".
+  It shows as many rows as fit (`pickRows`, most important first; a row that doesn't fit is skipped, not the end of the list:
+  Nov 26, docs/decisions/2026-11-26-scoreboard-rows-skip.md), four at least at 390 × 750.
   Guards: `e2e/crowd.spec.ts`, "the scoreboard never moves" and "the scoreboard box is built once"; `e2e/panel.spec.ts`,
   "a phone's 50 v 50 box".
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
