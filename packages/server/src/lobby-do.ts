@@ -676,8 +676,10 @@ export class Lobby extends DurableObject<Env> {
       // request is ignored, so nobody plays a ranked or fair-played match with the engine's moves on tap.
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
-      // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
-      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat }, msg.seeded === true);
+      // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md). A resident's seat is marked
+      // from its session as it's taken (residents.ts): the host rule passes over it while a real person is here, and a lobby of
+      // residents alone never asks the engine server (lobby.ts).
+      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat }, msg.seeded === true, !!attached?.resident);
       // A new player took a seat: one held for the players on their way is theirs (the oldest). (A party's member had their own.)
       if (result.ok && this.record.humans.length > before && !core.inCrowdParty(result.playerId)) this.reservations.shift();
       if (!result.ok) {
@@ -686,9 +688,6 @@ export class Lobby extends DurableObject<Env> {
         return;
       }
       ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}), ...(attached?.typer ? { typer: true } : {}), ...(attached?.young ? { young: true } : {}), ...(attached?.resident ? { resident: true } : {}) });
-      // (A resident's seat: the host rule passes over it while a real person is here, and a lobby of residents alone never asks the
-      // engine server: lobby.ts.)
-      core.markResident(result.playerId, !!attached?.resident);
       core.chatTyping(result.playerId, { may: !!attached?.typer && !!joining?.chatOn, young: !!attached?.young });
       if (joining) {
         if (joining.owned) core.chatOwned(result.playerId, joining.owned);

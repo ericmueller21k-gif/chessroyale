@@ -222,6 +222,8 @@ describe("residents: the report and the heartbeat", () => {
     expect(await sql.all("SELECT value FROM meta WHERE key = 'residents:beat'")).toEqual([{ value: JSON.stringify({ at: T0, by: "access", beat: { n: 2 } }) }]);
     for (const bad of ["[1,2]", "7", "not json", "null"]) expect((await beat(bad))!.status).toBe(400);
     expect((await beat(JSON.stringify({ pad: "x".repeat(BEAT_MAX_BYTES) })))!.status).toBe(413);
+    // (Too big by its own word: refused before the body is read, the review's n1.)
+    expect((await call("POST", { "content-length": String(BEAT_MAX_BYTES + 1) }, undefined, { access: RESIDENTS_CLIENT, path: "/beat", raw: JSON.stringify({ n: 3 }) }))!.status).toBe(413);
     expect((await call("GET", {}, undefined, { access: RESIDENTS_CLIENT, path: "/beat" }))!.status).toBe(405);
   });
 });
@@ -399,49 +401,102 @@ describe("residents: the kill switch in every room", () => {
     expect(eWs.closed).toBeNull();
   });
 
-  it("1 v 1: a resident's hello is refused while paused; a seated one's next message closes it, a disconnect", async () => {
-    const { d1, make } = await world();
+  /** A socket opened through a room's own door (its fetch, with a session cookie: the session says who's a resident). */
+  const door = async (room: { fetch(r: Request): Promise<Response> }, path: string, cookie: string) => {
+    expect((await room.fetch(new Request(`https://hunchess.test${path}`, { headers: { upgrade: "websocket", cookie } }))).status).toBe(200);
+    return pair[1]!;
+  };
+
+  it("1 v 1: a resident's socket is marked from its session; its hello is refused while paused; a seated one's next message closes it, its side away", async () => {
+    const { sql, d1, make } = await world();
     const env: Record<string, unknown> = { DB: d1, PAUSE_RESIDENTS: "1" };
     const rt = runtime();
     const game = new DuelGame(rt.ctx, env as never);
     await rt.loaded();
     const a = (await make("Mossy Bishop")).body;
-    const b = (await make("Pawn Storm")).body;
-    const p = (u: ResidentAnswer) => ({ uid: u.id, name: u.name, look: null, rank: null, rating: 1200 }) as never;
-    expect(await game.create("DUELR", { w: p(a), b: p(b) })).toBe(true);
-    const w = rt.socket({ color: "w", uid: a.id, resident: true });
+    const real = await signedIn(sql, "eric@example.com");
+    const p = (uid: string, name: string) => ({ uid, name, look: null, rank: null, rating: 1200 }) as never;
+    expect(await game.create("DUELR", { w: p(a.id, a.name), b: p(real.user.id, "Eric") })).toBe(true);
+    const session = async () => `hc_session=${await createSession(sql, a.id, Date.now())}`;
+    const w = await door(game, "/api/duel/DUELR/ws", await session());
+    const b = await door(game, "/api/duel/DUELR/ws", real.cookie);
+    expect(w.deserializeAttachment()).toMatchObject({ color: "w", uid: a.id, resident: true });
+    expect(b.deserializeAttachment()).toMatchObject({ color: "b", uid: real.user.id });
+    expect((b.deserializeAttachment() as { resident?: boolean }).resident).toBeUndefined();
     await say(game, w, { t: "hello", v: DUEL_PROTOCOL });
     expect(refused(w)).toBe(true);
+    await say(game, b, { t: "hello", v: DUEL_PROTOCOL });
+    expect(b.closed).toBeNull();
+    // Off: the resident sits. On again, its next message closes it: its side is away (its clock runs on, or the abort rule applies),
+    // and the person is told so.
     delete env.PAUSE_RESIDENTS;
-    const w2 = rt.socket({ color: "w", uid: a.id, resident: true });
+    const w2 = await door(game, "/api/duel/DUELR/ws", await session());
     await say(game, w2, { t: "hello", v: DUEL_PROTOCOL });
     expect(w2.closed).toBeNull();
-    const seen = JSON.stringify(rt.store.get("game"));
+    const goneAt = () => (rt.store.get("game") as { goneAt?: Partial<Record<"w" | "b", number>> }).goneAt ?? {};
+    expect(goneAt()).toEqual({});
     env.PAUSE_RESIDENTS = "1";
+    b.sent.length = 0;
     await say(game, w2, { t: "chat", say: "gg" });
     expect(refused(w2)).toBe(true);
-    expect(JSON.stringify(rt.store.get("game"))).not.toBe(seen);
+    expect(goneAt().w).toBeTypeOf("number");
+    expect(goneAt().b).toBeUndefined();
+    expect(b.sent).toContainEqual(expect.objectContaining({ t: "presence", connected: { w: false, b: true } }));
+    expect(b.closed).toBeNull();
   });
 
-  it("Squads' lobby and party: a resident's hello is refused while paused", async () => {
-    const env = { PAUSE_RESIDENTS: "1" };
+  it("Squads' lobby and party: a resident's socket is marked from its session; its hello is refused while paused; a seated one's next message closes it and its seat leaves", async () => {
+    const { sql, d1, make } = await world();
+    const env: Record<string, unknown> = { DB: d1, PAUSE_RESIDENTS: "1" };
+    const res = (await make("Mossy Bishop")).body;
+    const real = await signedIn(sql, "eric@example.com");
+    const session = async () => `hc_session=${await createSession(sql, res.id, Date.now())}`;
+    type Seat = { id: string; connected: boolean; goneAt?: number };
+    // The lobby.
     const rtL = runtime();
     const squads = new SquadsLobby(rtL.ctx, env as never);
     await rtL.loaded();
     expect(await squads.create("SQUAD", { fillAt: Date.now() + 5_000, test: { start: 0 } })).toEqual([]);
-    const ws = rtL.socket({ userId: "res-1", guest: false, banned: false, resident: true });
+    const ws = await door(squads, "/api/squads/SQUAD/ws", await session());
+    const person = await door(squads, "/api/squads/SQUAD/ws", real.cookie);
+    expect(ws.deserializeAttachment()).toMatchObject({ userId: res.id, resident: true });
+    expect((person.deserializeAttachment() as { resident?: boolean }).resident).toBeUndefined();
     await say(squads, ws, { t: "hello", v: SQUADS_PROTOCOL, name: "Mossy" });
     expect(refused(ws)).toBe(true);
-    const person = rtL.socket({ test: true });
     await say(squads, person, { t: "hello", v: SQUADS_PROTOCOL, name: "Eric" });
     expect(person.closed).toBeNull();
+    delete env.PAUSE_RESIDENTS;
+    const seated = await door(squads, "/api/squads/SQUAD/ws", await session());
+    await say(squads, seated, { t: "hello", v: SQUADS_PROTOCOL, name: "Mossy" });
+    const seat = (seated.deserializeAttachment() as { playerId: string }).playerId;
+    const human = () => (rtL.store.get("lobby") as { humans: Seat[] }).humans.find((h) => h.id === seat);
+    expect(human()).toMatchObject({ connected: true });
+    env.PAUSE_RESIDENTS = "1";
+    await say(squads, seated, { t: "chat", say: "gg" });
+    expect(refused(seated)).toBe(true);
+    expect(human()).toMatchObject({ connected: false, goneAt: expect.any(Number) });
+    expect(person.closed).toBeNull();
+    // The party (its seat's leaving runs the tower's upkeep too).
+    delete env.PAUSE_RESIDENTS;
     const rtP = runtime();
     const party = new SquadsParty(rtP.ctx, env as never);
     await rtP.loaded();
     expect(await party.create("PARTY", "squads-q", 60_000)).toBe(true);
-    const pws = rtP.socket({ userId: "res-1", guest: false, banned: false, resident: true });
+    env.PAUSE_RESIDENTS = "1";
+    const pws = await door(party, "/api/party/PARTY/ws", await session());
+    expect(pws.deserializeAttachment()).toMatchObject({ userId: res.id, resident: true });
     await say(party, pws, { t: "hello", v: SQUADS_PROTOCOL, name: "Mossy" });
     expect(refused(pws)).toBe(true);
+    delete env.PAUSE_RESIDENTS;
+    const member = await door(party, "/api/party/PARTY/ws", await session());
+    await say(party, member, { t: "hello", v: SQUADS_PROTOCOL, name: "Mossy" });
+    const id = (member.deserializeAttachment() as { playerId: string }).playerId;
+    const seatOf = () => (rtP.store.get("party") as { members: Seat[] }).members.find((m) => m.id === id);
+    expect(seatOf()).toMatchObject({ connected: true });
+    env.PAUSE_RESIDENTS = "1";
+    await say(party, member, { t: "ready" });
+    expect(refused(member)).toBe(true);
+    expect(seatOf()).toMatchObject({ connected: false, goneAt: expect.any(Number) });
   });
 });
 

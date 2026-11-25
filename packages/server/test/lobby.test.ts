@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CROWD_KNOCKOUTS, CROWD_START, CROWD_VOTES, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings, voteResultMs } from "@chessroyale/core";
 import { kingStrikeMs, lastStandMs, START_FEN, applyMove, bossIntroTimeline, freestyleBoard, isChess960Fen, legalMoves, pieceAt, sanLineToUci, toSan, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
-import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
+import { LobbyCore, newLobbyRecord, type LobbyIO } from "../src/lobby.ts";
 
 const hash = (s: string) => {
   let h = 2166136261;
@@ -23,7 +23,7 @@ const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({
 type Msg = ServerMessage;
 
 /** A fake lobby: clock, outboxes per player, and a fake host that scores with a hash "engine". */
-function setup(settings: Partial<Settings> = {}, icons: Record<string, string> = {}, seed = 7) {
+function setup(settings: Partial<Settings> = {}, icons: Record<string, string> = {}, seed = 7, io: Partial<LobbyIO> = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const core = new LobbyCore(
@@ -32,6 +32,7 @@ function setup(settings: Partial<Settings> = {}, icons: Record<string, string> =
       now: () => now,
       send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
       icon: (id) => icons[id],
+      ...io,
     },
     library,
     mulberry32(seed),
@@ -171,10 +172,12 @@ describe("lobby", () => {
     expect(L.last("p1", "reveal")).toBeTruthy();
   });
 
+  /** A resident's hello (residents.ts: the Durable Object marks its seat from its session). */
+  const resident = (L: ReturnType<typeof setup>, name: string) => L.core.connect(undefined, name, "computer", false, null, undefined, undefined, null, null, false, {}, false, true);
+
   it("residents (residents.ts): a real person's device hosts whenever one is connected, a resident only while none is", () => {
     const L = setup({ firstStageRounds: 3 });
-    L.core.connect(undefined, "Mossy", "computer");
-    L.core.markResident("p1", true);
+    resident(L, "Mossy");
     L.core.connect(undefined, "Eric", "phone");
     L.core.message("p1", { t: "start" });
     L.advance(6000);
@@ -184,17 +187,60 @@ describe("lobby", () => {
     expect(L.core.record.hostId).toBe("p2");
     expect(L.last("p1", "scoreRequest")).toBeUndefined();
     expect(L.hostScores("p2")).toBe(true);
-    // The person drops: the resident hosts, nobody else being here. Back, the person takes it again at the next host work.
+    // The person drops: the resident hosts, nobody else being here. Back, the person takes it again at once (the review's m1).
     L.core.disconnect("p2");
     expect(L.core.record.hostId).toBe("p1");
     L.core.connect(L.core.record.humans[1]!.token, undefined);
-    expect(L.core.record.hostId).toBe("p1");
+    expect(L.core.record.hostId).toBe("p2");
     L.take("p1");
     for (let i = 0; i < 200 && L.core.record.phase !== "scoring"; i++) L.advance(1000);
     expect(L.core.record.phase).toBe("scoring");
     expect(L.core.record.hostId).toBe("p2");
     expect(L.last("p1", "scoreRequest")).toBeUndefined();
     expect(L.last("p2", "scoreRequest")).toBeTruthy();
+  });
+
+  it("residents: Eric drops in scoring, returns, re-asked; the resident's answer is dropped (the review's m1)", () => {
+    const L = setup({ firstStageRounds: 3 });
+    resident(L, "Mossy");
+    L.core.connect(undefined, "Eric", "phone");
+    L.core.message("p1", { t: "start" });
+    L.advance(6000);
+    L.advance(DEFAULT_SETTINGS.moveClockSeconds * 1000 + 400);
+    expect(L.core.record.phase).toBe("scoring");
+    expect(L.core.record.hostId).toBe("p2");
+    // His phone drops: the resident is asked the round's scores.
+    L.core.disconnect("p2");
+    expect(L.core.record.hostId).toBe("p1");
+    const asked = L.last("p1", "scoreRequest")!;
+    expect(asked.key).toBe(L.core.record.scoreRequest!.key);
+    // Back 2 s later: his device hosts again, and is asked again.
+    L.advance(2000);
+    L.take("p2");
+    L.core.connect(L.core.record.humans[1]!.token, undefined);
+    expect(L.core.record.humans[1]).toMatchObject({ connected: true });
+    expect(L.core.record.hostId).toBe("p2");
+    expect(L.last("p2", "scoreRequest")?.key).toBe(asked.key);
+    // The resident's answer, late: not heard. Eric's is.
+    expect(L.hostScores("p1")).toBe(true);
+    expect(L.core.record.phase).toBe("scoring");
+    expect(L.hostScores("p2")).toBe(true);
+    expect(L.core.record.phase).toBe("reveal");
+  });
+
+  it("residents alone: the host isn't told the engine server re-checks its scores (it never does for them); with a real person, as ever", () => {
+    for (const people of [0, 1]) {
+      const L = setup({ firstStageRounds: 3 }, {}, 7, { serverEngine: true, serverScore: () => undefined });
+      resident(L, "Mossy");
+      if (people) L.core.connect(undefined, "Eric", "computer");
+      L.core.message("p1", { t: "start" });
+      L.advance(6000);
+      L.advance(DEFAULT_SETTINGS.moveClockSeconds * 1000 + 400);
+      expect(L.core.record.phase).toBe("scoring");
+      const host = L.core.record.hostId!;
+      expect(host).toBe(people ? "p2" : "p1");
+      expect(L.last(host, "scoreRequest")!.serverRecheck, String(people)).toBe(people ? true : undefined);
+    }
   });
 
   it("keeps going without any scorer (all picks treated equal) rather than stalling", () => {

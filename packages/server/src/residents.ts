@@ -318,6 +318,8 @@ export async function handleResidents(
   // (The kill switch: nothing new while it's on. The report still answers, so the dashboard shows the switch.)
   if (residentsPaused(env)) return residentsPausedResponse();
   if (beat) {
+    // (Too big by its own word: refused before the body is read.)
+    if (Number(request.headers.get("content-length") ?? 0) > BEAT_MAX_BYTES) return json({ message: `a heartbeat is at most ${BEAT_MAX_BYTES} bytes` }, 413);
     const r = await keepBeat(sql, await request.text(), who, now);
     return "error" in r ? json({ message: r.error }, r.status) : json(r satisfies ResidentBeatAnswer);
   }
@@ -335,21 +337,25 @@ export async function handleResidents(
   return json({ ...answer, reused: false }, 200, { "set-cookie": sessionCookie(token) });
 }
 
-/** This instance's answers to "is this session a resident's?", only asked while PAUSE_RESIDENTS is on (kept RESIDENT_CHECK_MS). */
+/**
+ * This instance's answers to "is this session a resident's?", only asked while PAUSE_RESIDENTS is on (kept RESIDENT_CHECK_MS), keyed
+ * by the token's hash (as sessions are stored), never the token itself.
+ */
 const RESIDENT_CHECK_MS = 60_000;
 const RESIDENT_CHECKS_MAX = 10_000;
 const residentChecks = new Map<string, { resident: boolean; until: number }>();
 
 /** Whether this session token is a live resident session (cached RESIDENT_CHECK_MS per instance; a read that fails: no). */
 export async function residentSessionOf(sql: Sql, token: string, now: number): Promise<boolean> {
-  const hit = residentChecks.get(token);
+  const hash = await sha256(token);
+  const hit = residentChecks.get(hash);
   if (hit && hit.until > now) return hit.resident;
   const s = await sql
-    .first<{ resident: number | null; expires_at: number }>("SELECT u.resident, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?", await sha256(token))
+    .first<{ resident: number | null; expires_at: number }>("SELECT u.resident, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?", hash)
     .catch(() => null);
   const resident = !!s && s.resident === 1 && s.expires_at >= now;
   if (residentChecks.size >= RESIDENT_CHECKS_MAX) residentChecks.delete(residentChecks.keys().next().value!);
-  residentChecks.set(token, { resident, until: now + RESIDENT_CHECK_MS });
+  residentChecks.set(hash, { resident, until: now + RESIDENT_CHECK_MS });
   return resident;
 }
 
