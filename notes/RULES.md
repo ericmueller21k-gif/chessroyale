@@ -195,3 +195,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - A waiter on .done also needs a look at the helper's session after ~1 h: Nov 25 the Squads helper went idle at 16:20 with .pr-body.md/.done uncommitted and sat 3 h unseen. Briefs say: COMMIT and push .pr-body.md and .done.
 - Send a working helper one message per round and wait for its report before the next: Nov 26 two corrections crossed on vote-card-fill and it built both in turn.
 - A question to Eric about anything on screen goes WITH its picture, in the same message (Nov 26: 'boss bar' and 'quest row' asked in words for a day; he didn't know what they were).
+- Nov 26 (Eric): two xhigh money jobs may run at once (PR 4 + PR 5), still within the two-Opus cap; each keeps its full-lane review.
