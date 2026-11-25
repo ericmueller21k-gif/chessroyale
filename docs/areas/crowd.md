@@ -21,6 +21,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   centered on the board, 22 px (a narrow board's as big as it holds); the scoreboard and the chat end on the board's bottom line (its
   clock bar included; `board-foot.ts` measures it, board-size.css uses it); the panel over the chat is one 206 px slot, what the
   reveal's six bars need. Guard: `e2e/desktop-board.spec.ts`, "a computer's 50 v 50 (Eric, Nov 25)…".
+- **The vote box is a standing skeleton** (Nov 25; [2026-11-25-crowd-poll-skeleton.md](../decisions/2026-11-25-crowd-poll-skeleton.md);
+  `SkeletonRows`, `SlotSkeleton` in `screens/Crowd.tsx`): the reveal's box always has its cap's rows (`useBarSlots`), the ones a round
+  doesn't fill gray (`.poll-row.skel`), and a watched turn's result line gray (`.poll-result-skel`). A computer's slot shows the
+  skeleton rows between reveals too (Play and `WatchScreen`), the status line at its foot; a phone's slot keeps the power-up row and the
+  status line until the reveal. Guard: `e2e/crowd.spec.ts`, "50 v 50's vote box is a standing skeleton".
 - **A mode is a preset over one engine.** `modeSettings()` and `CROWD_SETTINGS` / `RAID_SETTINGS` in settings.ts
   patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
