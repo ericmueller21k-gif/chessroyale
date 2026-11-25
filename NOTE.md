@@ -14,3 +14,5 @@ of the card's color where the edge crosses it.
 
 Root *-build-* overwritten after the director's second round: the fill at the bar's orange 40% (42% dark), no top edge; the blurb a step
 darker (light) / the text color (dark), so the count is AA and the blurb at least 5:1 over the fill. (mock/*-v2-* was the 2 px edge try.)
+
+Final (the director's pick): v2. Root *-build-* re-shot from the final commit: 35% fill (40% dark), 2 px edge, halo on the card's text.
