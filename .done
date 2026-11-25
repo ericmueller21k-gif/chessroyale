@@ -1,5 +1,0 @@
-Residents PR 3 (the always-on host) done, 2026-11-25 ~05:05 UTC. PR body: .pr-body.md (lane full: add full-e2e).
-Mergeable as is: no `containers` entry, RESIDENTS_HOST_ON "0", nothing starts and nothing is spent.
-Blocked on Eric (once): push the image (DEPLOY.md "Residents"; our API tokens get Forbidden on Containers) and make
-RESIDENTS_CLIENT_SECRET a Secret (at 04:15 UTC it was not among the Worker's secrets; names only checked).
-Then the director: the containers entry with the digest (standard-2), RESIDENTS_HOST_ON "1", the first-start check.
