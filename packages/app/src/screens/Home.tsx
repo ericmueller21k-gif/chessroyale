@@ -268,7 +268,8 @@ const RAID_SIZE = RAID_SETTINGS.lobbySize ?? S.lobbySize;
  * The RANKED row's three choices, left to right (Eric, Oct 16: "so that way it's clear that they're all ranked"). Classic
  * is still played with ?mode=classic while it's reworked; the boss raid is its own card and screen.
  */
-const MODES: { id: HomeMode; label: string; sub: string }[] = [
+/** The RANKED row's modes, in its order (the season ladder's tabs follow it: screens/Ladder.tsx). */
+export const MODES: { id: HomeMode; label: string; sub: string }[] = [
   { id: "crowd", label: `${CROWD_SIZE / 2} v ${CROWD_SIZE / 2}`, sub: "Crowd chess" },
   { id: "1v1", label: "1 v 1", sub: "Classic chess" },
   { id: "squads", label: "Squads", sub: `${SQUADS.squadCount} squads of ${SQUADS.squadSize}` },
@@ -578,6 +579,7 @@ export function HomeScreen({
   onSettings,
   onShop,
   onSignIn,
+  onLadder,
   bossParty,
 }: {
   /** In the queue: the queue screen (or the line for a seat), shown in place of the play column. */
@@ -638,6 +640,8 @@ export function HomeScreen({
   onSettings: () => void;
   /** The phone's shop icon in the top bar. */
   onShop: () => void;
+  /** "LADDER ›" at the end of the RANKED label: the season ladder (/ladder). */
+  onLadder: () => void;
   onSignIn: () => void;
   /**
    * Boss Battle's party (docs/decisions/2026-10-30-boss-party.md): its client once there is one, a note, the invite
@@ -1110,6 +1114,14 @@ export function HomeScreen({
       <h2 class={`fd-label${off}`} id="fd-ranked-label">
         RANKED
       </h2>
+      {/* (The season ladder's way in (Eric, Nov 25; the mockup's option A): at the end of the label's line, out of the flow, so nothing
+          moves. Lit while a search goes on: the ladder is a page to browse, as any.) */}
+      <button type="button" class="fd-ladder-a" data-testid="home-ladder" onClick={onLadder}>
+        LADDER
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </button>
       {searching ? (
         // (Searching: the same box, the same size, the search in it.)
         <SearchRow search={search!} />

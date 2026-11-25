@@ -29,6 +29,7 @@ import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { chatRoomOf, expireTownCache, signedInReader, townOpenParties } from "./town-chat-api.ts";
 import { handleFriendsApi } from "./friends-api.ts";
+import { handleLadder } from "./ladder.ts";
 import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
@@ -243,6 +244,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Friends and invites: /api/friends (friends-api.ts).
     const friends = await handleFriendsApi(request, env, waitUntil);
     if (friends) return friends;
+    // GET /api/ladder?mode=1v1: the season ladder's top 200 and your place (ladder.ts; the rows kept a minute in this Worker).
+    const ladder = await handleLadder(request, env);
+    if (ladder) return ladder;
     // POST /api/engine/score {fen, moves} → {moves}: the engine server's deeper look at a few moves (solo games'
     // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself). A position
     // Stockfish refuses is a bad request, turned away before the budget (it would end the server's Stockfish: engine.ts).

@@ -3717,6 +3717,15 @@ export const RANKED_1V1 = {
 };
 
 /**
+ * The season ladder (Eric, Nov 25: "a ladder board for all rank modes for the current season"; "scrollable to the top 200";
+ * docs/decisions/2026-11-25-ladder.md). `season`: the season shown (none is stored yet: "Season 1" is everything so far). `size`:
+ * the list's rows, one scroll, never a "next" page; your own row is pinned below it with your exact place wherever you are.
+ * `cacheSeconds`: how long each Worker instance keeps a mode's rows and count (at most one read of them a minute per instance, however
+ * busy); your own row is read for you every time and put in your copy of the list.
+ */
+export const LADDER = { season: 1, size: 200, cacheSeconds: 60 };
+
+/**
  * Leaving ranked games early (phase L1, 1 v 1; Eric, Nov 9: "Quitting during time control. Yeah, that's fine. Quitting
  * mid-game. Yeah, full loss."; docs/ideas/ranked-ladder.md section 4, docs/areas/ranked.md "Leaving"). The server
  * decides all of it from the game's own record (core's ranked-leaves.ts does the math); PAUSE_LEAVE_PENALTIES turns it off.

@@ -10661,9 +10661,36 @@ button.fd-logo {
 }
 /* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
 .fd-ranked {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+/*
+ * The phone's way in (Eric, Nov 25; the mockup's option A): "LADDER ›" at the end of home's RANKED label, out of the flow (the label's
+ * line keeps its height: nothing on home moves). A computer has it too, beside the side menu's Ladder.
+ */
+.fd-ladder-a {
+  position: absolute;
+  right: 0;
+  top: -12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-height: 40px;
+  padding: 0 2px 0 10px;
+  border: 0;
+  background: none;
+  color: var(--fd-link);
+  font: 800 12px/1 Archivo, system-ui, sans-serif;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+/* (LADDER's 40 px box reaches a few px over the mode row's top edge: the row is painted over it, so a tap there is the mode's, never
+   the ladder's. Searching, its search row in the same place.) */
+.fd-ranked > .fd-modes {
+  position: relative;
+  z-index: 1;
 }
 /* (Oct 24: centered over the three buttons.) */
 .fd-ranked .fd-label {

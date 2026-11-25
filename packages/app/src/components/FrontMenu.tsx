@@ -11,6 +11,7 @@ import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
 import { MOUSE_LAYOUT } from "./MatchMenu.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { questsForYou } from "../quests.ts";
+import { TROPHY_PATHS } from "../ladder.ts";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -27,11 +28,13 @@ export interface FrontNav {
   settings: () => void;
   /** Your friends list (the live panel's Friends section, the phone home's line). */
   friendsList: () => void;
+  /** The season ladder (/ladder; Eric, Nov 25: "visible from the left panel on desktop"); over the town in the town, as the shop. */
+  ladder: () => void;
   /** Sign in (the global chat's guests). */
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess" | "quests";
+export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess" | "quests" | "ladder";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -84,6 +87,20 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
               <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
               <circle cx="17" cy="9" r="2.6" />
               <path d="M16 13.6c2.8.2 5 2.2 5 5" />
+            </Icon>
+          }
+        />
+        {/* (The season ladder (Eric, Nov 25: "visible from the left panel on desktop"): the ranked modes' standings this season.) */}
+        <Item
+          tip={tip}
+          label="Ladder"
+          on={page === "ladder"}
+          onClick={nav.ladder}
+          icon={
+            <Icon>
+              {TROPHY_PATHS.map((d) => (
+                <path key={d} d={d} />
+              ))}
             </Icon>
           }
         />
