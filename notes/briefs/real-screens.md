@@ -33,3 +33,7 @@ Read CLAUDE.md, `.claude/LESSONS.md`, `docs/rules/eric.md`, `docs/areas/board.md
 **Eric, Nov 25:** "don't take those notes and assume that it's for every single device ... the whole point is we've tried to make a point to
 differentiate what screen we're referring to." Every still and every claim in the PR body names its screen size. Look at your own stills at
 each size before reporting.
+**Eric, Nov 25 (desktop, 100%, app window ~1858 × 1040), the 1 v 1 GAME screen on a computer:** the opponent's strip (icon, name, rank) at
+the very top, no title line; "1 v 1 · Blitz 3+2" between their name and clock; the gear top right; the board takes all the height between the
+two strips; the right column flush with the board top and bottom; a redesigned right column (clean action row: Offer a draw / Resign; the
+chat filling the rest); "Your move" placed logically (by your own strip/clock). Mockup at desktop ~1858×1040, laptop 1536×730, 1920×960.
