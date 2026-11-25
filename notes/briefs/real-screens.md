@@ -14,10 +14,15 @@ layout specs: **1536×730** (1080p @125%, Eric's laptop), **1280×600** (1080p @
 `deviceScaleFactor` to match (1.25 / 1.5 / 1). A layout check every computer game screen and end page runs at each: no horizontal scroll,
 nothing cut off at the top, the chat's message area ≥ 120 px, the board at least (viewport height − 2 name bars − 40). Add the rule to
 `docs/rules/eric.md` ONLY as a proposal in the PR body (a guard needs Eric's OK); put the sizes in `docs/areas/board.md`.
-**Part 2, the 1 v 1 end page (`DuelEndPage`, `EndScreen`) to Eric's Nov 20 spec** (docs/decisions/2026-11-20-end-screen.md): centered, the
-move-by-move BELOW (not beside), nothing shifts; the quests row shows the day's quests with their progress (moved ones lit), never "No quests
+**Part 2, the 1 v 1 end page (`DuelEndPage`, `EndScreen`) to Eric's Nov 20 spec** (docs/decisions/2026-11-20-end-screen.md): on a computer the move-by-move stays on the RIGHT
+(Eric, Nov 25: "I don't care if the move by move is on the right ... obviously when the screen is vertical like a phone, we're not going to
+be able to squeeze a board to the right"), the two columns balanced with even gutters, nothing shifts; the quests row shows the day's quests with their progress (moved ones lit), never "No quests
 moved this game"; the placement card "1 of 5 games" (not RP); Play again / Home normal button size; the chat with a real message area;
 header never cut. Ship parts 1-2 together on `claude/real-screens` with `.pr-body.md` + `.done` (targeted lane) and stills at the 4 sizes.
+**The principle for every computer screen (Eric, Nov 25): "the laptop is just a smaller desktop screen, and we should be seeing pretty much
+the same thing, just smaller versions ... where everything is sitting."** Same arrangement on every landscape screen, scaled to the window
+(sizes from the viewport, not fixed px that reflow at a breakpoint); only a portrait/phone screen rearranges. A laptop still must look like
+the desktop shot, shrunk.
 **Part 3, MOCKUP (stills only, `claude/game-layout-mockup`, `stills/game-layout-mockup`):** one shared computer layout for every game screen
 (1 v 1, 50 v 50, boss, Squads): the board as tall as the window allows (chess.com: only a name bar above and below; "1 v 1 · Rapid 10+5" in
 the top bar by the clock), one right panel width, the chat never collapses; the rank emblem by every name; tap a rank → a "Ranks" pop-up
