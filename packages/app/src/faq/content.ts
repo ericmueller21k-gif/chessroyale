@@ -13,6 +13,7 @@
  * - Something built but not yet on for players is marked "Being tested"; something only planned, "Planned".
  */
 import {
+  LADDER,
   POWER_TIPS,
   BATTLE_TOWER,
   BOT_LEVELS,
@@ -390,6 +391,8 @@ ${emblems(Array.from({ length: R.divisions }, (_, i) => emblemId(example, R.divi
 - **The top two tiers,** with no divisions: **${lowTop!.name}**, the ${num(lowTop!.top)} highest ranks, and above it **${highTop!.name}**, the ${num(highTop!.top)} highest, both from ${floorRp} RP in ${last} 1 (their RP count from there). Equal ranks share a place, and your place is brought up to date within a minute. At ${floorRp} RP or more in ${last} 1 but outside the top ${num(lowTop!.top)}, you stay ${last} 1 and your RP keeps counting past ${floorRp}. Their emblems shimmer:
 
 ${emblems([emblemId(lowTop!.name, null), emblemId(highTop!.name, null)])}
+
+- **The season ladder:** **LADDER ›** at the end of home's RANKED label (a computer's side menu: **Ladder**) shows the ${num(LADDER.size)} highest ranks this season in one list, with your own place pinned under it wherever you are. Equal ranks share a place. Only 1 v 1 has ranks of its own so far: the 50 v 50 and Squads tabs wait for theirs.
 
 - **Rank points:** about +${num(R.points.perGame)} for a win and −${num(R.points.perGame)} for a loss against a player at your level, about 0 for a draw; more for beating someone stronger, less for beating someone weaker. Behind them is a hidden rating, worked out from your results and whom you played them against: when your rank is lower than it, you gain more and lose less (up to ${n(R.points.maxAdjust, "RP", "RP")} more or less), so your rank settles where your play is. A win never costs you points.
 - **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${top.label.replace(/ · .*/, "")}.

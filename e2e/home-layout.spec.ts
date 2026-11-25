@@ -793,12 +793,12 @@ test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry ope
   await quests.getByRole("button", { name: "Got it" }).click();
   await expect(quests).toHaveCount(0);
   // The entry: in the top bar on a phone (1 px from the shop's row); on a computer (1024 px and up) "Daily Quests" in the side menu,
-  // between Play with friends and Shop & crates, and nothing on your card (Eric, Nov 10).
+  // between Play with friends and Shop & crates (the season ladder's Ladder above it since Nov 25), and nothing on your card (Eric, Nov 10).
   const computer = await page.evaluate(() => innerWidth >= 1024);
   await expect(page.locator(".fd-hero button.fd-quests-btn, .fd-hero [aria-label=Quests]")).toHaveCount(0);
   if (computer) {
     await expect(page.locator(".fd-top .fd-top-quests")).toHaveCount(0);
-    await expect(page.locator(".fd-side .fd-menu-item")).toHaveText(["Main menu", "Chess Town", "Boss Battle", "Play with friends", "Daily Quests", "Shop & crates", "Profile", "Settings"]);
+    await expect(page.locator(".fd-side .fd-menu-item")).toHaveText(["Main menu", "Chess Town", "Boss Battle", "Play with friends", "Ladder", "Daily Quests", "Shop & crates", "Profile", "Settings"]);
   } else await expect(page.locator(".fd-top .fd-top-quests")).toHaveCount(1);
   await entry.click();
   await expect(quests).toBeVisible();
