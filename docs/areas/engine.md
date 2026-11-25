@@ -75,6 +75,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   class `EngineServer`, binding `ENGINE`, instance `standard-2`) at 2M nodes (`SERVER_RECHECK_NODES`). If it doesn't
   answer in time, the host re-checks on its own device. Server searches are capped per day by
   `ENGINE_DAILY_SEARCHES` (3000), counted in D1 (`engine_usage`); `ENGINE_OFF=1` turns the server off (local, e2e).
+  Residents alone (Nov 25; `lobby.ts` `residentsOnly`): a Crowd, raid or Classic lobby whose connected people are all residents never
+  asks it and a resident's hello never wakes it; a real person connected turns it back on. The host is a real person's device whenever
+  one is connected (`pickHost`: trusted people, trusted residents, then anyone). [accounts.md](accounts.md), "Residents".
   The Hidden Boss's own moves in his phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-server-only.md) come from the
   engine server alone (`serverAllMovesAt`, instance `engine-1`) and are **never refused for the day's budget** (they're bounded by
   the fights; the review of #683, M2): each position is counted once on his own row (`<day>:recluse`, the pool `"recluse"`), never
