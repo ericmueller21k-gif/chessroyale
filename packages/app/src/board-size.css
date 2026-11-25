@@ -152,7 +152,9 @@
  * The scoreboard's table starts on the board's top (its "BLACK TEAM" label in the row's height) and it ends on the board's foot, as the
  * chat does (board-foot.ts measures that line: the board's frame, its clock's bar under it included). A phone and a tablet are unchanged. */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
-  .screen.game.crowd-50 {
+  /* (The opening vote's screen too, `cf-vote`: the same frame, so the board is where the game's is when the game begins.) */
+  .screen.game.crowd-50,
+  .screen.game.cf-vote {
     --cf-gap: 28px;
     /* (The least room either side of the block, as the old layout had at 1280 × 800: every board is at least its old size.) */
     --cf-edge: 10px;
@@ -169,16 +171,17 @@
     column-gap: var(--cf-gap);
     row-gap: 0;
   }
-  .screen.game.crowd-50:has(.board-row > .eval-bar) {
+  .screen.game.crowd-50:has(.board-row > .eval-bar),
+  .screen.game.cf-vote:has(.board-row > .eval-bar) {
     --cf-bw: calc(round(down, min(var(--bd-h), var(--cf-free) - 280px - 48px), var(--cf-step, 1px)) + var(--cf-snap, 0px));
     grid-template-columns: calc(var(--cf-bw) + 48px) var(--side-w);
   }
-  .screen.game.crowd-50 .board-area .board-wrap,
-  .screen.game.crowd-50 .board-row .eval-bar ~ .board-wrap {
+  .screen.game:is(.crowd-50, .cf-vote) .board-area .board-wrap,
+  .screen.game:is(.crowd-50, .cf-vote) .board-row .eval-bar ~ .board-wrap {
     width: var(--cf-bw);
     flex: none;
   }
-  .screen.game.crowd-50 > .board-area {
+  .screen.game:is(.crowd-50, .cf-vote) > .board-area {
     grid-row: 3 / 5;
   }
   /* (The line over the board is gone: its count is the top row's PICKED, the voting team in the status box, your team the scoreboard's.) */
@@ -255,13 +258,15 @@
     font-size: 1em;
   }
   /* The gear: the column's first line, at its right end, beside the power-ups row (as tall as the row, 32 px). */
-  .screen.game.crowd-50 > .cf-row > .mm {
+  .screen.game.crowd-50 > .cf-row > .mm,
+  .screen.game.cf-vote > .vote-hud > .mm {
     position: absolute;
     top: 100%;
     right: calc(-1 * (var(--cf-gap) + var(--side-w)));
     display: flex;
   }
-  .screen.game.crowd-50 > .cf-row > .mm .mm-more {
+  .screen.game.crowd-50 > .cf-row > .mm .mm-more,
+  .screen.game.cf-vote > .vote-hud > .mm .mm-more {
     height: 32px;
     min-height: 32px;
   }
@@ -291,7 +296,7 @@
   }
   /* (The scoreboard: the 50 v 50 only, a raid keeps its own column, board-layout.spec.ts. Its table's top on the board's top, its foot the
      board's: board-foot.ts.) */
-  .arena:not(.sq-arena):has(> .screen.game.crowd-50) > .tower-side {
+  .arena:not(.sq-arena):has(> .screen.game:is(.crowd-50, .cf-vote)) > .tower-side {
     max-height: var(--side-foot, var(--app-h));
     padding-top: var(--side-pad, 14px);
     padding-bottom: 0;
@@ -331,26 +336,83 @@
     font-size: 22px;
   }
 }
+/* The opening vote in the frame: its title ("VOTE 1 OF 3" over "How are moves picked?") the top row, centered on the board as the game's
+   numbers are; the gear where the game's is; the line that says what to do on the column's first line, where the game's power-ups row
+   goes; the cards under it, where the vote box goes. (No chat: the vote has none, as before.) */
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game.cf-vote > .vote-hud {
+    grid-column: 1;
+    grid-row: 1;
+    position: relative;
+    height: 40px;
+    margin: 0;
+  }
+  .screen.game.cf-vote > .vote-hud > .vote-title {
+    flex: 1 1 auto;
+    height: 40px;
+    min-height: 0;
+    align-content: end;
+    justify-items: center;
+    gap: 3px;
+    padding: 0 0 9px;
+    border: 0;
+    background: none;
+    text-align: center;
+  }
+  .screen.game.cf-vote > .vote-hud > .vote-title .vote-step {
+    font: 700 9px/1 Archivo, system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .screen.game.cf-vote > .vote-hud > .vote-title h1 {
+    font-size: 20px;
+    line-height: 1;
+  }
+  .screen.game.cf-vote > .board-area {
+    position: relative;
+  }
+  .screen.game.cf-vote > .board-area > .vote-hint {
+    position: absolute;
+    top: 0;
+    left: calc(100% + var(--cf-gap));
+    width: calc(var(--side-w) - 44px);
+    height: 32px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 15px;
+    text-align: center;
+  }
+  .screen.game.cf-vote > .vote-cards {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: start;
+    margin-top: 36px;
+  }
+}
 /* (The board's drawing step: 8 device pixels, as game-frame.css rounds the boss screens' and the 1 v 1's boxes. At 125% and 150% the step
    isn't a whole number of layout units (1/64 px), so 1/64 px more keeps the box from snapping just under a step: the 1 v 1's fix.) */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (max-resolution: 1dppx) {
-  .screen.game.crowd-50 {
+  .screen.game:is(.crowd-50, .cf-vote) {
     --cf-step: 8px;
   }
 }
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 2dppx) {
-  .screen.game.crowd-50 {
+  .screen.game:is(.crowd-50, .cf-vote) {
     --cf-step: 4px;
   }
 }
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 1.25dppx) {
-  .screen.game.crowd-50 {
+  .screen.game:is(.crowd-50, .cf-vote) {
     --cf-step: 6.4px;
     --cf-snap: calc(1px / 64);
   }
 }
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 1.5dppx) {
-  .screen.game.crowd-50 {
+  .screen.game:is(.crowd-50, .cf-vote) {
     --cf-step: calc(8px / 1.5);
     --cf-snap: calc(1px / 64);
   }

@@ -134,6 +134,7 @@ export function VoteScreen({
   evalBar = true,
   extra,
   below,
+  frame = false,
   chime = true,
   menu,
 }: {
@@ -149,6 +150,8 @@ export function VoteScreen({
   extra?: ComponentChildren;
   /** Under the cards (Squads' standings on a phone). */
   below?: ComponentChildren;
+  /** The 50 v 50's opening vote: its computer frame, the game's (board-size.css, "The 50 v 50's frame"), so the board never moves. */
+  frame?: boolean;
   /** The result's three tones and the timer's ticks (Crowd's); Squads has neither. */
   chime?: boolean;
   /** At the top line's end: the match's control (Sound, and Leave: MatchMenu); without one, the sound button. */
@@ -319,7 +322,7 @@ export function VoteScreen({
           : "Drag your pawn into a zone, or tap a card.";
 
   return (
-    <div class={`screen game vote-screen${towerClosed ? " tower-closed" : ""}`}>
+    <div class={`screen game vote-screen${towerClosed ? " tower-closed" : ""}${frame ? " cf-vote" : ""}`}>
       {/* The same frame as the game's screens (the top line, the line above the board, the board beside its eval
           bar), so the board stays exactly where it is when the game begins. */}
       <div class="hud-row vote-hud">
