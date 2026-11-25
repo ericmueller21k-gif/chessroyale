@@ -217,7 +217,21 @@ export interface Human {
   maiaReady?: true;
   /** Maia's files are saved on it (its speed report): a phone may then be told to load Maia to check his moves (BOSS_CHECK.loaders). */
   maiaSaved?: true;
+  /**
+   * A resident's seat (users.resident, as the Durable Object found on its hello; residents.ts): the host rule passes over it while a
+   * real person is connected (pickHost), and a lobby of residents alone never asks the engine server (residentsOnly).
+   */
+  resident?: true;
 }
+
+/**
+ * The lobby's people are residents alone (residents.ts): it has a resident's seat and no real person's. Then the engine server is never
+ * asked (LobbyCore.serverOn, the host's re-check in lobby-do.ts, the Hidden Boss's searches): the devices re-check close calls
+ * themselves, as with no engine server (ENGINE_OFF). A real person's seat counts while it's in the match, connected or away (a phone
+ * locked as judging runs, the review's M1): it leaves `humans` only when they leave the match (a resign, or away past LEAVING.awayMs).
+ * A lobby with no resident is never this.
+ */
+export const residentsOnly = (r: Pick<LobbyRecord, "humans">): boolean => r.humans.some((h) => h.resident) && !r.humans.some((h) => !h.resident);
 
 /**
  * A person's result in a match, for their profile (humanResults; a resign's is taken as they leave). `noResult`: the match ended with
@@ -853,12 +867,25 @@ export class LobbyCore {
     };
   }
 
+  /**
+   * The Hidden Boss's searches on the engine server (io.phase2Search: his move in phase 1 or 2, a bot's, a person's fair play), and its
+   * wake-up: none for a lobby of residents alone (residentsOnly), which takes the path of no engine server set up (the server's quick
+   * move, the result unvouched), as ENGINE_OFF does. The review's m3.
+   */
+  private get phase2Search(): LobbyIO["phase2Search"] {
+    return residentsOnly(this.r) ? undefined : this.io.phase2Search;
+  }
+
+  private get warmEngine(): LobbyIO["warmEngine"] {
+    return residentsOnly(this.r) ? undefined : this.io.warmEngine;
+  }
+
   /** What the Hidden Boss's phase 2 (bosses/recluse.ts) may use of this lobby. */
   private get phase2Lobby(): Phase2Lobby {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const lobby = this;
-    const search = lobby.io.phase2Search;
-    const warm = lobby.io.warmEngine;
+    const search = lobby.phase2Search;
+    const warm = lobby.warmEngine;
     const none = lobby.io.phase2NoResult;
     return {
       get r() {
@@ -1093,20 +1120,29 @@ export class LobbyCore {
     return this.r.humans.filter((h) => alive.has(h.id));
   }
 
-  /** The host scores rounds; prefer a connected computer. */
+  /**
+   * The host scores rounds; prefer a connected computer. Not a device benched for wrong scores, while there's anyone else; and a
+   * resident (residents.ts) only while no real person's trusted device is connected: a real person's device hosts whenever one is here
+   * (residents still judge).
+   */
   private pickHost(exclude?: string): string | null {
-    const all = this.r.humans.filter((h) => h.connected && h.id !== exclude);
-    // (Not a device benched for wrong scores, while there's anyone else.)
-    const trusted = all.filter((h) => !this.benched(h.id));
-    const candidates = trusted.length ? trusted : all;
+    const here = this.r.humans.filter((h) => h.connected && h.id !== exclude);
+    const trusted = (h: Human) => !this.benched(h.id);
+    // (Trusted people first, then trusted residents, then anyone: with no resident here, as ever, the trusted, else anyone.)
+    const tiers = [here.filter((h) => trusted(h) && !h.resident), here.filter((h) => trusted(h) && h.resident), here.filter((h) => !h.resident), here];
+    const candidates = tiers.find((t) => t.length) ?? [];
     const computer = candidates.find((h) => h.device === "computer");
     return (computer ?? candidates[0])?.id ?? null;
   }
 
-  /** The host for the engine work now: the current one, unless it's gone or was benched for wrong scores. */
+  /**
+   * The host for the engine work now: the current one, unless it's gone, was benched for wrong scores, or is a resident while a real
+   * person's trusted device is connected (pickHost).
+   */
   private hostNow(): string | null {
     const h = this.r.hostId;
-    if (h && this.human(h)?.connected && !this.benched(h)) return h;
+    const passedOver = !!this.human(h ?? "")?.resident && this.r.humans.some((p) => p.connected && !p.resident && !this.benched(p.id));
+    if (h && this.human(h)?.connected && !this.benched(h) && !passedOver) return h;
     return this.pickHost() ?? (h && this.human(h)?.connected ? h : null);
   }
 
@@ -1125,6 +1161,7 @@ export class LobbyCore {
     admin = false,
     party: { pass?: unknown; seat?: unknown } = {},
     seeded = false,
+    resident = false,
   ) {
     this.r.activeAt = this.io.now();
     const byToken = token ? this.r.humans.find((h) => h.token === token) : undefined;
@@ -1147,8 +1184,24 @@ export class LobbyCore {
       // (Its app may have changed with a reload; its Maia went with the page: an app that still has it says so again.)
       if (seeded) existing.seeded = true;
       else delete existing.seeded;
+      if (resident) existing.resident = true;
+      else delete existing.resident;
       delete existing.maiaReady;
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
+      // (A real person back while a resident hosts: the host is chosen again now, so the work in flight goes to the person's device
+      // below, and the resident's late answer isn't heard: scores and bossMove come from the host alone. The review's m1.)
+      else if (!existing.resident && this.human(this.r.hostId)?.resident) {
+        this.r.hostId = this.hostNow();
+        // (The phase's timer from now, for the device that hosts now: the old one would hand the work back to the resident when it
+        // fires, a person back late in the window losing hosting again. The delta review's d-m2.)
+        if (this.r.hostId === existing.id) {
+          if (this.r.phase === "scoring" && this.r.scoreRequest && !this.r.judges?.tasks && this.r.timer?.kind === "scoreTimeout") {
+            this.setTimer("scoreTimeout", this.io.now() + SCORE_TIMEOUT_MS);
+          } else if (this.r.phase === "boss" && this.r.bossKey && !this.r.bossCheck && this.r.recluse1?.key !== this.r.bossKey && this.r.timer?.kind === "bossTimeout") {
+            this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()) + hoopsMs(this.runner));
+          }
+        }
+      }
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
       this.broadcast(this.lobbyMessage(existing.id), false);
       const last = this.r.last[existing.id];
@@ -1195,6 +1248,7 @@ export class LobbyCore {
       ...(evalBar !== null ? { evalBar } : {}),
       ...(admin ? { admin: true } : {}),
       ...(seeded ? { seeded: true as const } : {}),
+      ...(resident ? { resident: true as const } : {}),
     });
     if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [id]: userId };
     if (pl && admit) {
@@ -2842,10 +2896,13 @@ export class LobbyCore {
     // The Hidden Boss's own move (his room's fight, the Crowd's final), no device having answered it: never a random move, nor
     // another device's window on top (another 15 s for everyone, and two silent devices took turns forever): the engine server's, at
     // his strength, while his turn waits for it (Eric, Nov 13, option 1). Another device hosts his moves to come, as below.
-    if (this.hisOwnMove() && this.io.phase2Search) {
+    if (this.hisOwnMove() && this.phase2Search) {
       if (next) this.r.hostId = next;
       return this.askHis();
     }
+    // (Residents alone: no engine server, and their devices can't play his move, so another resident's window would only bounce
+    // between them forever: his quick move now, the match unvouched, as with no engine server set up. The delta review's d-m1.)
+    if (this.hisOwnMove() && residentsOnly(this.r)) return this.hisQuick();
     if (next && next !== this.r.hostId) {
       this.r.hostId = next;
       if (c) {
@@ -2897,12 +2954,13 @@ export class LobbyCore {
   /** A try at his move on the engine server (on his own row of the day: counted once, `again` after the first); none set up any more (a deploy without it): the quick move. */
   private searchHis() {
     const a = this.r.recluse1!;
-    if (!this.io.phase2Search) return this.hisQuick();
+    const search = this.phase2Search;
+    if (!search) return this.hisQuick();
     a.tries++;
     a.at = this.io.now();
     a.retryAt = undefined;
     a.ask = `p1-${a.key}.${a.tries}`;
-    this.io.phase2Search({ id: a.ask, fen: a.fen, boss: true, ...(a.tries > 1 ? { again: true as const } : {}) });
+    search({ id: a.ask, fen: a.fen, boss: true, ...(a.tries > 1 ? { again: true as const } : {}) });
     this.armHis();
   }
 
@@ -3450,7 +3508,7 @@ export class LobbyCore {
     if (this.judging()) return this.startJudging();
     const host = this.hostNow();
     this.r.hostId = host;
-    if (host) this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest, ...(this.io.serverEngine ? { serverRecheck: true } : {}) });
+    if (host) this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest, ...(this.serverRechecks ? { serverRecheck: true } : {}) });
     this.setTimer("scoreTimeout", this.io.now() + SCORE_TIMEOUT_MS);
   }
 
@@ -3460,7 +3518,7 @@ export class LobbyCore {
     if (next && next !== this.r.hostId) {
       this.r.hostId = next;
       this.broadcast(this.lobbyMessage(), false);
-      this.io.send(next, { t: "scoreRequest", ...this.r.scoreRequest, ...(this.io.serverEngine ? { serverRecheck: true } : {}) });
+      this.io.send(next, { t: "scoreRequest", ...this.r.scoreRequest, ...(this.serverRechecks ? { serverRecheck: true } : {}) });
       this.setTimer("scoreTimeout", this.io.now() + SCORE_TIMEOUT_MS);
       return;
     }
@@ -3686,9 +3744,17 @@ export class LobbyCore {
     return (this.r.judges?.devices[id]?.strikes ?? 0) >= this.jcfg.strikes;
   }
 
-  /** The engine server can be asked now. */
+  /**
+   * The host's scores will be re-checked on the engine server (lobby-do.ts, as they come in), so it's told to skip its own re-check
+   * (`serverRecheck`): never for a lobby of residents alone, whose scores the server never re-checks (residentsOnly).
+   */
+  private get serverRechecks(): boolean {
+    return !!this.io.serverEngine && !residentsOnly(this.r);
+  }
+
+  /** The engine server can be asked now: it's there, and the lobby isn't residents alone (residentsOnly). */
   private get serverOn(): boolean {
-    return !!this.io.serverEngine && !!this.io.serverScore;
+    return !!this.io.serverEngine && !!this.io.serverScore && !residentsOnly(this.r);
   }
 
   /** Devices that can judge now: connected, speed known (an up-to-date app), not benched. */
@@ -4449,6 +4515,9 @@ export class LobbyCore {
     // no fair-play signals from a party's battle.)
     if (!round || this.r.party) return;
     const people = new Set(this.r.humans.filter((h) => !h.practice).map((h) => h.id));
+    // (Residents' picks (residents.ts) are in a resident's own crowd, never in a real person's: a real player's hard finds are measured
+    // against real people alone. The review's m4, the director's call.)
+    const residents = new Set(this.r.humans.filter((h) => h.resident).map((h) => h.id));
     const sig = FAIRPLAY.signals;
     let added = false;
     for (const b of report.boards) {
@@ -4464,10 +4533,17 @@ export class LobbyCore {
       const legal = legalMoves(b.fenBefore).length;
       const [, side, , , , full] = b.fenBefore.split(" ");
       const ply = (Math.max(1, Number(full) || 1) - 1) * 2 + (side === "b" ? 1 : 0);
-      const crowd = picked.filter((p) => !p.usedPowerUp);
-      const tally = new Map<string, number>();
-      for (const o of crowd) tally.set(o.move!, (tally.get(o.move!) ?? 0) + 1);
+      const everyone = picked.filter((p) => !p.usedPowerUp);
+      const real = everyone.filter((o) => !residents.has(o.playerId));
+      const tallyOf = (crowd: typeof everyone) => {
+        const tally = new Map<string, number>();
+        for (const o of crowd) tally.set(o.move!, (tally.get(o.move!) ?? 0) + 1);
+        return tally;
+      };
+      const [everyoneTally, realTally] = [tallyOf(everyone), tallyOf(real)];
       for (const p of picked) {
+        const resident = residents.has(p.playerId);
+        const [crowd, tally] = resident ? [everyone, everyoneTally] : [real, realTally];
         const others = crowd.filter((o) => o.playerId !== p.playerId);
         // What the others picked, the most picked few (the crowd's rate for any move, read later).
         const mine = crowd.includes(p) ? p.move! : null;

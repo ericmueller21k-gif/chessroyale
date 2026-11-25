@@ -255,6 +255,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   rules, if they misfire: no dodge or leave is charged or marked, and no lockout or delayed queue applies; games play on;
   [ranked.md](ranked.md), "Leaving early"),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
+  `PAUSE_RESIDENTS` (Nov 25; `residents.ts`): the server's own, never in `/api/status`: a resident's session gets 503 "Residents are paused." on
+  every `/api/*` route, every room (Lobby, DuelGame, SquadsLobby, SquadsParty) refuses its hello and closes its socket on its next message.
   - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
     `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,
     `{ message, paused }`: a refusal, not an error, so error capture never counts it). Matches already running finish normally, and lobbies already made still start and take
@@ -287,6 +289,35 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **A version carries its own variables:** rolling back to a version from before a `PAUSE_` or banner change undoes
     that change too. Check the switches after a rollback.
   - The database's schema only grows (columns are added, never removed), so an older version still runs on it.
+- **Residents, the program** (Nov 25; Eric: "have 200 bots made which just sit on the server and play ranked ... so like any time of
+  day I can login and see games played"; the design: `notes/residents-design.md` on `claude/director-notes`;
+  [2026-11-25-residents-program.md](../decisions/2026-11-25-residents-program.md)). `scripts/residents/` (Node, run with tsx) plays
+  resident accounts (`users.resident`, made and signed in through `/api/admin/residents`) as people with browsers, through the same
+  routes and sockets as the app. Ranked 1 v 1 only so far (50 v 50 is the design's PR 5).
+  - **Run it:** `npx tsx scripts/residents/run.ts [--base https://hunchess.com] [--accounts 200] [--target-online 30] [--hours 0]
+    [--modes 1v1] [--flat]`. The live site takes the residents' Access service token from `CF_ACCESS_CLIENT_ID` and
+    `CF_ACCESS_CLIENT_SECRET` (headers on every request and socket, never printed); its client ID must be the one
+    `RESIDENTS_CLIENT_ID` names. A local server (`npx wrangler dev --var E2E_SQL:<a key of 32+ characters>`) takes that key as
+    `E2E_SQL_KEY`. Any other host is refused, so the token never goes elsewhere. `--flat` drops the schedule and keeps the first
+    `--target-online` residents on all the time (a local test).
+  - **What it does:** signs every account in at the start, four at a time (each its own cookie jar: the session and fair play's
+    device cookie, as separate browsers; the look, pawn color and a free icon, is given when an account is made, and its seeded
+    items are put on then, once). A schedule keeps about `--target-online` on, in waves; each online resident sits on home (the
+    live line every 5 s, so it's on the online count), queues for 1 v 1 (`/api/1v1/play` with its ticket; a gate lets residents in a
+    few at a time so one is often alone in line and a person who queues meets them within seconds), votes, plays moves drawn from
+    Maia at its own rating after a clock-aware think, now and then offers or takes a draw, resigns lost games, says quick-chat
+    presets, and goes back home. Its behavior (normal, slow, leaver, AFK, chatty, rage-quit; 2% of games drop the socket and come
+    back) goes through ranked's leaving rules for real. One Maia process for all of them; no Stockfish (1 v 1 has no judging).
+  - **The switch:** `PAUSE_RESIDENTS` (the server's; PR 1). While it's on the program won't start; when it comes on (any answer
+    "Residents are paused.", or a game's socket refused and the route saying so) every resident stops and the program exits.
+    SIGTERM or Ctrl-C stops them cleanly too (out of the queue, games in progress resigned, a last heartbeat).
+  - **What it reports:** a heartbeat each minute to `POST /api/admin/residents/beat` (online by state, games and their results,
+    games against people, moves, errors by kind, Maia's state, the queue gate), and on stdout one line per event (sessions, games
+    and how they ended, rank changes, lockouts) and a summary every 5 minutes. Never a cookie or a token.
+  - **Settings:** `RESIDENTS` in `settings.ts` (accounts, target and waves, time zones and daily shape, sessions, behaviors' shares,
+    think times, resigning, draws, chat). The names: `scripts/residents/names.json` (200 handles, reviewed: never a real person's
+    name or a hint of one, never "bot" or "resident"). Tests: `packages/server/test/residents-program.test.ts` (names, profiles, the
+    schedule's waves and caps, think times, behaviors).
 - **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
   and send feedback and ideas, and admins read them all on `/admin/ops`.
 - **Health** (below): one snapshot of the game for an admin (`/admin/ops`) or a script (`npm run ops:report`).

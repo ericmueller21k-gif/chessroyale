@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, JUDGES, modeSettings, mulberry32, type JudgeConfig, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FAIRPLAY, JUDGES, modeSettings, mulberry32, type FairMove, type JudgeConfig, type Settings } from "@chessroyale/core";
 import { deepCheck, deepTargets, judgedBoard, legalMoves, runJudgeJob, runQuickJob, sanLineToUci, type EngineLike, type JudgeJob, type JudgeReport, type MoveScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type ServerScoreRequest } from "../src/lobby.ts";
 import { assignJudges, cutBubble, drawJudges, seedFor } from "../src/judges.ts";
@@ -108,13 +108,13 @@ function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings
    * every person picking in the same rounds, so the lobby's seed is one that puts them all on White (the first to
    * move): searched for here, a new lobby each try.
    */
-  const begin = (n: number, nps: number[] = [], old: number[] = [], computers: number[] = [0]) => {
+  const begin = (n: number, nps: number[] = [], old: number[] = [], computers: number[] = [0], residents: number[] = []) => {
     for (let seed = 1; ; seed++) {
       core = make(seed);
       inbox.clear();
       serverAsks.length = 0;
       for (let i = 0; i < n; i++) {
-        core.connect(undefined, `P${i + 1}`, computers.includes(i) ? "computer" : "phone");
+        core.connect(undefined, `P${i + 1}`, computers.includes(i) ? "computer" : "phone", false, null, undefined, undefined, null, null, false, {}, false, residents.includes(i));
         if (!old.includes(i)) core.message(`p${i + 1}`, { t: "speed", nps: nps[i] ?? 400_000 });
       }
       core.message("p1", { t: "start" });
@@ -579,8 +579,8 @@ describe("the best move is the highest-scored pick (docs/decisions/2026-10-16-th
     }
   };
   /** Three people on White: p1 and p3 pick the best move, p2 the worst (which the second search scores above it). */
-  const start = (L: ReturnType<typeof setup>) => {
-    L.begin(3, [1_000_000, 900_000, 300_000]);
+  const start = (L: ReturnType<typeof setup>, residents: number[] = []) => {
+    L.begin(3, [1_000_000, 900_000, 300_000], [], [0], residents);
     const fen = L.last("p1", "round")!.board!.fen;
     const [first, worst] = [ranked(fen)[0]!, ranked(fen).at(-1)!];
     L.pickAll(3, { p1: first, p2: worst, p3: first });
@@ -603,6 +603,44 @@ describe("the best move is the highest-scored pick (docs/decisions/2026-10-16-th
     expect(rev.bestMove).toBe(worst);
     expect(rev.picks.find((p) => p.playerId === "p1")!.loss).toBeCloseTo(6, 9);
     consistent(rev);
+  });
+
+  it("residents alone (residents.ts): the engine server is never asked; a real person in the match, connected or away, turns it back on", async () => {
+    for (const people of [[], ["p3"], ["p3 away"]]) {
+      const L = setup({ server: true });
+      const { first, worst } = start(L, people.length ? [0, 1] : [0, 1, 2]);
+      expect(L.core.record.humans.map((h) => !!h.resident)).toEqual([true, true, !people.length]);
+      // (A real person's phone locked as the round is judged (the review's M1): still in the match, so still checked.)
+      if (people.includes("p3 away")) L.core.disconnect("p3");
+      for (const id of L.judgesOf()) await answerWith(L, id, inflated);
+      // (With a person here, the close call goes to the engine server as ever: down here, so the pick above the first line is the
+      // best. With residents alone, the devices re-check it themselves, as with no engine server: the first line is.)
+      expect(L.serverAsks, people.join()).toHaveLength(people.length ? 1 : 0);
+      if (people.length) L.serve(true);
+      expect(L.core.record.phase).toBe("reveal");
+      expect(L.last("p1", "reveal")!.bestMove, people.join()).toBe(people.length ? worst : first);
+    }
+  });
+
+  it("residents' picks (residents.ts): in a resident's own crowd for fair play, never in a real person's (the review's m4)", async () => {
+    const fairOf = async (residents: number[]) => {
+      const L = setup({ server: false });
+      const { first, worst } = start(L, residents);
+      for (const id of L.judgesOf()) await answerWith(L, id, inflated);
+      expect(L.core.record.phase).toBe("reveal");
+      return { first, worst, row: (id: string) => L.core.fairMoves(id)[0]! };
+    };
+    const found = (row: FairMove) => (row.loss <= FAIRPLAY.signals.foundLoss ? 1 : 0);
+    // Nobody a resident: everyone's crowd is the two others (p1 and p3 picked the first line, p2 the worst).
+    const all = await fairOf([]);
+    expect(all.row("p1")).toMatchObject({ crowd: 2, crowdFound: found(all.row("p3")) + found(all.row("p2")), picks: { [all.first]: 1, [all.worst]: 1 } });
+    // p2 a resident: the real people's crowd leaves its pick out; its own row keeps everyone.
+    const one = await fairOf([1]);
+    for (const [me, them] of [["p1", "p3"], ["p3", "p1"]] as const) {
+      expect(one.row(me)).toMatchObject({ crowd: 1, crowdFound: found(one.row(them)), picks: { [one.first]: 1 } });
+      expect(one.row(me).picks).not.toHaveProperty(one.worst);
+    }
+    expect(one.row("p2")).toMatchObject({ crowd: 2, crowdFound: found(one.row("p1")) + found(one.row("p3")), picks: { [one.first]: 2 } });
   });
 
   it("the engine server's re-check weighs the first line against it, like for like: the better one is the best", async () => {

@@ -121,6 +121,8 @@ decisions. In this order:
      their fair-play files), then `TEST_ACCOUNTS_CLIENT_ID` back to `""` in `wrangler.jsonc` and deployed (no token
      can make or sign in to accounts on the live site; docs/decisions/2026-11-10-cheater-demo.md; PR #622 review,
      finding 1).
+   - purge residents; remove RESIDENTS_CLIENT_ID and the token (`users.resident`, `residents.ts`; the purge is PR 1b;
+     docs/decisions/2026-11-25-residents-server.md).
 
 **Only Eric can do:**
 
