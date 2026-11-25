@@ -616,6 +616,10 @@
       ],
       "specs": ["e2e/crowd.spec.ts", "e2e/crowd-play.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
     },
+    "the season ladder (Nov 25): /ladder, its endpoint, home's LADDER and the side menu's Ladder (the check lives in home-ranked.spec)": {
+      "paths": ["packages/app/src/screens/Ladder.tsx", "packages/app/src/ladder.ts", "packages/app/src/ladder.css", "packages/server/src/ladder.ts"],
+      "specs": ["e2e/home-ranked.spec.ts"]
+    },
     "home and the front door": {
       "paths": [
         "packages/app/src/App.tsx",

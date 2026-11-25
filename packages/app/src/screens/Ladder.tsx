@@ -40,9 +40,7 @@ export function LadderScreen({ onBack, onSignIn }: { onBack: () => void; onSignI
   const [asks, setAsks] = useState(0);
   const [note, setNote] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (location.pathname !== "/ladder") history.replaceState(null, "", `/ladder${location.search}${location.hash}`);
-  }, []);
+  // (No address of its own here: the side menu and home's LADDER set /ladder (App's nav.ladder); over the town it stays /town.)
   useEffect(() => {
     if (answer) return;
     let live = true;

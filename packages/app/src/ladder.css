@@ -373,12 +373,15 @@
   z-index: 40;
 }
 
-/* A narrow phone (under 360 px): the record's column a little narrower. */
+/* A narrow phone (under 360 px): the face and the record's column a little narrower (the place keeps its 30 px: "200" whole). */
 @media (max-width: 359px) {
   .ld-cols,
   .ld-row {
-    grid-template-columns: 26px 34px minmax(0, 1fr) 48px 52px;
+    grid-template-columns: 30px 34px minmax(0, 1fr) 48px 52px;
     column-gap: 5px;
+  }
+  .ld-placing {
+    grid-template-columns: 30px 34px minmax(0, 1fr) auto;
   }
   .ld-face {
     width: 34px;
