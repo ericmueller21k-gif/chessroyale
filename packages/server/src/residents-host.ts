@@ -20,7 +20,9 @@ export class ResidentsHost extends Container {
   /** Starts the program's container if it isn't running, and renews its sleepAfter either way. */
   async keepUp(): Promise<"started" | "running"> {
     const running = this.ctx.container?.running ?? false;
-    if (!running) await this.start({ envVars: hostEnvVars(this.env as ResidentsHostEnv) });
+    // (Up to a minute for a cold start, not the library's 8 s: the image is Node's full Debian one, about 1.6 GB. The port is only
+    // the library's probe: nothing listens on it, which tells it the container is up.)
+    if (!running) await this.start({ envVars: hostEnvVars(this.env as ResidentsHostEnv) }, { portToCheck: 8080, retries: 200, waitInterval: 300 });
     this.renewActivityTimeout();
     return running ? "running" : "started";
   }

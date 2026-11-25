@@ -321,7 +321,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 - **Residents, the host** (Nov 25; `residents-host.ts`, `scripts/residents/container/`, DEPLOY.md "Residents"): a Container whose
   image clones `main`, installs it and runs the program `--follow-deploys` (after a deploy: games finish, exit 75, start again). The
   cron keeps it up while `RESIDENTS_HOST_ON` (wrangler.jsonc) is "1" and stops it while `PAUSE_RESIDENTS` is on; the token's secret
-  (`RESIDENTS_CLIENT_SECRET`) goes to the program alone, never git or npm. About $42 a month. Tests: `residents-host.test.ts`.
+  (`RESIDENTS_CLIENT_SECRET`) goes to the program alone, never git or npm. About $52 a month. Tests: `residents-host.test.ts`.
 - **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
   and send feedback and ideas, and admins read them all on `/admin/ops`.
 - **Health** (below): one snapshot of the game for an admin (`/admin/ops`) or a script (`npm run ops:report`).

@@ -43,15 +43,18 @@ npx wrangler containers build scripts/residents/container -t chessroyale-residen
 ```
 
 It ends by printing the pushed image's digest (`sha256:…`; `npx wrangler containers images list` shows it again). The digest isn't
-a secret: send it to the director, who adds the host's entry to `containers` in `wrangler.jsonc` and deploys:
+a secret: send it to the director. (Or, with no Docker at hand: add **Account · Containers · Edit** to the API token the director's
+sessions have as `CLOUDFLARE_API_TOKEN`, and the director pushes it from a cloud session, where the same build was tested Nov 25:
+there `docker pull mirror.gcr.io/library/node:22-bookworm` and tag it `public.ecr.aws/docker/library/node:22-bookworm` first, as
+AWS's mirror turns that shared address away.) The director then adds the host's entry to `containers` in `wrangler.jsonc`:
 
 ```jsonc
-{ "class_name": "ResidentsHost", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-residents@sha256:<digest>", "instance_type": "standard-1", "max_instances": 1 }
+{ "class_name": "ResidentsHost", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-residents@sha256:<digest>", "instance_type": "standard-2", "max_instances": 1 }
 ```
 
 - **On:** `RESIDENTS_HOST_ON` = `"1"` in `wrangler.jsonc` (a PR; not the dashboard, where a deploy would put the file's value back).
-  The next 15-minute cron starts it. That starts the spend: about $42 a month (below).
-- **Stop at once:** `PAUSE_RESIDENTS` = `1` (dashboard, Save and deploy; DEPLOY.md "Kill switches"). The server refuses every
+  The next 15-minute cron starts it. That starts the spend: about $52 a month (below).
+- **Stop at once:** `PAUSE_RESIDENTS` = `1` (dashboard, Save and deploy; "Kill switches" below). The server refuses every
   resident within seconds, the program ends its games and exits, and the next cron run (within 15 minutes) stops the container.
   Delete it to bring them back. `RESIDENTS_HOST_ON` = `"0"`: the cron stops renewing it, and it sleeps within 30 minutes.
 - **Deploys:** a Worker deploy doesn't restart the container (no container change, no rollout; its Durable Object restarts and finds
@@ -62,10 +65,11 @@ a secret: send it to the director, who adds the host's entry to `containers` in 
   at …") and `residents:`; `GET /api/admin/residents` shows `host` (the cron's plan) and the program's last heartbeat (`beat`: its
   commit, the live version it follows, who's online). If Access turns the token away, the program stops at start with "Access turned
   the service token away": check the token is in the hunchess.com application's Service Auth policy.
-- **Cost (standard-1: ½ vCPU, 4 GiB, 8 GB):** memory $25.70, CPU about $15 (billed on use: about 0.3 vCPU on average), disk $1.40,
-  egress nothing (1 TB included): about **$42 a month**. Its Durable Object stays awake while the container runs (about 330k GB-s a
-  month: inside the 400k included, or up to about $4 if other objects use it up). Measured locally: about 0.5 GiB of memory with
-  a few residents (DECISIONS: docs/decisions/2026-11-25-residents-host.md).
+- **Size and cost (standard-2: 1 vCPU, 6 GiB, 12 GB):** measured in Docker with 40 residents online (18 games at once): CPU 0.25
+  vCPU on average, 0.43 at peaks, memory at most 0.6 GiB. standard-1's ½ vCPU would run near its limit when the waves peak
+  (about 54 online), and custom sizes can't be checked from here. Memory $38.70, CPU about $11 (billed on use), disk $2.10, egress
+  nothing (1 TB included): about **$52 a month**. Its Durable Object stays awake while the container runs (about 330k GB-s a
+  month: inside the 400k included, or up to about $4 more if other objects use it up).
 
 ## Fair play: the review page, the reviewer's key and the deep re-check
 
@@ -117,6 +121,8 @@ message, without a code change: each is a Worker variable (docs/areas/ops.md, "K
      delayed queue applies while it's on). Games play as usual. For when the rules misfire.
    - `PAUSE_TOWN_CHAT`: typing in the town square's chat, everywhere at once (the field says "Chat is paused."; players'
      messages stop showing, the bosses' chatter goes on).
+   - `PAUSE_RESIDENTS`: every resident turned away (their games end as anyone's who leaves), and their host stopped within 15
+     minutes ("Residents" above).
    - One boss, never met while it's set (its id, from `BOSS_ROSTER` in `packages/core/src/boss.ts`, isn't always its
      name): Ginger `PAUSE_BOSS_GINGERBREAD`, Boingo the Clown `PAUSE_BOSS_CLOWN`, Jefferson `PAUSE_BOSS_GREX`, Hollow
      `PAUSE_BOSS_HOLLOW`, Big Boy `PAUSE_BOSS_BIGBOY`, Sawyer `PAUSE_BOSS_SAWYER`, Wrangler `PAUSE_BOSS_PIG`, the
