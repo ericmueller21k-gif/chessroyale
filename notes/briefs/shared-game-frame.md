@@ -73,3 +73,20 @@ Build exactly what `notes/tools/mock-crowd-50.spec.ts` shows, including the stan
   and push it to `stills/squads-frame/mock/`; then build without waiting (the director reviews the mock and the build together).
 - Stills of the build: 1536x730, 1920x960, 1858x1040, plus the phone 390x844 unchanged, on `stills/squads-frame/`.
 - The phone is unchanged.
+
+## Third job (Nov 26): Boss battles (alone and raid), one PR (branch `claude/boss-frame`)
+Eric, Nov 26: KEEP the two-line boss bar ("I like the boss bar bigger"). The board stays the size the two-line bar allows (602 at
+1536x730, 832 at 1920x960 today: don't shrink it; grow it only if the frame frees room without touching the bar).
+- Build on main after #953/#956/#959 (the frames, `--cf-gap`, the column-rule guard in `desktop-board.spec.ts`). Reuse; don't copy. Read
+  #959's PR body first.
+- Boss alone and a Boss raid on a computer (1100 px and up, mouse): every column on the board's top and bottom lines (the boss bar counts as
+  the board's top strip, as the 1 v 1's strips do); equal gaps either side of the board; the Moves panel (and a raid's crowd/vote parts)
+  runs the board's full height (today it stops halfway); the gear in the same place as the other modes (top right, level with the top
+  strip). The boss and your pawn sprites beside the board keep their places and size (they're the show): if they live in a column, that
+  column runs the board's lines too. The board never shrinks for the menu; labels by #953's rule.
+- Add Boss alone and a raid to the eric.md column-rule guard at 1536x730 and 1920x960; update the rule's text.
+- BEFORE building: a quick mockup still (CSS/DOM injected over the live screen, as the Squads job did) at 1536x730 to
+  `stills/boss-frame/mock/` and write `.mock-ready`; then build without waiting.
+- Boss lane: also run the boss kit (`packages/chess/test/boss-kit.test.ts`, `e2e/boss-smoke.spec.ts` for the first boss on desktop) and
+  `boss-side`/`boss-bar`/`boss-dock` specs. Stills of the build: Boss alone and a raid at 1536x730, 1920x960, 1858x1040; the phone
+  390x844 unchanged, on `stills/boss-frame/`.
