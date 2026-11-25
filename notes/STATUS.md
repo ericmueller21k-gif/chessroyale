@@ -2088,3 +2088,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~13:05 UTC: #949 town-atlas CI RED (real bug): town-controls:347 portraits 0/21 both projects: chipFace stand-in drawn via drawImage stays empty (chips + large map blank on repeat visit; maybe 2D fallback too). HELD; brief town-atlas-pages-2.md queued AFTER payments PR 2 (xhigh alone).
 - Nov 25 ~13:30 UTC: main 9b03cb5d (#948) GREEN, FLAKY_RED cleared. #944 end screens MERGED (f695bb7f); main watcher armed. Next: #945 → #946 (one at a time). #949 held (round 2 after payments PR 2).
 - Nov 25 ~13:55 UTC: main f695bb7f (#944) GREEN + LIVE. #945 crowd-poll MERGED (ca760a55); main watcher armed. Next: #946.
+- Nov 25 ~14:10 UTC: payments PR 2 DONE → #950 (a4de7fcc, full-e2e label); helper archived. Independent review (xhigh, read-only, review/pay-play-coins) starting, ALONE. #945 merged (ca760a55), main watcher bjqjwloyf; #946 next. #949 round 2 queued after the review.
