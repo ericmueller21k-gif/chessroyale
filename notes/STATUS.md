@@ -2125,3 +2125,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: duel-layout round 2 done → PR #953 (draft, full CI: core ranked.ts). 1 v 1 stills sent to Eric. Next after merge: shared-game-frame (50 v 50 approved mock; note labels may cost the mock's 634 board → icons by the rule). Squads-no-check helper still running.
 - Nov 26: #953 MERGED (f9caf556), main full run watched. crowd-frame helper started (session_01JuCWRusmCJS87agXNDDGqu, Opus high, branch claude/crowd-frame). Running: squads-no-check + crowd-frame (2).
 - Nov 26: squads-no-check helper had gone idle 16:20 without committing its handoff → messaged it to merge main, commit, push. Waiter b8p9a2d4n.
+- Nov 26: main f9caf556 RED (FLAKY_RED): boss-smoke Folio passive not seen. Helper flake-folio-smoke. #949 merged main (b3fcd6b2), CI pending. #954 merged (5dd1f196), main run b10g20r21.
