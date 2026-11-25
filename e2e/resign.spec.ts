@@ -1,5 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
-import { named, test, bossAloneFromHome, openBossRaid, pickMode, startBotLevel } from "./helpers.ts";
+import { named, test, bossAloneFromHome, endGaps, openBossRaid, pickMode, startBotLevel } from "./helpers.ts";
 
 /**
  * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the gear in the top line
@@ -14,6 +14,25 @@ const path = (p: Page) => new URL(p.url()).pathname;
 const run = Date.now().toString(36).slice(-5);
 const pool = (name: string) => `${name}-${test.info().project.name[0]}${run}`;
 const phone = () => test.info().project.name === "phone";
+
+/**
+ * An end page under Eric's spacing rule (Nov 25, round 2c; docs/decisions/2026-11-25-end-screens-2.md): one gap between every container
+ * (to 2 px), nothing stretched or spread, the buttons stacked with the next game on top, and a stack shorter than the screen centered as
+ * one block (the room above and under it within 30 px).
+ */
+async function endPage(page: Page, at: string) {
+  const g = await endGaps(page, ".screen.es-screen");
+  for (const x of g.gaps) expect(Math.abs(x.px - g.token), `${at}: ${x.between}: ${x.px.toFixed(1)} px, not the one gap (${g.token} px)`).toBeLessThanOrEqual(2);
+  expect(g.spread, `${at}: nothing spread apart`).toEqual([]);
+  expect(g.grow, `${at}: nothing grows to fill`).toEqual([]);
+  const m = await page.evaluate(() => {
+    const t = document.querySelector(".es-screen .es-head")!.getBoundingClientRect();
+    const [home, again] = [...document.querySelectorAll(".es-screen .actions .btn")].map((b) => b.getBoundingClientRect());
+    return { above: t.top, under: innerHeight - home!.bottom, scroll: document.documentElement.scrollHeight - innerHeight, stacked: again!.bottom <= home!.top && Math.abs(again!.left - home!.left) < 1 };
+  });
+  expect(m.stacked, `${at}: the buttons stacked, the next game on top`).toBe(true);
+  if (m.scroll <= 0) expect(Math.abs(m.above - m.under), `${at}: centered (${m.above.toFixed(0)} above, ${m.under.toFixed(0)} under)`).toBeLessThanOrEqual(30);
+}
 
 /**
  * Opens the match's gear, then Resign or Leave in its list, and checks the confirm says `title` and `note`: Cancel has the
@@ -132,6 +151,13 @@ test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign m
   await expect(page.locator(".results")).toContainText("It counts as a loss.");
   await page.waitForTimeout(2_000);
   expect(await phase(page)).toBe("results");
+  // (Its end page: one gap (no blank line under "You resigned"), and nothing judged is one line, never an empty table: round 2c.)
+  await expect(page.getByTestId("es-quests")).toHaveText("Quests No quests this game.", { timeout: 20_000 });
+  if ((await page.locator(".stage-table tbody tr").count()) === 0) {
+    await expect(page.getByTestId("no-judged")).toHaveText("No moves judged this game.");
+    await expect(page.locator(".stage-table")).toHaveCount(0);
+  }
+  await endPage(page, "50 v 50, phone 390×844");
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });
@@ -154,6 +180,7 @@ test("Squads (a test lobby): Resign leaves the lobby, a bot plays your seat, and
   await confirm.getByRole("button", { name: /Resign/ }).click();
   await expect(page.locator(".sq-resigned h1")).toHaveText("You resigned");
   await expect(page.locator(".sq-resigned")).toContainText(`Test lobby: nothing goes on your record. A bot plays your seat for the ${squad}.`);
+  await endPage(page, "Squads, phone 390×844");
   // Nobody is left in it: it has ended and closed (its code no longer works).
   await expect
     .poll(() => page.evaluate((c) => fetch(`/api/squads/lobby/${c}`).then((r) => r.json()).then((b: { open?: boolean }) => b.open), code), { timeout: 15_000 })
@@ -166,6 +193,34 @@ test("Squads (a test lobby): Resign leaves the lobby, a bot plays your seat, and
 /** A second device, the same kind as the project's. */
 const device = (browser: Browser) =>
   browser.newContext(phone() ? ({ ...devices["iPhone 13"], browserName: undefined } as never) : { viewport: { width: 1280, height: 800 } });
+
+test("the 50 v 50's and Squads' end pages on a laptop 1536×730 (125%): one gap, the buttons stacked, the block centered, the stage table the column's width", async ({ browser }) => {
+  test.skip(phone(), "opens its own laptop window");
+  test.setTimeout(4 * 60_000);
+  const ctx = await browser.newContext({ viewport: { width: 1536, height: 730 }, deviceScaleFactor: 1.25 });
+  const page = await ctx.newPage();
+  await named(page, "Tess");
+  await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30&augments=0");
+  await pickMode(page);
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await startBotLevel(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|watching)$/);
+  await (await openConfirm(page, /^Resign\?$/, /^The match ends here for you and counts as a loss\.$/)).getByRole("button", { name: /Resign/ }).click();
+  await expect(page.getByTestId("es-quests")).toHaveText("Quests No quests this game.", { timeout: 20_000 });
+  await endPage(page, "50 v 50, laptop 1536×730");
+  // (A table, when there is one, no wider than the column: the XP bar's width.)
+  const w = await page.evaluate(() => [".stage-table", ".es-track"].map((q) => document.querySelector(q)?.getBoundingClientRect().width ?? 0));
+  expect(w[0], "the stage table the column's width").toBeLessThanOrEqual(w[1]! + 1);
+
+  await page.goto("/squads/test/relay?nolanding&debug&clock=90,0,3,0");
+  await page.getByRole("button", { name: "Skip votes" }).click({ timeout: 30_000 });
+  await expect(page.locator(".sq-game")).toBeVisible({ timeout: 30_000 });
+  await (await openConfirm(page, /^Resign\?$/, /^You'll leave the lobby and it counts as a loss\./)).getByRole("button", { name: /Resign/ }).click();
+  await expect(page.locator(".sq-resigned h1")).toHaveText("You resigned");
+  await endPage(page, "Squads, laptop 1536×730");
+  await ctx.close();
+});
 
 test("online boss raid: one resigns, a bot takes the seat, the other plays on (and now runs the boss); the one who left isn't put back", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(5 * 60_000);

@@ -499,7 +499,7 @@ door's look; every class is `sq-`.
   standings' foot has "Leave the lobby" (it asks again while your squad still plays: "Resign: a
   loss, and a bot takes your seat"). The match's top line ends in the match's control as in every mode
   (`MatchMenu`: the gear, with Sound, Animations and Resign, on a phone and a computer; `squadsExit` says what it offers), and the
-  votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home.
+  votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home: an end screen since Nov 25 (round 2c: the headline, the flag, the buttons stacked, one gap, centered; the results' buttons stacked too).
 - **A match** (`screens/SquadsMatch.tsx`): the score and round on top, the strip, every board in the lobby as tiny
   boards (`TinyBoard`, match by match, your squad's ringed, YOU on your board and NEXT on the next board you'll move on (Relay skips a finished one, as the quick jump does: Nov 18); tappable only once
   you've moved or locked in: one opens full size with "Back to my board"; a new half that asks something of you brings

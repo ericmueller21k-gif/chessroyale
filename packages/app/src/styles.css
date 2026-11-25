@@ -3106,17 +3106,23 @@ button.history-label {
      one height on every phase of a match (the power-up row, the status line and the vote results take turns in it), so the
      scoreboard never moves (crowd.spec, "the scoreboard never moves"). A bar is 14 px with its gap, the result line 20 px:
      six bars at most (--slots; Crowd.tsx, useBarSlots, shows as many as the box holds). The board keeps its size. */
+  /* Nov 25 (Eric: the vote box stands on the phone too): the box is the power-up row (32 px), the vote rows (13 px, 1 px apart) and
+     the status line under them (24 px: the waiting line between reveals, the result line at the reveal), 6 px between the
+     three, in every phase: 151 px with six rows (was 104, the rows only at the reveal), so the scoreboard sits 47 px lower, all
+     game. The board keeps its size (its width is the phone's). */
   .screen.game.crowd-50 {
     --slots: 6;
-    --mid-h: calc(var(--slots) * 14px + 20px);
+    --status-h: 24px;
+    --mid-h: calc(32px + 6px + var(--slots) * 14px - 1px + 6px + var(--status-h));
   }
-  /* Shorter screens: fewer bars, so the scoreboard keeps its rows (at 664 and 667 it keeps four or five with six). */
-  @media (max-height: 639px) {
+  /* Shorter screens: fewer bars, so the scoreboard keeps its three rows' room (MiniTower's floor) under the taller box (Nov 25:
+     measured at 375x667, 360x640, 390x700, 414x736 and 430x740; was 5 under 640 px and 4 under 600 before the box stood). */
+  @media (max-height: 759px) {
     .screen.game.crowd-50 {
       --slots: 5;
     }
   }
-  @media (max-height: 599px) {
+  @media (max-height: 699px) {
     .screen.game.crowd-50 {
       --slots: 4;
     }
@@ -3128,18 +3134,55 @@ button.history-label {
     min-height: 0;
     align-content: start;
   }
+  /* (The reveal's box as wide as the standing one, so its power-up row and rows don't move sideways: no phone inset, Nov 25.) */
+  .screen.game.crowd-50 > .poll {
+    margin: 0;
+  }
   /* Nov 8 (Eric: nothing on the match screen moves): the power-up row sits at the top of the box, right under the board, on
      every phase, and the status slot under it is 42 px on every phase (empty while picking, the waiting line's box in the
      others). Two lines of text fit it, so a long line never grows the box. */
   .screen.game.crowd-50 > .play-footer {
     align-content: start;
   }
+  .screen.game.crowd-50 > .play-footer > .poll-skel {
+    display: grid;
+    gap: 1px;
+  }
+  /* The status line: one line (Nov 25), 13 px, as tall as the result line it gives way to. Its words fit 320 px
+     ("White is voting. Your team moves next." and the count), so nothing is cut. */
   .screen.game.crowd-50 .play-slot {
-    height: 42px;
+    height: var(--status-h);
   }
   .screen.game.crowd-50 .play-slot > .waiting-banner {
-    padding: 0 14px;
-    line-height: 1.2;
+    gap: 8px;
+    min-height: 0;
+    padding: 0 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  /* (Narrower phones: tighter, 12 px under 390 px and 11 px under 360, so "White is voting. Your team moves next. 50/50" stays
+     one line inside the board's width down to 320 px; measured at 13 px it needs 344 px.) */
+  @media (max-width: 389px) {
+    .screen.game.crowd-50 .play-slot > .waiting-banner {
+      gap: 6px;
+      padding: 0 8px;
+      font-size: 12px;
+    }
+  }
+  @media (max-width: 359px) {
+    .screen.game.crowd-50 .play-slot > .waiting-banner {
+      font-size: 11px;
+    }
+  }
+  /* The reveal: the power-up row stays on top, greyed (Crowd.tsx, LockedPowerRow), 6 px over the rows. */
+  .screen.game.crowd-50 .poll-result-skel {
+    height: var(--status-h);
+  }
+  .screen.game.crowd-50 > .poll > .history-nav {
+    flex: none;
+    margin-bottom: 5px;
   }
   .screen.game.crowd-50 .poll {
     display: flex;
@@ -3182,7 +3225,7 @@ button.history-label {
     align-items: baseline;
     justify-content: center;
     gap: 8px;
-    height: 20px;
+    height: var(--status-h);
     margin-top: auto;
     min-width: 0;
     overflow: hidden;
@@ -3590,6 +3633,32 @@ button.history-label {
 }
 .poll-row.lose {
   opacity: 0.45;
+}
+/* The vote box's empty rows (50 v 50, Eric, Nov 25): the app's loading look, a soft gray bar where the move goes and the bar's
+   gray track, still (no shimmer: nothing to draw each frame). Light and dark from the text color. */
+.poll-row.skel .poll-move i,
+.poll-result-skel i {
+  display: block;
+  width: 70%;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+/* (An empty result line, a turn you watched: the box's own foot line in its fixed spot at the box's foot, a row's width and
+   look with a shorter gray bar, not a stray pill: Nov 25, round 2.) */
+.poll-result-skel {
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  margin-top: auto;
+}
+.poll-result-skel i {
+  width: 40%;
 }
 .poll-result {
   display: flex;
@@ -21437,10 +21506,13 @@ button.sq-tiny {
   .screen.game.duel-screen {
     --dv-w: min(100%, calc(var(--app-h) - 250px));
   }
+  /* (Nov 25: from under the panel down to the board's foot, its strip included, not a fixed 320 px: on a laptop's 1536 × 730 the chat
+     sat short of the board with 104 px of messages. `contain: size`: its content never makes the row taller than the board's.) */
   .screen.game.duel-screen .dv-chat {
     grid-column: 2;
     grid-row: 4;
-    height: 320px;
+    align-self: stretch;
+    contain: size;
   }
 }
 
@@ -26308,16 +26380,16 @@ body.mo-on .mm-scrim {
 }
 .rd-attack {
   position: absolute;
-  left: calc(50% - var(--ra-fx) * 2px);
-  bottom: calc((var(--ra-fy) - var(--ra-h)) * 2px);
-  width: calc(var(--ra-w) * 2px);
-  height: calc(var(--ra-h) * 2px);
+  left: calc(50% - var(--ra-fx) * var(--rd-k, 2) * 1px);
+  bottom: calc((var(--ra-fy) - var(--ra-h)) * var(--rd-k, 2) * 1px);
+  width: calc(var(--ra-w) * var(--rd-k, 2) * 1px);
+  height: calc(var(--ra-h) * var(--rd-k, 2) * 1px);
   pointer-events: none;
 }
 /* (Drawn facing our left: mirrored about his feet, toward your pawn.) */
 .rd-attack.flip {
   transform: scaleX(-1);
-  transform-origin: calc(var(--ra-fx) * 2px) 100%;
+  transform-origin: calc(var(--ra-fx) * var(--rd-k, 2) * 1px) 100%;
 }
 .rd-you {
   flex: none;

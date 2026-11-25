@@ -236,24 +236,33 @@ export interface QuestMoved {
   quest: QuestsAnswer["quests"][number];
   from: number;
 }
+/** One of your quests on an end screen that shows them all (ranked 1 v 1's, Nov 25): its count before this game, and whether it moved. */
+export interface QuestRow extends QuestMoved {
+  moved: boolean;
+}
 /** The answer for each grant, asked once: a second end screen for the same game (Squads' card, then its results) shows the same. */
-const movedBy = new WeakMap<object, Promise<QuestMoved[]>>();
+const rowsBy = new WeakMap<object, Promise<QuestRow[]>>();
 /**
- * The quests this game moved (its XP `grant` has come: the server counted them in the same batch). Against this page's last read, or
- * (none this page) home's last shown; none if neither knows the quest.
+ * Every quest you have (the dailies, then the weekly), each with its count before this game (its XP `grant` has come: the server counted
+ * them in the same batch) and whether this game moved it. Against this page's last read, or (none this page) home's last shown; a quest
+ * neither knows didn't move. `grant` null (no XP came): the quests as they stand, none moved.
  */
-export function questsMovedBy(grant: object): Promise<QuestMoved[]> {
-  let p = movedBy.get(grant);
+export function questRowsBy(grant: object | null): Promise<QuestRow[]> {
+  let p = grant ? rowsBy.get(grant) : undefined;
   if (p) return p;
   const user = account().profile?.user.id ?? "";
   const before = counts?.user === user ? counts.at : lastShown(user);
   p = fetchQuests()
     .then((a) => {
       noteQuestCounts(user, a);
-      const was = questsMoved(before, a);
-      return a.quests.filter((q) => q.id in was).map((q) => ({ quest: q, from: was[q.id]! }));
+      const was = grant ? questsMoved(before, a) : {};
+      return a.quests.map((q) => ({ quest: q, from: q.id in was ? was[q.id]! : q.progress, moved: q.id in was }));
     })
     .catch(() => []);
-  movedBy.set(grant, p);
+  if (grant) rowsBy.set(grant, p);
   return p;
+}
+/** The quests this game moved (questRowsBy's moved rows). */
+export function questsMovedBy(grant: object): Promise<QuestMoved[]> {
+  return questRowsBy(grant).then((rows) => rows.filter((r) => r.moved).map(({ quest, from }) => ({ quest, from })));
 }

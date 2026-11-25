@@ -33,34 +33,38 @@ import { XP_NONE_LINES, type XpGrant } from "@chessroyale/core";
 export { squadsExit, squadsWaiting, type SquadsActions } from "./squads-exit.ts";
 import { squadsExit, type SquadsActions } from "./squads-exit.ts";
 
-/** You resigned: what went on your record, and where to go next (the lobby goes on without you). */
+/**
+ * You resigned: what went on your record, and where to go next (the lobby goes on without you). Every end screen's rules (Eric, Nov 25;
+ * end-screen.css): the headline, its line, the flag, the buttons stacked (the next game on top), one gap between them, a block centered
+ * in the page.
+ */
 function SquadsResigned({ client, actions }: { client: SquadsClient; actions: SquadsActions }) {
   const r = client.resigned;
   const sq = client.mySquad;
   return (
-    <div class="screen results sq-results sq-resigned">
-      <div class="trophy resigned" aria-hidden="true">
-        <FlagIcon size={56} />
-      </div>
-      <h1>You resigned</h1>
-      <p class="muted">
+    <div class="screen results sq-results sq-resigned es-screen">
+      <EndHeadline title="You resigned" line="" tone="loss" />
+      <p class="muted left-line">
         {!r ? "Leaving the lobby…" : client.lobby?.test ? "Test lobby: nothing goes on your record." : `On your record: ${placementText(r.placement)} of ${r.players} squads.`}
         {sq ? ` A bot plays your seat for the ${squadName(sq.id)}.` : ""}
       </p>
+      <div class="trophy resigned" aria-hidden="true">
+        <FlagIcon size={56} />
+      </div>
       {r && !client.lobby?.test && <p class="team-result bad">It counts as a loss.</p>}
-      <div class="sq-card-actions">
-        <button type="button" class="fd-btn primary" onClick={actions.onAgain}>
-          {actions.party ? "Back to your party" : "Queue again"}
-        </button>
-        <button type="button" class="fd-btn" onClick={actions.onHome}>
+      {/* (Stacked, Play again's place on top: `.es-screen .actions` lays them out bottom-up.) */}
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" onClick={actions.onHome}>
           Home
+        </button>
+        <button type="button" class="btn btn-primary" onClick={actions.onAgain}>
+          {actions.party ? "Back to your party" : "Queue again"}
         </button>
       </div>
     </div>
   );
 }
 
-/** The waiting room: "12 / 32", the seconds until bots fill, and the 32 seats (your party's together), then the squads. */
 export function SquadsQueue({ client, onCancel, onAway }: { client: SquadsClient; onCancel: () => void; onAway?: () => void }) {
   const now = useNow(250);
   const lobby = client.lobby;
@@ -366,12 +370,13 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
       </ol>
       <MyTokens client={client} />
       <Bracket lobby={lobby} mine={mine} />
-      <div class="sq-card-actions">
-        <button type="button" class="fd-btn primary" onClick={actions.onAgain}>
-          {actions.party ? "Back to your party" : "Play again"}
-        </button>
-        <button type="button" class="fd-btn" onClick={actions.onHome}>
+      {/* (Stacked, Play again on top, as on every end screen: `.es-screen .actions` lays them out bottom-up.) */}
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" onClick={actions.onHome}>
           Home
+        </button>
+        <button type="button" class="btn btn-primary" onClick={actions.onAgain}>
+          {actions.party ? "Back to your party" : "Play again"}
         </button>
       </div>
     </div>
