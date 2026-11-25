@@ -745,6 +745,15 @@ export async function openSoloBoss(page: Page) {
 }
 
 /**
+ * A deploy landed (as the page will find out): the server's `/version.json` names another build than the page's. With a file of the game
+ * refused, this stages a deploy's missing file; a file refused without it is a dropped connection, which never loads the page again
+ * (stale.ts, Nov 25: the Boss Battle screen thrown back to home by one, main's run 45559755980).
+ */
+export async function aDeployLanded(page: Page) {
+  await page.route(/\/version\.json$/, (r) => r.fulfill({ json: { version: "0123456789ab", commit: null, built: new Date().toISOString() } }));
+}
+
+/**
  * Home → Boss Battle → (the boss's tile, `boss`: its name, as its tile is named) → START: the battle at once, with that boss, or a
  * random one without `boss`, at the screen's difficulty (Oct 29: START skips the old Boss alone menu).
  */

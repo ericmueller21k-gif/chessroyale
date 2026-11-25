@@ -1465,9 +1465,10 @@ export function App() {
     // (A solo boss battle kept on this device (step 2): "Forfeit your game in progress?" first, never recorded as left unasked.)
     if (!(await askForfeitFirst(account().profile?.user.id))) return;
     setLoading(true);
-    // (Solo's code, its opening library and the match's screens, each fetched once: usually here already, play was near.)
-    const [engines, soloCode] = await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
-    if (!soloCode) {
+    // (Solo's code, its opening library and the match's screens, each fetched once: usually here already, play was near. One that won't
+    // load says so, never a screen stuck loading: Nov 25.)
+    const [engines, soloCode] = (await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]).catch(() => null)) ?? [];
+    if (!soloCode || !engines) {
       setLoading(false);
       return setError("Couldn't load the game. Check your connection and try again.");
     }
@@ -1566,9 +1567,9 @@ export function App() {
   const startTowerFloor = async (e: FloorEntry) => {
     unlockAudio();
     setLoading(true);
-    const [engines, soloCode] = await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
+    const [engines, soloCode] = (await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]).catch(() => null)) ?? [];
     setLoading(false);
-    if (!soloCode) return setError("Couldn't load the game. Check your connection and try again.");
+    if (!soloCode || !engines) return setError("Couldn't load the game. Check your connection and try again.");
     // (The floor's own strength: no difficulty, no Maia of your pick, no boss avoided or resting: the server dealt them.)
     const settings: Settings = { ...DEFAULT_SETTINGS, ...overridesFromUrl("raid"), bossDifficulty: 0, bossAloneMaia: 0, bossHidden: false, bossUnfinished: false, bossesOff: undefined, ...e.start.settings };
     const m = new soloCode.SoloMatch(engines, playerName(), settings, false, false);

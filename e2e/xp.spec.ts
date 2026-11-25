@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { SOLO_ABANDON } from "@chessroyale/core";
-import { test, asAdmin, bossAloneFromHome, endBattle, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
+import { test, aDeployLanded, asAdmin, bossAloneFromHome, endBattle, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * XP and levels on the end screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't want it
@@ -458,7 +458,8 @@ test.describe(() => {
     await playOwnMoves(page, 2);
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
     const before = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }));
-    // (The solo game's code fails to load until the page loads again: stale.ts's reload, as for a deploy's missing file.)
+    // (The solo game's code fails to load until the page loads again: stale.ts's reload, for a deploy's missing file.)
+    await aDeployLanded(page);
     const loads = log.loads;
     let failed = 0;
     await page.route(/\/assets\/solo-[^/]*\.js$/, (r) => (log.loads - loads >= 2 ? r.continue() : (failed++, r.abort())));
@@ -470,6 +471,21 @@ test.describe(() => {
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
     await expect(card).toHaveCount(0);
     expect(await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, moves: (window as any).match.moves.length as number }))).toEqual(before);
+  });
+
+  test("a file dropped with no deploy (main's run 45559755980, Nov 25: the opening library, fetched in the background): Boss Battle stays, the page never loads again, and START plays", { tag: "@phone-only" }, async ({ page }) => {
+    test.setTimeout(3 * 60_000);
+    // (The same build on the server: a dropped connection, not a deploy. It loaded the page again, back to home, until Nov 25.)
+    let refused = 0;
+    await page.route(/\/assets\/openings-[^/]*\.js$/, (r) => (refused++ === 0 ? r.fulfill({ status: 500, body: "" }) : r.continue()));
+    let loads = 0;
+    page.on("request", (r) => r.isNavigationRequest() && r.frame() === page.mainFrame() && loads++);
+    await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
+    await openSoloBoss(page);
+    await expect.poll(() => refused, { timeout: 20_000 }).toBeGreaterThan(0);
+    await page.getByRole("main").getByRole("button", { name: "START" }).click({ timeout: 20_000 });
+    await expect(page.locator(".results h1")).toHaveText("Defeat", { timeout: 120_000 });
+    expect(loads, "the page never loaded again").toBe(1);
   });
 });
 

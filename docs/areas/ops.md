@@ -32,7 +32,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   A file under `/assets/` is answered from any kept version (its name is its contents'), any other file from this version only.
   Not covered: a picture changed by the deploy and not shown yet (pictures aren't precached), and a page no worker answers (a first
   visit before it's ready): `stale.ts` reloads it once a minute at most, back where it was (the town's square and facing, and the
-  room or challenge your tap was opening). Tests: `sw-versions.test.ts`, `stale.test.ts`, town.spec's two "a deploy landed" describes
+  room or challenge your tap was opening), and only for a deploy: it asks `/version.json` first, and a file that failed with the same
+  build on the server (a dropped connection) just fails, for its caller to try again (Nov 25,
+  [decision](../decisions/2026-11-25-stale-reload-only-for-a-deploy.md); it had thrown the Boss Battle screen back to home). Tests: `sw-versions.test.ts`, `stale.test.ts`, town.spec's two "a deploy landed" describes
   (the e2e server's `/api/e2e/sw.js`, `e2e-sql.ts`, serves the next deploy's worker).
 - **A page the network answered is never replaced by the saved app** (Nov 20, [decision](../decisions/2026-11-20-account-load-fail.md)):
   the worker's `navigate` branch passes on whatever the network answers (an error page, the site's gate's redirect to its login, which
