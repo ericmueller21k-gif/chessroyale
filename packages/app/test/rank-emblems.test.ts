@@ -36,11 +36,11 @@ describe("the rank emblems", () => {
   });
 
   it("an admin's ?rank=: a tier and its division (5 to 1), or a top tier; anything else ignored", () => {
-    expect(rankFromSwitch("gold-3")).toMatchObject({ tier: "Gold", division: 3, label: "Gold 3 · 45 RP", emblem: "gold-d3" });
-    expect(rankFromSwitch("Wood-5")).toMatchObject({ label: "Wood 5 · 45 RP", emblem: "wood-d5" });
-    expect(rankFromSwitch("radiant-1")).toMatchObject({ label: "Radiant 1 · 45 RP", emblem: "radiant-d1" });
-    expect(rankFromSwitch("transcendent")).toMatchObject({ tier: "Transcendent", division: null, label: "Transcendent · 120 RP", emblem: "transcendent" });
-    expect(rankFromSwitch("pearlescent")).toMatchObject({ label: "Pearlescent · 120 RP", emblem: "pearlescent" });
+    expect(rankFromSwitch("gold-3")).toMatchObject({ tier: "Gold", division: 3, label: "Gold III – 45", emblem: "gold-d3" });
+    expect(rankFromSwitch("Wood-5")).toMatchObject({ label: "Wood V – 45", emblem: "wood-d5" });
+    expect(rankFromSwitch("radiant-1")).toMatchObject({ label: "Radiant I – 45", emblem: "radiant-d1" });
+    expect(rankFromSwitch("transcendent")).toMatchObject({ tier: "Transcendent", division: null, label: "Transcendent – 120", emblem: "transcendent" });
+    expect(rankFromSwitch("pearlescent")).toMatchObject({ label: "Pearlescent – 120", emblem: "pearlescent" });
     for (const bad of [null, "", "gold", "gold-0", "gold-6", "iron-2", "transcendent-1", "gold-3x", "master"]) expect(rankFromSwitch(bad), String(bad)).toBeNull();
   });
 });

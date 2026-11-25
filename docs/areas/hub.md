@@ -82,9 +82,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     Nov 9; a stored "botsoff", a test's, still queues people only); Squads' **Solo queue**, **Party** ([squads.md](squads.md); Party
     opens the party sheet at once, and PLAY opens it again while Party is picked; its line "Queue with up to 3 friends") and **Bots**, greyed ("Soon") until its server part;
     for 1 v 1 (always people) your rank's emblem (48 px, its box
-    there before your profile loads; none in placements) beside your rank, "Your rank: Gold 2 · 45 RP" or "Your rank:
+    there before your profile loads; none in placements) beside your rank, "Your rank: Gold II – 45" or "Your rank:
     Placement 2/5" (`ranked1v1Rank`, from your profile; whole on one line at 320 px at its widest, "Your rank:
-    Transcendent · 1234 RP"), over "Win to climb, lose to drop" (Nov 9; what 1 v 1 is, "Ranked chess vs one player near your level", is
+    Transcendent – 1234"), over "Win to climb, lose to drop" (Nov 9; what 1 v 1 is, "Ranked chess vs one player near your level", is
     the line above PLAY). Then **the line above PLAY** (Oct 28, Eric: "swap the line
     of text below Play and put it above play") and PLAY. The line is exactly one line whatever it says, phone and computer (Nov 9,
     [2026-11-09-home-modes-hint-line.md](../decisions/2026-11-09-home-modes-hint-line.md): ellipsized if ever too long, every line
@@ -181,8 +181,12 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
   - Your icon (no coins at the top: the shop shows them, Eric, Oct 18; the profile's coins pill went Nov 17), and the live line ("214 online · 9 matches running · 31 in queue") with the typical
   - **On a game's screen** (Nov 1, Eric: "the side menu… on the desktop still"; docs/decisions/2026-11-01-game-screens-computer.md):
-    a computer with a mouse has the same side menu beside every game screen (`GameFrame`, `game-frame.css`): 232 px with labels from
-    1800 px wide (round 2; 1366 before), icons only below it (labels as tooltips). An item leaves the match through the gear's own Resign or Leave confirm,
+    a computer with a mouse has the same side menu beside every game screen (`GameFrame`, `game-frame.css`): 232 px with labels
+    wherever the board keeps its size (Eric's order, Nov 25 round 2, [decision](../decisions/2026-11-25-menu-labels-2.md): the board never
+    shrinks for the menu; the labels show; the column beside the board narrows first, to its least, 280 px; icons only where the board would
+    still shrink). The frame tries them and keeps them where the board is the same size inside its column (`useMenuLabels`), at every width;
+    a page without a board, from 1800 px. Eric's laptop, 1536 × 730: labels on every game screen. The chat beside the board keeps its emoji
+    in one row at any width (`game-frame.css`), so the narrower column costs it no row. Elsewhere icons only (labels as tooltips). An item leaves the match through the gear's own Resign or Leave confirm,
     then goes to its page. A phone and a touch tablet have none.
     wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
@@ -193,7 +197,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     Boss Battle form has none).
   - **The rank line under your name** (Oct 28, Eric: "get rid of the novice weighty … we're going with the new ranking
     system"): your ranked 1 v 1 rank (`RankLine`, `homeRankLine()` in `ranked.ts`): the tier and division in the tier's
-    color, then the RP ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked game (a blank line of the
+    color, then the RP ("Gold III – 45"), "Placement 2/5", or "Unranked" before your first ranked game (a blank line of the
     same height while your account loads). No rating rank's name: `RATING_RANKS` is retired
     ([2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)).
   - **An admin's test rank** (Oct 28: `?rank=gold-3`, only where `testSwitchesAllowed()`) shows in the rank line; a player sees their real
@@ -213,7 +217,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, the line
     above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side, at the bottom. Your pawn's card takes the room
-    left: your tag (icon, name, "Gold 3 · 45 RP"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
+    left: your tag (icon, name, "Gold III – 45"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
     (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
     640 px phone, or a 740 px one (measured at 320, 375 and 430 px wide), since the options panel is there from the first view, Oct 25)
     the tag stands beside the pawn instead, as it did when the room was short (Oct 18), so home fits with no scrolling

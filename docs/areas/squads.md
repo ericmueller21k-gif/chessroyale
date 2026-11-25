@@ -40,6 +40,10 @@ move.
   `noteActions` logs every miss; `noShowsBeforeBot` (3) in a row hands the seat to a bot (`replacedByBot`).
 - **Seeded randomness**: `squadsRng(seed, ...names)` gives each decision its own stream (match, turn, half, board,
   what's drawn), so the server can replay any decision from the lobby's seed, and adding a draw never moves others.
+- **Opening starts** (`squadsOpenings`, `drawOpenings` in match.ts): a board starts `openingMoves` (4) moves per side
+  into a library line, balanced (`openingBalance`) and never with the side to move in check (Eric, Nov 25: the
+  Steinitz Gambit's forced Ke2 dropped; docs/decisions/2026-11-25-squads-no-check-starts.md). The filter runs at the
+  draw; `data/openings.json` is unchanged. Test: squads-match.test.ts, "no opening start leaves the side to move in check".
 - **Votes** (`votes.ts`): Mode, Start and Clock as `PregameVote`s, run by Crowd's machinery (`castPregameVote`,
   `botVotes`, `closePregameVote`); `rulesFromVotes` gives `SquadsRules`. Nobody voting: Classic, the normal start, the
   Blitz clock, each named by its option's id (`optionIndex`, `clockDefault: "blitz"`), never by its place. Every vote's

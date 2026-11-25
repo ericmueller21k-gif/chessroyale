@@ -106,7 +106,7 @@ describe("the ladder's top", () => {
     const top = await ladderTop(sql);
     expect(top.rows.map((r) => r.place)).toEqual([1, 2, 3]);
     expect(top.total).toBe(3);
-    expect(top.rows[2]!.rank.label).toBe("Gold 3 · 40 RP");
+    expect(top.rows[2]!.rank.label).toBe("Gold III – 40");
   });
 
   it("banned players, players under review, the engine pool and test accounts are left out of the list, the count and everyone's place; residents and the rest stay", async () => {
@@ -186,7 +186,7 @@ describe("your standing", () => {
     const you = (await ladderYou(sql, me.user, false)).you as LadderRow;
     // 3000 … 2761: 230 ladders above 2770, and 2770 itself is shared with p230 (the same place).
     expect(you).toMatchObject({ uid: me.user.id, name: "Mia", place: 231, wins: 15, losses: 15 });
-    expect(you.rank.label).toBe("Radiant 1 · 50 RP");
+    expect(you.rank.label).toBe("Radiant I – 50");
     const top = await ladderTop(sql);
     expect(top.total).toBe(241);
     expect(top.rows.some((r) => r.uid === me.user.id)).toBe(false);

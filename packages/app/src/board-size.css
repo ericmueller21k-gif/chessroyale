@@ -92,6 +92,11 @@
     --bd-room: 170px;
     --dv-w: min(100%, var(--bd-h));
   }
+  /* (Its computer frame, in play and on the end page (Duel.tsx DuelWide, Nov 25: no title line): the two 34 px strips, their 8 px gaps
+     and the screen's 10 and 14 px padding: 108.) */
+  .screen.game.duel-screen.dv-frame {
+    --bd-room: 108px;
+  }
 }
 
 /* Beside a leaderboard (1100 px and up): the screen is the window less the leaderboard's column, as before, up to what its
