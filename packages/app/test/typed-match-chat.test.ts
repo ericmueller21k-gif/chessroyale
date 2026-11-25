@@ -3,7 +3,7 @@ import { GLOBAL_CHAT } from "@chessroyale/core";
 import type { ClientMessage } from "@chessroyale/chess";
 
 /** Typed chat in a match's chat (Nov 7): who types, who reads, the 5 s wait mirrored, the server's reason shown. */
-const who = vi.hoisted(() => ({ signedIn: true, young: false, on: true, heard: [] as (() => void)[] }));
+const who = vi.hoisted(() => ({ signedIn: true, young: false, on: true, heard: [] as (() => void)[], saved: Promise.resolve() as Promise<void> }));
 vi.mock("../src/sound.ts", () => ({ play: vi.fn() }));
 vi.mock("../src/account.ts", async (orig) => ({
   ...(await orig<typeof import("../src/account.ts")>()),
@@ -18,6 +18,7 @@ vi.mock("../src/chat-on.ts", () => ({
   },
   setChatOn: async () => undefined,
   chatNoticeDue: () => false,
+  chatOnSaved: () => who.saved,
 }));
 
 const { MatchChat } = await import("../src/chat.ts");
@@ -33,11 +34,11 @@ describe("typed chat in a match (the app's side)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000_000);
-    Object.assign(who, { signedIn: true, young: false, on: true, heard: [] });
+    Object.assign(who, { signedIn: true, young: false, on: true, heard: [], saved: Promise.resolve() });
   });
   afterEach(() => vi.useRealTimers());
 
-  it("signed in, chat on, not too young: types to the team (or All), one message every 5 s; tells the server it reads typed lines", () => {
+  it("signed in, chat on, not too young: types to the team (or All), one message every 5 s; tells the server it reads typed lines", async () => {
     const { chat, sent } = setup();
     chat.onWelcome();
     expect(sent).toEqual([{ t: "chatPrefs", typed: true }]);
@@ -57,8 +58,26 @@ describe("typed chat in a match (the app's side)", () => {
     // Chat turned off elsewhere: the server is told, and typing stops.
     who.on = false;
     who.heard.forEach((f) => f());
+    await Promise.resolve();
     expect(sent.at(-1)).toEqual({ t: "chatPrefs", typed: false });
     expect(chat.mayType()).toBe(false);
+  });
+
+  it("chat turned on mid-match: the server is told only once the account's switch is saved (it reads chat_on to let you type, Nov 25)", async () => {
+    who.on = false;
+    const { chat, sent } = setup();
+    chat.onWelcome();
+    expect(sent).toEqual([]);
+    let save!: () => void;
+    who.saved = new Promise<void>((r) => (save = r));
+    who.on = true;
+    who.heard.forEach((f) => f());
+    await Promise.resolve();
+    expect(sent).toEqual([]);
+    save();
+    await who.saved;
+    await Promise.resolve();
+    expect(sent).toEqual([{ t: "chatPrefs", typed: true }]);
   });
 
   it("a guest reads (with chat on) but doesn't type; a device too young neither reads nor types (the quick lines stay)", () => {
