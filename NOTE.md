@@ -8,3 +8,6 @@ mock/: CSS injected over the live vote, counts fixed at 4 / 2 / 6, light and dar
 - The phone's vote uses the same cards (shorter), so it gets the same fill.
 
 Build (root): the real fill with the bots' votes, 1536x730 (125%), 1920x960, phone 390x844, light and dark.
+
+mock/*-v2-*: after the director's review, built: the fill at the bar's color 35% (40% dark) with a 2 px top edge; the card's text has a halo
+of the card's color where the edge crosses it.
