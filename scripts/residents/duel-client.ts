@@ -75,6 +75,8 @@ export class DuelGameClient {
     private readonly rng: Rng,
     private readonly plan: GamePlan,
     private readonly log: (line: string) => void,
+    /** A socket refused with 503 (residents paused, or a passing fault): the program asks the route which, and stops if paused. */
+    private readonly onRefused: () => void = () => undefined,
   ) {}
 
   /** Plays the game to its end for this resident. */
@@ -161,11 +163,12 @@ export class DuelGameClient {
       this.onMessage(m);
     });
     ws.on("unexpected-response", (_req: unknown, res: { statusCode?: number }) => {
-      // (Refused before it opened: 503 while residents are paused; 404 for a game that has ended.)
-      if (res.statusCode === 503) this.finish("paused");
-      else if (res.statusCode === 404) this.finish(this.view?.end ? "over" : "gone", "the game has ended");
-      // (Anything else: dropped, and tried again as a lost connection is.)
-      else ws.terminate();
+      // (Refused before it opened: 404 for a game that has ended; 503 while residents are paused, which the program confirms with
+      // the route and then stops everyone, this game included (pausedNow). Anything else, and a 503 meanwhile: tried again as a lost
+      // connection is.)
+      if (res.statusCode === 404) return this.finish(this.view?.end ? "over" : "gone", "the game has ended");
+      if (res.statusCode === 503) this.onRefused();
+      ws.terminate();
     });
     ws.on("error", () => undefined);
     ws.on("close", (code: number) => {

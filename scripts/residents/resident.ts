@@ -207,7 +207,8 @@ export class Resident {
   }
 
   private async live() {
-    this.world.log(`${this.name}: online until ${new Date(this.sessionEnd).toISOString().slice(11, 16)} UTC (${this.profile.behavior}, ${this.profile.rating})`);
+    const until = this.sessionEnd - Date.now() > 86_400_000 ? "stopped" : `${new Date(this.sessionEnd).toISOString().slice(11, 16)} UTC`;
+    this.world.log(`${this.name}: online until ${until} (${this.profile.behavior}, ${this.profile.rating})`);
     while (!this.over()) {
       this.state = "home";
       await this.home(between(this.rng, RESIDENTS.duel.homeMs[0], RESIDENTS.duel.homeMs[1]));
@@ -217,7 +218,6 @@ export class Resident {
       if (!code) continue;
       this.state = "game";
       const report = await this.playGame(code);
-      if (report.how === "paused") this.world.paused("the game's socket");
       if (report.how === "left" || report.how === "paused" || report.how === "stopped") break;
       const lost = !!report.end && report.you !== null && (report.end.result === (report.you === "w" ? "0-1" : "1-0"));
       if (logsOffAfter(this.profile.behavior, lost, this.rng)) {
@@ -295,7 +295,7 @@ export class Resident {
 
   private async playGame(code: string): Promise<GameReport> {
     const plan = gamePlan(this.profile.behavior, this.rng);
-    const game = new DuelGameClient(this.api, code, this.profile, this.world.engine, this.rng, plan, (l) => this.world.log(l));
+    const game = new DuelGameClient(this.api, code, this.profile, this.world.engine, this.rng, plan, (l) => this.world.log(l), () => this.world.paused("the game's socket"));
     this.game = game;
     this.world.stats.games.started++;
     // (The 30 s heartbeat a match keeps, as the app's: still online, "In a match".)
