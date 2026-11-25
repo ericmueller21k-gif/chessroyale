@@ -1,0 +1,450 @@
+/*
+ * The season ladder (screens/Ladder.tsx; Eric, Nov 25, from the approved mockup). The page is the window's height: its head, season
+ * line, tabs and columns fixed, the list the only part that scrolls, your row pinned at the foot. The front door's tokens, so both
+ * themes follow.
+ */
+.fd-page.ld {
+  --ld-row: 60px;
+  color: var(--fd-text);
+  --ld-gold: #e2b33c;
+  --ld-silver: #b8c0cc;
+  --ld-bronze: #c9894d;
+  height: var(--app-h);
+  min-height: 0;
+  gap: 10px;
+  padding-top: calc(env(safe-area-inset-top) + 10px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
+  padding-inline: calc(12px + env(safe-area-inset-left)) calc(12px + env(safe-area-inset-right));
+  overflow: hidden;
+}
+.ld-head {
+  height: 44px;
+  flex: none;
+}
+.fd-page.ld .ld-head h1 {
+  flex: 1;
+  color: var(--fd-text);
+  text-align: center;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+/* The season and how many are ranked. */
+.ld-season {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.ld-season strong {
+  color: var(--fd-gold-text);
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+/* A tab per ranked mode: the home RANKED row's buttons, smaller; a greyed one keeps its place and says why on a tap. */
+.ld-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+  border: 1px solid var(--fd-line);
+}
+.ld-tabs button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fd-text);
+  font: 800 15px Archivo, system-ui, sans-serif;
+  line-height: 1.1;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.ld-tabs button span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fd-muted);
+}
+.ld-tabs button.on {
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+}
+.ld-tabs button.on span {
+  color: var(--fd-gold-ink);
+  opacity: 0.75;
+}
+.ld-tabs button.off {
+  color: var(--fd-dim);
+  cursor: default;
+}
+.ld-tabs button.off span {
+  color: var(--fd-dim);
+}
+
+/* The columns' names, over the list's own grid. */
+.ld-cols,
+.ld-row {
+  display: grid;
+  grid-template-columns: 30px 40px minmax(0, 1fr) 48px 58px;
+  align-items: center;
+  column-gap: 6px;
+}
+.ld-cols {
+  flex: none;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--fd-muted);
+}
+.ld-c-place {
+  text-align: center;
+}
+.ld-c-player {
+  grid-column: 2 / 5;
+}
+.ld-c-rec {
+  text-align: right;
+}
+.ld-c-wide,
+.ld-wide {
+  display: none;
+}
+
+/* The list: the only part that scrolls. */
+.ld-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 14px;
+  scrollbar-width: thin;
+}
+.ld-row {
+  flex: none;
+  width: 100%;
+  min-height: var(--ld-row);
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ld-row:active {
+  transform: scale(0.99);
+}
+/* The top three: a medal for the place, a thin edge of its color. */
+.ld-row.t1 {
+  border-color: color-mix(in srgb, var(--ld-gold) 60%, transparent);
+  background: color-mix(in srgb, var(--ld-gold) 10%, var(--fd-panel));
+}
+.ld-row.t2 {
+  border-color: color-mix(in srgb, var(--ld-silver) 55%, transparent);
+}
+.ld-row.t3 {
+  border-color: color-mix(in srgb, var(--ld-bronze) 55%, transparent);
+}
+/* You: the gold edge and tint, in the list and pinned. */
+.ld-row.you {
+  border-color: var(--fd-gold);
+  background: var(--fd-gold-soft);
+}
+
+.ld-place {
+  text-align: center;
+  font-weight: 800;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fd-sub);
+}
+.ld-place.long {
+  font-size: 11px;
+  letter-spacing: -0.3px;
+}
+.ld-medal {
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 15px;
+  color: #1a1406;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+.ld-medal.m1 {
+  background: var(--ld-gold);
+}
+.ld-medal.m2 {
+  background: var(--ld-silver);
+}
+.ld-medal.m3 {
+  background: var(--ld-bronze);
+}
+
+/* Their head: the dressed pawn, cropped to the hat and face in a circle (as the profile's recent games). */
+.ld-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--fd-panel-2);
+}
+.ld-face .fd-pawn-seat {
+  transform: scale(1.7);
+  transform-origin: 50% 22%;
+}
+.ld-row.you .ld-face,
+.ld-pin .ld-face {
+  background: color-mix(in srgb, var(--fd-gold) 25%, var(--fd-panel-2));
+}
+
+.ld-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ld-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+.ld-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ld-tag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+/* The rank in its tier's color, darkened in light (home's line under your name does the same: 4.5:1 on both). */
+.ld-rank {
+  --ld-tier-ink: var(--tier);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ld-tier-ink);
+}
+:root[data-theme="light"] .ld-rank {
+  --ld-tier-ink: color-mix(in srgb, var(--tier) 55%, #000);
+}
+.ld-sub {
+  font-size: 12.5px;
+  color: var(--fd-sub);
+  line-height: 1.25;
+}
+.ld-emblem {
+  justify-self: center;
+}
+.ld-rec {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.ld-rec strong {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.ld-rec span {
+  font-size: 12px;
+  color: var(--fd-sub);
+}
+
+/* Loading: greyed rows in the rows' own places (and your row's), so nothing moves when the list comes. */
+.ld-ghost {
+  background: var(--fd-panel);
+  opacity: 0.5;
+  cursor: default;
+}
+.ld-ghost:active {
+  transform: none;
+}
+.ld-list.ld-loading {
+  overflow: hidden;
+}
+/* Nothing to list, or it didn't load: the words in the list's middle (never an empty well). */
+.ld-empty {
+  margin: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--fd-sub);
+}
+.ld-empty p {
+  margin: 0;
+}
+
+/* Your row, pinned at the foot: always there, the same height in every state. */
+.ld-mine {
+  flex: none;
+  padding-top: 8px;
+  border-top: 1px solid var(--fd-line);
+}
+.ld-pin {
+  min-height: 64px;
+  border-color: var(--fd-gold);
+  background: var(--fd-gold-soft);
+}
+.ld-placing {
+  grid-template-columns: 30px 40px minmax(0, 1fr) auto;
+  cursor: default;
+}
+.ld-placing.ld-guest {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+}
+.ld-badge {
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 9px;
+  background: var(--fd-panel-2);
+  color: var(--fd-sub);
+  font-weight: 800;
+  font-size: 14px;
+}
+.ld-signin {
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+/* A greyed tab's reason: a note over the page's foot for a few seconds, never in the page's flow. */
+.ld-note {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 92px);
+  transform: translateX(-50%);
+  width: min(92vw, 420px);
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--fd-text);
+  color: var(--fd-bg);
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  z-index: 40;
+}
+
+/* A narrow phone (under 360 px): the record's column a little narrower. */
+@media (max-width: 359px) {
+  .ld-cols,
+  .ld-row {
+    grid-template-columns: 26px 34px minmax(0, 1fr) 48px 52px;
+    column-gap: 5px;
+  }
+  .ld-face {
+    width: 34px;
+    height: 34px;
+  }
+  .ld-rank {
+    font-size: 11.5px;
+  }
+}
+
+/* A computer: the page in the frame's center column, games and streak as columns of their own. */
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-page.ld {
+    height: 100vh;
+    padding: 24px 28px 20px;
+    gap: 12px;
+  }
+  .fd-page.ld {
+    --ld-row: 62px;
+  }
+  .fd-page.ld .ld-head h1 {
+    text-align: left;
+    padding-left: 6px;
+    font-size: 22px;
+  }
+  .ld-season {
+    justify-content: flex-start;
+    padding-left: 6px;
+  }
+  .ld-tabs {
+    max-width: 480px;
+  }
+  .ld-cols,
+  .ld-row {
+    grid-template-columns: 44px 42px minmax(0, 1fr) 48px 72px 72px 96px;
+    column-gap: 12px;
+    padding: 0 16px;
+  }
+  .ld-c-wide,
+  .ld-wide {
+    display: block;
+    text-align: right;
+  }
+  .ld-wide {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--fd-sub);
+    font-variant-numeric: tabular-nums;
+  }
+  .ld-c-player {
+    grid-column: 2 / 5;
+  }
+  .ld-placing {
+    grid-template-columns: 44px 42px minmax(0, 1fr) auto;
+  }
+  .ld-placing.ld-guest {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+  .ld-row:hover:not(.ld-placing):not(.ld-ghost) {
+    border-color: var(--fd-line);
+  }
+  .ld-row.you:hover,
+  .ld-row.top:hover {
+    filter: brightness(1.06);
+  }
+  .ld-note {
+    bottom: 40px;
+  }
+}

@@ -40,6 +40,7 @@ import { FloorPlay, askFloor, forgetPartyFloor, keepPartyFloor, loadKept, onEnte
 import { joinTowerParty, onEnterPartyFloor, towerParty, type PartyFloorEntry } from "./tower-party.ts";
 import type { TowerBack } from "./town/Town.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
+import { LadderScreen } from "./screens/Ladder.tsx";
 import { FrontFrame, GameFrame, type FrontNav, type FrontPage } from "./components/FrontMenu.tsx";
 import { showAwayNote } from "./components/AwayNote.tsx";
 import { useAccount } from "./screens/Profile.tsx";
@@ -455,6 +456,8 @@ export function App() {
   const [showFaq, setShowFaq] = useState(() => location.pathname === "/faq");
   /** Your friends list (/friends: screens/Friends.tsx). */
   const [showFriends, setShowFriends] = useState(() => location.pathname === "/friends");
+  /** The season ladder (/ladder: screens/Ladder.tsx; Eric, Nov 25). */
+  const [showLadder, setShowLadder] = useState(() => location.pathname === "/ladder");
   /**
    * Open the home screen's boss menu or Play with friends: the computer's side menu, or the hidden /bosses (Eric's way
    * straight to the solo boss picker, unlisted, not admin-gated; Oct 16). Used once: a match started clears it.
@@ -501,7 +504,7 @@ export function App() {
    * profile without exiting out of Chesttown"): the side menu's page open over the town's middle column (PageLayer.tsx), the town under
    * it as it was (your pawn, the chat, a party). `tab`: the shop's (from your profile's locker or chat packs); `you`: your profile's.
    */
-  const [townLayer, setTownLayer] = useState<{ page: "friends" | "quests" | "shop" | "profile"; tab?: "locker" | "chat"; you?: ProfileTarget } | null>(null);
+  const [townLayer, setTownLayer] = useState<{ page: "friends" | "quests" | "shop" | "profile" | "ladder"; tab?: "locker" | "chat"; you?: ProfileTarget } | null>(null);
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -1903,8 +1906,9 @@ export function App() {
     setShowFaq(false);
     setShowShop(false);
     setShowFriends(false);
-    // (From /friends, the page's query and hash stay: a test switch or tour link, as the pop-up kept them before, Nov 11.)
-    if (location.pathname !== "/") history.replaceState(null, "", location.pathname === "/friends" ? `/${location.search}${location.hash}` : "/");
+    setShowLadder(false);
+    // (From /friends or /ladder, the page's query and hash stay: a test switch or tour link, as the pop-up kept them before, Nov 11.)
+    if (location.pathname !== "/") history.replaceState(null, "", location.pathname === "/friends" || location.pathname === "/ladder" ? `/${location.search}${location.hash}` : "/");
   };
   const nav: FrontNav = {
     home: () => {
@@ -1953,6 +1957,12 @@ export function App() {
       setShowFriends(true);
       history.replaceState(null, "", `/friends${location.search}${location.hash}`);
     },
+    // (The season ladder: Eric, Nov 25, "visible from the left panel on desktop"; a phone's way in is home's "LADDER ›".)
+    ladder: () => {
+      goHome();
+      setShowLadder(true);
+      history.replaceState(null, "", `/ladder${location.search}${location.hash}`);
+    },
     signIn: () => chooseGuest(false),
   };
   /**
@@ -1970,7 +1980,7 @@ export function App() {
       }
       setSideAsk({ exit: { ...e, go: () => { setSideNext({ page: k, from }); e.go(); } }, then: k });
     };
-    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), quests: page("quests"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
+    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), quests: page("quests"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList"), ladder: page("ladder") };
   };
   // The town's side menu (and its panel, and the global chat's sign-in): each page that leaves asks first. Chess Town itself doesn't.
   // Play with friends, Daily Quests, Shop & crates and Profile open over the town instead (townLayer; another of them switches it, Chess
@@ -1992,6 +2002,9 @@ export function App() {
     quests: () => openTownLayer({ page: "quests" }),
     shop: () => openTownLayer({ page: "shop" }),
     profile: () => openTownLayer({ page: "profile", you: { you: true, name: account().profile?.user.name ?? "" } }),
+    // (The ladder over the town too, as the shop and your profile: a page to look at, nothing to leave the town for. A player's row opens
+    // their profile in the same layer, and its Back comes back to the list.)
+    ladder: () => openTownLayer({ page: "ladder" }),
     settings: () => askLeave("Settings", nav.settings),
     friendsList: () => askLeave("your friends", nav.friendsList),
     signIn: () => askLeave("Sign in", nav.signIn!),
@@ -2160,7 +2173,7 @@ export function App() {
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["chessTown", "soloBoss", "friends", "quests", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["chessTown", "soloBoss", "friends", "quests", "shop", "settings", "friendsList", "ladder"] as const).map((k) => [
         k,
         () => {
           if (keepInQueue() && stepOutOfLobby()) {
@@ -2281,7 +2294,7 @@ export function App() {
   }
   /** The side menu item lit while a town layer is open: its page's (none for someone else's profile shown in it). */
   const townLayerPage = (page: NonNullable<typeof townLayer>["page"], other: ProfileTarget | null): FrontPage | undefined =>
-    other && !other.you ? undefined : ({ friends: "lobby", quests: "quests", shop: "shop", profile: "profile" } as const)[page];
+    other && !other.you ? undefined : ({ friends: "lobby", quests: "quests", shop: "shop", profile: "profile", ladder: "ladder" } as const)[page];
   /**
    * The town layer's page: each page's own component, as the main menu opens it (Eric, Nov 22: "we should do the same thing for all these
    * other stuff"). The shop and your profile in the page's own column; Daily Quests and Play with friends are home's cards, over the town
@@ -2289,7 +2302,7 @@ export function App() {
    * menu does.
    */
   const townLayerNode = (l: NonNullable<typeof townLayer>) => {
-    const label = { friends: "Play with friends", quests: "Daily Quests", shop: "Shop & crates", profile: "Profile" }[l.page];
+    const label = { friends: "Play with friends", quests: "Daily Quests", shop: "Shop & crates", profile: "Profile", ladder: "Ladder" }[l.page];
     const page = profileOpen ? (
       <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
     ) : l.page === "shop" ? (
@@ -2303,6 +2316,8 @@ export function App() {
         onSettings={townNav.settings}
         onFriends={townNav.friendsList}
       />
+    ) : l.page === "ladder" ? (
+      <LadderScreen onBack={closeTownLayer} onSignIn={townNav.signIn!} />
     ) : l.page === "quests" ? (
       <QuestsLayer onClose={closeTownLayer} />
     ) : (
@@ -2487,6 +2502,19 @@ export function App() {
       </FrontFrame>
     );
   }
+  if (!match && showLadder) {
+    return (
+      <FrontFrame page="ladder" nav={nav}>
+        <LadderScreen
+          onBack={() => {
+            setShowLadder(false);
+            if (location.pathname === "/ladder") history.replaceState(null, "", `/${location.search}${location.hash}`);
+          }}
+          onSignIn={() => chooseGuest(false)}
+        />
+      </FrontFrame>
+    );
+  }
   if (!match && showFriends) {
     return (
       <FrontFrame page="friends" nav={nav}>
@@ -2615,6 +2643,7 @@ export function App() {
         onInventory={() => setShowShop("locker")}
         onSettings={() => setShowSettings(true)}
         onShop={() => setShowShop("shop")}
+        onLadder={nav.ladder}
       />
     </FrontFrame>
     );

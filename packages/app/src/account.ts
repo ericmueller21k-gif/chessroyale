@@ -133,7 +133,11 @@ export function onAccountChange(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * A request to our API, its answer read: an error with the server's words and its status when it isn't ok, the site's gate read as
+ * being signed out of the site, and an answer that can't be read a failure (never `{}`). Exported for the season ladder (ladder.ts).
+ */
+export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // (`redirect: "manual"`: our API never redirects a script's request, so a redirect is the site's gate, read as such: followed, its
   // login page on another origin failed like being offline, and nothing knew why. site-gate.ts.)
   const res = await fetch(path, { credentials: "same-origin", redirect: "manual", ...init, headers: { "content-type": "application/json", ...init?.headers } });
