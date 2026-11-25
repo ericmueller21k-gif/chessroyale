@@ -157,6 +157,9 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   the winner, then the winner's banner; each result shows `voteResultSeconds` (4.2 s since Eric's Oct 15 "every banner a
   second longer"; was 3.2). `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
   blitz; an unknown id gets Blitz).
+- **The vote cards fill upward** (Eric, Nov 26; [2026-11-26-vote-card-fill.md](../decisions/2026-11-26-vote-card-fill.md)): no bar;
+  each card's fill rises from its foot to its share of all the votes (`.vote-card-fill`, `scaleY`), the count at its foot, the box
+  unchanged; phone and computer. Guard: `e2e/vote-hint.spec.ts`, "50 v 50's vote (Eric, Nov 26)…".
 - **How it starts** (Eric, Oct 24; docs/decisions/2026-10-24-opening-vote.md): the second vote. Each option's patch sets
   `crowdStart` and `openingMoves`; `MatchRunner.patchSettings` then sets the board up before move 1 (`setUpStart`), one
   start for the one board everyone shares. **Normal**: the starting position (nothing drawn: the board as made).
@@ -175,7 +178,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   carries `start` (Freestyle's position) so the pieces that drop in after the last vote are the game's. `?start=normal|random|freestyle`
   sets it for tests (with `?format=`, like `?speed=`; an unknown id is Normal).
 - **The first-time hint** (Oct 16): the first pawn vote a player meets on a device (any mode: this one, Squads' or
-  1 v 1's) shows "Drag your pawn into a zone to vote" over the board just above the zones until they vote; never again
+  1 v 1's) shows "Drag your pawn into a zone to vote" over the board just under the zones (above them it covered the middle
+  zone's name tag: Eric, Nov 26) until they vote; never again
   on that device (`VoteHint`, `brc.voteHintSeen`; `FirstVoteHint` in `screens/Vote.tsx`, one per vote). e2e
   `vote-hint.spec.ts`.
 - **The zones' name tags** (Eric, Nov 25, look B of the mockup): on every pawn vote on `VoteScreen` (this one's and Squads'), a

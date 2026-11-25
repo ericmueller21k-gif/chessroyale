@@ -4846,6 +4846,10 @@ button.history-label {
   font: inherit;
   cursor: pointer;
   text-align: center;
+  /* (Its fill, .vote-card-fill, stays inside it, under its text.) */
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 .vote-card:disabled {
   cursor: default;
@@ -4868,19 +4872,16 @@ button.history-label {
   color: var(--muted);
   line-height: 1.25;
 }
-.vote-card-bar {
-  width: 100%;
-  height: 5px;
-  border-radius: 3px;
-  background: var(--surface-2);
-  overflow: hidden;
-  margin-top: 4px;
-}
-.vote-card-bar i {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  transition: width 200ms;
+/* Each card fills upward with its share of the votes (Eric, Nov 26): the bar's color, light enough to read the name and blurb
+   over. One element per card, scaled from its foot (no layout per frame); the card's box never changes. */
+.vote-card-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform-origin: bottom;
+  transform: scaleY(var(--fill, 0));
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  transition: transform 300ms ease-out;
 }
 .vote-card-count {
   display: inline-block;
@@ -4919,6 +4920,9 @@ button.history-label {
   .vote-zone-count.pop,
   .vote-card-count.pop {
     animation: none;
+  }
+  .vote-card-fill {
+    transition: none;
   }
 }
 /* Phones: the scoreboard minimized makes the game's board bigger; the vote's board matches it. */
@@ -21979,12 +21983,12 @@ button.sq-tiny {
   border-top: none;
   border-bottom-color: var(--accent);
 }
-/* The Crowd's and Squads' pre-game votes: the first-time hint just above the zones (ranks 4-5, the board's middle),
-   its arrow pointing down at them. */
+/* The Crowd's and Squads' pre-game votes: the first-time hint just under the zones (ranks 4-5, the board's middle), its
+   arrow pointing up at them, so it covers no zone's name tag (Eric, Nov 26). */
 .first-vote-hint.vh-zones {
   position: absolute;
   left: 50%;
-  bottom: calc(62.5% + 8px);
+  top: calc(62.5% + 8px);
   z-index: 8;
   transform: translateX(-50%);
   white-space: nowrap;
@@ -21993,11 +21997,11 @@ button.sq-tiny {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: -6px;
+  top: -6px;
   translate: -50% 0;
   border: 6px solid transparent;
-  border-bottom: none;
-  border-top-color: var(--accent);
+  border-top: none;
+  border-bottom-color: var(--accent);
 }
 /* A profile's 1 v 1 section: the rank, big, and the record. */
 .dv-profile-row {
