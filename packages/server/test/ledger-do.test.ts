@@ -286,9 +286,12 @@ describe("Squads rewards, at least once (squads-do.ts: squads:<code>:<created>:<
       await rt.settle();
     };
     // (A placement's crates are Winter Crates since Nov 9: series_crates.)
-    const wallet = (id: string) => db.prepare("SELECT w.coins, (SELECT COALESCE(SUM(s.n), 0) FROM series_crates s WHERE s.user_id = w.user_id) AS crates FROM wallets w WHERE w.user_id = ?").get(id);
+    // (Coins since Nov 25: the lobby's play coins and its placement's bonus, paid with its XP: PLAY_COINS; the reward is its crates.)
+    const wallet = (id: string) => db.prepare("SELECT COALESCE((SELECT coins FROM wallets WHERE user_id = ?1), 0) AS coins, (SELECT COALESCE(SUM(n), 0) FROM series_crates WHERE user_id = ?1) AS crates").get(id);
     const results = (id: string) => (db.prepare("SELECT COUNT(*) AS n FROM results WHERE user_id = ? AND mode = 'squads'").get(id) as { n: number }).n;
-    const annWon: SquadsReward = { playerId: "p1", userId: ann.id, squadId: 0, placement: 1, coins: 100, crates: 1, recorded: true };
+    // (14 minutes and 14 moves (short of the daily reward's crate): 25 play coins and 1st place's 40. Its old `coins` field (a reward
+    // queued before Nov 25) is never paid.)
+    const annWon: SquadsReward = { playerId: "p1", userId: ann.id, squadId: 0, placement: 1, coins: 100, crates: 1, recorded: true, moves: 14, playMs: 14 * 60_000 };
 
     // D1 down: the write fails; the reward stays stored, and a wake is due within rewardRetrySeconds.
     await queue(annWon);
@@ -296,25 +299,28 @@ describe("Squads rewards, at least once (squads-do.ts: squads:<code>:<created>:<
     await wake();
     expect(record().rewardQueue).toEqual([annWon]);
     expect(rt.alarm).toBeLessThanOrEqual(Date.now() + SQUADS_LOBBY.rewardRetrySeconds * 1000);
-    expect(wallet(ann.id)).toBeUndefined();
+    expect(wallet(ann.id)).toEqual({ coins: 0, crates: 0 });
     // D1 back: the next alarm writes it, and only then it leaves the record.
     D1.state.down = false;
     await wake();
     expect(record().rewardQueue).toEqual([]);
-    expect(wallet(ann.id)).toEqual({ coins: 100, crates: 1 });
+    expect(wallet(ann.id)).toEqual({ coins: 65, crates: 1 });
     expect(results(ann.id)).toBe(1);
     const acct = (await ledgerAccount(sql, ann.id))!.account;
     expect(db.prepare("SELECT op_id, leg, asset_kind, delta FROM ledger WHERE reason = 'reward' ORDER BY leg").all()).toEqual([
-      { op_id: `squads:SQUAD:${created}:${acct}`, leg: 0, asset_kind: "coins", delta: 100 },
-      { op_id: `squads:SQUAD:${created}:${acct}`, leg: 1, asset_kind: "series_crate", delta: 1 },
+      { op_id: `squads:SQUAD:${created}:${acct}`, leg: 0, asset_kind: "series_crate", delta: 1 },
+    ]);
+    expect(db.prepare("SELECT op_id, delta FROM ledger WHERE reason IN ('play', 'play-bonus') ORDER BY op_id").all()).toEqual([
+      { op_id: `coins:squads:SQUAD:${created}:${acct}`, delta: 25 },
+      { op_id: `coinsbonus:squads:SQUAD:${created}:${acct}`, delta: 40 },
     ]);
     // The room wrote it and stopped before storing that it had: it's written again on waking, and nothing changes.
     await queue(annWon);
     await wake();
     expect(record().rewardQueue).toEqual([]);
-    expect(wallet(ann.id)).toEqual({ coins: 100, crates: 1 });
+    expect(wallet(ann.id)).toEqual({ coins: 65, crates: 1 });
     expect(results(ann.id)).toBe(1);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM ledger WHERE reason = 'reward'").get()).toEqual({ n: 2 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM ledger WHERE reason IN ('reward', 'play', 'play-bonus')").get()).toEqual({ n: 3 });
 
     // The lobby's time to close comes while D1 is down with Bob's reward waiting: it stays (its code held) and tries again.
     await queue({ playerId: "p2", userId: bob.id, squadId: 1, placement: 2, coins: 60, crates: 1, recorded: true });
@@ -328,7 +334,7 @@ describe("Squads rewards, at least once (squads-do.ts: squads:<code>:<created>:<
     D1.state.down = false;
     await wake();
     expect(rt.store.size).toBe(0);
-    expect(wallet(bob.id)).toEqual({ coins: 60, crates: 1 });
+    expect(wallet(bob.id)).toEqual({ coins: 0, crates: 1 });
     expect(results(bob.id)).toBe(1);
     for (const u of [ann, bob]) expect(await ledgerMismatches(sql, u.id)).toEqual([]);
   });

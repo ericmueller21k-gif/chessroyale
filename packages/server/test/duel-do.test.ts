@@ -175,8 +175,19 @@ describe("the 1 v 1 game object", () => {
     await game.webSocketMessage(w as never, JSON.stringify({ t: "resign" }));
     await rt.settle();
     expect(b.last("game")!.game.end).toMatchObject({ result: "0-1", reason: "resign" });
-    expect(b.last("outcome")!.outcome.xp).toEqual({ before: 0, after: 50, levelBefore: 1, levelAfter: 1, parts: [{ label: "Win", xp: 50 }] });
-    expect(w.last("outcome")!.outcome.xp).toEqual({ before: 0, after: 0, levelBefore: 1, levelAfter: 1, parts: [] });
+    // (Its coins with its XP since Nov 25 (PLAY_COINS): a 20-second game's play coin (at least 1) and the win's 15; the outcome's
+    // coin line is their sum.)
+    expect(b.last("outcome")!.outcome.xp).toEqual({
+      before: 0,
+      after: 50,
+      levelBefore: 1,
+      levelAfter: 1,
+      parts: [{ label: "Win", xp: 50 }],
+      coins: { play: 1, bonus: 15, parts: [{ label: "Win", coins: 15 }], step: 0, today: { play: 1, bonus: 15 } },
+    });
+    expect(b.last("outcome")!.outcome.coins).toBe(16);
+    expect(w.last("outcome")!.outcome.xp).toEqual({ before: 0, after: 0, levelBefore: 1, levelAfter: 1, parts: [], coins: { play: 1, bonus: 0, parts: [], step: null, today: { play: 1, bonus: 0 } } });
+    expect(w.last("outcome")!.outcome.coins).toBe(1);
     expect(await xpOf(d1Sql(rt.d1), rt.bob.id)).toBe(50);
   });
 

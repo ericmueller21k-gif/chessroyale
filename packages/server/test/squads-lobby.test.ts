@@ -548,8 +548,8 @@ describe("squads lobby: rewards", () => {
     L.runUntil(() => L.core.record.phase === "results", 3 * 3_600_000, "the results");
     const rewards = L.core.takeRewards();
     const ann = rewards.find((r) => r.playerId === a)!;
-    expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: SQUADS_LOBBY.rewards[ann.placement].coins, crates: SQUADS_LOBBY.rewards[ann.placement].crates });
-    expect(ann.coins).toBeGreaterThan(0);
+    // (Coins since Nov 25: none in the reward; the lobby's play coins and its placement's bonus come with its XP: PLAY_COINS.)
+    expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: 0, crates: SQUADS_LOBBY.rewards[ann.placement].crates });
     // (Bo's row was written as he left: never his squad's later place, whatever it is.)
     expect(rewards.find((r) => r.playerId === b)).toBeUndefined();
     const cy = rewards.find((r) => r.playerId === c)!;

@@ -939,9 +939,11 @@ export class SquadsParty extends DurableObject<Env> {
 }
 
 /**
- * One reward, written so that writing it again changes nothing: its results row only if this account has none from this lobby yet
- * (code and creation), the Welcome Crate (once ever), and the coins and crates as a ledger op keyed `squads:<code>:<created>:<ledger
- * id>`. Throws if D1 fails, so the lobby keeps it to try again.
+ * One reward, written so that writing it again changes nothing: its XP and play coins (keyed by the lobby: server/xp.ts; the
+ * placement's bonus, PLAY_COINS.bonus.squads, for someone still in their seat), its results row only if this account has none from
+ * this lobby yet (code and creation), the Welcome Crate (once ever), and the crates as a ledger op keyed `squads:<code>:<created>:<ledger
+ * id>` (Squads' own placement coins are gone since Nov 25: a reward queued before then pays its crates only). Throws if D1 fails, so the
+ * lobby keeps it to try again.
  */
 export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean, paused = false): Promise<Outcome | null> {
   if (!r.userId) return null;
@@ -955,6 +957,8 @@ export async function writeReward(sql: Sql, code: string, created: number, r: Sq
       now,
       paused,
       quest: "squads",
+      // (Play coins, Nov 25: the placement's bonus for someone still in their seat when it was decided; one who resigned or left gets none.)
+      ...(r.resigned || r.abandoned ? {} : { coin: { squads: r.placement } }),
     }).catch((e: unknown) => {
       console.log(`xp for squads ${code}: ${String(e)}`);
       return null;
@@ -964,11 +968,11 @@ export async function writeReward(sql: Sql, code: string, created: number, r: Sq
     // (A finished game: maybe the Welcome Crate, once ever: welcome.ts.)
     await grantWelcomeCrate(sql, r.userId, now).catch(() => false);
   }
-  return grantReward(sql, r.userId, r.coins, r.crates, opKeys.squadsReward(code, created), now, squadsDailyCap(now));
+  return grantReward(sql, r.userId, 0, r.crates, opKeys.squadsReward(code, created), now, squadsDailyCap(now));
 }
 
 /**
- * Squads' daily cap (SQUADS_LOBBY.rewardsPerDay, like ranked's): fewer than that many Squads placement rewards in the account's ledger
+ * Squads' daily cap (SQUADS_LOBBY.rewardsPerDay): fewer than that many Squads placement rewards (crates) in the account's ledger
  * since the UTC day began, checked in the same statement as this one goes in (two lobbies ending at once can't both pass it).
  */
 export const squadsDailyCap =

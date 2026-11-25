@@ -285,10 +285,11 @@ export interface SquadsReward {
   userId: string | null;
   squadId: number;
   placement: SquadsPlacement;
+  /** Always 0 since Nov 25 (the placement's coins are PLAY_COINS', paid with the XP); a reward queued before then is never paid it. */
   coins: number;
   crates: number;
   recorded: boolean;
-  /** Why a placement that pays had nothing: "daily" (the daily cap). */
+  /** Why a placement that pays crates had none: "daily" (the daily cap). */
   why?: "daily";
   /** XP (Nov 9; squads-do.ts): their own moves and their time in the lobby's games (`xpSpan`), and how they left, if they did. */
   moves?: number;
@@ -1883,8 +1884,10 @@ export class SquadsCore {
   }
 
   /**
-   * A person's reward for their squad's placement: coins and crates if they're still playing their seat (not left,
-   * not handed to a bot), and recorded on their profile if signed in; nothing in a lobby a test control touched.
+   * A person's reward for their squad's placement: crates if they're still playing their seat (not left, not handed to a bot), and
+   * recorded on their profile if signed in; nothing in a lobby a test control touched. Coins: none here since Nov 25 (`coins` stays 0
+   * in the message for apps from before): the lobby's play coins and its placement's bonus are paid with its XP (PLAY_COINS;
+   * squads-do.ts writeReward), and the screen shows them from there.
    */
   private rewardFor(id: string, placement: SquadsPlacement): { coins: number; crates: number; recorded: boolean; why?: "daily" } {
     const testing = !!this.r.test || !!this.r.testUsed;
@@ -1896,10 +1899,10 @@ export class SquadsCore {
     // all bots, you still get rewards from that"): the daily cap bounds what its own devices could farm.)
     const why = this.r.capped?.[id] ? ("daily" as const) : null;
     const pays = playing && !testing && !why;
-    return { coins: pays ? r.coins : 0, crates: pays ? r.crates : 0, recorded: !testing && !!this.r.accounts[id], ...(playing && !testing && why && (r.coins || r.crates) ? { why } : {}) };
+    return { coins: 0, crates: pays ? r.crates : 0, recorded: !testing && !!this.r.accounts[id], ...(playing && !testing && why && r.crates ? { why } : {}) };
   }
 
-  /** The daily cap took this person's placement reward (its write found SQUADS_LOBBY.rewardsPerDay spent today): they're told. */
+  /** The daily cap took this person's placement crates (its write found SQUADS_LOBBY.rewardsPerDay spent today): they're told. */
   rewardCapped(id: string) {
     (this.r.capped ??= {})[id] = true;
     const sq = this.squadOf(id);

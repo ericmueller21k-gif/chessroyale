@@ -346,11 +346,14 @@ async function withXp(sql: ReturnType<typeof d1Sql>, f: FinishedDuel, outcomes: 
       now: Date.now(),
       paused,
       quest: "duel",
+      // (Play coins, Nov 25: a draw's bonus; a win's comes from XP's own win.)
+      coin: { draw: f.result === "1/2-1/2" },
     }).catch((e: unknown) => {
       console.log(`xp for duel ${f.id}: ${String(e)}`);
       return null;
     });
-    if (xp) out[c] = { ...out[c], xp };
+    // (The game's coins are its play coins and bonus, paid with its XP (PLAY_COINS since Nov 25; ranked's own coins are gone).)
+    if (xp) out[c] = { ...out[c], xp, coins: xp.coins ? xp.coins.play + xp.coins.bonus : 0 };
   }
   return out;
 }

@@ -155,8 +155,8 @@ function Privacy() {
             <p>
               Your 1 v 1 rank: your tier, division and rank points (or how many placement games you've played), the highest you've
               reached, your wins, losses and draws, your current run of wins, when you last played, and a hidden rating of how well you play (a number and how sure it is) that
-              decides your rank points and whom you're matched with; and how many of today's games paid you coins (at most{" "}
-              {RANKED_1V1.coins.perDay} a day do).
+              decides your rank points and whom you're matched with; and, from before Nov 25, 2026, how many of one day's ranked games
+              paid you coins (no longer counted: a ranked game's coins are kept with its XP, below).
             </p>
             <p>
               Each ranked game: the two players, the time control, the result and how it ended, the rank points it moved for each
@@ -214,15 +214,15 @@ function Privacy() {
         what={
           <p>
             Your XP (your level is worked out from it), and for each game you finish: how long you played it and how many moves you made,
-            the XP it gave you and what for, or why it gave none, and the crates and keys it gave you (the daily reward, your levels' and
-            your quests'). The crates you hold by series (and how many of them came as a bonus), and the boss crates you have to pick. When a game you play on your device began
+            the XP it gave you and what for, or why it gave none, the coins it gave you (and what for, with your coins from games that day so
+            far, or why it gave none), and the crates and keys it gave you (the daily reward, your levels' and your quests'). The crates you hold by series (and how many of them came as a bonus), and the boss crates you have to pick. When a game you play on your device began
             (our server times it), and once you've made {SOLO_ABANDON.minMoves} moves in it, when, with its mode, the number of players, your team and
             the boss, so leaving it counts as a loss. Your quests: which ones you have, when each was given and finished, which games moved each one, and the
             day a reroll gave it.
           </p>
         }
         why="so your level and quests are yours on every device, a game's XP, rewards and quest progress are counted once, and the result screen can show what a game gave you."
-        kept="your XP, crates and boss crates to pick until you open or pick them, or the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in or it counts as left; a daily quest until the day after it's finished (one not finished waits), the weekly until the week ends, each with the games that moved it."
+        kept="your XP, crates and boss crates to pick until you open or pick them, or the account is deleted; each game's XP and coins with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in or it counts as left; a daily quest until the day after it's finished (one not finished waits), the weekly until the week ends, each with the games that moved it."
       />
       <Item
         title="The Battle Tower"

@@ -27,6 +27,9 @@ import {
   CRATE_BONUS,
   bonusOddsLine,
   XP,
+  PLAY_COINS,
+  bonusMax,
+  playCoinsFor,
   everyLevel,
   QUESTS,
   BOSS_PARTY,
@@ -130,6 +133,8 @@ export interface FaqSources {
   /** The bonus crate (Nov 24): an opening's chance of one (CRATE_BONUS). */
   crateBonus: { chance: number };
   xp: typeof XP;
+  /** Play coins (Nov 25): what every counted game pays (PLAY_COINS). */
+  playCoins: typeof PLAY_COINS;
   /** Quests (Nov 9, phase 3): how many, the carry-over, the reroll, the pool. */
   quests: typeof QUESTS;
   bossCratePrice: typeof BOSS_CRATE_PRICE;
@@ -183,6 +188,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   bossTokens: BOSS_TOKENS,
   crateBonus: CRATE_BONUS,
   xp: XP,
+  playCoins: PLAY_COINS,
   quests: QUESTS,
   bossCratePrice: BOSS_CRATE_PRICE,
   colors: ITEM_COLORS,
@@ -328,7 +334,7 @@ ${finalBoss ? `- **${capitalFirst(bossInText(finalBoss.name, false, src.roster))
 
 ${mercenary(Q)}
 
-${ranked1v1(src.ranked, src.leaves)}
+${ranked1v1(src.ranked, src.leaves, src.playCoins)}
 
 ${leaving(src)}
 
@@ -363,7 +369,7 @@ function squadsClocks(Q: SquadsSettings): string {
  * rule (every pair of picks worked out by the game's own rule, votedControl), the clocks, how a game ends, ranks, rank points,
  * placements and coins.
  */
-export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES): string {
+export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES, P: typeof PLAY_COINS = PLAY_COINS): string {
   const z = (id: "bullet" | "blitz" | "rapid") => controlLabel(zoneControl(id, R));
   const meet = (a: "bullet" | "blitz" | "rapid", b: "bullet" | "blitz" | "rapid") => `**${controlLabel(votedControl(a, b, R))}**`;
   const def = R.controls.find((c) => c.id === R.defaultControl) ?? R.controls[0]!;
@@ -376,7 +382,6 @@ export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES): stri
   const floorRp = R.topFloor - (divisionsEnd(R) - R.pointsPerDivision);
   const emblems = (ids: readonly string[]) => `!emblems ${ids.join(" ")}`;
   const example = R.tiers[Math.min(2, R.tiers.length - 1)]!.name;
-  const C = R.coins;
   return `### 1 v 1 · Classic chess {#mode-1v1}
 
 - **Normal chess against one other person, ranked.** Checkmate wins, the clocks are real, and nothing else: no power-ups, no scoring of your moves. One tap on **1 v 1** finds you an opponent near your strength; the longer you wait, the wider the search. If nobody turns up within ${n(R.fewPlayersSeconds, "second")}, you can keep waiting or **play a bot** (unranked: nothing on your record, no coins).
@@ -398,7 +403,7 @@ ${emblems([emblemId(lowTop!.name, null), emblemId(highTop!.name, null)])}
 
 - **Rank points:** about +${num(R.points.perGame)} for a win and −${num(R.points.perGame)} for a loss against a player at your level, about 0 for a draw; more for beating someone stronger, less for beating someone weaker. Behind them is a hidden rating, worked out from your results and whom you played them against: when your rank is lower than it, you gain more and lose less (up to ${n(R.points.maxAdjust, "RP", "RP")} more or less), so your rank settles where your play is. A win never costs you points.
 - **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${top.label.replace(/ · .*/, "")}.
-- **Coins:** a game pays ${num(C.perMinute.win)} coins a minute for a win, ${num(C.perMinute.draw)} for a draw and ${num(C.perMinute.loss)} for a loss, at least 1 and at most ${num(C.maxPerGame)}, once both sides have made ${n(C.minMoves, "move")}. Up to ${n(C.perDay, "game")} a day pay coins; after that they still count for your rank. A called-off game and a bot game pay nothing.
+- **Coins:** a ranked game pays coins as every game does ([Coins](#xp)): more for a longer game, ${n(P.bonus.win, "coin")} more for a win and ${n(P.bonus.draw, "coin")} for a draw. A called-off game and a bot game pay nothing.
 - **Quick chat** works as in other online matches, and you can mute the other player.
 
 ${rankedLeaving(L)}`;
@@ -1205,6 +1210,11 @@ export function xpAndLevels(src: FaqSources): FaqSection {
   const X = src.xp;
   const Q = src.quests;
   const most = X.maxMinutes * X.perMinute + X.win;
+  const P = src.playCoins;
+  const coinsMost = playCoinsFor(X.maxMinutes, false, P);
+  const steps = P.bonusSteps;
+  const bonusTop = bonusMax(steps);
+  const squadsBonus = `${P.bonus.squads[1]} for 1st, ${P.bonus.squads[2]} for 2nd, ${P.bonus.squads[3]} for 3rd-4th and ${P.bonus.squads[5]} for 5th-8th`;
   const nth = (k: number) => `${k}${k % 100 >= 11 && k % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][k % 10] ?? "th")}`;
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
   const things = (q: { xp: number; crates?: number; keys?: number }) =>
@@ -1235,6 +1245,12 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 - **What counts:** only games that earn XP (the same rules as above), each game once per quest. Quests ask for modes you can always play: Squads, 50 v 50, Boss Battles (alone counts too), and any game. A win counts when it earns its win XP. Games on your device count toward "finish games" quests, and a Boss Battle on your device toward the Boss Battle quests too, but only once they've lasted a little while (our server times them).
 - **New dailies** come each day at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC; the weekly resets on Mondays at the same time. **Unfinished dailies stay**, up to ${Q.maxDailies} waiting, so missing a day doesn't waste them. A new weekly replaces the old one, finished or not.
 - **One free reroll a day for each daily:** the arrows on a daily you haven't finished swap it for another quest (only that one). The new quest's arrows come back the next day.
+
+**Coins:** every game that earns XP also earns coins, by the same rules (your own game as our server measured it, from your ${nth(X.minMoves)} move; nothing for leaving, a test game, a guest, or an account fair play is reviewing).
+- **Play coins:** more for a longer game, up to ${coinsMost} a game, until **${P.perDay} a day**.
+- **A bonus for playing well,** even past the day's ${P.perDay}: **${P.bonus.win}** for a win (the same wins as XP's, the friends' lobby rule too), **${P.bonus.draw}** for a draw in ranked 1 v 1, **${P.bonus.crowdTop3}** for finishing in your team's top ${P.crowdTopPlaces} in a 50 v 50, and in Squads by your squad's place: ${squadsBonus}.
+- **The bonus slows through the day:** the first ${steps[0]?.upTo ?? 0} bonus coins of a day pay in full, ${steps.slice(1).map((st, i) => `the next ${st.upTo - steps[i]!.upTo} ${st.rate === 0.5 ? "at half" : st.rate === 0.25 ? "at a quarter" : `at ${Math.round(st.rate * 100)}%`}`).join(", ")}, then none: at most ${bonusTop} bonus coins and **${P.perDay + bonusTop} coins a day** in all.
+- **Games on your device** pay play coins for the time that earned XP under their daily limit, and no bonus.
 
 After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level that pays, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
 `,

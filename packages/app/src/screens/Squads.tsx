@@ -21,7 +21,7 @@ import { FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx
 import { ReplayButton } from "../components/MoveReplay.tsx";
 import { useGameXp } from "../components/XpResult.tsx";
 import { EndHeadline, EndRewards } from "../components/EndScreen.tsx";
-import { XP_NONE_LINES } from "@chessroyale/core";
+import { XP_NONE_LINES, type XpGrant } from "@chessroyale/core";
 
 /**
  * Squads' screens (docs/areas/squads.md, "The screens"), by the lobby's phase: the waiting room (the queue's seats, 32 of
@@ -193,23 +193,38 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
   );
 }
 
-/** Why a placement that pays had no coins or crates (the outside review of Nov 10): the day's paying lobbies used (SQUADS_LOBBY.rewardsPerDay). */
+/** Why a placement that pays crates had none (the outside review of Nov 10): the day's paying lobbies used (SQUADS_LOBBY.rewardsPerDay). */
 export const NO_REWARD: Record<"daily", string> = {
-  daily: `No coins or crates: today's ${SQUADS_LOBBY.rewardsPerDay} paying lobbies are used. More tomorrow.`,
+  daily: `No crates: today's ${SQUADS_LOBBY.rewardsPerDay} paying lobbies are used. More tomorrow.`,
 };
+
+/**
+ * Your placement's reward words (Nov 25): the lobby's coins (PLAY_COINS: its play coins and its placement's bonus, paid with its XP;
+ * `xp` undefined while they're coming, "+… coins"), its crates (`sep` between), or why there were none.
+ */
+export function squadsRewardLine(p: { crates: number; recorded: boolean; why?: "daily" }, xp: XpGrant | null | undefined, test: boolean, sep: string): string {
+  if (test) return "Test lobby: no rewards.";
+  const coins = xp?.coins ? xp.coins.play + xp.coins.bonus : 0;
+  const words = [xp === undefined && p.recorded ? "+… coins" : coins > 0 ? `+${coins} coins` : "", p.crates ? `${p.crates} crate` : ""].filter(Boolean).join(sep);
+  const why = p.why ? NO_REWARD[p.why] : "";
+  return words && why ? `${words}. ${why}` : words || why;
+}
 
 /**
  * Your squad is out: where it placed, your reward, and what next: watch the rest of the bracket, or queue again.
  */
 function OutCard({ client, actions, onSpectate }: { client: SquadsClient; actions: SquadsActions; onSpectate: () => void }) {
   const p = client.placed!;
+  const test = !!client.lobby?.test;
+  // (The lobby's coins come with its XP, Nov 25: the same answer the XP box shows.)
+  const xp = useGameXp(client.placed ?? client, { code: test ? null : client.code });
   return (
     <div class="fd-sheet-scrim sq-out-scrim">
     <div class="fd-sheet sq-out" role="dialog" aria-modal="true" aria-label="Knocked out">
       <div class="sq-card-title">Knocked out · {placementText(p.placement)}</div>
       <p class="muted small">
         {squadName(p.squadId)} placed {placementText(p.placement)} of 8 squads.{" "}
-        {p.coins || p.crates ? `+${p.coins} coins${p.crates ? ` · ${p.crates} crate` : ""}` : client.lobby?.test ? "Test lobby: no rewards." : p.why ? NO_REWARD[p.why] : ""}
+        {squadsRewardLine(p, xp, test, " · ")}
       </p>
       <SquadsXp client={client} />
       <div class="sq-card-actions">
@@ -297,6 +312,8 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
   const placed = client.placed;
   const order = standingsOrder(lobby);
   const won = placed?.placement === 1;
+  // (The lobby's coins come with its XP, Nov 25: the same answer the XP box below shows.)
+  const xp = useGameXp(client.placed ?? client, { code: lobby.test ? null : client.code });
   return (
     <div class="screen results sq-results es-screen">
       {/* (The end screen's headline, Nov 20: "Victory!" for the champions; your squad's place otherwise.) */}
@@ -308,7 +325,10 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
       {placed && (
         <p class="muted">
           {won ? `${squadName(placed.squadId)} won the Squads final.` : `${squadName(placed.squadId)} placed ${placementText(placed.placement)}.`}{" "}
-          {placed.coins || placed.crates ? `+${placed.coins} coins${placed.crates ? ` and ${placed.crates} crate` : ""}.` : lobby.test ? "Test lobby: no rewards." : placed.why ? NO_REWARD[placed.why] : ""}
+          {(() => {
+            const line = squadsRewardLine(placed, xp, !!lobby.test, " and ");
+            return line && !/[.]$/.test(line) ? `${line}.` : line;
+          })()}
         </p>
       )}
       {/* (The rewards' middle: your squad, its tag and its members.) */}
