@@ -37,3 +37,7 @@ each size before reporting.
 the very top, no title line; "1 v 1 · Blitz 3+2" between their name and clock; the gear top right; the board takes all the height between the
 two strips; the right column flush with the board top and bottom; a redesigned right column (clean action row: Offer a draw / Resign; the
 chat filling the rest); "Your move" placed logically (by your own strip/clock). Mockup at desktop ~1858×1040, laptop 1536×730, 1920×960.
+**Eric, Nov 25 (desktop 100%, ~1735 × 1035), the 1 v 1 END page on a computer (phone end page stays):** the move-by-move board on the right
+as big as the game's board (slim one-line header, tight padding); left column a tight stack: headline, reason, RP, XP, level, quests, coins
+in a tidy row, Play again + Home STACKED, the chat (readable) filling down to the board's bottom; gear top right; no excess padding; columns
+flush with the board. Built directly (bug fix), stills at desktop ~1735×1035, laptop 1536×730, 1920×960.
