@@ -8,8 +8,8 @@
  * since Nov 25 hands them to the painter whole (`Painter.adopt`): they're packed as the WebGL atlas packs (paint.ts `ATLAS`), so each is
  * uploaded as one layer, never cut up and uploaded a picture at a time (1,912 of them: 3.3 s and 0.55 s of a slowed phone's 7 s). Each
  * picture is a canvas standing in for it, put where its painting would have gone (render.ts `plan`) and drawn by as before; it's empty
- * until something asks for its pixels (its 2D context: a tap's hit test, a statue's mask; or the painter uploading it alone), then cut
- * from its page. The town draws exactly what it drew before.
+ * until something asks for its pixels (its 2D context: a tap's hit test, a statue's mask; a 2D context drawing from it: a chip's face,
+ * `cutBeforeDraw`; or the painter uploading it alone), then cut from its page. The town draws exactly what it drew before.
  *
  * It never breaks the town: no storage, a quota error, a missing, partial, corrupt or other build's entry, a decode failure or a slow
  * read (`TOWN_PICTURES.waitMs`) paints as before, silently, and the entry is cleared. Only one entry is ever kept (the last build's).
@@ -68,7 +68,10 @@ export interface Restored {
 /** The browser's part (tests pass their own). */
 export interface PageIO {
   decode(b: Blob): Promise<Page>;
-  /** A w x h canvas for the picture at (x, y) on `page`: empty until its 2D context is asked for, or `fill`, then cut from the page. */
+  /**
+   * A w x h canvas for the picture at (x, y) on `page`: empty until its 2D context is asked for, a 2D context draws from it, or `fill`,
+   * then cut from the page.
+   */
   standIn(page: Page, x: number, y: number, w: number, h: number): HTMLCanvasElement;
   /** Cuts a stand-in's picture onto it now, if it isn't yet (anything else: nothing). */
   fill(c: HTMLCanvasElement): void;
@@ -366,11 +369,35 @@ export function idbShelf(): Shelf | null {
   };
 }
 
+/** (`domPageIO`) Each stand-in not cut yet: what cuts it. */
+const uncut = new WeakMap<object, () => void>();
+let cutOnDraw = false;
+/**
+ * (Nov 25, round 2) A 2D context drawing FROM a stand-in (or making a pattern of one) cuts it first. Drawing from a canvas never asks
+ * for its context, so a picture drawn anywhere but the WebGL painter (which cuts one before uploading it alone, paint-gl.ts `upload`)
+ * copied an empty canvas: the chips' and the large map's boss faces were blank on a repeat visit (render.ts `chipFace`). One place for
+ * every 2D reader there is or will be, rather than a cut at each. Set once, as the first stand-in is made (never on a first visit or a
+ * 2D painter); a draw from anything else costs one WeakMap look.
+ */
+function cutBeforeDraw(): void {
+  if (cutOnDraw || typeof CanvasRenderingContext2D === "undefined") return;
+  cutOnDraw = true;
+  const P = CanvasRenderingContext2D.prototype;
+  const draw = P.drawImage as (...a: unknown[]) => void;
+  const pattern = P.createPattern;
+  P.drawImage = function (this: CanvasRenderingContext2D, img: CanvasImageSource) {
+    uncut.get(img)?.();
+    return draw.apply(this, arguments as unknown as unknown[]);
+  } as typeof P.drawImage;
+  P.createPattern = function (this: CanvasRenderingContext2D, img: CanvasImageSource, rep: string | null) {
+    uncut.get(img)?.();
+    return pattern.call(this, img, rep);
+  };
+}
+
 /** Decoding pages, and cutting their pictures as they're asked for, in the browser (null: it can't). */
 export function domPageIO(art2d: (c: HTMLCanvasElement) => CanvasRenderingContext2D): PageIO | null {
   if (typeof createImageBitmap !== "function") return null;
-  /** Each stand-in not cut yet: what cuts it. */
-  const uncut = new WeakMap<HTMLCanvasElement, () => void>();
   const fill = (c: HTMLCanvasElement) => uncut.get(c)?.();
   const own = HTMLCanvasElement.prototype.getContext as (...a: unknown[]) => RenderingContext | null;
   return {
@@ -379,10 +406,12 @@ export function domPageIO(art2d: (c: HTMLCanvasElement) => CanvasRenderingContex
     // and twice as quick to upload as one made "premultiply", 11 ms a page against 27.)
     decode: (b) => createImageBitmap(b, { colorSpaceConversion: "none", premultiplyAlpha: "default" }),
     standIn: (page, x, y, w, h) => {
+      cutBeforeDraw();
       const c = document.createElement("canvas");
       c.width = w;
       c.height = h;
-      // (Its 2D context asked for (anything reading or drawing its pixels): cut first. No canvas is made for the picture until then.)
+      // (Its 2D context asked for (anything reading or drawing on its pixels), or a 2D context drawing from it (`cutBeforeDraw`): cut
+      // first. No canvas is made for the picture until then.)
       c.getContext = function (this: HTMLCanvasElement, ...a: Parameters<HTMLCanvasElement["getContext"]>) {
         fill(c);
         return own.apply(this, a);
