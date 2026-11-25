@@ -6012,8 +6012,22 @@ export const RESIDENTS = {
     safetyMs: 1500,
     slowFactor: 2.2,
     slowFlagChance: 0.01,
-    /** Resigning a lost game: material down by `lostBy` or more, from the `afterMove`th move, this chance a move (a rage-quitter: `rageLostBy`, `rageChance`). */
-    resign: { lostBy: 8, afterMove: 12, chance: 0.12, rageLostBy: 4, rageChance: 0.25 },
+    /**
+     * Resigning a lost game, by the resident's rating (Eric, Nov 25: "can't we just make them not forfeit for a bit longer?"): the first
+     * band whose `upTo` holds: material down by `lostBy` or more, from its own `afterMove`th move, this `chance` a move. Players under
+     * about 1200 mostly play on to the end, stronger ones resign a clearly lost game. A rage-quitter: down `rageLostBy` from move
+     * `rageAfterMove`, `rageChance` a move.
+     */
+    resign: {
+      bands: [
+        { upTo: 1199, lostBy: 15, afterMove: 30, chance: 0.04 },
+        { upTo: 1599, lostBy: 10, afterMove: 25, chance: 0.08 },
+        { upTo: 9999, lostBy: 7, afterMove: 20, chance: 0.12 },
+      ],
+      rageLostBy: 6,
+      rageAfterMove: 12,
+      rageChance: 0.25,
+    },
     /** Draw offers: material level within 1, from ply `fromPly`, this chance a move; an offer is taken when level and past `acceptFromPly` (`acceptChance`). */
     draw: { fromPly: 60, offerChance: 0.02, acceptFromPly: 40, acceptChance: 0.5 },
     /** A leaver walks away from this share of its games, after 10-30 moves; an AFK resident never makes its first move in `afkNoShow`, and stops moving midgame in `afkStall`. */
