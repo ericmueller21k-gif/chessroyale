@@ -40,6 +40,7 @@ import { FloorPlay, askFloor, forgetPartyFloor, keepPartyFloor, loadKept, onEnte
 import { joinTowerParty, onEnterPartyFloor, towerParty, type PartyFloorEntry } from "./tower-party.ts";
 import type { TowerBack } from "./town/Town.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
+import { LadderScreen } from "./screens/Ladder.tsx";
 import { FrontFrame, GameFrame, type FrontNav, type FrontPage } from "./components/FrontMenu.tsx";
 import { showAwayNote } from "./components/AwayNote.tsx";
 import { useAccount } from "./screens/Profile.tsx";
@@ -419,7 +420,7 @@ const storedGuest = () => {
 
 type AnyMatch = GameView & { dispose(): void };
 /** The pages a computer's side menu goes to from a match (each leaves the match first, App's matchPage). */
-type MatchPage = Exclude<keyof FrontNav, "signIn">;
+type MatchPage = Exclude<keyof FrontNav, "signIn" | "ladder">;
 /** The game a computer's side menu leaves (App's sideNav): a match, a 1 v 1 duel, a Squads lobby or auto chess. */
 type SideFrom = "match" | "duel" | "squads" | "auto";
 
@@ -455,6 +456,8 @@ export function App() {
   const [showFaq, setShowFaq] = useState(() => location.pathname === "/faq");
   /** Your friends list (/friends: screens/Friends.tsx). */
   const [showFriends, setShowFriends] = useState(() => location.pathname === "/friends");
+  /** The season ladder (/ladder: screens/Ladder.tsx; a mockup, Nov 25). */
+  const [showLadder, setShowLadder] = useState(() => location.pathname === "/ladder");
   /**
    * Open the home screen's boss menu or Play with friends: the computer's side menu, or the hidden /bosses (Eric's way
    * straight to the solo boss picker, unlisted, not admin-gated; Oct 16). Used once: a match started clears it.
@@ -1903,8 +1906,9 @@ export function App() {
     setShowFaq(false);
     setShowShop(false);
     setShowFriends(false);
+    setShowLadder(false);
     // (From /friends, the page's query and hash stay: a test switch or tour link, as the pop-up kept them before, Nov 11.)
-    if (location.pathname !== "/") history.replaceState(null, "", location.pathname === "/friends" ? `/${location.search}${location.hash}` : "/");
+    if (location.pathname !== "/") history.replaceState(null, "", location.pathname === "/friends" || location.pathname === "/ladder" ? `/${location.search}${location.hash}` : "/");
   };
   const nav: FrontNav = {
     home: () => {
@@ -1954,6 +1958,11 @@ export function App() {
       history.replaceState(null, "", `/friends${location.search}${location.hash}`);
     },
     signIn: () => chooseGuest(false),
+    ladder: () => {
+      goHome();
+      setShowLadder(true);
+      history.replaceState(null, "", `/ladder${location.search}${location.hash}`);
+    },
   };
   /**
    * A computer's side menu on a game screen (GameFrame, Nov 1): the page it asks for. Something to leave (`exit`): its
@@ -2483,6 +2492,19 @@ export function App() {
             closeProfile();
             nav.friendsList();
           }}
+        />
+      </FrontFrame>
+    );
+  }
+  if (!match && showLadder) {
+    return (
+      <FrontFrame page="ladder" nav={nav}>
+        <LadderScreen
+          onBack={() => {
+            setShowLadder(false);
+            if (location.pathname === "/ladder") history.replaceState(null, "", `/${location.search}${location.hash}`);
+          }}
+          onSignIn={() => chooseGuest(false)}
         />
       </FrontFrame>
     );

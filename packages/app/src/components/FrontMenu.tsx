@@ -22,6 +22,8 @@ export interface FrontNav {
   friends: () => void;
   /** Daily Quests: home with its quests overlay open (Eric, Nov 10). */
   quests: () => void;
+  /** The season ladder (/ladder; Eric, Nov 25, a mockup). Missing (a match's and the town's menus for now): the item greyed. */
+  ladder?: () => void;
   shop: () => void;
   profile: () => void;
   settings: () => void;
@@ -31,7 +33,7 @@ export interface FrontNav {
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess" | "quests";
+export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess" | "quests" | "ladder";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -84,6 +86,21 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
               <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
               <circle cx="17" cy="9" r="2.6" />
               <path d="M16 13.6c2.8.2 5 2.2 5 5" />
+            </Icon>
+          }
+        />
+        {/* (The season ladder (Eric, Nov 25: "visible from the left panel on desktop"): every ranked mode's standings this season.) */}
+        <Item
+          tip={tip}
+          label="Ladder"
+          on={page === "ladder"}
+          disabled={!nav.ladder}
+          onClick={() => nav.ladder?.()}
+          icon={
+            <Icon>
+              <path d="M8 4h8v5a4 4 0 0 1-8 0z" />
+              <path d="M8 6H5.5a2.5 2.5 0 0 0 2.6 3.4M16 6h2.5a2.5 2.5 0 0 1-2.6 3.4" />
+              <path d="M12 13v3M8.5 20h7M9.5 20l.5-4h4l.5 4" />
             </Icon>
           }
         />
