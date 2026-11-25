@@ -390,9 +390,31 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   await btn.click();
   await expect(small).toHaveCount(0);
   await expect(btn).toHaveAttribute("aria-pressed", "false");
+  // (Nov 25, round 2: the reload is a repeat visit, its pictures from the first visit's kept pages, each empty until something reads
+  // it. The first visit's are on the shelf before it reloads.)
+  type Kept = { __townPaint: () => { pictures: { kept: boolean; saved: number | null | undefined } } };
+  await expect.poll(() => page.evaluate(() => (window as unknown as Kept).__townPaint().pictures.saved), { timeout: 60_000 }).toBeGreaterThan(0);
   await page.reload();
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  expect(await page.evaluate(() => (window as unknown as Kept).__townPaint().pictures.kept), "a repeat visit: its pictures kept").toBe(true);
   await expect(small, "still off after a reload").toHaveCount(0);
+  // The chips' faces drawn on it: each shown chip's canvas has pixels (a 2D draw from a kept picture cuts it first).
+  await expect
+    .poll(
+      () =>
+        page.locator(".town-chip").evaluateAll((els) => {
+          const shown = els.filter((e) => (e as HTMLElement).style.display !== "none");
+          const drawn = shown.filter((e) => {
+            const c = e.querySelector("canvas")!;
+            const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+            for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) return true;
+            return false;
+          });
+          return `${drawn.length} of ${shown.length}`;
+        }),
+      { timeout: 5000, message: "every chip shown has its face drawn" },
+    )
+    .toMatch(/^([1-9]\d*) of \1$/);
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(small).toBeVisible();
 
