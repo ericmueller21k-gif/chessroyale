@@ -2,6 +2,8 @@
  * Which players the small scoreboard shows when only `rows` fit, most
  * important first: you, the leader, the two either side of the cut line, your
  * neighbors, the rest of the top five, then outwards from you (as many as fit).
+ * A row that doesn't fit is skipped, not the end of the list (Nov 26): one that needs more room (a "⋯" gap and the cut line,
+ * the first row past the cut when you're last) left a phone's 50 v 50 scoreboard at three rows while your neighbor fit.
  */
 export function pickRows(n: number, me: number, cutoff: number, fits: (keep: Set<number>) => boolean): Set<number> {
   const knockouts = cutoff > 0 && cutoff < n;
@@ -13,10 +15,7 @@ export function pickRows(n: number, me: number, cutoff: number, fits: (keep: Set
   for (const i of order) {
     if (i < 0 || i >= n || keep.has(i)) continue;
     keep.add(i);
-    if (!fits(keep)) {
-      keep.delete(i);
-      break;
-    }
+    if (!fits(keep)) keep.delete(i);
   }
   return keep;
 }
