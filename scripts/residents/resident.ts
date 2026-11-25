@@ -1,8 +1,9 @@
 /**
  * One resident as a person with a browser: signed in once (its own cookie jar), then in each of its sessions it sits on home (the
  * live line every few seconds, which also puts it on the online count), queues for ranked 1 v 1 with its ticket, plays the game,
- * and goes back home, until the session ends (a game in progress is finished first) or its behavior ends it early. The queue gate
- * spaces residents into the queue so one is often alone in line, and a person who queues meets them within seconds.
+ * and goes back home, until the session ends (a game in progress is finished first; after a deploy, the same, at once) or its
+ * behavior ends it early. The queue gate spaces residents into the queue so one is often alone in line, and a person who queues
+ * meets them within seconds.
  */
 import { RESIDENTS, itemDef, mulberry32, type Rng } from "@chessroyale/core";
 import { Api, CookieJar, isPausedAnswer, type Answer, type Target } from "./client.ts";
@@ -98,6 +99,8 @@ export interface World {
   /** Our residents' account ids (a game against anyone else is against a person). */
   residentIds: Set<string>;
   stopping: () => boolean;
+  /** A new version went live (run.ts, --follow-deploys): nothing new starts, games in progress finish, then everyone goes offline. */
+  draining: () => boolean;
   /** An answer said residents are paused (or a socket was refused as they are): the program checks and stops. */
   paused: (how: string) => void;
   /** Sleeps up to `ms`, less if the program stops. */
@@ -203,7 +206,7 @@ export class Resident {
   }
 
   private over() {
-    return this.world.stopping() || Date.now() >= this.sessionEnd;
+    return this.world.stopping() || this.world.draining() || Date.now() >= this.sessionEnd;
   }
 
   private async live() {
@@ -231,7 +234,7 @@ export class Resident {
   /** On home for `ms`: the live line every RESIDENTS.homePollMs, as the front door polls it. */
   private async home(ms: number) {
     const until = Date.now() + ms;
-    while (!this.world.stopping() && Date.now() < until) {
+    while (!this.world.stopping() && !this.world.draining() && Date.now() < until) {
       await this.call("GET", "/api/live");
       await this.world.nap(Math.min(RESIDENTS.homePollMs, until - Date.now()));
     }
@@ -244,7 +247,7 @@ export class Resident {
     let ticket: string | null = null;
     try {
       // (A resident waits up to three minutes, then goes back home: a person would try a bot or come back later.)
-      while (!this.world.stopping() && Date.now() - since < 180_000 && (Date.now() < this.sessionEnd || Date.now() - since < 60_000)) {
+      while (!this.world.stopping() && !this.world.draining() && Date.now() - since < 180_000 && (Date.now() < this.sessionEnd || Date.now() - since < 60_000)) {
         const r = await this.call("POST", `/api/1v1/play${ticket ? `?ticket=${encodeURIComponent(ticket)}` : ""}`, { timeoutMs: 60_000 });
         if (isPausedAnswer(r)) return null;
         if (typeof r.body?.code === "string") {

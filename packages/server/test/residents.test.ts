@@ -205,7 +205,7 @@ describe("residents: the report and the heartbeat", () => {
     expect((await call("POST", {}, { pool: 3, errors: { judgeLate: 2 } }, { access: RESIDENTS_CLIENT, path: "/beat" }))!.status).toBe(200);
     const report = (await (await call("GET", {}, undefined, { access: RESIDENTS_CLIENT }))!.json()) as ResidentsReport;
     expect(report.paused).toBe(false);
-    expect(report.beat).toEqual({ at: T0, by: "access", beat: { pool: 3, errors: { judgeLate: 2 } } });
+    expect(report.beat).toEqual({ at: T0, by: "access:residents", beat: { pool: 3, errors: { judgeLate: 2 } } });
     expect(report.today).toEqual({ since: Date.UTC(2026, 10, 25), results: { crowd: 1 }, players: 1, duels: 2, duelsWithPeople: 1 });
     expect(report.fairPlay).toEqual({ matches: 2, would: { watch: 0, review: 0, pool: 1, ban: 0 } });
     expect(report.residents.map((r) => [r.name, r.gamesToday])).toEqual([
@@ -219,7 +219,10 @@ describe("residents: the report and the heartbeat", () => {
     const beat = (raw: string) => call("POST", {}, undefined, { access: RESIDENTS_CLIENT, path: "/beat", raw });
     expect((await beat(JSON.stringify({ n: 1 })))!.status).toBe(200);
     expect((await beat(JSON.stringify({ n: 2 })))!.status).toBe(200);
-    expect(await sql.all("SELECT value FROM meta WHERE key = 'residents:beat'")).toEqual([{ value: JSON.stringify({ at: T0, by: "access", beat: { n: 2 } }) }]);
+    expect(await sql.all("SELECT value FROM meta WHERE key = 'residents:beat'")).toEqual([{ value: JSON.stringify({ at: T0, by: "access:residents", beat: { n: 2 } }) }]);
+    // (Which token sent it, so two programs at once show: the host's own, or the test accounts' (the director's runs). The review's M3.)
+    expect((await call("POST", {}, { n: 3 }, { access: TEST_CLIENT, path: "/beat" }))!.status).toBe(200);
+    expect(((await (await call("GET", {}, undefined, { access: RESIDENTS_CLIENT }))!.json()) as ResidentsReport).beat?.by).toBe("access:test");
     for (const bad of ["[1,2]", "7", "not json", "null"]) expect((await beat(bad))!.status).toBe(400);
     expect((await beat(JSON.stringify({ pad: "x".repeat(BEAT_MAX_BYTES) })))!.status).toBe(413);
     // (Too big by its own word: refused before the body is read, the review's n1.)
