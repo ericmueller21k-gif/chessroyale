@@ -19,8 +19,9 @@ const SIZES = ["1920x1080", "1440x900", "1366x768", "1280x800"] as const;
 type Size = (typeof SIZES)[number];
 const dims = (s: string) => s.split("x").map(Number) as [number, number];
 
-/** Each screen's room above and below the board (board-size.css' --bd-room): its board is never taller than the rest. */
-const ROOM = { alone: 123, raid: 123, crowd: 170, vote: 170, duel: 170, squads: 230 } as const;
+/** Each screen's room above and below the board (board-size.css' --bd-room): its board is never taller than the rest. (1 v 1's: 108 since
+ * Nov 25, its computer frame: no title line, the two strips.) */
+const ROOM = { alone: 123, raid: 123, crowd: 170, vote: 170, duel: 108, squads: 230 } as const;
 type Screen = keyof typeof ROOM;
 /**
  * The board's side, measured with this change. Nov 1 (the eval bar off for everyone, as every player's board is: a raid's,
@@ -28,14 +29,15 @@ type Screen = keyof typeof ROOM;
  * bar on; Boss alone's and 1v1's and Squads' are the same). Round 2 (Nov 1): the side menu is icons only below 1800 px (80 px,
  * not 232), and the columns beside the board give the room back: the right column is 280 px where the window is what limits
  * the board (340 where its height does), a leaderboard 340 px (was 360), Boss alone's empty column 196 px (was 216). Every
- * screen's board is at least main's at these sizes (MAIN below).
+ * screen's board is at least main's at these sizes (MAIN below). Nov 25: 1 v 1's computer frame (no title line, the board the window's
+ * height less its two strips): 968, 792, 656 and 688 (were 904, 728, 592, 624).
  */
 const NOW: Record<Screen, Record<Size, number>> = {
   alone: { "1920x1080": 952, "1440x900": 760, "1366x768": 640, "1280x800": 600 },
   raid: { "1920x1080": 952, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
   crowd: { "1920x1080": 904, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
   vote: { "1920x1080": 904, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
-  duel: { "1920x1080": 904, "1440x900": 728, "1366x768": 592, "1280x800": 624 },
+  duel: { "1920x1080": 968, "1440x900": 792, "1366x768": 656, "1280x800": 688 },
   squads: { "1920x1080": 848, "1440x900": 664, "1366x768": 536, "1280x800": 504 },
 };
 /**
@@ -96,6 +98,7 @@ const BESIDE: Record<string, string> = {
   chat: ".screen.game > .under-board",
   squadPanel: ".screen.game .sq-panel",
   strips: ".screen.game .dv-strip",
+  side: ".screen.game > .dv-side",
   tools: ".screen.game > .gm-tools",
 };
 async function look(page: Page) {
@@ -339,7 +342,8 @@ const BOARD_TODAY: Record<Screen, Record<string, number>> = {
   raid: { "1536x730": 600, "1280x600": 472, "1366x650": 520, "1920x960": 832 },
   crowd: { "1536x730": 560, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
   vote: { "1536x730": 560, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
-  duel: { "1536x730": 557, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
+  // (1 v 1: none since Nov 25, its computer frame: its board is the target, to its 8 device pixel step.)
+  duel: {},
   squads: { "1536x730": 496, "1280x600": 368, "1366x650": 416, "1920x960": 728 },
 };
 const END_SCROLL_TODAY: Partial<Record<Screen, Record<string, number>>> = {
@@ -619,11 +623,13 @@ test("a computer's boss battle with chat: the chat box under the moves, the same
 });
 
 /**
- * Nov 1 (round 2: the labels from 1800 px, not 1366): the front door's side menu on a computer's game screens (Boss alone, the
- * Crowd, 1 v 1, Squads): icons only below 1800 px (the labels as tooltips, read by screen readers), the full menu from 1800 px.
- * A phone and a touch tablet have none (the touch test above keeps their boards to the pixel).
+ * The front door's side menu on a computer's game screens (Boss alone, the Crowd, 1 v 1, Squads): its labels wherever they cost the board
+ * nothing, else icons only (the labels as tooltips, read by screen readers). Nov 25 (Eric: "Why isn't the names on the left appearing
+ * there's plenty of space?"; docs/decisions/2026-11-25-menu-labels.md): the frame keeps the labels where the board is the same size and inside
+ * its column with them (was: from 1800 px wide, Nov 1 round 2). At 1280 × 800 that's 1 v 1 only; Eric's laptop (1536 × 730 at 125%) has them
+ * on every screen. A phone and a touch tablet have none (the touch test above keeps their boards to the pixel).
  */
-test("a computer's game screens: the side menu is on each; icons only below 1800 px, its labels as tooltips; the full menu from 1800 px", async ({ browser }) => {
+test("a computer's game screens: the side menu is on each; its labels wherever the board is the same with them (Eric's laptop: every screen), else icons with the labels as tooltips", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
   test.setTimeout(12 * 60_000);
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -656,9 +662,39 @@ test("a computer's game screens: the side menu is on each; icons only below 1800
   await page.setViewportSize({ width: 1280, height: 800 });
   for (const screen of ["crowd", "duel", "squads"] as Screen[]) {
     await into(page, screen);
-    await check(`${screen} 1280 x 800`, false);
+    // (1 v 1's board, the window's height less its strips, leaves its column the room: the labels.)
+    await check(`${screen} 1280 x 800`, screen === "duel");
   }
   await ctx.close();
+  // Eric's laptop (1536 × 730 at 125%): the labels on 1 v 1 and the 50 v 50, and each board the size it is with icons only, inside its column.
+  const laptop = REAL_SCREENS[0];
+  for (const screen of ["duel", "crowd"] as Screen[]) {
+    const lc = await realScreenContext(browser, laptop);
+    const lp = await lc.newPage();
+    await into(lp, screen);
+    await lp.waitForTimeout(300);
+    const side = lp.locator(".gm-frame > .fd-side");
+    expect(Math.abs((await side.boundingBox())!.width - 232), `${screen} on the ${laptop.name}: the labels`).toBeLessThanOrEqual(1);
+    expect((await side.locator(".fd-menu-item > span:last-child").first().boundingBox())!.width, `${screen} on the ${laptop.name}: its labels show`).toBeGreaterThan(20);
+    const board = (menu: string) =>
+      lp.evaluate(
+        ({ menu, sel }) => {
+          document.getElementById("probe-menu")?.remove();
+          if (menu) document.head.insertAdjacentHTML("beforeend", `<style id="probe-menu">.gm-frame { --gm-menu: ${menu} !important; }</style>`);
+          const b = document.querySelector(`.board-area .board-row > .board-wrap ${sel}`)!.getBoundingClientRect();
+          const a = document.querySelector(".board-area")!.getBoundingClientRect();
+          return { w: b.width, inside: b.left >= a.left - 0.5 && b.right <= a.right + 0.5 };
+        },
+        { menu, sel: BOARD_SEL.container },
+      );
+    const shown = await board("");
+    const icons = await board("80px");
+    await board("");
+    expect(shown.inside, `${screen} on the ${laptop.name}: the board inside its column`).toBe(true);
+    expect(Math.abs(shown.w - icons.w), `${screen} on the ${laptop.name}: the board with the labels (${shown.w}) as with icons only (${icons.w})`).toBeLessThanOrEqual(0.5);
+    if (screen === "duel") expect(Math.abs(shown.w - 621), `the 1 v 1's board on the ${laptop.name}: 621`).toBeLessThanOrEqual(1);
+    await lc.close();
+  }
 });
 
 /**

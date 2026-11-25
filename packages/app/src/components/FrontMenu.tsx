@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useLayoutEffect, useRef } from "preact/hooks";
 import { account } from "../account.ts";
 import { friendsBadge, useFriends } from "../friends.ts";
 import { useLive } from "../live.ts";
@@ -205,12 +206,69 @@ export function GameFrame({ children, nav }: { children: ComponentChildren; nav:
   // tablet's screen, so it isn't drawn there. The frame is the same element either way (no box of its own on a phone or a
   // tablet: game-frame.css), so a window that crosses the line keeps its screen mounted.)
   const mouse = useMedia(MOUSE_LAYOUT);
+  const frame = useRef<HTMLDivElement>(null);
+  useMenuLabels(frame, mouse);
   return (
-    <div class="gm-frame">
+    <div class="gm-frame" ref={frame}>
       {mouse && <SideMenu nav={nav} game />}
       <div class="gm-main">{children}</div>
     </div>
   );
+}
+
+/**
+ * The side menu's labels whenever they cost the board nothing (Eric, Nov 25: "Why isn't the names on the left appearing there's plenty of
+ * space?"; docs/decisions/2026-11-25-menu-labels.md). Each game screen needs its own room (its strips or bars over the board, a scoreboard or
+ * the boss's column beside it), so no one window width says where the labels fit: the frame tries them (`gm-labels`, game-frame.css: 232 px
+ * in place of the 80 px icons) and keeps them only where the board is the same size and still inside its own column. Done before the screen
+ * is drawn (a layout effect, a resize, the board resizing or a new screen), so nothing is seen to move. A screen without a board (a
+ * result page) keeps the old rule: the labels from 1800 px wide.
+ */
+function useMenuLabels(frame: { current: HTMLDivElement | null }, on: boolean) {
+  useLayoutEffect(() => {
+    const el = frame.current;
+    if (!on || !el) return;
+    let board: Element | null = null;
+    const fit = () => {
+      const wrap = el.querySelector(".board-area .board-row > .board-wrap");
+      const area = wrap?.closest(".board-area");
+      if (!wrap || !area) {
+        el.classList.toggle("gm-labels", innerWidth >= 1800);
+        return;
+      }
+      const read = () => {
+        const a = area.getBoundingClientRect();
+        const b = wrap.getBoundingClientRect();
+        return { w: b.width, inside: b.left >= a.left - 0.5 && b.right <= a.right + 0.5 };
+      };
+      el.classList.remove("gm-labels");
+      const icons = read();
+      el.classList.add("gm-labels");
+      const labels = read();
+      el.classList.toggle("gm-labels", labels.inside && Math.abs(labels.w - icons.w) < 0.5);
+    };
+    // (Its board: watched for its size, and found again when the screen changes.)
+    const sized = new ResizeObserver(fit);
+    const look = () => {
+      const now = el.querySelector(".board-area .board-row > .board-wrap");
+      if (now === board) return;
+      board = now;
+      sized.disconnect();
+      if (now) sized.observe(now);
+      fit();
+    };
+    const changed = new MutationObserver(look);
+    changed.observe(el, { childList: true, subtree: true });
+    addEventListener("resize", fit);
+    look();
+    fit();
+    return () => {
+      sized.disconnect();
+      changed.disconnect();
+      removeEventListener("resize", fit);
+      el.classList.remove("gm-labels");
+    };
+  }, [on]);
 }
 
 /**

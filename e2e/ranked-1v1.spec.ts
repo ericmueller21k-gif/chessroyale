@@ -622,7 +622,8 @@ test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longe
  * (1920 × 960), each at its own device scale. In play: nothing scrolls, the chat beside the board shows at least 120 px of messages. The
  * end page is the game's own screen with its right column swapped (Eric, Nov 25: "the chat box on the end game screen should not now
  * suddenly be to the left of the board when it's to the right during the game"): nothing scrolls either way, the board where it was and
- * the same size, the moves' stepper in your strip; the right column flush with the board's strips, holding the result ("Defeat" in view),
+ * the same size, the moves' stepper in your strip; the right column flush with the board (its top and foot the board's, Nov 25's frame),
+ * holding the result ("Defeat" in view),
  * the placement card ("1 of 5 placement games", no RP slot over it), the quests in one line, Play again and Home stacked the column's
  * width, then the chat to the foot with its post-game lines ("GG", "Well played", "Thanks!", "Rematch?").
  */
@@ -654,7 +655,18 @@ test("real screens (Nov 25): a ranked game and its end page on laptop 1536×730,
     expect(g.cut, `${at}, in play: nothing cut off at the top`).toEqual([]);
     expect(g.feeds.length, `${at}, in play: the chat`).toBe(1);
     expect(g.feeds[0], `${at}, in play: the chat's messages`).toBeGreaterThanOrEqual(120);
-    const area = await white.locator(".board-area").boundingBox();
+    // The frame (Nov 25, mockup round 2): no title line, the board the window's height less the two strips (to its 8 device pixel step), the
+    // panel's top and foot the board's, the gear level with the top strip, "Your move" in your strip.
+    const f = await white.evaluate(() => {
+      const r = (q: string) => document.querySelector(q)!.getBoundingClientRect();
+      return { box: r(".dv-side > .dv-box"), gear: r(".dv-gear .mm-more"), top: r(".dv-strip.dv-them"), chip: !!document.querySelector(".dv-strip.dv-you .dv-status"), title: document.querySelectorAll(".screen.game > .hud-row").length };
+    });
+    expect(f.title, `${at}, in play: no title line`).toBe(0);
+    expect(s.height - 108 - g.board!.h, `${at}, in play: the board (${g.board!.h}) the window's height less 108`).toBeLessThan(8);
+    expect(Math.abs(f.box.top - g.board!.y), `${at}, in play: the panel's top the board's`).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(f.box.bottom - g.board!.b), `${at}, in play: the panel's foot the board's`).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(f.gear.top + f.gear.height / 2 - (f.top.top + f.top.height / 2)), `${at}, in play: the gear level with the top strip`).toBeLessThanOrEqual(1.5);
+    expect(f.chip, `${at}, in play: "Your move" in your strip`).toBe(true);
     await resign(white);
     await expect(white.getByTestId("es-title")).toHaveText("Defeat");
     await expect(white.getByTestId("es-now-rp")).toHaveText("1 of 5 placement games", { timeout: 15_000 });
@@ -674,8 +686,8 @@ test("real screens (Nov 25): a ranked game and its end page on laptop 1536×730,
     });
     expect(m.title.top, `${at}, the end page: "Defeat" in view`).toBeGreaterThanOrEqual(0);
     expect(m.col.left, `${at}, the end page: the column right of the board`).toBeGreaterThan(m.area.right);
-    expect(Math.abs(m.col.top - area!.y), `${at}, the end page: the column's top the board's strip's`).toBeLessThanOrEqual(1.5);
-    expect(Math.abs(m.col.bottom - (area!.y + area!.height)), `${at}, the end page: the column's foot the board's strip's`).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(m.col.top - e.board!.y), `${at}, the end page: the column's top the board's`).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(m.col.bottom - e.board!.b), `${at}, the end page: the column's foot the board's`).toBeLessThanOrEqual(1.5);
     expect(m.steps, `${at}, the end page: the moves' stepper in your strip`).toBe(true);
     expect(m.btns.length).toBe(2);
     expect(m.btns[1]!.y, `${at}, the end page: Play again and Home stacked`).toBeGreaterThan(m.btns[0]!.y + m.btns[0]!.h - 1);
