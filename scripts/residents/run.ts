@@ -6,6 +6,7 @@
  * resident's rating, on a daily schedule that keeps about --target-online of them online, in waves.
  *
  *   npx tsx scripts/residents/run.ts [--base https://hunchess.com] [--accounts 200] [--target-online 30] [--hours 0] [--modes 1v1]
+ *     [--flat] [--follow-deploys]
  *
  * Options:
  *   --base URL           the site (default https://hunchess.com: Cloudflare Access's service token from CF_ACCESS_CLIENT_ID and
@@ -16,6 +17,10 @@
  *   --hours H            stop after H hours (default 0: run until stopped)
  *   --modes LIST         the modes they play (only "1v1" so far)
  *   --flat               no schedule: the first --target-online residents online all the time (a local test, a load check)
+ *   --follow-deploys     the always-on host's way (scripts/residents/container): reads the site's /version.json every
+ *                        RESIDENTS.host.versionCheckMinutes; once a new version is live it starts nothing new, lets games in
+ *                        progress finish (at most RESIDENTS.host.drainMinutes, then resigns what's left) and exits with 75, so
+ *                        the host starts it again on the new main
  *
  * Stopping: SIGTERM or Ctrl-C stops every resident cleanly (out of the queue, a game in progress resigned), sends a last heartbeat
  * and exits; a second one exits at once. The kill switch PAUSE_RESIDENTS is the server's: while it's on the program won't start, and
@@ -60,6 +65,7 @@ const accounts = Math.floor(num("accounts", RESIDENTS.accounts));
 const targetOnline = Math.floor(num("target-online", RESIDENTS.targetOnline));
 const hours = num("hours", 0);
 const flat = !!arg("flat");
+const follow = !!arg("follow-deploys");
 const modes = (arg("modes", "1v1") ?? "").split(",").map((m) => m.trim());
 if (modes.some((m) => m !== "1v1")) fail('only "--modes 1v1" so far (50 v 50 comes in a later PR).');
 if (accounts < 1) fail("--accounts must be at least 1.");
@@ -81,6 +87,9 @@ const log = (line: string) => console.log(`${new Date().toISOString().slice(0, 1
 
 let stopping = false;
 let pausedSeen = false;
+/** A new version went live (--follow-deploys): since when, and the versions. */
+let draining: { since: number; from: string; to: string } | null = null;
+const drainingNow = () => draining;
 const sleepers = new Set<() => void>();
 const nap = (ms: number) =>
   stopping
@@ -113,6 +122,7 @@ const world: World = {
   log,
   residentIds: new Set(),
   stopping: () => stopping,
+  draining: () => draining !== null,
   nap,
   paused: (how) => {
     if (stopping || checkingPause) return;
@@ -160,6 +170,37 @@ for (const sig of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
+// ---------------- Following deploys ----------------
+
+/** The exit code that tells the host a new version is live and the program is done with this one (start.sh starts over at once). */
+const NEW_VERSION_EXIT = 75;
+
+/** The version live on the site (/version.json's `version`: the build's commit, 12 characters), or null (no answer, or none built). */
+async function liveVersion(): Promise<string | null> {
+  const r = await admin.request("GET", "/version.json");
+  const v = r.status === 200 ? r.body?.version : null;
+  return typeof v === "string" && /^[0-9a-f]{7,40}$/.test(v) ? v : null;
+}
+
+/** The version live when this program started (or first answered): a different one later means a deploy. */
+let startVersion: string | null = null;
+
+/** Reads the live version; a new one starts the drain: nothing new from now, games in progress finish. */
+async function checkVersion(now: number): Promise<void> {
+  const v = await liveVersion().catch(() => null);
+  if (!v || draining || stopping) return;
+  if (!startVersion) {
+    startVersion = v;
+    return;
+  }
+  if (v === startVersion) return;
+  draining = { since: now, from: startVersion, to: v };
+  // (Everyone waiting at the queue's gate goes in at once and sees the drain: nobody waits out the gate's spacing.)
+  world.gate.close();
+  const playing = residents.filter((r) => r.state === "game").length;
+  log(`a new version is live (${startVersion} → ${v}): starting nothing new, ${playing} game${playing === 1 ? "" : "s"} to finish (at most ${RESIDENTS.host.drainMinutes} min)`);
+}
+
 // ---------------- The heartbeat and the summary ----------------
 
 function counts(): Record<State, number> {
@@ -190,6 +231,9 @@ async function beat(): Promise<void> {
     errors: s.errors,
     maia: world.engine.ready(),
     queueGate: { waiting: world.gate.waiting, inLine: world.gate.queued },
+    // (Where it runs from: the host's commit of main, the live version it follows, and whether it's winding down for a new one.)
+    commit: process.env.RESIDENTS_COMMIT?.slice(0, 12) ?? null,
+    follow: follow ? { version: startVersion, draining: draining ? { since: draining.since, to: draining.to } : null } : null,
   };
   const r = await admin.request("POST", "/api/admin/residents/beat", { admin: true, body });
   if (isPausedAnswer(r)) return world.paused("POST /api/admin/residents/beat");
@@ -223,6 +267,10 @@ try {
   fail(e instanceof AccessRefused ? e.message : `couldn't reach ${target!.origin}: ${String(e)}`);
 }
 log(`residents: ${residents.length} accounts, about ${targetOnline} online${flat ? " (flat)" : ""}, ${hours ? `for ${hours} h` : "until stopped"}, modes ${modes.join(",")}, at ${target!.origin}`);
+if (follow) {
+  startVersion = await liveVersion().catch(() => null);
+  log(`following deploys: the live version is ${startVersion ?? "unknown (read again in a moment)"}${process.env.RESIDENTS_COMMIT ? `, this program is ${process.env.RESIDENTS_COMMIT.slice(0, 12)}` : ""}`);
+}
 
 if (!(await world.engine.start())) fail("Maia didn't load: residents play Maia's moves, so not starting (packages/maia-worker: npm run build -w maia-worker?).");
 
@@ -261,6 +309,7 @@ const begun = new Set<string>();
 const endAt = hours > 0 ? t0 + hours * 3_600_000 : Infinity;
 let nextBeat = Date.now();
 let nextSummary = Date.now() + RESIDENTS.summaryMinutes * 60_000;
+let nextVersion = Date.now() + RESIDENTS.host.versionCheckMinutes * 60_000;
 
 while (!stopping) {
   const now = Date.now();
@@ -268,7 +317,22 @@ while (!stopping) {
     await shutdown(`${hours} h are up`, 0);
     break;
   }
-  if (flat) {
+  if (follow && now >= nextVersion) {
+    nextVersion = now + RESIDENTS.host.versionCheckMinutes * 60_000;
+    await checkVersion(now);
+  }
+  // (Read through a call: TypeScript can't see checkVersion set it.)
+  const drain = drainingNow();
+  if (drain) {
+    if (residents.every((r) => !r.busy)) {
+      await shutdown(`a new version is live (${drain.to}), every game finished`, NEW_VERSION_EXIT);
+      break;
+    }
+    if (now - drain.since >= RESIDENTS.host.drainMinutes * 60_000) {
+      await shutdown(`a new version is live (${drain.to}), ${RESIDENTS.host.drainMinutes} min are up`, NEW_VERSION_EXIT);
+      break;
+    }
+  } else if (flat) {
     for (const r of residents.slice(0, targetOnline)) if (r.id && !r.busy && r.lockedUntil <= now) r.startSession(endAt === Infinity ? now + 365 * 86_400_000 : endAt);
   } else {
     const running = scheduler.runningAt(now);
