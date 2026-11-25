@@ -1,7 +1,0 @@
-Residents PR 3 (#936) review fixes done, 2026-11-25 ~05:50 UTC. PR body: .pr-body.md ("Review fixes", changed checks old → new; lane full).
-Fixed: M1 (exit 78 ends the container; env hash restart, covers m4), M2 (off/paused/no-token stop once RESIDENTS_HOST_IMAGE is "1"; n5),
-M3 (instance id, start refused beside a recent beat unless --force, by = access:residents / access:test), ROADMAP's OPS_ACCESS_CLIENT_ID,
-m1, m2, m3, m5 (lifecycle.ts + start.sh test), n1-n4; n6 left and noted. Typecheck and all server unit tests pass (103 files, 1552 tests);
-the new and changed checks fail on the pre-fix code (16) and pass now.
-For the director: the containers-entry PR must also set RESIDENTS_HOST_IMAGE "1". One slip: I ran pgrep once to confirm no Maia
-process was left after exit (n2); no environment or /proc was read.
