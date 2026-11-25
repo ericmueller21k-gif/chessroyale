@@ -921,7 +921,8 @@
     grid-column: 2;
     grid-row: 3 / 5;
     align-self: stretch;
-    --es-gap: calc(12 * var(--es-u));
+    /* (Never under 8 px: at 1280 × 600 the column is at 0.65, Nov 25.) */
+    --es-gap: max(8px, calc(12 * var(--es-u)));
     --es-gap-in: calc(6 * var(--es-u));
     contain: size;
     overflow: hidden;
@@ -1020,9 +1021,26 @@
     grid-template-columns: calc(32 * var(--es-u)) minmax(0, 1fr) calc(56 * var(--es-u)) calc(36 * var(--es-u)) auto;
     column-gap: calc(8 * var(--es-u));
   }
+  /* (The coin strip: the design's compact one, as on a boss result's (Nov 25: at its full 76 the chat fell under its 40 px of messages at
+     1536 × 730). Two rows: the count with the day's total at its right, then the parts; 44 design px tall (its frame's 6 and the rows'
+     37), all of it (words, coins) drawn at the column's scale (`zoom`: --es-u as a number; `tan(atan2(a, b))` is a / b).) */
   .dv-end-col .es-coin-strip {
-    --cs-h: calc(76 * var(--es-u));
+    --cs-h: 44px;
     width: 100%;
+    zoom: tan(atan2(var(--es-u), 1px));
+  }
+  .dv-end-col .es-cs-text {
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 3px;
+  }
+  .dv-end-col .es-cs-today {
+    grid-area: 1 / 2;
+    align-self: center;
+    justify-self: end;
+  }
+  .dv-end-col .es-cs-parts {
+    grid-column: 1 / -1;
   }
   /* (Your strip: the moves' ◀ ▶ in your clock's place; the opponent's clock as it ended.) */
   .dv-ended .dv-strip .dv-steps {
