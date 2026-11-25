@@ -2131,3 +2131,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: ERIC: 1 v 1 stills (#953) 'seem good now': approved.
 - Nov 26: #955 (Folio smoke fix) MERGED f2e6a3ca. Running: panel-282 helper (session_01JuCWRtiPs7ZcjpB2wsRCTY), crowd-frame round 2 (session_01JuCWRrWgbcKbjK4b3Hgk42, PR #956). Director's own: claude/no-check-starts (worktree $S/nc; usableAt rejects check starts, every mode; Eric 'Yes'), unit run b6esgxazm. TODO after a batch: check other passives' test switches (Folio lesson).
 - Nov 26: crowd-frame round 2 done (vote column + chat). Follow-up nit: on the 50 v 50 opening vote the 'Drag your pawn into a zone to vote' pill covers the middle zone's label ('Majority') at 1536x730 and 1920x960.
+- Nov 26: #957 (no check starts, every mode) CI GREEN at ce2c2564, HELD until main green (panel-282 fix). #956 round-2 CI running (6e56affc).
