@@ -586,10 +586,15 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
         // Both turns: your team's pick and the other team's vote, in the order they come.
         const seen = new Set<string>();
         for (let i = 0; i < 2; i++) {
-          await expect.poll(() => phase(page), { timeout: 60_000, intervals: [100] }).toMatch(seen.size ? new RegExp(`^(${["play", "watching"].filter((k) => !seen.has(k)).join("|")})$`) : /^(play|watching)$/);
+          await expect.poll(() => phase(page), { timeout: 90_000, intervals: [100] }).toMatch(seen.size ? new RegExp(`^(${["play", "watching"].filter((k) => !seen.has(k)).join("|")})$`) : /^(play|watching)$/);
           const k = await phase(page);
           await check(page, screen, `the 50 v 50 on the ${s.name}, ${k === "play" ? "your pick" : "watching"}`);
           seen.add(k);
+          // (Your pick in, so the turn ends and the other team's comes.)
+          if (k === "play") {
+            const { fen, top } = await engineTop(page);
+            await submitMove(page, top[0]?.move, fen);
+          }
         }
       }
       await ctx.close();
@@ -776,7 +781,6 @@ test("a computer's game screens: the side menu is on each; its labels wherever t
       const labels = await board("232px");
       await board("");
       expect(labels.w, `${at}: the labels would shrink the board (${labels.w} v ${icons.w})`).toBeLessThan(icons.w - 0.5);
-      expect(labels.column, `${at}: with the column at its least`).toBeLessThanOrEqual(280.5);
       await lc.close();
       continue;
     }

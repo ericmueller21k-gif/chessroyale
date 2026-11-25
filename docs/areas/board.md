@@ -91,7 +91,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   - **How big a screen makes it on a computer** (Eric, Oct 29: "the way that they do the large chessboard" on chess.com;
     docs/decisions/2026-10-29-desktop-board-size.md; `packages/app/src/board-size.css`, loaded after styles.css): every game
     screen with a chessboard sizes it by the **window's height less the room the screen needs above and below it**
-    (`--bd-room`: a boss battle 123 px (Nov 1: no title line), a crowd's screens and 1 v 1 170, Squads 230, its relay 250),
+    (`--bd-room`: a boss battle 123 px (Nov 1: no title line), a crowd's screens 170 (the 50 v 50 and its opening vote 92 since Nov 26, their frame: crowd.md), the 1 v 1 108, Squads 230, its relay 250),
     never wider than its column; the screen grows to hold it (`--scr`), at least its old width, never past the window. So it grows and shrinks
     live with the window and with nothing else (every screen of a game has the same room). Where the window is too narrow
     (a scoreboard's 340 px and the column beside the board: 280 px where the width is the limit, 340 where the height is; Nov 1,
