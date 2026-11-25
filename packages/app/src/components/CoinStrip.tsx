@@ -1,4 +1,4 @@
-import type { RefObject } from "preact";
+import { Fragment, type RefObject } from "preact";
 import { useImperativeHandle, useLayoutEffect, useRef } from "preact/hooks";
 import { END_SCREEN, coinStripView, type XpGrant } from "@chessroyale/core";
 import coinUrl from "../coin/coin.png?url";
@@ -275,11 +275,15 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
             {view.today}
           </span>
           <span class="es-cs-parts" ref={partsRef} data-testid="es-cs-parts">
+            {/* (A space between the parts, outside them: a narrow phone wraps there, each part whole; its "·" shows with it.) */}
             {view.parts.map((p, i) => (
-              <span class="es-cs-part" key={p.label}>
-                {i ? " · " : ""}
-                {p.label} <b>+{p.coins}</b>
-              </span>
+              <Fragment key={p.label}>
+                {i ? " " : ""}
+                <span class="es-cs-part">
+                  {i ? "· " : ""}
+                  {p.label} <b>+{p.coins}</b>
+                </span>
+              </Fragment>
             ))}
           </span>
         </div>

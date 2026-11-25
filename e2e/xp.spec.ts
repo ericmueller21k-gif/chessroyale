@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { SOLO_ABANDON } from "@chessroyale/core";
-import { test, aDeployLanded, asAdmin, bossAloneFromHome, endBattle, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
+import { test, aDeployLanded, asAdmin, bossAloneFromHome, endBattle, endGaps, engineTop, openSoloBoss, pickMove, submitMove } from "./helpers.ts";
 
 /**
  * XP and levels on the end screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't want it
@@ -171,6 +171,101 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   expect(filled).toBeCloseTo(0.32, 2);
 });
 
+/**
+ * The coin strip (Nov 25; docs/decisions/2026-11-25-coin-strip.md): every frame from the page's start, its box and the XP box's, its
+ * state, the count its digit columns show (from their transforms: the count moves by transform only) and the XP fill's share.
+ */
+async function sampleCoins(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __cs: unknown[] };
+    w.__cs = [];
+    const frame = () => {
+      const strip = document.querySelector("[data-testid=es-coin-strip]");
+      const track = document.querySelector(".es-track-xp");
+      if (strip && track) {
+        const r = strip.getBoundingClientRect();
+        const t = track.getBoundingClientRect();
+        // (Each digit's column: 11 rows (0-9, 0); its translate over a row's height is the digit, rolling.)
+        const cols = [...strip.querySelectorAll<HTMLElement>(".es-cs-col")].reverse();
+        const count = cols.reduce((n, c, d) => {
+          const v = -new DOMMatrixReadOnly(getComputedStyle(c).transform === "none" ? undefined : getComputedStyle(c).transform).m42 / (c.getBoundingClientRect().height / 11);
+          return n + (d === 0 ? v : Math.floor(v + 1e-6)) * 10 ** d;
+        }, 0);
+        const fill = document.querySelector(".es-track-xp .es-fill");
+        w.__cs.push({
+          t: performance.now(),
+          cs: strip.getAttribute("data-cs"),
+          count: Math.round(count * 100) / 100,
+          share: fill ? Math.round(new DOMMatrixReadOnly(getComputedStyle(fill).transform === "none" ? undefined : getComputedStyle(fill).transform).a * 10_000) / 10_000 : 0,
+          box: [r.x - t.x, r.y - t.bottom, r.width, r.height, t.width].map((v) => Math.round(v * 10) / 10),
+          parts: [...strip.querySelectorAll(".es-cs-part")].map((p) => getComputedStyle(p).opacity === "1"),
+        });
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+}
+type CoinSample = { t: number; cs: string; count: number; share: number; box: number[]; parts: boolean[] };
+
+test("the coin strip under the XP box (Nov 25): there from the first frame, the XP box's width, never moving; the grant's coins counted after the fill; the parts; endGaps with it (phone 390×844, laptop 1536×730)", { tag: "@phone-only" }, async ({ browser }) => {
+  test.setTimeout(5 * 60_000);
+  for (const s of [
+    { at: "phone 390×844", width: 390, height: 844, scale: 3, phone: true, root: ".screen.es-screen" },
+    { at: "laptop 1536×730", width: 1536, height: 730, scale: 1.25, phone: false, root: ".boss-results > .results-top" },
+  ]) {
+    const ctx = await browser.newContext({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: s.scale, isMobile: s.phone, hasTouch: s.phone });
+    const page = await ctx.newPage();
+    await sampleCoins(page);
+    await page.addInitScript(() => ((window as any).__soundLog = []));
+    // (A won Boss alone game counted as 12 minutes: 22 play coins; a solo win pays no bonus.)
+    await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xpgame=12&quests=squad-up,fifty-fifty,regular");
+    await bossAloneFromHome(page);
+    await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+    await submitMove(page, "h5f7");
+    await expect(rewards(page)).toHaveAttribute("data-es", "done", { timeout: 120_000 });
+    const strip = page.getByTestId("es-coin-strip");
+    // The grant's number: the account's coins (the server's), the strip's total, its parts (never the minutes) and the day.
+    const paid = await page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { shop?: { coins?: number } }).shop?.coins);
+    expect(paid, s.at).toBe(22);
+    await expect(strip).toHaveAttribute("data-total", "22");
+    await expect(strip).toHaveAttribute("aria-label", "+22 coins");
+    await expect(strip).toHaveAttribute("data-cs", "done");
+    await expect(strip.getByTestId("es-cs-parts")).toHaveText("Play +22");
+    await expect(strip.getByTestId("es-cs-today")).toHaveText("PLAY TODAY 22/300");
+    const all = (await page.evaluate(() => (window as any).__cs)) as CoinSample[];
+    expect(all.at(-1)!.count, `${s.at}: the count ends at the grant's`).toBe(22);
+    // Its place and size from the first frame to the last: right under the XP box (the one gap), its width and height.
+    for (const x of all) expect(x.box, `${s.at}: the strip in its place and size`).toEqual(all[0]!.box);
+    const [dx, gap, w, h, trackW] = all[0]!.box as [number, number, number, number, number];
+    expect(Math.abs(dx), `${s.at}: under the XP box`).toBeLessThanOrEqual(0.5);
+    expect(w, `${s.at}: the XP box's width`).toBe(trackW);
+    expect(h, `${s.at}: the XP box's height`).toBe(BOX_H);
+    expect(Math.abs(gap - 12), `${s.at}: the one gap under the XP box (${gap} px)`).toBeLessThanOrEqual(2);
+    // It counts once the XP fill has ended (0.1 of 0 to 0.12: 60 XP of 500), never down, through many frames.
+    const run = all.filter((x) => x.cs === "run");
+    expect(run.length, `${s.at}: a count over many frames`).toBeGreaterThan(20);
+    expect(all.filter((x) => x.t < run[0]!.t).every((x) => x.count === 0), `${s.at}: 0 until it starts`).toBe(true);
+    expect(run[0]!.share, `${s.at}: it starts once the fill has ended`).toBeCloseTo(all.at(-1)!.share, 3);
+    for (let i = 1; i < all.length; i++) expect(all[i]!.count, `${s.at}: never down`).toBeGreaterThanOrEqual(all[i - 1]!.count - 0.01);
+    expect(new Set(run.map((x) => Math.floor(x.count))).size, `${s.at}: rolls through the numbers`).toBeGreaterThan(8);
+    // The part shows as the count reaches it.
+    expect(all.find((x) => x.parts[0])!.count, `${s.at}: "Play" once the count starts`).toBeGreaterThan(0);
+    // Its sounds: a clink as each coin lands (5 for 22), then the cascade, once.
+    const heard = ((await page.evaluate(() => (window as any).__soundLog)) as string[]).map((l) => l.split(":")[0]!);
+    expect(heard.filter((n) => n === "clawCoin").length, `${s.at}: a clink a coin`).toBe(5);
+    expect(heard.filter((n) => n === "sell").length, `${s.at}: the cascade once`).toBe(1);
+    expect(heard.lastIndexOf("clawCoin"), `${s.at}: the cascade last`).toBeLessThan(heard.indexOf("sell"));
+    // The one gap with the strip in the stack (endGaps).
+    const g = await endGaps(page, s.root);
+    expect(g.gaps.some((x) => /es-coin-strip/.test(x.between)), `${s.at}: the strip is in the stack`).toBe(true);
+    for (const x of g.gaps) expect(Math.abs(x.px - g.token), `${s.at}: ${x.between}: ${x.px.toFixed(1)} px, not the one gap (${g.token} px)`).toBeLessThanOrEqual(2);
+    expect(g.grow, `${s.at}: nothing grows to fill`).toEqual([]);
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/coins-done-${s.width}x${s.height}.png` });
+    await ctx.close();
+  }
+});
+
 test('"No XP: test game." in the same box, the same size: a test switch on (?mate)', async ({ page }, testInfo) => {
   test.setTimeout(3 * 60_000);
   await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread&xp=250");
@@ -184,6 +279,11 @@ test('"No XP: test game." in the same box, the same size: a test switch on (?mat
   await expect(page.locator(".es-quests-none")).toHaveText("Quests No quests this game.");
   await expect(rewards(page)).toHaveAttribute("data-es", "done");
   expect((await box.boundingBox())!.height).toBe(BOX_H);
+  // (The coin strip greyed, with why, the XP box's height: Nov 25.)
+  const strip = page.getByTestId("es-coin-strip");
+  await expect(strip).toHaveClass(/es-cs-off/);
+  await expect(strip.getByTestId("es-cs-why")).toHaveText("No coins: test game.");
+  expect((await strip.boundingBox())!.height).toBe(BOX_H);
   // (The bar stands at your XP: 250 of 500.)
   const share = await box.locator(".es-fill").evaluate((e) => new DOMMatrixReadOnly(getComputedStyle(e).transform).a);
   expect(share).toBeCloseTo(0.5, 2);
@@ -261,7 +361,18 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
     const res = await route.fetch();
     await route.fulfill({
       response: res,
-      json: { ok: true, xp: { before: 99_950, after: 100_250, levelBefore: 200, levelAfter: 201, parts: [{ label: "30 min", xp: 300 }, { label: "Win (paid once today)", xp: 0 }] } },
+      // (Coins with the most parts a game has, three-digit day, the strip's widest: Nov 25.)
+      json: {
+        ok: true,
+        xp: {
+          before: 99_950,
+          after: 100_250,
+          levelBefore: 200,
+          levelAfter: 201,
+          parts: [{ label: "30 min", xp: 300 }, { label: "Win (paid once today)", xp: 0 }],
+          coins: { play: 54, bonus: 25, parts: [{ label: "Win", coins: 15 }, { label: "Top 3", coins: 10 }], step: 0, today: { play: 288, bonus: 25 } },
+        },
+      },
     });
   });
   await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
@@ -279,6 +390,16 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
   await expect(page.locator(".es-earned-xp .es-parts")).toHaveText("Win (paid once today) +0");
   await expect(box.locator(".es-level")).toHaveText("Level 201");
   for (const sel of [".es-track-top", ".es-earned-xp .es-parts"]) expect(await page.locator(sel).evaluate((e) => e.scrollWidth <= e.clientWidth), `${sel} fits at 320 px`).toBe(true);
+  // The coin strip's widest parts at 320 px: every part whole inside the strip (they may take two lines), nothing cut.
+  await expect(page.getByTestId("es-cs-parts")).toHaveText("Play +54 · Win +15 · Top 3 +10");
+  const fit = await page.getByTestId("es-coin-strip").evaluate((strip) => {
+    const b = strip.getBoundingClientRect();
+    return [...strip.querySelectorAll(".es-cs-part, .es-cs-today, .es-cs-pump")].map((e) => {
+      const r = e.getBoundingClientRect();
+      return r.left >= b.left && r.right <= b.right && r.top >= b.top && r.bottom <= b.bottom;
+    });
+  });
+  expect(fit, "the strip's words whole inside it at 320 px").toEqual([true, true, true, true, true]);
   const b = (await box.boundingBox())!;
   expect(b.x).toBeGreaterThanOrEqual(0);
   expect(b.x + b.width).toBeLessThanOrEqual(320);
