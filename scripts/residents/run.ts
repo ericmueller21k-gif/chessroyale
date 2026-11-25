@@ -6,7 +6,7 @@
  * resident's rating, on a daily schedule that keeps about --target-online of them online, in waves.
  *
  *   npx tsx scripts/residents/run.ts [--base https://hunchess.com] [--accounts 200] [--target-online 30] [--hours 0] [--modes 1v1]
- *     [--flat] [--follow-deploys]
+ *     [--flat] [--follow-deploys] [--force]
  *
  * Options:
  *   --base URL           the site (default https://hunchess.com: Cloudflare Access's service token from CF_ACCESS_CLIENT_ID and
@@ -21,18 +21,25 @@
  *                        RESIDENTS.host.versionCheckMinutes; once a new version is live it starts nothing new, lets games in
  *                        progress finish (at most RESIDENTS.host.drainMinutes, then resigns what's left) and exits with 75, so
  *                        the host starts it again on the new main
+ *   --force              start even though another program sent a heartbeat moments ago (two at once sign each other's residents
+ *                        out, so without it the program won't start: stop the other first; DEPLOY.md, "Residents")
  *
  * Stopping: SIGTERM or Ctrl-C stops every resident cleanly (out of the queue, a game in progress resigned), sends a last heartbeat
  * and exits; a second one exits at once. The kill switch PAUSE_RESIDENTS is the server's: while it's on the program won't start, and
  * when it comes on (any answer "Residents are paused.", or a socket refused and the route saying so) every resident stops and the
  * program exits.
  *
+ * Exit codes (lifecycle.ts; the host's start.sh acts on them): 0 stopped, 75 a new version is live and its games are done, 78 Access
+ * turned the service token away (at the start or later), 1 anything else (another program playing, Maia, no answer, …).
+ *
  * Logs: one line per event on stdout (never a cookie or token), and a summary every RESIDENTS.summaryMinutes.
  */
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { RESIDENTS, mulberry32 } from "@chessroyale/core";
-import { AccessRefused, Api, CookieJar, isPausedAnswer, targetFrom, type Target } from "./client.ts";
+import { AccessRefused, Api, CookieJar, isPausedAnswer, targetFrom, type Answer, type Target } from "./client.ts";
 import { MoveSource } from "./engine.ts";
+import { ACCESS_REFUSED_EXIT, NEW_VERSION_EXIT, drainOver, firstVersion, otherProgram, versionCall } from "./lifecycle.ts";
 import { profilesFor } from "./profiles.ts";
 import { QueueGate, Resident, Stats, type State, type World } from "./resident.ts";
 import { Scheduler } from "./schedule.ts";
@@ -46,9 +53,9 @@ const arg = (k: string, d?: string) => {
   const v = args[i + 1];
   return v && !v.startsWith("--") ? v : "1";
 };
-const fail = (message: string): never => {
+const fail = (message: string, code = 1): never => {
   console.error(`residents: ${message}`);
-  process.exit(1);
+  process.exit(code);
 };
 const num = (k: string, d: number) => {
   const v = Number(arg(k, String(d)));
@@ -61,11 +68,14 @@ try {
 } catch (e) {
   fail((e as Error).message);
 }
+// (The token's secret now lives in `target` alone: out of the environment, so nothing started from here (Maia) inherits it.)
+delete process.env.CF_ACCESS_CLIENT_SECRET;
 const accounts = Math.floor(num("accounts", RESIDENTS.accounts));
 const targetOnline = Math.floor(num("target-online", RESIDENTS.targetOnline));
 const hours = num("hours", 0);
 const flat = !!arg("flat");
 const follow = !!arg("follow-deploys");
+const force = !!arg("force");
 const modes = (arg("modes", "1v1") ?? "").split(",").map((m) => m.trim());
 if (modes.some((m) => m !== "1v1")) fail('only "--modes 1v1" so far (50 v 50 comes in a later PR).');
 if (accounts < 1) fail("--accounts must be at least 1.");
@@ -81,6 +91,10 @@ try {
 // ---------------- The log ----------------
 
 const t0 = Date.now();
+/** This run's own id, in every heartbeat: another program's beat names a different one. */
+const instance = randomBytes(4).toString("hex");
+/** The commit this program runs (the host's checkout of main, RESIDENTS_COMMIT), as /version.json names a version; null off the host. */
+const own = process.env.RESIDENTS_COMMIT?.slice(0, 12) || null;
 const log = (line: string) => console.log(`${new Date().toISOString().slice(0, 19)}Z  ${line}`);
 
 // ---------------- Stopping ----------------
@@ -106,11 +120,11 @@ const nap = (ms: number) =>
 
 const admin = new Api(target!, new CookieJar());
 
+/** Whether the residents' route's answer says residents are paused (null: no answer). */
+const pausedIn = (r: Answer): boolean | null => (isPausedAnswer(r) ? true : r.status === 200 && typeof r.body?.paused === "boolean" ? r.body.paused : null);
 /** The residents' route: whether residents are paused (null: no answer). */
 async function pausedNow(): Promise<boolean | null> {
-  const r = await admin.request("GET", "/api/admin/residents", { admin: true });
-  if (isPausedAnswer(r)) return true;
-  return r.status === 200 && typeof r.body?.paused === "boolean" ? r.body.paused : null;
+  return pausedIn(await admin.request("GET", "/api/admin/residents", { admin: true }));
 }
 
 let checkingPause = false;
@@ -155,7 +169,7 @@ function shutdown(why: string, code: number): Promise<void> {
     log(`stopping (${why})`);
     if (pausedSeen) for (const r of residents) r.pausedNow();
     await Promise.race([Promise.all(residents.map((r) => r.stopNow())), new Promise((r) => setTimeout(r, 15_000))]);
-    if (!pausedSeen) await beat().catch(() => undefined);
+    if (!pausedSeen) await beat(true).catch(() => undefined);
     log(summary());
     world.engine.close();
     process.exit(code);
@@ -172,9 +186,6 @@ for (const sig of ["SIGTERM", "SIGINT"] as const) {
 
 // ---------------- Following deploys ----------------
 
-/** The exit code that tells the host a new version is live and the program is done with this one (start.sh starts over at once). */
-const NEW_VERSION_EXIT = 75;
-
 /** The version live on the site (/version.json's `version`: the build's commit, 12 characters), or null (no answer, or none built). */
 async function liveVersion(): Promise<string | null> {
   const r = await admin.request("GET", "/version.json");
@@ -182,23 +193,21 @@ async function liveVersion(): Promise<string | null> {
   return typeof v === "string" && /^[0-9a-f]{7,40}$/.test(v) ? v : null;
 }
 
-/** The version live when this program started (or first answered): a different one later means a deploy. */
+/** The version live when this program started (its own commit if that read failed; lifecycle.ts versionCall): another later is a deploy. */
 let startVersion: string | null = null;
 
 /** Reads the live version; a new one starts the drain: nothing new from now, games in progress finish. */
 async function checkVersion(now: number): Promise<void> {
   const v = await liveVersion().catch(() => null);
-  if (!v || draining || stopping) return;
-  if (!startVersion) {
-    startVersion = v;
-    return;
-  }
-  if (v === startVersion) return;
-  draining = { since: now, from: startVersion, to: v };
+  if (draining || stopping) return;
+  const call = versionCall(startVersion, own, v);
+  startVersion = call.start;
+  if (!call.drainTo) return;
+  draining = { since: now, from: startVersion ?? "unknown", to: call.drainTo };
   // (Everyone waiting at the queue's gate goes in at once and sees the drain: nobody waits out the gate's spacing.)
   world.gate.close();
   const playing = residents.filter((r) => r.state === "game").length;
-  log(`a new version is live (${startVersion} → ${v}): starting nothing new, ${playing} game${playing === 1 ? "" : "s"} to finish (at most ${RESIDENTS.host.drainMinutes} min)`);
+  log(`a new version is live (${draining.from} → ${draining.to}): starting nothing new, ${playing} game${playing === 1 ? "" : "s"} to finish (at most ${RESIDENTS.host.drainMinutes} min)`);
 }
 
 // ---------------- The heartbeat and the summary ----------------
@@ -210,11 +219,14 @@ function counts(): Record<State, number> {
 }
 
 let lastBeatOk = 0;
-async function beat(): Promise<void> {
+/** The heartbeat; `last` on a clean stop (it says `stopped`, so the next program to start knows this one is gone). */
+async function beat(last = false): Promise<void> {
   const c = counts();
   const s = world.stats;
   const body = {
     v: 1,
+    instance,
+    stopped: last,
     at: Date.now(),
     startedAt: t0,
     accounts: residents.length,
@@ -232,7 +244,7 @@ async function beat(): Promise<void> {
     maia: world.engine.ready(),
     queueGate: { waiting: world.gate.waiting, inLine: world.gate.queued },
     // (Where it runs from: the host's commit of main, the live version it follows, and whether it's winding down for a new one.)
-    commit: process.env.RESIDENTS_COMMIT?.slice(0, 12) ?? null,
+    commit: own,
     follow: follow ? { version: startVersion, draining: draining ? { since: draining.since, to: draining.to } : null } : null,
   };
   const r = await admin.request("POST", "/api/admin/residents/beat", { admin: true, body });
@@ -260,16 +272,25 @@ function summary(): string {
 // ---------------- Start ----------------
 
 try {
-  const p = await pausedNow();
+  const r = await admin.request("GET", "/api/admin/residents", { admin: true });
+  const p = pausedIn(r);
   if (p === null) fail("the residents' route didn't answer (not deployed there yet, or this caller isn't let in: the Access token / E2E_SQL_KEY).");
   if (p) fail("residents are paused on the server (PAUSE_RESIDENTS): not starting.");
+  // (Two programs at once sign each other's residents out, every sign-in ending the account's other sessions: one at a time.)
+  const other = otherProgram(r.body?.beat, Date.now(), RESIDENTS.beatSeconds);
+  if (other && !force) fail(`another residents program is playing (${other}): stop it first (the host: RESIDENTS_HOST_ON "0", or PAUSE_RESIDENTS; DEPLOY.md, "Residents"), or start with --force.`);
+  if (other) log(`--force: starting beside another program (${other})`);
 } catch (e) {
-  fail(e instanceof AccessRefused ? e.message : `couldn't reach ${target!.origin}: ${String(e)}`);
+  if (e instanceof AccessRefused) fail(e.message, ACCESS_REFUSED_EXIT);
+  fail(`couldn't reach ${target!.origin}: ${String(e)}`);
 }
-log(`residents: ${residents.length} accounts, about ${targetOnline} online${flat ? " (flat)" : ""}, ${hours ? `for ${hours} h` : "until stopped"}, modes ${modes.join(",")}, at ${target!.origin}`);
+// (A first heartbeat at once, so a program starting from now on sees this one, during Maia's load and the sign-ins too.)
+await beat().catch(() => undefined);
+log(`residents: ${residents.length} accounts, about ${targetOnline} online${flat ? " (flat)" : ""}, ${hours ? `for ${hours} h` : "until stopped"}, modes ${modes.join(",")}, at ${target!.origin}, instance ${instance}`);
 if (follow) {
-  startVersion = await liveVersion().catch(() => null);
-  log(`following deploys: the live version is ${startVersion ?? "unknown (read again in a moment)"}${process.env.RESIDENTS_COMMIT ? `, this program is ${process.env.RESIDENTS_COMMIT.slice(0, 12)}` : ""}`);
+  const live = await liveVersion().catch(() => null);
+  startVersion = firstVersion(live, own);
+  log(`following deploys: the live version is ${live ?? `unknown${own ? ` (counted as this program's own, ${own})` : " (read again in a moment)"}`}${own ? `, this program is ${own}` : ""}`);
 }
 
 if (!(await world.engine.start())) fail("Maia didn't load: residents play Maia's moves, so not starting (packages/maia-worker: npm run build -w maia-worker?).");
@@ -287,7 +308,7 @@ if (!(await world.engine.start())) fail("Maia didn't load: residents play Maia's
         try {
           res = await r.signIn();
         } catch (e) {
-          if (e instanceof AccessRefused) fail(e.message);
+          if (e instanceof AccessRefused) fail(e.message, ACCESS_REFUSED_EXIT);
           res = { ok: false, status: 0, message: String(e) };
         }
         if (res.ok && res.created) made++;
@@ -324,12 +345,10 @@ while (!stopping) {
   // (Read through a call: TypeScript can't see checkVersion set it.)
   const drain = drainingNow();
   if (drain) {
-    if (residents.every((r) => !r.busy)) {
-      await shutdown(`a new version is live (${drain.to}), every game finished`, NEW_VERSION_EXIT);
-      break;
-    }
-    if (now - drain.since >= RESIDENTS.host.drainMinutes * 60_000) {
-      await shutdown(`a new version is live (${drain.to}), ${RESIDENTS.host.drainMinutes} min are up`, NEW_VERSION_EXIT);
+    // (Winding down: nothing new starts; done once every game has finished, or drainMinutes are up.)
+    const over = drainOver(drain.since, now, residents.some((r) => r.busy), RESIDENTS.host.drainMinutes);
+    if (over) {
+      await shutdown(`a new version is live (${drain.to}), ${over === "finished" ? "every game finished" : `${RESIDENTS.host.drainMinutes} min are up`}`, NEW_VERSION_EXIT);
       break;
     }
   } else if (flat) {
@@ -346,8 +365,9 @@ while (!stopping) {
   }
   if (now >= nextBeat) {
     nextBeat = now + RESIDENTS.beatSeconds * 1000;
-    // (Access turning the token away mid-run means it was revoked or changed: stop, as at the start; the host tries again later.)
-    void beat().catch((e: unknown) => (e instanceof AccessRefused ? void shutdown("Access turned the service token away", 1) : world.stats.error("beat")));
+    // (Access turning the token away mid-run means it was revoked or changed: stop, as at the start. On the host the container ends
+    // on this exit, and the cron's next start brings the Worker's current secret.)
+    void beat().catch((e: unknown) => (e instanceof AccessRefused ? void shutdown("Access turned the service token away", ACCESS_REFUSED_EXIT) : world.stats.error("beat")));
   }
   if (now >= nextSummary) {
     nextSummary = now + RESIDENTS.summaryMinutes * 60_000;

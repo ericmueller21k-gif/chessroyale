@@ -1,12 +1,18 @@
 #!/bin/bash
 # HunChess residents host (docs/areas/ops.md, "Residents, the host"): the container's one process. Forever: fetch the public
 # repository's main, install it, run the residents program until it exits, then again. Exit 75 from the program means a new version
-# went live and its games are done (restart at once); anything else waits a minute, doubling to 15 (a crash at start can't spin).
-# SIGTERM (the Worker stopping the container: PAUSE_RESIDENTS, or asleep) goes to the program, which ends its games and exits.
+# went live and its games are done (restart at once); 78 means Access turned the token away, which ends the container (no retry with
+# the same secret: the cron's next start brings the Worker's current one); anything else waits a minute, doubling to 15 (a crash at
+# start can't spin). SIGTERM (the Worker stopping the container: off, paused, a new token) goes to the program, which ends its games.
 #
-# The Access token's secret comes in as CF_ACCESS_CLIENT_SECRET. It's taken out of the environment here and handed to the program
-# alone: git and npm never see it (npm also runs no install scripts). Nothing here prints it.
+# The Access token's secret comes in as CF_ACCESS_CLIENT_SECRET. It's unset here and handed to node alone, so git's and npm's
+# environments don't carry it; this script's own startup environment still does (any process of this user could read it there).
+# What protects it: git and npm run no code from the repository or its packages (npm ci --ignore-scripts), and what does run with
+# it, the program and what it imports, comes from main, trusted as the Worker's own bundle is (that runs with every Worker secret).
+# The program drops it from its own environment once read, so Maia doesn't get it. Nothing here prints it.
 set -u
+# (Docker sets HOME from the image's USER, and the image sets it too; in case a runtime does neither.)
+: "${HOME:=/home/node}"
 REPO="${RESIDENTS_REPO:-https://github.com/ericmueller21k-gif/chessroyale.git}"
 REF="${RESIDENTS_REF:-main}"
 DIR="$HOME/hc"
@@ -66,19 +72,23 @@ while [ "$stopping" -eq 0 ]; do
     # shellcheck disable=SC2086
     CF_ACCESS_CLIENT_SECRET="$secret" RESIDENTS_COMMIT="$commit" run node --import tsx scripts/residents/run.ts ${RESIDENTS_ARGS:-}
     code=$?
+    [ "$stopping" -eq 0 ] || break
+    if [ "$code" -eq 75 ]; then
+      log "a new version is live: starting over"
+      wait_s=60
+      continue
+    fi
+    if [ "$code" -eq 78 ]; then
+      log "Access turned the token away: ending the container (the next start brings the Worker's current secret)"
+      exit 78
+    fi
+    # (A run that lasted half an hour wasn't a crash loop: back to a minute.)
+    [ $((SECONDS - t0)) -lt 1800 ] || wait_s=60
+    log "the program exited with ${code}: again in ${wait_s} s"
   else
-    log "couldn't fetch or install ${REF}"
-    code=1
+    [ "$stopping" -eq 0 ] || break
+    log "couldn't fetch or install ${REF}: again in ${wait_s} s"
   fi
-  [ "$stopping" -eq 0 ] || break
-  if [ "$code" -eq 75 ]; then
-    log "a new version is live: starting over"
-    wait_s=60
-    continue
-  fi
-  # (A run that lasted half an hour wasn't a crash loop: back to a minute.)
-  [ $((SECONDS - t0)) -lt 1800 ] || wait_s=60
-  log "the program exited with ${code}: again in ${wait_s} s"
   run sleep "$wait_s"
   wait_s=$((wait_s * 2 > 900 ? 900 : wait_s * 2))
 done

@@ -115,7 +115,7 @@ export default {
     const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
     // Alerts to Discord (alerts.ts): apart from the jobs below, so a database that doesn't answer still pages.
     ctx.waitUntil(checkAlerts(rawEnv, d1Sql(db), Date.now()).catch(failed("alerts")));
-    // The residents' host (residents-host.ts): kept up while RESIDENTS_HOST_ON is "1", stopped while PAUSE_RESIDENTS is on. Apart too.
+    // The residents' host (residents-host.ts): kept up while RESIDENTS_HOST_ON is "1", stopped while off or paused. Apart too.
     ctx.waitUntil(
       residentsHostTick(rawEnv)
         .then((did) => did && console.log(`residents host: ${did}`))

@@ -9,22 +9,40 @@ import { residentsPaused } from "./kill-switches.ts";
  * installs it and runs the program, so a code change reaches it with no new image. Its traffic leaves the container and comes back to
  * hunchess.com through the public edge and Cloudflare Access, as any player's, with the residents' own service token.
  *
- * Kept up by the Worker's 15-minute cron (index.ts `scheduled`, `residentsHostTick`): while `RESIDENTS_HOST_ON` is "1" and
- * `PAUSE_RESIDENTS` isn't on, each run starts it if it's down and renews its `sleepAfter` (two missed runs and it sleeps). While
- * PAUSE_RESIDENTS is on, each run stops it (the server has already refused every resident, so the program has stopped its games).
+ * Kept up by the Worker's 15-minute cron (index.ts `scheduled`, `residentsHostTick`) once its image exists (`RESIDENTS_HOST_IMAGE`
+ * "1"): while `RESIDENTS_HOST_ON` is "1" and `PAUSE_RESIDENTS` isn't on, each run starts it if it's down and renews its `sleepAfter`
+ * (two missed runs and it sleeps). Paused, off or with no token, each run stops it (paused, the server has already refused every
+ * resident, so the program has stopped its games; off, the program ends them on the SIGTERM). Never left to sleep on its own: the
+ * library renews the sleep deadline whenever its object starts again, at every deploy (the review's M2).
  */
 export class ResidentsHost extends Container {
   // (No port: the program serves nothing. `start` sees nothing listening and is done.)
   sleepAfter = RESIDENTS.host.sleepAfter;
 
-  /** Starts the program's container if it isn't running, and renews its sleepAfter either way. */
-  async keepUp(): Promise<"started" | "running"> {
-    const running = this.ctx.container?.running ?? false;
-    // (Up to a minute for a cold start, not the library's 8 s: the image is Node's full Debian one, about 1.6 GB. The port is only
-    // the library's probe: nothing listens on it, which tells it the container is up.)
-    if (!running) await this.start({ envVars: hostEnvVars(this.env as ResidentsHostEnv) }, { portToCheck: 8080, retries: 200, waitInterval: 300 });
+  /**
+   * Starts the program's container if it isn't running, and renews its sleepAfter. Running with another environment than it would
+   * start with now (the token's secret changed, or the program's options), it's stopped instead (SIGTERM: the program ends its
+   * games and exits), and the next run starts it with the new one. What it started with is kept as a SHA-256 of the environment in
+   * this object's storage (ENV_HASH_KEY), never the values.
+   */
+  async keepUp(): Promise<"started" | "running" | "restarting"> {
+    const vars = hostEnvVars(this.env as ResidentsHostEnv);
+    const hash = await envHash(vars);
+    if (this.ctx.container?.running) {
+      if ((await this.ctx.storage.get<string>(ENV_HASH_KEY)) !== hash) {
+        await this.stop("SIGTERM");
+        return "restarting";
+      }
+      this.renewActivityTimeout();
+      return "running";
+    }
+    await this.ctx.storage.put(ENV_HASH_KEY, hash);
+    // (The library tries the port up to `retries` times, `waitInterval` apart, each try taking up to its 5 s ping: at most about 18
+    // minutes, not its default 8 s. A cold start, pulling Node's full Debian image of about 1.6 GB, takes about a minute. The port is
+    // only the library's probe: nothing listens on it, which tells it the container is up.)
+    await this.start({ envVars: vars }, { portToCheck: 8080, retries: 200, waitInterval: 300 });
     this.renewActivityTimeout();
-    return running ? "running" : "started";
+    return "started";
   }
 
   /** Asks the program to stop (SIGTERM: it ends its games and exits), if it's running. */
@@ -51,7 +69,9 @@ export class ResidentsHost extends Container {
 export interface ResidentsHostEnv {
   /** The container's Durable Object (wrangler.jsonc `RESIDENTS_HOST`; its `containers` entry names the image). */
   RESIDENTS_HOST?: DurableObjectNamespace<ResidentsHost>;
-  /** "1": the cron keeps the host up (it starts the spend). Anything else: the cron leaves it alone, and it sleeps within sleepAfter. */
+  /** "1" once the image exists (set with the host's `containers` entry): before it, the cron never touches the host (it can't be made). */
+  RESIDENTS_HOST_IMAGE?: string;
+  /** "1": the cron keeps the host up (it starts the spend). Anything else: each run stops it. */
   RESIDENTS_HOST_ON?: string;
   /** The kill switch (kill-switches.ts residentsPaused): "1" stops the host at the next cron run. */
   PAUSE_RESIDENTS?: string;
@@ -68,37 +88,53 @@ export interface HostPlan {
 }
 
 /**
- * The cron's call, from the Worker's variables alone. Off (RESIDENTS_HOST_ON not "1"), the host is never touched: before its image
- * exists (wrangler.jsonc has no `containers` entry for it) its Durable Object can't be made at all. Paused or with no token, it's
- * stopped.
+ * The cron's call, from the Worker's variables alone. Before the image exists (RESIDENTS_HOST_IMAGE not "1": wrangler.jsonc has no
+ * `containers` entry for it) the host is never touched, as its Durable Object can't be made at all. After, it's stopped while paused
+ * (checked first), off (RESIDENTS_HOST_ON not "1") or with no token, and kept up otherwise.
  */
 export function hostPlan(env: ResidentsHostEnv): HostPlan {
   if (!env.RESIDENTS_HOST) return { action: "none", why: "no host in this Worker" };
-  if (env.RESIDENTS_HOST_ON?.trim() !== "1") return { action: "none", why: "off (RESIDENTS_HOST_ON isn't 1)" };
+  if (env.RESIDENTS_HOST_IMAGE?.trim() !== "1") return { action: "none", why: "no image yet (RESIDENTS_HOST_IMAGE isn't 1)" };
   if (residentsPaused(env)) return { action: "stop", why: "paused (PAUSE_RESIDENTS)" };
-  if (!env.RESIDENTS_CLIENT_ID?.trim() || !env.RESIDENTS_CLIENT_SECRET) return { action: "stop", why: "no token (RESIDENTS_CLIENT_ID and RESIDENTS_CLIENT_SECRET)" };
+  if (env.RESIDENTS_HOST_ON?.trim() !== "1") return { action: "stop", why: "off (RESIDENTS_HOST_ON isn't 1)" };
+  if (!env.RESIDENTS_CLIENT_ID?.trim() || !env.RESIDENTS_CLIENT_SECRET?.trim()) return { action: "stop", why: "no token (RESIDENTS_CLIENT_ID and RESIDENTS_CLIENT_SECRET)" };
   return { action: "keep", why: "on" };
 }
 
 /**
- * The container's environment: the residents' token (as the program reads it, CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET) and
- * the program's options. Passed to the container at start only; never logged.
+ * The container's environment: the residents' token (as the program reads it, CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET, both
+ * trimmed: a secret pasted with a newline would be turned away) and the program's options. Passed to the container at start only;
+ * never logged.
  */
 export function hostEnvVars(env: ResidentsHostEnv): Record<string, string> {
   return {
     CF_ACCESS_CLIENT_ID: env.RESIDENTS_CLIENT_ID?.trim() ?? "",
-    CF_ACCESS_CLIENT_SECRET: env.RESIDENTS_CLIENT_SECRET ?? "",
+    CF_ACCESS_CLIENT_SECRET: env.RESIDENTS_CLIENT_SECRET?.trim() ?? "",
     RESIDENTS_ARGS: RESIDENTS.host.args.join(" "),
   };
+}
+
+/** Where keepUp keeps the hash of the environment the running container started with. */
+export const ENV_HASH_KEY = "envHash";
+
+/** A SHA-256 of an environment (hex), to tell whether it changed without keeping it: never the values themselves. */
+export async function envHash(vars: Record<string, string>): Promise<string> {
+  const text = JSON.stringify(Object.keys(vars).sort().map((k) => [k, vars[k]]));
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
+  return [...digest].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /** The host's one instance. */
 export const HOST_INSTANCE = "residents";
 
-/** The cron's run (index.ts): what it did, for the log (null: nothing, it's off). Throws on a failed start or stop (the cron counts it). */
+/**
+ * The cron's run (index.ts): what it did, for the log (null: nothing to do: no image yet, or stopped already). Throws on a failed
+ * start or stop (the cron counts it).
+ */
 export async function residentsHostTick(env: ResidentsHostEnv): Promise<string | null> {
   const plan = hostPlan(env);
   if (plan.action === "none") return null;
   const host = getContainer(env.RESIDENTS_HOST!, HOST_INSTANCE);
-  return plan.action === "keep" ? await host.keepUp() : `${await host.halt()}: ${plan.why}`;
+  if (plan.action === "keep") return await host.keepUp();
+  return (await host.halt()) === "stopping" ? `stopping: ${plan.why}` : null;
 }
