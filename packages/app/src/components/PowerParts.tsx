@@ -369,7 +369,7 @@ export function PowerBanner({ boss, side, text, sub, tone = "", ms }: { boss: Bo
         </span>
         {/* (Your own pawn, as your profile has it: the God King keeps his banner only for his save, LastStand.tsx.) */}
         <span class="kc-target pc-pawn">
-          <Avatar look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={side} live />
+          <Avatar look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={side} />
         </span>
       </div>
     </div>
