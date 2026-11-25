@@ -8,7 +8,8 @@ The per-day table: `reports/coin-report.md`. Calls made in building it (the dire
 1. **Paid in XP's own batch, keyed by the game** (`coins:<game>:<ledger id>` reason `play`, `coinsbonus:<game>:<ledger id>` reason
    `play-bonus`), so a game pays once however it's retried. Each op's guard reads the XP day's totals in the same statement (play: the
    day's 300; bonus: the day's paid bonus as read, and XP's win op when it pays a win). One refused by a game landing at once is worked
-   out again from the ledger and tried alone, up to 3 times.
+   out again from the ledger and tried alone, up to 3 times; the last try's bonus is held to the day's 300 only (never starved; a
+   coin or two off the steps then, never past the ceiling).
 2. **The day's totals are the ledger's own sums** (reasons `play` and `play-bonus`, from `xpDayStart` to the next day's), as XP's solo
    minutes are: no table. A room's late retry counts in its own game's day.
 3. **`results.coins`** (a new nullable TEXT column, JSON `PlayCoins`): the result row keeps the game's coins beside its XP, so

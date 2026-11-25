@@ -82,11 +82,11 @@ describe("play coins, paid with a game's XP", () => {
     expect(bonuses.at(-1)).toBe(0);
     expect(bonuses.reduce((a, b) => a + b, 0)).toBe(300);
     expect(await coinsOf(sql, ann.id)).toBe(600);
-    // (At once: still 300 bonus at most, and the day's paid bonus on the steps' curve: each refused share worked out again.)
+    // (At once: each refused share worked out again (the last try held to the day's ceiling only): none starved, 300 bonus exactly.)
     const bo = await signedIn(sql, "bo@example.com");
     await Promise.all(Array.from({ length: 50 }, (_, i) => grantXp(sql, bo.id, game(`v${i}`, 5, {}, { won: true }))));
     const day = await coinDayOf(sql, (await ledgerAccount(sql, bo.id))!.account, xpDayStart(T0));
-    expect(day.bonus).toBeLessThanOrEqual(300);
+    expect(day.bonus).toBe(300);
     expect(day.play).toBe(300);
     expect(await coinsOf(sql, bo.id)).toBe(day.play + day.bonus);
     expect(await ledgerMismatches(sql, bo.id)).toEqual([]);

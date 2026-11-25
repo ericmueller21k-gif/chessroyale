@@ -1,4 +1,4 @@
-import { PLAY_COINS, XP, bonusStep, coinParts, gameCoins, type CoinDay, type CoinGame, type CoinResult, type GameXp, type PlayCoins } from "@chessroyale/core";
+import { PLAY_COINS, XP, bonusMax, bonusStep, coinParts, gameCoins, type CoinDay, type CoinGame, type CoinResult, type GameXp, type PlayCoins } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { applyOp, cond, leg, type LedgerAccount, type Op } from "./ledger.ts";
 
@@ -14,7 +14,7 @@ import { applyOp, cond, leg, type LedgerAccount, type Op } from "./ledger.ts";
  *     is still what this game's share was worked out from (equal, in the same statement), and, with a win, that the XP win op is there
  *     (XP's win rules, its friends'-lobby once-a-day included).
  * An op its guard refused (another game of the account's landed between the read and the write, or the win wasn't paid) is worked
- * out again from the ledger as it stands and tried alone, up to RETRIES times. The day's totals are the ledger's own, from the XP day's
+ * out again from the ledger as it stands and tried alone, up to RETRIES times, the last held to the day's ceilings only (then logged). The day's totals are the ledger's own, from the XP day's
  * start (core's xpDayStart) to its end: no table of their own.
  */
 
@@ -68,8 +68,12 @@ export function coinsFor(p: CoinPlan, day: CoinDay, timeXp: number, winPaid: boo
   return gameCoins(g, day);
 }
 
-/** The game's coin ops for `c` (worked out against `day`): only those that pay. Their guards are the module comment's. */
-export function coinOps(me: LedgerAccount, p: CoinPlan, c: PlayCoins, day: CoinDay, which: { play?: boolean; bonus?: boolean } = { play: true, bonus: true }): Op[] {
+/**
+ * The game's coin ops for `c` (worked out against `day`): only those that pay. Their guards are the module comment's; `loose` (the last
+ * retry) holds the bonus to the day's ceiling only (bonusMax), not to the paid bonus as read: a game is never starved by others landing
+ * at once, at the cost of a coin or two off the steps' curve, and the day still never passes its 300.
+ */
+export function coinOps(me: LedgerAccount, p: CoinPlan, c: PlayCoins, day: CoinDay, which: { play?: boolean; bonus?: boolean } = { play: true, bonus: true }, loose = false): Op[] {
   const ids = coinOpIds(p.key, me.account);
   const end = p.day + DAY_MS;
   const ops: Op[] = [];
@@ -89,7 +93,14 @@ export function coinOps(me: LedgerAccount, p: CoinPlan, c: PlayCoins, day: CoinD
       id: ids.bonus,
       reason: PLAY_BONUS,
       now: p.now,
-      when: cond(`${daySum(PLAY_BONUS)} = ?${won ? ` AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)` : ""}`, me.account, p.day, end, day.bonus, ...(won ? [p.winOp] : [])),
+      when: cond(
+        `${daySum(PLAY_BONUS)} ${loose ? "+ ? <=" : "="} ?${won ? ` AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)` : ""}`,
+        me.account,
+        p.day,
+        end,
+        ...(loose ? [c.bonus, bonusMax()] : [day.bonus]),
+        ...(won ? [p.winOp] : []),
+      ),
       legs: [leg.coins(me.user, c.bonus, p.key)],
     });
   }
@@ -122,16 +133,23 @@ async function xpPaidOf(sql: Sql, p: CoinPlan): Promise<{ timeXp: number; winPai
 export async function settleCoins(sql: Sql, me: LedgerAccount, p: CoinPlan, tried: readonly Op[]): Promise<PlayCoins> {
   const ids = coinOpIds(p.key, me.account);
   let paid = await paidOf(sql, me, p.key);
-  for (let i = 0; i < RETRIES; i++) {
+  for (let i = 0; ; i++) {
     const play = tried.some((o) => o.id === ids.play) && paid.play === null;
     const bonus = tried.some((o) => o.id === ids.bonus) && paid.bonus === null;
     if (!play && !bonus) break;
     const x = await xpPaidOf(sql, p);
     const day = await coinDayOf(sql, me.account, p.day);
-    const ops = coinOps(me, p, coinsFor(p, day, x.timeXp, x.winPaid), day, { play, bonus });
+    // (The last retry's bonus guard is the day's ceiling only: never starved.)
+    const ops = coinOps(me, p, coinsFor(p, day, x.timeXp, x.winPaid), day, { play, bonus }, i >= RETRIES - 1);
+    if (!ops.length) break;
+    if (i === RETRIES) {
+      // (Still refused: another of the account's games kept landing between the read and the write, and took the day's ceiling. It
+      // pays what went in.)
+      console.log(`coins for ${p.key}: ${ops.map((o) => o.id.split(":")[0]).join(", ")} refused ${RETRIES + 1} times`);
+      break;
+    }
     for (const op of ops) await applyOp(sql, me, op);
     paid = await paidOf(sql, me, p.key);
-    if (!ops.length) break;
   }
   const x = await xpPaidOf(sql, p);
   const today = await coinDayOf(sql, me.account, p.day);

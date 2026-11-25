@@ -82,7 +82,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   40/25/15/5, by the day's steps: full to 150 earned, half to 350, a quarter to 550, none past; 600 a day at most). Each op's guard
   reads the XP day's totals in the same statement (the ledger's own sums, from `xpDayStart`, no table of their own), the play op the
   day's 300, the bonus op the day's paid bonus as read and, with a win, XP's win op (its friends'-lobby rule); one refused (a game
-  landing at the same moment) is worked out again and tried alone (3 times). XP's eligibility, plus none while fair play holds the
+  landing at the same moment) is worked out again and tried alone (3 times, the last held to the day's 300 bonus only: never starved). XP's eligibility, plus none while fair play holds the
   player (review or banned: `held`). Solo (and an online game on one device's word): the minutes XP paid under its solo cap, no
   minimum, no bonus. The grant answers `XpGrant.coins` (core's `PlayCoins`: play, bonus, the bonus's parts as earned, the step, the
   day's totals, or why none) and the result row keeps it (`results.coins`, JSON; NULL before Nov 25 and while rewards are paused), so
