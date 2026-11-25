@@ -769,3 +769,13 @@ several, send one of each kind before making versions of one.
 - `stills/trailer-v2`, commit `e5982a41`, `birdie-train/`: the whistles beside the runs; the README now leads with
   his words and the whistles, and calls the runs the "other stuff" (under a whistle, or left out). Told the director.
 - Sent Eric the whistles' sheet. Still no word on which chirps or whistles he likes beyond the double toot.
+
+## The whole game's music in one place (Nov 25)
+
+Eric: "how can we make a folder I can open on my phone right now and listen to all of the songs for the whole game,
+or download it". `soundtrack.py` builds a listen-through of every song from the game's own files on main (intro, one
+pass of the loop, five seconds of it coming round again, fading): 27 tracks, 58 minutes (the town and its two piano
+solos, the tower, nineteen bosses, Birdie's ult, the Hidden Boss's three pieces). Published for him as a private page
+(a list to tap, with a player) and sent as a zip of numbered, tagged MP3s. It is a snapshot: when a theme is added or
+changed, run it again, republish the page and send the zip again.
+
