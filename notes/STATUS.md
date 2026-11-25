@@ -2117,3 +2117,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~22:20 UTC: ERIC: the 50 v 50 status box always visible (gray 'Waiting…' when idle), like the vote box → in shared-game-frame.md.
 - Nov 25 ~22:50 UTC: ERIC: 50 v 50 top row: drop 'Your pick' line → PICKED x/y after MOVE; no circle; row on the timer's line close above the board; screen up; gear near the arrows → mock sent (laptop 621, desktop 856). In shared-game-frame.md.
 - Nov 25 ~23:10 UTC: ERIC: row right on the board (a hair above the green), timer NOT moved → final mock sent (laptop 634, desktop 864). Brief updated.
+- Nov 25 ~23:25 UTC: duel-layout round 1 DONE (55b4fce8) but MISSED Eric's follow-ups (narrow the column before icons — it chose the opposite; Roman rank pill; equal gaps/lines report). Brief duel-layout-2.md → fresh helper. Squads-no-check-starts: code pushed (0f25f686), helper finishing.
