@@ -109,6 +109,7 @@
     "packages/app/src/components/BoardClock.tsx",
     "packages/app/src/components/Countdown.tsx",
     "packages/app/src/components/EvalBar.tsx",
+    "packages/app/src/components/SlotIdle.tsx",
     "packages/app/src/components/HistoryNav.tsx",
     "packages/app/src/components/LiveNumber.tsx",
     "packages/app/src/components/MuteButton.tsx",
