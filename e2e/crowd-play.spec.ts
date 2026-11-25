@@ -185,7 +185,7 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
 });
 
 test("the match screen's rows never move (Nov 8, Eric: nothing on the match screen moves): the power-up row, the status slot and the table keep one place through picking, move in and the other team's vote, at 390×844, 360×740 and a computer", async ({ page }) => {
-  // One game, three sizes: each size plays a turn through picking ("Your pick for …": the status slot empty), move in
+  // One game, three sizes: each size plays a turn through picking ("Your pick for …": the status slot's gray "Waiting…"), move in
   // ("Move in. Waiting for other players") and the other team's vote ("… is voting"), and the row tops, the status slot's
   // top and height, and the table's top must be the same (within 1 px) in all three phases.
   test.setTimeout(10 * 60_000);
@@ -201,7 +201,8 @@ test("the match screen's rows never move (Nov 8, Eric: nothing on the match scre
         const r = el.getBoundingClientRect();
         return { top: r.top, h: r.height };
       };
-      const banner = document.querySelector(".screen.game .play-slot .waiting-banner");
+      // (Your own pick shows the status box's gray "Waiting…" since Nov 26: still picking.)
+      const banner = document.querySelector(".screen.game .play-slot .waiting-banner:not(.slot-idle)");
       const text = banner?.textContent ?? "";
       const kind = (m?.phase.kind ?? "none") as string;
       const state = banner ? (/is voting/.test(text) ? "voting" : /Waiting for other players/.test(text) ? "move in" : "other") : kind === "play" ? "picking" : "other";

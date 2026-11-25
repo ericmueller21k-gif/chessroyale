@@ -80,7 +80,7 @@ import {
 import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./protocol.ts";
 import { BOSS_OPENING, FREESTYLE_OPENING, boardEnd, boardStatus, freestyleBoard, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { freestyleStart } from "./chess960.ts";
-import { pickOpenings, type Opening } from "./openings.ts";
+import { pickOpenings, startsInCheck, type Opening } from "./openings.ts";
 import { START_FEN, applyMove, baseAt, fenAtPly, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan, type GameEnd } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { BATTLE_TOWER, BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, floorStrength, levelForMaia, sideRefusal, type BossBrain, type BossBrainPlan, type BossForm, type FloorStrength } from "@chessroyale/core";
@@ -407,7 +407,7 @@ export class MatchRunner {
     }
     const plies = openingPlies(this.settings);
     const [opening] = pickOpenings(this.opts.rng, this.opts.library, { classic: 1, unusual: 0 }, plies, this.settings.openingBalance, this.usedFamilies);
-    const chosen = opening ?? this.opts.library.find((o) => o.expected[plies] !== undefined) ?? this.opts.library[0]!;
+    const chosen = opening ?? this.opts.library.find((o) => o.expected[plies] !== undefined && !startsInCheck(o, plies)) ?? this.opts.library[0]!;
     this.usedFamilies.add(chosen.family);
     this.boards.set(id, newBoard(id, chosen, plies, generation));
   }
@@ -695,7 +695,7 @@ export class MatchRunner {
       this.settings.openingBalance,
       this.usedFamilies,
     );
-    const fallback = this.opts.library.find((o) => o.expected[plies] !== undefined && !this.usedFamilies.has(o.family));
+    const fallback = this.opts.library.find((o) => o.expected[plies] !== undefined && !startsInCheck(o, plies) && !this.usedFamilies.has(o.family));
     const chosen = opening ?? fallback ?? this.opts.library[0]!;
     this.usedFamilies.add(chosen.family);
     this.boards.set(id, newBoard(id, chosen, plies, old.generation + 1));

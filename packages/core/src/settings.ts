@@ -4422,7 +4422,7 @@ export const ALERTS = {
  * Chess Town's pictures kept between visits (Nov 23, Eric: "the drawn pictures between visits ... it seems like just smart"; the app's
  * town/keep-pictures.ts): the first visit on a build paints every picture on the loading screen, as before, then keeps them on the device
  * (IndexedDB, as PNG pages); a later visit on the same build and layout loads them instead of painting. Anything odd paints as before.
- * `on`: the switch. `maxMB`: the most it keeps (more, and nothing is kept). `pagePx`: a page's side. `waitMs`: how long the loading
+ * `on`: the switch. `maxMB`: the most it keeps (more, and nothing is kept). (Its pages' size is the WebGL atlas's, Nov 25: the app's town/paint.ts `ATLAS`.) `waitMs`: how long the loading
  * screen waits for the kept pictures to be read and decoded before it paints instead. `afterMs`: how long after the first visit's first
  * frame they're kept (composed a page at a time, up to `sliceMs` a frame, encoded in a worker).
  * docs/decisions/2026-11-23-town-keep-pictures.md.
@@ -4430,7 +4430,6 @@ export const ALERTS = {
 export const TOWN_PICTURES = {
   on: true,
   maxMB: 24,
-  pagePx: 2048,
   waitMs: 4000,
   afterMs: 1500,
   sliceMs: 3,

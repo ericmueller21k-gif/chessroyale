@@ -1236,3 +1236,17 @@ lobby's e2e typed in a lobby and a team match; nothing typed in a 1 v 1.
 
 **The fix:** the bridge forwards each message as it is (only the lobby's `to` left off), so a field added later goes through. The 1 v 1
 has an e2e that types. docs/decisions/2026-11-25-duel-vote-and-chat.md.
+
+
+## Folio's Draft that never came in the smoke (Nov 25, 2026)
+
+Main's full run after #953 went red on boss-smoke's Folio: `{ passive: false, ultimate: true }`, passing on its retry; both runs
+used nearly all of the 70 s deadline. The Draft marks only a defended piece of yours that Folio attacks with nothing cheaper, and the
+smoke's crowd shuffles a knight between a3 and b1 with every other piece at home. So the Draft came only when Folio happened to open
+its f8 bishop onto a3 while the knight stood there: turn 4 or later locally, sometimes not at all on a busy runner. The same kind of
+miss came on Nov 16 for Chandy (his lock-on waits for a capture), patched then with a line of the crowd's that bets on the engine
+taking a free bishop. A search over every reply showed no crowd line can force the Draft's condition from the usual start: Folio
+can keep its pieces home too.
+
+**The fix:** Folio's `?power=draft` starts from BALLOON_TEST_MOVES (its queen on d5), as Don Dough's and Smudgy's switches already
+do; after the smoke's Na3 every reply leaves a mark, and a unit test checks all of them. docs/decisions/2026-11-25-folio-draft-test-start.md.

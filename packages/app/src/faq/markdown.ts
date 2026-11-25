@@ -11,9 +11,11 @@
  * - `$ formula`: a formula line, shown on its own in a fixed-width font (consecutive lines make one block).
  * - `> text`: a note, set apart (for "Being tested" and "Planned").
  * - `!emblems gold-d5 gold-d4 transcendent`: a row of 1 v 1's rank emblems by id (the baked set's), each captioned with its
- *   tier and division ("Gold 5", "Transcendent").
+ *   tier and division ("Gold V", "Transcendent").
  * - Inline: `**bold**`, `*italic*`, `[words](#anchor)` or `[words](https://…)`.
  */
+
+import { romanDivision } from "@chessroyale/core";
 
 export type Inline = { kind: "text"; text: string } | { kind: "bold"; text: string } | { kind: "em"; text: string } | { kind: "link"; text: string; href: string };
 
@@ -26,10 +28,10 @@ export type Block =
   | { kind: "note"; inlines: Inline[] }
   | { kind: "emblems"; items: { id: string; caption: string }[] };
 
-/** An emblem's caption from its id: "gold-d3" → "Gold 3", "transcendent" → "Transcendent". */
+/** An emblem's caption from its id: "gold-d3" → "Gold III" (the division as the rank pill names it), "transcendent" → "Transcendent". */
 export const emblemCaption = (id: string) => {
   const [tier = "", d] = id.split("-d");
-  return `${tier.charAt(0).toUpperCase()}${tier.slice(1)}${d ? ` ${d}` : ""}`;
+  return `${tier.charAt(0).toUpperCase()}${tier.slice(1)}${d ? ` ${romanDivision(Number(d))}` : ""}`;
 };
 
 /** An anchor from words: lower case, letters and digits, dashes between. */

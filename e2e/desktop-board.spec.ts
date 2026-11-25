@@ -19,8 +19,10 @@ const SIZES = ["1920x1080", "1440x900", "1366x768", "1280x800"] as const;
 type Size = (typeof SIZES)[number];
 const dims = (s: string) => s.split("x").map(Number) as [number, number];
 
-/** Each screen's room above and below the board (board-size.css' --bd-room): its board is never taller than the rest. */
-const ROOM = { alone: 123, raid: 123, crowd: 170, vote: 170, duel: 170, squads: 230 } as const;
+/** Each screen's room above and below the board (board-size.css' --bd-room): its board is never taller than the rest. (1 v 1's: 108 since
+ * Nov 25, its computer frame: no title line, the two strips. The 50 v 50's and its opening vote's: 92 since Nov 26, their frame: the
+ * labeled top row on the board, nothing under it but its clock's bar.) */
+const ROOM = { alone: 123, raid: 123, crowd: 92, vote: 92, duel: 108, squads: 230 } as const;
 type Screen = keyof typeof ROOM;
 /**
  * The board's side, measured with this change. Nov 1 (the eval bar off for everyone, as every player's board is: a raid's,
@@ -28,14 +30,17 @@ type Screen = keyof typeof ROOM;
  * bar on; Boss alone's and 1v1's and Squads' are the same). Round 2 (Nov 1): the side menu is icons only below 1800 px (80 px,
  * not 232), and the columns beside the board give the room back: the right column is 280 px where the window is what limits
  * the board (340 where its height does), a leaderboard 340 px (was 360), Boss alone's empty column 196 px (was 216). Every
- * screen's board is at least main's at these sizes (MAIN below).
+ * screen's board is at least main's at these sizes (MAIN below). Nov 25: 1 v 1's computer frame (no title line, the board the window's
+ * height less its two strips): 968, 792, 656 and 688 (were 904, 728, 592, 624). Nov 26: the 50 v 50's frame and its opening vote's: 984 at
+ * 1920 × 1080 (was 904); the narrower windows' boards are width-bound and keep their sizes (the gaps either side equal now, the room at the
+ * window's edges what it was).
  */
 const NOW: Record<Screen, Record<Size, number>> = {
   alone: { "1920x1080": 952, "1440x900": 760, "1366x768": 640, "1280x800": 600 },
   raid: { "1920x1080": 952, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
-  crowd: { "1920x1080": 904, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
-  vote: { "1920x1080": 904, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
-  duel: { "1920x1080": 904, "1440x900": 728, "1366x768": 592, "1280x800": 624 },
+  crowd: { "1920x1080": 984, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
+  vote: { "1920x1080": 984, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
+  duel: { "1920x1080": 968, "1440x900": 792, "1366x768": 656, "1280x800": 688 },
   squads: { "1920x1080": 848, "1440x900": 664, "1366x768": 536, "1280x800": 504 },
 };
 /**
@@ -96,6 +101,7 @@ const BESIDE: Record<string, string> = {
   chat: ".screen.game > .under-board",
   squadPanel: ".screen.game .sq-panel",
   strips: ".screen.game .dv-strip",
+  side: ".screen.game > .dv-side",
   tools: ".screen.game > .gm-tools",
 };
 async function look(page: Page) {
@@ -337,16 +343,21 @@ const realKey = (s: RealScreen) => `${s.width}x${s.height}`;
 const BOARD_TODAY: Record<Screen, Record<string, number>> = {
   alone: { "1536x730": 600, "1280x600": 472, "1366x650": 520, "1920x960": 832 },
   raid: { "1536x730": 600, "1280x600": 472, "1366x650": 520, "1920x960": 832 },
-  crowd: { "1536x730": 560, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
-  vote: { "1536x730": 560, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
-  duel: { "1536x730": 557, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
+  // (1 v 1: none since Nov 25, its computer frame: its board is the target, to its 8 device pixel step. The 50 v 50 and its opening vote: none
+  // since Nov 26, their frame: 634, 501, 552 and 864, were 560, 424, 480 and 784.)
+  crowd: {},
+  vote: {},
+  duel: {},
   squads: { "1536x730": 496, "1280x600": 368, "1366x650": 416, "1920x960": 728 },
 };
 const END_SCROLL_TODAY: Partial<Record<Screen, Record<string, number>>> = {
   alone: { "1536x730": 35, "1280x600": 165, "1366x650": 115 },
   crowd: { "1280x600": 111, "1366x650": 61 },
 };
-const CHAT_TODAY: Partial<Record<Screen, Record<string, number>>> = { crowd: { "1536x730": 119, "1280x600": 8, "1366x650": 42 } };
+// (Nov 25, round 2: the same with the side menu's labels on the 50 v 50 at 1536 × 730: its column 340 → 280, the chat's lines still 4 rows and
+// its emoji one row, game-frame.css. The two shorter laptops keep their icons. Nov 26, the 50 v 50's frame: 166 px at 1536 × 730 (the target
+// met), 33 and 84 on the two shorter laptops, were 8 and 42. Nov 26, round 2: the opening vote has the game's chat in its place, so the same.)
+const CHAT_TODAY: Partial<Record<Screen, Record<string, number>>> = { crowd: { "1280x600": 33, "1366x650": 84 }, vote: { "1280x600": 33, "1366x650": 84 } };
 
 /** Resign from the gear: the match's end page. */
 async function resignFromGear(page: Page) {
@@ -447,40 +458,35 @@ test("a computer: Babur's pump beside him at every size, as big as the board's b
  * new sizes are a computer's (a mouse).
  */
 /**
- * A computer's 50 v 50 (Eric, Nov 25; docs/decisions/2026-11-25-crowd-desktop-flush.md): the status line ("Move 5 · cut in 10 · P38/50 ·
- * −0.8 · CUT +0.2") centered over the board and bigger (22 px, 1.4 times its 16, where the board is wide enough; a narrower board's as
- * big as its width holds: about 18 px on 1280 × 800's 504 px board), one line, clear of the gear; the scoreboard, the board (its frame: the clock's bar under it) and the chat end
- * on one bottom line; the chat starts right under the panel's one fixed slot. A phone's line and panel are as before.
+ * A computer's 50 v 50 (Eric, Nov 26: his approved mock; docs/decisions/2026-11-26-crowd-frame.md; replaces Nov 25's centered status line):
+ * the top row is the status line, each number under a small gray label (MOVE, PICKED, NEXT CUT, YOUR PLACE, YOUR POINTS, CUT LINE), right
+ * on the board (no line over the board), centered on it where the board is wide enough and always clear of its clock pill, which stays at
+ * the board's top right; the power-ups row on the board's top line in the column beside it, the gear on that line's right end; the
+ * scoreboard's table and the chat on the board's top and bottom lines (the column rule's guard is the next test); the column's slot one
+ * fixed 250 px. A phone's line and panel are as before.
  */
-test("a computer's 50 v 50 (Eric, Nov 25): the status line centered over the board and bigger; the scoreboard, the board and the chat on one bottom line at 1280 × 800, 1440 × 900, 1920 × 1080 and 2000 × 1100; a phone's as before", async ({ browser }) => {
+test("a computer's 50 v 50 (Eric, Nov 26): the labeled top row on the board, clear of its clock; the power-ups and the gear atop the column; the slot fixed, at 1280 × 800, 1440 × 900, 1920 × 1080 and 2000 × 1100; a phone's as before", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "a computer and a phone, in their own windows");
   test.setTimeout(5 * 60_000);
   const lines = (page: Page) =>
     page.evaluate(() => {
-      const wrap = document.querySelector<HTMLElement>(".board-area .board-row > .board-wrap")!;
-      const css = getComputedStyle(wrap);
-      const side = parseFloat(css.getPropertyValue("--board-size"));
-      const w = wrap.getBoundingClientRect();
-      const hud = document.querySelector(".screen.game > .hud-row > .hud")!;
-      let l = Infinity, r = -Infinity;
-      for (const c of hud.children) {
-        const b = c.getBoundingClientRect();
-        if (b.width) [l, r] = [Math.min(l, b.left), Math.max(r, b.right)];
-      }
-      const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+      const box = (s: string) => document.querySelector(s)?.getBoundingClientRect() ?? null;
+      const squares = box(".board-area .board-row > .board-wrap .hb-container")!;
+      const stats = [...document.querySelectorAll(".screen.game > .hud-row .cf-stat")].map((e) => ({ label: e.querySelector("i")!.textContent, b: e.getBoundingClientRect() }));
       return {
-        foot: w.top + side + parseFloat(css.getPropertyValue("--timer-bar-h")),
-        scoreboard: box(".arena > .tower-side")?.bottom ?? NaN,
-        tableTop: box(".arena > .tower-side > .tower")?.top ?? NaN,
-        top: w.top,
-        chat: box(".screen.game > .under-board.side") ?? null,
-        slot: box(".screen.game > .play-footer, .screen.game > .poll") ?? null,
-        mid: (l + r) / 2,
-        board: w.left + side / 2,
-        words: r,
-        gear: box(".screen.game > .hud-row > .mm")!.left,
-        hudH: hud.getBoundingClientRect().height,
-        font: parseFloat(getComputedStyle(hud).fontSize),
+        squares,
+        labels: stats.map((x) => x.label),
+        l: Math.min(...stats.map((x) => x.b.left)),
+        r: Math.max(...stats.map((x) => x.b.right)),
+        foot: Math.max(...stats.map((x) => x.b.bottom)),
+        rowH: box(".screen.game > .hud-row")!.height,
+        clock: box(".board-area .board-clock"),
+        line: getComputedStyle(document.querySelector(".board-area > .opening-name")!).display,
+        nav: box(".screen.game > .play-footer > .history-nav, .screen.game > .poll > .history-nav"),
+        gear: box(".screen.game .mm-more"),
+        slot: box(".screen.game > .play-footer, .screen.game > .poll"),
+        chat: box(".screen.game > .under-board.side"),
+        status: box(".screen.game > .play-footer > .play-slot"),
       };
     });
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
@@ -489,30 +495,139 @@ test("a computer's 50 v 50 (Eric, Nov 25): the status line centered over the boa
   for (const size of ["1280x800", "1440x900", "1920x1080", "2000x1100"]) {
     const [w, h] = dims(size);
     await page.setViewportSize({ width: w, height: h });
-    // (Measured after the window settles: board-foot.ts writes the line on a resize.)
-    await expect.poll(async () => {
-      const g = await lines(page);
-      return Math.max(Math.abs(g.scoreboard - g.foot), Math.abs((g.chat?.bottom ?? NaN) - g.foot), Math.abs(g.tableTop - g.top), Math.abs(g.mid - g.board) - 1);
-    }, { message: `${size}: the scoreboard's top and bottom on the board's (Eric: "the same height as the chessboard"), the chat's bottom, the line over its middle`, timeout: 5_000 }).toBeLessThanOrEqual(1);
+    await page.waitForTimeout(500);
     const g = await lines(page);
-    expect(Math.abs(g.mid - g.board), `${size}: the status line centered over the board (${g.mid} / ${g.board})`).toBeLessThanOrEqual(2);
-    expect(g.font, `${size}: the status line bigger (${g.font} px)`).toBeGreaterThanOrEqual(w > 1300 ? 22 : 18);
-    expect(g.hudH, `${size}: one line`).toBeLessThanOrEqual(42.5);
-    expect(g.words, `${size}: the words clear of the gear`).toBeLessThanOrEqual(g.gear);
-    expect(g.chat!.top - g.slot!.bottom, `${size}: the chat right under the panel's slot`).toBeLessThanOrEqual(24);
-    expect(Math.abs(g.slot!.height - 206), `${size}: the panel one fixed slot (${g.slot!.height})`).toBeLessThanOrEqual(1);
+    const at = size;
+    expect(g.labels, `${at}: the labeled numbers`).toEqual(["Move", "Picked", "Next cut", "Your place", "Your points", "Cut line"]);
+    expect(g.line, `${at}: no line over the board`).toBe("none");
+    expect(g.rowH, `${at}: one row, 40 px`).toBeLessThanOrEqual(40.5);
+    expect(g.foot, `${at}: the row right on the board, clear of its clock's bar`).toBeLessThanOrEqual(g.squares.top - 6);
+    expect(g.foot, `${at}: the row right on the board`).toBeGreaterThanOrEqual(g.squares.top - 12);
+    expect(g.l, `${at}: the row over the board`).toBeGreaterThanOrEqual(g.squares.left - 0.5);
+    expect(g.r, `${at}: clear of the board's clock pill`).toBeLessThanOrEqual(g.clock!.left - 4);
+    expect(Math.abs(g.clock!.right - g.squares.right), `${at}: the clock pill at the board's top right, as always`).toBeLessThanOrEqual(1);
+    // (Centered on the board where it's wide enough to be, clear of the clock: 1280 × 800's 504 px board isn't.)
+    if (g.squares.width >= 600) expect(Math.abs((g.l + g.r) / 2 - (g.squares.left + g.squares.right) / 2), `${at}: the row centered on the board`).toBeLessThanOrEqual(2);
+    expect(Math.abs(g.nav!.top - g.squares.top), `${at}: the power-ups row on the board's top line`).toBeLessThanOrEqual(1);
+    expect(g.nav!.left, `${at}: in the column beside the board`).toBeGreaterThan(g.squares.right);
+    expect(Math.abs(g.gear!.top + g.gear!.height / 2 - (g.nav!.top + g.nav!.height / 2)), `${at}: the gear level with the power-ups row`).toBeLessThanOrEqual(1);
+    expect(Math.abs(g.gear!.right - g.slot!.right), `${at}: at the column's right end`).toBeLessThanOrEqual(1);
+    expect(g.gear!.left, `${at}: the gear clear of the power-ups`).toBeGreaterThanOrEqual(g.nav!.left);
+    expect(Math.abs(g.slot!.height - 250), `${at}: the slot one fixed 250 px (${g.slot!.height})`).toBeLessThanOrEqual(1);
+    expect(g.chat!.top - g.slot!.bottom, `${at}: the chat 8 px under the slot`).toBeCloseTo(8, 0);
+    // The status box always shows (Eric, Nov 26): on your own pick a gray "Waiting…", in the waiting line's place and size.
+    expect(g.status!.height, `${at}: the status box`).toBeCloseTo(56, 0);
   }
+  await expect(page.locator(".screen.game > .play-footer .play-slot")).toContainText(/Waiting…|is voting/);
   await ctx.close();
   // A phone: the line and the panel as before (16 px, the words from the left; the panel the locked screen's --mid-h, 151 px since Nov 25: the power-up row, six vote rows and the status line).
   const phone = await touchPage(browser);
   await into(phone.page, "crowd");
   const p = await phone.page.evaluate(() => {
     const hud = document.querySelector(".screen.game > .hud-row > .hud")!;
-    return { font: getComputedStyle(hud).fontSize, justify: getComputedStyle(hud).justifyContent, slot: document.querySelector(".screen.game > .play-footer")!.getBoundingClientRect().height };
+    return { font: getComputedStyle(hud).fontSize, justify: getComputedStyle(hud).justifyContent, slot: document.querySelector(".screen.game > .play-footer")!.getBoundingClientRect().height, labels: document.querySelectorAll(".cf-stat").length };
   });
-  expect(p, "a phone: the status line and the panel as before").toEqual({ font: "16px", justify: "normal", slot: 151 });
+  expect(p, "a phone: the status line and the panel as before").toEqual({ font: "16px", justify: "normal", slot: 151, labels: 0 });
   await phone.ctx.close();
 });
+
+/**
+ * Eric's column rule (Nov 25; docs/rules/eric.md, "Every computer game screen: one top line, one bottom line, equal gaps"): every column
+ * shares the board's top and bottom line, its content inside that height (the chat shrinks to fit, never past the board), and the gap from
+ * the left column (or, with none, the side menu) to the board equals the gap from the board to the right column, each ±1 px, at Eric's laptop
+ * (1536 × 730 at 125%) and a desktop (1920 × 960). The 50 v 50 (on your own pick or watching, whichever comes, and the other one too) and the
+ * 1 v 1 now; Squads and Boss join it in their own PRs. The board's lines are its frame's: the 50 v 50's bottom line is under its clock's bar
+ * (mirrored under the board in every phase), the 1 v 1's its squares' foot (its own strip under it).
+ * The 50 v 50's opening vote too (Nov 26, the director's round 2): its column (the line that says what to do, on one line, the cards, the
+ * chat) on the same lines, and nothing moves as the game begins: the board, the scoreboard and the chat are where the game's are.
+ */
+test("Eric's column rule (Nov 25): every column on the board's top and bottom lines, the gaps either side of the board equal: the 50 v 50 (its opening vote and both turns) and the 1 v 1 at 1536 × 730 and 1920 × 960", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
+  test.setTimeout(12 * 60_000);
+  const lines = (page: Page, screen: "crowd" | "vote" | "duel") =>
+    page.evaluate((screen) => {
+      const box = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+      const sq = box(".board-area .board-row > .board-wrap .hb-container");
+      const wrap = document.querySelector(".board-area .board-row > .board-wrap")!;
+      const bar = screen === "duel" ? 0 : parseFloat(getComputedStyle(wrap).getPropertyValue("--timer-bar-h"));
+      const board = { top: sq.top, foot: sq.bottom + bar, left: sq.left, right: sq.right };
+      if (screen === "duel") {
+        const panel = box(".dv-side > .dv-box");
+        return { board, columns: { panel: { top: panel.top, foot: panel.bottom } }, gaps: [sq.left - box(".gm-frame > .fd-side").right, panel.left - sq.right] };
+      }
+      const side = box(".arena > .tower-side");
+      const table = box(".arena > .tower-side > .tower");
+      // (The vote's column starts with its line that says what to do, where the game's power-ups row is.)
+      const slot = box(screen === "vote" ? ".screen.game > .board-area > .vote-hint" : ".screen.game > .play-footer, .screen.game > .poll");
+      const chat = box(".screen.game > .under-board.side");
+      return {
+        board,
+        columns: { scoreboard: { top: table.top, foot: side.bottom }, "the column": { top: slot.top, foot: chat.bottom } },
+        gaps: [sq.left - side.right, slot.left - sq.right],
+      };
+    }, screen);
+  const check = async (page: Page, screen: "crowd" | "vote" | "duel", at: string) => {
+    await expect.poll(async () => {
+      const g = await lines(page, screen);
+      return Math.max(...Object.values(g.columns).flatMap((c) => [Math.abs(c.top - g.board.top), Math.abs(c.foot - g.board.foot)]), Math.abs(g.gaps[0]! - g.gaps[1]!));
+    }, { message: `${at}: settled`, timeout: 5_000 }).toBeLessThanOrEqual(1);
+    const g = await lines(page, screen);
+    for (const [name, c] of Object.entries(g.columns)) {
+      expect(Math.abs(c.top - g.board.top), `${at}: the ${name}'s top on the board's (${c.top} v ${g.board.top})`).toBeLessThanOrEqual(1);
+      expect(Math.abs(c.foot - g.board.foot), `${at}: the ${name}'s foot on the board's (${c.foot} v ${g.board.foot})`).toBeLessThanOrEqual(1);
+    }
+    expect(Math.abs(g.gaps[0]! - g.gaps[1]!), `${at}: the gaps either side of the board equal (${g.gaps.join(" v ")})`).toBeLessThanOrEqual(1);
+  };
+  for (const s of [REAL_SCREENS[0], REAL_SCREENS[3]]) {
+    for (const screen of ["vote", "crowd", "duel"] as const) {
+      const ctx = await realScreenContext(browser, s);
+      const page = await ctx.newPage();
+      await into(page, screen);
+      await page.waitForTimeout(500);
+      if (screen === "duel") await check(page, screen, `the 1 v 1 on the ${s.name}`);
+      else if (screen === "vote") {
+        const at = `the 50 v 50's opening vote on the ${s.name}`;
+        await check(page, screen, at);
+        // Its line that says what to do is one line, all of it in view (beside the gear, the column's first line).
+        const hint = await page.locator(".vote-hint").evaluate((e) => ({ h: e.getBoundingClientRect().height, line: parseFloat(getComputedStyle(e).lineHeight), over: e.scrollWidth - e.clientWidth, text: e.textContent }));
+        expect(hint.over, `${at}: "${hint.text}" fits its line`).toBeLessThanOrEqual(0);
+        const range = await page.locator(".vote-hint").evaluate((e) => { const r = document.createRange(); r.selectNodeContents(e); return r.getClientRects().length; });
+        expect(range, `${at}: "${hint.text}" on one line`).toBe(1);
+        // Nothing moves as the game begins: the board, the scoreboard and the chat where the game's are.
+        const places = () =>
+          page.evaluate(() => {
+            const at = (s: string) => {
+              const r = document.querySelector(s)!.getBoundingClientRect();
+              return [r.left, r.top, r.right, r.bottom].map((v) => Math.round(v));
+            };
+            return { board: at(".board-area .board-row > .board-wrap .hb-container"), scoreboard: at(".arena > .tower-side"), chat: at(".screen.game > .under-board.side") };
+          });
+        const before = await places();
+        await expect.poll(() => phase(page), { timeout: 180_000, intervals: [100] }).toMatch(/^(play|watching)$/);
+        await page.waitForTimeout(300);
+        const after = await places();
+        for (const k of Object.keys(before) as (keyof typeof before)[])
+          before[k].forEach((v, i) => expect(Math.abs(after[k][i]! - v), `${at}: the ${k} in the same place at move 1 (${before[k]} → ${after[k]})`).toBeLessThanOrEqual(1));
+      } else {
+        // Both turns: your team's pick and the other team's vote, in the order they come.
+        const seen = new Set<string>();
+        for (let i = 0; i < 2; i++) {
+          await expect.poll(() => phase(page), { timeout: 90_000, intervals: [100] }).toMatch(seen.size ? new RegExp(`^(${["play", "watching"].filter((k) => !seen.has(k)).join("|")})$`) : /^(play|watching)$/);
+          const k = await phase(page);
+          await check(page, screen, `the 50 v 50 on the ${s.name}, ${k === "play" ? "your pick" : "watching"}`);
+          seen.add(k);
+          // (Your pick in, so the turn ends and the other team's comes.)
+          if (k === "play") {
+            const { fen, top } = await engineTop(page);
+            await submitMove(page, top[0]?.move, fen);
+          }
+        }
+      }
+      await ctx.close();
+    }
+  }
+});
+
 
 const TOUCH = ["390x844", "430x932", "768x1024", "844x390", "1024x768", "1180x820"] as const;
 const MAIN_TOUCH: Record<"alone" | "crowd" | "duel", Record<(typeof TOUCH)[number], [number, number, number]>> = {
@@ -619,11 +734,15 @@ test("a computer's boss battle with chat: the chat box under the moves, the same
 });
 
 /**
- * Nov 1 (round 2: the labels from 1800 px, not 1366): the front door's side menu on a computer's game screens (Boss alone, the
- * Crowd, 1 v 1, Squads): icons only below 1800 px (the labels as tooltips, read by screen readers), the full menu from 1800 px.
- * A phone and a touch tablet have none (the touch test above keeps their boards to the pixel).
+ * The front door's side menu on a computer's game screens (Boss alone, the Crowd, 1 v 1, Squads): its labels wherever the board keeps its
+ * size, else icons only (the labels as tooltips, read by screen readers). Eric's order (Nov 25, round 2: "why would this be the case when
+ * there's ample room on the right to shrink the chat box in order to make the left menus their necessary size";
+ * docs/decisions/2026-11-25-menu-labels-2.md): the board never shrinks for the menu; the labels show; the column beside the board narrows
+ * first, to its least (280 px); icons only where the board would still shrink. On Eric's laptop (1536 × 730 at 125%) that's every game
+ * screen; the 1 v 1 and the 50 v 50 are checked here. (Round 1, the same day: labels where the board and that column were both unchanged;
+ * before it, from 1800 px only.) A phone and a touch tablet have none (the touch test above keeps their boards to the pixel).
  */
-test("a computer's game screens: the side menu is on each; icons only below 1800 px, its labels as tooltips; the full menu from 1800 px", async ({ browser }) => {
+test("a computer's game screens: the side menu is on each; its labels wherever the board keeps its size, the column beside it narrowing first to 280 px (Eric's laptop: the 1 v 1's; the 50 v 50's board would shrink, so icons), else icons with the labels as tooltips", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
   test.setTimeout(12 * 60_000);
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -654,11 +773,54 @@ test("a computer's game screens: the side menu is on each; icons only below 1800
   await page.waitForTimeout(500);
   await check("alone 1920 x 1080", true);
   await page.setViewportSize({ width: 1280, height: 800 });
+  // (1280 × 800: the 1 v 1's board keeps its size with the labels, its column 340 → 280; the others' would shrink.)
   for (const screen of ["crowd", "duel", "squads"] as Screen[]) {
     await into(page, screen);
-    await check(`${screen} 1280 x 800`, false);
+    await check(`${screen} 1280 x 800`, screen === "duel");
   }
   await ctx.close();
+  // Eric's laptop (1536 × 730 at 125%; Eric's order, Nov 25 round 2): the labels on the 1 v 1. The board (its box, laid out at once) the size it
+  // is with icons only, inside its column; the column beside it narrowed no further than its least, 280 px; the 1 v 1's board 621. The 50 v 50
+  // (Nov 26, its frame: the board 634, was 560): icons, as its board would shrink with the labels (627), the column at its least already.
+  const laptop = REAL_SCREENS[0];
+  for (const screen of ["duel", "crowd"] as Screen[]) {
+    const lc = await realScreenContext(browser, laptop);
+    const lp = await lc.newPage();
+    await into(lp, screen);
+    await lp.waitForTimeout(300);
+    const at = `${screen} on the ${laptop.name}`;
+    const side = lp.locator(".gm-frame > .fd-side");
+    const drawn = (await lp.locator(`.board-area .board-row > .board-wrap ${BOARD_SEL.container}`).boundingBox())!.width;
+    const board = (menu: string) =>
+      lp.evaluate((menu) => {
+        document.getElementById("probe-menu")?.remove();
+        if (menu) document.head.insertAdjacentHTML("beforeend", `<style id="probe-menu">.gm-frame { --gm-menu: ${menu} !important; }</style>`);
+        const b = document.querySelector(".board-area .board-row > .board-wrap")!.getBoundingClientRect();
+        const a = document.querySelector(".board-area")!.getBoundingClientRect();
+        const column = parseFloat(getComputedStyle(document.querySelector(".screen.game")!).gridTemplateColumns.split(" ").pop()!);
+        return { w: b.width, inside: b.left >= a.left - 0.5 && b.right <= a.right + 0.5, column };
+      }, menu);
+    if (screen === "crowd") {
+      expect(Math.abs((await side.boundingBox())!.width - 80), `${at}: icons only`).toBeLessThanOrEqual(1);
+      expect(Math.abs(drawn - 633.6), `the 50 v 50's board on the ${laptop.name}: 634`).toBeLessThanOrEqual(1);
+      const icons = await board("80px");
+      const labels = await board("232px");
+      await board("");
+      expect(labels.w, `${at}: the labels would shrink the board (${labels.w} v ${icons.w})`).toBeLessThan(icons.w - 0.5);
+      await lc.close();
+      continue;
+    }
+    expect(Math.abs((await side.boundingBox())!.width - 232), `${at}: the labels`).toBeLessThanOrEqual(1);
+    expect((await side.locator(".fd-menu-item > span:last-child").first().boundingBox())!.width, `${at}: its labels show`).toBeGreaterThan(20);
+    const shown = await board("");
+    const icons = await board("80px");
+    await board("");
+    expect(shown.inside, `${at}: the board inside its column`).toBe(true);
+    expect(Math.abs(shown.w - icons.w), `${at}: the board with the labels (${shown.w}) as with icons only (${icons.w})`).toBeLessThanOrEqual(0.5);
+    expect(shown.column, `${at}: the column beside the board (${icons.column} with icons) no narrower than its least`).toBeGreaterThanOrEqual(280);
+    expect(Math.abs(drawn - 621), `the 1 v 1's board on the ${laptop.name}: 621`).toBeLessThanOrEqual(1);
+    await lc.close();
+  }
 });
 
 /**

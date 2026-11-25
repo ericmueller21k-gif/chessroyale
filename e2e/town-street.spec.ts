@@ -491,13 +491,42 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
     expect(s.resets, `${visit}: atlas pages started again`).toBe(0);
     expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
   };
+  // (Nov 25) The context lost and back: every picture on screen uploaded again (on the second visit, each cut from its kept page as it
+  // is): what the GPU holds for each the same as before.
+  const lossCheck = async (visit: string) => {
+    type S = { __townPictureSum: (each: boolean) => { each: number[] | null } };
+    const sums = () => page.evaluate(() => (window as unknown as S).__townPictureSum(true).each!);
+    await page.evaluate(() => (window as unknown as { __townHold: (on: boolean) => void }).__townHold(true));
+    const before = await sums();
+    expect(before.every((k) => k !== 0), `${visit}: every kept picture on the GPU`).toBe(true);
+    await page.evaluate(async () => {
+      const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!;
+      const ext = (cv.getContext("webgl2") as WebGL2RenderingContext).getExtension("WEBGL_lose_context")!;
+      const lost = new Promise((ok) => cv.addEventListener("webglcontextlost", ok, { once: true }));
+      ext.loseContext();
+      await lost;
+      await new Promise((ok) => setTimeout(ok, 50));
+      const back = new Promise((ok) => cv.addEventListener("webglcontextrestored", ok, { once: true }));
+      ext.restoreContext();
+      await back;
+      // (A frame drawn: what's on screen uploaded again.)
+      cv.getContext("2d")!.getImageData(0, 0, 1, 1);
+    });
+    const after = await sums();
+    await page.evaluate(() => (window as unknown as { __townHold: (on: boolean) => void }).__townHold(false));
+    const again = after.flatMap((k, i) => (k ? [[k, before[i]]] : []));
+    expect(again.length, `${visit}: pictures uploaded again after the context came back`).toBeGreaterThan(10);
+    expect(again.filter(([a, b]) => a !== b).length, `${visit}: pictures not as they were before the context was lost`).toBe(0);
+  };
   await roam("the first visit");
-  // The second visit: its pictures cut back out of the first's, kept (keep-pictures.ts), and the labels made again; the same.
+  await lossCheck("the first visit");
+  // The second visit: its pictures' pages uploaded whole (keep-pictures.ts, paint-gl.ts `adopt`, Nov 25), and the labels made again; the same.
   await expect.poll(() => page.evaluate(() => (window as unknown as R).__townPaint().pictures.saved), { timeout: 60_000 }).not.toBeUndefined();
   await page.goto("/town?sky=day&report");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect((await page.evaluate(() => (window as unknown as R).__townPaint())).pictures.kept, "the second visit's pictures were kept").toBe(true);
   await roam("the second visit");
+  await lossCheck("the second visit");
   expect(errors).toEqual([]);
 });
 

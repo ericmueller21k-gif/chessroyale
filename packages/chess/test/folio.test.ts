@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Chess, type Square } from "chess.js";
 import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, POWER_IDS, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type FolioState, type MatchState, type Settings } from "@chessroyale/core";
 import {
+  BALLOON_TEST_MOVES,
   BOSS_OPENING,
   CREASE_LINES,
   FOLIO,
@@ -206,6 +207,19 @@ describe("Folio's Draft: which piece", () => {
     expect(bossOf(t).powers!.nextPassive).toBe(3);
     const r = new MatchRunner({ settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "folio", bossUnfinished: true, bossPowerTest: "draft" } as Settings, rng: mulberry32(3), engines: [], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
     expect(r.boss!.powers!.nextPassive).toBe(2);
+  });
+
+  it("?power=draft starts with its queen on d5 (BALLOON_TEST_MOVES): after the smoke's first move, whatever it plays, the Draft has a mark as turn 2 begins", () => {
+    // (From the usual start a battle could keep its pieces home and the Draft never came: main, Nov 25, boss-smoke's Folio.)
+    const r = new MatchRunner({ settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossId: "folio", bossUnfinished: true, bossPowerTest: "draft" } as Settings, rng: mulberry32(3), engines: [], library: [opening(RUY)], entrants: [{ id: "h0", name: "H", isBot: false }] });
+    const start = new Chess();
+    for (const m of BALLOON_TEST_MOVES) start.move({ from: m.slice(0, 2), to: m.slice(2, 4) });
+    expect(fenOfR(r)).toBe(start.fen());
+    // The smoke's first move (e2e/boss-smoke.spec.ts: a knight to an empty square, the first in order), then every reply of its.
+    const after = applyMove(start.fen(), "b1a3");
+    const replies = legalMoves(after);
+    expect(replies.length).toBeGreaterThan(40);
+    for (const m of replies) expect(chooseDraft(applyMove(after, m), "w", 1, 2), m).not.toBeNull();
   });
 });
 

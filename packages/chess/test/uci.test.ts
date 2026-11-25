@@ -116,13 +116,15 @@ describe("engine (WebAssembly Stockfish, fixed budget)", () => {
   }, 30_000);
 
   it("lists every legal move when there are fewer than asked for: a start in check (a power-up's hints are then fewer than 3)", async () => {
-    // Classic deals Black's boards one ply past the opening length, and the library holds a start there with two replies:
-    // the Caro-Kann's 5.Nxf6+ (exf6, gxf6). The multiplayer e2e read 2 hints there and failed (Nov 11-16).
+    // The Caro-Kann's 5.Nxf6+ (exf6, gxf6): two replies. Classic dealt it to Black's boards (one ply past the opening length)
+    // until Nov 26, and the multiplayer e2e read 2 hints there and failed (Nov 11-16). No opening starts in check now
+    // (usableAt), so it isn't dealt any more; a power-up's hints can still meet a position with fewer than 3 moves.
     const library = JSON.parse(readFileSync(new URL("../data/openings.json", import.meta.url), "utf8")) as Opening[];
     const plies = openingPlies(DEFAULT_SETTINGS) + 1;
     const dealt = library.filter((o) => usableAt(o, plies, DEFAULT_SETTINGS.openingBalance)).map((o) => newBoard(0, o, plies).fen);
-    const fen = dealt.find((f) => legalMoves(f).length < 3)!;
-    expect(fen).toBe("rnbqkb1r/pp2pppp/2p2N2/8/3P4/8/PPP2PPP/R1BQKBNR b KQkq - 0 5");
+    const fen = "rnbqkb1r/pp2pppp/2p2N2/8/3P4/8/PPP2PPP/R1BQKBNR b KQkq - 0 5";
+    expect(dealt).not.toContain(fen);
+    expect(legalMoves(fen)).toHaveLength(2);
     const top = await engine.topMoves(fen, DEFAULT_SETTINGS.botCandidateMoves);
     expect(top.map((m) => m.move).sort()).toEqual(legalMoves(fen).sort());
   }, 30_000);

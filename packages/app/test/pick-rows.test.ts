@@ -18,4 +18,19 @@ describe("pickRows (the phone's small scoreboard)", () => {
   it("skips the cut line when nobody goes out", () => {
     expect(sorted(pickRows(4, 2, 4, upTo(2)))).toEqual([0, 2]);
   });
+  it("skips a row that doesn't fit and shows the next that does (Nov 26: a phone's 50 v 50, you last on your team)", () => {
+    // MiniTower's heights: an 18 px header, 22 px rows, a "⋯" gap 13.2 px, the cut line 10 px; a 137 px body (390 × 750).
+    const fits = (cutoff: number) => (keep: Set<number>) => {
+      const idx = sorted(keep);
+      let h = 18 + idx.length * 22;
+      idx.forEach((i, k) => {
+        if (k > 0 && i - idx[k - 1]! > 1) h += 13.2;
+        if (i === cutoff) h += 10;
+      });
+      return h <= 137;
+    };
+    // You, the leader and the last safe row; the first row past the cut (a gap and the line: 142.4 px) doesn't fit, your
+    // neighbor does: four rows, not three.
+    expect(sorted(pickRows(50, 49, 47, fits(47)))).toEqual([0, 46, 48, 49]);
+  });
 });

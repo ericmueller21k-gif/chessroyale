@@ -378,7 +378,8 @@ test("50 v 50's vote box is a standing skeleton (Eric, Nov 25): its cap's rows w
   expect(after.rows).toHaveLength(before.rows.length);
   expect(after.rows.join(" ")).toMatch(/^f\S+( f\S+)*( s\S+)*$/);
   expect([after.box, after.board, after.under]).toEqual([before.box, before.board, before.under]);
-  // The rows at the same places (a computer's and a phone's), and a phone's power-up row on top through the reveal.
+  // The rows at the same places, and the power-up row on top through the reveal (a phone's; a computer's too since its frame, Nov 26).
   expect(after.rows.map((r) => r.slice(1))).toEqual(before.rows.map((r) => r.slice(1)));
-  if (!computer) expect(after.nav).toBe(before.nav);
+  expect(after.nav, computer ? "a computer: the power-ups row atop the column" : "a phone").toBe(before.nav);
+  expect(after.nav).not.toBe("");
 });
