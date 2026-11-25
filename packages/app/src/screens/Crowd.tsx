@@ -572,10 +572,11 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // result line; the brilliant find is a mark on its bar; the result is one line, the score then your move and the best.)
   const poll = useMemo(() => {
     if (match.boss) return null;
-    // The bars the box holds: yours and the brilliant find's move always, then the most voted (five, as before).
+    // The bars the box holds: yours and the brilliant find's move always, then the most voted (as many as it holds, Nov 25: the
+    // 50 v 50's standing rows fill before any stays skeleton).
     const yourRow = rows.find((r) => r.you) ?? null;
     const brilRow = shout ? (rows.find((r) => shout.moves.includes(r.move)) ?? null) : null;
-    const cand = rows.filter((r, i) => i < 5 || r === yourRow || r === brilRow);
+    const cand = rows.filter((r, i) => i < (isCrowdFifty(match) ? slots : 5) || r === yourRow || r === brilRow);
     const must = [...new Set([yourRow, brilRow].filter((r) => !!r))];
     const keep = new Set([...must, ...cand.filter((r) => !must.includes(r))].slice(0, slots));
     const bars = cand.filter((r) => keep.has(r));
