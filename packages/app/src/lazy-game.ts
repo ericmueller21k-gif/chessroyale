@@ -10,7 +10,8 @@ import { lazyGroup } from "./lazy.tsx";
  */
 export const game = lazyGroup(() =>
   import("./screens/game-screens.ts").then((m) => {
-    if (typeof document !== "undefined") document.documentElement.dataset.matchChunk = "";
+    // (Only once it's in: a load that failed (stale.ts: Vite's import then gives nothing) is tried again, and no test waits past it.)
+    if (m && typeof document !== "undefined") document.documentElement.dataset.matchChunk = "";
     return m;
   }),
 );

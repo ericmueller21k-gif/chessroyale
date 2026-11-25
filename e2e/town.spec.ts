@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
-import { BOARD_SEL, giveItems, tapInTown, test, townTap, townTapPoint, wearItem } from "./helpers.ts";
+import { BOARD_SEL, aDeployLanded, giveItems, tapInTown, test, townTap, townTapPoint, wearItem } from "./helpers.ts";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -176,6 +176,7 @@ test.describe("a deploy landed", () => {
   test.use({ serviceWorkers: "block" });
 test("a deploy landed while the page was open: the town square's files are gone, so the page loads again, once, and the town opens", { tag: "@phone-only" }, async ({ page }) => {
   // (After a deploy the old version's files are gone: the first ask for the town's styles fails as it would then.)
+  await aDeployLanded(page);
   let asked = 0;
   await page.route(/\/assets\/Town-[^/]*\.css$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
   // (Counted as the page's documents arrive, not by "load": on a slow run the town's chunk is asked for, refused and the page
@@ -185,7 +186,8 @@ test("a deploy landed while the page was open: the town square's files are gone,
   let loads = 0;
   page.on("request", (r) => r.isNavigationRequest() && r.frame() === page.mainFrame() && loads++);
   await page.goto("/town");
-  await expect.poll(() => loads, { message: "the page loaded again" }).toBe(2);
+  // (After the server's answer that a deploy landed: stale.ts asks /version.json first, Nov 25.)
+  await expect.poll(() => loads, { message: "the page loaded again", timeout: 20_000 }).toBe(2);
   // (The second load fetches the town's chunk again, from the network now: a busy runner took over 5 s.)
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
   expect(asked, "the styles were refused").toBeGreaterThanOrEqual(1);
@@ -196,6 +198,7 @@ test("a deploy landed while the page was open: the town square's files are gone,
 // (Nov 15, the fallback: a page no service worker answers.) Eric's tap: a challenge whose room's code is gone.
 test("a deploy landed and a challenge's room code is gone: the page loads again, once, and the challenge goes on (Babur's Circus opens)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(180_000);
+  await aDeployLanded(page);
   let asked = 0;
   await page.route(/\/assets\/ShopRoom-[^/]*\.js$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
   let loads = 0;
