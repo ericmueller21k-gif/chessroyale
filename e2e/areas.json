@@ -580,6 +580,7 @@
         "packages/app/src/components/Breakdown.tsx",
         "packages/app/src/components/VoteHint.tsx",
         "packages/app/src/components/VoteZoneTags.tsx",
+        "packages/app/src/components/VoteZoneHits.tsx",
         "packages/app/src/components/vote-tags.css",
         "packages/app/src/pick-rows.ts",
         "packages/app/src/looks.ts",
@@ -870,6 +871,7 @@
         "packages/server/src/global-chat-api.ts",
         "packages/server/src/text-filter.ts",
         "packages/server/src/town-chat.ts",
+        "packages/server/src/typed-chat.ts",
         "packages/server/src/town-chat-api.ts"
       ],
       "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/global-chat.spec.ts", "e2e/panel.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts"]
@@ -915,6 +917,7 @@
         "packages/app/src/components/DuelRankPill.tsx",
         "packages/app/src/components/DuelStage.tsx",
         "packages/app/src/components/DuelVote.tsx",
+        "packages/app/src/components/VoteZoneHits.tsx",
         "packages/app/src/components/RankEmblem.tsx",
         "packages/app/src/emblems/**",
         "packages/app/src/characters/rank-set.ts",

@@ -83,7 +83,7 @@ async function tapMove(page: Page, uci: string) {
 
 /**
  * Each page's game is on its board (the vote, the "Timer" line or play) and not over: a state that lasts from the vote to the
- * result. (The versus moment lasts 2.5 s and the vote 5: a test process slowed for longer missed them, the page went on, and the
+ * result. (The versus moment lasts 2.5 s and the vote up to 10: a test process slowed for longer missed them, the page went on, and the
  * wait timed out on a game that was fine. The versus moment has its own test, "the stage", below.)
  */
 async function inGame(pages: Page[], timeout = 30_000) {
