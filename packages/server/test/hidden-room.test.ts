@@ -199,8 +199,12 @@ describe("the admin's test bots: \"Fill with 3 bots\" (admins only, server-check
     expect(R.challenge("adm", T, 10).view).toMatchObject({ count: 1 });
     expect(R.due(10 + HIDDEN_ROOM.botJoinMs - 1)).toEqual([]);
     expect(R.look("adm", T, 10 + HIDDEN_ROOM.botJoinMs).count).toBe(2);
-    expect(R.look("adm", T, 10 + 2 * HIDDEN_ROOM.botJoinMs).count).toBe(3);
-    const starts = R.due(10 + 3 * HIDDEN_ROOM.botJoinMs);
+    // (One a look, on the admin's: a look that comes late, or another's, never steps over a count. Nov 25: "3 of 4" was never shown.)
+    expect(R.look("adm", T, 10 + 4 * HIDDEN_ROOM.botJoinMs).count).toBe(3);
+    expect(R.due(10 + 10 * HIDDEN_ROOM.botJoinMs)).toEqual([]);
+    expect(R.look("adm", T, 10 + 5 * HIDDEN_ROOM.botJoinMs - 1).count).toBe(3);
+    expect(R.look("adm", T, 10 + 5 * HIDDEN_ROOM.botJoinMs).count).toBe(4);
+    const starts = R.due(10 + 5 * HIDDEN_ROOM.botJoinMs);
     expect(starts).toHaveLength(1);
     expect(starts[0]!.seats.map((s) => [s.name, s.bot])).toEqual([["Eric", false], ["Bot 1", true], ["Bot 2", true], ["Bot 3", true]]);
     R.started(starts[0]!, "FIGHT", { adm: "pass" }, 3000);
@@ -490,6 +494,11 @@ describe("review round (Nov 13): a ban at his door, a start racing a cancel or a
       await act("eric", "enter");
       await act("eric", "fill", { admin: true });
       await act("eric", "challenge");
+      // (The bots join one a look, on the admin's.)
+      for (let k = 1; k < HIDDEN_ROOM.bots; k++) {
+        vi.setSystemTime(1_000_000 + k * HIDDEN_ROOM.botJoinMs);
+        await act("eric", "look");
+      }
       vi.setSystemTime(1_000_000 + HIDDEN_ROOM.bots * HIDDEN_ROOM.botJoinMs);
       const v = await act("eric", "look");
       expect(creates).toEqual([]);
