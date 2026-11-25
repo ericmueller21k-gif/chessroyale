@@ -15,6 +15,12 @@ export const TYPED_EMPTY = "Type a message first.";
 export const TYPED_OFF = "Turn on chat to type.";
 export const typedTooLong = (max: number) => `Messages are at most ${max} characters.`;
 export const typedWait = (gapMs: number) => `One message every ${Math.round(gapMs / 1000)} s.`;
+/**
+ * To one who typed, in a 1 v 1, when the other player won't see it: their chat is off ("off"), or typed lines are off there (a device
+ * with chat's opt-in off, or a quick-lines-only one: "typed"). Never for a mute.
+ */
+export const typedUnseen = (name: string, why: "off" | "typed") =>
+  why === "off" ? `${name} has chat off, so they won't see this.` : `${name} doesn't see typed messages, only the quick lines.`;
 
 /** A typed message as it's shown (tidied, through the filter, at most `max` characters), or why it can't go. */
 export function typedText(text: unknown, max: number = GLOBAL_CHAT.maxChars): { ok: true; text: string } | { ok: false; message: string } {

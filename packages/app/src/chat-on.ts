@@ -52,9 +52,15 @@ export const chatOnSaved = (): Promise<void> => saving;
 export async function setChatOn(on: boolean): Promise<void> {
   if (on) write(SEEN_KEY, "1");
   if (account().profile?.user.signedIn) {
-    const save = updateChatOn(on);
-    saving = save.catch(() => undefined);
-    await save;
+    // (Waited on from before the switch shows: showing it tells the account's listeners at once, and a match's chat waiting on this
+    // then waits for this save, not the one before. Nov 25: it told the server before chat_on was saved, so typing stayed refused.)
+    let done!: () => void;
+    saving = new Promise<void>((r) => (done = r));
+    try {
+      await updateChatOn(on);
+    } finally {
+      done();
+    }
   } else write(GUEST_KEY, on ? "1" : null);
   emit();
 }

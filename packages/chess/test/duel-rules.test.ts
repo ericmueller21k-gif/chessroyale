@@ -29,7 +29,8 @@ function playing(w: "bullet" | "blitz" | "rapid" | null = "blitz", b: "bullet" |
   let s = newDuel(0, { testSeconds });
   if (w) s = pick(s, "w", w, 100).state;
   if (b) s = pick(s, "b", b, 200).state;
-  const t = VOTE + OVERLAY;
+  // (Both picks in: the vote closes a beat after the second, RANKED_1V1.voteBothPickedMs.)
+  const t = s.voteEndsAt + OVERLAY;
   s = tick(s, t);
   expect(s.phase).toBe("play");
   return { s, t };
@@ -51,20 +52,45 @@ describe("1 v 1: the vote and the start", () => {
   it("the vote: picks change until time's up, then the voted control's clocks, the overlay, then play", () => {
     let s = newDuel(1000);
     expect(s.phase).toBe("vote");
+    expect(VOTE).toBe(10_000);
     expect(nextDeadline(s)).toBe(1000 + VOTE);
     s = pick(s, "w", "bullet", 2000).state;
     s = pick(s, "w", "rapid", 3000).state;
-    s = pick(s, "b", "blitz", 4000).state;
+    // (One pick in: the vote keeps its whole time.)
+    expect(nextDeadline(s)).toBe(1000 + VOTE);
     expect(pick(s, "b", "nonsense", 4100).ok).toBe(false);
+    expect(tick(s, 1000 + VOTE - 1).phase).toBe("vote");
     s = tick(s, 1000 + VOTE);
     expect(s.phase).toBe("overlay");
-    expect(s.control).toBe("blitz-rapid");
-    expect(s.clocks).toEqual({ w: 300_000, b: 300_000 });
+    expect(s.control).toBe("rapid");
+    expect(s.clocks).toEqual({ w: 600_000, b: 600_000 });
     expect(pick(s, "w", "bullet", 1000 + VOTE + 10).ok).toBe(false);
     expect(nextDeadline(s)).toBe(1000 + VOTE + OVERLAY);
     s = tick(s, 1000 + VOTE + OVERLAY);
     expect(s.phase).toBe("play");
     expect(s.turnAt).toBe(1000 + VOTE + OVERLAY);
+  });
+
+  it("both picked: the vote closes a beat later (Eric, Nov 25); a change in the beat counts and doesn't put the close back", () => {
+    const BEAT = RANKED_1V1.voteBothPickedMs;
+    let s = newDuel(1000);
+    s = pick(s, "w", "rapid", 2000).state;
+    s = pick(s, "b", "blitz", 4000).state;
+    expect(s.voteEndsAt).toBe(4000 + BEAT);
+    expect(nextDeadline(s)).toBe(4000 + BEAT);
+    // Black changes its mind in the beat: it counts; the close stays.
+    s = pick(s, "b", "bullet", 4000 + BEAT / 2).state;
+    expect(s.voteEndsAt).toBe(4000 + BEAT);
+    expect(tick(s, 4000 + BEAT - 1).phase).toBe("vote");
+    s = tick(s, 4000 + BEAT);
+    expect(s.phase).toBe("overlay");
+    expect(s.control).toBe("blitz");
+    expect(s.startsAt).toBe(4000 + BEAT + OVERLAY);
+    expect(pick(s, "w", "bullet", 4000 + BEAT + 1).ok).toBe(false);
+    // The second pick just before time's up: the vote's own end, never later.
+    let late = pick(newDuel(0), "w", "rapid", 100).state;
+    late = pick(late, "b", "rapid", VOTE - 200).state;
+    expect(late.voteEndsAt).toBe(VOTE);
   });
 
   it("nobody picks: Blitz 3+2; one pick: it counts", () => {

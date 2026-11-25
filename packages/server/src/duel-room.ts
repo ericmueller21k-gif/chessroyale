@@ -1,4 +1,4 @@
-import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
+import { hearsTyped, typedReads, typedSay, typedSeat, typedUnseen, type TypedSeats } from "./typed-chat.ts";
 import { LEAVES, QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
 import { START_FEN, type ChatBlock, type ChatRefusal, type NetChatLine } from "@chessroyale/chess";
 import {
@@ -414,7 +414,9 @@ export class DuelCore {
         const r = pick(g, c, msg.zone, now);
         if (!r.ok) return;
         this.r.game = r.state;
-        this.both({ t: "picks", picks: r.state.picks });
+        // (Both picks in, the vote's close came forward, RANKED_1V1.voteBothPickedMs: the whole game, its new close in it. Else the picks.)
+        if (r.state.voteEndsAt !== g.voteEndsAt) this.broadcastGame();
+        else this.both({ t: "picks", picks: r.state.picks });
         return;
       }
       case "move": {
@@ -540,7 +542,12 @@ export class DuelCore {
   private post(full: NetChatLine) {
     const ch = this.r.chat;
     ch.lines = [...ch.lines, full].slice(-QUICK_CHAT.logSize);
-    for (const to of ["w", "b"] as const) if (this.hears(to, full)) this.io.send(to, { t: "chat", line: full });
+    // (Your own typed line always shows; when the other player won't see it, it says so: nothing hidden, Nov 25.)
+    // (A mute isn't told: the line just doesn't go.)
+    const them = other(full.from as Color);
+    const name = this.r.players[them].name;
+    const note = full.text === undefined || ch.muted[them] ? undefined : ch.off[them] ? typedUnseen(name, "off") : !this.hears(them, full) ? typedUnseen(name, "typed") : undefined;
+    for (const to of ["w", "b"] as const) if (this.hears(to, full)) this.io.send(to, { t: "chat", line: full, ...(note && to === full.from ? { note } : {}) });
   }
 
   /** Typed chat for a side as it connects (or turns chat on): may it type, is its device too young (typed-chat.ts). */

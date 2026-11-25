@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { RANKED_1V1, rankView } from "@chessroyale/core";
-import { BOARD_SEL, named, test, watchFor, watchSpans } from "./helpers.ts";
+import { BOARD_SEL, asSignedIn, named, test, watchFor, watchSpans } from "./helpers.ts";
 
 /**
  * Ranked 1 v 1 through the real server (docs/areas/ranked.md), two players on emulated phones (and computers): both
@@ -83,7 +83,7 @@ async function tapMove(page: Page, uci: string) {
 
 /**
  * Each page's game is on its board (the vote, the "Timer" line or play) and not over: a state that lasts from the vote to the
- * result. (The versus moment lasts 2.5 s and the vote 5: a test process slowed for longer missed them, the page went on, and the
+ * result. (The versus moment lasts 2.5 s and the vote up to 10: a test process slowed for longer missed them, the page went on, and the
  * wait timed out on a game that was fine. The versus moment has its own test, "the stage", below.)
  */
 async function inGame(pages: Page[], timeout = 30_000) {
@@ -117,7 +117,7 @@ async function bySide(a: Page, b: Page): Promise<{ white: Page; black: Page }> {
 
 /** Waits for play: the overlay gone, the first move due. */
 async function waitForPlay(...pages: Page[]) {
-  for (const p of pages) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 15_000 });
+  for (const p of pages) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 25_000 });
 }
 
 /** Resign (or Leave: an abort) from the match's gear and its list, on a phone or a computer; then confirm. */
@@ -154,26 +154,30 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
   }
   const boardBefore = (await a.locator(`.board-area ${BOARD_SEL.wrap}`).boundingBox())!;
 
-  // Ann drags hers into Rapid; Bo picks up his with a tap, then taps Bullet. The other's pawn moves live.
+  // Bo taps Bullet, his pawn not picked up first, and it goes there (Eric's rule, every pawn vote, Nov 25: docs/rules/eric.md); Ann sees
+  // it move live. Then Ann drags hers into Rapid: both in, the vote closes a beat later (RANKED_1V1.voteBothPickedMs), not at its 10 s.
   const overlay = await watchFor(a, { timer: { selector: ".dv-overlay", text: /^Timer: Blitz 3\+2$/ } });
+  await expect(b.locator(".vote-me.selected")).toHaveCount(0);
+  await b.getByRole("button", { name: "Pick Bullet 1+1" }).click();
+  await expect(b.locator(".dv-label.mine")).toHaveText("Bullet 1+1");
+  const inZone = async (p: Page, pawn: string, zone: number) => {
+    const z = (await p.locator(".vote-zone").nth(zone).boundingBox())!;
+    const q = (await p.locator(pawn).boundingBox())!;
+    const [x, y] = [q.x + q.width / 2, q.y + q.height * 0.55];
+    return x > z.x && x < z.x + z.width && y > z.y && y < z.y + z.height;
+  };
+  await expect.poll(() => inZone(b, ".vote-me", 0), { message: "Bo's pawn stands in the zone he tapped" }).toBe(true);
+  // Ann sees Bo's pawn in Bullet (the zone on her left).
+  await expect.poll(() => inZone(a, ".dv-pawn:not(.vote-me)", 0)).toBe(true);
   const zone = (await a.locator(".vote-zone").nth(2).boundingBox())!;
   const mine = (await a.locator(".vote-me").boundingBox())!;
   await a.mouse.move(mine.x + mine.width / 2, mine.y + mine.height / 2);
   await a.mouse.down();
   await a.mouse.move(zone.x + zone.width / 2, zone.y + zone.height * 0.7, { steps: 8 });
   await a.mouse.up();
-  await b.locator(".vote-me").click();
-  await b.getByRole("button", { name: "Pick Bullet 1+1" }).click();
-  await expect(a.locator(".dv-label.mine")).toHaveText("Rapid 10+5");
-  await expect(b.locator(".dv-label.mine")).toHaveText("Bullet 1+1");
-  // Ann sees Bo's pawn in Bullet (the zone on her left).
-  const bullet = (await a.locator(".vote-zone").nth(0).boundingBox())!;
-  await expect
-    .poll(async () => {
-      const p = (await a.locator(".dv-pawn:not(.vote-me)").boundingBox())!;
-      return p.x + p.width / 2 > bullet.x && p.x + p.width / 2 < bullet.x + bullet.width;
-    })
-    .toBe(true);
+  const both = Date.now();
+  await expect(a.locator(".dv-overlay")).toHaveText("Timer: Blitz 3+2", { timeout: 8_000 });
+  expect(Date.now() - both, "the vote closed a beat after both picks, well before its 10 s").toBeLessThan(RANKED_1V1.voteBothPickedMs + 4_000);
 
   // Rapid and Bullet meet on Blitz: "Timer: Blitz 3+2" over the board, then the game on the same board.
   await waitForPlay(a, b);
@@ -205,6 +209,35 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
   for (const p of [white, black]) await expect(p.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: the game ended before move 10.");
   expect(await record(black)).toMatchObject({ games: 1, wins: 1, losses: 0, rank: { label: "Placement 1/5" } });
   expect(await record(white)).toMatchObject({ games: 1, wins: 0, losses: 1 });
+});
+
+test("typed chat in a 1 v 1 (Eric, Nov 25: \"i said hello, it never appeared, twice\"): your own line shows; told when the other doesn't see typed messages; they turn it on mid-game, read it and answer", { tag: "@phone-only" }, async ({ browser }) => {
+  test.setTimeout(3 * 60_000);
+  const a = await player(browser, "Ann Typed");
+  const b = await player(browser, "Bo Typed");
+  // Both signed in (typing is for accounts); Ann's chat on, Bo's still off.
+  for (const p of [a, b]) await asSignedIn(p);
+  expect((await a.request.patch("/api/me", { data: { chatOn: true } })).status()).toBe(200);
+  await meet(a, b, poolName());
+  const field = (p: Page) => p.locator(".dv-chat").getByRole("textbox", { name: "Send a message" });
+  await field(a).fill("hello");
+  await field(a).press("Enter");
+  await expect(a.locator(".dv-chat .qline.you", { hasText: "hello" })).toBeVisible();
+  await expect(a.locator(".dv-chat .qtype-note")).toHaveText("Bo Typed doesn't see typed messages, only the quick lines.");
+  // Bo turns typed chat on in the match's chat options (the notice once): Ann's line comes, and he can type back.
+  await expect(field(b)).toHaveCount(0);
+  await b.locator(".dv-chat").getByRole("button", { name: "Chat options" }).click();
+  await b.getByRole("checkbox", { name: "Typed chat (players' messages)" }).click();
+  await b.getByRole("button", { name: "Turn on chat", exact: true }).click();
+  await expect(b.getByRole("checkbox", { name: "Typed chat (players' messages)" })).toBeChecked();
+  await b.locator(".dv-chat").getByRole("button", { name: "Chat options" }).click();
+  await expect(b.locator(".dv-chat .qline", { hasText: "hello" }).filter({ hasText: "Ann Typed" })).toBeVisible();
+  await expect(field(b)).toBeVisible();
+  await field(b).fill("hi Ann");
+  await field(b).press("Enter");
+  await expect(b.locator(".dv-chat .qline.you", { hasText: "hi Ann" })).toBeVisible();
+  await expect(a.locator(".dv-chat .qline", { hasText: "hi Ann" }).filter({ hasText: "Bo Typed" })).toBeVisible();
+  await expect(b.locator(".dv-chat .qtype-note")).toHaveCount(0);
 });
 
 test("resigning, then a flag: Play again queues both again; each game counts", { tag: "@phone-only" }, async ({ browser }) => {

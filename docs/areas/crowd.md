@@ -123,7 +123,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   being away" and "You missed 4 moves. Out in Nth place of 100."; home's note if you come back. Bots never miss. Test switch
   `?afk=0` (solo, a lobby you create, a test pool's PLAY): misses as before, for tests that idle on purpose.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
-  on an empty board (or tapping a zone, which puts your pawn there, Eric, Nov 2; or tapping a card; the zone takes the tap, never the board
+  on an empty board (or tapping a zone, which puts your pawn there, Eric, Nov 2; one shared piece, `VoteZoneHits`, in every pawn vote since Nov 25; or tapping a card; the zone takes the tap, never the board
   under it). The options are words only: their emoji (on the cards, the zones and the winner's banner) were deleted (Eric, Nov 2; Squads'
   votes, on the same screen, too; docs/decisions/2026-11-02-nov2-fixes-b.md): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then
   "How does it start?" (**Normal**, **Random opening**, **Freestyle**; Normal when nobody votes; below), then "How fast?", a
