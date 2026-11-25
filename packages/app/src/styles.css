@@ -3106,9 +3106,14 @@ button.history-label {
      one height on every phase of a match (the power-up row, the status line and the vote results take turns in it), so the
      scoreboard never moves (crowd.spec, "the scoreboard never moves"). A bar is 14 px with its gap, the result line 20 px:
      six bars at most (--slots; Crowd.tsx, useBarSlots, shows as many as the box holds). The board keeps its size. */
+  /* Nov 25 (Eric: the vote box stands on the phone too): the box is the power-up row (32 px), the vote rows (13 px, 1 px apart) and
+     the status line under them (24 px: the waiting line between reveals, the result line at the reveal), 6 px between the
+     three, in every phase: 151 px with six rows (was 104, the rows only at the reveal), so the scoreboard sits 47 px lower, all
+     game. The board keeps its size (its width is the phone's). */
   .screen.game.crowd-50 {
     --slots: 6;
-    --mid-h: calc(var(--slots) * 14px + 20px);
+    --status-h: 24px;
+    --mid-h: calc(32px + 6px + var(--slots) * 14px - 1px + 6px + var(--status-h));
   }
   /* Shorter screens: fewer bars, so the scoreboard keeps its rows (at 664 and 667 it keeps four or five with six). */
   @media (max-height: 639px) {
@@ -3134,12 +3139,31 @@ button.history-label {
   .screen.game.crowd-50 > .play-footer {
     align-content: start;
   }
+  .screen.game.crowd-50 > .play-footer > .poll-skel {
+    display: grid;
+    gap: 1px;
+  }
+  /* The status line: one line (Nov 25), 13 px, as tall as the result line it gives way to. Its words fit 320 px
+     ("White is voting. Your team moves next." and the count), so nothing is cut. */
   .screen.game.crowd-50 .play-slot {
-    height: 42px;
+    height: var(--status-h);
   }
   .screen.game.crowd-50 .play-slot > .waiting-banner {
-    padding: 0 14px;
-    line-height: 1.2;
+    gap: 8px;
+    min-height: 0;
+    padding: 0 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  /* The reveal: the power-up row stays on top, greyed (Crowd.tsx, LockedPowerRow), 6 px over the rows. */
+  .screen.game.crowd-50 .poll-result-skel {
+    height: var(--status-h);
+  }
+  .screen.game.crowd-50 > .poll > .history-nav {
+    flex: none;
+    margin-bottom: 5px;
   }
   .screen.game.crowd-50 .poll {
     display: flex;
@@ -3182,7 +3206,7 @@ button.history-label {
     align-items: baseline;
     justify-content: center;
     gap: 8px;
-    height: 20px;
+    height: var(--status-h);
     margin-top: auto;
     min-width: 0;
     overflow: hidden;

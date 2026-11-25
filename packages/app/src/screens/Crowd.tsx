@@ -127,8 +127,7 @@ export function WatchScreen({
   const you = standings.find((s) => s.isYou);
   // (Cut in a 50 v 50 rework: watching to the podium, Spectate on the cut screen; C3.)
   const spectating = !!you?.out;
-  const noHistory = { ply: 0, browsing: false, go: () => {}, live: () => {} } as unknown as ReturnType<typeof useHistoryView>;
-  const powerRow = fifty ? <HistoryNav view={noHistory} total={0} extra={<PowerUps count={spectating ? 0 : match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} /> : null;
+  const powerRow = fifty ? <LockedPowerRow match={match} /> : null;
   return (
     <div class={`screen game crowd${isCrowdFifty(match) ? " crowd-50" : ""}`}>
       <Hud match={match} />
@@ -186,7 +185,11 @@ export function useBarSlots(ref: { current: HTMLElement | null }, parent = false
   useLayoutEffect(() => {
     const el = parent ? (ref.current?.parentElement ?? null) : ref.current;
     if (!el) return;
-    const fit = () => setSlots(Math.max(4, Math.min(6, Math.floor((el.clientHeight - RESULT_PX) / BAR_PX))));
+    // (A phone's box says its rows itself, --slots: its height also holds the power-up row and the status line, Nov 25.)
+    const fit = () => {
+      const set = parseInt(getComputedStyle(el).getPropertyValue("--slots"));
+      setSlots(Math.max(4, Math.min(6, set > 0 ? set : Math.floor((el.clientHeight - RESULT_PX) / BAR_PX))));
+    };
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     fit();
@@ -218,12 +221,24 @@ export function SkeletonRows({ count }: { count: number }) {
 const COMPUTER_SLOT = "(min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine)";
 
 /**
- * A computer's 50 v 50 between reveals (Eric, Nov 25): the vote box's skeleton rows wait in the slot, as many as the reveal's box
- * holds, the status line at the slot's foot where the result line goes; the reveal then fills the same rows in place. A phone's
- * slot holds the power-up row and the status line instead (no room for both), so its box shows at the reveal, at its full height.
+ * Your power-ups, all greyed, with no history to step through: the power-up row in its place while you can't use it (the other
+ * team's vote; on a phone, the reveal too), so it never comes and goes (Nov 8 and Nov 25, Eric: nothing on the match screen moves).
+ */
+export function LockedPowerRow({ match }: { match: GameView }) {
+  const you = match.standings().find((s) => s.isYou);
+  const noHistory = { ply: 0, browsing: false, go: () => {}, live: () => {} } as unknown as ReturnType<typeof useHistoryView>;
+  return <HistoryNav view={noHistory} total={0} extra={<PowerUps count={you?.out ? 0 : match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} />;
+}
+
+/**
+ * A 50 v 50 between reveals (Eric, Nov 25: "do that also on mobile and desktop"): the vote box's skeleton rows wait in the slot, as
+ * many as the reveal's box holds, the status line at the slot's foot where the result line goes; the reveal then fills the same
+ * rows in place. A computer's slot is the 206 px box above the chat; a phone's is taller for it, the power-up row on top (styles.css).
  */
 export function SlotSkeleton({ match }: { match: GameView }) {
-  const on = useMedia(COMPUTER_SLOT) && isCrowdFifty(match);
+  const computer = useMedia(COMPUTER_SLOT);
+  const phone = useMedia(LOCKED_PHONE);
+  const on = (computer || phone) && isCrowdFifty(match);
   const ref = useRef<HTMLDivElement>(null);
   const slots = useBarSlots(ref, true);
   return on ? (
@@ -390,6 +405,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   // The vote box's bars: how many its height holds (see useBarSlots); yours and the brilliant find's move come first.
   const pollBox = useRef<HTMLDivElement>(null);
   const slots = useBarSlots(pollBox);
+  const lockedPhone = useMedia(LOCKED_PHONE) && isCrowdFifty(match);
 
   // The ghosts come in silently; the winner gets three tones as it blinks.
   // (Not when you're the whole crowd: your move was simply played.)
@@ -569,6 +585,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     const miss = me ? missLine(me, match.settings.crowdMisses?.allowed) : null;
     return (
       <div class="poll" role="status" ref={pollBox}>
+        {/* (A phone's 50 v 50: the power-up row stays on top of the box through the reveal, greyed, Nov 25.) */}
+        {lockedPhone && <LockedPowerRow match={match} />}
         {bars.map((r) => {
           const win = landed && r.move === mine.result.playedMove;
           const marked = !!mark && mark.moves.includes(r.move);
