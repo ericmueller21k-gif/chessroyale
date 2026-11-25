@@ -21,3 +21,20 @@ out of the kept PNG pages, then uploading each. Plan: keep the pages as packed a
 - **Guards:** the kept-pictures perf spec's hash now also hashes what the GPU holds for each picture (`__townPictureSum().gpu`), the same on
   all three visits. The loading-screen spec still uploads nothing while walking on both visits, and now also loses the context on each
   visit: every picture uploaded again holds what it held before.
+
+## Round 2: blank faces on a repeat visit (Nov 25)
+
+- **What broke:** CI's minimap spec, "every portrait drawn" 0 of 21 on its reload (a repeat visit). The chips (Town.tsx `drawFace`) and
+  the large map (TownMap.tsx `Face`) draw `r.chipFace(…).img` onto their own canvas: drawing FROM a stand-in never asks for its context,
+  so they copied an empty canvas. Players would have seen blank boss faces on a repeat visit.
+- **Fix (one place, every reader):** the first stand-in made wraps `CanvasRenderingContext2D.prototype.drawImage` and `createPattern`
+  (keep-pictures.ts `cutBeforeDraw`): a 2D draw from an uncut stand-in cuts it first. Picked over a cut at each consumer (`chipFace`)
+  because a new 2D reader would bring the bug back; and over cutting in the frame accessors (`FrameCache.get`), which the WebGL painter
+  calls every frame, so every picture would be cut while you walk. Cost: one WeakMap look a 2D draw, and only after a repeat visit began.
+- **Audit:** the 2D painter never restores (no `keep`, so no shelf) and a failed WebGL reloads the page, so render.ts's own 2D draws
+  (`blitSoft`'s scratch canvas, light layers, the 2D path) never get a stand-in; on WebGL they're the painter's (cut before an upload
+  alone, `upload`). Hit tests, statue masks, `pawnFace` and the sprite strip's face read through `getContext` (cut already). The
+  save's `createImageBitmap` runs on a first visit only (no stand-ins). Only `chipFace` handed one to a plain 2D draw.
+- **Gain kept:** perf spec "a second visit…" 5.05 s against the first's 10.2 s here; the fix cuts only what a chip or the map draws.
+- **Checks:** the minimap spec waits for the first visit's pictures to be kept before its reload, checks the reload's were kept, and
+  checks every shown chip's face has pixels (fails without the fix: "0 of 4").

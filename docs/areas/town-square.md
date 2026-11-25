@@ -1329,12 +1329,14 @@ same build and layout (`pictureKey`: version, the town chunk's hashed name, `ren
 4x slowed, 18.5 s → 5.9 s. **Uploaded whole (Nov 25; [decision](../decisions/2026-11-25-town-atlas-pages.md)):** the pages are packed as the
 atlas packs (`paint.ts` `ATLAS`: 2048 px, 2 px padding, a picture over 1024 px alone), so a later visit uploads each page as one atlas layer
 (`paint-gl.ts` `adopt`) instead of cutting 1,912 pictures out and uploading each. Each picture is a stand-in canvas, cut from its page only
-when something reads it (its 2D context: hit tests, statue masks) or it must be uploaded alone (a lost context). The pages stay decoded
+when something reads it (its 2D context: hit tests, statue masks; a 2D context drawing from it: the chips' and the large map's faces,
+`cutBeforeDraw`, Nov 25 round 2) or it must be uploaded alone (a lost context). The pages stay decoded
 until the town closes. Headless, repeat visit at 4x: 5.47 → 4.52 s to the first frame (a page upload is about 50 to 65 ms at 4x here).
 Anything odd paints as before and clears the entry. `?paintall` skips it. Hooks: `__townPaint().pictures`, `__townPictureSum()` (its `gpu`:
 what the atlas holds for each picture; `(true)`: each one's hash). Tests: `town-keep-pictures.test.ts`, `e2e/perf.spec.ts` ("a second
 visit…": canvas and GPU hashes the same on all three visits), `e2e/town-street.spec.ts` ("the town's loading screen…": a lost context on
-either visit gives back the same texels).
+either visit gives back the same texels), `e2e/town-controls.spec.ts` ("the minimap…": its reload is a repeat visit; every chip's face and
+the map's portraits drawn).
 **Painted on more cores (Nov 23; [decision](../decisions/2026-11-23-town-paint-workers.md)):** a first visit's pictures are painted ahead by a
 pool of workers (`town/paint-pool.ts`, `paint.worker.ts`; the cores less one, at most 3, `TOWN_PAINT_WORKERS`) with the main thread's own
 code (`town/paint-jobs.ts`), their art sent once as JSON (a character's idle frames and parts, a roof's geometry: `box-geom.ts`); the main
