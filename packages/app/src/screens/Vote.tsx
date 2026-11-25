@@ -452,13 +452,10 @@ export function VoteScreen({
               aria-disabled={o.disabled ? true : undefined}
               onClick={() => cast(i, voteZoneCentre(zoneOf(i), side))}
             >
+              {/* Its share of the votes, rising from the card's foot (Eric, Nov 26): slid up from its foot, the card's box never changes. */}
+              {!o.disabled && <i class="vote-card-fill" aria-hidden="true" style={{ "--fill": String(counts[i]! / total) }} />}
               <strong>{o.label}</strong>
               <span class="vote-card-blurb">{o.blurb}</span>
-              {!o.disabled && (
-                <span class="vote-card-bar">
-                  <i style={{ width: `${(100 * counts[i]!) / total}%` }} />
-                </span>
-              )}
               {!o.disabled && <PopCount n={counts[i]!} class="vote-card-count" />}
             </button>
           );
