@@ -1,14 +1,16 @@
 import { useEffect, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
 import { LeaderboardSheet } from "../components/LeaderboardSheet.tsx";
 import { LiveNumber } from "../components/LiveNumber.tsx";
 import { BrainDebug, EngineMove, UltimateTest, WinForm } from "../components/BossDock.tsx";
-import { COMPUTER_LAYOUT, MatchMenu, MOUSE_LAYOUT } from "../components/MatchMenu.tsx";
+import { COMPUTER_LAYOUT, CROWD_FRAME, MatchMenu, MOUSE_LAYOUT } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
 import { clockShown } from "../clock-text.ts";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
-import { bossAlone, cutCountdown, isCrowd, shortCountdown, myBoardId, towerView, type GameView } from "../game.ts";
+import { bossAlone, cutCountdown, isCrowd, isCrowdFifty, nextCutValue, shortCountdown, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
+import { sideToMove } from "@chessroyale/chess";
 import { BossBar } from "./Boss.tsx";
 import { TowerBar, TowerStrip, TowerStripLives, sideOf } from "./TowerBar.tsx";
 
@@ -57,6 +59,7 @@ export function Hud({ match, stripFrozen = false, caster = null }: { match: Game
   const [open, setOpen] = useState(false);
   const computer = useMedia(COMPUTER_LAYOUT);
   const mouse = useMedia(MOUSE_LAYOUT);
+  const frame = useMedia(CROWD_FRAME) && isCrowdFifty(match);
   // During the reveal the round counter has already moved on; show the round just played.
   const shownRound = match.phase.kind === "reveal" ? match.roundsPlayed : match.roundsPlayed + 1;
   // Crowd 50 v 50: your team, with your team's cut line.
@@ -102,6 +105,45 @@ export function Hud({ match, stripFrozen = false, caster = null }: { match: Game
         <BossTools match={match} crowd={crowd} />
       </>
     );
+  // The 50 v 50 on a computer (Nov 26, Eric's approved mock): the top row is the status line, each number under a small gray label, right
+  // on the board; the gear is the column's (board-size.css, "The 50 v 50's frame"). The same numbers as the line below.
+  if (frame) {
+    const picks = pickCount(match);
+    return (
+      <>
+        <div class="hud-row cf-row">
+          <button type="button" class="hud" onClick={() => setOpen(true)} aria-label="Show the leaderboard">
+            <Stat label="Move">{match.final ? "Final" : (moveNo ?? "–")}</Stat>
+            {picks && (
+              <Stat label="Picked" cls="cf-picked">
+                {picks.done}/{picks.of}
+              </Stat>
+            )}
+            {!match.final && <Stat label="Next cut">{nextCutValue(countdown, movesLeft)}</Stat>}
+            {rank > 0 && (
+              <Stat label="Your place" cls={`hud-rank${inZone ? " danger" : ""}`}>
+                <LiveNumber value={rank} format={(x) => String(Math.round(x))} goodWhenDown />
+                <span class="muted">/{match.final ? match.final.order.length : alive.length}</span>
+              </Stat>
+            )}
+            {me && !match.final && (
+              <Stat label="Your points" cls={`hud-score ${inZone ? "danger" : "safe"}`}>
+                <LiveNumber value={me.points} format={pts} />
+              </Stat>
+            )}
+            {cutScore !== null && me && !match.final && (
+              <Stat label="Cut line" cls="hud-cut">
+                <LiveNumber value={cutScore} format={pts} />
+              </Stat>
+            )}
+          </button>
+          <MatchMenu exit={exitFor(match)} crowd={crowd} />
+        </div>
+        <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />
+        {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
+      </>
+    );
+  }
   return (
     <>
       <div class="hud-row">
@@ -196,6 +238,30 @@ export function Hud({ match, stripFrozen = false, caster = null }: { match: Game
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
     </>
   );
+}
+
+/** One number of the 50 v 50's top row on a computer, under its small gray label (Nov 26). */
+function Stat({ label, cls, children }: { label: string; cls?: string; children: ComponentChildren }) {
+  return (
+    <span class="cf-stat">
+      <i>{label}</i>
+      <span class={cls ? `cf-val ${cls}` : "cf-val"}>{children}</span>
+    </span>
+  );
+}
+
+/**
+ * The 50 v 50's PICKED (Nov 26: the line over the board, "Your pick for White · 12/50 picked", is gone on a computer; its count is here):
+ * your team's picks on your turn, the voting team's while you watch, and the moved side's votes at the reveal.
+ */
+function pickCount(match: GameView): { done: number; of: number } | null {
+  const p = match.phase;
+  const fen = p.kind === "reveal" ? p.mine.fenBefore : "board" in p && p.board ? p.board.fen : null;
+  if (!fen) return null;
+  const side = sideToMove(fen);
+  const choosing = match.standings().filter((s) => !s.out && (s.team == null || s.team === side));
+  const done = p.kind === "reveal" ? p.mine.result.players.filter((x) => x.move).length : choosing.filter((s) => match.done.has(s.id)).length;
+  return { done: Math.min(done, choosing.length), of: choosing.length };
 }
 
 /**

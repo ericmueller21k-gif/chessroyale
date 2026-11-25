@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CROWD_CUTS, CROWD_SETTINGS, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
-import { cutCountdown, lossRows, shortCountdown, stagesAhead, stagesLine } from "../src/game.ts";
+import { cutCountdown, lossRows, nextCutValue, shortCountdown, stagesAhead, stagesLine } from "../src/game.ts";
 import { endWords } from "../src/components/Podium.tsx";
 
 /** The results table names what was played (the audit, Oct 15: a boss battle's row read "Duel"). */
@@ -44,6 +44,9 @@ describe("the 50 v 50 rework's words", () => {
     expect(cutCountdown(s, CROWD_CUTS.length, 0, 43)).toBe("1 v 1");
     // A narrow phone's: about 60 px under "Move 34".
     expect(["34 v 34 next", "1 v 1 from move 43", "1 v 1"].map(shortCountdown)).toEqual(["to 34v34", "1v1 at 43", "1v1"]);
+    // A computer's labeled top row, NEXT CUT (Nov 26): the same words, as a value under the label.
+    expect(["cut in 14", "34 v 34 next", "1 v 1 from move 43", "1 v 1 next", "1 v 1"].map((w) => nextCutValue(w, 0))).toEqual(["in 14 moves", "34 v 34", "1 v 1 at move 43", "1 v 1", "1 v 1"]);
+    expect([nextCutValue(null, 4), nextCutValue(null, 1)]).toEqual(["in 4 moves", "now"]);
     // Not the rework: the old words stay the Hud's.
     expect(cutCountdown({ ...s, crowdCuts: undefined }, 0, 0, 1)).toBeNull();
   });

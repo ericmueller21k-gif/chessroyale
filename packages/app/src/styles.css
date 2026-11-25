@@ -1896,6 +1896,19 @@ p {
   height: 100%;
   min-width: 0;
 }
+/* (The 50 v 50's status box on your own pick, Nov 26: the waiting line's box, gray as the vote box's skeleton rows, a quiet "Waiting…".) */
+.waiting-banner.slot-idle {
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  font-weight: 600;
+  animation: none;
+}
+.waiting-banner.slot-idle > i {
+  flex: none;
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
 .waiting-count {
   margin-left: auto;
   font-weight: 800;
