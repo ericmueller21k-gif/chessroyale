@@ -52,3 +52,18 @@ before shipping any change to an end screen.
 - The right column runs from the top strip's top to the bottom strip's foot; its content is centered in it as one block. On a short laptop
   (1280 × 600) the chat is shorter; the page never scrolls.
 - "Good game!" isn't one of the chat's lines (a new line is a chat-data change); "Well played" stands in.
+
+## Round 2c (the director's review of the sheet, Nov 25)
+- Squads' resigned page is an end screen: the headline in the pixel type, its line, the flag, Queue again over Home stacked, one gap,
+  centered (it was "You resigned" pinned to the top, the buttons side by side). Its results' buttons are stacked too.
+- No blank headline line: a screen whose headline has no line (you resigned, out in the crowd) never gets one later, so none is kept
+  (it made the gap under "You resigned" three times the others). The 50 v 50's stage table is the column's width (340 px); no judged move
+  is one line, "No moves judged this game."; the best and worst moves only with a move (their empty box took a second gap).
+- A boss result on a computer with no move of yours to review is one column, centered in the page (the mate test and an instant resign);
+  a game with moves keeps the move by move beside it.
+- Call: on a phone his words sit beside his head, over your pawn's column, their foot 8 px over your pawn's head, tail pointing at him;
+  no band kept over him. A computer keeps them over his head (the brief named the phone; its 56 px room shows there too: the director's
+  call). Measured at 2.25: every boss is 137 to 205 px tall and your pawn's head about 100 px up, so only the shortest (Ginger, Birdie)
+  could have two-line words reach into the gap above the duo, never the headline.
+- Guard: `endPage` (resign.spec.ts: `endGaps`, buttons stacked, centered) on the 50 v 50 and Squads end pages, phone 390 x 844 and laptop
+  1536 x 730; boss-result's resigned check at desktop 1920 x 960 too (the column centered with nothing to review; his words clear of your pawn).
