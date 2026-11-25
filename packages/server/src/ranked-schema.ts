@@ -96,13 +96,14 @@ export const RANKED_COLUMNS: { table: string; column: string; type: string; then
 ];
 
 /**
- * SQL: the accounts no ranking shows (a list of ids): banned players, fair play's engine pool (fairplay.ts, NOT_POOLED) and test
- * accounts (test-accounts.ts). Read from their own few rows (fairplay_cases' status, users_test), never a scan. The season ladder
- * (ladder.ts) and the top tiers' place (topPlace) both leave out exactly these, so a place on the ladder and the tier it gives always
- * agree. (Residents count: they're real-looking players by design.)
+ * SQL: the accounts no ranking shows (a list of ids): banned players, players under fair-play review (fairplay.ts's eligibleForRanked:
+ * "not while they're in review or banned"; the director's call, Nov 25), fair play's engine pool (NOT_POOLED) and test accounts
+ * (test-accounts.ts). Read from their own few rows (fairplay_cases' status, users_test), never a scan. The season ladder (ladder.ts) and
+ * the top tiers' place (topPlace) both leave out exactly these, so a place on the ladder and the tier it gives always agree. A left-out
+ * player still sees their own place, and the ladder, as ever (ladder.ts ladderFor). (Residents count: real-looking players by design.)
  */
 // (Never a NULL in it: a TEXT primary key may hold one in SQLite, and one NULL would make every `NOT IN` unknown, the ladder empty.)
-export const LEFT_OUT = `(SELECT user_id FROM fairplay_cases WHERE status IN ('banned', 'pool') AND user_id IS NOT NULL UNION ALL SELECT id FROM users WHERE test = 1 AND id IS NOT NULL)`;
+export const LEFT_OUT = `(SELECT user_id FROM fairplay_cases WHERE status IN ('banned', 'review', 'pool') AND user_id IS NOT NULL UNION ALL SELECT id FROM users WHERE test = 1 AND id IS NOT NULL)`;
 
 /** SQL: how many shown ladders there are (no bound values): every ladder (placements done), less the few left out (LEFT_OUT's). */
 export const SHOWN_ALL_SQL = `SELECT (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder IS NOT NULL)
@@ -135,7 +136,7 @@ const topPlaces = new Map<number, { place: number; at: number }>();
  * busy profile or queue costs one count a minute per ladder (placeOf). Fair play's engine pool is left out of the count (its ladders
  * above, taken away: the pool's few cases, never a scan of the table): a pooled player never takes an honest player's place, and theirs
  * is counted the same way, so it looks as ever. Test accounts (test-accounts.ts) and, since the season ladder (Nov 25, 2026), banned
- * players are left out the same way (LEFT_OUT): the ladder's places and these tiers come from the same count.
+ * players and players under review are left out the same way (LEFT_OUT): the ladder's places and these tiers come from the same count.
  */
 export async function topPlace(sql: Sql, ladder: number | null | undefined, now = Date.now()): Promise<number | null> {
   if (!mayBeTop(ladder)) return null;

@@ -244,8 +244,8 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // Friends and invites: /api/friends (friends-api.ts).
     const friends = await handleFriendsApi(request, env, waitUntil);
     if (friends) return friends;
-    // GET /api/ladder?mode=1v1: the season ladder's top 200 and your place (ladder.ts; the rows kept a minute at the edge).
-    const ladder = await handleLadder(request, env, waitUntil);
+    // GET /api/ladder?mode=1v1: the season ladder's top 200 and your place (ladder.ts; the rows kept a minute in this Worker).
+    const ladder = await handleLadder(request, env);
     if (ladder) return ladder;
     // POST /api/engine/score {fen, moves} → {moves}: the engine server's deeper look at a few moves (solo games'
     // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself). A position

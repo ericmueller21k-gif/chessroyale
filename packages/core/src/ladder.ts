@@ -28,11 +28,11 @@ export interface LadderRow {
 /** Your own standing: your row (your exact place, wherever it is), or how far into placements you are, or null (signed out or a guest). */
 export type LadderYou = LadderRow | { placement: { played: number; of: number } } | null;
 
-/** The answer: the season, how many are on the ladder, its top `LADDER.size` rows, and you. */
+/** The answer: the season, how many are on the ladder, its top `LADDER.size` rows (your own among them fresh), and you. */
 export interface LadderAnswer {
   season: number;
   mode: LadderMode;
-  /** Players on the ladder (placements done; banned players, the engine pool and test accounts left out). */
+  /** Players on the ladder (placements done; banned players, players under review, the engine pool and test accounts left out: one of them sees themselves counted, as ever). */
   total: number;
   rows: LadderRow[];
   you: LadderYou;
