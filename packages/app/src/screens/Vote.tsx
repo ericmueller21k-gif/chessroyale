@@ -31,6 +31,7 @@ import { useBoardAnimations } from "../hooks.ts";
 import { pausedBosses, useServerStatus } from "../status.ts";
 import { VoteHint, useVoteHint } from "../components/VoteHint.tsx";
 import { VoteZoneTags } from "../components/VoteZoneTags.tsx";
+import { VoteZoneHits } from "../components/VoteZoneHits.tsx";
 
 /** No pieces while the votes run: only everyone's pawns. */
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
@@ -392,26 +393,13 @@ export function VoteScreen({
                   voted={!!mine}
                 />
               )}
-              {/* A tap on a zone puts your pawn there: your vote (Eric, Nov 2: "Tapping on an augment area puts your piece there"),
-                  whether or not you picked your pawn up first. The zone takes the tap, so the board under it never gets one. */}
-              {canAct &&
-                def.options.map((o, i) => {
-                  const box = zoneOnScreen(zoneOf(i), orientation);
-                  if (o.disabled) return null;
-                  return (
-                    <button
-                      type="button"
-                      key={o.id}
-                      class="vote-zone-hit"
-                      aria-label={`Vote ${o.label}`}
-                      style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height}%` }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        cast(i, voteZoneCentre(zoneOf(i), side));
-                      }}
-                    />
-                  );
-                })}
+              {/* A tap on a zone puts your pawn there: your vote (Eric's rule, every pawn vote: VoteZoneHits). */}
+              {canAct && (
+                <VoteZoneHits
+                  zones={def.options.map((o, i) => ({ key: o.id, label: `Vote ${o.label}`, box: zoneOnScreen(zoneOf(i), orientation), disabled: o.disabled }))}
+                  onTap={(i) => cast(i, voteZoneCentre(zoneOf(i), side))}
+                />
+              )}
               {myAt && (
                 <span
                   class={`vote-pawn vote-me${dragAt ? " lifted" : ""}${selected ? " selected" : ""}${canAct ? " can" : ""}${mine && !home ? " in" : ""}`}

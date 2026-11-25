@@ -89,9 +89,13 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   - **waiting** for both players' sockets (seats by account: a reload or another device of theirs goes straight back
     in), at most `joinSeconds` (10), or it's called off ("no_show", nothing recorded);
   - **versus** (`versusMs`, 2.5 s): the "found" moment on the stage (above): both players' pawns, names and ranks;
-  - **the vote** (`voteSeconds`, 5): three zones on the game's own board (ranks 4 and 5; Bullet, Blitz, Rapid left to
+  - **the vote** (`voteSeconds`, 10; Eric, Nov 25, was 5): three zones on the game's own board (ranks 4 and 5; Bullet, Blitz, Rapid left to
     right from either side), each player's dressed pawn off the grid on their own side's line between their second and
-    third ranks. Drag it into a zone, or tap it and then a zone; it can change until time's up; the other's moves live.
+    third ranks. Drag it into a zone, or tap a zone (your pawn glides there, picked up first or not: `VoteZoneHits`, Eric's rule
+    for every pawn vote); it can change until the vote closes; the other's moves live. Once both have picked it closes
+    `voteBothPickedMs` (1 s) after the second pick, never later than its own end (a change in that beat counts and doesn't put the
+    close back); the room sends both the game with its new close. Residents and the bot pick 1.5-5 s in (`RESIDENTS.duel.pickMs`).
+    [docs/decisions/2026-11-25-duel-vote-and-chat.md](../decisions/2026-11-25-duel-vote-and-chat.md);
     The control is halfway between the two picks (`votedControl`): the same pick, that control; neighbors, the one
     between (Bullet 2+1, Blitz 5+3); Bullet against Rapid, Blitz 3+2; one pick counts alone; none: Blitz 3+2;
   - **the overlay** (`overlayMs`, 1.5 s): "Timer: Blitz 3+2" over the board (a line, not a banner); the pawns are gone;
@@ -166,8 +170,11 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   - **Its kill switch:** `PAUSE_LEAVE_PENALTIES` ([ops.md](ops.md)): nothing charged or marked, no lockout or delayed queue,
     `/api/me`'s `leaves` null (the confirms' words as before);
   - **The other player:** loses nothing, and goes back to the queue as ever (Play again).
-- **Quick chat** as in other online matches (`MatchChat`, `ChatPanel`), one channel (no teams: every line a player
-  owns goes to both), the limits of `QUICK_CHAT`, mute by account on the device (`chat-mod.ts` in the app) and on the
+- **Quick chat** as in other online matches (`MatchChat`, `ChatPanel`; typed chat for a signed-in player with chat on, as in every
+  match since Nov 7), one channel (no teams: every line a player owns goes to both). The app's bridge (`duel.ts`) forwards the chat's
+  messages whole, only `to` left off (Nov 25: it copied fields by name and dropped the typed text). Your own typed line always shows;
+  when the other player won't see it (their chat off, or typed lines off there) the field's note says so (`typedUnseen`, never for a
+  mute); the limits of `QUICK_CHAT`, mute by account on the device (`chat-mod.ts` in the app) and on the
   server (`chatPrefs`), and #252's chat bans (read as each player connects, again at most every `CHAT_MOD.recheckMs` as
   they chat: "mod" refusals).
 - **Ranks** (core's `ranked.ts`; Eric, Oct 28: Puzzle Pirates' names, "each tier has numbers 1-5 within it wood 5 being

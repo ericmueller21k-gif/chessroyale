@@ -3609,8 +3609,14 @@ export const RANKED_1V1 = {
   ] as readonly DuelControl[],
   /** Neither player picks a zone: this control. */
   defaultControl: "blitz",
-  /** How long both players have to drag their pawn into a zone. */
-  voteSeconds: 5,
+  /**
+   * How long both players have to drag their pawn into a zone (Eric, Nov 25: "needs to be like 10s, or when both pick then it
+   * instantly ends"; it was 5). Once both have picked, the vote closes `voteBothPickedMs` later (a changed pick still counts until
+   * then), if that's sooner. docs/decisions/2026-11-25-duel-vote-and-chat.md.
+   */
+  voteSeconds: 10,
+  /** Both picks in: the vote closes this long after the second (a beat to see both pawns land), never later than its own end. */
+  voteBothPickedMs: 1_000,
   /** The "found" moment (the versus screen's), before the vote starts on the board. */
   versusMs: 2_500,
   /** "Timer: Blitz 3+2" over the board after the vote, before White's first move. */
@@ -6016,8 +6022,11 @@ export const RESIDENTS = {
   duel: {
     zones: { bullet: 25, blitz: 50, rapid: 25 },
     queue: { maxWaiting: 3, gapSeconds: [2, 25] as readonly [number, number] },
-    /** A resident's vote comes this long after the vote opens (ms). */
-    pickMs: [800, 3500] as readonly [number, number],
+    /**
+     * A resident's vote comes this long after the vote opens (ms): as a person's, so the other player sees its pawn move (Nov 25: the
+     * vote now closes a beat after both have picked, RANKED_1V1.voteBothPickedMs). The app's bot game picks the same way.
+     */
+    pickMs: [1500, 5000] as readonly [number, number],
     /** The first move (White's and Black's): within this long (ms), well inside the 20 s rule. */
     firstMoveMs: [1200, 6000] as readonly [number, number],
     /** Later moves: the clock left spread over this many more moves (never fewer than `minMovesLeft`), plus most of the increment. */

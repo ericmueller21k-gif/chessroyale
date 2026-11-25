@@ -455,3 +455,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **A test never waits to catch a moment live** (Nov 22, main's run on d30c64b: a shared floor's test polled for Grex's turn and
   it passed between two polls): a phase that can last under a second (a boss's quick turn, a reveal, a banner) is recorded every frame
   by an init script and read afterward; poll only for states that hold until the player acts.
+
+- **A typed "hello" that never left** (Nov 25, [story](../docs/history/lessons.md#a-typed-hello-that-never-left-nov-25-2026)):
+  - Code that passes a message between two protocols forwards it whole (spread it, leave off only what the other side can't take),
+    never rebuilt field by field: a field added later is dropped silently.
+  - A feature added to every mode gets one real use in each mode's e2e (a typed line in a lobby, a team match, a 1 v 1), not only in one.

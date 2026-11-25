@@ -10,7 +10,12 @@ Lane: `social`.
   relays only known lines the sender owns, within the limits; names come from the lobby or the account, never from the
   message. What players can abuse is how they use the lines (spam, taunts), their name and their icon: see
   Moderation below. Squads has no chat. Ranked 1 v 1 has the match's quick chat, one channel for its two players
-  (no teams), with mute by account and the chat ban read as each player connects ([ranked.md](ranked.md)).
+  (no teams), with mute by account and the chat ban read as each player connects ([ranked.md](ranked.md)); typed as everywhere
+  (Nov 25: its bridge dropped the typed text, fixed), and a typer is told when the other player won't see the line ("Bo doesn't see
+  typed messages, only the quick lines." / "Bo has chat off, so they won't see this."; never for a mute).
+- **Chat turned on mid-match** (the chat options' "Typed chat"): the match tells the server only once the account's `chat_on` is
+  saved (`chatOnSaved`, set before the switch shows), since the server reads it to let you type (Nov 25: told before the save, typing
+  stayed refused for the rest of the match). [docs/decisions/2026-11-25-duel-vote-and-chat.md](../decisions/2026-11-25-duel-vote-and-chat.md).
 - **Quick chat in a match.** A chat button and panel in the places the design names (the match screens are the
   director's: no change to the board, clock, picks or reveal). Four groups of phrases: Hello and Sporting can go to
   everyone (the Team / All switch); Reactions and Plans stay inside your team, so plans stay secret. Emoji can go to
