@@ -211,8 +211,33 @@ interface TagArt {
   s: number;
   kind: TagKind;
   used: number;
-  /** `fontsLoaded` when it was drawn: a tag drawn before its font came is drawn again. */
+  /** `fontsLoaded` when it was drawn: a tag drawn before its font came is drawn again (-2: its font was in; -1: not drawn yet). */
   fonts: number;
+}
+/** A home's name drawn once a size (`Renderer.nameArtOf`): its outline's row and its white's, `rh` device pixels each; where x, y fall. */
+interface NameArt {
+  cv: HTMLCanvasElement;
+  ox: number;
+  oy: number;
+  rh: number;
+  /** As TagArt's. */
+  fonts: number;
+}
+/** The homes' names' outline (CSS pixels). */
+const NAME_LINE = 3.5;
+/** The sizes a home's name shows at (drawNames' clamp) and a tag (`tag`'s): the loading screen makes each (`makeLabels`). */
+const NAME_SIZES = [12, 20] as const;
+const TAG_SIZES = [8, 12] as const;
+/** The tables' clock's characters (TABLE_DIGITS), and the digits by value. */
+const CLOCK_CHARS = "0123456789:";
+const DIGIT = "0123456789".split("");
+/** Whether `font` is in (or there are no web fonts to wait for). */
+function fontReady(font: string): boolean {
+  try {
+    return typeof document === "undefined" || !document.fonts?.check || document.fonts.check(font);
+  } catch {
+    return true;
+  }
 }
 const TAG_PAD = 8;
 /** Counts the web fonts' loads finished (a tag's font, Archivo, may come after the town opens). */
@@ -819,7 +844,7 @@ export class Renderer {
   private tagDpr = 0;
   private readonly nameW = new Map<string, number[]>();
   /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
-  private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement[] }[];
+  private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement | null }[];
   /** Where each place's name floats this frame (drawn over everything, after the homes): x, the building's top, its fade. */
   private readonly names: { x: number; y: number; a: number; k: number; eave: number; dz: number }[];
   private readonly tops: number[] = [];
@@ -899,7 +924,7 @@ export class Renderer {
     this.names = this.places.map(() => ({ x: 0, y: 0, a: 0, k: 0, eave: NaN, dz: 0 }));
     this.signs = this.places.map((h) => {
       const face = artOf(h).sign;
-      return { ...layout(h.name, face.w, face.h), art: [] };
+      return { ...layout(h.name, face.w, face.h), art: null };
     });
     this.bossItems = town.bosses.map((_, i) => newItem("boss", i));
     this.propItems = PROPS.map((_, i) => newItem("prop", i));
@@ -1002,7 +1027,7 @@ export class Renderer {
     this.H = H;
     this.DPR = DPR;
     this.sky.resize(W, H, DPR);
-    for (const s of this.signs) s.art.length = 0;
+    if (this.nameDpr !== DPR) this.nameArt.length = 0;
   }
 
   /** The sky's look changed (the clock, or `?sky=`): the sky, the horizon's colors and the world's tint follow. */
@@ -1668,8 +1693,8 @@ export class Renderer {
             this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
             this.soonBox(it, this.soonOf(person), wview, f.youSquares);
           }
-          if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade, it.i);
-          if (person.zzz) this.zzz(it.i, it.fx, it.hy, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
+          if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, TAG_SIZES[0], TAG_SIZES[1]), this.fade, it.i);
+          if (person.zzz) this.zzz(it.i, it.fx, it.hy, clamp((11 * this.p.k) / v.kf, TAG_SIZES[0], TAG_SIZES[1]), this.fade);
         } else {
           const lk = person.look;
           if (isSprite(lk)) {
@@ -1705,10 +1730,10 @@ export class Renderer {
             const dist = Math.max(Math.abs(wrapF(it.dx - this.youDx)), Math.abs(wrapF(it.dz - this.youDz)));
             // (Eased toward it over about 150 ms, so a slow frame doesn't pop it: tags.ts easeTag.)
             const a = this.easedTag(person, tagAlpha(this.tagNames, dist, always, clamp((f.tagFar - far) / 0.12, 0, 1)), now);
-            if (a > 0.004) this.tag(person.name, it.fx, it.hy - 2, isSprite(lk) ? "sidekick" : "bot", clamp((11 * this.p.k) / v.kf, 8, 12), a * this.fade, it.i);
+            if (a > 0.004) this.tag(person.name, it.fx, it.hy - 2, isSprite(lk) ? "sidekick" : "bot", clamp((11 * this.p.k) / v.kf, TAG_SIZES[0], TAG_SIZES[1]), a * this.fade, it.i);
           }
           // (Away: the "zzz" over the head, near or far, whether or not the tag shows: everyone sees who's away.)
-          if (person.zzz && it.on && far < f.tagFar && this.fade > 0.02) this.zzz(it.i, it.fx, it.hy, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
+          if (person.zzz && it.on && far < f.tagFar && this.fade > 0.02) this.zzz(it.i, it.fx, it.hy, clamp((11 * this.p.k) / v.kf, TAG_SIZES[0], TAG_SIZES[1]), this.fade);
         }
         this.fade = 1;
         this.sitting = false;
@@ -1942,6 +1967,9 @@ export class Renderer {
         if (!sp.ready) return sp.failed ? undefined : false;
         for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) P().keep(c);
       });
+    // (The labels, Nov 25: once their fonts are in, up to `loadSheetWaitMs` all told; made fresh each visit, as they're quick.)
+    jobs.push(() => this.fontsIn());
+    jobs.push(() => this.makeLabels((c) => P().keep(c)));
     // (Painted ahead by planBoxes from here on: nothing left to paint. Marked done so it doesn't walk them again.)
     jobs.push(() => {
       for (const at of this.warmAt) at.fill(-1);
@@ -2408,8 +2436,7 @@ export class Renderer {
     const fit = Math.min((sign.w * px) / sg.w, (sign.h * px) / sg.h) * 0.94;
     const s = Math.floor(fit * DPR + 0.25);
     if (s < 1 || (s / DPR) * CAP < TOWN_FEEL.signMinCap) return;
-    let art = sg.art[s];
-    if (!art) art = sg.art[s] = renderLines(sg.lines, sg.w, sg.h, s, SIGN_INK);
+    const art = this.signArt(sg);
     // (In the picture's pixels: the lettering's CSS size over the front's scale.)
     const w = (sg.w * s) / DPR / px;
     const h = (sg.h * s) / DPR / px;
@@ -2423,8 +2450,10 @@ export class Renderer {
     const ty = Math.round(DPR * (m[1]! * lx + m[3]! * ly + m[5]!));
     ctx.setTransform(DPR * m[0]!, level ? 0 : DPR * m[1]!, DPR * m[2]!, DPR * m[3]!, tx, ty);
     ctx.globalAlpha = alpha;
-    ctx.imageSmoothingEnabled = true;
+    // (Nov 25: the one picture at its font's own pixels, `s` times over, nearest: the same pixels as a picture drawn at `s`.)
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(art, 0, 0, w, h);
+    ctx.imageSmoothingEnabled = true;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
   }
@@ -2598,7 +2627,6 @@ export class Renderer {
   private tablesAt = -1;
   private games: ({ pcs: TablePiece[]; moves: number; next: number; since: number } | null)[] = [];
   private pieceImgs = new Map<string, HTMLCanvasElement>();
-  private clockImgs = new Map<string, HTMLCanvasElement>();
   private bp = newPt();
   private bq = newPt();
   private grid = Array.from({ length: 81 }, () => newPt());
@@ -2678,34 +2706,61 @@ export class Renderer {
     return c;
   }
 
-  /** The clock's face for `text` (TABLE_DIGITS: black digits, their top edge lighter, a grey side under), made once. */
-  private clockImg(text: string): HTMLCanvasElement {
-    let c = this.clockImgs.get(text);
-    if (c) return c;
-    const glyphs = [...text].map((ch) => TABLE_DIGITS[ch]!);
-    c = document.createElement("canvas");
-    c.width = glyphs.reduce((n, gl) => n + gl[0]!.length + 1, 0) + 1;
+  /**
+   * The clock's digits and colon (TABLE_DIGITS: black, their top edge lighter, a grey side under) side by side in one picture, made
+   * once (Nov 25: before, each second's face was a picture of its own, made and uploaded as it ticked).
+   */
+  private clockStrip(): HTMLCanvasElement {
+    if (this.clockArt) return this.clockArt;
+    const ink = TABLE_CLOCK_INK;
+    const c = document.createElement("canvas");
+    let x = 0;
+    for (const ch of CLOCK_CHARS) {
+      this.clockAt[ch] = x;
+      x += TABLE_DIGITS[ch]![0]!.length + 1;
+    }
+    c.width = x;
     c.height = 7;
     const g = art2d(c);
-    const ink = TABLE_CLOCK_INK;
     // The side first (a pixel under each lit one), then the face over it.
-    for (const side of [true, false]) {
-      let x = 0;
-      for (const gl of glyphs) {
+    for (const side of [true, false])
+      for (const ch of CLOCK_CHARS) {
+        const gl = TABLE_DIGITS[ch]!;
+        const x0 = this.clockAt[ch]!;
         gl.forEach((row, j) => {
           for (let i = 0; i < row.length; i++) {
             if (row[i] !== "#") continue;
             g.fillStyle = side ? ink.side : j === 0 || gl[j - 1]![i] !== "#" ? ink.edge : ink.face;
-            g.fillRect(x + i, j + (side ? 1 : 0), 1, 1);
+            g.fillRect(x0 + i, j + (side ? 1 : 0), 1, 1);
           }
         });
-        x += gl[0]!.length + 1;
       }
+    return (this.clockArt = c);
+  }
+  private clockArt: HTMLCanvasElement | null = null;
+  private readonly clockAt: Record<string, number> = {};
+  private readonly clockText: string[] = [];
+
+  /** A game's clock, "m:ss" for `secs`, centered on x with its foot on y, `ps` pixels a font pixel: each character from `clockStrip`. */
+  private drawClock(secs: number, x: number, y: number, ps: number): void {
+    const strip = this.clockStrip();
+    const t = this.clockText;
+    t.length = 0;
+    for (let mins = Math.floor(secs / 60); ; mins = Math.floor(mins / 10)) {
+      t.unshift(DIGIT[mins % 10]!);
+      if (mins < 10) break;
     }
-    // (A minute's worth of faces at most: the old ones go.)
-    if (this.clockImgs.size > 64) this.clockImgs.clear();
-    this.clockImgs.set(text, c);
-    return c;
+    t.push(":", DIGIT[Math.floor((secs % 60) / 10)]!, DIGIT[secs % 10]!);
+    // (As one picture of them all: a column apart, one more at the end.)
+    let w = 1;
+    for (const ch of t) w += TABLE_DIGITS[ch]![0]!.length + 1;
+    let at = x - (w * ps) / 2;
+    const top = y - 7 * ps;
+    for (const ch of t) {
+      const gw = TABLE_DIGITS[ch]![0]!.length;
+      this.ctx.drawImage(strip, this.clockAt[ch]!, 0, gw, 7, at, top, gw * ps, 7 * ps);
+      at += (gw + 1) * ps;
+    }
   }
 
   /** The soft green ring on the ground under a waiting table's free stool (`free`: its index, west 0, east 1). */
@@ -2744,7 +2799,8 @@ export class Renderer {
    * Table `ti`'s top: the slab (its front face, its stone top), the board's 8 x 8 squares lying flat (two fills over one
    * 9 x 9 grid of points), its pieces standing up (far ones first), and over a game its clock. `s`: how far into the far
    * band it stands (its pieces and clock are left out far off). While nothing on it moves and the camera holds still, the
-   * slab, board and pieces are one picture, made on the second frame alike and reused (`boardCache`): one draw a frame.
+   * slab, board and pieces are one picture, made on the second frame alike and reused (`boardCache`): one draw a frame. (Canvas 2D
+   * only: WebGL draws it as it is, Nov 25.)
    */
   private drawBoard(it: Item, ti: number, state: TableState, now: number, alpha: number, s: number): void {
     const { ctx, view: v, DPR } = this;
@@ -2787,13 +2843,14 @@ export class Renderer {
       this.paintBoard(g, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
       g.restore();
     };
-    // The same picture as the last frame (camera, alpha and pieces alike): once seen twice, it's kept and reused.
+    // The same picture as the last frame (camera, alpha and pieces alike): once seen twice, it's kept and reused. (Not with WebGL,
+    // Nov 25: a picture made on the CPU is uploaded, a hitch each time the camera comes to rest; drawn as it is while you walk instead.)
     const c0 = this.grid[0]!;
     const c8 = this.grid[80]!;
     const key = `${Math.round((c0.x * m + tx) * 8)},${Math.round((c0.y * m + ty) * 8)},${Math.round((c8.x * m + tx) * 8)},${Math.round((c8.y * m + ty) * 8)},${Math.round(shift * m * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${DPR}`;
     const cache = (this.boardCache[ti] ??= { key: "", seen: "", cv: null, x: 0, y: 0, w: 0, h: 0 });
     ctx.globalAlpha = alpha;
-    if (moving || key !== cache.seen) {
+    if (moving || key !== cache.seen || this.paint.kind === "webgl") {
       cache.seen = moving ? "" : key;
       cache.key = "";
       paint(ctx);
@@ -2805,10 +2862,8 @@ export class Renderer {
     // The game's clock, floating over the middle of the board, straight above the leg.
     if (game && proj(v, it.dx, dz, top + B.clockLift, a)) {
       const secs = Math.floor((now - game.since) / 1000);
-      const img = this.clockImg(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`);
-      const ps = a.k * m * B.clockPx;
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, footX * m + tx - (img.width * ps) / 2, a.y * m + ty - img.height * ps, img.width * ps, img.height * ps);
+      this.drawClock(secs, footX * m + tx, a.y * m + ty, a.k * m * B.clockPx);
     }
     ctx.globalAlpha = 1;
   }
@@ -3145,7 +3200,7 @@ export class Renderer {
       const d = Math.max(0, Math.abs(wrapFX(me.x - h.cx)) - h.half, Math.abs(wrapFY(me.y - h.cy)) - h.half);
       const a = nm.a * clamp((f.nameShowFrom - d) / (f.nameShowFrom - f.nameFullAt), 0, 1);
       if (a <= 0.01) continue;
-      const size = Math.round(clamp((15 * nm.k) / v.kf, 12, 20));
+      const size = Math.round(clamp((15 * nm.k) / v.kf, NAME_SIZES[0], NAME_SIZES[1]));
       ctx.globalAlpha = a;
       ctx.font = NAME_FONT[size]!;
       let widths = this.nameW.get(h.name);
@@ -3167,17 +3222,104 @@ export class Renderer {
       }
       y += (1 - a) * f.nameRise;
       this.keepFree(nm.x - tw / 2 - 2, y - size - 2, tw + 4, size + 4);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = 3.5;
-      ctx.strokeStyle = INK;
-      ctx.strokeText(h.name, nm.x, y);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(h.name, nm.x, y);
+      this.drawName(i, size, nm.x, y);
     }
     ctx.globalAlpha = 1;
   }
+
+  /**
+   * Home `i`'s name at `size` (centered on x, its foot on y), from its picture (`nameArtOf`): its outline, then its white over it, at the
+   * alpha set, as strokeText and fillText drew them (Nov 25: before, each size a string came to was drawn and uploaded as it showed).
+   */
+  private drawName(i: number, size: number, x: number, y: number): void {
+    const { ctx, DPR } = this;
+    const a = this.nameArtOf(i, size);
+    const cw = a.cv.width;
+    // (On the device's pixel grid, so the picture lands pixel for pixel.)
+    const X = (Math.round(x * DPR) - a.ox) / DPR;
+    const Y = (Math.round(y * DPR) - a.oy) / DPR;
+    ctx.drawImage(a.cv, 0, 0, cw, a.rh, X, Y, cw / DPR, a.rh / DPR);
+    ctx.drawImage(a.cv, 0, a.rh, cw, a.rh, X, Y, cw / DPR, a.rh / DPR);
+  }
+
+  /** Home `i`'s name's picture at `size` (NAME_FONT): two rows, `rh` device pixels each, its outline and its white; made once. */
+  private nameArtOf(i: number, size: number): NameArt {
+    const row = (this.nameArt[i] ??= []);
+    const had = row[size];
+    if (had && (had.fonts === -2 || had.fonts === fontsLoaded)) return had;
+    const { DPR } = this;
+    this.nameDpr = DPR;
+    const text = this.places[i]!.name;
+    const font = NAME_FONT[size]!;
+    const cv = had?.cv ?? document.createElement("canvas");
+    const g = art2d(cv);
+    g.font = font;
+    g.textAlign = "center";
+    g.textBaseline = "bottom";
+    const mt = g.measureText(text);
+    const pad = NAME_LINE + 2;
+    const ox = Math.ceil((mt.actualBoundingBoxLeft + pad) * DPR);
+    const oy = Math.ceil((mt.actualBoundingBoxAscent + pad) * DPR);
+    const rh = oy + Math.ceil((mt.actualBoundingBoxDescent + pad) * DPR);
+    cv.width = Math.max(1, ox + Math.ceil((mt.actualBoundingBoxRight + pad) * DPR));
+    cv.height = 2 * rh;
+    g.font = font;
+    g.textAlign = "center";
+    g.textBaseline = "bottom";
+    g.setTransform(DPR, 0, 0, DPR, ox, oy);
+    g.lineJoin = "round";
+    g.lineWidth = NAME_LINE;
+    g.strokeStyle = INK;
+    g.strokeText(text, 0, 0);
+    g.setTransform(DPR, 0, 0, DPR, ox, rh + oy);
+    g.fillStyle = "#ffffff";
+    g.fillText(text, 0, 0);
+    const a: NameArt = { cv, ox, oy, rh, fonts: fontReady(font) ? -2 : fontsLoaded };
+    row[size] = a;
+    if (had) this.paint.changed(cv);
+    return a;
+  }
+  private readonly nameArt: (NameArt | undefined)[][] = [];
+  private nameDpr = 0;
+
+  /** A home's sign's lettering at its font's own pixels (sign-font.ts), made once: drawn `s` times over (writeSign, writeSignT). */
+  private signArt(sg: (typeof this.signs)[number]): HTMLCanvasElement {
+    return (sg.art ??= renderLines(sg.lines, sg.w, sg.h, 1, SIGN_INK));
+  }
+
+  /**
+   * (The loading screen, Nov 25: Eric's laptop, "1063 uploads" in 15 s of walking.) The labels, made here and kept (`keep`), so walking
+   * and zooming make and upload none: every home's sign and its name at every size it can show (NAME_SIZES), the tags of everyone in
+   * the town now at every size (TAG_SIZES, as `tag` sizes them), the sky's clouds and sun, the tables' clock digits. Someone arriving
+   * later has theirs made as they show (a few small pictures, once).
+   */
+  private makeLabels(keep: (c: HTMLCanvasElement) => void): void {
+    for (const sg of this.signs) keep(this.signArt(sg));
+    for (let i = 0; i < this.places.length; i++) for (let s = NAME_SIZES[0]; s <= NAME_SIZES[1]; s++) keep(this.nameArtOf(i, s).cv);
+    const people = this.town.people;
+    // (Room for them all, and as many again: the tags are let go only past it.)
+    this.tagArt.max = Math.max(TAG_ART_MAX, 2 * people.length * (TAG_SIZES[1] - TAG_SIZES[0] + 1));
+    for (const p of people) {
+      if (p.remote && !p.name) continue;
+      const kind: TagKind = p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot";
+      for (let s = TAG_SIZES[0]; s <= TAG_SIZES[1]; s++) keep(this.tagReady(p.name, s, kind).cv);
+    }
+    this.sky.warm(keep);
+    keep(this.clockStrip());
+  }
+
+  /** (The loading screen) Whether the labels' fonts are in (asked for the first time it's called): their pictures wait for them. */
+  private fontsIn(): boolean {
+    const fonts = typeof document === "undefined" ? undefined : document.fonts;
+    if (!fonts?.check) return true;
+    const list = [TAG_FONT[11]!, NAME_FONT[16]!, BUBBLE_FONT];
+    if (!this.fontsAsked) {
+      this.fontsAsked = true;
+      for (const f of list) void fonts.load(f).catch(() => undefined);
+    }
+    return list.every(fontReady);
+  }
+  private fontsAsked = false;
 
   /** Whether the box (x, y, w, h) on screen lies under a street-town building standing nearer than `dz` (drawn this frame): it'd hide it. */
   private overNearer(x: number, y: number, w: number, h: number, dz: number): boolean {
@@ -3438,7 +3580,7 @@ export class Renderer {
   /**
    * Writes a home's name on its sign's face (fx, fy, fw, fh) in the signs' pixel capitals (sign-font.ts), on one line
    * or two, as big as fits in whole device pixels, and only when its letters are big enough to read (`signMinCap`);
-   * else the board stays blank. Each size is drawn once.
+   * else the board stays blank. One picture a sign, at its font's own pixels (`signArt`), drawn `s` times over, nearest (Nov 25).
    */
   private writeSign(i: number, fx: number, fy: number, fw: number, fh: number, alpha: number): void {
     const { ctx, DPR } = this;
@@ -3446,8 +3588,7 @@ export class Renderer {
     const fit = Math.min(fw / sg.w, fh / sg.h) * 0.94; // CSS pixels a font pixel
     const s = Math.floor(fit * DPR + 0.25); // device pixels a font pixel, whole, so the letters stay crisp
     if (s < 1 || (s / DPR) * CAP < TOWN_FEEL.signMinCap) return;
-    let art = sg.art[s];
-    if (!art) art = sg.art[s] = renderLines(sg.lines, sg.w, sg.h, s, SIGN_INK);
+    const art = this.signArt(sg);
     const w = (sg.w * s) / DPR;
     const h = (sg.h * s) / DPR;
     ctx.globalAlpha = alpha;
@@ -3458,8 +3599,7 @@ export class Renderer {
   /** A name tag over a figure: white for the pawns, gold for you, blue for a boss's sidekick; it shrinks with distance. Stamped from its drawing (`tagArtOf`). */
   private drawTag(text: string, ax: number, ay: number, kind: TagKind, size: number, alpha: number): void {
     const { ctx, DPR } = this;
-    const a = this.tagArtOf(text, Math.round(size), kind);
-    if (a.fonts !== fontsLoaded) this.paintTag(a, text);
+    const a = this.tagReady(text, Math.round(size), kind);
     a.used = this.frameNo;
     this.keepFree(ax - a.w / 2, ay - a.h, a.w, a.h);
     // (On the device's pixel grid, so the drawing lands pixel for pixel.)
@@ -3494,11 +3634,19 @@ export class Renderer {
     return a;
   }
 
+  /** A tag's drawing (`tagArtOf`), painted if it's new or was painted before its font came. */
+  private tagReady(text: string, s: number, kind: TagKind): TagArt {
+    const a = this.tagArtOf(text, s, kind);
+    if (a.fonts !== -2 && a.fonts !== fontsLoaded) this.paintTag(a, text);
+    return a;
+  }
+
   /** Draws a tag's four rows (`tagArtOf`) into its canvas, sized to its name in its font. */
   private paintTag(a: TagArt, text: string): void {
     const { DPR } = this;
     const { cv, s } = a;
-    a.fonts = fontsLoaded;
+    // (Its font in: never painted again. Not yet: painted again when a font comes.)
+    a.fonts = fontReady(TAG_FONT[s]!) ? -2 : fontsLoaded;
     const g = art2d(cv);
     g.font = TAG_FONT[s]!;
     const w = (a.w = g.measureText(text).width + s * 1.25);
@@ -3557,8 +3705,11 @@ export class Renderer {
     }
     const lh = 16;
     const h = b.lines.length * lh + 10;
-    const bx = clamp(ax - b.w / 2, 6, W - b.w - 6);
-    const by = Math.max(6, ay - h - 9);
+    // (On whole device pixels, Nov 25: its shadowed shape is drawn once a shape (paint-gl.ts `bakeFill`), and a speaker gliding a
+    // fraction of a pixel made a new one, and an upload, every frame.)
+    const { DPR } = this;
+    const bx = Math.round(clamp(ax - b.w / 2, 6, W - b.w - 6) * DPR) / DPR;
+    const by = Math.round(Math.max(6, ay - h - 9) * DPR) / DPR;
     this.keepFree(bx, by, b.w, h + 7);
     ctx.save();
     ctx.globalAlpha = 1;
@@ -3568,7 +3719,7 @@ export class Renderer {
     ctx.fillStyle = "#fff";
     roundRect(ctx, bx, by, b.w, h, 12);
     ctx.fill();
-    const tx = clamp(ax, bx + 14, bx + b.w - 14);
+    const tx = Math.round(clamp(ax, bx + 14, bx + b.w - 14) * DPR) / DPR;
     ctx.beginPath();
     ctx.moveTo(tx - 6, by + h - 1);
     ctx.lineTo(tx + 6, by + h - 1);
