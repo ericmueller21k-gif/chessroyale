@@ -194,3 +194,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - When Eric asks for a change and a mockup is in progress, the mockup shows EVERY ask so far (not only the brief): Nov 25, the standing status box was in the brief but missing from the mock, and he saw the gap again.
 - A waiter on .done also needs a look at the helper's session after ~1 h: Nov 25 the Squads helper went idle at 16:20 with .pr-body.md/.done uncommitted and sat 3 h unseen. Briefs say: COMMIT and push .pr-body.md and .done.
 - Send a working helper one message per round and wait for its report before the next: Nov 26 two corrections crossed on vote-card-fill and it built both in turn.
+- A question to Eric about anything on screen goes WITH its picture, in the same message (Nov 26: 'boss bar' and 'quest row' asked in words for a day; he didn't know what they were).

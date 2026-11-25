@@ -2143,3 +2143,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: Eric asked Stripe status (answered: PR1-2 done, PR3 coin strip paused at 98c2a8cc, PR4-12 not started; Stripe checkout = PR8, needs 5 storage first; test key saved Nov 25). Eric's ideas noted in notes/briefs/eric-ideas-nov26.md (settings→Handbook + left menu tab; engine wording; chess-integrity statement).
 - Nov 26: #959 (Squads frame) MERGED 1c9d60ee. Main run watched. Running: pay-coin-strip finish (session_01JuCWRrjsrCbKQyK4tbCnyF, high). vote-card-fill waits for Eric's OK (merge main into it first: #959 touched Vote.tsx).
 - Nov 26: main 1c9d60ee GREEN + LIVE (Squads frame).
+- Nov 26: ERIC: vote fill GOOD → PR #960 (6f1f0d8b) CI. Squads frame 'perfect'. Eric didn't know 'boss bar'/'quest row' → sent stills (game-layout-mockup alone before/after; end-screens-2 duel-xp-win phone quest gap). Lesson: questions to Eric carry their picture.
