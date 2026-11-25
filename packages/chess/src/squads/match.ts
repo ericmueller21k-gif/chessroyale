@@ -1,6 +1,6 @@
 import { SQUADS, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
-import { START_FEN, fenAfter } from "../rules.ts";
-import { pickOpenings, type Opening } from "../openings.ts";
+import { START_FEN, fenAfter, inCheck } from "../rules.ts";
+import { pickOpenings, usableAt, type Opening } from "../openings.ts";
 import {
   boardPoints,
   colourToMove,
@@ -182,9 +182,18 @@ export function openingStart(o: Opening, s: SquadsSettings = SQUADS): BoardStart
   return { fen: fenAfter(o.moves.slice(0, 2 * s.openingMoves)), openingId: o.id };
 }
 
-/** `count` different balanced openings (classic lines, distinct families where the library allows). */
+/**
+ * The library lines a Squads board can start from: usable at `openingMoves` and not leaving the side to move in check
+ * (Eric, Nov 25: no forced first move, e.g. the Steinitz Gambit's 4...Qh4+).
+ */
+export function squadsOpenings(library: readonly Opening[], s: SquadsSettings = SQUADS): Opening[] {
+  const plies = 2 * s.openingMoves;
+  return library.filter((o) => usableAt(o, plies, s.openingBalance) && !inCheck(fenAfter(o.moves.slice(0, plies))));
+}
+
+/** `count` different balanced openings (classic lines, distinct families where the library allows), none starting in check. */
 export function drawOpenings(library: readonly Opening[], count: number, rng: () => number, s: SquadsSettings = SQUADS): BoardStart[] {
-  const picked = pickOpenings(rng, library, { classic: count, unusual: 0 }, 2 * s.openingMoves, s.openingBalance);
+  const picked = pickOpenings(rng, squadsOpenings(library, s), { classic: count, unusual: 0 }, 2 * s.openingMoves, s.openingBalance);
   if (picked.length < count) throw new Error("Not enough openings in the library");
   return picked.slice(0, count).map((o) => openingStart(o, s));
 }
