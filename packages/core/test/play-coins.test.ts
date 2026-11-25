@@ -119,25 +119,34 @@ describe("play coins (PLAY_COINS, Nov 25; the payments design's section 6)", () 
     expect(paid).toBe(600);
   });
 
-  it("a game's share never drifts: any order of bonuses sums to the steps' curve at their earned total, rounded", () => {
-    for (const seq of [
-      [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15],
-      [5, 5, 5, 5, 5, 40, 25, 5, 10, 15, 5, 5, 5, 5, 25],
-      [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40],
-    ]) {
+  it("a game's share is its bonus at the steps' rates from where the day stands, within half a coin; the rounding isn't carried, so a day can run a few coins off the exact curve, never past 300", () => {
+    const wins = Array<number>(45).fill(15);
+    const draws = Array<number>(120).fill(5);
+    const mixed = [5, 5, 5, 5, 5, 40, 25, 5, 10, 15, 5, 5, 5, 5, 25, ...Array<number[]>(30).fill([15, 10, 5]).flat()];
+    const runs = [wins, draws, mixed, Array<number>(40).fill(40), Array<number>(45).fill(25)].map((seq) => {
       let p = 0;
       let e = 0;
-      for (const b of seq) {
+      let ahead = 0;
+      let full = 0;
+      for (const [i, b] of seq.entries()) {
         const got = bonusFor(p, b);
+        // (Its share: the steps' value from the paid total's place on the curve, rounded: within half a coin, never past the bonus.)
+        if (p < 300) expect(Math.abs(got - (bonusPaidAt(bonusEarnedAt(p) + b) - p))).toBeLessThanOrEqual(0.5);
         expect(got).toBeGreaterThanOrEqual(0);
         expect(got).toBeLessThanOrEqual(b);
         p += got;
         e += b;
-        // (Never past the curve at the bonus earned; at most a coin or two under it from rounding small bonuses at a quarter.)
-        expect(p).toBeLessThanOrEqual(Math.round(bonusPaidAt(e)) + 1);
+        ahead = Math.max(ahead, p - bonusPaidAt(e));
         expect(p).toBeLessThanOrEqual(300);
+        if (p === 300 && !full) full = i + 1;
       }
-    }
+      expect(p).toBe(300);
+      return { full, ahead };
+    });
+    // (Only wins: 15, 8 for each 7.5, 4 for each 3.75: the 300 at the 35th win, where the exact curve (550 earned) takes 37; 6.25 ahead
+    // at most. Only draws: 3 for each 2.5, 1 for each 1.25: up to 16.5 ahead midway, and the 300 at the 113th, the curve's 110th.)
+    expect(runs[0]).toEqual({ full: 35, ahead: 6.25 });
+    expect(runs[1]).toEqual({ full: 113, ahead: 16.5 });
     expect(bonusFor(0, 0)).toBe(0);
     expect(bonusFor(-5, 15)).toBe(15);
   });

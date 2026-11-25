@@ -106,8 +106,11 @@ export function bonusStep(paid: number, steps = PLAY_COINS.bonusSteps): number {
 
 /**
  * A game's bonus paid, with `paid` bonus already paid today: the day's paid total moves from `paid` to the steps' value at the
- * earned bonus it stands for plus `earned`, rounded (half up). So the day's paid bonus is always a whole number on the steps' curve,
- * a game's share never drifts, and the day never passes bonusMax. (A win past the first step: 15, then 8, then 4.)
+ * earned bonus it stands for plus `earned`, rounded (half up). So a game's share is its bonus at the steps' rates from where the day's
+ * paid total stands, to within half a coin (a win: 15, then 8 for 7.5, then 4 for 3.75), and the day never passes bonusMax. The
+ * rounding isn't carried over (the paid total is the only state): over a day the paid total can run a few coins off the steps' exact
+ * curve at the bonus earned, most with many small bonuses (only wins: 300 at the 35th, where the exact curve takes about 37; only
+ * draws: up to 16 ahead midway, 300 at the 113th, the curve's 110th). The review's m4, Nov 25.
  */
 export function bonusFor(paid: number, earned: number, steps = PLAY_COINS.bonusSteps): number {
   const max = bonusMax(steps);
@@ -142,9 +145,8 @@ export function coinParts(r: CoinResult | undefined, solo = false, s = PLAY_COIN
  */
 export function gameCoins(g: CoinGame, day: CoinDay, s = PLAY_COINS): PlayCoins {
   const today = { play: Math.max(0, day.play), bonus: Math.max(0, day.bonus) };
-  const none: CoinNone | undefined = g.xp.none ?? (g.held ? "held" : undefined);
-  if (none) return { play: 0, bonus: 0, parts: [], step: null, today, none };
-  if (g.xp.none !== undefined) return { play: 0, bonus: 0, parts: [], step: null, today };
+  // (XP's reason first, else fair play's hold: one check, which also tells the type the game has minutes past it.)
+  if (g.xp.none !== undefined || g.held) return { play: 0, bonus: 0, parts: [], step: null, today, none: g.xp.none ?? "held" };
   const minutes = Math.max(0, Math.min(g.xp.minutes, g.paidMinutes ?? g.xp.minutes));
   const solo = !!g.solo;
   const play = Math.max(0, Math.min(playCoinsFor(minutes, solo, s), s.perDay - today.play));

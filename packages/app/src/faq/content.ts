@@ -1252,7 +1252,7 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 - **The bonus slows through the day:** the first ${steps[0]?.upTo ?? 0} bonus coins of a day pay in full, ${steps.slice(1).map((st, i) => `the next ${st.upTo - steps[i]!.upTo} ${st.rate === 0.5 ? "at half" : st.rate === 0.25 ? "at a quarter" : `at ${Math.round(st.rate * 100)}%`}`).join(", ")}, then none: at most ${bonusTop} bonus coins and **${P.perDay + bonusTop} coins a day** in all.
 - **Games on your device** pay play coins for the time that earned XP under their daily limit, and no bonus.
 
-After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level that pays, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
+After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level that pays, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, coins, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
 `,
   };
 }

@@ -15,7 +15,8 @@ const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 export const RANKED_SCHEMA = [
   // One row per player who has played a ranked 1 v 1 game: the hidden rating (Glicko-1: rating, rd), the record, and
   // the ladder (null until the placements are done). `last_game`: the game that last changed it. `coin_day`,
-  // `coin_games`: the UTC day of their last paying game and how many paid that day (RANKED_1V1.coins.perDay). `peak`: the
+  // `coin_games`: ranked's old daily coin cap (the UTC day of their last paying game, how many paid that day), kept as they were and
+  // no longer read or moved since Nov 25 (a ranked game pays PLAY_COINS with its XP: docs/decisions/2026-11-25-play-coins.md). `peak`: the
   // highest ladder reached (kept from Oct 28, 2026; it started at the ladder then), `streak`: the current run of wins.
   `CREATE TABLE IF NOT EXISTS ranked_1v1 (
     user_id TEXT PRIMARY KEY,
@@ -84,7 +85,8 @@ export const RANKED_SCHEMA = [
 
 /** Columns added after the table first shipped on a test server (accounts.ts adds them to a table made before). */
 export const RANKED_COLUMNS: { table: string; column: string; type: string; then?: string[] }[] = [
-  // The daily coin cap (Oct 16, 2026: RANKED_1V1.coins.perDay).
+  // Ranked's old daily coin cap (Oct 16, 2026), no longer read or moved since Nov 25 (play coins: PLAY_COINS); kept, no destructive
+  // migration.
   { table: "ranked_1v1", column: "coin_day", type: "INTEGER" },
   { table: "ranked_1v1", column: "coin_games", type: "INTEGER NOT NULL DEFAULT 0" },
   // The public profile's numbers (Oct 28, 2026), kept from then on: the peak starts at each player's ladder then; the
