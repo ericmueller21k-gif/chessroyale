@@ -179,3 +179,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - **A change Eric makes while a helper runs goes into its brief AND is checked in its result before the PR (Nov 24):** the crate build
   shipped sound A's spin though Eric had asked for C's (the message reached the helper after it had built the sounds). Read the result for
   every late item before opening the PR.
+- (Nov 25) Computer layouts are checked at REAL laptop sizes, not just 1280×800/1440×900/1920×1080: 1536×730 (1080p at Windows' recommended 125%: Eric's laptop), 1280×600 (150%), 1366×650, and a 1920×960 desktop. Every brief for a computer screen names them; stills for Eric include his laptop size.
