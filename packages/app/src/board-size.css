@@ -435,9 +435,29 @@
   .screen.game.sq-game > .hud-row {
     grid-column: 2;
     grid-row: 1;
+    position: relative;
     height: 40px;
     margin: 0;
+    gap: 4px;
     align-items: center;
+  }
+  /* (The score in what the replay button and the gear leave: at the column's least, 280 px, the widest two squads and score, "Bishops
+     2½–1½ Knights", whole. A test lobby's "Next round" at the strip's left end, over the board's left edge.) */
+  .screen.game.sq-game > .hud-row > .sq-next {
+    position: absolute;
+    top: 6px;
+    left: calc(-1 * (var(--cf-gap) + var(--cf-bw)));
+  }
+  .screen.game.sq-game > .hud-row > .hud {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+  }
+  .screen.game.sq-game > .hud-row > .hud .sq-hud-vs {
+    gap: 4px;
+  }
+  .screen.game.sq-game > .hud-row > .rp-btn {
+    width: 32px;
   }
   .screen.game.sq-game > .sq-boards {
     grid-column: 2;

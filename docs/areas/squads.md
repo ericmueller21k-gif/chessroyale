@@ -24,8 +24,9 @@ move.
   button skips to the end; reduced motion: the end at once. The reward card after it (Nov 22, [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md)) shows only crates and keys (`RewardBox endScreen`): centered, in the crate screens' blue window, OK and Go to inventory (your inventory as a layer over the end screen, `InventoryLayer`). The results' middle: your squad (its tag and members); the headline "Victory!" (champions) or your place. The card's run plays once: the results show its end. Its rules and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
-  less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column: 848 px at
-  1920 × 1080, width-bound at 1280 × 800 (504, as before).
+  less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column. Since Nov 26, at 1100 px
+  and up with a mouse, the 50 v 50's frame (below, "On a computer"): the window's height less 92, as wide as the standings, the column's
+  least (280) and the gaps leave: 634 at 1536 × 730 (125%), 864 at 1920 × 960, 984 at 1920 × 1080, 504 at 1280 × 800.
 - **Its kill switch** (`PAUSE_SQUADS`, [ops.md](ops.md) "Kill switches"): no new queue or party (503 with "Squads is
   resting for a bit. Back soon."); a party already in line waits with that line and goes in once it's back; lobbies
   already running finish; admins' test lobbies stay open.
@@ -510,6 +511,18 @@ door's look; every class is `sq-`.
   loss, and a bot takes your seat"). The match's top line ends in the match's control as in every mode
   (`MatchMenu`: the gear, with Sound, Animations and Resign, on a phone and a computer; `squadsExit` says what it offers), and the
   votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home: an end screen since Nov 25 (round 2c: the headline, the flag, the buttons stacked, one gap, centered; the results' buttons stacked too).
+- **On a computer** (1100 px and up with a mouse; Nov 26, [2026-11-26-squads-frame.md](../decisions/2026-11-26-squads-frame.md);
+  `board-size.css`, "Squads' frame"): the 50 v 50's frame, reused. Eric's column rule ([eric.md](../rules/eric.md)): the standings,
+  the board and the column beside it start and end on the board's two lines (its squares' top, and their foot with the clock's bar),
+  with one 28 px gap either side of the board. No title line: the board line is the top strip, centered on the board. The score and
+  round sit at the column's top, the replay button and the gear at its right end; a test lobby's "Next round" sits at the strip's left
+  end. The column: the tiny boards (two matches a row) on the board's top line, then the panel, a standing box to the board's foot
+  (`board-foot.ts`). The panel holds your pick or vote, a gray "Waiting…" (`SlotIdle`) while there's nothing to pick, the rules line,
+  and a Relay's turn order (its rows scroll inside it). The standings: "Squads · team clocks" in the strip, their rows in a box from the
+  board's top to its foot (`.sq-standings-rows`, no box elsewhere), scrolling inside it where they're taller (Eric's laptop). The votes
+  use the 50 v 50's vote frame (`VoteScreen frame`): its title is the top row, its line and cards are in the column, and then the
+  lobby's votes (`VoteSteps`) run to the board's foot. Squads has no chat. Guard: `e2e/desktop-board.spec.ts`, "Eric's column rule…"
+  (the votes, Pairs and Relay at 1536 × 730 and 1920 × 960). A phone, a tablet and a computer under 1100 px are unchanged.
 - **A match** (`screens/SquadsMatch.tsx`): the score and round on top, the strip, every board in the lobby as tiny
   boards (`TinyBoard`, match by match, your squad's ringed, YOU on your board and NEXT on the next board you'll move on (Relay skips a finished one, as the quick jump does: Nov 18); tappable only once
   you've moved or locked in: one opens full size with "Back to my board"; a new half that asks something of you brings
