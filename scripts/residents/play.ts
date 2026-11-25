@@ -67,7 +67,7 @@ export function thinkMs(x: ThinkInput, rng: Rng, s: ResidentSettings = RESIDENTS
     if (rng() < d.slowFlagChance) return Math.round(x.clockMs + 500);
   }
   const latest = x.clockMs - d.safetyMs;
-  return Math.round(Math.max(Math.min(d.minThinkMs, Math.max(0, latest)), Math.min(ms, latest)));
+  return Math.floor(Math.max(Math.min(d.minThinkMs, Math.max(0, latest)), Math.min(ms, latest)));
 }
 
 /** Whether to resign now: well behind in material, past the opening (a rage-quitter: sooner). */
