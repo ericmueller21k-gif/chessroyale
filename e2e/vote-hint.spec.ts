@@ -75,7 +75,7 @@ test("50 v 50's vote (Eric, Nov 26): the hint covers no zone's name or count, an
   });
   expect(overlaps).toBe(0);
   await underZones(page);
-  // The fills follow the counts: votes / all votes of the card's height, from its foot; the cards keep their size.
+  // The fills follow the counts: votes / all votes of the card's height, up from its foot; the cards keep their size.
   const sizes = await page.locator(".vote-card").evaluateAll((els) => els.map((e) => [e.clientWidth, e.clientHeight].join("x")));
   const fit = () =>
     page.evaluate(() => {
@@ -86,7 +86,8 @@ test("50 v 50's vote (Eric, Nov 26): the hint covers no zone's name or count, an
       return cards
         .map((c, i) => {
           const card = c.getBoundingClientRect(), f = c.querySelector(".vote-card-fill")!.getBoundingClientRect();
-          return Math.abs(f.height - (card.height * n[i]!) / total) <= 3 && Math.abs(f.bottom - card.bottom) <= 3 ? "ok" : `card ${i}: ${f.height} of ${card.height} for ${n[i]}/${total}`;
+          const shown = card.bottom - f.top;
+          return Math.abs(shown - (card.height * n[i]!) / total) <= 3 ? "ok" : `card ${i}: ${shown} of ${card.height} for ${n[i]}/${total}`;
         })
         .filter((x) => x !== "ok")
         .join("; ") || "ok";

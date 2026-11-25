@@ -451,7 +451,7 @@ export function VoteScreen({
               aria-disabled={o.disabled ? true : undefined}
               onClick={() => cast(i, voteZoneCentre(zoneOf(i), side))}
             >
-              {/* Its share of the votes, rising from the card's foot (Eric, Nov 26): a scaleY transition, the card's box never changes. */}
+              {/* Its share of the votes, rising from the card's foot (Eric, Nov 26): slid up from its foot, the card's box never changes. */}
               {!o.disabled && <i class="vote-card-fill" aria-hidden="true" style={{ "--fill": String(counts[i]! / total) }} />}
               <strong>{o.label}</strong>
               <span class="vote-card-blurb">{o.blurb}</span>

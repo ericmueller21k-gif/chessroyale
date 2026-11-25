@@ -4872,16 +4872,27 @@ button.history-label {
   color: var(--muted);
   line-height: 1.25;
 }
-/* Each card fills upward with its share of the votes (Eric, Nov 26): the bar's color, light enough to read the name and blurb
-   over. One element per card, scaled from its foot (no layout per frame); the card's box never changes. */
+/* Each card fills upward with its share of the votes (Eric, Nov 26): the bar's color (35%; 40% on the dark card) with a 2 px top
+   edge in it, under the name, blurb and count. One element per card, as tall as the card, slid up from below its foot by its share
+   (a translate: no layout per frame, and the edge stays 2 px, as a scale would squash it); the card's box never changes. */
 .vote-card-fill {
   position: absolute;
   inset: 0;
   z-index: -1;
-  transform-origin: bottom;
-  transform: scaleY(var(--fill, 0));
-  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  transform: translateY(calc((1 - var(--fill, 0)) * 100%));
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  border-top: 2px solid var(--accent);
   transition: transform 300ms ease-out;
+}
+/* (Where the edge crosses the name, blurb or count, a halo of the card's own color keeps the letters clear of the line.) */
+.vote-card > :not(.vote-card-fill) {
+  text-shadow:
+    0 0 2px var(--surface),
+    0 0 2px var(--surface),
+    0 0 3px var(--surface);
+}
+:root[data-theme="dark"] .vote-card-fill {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .vote-card-count {
   display: inline-block;

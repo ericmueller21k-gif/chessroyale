@@ -158,7 +158,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   second longer"; was 3.2). `?speed=bullet|blitz|rapid` skips the vote for tests (old ids map over: normal → rapid, variable →
   blitz; an unknown id gets Blitz).
 - **The vote cards fill upward** (Eric, Nov 26; [2026-11-26-vote-card-fill.md](../decisions/2026-11-26-vote-card-fill.md)): no bar;
-  each card's fill rises from its foot to its share of all the votes (`.vote-card-fill`, `scaleY`), the count at its foot, the box
+  each card's fill rises from its foot to its share of all the votes (`.vote-card-fill`, a `translateY` transition), the count at its foot, the box
   unchanged; phone and computer. Guard: `e2e/vote-hint.spec.ts`, "50 v 50's vote (Eric, Nov 26)…".
 - **How it starts** (Eric, Oct 24; docs/decisions/2026-10-24-opening-vote.md): the second vote. Each option's patch sets
   `crowdStart` and `openingMoves`; `MatchRunner.patchSettings` then sets the board up before move 1 (`setUpStart`), one
