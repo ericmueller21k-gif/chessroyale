@@ -182,10 +182,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - Your icon (no coins at the top: the shop shows them, Eric, Oct 18; the profile's coins pill went Nov 17), and the live line ("214 online · 9 matches running · 31 in queue") with the typical
   - **On a game's screen** (Nov 1, Eric: "the side menu… on the desktop still"; docs/decisions/2026-11-01-game-screens-computer.md):
     a computer with a mouse has the same side menu beside every game screen (`GameFrame`, `game-frame.css`): 232 px with labels
-    wherever they cost the board nothing, else icons only (labels as tooltips). Since Nov 25 ([decision](../decisions/2026-11-25-menu-labels.md))
-    the frame tries the labels and keeps them where the board is the same size and inside its column (`useMenuLabels`; the column beside it
-    may narrow to its 280 px least): Eric's laptop (1536 × 730) has them on every screen; a page without a board keeps the old 1800 px.
-    (From 1800 px, Nov 1 round 2; 1366 before.) An item leaves the match through the gear's own Resign or Leave confirm,
+    from 1800 px wide (Nov 1, round 2; 1366 before) and, since Nov 25 ([decision](../decisions/2026-11-25-menu-labels.md)), wherever else
+    they cost the game nothing: the frame tries them and keeps them where the board is the same size inside its column and the column beside
+    it as wide (`useMenuLabels`; Eric's laptop, 1536 × 730: 1 v 1 and Squads). Elsewhere icons only (labels as tooltips). An item leaves the match through the gear's own Resign or Leave confirm,
     then goes to its page. A phone and a touch tablet have none.
     wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).

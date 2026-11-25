@@ -623,13 +623,14 @@ test("a computer's boss battle with chat: the chat box under the moves, the same
 });
 
 /**
- * The front door's side menu on a computer's game screens (Boss alone, the Crowd, 1 v 1, Squads): its labels wherever they cost the board
- * nothing, else icons only (the labels as tooltips, read by screen readers). Nov 25 (Eric: "Why isn't the names on the left appearing
- * there's plenty of space?"; docs/decisions/2026-11-25-menu-labels.md): the frame keeps the labels where the board is the same size and inside
- * its column with them (was: from 1800 px wide, Nov 1 round 2). At 1280 × 800 that's 1 v 1 only; Eric's laptop (1536 × 730 at 125%) has them
- * on every screen. A phone and a touch tablet have none (the touch test above keeps their boards to the pixel).
+ * The front door's side menu on a computer's game screens (Boss alone, the Crowd, 1 v 1, Squads): its labels from 1800 px and wherever else
+ * they cost the game nothing, else icons only (the labels as tooltips, read by screen readers). Nov 25 (Eric: "Why isn't the names on the
+ * left appearing there's plenty of space?"; docs/decisions/2026-11-25-menu-labels.md): the frame keeps the labels where the board is the same
+ * size inside its column and the column beside it as wide (was: from 1800 px only, Nov 1 round 2). On Eric's laptop (1536 × 730 at 125%)
+ * that's 1 v 1 and Squads; the 50 v 50 keeps its icons there (its column, and so its chat, would narrow). A phone and a touch tablet have
+ * none (the touch test above keeps their boards to the pixel).
  */
-test("a computer's game screens: the side menu is on each; its labels wherever the board is the same with them (Eric's laptop: every screen), else icons with the labels as tooltips", async ({ browser }) => {
+test("a computer's game screens: the side menu is on each; its labels from 1800 px and wherever the board and the column beside it are the same with them (Eric's laptop: 1 v 1), else icons with the labels as tooltips", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
   test.setTimeout(12 * 60_000);
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -662,11 +663,11 @@ test("a computer's game screens: the side menu is on each; its labels wherever t
   await page.setViewportSize({ width: 1280, height: 800 });
   for (const screen of ["crowd", "duel", "squads"] as Screen[]) {
     await into(page, screen);
-    // (1 v 1's board, the window's height less its strips, leaves its column the room: the labels.)
-    await check(`${screen} 1280 x 800`, screen === "duel");
+    await check(`${screen} 1280 x 800`, false);
   }
   await ctx.close();
-  // Eric's laptop (1536 × 730 at 125%): the labels on 1 v 1 and the 50 v 50, and each board the size it is with icons only, inside its column.
+  // Eric's laptop (1536 × 730 at 125%): the labels on 1 v 1, its board 621, the size it is with icons only, inside its column, and the panel
+  // beside it as wide. (The 50 v 50 keeps its icons there: with the labels its column, and its chat, would narrow.)
   const laptop = REAL_SCREENS[0];
   for (const screen of ["duel", "crowd"] as Screen[]) {
     const lc = await realScreenContext(browser, laptop);
@@ -674,7 +675,12 @@ test("a computer's game screens: the side menu is on each; its labels wherever t
     await into(lp, screen);
     await lp.waitForTimeout(300);
     const side = lp.locator(".gm-frame > .fd-side");
-    expect(Math.abs((await side.boundingBox())!.width - 232), `${screen} on the ${laptop.name}: the labels`).toBeLessThanOrEqual(1);
+    const labels = screen === "duel";
+    expect(Math.abs((await side.boundingBox())!.width - (labels ? 232 : 80)), `${screen} on the ${laptop.name}: ${labels ? "the labels" : "icons only"}`).toBeLessThanOrEqual(1);
+    if (!labels) {
+      await lc.close();
+      continue;
+    }
     expect((await side.locator(".fd-menu-item > span:last-child").first().boundingBox())!.width, `${screen} on the ${laptop.name}: its labels show`).toBeGreaterThan(20);
     const board = (menu: string) =>
       lp.evaluate(
@@ -683,7 +689,7 @@ test("a computer's game screens: the side menu is on each; its labels wherever t
           if (menu) document.head.insertAdjacentHTML("beforeend", `<style id="probe-menu">.gm-frame { --gm-menu: ${menu} !important; }</style>`);
           const b = document.querySelector(`.board-area .board-row > .board-wrap ${sel}`)!.getBoundingClientRect();
           const a = document.querySelector(".board-area")!.getBoundingClientRect();
-          return { w: b.width, inside: b.left >= a.left - 0.5 && b.right <= a.right + 0.5 };
+          return { w: b.width, inside: b.left >= a.left - 0.5 && b.right <= a.right + 0.5, panel: document.querySelector(".dv-side")!.getBoundingClientRect().width };
         },
         { menu, sel: BOARD_SEL.container },
       );
@@ -692,6 +698,7 @@ test("a computer's game screens: the side menu is on each; its labels wherever t
     await board("");
     expect(shown.inside, `${screen} on the ${laptop.name}: the board inside its column`).toBe(true);
     expect(Math.abs(shown.w - icons.w), `${screen} on the ${laptop.name}: the board with the labels (${shown.w}) as with icons only (${icons.w})`).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(shown.panel - icons.panel), `${screen} on the ${laptop.name}: the panel beside it as wide (${shown.panel} v ${icons.panel})`).toBeLessThanOrEqual(0.5);
     if (screen === "duel") expect(Math.abs(shown.w - 621), `the 1 v 1's board on the ${laptop.name}: 621`).toBeLessThanOrEqual(1);
     await lc.close();
   }

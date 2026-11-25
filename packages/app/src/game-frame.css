@@ -5,9 +5,10 @@
  * (`display: contents`), and the rules below are for a computer with a mouse only (MOUSE_LAYOUT).
  *
  * - The side menu: the front door's (components/FrontMenu.tsx, SideMenu, `game`), on every game screen with a board. 232 px with its
- *   labels (`gm-labels`) wherever they cost the board nothing: the frame tries them and keeps them only where the board is the same size and
- *   inside its column (Nov 25, FrontMenu.tsx useMenuLabels; it was a fixed 1800 px, Nov 1 round 2). Elsewhere icons only (80 px), the labels
- *   as tooltips and read by screen readers. The screens lay out in what's left (`--win-w`, read by board-size.css and styles.css).
+ *   labels (`gm-labels`) from 1800 px wide (Nov 1, round 2) and wherever else they cost the game nothing: the frame tries them and keeps them
+ *   where the board is the same size inside its column and the column beside it as wide (Nov 25, FrontMenu.tsx useMenuLabels). Elsewhere
+ *   icons only (80 px), the labels as tooltips and read by screen readers. The screens lay out in what's left (`--win-w`, read by
+ *   board-size.css and styles.css).
  * - A boss battle: no title line. The boss's bar is the top of the screen (its "Move N" left of the status), and the ⚡, the
  *   fish and the gear sit at the top of the column beside the board (Hud.tsx, BossTools), the move list under them.
  */
@@ -90,7 +91,7 @@
   }
 }
 
-/* The labels (232 px) where they cost the board nothing (FrontMenu.tsx useMenuLabels, Nov 25). */
+/* The labels (232 px) where they cost the game nothing (FrontMenu.tsx useMenuLabels, Nov 25). */
 @media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
   .gm-frame.gm-labels {
     --gm-menu: 232px;
