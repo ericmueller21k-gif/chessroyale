@@ -70,6 +70,7 @@ import { noteFloorGame, noteSoloGame, postingSoloResult, resumeSoloGame, settleS
 import { isPaused, pausedBosses } from "./status.ts";
 import { kingSay, type KingCue } from "./godKing.ts";
 import { game } from "./lazy-game.ts";
+import { dropPlace, setPlace, takePlace } from "./stale.ts";
 
 // Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
 // near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
@@ -464,7 +465,7 @@ export function App() {
    */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends" | "quests"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
   /** The Boss raid screen (the Solo Boss Mode card on home, the side menu's Solo Boss Mode, ?mode=raid). */
-  const [raidOpen, setRaidOpen] = useState(() => raidInUrl() || !!bossPartyLinkCode);
+  const [raidOpen, setRaidOpen] = useState(() => raidInUrl() || !!bossPartyLinkCode || takePlace("raid") === true);
   /** That screen is the full one (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form (Eric, Oct 26). */
   const [raidFull, setRaidFull] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
@@ -1557,6 +1558,14 @@ export function App() {
   }, [!!match, soloKept]);
   useEffect(() => {
     if (raidOpen && !match) reofferKeptSolo();
+  }, [raidOpen, !!match]);
+  // (The Boss Battle screen is a place (stale.ts): should the page load again for a file that won't load (a deploy, or an older
+  // browser's kept failure), it comes back on Boss Battle, never home: #942, Nov 25.)
+  useEffect(() => {
+    if (!raidOpen || match) return;
+    const here = () => ({ raid: true });
+    setPlace(here);
+    return () => dropPlace(here);
   }, [raidOpen, !!match]);
 
   /**

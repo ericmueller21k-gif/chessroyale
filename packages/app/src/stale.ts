@@ -11,8 +11,12 @@ import { APP_CACHE } from "@chessroyale/core";
  * dropped connection, a phone between networks) is no reason to load the page again, which threw the Boss Battle screen back to home
  * (xp.spec's "No XP" loop, main's run 45559755980: the opening library, fetched in the background there, dropped once) and lost a
  * Resume's tap (Nov 23). So a failed chunk asks the server which build it runs (`/version.json`): another than this page's, the page
- * loads again; the same (or no answer), the load fails as any failed load does, and its caller tries again next time (the browser
- * fetches a failed module again) or says so.
+ * loads again; the same (or no answer), the load fails as any failed load does, and its caller tries again next time or says so.
+ *
+ * Older Chromium (CI's 141; Safari too) keeps a failed import() and fails the same file again without asking the server (#942, Nov 25),
+ * so a try again can't load it until the page loads again. So a second failure while the server answers with this same build loads the
+ * page again too (once a minute, as for a deploy), keeping the screen: the Boss Battle screen is a place (App.tsx), as the town is. A
+ * newer browser fetches the file again, so one dropped connection never loads the page there.
  *
  * Since Nov 15 this is the fallback: the service worker keeps an open tab's version's files until it loads again
  * (sw-template.js), so it's for a page the worker doesn't answer (a first visit before it's ready, a browser without one). And
@@ -72,11 +76,16 @@ const saved: { path: string; place: Place } | null = (() => {
 })();
 let taken = false;
 
-/** The place kept for this page (the first ask only, and only at the address it was kept at), or null. */
-export function takePlace(path = location.pathname): Place | null {
-  if (taken || !saved || saved.path !== path) return null;
+/** A screen's place was `get`: it's gone (as `setPlace(null)`, unless another screen's has taken over since). */
+export function dropPlace(get: () => Place | null): void {
+  if (placeOf === get) placeOf = null;
+}
+
+/** The place kept for this page under `key` (a screen's own: the first ask only, and only at the address it was kept at), or null. */
+export function takePlace(key: string, path = location.pathname): unknown {
+  if (taken || !saved || saved.path !== path || !(key in saved.place)) return null;
   taken = true;
-  return saved.place;
+  return saved.place[key];
 }
 
 /** This page's build (vite.config.ts's `__APP_VERSION__`, as version.json names it); "dev" on the dev server, which has no version.json. */
@@ -84,36 +93,43 @@ declare const __APP_VERSION__: string | undefined;
 const MINE = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
 
 /**
- * Whether a deploy has landed since this page loaded: the server's `/version.json` names another build than `mine`. No answer within
- * `ms` (offline, a dropped connection again), an answer without a version, or a page that doesn't know its own build ("dev"): no.
+ * The server's build against this page's (`/version.json`): "another" (a deploy has landed since this page loaded), "same", or null:
+ * no answer within `ms` (offline, a dropped connection again), an answer without a version, or a page that doesn't know its own build
+ * ("dev").
  */
-export async function deployLanded(mine = MINE, ms = APP_CACHE.staleCheckMs): Promise<boolean> {
-  if (mine === "dev") return false;
+export async function serverBuild(mine = MINE, ms = APP_CACHE.staleCheckMs): Promise<"another" | "same" | null> {
+  if (mine === "dev") return null;
   try {
     const res = await fetch("/version.json", { cache: "no-store", signal: AbortSignal.timeout(ms) });
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const v = (await res.json()) as { version?: unknown };
-    return typeof v.version === "string" && v.version !== mine;
+    return typeof v.version !== "string" ? null : v.version === mine ? "same" : "another";
   } catch {
-    return false;
+    return null;
   }
 }
 
 /**
  * The last failed chunk's error (Vite's event's) and verdict, for the import it fails (Vite fires the event before that import gives
- * `undefined`); and the check under way (one for failures together).
+ * `undefined`); the check under way (one for failures together); and whether a failure on this same build has stood already.
  */
 let lastError: unknown = null;
 let verdict: Promise<boolean> = Promise.resolve(false);
 let check: Promise<boolean> | null = null;
+let stood = false;
 
-/** A chunk failed: true once the page is loading again for a deploy (reloadForStaleChunk); false: the failure stands. */
-export function chunkFailed(error: unknown, landed: () => Promise<boolean> = deployLanded): Promise<boolean> {
+/**
+ * A chunk failed: true once the page is loading again (reloadForStaleChunk) for a deploy, or for a second failure on the same build
+ * (an older browser's kept failure: a try again can't load it); false: the failure stands.
+ */
+export function chunkFailed(error: unknown, build: () => Promise<"another" | "same" | null> = serverBuild): Promise<boolean> {
   lastError = error;
   if (reloading) return (verdict = Promise.resolve(true));
-  return (verdict = check ??= landed().then((yes) => {
+  return (verdict = check ??= build().then((b) => {
     check = null;
-    return yes && reloadForStaleChunk();
+    if (b === "another" || (b === "same" && stood)) return reloadForStaleChunk();
+    if (b === "same") stood = true;
+    return false;
   }));
 }
 
@@ -133,7 +149,7 @@ export function chunk<M>(load: Promise<M>): Promise<M> {
 
 /**
  * Vite's event for a chunk that won't load: prevented always, as it must be decided at once, before the server can say whether a
- * deploy landed; the page loads again only if one did (chunkFailed). A `lazyGroup` (lazy.tsx) takes the `undefined` as a load to try
+ * deploy landed; the page loads again only if one did, or for a second failure (chunkFailed). A `lazyGroup` (lazy.tsx) takes the `undefined` as a load to try
  * again next time.
  */
 export function watchStaleChunks(): void {

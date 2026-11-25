@@ -56,10 +56,11 @@ describe("the reload keeps your place (Nov 15: back in the town at its center, t
     expect(first.reloadForStaleChunk(1_000_000)).toBe(true);
     const next = await stale();
     expect(reloads.storage.has("brc.stalePlace"), "read as the page loads, and let go").toBe(false);
-    expect(next.takePlace()).toEqual(place);
-    expect(next.takePlace(), "once only").toBeNull();
+    expect(next.takePlace("raid"), "another screen's key: not taken").toBeNull();
+    expect(next.takePlace("town")).toEqual(place.town);
+    expect(next.takePlace("town"), "once only").toBeNull();
     // (And a later load of the same tab doesn't bring it back.)
-    expect((await stale()).takePlace()).toBeNull();
+    expect((await stale()).takePlace("town")).toBeNull();
   });
 
   it("only at the address it was kept at, and nothing when no screen says (setPlace(null)) or the reload doesn't happen", async () => {
@@ -67,14 +68,30 @@ describe("the reload keeps your place (Nov 15: back in the town at its center, t
     const a = await stale();
     a.setPlace(() => place);
     a.reloadForStaleChunk(1_000_000);
-    expect((await stale()).takePlace("/")).toBeNull();
+    expect((await stale()).takePlace("town", "/")).toBeNull();
 
     tab();
     const b = await stale();
     b.setPlace(() => place);
     b.setPlace(null);
     b.reloadForStaleChunk(1_000_000);
-    expect((await stale()).takePlace()).toBeNull();
+    expect((await stale()).takePlace("town")).toBeNull();
+
+    // (A screen's place dropped as it goes: only its own, never one another screen has set since.)
+    tab();
+    const d = await stale();
+    const raid = () => ({ raid: true });
+    d.setPlace(raid);
+    d.setPlace(() => place);
+    d.dropPlace(raid);
+    d.reloadForStaleChunk(1_000_000);
+    expect((await stale()).takePlace("town")).toEqual(place.town);
+    tab();
+    const e = await stale();
+    e.setPlace(raid);
+    e.dropPlace(raid);
+    e.reloadForStaleChunk(1_000_000);
+    expect((await stale()).takePlace("raid")).toBeNull();
 
     // (Within the minute: no reload, so nothing kept: no loop of reloads reopening the same room.)
     tab();
@@ -82,14 +99,14 @@ describe("the reload keeps your place (Nov 15: back in the town at its center, t
     const c = await stale();
     c.setPlace(() => place);
     expect(c.reloadForStaleChunk(1_010_000)).toBe(false);
-    expect((await stale()).takePlace()).toBeNull();
+    expect((await stale()).takePlace("town")).toBeNull();
   });
 
   it("without storage: no place, no throw", async () => {
     tab(true);
     const s = await stale();
     s.setPlace(() => place);
-    expect(s.takePlace()).toBeNull();
+    expect(s.takePlace("town")).toBeNull();
   });
 });
 
@@ -99,7 +116,7 @@ describe("a chunk gone while the page loads again: nothing goes on to use it (No
     const { chunk, chunkFailed } = await stale();
     expect(await chunk(Promise.resolve({ loadIntro: 1 }))).toEqual({ loadIntro: 1 });
     // (Vite's event, as watchStaleChunks hears it: the server runs another build.)
-    expect(await chunkFailed(new Error("gone"), async () => true)).toBe(true);
+    expect(await chunkFailed(new Error("gone"), async () => "another")).toBe(true);
     expect(reloads.n).toBe(1);
     const used = vi.fn();
     const failed = vi.fn();
@@ -119,25 +136,48 @@ describe("a file that failed with no deploy (a dropped connection; main's run 45
     const reloads = tab(false, "/");
     const { chunk, chunkFailed } = await stale();
     const err = new Error("Failed to fetch dynamically imported module: /assets/openings-x.js");
-    const asked = chunkFailed(err, async () => false);
+    const asked = chunkFailed(err, async () => "same");
     await expect(chunk(Promise.resolve(undefined as unknown as { default: unknown }))).rejects.toBe(err);
     expect(await asked).toBe(false);
     expect(reloads.n).toBe(0);
     // (And the next failure asks again: a deploy since then still reloads.)
-    expect(await chunkFailed(err, async () => true)).toBe(true);
+    expect(await chunkFailed(err, async () => "another")).toBe(true);
     expect(reloads.n).toBe(1);
+  });
+
+  it("no answer from the server (offline): never a reload, however often it fails (the caller says \"Check your connection\")", async () => {
+    const reloads = tab(false, "/");
+    const { chunkFailed } = await stale();
+    for (let i = 0; i < 3; i++) expect(await chunkFailed(i, async () => null)).toBe(false);
+    expect(reloads.n).toBe(0);
+  });
+
+  it("a second failure on the same build (older Chromium keeps a failed import: #942, Nov 25): the page loads again, keeping Boss Battle", async () => {
+    const reloads = tab(false, "/");
+    const { chunk, chunkFailed, setPlace } = await stale();
+    setPlace(() => ({ raid: true }));
+    expect(await chunkFailed(1, async () => "same")).toBe(false);
+    expect(reloads.n, "one failure: tried again, no reload").toBe(0);
+    expect(await chunkFailed(2, async () => "same")).toBe(true);
+    expect(reloads.n).toBe(1);
+    // (The import that failed waits for the page, never rejecting into "Couldn't load the game.")
+    const failed = vi.fn();
+    void chunk(Promise.resolve(undefined as unknown as { default: unknown })).catch(failed);
+    await new Promise((ok) => setTimeout(ok, 20));
+    expect(failed).not.toHaveBeenCalled();
+    expect((await stale()).takePlace("raid")).toBe(true);
   });
 
   it("failures together ask the server once", async () => {
     tab();
     const { chunkFailed } = await stale();
-    const landed = vi.fn(async () => false);
+    const landed = vi.fn(async () => "same" as const);
     await Promise.all([chunkFailed(1, landed), chunkFailed(2, landed), chunkFailed(3, landed)]);
     expect(landed).toHaveBeenCalledTimes(1);
   });
 
-  it("deployLanded: another build in /version.json, yes; the same, no answer, an error page or a page without a build (dev), no", async () => {
-    const { deployLanded } = await stale();
+  it("serverBuild: another build in /version.json, \"another\"; this one, \"same\"; no answer, an error page or a page without a build (dev), null", async () => {
+    const { serverBuild } = await stale();
     const answer = (r: (() => Promise<Response>) | null) => {
       const f = vi.fn(r ?? (() => Promise.reject(new TypeError("Failed to fetch"))));
       vi.stubGlobal("fetch", f);
@@ -145,20 +185,20 @@ describe("a file that failed with no deploy (a dropped connection; main's run 45
     };
     const json = (v: unknown) => () => Promise.resolve(new Response(JSON.stringify(v), { status: 200 }));
     answer(json({ version: "bbbbbbbbbbbb", commit: "b" }));
-    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(true);
+    expect(await serverBuild("aaaaaaaaaaaa", 100)).toBe("another");
     answer(json({ version: "aaaaaaaaaaaa" }));
-    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(false);
+    expect(await serverBuild("aaaaaaaaaaaa", 100)).toBe("same");
     answer(null);
-    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(false);
+    expect(await serverBuild("aaaaaaaaaaaa", 100)).toBeNull();
     answer(() => Promise.resolve(new Response("x", { status: 500 })));
-    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(false);
+    expect(await serverBuild("aaaaaaaaaaaa", 100)).toBeNull();
     answer(json({}));
-    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(false);
+    expect(await serverBuild("aaaaaaaaaaaa", 100)).toBeNull();
     const f = answer(json({ version: "bbbbbbbbbbbb" }));
-    expect(await deployLanded("dev", 100)).toBe(false);
+    expect(await serverBuild("dev", 100)).toBeNull();
     expect(f).not.toHaveBeenCalled();
     // (The page's own build is the one vite.config.ts writes: "dev" here, under the unit tests.)
-    expect(await deployLanded(undefined, 100)).toBe(false);
+    expect(await serverBuild(undefined, 100)).toBeNull();
   });
 });
 

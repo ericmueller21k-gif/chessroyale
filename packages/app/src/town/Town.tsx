@@ -132,7 +132,7 @@ interface TownPlace {
 }
 /** That place, the first time the town opens after that reload (null any other time, or for anything that doesn't read as one). */
 function townPlaceBack(): TownPlace | null {
-  const v = takePlace()?.town as Partial<TownPlace> | undefined;
+  const v = takePlace("town") as Partial<TownPlace> | null;
   const st = v?.stand;
   if (!st || !Number.isInteger(st.c) || !Number.isInteger(st.r) || (st.facing !== 1 && st.facing !== -1) || ![0, 1, 2].includes(st.view)) return null;
   const open = v.open && typeof v.open.home === "string" && HOMES.some((h) => h.id === v.open!.home) ? { home: v.open.home, challenge: v.open.challenge === true } : null;
