@@ -72,6 +72,23 @@ export interface PaintLayer {
 export type Backend = "2d" | "webgl";
 
 /**
+ * The WebGL atlas's layout (paint-gl.ts), which the kept pictures' pages are packed to (keep-pictures.ts, Nov 25): pages `page` px
+ * square, each picture with `pad` clear pixels round it; one bigger than `big` either way has a texture (and a kept page) of its own.
+ */
+export const ATLAS = { page: 2048, pad: 2, big: 1024 } as const;
+
+/**
+ * (A later visit, keep-pictures.ts) A kept page as the atlas would have packed it (`ATLAS`): its decoded pixels, its size, and each
+ * picture on it (the canvas standing in for it, drawn by as any other, and its top left on the page).
+ */
+export interface AtlasPage {
+  readonly img: TexImageSource;
+  readonly width: number;
+  readonly height: number;
+  readonly pics: readonly { readonly src: HTMLCanvasElement; readonly x: number; readonly y: number }[];
+}
+
+/**
  * The 2D context of a picture the town makes (a frame, a tag, a sign, text, a cloud, the bubble). Once the street town's WebGL is
  * drawing (`artInMemory`, Nov 11), kept in memory rather than on the GPU (`willReadFrequently`): WebGL uploading a picture drawn on
  * the GPU first waits for the GPU to finish what it's drawing (measured: 30 to 120 ms an upload, headless; on Eric's iPhone, the
@@ -102,6 +119,12 @@ export interface Painter {
   keep?(src: CanvasImageSource): void;
   /** (With `keep`) Uploads what it was handed, a slice of up to `budgetMs` at a time; says how much is done (0 to 1). */
   kept?(budgetMs: number): number;
+  /**
+   * (With `keep`, a later visit's loading screen, before `kept`; Nov 25) The kept pages, uploaded whole by `kept`: each picture on them
+   * kept as `keep` keeps one, where its page put it, never uploaded alone. `fill` puts a picture's pixels on its canvas (empty until
+   * then) should it need uploading again (a lost context, `changed`). Pages it can't take (too many) leave their pictures to `keep`.
+   */
+  adopt?(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): void;
   /** `src`, drawn before, has been drawn on again: the next draw shows its new pixels (the WebGL backend uploads it again). */
   changed(src: CanvasImageSource): void;
   /**
@@ -115,6 +138,8 @@ export interface Painter {
   readonly lost: boolean;
   /** (Tests) The pixels of `x, y, w, h` (device pixels, from the top left) as the last frame drew them; call right after a draw. */
   pixels(x: number, y: number, w: number, h: number): ImageData;
+  /** (Tests, WebGL) A hash of what the textures hold for each of `list` (keep-pictures' pictures): its size and texels, in order. */
+  texelSum?(list: readonly object[]): string;
   /** Lets go of what it holds (a backend swapped out). */
   dispose(): void;
 }

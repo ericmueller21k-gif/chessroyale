@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TOWN_PICTURES } from "@chessroyale/core";
 import { Pictures, entryFor, manifestOf, packPictures, pictureKey, restore, save, type Entry, type Page, type PageIO, type SaveIO, type Shelf } from "../src/town/keep-pictures.ts";
 import type { RoofArt } from "../src/town/box-draw.ts";
+import { ATLAS } from "../src/town/paint.ts";
 
 /**
  * Chess Town's pictures kept between visits (Nov 23, docs/decisions/2026-11-23-town-keep-pictures.md): a later visit gets back exactly
@@ -34,7 +35,7 @@ function shelfOf(v: unknown = undefined, fail: { read?: boolean; write?: boolean
   return s satisfies Shelf;
 }
 
-/** Pages as blobs naming their page and size; decoding reads that back; a cut is the rect it was cut from. */
+/** Pages as blobs naming their page and size; decoding reads that back; a stand-in names the rect it stands for, and is cut once filled. */
 const saveIO: SaveIO = { compose: async (m, p) => new Blob([JSON.stringify([p, m.pages[p * 2], m.pages[p * 2 + 1]])]) };
 const closed: number[] = [];
 const pageIO = (o: { fail?: boolean; size?: number } = {}): PageIO => ({
@@ -43,7 +44,8 @@ const pageIO = (o: { fail?: boolean; size?: number } = {}): PageIO => ({
     const [p, w, h] = JSON.parse(await b.text()) as number[];
     return { width: o.size ?? w!, height: h!, p, close: () => void closed.push(p!) } as Page;
   },
-  cut: (page, x, y, w, h) => ({ tag: `${(page as Page & { p: number }).p}:${x},${y} ${w}x${h}`, width: w, height: h }) as unknown as HTMLCanvasElement,
+  standIn: (page, x, y, w, h) => ({ tag: `${(page as Page & { p: number }).p}:${x},${y} ${w}x${h}`, width: w, height: h, cuts: 0 }) as unknown as HTMLCanvasElement,
+  fill: (c) => void ((c as unknown as { cuts: number }).cuts = 1),
 });
 
 /** A first visit: 300 pictures, a roof of two faces over three of them, and the same picture kept twice (listed once). */
@@ -67,21 +69,34 @@ function firstVisit() {
 const KEY = pictureKey("abc123", "/assets/Town-x.js", "layout");
 
 describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
-  it("packs pictures onto pages without overlap, a picture wider than a page on one its width", () => {
-    const sizes = [...Array.from({ length: 400 }, (_, i) => [10 + ((i * 41) % 500), 10 + ((i * 29) % 300)] as const), [3000, 40] as const];
-    const { at, pages } = packPictures(sizes, 2048);
+  it("packs pictures as the WebGL atlas holds them (Nov 25): pages no bigger than its, the padding clear round each, a big one alone", () => {
+    const { page, pad, big } = ATLAS;
+    const sizes = [...Array.from({ length: 400 }, (_, i) => [10 + ((i * 41) % 500), 10 + ((i * 29) % 300)] as const), [3000, 40] as const, [1025, 1025] as const, [1024, 1024] as const];
+    const { at, pages } = packPictures(sizes);
     const rects = at.map(([p, x, y], i) => ({ p, x, y, w: sizes[i]![0], h: sizes[i]![1] }));
     for (const r of rects) {
-      expect(r.x + r.w).toBeLessThanOrEqual(pages[r.p]![0]);
-      expect(r.y + r.h).toBeLessThanOrEqual(pages[r.p]![1]);
+      const [pw, ph] = pages[r.p]!;
+      if (r.w > big || r.h > big) {
+        // (A big one: alone, at its page's top left, its page its size: the atlas gives it a texture of its own.)
+        expect([r.x, r.y, pw, ph]).toEqual([0, 0, r.w, r.h]);
+        expect(rects.filter((o) => o.p === r.p).length).toBe(1);
+        continue;
+      }
+      expect(pw).toBeLessThanOrEqual(page);
+      expect(ph).toBeLessThanOrEqual(page);
+      expect(r.x - pad).toBeGreaterThanOrEqual(0);
+      expect(r.y - pad).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.w + pad).toBeLessThanOrEqual(pw);
+      expect(r.y + r.h + pad).toBeLessThanOrEqual(ph);
     }
+    // (Padding included, no two overlap.)
     for (let i = 0; i < rects.length; i++)
       for (let j = i + 1; j < rects.length; j++) {
         const a = rects[i]!;
         const b = rects[j]!;
-        if (a.p === b.p) expect(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y).toBe(true);
+        if (a.p === b.p) expect(a.x + a.w + pad <= b.x - pad || b.x + b.w + pad <= a.x - pad || a.y + a.h + pad <= b.y - pad || b.y + b.h + pad <= a.y - pad).toBe(true);
       }
-    expect(pages.some(([w]) => w === 3000)).toBe(true);
+    expect(new Set(rects.filter((r) => r.w > big || r.h > big).map((r) => r.p)).size).toBe(2);
   });
 
   it("a later visit gets every picture and roof back, in the loading screen's order", async () => {
@@ -91,9 +106,13 @@ describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
     const bytes = await save(shelf, KEY, P, saveIO);
     expect(bytes).toBeGreaterThan(0);
     expect(shelf.writes).toBe(1);
-    const m = manifestOf(KEY, P, TOWN_PICTURES.pagePx);
+    const m = manifestOf(KEY, P);
     const from = (await restore(shelf, KEY, pageIO()))!;
     expect(from.count).toBe(300);
+    // (Its pages for the painter to upload whole (Nov 25): each picture on its page, at its place, by the canvas standing in for it.)
+    expect(from.pages.length).toBe(m.pages.length / 2);
+    expect(from.pages.flatMap((pg, p) => pg.pics.map((q) => [(q.src as Pic).tag, `${p}:${q.x},${q.y} ${q.src.width}x${q.src.height}`])).every(([a, b]) => a === b)).toBe(true);
+    expect(from.pages.reduce((n, pg) => n + pg.pics.length, 0)).toBe(300);
     // (The later visit runs the same jobs: each new picture is the last visit's at its place, the roof its kept pieces.)
     const later = new Pictures(() => undefined, from);
     for (let i = 0; i < 200; i++) later.add(later.next());
@@ -114,6 +133,11 @@ describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
     const short = new Pictures(() => undefined, from);
     short.add(short.next());
     expect(short.matched()).toBe(false);
+    // (A stand-in is the same canvas each time it's asked for, and empty until filled.)
+    expect(from.pic(7)).toBe(later.list[7]);
+    expect((from.pic(7) as unknown as { cuts: number }).cuts).toBe(0);
+    from.fill(from.pic(7));
+    expect((from.pic(7) as unknown as { cuts: number }).cuts).toBe(1);
   });
 
   it("anything odd paints as before (null) and clears the entry", async () => {
@@ -138,7 +162,8 @@ describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
       ["an older build's", { ...entry, manifest: { ...m, key: pictureKey("old", "/assets/Town-x.js", "layout") } }, undefined],
       ["another layout's (an admin's town)", { ...entry, manifest: { ...m, key: pictureKey("abc123", "/assets/Town-x.js", "admin layout") } }, undefined],
       ["not an entry", "garbage", undefined],
-      ["another version", { ...entry, manifest: { ...m, v: 2 } }, undefined],
+      ["another version (Nov 23's, packed without the atlas's padding)", { ...entry, manifest: { ...m, v: 1 } }, undefined],
+      ["a page bigger than the atlas's", { ...entry, manifest: { ...m, pages: m.pages.map((v, i) => (i === 0 ? ATLAS.page + 2 : v)) } }, undefined],
       ["a page short", { ...entry, blobs: entry.blobs.slice(1) }, undefined],
       ["an empty page", { ...entry, blobs: entry.blobs.map((b, i) => (i ? b : new Blob([]))) }, undefined],
       ["a picture off its page", { ...entry, manifest: { ...m, pics: m.pics.map((v, i) => (i === 3 ? 99999 : v)) } }, undefined],

@@ -33,14 +33,14 @@
 import { REC } from "./frame-report.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
-import { art2d, artInMemory } from "./paint.ts";
+import { ATLAS, art2d, artInMemory, type AtlasPage } from "./paint.ts";
 
 /** Floats a vertex: x, y, u, v, color (rgba8), flags (u32), p0 to p5. */
 const VF = 12;
-const PAGE = 2048;
+const PAGE = ATLAS.page;
 /** A picture bigger than this either way gets a texture of its own. */
-const BIG = 1024;
-const PAD = 2;
+const BIG = ATLAS.big;
+const PAD = ATLAS.pad;
 /**
  * The atlas (Nov 11, the town's loading screen): one array texture of 2048 px pages (16 MB a page). Its kept pages hold the pictures
  * the loading screen keeps (`keep`, `kept`): made once as deep as they need, never started again. The rest (SPARE pages) hold whatever's
@@ -215,6 +215,8 @@ interface Entry {
   used: number;
   /** Kept for good (`keep`): never let go by the sweep, its page never started again. */
   kept: boolean;
+  /** A kept page's picture (`adopt`): its canvas empty until `fill` puts its pixels on it, before it's ever uploaded alone. */
+  stand: boolean;
 }
 
 /** A target's recorded triangles: its vertices, how many, whether they read the atlas, and the texture of its own they read (one a draw). */
@@ -552,6 +554,9 @@ class GLPainter implements Painter {
     this.atlas = null;
     this.cap = 0;
     this.pages = [];
+    // (Kept pages not uploaded yet, after a lost context: their pictures are filled and uploaded one by one as they show, `upload`.)
+    this.adoptQ = [];
+    this.adoptAt = 0;
     this.dummy = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.dummy);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -677,6 +682,11 @@ class GLPainter implements Painter {
       this.keepAt = 0;
     }
     const t0 = performance.now();
+    // (A later visit's kept pages first, each whole, `adopt`.)
+    while (this.adoptAt < this.adoptQ.length) {
+      this.pageUp(this.adoptQ[this.adoptAt++]!);
+      if (performance.now() - t0 > budgetMs) return this.adoptAt / (this.adoptQ.length + q.length);
+    }
     while (this.keepAt < q.length) {
       const e = q[this.keepAt++]!;
       this.entry(e.src as CanvasImageSource);
@@ -690,15 +700,74 @@ class GLPainter implements Painter {
     if (this.keepAt >= q.length) {
       this.keepQ = [];
       this.keepAt = -1;
+      this.adoptQ = [];
+      this.adoptAt = 0;
       return 1;
     }
-    return this.keepAt / q.length;
+    return (this.adoptAt + this.keepAt) / (this.adoptQ.length + q.length);
+  }
+
+  /** (`adopt`) The kept pages waiting for `kept` to upload them whole, and how far it has come through them. */
+  private adoptQ: { tex: Tex; img: TexImageSource; w: number; h: number }[] = [];
+  private adoptAt = 0;
+  /** (`adopt`) Puts a kept picture's pixels on its canvas. */
+  private fill: ((src: HTMLCanvasElement) => void) | null = null;
+
+  /**
+   * A later visit's kept pages (keep-pictures.ts, Nov 25), packed as the atlas packs (`ATLAS`): each a layer of the atlas (or, one big
+   * picture's, its own texture), uploaded whole by `kept`, and each picture on it kept where its page put it, as `keep` would keep it.
+   * Until 7.0 s to a slowed phone's first frame, 3.3 s of it cutting 1,912 pictures out of these pages and 0.55 s uploading each.
+   * (Called once, before `kept` starts. Pages that wouldn't all fit, or one not of the atlas's layout, leave every picture to `keep`,
+   * filled as it's uploaded.)
+   */
+  adopt(pages: readonly AtlasPage[], fill: (src: HTMLCanvasElement) => void): void {
+    this.fill = fill;
+    const own = (pg: AtlasPage) => pg.pics.length === 1 && (pg.width > BIG || pg.height > BIG);
+    const fits = (pg: AtlasPage) =>
+      own(pg) ? pg.pics[0]!.x === 0 && pg.pics[0]!.y === 0 && pg.pics[0]!.src.width === pg.width && pg.pics[0]!.src.height === pg.height : pg.width <= PAGE && pg.height <= PAGE;
+    const layers = pages.filter((pg) => !own(pg)).length;
+    const room = Math.min(MAX_PAGES, this.gl.getParameter(this.gl.MAX_ARRAY_TEXTURE_LAYERS) as number) - SPARE;
+    const whole = !this.lost && this.keepAt < 0 && this.pages.length + layers <= room && pages.every(fits);
+    for (const pg of pages) {
+      let tex: Tex | null = null;
+      let page: Page | null = null;
+      if (whole) {
+        if (own(pg)) tex = { t: null, w: pg.width, h: pg.height, stream: null, layer: -1 };
+        else {
+          page = { tex: { t: this.atlas, w: PAGE, h: PAGE, stream: null, layer: this.pages.length }, shelves: [], top: PAGE, used: 0, entries: [], kept: true };
+          this.pages.push(page);
+          tex = page.tex;
+        }
+        this.adoptQ.push({ tex, img: pg.img, w: pg.width, h: pg.height });
+      }
+      for (const p of pg.pics) {
+        const e = this.entryOf(p.src);
+        e.stand = true;
+        if (!tex) continue;
+        Object.assign(e, { kept: true, tex, page, x: p.x, y: p.y, w: p.src.width, h: p.src.height, gen: this.gen, dirty: false });
+        page?.entries.push(e);
+      }
+    }
+  }
+
+  /** (`kept`) A kept page uploaded whole: onto its layer of the atlas, or into a texture of its own. */
+  private pageUp(a: { tex: Tex; img: TexImageSource; w: number; h: number }): void {
+    const { gl } = this;
+    if (a.tex.layer >= 0) {
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, a.tex.t);
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, a.tex.layer, a.w, a.h, 1, gl.RGBA, gl.UNSIGNED_BYTE, a.img);
+    } else {
+      a.tex.t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, a.tex.t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, a.w, a.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, a.img);
+    }
   }
 
   private entryOf(src: CanvasImageSource): Entry {
     let e = this.reg.get(src);
     if (!e) {
-      e = { src, tex: null, page: null, x: 0, y: 0, w: 0, h: 0, gen: 0, dirty: true, used: 0, kept: false };
+      e = { src, tex: null, page: null, x: 0, y: 0, w: 0, h: 0, gen: 0, dirty: true, used: 0, kept: false, stand: false };
       this.reg.set(src, e);
       this.live.push(e);
     }
@@ -722,6 +791,11 @@ class GLPainter implements Painter {
   private upload(e: Entry, src: CanvasImageSource): void {
     const { gl } = this;
     const s = src as HTMLCanvasElement;
+    // (A kept page's picture uploaded alone (a lost context, a page `adopt` couldn't take): its pixels on its canvas first.)
+    if (e.stand) {
+      e.stand = false;
+      this.fill?.(s);
+    }
     const w = s.width;
     const h = s.height;
     e.dirty = false;
@@ -1068,6 +1142,47 @@ class GLPainter implements Painter {
       }
     }
     return out;
+  }
+
+  /**
+   * (Tests, `__townPictureSum`) What the textures hold for each of `list`: a hash of each picture's size and texels (premultiplied, as
+   * uploaded), in its order. Each atlas page is read once. A picture with no texture now counts as none.
+   */
+  texelSum(list: readonly object[]): string {
+    const { gl } = this;
+    if (this.lost) return "lost";
+    const each = new Uint32Array(list.length);
+    const byLayer = new Map<number, number[]>();
+    const fb = (this.readFb ??= gl.createFramebuffer());
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    const sum = (i: number, d: Uint8Array, stride: number, x0: number, y0: number, w: number, h: number) => {
+      let k = Math.imul(Math.imul(0x811c9dc5 ^ w, 16777619) ^ h, 16777619);
+      for (let y = 0; y < h; y++)
+        for (let x = 0, j = ((y0 + y) * stride + x0) * 4; x < w; x++, j += 4) k = Math.imul(k ^ (d[j]! | (d[j + 1]! << 8) | (d[j + 2]! << 16) | (d[j + 3]! << 24)), 16777619);
+      each[i] = k >>> 0;
+    };
+    list.forEach((src, i) => {
+      const e = this.reg.get(src);
+      if (!e?.tex?.t || e.gen !== this.gen) return void (each[i] = 0xdead);
+      if (e.tex.layer >= 0) return void byLayer.set(e.tex.layer, [...(byLayer.get(e.tex.layer) ?? []), i]);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, e.tex.t, 0);
+      const d = new Uint8Array(e.w * e.h * 4);
+      gl.readPixels(e.x, e.y, e.w, e.h, gl.RGBA, gl.UNSIGNED_BYTE, d);
+      sum(i, d, e.w, 0, 0, e.w, e.h);
+    });
+    const d = new Uint8Array(PAGE * PAGE * 4);
+    for (const [layer, is] of byLayer) {
+      gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, this.atlas, 0, layer);
+      gl.readPixels(0, 0, PAGE, PAGE, gl.RGBA, gl.UNSIGNED_BYTE, d);
+      for (const i of is) {
+        const e = this.reg.get(list[i]!)!;
+        sum(i, d, PAGE, e.x, e.y, e.w, e.h);
+      }
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    let h = 0x811c9dc5;
+    for (const k of each) h = Math.imul(h ^ k, 16777619);
+    return (h >>> 0).toString(16);
   }
 
   dispose(): void {
