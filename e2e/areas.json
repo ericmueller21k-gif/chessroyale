@@ -646,7 +646,7 @@
       ]
     },
     "a computer's board size, every game screen (board-size.css)": {
-      "paths": ["packages/app/src/board-size.css", "packages/app/src/game-frame.css"],
+      "paths": ["packages/app/src/board-size.css", "packages/app/src/game-frame.css", "packages/app/src/board-foot.ts"],
       "specs": [
         "e2e/desktop-board.spec.ts",
         "e2e/board-layout.spec.ts",

@@ -131,3 +131,87 @@
     --gk-screen: var(--scr);
   }
 }
+
+/* ---- A computer's 50 v 50 (Eric, Nov 25; docs/decisions/2026-11-25-crowd-desktop-flush.md) ----
+ * - The status line ("Move 5 · cut in 10 · P38/50 · −0.8 · CUT +0.2") centered over the board and 1.4 times its size, one line; the
+ *   gear stays at the line's right end, out of the line's flow, so the words center on the board (the column is centered on it).
+ * - One bottom line: the scoreboard on the left and the chat on the right end where the board's frame ends (board-foot.ts measures
+ *   it: `--side-foot`, `--chat-foot`); what doesn't fit scrolls inside them.
+ * - The chat higher: the panel over it is one fixed slot, as tall as the reveal's vote results need (six bars, the result, its note:
+ *   the tallest thing it shows; the waiting line and the empty pick are shorter), with the bars a little thinner than before.
+ * A phone and a tablet are unchanged. */
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game.crowd-50 > .hud-row {
+    position: relative;
+    container-type: inline-size;
+  }
+  /* (22 px, 1.4 times the 16 px it was, where the board is wide enough; on a narrower board, e.g. 504 px at 1280 × 800, as big as
+     its width less the gear's room at each end holds a usual line, about 18 px there. A longer one than that ("Move 34 · 34 v 34 next
+     P50/50 −12.34 CUT −12.34") ends its "Move" part in "…", as a phone does, never under the gear.) */
+  .screen.game.crowd-50 > .hud-row > .hud {
+    justify-content: center;
+    gap: 0.6em;
+    /* (Room for the gear at each end, so the words never run under it.) */
+    padding: 0 40px;
+    font-size: clamp(16px, calc((100cqi - 80px) / 23), 22px);
+    translate: var(--board-shift, 0px) 0;
+  }
+  .screen.game.crowd-50 > .hud-row > .hud .hud-spacer {
+    display: none;
+  }
+  .screen.game.crowd-50 > .hud-row > .hud .hud-stage {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .screen.game.crowd-50 > .hud-row > .hud .hud-score {
+    font-size: 1.27em;
+  }
+  .screen.game.crowd-50 > .hud-row > .hud .hud-cut {
+    padding: 0.15em 0.45em;
+    font-size: 0.82em;
+  }
+  .screen.game.crowd-50 > .hud-row > .hud .hud-cut small {
+    font-size: 0.7em;
+  }
+  .screen.game.crowd-50 > .hud-row > .mm {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+  }
+
+  /* (The 50 v 50 only: a raid keeps its own column, board-layout.spec.ts.) */
+  .arena:not(.sq-arena):has(> .screen.game.crowd-50) > .tower-side {
+    max-height: var(--side-foot, var(--app-h));
+    /* (Its table's top on the board's squares' top: the scoreboard as tall as the board, Eric, Nov 25. board-foot.ts.) */
+    padding-top: var(--side-pad, 14px);
+    padding-bottom: 0;
+  }
+  .arena > .screen.game.crowd-50:not(:has(> .boss-dock)) > .under-board.side {
+    align-self: start;
+    height: var(--chat-foot, auto);
+    min-height: 0;
+  }
+
+  .screen.game.crowd-50 > .play-footer,
+  .screen.game.crowd-50 > .poll {
+    height: var(--crowd-slot);
+    min-height: 0;
+  }
+  .screen.game.crowd-50 {
+    --crowd-slot: 206px;
+  }
+  .screen.game.crowd-50 > .poll {
+    gap: 3px;
+  }
+  .screen.game.crowd-50 > .poll .poll-row {
+    padding: 1px 8px;
+    font-size: 15px;
+    line-height: 20px;
+  }
+  .screen.game.crowd-50 > .poll .poll-result .round-score {
+    font-size: 22px;
+  }
+}

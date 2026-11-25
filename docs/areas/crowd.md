@@ -17,6 +17,10 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   less 170 px (the title line, the line over the board, the row under it), never wider than its column: 904 px at 1920 × 1080
   (the scoreboard 360 px on the left, the column 340 on the right); width-bound from about 1440 px wide down (456 at
   1280 × 800, as before). The opening vote's board is the same size, so the game starts with the board where it was.
+- **A computer's 50 v 50** (Nov 25; [2026-11-25-crowd-desktop-flush.md](../decisions/2026-11-25-crowd-desktop-flush.md)): the status line
+  centered on the board, 22 px (a narrow board's as big as it holds); the scoreboard and the chat end on the board's bottom line (its
+  clock bar included; `board-foot.ts` measures it, board-size.css uses it); the panel over the chat is one 206 px slot, what the
+  reveal's six bars need. Guard: `e2e/desktop-board.spec.ts`, "a computer's 50 v 50 (Eric, Nov 25)…".
 - **A mode is a preset over one engine.** `modeSettings()` and `CROWD_SETTINGS` / `RAID_SETTINGS` in settings.ts
   patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
