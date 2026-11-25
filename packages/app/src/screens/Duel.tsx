@@ -454,6 +454,9 @@ function DuelEndPage({ session, snap, people, computer, onHome, onAgain }: { ses
   // (The rank's change: coming until the outcome; none for an unranked game or one fair play holds: your rank as it stands.)
   const change = o ? (o.unranked ? null : o.change) : undefined;
   const now = o?.unranked ? null : ranked1v1Rank();
+  // (A computer: the headline over the left half; under it your rewards and the chat side by side; the move-by-move on the right, as tall
+  // as the window. Everything the window's height, scaled to it (end-screen.css, "Ranked 1 v 1's end page on a computer"). A phone: one
+  // column, as before: the wrappers are `display: contents` there.)
   return (
     <div class="screen results mm-screen boss-results es-screen dv-end">
       <div class="results-top">
@@ -461,27 +464,32 @@ function DuelEndPage({ session, snap, people, computer, onHome, onAgain }: { ses
           <MatchMenu exit={null} />
         </div>
         <EndHeadline title={tone === "win" ? "Victory!" : tone === "loss" ? "Defeat" : "A draw"} line={resultReason(end, you, snap.players[other(you)].name, snap.left, o)} tone={tone} plain />
-        <EndRewards
-          xp={o ? (o.xp ?? null) : undefined}
-          none={o?.unranked ? XP_NONE_LINES.test : undefined}
-          rp={{ change: change === undefined ? undefined : change && { ...change, before: yourRankShown(change.before), after: yourRankShown(change.after) }, now: o?.unranked ? null : now }}
-        />
-        <p class="es-coins muted" data-testid="es-coins">
-          {o?.unranked ? "Unranked game" : coins > 0 ? `+${coins} coins` : " "}
-        </p>
-        <div class="dv-result-actions">
-          <button type="button" class="btn btn-primary" onClick={onAgain}>
-            Play again
-          </button>
-          <button type="button" class="btn btn-secondary" onClick={onHome}>
-            Home
-          </button>
-        </div>
-        {session.chat && session.chat.enabled && (
-          <div class="lchat dv-chat">
-            <ChatPanel people={people} chat={session.chat} variant={computer ? "side" : "full"} />
+        <div class="dv-end-cols">
+          <div class="dv-end-rewards">
+            <EndRewards
+              xp={o ? (o.xp ?? null) : undefined}
+              none={o?.unranked ? XP_NONE_LINES.test : undefined}
+              rp={{ change: change === undefined ? undefined : change && { ...change, before: yourRankShown(change.before), after: yourRankShown(change.after) }, now: o?.unranked ? null : now }}
+              day
+            />
+            <p class="es-coins muted" data-testid="es-coins">
+              {o?.unranked ? "Unranked game" : coins > 0 ? `+${coins} coins` : " "}
+            </p>
+            <div class="dv-result-actions">
+              <button type="button" class="btn btn-primary" onClick={onAgain}>
+                Play again
+              </button>
+              <button type="button" class="btn btn-secondary" onClick={onHome}>
+                Home
+              </button>
+            </div>
           </div>
-        )}
+          {session.chat && session.chat.enabled && (
+            <div class="lchat dv-chat">
+              <ChatPanel people={people} chat={session.chat} variant={computer ? "side" : "full"} />
+            </div>
+          )}
+        </div>
       </div>
       <div class="results-review">
         <GameSteps moves={snap.moves} orientation={you === "w" ? "white" : "black"} />

@@ -106,6 +106,13 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     900 × 600 and up **with a mouse** (`pointer: fine`; the side menu beside the screen, from Nov 1, `game-frame.css`, takes its width
     (`--win-w`): 60 px from 900 to 1099, 80 below 1800, 232 from there): phones and tablets, a tablet on its side included, keep their
     sizes to the pixel. Auto chess has its own board and frame: not changed. Tests: `e2e/desktop-board.spec.ts`.
+  - **Real screens** (Nov 25; docs/decisions/2026-11-25-real-screens.md): every computer layout is checked at **laptop 1536 × 730**
+    (1080p at Windows' recommended 125%, scale 1.25: Eric's), **laptop 1280 × 600** (1080p at 150%, 1.5), **laptop 1366 × 650**
+    (768p, 1) and **desktop 1920 × 960** (1), not only 1280 × 800 / 1440 × 900 / 1920 × 1080 (`REAL_SCREENS`, `realLayout` in
+    `e2e/helpers.ts`): no scroll either way, nothing cut off at the top, chats with at least 120 px of messages, the board at least the
+    window's height less two 34 px name bars and 40 px. Today every game screen's board is under that (held at today's as known gaps,
+    `BOARD_TODAY` in desktop-board.spec.ts, until the shared game layout). A laptop is the desktop, smaller: the same arrangement,
+    sizes from the window, only a phone rearranges. Stills and claims name their size ("laptop 1536×730").
   - **When it draws** (Oct 14, 2026; DECISIONS.md, "The board draws its pieces only when they change"): the board is
     two parts. `OwnBoard` is the wrap, what the screen draws over the board (`children`, under the `BoardTurn`
     context) and the promotion picker; it's drawn again whenever the screen is (a boss screen draws every frame while an

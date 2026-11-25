@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { RANKED_1V1, rankView } from "@chessroyale/core";
-import { BOARD_SEL, named, test, watchFor, watchSpans } from "./helpers.ts";
+import { BOARD_SEL, REAL_SCREENS, named, realLayout, realScreenContext, test, watchFor, watchSpans } from "./helpers.ts";
 
 /**
  * Ranked 1 v 1 through the real server (docs/areas/ranked.md), two players on emulated phones (and computers): both
@@ -226,6 +226,12 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
   await expect(black.getByTestId("es-line")).toHaveText(/ resigned\.$/);
   await expect(white.getByTestId("es-line")).toHaveText("You resigned.");
   for (const p of [white, black]) await expect(p.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  // (Nov 25: a placement counts games, not RP; the quests box shows your quests, never "No quests moved this game".)
+  for (const p of [white, black]) {
+    await expect(p.getByTestId("es-now-rp")).toHaveText("1 of 5 games");
+    await expect(p.getByTestId("es-q").first()).toBeVisible({ timeout: 10_000 });
+    await expect(p.getByTestId("es-quests")).not.toContainText("No quests moved");
+  }
   expect(await leavesOf(white)).toMatchObject({ marks: 1 });
   expect(await leavesOf(black)).toMatchObject({ marks: 0 });
 
@@ -563,4 +569,75 @@ test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longe
     [...document.querySelectorAll(".dv-stage, .dv-stage *")].filter((e) => getComputedStyle(e).animationName !== "none").map((e) => e.className),
   );
   expect(moving).toEqual([]);
+});
+
+/**
+ * Real screens (Nov 25; docs/decisions/2026-11-25-real-screens.md; e2e/helpers.ts REAL_SCREENS): a ranked game and its end page on a 1080p
+ * laptop at 125% (Eric's, 1536 × 730), at 150% (1280 × 600), a 768p laptop (1366 × 650) and a desktop (1920 × 960), each at its own device
+ * scale. In play: nothing scrolls, the chat beside the board shows at least 120 px of messages. The end page (Eric, Nov 25: "this defeat
+ * screen looks horrendous"): nothing scrolls either way (a page taller than the window showed Windows' scrollbar, and its 100vw widths
+ * then scrolled sideways), "Defeat" in view; the headline and your rewards with the chat on the left, the move-by-move on the right, both
+ * from the same top, even gutters (the page's padding is the gap between them), the review's board down to 40 px from the window's
+ * foot; the chat with at least 120 px of messages; Play again and Home a normal button's size; the placement card "1 of 5 games"; your
+ * quests, never "No quests moved this game".
+ */
+test("real screens (Nov 25): a ranked game and its end page on laptop 1536×730, 1280×600, 1366×650 and desktop 1920×960", async ({ browser }) => {
+  test.skip(!isComputer(), "a computer only; it opens its own windows");
+  test.setTimeout(8 * 60_000);
+  for (const s of REAL_SCREENS) {
+    const at = `the ${s.name}`;
+    const open = async (name: string) => {
+      const page = await (await realScreenContext(browser, s)).newPage();
+      players.push([name, page]);
+      await named(page, name);
+      await page.goto("/?nolanding");
+      await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+      return page;
+    };
+    const a = await open(`Ann ${s.width}`);
+    const b = await open(`Bo ${s.width}`);
+    await meet(a, b, poolName());
+    await waitForPlay(a, b);
+    const { white, black } = await bySide(a, b);
+    await tapMove(white, "e2e4");
+    await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
+    await tapMove(black, "e7e5");
+    await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
+    const g = await realLayout(white);
+    expect(g.scrollX, `${at}, in play: no scrolling across`).toBeLessThanOrEqual(0);
+    expect(g.scrollY, `${at}, in play: no scrolling down`).toBeLessThanOrEqual(0);
+    expect(g.cut, `${at}, in play: nothing cut off at the top`).toEqual([]);
+    expect(g.feeds.length, `${at}, in play: the chat`).toBe(1);
+    expect(g.feeds[0], `${at}, in play: the chat's messages`).toBeGreaterThanOrEqual(120);
+    await resign(white);
+    await expect(white.getByTestId("es-title")).toHaveText("Defeat");
+    await expect(white.locator(".es-earned-rp .es-earned-why")).toHaveText("Placement 1/5", { timeout: 15_000 });
+    await expect(white.getByTestId("es-q").first()).toBeVisible({ timeout: 10_000 });
+    await white.waitForTimeout(500);
+    const e = await realLayout(white);
+    expect(e.scrollX, `${at}, the end page: no scrolling across`).toBeLessThanOrEqual(0);
+    expect(e.scrollY, `${at}, the end page: no scrolling down`).toBeLessThanOrEqual(0);
+    expect(e.cut, `${at}, the end page: nothing cut off at the top`).toEqual([]);
+    expect(e.feeds.length, `${at}, the end page: the chat`).toBe(1);
+    expect(e.feeds[0], `${at}, the end page: the chat's messages`).toBeGreaterThanOrEqual(120);
+    const m = await white.evaluate(() => {
+      const r = (q: string) => document.querySelector(q)!.getBoundingClientRect();
+      const btns = [...document.querySelectorAll(".dv-end .dv-result-actions .btn")].map((x) => x.getBoundingClientRect());
+      return { screen: r(".dv-end"), left: r(".dv-end > .results-top"), right: r(".dv-end > .results-review"), chat: r(".dv-end .dv-chat"), title: r(".es-title"), btns: btns.map((x) => ({ w: x.width, h: x.height })), pad: parseFloat(getComputedStyle(document.querySelector(".dv-end")!).paddingLeft) };
+    });
+    expect(m.title.top, `${at}, the end page: "Defeat" in view`).toBeGreaterThanOrEqual(0);
+    expect(m.right.left, `${at}, the end page: the move-by-move on the right`).toBeGreaterThan(m.left.right);
+    expect(Math.abs(m.left.top - m.right.top), `${at}, the end page: both columns from the same top`).toBeLessThanOrEqual(1);
+    expect(Math.abs(m.right.left - m.left.right - m.pad), `${at}, the end page: the gap between the columns is the page's padding`).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(m.screen.right - m.right.right - m.pad), `${at}, the end page: the same gutter at the right edge`).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(m.chat.bottom - m.left.bottom), `${at}, the end page: the chat down to the left column's foot`).toBeLessThanOrEqual(1.5);
+    expect(e.review!.b, `${at}, the end page: the review's board down to 40 px from the window's foot`).toBeGreaterThanOrEqual(s.height - 40);
+    for (const x of m.btns) {
+      expect(x.h, `${at}, the end page: Play again / Home a normal button's height`).toBeLessThanOrEqual(50);
+      expect(x.w, `${at}, the end page: Play again / Home a normal button's width`).toBeLessThanOrEqual(200);
+    }
+    await expect(white.getByTestId("es-now-rp")).toHaveText("1 of 5 games");
+    await expect(white.getByTestId("es-quests")).not.toContainText("No quests moved");
+    for (const p of [a, b]) await p.context().close();
+  }
 });
