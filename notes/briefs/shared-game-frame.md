@@ -1,0 +1,27 @@
+# Build: one shared computer frame for every game screen (50 v 50, Boss alone/raid, Squads), after the 1 v 1 (Nov 25). Opus high, targeted, one PR per mode
+
+Eric (Nov 25): "address the screens", "make sure changes are done to all screens so I'm not repeating myself", and on the 50 v 50 mockup:
+"chat ... still too low, needs to be shrunk to match the left black box same height as I've said many times, it's below the board".
+Start AFTER `claude/duel-layout` merges (the 1 v 1 frame, the side menu's labels-whenever-they-fit and the narrowing right column), and
+build the other modes ON that frame (shared pieces, not copies): the top strip, the right column, the gap token, the gear's place.
+Reference: round 1's NOTE and stills (`git show origin/stills/game-layout-mockup:NOTE.md`, `stills/*-before-after.png`).
+
+## Eric's rules for every computer game screen (all of them, every size)
+1. **Every column shares the board's top and bottom line.** The left column (the 50 v 50 scoreboard, Squads' team clocks), the board (with
+   its strips) and the right column all start and end on the same two lines; the right column's content (status, buttons, chat) fits
+   INSIDE that height: the chat shrinks to fit, never runs past the board. Add this to `docs/rules/eric.md` (at Eric's request) with ONE
+   guard test that checks it on every mode at 1536x730 and 1920x960 (± 1 px).
+2. The board never shrinks for the menu; labels show; the right column narrows to a working minimum first (the 1 v 1 PR's rule).
+3. No title line: the mode's status line is the top strip; the gear top right, level with it.
+4. Nothing hidden, nothing shifts; one gap token; nothing stretched.
+## Per mode
+- **50 v 50:** status at the top of the right column (the voting box), the vote box (the standing skeleton, live) and the chat under it,
+  all inside the board's height; the scoreboard on the left the same height.
+- **Squads:** a real right panel the board's height: the tiny boards on top, the pick line, then the chat; the board line ("Board 2 ·
+  starting soon") in the top strip's middle.
+- **Boss alone / raid:** the Moves panel the board's height (not stopping halfway); the boss bar: ASK the director (Eric's call pending:
+  one-line bar for 621 px, or today's two-line bar for 602 px).
+## Each PR
+Stills at 1536x730, 1920x960, 1858x1040 (and the phone unchanged), looked at yourself against the rules above before pushing; the
+`desktop-board.spec` real-screens numbers updated; checks changed old → new; a short decision note; area pages. Push, `.done`, stop.
+Commits end with only `Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR` (no Co-Authored-By).
