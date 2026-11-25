@@ -782,11 +782,23 @@ describe("the FAQ: 1 v 1", () => {
     expect(t).toContain(`about +${RANKED_1V1.points.perGame} for a win and −${RANKED_1V1.points.perGame} for a loss against a player at your level`);
     expect(t).toContain(`${RANKED_1V1.coins.perMinute.win} coins a minute for a win`);
     expect(t).toContain(`Up to ${RANKED_1V1.coins.perDay} games a day pay coins`);
+    // Colors (Eric, Nov 25): in turn, as evenly as it can; no White edge in the rating.
+    expect(t).toContain("Colors: the game gives each player White and Black in turn, as evenly as it can, so nobody is stuck on one color.");
+    expect(t).toContain(
+      `Nobody gets the same color more than ${RANKED_1V1.colors.maxInRow} games in a row unless it can't be helped; otherwise White goes to whichever of you has had Black more often in your last ${RANKED_1V1.colors.recentGames} ranked games (if that's even, whoever had Black last).`,
+    );
+    expect(t).toContain("Your rating doesn't change by color: over many games each color evens out.");
     // Changed numbers change the words.
-    const R = { ...RANKED_1V1, voteSeconds: 7, controls: RANKED_1V1.controls.map((c) => (c.id === "blitz-rapid" ? { ...c, baseSeconds: 240 } : c)) };
+    const R = {
+      ...RANKED_1V1,
+      voteSeconds: 7,
+      controls: RANKED_1V1.controls.map((c) => (c.id === "blitz-rapid" ? { ...c, baseSeconds: 240 } : c)),
+      colors: { recentGames: 20, maxInRow: 3 },
+    };
     const changed = text({ ...FAQ_DEFAULTS, ranked: R });
     expect(changed).toContain("you both have 7 seconds");
     expect(changed).toContain("Blitz and Rapid Blitz 4+3");
+    expect(changed).toContain("more than 3 games in a row unless it can't be helped; otherwise White goes to whichever of you has had Black more often in your last 20 ranked games");
   });
 });
 

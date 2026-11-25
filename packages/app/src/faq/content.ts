@@ -358,8 +358,9 @@ function squadsClocks(Q: SquadsSettings): string {
 }
 
 /**
- * Ranked 1 v 1 (Eric, Oct 16; RANKED_1V1): the mode, the time-control vote and its rule (every pair of picks worked out
- * by the game's own rule, votedControl), the clocks, how a game ends, ranks, rank points, placements and coins.
+ * Ranked 1 v 1 (Eric, Oct 16; RANKED_1V1): the mode, colors (Eric, Nov 25: core's firstGetsWhite), the time-control vote and its
+ * rule (every pair of picks worked out by the game's own rule, votedControl), the clocks, how a game ends, ranks, rank points,
+ * placements and coins.
  */
 export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES): string {
   const z = (id: "bullet" | "blitz" | "rapid") => controlLabel(zoneControl(id, R));
@@ -378,6 +379,7 @@ export function ranked1v1(R: typeof RANKED_1V1, L: typeof LEAVES = LEAVES): stri
   return `### 1 v 1 · Classic chess {#mode-1v1}
 
 - **Normal chess against one other person, ranked.** Checkmate wins, the clocks are real, and nothing else: no power-ups, no scoring of your moves. One tap on **1 v 1** finds you an opponent near your strength; the longer you wait, the wider the search. If nobody turns up within ${n(R.fewPlayersSeconds, "second")}, you can keep waiting or **play a bot** (unranked: nothing on your record, no coins).
+- **Colors:** the game gives each player White and Black in turn, as evenly as it can, so nobody is stuck on one color. Nobody gets the same color more than ${n(R.colors.maxInRow, "game")} in a row unless it can't be helped; otherwise White goes to whichever of you has had Black more often in your last ${n(R.colors.recentGames, "ranked game")} (if that's even, whoever had Black last). Your rating doesn't change by color: over many games each color evens out.
 - **The time control, voted on the board:** before move 1, three zones appear in the middle of the board, **${z("bullet")}** on the left, **${z("blitz")}** in the middle and **${z("rapid")}** on the right, and you both have ${n(R.voteSeconds, "second")} to drag your pawn into one. The same pick plays that control. Picks next to each other meet in between: Bullet and Blitz make ${meet("bullet", "blitz")}, Blitz and Rapid ${meet("blitz", "rapid")}. Bullet against Rapid makes ${meet("bullet", "rapid")}. If only one of you picks, that pick counts; if neither does, it's **${controlLabel(def)}**.
 - **The clocks:** "${controlLabel(blitz)}" means ${n(blitz.baseSeconds / 60, "minute")} each, plus ${n(blitz.incrementSeconds, "second")} after every move. They start after Black's first move. Each side has ${n(R.firstMoveSeconds, "second")} for its first move, or the game is called off (no result; for the side that didn't move, it's a dodge: leaving early, below).
 - **How a game ends:** checkmate; resigning; running out of time, a loss (but a draw if the other player has only a king, or a king and one knight or one bishop, so they couldn't mate); or a draw, by stalemate, threefold repetition, the 50-move rule, too little material for either side to mate, or agreement. **Offer a draw** is under the board: the other player accepts or declines, and after a decline you can offer again once you've made ${n(R.drawOfferEveryMoves, "more move")}.

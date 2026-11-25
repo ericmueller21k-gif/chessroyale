@@ -3632,6 +3632,13 @@ export const RANKED_1V1 = {
    */
   match: { startRange: 100, perSecond: 10, perRd: 1, maxRange: 1000 },
   /**
+   * Colors (Eric, Nov 25: "Color balance seems good"; docs/decisions/2026-11-25-duel-color-balance.md; core's firstGetsWhite): as a
+   * pair is seated, nobody gets one color more than `maxInRow` games in a row when the other player can take it instead; then White
+   * goes to the larger (Black games − White games) over each player's last `recentGames` ranked games; a tie, to the one who had
+   * Black last; still tied, a coin flip. The rating has no White edge (expectedScore ignores color).
+   */
+  colors: { recentGames: 10, maxInRow: 2 },
+  /**
    * The hidden rating: Glicko-1, each game its own rating period. A new player starts at their account's rating (from
    * other modes, clamped to `seedMin`-`seedMax`) or `start`, with `startRd`; the deviation shrinks with each game to
    * `minRd`, and grows back with idle days (`rdPerDay`: sqrt(RD² + c² × days)).

@@ -4,7 +4,7 @@ import { DELETED_ID, createGuest, ensureSchema, profile, publicProfile, signInWi
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { equipLocker, lockerState, openCrate } from "../src/locker.ts";
 import { appeal, setCase } from "../src/fairplay.ts";
-import { coinCount, duelEntrant, duelGamesOf, marksOf, purgeConduct, purgeDuelGames, rankedLeaves, rankedRecordOf, recordDuel, type FinishedDuel } from "../src/ranked.ts";
+import { coinCount, duelEntrant, duelGamesOf, marksOf, purgeConduct, purgeDuelGames, rankedLeaves, rankedRecordOf, recentColors, recordDuel, type FinishedDuel } from "../src/ranked.ts";
 import { TOP_PLACE_MS, forgetTopPlaces, rankOf, rankedSummary, topPlace } from "../src/ranked-schema.ts";
 import { memoryDb, stockCrates } from "./memory-db.ts";
 
@@ -477,7 +477,25 @@ describe("keeping, the profile and the account", () => {
   it("the queue's read of a player: their account's name, their look, their rank and hidden rating (with its deviation)", async () => {
     const { sql, a } = await setup();
     const e = await duelEntrant(sql, a);
-    expect(e).toEqual({ player: { uid: a.id, name: "Ann", look: {}, rank: rankView(null) }, rating: 1500, rd: RANKED_1V1.rating.startRd });
+    expect(e).toEqual({ player: { uid: a.id, name: "Ann", look: {}, rank: rankView(null) }, rating: 1500, rd: RANKED_1V1.rating.startRd, colors: [] });
+  });
+
+  it("the queue's read of a player's colors (Nov 25): their last ranked games, newest first, only their own; a failed read is none", async () => {
+    const { sql, a, b } = await setup();
+    const c = (await createGuest(sql, T0, "Cy")).user;
+    // Twelve games, Ann White in every third; then one between Bob and Cy, the newest.
+    for (let i = 0; i < 12; i++) {
+      const [w, bl] = i % 3 === 0 ? [a.id, b.id] : [b.id, a.id];
+      await recordDuel(sql, game(w, bl, "1/2-1/2", { endedAt: T0 + (i + 1) * MIN }), notHeld);
+    }
+    await recordDuel(sql, game(b.id, c.id, "1-0", { endedAt: T0 + 20 * MIN }), notHeld);
+    // The last 10 of them (Bob's: Cy's game and 9), newest first: Ann had White in every third.
+    expect((await recentColors(sql, a.id)).join("")).toBe("bbwbbwbbwb");
+    expect((await recentColors(sql, b.id)).join("")).toBe("wwwbwwbwwb");
+    expect(await recentColors(sql, c.id)).toEqual(["b"]);
+    expect((await duelEntrant(sql, c)).colors).toEqual(["b"]);
+    const broken: Sql = { ...sql, all: async (q, ...p) => (q.includes("ranked_1v1_games") ? Promise.reject(new Error("D1 down")) : sql.all(q, ...p)) };
+    expect((await duelEntrant(broken, a)).colors).toEqual([]);
   });
 
   it("the download has the rank and the games (the opponent by name, not fair play's check); deleting leaves the opponent's games", async () => {

@@ -38,6 +38,11 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   comes); a ticket paired already ends that game for its player (`DuelGame.abandon`): called off and nobody's dodge if they
   never connected to it (pressed the moment it was found), else their own Abort or Resign ("Leaving early", below). After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and
   Play a bot (unranked).
+- **Colors** (Eric, Nov 25; [2026-11-25-duel-color-balance.md](../decisions/2026-11-25-duel-color-balance.md)): as a pair is seated, core's
+  `firstGetsWhite` from each player's colors in their last ranked games (`recentColors`, read with the ticket): never a third in a row on one
+  color when the other can take it (both stuck: the longer run switches), then more Black over the last `colors.recentGames` (10), then
+  Black last, then a coin. No White edge in the rating. Bot and town games keep theirs and don't count. Tests: core `ranked.test.ts`,
+  `duel-queue.test.ts`, `ranked-store.test.ts`, the e2e's second game.
 - **The stage** (Eric, Oct 16: "your character's sitting there, and then there's like kind of this empty platform thing
   like waiting, and then when your opponent joins, like their pawn loads up next to you"; `components/DuelStage.tsx`,
   styles `dv-st-`; why: [docs/decisions/2026-10-16-ranked-1v1-versus-screen.md](../decisions/2026-10-16-ranked-1v1-versus-screen.md)).
