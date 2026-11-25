@@ -49,7 +49,7 @@ fetch() {
   if [ ! -d node_modules ] || [ "$lock" != "$(cat "$HOME/.lock-installed" 2>/dev/null)" ]; then
     rm -f "$HOME/.lock-installed"
     local t0=$SECONDS
-    run npm ci --ignore-scripts --no-audit --no-fund --loglevel=error || return 1
+    run npm ci --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error || return 1
     echo "$lock" > "$HOME/.lock-installed"
     log "installed in $((SECONDS - t0)) s"
   fi
@@ -61,10 +61,10 @@ while [ "$stopping" -eq 0 ]; do
   if fetch; then
     commit=$(git -C "$DIR" rev-parse HEAD)
     log "running ${REF} at ${commit:0:12}"
-    # (The program's options come from the Worker: RESIDENTS_ARGS, plain words. `env` hands over to node, so the trap's signal
-    # reaches the program itself.)
+    # (The program's options come from the Worker: RESIDENTS_ARGS, plain words. The secret goes into node's environment only, never
+    # a command line; node is the job itself, so the trap's signal reaches the program.)
     # shellcheck disable=SC2086
-    run env CF_ACCESS_CLIENT_SECRET="$secret" RESIDENTS_COMMIT="$commit" node --import tsx scripts/residents/run.ts ${RESIDENTS_ARGS:-}
+    CF_ACCESS_CLIENT_SECRET="$secret" RESIDENTS_COMMIT="$commit" run node --import tsx scripts/residents/run.ts ${RESIDENTS_ARGS:-}
     code=$?
   else
     log "couldn't fetch or install ${REF}"

@@ -318,6 +318,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     think times, resigning, draws, chat). The names: `scripts/residents/names.json` (200 handles, reviewed: never a real person's
     name or a hint of one, never "bot" or "resident"). Tests: `packages/server/test/residents-program.test.ts` (names, profiles, the
     schedule's waves and caps, think times, behaviors).
+- **Residents, the host** (Nov 25; `residents-host.ts`, `scripts/residents/container/`, DEPLOY.md "Residents"): a Container whose
+  image clones `main`, installs it and runs the program `--follow-deploys` (after a deploy: games finish, exit 75, start again). The
+  cron keeps it up while `RESIDENTS_HOST_ON` (wrangler.jsonc) is "1" and stops it while `PAUSE_RESIDENTS` is on; the token's secret
+  (`RESIDENTS_CLIENT_SECRET`) goes to the program alone, never git or npm. About $42 a month. Tests: `residents-host.test.ts`.
 - **Errors and player reports** (below): every device reports its errors, the server its own, players report bugs
   and send feedback and ideas, and admins read them all on `/admin/ops`.
 - **Health** (below): one snapshot of the game for an admin (`/admin/ops`) or a script (`npm run ops:report`).
@@ -472,9 +476,10 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
   in the Worker against the team's public keys (RS256, cached an hour; Access's endpoint asked at most once a minute
   whatever the cache, even while it fails), its audience (`ACCESS_AUD`), issuer, expiry and not-before (30 s for
   clocks), and its `common_name` must be a service token's client ID (a person's login, which carries an email instead,
-  never opens it, whoever the application lets in). If the Worker has `OPS_ACCESS_CLIENT_ID` (optional, set in
-  Cloudflare as a secret, never in the repository), only that client ID does (`packages/server/src/access.ts`). The
-  team domain and the AUD tag are public (in `wrangler.jsonc`, `vars`). Anyone else: "Not found".
+  never opens it, whoever the application lets in). Only the client ID `OPS_ACCESS_CLIENT_ID` names does (since Nov 25 in
+  `wrangler.jsonc` `vars`: the ops scripts' token, an identifier, not a secret; unset, any service token Access admits would,
+  the residents' included: `packages/server/src/access.ts`). The team domain and the AUD tag are public (in `wrangler.jsonc`,
+  `vars`). Anyone else: "Not found".
 - **`npm run ops:report`** (`scripts/ops-report.mjs`): reads the view from hunchess.com with the Access service token
   in `CF_ACCESS_CLIENT_ID2` / `CF_ACCESS_CLIENT_SECRET2` (sent as headers, never printed) and prints a short summary,
   "Needs attention" first: D1 failing, no live hub, errors up (20 or more this hour, or 3 times the hour before),

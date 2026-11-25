@@ -122,7 +122,8 @@ decisions. In this order:
      can make or sign in to accounts on the live site; docs/decisions/2026-11-10-cheater-demo.md; PR #622 review,
      finding 1).
    - purge residents; remove RESIDENTS_CLIENT_ID and the token (`users.resident`, `residents.ts`; the purge is PR 1b;
-     docs/decisions/2026-11-25-residents-server.md).
+     docs/decisions/2026-11-25-residents-server.md); the host first: `RESIDENTS_HOST_ON` to "0", then its `containers`
+     entry, binding and class out (a deleted-classes migration), and the Worker secret `RESIDENTS_CLIENT_SECRET` deleted.
 
 **Only Eric can do:**
 

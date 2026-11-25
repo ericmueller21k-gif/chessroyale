@@ -27,6 +27,46 @@ it pushed; or, once Workers Builds runs Docker again, put `"./engine/Dockerfile"
 - **Locally:** `npx wrangler dev` builds and runs the container with Docker; `--enable-containers=false --var ENGINE_OFF:1` runs without it (the e2e suite does, to test the device fallback). Add `--var TEST_SWITCHES:1` for the test switches in the address (`?debug`, `?rounds=`, `?pool=`, …: docs/areas/ops.md, "Test switches"); never set `TEST_SWITCHES` on the production Worker.
 - **Budget alert:** Billing → Add Budget Alert in the Cloudflare dashboard (suggested: $20/month).
 
+## Residents: the always-on host (Nov 25, 2026)
+
+The residents program (`scripts/residents/`, docs/areas/ops.md "Residents") runs around the clock in a Cloudflare Container: class
+`ResidentsHost` (`packages/server/src/residents-host.ts`), binding `RESIDENTS_HOST`. Its image (`scripts/residents/container/`) is
+only Node and git: at each start it clones `main` (the repository is public), installs it and runs the program, so code changes
+reach it with no new image. It signs in with the Access service token "residents": client ID `RESIDENTS_CLIENT_ID` (wrangler.jsonc),
+secret the Worker secret `RESIDENTS_CLIENT_SECRET` (type **Secret**; never in the repository or a chat).
+
+**Once (Eric, from a computer with Docker running, about 5 minutes):** in a terminal in the repository, signed in to Cloudflare
+(`npx wrangler login`):
+
+```sh
+npx wrangler containers build scripts/residents/container -t chessroyale-residents:1 --push
+```
+
+It ends by printing the pushed image's digest (`sha256:…`; `npx wrangler containers images list` shows it again). The digest isn't
+a secret: send it to the director, who adds the host's entry to `containers` in `wrangler.jsonc` and deploys:
+
+```jsonc
+{ "class_name": "ResidentsHost", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-residents@sha256:<digest>", "instance_type": "standard-1", "max_instances": 1 }
+```
+
+- **On:** `RESIDENTS_HOST_ON` = `"1"` in `wrangler.jsonc` (a PR; not the dashboard, where a deploy would put the file's value back).
+  The next 15-minute cron starts it. That starts the spend: about $42 a month (below).
+- **Stop at once:** `PAUSE_RESIDENTS` = `1` (dashboard, Save and deploy; DEPLOY.md "Kill switches"). The server refuses every
+  resident within seconds, the program ends its games and exits, and the next cron run (within 15 minutes) stops the container.
+  Delete it to bring them back. `RESIDENTS_HOST_ON` = `"0"`: the cron stops renewing it, and it sleeps within 30 minutes.
+- **Deploys:** a Worker deploy doesn't restart the container (no container change, no rollout; its Durable Object restarts and finds
+  it running). The program follows deploys itself: it reads `/version.json` every 2 minutes, and after a new version starts nothing
+  new, lets games finish (at most 20 minutes) and exits; the image's script fetches the new `main` and starts it again (installing
+  only when the lockfile changed). A change to the image or the host's `containers` entry is a rollout: SIGTERM, then the new one.
+- **The first start:** Workers & Pages → chessroyale → Observability, lines with `host:` (the container: "installed", "running main
+  at …") and `residents:`; `GET /api/admin/residents` shows `host` (the cron's plan) and the program's last heartbeat (`beat`: its
+  commit, the live version it follows, who's online). If Access turns the token away, the program stops at start with "Access turned
+  the service token away": check the token is in the hunchess.com application's Service Auth policy.
+- **Cost (standard-1: ½ vCPU, 4 GiB, 8 GB):** memory $25.70, CPU about $15 (billed on use: about 0.3 vCPU on average), disk $1.40,
+  egress nothing (1 TB included): about **$42 a month**. Its Durable Object stays awake while the container runs (about 330k GB-s a
+  month: inside the 400k included, or up to about $4 if other objects use it up). Measured locally: about 0.5 GiB of memory with
+  a few residents (DECISIONS: docs/decisions/2026-11-25-residents-host.md).
+
 ## Fair play: the review page, the reviewer's key and the deep re-check
 
 Two settings, both added by Eric in the Cloudflare dashboard. **Neither is ever pasted in a chat or put in the
