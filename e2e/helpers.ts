@@ -1007,3 +1007,29 @@ export async function realLayout(page: Page) {
     };
   });
 }
+
+/**
+ * An end screen's spacing (Eric, Nov 25: "Make things spaced evenly and tight, and then we can always just center the whole thing";
+ * docs/decisions/2026-11-25-end-screens-2.md): the containers of its stack (`root`'s children, through `display: contents` wrappers and
+ * the rewards' column), each gap between two in a row, the stack's one gap (its row gap: `--es-gap`), and anything set to stretch (a
+ * container that grows, a stack that spreads its items).
+ */
+export async function endGaps(page: Page, root: string) {
+  return page.evaluate((sel) => {
+    const top = document.querySelector(sel)!;
+    const flat = (e: Element): Element[] =>
+      [...e.children].flatMap((c) => {
+        const s = getComputedStyle(c);
+        if (s.display === "contents" || c.classList.contains("es-rewards")) return flat(c);
+        if (s.display === "none" || s.position === "absolute" || s.position === "fixed") return [];
+        const b = c.getBoundingClientRect();
+        return b.height > 0 && b.width > 0 ? [c] : [];
+      });
+    const items = flat(top);
+    const name = (e: Element) => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
+    const gaps = items.slice(1).map((e, i) => ({ between: `${name(items[i]!)} → ${name(e)}`, px: e.getBoundingClientRect().top - items[i]!.getBoundingClientRect().bottom }));
+    const spread = [top, ...top.querySelectorAll(".es-rewards")].map((e) => getComputedStyle(e).justifyContent).filter((j) => /space-|stretch/.test(j));
+    const grow = items.filter((e) => Number(getComputedStyle(e).flexGrow) > 0 && !e.classList.contains("results-review")).map(name);
+    return { token: parseFloat(getComputedStyle(top).rowGap), gaps, spread, grow };
+  }, root);
+}

@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
+import { test, bossAloneFromHome, endGaps, submitMove } from "./helpers.ts";
 
 /**
  * Eric, Nov 7: a boss battle's result screen has no trophy or skull above its title, its title in the God King's pixel type,
@@ -144,4 +144,48 @@ test("a boss battle won: Victory!, no trophy or skull, no record text, the boss'
   const s = await duoSamples(page);
   expect(s.some((x) => x.stage === "on"), "no attack on a win").toBe(false);
   for (const x of s) if (x.gap !== null) expect(x.gap, "16 px between the boss and your pawn").toBeGreaterThanOrEqual(16);
+});
+
+/**
+ * Eric's spacing rule (Nov 25; docs/decisions/2026-11-25-end-screens-2.md): "Make things spaced evenly and tight, and then we can always
+ * just center the whole thing". A boss battle resigned (+0 XP, no quests) on a phone 390 × 844 and a laptop 1536 × 730 (125%): one gap
+ * between every container (the headline, XP EARNED, the boss and your pawn, your bar, the quests' line, the buttons), to 2 px; nothing set
+ * to stretch; a stack shorter than the screen centered as one block (the room above and under it within 30 px). And a skip tap on its first
+ * frame leaves the "No XP" line whole (it used to keep the "+0" the skip wrote).
+ */
+test("a boss battle resigned: one gap between every container, nothing stretched, the short stack centered (phone 390×844, laptop 1536×730)", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "opens its own phone and laptop windows");
+  test.setTimeout(4 * 60_000);
+  for (const s of [
+    { at: "phone 390×844", width: 390, height: 844, scale: 3, phone: true, root: ".screen.es-screen" },
+    { at: "laptop 1536×730", width: 1536, height: 730, scale: 1.25, phone: false, root: ".boss-results > .results-top" },
+  ]) {
+    const ctx = await browser.newContext({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: s.scale, isMobile: s.phone, hasTouch: s.phone });
+    const page = await ctx.newPage();
+    await page.goto("/?debug&clock=60&boss=gingerbread");
+    await bossAloneFromHome(page);
+    await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+    await page.getByRole("button", { name: "Match options" }).click();
+    await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^Resign$/ }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: /Resign/ }).click();
+    // (A tap as the page appears, before its XP has come, skips the sequence: the "No XP" line still comes in full, never "+0" in its
+    // place: Eric's "XP EARNED +0", Nov 25.)
+    await expect(page.getByTestId("es-title")).toBeVisible({ timeout: 20_000 });
+    await page.mouse.click(4, 4);
+    await expect(page.locator(".es-earned-xp .es-earned-why")).toHaveText("No XP: test game.", { timeout: 20_000 });
+    await expect(page.getByTestId("es-quests")).toHaveText("Quests No quests this game.", { timeout: 20_000 });
+    await page.waitForTimeout(600);
+    const g = await endGaps(page, s.root);
+    for (const x of g.gaps) expect(Math.abs(x.px - g.token), `${s.at}: ${x.between}: ${x.px.toFixed(1)} px, not the one gap (${g.token} px)`).toBeLessThanOrEqual(2);
+    expect(g.spread, `${s.at}: nothing spread apart`).toEqual([]);
+    expect(g.grow, `${s.at}: nothing grows to fill`).toEqual([]);
+    // (Centered as one block: the room above the headline and under the buttons, within the screen, the same.)
+    const m = await page.evaluate(() => {
+      const t = document.querySelector(".es-head")!.getBoundingClientRect();
+      const b = document.querySelector(".es-screen .actions")!.getBoundingClientRect();
+      return { above: t.top, under: innerHeight - b.bottom, scroll: document.documentElement.scrollHeight - innerHeight };
+    });
+    if (m.scroll <= 0) expect(Math.abs(m.above - m.under), `${s.at}: centered (${m.above.toFixed(0)} above, ${m.under.toFixed(0)} under)`).toBeLessThanOrEqual(30);
+    await ctx.close();
+  }
 });

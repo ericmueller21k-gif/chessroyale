@@ -144,14 +144,19 @@ function EarnedSlot({ kind, slot, down, why, parts, games = false }: { kind: "xp
     <div class={`es-earned es-earned-${kind}${down ? " es-down" : ""}${why ? " es-why" : ""}`} data-testid={`es-earned-${kind}`}>
       {/* (Placement games earn no RP, Eric, Nov 25: their slot says what they are.) */}
       <span class="es-earned-label">{kind === "xp" ? "XP EARNED" : games ? "PLACEMENT" : down ? "RP LOST" : "RP EARNED"}</span>
+      {/* (Keyed: a skip tap before the XP came writes the number's text by hand; the line that comes after must be a new element, or it
+          kept that "+0", Nov 25.) */}
       {why ? (
-        <span class="es-earned-why">{why}</span>
+        <span class="es-earned-why" key="why">
+          {why}
+        </span>
       ) : (
-        <span class="es-earned-num" ref={slot}>
+        <span class="es-earned-num" key="num" ref={slot}>
           {down ? "0" : "+0"}
         </span>
       )}
-      <span class="es-parts">{parts || " "}</span>
+      {/* (What made it, when there's something to say: no blank line kept, Nov 25: one gap between containers.) */}
+      {parts && <span class="es-parts">{parts}</span>}
     </div>
   );
 }

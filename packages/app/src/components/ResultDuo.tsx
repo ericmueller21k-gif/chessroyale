@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { KING_ATTACK } from "@chessroyale/chess";
 import type { GameView } from "../game.ts";
+import { drawnBox } from "../screens/TowerBar.tsx";
 import { bossKit } from "../characters/kits.ts";
 import { turned } from "../characters/sprite-kit.ts";
 import { pawnLook } from "../looks.ts";
@@ -52,7 +53,9 @@ export function ResultDuo({ match, result, hopAt = 0 }: { match: GameView; resul
   const [lashIn] = useState(() => at + (KING_ATTACK.lashAt - KING_ATTACK.landAt) - Date.now());
   return (
     <div class={`results-duo rd-is-${result}${attacking ? " rd-attacking" : ""}`} data-attack={ka ? stage : undefined}>
-      <div class="rd-boss">
+      {/* (`--rd-top`: the first drawn row of his idle in his frame: the end screen's box starts at his head, not at the frame's empty top,
+          Nov 25. His frame stays anchored at his feet.) */}
+      <div class="rd-boss" style={{ "--rd-top": kit ? drawnBox(boss.name, kit.ch, kit.anims.idle ?? "idle").top : 0 }}>
         <BossCharacter match={match} place="results" />
         {attacking && (
           <span

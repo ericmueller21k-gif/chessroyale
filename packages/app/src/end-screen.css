@@ -1,13 +1,23 @@
 /* ---- The end screen of every match (Eric, Nov 20; components/EndScreen.tsx; docs/decisions/2026-11-20-end-screen.md). Every box has
    its size from the first frame; the sequence only sets transforms, opacity and texts. Centered, cards and all. ---- */
+/* One spacing rule on every end screen (Eric, Nov 25: "Make things spaced evenly and tight, and then we can always just center the whole
+   thing"): one gap between every container (`--es-gap`), half of it inside a group (the headline and its line, a number and its label);
+   nothing stretched to fill height; a stack shorter than the screen centered as one block. Guard: `endGaps` (e2e/helpers.ts) in
+   ranked-1v1.spec.ts and boss-result.spec.ts. */
 .es-screen {
+  --es-gap: 12px;
+  --es-gap-in: 6px;
   text-align: center;
+}
+.screen.es-screen {
+  gap: var(--es-gap);
+  justify-content: safe center;
 }
 .es-rewards {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--es-gap);
   width: 100%;
 }
 
@@ -16,6 +26,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: var(--es-gap-in, 6px);
   text-align: center;
 }
 .results .es-title,
@@ -25,7 +36,7 @@
   line-height: 1.4;
   color: #1a1406;
   text-shadow: 3px 3px 0 #e8b84a;
-  margin: 6px 0 4px;
+  margin: 0;
 }
 :root:not([data-theme="light"]) .es-title {
   color: #fff3d1;
@@ -83,12 +94,10 @@
 /* "XP EARNED" and its number: a fixed box; the number counts here, then lobs into its bar. (Nov 25: the label and the number a size
    bigger, Eric: "I need a magnifying glass to read XP EARNED +0".) */
 .es-earned {
-  height: 84px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: var(--es-gap-in, 6px);
   text-align: center;
 }
 /* Why there's none ("No XP: test game."), in the number's place, the same height. */
@@ -131,7 +140,7 @@
   color: var(--good);
   text-shadow: 0 2px 0 color-mix(in srgb, var(--good) 30%, #000 35%);
   font-variant-numeric: tabular-nums;
-  opacity: 0.3;
+  opacity: 0.6;
   transform-origin: center;
   will-change: transform;
   position: relative;
@@ -151,7 +160,7 @@
   opacity: 1;
 }
 .es-earned-num.es-settled {
-  opacity: 0.42;
+  opacity: 0.75;
   animation: es-settle 320ms ease-out both;
 }
 @keyframes es-settle {
@@ -159,7 +168,7 @@
     opacity: 0;
   }
   to {
-    opacity: 0.42;
+    opacity: 0.75;
   }
 }
 
@@ -646,28 +655,34 @@
   height: 72px;
 }
 /* (A boss battle's ResultDuo as the rewards' middle: nothing under your pawn now, so he stands on its base line.) Nov 25 (Eric: "the
-   character models are small here ... they can be bigger or just moved up"): the boss at 2.5 (was 2; his attack at the same scale,
-   `--rd-k`) and your pawn at 2 (was 1.6); the room over him for his words 76 px (was 100), the row's gap wider for the 16 px between them. */
+   character models are small here ... they can be bigger or just moved up"): the boss at 2.25 (was 2; his attack at the same scale,
+   `--rd-k`) and your pawn at 1.8 (was 1.6); the room over him for his words 76 px (was 100), the row's gap wider for the 16 px between them. */
 .es-screen .rd-boss {
   margin-bottom: 12px;
-  --rd-k: 2.5;
+  --rd-k: 2.25;
 }
 .es-screen .rd-boss:has(.ch-recluse) {
   --rd-k: 1.25;
 }
 .es-screen .results-duo .boss-char.place-results:not(.ch-recluse) {
-  --bc-scale: 2.5;
-  --bc-box: 150px;
-  width: 112px;
+  --bc-scale: 2.25;
+  width: 104px;
+  /* (From his head to his feet: his frame's empty rows above his idle's first drawn one (`--rd-top`, ResultDuo) left out of the box.) */
+  height: calc((var(--bc-fy) - var(--rd-top, 0)) * var(--bc-scale) * 1px);
 }
+/* (Room over him for his words, only what a two-line line needs over his head: his box is as tall as his figure, nothing reserved.) */
 .es-screen .results-duo .boss-char.place-results {
-  margin-top: 76px;
+  margin-top: 56px;
+}
+.es-screen .rd-boss {
+  margin-bottom: 0;
 }
 .es-screen .results-duo {
-  gap: 40px;
+  gap: 48px;
+  padding-left: 24px;
 }
 .es-screen .rd-you .you-pawn {
-  --pk: 2;
+  --pk: 1.8;
   --pw: calc(68px * var(--pk));
 }
 /* Squads' middle: your squad's tag and members, in a row. */
@@ -705,6 +720,19 @@
   animation: none;
 }
 
+/* Every end screen's buttons stacked, the column's width, Play again on top (Eric, Nov 25). */
+.es-screen .actions {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  width: min(340px, 100%);
+  margin: 0 auto;
+  gap: var(--es-gap-in, 6px);
+}
+.es-screen .actions .btn {
+  min-height: 46px;
+}
+
 /* ---- Ranked 1 v 1's end page (Eric, Nov 25; docs/decisions/2026-11-25-end-screens-2.md) ----
  * Play again and Home stacked, the column's width; the chat with its post-game lines. A phone: one tight column, the chat with a message
  * area, the move by move clear of Safari's bar. A computer: the game's own screen (Duel.tsx `dv-ended`), its right column's content
@@ -714,7 +742,7 @@
   align-items: stretch;
   width: min(340px, 100%);
   margin: 0 auto;
-  gap: 8px;
+  gap: var(--es-gap-in, 6px);
 }
 .dv-result-actions.dv-stacked .btn {
   flex: none;
@@ -742,13 +770,13 @@
 }
 @media (max-width: 899px), (max-height: 599px) {
   .screen.dv-end {
-    gap: 10px;
     padding-bottom: calc(env(safe-area-inset-bottom) + 40px);
   }
+  /* (A small chat, Eric, Nov 25: "fit a small one with a few lines visible": about four lines of messages, its lines in one row.) */
   .dv-end .dv-chat {
     flex: none;
     width: min(380px, 100%);
-    height: 290px;
+    height: 240px;
     margin: 0 auto;
   }
 }
@@ -762,11 +790,14 @@
     grid-column: 2;
     grid-row: 3 / 5;
     align-self: stretch;
+    --es-gap: calc(12 * var(--es-u));
+    --es-gap-in: calc(6 * var(--es-u));
     contain: size;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: calc(8 * var(--es-u));
+    justify-content: safe center;
+    gap: var(--es-gap);
     min-height: 0;
   }
   .dv-end-col > .es-head {
@@ -774,25 +805,23 @@
   }
   .dv-end-col .es-rewards {
     flex: none;
-    gap: calc(8 * var(--es-u));
   }
   .dv-end-col .dv-result-actions.dv-stacked {
     width: 100%;
-    gap: calc(6 * var(--es-u));
   }
   .dv-end-col .dv-result-actions.dv-stacked .btn {
     min-height: calc(40 * var(--es-u));
     font-size: calc(16 * var(--es-u));
     border-radius: calc(12 * var(--es-u));
   }
+  /* (Small: about four lines of messages, Eric, Nov 25; shorter only if the column hasn't the room.) */
   .dv-end-col > .dv-chat {
-    flex: 1 1 0;
-    min-height: 0;
+    flex: 0 1 236px;
+    min-height: 120px;
     height: auto;
     width: auto;
   }
   .dv-end-col .es-title {
-    margin: 0 0 calc(2 * var(--es-u));
     font-size: calc(22 * var(--es-u));
   }
   .dv-end-col .es-line,
@@ -801,16 +830,13 @@
     line-height: calc(20 * var(--es-u));
     font-size: calc(14 * var(--es-u));
   }
-  .dv-end-col .es-earned {
-    height: calc(76 * var(--es-u));
-    gap: calc(3 * var(--es-u));
-  }
+
   .dv-end-col .es-earned-label {
-    font-size: calc(11 * var(--es-u));
+    font-size: calc(12 * var(--es-u));
   }
   .dv-end-col .es-earned-num {
-    font-size: calc(36 * var(--es-u));
-    line-height: calc(38 * var(--es-u));
+    font-size: calc(40 * var(--es-u));
+    line-height: calc(42 * var(--es-u));
   }
   .dv-end-col .es-earned-why {
     height: calc(38 * var(--es-u));
@@ -871,5 +897,16 @@
   /* (Your strip: the moves' ◀ ▶ in your clock's place; the opponent's clock as it ended.) */
   .dv-ended .dv-strip .dv-steps {
     margin-left: auto;
+  }
+}
+
+/* A computer's boss result page: its two columns (the result, the review) centered down the window as one block when shorter than it; the
+   result's own stack in the one gap. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.results.boss-results.es-screen {
+    align-content: safe center;
+  }
+  .es-screen.boss-results > .results-top {
+    gap: var(--es-gap);
   }
 }

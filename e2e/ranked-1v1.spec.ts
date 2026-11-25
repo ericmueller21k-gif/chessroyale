@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { RANKED_1V1, rankView } from "@chessroyale/core";
-import { BOARD_SEL, REAL_SCREENS, asSignedIn, named, realLayout, realScreenContext, test, watchFor, watchSpans } from "./helpers.ts";
+import { BOARD_SEL, REAL_SCREENS, asSignedIn, endGaps, named, realLayout, realScreenContext, test, watchFor, watchSpans } from "./helpers.ts";
 
 /**
  * Ranked 1 v 1 through the real server (docs/areas/ranked.md), two players on emulated phones (and computers): both
@@ -48,6 +48,15 @@ async function player(browser: Browser, name: string): Promise<Page> {
   await page.goto("/?nolanding");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   return page;
+}
+
+/** Eric's spacing rule on an end page (Nov 25): every gap between two containers the stack's one gap, to 2 px; nothing set to stretch. */
+async function expectEvenGaps(page: Page, root: string, at: string) {
+  const g = await endGaps(page, root);
+  expect(g.token, `${at}: the stack's gap`).toBeGreaterThanOrEqual(8);
+  for (const x of g.gaps) expect(Math.abs(x.px - g.token), `${at}: ${x.between}: ${x.px.toFixed(1)} px, not the one gap (${g.token} px)`).toBeLessThanOrEqual(2);
+  expect(g.spread, `${at}: nothing spread apart`).toEqual([]);
+  expect(g.grow, `${at}: nothing grows to fill`).toEqual([]);
 }
 
 /** A pool of this test's own. */
@@ -266,6 +275,8 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
     await expect(p.getByTestId("es-quests")).toHaveText("Quests No quests this game.", { timeout: 10_000 });
     await expect(p.locator(".dv-result-actions .btn").nth(1)).toHaveText("Home");
   }
+  // Eric's spacing rule (Nov 25), phone 390 × 844: one gap between every container of the page, nothing stretched.
+  await expectEvenGaps(white, ".screen.dv-end", "phone 390×844");
   expect(await leavesOf(white)).toMatchObject({ marks: 1 });
   expect(await leavesOf(black)).toMatchObject({ marks: 0 });
 
@@ -672,6 +683,8 @@ test("real screens (Nov 25): a ranked game and its end page on laptop 1536×730,
     expect(m.lines, `${at}, the end page: the post-game lines`).toEqual(["GG", "Well played", "Thanks!", "Rematch?"]);
     expect(m.feed.height, `${at}, the end page: the chat's messages`).toBeGreaterThanOrEqual(40);
     await expect(white.getByTestId("es-earned-rp")).toHaveCount(0);
+    // Eric's spacing rule (Nov 25): one gap between every container of the right column, nothing stretched, the block centered.
+    await expectEvenGaps(white, ".dv-end-col", s.name);
     for (const p of [a, b]) await p.context().close();
   }
 });
