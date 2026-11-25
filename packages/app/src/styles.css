@@ -26311,16 +26311,16 @@ body.mo-on .mm-scrim {
 }
 .rd-attack {
   position: absolute;
-  left: calc(50% - var(--ra-fx) * 2px);
-  bottom: calc((var(--ra-fy) - var(--ra-h)) * 2px);
-  width: calc(var(--ra-w) * 2px);
-  height: calc(var(--ra-h) * 2px);
+  left: calc(50% - var(--ra-fx) * var(--rd-k, 2) * 1px);
+  bottom: calc((var(--ra-fy) - var(--ra-h)) * var(--rd-k, 2) * 1px);
+  width: calc(var(--ra-w) * var(--rd-k, 2) * 1px);
+  height: calc(var(--ra-h) * var(--rd-k, 2) * 1px);
   pointer-events: none;
 }
 /* (Drawn facing our left: mirrored about his feet, toward your pawn.) */
 .rd-attack.flip {
   transform: scaleX(-1);
-  transform-origin: calc(var(--ra-fx) * 2px) 100%;
+  transform-origin: calc(var(--ra-fx) * var(--rd-k, 2) * 1px) 100%;
 }
 .rd-you {
   flex: none;

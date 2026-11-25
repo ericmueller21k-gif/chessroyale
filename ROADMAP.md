@@ -122,7 +122,8 @@ decisions. In this order:
      can make or sign in to accounts on the live site; docs/decisions/2026-11-10-cheater-demo.md; PR #622 review,
      finding 1).
    - purge residents; remove RESIDENTS_CLIENT_ID and the token (`users.resident`, `residents.ts`; the purge is PR 1b;
-     docs/decisions/2026-11-25-residents-server.md).
+     docs/decisions/2026-11-25-residents-server.md); the host first: `RESIDENTS_HOST_ON` to "0", then its `containers`
+     entry, binding and class out (a deleted-classes migration), and the Worker secret `RESIDENTS_CLIENT_SECRET` deleted.
 
 **Only Eric can do:**
 
@@ -132,9 +133,9 @@ decisions. In this order:
 - At launch, when Access comes off the rest of the site: keep an Access application on the health path
   (`hunchess.com/api/admin/health`) with the service-token policy, and give its AUD tag to a session for
   `ACCESS_AUD` in `wrangler.jsonc` (today's is the whole site's application). Without it, `npm run ops:report` is
-  refused, and only admins signed in can read the view. Optional, any time: pin the view to the one service token by
-  adding the Worker secret `OPS_ACCESS_CLIENT_ID` (its client ID) in Cloudflare (Workers, chessroyale, Settings,
-  Variables and Secrets); unset, any service token the application admits may read it.
+  refused, and only admins signed in can read the view. The view is pinned to the ops scripts' token by
+  `OPS_ACCESS_CLIENT_ID` in `wrangler.jsonc` `vars` (since Nov 25; a client ID, not a secret): never add a Worker secret
+  of that name too (Cloudflare refuses one name for two bindings).
 - Any paid service (an uptime monitor, an error service, a paging service), if we ever want one: asked first with a
   monthly price.
 - Legal sign-off: the privacy policy and terms, and the rules for crates before any real money.

@@ -5,6 +5,8 @@ import { ICONS, cleanName } from "../src/accounts.ts";
 import { profileOf, profilesFor } from "../../../scripts/residents/profiles.ts";
 import { DAY, HOUR, MINUTE, Scheduler, isWeekend, localDay, localHour, planDay, targetAt } from "../../../scripts/residents/schedule.ts";
 import { chooseZone, gamePlan, material, materialEdge, shouldResign, thinkMs } from "../../../scripts/residents/play.ts";
+import { ACCESS_REFUSED_EXIT, NEW_VERSION_EXIT, drainOver, firstVersion, otherProgram, versionCall } from "../../../scripts/residents/lifecycle.ts";
+import { maiaEnv } from "../../sim/src/maia-process.ts";
 
 // The residents' program (scripts/residents; docs/areas/ops.md "Residents"): its names, profiles, schedule and play rules. The program's
 // network side is proven by a run against a local server (the PR's proof), not here.
@@ -236,5 +238,60 @@ describe("how a resident plays", () => {
     expect(tally.leave / 2000).toBeLessThan(0.14);
     expect(tally.drop / 2000).toBeGreaterThan(0.005);
     expect(tally.drop / 2000).toBeLessThan(0.04);
+  });
+});
+
+describe("the program on the host (lifecycle.ts)", () => {
+  const OLD = "aaaaaaaaaaaa";
+  const OWN = "bbbbbbbbbbbb";
+  const NEXT = "cccccccccccc";
+
+  it("exit codes start.sh acts on: 75 a new version (start over), 78 Access refused (end the container)", () => {
+    expect([NEW_VERSION_EXIT, ACCESS_REFUSED_EXIT]).toEqual([75, 78]);
+  });
+
+  it("a new version live: drain; the same one, or no answer: nothing", () => {
+    expect(versionCall(OLD, null, NEXT)).toEqual({ start: OLD, drainTo: NEXT });
+    expect(versionCall(OLD, null, OLD)).toEqual({ start: OLD, drainTo: null });
+    expect(versionCall(OLD, OWN, null)).toEqual({ start: OLD, drainTo: null });
+    // (Off the host, no version read yet: the first one read is the start.)
+    expect(versionCall(null, null, OLD)).toEqual({ start: OLD, drainTo: null });
+  });
+
+  it("its own commit going live (main was ahead of the live version at its start): no drain, and that's its start now (the review's m1)", () => {
+    expect(versionCall(OLD, OWN, OWN)).toEqual({ start: OWN, drainTo: null });
+    expect(versionCall(OWN, OWN, NEXT)).toEqual({ start: OWN, drainTo: NEXT });
+  });
+
+  it("the start version: the live one, or its own commit when that first read fails", () => {
+    expect(firstVersion(OLD, OWN)).toBe(OLD);
+    expect(firstVersion(null, OWN)).toBe(OWN);
+    expect(firstVersion(null, null)).toBeNull();
+  });
+
+  it("the drain ends once no resident is busy, or when drainMinutes are up", () => {
+    const since = 1_000_000;
+    expect(drainOver(since, since + 1000, false, 20)).toBe("finished");
+    expect(drainOver(since, since + 19 * 60_000, true, 20)).toBeNull();
+    expect(drainOver(since, since + 20 * 60_000, true, 20)).toBe("time up");
+  });
+
+  it("another program: a beat within 2 x beatSeconds that didn't say it stopped (two would sign each other's residents out: M3)", () => {
+    const now = 10_000_000;
+    const beat = (ago: number, extra: object = {}) => ({ at: now - ago, by: "access:test", beat: { instance: "1a2b3c4d", ...extra } });
+    expect(otherProgram(beat(30_000), now, 60)).toBe("instance 1a2b3c4d (by access:test) sent a heartbeat 30 s ago");
+    expect(otherProgram(beat(119_000), now, 60)).not.toBeNull();
+    expect(otherProgram(beat(120_000), now, 60)).toBeNull();
+    // (A clean stop's last beat says so: the host's restart after a deploy starts at once.)
+    expect(otherProgram(beat(5_000, { stopped: true }), now, 60)).toBeNull();
+    expect(otherProgram(beat(5_000, { stopped: false }), now, 60)).not.toBeNull();
+    // (A beat from before instance ids: still another program.)
+    expect(otherProgram({ at: now - 5_000, by: "access:residents", beat: {} }, now, 60)).toMatch(/^instance unknown \(by access:residents\)/);
+    expect(otherProgram(null, now, 60)).toBeNull();
+  });
+
+  it("Maia's process gets no secret (the residents' token), and the rest of the environment", () => {
+    const env = maiaEnv({ PATH: "/usr/bin", HOME: "/home/node", CF_ACCESS_CLIENT_ID: "id.access", CF_ACCESS_CLIENT_SECRET: "not-real", CF_ACCESS_CLIENT_SECRET2: "x", CLOUDFLARE_API_TOKEN: "y" });
+    expect(env).toEqual({ PATH: "/usr/bin", HOME: "/home/node", CF_ACCESS_CLIENT_ID: "id.access" });
   });
 });

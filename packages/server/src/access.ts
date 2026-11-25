@@ -13,8 +13,8 @@ export interface AccessEnv {
   /** The Access application's audience (AUD) tag for the path the scripts read. */
   ACCESS_AUD?: string;
   /**
-   * Optional: the one service token's client ID the view takes (its token's `common_name`). Unset, any service token the
-   * application admits does. Set in Cloudflare (a Worker secret, so deploys keep it), never in the repository.
+   * The one service token's client ID the view takes (its token's `common_name`): the ops scripts' (wrangler.jsonc `vars`, since
+   * Nov 25: a client ID is an identifier, not a secret). Unset, any service token the application admits would, the residents' too.
    */
   OPS_ACCESS_CLIENT_ID?: string;
 }
