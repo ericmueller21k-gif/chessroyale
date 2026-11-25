@@ -154,9 +154,10 @@ export function VoteScreen({
   below?: ComponentChildren;
   /**
    * The 50 v 50's opening vote (its match): its computer frame, the game's (board-size.css, "The 50 v 50's frame"), so nothing moves when
-   * the game begins. On a computer the column ends in the game's chat, the same component in the same place (UnderBoard).
+   * the game begins. On a computer the column ends in the game's chat, the same component in the same place (UnderBoard). `true`: the
+   * frame without a chat (Squads' votes, Nov 26: their column ends in `below`'s list of the votes).
    */
-  frame?: GameView;
+  frame?: GameView | true;
   /** The result's three tones and the timer's ticks (Crowd's); Squads has neither. */
   chime?: boolean;
   /** At the top line's end: the match's control (Sound, and Leave: MatchMenu); without one, the sound button. */
@@ -463,7 +464,7 @@ export function VoteScreen({
           );
         })}
       </div>
-      {computerFrame && <UnderBoard match={frame!} />}
+      {computerFrame && frame !== true && <UnderBoard match={frame!} />}
       {below}
     </div>
   );

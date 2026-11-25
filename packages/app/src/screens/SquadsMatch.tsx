@@ -6,7 +6,8 @@ import { matchClockLine, minutesName, tokenLines, type Colour, type Side, type S
 import { Board, type Arrow } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
-import { COMPUTER_LAYOUT, MatchMenu, SwitchRow, type MatchExit } from "../components/MatchMenu.tsx";
+import { COMPUTER_LAYOUT, CROWD_FRAME, MatchMenu, SwitchRow, type MatchExit } from "../components/MatchMenu.tsx";
+import { SlotIdle } from "../components/SlotIdle.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, Watchers, shownTurn, useNow } from "../components/SquadsParts.tsx";
@@ -649,6 +650,7 @@ function MatchView({
   }, [banner?.at]);
   const sideTag = (s: Side) => <SquadTag id={m.sides[s].squadId} you={s === mySide} />;
   const computer = useMedia(COMPUTER_LAYOUT);
+  const framed = useMedia(CROWD_FRAME);
   const turnBox = m.format === "relay" ? <TurnOrderBox client={client} m={m} board={boardId} computer={computer} onRow={canShow ? onShow : null} shownPly={history.browsing ? history.ply : null} /> : null;
   return (
     <div class={`screen game sq-game sq-${m.format}${m.round === 2 ? " sq-is-final" : ""}`}>
@@ -815,6 +817,8 @@ function MatchView({
         )}
         {m.format === "pairs" && m.tokenLog.length > 0 && (m.state === "over" || !!m.result) && <TokenBreakdown log={m.tokenLog} sides={m.sides} mine={mySide} />}
         {m.mode === "mercenary" && <KitLine client={client} m={m} mine={mySide} />}
+        {/* (A computer's frame, Nov 26: the pick's place stands, a gray "Waiting…" while there's nothing to pick, as the 50 v 50's status box.) */}
+        {framed && m.format !== "relay" && !(d && m.state === "half") && <SlotIdle />}
         {!d && m.format !== "relay" && <p class="sq-explain">{rulesLine(m)}</p>}
         {client.me?.botPlays && !client.me.isBot && !client.me.left && mySide !== null && (
           <div class="sq-card">
