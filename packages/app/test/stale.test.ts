@@ -94,10 +94,13 @@ describe("the reload keeps your place (Nov 15: back in the town at its center, t
 });
 
 describe("a chunk gone while the page loads again: nothing goes on to use it (Nov 15: reading 'loadIntro' of undefined)", () => {
-  it("chunk() passes a module on, and holds an import that gave nothing (Vite's, once stale.ts took over) forever, never rejecting", async () => {
-    tab();
-    const { chunk } = await stale();
+  it("chunk() passes a module on, and, a deploy landed, holds an import that gave nothing (Vite's, once stale.ts took over) forever, never rejecting", async () => {
+    const reloads = tab();
+    const { chunk, chunkFailed } = await stale();
     expect(await chunk(Promise.resolve({ loadIntro: 1 }))).toEqual({ loadIntro: 1 });
+    // (Vite's event, as watchStaleChunks hears it: the server runs another build.)
+    expect(await chunkFailed(new Error("gone"), async () => true)).toBe(true);
+    expect(reloads.n).toBe(1);
     const used = vi.fn();
     const failed = vi.fn();
     void chunk(Promise.resolve(undefined as unknown as { loadIntro: number }))
@@ -108,6 +111,54 @@ describe("a chunk gone while the page loads again: nothing goes on to use it (No
     expect(failed).not.toHaveBeenCalled();
     // (A real failure, not taken over by stale.ts, still fails as before.)
     await expect(chunk(Promise.reject(new Error("offline")))).rejects.toThrow("offline");
+  });
+});
+
+describe("a file that failed with no deploy (a dropped connection; main's run 45559755980, Nov 25): no reload, the load just fails", () => {
+  it("the same build on the server: the page stays (Boss Battle stays Boss Battle), and the import fails with its own error, to be tried again", async () => {
+    const reloads = tab(false, "/");
+    const { chunk, chunkFailed } = await stale();
+    const err = new Error("Failed to fetch dynamically imported module: /assets/openings-x.js");
+    const asked = chunkFailed(err, async () => false);
+    await expect(chunk(Promise.resolve(undefined as unknown as { default: unknown }))).rejects.toBe(err);
+    expect(await asked).toBe(false);
+    expect(reloads.n).toBe(0);
+    // (And the next failure asks again: a deploy since then still reloads.)
+    expect(await chunkFailed(err, async () => true)).toBe(true);
+    expect(reloads.n).toBe(1);
+  });
+
+  it("failures together ask the server once", async () => {
+    tab();
+    const { chunkFailed } = await stale();
+    const landed = vi.fn(async () => false);
+    await Promise.all([chunkFailed(1, landed), chunkFailed(2, landed), chunkFailed(3, landed)]);
+    expect(landed).toHaveBeenCalledTimes(1);
+  });
+
+  it("deployLanded: another build in /version.json, yes; the same, no answer, an error page or a page without a build (dev), no", async () => {
+    const { deployLanded } = await stale();
+    const answer = (r: (() => Promise<Response>) | null) => {
+      const f = vi.fn(r ?? (() => Promise.reject(new TypeError("Failed to fetch"))));
+      vi.stubGlobal("fetch", f);
+      return f;
+    };
+    const json = (v: unknown) => () => Promise.resolve(new Response(JSON.stringify(v), { status: 200 }));
+    answer(json({ version: "bbbbbbbbbbbb", commit: "b" }));
+    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(true);
+    answer(json({ version: "aaaaaaaaaaaa" }));
+    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(false);
+    answer(null);
+    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(false);
+    answer(() => Promise.resolve(new Response("x", { status: 500 })));
+    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(false);
+    answer(json({}));
+    expect(await deployLanded("aaaaaaaaaaaa", 100)).toBe(false);
+    const f = answer(json({ version: "bbbbbbbbbbbb" }));
+    expect(await deployLanded("dev", 100)).toBe(false);
+    expect(f).not.toHaveBeenCalled();
+    // (The page's own build is the one vite.config.ts writes: "dev" here, under the unit tests.)
+    expect(await deployLanded(undefined, 100)).toBe(false);
   });
 });
 

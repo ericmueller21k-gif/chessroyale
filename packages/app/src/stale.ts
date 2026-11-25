@@ -1,9 +1,18 @@
+import { APP_CACHE } from "@chessroyale/core";
+
 /**
  * A deploy landed while this page was open: the old version's files are gone from the server, so opening a part of the
  * game loaded on demand (the town square's chunk) fails ("Unable to preload CSS for …", a module that won't load). The page
  * loads again, so it gets the new version and opens where it was (/town). Once: not again within a minute, so a file
  * missing for another reason is reported (problems.ts) rather than reloaded in a loop; and never without storage to
  * remember that it tried.
+ *
+ * Only for a deploy (Nov 25, docs/decisions/2026-11-25-stale-reload-only-for-a-deploy.md): a file that failed for any other reason (a
+ * dropped connection, a phone between networks) is no reason to load the page again, which threw the Boss Battle screen back to home
+ * (xp.spec's "No XP" loop, main's run 45559755980: the opening library, fetched in the background there, dropped once) and lost a
+ * Resume's tap (Nov 23). So a failed chunk asks the server which build it runs (`/version.json`): another than this page's, the page
+ * loads again; the same (or no answer), the load fails as any failed load does, and its caller tries again next time (the browser
+ * fetches a failed module again) or says so.
  *
  * Since Nov 15 this is the fallback: the service worker keeps an open tab's version's files until it loads again
  * (sw-template.js), so it's for a page the worker doesn't answer (a first visit before it's ready, a browser without one). And
@@ -70,18 +79,66 @@ export function takePlace(path = location.pathname): Place | null {
   return saved.place;
 }
 
+/** This page's build (vite.config.ts's `__APP_VERSION__`, as version.json names it); "dev" on the dev server, which has no version.json. */
+declare const __APP_VERSION__: string | undefined;
+const MINE = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+
 /**
- * A chunk loaded on demand (`chunk(import("./x.ts")).then((m) => m.x)`): as import() gives it, or, when it's gone after a deploy
- * and the page is loading again (the "vite:preloadError" below, prevented: Vite's import then gives `undefined`), a promise that
- * never settles, so nothing goes on to use it (Nov 15: "reading 'loadIntro'" of undefined) or backs out as from a failure.
+ * Whether a deploy has landed since this page loaded: the server's `/version.json` names another build than `mine`. No answer within
+ * `ms` (offline, a dropped connection again), an answer without a version, or a page that doesn't know its own build ("dev"): no.
  */
-export function chunk<M>(load: Promise<M>): Promise<M> {
-  return load.then((m) => (m === undefined ? new Promise<M>(() => {}) : m));
+export async function deployLanded(mine = MINE, ms = APP_CACHE.staleCheckMs): Promise<boolean> {
+  if (mine === "dev") return false;
+  try {
+    const res = await fetch("/version.json", { cache: "no-store", signal: AbortSignal.timeout(ms) });
+    if (!res.ok) return false;
+    const v = (await res.json()) as { version?: unknown };
+    return typeof v.version === "string" && v.version !== mine;
+  } catch {
+    return false;
+  }
 }
 
-/** Vite's event for a chunk that won't load: the page loads again instead of the error (when it does). */
+/**
+ * The last failed chunk's error (Vite's event's) and verdict, for the import it fails (Vite fires the event before that import gives
+ * `undefined`); and the check under way (one for failures together).
+ */
+let lastError: unknown = null;
+let verdict: Promise<boolean> = Promise.resolve(false);
+let check: Promise<boolean> | null = null;
+
+/** A chunk failed: true once the page is loading again for a deploy (reloadForStaleChunk); false: the failure stands. */
+export function chunkFailed(error: unknown, landed: () => Promise<boolean> = deployLanded): Promise<boolean> {
+  lastError = error;
+  if (reloading) return (verdict = Promise.resolve(true));
+  return (verdict = check ??= landed().then((yes) => {
+    check = null;
+    return yes && reloadForStaleChunk();
+  }));
+}
+
+/**
+ * A chunk loaded on demand (`chunk(import("./x.ts")).then((m) => m.x)`): as import() gives it. One that won't load reaches Vite's
+ * "vite:preloadError" below, prevented (Vite's import then gives `undefined`): while the page loads again for a deploy, a promise that
+ * never settles, so nothing goes on to use it (Nov 15: "reading 'loadIntro'" of undefined) or backs out as from a failure; otherwise
+ * the load's own error, as if nothing had taken it over.
+ */
+export function chunk<M>(load: Promise<M>): Promise<M> {
+  return load.then((m) =>
+    m !== undefined
+      ? m
+      : verdict.then((reload) => (reload ? new Promise<M>(() => {}) : Promise.reject(lastError ?? new Error("A part of the game didn't load.")))),
+  );
+}
+
+/**
+ * Vite's event for a chunk that won't load: prevented always, as it must be decided at once, before the server can say whether a
+ * deploy landed; the page loads again only if one did (chunkFailed). A `lazyGroup` (lazy.tsx) takes the `undefined` as a load to try
+ * again next time.
+ */
 export function watchStaleChunks(): void {
   addEventListener("vite:preloadError", (e) => {
-    if (reloadForStaleChunk()) e.preventDefault();
+    e.preventDefault();
+    void chunkFailed((e as Event & { payload?: unknown }).payload);
   });
 }
