@@ -2128,3 +2128,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: main f9caf556 RED (FLAKY_RED): boss-smoke Folio passive not seen. Helper flake-folio-smoke. #949 merged main (b3fcd6b2), CI pending. #954 merged (5dd1f196), main run b10g20r21.
 - Nov 26: #949 MERGED (d0bf9761) after full green on b3fcd6b2 (panel.spec:282 passed). Main runs pending: 5dd1 (b10g20r21), d0bf. Folio flake helper session_01JuCWRrcbodVGTMvHFLB97C. crowd-frame pushing (78609636).
 - Nov 26: main 5dd1f196 RED (FLAKY_RED) panel.spec:282 rows 3<4 (2nd time). Brief flake-panel-282.md QUEUED (2 Opus running: crowd-frame, folio).
+- Nov 26: ERIC: 1 v 1 stills (#953) 'seem good now': approved.
