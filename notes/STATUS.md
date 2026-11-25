@@ -2145,3 +2145,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: main 1c9d60ee GREEN + LIVE (Squads frame).
 - Nov 26: ERIC: vote fill GOOD → PR #960 (6f1f0d8b) CI. Squads frame 'perfect'. Eric didn't know 'boss bar'/'quest row' → sent stills (game-layout-mockup alone before/after; end-screens-2 duel-xp-win phone quest gap). Lesson: questions to Eric carry their picture.
 - Nov 26: ERIC: KEEP two-line boss bar. Boss-frame job started (brief: shared-game-frame.md 'Third job').
+- Nov 26: ERIC: quests NEVER reserve empty rows (exactly the rows that moved; none = one line; buttons may move: his named exception to nothing-shifts). Sent to pay-coin-strip helper (same end screens).
