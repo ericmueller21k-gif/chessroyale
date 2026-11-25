@@ -8,7 +8,7 @@ CI's error 2 of 2. It's the same cause as Nov 23's lost Resume tap (2026-11-23-r
 across the reload; and a player on a patchy phone connection was thrown home the same way.
 **Changed:** `stale.ts` always takes Vite's event, then asks the server's `/version.json`: another build than the page's, the page
 loads again (as before: once a minute, back where it was); the same build or no answer within `APP_CACHE.staleCheckMs` (5 s), the
-load just fails and its caller tries again (the browser fetches a failed module again). `loadOpenings` tries a second time at once,
+load just fails and its caller tries again (a newer browser fetches a failed module again; an older one keeps the failure: [2026-11-25-stale-second-failure-reloads.md](2026-11-25-stale-second-failure-reloads.md)). `loadOpenings` tries a second time at once,
 so a START that joined the failing background load still plays; `startSolo` and `startTowerFloor` say "Couldn't load the game." for
 a load that rejects, never a screen stuck loading (Nov 23's follow-up). `lazy-game.ts` marks the match chunk only once it's in.
 Call: no new player-visible text. Tests that stage a deploy now stage one (`aDeployLanded`: another build in `/version.json`).
