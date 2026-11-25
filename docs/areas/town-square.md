@@ -1403,6 +1403,10 @@ noted wherever a slice changed one.
 
 ## Tests
 
+- **A test's walk or arrow step needs a square no bot stands on (Nov 25):** the bots pick spots in columns 14 to 29, rows 21 to 34
+  (world.ts `freeSpot`). A bot standing on the square claims it (`taken`), so a step onto it waits as long as the bot stays, sometimes
+  over a minute. Walk and step outside that area, as town-controls' minimap test does since Nov 25
+  ([2026-11-25-town-arrowstep-bots.md](../decisions/2026-11-25-town-arrowstep-bots.md)).
 - **Tapping in the street town from a spec (Nov 13):** `tapInTown(page, kind, id, card)` in `e2e/helpers.ts` opens a figure's or a
   place's card. It waits until the view holds still over 3 drawn frames (`townTapPoint`), glides there once if the target is off the screen
   or covered, and taps with the press and release together (`quickTap`). Read a point mid-glide, or a separate `page.mouse.click`, and
