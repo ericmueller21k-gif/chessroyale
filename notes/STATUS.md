@@ -2150,3 +2150,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: coin-strip finish round done (e2c7a54b) WITHOUT the quest change (message arrived late); helper now doing quests (waiter on new .done). Review note: boss result on computers uses zoom (0.84 at 1536x730, 0.69 at 1280x600 → 'tiny text'): check it after quest gaps are gone; prefer less zoom.
 - Nov 26: boss-frame mock reviewed: alone OK; raid: boss covers scoreboard + block hits right edge → message sent. Waiter on .done.
 - Nov 26: #961 (payment page drafts) MERGED d3bcdbc4. #960 CI still running (bg1v4vv62).
+- Nov 26: #960 (vote fill) MERGED 92320601. Main run watched (covers #961 too).
