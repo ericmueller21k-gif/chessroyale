@@ -7,8 +7,8 @@ nothing is served, linked or wired. Steps:
    section 12. List each fact you use with its section number at the end of each file ("Sources").
 2. Write five files, plain American English, short paragraphs, headings, no legal jargon beyond what the design uses:
    `terms.md` (Terms of Service: the coins are a license to use in-game, not money; no cash value; who may buy; closing an account;
-   changes to terms), `refunds.md` (the refund policy exactly as the design says), `prices.md` (packs and prices from `PAYMENTS.packs`
-   in `packages/core/src/settings.ts`, read the real numbers), `privacy-purchases.md` (what purchase data is kept, how long, delete and
+   changes to terms), `refunds.md` (the refund policy exactly as the design says), `prices.md` (the coin packs and their dollar prices from the design doc's pack
+   table; `PAYMENTS` isn't in settings.ts yet, so copy the design's numbers and say so), `privacy-purchases.md` (what purchase data is kept, how long, delete and
    download), `contact.md` (support@hunchess.com, what to include).
 3. Where the design doesn't say something a page needs, write `[TODO for Eric: …]` instead of inventing it.
 4. Never mention any lawyer or legal advice. Never name the Hidden Boss. No model names.
