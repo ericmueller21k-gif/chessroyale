@@ -151,10 +151,11 @@
   .screen.game.crowd-50 > .hud-row > .hud {
     justify-content: center;
     gap: 0.6em;
-    /* (Room for the gear at each end, so the words never run under it.) */
-    padding: 0 40px;
+    /* (Room for the gear at each end: the line's box ends where the gear starts, so the gear stays after the title,
+       match-menu.spec. The words move onto the board's middle inside the box, by padding on one side, never the box itself.) */
+    margin: 0 40px;
+    padding: 0 max(0px, calc(var(--board-shift, 0px) * -2)) 0 max(0px, calc(var(--board-shift, 0px) * 2));
     font-size: clamp(16px, calc((100cqi - 80px) / 23), 22px);
-    translate: var(--board-shift, 0px) 0;
   }
   .screen.game.crowd-50 > .hud-row > .hud .hud-spacer {
     display: none;
