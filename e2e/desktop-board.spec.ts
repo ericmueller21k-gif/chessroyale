@@ -21,8 +21,9 @@ const dims = (s: string) => s.split("x").map(Number) as [number, number];
 
 /** Each screen's room above and below the board (board-size.css' --bd-room): its board is never taller than the rest. (1 v 1's: 108 since
  * Nov 25, its computer frame: no title line, the two strips. The 50 v 50's and its opening vote's: 92 since Nov 26, their frame: the
- * labeled top row on the board, nothing under it but its clock's bar.) */
-const ROOM = { alone: 123, raid: 123, crowd: 92, vote: 92, duel: 108, squads: 230 } as const;
+ * labeled top row on the board, nothing under it but its clock's bar. Squads': 92 since Nov 26 too, the same frame: the board line over it,
+ * the move arrows and clocks under it; was 230, the tiny boards over it, now in the column beside it.) */
+const ROOM = { alone: 123, raid: 123, crowd: 92, vote: 92, duel: 108, squads: 92 } as const;
 type Screen = keyof typeof ROOM;
 /**
  * The board's side, measured with this change. Nov 1 (the eval bar off for everyone, as every player's board is: a raid's,
@@ -33,7 +34,7 @@ type Screen = keyof typeof ROOM;
  * screen's board is at least main's at these sizes (MAIN below). Nov 25: 1 v 1's computer frame (no title line, the board the window's
  * height less its two strips): 968, 792, 656 and 688 (were 904, 728, 592, 624). Nov 26: the 50 v 50's frame and its opening vote's: 984 at
  * 1920 × 1080 (was 904); the narrower windows' boards are width-bound and keep their sizes (the gaps either side equal now, the room at the
- * window's edges what it was).
+ * window's edges what it was). Nov 26, Squads on that frame: 984 and 584 at 1920 × 1080 and 1366 × 768 (were 848 and 536).
  */
 const NOW: Record<Screen, Record<Size, number>> = {
   alone: { "1920x1080": 952, "1440x900": 760, "1366x768": 640, "1280x800": 600 },
@@ -41,7 +42,7 @@ const NOW: Record<Screen, Record<Size, number>> = {
   crowd: { "1920x1080": 984, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
   vote: { "1920x1080": 984, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
   duel: { "1920x1080": 968, "1440x900": 792, "1366x768": 656, "1280x800": 688 },
-  squads: { "1920x1080": 848, "1440x900": 664, "1366x768": 536, "1280x800": 504 },
+  squads: { "1920x1080": 984, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
 };
 /**
  * Main at a2f721a, before the Nov 1 changes (measured with the eval bar on, as the sizes were then): the board's side must be at least
@@ -344,11 +345,12 @@ const BOARD_TODAY: Record<Screen, Record<string, number>> = {
   alone: { "1536x730": 600, "1280x600": 472, "1366x650": 520, "1920x960": 832 },
   raid: { "1536x730": 600, "1280x600": 472, "1366x650": 520, "1920x960": 832 },
   // (1 v 1: none since Nov 25, its computer frame: its board is the target, to its 8 device pixel step. The 50 v 50 and its opening vote: none
-  // since Nov 26, their frame: 634, 501, 552 and 864, were 560, 424, 480 and 784.)
+  // since Nov 26, their frame: 634, 501, 552 and 864, were 560, 424, 480 and 784. Squads: none since Nov 26, the same frame: the same
+  // sizes, were 496, 368, 416 and 728.)
   crowd: {},
   vote: {},
   duel: {},
-  squads: { "1536x730": 496, "1280x600": 368, "1366x650": 416, "1920x960": 728 },
+  squads: {},
 };
 const END_SCROLL_TODAY: Partial<Record<Screen, Record<string, number>>> = {
   alone: { "1536x730": 35, "1280x600": 165, "1366x650": 115 },
@@ -535,16 +537,19 @@ test("a computer's 50 v 50 (Eric, Nov 26): the labeled top row on the board, cle
  * Eric's column rule (Nov 25; docs/rules/eric.md, "Every computer game screen: one top line, one bottom line, equal gaps"): every column
  * shares the board's top and bottom line, its content inside that height (the chat shrinks to fit, never past the board), and the gap from
  * the left column (or, with none, the side menu) to the board equals the gap from the board to the right column, each ±1 px, at Eric's laptop
- * (1536 × 730 at 125%) and a desktop (1920 × 960). The 50 v 50 (on your own pick or watching, whichever comes, and the other one too) and the
- * 1 v 1 now; Squads and Boss join it in their own PRs. The board's lines are its frame's: the 50 v 50's bottom line is under its clock's bar
- * (mirrored under the board in every phase), the 1 v 1's its squares' foot (its own strip under it).
+ * (1536 × 730 at 125%) and a desktop (1920 × 960). The 50 v 50 (on your own pick or watching, whichever comes, and the other one too), the
+ * 1 v 1 and Squads (Nov 26: its votes, a Pairs match and a Relay match); Boss joins it in its own PR. The board's lines are its frame's: the
+ * 50 v 50's and Squads' bottom line is under the clock's bar (mirrored under the board), the 1 v 1's its squares' foot (its own strip under
+ * it). Squads' columns: the standings' box on the left; the tiny boards (in the votes, the line that says what to do) down to the panel's foot
+ * (the votes' list's) on the right.
  * The 50 v 50's opening vote too (Nov 26, the director's round 2): its column (the line that says what to do, on one line, the cards, the
  * chat) on the same lines, and nothing moves as the game begins: the board, the scoreboard and the chat are where the game's are.
  */
-test("Eric's column rule (Nov 25): every column on the board's top and bottom lines, the gaps either side of the board equal: the 50 v 50 (its opening vote and both turns) and the 1 v 1 at 1536 × 730 and 1920 × 960", async ({ browser }) => {
+test("Eric's column rule (Nov 25): every column on the board's top and bottom lines, the gaps either side of the board equal: the 50 v 50 (its opening vote and both turns), the 1 v 1 and Squads (its votes, Pairs and Relay) at 1536 × 730 and 1920 × 960", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
-  test.setTimeout(12 * 60_000);
-  const lines = (page: Page, screen: "crowd" | "vote" | "duel") =>
+  test.setTimeout(18 * 60_000);
+  type Lined = "crowd" | "vote" | "duel" | "squads" | "squads relay" | "squads votes";
+  const lines = (page: Page, screen: Lined) =>
     page.evaluate((screen) => {
       const box = (s: string) => document.querySelector(s)!.getBoundingClientRect();
       const sq = box(".board-area .board-row > .board-wrap .hb-container");
@@ -554,6 +559,17 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
       if (screen === "duel") {
         const panel = box(".dv-side > .dv-box");
         return { board, columns: { panel: { top: panel.top, foot: panel.bottom } }, gaps: [sq.left - box(".gm-frame > .fd-side").right, panel.left - sq.right] };
+      }
+      if (screen.startsWith("squads")) {
+        const side = box(".arena > .tower-side");
+        const rows = box(".arena > .tower-side .sq-standings-rows");
+        const top = box(screen === "squads votes" ? ".screen.game > .board-area > .vote-hint" : ".screen.game > .sq-boards");
+        const foot = box(screen === "squads votes" ? ".screen.game > .sq-votes" : ".screen.game > .sq-panel");
+        return {
+          board,
+          columns: { standings: { top: rows.top, foot: side.bottom }, "the column": { top: top.top, foot: foot.bottom } },
+          gaps: [sq.left - side.right, top.left - sq.right],
+        };
       }
       const side = box(".arena > .tower-side");
       const table = box(".arena > .tower-side > .tower");
@@ -566,7 +582,7 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
         gaps: [sq.left - side.right, slot.left - sq.right],
       };
     }, screen);
-  const check = async (page: Page, screen: "crowd" | "vote" | "duel", at: string) => {
+  const check = async (page: Page, screen: Lined, at: string) => {
     await expect.poll(async () => {
       const g = await lines(page, screen);
       return Math.max(...Object.values(g.columns).flatMap((c) => [Math.abs(c.top - g.board.top), Math.abs(c.foot - g.board.foot)]), Math.abs(g.gaps[0]! - g.gaps[1]!));
@@ -579,12 +595,19 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
     expect(Math.abs(g.gaps[0]! - g.gaps[1]!), `${at}: the gaps either side of the board equal (${g.gaps.join(" v ")})`).toBeLessThanOrEqual(1);
   };
   for (const s of [REAL_SCREENS[0], REAL_SCREENS[3]]) {
-    for (const screen of ["vote", "crowd", "duel"] as const) {
+    for (const screen of ["vote", "crowd", "duel", "squads", "squads relay", "squads votes"] as const) {
       const ctx = await realScreenContext(browser, s);
       const page = await ctx.newPage();
-      await into(page, screen);
+      if (screen === "squads relay" || screen === "squads votes") {
+        // (Squads' Relay: its twelve tiny boards and the turn order; its votes: the lobby's first, the board with the pawns.)
+        await named(page, "Wide Window");
+        await page.goto(screen === "squads relay" ? "/squads/test/relay?nolanding&debug&clock=90,0,3,0" : "/squads/test?nolanding&debug&clock=90,0,3,0");
+        if (screen === "squads relay") await page.getByRole("button", { name: "Skip votes" }).click({ timeout: 40_000 });
+        await expect(page.locator(screen === "squads relay" ? ".sq-game.sq-relay .board-area .board-wrap" : ".vote-screen .board-area .board-wrap")).toBeVisible({ timeout: 40_000 });
+      } else await into(page, screen);
       await page.waitForTimeout(500);
       if (screen === "duel") await check(page, screen, `the 1 v 1 on the ${s.name}`);
+      else if (screen.startsWith("squads")) await check(page, screen, `Squads (${screen === "squads" ? "Pairs" : screen === "squads relay" ? "Relay" : "its votes"}) on the ${s.name}`);
       else if (screen === "vote") {
         const at = `the 50 v 50's opening vote on the ${s.name}`;
         await check(page, screen, at);

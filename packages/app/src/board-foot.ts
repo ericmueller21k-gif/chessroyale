@@ -7,7 +7,7 @@ import { useLayoutEffect, useRef } from "preact/hooks";
  * or its column's width, whichever is less), so this measures it and writes, on the arena around the screen:
  * - `--side-foot`: from the scoreboard's top (`.tower-side`) to that line; `--side-pad`: its padding, so its table's top is the squares' top
  *   (Eric: "the same height as the chessboard");
- * - `--chat-foot`: from the chat's top (the screen's `.under-board.side`) to it.
+ * - `--chat-foot`: from the chat's top (the screen's `.under-board.side`; Squads' panel or its votes' list) to it.
  * board-size.css uses them on a computer only; a phone never reads them. Neither box's height moves its own top, so there is no loop.
  * docs/decisions/2026-11-25-crowd-desktop-flush.md.
  */
@@ -28,13 +28,15 @@ export function measureBoardFoot(arena: HTMLElement) {
   // (Eric, Nov 25: the scoreboard "literally the same height as the chessboard": its table's top on the squares' top too. The column's own
   // top never moves (sticky at the screen's top), so its padding is the table's offset from there: what it is now plus the gap left.)
   const side = arena.querySelector<HTMLElement>(":scope > .tower-side");
-  const table = side?.querySelector<HTMLElement>(":scope > .tower");
+  // (The 50 v 50's scoreboard table; Squads' standings' box: Nov 26.)
+  const table = side?.querySelector<HTMLElement>(":scope > .tower, :scope > .sq-standings > .sq-standings-rows");
   if (side && table) {
     const pad = parseFloat(getComputedStyle(side).paddingTop) || 0;
     put("--side-pad", `${Math.max(0, Math.round(pad + b.top - table.getBoundingClientRect().top))}px`);
   }
   put("--side-foot", to(side ?? null));
-  put("--chat-foot", to(arena.querySelector(":scope > .screen.game > .under-board.side")));
+  // (The column's last box: the 50 v 50's chat; Squads' panel, or its votes' list in the vote: Nov 26.)
+  put("--chat-foot", to(arena.querySelector(":scope > .screen.game > :is(.under-board.side, .sq-panel, .sq-votes)")));
 }
 
 /**
