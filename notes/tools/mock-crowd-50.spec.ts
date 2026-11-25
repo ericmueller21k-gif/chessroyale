@@ -3,7 +3,7 @@ import { BOARD_SEL, named, soloFromHome, test } from "./helpers.ts";
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const CSS = `
 @media (min-width: 900px) {
-  .screen.game.crowd-50 { --bd-room: ${process.env.ROOM ?? 140}px; --side-w: ${process.env.RW ?? 300}px !important; --gutter: 14px !important;
+  .screen.game.crowd-50 { --bd-room: ${process.env.ROOM ?? 110}px; --crowd-slot: 250px !important; --side-w: ${process.env.RW ?? 300}px !important; --gutter: 14px !important;
     --scr: calc(var(--bd-h) + var(--side-w) + 2 * var(--gutter) + 28px) !important; }
   .arena:not(.sq-arena):has(> .screen.game.crowd-50) > .tower-side { flex: 0 0 ${process.env.LW ?? 340}px !important; }
   .arena:has(> .screen.game.crowd-50) { width: fit-content !important; margin-inline: auto !important; gap: 15px !important; }
@@ -18,6 +18,7 @@ const CSS = `
   .screen.game.crowd-50 > .hud-row > .hud { gap: 0 !important; }
   .screen.game.crowd-50 > .hud-row > .hud .hud-dot { display: none; }
   .screen.game.crowd-50 > .hud-row > .hud .hud-cut small { display: none; }
+  .mk-pw { display: flex; justify-content: center; margin-bottom: 4px; } .mk-pw .history-nav { width: 100%; }
 }`;
 for (const [w, h, sc] of [[1536, 730, 1.25], [1920, 960, 1]] as const)
   test(`mock crowd ${w}x${h}`, async ({ browser }) => {
@@ -31,6 +32,11 @@ for (const [w, h, sc] of [[1536, 730, 1.25], [1920, 960, 1]] as const)
     const shot = process.env.SHOTS!;
     await page.screenshot({ path: `${shot}/crowd-${w}x${h}-before.png` });
     await page.addStyleTag({ content: CSS });
+    await page.evaluate(() => {
+      const nav = document.querySelector(".screen.game.crowd-50 .history-nav");
+      const slot = document.querySelector(".screen.game.crowd-50 > .play-footer, .screen.game.crowd-50 > .poll");
+      if (nav && slot) { const w = document.createElement("div"); w.className = "mk-pw"; w.appendChild(nav); slot.insertBefore(w, slot.firstChild); }
+    });
     await page.evaluate(() => {
       const hud = document.querySelector(".screen.game.crowd-50 > .hud-row > .hud")!;
       const wrap = (el: Element | null, label: string) => { if (!el) return; const w = document.createElement("span"); w.className = "mk-lab"; const i = document.createElement("i"); i.textContent = label; el.parentElement!.insertBefore(w, el); w.append(i, el); };

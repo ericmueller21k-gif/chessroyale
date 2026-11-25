@@ -18,8 +18,12 @@ Reference: round 1's NOTE and stills (`git show origin/stills/game-layout-mockup
 3. No title line: the mode's status line is the top strip; the gear top right, level with it.
 4. Nothing hidden, nothing shifts; one gap token; nothing stretched.
 ## Per mode
-- **50 v 50:** status at the top of the right column (the voting box), the vote box (the standing skeleton, live) and the chat under it,
-  all inside the board's height; the scoreboard on the left the same height.
+- **50 v 50 (Eric APPROVED the director's mock, Nov 25; script `notes/tools/mock-crowd-50.spec.ts`, stills sent to him):** the top row is
+  the status line, LABELED and longer: MOVE · NEXT CUT ("34 v 34" / "in 14 moves" / "now") · YOUR PLACE (1/50) · YOUR POINTS · CUT LINE,
+  a small gray caps label over each value, centered over the board, the gear at the top right; the "Your pick for White · N/50 picked" line
+  over the board stays. The history arrows + power-ups row moves to the TOP of the right column (Eric chose this over keeping it under
+  the board), then the vote box (standing skeleton), the status/result line, the chat to the board's foot. Board 614 at 1536x730, 848 at
+  1920x960 (bd-room ~110). Scoreboard 340, right column 300, equal gaps (~29), centered. The phone is unchanged.
 - **Squads:** a real right panel the board's height: the tiny boards on top, the pick line, then the chat; the board line ("Board 2 ·
   starting soon") in the top strip's middle.
 - **Boss alone / raid:** the Moves panel the board's height (not stopping halfway); the boss bar: ASK the director (Eric's call pending:
