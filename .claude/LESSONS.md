@@ -464,3 +464,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Code that passes a message between two protocols forwards it whole (spread it, leave off only what the other side can't take),
     never rebuilt field by field: a field added later is dropped silently.
   - A feature added to every mode gets one real use in each mode's e2e (a typed line in a lobby, a team match, a 1 v 1), not only in one.
+
+- **Folio's Draft that never came in the smoke** (Nov 25, [story](../docs/history/lessons.md#folios-draft-that-never-came-in-the-smoke-nov-25-2026)):
+  - A passive's test switch (`?power=<passive>`) makes its condition certain from its start, whatever the engine plays: a fixed start
+    position where needed (BALLOON_TEST_MOVES, REPAINT_TEST_MOVES), proved over every reply in a unit test. A crowd line in the smoke
+    that bets on the engine's choice (SMOKE_FIRST) is a patch, not the fix.
