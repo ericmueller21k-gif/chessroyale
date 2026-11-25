@@ -274,7 +274,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             ) : (
               <p class="muted small" data-testid="no-judged">No moves judged this game.</p>
             )}
-            <div class="best-worst">
+            {/* (Only with a move to show: an empty box still took a gap, Nov 25, round 2c.) */}
+            {best && <div class="best-worst">
               {best && (
                 <div>
                   <h2>Best move</h2>
@@ -294,7 +295,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
                   </p>
                 </div>
               )}
-            </div>
+            </div>}
             {played.some((m) => m.bestMove) && (
               <button type="button" class="btn btn-secondary btn-wide" onClick={() => setReview(true)}>
                 {elim ? "Why you went out" : "Your game, move by move"}

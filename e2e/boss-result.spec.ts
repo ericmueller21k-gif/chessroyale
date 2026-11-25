@@ -153,12 +153,13 @@ test("a boss battle won: Victory!, no trophy or skull, no record text, the boss'
  * to stretch; a stack shorter than the screen centered as one block (the room above and under it within 30 px). And a skip tap on its first
  * frame leaves the "No XP" line whole (it used to keep the "+0" the skip wrote).
  */
-test("a boss battle resigned: one gap between every container, nothing stretched, the short stack centered (phone 390×844, laptop 1536×730)", async ({ browser }) => {
+test("a boss battle resigned: one gap between every container, nothing stretched, the short stack centered (phone 390×844, laptop 1536×730, desktop 1920×960)", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "opens its own phone and laptop windows");
   test.setTimeout(4 * 60_000);
   for (const s of [
     { at: "phone 390×844", width: 390, height: 844, scale: 3, phone: true, root: ".screen.es-screen" },
     { at: "laptop 1536×730", width: 1536, height: 730, scale: 1.25, phone: false, root: ".boss-results > .results-top" },
+    { at: "desktop 1920×960", width: 1920, height: 960, scale: 1, phone: false, root: ".boss-results > .results-top" },
   ]) {
     const ctx = await browser.newContext({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: s.scale, isMobile: s.phone, hasTouch: s.phone });
     const page = await ctx.newPage();
@@ -186,6 +187,25 @@ test("a boss battle resigned: one gap between every container, nothing stretched
       return { above: t.top, under: innerHeight - b.bottom, scroll: document.documentElement.scrollHeight - innerHeight };
     });
     if (m.scroll <= 0) expect(Math.abs(m.above - m.under), `${s.at}: centered (${m.above.toFixed(0)} above, ${m.under.toFixed(0)} under)`).toBeLessThanOrEqual(30);
+    // (A computer, round 2c: the move by move beside the column, or, with no move of yours to show (resigned at once), the column
+    // centered in the page: never a half-empty page.)
+    if (!s.phone) {
+      const c = await page.evaluate(() => {
+        const page = document.querySelector(".boss-results")!.getBoundingClientRect();
+        const col = document.querySelector(".boss-results > .es-rewards, .boss-results .es-track")!.getBoundingClientRect();
+        return { review: !!document.querySelector(".results-review"), off: col.left + col.width / 2 - (page.left + page.width / 2) };
+      });
+      if (!c.review) expect(Math.abs(c.off), `${s.at}: nothing to review: the column centered in the page (${c.off.toFixed(0)} px off)`).toBeLessThanOrEqual(4);
+    }
+    // (A phone: his words beside his head, never over your pawn (round 2c): any bubble's foot over your pawn's top.)
+    if (s.phone) {
+      const b = await page.evaluate(() => {
+        const bub = document.querySelector(".results-duo .bc-bubble")?.getBoundingClientRect();
+        const pawn = document.querySelector(".results-duo .rd-you .you-pawn-bob")!.getBoundingClientRect();
+        return bub ? { foot: bub.bottom, pawn: pawn.top + pawn.height * 0.25 } : null;
+      });
+      if (b) expect(b.foot, `${s.at}: his words clear of your pawn`).toBeLessThanOrEqual(b.pawn);
+    }
     await ctx.close();
   }
 });
