@@ -352,3 +352,30 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
     expect(pod.podRight, at).toBeLessThanOrEqual(w);
   }
 });
+
+test("50 v 50's vote box is a standing skeleton (Eric, Nov 25): its cap's rows wait gray, the reveal fills them in place, nothing moves", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  await page.goto("/?debug&pace=quick&mode=crowd&clock=6&augments=0");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toMatch(/play|watching/);
+  const computer = test.info().project.name === "desktop";
+  // The slot, the board, the rows (s: skeleton, f: filled) and their tops, in the screen's middle box whichever phase has it.
+  const geo = () =>
+    page.evaluate(() => {
+      const box = document.querySelector(".screen.game > .poll, .screen.game > .play-footer") as HTMLElement;
+      const rect = (e: Element | null) => (e ? Math.round(e.getBoundingClientRect().top) + "/" + Math.round(e.getBoundingClientRect().height) : "");
+      const rows = [...box.querySelectorAll(".poll-row")];
+      return { kind: box.className, box: rect(box), board: rect(document.querySelector(".board-row")), under: rect(document.querySelector(".screen.game > .under-board")), rows: rows.map((r) => (r.classList.contains("skel") ? "s" : "f") + rect(r)) };
+    });
+  // A computer: the box waits in the slot as six skeleton rows. A phone's slot holds the power-up row and the status until then.
+  await expect.poll(async () => (await geo()).rows.join(" "), { timeout: 10_000 }).toMatch(computer ? /^(s\S+ ){5}s\S+$/ : /^$/);
+  const before = await geo();
+  await expect.poll(() => phase(page), { timeout: 60_000, intervals: [50] }).toBe("reveal");
+  const after = await geo();
+  expect(after.kind).toBe("poll");
+  // The cap's six rows, filled top down, the rest skeleton; the box, the board and the scoreboard where they were.
+  expect(after.rows).toHaveLength(6);
+  expect(after.rows.join(" ")).toMatch(/^(f\S+ )+(s\S+ ?)*$/);
+  expect([after.box, after.board, after.under]).toEqual([before.box, before.board, before.under]);
+  if (computer) expect(after.rows.map((r) => r.slice(1))).toEqual(before.rows.map((r) => r.slice(1)));
+});

@@ -3594,18 +3594,23 @@ button.history-label {
 /* The vote box's empty rows (50 v 50, Eric, Nov 25): the app's loading look, a soft gray bar where the move goes and the bar's
    gray track, still (no shimmer: nothing to draw each frame). Light and dark from the text color. */
 .poll-row.skel .poll-move i,
-.poll-result.skel i {
+.poll-result-skel i {
   display: block;
   width: 70%;
   height: 8px;
   border-radius: 4px;
   background: color-mix(in srgb, var(--text) 12%, transparent);
 }
-.poll-result.skel {
+/* (An empty result line, a turn you watched: its own fixed 20 px line at the box's foot, a shorter gray bar.) */
+.poll-result-skel {
+  flex: none;
+  display: flex;
   align-items: center;
+  justify-content: center;
   height: 20px;
+  margin-top: auto;
 }
-.poll-result.skel i {
+.poll-result-skel i {
   width: 40%;
 }
 .poll-result {

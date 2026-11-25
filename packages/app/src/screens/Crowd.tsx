@@ -151,6 +151,7 @@ export function WatchScreen({
       </div>
       <div class="play-footer">
         {lockedPhone && powerRow}
+        <SlotSkeleton match={match} />
         <div class={fifty ? "play-slot" : undefined}>
           <div class="waiting-banner" role="status">
             <span class="waiting-dots" aria-hidden="true">
@@ -180,10 +181,10 @@ const BAR_PX = 14;
 const RESULT_PX = 20;
 
 /** How many bars the vote box holds, from its height (the box's height is set by the screen: styles.css, --mid-h). */
-export function useBarSlots(ref: { current: HTMLElement | null }): number {
+export function useBarSlots(ref: { current: HTMLElement | null }, parent = false): number {
   const [slots, setSlots] = useState(6);
   useLayoutEffect(() => {
-    const el = ref.current;
+    const el = parent ? (ref.current?.parentElement ?? null) : ref.current;
     if (!el) return;
     const fit = () => setSlots(Math.max(4, Math.min(6, Math.floor((el.clientHeight - RESULT_PX) / BAR_PX))));
     const ro = new ResizeObserver(fit);
@@ -211,6 +212,25 @@ export function SkeletonRows({ count }: { count: number }) {
       ))}
     </>
   );
+}
+
+/** Where the 50 v 50's middle box is the computer's fixed 206 px slot (board-size.css, the same query). */
+const COMPUTER_SLOT = "(min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine)";
+
+/**
+ * A computer's 50 v 50 between reveals (Eric, Nov 25): the vote box's skeleton rows wait in the slot, as many as the reveal's box
+ * holds, the status line at the slot's foot where the result line goes; the reveal then fills the same rows in place. A phone's
+ * slot holds the power-up row and the status line instead (no room for both), so its box shows at the reveal, at its full height.
+ */
+export function SlotSkeleton({ match }: { match: GameView }) {
+  const on = useMedia(COMPUTER_SLOT) && isCrowdFifty(match);
+  const ref = useRef<HTMLDivElement>(null);
+  const slots = useBarSlots(ref, true);
+  return on ? (
+    <div class="poll-skel" ref={ref}>
+      <SkeletonRows count={slots} />
+    </div>
+  ) : null;
 }
 
 /**
@@ -600,7 +620,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
         )}
         {/* (Only for your own pick: a turn you watched has no result line, its line a skeleton in the 50 v 50.) */}
         {!me && isCrowdFifty(match) && (
-          <div class="poll-result skel" aria-hidden="true">
+          <div class="poll-result-skel" aria-hidden="true">
             <i />
           </div>
         )}
