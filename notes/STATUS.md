@@ -2053,3 +2053,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 25 ~07:03 UTC: RESIDENTS HOST LIVE on Cloudflare: first beat 07:01 by access:residents (Access accepted the token), instance 1d09eada, commit bb523ef7, 200/200 signed in, 23 online, Maia ready, 0 errors. Around the clock now (~$52/mo).
 - Nov 25 ~07:05 UTC: main GREEN at 6c188b9d (covers #936 host, #937 town, #938 Birdie; the xp flake didn't recur). Flake helper keeps looking for the cause. Merges unblocked: #941 when its CI is green. Main run for bb523ef7 (#939) pending.
 - Nov 25 ~07:10 UTC: ERIC: 50v50 vote results box → standing gray skeleton that fills in (brief crowd-poll-skeleton.md, Opus medium; queue). ERIC: director must look at screens with common sense before he does (RULES checklist added).
+- Nov 25 ~07:15 UTC: #941 duel vote/chat/tap-a-zone MERGED (9d305aa2). Main runs: bdvdv59wj (#939), next covers #941.
