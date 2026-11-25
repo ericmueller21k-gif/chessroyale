@@ -18,5 +18,5 @@ Calls made:
 4. Checks read design px on a zoomed column: `endGaps`' gap times the column's zoom; xp.spec's box heights and the boss/pawn 16 px gaps
    (boss-result.spec, formats.spec) over it.
 
-Not fixed (other lanes, pre-existing): the 1 v 1 end page with XP and quest rows at 1536 × 730 cuts the chat's emoji row (it was cut on
-main too: the day box keeps an empty row); at 0.69 the strip's smallest words are about 5 px.
+Since Nov 26 the quests keep no empty rows ([2026-11-26-quests-no-empty-rows.md](2026-11-26-quests-no-empty-rows.md)): the 1 v 1 end
+page with XP and one quest at 1536 × 730 is whole, its chat too. Left: at 0.69 the strip's smallest words are about 5 px.

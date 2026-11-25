@@ -4745,7 +4745,7 @@ export const END_SCREEN = {
   /** Each moved quest's slide, and the gap before the next. */
   questMs: 650,
   questGapMs: 250,
-  /** The most quest rows the box shows (its height is this many rows, always). */
+  /** The most quest rows the box shows (as many as the game moved, up to this; none kept empty: Eric, Nov 26). */
   questRows: 2,
   /** How long the end screen waits for the quests' answer before it goes on without them. */
   questWaitMs: 4000,

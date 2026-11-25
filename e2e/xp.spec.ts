@@ -160,9 +160,17 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   expect(end).toBeGreaterThan(20);
   expect(fill[end]!.t - fill[0]!.t).toBeGreaterThan(1000);
   // Nothing shifts: the number's box, the bar, the quests, the title and the buttons keep their places (to one another: a still may
-  // scroll the page) and sizes from the first frame to the last.
+  // scroll the page) and sizes from the first frame to the last. The quests alone take their rows as their answer comes (Eric, Nov 26:
+  // no empty rows kept), and the buttons under them move once then, before anything counts: from the sequence's start, nothing moves.
   const shape = (x: Sample) => [x.box[0], x.box[1]! - x.title![1]!, x.box[2], x.box[3], x.earned[1]! - x.title![1]!, x.earned[3], x.quests[1]! - x.title![1]!, x.quests[3], x.actions![1]! - x.title![1]!, x.title![2], x.title![3], x.actions![3]];
-  for (const x of all) expect(shape(x), "every part in its place and size").toEqual(shape(all[0]!));
+  const run = all.filter((x) => !x.wait);
+  expect(run.length, "the sequence's frames").toBeGreaterThan(20);
+  for (const x of run) expect(shape(x), "every part in its place and size").toEqual(shape(run[0]!));
+  // (Before it: the same but the quests' height and the buttons' place.)
+  const still = (x: Sample) => shape(x).filter((_, i) => i !== 7 && i !== 8);
+  for (const x of all) expect(still(x), "the rest in its place and size from the first frame").toEqual(still(all[0]!));
+  // (Exactly the rows it moved: the heading and one row, no empty row kept.)
+  expect(await page.getByTestId("es-quests").evaluate((e) => e.getBoundingClientRect().height / (parseFloat(getComputedStyle(document.querySelector(".results-top") ?? document.body).zoom) || 1)), "one row, no empty one").toBeCloseTo(16 + 4 + 42, 0);
   expect(all[0]!.box[3]! / (await colZoom(page)), "the bar's fixed height").toBeCloseTo(BOX_H, 0);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/xp-counted-${testInfo.project.name}.png` });
   // Home: the real level and its ring (Level 2, 32% of the way round). (Level 2's reward card first: it waits for OK since Nov 22.)
