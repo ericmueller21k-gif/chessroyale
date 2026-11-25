@@ -17,7 +17,9 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   mouse** (Nov 25, mockup round 2: [2026-11-25-duel-layout.md](../decisions/2026-11-25-duel-layout.md); `Duel.tsx` `DuelWide`): no title
   line; the opponent's strip is the top ("1 v 1 · Blitz 3+2" just before their clock), the gear top right level with it, the board the
   window's height less 108 (the two strips: 621 px at 1536 × 730, 848 at 1920 × 960, 928 at 1858 × 1040, 968 at 1920 × 1080), and one
-  panel beside it whose top and foot are the board's: the chat over one row (Offer a draw | Resign, greyed until they apply; a draw
+  panel beside it whose top and foot are the board's (to the pixel at 100%, 125%, 150% and 200%: at 125% and 150% the box is rounded to the
+  board's step too), the gaps either side of the board equal (Eric's column rule, Nov 25 round 2: the gap to the panel is the screen's left
+  padding; 62 px both sides at 1536 × 730, 47 at 1920 × 960 and 1858 × 1040): the chat over one row (Offer a draw | Resign, greyed until they apply; a draw
   offer's words, Accept and Decline take the row); "Your move" a chip by your clock. The end page is the same frame. A phone and a touch
   tablet keep their layouts (the title line, the panel under the board).
 - **The mode** (Eric, Oct 16): "1 v 1 · Classic chess". Normal chess between two signed-in players: checkmate wins, real
@@ -192,8 +194,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     extra carried), below 0 the one before; no promotion series, no demotion shields; never below Wood 5 0.
   - **The top two tiers** (`topTiers`, `topFloor`), no divisions: **Pearlescent** at `topFloor` (2800, Radiant 1's 80 RP)
     or more and among the 500 highest ladders, **Transcendent** among the 100 highest; their RP count from the floor
-    ("Transcendent · 120 RP"). At the floor or more but outside the top 500 a player stays Radiant 1, the RP counting on
-    past 80 ("Radiant 1 · 95 RP"). The place is 1 + how many ladders are higher (equal ladders share a place), counted
+    ("Transcendent – 120"). At the floor or more but outside the top 500 a player stays Radiant 1, the RP counting on
+    past 80 ("Radiant I – 95"). The place is 1 + how many ladders are higher (equal ladders share a place), counted
     by the server (`topPlace` in `ranked-schema.ts`): only for a ladder at the floor or more, one `COUNT(*)` on the
     `ranked_1v1_ladder` index (the entries above it, never the table), less fair play's engine pool's ladders above it
     ([fairplay.md](fairplay.md)), kept a minute per ladder in each Worker instance. Falling below the floor is Radiant 1 again.
@@ -210,11 +212,13 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     (`ranked_1v1.peak`, only ever up), the current win streak (`ranked_1v1.streak`), each game's points by side
     (`ranked_1v1_games.white_points`, `black_points`), and the last 5 kept games (`recent`: when, the opponent by id, name
     and look, the result, your points). Never the hidden rating.
-  - **Shown as** `RankView.label` and its emblem (`RankView.emblem`, below): "Gold 2 · 45 RP", "Radiant 1 · 95 RP",
-    "Transcendent · 120 RP", "Placement 2/5"; on the profile (your own: a "1 V 1" section; anyone's, yours as others see it
-    included: the public profile's Ranked Standing card, [hub.md](hub.md), "Profiles"; null for a banned player), in the game's strips (the pill only) and the versus moment, and on the result card ("Gold 2 · 45 RP
-    (+18)", "Placed: Gold 4 · 25 RP"). With 1 v 1 picked, the home screen's panel under its RANKED row reads
-    `ranked1v1Rank()` (`packages/app/src/ranked.ts`): "Your rank: Gold 2 · 45 RP". Each tier's pill color is its
+  - **Shown as** `RankView.label` and its emblem (`RankView.emblem`, below), the tier, its division in Roman numerals, an en dash and the
+    points, no "RP" (Eric, Nov 25: "remove RP next to names and use Roman ... like Paragon IV - 50"; [decision](../decisions/2026-11-25-rank-pill.md);
+    core's `divisionTitle` names a division alone, "Gold III", for the profile card, the end page's bar and the FAQ): "Gold II – 45", "Radiant I – 95",
+    "Transcendent – 120", "Placement 2/5"; on the profile (your own: a "1 V 1" section; anyone's, yours as others see it
+    included: the public profile's Ranked Standing card, [hub.md](hub.md), "Profiles"; null for a banned player), in the game's strips (the pill only) and the versus moment, and on the result card ("Gold II – 45
+    (+18)", "Placed: Gold IV – 25"). With 1 v 1 picked, the home screen's panel under its RANKED row reads
+    `ranked1v1Rank()` (`packages/app/src/ranked.ts`): "Your rank: Gold II – 45". Each tier's pill color is its
     emblem's main color, 4.5:1 or better on both themes.
 - **The season ladder** (Nov 25, [decision](../decisions/2026-11-25-ladder.md); the page: [hub.md](hub.md)): `GET /api/ladder?mode=1v1` (`server/src/ladder.ts`) answers `{ season, mode, total, rows, you }`
   (core's `LadderAnswer`, numbers in `LADDER`): the top 200 read in order from `ranked_1v1_board`, places shared by equal ladders, their looks in one read; `total` and your place from

@@ -1,0 +1,4 @@
+# 1 v 1: Eric's column rule, measured (Nov 25, 2026)
+
+- Eric's standing rule: every column shares the board's top and bottom line (±1 px) and the gaps either side of the board are equal (±1 px). Measured in play and on the end page: the gaps were 55 | 70 px at 1536 × 730 and 40 | 54 at 1920 × 960 and 1858 × 1040 (the board centered in its column, the gap to the panel 28 against the screen's 14 px padding); at 125% the panel's foot was 1.2 px under the board (its box not on the board's 8-device-pixel step).
+- Fix: the gap to the panel is the screen's left padding (14), so the centered board has equal gaps (62.6 | 62.6, 47 | 47); at 125% and 150% the 1 v 1's box is rounded to the board's step as at 100% and 200% (plus 1/64 px so layout snapping never draws a step smaller). The board's size is unchanged everywhere. Guard: `ranked-1v1.spec.ts` real screens, both to 1 px.
