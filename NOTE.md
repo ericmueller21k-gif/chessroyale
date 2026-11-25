@@ -16,3 +16,6 @@ Root *-build-* overwritten after the director's second round: the fill at the ba
 darker (light) / the text color (dark), so the count is AA and the blurb at least 5:1 over the fill. (mock/*-v2-* was the 2 px edge try.)
 
 Final (the director's pick): v2. Root *-build-* re-shot from the final commit: 35% fill (40% dark), 2 px edge, halo on the card's text.
+
+Final, after all (the director, 22:05): 8d9420ab's look, 40% fill (42% dark), no edge, a darker blurb. Root *-build-* are those shots
+(from that exact CSS); mock/*-v2-* are the edge version, not used.
