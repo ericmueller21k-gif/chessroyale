@@ -1,6 +1,6 @@
 import { SideFigures, TowerBoardLives } from "./TowerBar.tsx";
 import { onSide, partOf, partsOf, sideOf } from "../boss-side.ts";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { applyMove, fenAtPly, legalMoves, sideToMove } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
@@ -20,7 +20,7 @@ import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
-import { LiveGhosts, OneVOneBanner } from "./Crowd.tsx";
+import { LiveGhosts, OneVOneBanner, SkeletonRows, useBarSlots } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, battleDecor, crowdView } from "../components/BossPowers.tsx";
 import { goldClink, zebraGold } from "../components/Zebra.tsx";
 import { DarkForced, HOLLOW_BULB_LINES, HollowBlackout, hollowTaunt } from "../components/Hollow.tsx";
@@ -140,6 +140,8 @@ export function PlayScreen({
   // (50 v 50 only: a boss raid and the boss final keep the power-up row under the board, as on main.)
   const fifty = isCrowdFifty(match);
   const lockedPhone = useMedia(LOCKED_PHONE) && fifty;
+  const footer = useRef<HTMLDivElement>(null);
+  const slots = useBarSlots(footer);
   const powerRow = match.boss ? null : (
     <HistoryNav view={history} total={board.history.length} extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />} />
   );
@@ -438,8 +440,15 @@ export function PlayScreen({
           }
         />
       ) : (
-        <div class="play-footer">
+        <div class="play-footer" ref={footer}>
         {lockedPhone && powerRow}
+        {/* (A computer's 50 v 50: the vote box's skeleton rows wait in the slot between reveals, the status line at its foot
+            where the result line goes; a phone's slot holds the power-up row and the status instead: styles.css, Nov 25.) */}
+        {fifty && !lockedPhone && (
+          <div class="poll-skel">
+            <SkeletonRows count={slots} />
+          </div>
+        )}
         {/* (A 50 v 50's status slot: one fixed height in every phase, empty while picking, so nothing below moves: styles.css.) */}
         <div class={fifty ? "play-slot" : undefined}>
         {waiting ? (

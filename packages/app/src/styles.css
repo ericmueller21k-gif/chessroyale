@@ -3591,6 +3591,23 @@ button.history-label {
 .poll-row.lose {
   opacity: 0.45;
 }
+/* The vote box's empty rows (50 v 50, Eric, Nov 25): the app's loading look, a soft gray bar where the move goes and the bar's
+   gray track, still (no shimmer: nothing to draw each frame). Light and dark from the text color. */
+.poll-row.skel .poll-move i,
+.poll-result.skel i {
+  display: block;
+  width: 70%;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+.poll-result.skel {
+  align-items: center;
+  height: 20px;
+}
+.poll-result.skel i {
+  width: 40%;
+}
 .poll-result {
   display: flex;
   align-items: baseline;

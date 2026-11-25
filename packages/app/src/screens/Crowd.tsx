@@ -180,7 +180,7 @@ const BAR_PX = 14;
 const RESULT_PX = 20;
 
 /** How many bars the vote box holds, from its height (the box's height is set by the screen: styles.css, --mid-h). */
-function useBarSlots(ref: { current: HTMLElement | null }): number {
+export function useBarSlots(ref: { current: HTMLElement | null }): number {
   const [slots, setSlots] = useState(6);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -192,6 +192,25 @@ function useBarSlots(ref: { current: HTMLElement | null }): number {
     return () => ro.disconnect();
   }, []);
   return slots;
+}
+
+/**
+ * The vote box's empty rows (Eric, Nov 25: "a skeleton container ... grayed out waiting to be filled"): a gray bar where the
+ * move goes and the bar's gray track, in the rows' own grid, so a round's results fill them in place and nothing moves.
+ */
+export function SkeletonRows({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: Math.max(0, count) }, (_, i) => (
+        <div key={`skel-${i}`} class="poll-row skel" aria-hidden="true">
+          <span class="poll-move">
+            <i />
+          </span>
+          <span class="poll-bar" />
+        </div>
+      ))}
+    </>
+  );
 }
 
 /**
@@ -558,6 +577,8 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             </div>
           );
         })}
+        {/* (50 v 50: the box keeps its cap's rows; the rows this round didn't fill stay skeleton, Eric, Nov 25.) */}
+        {isCrowdFifty(match) && <SkeletonRows count={slots - bars.length - (mine.king !== undefined && (mine.kingCalls ?? 0) > 0 ? 1 : 0)} />}
         {mine.king !== undefined && (mine.kingCalls ?? 0) > 0 && (
           <div class={`poll-row king-row${landed && mine.king ? " win" : ""}`}>
             <span class="poll-move">👑 King</span>
@@ -577,7 +598,12 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
             </span>
           </div>
         )}
-        {/* (Only for your own pick: a turn you watched has no result line.) */}
+        {/* (Only for your own pick: a turn you watched has no result line, its line a skeleton in the 50 v 50.) */}
+        {!me && isCrowdFifty(match) && (
+          <div class="poll-result skel" aria-hidden="true">
+            <i />
+          </div>
+        )}
         {me && (
           <div class="poll-result">
             <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>
