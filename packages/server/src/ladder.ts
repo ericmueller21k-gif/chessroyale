@@ -99,8 +99,9 @@ const movedTo = (r: LadderRow, place: number): LadderRow => ({ ...r, place, rank
  * own row in it fresh, so the list and your pinned row always agree and a left-out player's answer reads as an honest player's in the
  * same spot. Your kept row (if any) goes; your fresh row goes in ladder order (`ladder DESC, user_id DESC`, the list's own), or after
  * the last row when the list holds the whole ladder; every shown row you now rank above moves one place down and every one you ranked
- * above before moves one up (their ranks with them); `total` gains you when the shared count didn't hold you (left out, or new to a
- * ladder the list holds whole); then the list is cut to `LADDER.size`. Signed out, a guest, or in placements: the shared top as it is.
+ * above before moves one up (their ranks with them); `total` gains you when the shared count didn't hold you (left out and not in the
+ * kept rows, or new to a ladder the list holds whole); then the list is cut to `LADDER.size`. Signed out, a guest, or in placements:
+ * the shared top as it is.
  */
 export function ladderFor(top: Top, { you, leftOut }: Standing): Top {
   if (!you || "placement" in you) return top;
@@ -121,7 +122,8 @@ export function ladderFor(top: Top, { you, leftOut }: Standing): Top {
   }
   const whole = top.rows.length < LADDER.size;
   if (whole && !placed) rows.push(you);
-  const counted = !leftOut && (kept !== undefined || !whole);
+  // (Counted already: in the kept rows, or under a full list's 200 and not left out.)
+  const counted = kept !== undefined || (!leftOut && !whole);
   return { total: top.total + (counted ? 0 : 1), rows: rows.slice(0, LADDER.size) };
 }
 

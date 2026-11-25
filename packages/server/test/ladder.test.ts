@@ -380,6 +380,19 @@ describe("a left-out viewer sees the ladder as ever", () => {
     expect(others.total).toBe(205);
   });
 
+  it("pooled within the kept minute: still in the kept rows and count, so in their copy once and counted once", async () => {
+    const { sql, d1 } = await setup();
+    await players(sql, [3000, 2900]);
+    const me = await signedIn(sql);
+    await rankRow(sql, me.user.id, 20, 2950);
+    const env = { DB: d1 };
+    const before = (await call(env, { token: me.token })).body;
+    await setCase(sql, me.user.id, "pool", "admin:x@example.com", "engine", T0);
+    const after = (await call(env, { token: me.token, now: T0 + 1000 })).body;
+    expect(after).toEqual(before);
+    expect(after.total).toBe(3);
+  });
+
   it("below a full list: the same 200 rows as everyone, only the total with them", async () => {
     const { me, honest, hidden, others } = await bothWays(Array.from({ length: LADDER.size + 5 }, (_, i) => 3200 - 2 * i), 2700, "pool");
     expect(hidden).toEqual(honest);
