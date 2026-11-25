@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { FRONT_DOOR, levelOf, levelProgress, sideOfPawn, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { FRONT_DOOR, divisionTitle, levelOf, levelProgress, sideOfPawn, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { HomeRankLine } from "../ranked.ts";
 import { Avatar } from "./Items.tsx";
 import { account, myPawnColor, onAccountChange } from "../account.ts";
@@ -220,20 +220,21 @@ export function RatingPill({ rating }: { rating: number | null }) {
 
 /**
  * The rank line under your name on home (Eric, Oct 28: "we're going with the new ranking system"): your ranked 1 v 1 rank,
- * the tier and division in the tier's color ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked
+ * the tier and division in the tier's color ("Gold III – 45"), "Placement 2/5", or "Unranked" before your first ranked
  * game; a non-breaking space while your account loads (the line keeps its height). An admin's `?rank=` shows that rank.
  */
 export function RankLine({ line }: { line: HomeRankLine }) {
   if (!line) return <>{"\u00a0"}</>;
   if (line === "unranked") return <>Unranked</>;
   if (line.placement) return <>{line.label}</>;
-  const i = line.label.indexOf(" · ");
+  // (The tier and division in its color, then " – 45": the label starts with them, core's divisionTitle.)
+  const title = divisionTitle(line);
   return (
     <>
       <span class="fd-rank" style={{ "--tier": line.color }}>
-        {line.label.slice(0, i)}
+        {title}
       </span>
-      {line.label.slice(i)}
+      {line.label.slice(title.length)}
     </>
   );
 }

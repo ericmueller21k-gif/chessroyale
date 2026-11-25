@@ -116,7 +116,7 @@ test("1 v 1's rank line at its widest (a top tier with four-digit points, its em
     await page.setViewportSize({ width, height: 740 });
     await page.goto("/?mode=1v1");
     const line = page.locator(".fd-rank1v1");
-    await expect(line).toHaveText("Your rank: Transcendent · 1234 RP");
+    await expect(line).toHaveText("Your rank: Transcendent – 1234");
     await expect(page.locator(".fd-rank-words .re-box")).toHaveAttribute("data-emblem", "transcendent");
     expect(await line.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
     expect((await line.boundingBox())!.height, `${width}: one line`).toBeLessThan(26);
@@ -574,9 +574,9 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
   }
 });
 
-test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's home reads their ?rank= (\"Gold 3 · 45 RP\"); everyone's has their real level, a green ring at 3/4 round the icon and LVL 38 over it (18,875 XP: levels of 500 since Nov 20); a player sees their real rank, and nothing moves", async ({ page }) => {
+test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's home reads their ?rank= (\"Gold III – 45\"); everyone's has their real level, a green ring at 3/4 round the icon and LVL 38 over it (18,875 XP: levels of 500 since Nov 20); a player sees their real rank, and nothing moves", async ({ page }) => {
   await named(page, "Leveled");
-  // A ranked account (Paragon 4 · 30 RP: reaching it takes many games, so the server's answer carries it), an admin once
+  // A ranked account (Paragon IV – 30: reaching it takes many games, so the server's answer carries it), an admin once
   // `admin` is set (as /api/me says for an email in ADMIN_EMAILS). The admin's address asks for Gold 3.
   let isAdmin = false;
   const real = rankView({ games: 40, ladder: 3 * 400 + 80 + 30 });
@@ -604,9 +604,9 @@ test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's
 
   // A player: their real rank (the ?rank= ignored) and their real level (Nov 9: from their XP); no rating rank's name (retired Oct 28).
   await page.goto("/?rank=gold-3");
-  await expect(sub).toHaveText("Paragon 4 · 30 RP");
+  await expect(sub).toHaveText("Paragon IV – 30");
   await settled();
-  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 4");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon IV");
   await expect(page.locator(".fd-level")).toHaveText("LVL 38");
   await expect(page.locator(".fd-level-ring")).toHaveCount(1);
   const player = await measure();
@@ -614,11 +614,11 @@ test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's
   // An admin: the same page, the test rank in the rank's place, the same ring and level; every box where it was.
   isAdmin = true;
   await page.reload();
-  await expect(sub).toHaveText("Gold 3 · 45 RP");
+  await expect(sub).toHaveText("Gold III – 45");
   await settled();
   await expect(page.locator(".fd-level")).toHaveCount(1);
   await expect(page.locator(".fd-level-ring")).toHaveCount(1);
-  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Gold 3");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Gold III");
   const admin = await measure();
   // (The tag is as wide as its words and centered, so a different rank ("Gold 3" for "Paragon 4") moves it sideways by half
   // the difference, and your pawn too when it stands beside the tag on a short card: those sideways boxes aren't compared,
@@ -768,9 +768,9 @@ test("the season ladder (Eric, Nov 25): home's LADDER › on a phone, the side m
   // Your row, pinned at the foot: your place (past the 230 above you), You (its label too), your rank.
   const pin = page.locator(".ld-mine .ld-row.you");
   await expect(pin).toContainText("Laddie");
-  await expect(pin).toHaveAttribute("aria-label", /^#[\d,]+ Laddie \(You\), Gold 3/);
+  await expect(pin).toHaveAttribute("aria-label", /^#[\d,]+ Laddie \(You\), Gold III/);
   await expect(pin.locator(".ld-tag")).toHaveText("You");
-  await expect(pin.locator(".ld-rank")).toHaveText("Gold 3 · 40 RP");
+  await expect(pin.locator(".ld-rank")).toHaveText("Gold III – 40");
   expect(Number((await pin.locator(".ld-place").textContent())!.replace(/,/g, ""))).toBeGreaterThan(230);
   // Only the list scrolls: the page never does, and scrolling the list to its end keeps your row where it was.
   const pinBox = (await pin.boundingBox())!;

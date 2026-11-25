@@ -11152,7 +11152,7 @@ button.fd-logo {
   /* (The emblem's own picture has a few clear pixels round it: it can sit on the panel's edge.) */
   padding: 0 8px 0 2px;
 }
-/* (A narrow phone: the widest rank, "Your rank: Transcendent · 1234 RP", still one line beside the emblem.) */
+/* (A narrow phone: the widest rank, "Your rank: Transcendent – 1234", still one line beside the emblem.) */
 @media (max-width: 359px) {
   .fd-rank-words .fd-rank1v1 {
     font-size: 13px;
@@ -21323,7 +21323,7 @@ button.sq-tiny {
   max-width: 100%;
   overflow-wrap: anywhere;
 }
-/* (A rank's pill may take two lines in a narrow column: "Grandmaster · 499 RP" at 320 px.) */
+/* (A rank's pill may take two lines in a narrow column: "Grandmaster – 499" at 320 px.) */
 .dv-stage .dv-st-rank {
   font-size: var(--dv-pill);
   line-height: 1.5;

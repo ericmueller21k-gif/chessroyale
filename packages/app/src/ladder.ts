@@ -62,7 +62,7 @@ export const winPct = (r: Pick<LadderRow, "wins" | "losses" | "draws">) => {
   const g = r.wins + r.losses + r.draws;
   return g > 0 ? `${Math.round((100 * r.wins) / g)}%` : "–";
 };
-/** The rank's words, as everywhere ("Gold 2 · 45 RP", "Transcendent · 214 RP"): core's own label. */
+/** The rank's words, as everywhere ("Gold II – 45", "Transcendent – 214"): core's own label. */
 export const rankLine = (rank: RankView) => rank.label;
 /** "#2,418". */
 export const placeText = (n: number) => `#${n.toLocaleString("en-US")}`;

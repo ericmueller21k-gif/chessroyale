@@ -528,11 +528,11 @@ test("the stage: your pawn on the left platform while searching; the opponent's 
 
 test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longest names and ranks, no sideways scroll", async ({ browser }) => {
   test.setTimeout(2 * 60_000);
-  // The widest a name (16 characters) and a rank can be ("Transcendent · 1199 RP", with its emblem), for both players:
+  // The widest a name (16 characters) and a rank can be ("Transcendent – 1199", with its emblem), for both players:
   // your own from the server's answer, the opponent's (and the game's timing, held in the versus moment) from the game's.
   const WIDE = "WWWWWWWWWWWWWWWW";
   const gm = rankView({ games: 40, ladder: RANKED_1V1.topFloor + 1199, place: 1 });
-  expect(gm.label).toBe("Transcendent · 1199 RP");
+  expect(gm.label).toBe("Transcendent – 1199");
   const a = await player(browser, "Ann Fit");
   const b = await player(browser, "Bo Fit");
   await a.route(/\/api\/me(\?|$)/, async (route) => {
@@ -601,7 +601,7 @@ test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longe
   // Searching, with "Few players online right now" (after 1 s here) above Cancel: the tallest the search gets.
   await a.goto(`/1v1?nolanding&pool=${pool}&fewAfter=1`);
   await expect(a.locator(".dv-st-you .dv-st-name")).toHaveText(WIDE);
-  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Transcendent · 1199 RP");
+  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Transcendent – 1199");
   await expect(a.locator(".dv-few")).toBeVisible({ timeout: 10_000 });
   await fits("searching");
   // Found (held in the versus moment): both pawns, names and ranks at their widest, VS between.

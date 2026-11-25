@@ -765,8 +765,8 @@ describe("the FAQ's text format", () => {
 
   it("a row of rank emblems by id, each captioned with its tier and division", () => {
     const [b] = parse("!emblems gold-d3 transcendent");
-    expect(b).toEqual({ kind: "emblems", items: [{ id: "gold-d3", caption: "Gold 3" }, { id: "transcendent", caption: "Transcendent" }] });
-    expect(plainText([b!])).toBe("[Emblems: Gold 3, Transcendent]");
+    expect(b).toEqual({ kind: "emblems", items: [{ id: "gold-d3", caption: "Gold III" }, { id: "transcendent", caption: "Transcendent" }] });
+    expect(plainText([b!])).toBe("[Emblems: Gold III, Transcendent]");
   });
 
   it("a heading without an id gets one from its words", () => {
@@ -782,17 +782,17 @@ describe("the FAQ: 1 v 1", () => {
     expect(t).toContain("Bullet and Blitz make Bullet 2+1, Blitz and Rapid Blitz 5+3. Bullet against Rapid makes Blitz 3+2.");
     expect(t).toContain(`you both have ${RANKED_1V1.voteSeconds} seconds to drag your pawn`);
     expect(t).toContain(`Each side has ${RANKED_1V1.firstMoveSeconds} seconds for its first move`);
-    expect(t).toContain("Wood, Silver, Gold, Paragon, Illustrious, Sublime and Radiant, each with divisions 5 (the lowest) to 1. A division is 80 rank points (RP)");
-    expect(t).toContain("nobody goes below Wood 5 with 0 RP");
-    expect(t).toContain("Pearlescent, the 500 highest ranks, and above it Transcendent, the 100 highest, both from 80 RP in Radiant 1");
-    expect(t).toContain("outside the top 500, you stay Radiant 1 and your RP keeps counting past 80");
+    expect(t).toContain("Wood, Silver, Gold, Paragon, Illustrious, Sublime and Radiant, each with divisions V (the lowest) to I. A division is 80 rank points (RP)");
+    expect(t).toContain("nobody goes below Wood V with 0 RP");
+    expect(t).toContain("Pearlescent, the 500 highest ranks, and above it Transcendent, the 100 highest, both from 80 RP in Radiant I");
+    expect(t).toContain("outside the top 500, you stay Radiant I and your RP keeps counting past 80");
     expect(ranked1v1(RANKED_1V1)).not.toMatch(/\b(Iron|Bronze|Platinum|Emerald|Diamond|Master|Grandmaster|Champion)\b/);
     // Each tier's emblem, a division's steps, and the top two's.
-    expect(t).toContain("[Emblems: Wood 5, Silver 5, Gold 5, Paragon 5, Illustrious 5, Sublime 5, Radiant 5]");
-    expect(t).toContain("[Emblems: Gold 5, Gold 4, Gold 3, Gold 2, Gold 1]");
+    expect(t).toContain("[Emblems: Wood V, Silver V, Gold V, Paragon V, Illustrious V, Sublime V, Radiant V]");
+    expect(t).toContain("[Emblems: Gold V, Gold IV, Gold III, Gold II, Gold I]");
     expect(t).toContain("[Emblems: Pearlescent, Transcendent]");
     expect(t).toContain(`your first ${RANKED_1V1.placements.games} games show "Placement 1/${RANKED_1V1.placements.games}"`);
-    expect(t).toContain("at most Radiant 5.");
+    expect(t).toContain("at most Radiant V."); // (Named as the pill names it: it cut the old label at " · ", Nov 25.)
     expect(t).toContain(`about +${RANKED_1V1.points.perGame} for a win and −${RANKED_1V1.points.perGame} for a loss against a player at your level`);
     // (Coins since Nov 25: PLAY_COINS, as every game; ranked's own per-minute coins are gone.)
     expect(t).toContain(`a ranked game pays coins as every game does (Coins): more for a longer game, ${PLAY_COINS.bonus.win} coins more for a win and ${PLAY_COINS.bonus.draw} coins for a draw.`);

@@ -202,7 +202,7 @@ function rankAfter(snap: DuelSnapshot): RankView | null {
   return c ? yourRankShown(c.after) : null;
 }
 
-/** Your rank's change, in a line ("Gold 2 · 45 RP (+18)", "Placement 2/5", "Placed: Gold 4 · 25 RP"). */
+/** Your rank's change, in a line ("Gold II – 45 (+18)", "Placement 2/5", "Placed: Gold IV – 25"). */
 function rankLine(snap: DuelSnapshot): string | null {
   if (snap.town) return "Casual game";
   if (snap.bot) return "Unranked game";
