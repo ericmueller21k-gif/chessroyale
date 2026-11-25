@@ -17,7 +17,9 @@ import { HERE_LIMITS, TownHere, type HereLimits } from "./town-here.ts";
  *   hub makes the fight (a party battle's lobby) and `started` gives each person their pass, read on their next look; then they're out
  *   of the room (the next four may come in). Not four by HIDDEN_ROOM.capSec: everyone in it reads "Sorry, not enough players."
  * - **The test bots** (admins only; the API and the hub check): `fill` puts HIDDEN_ROOM.bots bots in the room; they join a request as
- *   players would, one each HIDDEN_ROOM.botJoinMs, and play in the fight as its bot members. They leave with the admin who filled them.
+ *   players would, one at a time, each on the admin's first look HIDDEN_ROOM.botJoinMs or more after the last (so the admin's own
+ *   answers carry every count, "2 of 4", "3 of 4", however late a look comes; Nov 25), and play in the fight as its bot members. They
+ *   leave with the admin who filled them.
  *
  * Everything ends: a room with nobody in it and nothing to read is forgotten at the next sweep; an outcome waits HIDDEN_ROOM.outcomeSec.
  */
@@ -105,8 +107,9 @@ interface Request {
   /** In order: the first challenger first (the leader's seat). */
   ids: string[];
   at: number;
-  /** Bots on their way into it: each joins at its time. */
-  coming: { id: string; at: number }[];
+  /** Bots on their way into it, in order: the next joins on the admin's first look from `nextAt`. */
+  coming: string[];
+  nextAt: number;
   /** Full: the fight is being made (nobody joins or leaves it now). */
   starting?: true;
 }
@@ -183,8 +186,10 @@ export class HiddenRooms {
   /** A device in the room asks again: where it stands, its idle time. Not in the room (a disconnect dropped it): `in` false. */
   look(id: string, room: string, now: number, beat?: RoomBeat): RoomView {
     this.sweep(now);
-    const m = this.where.get(id) === room ? this.rooms.get(room)?.members.get(id) : undefined;
+    const i = this.where.get(id) === room ? this.rooms.get(room) : undefined;
+    const m = i?.members.get(id);
     if (m) this.touch(m, now, beat);
+    if (i && m) this.botJoins(i, id, now);
     return this.view(id, room, now);
   }
 
@@ -205,27 +210,31 @@ export class HiddenRooms {
     this.sweep(now);
     const i = this.rooms.get(room);
     if (!i || this.where.get(id) !== room || i.request?.starting) return { view: this.view(id, room, now), start: null };
-    if (!i.request) {
-      i.request = { ids: [], at: now, coming: [] };
-      const bots = [...i.members.values()].filter((m) => m.bot);
-      bots.forEach((b, k) => i.request!.coming.push({ id: b.id, at: now + (k + 1) * HIDDEN_ROOM.botJoinMs }));
-    }
+    if (!i.request) i.request = { ids: [], at: now, coming: this.botIds(i), nextAt: now + HIDDEN_ROOM.botJoinMs };
     if (!i.request.ids.includes(id)) i.request.ids.push(id);
     this.outcomes.delete(id);
     return { view: this.view(id, room, now), start: this.full(i, now) };
   }
 
-  /** Bots whose time has come join the request. */
-  private joinDue(i: Inst, now: number) {
+  private botIds(i: Inst): string[] {
+    return [...i.members.values()].filter((m) => m.bot).map((m) => m.id);
+  }
+
+  /**
+   * The admin's look (`id`, who filled the bots): the next bot joins if its time has come, one a look, so this look's answer carries the
+   * new count. (Timed on their own, joins made by anyone's look stepped over a count a slow poll missed: "3 of 4" never shown, Nov 25.)
+   */
+  private botJoins(i: Inst, id: string, now: number) {
     const q = i.request;
-    if (!q || q.starting) return;
-    for (const b of q.coming.filter((x) => x.at <= now)) if (q.ids.length < HIDDEN_ROOM.players && i.members.has(b.id) && !q.ids.includes(b.id)) q.ids.push(b.id);
-    q.coming = q.coming.filter((x) => x.at > now && i.members.has(x.id));
+    if (id !== i.botsBy || !q || q.starting) return;
+    q.coming = q.coming.filter((b) => i.members.has(b) && !q.ids.includes(b));
+    if (!q.coming.length || now < q.nextAt || q.ids.length >= HIDDEN_ROOM.players) return;
+    q.ids.push(q.coming.shift()!);
+    q.nextAt = now + HIDDEN_ROOM.botJoinMs;
   }
 
   /** At HIDDEN_ROOM.players the request is full: its start (once). */
   private full(i: Inst, now: number): RoomStart | null {
-    this.joinDue(i, now);
     const q = i.request;
     if (!q || q.starting) return null;
     if (q.ids.length < HIDDEN_ROOM.players) return null;
@@ -234,7 +243,7 @@ export class HiddenRooms {
   }
 
   /**
-   * Bots due to join a request: any request this makes full (the hub calls it on every look, so a request the bots fill starts
+   * Any request now full: its start (the hub calls it after every answer, so a request the bots fill, on the admin's look, starts
    * without anyone's tap).
    */
   due(now: number): RoomStart[] {
@@ -318,7 +327,7 @@ export class HiddenRooms {
     // (A fight being made keeps its four: it's theirs now.)
     if (!q || q.starting) return;
     q.ids = q.ids.filter((x) => x !== id);
-    q.coming = q.coming.filter((x) => x.id !== id);
+    q.coming = q.coming.filter((x) => x !== id);
     const people = q.ids.some((x) => !i.members.get(x)?.bot);
     if (!people) i.request = null;
   }
@@ -337,7 +346,7 @@ export class HiddenRooms {
     }
     i.botsBy = id;
     // (A request already on: they join it as players would.)
-    if (i.request && !i.request.starting) [...i.members.values()].filter((m) => m.bot).forEach((b, k) => i.request!.coming.push({ id: b.id, at: now + (k + 1) * HIDDEN_ROOM.botJoinMs }));
+    if (i.request && !i.request.starting) Object.assign(i.request, { coming: this.botIds(i), nextAt: now + HIDDEN_ROOM.botJoinMs });
     return this.view(id, room, now);
   }
 
@@ -351,7 +360,6 @@ export class HiddenRooms {
         const away = TownHere.past({ idleSince: m.idleSince, hiddenSince: m.hiddenSince, beatAt: m.seenAt, limits: L.here }, now);
         if (silent || away) this.out(i, m.id);
       }
-      this.joinDue(i, now);
       const q = i.request;
       if (q && !q.starting && q.ids.length < HIDDEN_ROOM.players && now - q.at >= L.capMs) {
         for (const id of q.ids) if (!i.members.get(id)?.bot) this.setOutcome(id, { n: 0, kind: "ended", message: NOT_ENOUGH }, now);

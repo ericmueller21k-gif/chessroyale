@@ -918,7 +918,7 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
     scene's summoning plays (`HIDDEN_ROOM_FEEL.summon`, about 7 s, to black); a black cover holds while his fight opens (the app's
     `hiddenFight` → `joinLobby`, `NetMatch.hiddenRoom`). Its result's "Back to town" brings you to his door.
   - **Eric's test kit (admins only, server-checked):** "Fill with 3 bots" on his card: three bots stand at the board's places, count
-    toward the four, join a request one by one (`botJoinMs`, so each count shows), go through the summoning and play as the fight's bot
+    toward the four, join a request one by one (one on each of the admin's looks `botJoinMs` or more after the last, so his answers carry every count; Nov 25), go through the summoning and play as the fight's bot
     members; they leave with the admin. A player's "fill" is refused ("Admins only."). The fight's 🏆: see bosses.md, "Win this form".
   - **The fight plays through** (Nov 13): the child first (beaten, a new match against the man), his adult form beaten, his phase change
     and the four boards online, to the result (bosses.md, "His child form", "Phase 2 online").
