@@ -20,13 +20,11 @@ Reference: round 1's NOTE and stills (`git show origin/stills/game-layout-mockup
 ## Per mode
 - **50 v 50 (Eric APPROVED the director's mock, Nov 25; script `notes/tools/mock-crowd-50.spec.ts`, stills sent to him):** the top row is
   the status line, LABELED and longer: MOVE · NEXT CUT ("34 v 34" / "in 14 moves" / "now") · YOUR PLACE (1/50) · YOUR POINTS · CUT LINE,
-  a small gray caps label over each value, centered over the board, the gear at the top right; the "Your pick for White · N/50 picked" line
-  over the board stays. The history arrows + power-ups row moves to the TOP of the right column (Eric chose this over keeping it under
+  a small gray caps label over each value (SUPERSEDED in part: see "Eric's correction" below: PICKED is added, the pick line goes). The history arrows + power-ups row moves to the TOP of the right column (Eric chose this over keeping it under
   the board), then the vote box (standing skeleton), the status/result line, the chat to the board's foot. **The status box ("White is voting… 27/50") always shows** (Eric, Nov 25: "same treatment" as the
   vote box: always visible, empty or a waiting line when not in use): the same place and size in every phase, gray like the skeleton rows
   with a quiet "Waiting…" when there's nothing to say (e.g. your own pick turn), never a blank hole; the phone's one-line status likewise.
-  Board 614 at 1536x730, 848 at
-  1920x960 (bd-room ~110). Scoreboard 340, right column 300, equal gaps (~29), centered. The phone is unchanged.
+  Board 634 at 1536x730, 864 at 1920x960 (final mock). Scoreboard 340, right column 300, equal gaps (~29), centered. The phone is unchanged.
 - **Squads:** a real right panel the board's height: the tiny boards on top, the pick line, then the chat; the board line ("Board 2 ·
   starting soon") in the top strip's middle.
 - **Boss alone / raid:** the Moves panel the board's height (not stopping halfway); the boss bar: ASK the director (Eric's call pending:
@@ -49,3 +47,14 @@ Commits end with only `Claude-Session: https://claude.ai/code/session_01JuCWRuPp
 
 ## 50 v 50 mock APPROVED Nov 26 (Eric: "It's fine, I see it now")
 Build exactly what `notes/tools/mock-crowd-50.spec.ts` shows, including the standing gray "Waiting…" status box.
+
+## First job (Nov 26): the 50 v 50 only, one PR (branch `claude/crowd-frame`)
+- Build on main after #953 (the 1 v 1 frame, `useMenuLabels`, the narrowing column, `--rd`/gap tokens). Reuse its pieces; don't copy.
+- Labels vs the mock: the mock measured 634 with ICONS. The #953 rule (board never shrinks for the menu) decides labels per window:
+  report the board with icons and with labels at 1536x730 and 1920x960. If labels would cost board, icons stay (the rule): say so.
+- The right column's minimum stays 280 (#953); the mock's 300 is the target where there's room.
+- Eric's column + equal-gap rule: add it to `docs/rules/eric.md` with ONE guard test (in `desktop-board.spec.ts`), checking the 50 v 50
+  and the 1 v 1 now; Squads and Boss join it in their own PRs (say so in the rule's text).
+- Stills: 1536x730 and 1920x960 on your own pick turn (the Waiting box) and while watching the other team vote, plus 1858x1040, plus
+  the phone 390x844 to show it unchanged. Put them on `stills/crowd-frame`.
+- Squads and Boss are NOT in this job.
