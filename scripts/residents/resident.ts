@@ -2,8 +2,8 @@
  * One resident as a person with a browser: signed in once (its own cookie jar), then in each of its sessions it sits on home (the
  * live line every few seconds, which also puts it on the online count), queues for ranked 1 v 1 with its ticket, plays the game,
  * and goes back home, until the session ends (a game in progress is finished first; after a deploy, the same, at once) or its
- * behavior ends it early. The queue gate
- * spaces residents into the queue so one is often alone in line, and a person who queues meets them within seconds.
+ * behavior ends it early. The queue gate spaces residents into the queue so one is often alone in line, and a person who queues
+ * meets them within seconds.
  */
 import { RESIDENTS, itemDef, mulberry32, type Rng } from "@chessroyale/core";
 import { Api, CookieJar, isPausedAnswer, type Answer, type Target } from "./client.ts";

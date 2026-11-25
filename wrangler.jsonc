@@ -75,7 +75,7 @@
     // for the director's own runs. Before launch: purge the residents, then back to "" and the token deleted (ROADMAP.md).
     "RESIDENTS_CLIENT_ID": "4bea329adb64a99cfe4f020046bb9bd4.access",
     // The residents' always-on host (residents-host.ts; DEPLOY.md, "Residents"): "1" and the 15-minute cron keeps it running (about
-    // $36-56 a month). Set here, not in the dashboard (a deploy would put this value back). To stop it at once: PAUSE_RESIDENTS.
+    // $42 a month). Set here, not in the dashboard (a deploy would put this value back). To stop it at once: PAUSE_RESIDENTS.
     "RESIDENTS_HOST_ON": "0",
     // The health view's one service token (access.ts; the review of the residents' server, m6): the ops scripts' token, the same one
     // as TEST_ACCOUNTS_CLIENT_ID. Without it any service token Access admits could read the view, the residents' included.

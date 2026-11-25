@@ -13,7 +13,8 @@
  *
  * Callers: an admin's session (from the site itself), the e2e's local key, or a script through Cloudflare Access with the service token
  * `RESIDENTS_CLIENT_ID` names (the residents' own: the always-on host, residents-host.ts), or the one `TEST_ACCOUNTS_CLIENT_ID` names
- * (the director's own runs, kept on purpose). Anyone else: "Not found". The POSTs are refused while the kill switch `PAUSE_RESIDENTS` is on (503, `RESIDENTS_PAUSED`).
+ * (the director's own runs, kept on purpose). Anyone else: "Not found". The POSTs are refused while the kill switch `PAUSE_RESIDENTS`
+ * is on (503, `RESIDENTS_PAUSED`).
  */
 
 import { CRATES, rollCrate, tierItems, type CrateDef, type Rng } from "@chessroyale/core";

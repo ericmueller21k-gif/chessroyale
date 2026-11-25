@@ -346,7 +346,8 @@ while (!stopping) {
   }
   if (now >= nextBeat) {
     nextBeat = now + RESIDENTS.beatSeconds * 1000;
-    void beat().catch(() => world.stats.error("beat"));
+    // (Access turning the token away mid-run means it was revoked or changed: stop, as at the start; the host tries again later.)
+    void beat().catch((e: unknown) => (e instanceof AccessRefused ? void shutdown("Access turned the service token away", 1) : world.stats.error("beat")));
   }
   if (now >= nextSummary) {
     nextSummary = now + RESIDENTS.summaryMinutes * 60_000;
