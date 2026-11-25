@@ -182,17 +182,29 @@ describe("how a resident plays", () => {
     expect(avg({ clockMs: 600_000, incrementMs: 5000, behavior: "slow" })).toBeGreaterThan(rapid * 1.5);
   });
 
-  it("resigns only lost games, a rage-quitter sooner", () => {
-    let normal = 0;
-    let rage = 0;
-    for (let i = 0; i < 2000; i++) {
-      expect(shouldResign(-2, 30, "normal", rng)).toBe(false);
-      expect(shouldResign(-9, 5, "normal", rng)).toBe(false);
-      if (shouldResign(-9, 20, "normal", rng)) normal++;
-      if (shouldResign(-5, 6, "rageQuit", rng)) rage++;
-    }
-    expect(normal).toBeGreaterThan(0);
-    expect(rage).toBeGreaterThan(0);
+  it("resigns only clearly lost games, late, and later the weaker it is; a rage-quitter sooner (Eric, Nov 25: not so fast)", () => {
+    const count = (edge: number, moves: number, behavior: "normal" | "rageQuit", rating: number) => {
+      let n = 0;
+      for (let i = 0; i < 2000; i++) if (shouldResign(edge, moves, behavior, rating, rng)) n++;
+      return n;
+    };
+    // Never: a small deficit, or early in the game.
+    expect(count(-2, 40, "normal", 1800)).toBe(0);
+    expect(count(-9, 12, "normal", 1800)).toBe(0);
+    expect(count(-9, 19, "normal", 1800)).toBe(0);
+    // A 1000 plays on down a rook and more; down a queen and a rook late, now and then.
+    expect(count(-12, 40, "normal", 1000)).toBe(0);
+    expect(count(-15, 29, "normal", 1000)).toBe(0);
+    expect(count(-15, 30, "normal", 1000)).toBeGreaterThan(0);
+    // A 1400: down 10 from move 25. A 1800: down 7 from move 20.
+    expect(count(-9, 30, "normal", 1400)).toBe(0);
+    expect(count(-10, 25, "normal", 1400)).toBeGreaterThan(0);
+    expect(count(-7, 20, "normal", 1800)).toBeGreaterThan(0);
+    // The weaker the resident, the rarer at the same spot.
+    expect(count(-15, 40, "normal", 1000)).toBeLessThan(count(-15, 40, "normal", 1800));
+    // A rage-quitter: down 6 from move 12.
+    expect(count(-6, 11, "rageQuit", 1000)).toBe(0);
+    expect(count(-6, 12, "rageQuit", 1000)).toBeGreaterThan(0);
   });
 
   it("votes for its favorite time control most of the time", () => {
