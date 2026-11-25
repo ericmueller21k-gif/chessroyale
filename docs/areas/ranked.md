@@ -237,13 +237,17 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     `?rank=transcendent` shows that rank (45 RP into a division; 120 RP for a top tier) in place of your own on your own
     screens (home, the stage, your strip, the result, your profile, even before a game), only where
     `testSwitchesAllowed()`; read once as the page opens. A player's is ignored.
-- **Coins** (`duelCoins`): per minute of the game's length by result (win 2.4, draw 1.6, loss 0.8), at least 1, at
-  most 70, only when both sides made 10 moves; none for an aborted or a bot game, nor for a player fair play holds (in
-  review). At most `coins.perDay` (20) paying games a UTC day per account (`coin_day`, `coin_games` on their
-  `ranked_1v1` row, written in the game's batch); later games still count for the rank. Lined up with what a Squads
-  lobby pays per minute (the decision file has the table and the farming numbers).
+- **Coins** (since Nov 25: [2026-11-25-play-coins.md](../decisions/2026-11-25-play-coins.md)): a ranked game pays play coins as
+  every counted game does (`PLAY_COINS`, paid with its XP by `duel-do.ts withXp` → `server/xp.ts grantXp`; [shop.md](shop.md), "Play
+  coins"), plus the bonus's win (15) or ranked draw (5); none for an aborted or a bot game, nor for a player fair play holds. The
+  outcome's `coins` (the end page's line) is the grant's play coins and bonus. A grant D1 fails is tried again at once (3 tries); still
+  failing, the recording's try fails after `recordDuel` and the room keeps its answer (`DuelRecord.ranks`): the next try (as below) goes
+  on from it, never recording the game twice, and pays once (the grant is keyed by the game); the players hear their outcome once it's
+  all in (Nov 25, the review's M1). A game whose old `ranked:<id>:<color>` coins went in before a deploy pays no play coins on top
+  (m3). Ranked's own coins (`duelCoins`, 2.4/1.6/0.8 a minute, 20 paying games a UTC day) are gone; the row's `coin_day` and
+  `coin_games` keep what they had and are no longer moved.
 - **Recording** (`ranked.ts`, `recordDuel`): one D1 batch per finished game: the game's row, both players' ranks (from
-  both records as they stand now), their coins. The game's row goes in only if neither player's record changed since it
+  both records as they stand now); no coins of its own since Nov 25. The game's row goes in only if neither player's record changed since it
   was read (another game of theirs ending at the same moment), and everything else applies only if that row is this
   recording's (its nonce), so a game is recorded once; a row that didn't go in is read again and retried. The object
   starts a try at the end and again on any wake while no outcome has come back (15 s after the last try started for 4
@@ -281,7 +285,7 @@ by the clock (`voteAt`); everything else comes as a message.
 
 | Table / column | What | Kept |
 | --- | --- | --- |
-| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28; partial index `ranked_1v1_board` (ladder DESC, user_id DESC) WHERE games >= 5, Nov 25) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day; the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
+| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28; partial index `ranked_1v1_board` (ladder DESC, user_id DESC) WHERE games >= 5, Nov 25) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day (until Nov 25; no longer moved); the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
 | `ranked_conduct` (user_id, match_id, at, mode, kind, games, rp, nonce; PK (user_id, match_id); indexes on (user_id, at) and at; Nov 9) | Each dodge and leave (ranked's leave rules): which game, when, the mode ("1v1"), which kind, the player's ranked games by then (the last-20 window), the rank points it cost, the recording that wrote it | `LEAVES.keepDays` (90), then the 15-minute cron (`purgeConduct`); deleted with the account; in the download (`leaves`: game, at, mode, kind, rp); a guest's move to the account on sign-in |
 | `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce, white_points, black_points) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side; the rank points it moved for each side (from Oct 28) | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
 
@@ -292,7 +296,7 @@ entry says the same.
 
 | What | Where |
 | --- | --- |
-| The vote's rule, Glicko-1, the ladder, rank points, placements, pairing, coins (pure) | `packages/core/src/ranked.ts`; numbers `RANKED_1V1` |
+| The vote's rule, Glicko-1, the ladder, rank points, placements, pairing (pure); coins: `packages/core/src/play-coins.ts` (`PLAY_COINS`) | `packages/core/src/ranked.ts`; numbers `RANKED_1V1` |
 | The game's rules and the protocol (pure, shared with the app) | `packages/chess/src/duel/` (`@chessroyale/chess/duel`) |
 | The game's room (pure) and object | `packages/server/src/duel-room.ts`, `duel-do.ts` (binding `DUELS`, migration v6) |
 | Ranks and games in D1; the schema, a guest's merge, the profile's read | `packages/server/src/ranked.ts`, `ranked-schema.ts` |
@@ -336,7 +340,7 @@ decay, the last-20 window, the delayed queue's waits, the 8-mark lock, the quick
   mode; a game whose opening throws: the pair back in line in order and seated next, the batch's other pairs too, a
   throw every time tried once a second, never at once; putBack leaving placed tickets placed; an account's other
   device while its ticket is being seated), `ranked-store.test.ts` (recording:
-  placements, ranks, coins, the daily cap, once (and the answer to a repeat), a race with another game, aborted games,
+  placements, ranks, no coins of its own (the old daily count left as it was), once (and the answer to a repeat), a race with another game, aborted games,
   fair play's hold (no rank change, no coins), a deleted account; the purge by fair play's rule; the profile; the
   download, deleting, a guest's merge), `fairplay-duel.test.ts` (the engine check within the engine server's 8 moves
   a search), `kill-switches.test.ts` (the 1 v 1 queue resting), `account-data.test.ts` (the tables pinned and covered);

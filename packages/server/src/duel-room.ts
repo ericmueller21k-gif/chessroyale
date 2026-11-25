@@ -88,6 +88,11 @@ export interface DuelRecord {
   recordAt: number | null;
   /** What it did for each player (their rank, their coins), once recorded. */
   outcomes: Partial<Record<Color, DuelOutcome>> | null;
+  /**
+   * recordDuel's answer (the ranks), kept when a recording got that far and failed after it (XP and its coins: duel-do.ts withXp), so
+   * the next try goes on from it and never replays recordDuel, whose replay answers no rank-point change (the review's M1, Nov 25).
+   */
+  ranks?: Record<Color, DuelOutcome>;
   /** When the room closes (its results kept until then). */
   closeAt: number | null;
   /**

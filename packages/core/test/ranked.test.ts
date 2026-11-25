@@ -5,7 +5,6 @@ import {
   colorHistoryGames,
   divisionsEnd,
   controlLabel,
-  duelCoins,
   duelControl,
   expectedScore,
   firstGetsWhite,
@@ -463,16 +462,5 @@ describe("colors: who gets White as a pair is seated (Eric, Nov 25)", () => {
       // A third in a row only when both were in the same bind; never a fourth.
       expect(p.join("")).not.toMatch(/wwww|bbbb/);
     }
-  });
-});
-
-describe("coins", () => {
-  it("by the minute, by result, at least 1 and at most the cap; nothing under 10 moves each", () => {
-    expect(duelCoins("win", 6 * 60_000, 30)).toBe(14);
-    expect(duelCoins("draw", 6 * 60_000, 30)).toBe(10);
-    expect(duelCoins("loss", 6 * 60_000, 30)).toBe(5);
-    expect(duelCoins("loss", 20_000, 10)).toBe(1);
-    expect(duelCoins("win", 3 * 60 * 60_000, 80)).toBe(70);
-    expect(duelCoins("win", 6 * 60_000, 9)).toBe(0);
   });
 });

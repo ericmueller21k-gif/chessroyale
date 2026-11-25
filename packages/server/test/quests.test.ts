@@ -310,7 +310,7 @@ describe("completion: paid once through the ledger, in the game's XP", () => {
     expect(await xpOf(sql, ann.id)).toBe(120 + XP.win + 300);
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
     // (Kept on the result row as it is, for the result screen to ask for.)
-    expect(xpFromRow(Object.fromEntries(["xp_before", "xp_parts", "xp_none", "xp_rewards"].map((k, i) => [k, xpColumns(x)[i]])) as never)).toEqual(x);
+    expect(xpFromRow(Object.fromEntries(["xp_before", "xp_parts", "xp_none", "xp_rewards", "coins"].map((k, i) => [k, xpColumns(x)[i]])) as never)).toEqual(x);
   });
 
   it("a replay of the finishing game answers the same and pays nothing more; a later game pays nothing for it", async () => {

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { LEAVES, RANKED_1V1, duelCoins, itemDef, placeLadder, rankView } from "@chessroyale/core";
+import { LEAVES, RANKED_1V1, itemDef, placeLadder, rankView } from "@chessroyale/core";
 import { DELETED_ID, createGuest, ensureSchema, profile, publicProfile, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { equipLocker, lockerState, openCrate } from "../src/locker.ts";
 import { appeal, setCase } from "../src/fairplay.ts";
-import { coinCount, duelEntrant, duelGamesOf, marksOf, purgeConduct, purgeDuelGames, rankedLeaves, rankedRecordOf, recentColors, recordDuel, type FinishedDuel } from "../src/ranked.ts";
+import { duelEntrant, duelGamesOf, marksOf, purgeConduct, purgeDuelGames, rankedLeaves, rankedRecordOf, recentColors, recordDuel, type FinishedDuel } from "../src/ranked.ts";
 import { TOP_PLACE_MS, forgetTopPlaces, rankOf, rankedSummary, topPlace } from "../src/ranked-schema.ts";
 import { memoryDb, stockCrates } from "./memory-db.ts";
 
@@ -147,18 +147,19 @@ describe("the top tiers: place among the top ladders (Oct 28, 2026)", () => {
 });
 
 describe("recording a ranked game", () => {
-  it("both players' records, coins by the minute, and the game kept", async () => {
+  it("both players' records and the game kept; no coins of its own (since Nov 25 they come with its XP: PLAY_COINS)", async () => {
     const { sql, a, b } = await setup();
     const out = await recordDuel(sql, game(a.id, b.id, "1-0"), notHeld);
     expect(out!.w.change!.after.label).toBe("Placement 1/5");
     expect(out!.b.change!.after.label).toBe("Placement 1/5");
-    expect(out!.w.coins).toBe(duelCoins("win", 6 * MIN, 30));
-    expect(out!.b.coins).toBe(duelCoins("loss", 6 * MIN, 30));
+    expect(out!.w.coins).toBe(0);
+    expect(out!.b.coins).toBe(0);
     expect((await rankedRecordOf(sql, a.id)).record).toMatchObject({ games: 1, wins: 1, losses: 0, ladder: null });
     expect((await rankedRecordOf(sql, b.id)).record).toMatchObject({ games: 1, wins: 0, losses: 1 });
     expect((await rankedRecordOf(sql, a.id)).record.rating).toBeGreaterThan(1500);
-    expect((await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", a.id))!.coins).toBe(14);
-    expect((await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", b.id))!.coins).toBe(5);
+    expect(await sql.first("SELECT coins FROM wallets WHERE user_id = ?", a.id)).toBeNull();
+    expect(await sql.first("SELECT coins FROM wallets WHERE user_id = ?", b.id)).toBeNull();
+    expect(await sql.first("SELECT 1 FROM ledger WHERE reason = 'ranked'")).toBeNull();
     const [kept] = await duelGamesOf(sql, a.id);
     expect(kept).toMatchObject({ white_id: a.id, black_id: b.id, control: "blitz", result: "1-0", reason: "resign", started_at: T0, ended_at: T0 + 6 * MIN });
     expect(kept!.moves.split(" ")).toHaveLength(60);
@@ -192,7 +193,7 @@ describe("recording a ranked game", () => {
     const again = await recordDuel(sql, g, notHeld);
     expect(again!.w).toEqual({ change: { before: rankView({ games: 1, ladder: null }), after: rankView({ games: 1, ladder: null }), points: null, placed: false }, coins: 0 });
     expect((await rankedRecordOf(sql, a.id)).record.games).toBe(1);
-    expect((await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", a.id))!.coins).toBe(14);
+    expect(await sql.first("SELECT coins FROM wallets WHERE user_id = ?", a.id)).toBeNull();
   });
 
   it("another game of the same player recorded in between: read again and retried, both counted", async () => {
@@ -231,58 +232,19 @@ describe("recording a ranked game", () => {
     expect(out!.w.change).toBeNull();
     expect(out!.w.coins).toBe(0);
     expect(await sql.first("SELECT coins FROM wallets WHERE user_id = ?", a.id)).toBeNull();
-    expect(out!.b.coins).toBe(duelCoins("loss", 6 * MIN, 30));
+    expect(out!.b.coins).toBe(0);
     expect(out!.b.change!.after.label).toBe("Placement 1/5");
     expect((await rankedRecordOf(sql, a.id)).stored).toBe(false);
     expect((await rankedRecordOf(sql, b.id)).record.games).toBe(1);
   });
 
-  it("no coins under ten moves each; a short game at least one", async () => {
+  it("ranked's own daily coin count (coin_day, coin_games, until Nov 25) is no longer moved: a row keeps what it had", async () => {
     const { sql, a, b } = await setup();
-    const short = await recordDuel(sql, game(a.id, b.id, "1-0", { moves: Array.from({ length: 19 }, () => "e2e4") }), notHeld);
-    expect(short!.w.coins).toBe(0);
-    const quick = await recordDuel(sql, game(a.id, b.id, "0-1", { endedAt: T0 + 10_000 }), notHeld);
-    expect(quick!.b.coins).toBe(1);
-  });
-
-  it(`at most RANKED_1V1.coins.perDay paying games a UTC day per account, counted on the rank's row; the next day pays again`, async () => {
-    const { sql, a, b } = await setup();
-    const perDay = RANKED_1V1.coins.perDay;
-    const day0 = Math.floor(T0 / 86_400_000) * 86_400_000;
-    const at = (i: number, day = 0) => ({ startedAt: day0 + day * 86_400_000 + i * 7 * MIN, endedAt: day0 + day * 86_400_000 + i * 7 * MIN + 6 * MIN });
-    // A short game (under 10 moves each) pays nothing and doesn't count.
-    expect((await recordDuel(sql, game(a.id, b.id, "1-0", { ...at(0), moves: Array.from({ length: 10 }, () => "e2e4") }), notHeld))!.w.coins).toBe(0);
-    for (let i = 1; i <= perDay; i++) expect((await recordDuel(sql, game(a.id, b.id, i % 2 ? "1-0" : "0-1", at(i)), notHeld))!.w.coins).toBeGreaterThan(0);
-    expect(await sql.first("SELECT coin_games FROM ranked_1v1 WHERE user_id = ?", a.id)).toEqual({ coin_games: perDay });
-    const over = await recordDuel(sql, game(a.id, b.id, "1-0", at(perDay + 1)), notHeld);
-    expect(over!.w.coins).toBe(0);
-    expect(over!.b.coins).toBe(0);
-    // Its rank still moves.
-    expect((await rankedRecordOf(sql, a.id)).record.games).toBe(perDay + 2);
-    const wallet = (await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", a.id))!.coins;
-    expect(wallet).toBeLessThanOrEqual(perDay * RANKED_1V1.coins.maxPerGame);
-    // The next UTC day: paid again, the count from 1.
-    expect((await recordDuel(sql, game(a.id, b.id, "1-0", at(0, 1)), notHeld))!.w.coins).toBeGreaterThan(0);
-    expect(await sql.first("SELECT coin_games FROM ranked_1v1 WHERE user_id = ?", a.id)).toEqual({ coin_games: 1 });
-  });
-
-  it("the day's count across midnight: a game of the day before, recorded after one of the new day, leaves the new day's count alone", async () => {
-    const { sql, a, b } = await setup();
-    const midnight = Math.ceil(T0 / 86_400_000) * 86_400_000;
-    const ending = (end: number) => ({ startedAt: end - 6 * MIN, endedAt: end });
-    // Two of Ann's games recorded at once: both counted.
-    const c = (await createGuest(sql, T0, "Cy")).user;
-    await Promise.all([recordDuel(sql, game(a.id, b.id, "1-0", ending(midnight - 30 * MIN)), notHeld), recordDuel(sql, game(a.id, c.id, "1-0", ending(midnight - 20 * MIN)), notHeld)]);
-    expect(await sql.first("SELECT coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", a.id)).toEqual({ coin_day: midnight / 86_400_000 - 1, coin_games: 2 });
-    // The new day's first game, then a late recording of a game from before midnight (a retry): it pays, and the new
-    // day's count stays.
-    await recordDuel(sql, game(a.id, b.id, "1-0", ending(midnight + 10 * MIN)), notHeld);
-    const late = await recordDuel(sql, game(a.id, c.id, "1-0", ending(midnight - 5 * MIN)), notHeld);
-    expect(late!.w.coins).toBeGreaterThan(0);
-    expect(await sql.first("SELECT coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", a.id)).toEqual({ coin_day: midnight / 86_400_000, coin_games: 1 });
-    expect(coinCount({ day: 5, games: 3 }, 4, () => true)).toEqual({ pays: true, store: { day: 5, games: 3 } });
-    expect(coinCount({ day: 4, games: RANKED_1V1.coins.perDay }, 4, () => true)).toEqual({ pays: false, store: { day: 4, games: RANKED_1V1.coins.perDay } });
-    expect(coinCount({ day: 3, games: 7 }, 4, () => false)).toEqual({ pays: false, store: { day: null, games: 0 } });
+    await recordDuel(sql, game(a.id, b.id, "1-0"), notHeld);
+    await sql.run("UPDATE ranked_1v1 SET coin_day = 5, coin_games = 3 WHERE user_id = ?", a.id);
+    await recordDuel(sql, game(a.id, b.id, "0-1", { startedAt: T0 + 10 * MIN, endedAt: T0 + 16 * MIN }), notHeld);
+    expect(await sql.first("SELECT games, coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", a.id)).toEqual({ games: 2, coin_day: 5, coin_games: 3 });
+    expect(await sql.first("SELECT coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", b.id)).toEqual({ coin_day: null, coin_games: 0 });
   });
 
   it("an account deleted during the game: nothing for it; the game kept under 'deleted'", async () => {

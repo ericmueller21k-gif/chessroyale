@@ -39,6 +39,9 @@ export const LEDGER_SCHEMA = [
     PRIMARY KEY (op_id, leg)
   )`,
   `CREATE INDEX IF NOT EXISTS ledger_account ON ledger (account, asset_kind, asset_id)`,
+  // An account's legs of one reason since a time (Nov 25, the review's n7): the daily caps each grant reads (play coins' day,
+  // play-coins.ts; XP's solo minutes and wins, xp.ts; Squads' crates a UTC day), by this, never the account's whole history.
+  `CREATE INDEX IF NOT EXISTS ledger_reason ON ledger (account, reason, created_at)`,
   // Series crates you hold, unopened, by crate (Nov 9, XP phase 2: the daily reward's and each level's; Squads' placements' since): a
   // count per crate, as boss tokens are. Each takes a crate key to open (locker.ts openCrate). A new table: older data has none.
   `CREATE TABLE IF NOT EXISTS series_crates (

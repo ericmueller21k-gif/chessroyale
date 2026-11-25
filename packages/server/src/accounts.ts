@@ -289,6 +289,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // What the game paid beside its XP (Nov 9, 2026, XP phase 2): JSON {crate, daily, crates, keys, bossPicks, levels} (core's
   // XpRewards), for the result screen's rewards box. NULL: nothing (and every result from before).
   { table: "results", column: "xp_rewards", type: "TEXT" },
+  // A game's coins (Nov 25, 2026; PLAY_COINS, play-coins.ts): JSON {play, bonus, parts, step, today, none?} (core's PlayCoins), paid
+  // with its XP, for the result screen. NULL on every result from before, and when rewards were paused.
+  { table: "results", column: "coins", type: "TEXT" },
   // A solo result's game (Nov 22, 2026; xp.ts): its id from POST /api/xp/solo/start, so a game is recorded once: as its result, or as
   // a loss when it was left after SOLO_ABANDON.minMoves (then `abandoned` = 1). NULL online, for a solo game never timed, and before.
   { table: "results", column: "solo_game", type: "TEXT" },
@@ -924,8 +927,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     stmt(
       `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
          brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
-         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, solo_game)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards, coins, solo_game)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
        ${since !== null ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}
        ${soloGame !== null ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND solo_game = ?)" : ""}`,
       userId,

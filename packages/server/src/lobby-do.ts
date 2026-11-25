@@ -207,6 +207,8 @@ export class Lobby extends DurableObject<Env> {
         // (Only a friends' lobby caps the win by opponent: lobbyXpGame.)
         opponents: rec.auto ? [] : core.xpOpponents(r.playerId),
         battle: core.bossBattleSpan(r.playerId),
+        // (Play coins' 50 v 50 bonus: a place among the first of their team's scoreboard at the end; Nov 25.)
+        ...(over && core.crowdTeamTop(r.playerId) ? { crowdTop: true as const } : {}),
       });
     }
   }
@@ -907,7 +909,12 @@ export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingRe
   const held = !(await eligibleForRanked(c.sql, p.userId));
   // XP (Nov 9): decided from this room's own count and clock, granted once (keyed by this match), kept on the result row for the result
   // screen to ask for (server/xp.ts).
-  const xp = await soft("xp", grantXp(c.sql, p.userId, { ...lobbyXpGame(rec, p.result, p.userId, p.span, c.mode, p.opponents, c.signedInOnly, p.at), paused: c.paused }), null);
+  // (Play coins (Nov 25) are paid with it, in the same batch: the 50 v 50 top places' bonus as the room saw it at the end.)
+  const xp = await soft(
+    "xp",
+    grantXp(c.sql, p.userId, { ...lobbyXpGame(rec, p.result, p.userId, p.span, c.mode, p.opponents, c.signedInOnly, p.at), paused: c.paused, ...(p.crowdTop ? { coin: { crowdTop: true } } : {}) }),
+    null,
+  );
   await recordResult(c.sql, p.userId, { ...p.result, mode: c.mode, online: true, lobby: rec.code, held, playMs: p.span.ms, moves: p.span.moves, xp }, p.at, { since });
   // The Welcome Crate (Nov 6): a finished game may earn it, once ever (welcome.ts; an abandoned one isn't counted).
   await soft("welcome", grantWelcomeCrate(c.sql, p.userId, p.at), []);

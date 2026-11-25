@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, SOLO_ABANDON, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, PLAY_COINS, RANKED_1V1, SOLO_ABANDON, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, num, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -502,6 +502,20 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("3 wins a day");
   });
 
+  it("coins (Nov 25, PLAY_COINS), from the settings: play coins, the day's cap, the bonus and its steps, the most a day; no minutes", () => {
+    const t = section("xp");
+    expect(t).toContain("Coins: every game that earns XP also earns coins, by the same rules");
+    expect(t).toContain("Play coins: more for a longer game, up to 54 a game, until 300 a day.");
+    expect(t).toContain("15 for a win (the same wins as XP's, the friends' lobby rule too), 5 for a draw in ranked 1 v 1, 10 for finishing in your team's top 3 in a 50 v 50, and in Squads by your squad's place: 40 for 1st, 25 for 2nd, 15 for 3rd-4th and 5 for 5th-8th.");
+    expect(t).toContain("the first 150 bonus coins of a day pay in full, the next 200 at half, the next 200 at a quarter, then none: at most 300 bonus coins and 600 coins a day in all.");
+    const moved = section("xp", { ...FAQ_DEFAULTS, playCoins: { ...PLAY_COINS, perMinute: 2, perDay: 400, bonus: { ...PLAY_COINS.bonus, win: 20 }, bonusSteps: [{ upTo: 100, rate: 1 }, { upTo: 300, rate: 0.5 }] } });
+    expect(moved).toContain("up to 60 a game, until 400 a day.");
+    expect(moved).toContain("20 for a win");
+    expect(moved).toContain("the first 100 bonus coins of a day pay in full, the next 200 at half, then none: at most 200 bonus coins and 600 coins a day in all.");
+    // (No per-minute numbers, as XP's: Eric, Nov 9, "we dont want players to know they could just stall".)
+    expect(moved).not.toMatch(/\bminutes?\b|per minute|a minute/i);
+  });
+
   it("level-up rewards (Nov 20: every other level, a boss crate every 20th), from the settings, in the XP and the crates sections", () => {
     expect(section("xp")).toContain("Level-up rewards: every other level you reach (2, 4, 6, …) gives you 1 crate and 1 crate key, and every 20th level (20, 40, 60, …) also a boss crate you choose");
     expect(section("crates")).toContain("(1 crate and 1 key every other level, and a crate for the day's first game)");
@@ -780,8 +794,9 @@ describe("the FAQ: 1 v 1", () => {
     expect(t).toContain(`your first ${RANKED_1V1.placements.games} games show "Placement 1/${RANKED_1V1.placements.games}"`);
     expect(t).toContain("at most Radiant 5.");
     expect(t).toContain(`about +${RANKED_1V1.points.perGame} for a win and −${RANKED_1V1.points.perGame} for a loss against a player at your level`);
-    expect(t).toContain(`${RANKED_1V1.coins.perMinute.win} coins a minute for a win`);
-    expect(t).toContain(`Up to ${RANKED_1V1.coins.perDay} games a day pay coins`);
+    // (Coins since Nov 25: PLAY_COINS, as every game; ranked's own per-minute coins are gone.)
+    expect(t).toContain(`a ranked game pays coins as every game does (Coins): more for a longer game, ${PLAY_COINS.bonus.win} coins more for a win and ${PLAY_COINS.bonus.draw} coins for a draw.`);
+    expect(ranked1v1(RANKED_1V1)).not.toMatch(/coins a minute|games a day pay coins/);
     // Colors (Eric, Nov 25): in turn, as evenly as it can; no White edge in the rating.
     expect(t).toContain("Colors: the game gives each player White and Black in turn, as evenly as it can, so nobody is stuck on one color.");
     expect(t).toContain(

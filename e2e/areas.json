@@ -163,7 +163,7 @@
   ],
   "areas": {
     "XP and levels (Nov 9): the XP box on every result screen, the level on home and the profiles; the server's grant": {
-      "paths": ["packages/server/src/xp.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/PageLayer.tsx"],
+      "paths": ["packages/server/src/xp.ts", "packages/server/src/play-coins.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/PageLayer.tsx"],
       "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/quests.spec.ts", "e2e/tower-party.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
     },
     "A solo boss battle kept on the device (Nov 22, step 2): the reload's card, Resume or Forfeit, and another start asking first": {
