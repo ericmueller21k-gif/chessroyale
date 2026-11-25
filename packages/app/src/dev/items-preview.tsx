@@ -1,7 +1,7 @@
 import { render } from "preact";
 import "../board/pieces.css";
 import "../styles.css";
-import { ITEM_DEFS, SLOT_NAMES, itemColor, itemDef, tierInfo, type ItemLook } from "@chessroyale/core";
+import { ITEM_DEFS, SLOT_NAMES, itemColor, itemDef, itemName, tierInfo, type ItemLook } from "@chessroyale/core";
 import { Avatar, ItemArt } from "../components/Items.tsx";
 
 /**
@@ -12,7 +12,8 @@ import { Avatar, ItemArt } from "../components/Items.tsx";
  *
  * `?sheet=1` is the short sheet for showing a batch (Eric): each item as a card and worn on a white and a black pawn,
  * with its tier, the colors taken in turn from `?colors=` (and `?purity=`), then any whole outfits in
- * `?outfits=dark-shades+suit-and-tie+tommy-gun;eyepatch`, each on both pawns.
+ * `?outfits=dark-shades+suit-and-tie+tommy-gun;eyepatch`, each on both pawns. `?live=1` plays the items' animations (as
+ * where an item is the focus), `?seeds=3,9` sets each card's seed in turn (a smiley's expression), `?width=366` the page's.
  */
 const q = new URLSearchParams(location.search);
 const only = q.get("items")?.split(",");
@@ -36,6 +37,8 @@ const Cell = ({ look, side, label }: { look: ItemLook; side: "w" | "b"; label: s
 const sheet = q.get("sheet") === "1";
 const palette = (q.get("colors") ?? "yellow,red,cobalt,emerald,midnight,sage,opal,oceanic,pearl").split(",");
 const sheetBlemish = 100 - Number(q.get("purity") ?? 72);
+const live = q.get("live") === "1";
+const seeds = q.get("seeds")?.split(",").map(Number);
 // ("+" arrives as a space in a query string.)
 const outfits = (q.get("outfits") ?? "").split(";").filter(Boolean).map((o) => o.split(/[+ ]/));
 /** The sheet keeps the order asked for. */
@@ -44,22 +47,22 @@ const sheetDefs = only ? only.flatMap((id) => ITEM_DEFS.filter((d) => d.id === i
 const SheetCard = ({ def, i }: { def: string; i: number }) => {
   const d = itemDef(def)!;
   const t = tierInfo(d.tier);
-  const f = { color: palette[i % palette.length]!, color2: palette[(i + 3) % palette.length]!, blemish: sheetBlemish, seed: 5 + i };
+  const f = { color: palette[i % palette.length]!, color2: palette[(i + 3) % palette.length]!, blemish: sheetBlemish, seed: seeds?.[i] ?? 5 + i };
   const look: ItemLook = { [d.slot]: { def, ...f } };
   return (
     <div style={`width:300px;background:#3a3f48;border-radius:10px;padding:8px;color:#fff;font:12px sans-serif;border-left:6px solid ${t.color}`}>
       <div style="display:flex;gap:4px;align-items:center">
         <div style="width:96px;height:96px">
-          <ItemArt def={def} finish={f} />
+          <ItemArt def={def} finish={f} live={live} />
         </div>
         {(["w", "b"] as const).map((side) => (
           <div style="width:96px;height:96px;position:relative">
-            <Avatar look={look} side={side} ride />
+            <Avatar look={look} side={side} ride live={live} />
           </div>
         ))}
       </div>
       <div style="margin-top:4px">
-        <b style="font-size:14px">{d.name}</b> <span style={`color:${t.color};font-weight:800`}>{t.name}</span> · {SLOT_NAMES[d.slot]}
+        <b style="font-size:14px">{itemName({ def, seed: f.seed })}</b> <span style={`color:${t.color};font-weight:800`}>{t.name}</span> · {SLOT_NAMES[d.slot]}
       </div>
       <div style="opacity:0.75">
         {itemColor(f.color).name}
@@ -71,7 +74,7 @@ const SheetCard = ({ def, i }: { def: string; i: number }) => {
 
 render(
   sheet ? (
-    <div style="padding:12px;display:flex;flex-wrap:wrap;gap:10px;width:960px">
+    <div style={`padding:12px;display:flex;flex-wrap:wrap;gap:10px;width:${q.get("width") ?? 960}px`}>
       {sheetDefs.map((d, i) => (
         <SheetCard def={d.id} i={i} />
       ))}

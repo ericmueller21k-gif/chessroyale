@@ -1,6 +1,6 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
 import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
-import { BOARD_SEL, bossAloneFromHome, engineTop, named, openBossRaid, soloFromHome, submitMove, test } from "./helpers.ts";
+import { BOARD_SEL, REAL_SCREENS, boardTarget, bossAloneFromHome, engineTop, named, openBossRaid, realLayout, realScreenContext, soloFromHome, submitMove, test, type RealScreen } from "./helpers.ts";
 
 /**
  * A computer's board as big as the window's height lets it, as chess.com's (Eric, Oct 29;
@@ -323,6 +323,89 @@ for (const screen of Object.keys(ROOM) as Screen[]) {
   });
 }
 
+/**
+ * Real screens (Nov 25; docs/decisions/2026-11-25-real-screens.md; e2e/helpers.ts REAL_SCREENS): every computer game screen at a 1080p
+ * laptop at 125% (Eric's, 1536 × 730), at 150% (1280 × 600), a 768p laptop (1366 × 650) and a desktop (1920 × 960), each at its own device
+ * scale: nothing scrolls either way, nothing is cut off at the window's top, every chat shows at least 120 px of messages, and the board
+ * is at least the window's height less two name bars and 40 px. Boss alone and the 50 v 50 go on to their end pages (a resign).
+ *
+ * Known gaps (measured Nov 25, before the shared game layout, Part 3's mockup): today every game screen's board is under that target, and
+ * the 50 v 50's chat on the two shortest laptops is under 120 px. Each is held here at today's number (it may grow, never shrink) and
+ * written in the test's annotations; when a screen reaches the target, its entry goes.
+ */
+const realKey = (s: RealScreen) => `${s.width}x${s.height}`;
+const BOARD_TODAY: Record<Screen, Record<string, number>> = {
+  alone: { "1536x730": 600, "1280x600": 472, "1366x650": 520, "1920x960": 832 },
+  raid: { "1536x730": 600, "1280x600": 472, "1366x650": 520, "1920x960": 832 },
+  crowd: { "1536x730": 560, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
+  vote: { "1536x730": 560, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
+  duel: { "1536x730": 557, "1280x600": 424, "1366x650": 480, "1920x960": 784 },
+  squads: { "1536x730": 496, "1280x600": 368, "1366x650": 416, "1920x960": 728 },
+};
+const END_SCROLL_TODAY: Partial<Record<Screen, Record<string, number>>> = {
+  alone: { "1536x730": 35, "1280x600": 165, "1366x650": 115 },
+  crowd: { "1280x600": 111, "1366x650": 61 },
+};
+const CHAT_TODAY: Partial<Record<Screen, Record<string, number>>> = { crowd: { "1536x730": 119, "1280x600": 8, "1366x650": 42 } };
+
+/** Resign from the gear: the match's end page. */
+async function resignFromGear(page: Page) {
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^Resign$/ }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: /Resign/ }).click();
+  await expect.poll(() => phase(page), { timeout: 10_000 }).toBe("results");
+}
+
+for (const screen of Object.keys(ROOM) as Screen[]) {
+  const end = screen === "alone" || screen === "crowd";
+  test(`real screens (Nov 25): ${screen} on laptop 1536×730, 1280×600, 1366×650 and desktop 1920×960: no scroll either way, nothing cut off at the top, chats with 120 px of messages, the board the window's height less two name bars and 40 (or today's, a known gap)${end ? "; its end page too" : ""}`, async ({ browser }) => {
+    test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
+    test.setTimeout(10 * 60_000);
+    const notes: string[] = [];
+    for (const s of REAL_SCREENS) {
+      const ctx = await realScreenContext(browser, s);
+      const page = await ctx.newPage();
+      await into(page, screen);
+      await page.waitForTimeout(500);
+      const at = `${screen} on the ${s.name}`;
+      const g = await realLayout(page);
+      expect(g.scrollX, `${at}: no scrolling across`).toBeLessThanOrEqual(0);
+      expect(g.scrollY, `${at}: no scrolling down`).toBeLessThanOrEqual(0);
+      expect(g.cut, `${at}: nothing cut off at the top`).toEqual([]);
+      for (const f of g.feeds) {
+        const today = CHAT_TODAY[screen]?.[realKey(s)];
+        if (today === undefined) expect(f, `${at}: the chat's messages`).toBeGreaterThanOrEqual(120);
+        else {
+          expect(f, `${at}: the chat's messages, no less than today's (a known gap: 120 is the target)`).toBeGreaterThanOrEqual(today - 1);
+          notes.push(`${s.name}: chat ${Math.round(f)} px of messages (target 120)`);
+        }
+      }
+      const b = g.board!.h;
+      const target = boardTarget(s);
+      if (b < target) {
+        // (A whole number of device pixels: a few px either way with the scale.)
+        const today = BOARD_TODAY[screen][realKey(s)] ?? target;
+        expect(b, `${at}: the board (${b}) no smaller than today's ${today} (a known gap: the target is ${target})`).toBeGreaterThanOrEqual(today - 8);
+        notes.push(`${s.name}: board ${Math.round(b)} px, target ${target}`);
+      }
+      if (end) {
+        await resignFromGear(page);
+        await page.waitForTimeout(800);
+        const e = await realLayout(page);
+        expect(e.scrollX, `${at}, its end page: no scrolling across`).toBeLessThanOrEqual(0);
+        expect(e.cut, `${at}, its end page: nothing cut off at the top`).toEqual([]);
+        // (Known gap: these end pages scroll down on the laptops today, and on Windows a page that scrolls down shows a scrollbar that
+        // makes its 100vw widths scroll sideways too, as ranked 1 v 1's did. Held at today's; 0 is the target.)
+        const today = END_SCROLL_TODAY[screen]?.[realKey(s)] ?? 0;
+        expect(e.scrollY, `${at}, its end page: scrolls down no more than today's ${today} px (0 is the target)`).toBeLessThanOrEqual(today + 2);
+        if (e.scrollY > 0) notes.push(`${s.name}: its end page scrolls ${e.scrollY} px down`);
+      }
+      await ctx.close();
+    }
+    test.info().annotations.push({ type: "known gaps", description: notes.join("; ") || "none" });
+  });
+}
+
 test("a computer: Babur's pump beside him at every size, as big as the board's balloons, never flipping to the taller bar; the board one size through his game", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
   test.setTimeout(5 * 60_000);
@@ -420,14 +503,14 @@ test("a computer's 50 v 50 (Eric, Nov 25): the status line centered over the boa
     expect(Math.abs(g.slot!.height - 206), `${size}: the panel one fixed slot (${g.slot!.height})`).toBeLessThanOrEqual(1);
   }
   await ctx.close();
-  // A phone: the line and the panel as before (16 px, the words from the left; the panel the locked screen's --mid-h, 104 px).
+  // A phone: the line and the panel as before (16 px, the words from the left; the panel the locked screen's --mid-h, 151 px since Nov 25: the power-up row, six vote rows and the status line).
   const phone = await touchPage(browser);
   await into(phone.page, "crowd");
   const p = await phone.page.evaluate(() => {
     const hud = document.querySelector(".screen.game > .hud-row > .hud")!;
     return { font: getComputedStyle(hud).fontSize, justify: getComputedStyle(hud).justifyContent, slot: document.querySelector(".screen.game > .play-footer")!.getBoundingClientRect().height };
   });
-  expect(p, "a phone: the status line and the panel as before").toEqual({ font: "16px", justify: "normal", slot: 104 });
+  expect(p, "a phone: the status line and the panel as before").toEqual({ font: "16px", justify: "normal", slot: 151 });
   await phone.ctx.close();
 });
 

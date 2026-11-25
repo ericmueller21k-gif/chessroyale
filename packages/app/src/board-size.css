@@ -207,10 +207,33 @@
   .screen.game.crowd-50 > .poll {
     gap: 3px;
   }
-  .screen.game.crowd-50 > .poll .poll-row {
+  .screen.game.crowd-50 > .poll .poll-row,
+  .screen.game.crowd-50 > .play-footer .poll-row {
     padding: 1px 8px;
     font-size: 15px;
     line-height: 20px;
+  }
+  /* (Nov 25, Eric: the vote box sits in the slot between reveals as skeleton rows, filled in place by the reveal: the same rows at
+     the same places, 22 px each, a filled one's height; the status line at the slot's foot, where the result line goes.) */
+  .screen.game.crowd-50 .poll-row.skel {
+    height: 22px;
+  }
+  .screen.game.crowd-50 .poll-row.skel .poll-move i {
+    height: 10px;
+    border-radius: 5px;
+  }
+  .screen.game.crowd-50 > .play-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .screen.game.crowd-50 > .play-footer > .poll-skel {
+    display: grid;
+    gap: 3px;
+  }
+  .screen.game.crowd-50 > .play-footer > .play-slot {
+    flex: none;
+    margin-top: auto;
   }
   .screen.game.crowd-50 > .poll .poll-result .round-score {
     font-size: 22px;

@@ -424,7 +424,7 @@ function CosmeticsCard({ p, loading, onAll }: { p: PublicProfile | null; loading
         {tiles.map((t) => (
           <div key={t.slot} class="pp-tile" style={`--w:${tileWeight(t.line)}`}>
             <span class="pp-tile-art" aria-hidden="true">
-              <ItemArt def={t.def} finish={t.finish} />
+              <ItemArt def={t.def} finish={t.finish} live />
             </span>
             <span class="pp-tile-text">
               <strong>{t.name}</strong>

@@ -1,6 +1,6 @@
 import { Fragment } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
-import { FAIRPLAY, bossInfo, itemDef, shownLook, tierInfo, type ItemLook } from "@chessroyale/core";
+import { FAIRPLAY, bossInfo, itemDef, itemName, shownLook, tierInfo, type ItemLook } from "@chessroyale/core";
 import { wornDetails } from "../item-details.ts";
 import { FdButton, WORN_ORDER } from "./FrontDoor.tsx";
 import { ItemArt } from "./Items.tsx";
@@ -41,10 +41,10 @@ export function WearingRows({ look }: { look: ItemLook }) {
         return (
           <div key={slot} class="fd-item">
             <span class="fd-thumb" aria-hidden="true">
-              <ItemArt def={it.def} finish={it} />
+              <ItemArt def={it.def} finish={it} live />
             </span>
             <span class="fd-item-text">
-              <strong>{d.name}</strong>
+              <strong>{itemName(it)}</strong>
               <span>
                 {/* Each detail stays whole; a narrow row breaks between them. */}
                 {/* (A HunChess ride: no purity or shine, and "Not tradeable": item-details.ts.) */}

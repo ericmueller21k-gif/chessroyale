@@ -63,8 +63,14 @@ test("after the zzz wait with no input a \"zzz\" floats over your pawn, for you 
   await expect.poll(async () => (await them(bo, annId))?.here, { timeout: 15_000 }).toBe(true);
   await expect.poll(async () => (await them(page, boId))?.here, { timeout: 15_000 }).toBe(true);
   await page.keyboard.press("ArrowRight");
-  await expect.poll(async () => (await them(bo, annId))?.zzz, { timeout: 8_000 }).toBe(false);
-  expect((await them(bo, annId))!.drawn).toBe(false);
+  // ("zzz" is what the server said, set as its answer comes in; "drawn" is the last frame's, so the two are polled together: read
+  // separately, the second read can come before the next frame. Main's run 45599472319, Nov 25: the zzz cleared, the read after it
+  // still had the frame before; locally, with Bo's page slowed 6x, the read that first saw the zzz cleared still had it drawn 5 times
+  // in 5, and the next read never did. Every frame draws the whole town again, so the next frame always shows it: no frame is skipped.)
+  await expect.poll(async () => {
+    const a = await them(bo, annId);
+    return a ? [a.zzz, a.drawn] : null;
+  }, { timeout: 8_000 }).toEqual([false, false]);
   // Ann leaves it alone: her zzz, on her screen (over her own pawn) and on Bo's (drawn over hers).
   await expect.poll(async () => (await me(page)).drawn, { timeout: 15_000 }).toBe(true);
   await expect.poll(async () => {
@@ -79,8 +85,10 @@ test("after the zzz wait with no input a \"zzz\" floats over your pawn, for you 
   // Ann presses an arrow key (her pawn moves): gone at once on hers, and on Bo's within a beat.
   await page.keyboard.press("ArrowLeft");
   await expect.poll(async () => (await me(page)).zzz, { timeout: 3_000 }).toBe(false);
-  await expect.poll(async () => (await them(bo, annId))?.zzz, { timeout: 12_000, message: "Ann's zzz cleared on Bo's screen" }).toBe(false);
-  expect((await them(bo, annId))!.drawn).toBe(false);
+  await expect.poll(async () => {
+    const a = await them(bo, annId);
+    return a ? [a.zzz, a.drawn] : null;
+  }, { timeout: 12_000, message: "Ann's zzz cleared on Bo's screen" }).toEqual([false, false]);
   await bo.context().close();
 });
 

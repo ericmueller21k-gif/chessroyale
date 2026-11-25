@@ -959,3 +959,87 @@ export async function settled<T>(page: Page, read: () => Promise<T>, ms = 300, t
     if (Date.now() > until) throw new Error(`settled: still changing after ${timeout} ms (last: ${key.slice(0, 200)})`);
   }
 }
+
+/**
+ * Real computer screens (Nov 25; docs/decisions/2026-11-25-real-screens.md). Computer layouts were built and checked at 1280 × 800,
+ * 1440 × 900 and 1920 × 1080 only; a 1080p laptop at Windows' recommended 125% (Eric's) gives a window about 1536 × 730, shorter than any
+ * of them, so boards sized "height − 170" shrank and pages laid out for 800 px scrolled. Every computer layout check runs at these too,
+ * each with its own device scale (the board's size is a whole number of device pixels). Named by what they are: never "a computer".
+ */
+export const REAL_SCREENS = [
+  { name: "laptop 1536×730", width: 1536, height: 730, scale: 1.25, what: "a 1080p laptop at Windows' recommended 125% (Eric's)" },
+  { name: "laptop 1280×600", width: 1280, height: 600, scale: 1.5, what: "a 1080p laptop at 150%" },
+  { name: "laptop 1366×650", width: 1366, height: 650, scale: 1, what: "a 768p laptop at 100%" },
+  { name: "desktop 1920×960", width: 1920, height: 960, scale: 1, what: "a 1080p desktop at 100%, a maximized browser" },
+] as const;
+export type RealScreen = (typeof REAL_SCREENS)[number];
+
+/** A chess.com-style name bar's height (the 1 v 1's strip over and under the board): the board-size target counts two of them. */
+export const NAME_BAR_PX = 34;
+/** The board's target on a real screen (Nov 25 brief): the window's height less two name bars and 40 px. */
+export const boardTarget = (s: RealScreen) => s.height - 2 * NAME_BAR_PX - 40;
+
+/** A window on a real screen: its size and device scale, a computer's mouse. */
+export const realScreenContext = (browser: import("@playwright/test").Browser, s: RealScreen) =>
+  browser.newContext({ viewport: { width: s.width, height: s.height }, deviceScaleFactor: s.scale, isMobile: false, hasTouch: false });
+
+/**
+ * One screen's layout, measured: how far the page scrolls each way, every element of the screen cut off at the window's top (its
+ * selector-ish name), each chat's message area (`.qfeed`: its height), the game's board and the end page's move-by-move board (boxes).
+ */
+export async function realLayout(page: Page) {
+  return page.evaluate(() => {
+    const box = (e: Element | null) => {
+      if (!e) return null;
+      const b = e.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 ? { x: b.left, y: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height } : null;
+    };
+    const shown = (e: Element) => {
+      const s = getComputedStyle(e);
+      return s.visibility !== "hidden" && s.display !== "none" && Number(s.opacity) > 0;
+    };
+    const name = (e: Element) => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
+    const screen = document.querySelector(".screen");
+    const cut = screen
+      ? [screen, ...screen.querySelectorAll("*")].filter((e) => {
+          const b = e.getBoundingClientRect();
+          return b.width > 0 && b.height > 0 && b.top < -1 && shown(e) && getComputedStyle(e).position !== "fixed";
+        })
+      : [];
+    return {
+      scrollX: document.documentElement.scrollWidth - innerWidth,
+      scrollY: document.documentElement.scrollHeight - innerHeight,
+      cut: cut.slice(0, 6).map(name),
+      feeds: [...document.querySelectorAll(".qchat .qfeed")].filter(shown).map((e) => e.getBoundingClientRect().height),
+      board: box(document.querySelector(".board-area .board-row > .board-wrap .hb-container")),
+      review: box(document.querySelector(".results-review .hb-container")),
+      reviewCol: box(document.querySelector(".results-review")),
+    };
+  });
+}
+
+/**
+ * An end screen's spacing (Eric, Nov 25: "Make things spaced evenly and tight, and then we can always just center the whole thing";
+ * docs/decisions/2026-11-25-end-screens-2.md): the containers of its stack (`root`'s children, through `display: contents` wrappers and
+ * the rewards' column), each gap between two in a row, the stack's one gap (its row gap: `--es-gap`), and anything set to stretch (a
+ * container that grows, a stack that spreads its items).
+ */
+export async function endGaps(page: Page, root: string) {
+  return page.evaluate((sel) => {
+    const top = document.querySelector(sel)!;
+    const flat = (e: Element): Element[] =>
+      [...e.children].flatMap((c) => {
+        const s = getComputedStyle(c);
+        if (s.display === "contents" || c.classList.contains("es-rewards")) return flat(c);
+        if (s.display === "none" || s.position === "absolute" || s.position === "fixed") return [];
+        const b = c.getBoundingClientRect();
+        return b.height > 0 && b.width > 0 ? [c] : [];
+      });
+    const items = flat(top);
+    const name = (e: Element) => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
+    const gaps = items.slice(1).map((e, i) => ({ between: `${name(items[i]!)} → ${name(e)}`, px: e.getBoundingClientRect().top - items[i]!.getBoundingClientRect().bottom }));
+    const spread = [top, ...top.querySelectorAll(".es-rewards")].map((e) => getComputedStyle(e).justifyContent).filter((j) => /space-|stretch/.test(j));
+    const grow = items.filter((e) => Number(getComputedStyle(e).flexGrow) > 0 && !e.classList.contains("results-review")).map(name);
+    return { token: parseFloat(getComputedStyle(top).rowGap), gaps, spread, grow };
+  }, root);
+}

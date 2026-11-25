@@ -1,6 +1,6 @@
 import { render, type ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { CHAT_TYPED, GLOBAL_CHAT, QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
+import { CHAT_TYPED, GLOBAL_CHAT, QUICK_CHAT, chatSay, chatSays, type ChatSay } from "@chessroyale/core";
 import { onAccountChange, refreshChatStanding, tooYoung } from "../account.ts";
 import type { ChatLine, MatchChat } from "../chat.ts";
 import { chatBlockText } from "../chat-mod.ts";
@@ -275,7 +275,7 @@ function SayButton({ chat, say, now, onSent }: { chat: MatchChat; say: ChatSay; 
  * too); "groups": the lines wrapping, then the emoji (a computer). `only`: the lines or the emoji alone (a phone's chat
  * tab, one picker at a time), and `onSent` after a tap sends.
  */
-function ChatButtons({ chat, layout, fit, now, only, onSent }: { chat: MatchChat; layout: "rows" | "groups"; fit: boolean; now: number; only?: "lines" | "emoji"; onSent?: () => void }) {
+function ChatButtons({ chat, layout, fit, now, only, onSent, post = false }: { chat: MatchChat; layout: "rows" | "groups"; fit: boolean; now: number; only?: "lines" | "emoji"; onSent?: () => void; post?: boolean }) {
   // Your chat is banned (a moderator's decision): why, instead of buttons that can't send. Your profile is read again
   // as this shows, so a ban lifted meanwhile goes.
   const banned = chat.banned(now);
@@ -288,7 +288,8 @@ function ChatButtons({ chat, layout, fit, now, only, onSent }: { chat: MatchChat
     );
   }
   const picked = chat.picked();
-  const lines = only === "emoji" ? [] : picked.lines;
+  // (A finished game: its post-game lines, "GG", "Well played", "Thanks!", "Rematch?", not your mid-game picks.)
+  const lines = only === "emoji" ? [] : post ? chatSays(QUICK_CHAT.postGameLines) : picked.lines;
   const emoji = only === "lines" ? [] : picked.emoji;
   const none = !lines.length && !emoji.length && <p class="qbuttons-none">Nothing picked. Choose your lines and emoji in your profile, under Quick chat and emoji.</p>;
   const lineButtons = lines.map((s) => <SayButton key={s.id} chat={chat} say={s} now={now} onSent={onSent} />);
@@ -403,7 +404,7 @@ export type ChatVariant = "split" | "full" | "tab" | "side" | "page" | "lobby";
  * it takes its size from the box it's placed in); `tab` a phone's 50 v 50 chat tab (CrowdBox: the scoreboard's box,
  * with "‹ Back" in its header).
  */
-export function ChatPanel({ people, chat, variant, head, fold, back }: { people: ChatPeople; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren; back?: () => void }) {
+export function ChatPanel({ people, chat, variant, head, fold, back, post = false }: { people: ChatPeople; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren; back?: () => void; post?: boolean }) {
   const roomy = useMedia(ROOMY);
   const lobby = variant === "lobby";
   const self = useRef({});
@@ -573,7 +574,7 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
           ) : typing ? (
             <TypeBar chat={chat} />
           ) : (
-            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || ((variant === "page" || lobby) && !roomy)} now={now} />
+            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || ((variant === "page" || lobby) && !roomy)} now={now} post={post} />
           )}
         </>
       )}

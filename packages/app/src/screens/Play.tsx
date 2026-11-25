@@ -20,7 +20,7 @@ import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
-import { LiveGhosts, OneVOneBanner } from "./Crowd.tsx";
+import { LiveGhosts, OneVOneBanner, SlotSkeleton } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, battleDecor, crowdView } from "../components/BossPowers.tsx";
 import { goldClink, zebraGold } from "../components/Zebra.tsx";
 import { DarkForced, HOLLOW_BULB_LINES, HollowBlackout, hollowTaunt } from "../components/Hollow.tsx";
@@ -440,6 +440,8 @@ export function PlayScreen({
       ) : (
         <div class="play-footer">
         {lockedPhone && powerRow}
+        {/* (A computer's 50 v 50: the vote box's skeleton rows wait in the slot between reveals, Nov 25: Crowd.tsx.) */}
+        <SlotSkeleton match={match} />
         {/* (A 50 v 50's status slot: one fixed height in every phase, empty while picking, so nothing below moves: styles.css.) */}
         <div class={fifty ? "play-slot" : undefined}>
         {waiting ? (
