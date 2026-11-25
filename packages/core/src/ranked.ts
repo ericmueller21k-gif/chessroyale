@@ -351,13 +351,5 @@ export function firstGetsWhite(a: readonly SeatColor[], b: readonly SeatColor[],
   return coin();
 }
 
-// ---------------- Coins ----------------
-
-/**
- * The coins a finished ranked game pays one player: perMinute of its length (from its start to its end) by their
- * result, at least 1 and at most maxPerGame; nothing when either side made fewer than minMoves moves.
- */
-export function duelCoins(result: "win" | "draw" | "loss", gameMs: number, fewestMoves: number, s: Settings = RANKED_1V1): number {
-  if (fewestMoves < s.coins.minMoves) return 0;
-  return Math.max(1, Math.min(s.coins.maxPerGame, Math.round((s.coins.perMinute[result] * Math.max(0, gameMs)) / 60_000)));
-}
+// (Ranked's own coins (duelCoins: 2.4/1.6/0.8 a minute, 20 games a day) are gone since Nov 25: a ranked game pays PLAY_COINS with
+// its XP, as every counted game does: play-coins.ts, server/xp.ts.)

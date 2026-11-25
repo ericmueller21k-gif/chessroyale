@@ -1,3 +1,4 @@
+import type { PlayCoins } from "./play-coins.ts";
 import type { QuestPaid } from "./quests.ts";
 import { END_SCREEN, XP } from "./settings.ts";
 
@@ -61,6 +62,8 @@ export interface XpGrant {
   none?: XpNone;
   /** What else it paid (phase 2): absent when nothing (and on every grant from before). */
   rewards?: XpRewards;
+  /** Its coins (PLAY_COINS, Nov 25; play-coins.ts), paid with its XP: absent on a grant from before, and when rewards were paused. */
+  coins?: PlayCoins;
 }
 
 /**
