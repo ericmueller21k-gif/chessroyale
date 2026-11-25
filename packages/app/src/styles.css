@@ -21751,6 +21751,132 @@ button.sq-tiny {
   }
 }
 
+/* ---- 1 v 1 on a computer with a mouse (Eric, Nov 25, mockup round 2; docs/decisions/2026-11-25-duel-layout.md; Duel.tsx DuelWide) ----
+ * No title line: the opponent's strip is the top of the screen, "1 v 1 · Blitz 3+2" in it just before their clock. The board all the height
+ * between the two strips (board-size.css: 108 px of room). Beside it, the gear at the top right, level with the top strip, and one panel
+ * whose top and foot are the board's: the chat over one row (Offer a draw | Resign; a draw offer's Accept and Decline take the row), or on
+ * the end page the result's column. "Your move" a chip by your own clock. A phone and a touch tablet keep their layouts. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game.duel-screen.dv-frame {
+    grid-template-rows: auto;
+    row-gap: 0;
+  }
+  .screen.game.dv-frame > .board-area {
+    grid-row: 1;
+  }
+  /* (The column's three rows: the gear by the top strip, the panel by the board, nothing by your strip. `contain: size`: its content never
+     makes the row taller than the board's.) */
+  .dv-frame > .dv-side {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: stretch;
+    contain: size;
+    display: grid;
+    grid-template-rows: 34px minmax(0, 1fr) 34px;
+    row-gap: 8px;
+    min-height: 0;
+  }
+  .dv-side > .dv-gear {
+    grid-row: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .dv-gear .mm-more {
+    height: 34px;
+  }
+  .dv-side > .dv-box {
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  }
+  .dv-box > .dv-chat,
+  .screen.game.dv-ended .dv-box > .dv-end-col {
+    flex: 1 1 0;
+    min-height: 0;
+    contain: size;
+  }
+  /* (The end page's sizes from its column's height, the board's: 1 from an 800 px window, as before; at 1280 × 600 a little under the
+     window's 0.75, so the chat keeps 40 px of messages in a column no taller than the board.) */
+  .screen.game.dv-ended .dv-box > .dv-end-col {
+    --es-u: clamp(0.68px, calc((var(--app-h) - 160px) / 640), 1px);
+  }
+  .dv-actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+  }
+  .dv-actions > .btn,
+  .dv-actions > .dv-draw-sent {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 12px;
+  }
+  .dv-actions > .dv-draw-sent {
+    text-align: center;
+    font-weight: 700;
+  }
+  /* (A draw offer: the words take what's left, on up to two lines; Accept and Decline their own width.) */
+  .dv-actions.dv-draw {
+    flex-wrap: nowrap;
+    justify-content: stretch;
+  }
+  .dv-actions.dv-draw > .btn {
+    flex: none;
+  }
+  .dv-draw-words {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    line-height: 1.15;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .dv-box > .dv-result {
+    flex: none;
+    max-width: none;
+  }
+  .dv-mode {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .dv-mode h1 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .dv-mode .dv-control {
+    overflow: visible;
+  }
+  .dv-status.dv-chip {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+  .dv-status.dv-chip.mine {
+    background: color-mix(in srgb, var(--good) 18%, var(--surface));
+    color: var(--good);
+  }
+}
+
 /* The vote on the board: both pawns a little bigger than a crowd's, the other player's solid enough to follow. */
 .vote-layer.dv-vote {
   --vp: 10.5%;

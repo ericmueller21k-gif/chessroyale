@@ -228,6 +228,10 @@
   .screen.game:has(> .boss-dock) > .boss-bar {
     max-width: round(down, min(100% - 2 * max(0px, var(--bs-need)), var(--bd-h)), var(--bd-step));
   }
+  /* (1 v 1's computer frame: its board, its strips and the panel beside it, which DuelWide lays out from the board's box.) */
+  .screen.game.duel-screen.dv-frame {
+    --dv-w: round(down, min(100%, var(--bd-h)), var(--bd-step));
+  }
   .screen.game:has(.board-row > .eval-bar) > .boss-dock,
   .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) > .hud-row,
   .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) > .boss-bar {
