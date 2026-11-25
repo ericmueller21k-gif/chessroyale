@@ -12,3 +12,9 @@ Main's live Squads screens at 1536 × 730 (125%, Eric's laptop) with the frame's
   the old 250 px room, and the menu keeps its labels: both fixed in the build.)
 - `mock-squads-vote-1536x730.png`: the votes. These use the 50 v 50's vote frame (its title is the top row, its line and cards in the
   column). Squads has no chat, so under the cards the column ends in the lobby's votes, listed to the board's foot.
+
+## The build (root)
+`stills-squads.spec.ts` takes them. Squads' votes, a Pairs match and a Relay match, each at 1536 × 730 (125%), 1920 × 960 and
+1858 × 1040, plus the phone at 390 × 844 (Pairs, Relay), which is unchanged. In every computer still the standings' box, the board and the
+column start on the board's top line (its squares' top) and end on its foot (with the clock's bar). The gaps are 28 / 28. The board is 634,
+864 and 944.
