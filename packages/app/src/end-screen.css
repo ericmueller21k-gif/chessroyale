@@ -309,6 +309,11 @@
   right: 8px;
   margin: 0;
 }
+/* (Waiting, or no coins: one line in the strip's middle, no pile beside it.) */
+.es-cs-why {
+  left: 12px;
+  right: 12px;
+}
 .es-cs-text {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

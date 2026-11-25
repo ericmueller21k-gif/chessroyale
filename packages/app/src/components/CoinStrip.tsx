@@ -9,7 +9,7 @@ import { play, warmSounds } from "../sound.ts";
  * `stills/coin-reward-mockup`; docs/decisions/2026-11-25-coin-strip.md): right under the XP box on every end screen, its width, in the
  * FF window style, its height from the first paint. When the XP fill ends (EndScreen's sequence calls `play`), one coin for every
  * END_SCREEN.coins.coinPer drops into a pile at its left, the count rolls up like a gas pump (each digit a column moved by `transform`
- * only), and the parts appear as the count reaches them. No coins: greyed, with why.
+ * only), and the parts appear as the count reaches them. No coins: greyed, its why centered in it (no pile).
  *
  * Cheap on the GPU: one small canvas, the coin's spin frames drawn once per size, at most coinsMax `drawImage` a frame for about 1.4 s,
  * then one last frame and the loop stops. A skip (a tap), reduced motion or a screen drawn again after it ran: the end at once
@@ -94,7 +94,7 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
   // (Each part shows from where the count enters it: the parts' running sums.)
   const starts = (view?.parts ?? []).reduce<number[]>((a, p, i) => [...a, i ? a[i - 1]! + view!.parts[i - 1]!.coins : 0], []);
 
-  /** The canvas at `t`: the falling coins and the pile; past the end, the pile and a sparkle. A greyed strip: one coin, still. */
+  /** The canvas at `t`: the falling coins and the pile; past the end, the pile and a sparkle. (A greyed strip draws nothing.) */
   const paint = (t: number, img: HTMLImageElement | null) => {
     const c = cv.current;
     const b = box.current;
@@ -113,9 +113,9 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
     const k = H / 72;
     const S = Math.round(24 * k);
     const frames = spinFrames(img, Math.round(S * dpr));
-    const count = view?.why ? 1 : n;
-    for (let i = 0; i < count; i++) {
-      const s = view?.why ? Infinity : t - i * C.coinGapMs;
+    if (view?.why) return;
+    for (let i = 0; i < n; i++) {
+      const s = t - i * C.coinGapMs;
       if (s < 0) continue;
       const p = spot(i, H, S, k);
       if (s >= C.fallMs) {
@@ -128,7 +128,7 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
       const y = q < 0.85 ? y0 + (p.y - y0) * (q / 0.85) ** 2 : p.y - Math.sin(((q - 0.85) / 0.15) * Math.PI) * 5 * k;
       g.drawImage(frames[Math.floor(s / 60) % frames.length]!, p.x, y, S, S);
     }
-    if (!view?.why && t >= endAt(n)) {
+    if (t >= endAt(n)) {
       g.fillStyle = "#fff";
       for (const [x, y] of [
         [76, 12],
@@ -231,8 +231,7 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
   useLayoutEffect(() => {
     const b = box.current;
     if (!b) return;
-    if (view?.why) void loadCoin().then((img) => paint(Infinity, img));
-    else if (drawn.current >= 0) void loadCoin().then((img) => paint(drawn.current, img));
+    if (drawn.current >= 0) void loadCoin().then((img) => paint(drawn.current, img));
     const ro = new ResizeObserver(() => {
       if (drawn.current >= 0 && !run.current) void loadCoin().then((img) => paint(drawn.current, img));
     });
