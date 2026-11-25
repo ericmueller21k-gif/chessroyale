@@ -228,6 +228,27 @@ describe("lobby", () => {
     expect(L.core.record.phase).toBe("reveal");
   });
 
+  it("residents: Eric back late in the window keeps hosting: the round's timer starts again for him, not the resident (the delta review's d-m2)", () => {
+    const L = setup({ firstStageRounds: 3 });
+    resident(L, "Mossy");
+    L.core.connect(undefined, "Eric", "phone");
+    L.core.message("p1", { t: "start" });
+    L.advance(6000);
+    L.advance(DEFAULT_SETTINGS.moveClockSeconds * 1000 + 400);
+    expect(L.core.record.phase).toBe("scoring");
+    L.core.disconnect("p2");
+    expect(L.core.record.hostId).toBe("p1");
+    // Back 13 s later, 2 s before the first window's end: his device hosts, and keeps hosting past it.
+    L.advance(13_000);
+    L.core.connect(L.core.record.humans[1]!.token, undefined);
+    expect(L.core.record.hostId).toBe("p2");
+    L.advance(2500);
+    expect(L.core.record.hostId).toBe("p2");
+    expect(L.core.record.phase).toBe("scoring");
+    expect(L.hostScores("p2")).toBe(true);
+    expect(L.core.record.phase).toBe("reveal");
+  });
+
   it("residents alone: the host isn't told the engine server re-checks its scores (it never does for them); with a real person, as ever", () => {
     for (const people of [0, 1]) {
       const L = setup({ firstStageRounds: 3 }, {}, 7, { serverEngine: true, serverScore: () => undefined });

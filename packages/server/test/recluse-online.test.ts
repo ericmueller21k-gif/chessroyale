@@ -1234,17 +1234,19 @@ describe("his phase 1 move when no device answers (Eric, Nov 13, option 1: \"rep
   /** His tries at this move on the engine server (searches "p1-…"). */
   const tries = (F: ReturnType<typeof roomFight>) => F.searches.filter((s) => s.id.startsWith("p1-"));
 
-  it("residents alone (residents.ts): the host's window passes, his move is the server's quick one, never the engine server's (the review's m3)", () => {
-    const F = roomFight(1, 3, { engine: true, residents: true });
-    F.advance(1000);
-    F.advance(60_000);
-    const req = toHisTurn(F);
-    const ply = boardNow(F).history.length;
-    F.advance(15_000 + 100);
-    expect(F.searches).toEqual([]);
-    expect(F.core.record.recluse1).toBeUndefined();
-    expect(boardNow(F).history).toHaveLength(ply + 1);
-    expect(boardNow(F).lastMove).toBe(quickMove(req.fen));
+  it("residents alone (residents.ts): the host's window passes, his move is the server's quick one, never the engine server's, nor another resident's window (the review's m3; the delta's d-m1: two residents took turns forever)", () => {
+    for (const [devices, more] of [[1, 3], [2, 2]] as const) {
+      const F = roomFight(devices, more, { engine: true, residents: true });
+      F.advance(1000);
+      F.advance(60_000);
+      const req = toHisTurn(F, devices);
+      const ply = boardNow(F).history.length;
+      F.advance(15_000 + 100);
+      expect(F.searches, `${devices} devices`).toEqual([]);
+      expect(F.core.record.recluse1).toBeUndefined();
+      expect(boardNow(F).history, `${devices} devices`).toHaveLength(ply + 1);
+      expect(boardNow(F).lastMove).toBe(quickMove(req.fen));
+    }
   });
 
   it("the host's window passes: his move from the engine server at the man's level, never a random move; his turn waits for it (nobody's clock runs); a device's late answer isn't heard; his next move is the devices' again", () => {

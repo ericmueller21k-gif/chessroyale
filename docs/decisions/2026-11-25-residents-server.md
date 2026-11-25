@@ -25,6 +25,12 @@ Eric: "have 200 bots made which just sit on the server and play ranked, play 50v
 - A seat is marked a resident's as `connect()` takes it (n6); the heartbeat's `content-length` is checked before the body is read (n1);
   the pause cache is keyed by the token's hash (n2).
 
+- Delta review (Nov 25, `DELTA.md` on `review/residents-server-delta`), fixed by the director: **d-m1** residents alone at the Hidden
+  Boss's phase-1 move: his quick move at the host's window's end, never another resident's window (two residents took turns forever);
+  **d-m2** a person back while a resident hosts: the phase's timer starts again for them, so the old one doesn't hand the work back.
+  Nits a-e left (a: `resendHostWork` without `serverRecheck`, safe double work; c: with residents filling seats, a real player's crowd
+  is often under `minCrowd`, so their hard finds use the solo model).
+
 ### Later
 
 - m2 (PR 4): the dashboard counts distinct residents per "would have" level (or each one's worst), not rows.

@@ -1190,7 +1190,18 @@ export class LobbyCore {
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       // (A real person back while a resident hosts: the host is chosen again now, so the work in flight goes to the person's device
       // below, and the resident's late answer isn't heard: scores and bossMove come from the host alone. The review's m1.)
-      else if (!existing.resident && this.human(this.r.hostId)?.resident) this.r.hostId = this.hostNow();
+      else if (!existing.resident && this.human(this.r.hostId)?.resident) {
+        this.r.hostId = this.hostNow();
+        // (The phase's timer from now, for the device that hosts now: the old one would hand the work back to the resident when it
+        // fires, a person back late in the window losing hosting again. The delta review's d-m2.)
+        if (this.r.hostId === existing.id) {
+          if (this.r.phase === "scoring" && this.r.scoreRequest && !this.r.judges?.tasks && this.r.timer?.kind === "scoreTimeout") {
+            this.setTimer("scoreTimeout", this.io.now() + SCORE_TIMEOUT_MS);
+          } else if (this.r.phase === "boss" && this.r.bossKey && !this.r.bossCheck && this.r.recluse1?.key !== this.r.bossKey && this.r.timer?.kind === "bossTimeout") {
+            this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()) + hoopsMs(this.runner));
+          }
+        }
+      }
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
       this.broadcast(this.lobbyMessage(existing.id), false);
       const last = this.r.last[existing.id];
@@ -2889,6 +2900,9 @@ export class LobbyCore {
       if (next) this.r.hostId = next;
       return this.askHis();
     }
+    // (Residents alone: no engine server, and their devices can't play his move, so another resident's window would only bounce
+    // between them forever: his quick move now, the match unvouched, as with no engine server set up. The delta review's d-m1.)
+    if (this.hisOwnMove() && residentsOnly(this.r)) return this.hisQuick();
     if (next && next !== this.r.hostId) {
       this.r.hostId = next;
       if (c) {
