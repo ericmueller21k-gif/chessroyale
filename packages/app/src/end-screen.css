@@ -278,6 +278,120 @@
   }
 }
 
+/* The coin strip (Nov 25; components/CoinStrip.tsx; the payments design's section 11): right under the XP bar, its width and height,
+   in the FF window style, from the first paint. The pile's canvas fills it; the words sit right of the pile, centered down it as one
+   block (the parts may take two lines on a narrow phone: decided as the counting state first draws, never after). The count's digits
+   are columns moved by transform only. No coins: greyed, with why. */
+.es-coin-strip {
+  --cs-h: 80px;
+  box-sizing: border-box;
+  flex: none;
+  width: min(340px, 100%);
+  height: var(--cs-h);
+  margin: 0 auto;
+  overflow: hidden;
+  contain: layout paint;
+  text-align: left;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+}
+.es-cs-pile {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.es-cs-text,
+.es-cs-why {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--cs-h) * 1.25);
+  right: 8px;
+  margin: 0;
+}
+.es-cs-text {
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: center;
+  row-gap: 5px;
+}
+.es-cs-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.es-cs-pump {
+  display: flex;
+  height: 24px;
+  font-size: 20px;
+  line-height: 24px;
+  color: #ffd54a;
+  text-shadow: 2px 2px 0 #0b0b1a;
+}
+.es-cs-plus {
+  width: 20px;
+  text-align: center;
+}
+.es-cs-d {
+  width: 20px;
+  height: 24px;
+  overflow: hidden;
+}
+.es-cs-col {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+.es-cs-col i {
+  display: block;
+  height: 24px;
+  font-style: normal;
+  text-align: center;
+}
+.es-cs-label {
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #c9d2ff;
+}
+.es-cs-today {
+  font-size: 7px;
+  line-height: 9px;
+  color: #c9d2ff;
+  white-space: nowrap;
+}
+.es-cs-parts {
+  font-size: 7px;
+  line-height: 10px;
+  color: #fff;
+}
+.es-cs-part {
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.es-cs-part.on {
+  opacity: 1;
+}
+.es-cs-part b {
+  font-weight: normal;
+  color: #ffd54a;
+}
+.es-cs-why {
+  display: flex;
+  align-items: center;
+  font-size: 8px;
+  line-height: 13px;
+  color: #fff;
+}
+.es-cs-waiting {
+  color: #c9d2ff;
+}
+.es-coin-strip.es-cs-off {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
 /* The bar: the landing slot, your name, your level; the bar; 0, where you are, the level's end. */
 .es-track {
   box-sizing: border-box;
@@ -645,6 +759,9 @@
   .es-earned-num.es-settled {
     animation: none;
   }
+  .es-cs-part {
+    transition: none;
+  }
   .es-gain.on {
     opacity: 1;
   }
@@ -706,13 +823,6 @@
   gap: 6px;
   min-height: 64px;
   justify-content: center;
-}
-/* Ranked 1 v 1's coins line, under the quests: one line, always there. */
-.es-coins {
-  margin: 0;
-  height: 18px;
-  font-size: 13px;
-  font-weight: 700;
 }
 .dv-end .dv-result-actions {
   display: flex;
@@ -902,10 +1012,9 @@
     grid-template-columns: calc(32 * var(--es-u)) minmax(0, 1fr) calc(56 * var(--es-u)) calc(36 * var(--es-u)) auto;
     column-gap: calc(8 * var(--es-u));
   }
-  .dv-end-col .es-coins {
-    flex: none;
-    height: calc(18 * var(--es-u));
-    font-size: calc(13 * var(--es-u));
+  .dv-end-col .es-coin-strip {
+    --cs-h: calc(76 * var(--es-u));
+    width: 100%;
   }
   /* (Your strip: the moves' ◀ ▶ in your clock's place; the opponent's clock as it ended.) */
   .dv-ended .dv-strip .dv-steps {

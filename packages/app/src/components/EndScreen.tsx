@@ -10,6 +10,7 @@ import { markXpFilled, xpFilled } from "../xp.ts";
 import { SpriteAnim } from "./BossEffect.tsx";
 import { YourPawn } from "./BossDock.tsx";
 import { BossPortrait } from "./BossPortrait.tsx";
+import { CoinStrip, type CoinStripApi } from "./CoinStrip.tsx";
 import { QuestPicture } from "./QuestsOverlay.tsx";
 import { RankEmblem } from "./RankEmblem.tsx";
 import { RewardBox } from "./RewardBox.tsx";
@@ -26,6 +27,7 @@ import "../end-screen.css";
  *     the bar fills from where you were (the number under it counting with it), a rising ping with every step. A level (a division)
  *     reached: the bar flashes full, "Level 3!" pops, your pawn hops in a gold ring, and the bar goes on from 0.
  *   - Each screen's middle between the number and the bar: the floor's bosses 1-2-1 (EndDuo), the podium, the squads.
+ *   - The coin strip under the XP bar (CoinStrip, Nov 25): when the fill ends, coins drop into a pile and the count rolls up.
  *   - The quests this match moved, each sliding to its new count after the bars.
  *
  * Nothing shifts: every box (the number's slot, the bars, the quest box) has its size from the first frame, the game's XP still coming
@@ -341,7 +343,7 @@ interface Step {
  * fill; then the quests (`quests`: their rows drawn). Only transforms, opacity and texts change. A tap anywhere but a button or a field
  * skips to the end, the same as a remount after it ran (`already`). `onLevel`: a level reached (the pawn's hop).
  */
-function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly Step[]; quests: RefObject<HTMLDivElement>; questsIn: () => Promise<void>; root: RefObject<HTMLElement>; onLevel: () => void; onEmblem: (id: string | null) => void; onStart: () => void; onDone: () => void }) {
+function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly Step[]; coins: RefObject<CoinStripApi>; quests: RefObject<HTMLDivElement>; questsIn: () => Promise<void>; root: RefObject<HTMLElement>; onLevel: () => void; onEmblem: (id: string | null) => void; onStart: () => void; onDone: () => void }) {
   const opts = useRef(o);
   opts.current = o;
   // (The skip, from the first frame: a tap before the game's XP has come skips too.)
@@ -439,6 +441,8 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
       anim?.cancel();
       for (const st of steps) endState(st);
       if (ding) play("xpDing");
+      // (The coins at their end too; reduced motion: one clink.)
+      opts.current.coins.current?.end(ding);
       void questsIn().then(() => {
         questsEnd();
         set("done");
@@ -608,6 +612,9 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
         await fill(st);
       }
       if (stopped) return;
+      // (The coins when the XP fill ends: the eye goes XP, then coins.)
+      await opts.current.coins.current?.play();
+      if (stopped) return;
       await wait(FX.gapMs);
       await questRun();
       if (stopped) return;
@@ -619,6 +626,7 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
       timers.forEach(clearTimeout);
       frames.forEach(cancelAnimationFrame);
       anim?.cancel();
+      opts.current.coins.current?.end(false);
     };
   }, [o.ready]);
 }
@@ -634,7 +642,7 @@ export interface EndRp {
 
 /**
  * The rewards of every end screen, in order: (ranked: "RP EARNED" and its bar), "XP EARNED", the screen's own `middle` (given the
- * time a level was reached: the pawn's hop), the XP bar, the quests. `xp`: the game's grant (undefined: still coming; null: none came,
+ * time a level was reached: the pawn's hop), the XP bar, the coin strip (the game's coins, from the same grant), the quests. `xp`: the game's grant (undefined: still coming; null: none came,
  * for `none`'s reason). The toast for what the bars and rows don't show (crates, keys) once it has run.
  */
 export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day = false }: { xp: XpGrant | null | undefined; none?: string; rp?: EndRp; middle?: (hopAt: number) => ComponentChildren; day?: boolean }) {
@@ -643,6 +651,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day 
   const xpSlot = useRef<HTMLSpanElement>(null);
   const rpSlotRef = useRef<HTMLSpanElement>(null);
   const xpRefs = useTrackRefs();
+  const coins = useRef<CoinStripApi>(null);
   const rpRefs = useTrackRefs();
   const [hopAt, setHopAt] = useState(0);
   const [emblem, setEmblem] = useState<string | null | undefined>(undefined);
@@ -689,6 +698,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day 
     ready,
     already: !!already.current,
     steps,
+    coins,
     quests: qBox,
     questsIn: () => drawn.current!.p,
     root,
@@ -720,6 +730,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day 
       <EarnedSlot kind="xp" slot={xpSlot} down={false} why={why} parts={parts} />
       {middle?.(hopAt)}
       <Track plan={xpP} refs={xpRefs} />
+      <CoinStrip xp={xp} none={none} api={coins} />
       <QuestRows moves={moves} box={qBox} line={questLine} day={day} reserve={questRows} />
       {/* (What the bars and rows don't show, once the sequence has ended: a level's or the daily reward's crates and keys.) */}
       {ended && counted && xp!.rewards && <RewardBox xp={xp!} endScreen />}

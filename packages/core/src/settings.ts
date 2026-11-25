@@ -4755,6 +4755,12 @@ export const END_SCREEN = {
   backBoss: { w: 80, h: 66 },
   /** The largest a boss is drawn there (screen px a sprite px). */
   bossMaxScale: 2,
+  /**
+   * The coin strip under the XP box (Nov 25; the payments design's section 11; components/CoinStrip.tsx): after the XP fill, one coin
+   * for every `coinPer` coins (at least 1, at most `coinsMax`) drops into a pile, `coinGapMs` apart, each fall `fallMs`; the count rolls
+   * with them. `clinkGapMs`: the landing clinks (clawCoin) at most this often; the end's cascade (sell) once.
+   */
+  coins: { coinPer: 5, coinsMax: 10, coinGapMs: 110, fallMs: 420, clinkGapMs: 90 },
 } as const;
 
 /**
