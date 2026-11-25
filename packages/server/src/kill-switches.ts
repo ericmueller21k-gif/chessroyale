@@ -53,3 +53,11 @@ export const pausedBosses = (env: object, now?: number): string[] => bossesOff(s
 /** The server's answer to something new while its part is resting: 503, the friendly line, and which part. */
 export const pausedResponse = (what: Pausable): Response =>
   new Response(JSON.stringify({ message: pausedLine(what), paused: what }), { status: 503, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+
+/**
+ * The residents' switch (residents.ts; docs/areas/ops.md, "Kill switches"): `PAUSE_RESIDENTS` = "1" (read as every PAUSE_ variable)
+ * refuses every request of a resident's session (index.ts), every resident's `hello` and socket in every room (the lobby, 1 v 1,
+ * Squads' lobby and party), and the residents route's POSTs. The server's own switch, not a part players see: never in /api/status.
+ * Read straight from the variables each time (a dashboard change is a deploy, whose instances start afresh, as CACHE_MS says).
+ */
+export const residentsPaused = (env: object): boolean => on((env as Record<string, unknown>).PAUSE_RESIDENTS);

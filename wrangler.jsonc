@@ -65,7 +65,11 @@
     // Test accounts (packages/server/src/test-accounts.ts; scripts/cheater-demo.ts): the one service token's client ID (an
     // identifier, not a secret) whose scripts may make, sign in to and delete test accounts. Empty: no token gets in (an admin's
     // session and the e2e's key still do). Before launch: `cheater-demo.ts --delete`, then back to "" (ROADMAP.md).
-    "TEST_ACCOUNTS_CLIENT_ID": "52123888a4a289d33abe0914337ccd90.access"
+    "TEST_ACCOUNTS_CLIENT_ID": "52123888a4a289d33abe0914337ccd90.access",
+    // Residents (packages/server/src/residents.ts; the residents program): its own service token's client ID (an identifier, not a
+    // secret), set once Eric makes the "residents" token. Empty: no token gets in through it (the test accounts' token above does,
+    // for the first runs, until PR 3). Before launch: purge the residents, then back to "" and the token deleted (ROADMAP.md).
+    "RESIDENTS_CLIENT_ID": ""
   },
   // Fair play's deep re-check of flagged players' moves (packages/server/src/fairplay-deep.ts), and old errors and
   // player reports deleted (problems.ts).

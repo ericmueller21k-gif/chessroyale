@@ -143,7 +143,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   fairplay_devices: "device user_id first_seen last_seen",
   fairplay_identities: "kind hash user_id at",
   fairplay_log: "id user_id at action by reason",
-  fairplay_matches: "id user_id lobby mode played_at counted perf score level summary moves keep_until deep_queued deep_done",
+  fairplay_matches: "id user_id lobby mode played_at counted perf score level summary moves keep_until deep_queued deep_done would",
   friend_limits: "user_id kind window_start n",
   friend_requests: "from_id to_id at",
   friends: "user_id friend_id since",
@@ -173,7 +173,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   solo_games: "user_id id started_at test_minutes real_at mode players team boss_id boss_elo",
   tower_best: "user_id kind floor at",
   tower_runs: "id user_id kind seed floor met members fight last status started_at updated_at",
-  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online dnd pawn_color age_ok_at chat_on test",
+  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online dnd pawn_color age_ok_at chat_on test resident",
   wallets: "user_id coins crates crate_keys xp boss_picks",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
 };
