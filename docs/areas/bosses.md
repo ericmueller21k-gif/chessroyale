@@ -18,7 +18,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   [2026-11-09-boss-result-v2.md](../decisions/2026-11-09-boss-result-v2.md)): no God King, the boss on the left (his bow, his line),
   your pawn on the right facing him (your XP is in the bar under the row now). A loss: his `kingAttack` plays
   where he stands (landing to laugh, 1.9 s) and your pawn jolts at each lash; a win: his defeat; a draw: both stand. Your pawn's art is
-  centered in its column (Nov 11). 16 px between his figure and your pawn at rest (12 under 360; Smudgy's worst is 17.6 px at 360 to 430 px); his blow lands on your pawn but never passes it. A level reached during the bar's fill: your pawn hops. Tests: `e2e/boss-result.spec.ts`,
+  centered in its column (Nov 11). 16 px between his figure and your pawn at rest (12 under 360): on the end screen the row's gap is 48 px, or more for a boss drawn further right in his idle, defeat or victory (`--rd-reach`, ResultDuo, from his frames; Smudgy 50, Folio 52, Nov 25), so no number is tuned by hand to the bosses of the day; e2e/boss-result.spec.ts's victory meets Smudgy, the nearest; his blow lands on your pawn but never passes it. A level reached during the bar's fill: your pawn hops. Tests: `e2e/boss-result.spec.ts`,
   `e2e/formats.spec.ts` (after a Last Stand); frames: `node scripts/frames-boss-result.mjs <dir> <boss> <win|loss|draw|resign> [width]`.
   XP's rules and storage: [accounts.md](accounts.md), "XP and levels".
   Nov 25 (round 2c): on a computer, no move of yours to review (resigned at once, the mate test) makes the result's column the page's,

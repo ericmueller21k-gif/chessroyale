@@ -131,9 +131,10 @@ test("a boss battle's victory and defeat screens: the title in the pixel type, n
 
 test("a boss battle won: Victory!, no trophy or skull, no record text, the boss's defeat line", async ({ page }, testInfo) => {
   test.setTimeout(3 * 60_000);
-  // You mate the boss at once (?win=1): Victory!, and the boss's defeat line.
+  // You mate the boss at once (?win=1): Victory!, and the boss's defeat line. Smudgy (Nov 25): his defeat's drawing comes nearest your
+  // pawn of any boss's, so a row gap that doesn't keep 16 px fails here every run, not once in twenty on a random boss.
   await watchDuo(page);
-  await page.goto("/?debug&pace=quick&win=1");
+  await page.goto("/?debug&pace=quick&win=1&boss=smudgy");
   await bossAloneFromHome(page);
   // Your move (?win=1: Qxf7 mates him, from h5).
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");

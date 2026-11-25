@@ -669,10 +669,11 @@
 }
 .es-screen .results-duo:has(.ch-recluse) {
   --rd-k: 1.25;
+  --rd-bw: 96px;
 }
 .es-screen .results-duo .boss-char.place-results:not(.ch-recluse) {
   --bc-scale: 2.25;
-  width: 104px;
+  width: var(--rd-bw);
   /* (From his head to his feet: his frame's empty rows above his idle's first drawn one (`--rd-top`, ResultDuo) left out of the box.) */
   height: calc((var(--bc-fy) - var(--rd-top, 0)) * var(--bc-scale) * 1px);
 }
@@ -683,8 +684,14 @@
 .es-screen .rd-boss {
   margin-bottom: 0;
 }
+/* The row's gap: 48 px, or more where a boss's drawing reaches further right than that leaves room for (Nov 25, main's retry-passes:
+   Smudgy's defeat came to 14.3 px of your pawn at 2.25). `--rd-reach` (ResultDuo): how far right of his feet he's drawn in any figure
+   the result shows him in (his idle, defeat and victory), in his frame's px; his feet are his box's middle (`--rd-bw`: 104, the Hidden
+   Boss's 96), and your pawn's art box stands (176 - 68 × 1.8) / 2 px into its column. So 16 px between them for every boss, worked out
+   from his drawing, not a number tuned by hand to the bosses of the day (it went stale at each new scale: Nov 9, Nov 11, Nov 25). */
 .es-screen .results-duo {
-  gap: 48px;
+  --rd-bw: 104px;
+  gap: max(48px, round(up, calc(var(--rd-reach, 0) * var(--rd-k) * 1px - var(--rd-bw) / 2 - (176px - 68px * 1.8) / 2 + 16px), 1px));
   padding-left: 24px;
 }
 .es-screen .rd-you .you-pawn {
