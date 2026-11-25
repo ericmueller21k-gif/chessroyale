@@ -83,13 +83,30 @@ describe("1 v 1's room: the timeline", () => {
     r.set(T0 + 3000 + VERSUS);
     expect(r.core().phase()).toBe("vote");
     r.send("w", { t: "pick", zone: "bullet" });
-    r.send("b", { t: "pick", zone: "rapid" });
-    expect(r.last("b", "picks")?.picks).toEqual({ w: "bullet", b: "rapid" });
+    expect(r.last("b", "picks")?.picks).toEqual({ w: "bullet", b: null });
     expect(r.core().nextAlarm).toBe(T0 + 3000 + VERSUS + VOTE);
-    r.at(T0 + 3000 + VERSUS + VOTE);
+    // Both picked (Eric, Nov 25): the vote closes a beat after the second; both get the game with its new close.
+    r.set(T0 + 3000 + VERSUS + 2000);
+    r.send("b", { t: "pick", zone: "rapid" });
+    const close = T0 + 3000 + VERSUS + 2000 + RANKED_1V1.voteBothPickedMs;
+    for (const c of ["w", "b"] as const) expect(r.last(c, "game")?.game).toMatchObject({ phase: "vote", picks: { w: "bullet", b: "rapid" }, voteEndsAt: close });
+    expect(r.core().nextAlarm).toBe(close);
+    r.at(close);
     expect(r.last("w", "game")?.game).toMatchObject({ phase: "overlay", control: "blitz", clock: { baseSeconds: 180, incrementSeconds: 2 } });
-    r.at(T0 + 3000 + VERSUS + VOTE + OVERLAY);
-    expect(r.last("b", "game")?.game).toMatchObject({ phase: "play", firstMoveBy: T0 + 3000 + VERSUS + VOTE + OVERLAY + FIRST });
+    r.at(close + OVERLAY);
+    expect(r.last("b", "game")?.game).toMatchObject({ phase: "play", firstMoveBy: close + OVERLAY + FIRST });
+  });
+
+  it("one pick in: the vote keeps its whole time (RANKED_1V1.voteSeconds, 10)", () => {
+    const r = room();
+    r.come("w");
+    r.come("b");
+    r.set(T0 + VERSUS);
+    r.send("w", { t: "pick", zone: "rapid" });
+    r.at(T0 + VERSUS + VOTE - 1);
+    expect(r.core().phase()).toBe("vote");
+    r.at(T0 + VERSUS + VOTE);
+    expect(r.last("b", "game")?.game).toMatchObject({ phase: "overlay", control: "rapid" });
   });
 
   it("nobody, or only one, turned up: called off at the join time (the one who didn't come dodged: L1), closing later", () => {
@@ -501,9 +518,9 @@ describe("1 v 1's room: quick chat", () => {
     r.core().chatTyping("w", { may: true, young: false });
     r.core().chatTyping("b", { may: false, young: false });
     r.send("w", { t: "chat", say: "", text: "good luck  :knight:" });
-    // Black hasn't turned chat on: not sent; on, the log brings it.
+    // Black hasn't turned chat on: not sent; on, the log brings it. White's own line shows, and says Black won't see it (Nov 25).
     expect(r.last("b", "chat")).toBeUndefined();
-    expect(r.last("w", "chat")?.line).toMatchObject({ from: "w", say: "", text: "good luck :knight:" });
+    expect(r.last("w", "chat")).toMatchObject({ line: { from: "w", say: "", text: "good luck :knight:" }, note: "Bo doesn't see typed messages, only the quick lines." });
     r.send("b", { t: "chatPrefs", typed: true });
     expect(r.last("b", "chatLog")?.lines.map((l) => l.text)).toEqual(["good luck :knight:"]);
     r.send("b", { t: "chat", say: "", text: "thanks" });
@@ -512,6 +529,21 @@ describe("1 v 1's room: quick chat", () => {
     expect(r.last("w", "chatNo")).toMatchObject({ reason: "text", message: "No links or contact details in chat." });
     r.send("w", { t: "chat", say: "", text: "again" });
     expect(r.last("w", "chatNo")).toMatchObject({ reason: "gap" });
+    // Black reads typed lines now: no note. Chat off there: White is told; a mute isn't told.
+    r.set(r.now() + 6_000);
+    r.send("w", { t: "chat", say: "", text: "nice" });
+    expect(r.last("w", "chat")?.note).toBeUndefined();
+    expect(r.last("b", "chat")?.line.text).toBe("nice");
+    r.send("b", { t: "chatPrefs", off: true });
+    r.set(r.now() + 6_000);
+    r.send("w", { t: "chat", say: "", text: "hello?" });
+    expect(r.last("w", "chat")).toMatchObject({ line: { text: "hello?" }, note: "Bo has chat off, so they won't see this." });
+    r.send("b", { t: "chatPrefs", off: false, muted: ["w"] });
+    r.set(r.now() + 6_000);
+    r.send("w", { t: "chat", say: "", text: "muted?" });
+    expect(r.last("w", "chat")).toMatchObject({ line: { text: "muted?" } });
+    expect(r.last("w", "chat")?.note).toBeUndefined();
+    r.send("b", { t: "chatPrefs", muted: [] });
     // A device too young: never sent typed lines, whatever it asks.
     r.core().chatTyping("b", { may: false, young: true });
     r.send("b", { t: "chatPrefs", typed: true });

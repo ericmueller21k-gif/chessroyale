@@ -56,6 +56,14 @@ removed (old → new) and says whether any of them guards a rule here.
 
 ## A match
 
+- **Tap a vote zone and your pawn goes there, in every mode** (Eric, Nov 25: "when tapping on the augment square ... I don't know why
+  that's not a standing rule for every mode everywhere ... I tap on it and it should bring my pawn there"; first for the 50 v 50, Nov 2).
+  Every pawn vote (the 1 v 1's and the town games' time control, the 50 v 50's, Squads', a raid's): a tap on a zone, your pawn picked
+  up first or not, moves it there (gliding, as a drag lands) and is your pick. One shared piece, `components/VoteZoneHits.tsx`.
+  - Guards: `e2e/ranked-1v1.spec.ts`, "two players: one tap to queue, the vote on the game's own board…" (Bo taps Bullet, his pawn not
+    picked up, and it stands in Bullet); `e2e/votes.spec.ts`, "the vote board: … a tap on a zone votes too (never the board's)…" (the
+    50 v 50, phone and computer: your pawn stands in the zone you tapped).
+  - Decision: [2026-11-25-duel-vote-and-chat.md](../decisions/2026-11-25-duel-vote-and-chat.md).
 - **The opening always plays out.** At a game's start the dealt opening's moves play one by one, on both sides, whatever the
   Animations setting and whichever team moves first. (Eric, Oct 25.) Guard: `e2e/opening-animations.spec.ts`.
 - **The gear is on every screen with a chessboard**, phone and computer, with Sound, Animations (and Motion trail in a crowd

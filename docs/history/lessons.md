@@ -1224,3 +1224,15 @@ two rejoins that had never been reached (the dark's move due, a strike due after
 been. One test walks every timed power and moment in Boss alone and a Solo raid and checks the kept game at every update and every
 beat. docs/decisions/2026-11-22-solo-resume.md.
 
+
+## A typed "hello" that never left (Nov 25, 2026)
+
+Eric typed "hello" twice in a ranked 1 v 1 and it never showed, not even to him. Typed chat came to every match on Nov 7 through the
+shared `MatchChat`, whose messages carry the text in a new field (`text`) and the opt-in in another (`typed`). The 1 v 1 passes its
+chat's messages to its own socket through a small bridge in `duel.ts`, written before typed chat, that rebuilt each message from the
+fields it knew: `{ t: "chat", say }`. The text was dropped, the server got an empty quick line, refused it with a reason the app shows
+no words for, and the field had already cleared. The unit tests checked `MatchChat` and the room separately, each with the fields; the
+lobby's e2e typed in a lobby and a team match; nothing typed in a 1 v 1.
+
+**The fix:** the bridge forwards each message as it is (only the lobby's `to` left off), so a field added later goes through. The 1 v 1
+has an e2e that types. docs/decisions/2026-11-25-duel-vote-and-chat.md.
