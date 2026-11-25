@@ -5524,6 +5524,16 @@ export const MUSIC_SWITCH: Readonly<Record<string, { readonly fadeMs: number; re
  */
 export const AREA_BANNER = { inMs: 400, holdMs: 1800, outMs: 600 } as const;
 
+/**
+ * The vote zones' name tags (Eric, Nov 25, look B of the mockup: "the center one of the three, the best"; asked for as "when you
+ * actually put your vote in, then they go away because you know what they are"; docs/decisions/2026-11-25-vote-labels.md). On every
+ * pawn vote (50 v 50, Squads), a small dark tag above each zone names it as the vote opens: it rises in, bobs gently and lifts away.
+ * Gone the moment your vote is in. Reduced motion: no bob, shown for the same time.
+ * - `showMs`: how long the tags show from the vote's start (ms).
+ * - `goneMs`: your vote in: they fade this fast (ms).
+ */
+export const VOTE_TAGS = { showMs: 3000, goneMs: 300 } as const;
+
 /** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
 export type HapticPattern = number | readonly number[];
 

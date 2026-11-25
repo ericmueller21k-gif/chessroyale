@@ -30,6 +30,7 @@ import { play } from "../sound.ts";
 import { useBoardAnimations } from "../hooks.ts";
 import { pausedBosses, useServerStatus } from "../status.ts";
 import { VoteHint, useVoteHint } from "../components/VoteHint.tsx";
+import { VoteZoneTags } from "../components/VoteZoneTags.tsx";
 
 /** No pieces while the votes run: only everyone's pawns. */
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
@@ -382,6 +383,15 @@ export function VoteScreen({
                   );
                 })}
               </div>
+              {/* Each zone's name as a tag for 3 s as the vote opens, gone once your vote is in (Eric, Nov 25, VOTE_TAGS). */}
+              {counting && (
+                <VoteZoneTags
+                  tags={def.options.map((o, i) => ({ key: o.id, label: o.label, box: zoneOnScreen(zoneOf(i), orientation) }))}
+                  startsAt={vote.startsAt}
+                  now={now}
+                  voted={!!mine}
+                />
+              )}
               {/* A tap on a zone puts your pawn there: your vote (Eric, Nov 2: "Tapping on an augment area puts your piece there"),
                   whether or not you picked your pawn up first. The zone takes the tap, so the board under it never gets one. */}
               {canAct &&
