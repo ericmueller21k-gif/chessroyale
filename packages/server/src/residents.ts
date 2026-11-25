@@ -12,8 +12,9 @@
  *   POST /api/admin/residents/beat {…}       → the program's heartbeat (its own numbers), kept in D1 `meta` (the latest only)
  *
  * Callers: an admin's session (from the site itself), the e2e's local key, or a script through Cloudflare Access with the service token
- * `RESIDENTS_CLIENT_ID` names, or (tonight's first runs from the director's session, until PR 3) the one `TEST_ACCOUNTS_CLIENT_ID`
- * names. Anyone else: "Not found". The POSTs are refused while the kill switch `PAUSE_RESIDENTS` is on (503, `RESIDENTS_PAUSED`).
+ * `RESIDENTS_CLIENT_ID` names (the residents' own: the always-on host, residents-host.ts), or the one `TEST_ACCOUNTS_CLIENT_ID` names
+ * (the director's own runs, kept on purpose). Anyone else: "Not found". The POSTs are refused while the kill switch `PAUSE_RESIDENTS`
+ * is on (503, `RESIDENTS_PAUSED`).
  */
 
 import { CRATES, rollCrate, tierItems, type CrateDef, type Rng } from "@chessroyale/core";
@@ -25,6 +26,7 @@ import { banAnswer } from "./ban-gate.ts";
 import { caseOf } from "./fairplay.ts";
 import { e2eSqlAllowed, type E2eSqlEnv } from "./e2e-sql.ts";
 import { RESIDENTS_PAUSED, residentsPaused } from "./kill-switches.ts";
+import { hostPlan, type HostPlan, type ResidentsHostEnv } from "./residents-host.ts";
 import { applyOp, keyFor, leg, ledgerAccount } from "./ledger.ts";
 import { openingRng } from "./locker.ts";
 
@@ -84,7 +86,9 @@ export interface ResidentRow {
 export interface ResidentsReport {
   /** PAUSE_RESIDENTS is on. */
   paused: boolean;
-  /** The program's last heartbeat: when it came, who sent it ("access", "e2e", "admin:<email>"), and what it said. */
+  /** What the 15-minute cron does about the always-on host (residents-host.ts hostPlan), from the Worker's variables. */
+  host: HostPlan;
+  /** The program's last heartbeat: when it came, who sent it ("access:residents", "access:test", "e2e", "admin:<email>"), and what it said. */
   beat: { at: number; by: string; beat: ResidentBeat } | null;
   today: {
     /** Midnight UTC, today. */
@@ -120,7 +124,7 @@ export type ResidentsEnv = AdminEnv &
      * (wrangler.jsonc `vars`: an identifier, not a secret). Emptied at launch, with the token deleted (ROADMAP.md).
      */
     RESIDENTS_CLIENT_ID?: string;
-    /** The test accounts' token (test-accounts.ts), taken here too for the first runs from the director's session, until PR 3's own. */
+    /** The test accounts' token (test-accounts.ts), taken here too: the director's own runs of the program, from its sessions. */
     TEST_ACCOUNTS_CLIENT_ID?: string;
     /** The kill switch (kill-switches.ts residentsPaused): "1" refuses the POSTs here, and every resident everywhere. */
     PAUSE_RESIDENTS?: string;
@@ -146,14 +150,23 @@ const notFound = () => json({ message: "Not found" }, 404);
 export const residentsPausedResponse = () => json({ message: RESIDENTS_PAUSED, paused: "residents" }, 503);
 
 /**
- * Who's asking, if they may: "access" (through Access with the service token `RESIDENTS_CLIENT_ID` names, or the one
- * `TEST_ACCOUNTS_CLIENT_ID` names, while set), "e2e" (the local e2e's key), "admin:<email>" (an admin's session; a change only from
- * the site itself: the origin is checked); null for anyone else.
+ * Who's asking, if they may: "access:residents" (through Access with the service token `RESIDENTS_CLIENT_ID` names: the host),
+ * "access:test" (the one `TEST_ACCOUNTS_CLIENT_ID` names, while set: the director's own runs), "e2e" (the local e2e's key),
+ * "admin:<email>" (an admin's session; a change only from the site itself: the origin is checked); null for anyone else.
  */
 async function caller(request: Request, env: ResidentsEnv, sql: Sql, now: number, access: AccessCheck): Promise<string | null> {
-  // (Each token by its own client ID: a token Access issued for another path carries a valid signature and audience too. test-accounts.ts.)
-  const clients = [...new Set([env.RESIDENTS_CLIENT_ID?.trim(), env.TEST_ACCOUNTS_CLIENT_ID?.trim()])].filter((c): c is string => !!c);
-  for (const client of clients) if (await access(request, { ...env, OPS_ACCESS_CLIENT_ID: client })) return "access";
+  // (Each token by its own client ID: a token Access issued for another path carries a valid signature and audience too. test-accounts.ts.
+  // Which one it was goes into the heartbeat, so two programs at once show.)
+  const tokens: [string | undefined, string][] = [
+    [env.RESIDENTS_CLIENT_ID?.trim(), "access:residents"],
+    [env.TEST_ACCOUNTS_CLIENT_ID?.trim(), "access:test"],
+  ];
+  const tried = new Set<string>();
+  for (const [client, who] of tokens) {
+    if (!client || tried.has(client)) continue;
+    tried.add(client);
+    if (await access(request, { ...env, OPS_ACCESS_CLIENT_ID: client })) return who;
+  }
   if (e2eSqlAllowed(env.E2E_SQL, request.headers.get("x-e2e-sql"))) return "e2e";
   const user = await userFromToken(sql, readCookie(request, SESSION_COOKIE), now);
   if (!isAdmin(env, user)) return null;
@@ -267,6 +280,7 @@ export async function residentsReport(sql: Sql, env: object, now: number): Promi
   }
   return {
     paused: residentsPaused(env),
+    host: hostPlan(env as ResidentsHostEnv),
     beat: last,
     today: {
       since,

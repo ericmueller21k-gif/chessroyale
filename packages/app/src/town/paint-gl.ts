@@ -352,6 +352,8 @@ interface TextArt {
   ox: number;
   oy: number;
   used: number;
+  /** Its font was in as it was drawn: a web font coming later doesn't draw it again (Nov 25). */
+  ready: boolean;
 }
 const TEXT_MAX = 160;
 
@@ -1668,8 +1670,9 @@ class GLCtx {
       if (x > x1) x1 = x;
       if (y > y1) y1 = y;
     }
-    const bx = Math.floor(x0);
-    const by = Math.floor(y0);
+    // (A shape laid on whole device pixels (the bubble) keeps its corner as the speaker moves: a hair under a whole one is that one.)
+    const bx = Math.floor(x0 + 1e-6);
+    const by = Math.floor(y0 + 1e-6);
     // Its key: the shape (a quarter pixel) from its corner, its fill, its shadow, its alpha.
     let h = 2166136261;
     const mixIn = (v: number) => (h = Math.imul(h ^ (v | 0), 16777619));
@@ -2112,11 +2115,16 @@ class GLCtx {
     const a = this.globalAlpha;
     if (a <= 0) return;
     if (this.textGen !== GLCtx.fontsGen) {
-      // (A web font came: what was drawn in the fallback is drawn again.)
+      // (A web font came: what was drawn in the fallback is drawn again. Not what was drawn in its own font: any font's load, the
+      // chat's included, drew every string again, and uploaded it, Nov 25.)
       this.textGen = GLCtx.fontsGen;
-      for (const list of this.texts.values()) for (const t of list) t.used = -1;
-      this.texts.clear();
       this.nTexts = 0;
+      for (const [k, list] of this.texts) {
+        const keep = list.filter((t) => t.ready);
+        if (keep.length) this.texts.set(k, keep);
+        else this.texts.delete(k);
+        this.nTexts += keep.length;
+      }
     }
     const style = (stroke ? this.strokeStyle : this.fillStyle) as string;
     const scale = Math.round(this.unit() * 100) / 100;
@@ -2168,7 +2176,13 @@ class GLCtx {
       c.fillStyle = style;
       c.fillText(text, 0, 0);
     }
-    return { text, font: this.font, align: this.textAlign, base: this.textBaseline, style, stroke, join: this.lineJoin, scale, cv, ox: left, oy: top, used: 0 };
+    let ready = true;
+    try {
+      ready = !document.fonts?.check || document.fonts.check(this.font);
+    } catch {
+      /* (a font string it can't read: as drawn) */
+    }
+    return { text, font: this.font, align: this.textAlign, base: this.textBaseline, style, stroke, join: this.lineJoin, scale, cv, ox: left, oy: top, used: 0, ready };
   }
 
   /** Drops the strings least lately drawn (half of them). */

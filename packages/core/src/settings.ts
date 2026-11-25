@@ -2333,7 +2333,8 @@ export const BOSS_POWERS = {
    */
   birdie: {
     trainFrom: 2,
-    trainEvery: 3,
+    // (Eric, Nov 25: "Birdie's normal move is coming too often ... about double it ... maybe once every 4 to 5 turns": was 3.)
+    trainEvery: 5,
     trainPawnLogit: 1,
     fallLost: 9,
     armoredTrainEvery: 3,
@@ -5977,6 +5978,12 @@ export const AUTOCHESS: AutoChessSettings = {
  *   often alone in line and a person who queues meets them within seconds. Think times, resigning and draws: see each field.
  * - `beatSeconds`: the heartbeat to the server; `summaryMinutes`: the log's summary; `homePollMs` / `gamePollMs`: the live line
  *   (/api/live) on home and during a game, as the app polls it (FRONT_DOOR.livePollMs, the 30 s heartbeat).
+ * - `host`: the always-on host (the Cloudflare Container `ResidentsHost`, packages/server/src/residents-host.ts; docs/areas/ops.md,
+ *   "Residents, the host"). `sleepAfter`: it sleeps after this long without the 15-minute cron's ping (two missed runs). `args`: the
+ *   program's options there (a change restarts the host at the cron's next run, games in progress resigned: they're part of its
+ *   environment, whose hash it keeps). With `--follow-deploys` the program reads /version.json every `versionCheckMinutes`; after a
+ *   deploy it starts nothing new, lets games in progress finish (at most `drainMinutes`, then resigns what's left) and exits for the
+ *   host to start it again on the new main.
  */
 export const RESIDENTS = {
   accounts: 200,
@@ -6056,4 +6063,5 @@ export const RESIDENTS = {
   summaryMinutes: 5,
   homePollMs: 5000,
   gamePollMs: 30_000,
+  host: { sleepAfter: "30m", args: ["--follow-deploys"], versionCheckMinutes: 2, drainMinutes: 20 },
 } as const;

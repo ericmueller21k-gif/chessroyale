@@ -120,6 +120,20 @@ export class SkyPainter {
     this.layoutClouds();
   }
 
+  /**
+   * (The town's loading screen, Nov 25) The sun's or moon's picture and every cloud's for the sky's looks showing now, made here and
+   * handed to `keep`, so none is made (and uploaded) as it first drifts into view. A look the clock brings later is made as it comes.
+   */
+  warm(keep: (c: HTMLCanvasElement) => void): void {
+    if (!this.W || !this.H) return;
+    const R = clamp(Math.min(this.W, this.H) * TOWN_FEEL.sunSize, 22, 80);
+    for (const l of LOOKS) {
+      if (this.weights[l] < 0.01) continue;
+      keep(this.sunArt(l, R));
+      for (const c of this.clouds) if (l !== "night" || c.night) keep(this.cloudArt(c, l));
+    }
+  }
+
   setWeights(w: SkyWeights): void {
     this.weights = w;
     this.grad = null;

@@ -32,7 +32,7 @@ export class TagCache<A extends { s: number; kind: TagKind; used: number }> {
   private readonly byName = new Map<string, A[]>();
   /** How many drawings are held. */
   n = 0;
-  constructor(readonly max: number) {}
+  constructor(public max: number) {}
 
   /** The drawing of this name at this size and kind, or undefined. */
   find(text: string, s: number, kind: TagKind): A | undefined {

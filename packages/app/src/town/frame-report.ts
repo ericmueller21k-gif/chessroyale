@@ -418,7 +418,8 @@ export function summarize(r: RunData): Summary {
     bakes += r.bakes[i]!;
     if (r.turn[i]! > maxTurn) maxTurn = r.turn[i]!;
   }
-  // (Loading: pictures painted, sight lines, an atlas reset. Not a plain upload: a name tag or a board drawn again uploads most frames.)
+  // (Loading: pictures painted, sight lines, an atlas reset. Not a plain upload: since Nov 25 the labels are made on the loading screen, and
+  // an upload while walking is someone new or a line said.)
   const load = F.load;
   const town = (i: number) => !(r.flags[i]! & (F.room | F.goIn | F.goOut));
   const segs = [

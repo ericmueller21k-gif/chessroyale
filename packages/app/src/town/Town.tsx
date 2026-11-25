@@ -2823,6 +2823,8 @@ function startTown(
    */
   const loadTown = async () => {
     const t0 = performance.now();
+    // (Your name now, as each frame sets it: the loading screen makes your tag's pictures, render.ts `makeLabels`.)
+    town.you.name = playerName();
     const keep = (src: CanvasImageSource) => painter.keep?.(src);
     const tick = () => new Promise<void>((go) => requestAnimationFrame(() => go()));
     // (Whatever goes wrong here, the town opens: what wasn't made is made as it shows, as before.)
