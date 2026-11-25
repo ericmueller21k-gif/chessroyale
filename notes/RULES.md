@@ -191,3 +191,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - **A change Eric asks for on one screen applies to every screen of that kind** (every game mode, every end screen, every place a component
   shows) unless he says otherwise; briefs name every screen it covers and the stills show each. When it's unclear which screens a change
   covers, ASK Eric (Nov 25: "Just wanna make sure changes are done to all screens so I'm not repeating myself, or if you're never sure just ask").
+- When Eric asks for a change and a mockup is in progress, the mockup shows EVERY ask so far (not only the brief): Nov 25, the standing status box was in the brief but missing from the mock, and he saw the gap again.

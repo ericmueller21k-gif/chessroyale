@@ -39,6 +39,9 @@ const CSS = `
   .mk-gear { position: absolute; right: 0; top: 0; }
   .screen.game.crowd-50 > .hud-row > .hud { padding-bottom: 9px !important; }
   .screen.game.crowd-50 .board-area { margin-top: 0 !important; padding-top: 0 !important; }
+  .mk-wait { display: flex; align-items: center; gap: 10px; box-sizing: border-box; height: 62px; padding: 0 16px; border-radius: 14px;
+    background: #fbfaf6; border: 1.5px solid #e3dfd4; color: #a7a294; font: 600 15px Archivo, system-ui, sans-serif; }
+  .mk-wait i { width: 22px; height: 6px; border-radius: 3px; background: #e3dfd4; }
 }`;
 for (const [w, h, sc] of [[1536, 730, 1.25], [1920, 960, 1]] as const)
   test(`mock crowd ${w}x${h}`, async ({ browser }) => {
@@ -47,7 +50,7 @@ for (const [w, h, sc] of [[1536, 730, 1.25], [1920, 960, 1]] as const)
     await named(page, "Wide Window");
     await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=60&augments=0");
     await soloFromHome(page);
-    await expect.poll(() => phase(page), { timeout: 120_000 }).toMatch(/^(play|watching)$/);
+    await expect.poll(() => phase(page), { timeout: 240_000 }).toMatch(/^play$/);
     await page.waitForTimeout(1500);
     const shot = process.env.SHOTS!;
     await page.screenshot({ path: `${shot}/crowd-${w}x${h}-before.png` });
@@ -72,6 +75,8 @@ for (const [w, h, sc] of [[1536, 730, 1.25], [1920, 960, 1]] as const)
       const mm = document.querySelector(".screen.game.crowd-50 .mm, .gm-tools .mm");
       const slot = document.querySelector(".screen.game.crowd-50 > .play-footer, .screen.game.crowd-50 > .poll") as HTMLElement | null;
       if (mm && slot) { const pw = slot.querySelector(".mk-pw") as HTMLElement | null; if (pw) { pw.style.position = "relative"; pw.style.paddingRight = "44px"; pw.appendChild(mm); (mm as HTMLElement).style.position = "absolute"; (mm as HTMLElement).style.right = "0"; (mm as HTMLElement).style.top = "50%"; (mm as HTMLElement).style.transform = "translateY(-50%)"; } }
+      const ps = slot?.querySelector(".play-slot") as HTMLElement | null;
+      if (ps && !ps.textContent?.trim()) { ps.innerHTML = '<div class="mk-wait"><i></i>Waiting…</div>'; }
       const b = document.querySelector(".board-area .board-row > .board-wrap")!.getBoundingClientRect();
       if (slot) { const st = slot.getBoundingClientRect(); slot.style.marginTop = `${b.top - st.top}px`; }
       const side = document.querySelector(".arena > .tower-side") as HTMLElement | null;
