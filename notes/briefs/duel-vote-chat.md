@@ -11,6 +11,12 @@ the duel's chat), `duel-room.ts`, `duel-do.ts`, `screens/Duel.tsx`, `components/
    `voteSeconds` 10 (settings), and the vote **closes early once both have picked** (after a short beat, ~1 s, so you see both picks land;
    a changed pick still counts until then). The countdown visible on screen the whole time. Residents (scripts/residents/play.ts) pick after a
    human-like 1.5-5 s, not instantly, so a person sees the other pawn move. Tests: unit (core/server rules), the e2e `ranked-1v1.spec.ts`.
+1b. **Tap a zone = your pawn goes there, in EVERY pawn vote (Eric, Nov 25: "when tapping on the augment square ... I don't know why that's
+   not a standing rule for every mode everywhere ... I tap on it and it should bring my pawn there, but it didn't. I had to manually drag
+   it.").** The 50 v 50 already does it (crowd.md: "tapping a zone, which puts your pawn there", Eric Nov 2); the 1 v 1 vote needs tap-pawn-
+   then-zone. Make it one shared behavior for every pawn vote (1 v 1, 50 v 50, Squads, raids, the town's games): a tap on a zone moves your
+   pawn there (animated, as a drag would). Add it to `docs/rules/eric.md` as Eric's rule ("Tap a vote zone and your pawn goes there, in every
+   mode", Nov 25) with its guard test (e2e: tap a zone in the 1 v 1 vote and in a 50 v 50 vote, the pawn lands there): Eric asked for it.
 2. **Typed chat:** reproduce Eric's "hello" twice not showing in a ranked 1 v 1 against a resident (and against a person: e2e). Find why
    (the chat_on opt-in silently dropping? the opponent's chat off hiding it from the sender too? the filter? a resident session?). Fix the
    cause: your own message always shows in your chat (or the box says plainly why you can't type yet, with the way to turn it on: "nothing

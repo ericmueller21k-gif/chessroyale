@@ -41,3 +41,4 @@ chat filling the rest); "Your move" placed logically (by your own strip/clock). 
 as big as the game's board (slim one-line header, tight padding); left column a tight stack: headline, reason, RP, XP, level, quests, coins
 in a tidy row, Play again + Home STACKED, the chat (readable) filling down to the board's bottom; gear top right; no excess padding; columns
 flush with the board. Built directly (bug fix), stills at desktop ~1735×1035, laptop 1536×730, 1920×960.
+**Eric, Nov 25: the PHONE end page is bad too ("fix it everywhere"):** same tight stack in one column, one placement card "3 of 5 placement games", quests with progress, buttons stacked, readable chat, the move-by-move board clear of Safari's bar. Stills at phone 390×844 and 375×667 too.
