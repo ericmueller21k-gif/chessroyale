@@ -50,7 +50,7 @@ vi.mock("@cloudflare/containers", () => ({
     };
   },
 }));
-const { ENV_HASH_KEY, HOST_INSTANCE, ResidentsHost, envHash, hostEnvVars, hostPlan, residentsHostTick } = await import("../src/residents-host.ts");
+const { ENV_HASH_KEY, LAST_EXIT_KEY, REFUSED_EXIT, HOST_INSTANCE, ResidentsHost, envHash, hostEnvVars, hostPlan, residentsHostTick } = await import("../src/residents-host.ts");
 const { residentsReport } = await import("../src/residents.ts");
 const { default: worker } = await import("../src/index.ts");
 
@@ -194,6 +194,26 @@ describe("the container class (ResidentsHost)", () => {
     expect(await next.keepUp()).toBe("started");
     expect(next.started[0]?.CF_ACCESS_CLIENT_SECRET).toBe("rotated-not-real");
     expect(kept.map.get(ENV_HASH_KEY)).toBe(await envHash(next.started[0]!));
+  });
+
+  it("keepUp: Access refused the token at the last start (exit 78) with the same environment: started again, but thrown, so the cron counts it (the delta review's minor 1); a new secret, or another exit: no error", async () => {
+    const kept = storage();
+    await host(false, ON, kept).keepUp();
+    (host(true, ON, kept) as unknown as { onStop(p: object): void }).onStop({ exitCode: REFUSED_EXIT, reason: "exit" });
+    await Promise.resolve();
+    expect(kept.map.get(LAST_EXIT_KEY)).toBe(REFUSED_EXIT);
+    const again = host(false, ON, kept);
+    await expect(again.keepUp()).rejects.toThrow(/Access refused the residents' token/);
+    expect(again.started).toEqual([hostEnvVars(ON)]);
+    // (The secret fixed on the Worker: a new environment, no error.)
+    const fixed = host(false, { ...ON, RESIDENTS_CLIENT_SECRET: "fixed-not-real" }, kept);
+    expect(await fixed.keepUp()).toBe("started");
+    // (Any other exit, the same environment: no error.)
+    const other = storage();
+    await host(false, ON, other).keepUp();
+    (host(true, ON, other) as unknown as { onStop(p: object): void }).onStop({ exitCode: 1, reason: "exit" });
+    await Promise.resolve();
+    expect(await host(false, ON, other).keepUp()).toBe("started");
   });
 
   it("halt: SIGTERM if it's running (the program ends its games and exits), nothing if not", async () => {

@@ -278,7 +278,7 @@ try {
   if (p) fail("residents are paused on the server (PAUSE_RESIDENTS): not starting.");
   // (Two programs at once sign each other's residents out, every sign-in ending the account's other sessions: one at a time.)
   const other = otherProgram(r.body?.beat, Date.now(), RESIDENTS.beatSeconds);
-  if (other && !force) fail(`another residents program is playing (${other}): stop it first (the host: RESIDENTS_HOST_ON "0", or PAUSE_RESIDENTS; DEPLOY.md, "Residents"), or start with --force.`);
+  if (other && !force) fail(`another residents program is playing (${other}; if it's this host's own last run, stopped without its last beat, this passes in about 2 minutes): stop it first (the host: RESIDENTS_HOST_ON "0", or PAUSE_RESIDENTS; DEPLOY.md, "Residents"), or start with --force.`);
   if (other) log(`--force: starting beside another program (${other})`);
 } catch (e) {
   if (e instanceof AccessRefused) fail(e.message, ACCESS_REFUSED_EXIT);

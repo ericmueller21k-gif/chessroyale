@@ -36,12 +36,17 @@ export class ResidentsHost extends Container {
       this.renewActivityTimeout();
       return "running";
     }
+    // (Access turned the token away at the last start (the program's exit 78) and the environment is the same: started again, as the
+    // token may have been fixed in Zero Trust, but the run is counted as a server error, so a revoked, expired or wrongly pasted token
+    // shows on /admin/ops instead of a quiet reinstall every 15 minutes. The delta review's minor 1.)
+    const refused = (await this.ctx.storage.get<number | null>(LAST_EXIT_KEY)) === REFUSED_EXIT && (await this.ctx.storage.get<string>(ENV_HASH_KEY)) === hash;
     await this.ctx.storage.put(ENV_HASH_KEY, hash);
     // (The library tries the port up to `retries` times, `waitInterval` apart, each try taking up to its 5 s ping: at most about 18
     // minutes, not its default 8 s. A cold start, pulling Node's full Debian image of about 1.6 GB, takes about a minute. The port is
     // only the library's probe: nothing listens on it, which tells it the container is up.)
     await this.start({ envVars: vars }, { portToCheck: 8080, retries: 200, waitInterval: 300 });
     this.renewActivityTimeout();
+    if (refused) throw new Error("Access refused the residents' token at the last start (exit 78): fix the token in Zero Trust (or its secret on the Worker), or set RESIDENTS_HOST_ON to 0");
     return "started";
   }
 
@@ -58,6 +63,8 @@ export class ResidentsHost extends Container {
 
   override onStop(params: { exitCode?: number; reason?: string }): void {
     console.log(`residents host: stopped (${params.reason ?? "?"}, exit ${params.exitCode ?? "?"})`);
+    // (Kept for the next start: exit 78 is Access refusing the token, see keepUp.)
+    void this.ctx.storage.put(LAST_EXIT_KEY, params.exitCode ?? null);
   }
 
   override onError(error: unknown): unknown {
@@ -116,6 +123,9 @@ export function hostEnvVars(env: ResidentsHostEnv): Record<string, string> {
 
 /** Where keepUp keeps the hash of the environment the running container started with. */
 export const ENV_HASH_KEY = "envHash";
+/** Where onStop keeps the container's last exit code, and the program's exit when Access refuses its token (start.sh ends the container on it). */
+export const LAST_EXIT_KEY = "lastExit";
+export const REFUSED_EXIT = 78;
 
 /** A SHA-256 of an environment (hex), to tell whether it changed without keeping it: never the values themselves. */
 export async function envHash(vars: Record<string, string>): Promise<string> {
