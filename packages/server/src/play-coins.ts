@@ -40,7 +40,8 @@ export const coinOpIds = (key: string, account: string) => ({ play: `coins:${key
 export function oldCoins(key: string, account: string): Cond | null {
   if (key.startsWith("duel:")) {
     const id = key.slice("duel:".length);
-    return cond("NOT EXISTS (SELECT 1 FROM ledger WHERE op_id IN (?, ?) AND account = ?)", `ranked:${id}:w`, `ranked:${id}:b`, account);
+    // (`leg = 0`: the old op had one leg; with it the guard searches the primary key, not the account's whole ledger: delta review N3.)
+    return cond("NOT EXISTS (SELECT 1 FROM ledger WHERE op_id IN (?, ?) AND leg = 0 AND account = ?)", `ranked:${id}:w`, `ranked:${id}:b`, account);
   }
   if (key.startsWith("squads:")) return cond("NOT EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND asset_kind = 'coins')", `${key}:${account}`);
   return null;

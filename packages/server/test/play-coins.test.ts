@@ -3,7 +3,7 @@ import { MATCH_SAVE, PLAY_COINS, XP, modeSettings, xpDayStart } from "@chessroya
 import { createGuest, ensureSchema, grantReward, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { setCase } from "../src/fairplay.ts";
 import { applyOp, leg, ledgerAccount, ledgerMismatches, opKeys } from "../src/ledger.ts";
-import { PLAY, PLAY_BONUS, coinDayOf } from "../src/play-coins.ts";
+import { PLAY, PLAY_BONUS, coinDayOf, oldCoins } from "../src/play-coins.ts";
 import type { SquadsReward } from "../src/squads-lobby.ts";
 import { gameXpOf, grantXp, xpOf, type XpGame } from "../src/xp.ts";
 import { setup as lobbySetup } from "./lobby-fixture.ts";
@@ -19,7 +19,9 @@ const { writeReward, writeRewardQueue } = await import("../src/squads-do.ts");
  * start; the day's 300 and the bonus steps hold when games land at once; nothing for a player fair play holds; the friends' lobby
  * win rule holds the win's bonus back with its XP; the 50 v 50 scoreboard's top places. And the review's fixes (Nov 25): a failed D1
  * call never costs a Squads reward its coins (M1; ranked's: duel-do.test.ts), a squad on its own devices' word pays as solo (m2), a
- * game the old code paid never pays twice (m3), a Squads member who resigned late pays play coins only.
+ * game the old code paid never pays twice (m3), a Squads member who resigned late pays play coins only. The delta review's (Nov 25): a
+ * game pays at most one daily reward, granted again on the next XP day too (N1); a Squads queue's rewards share one window (N2); the
+ * ranked old-key guard searches the primary key (N3).
  */
 const T0 = Date.UTC(2026, 10, 25, 12, 0);
 const MIN = 60_000;
@@ -304,5 +306,66 @@ describe("play coins, the review's fixes (Nov 25)", () => {
     expect([await coinsOf(sql, cy.id), await xpOf(sql, cy.id)]).toEqual([100, 190]);
     expect((await gameXpOf(sql, cy.id, "SQOLD", T0))!.coins).toMatchObject({ play: 0, bonus: 0 });
     for (const u of [ann, bo, cy]) expect(await ledgerMismatches(sql, u.id)).toEqual([]);
+  });
+
+  /** The daily reward ops in an account's ledger. */
+  const dailies = async (sql: Sql, id: string) =>
+    (await sql.first<{ n: number }>("SELECT COUNT(DISTINCT op_id) AS n FROM ledger WHERE account = ? AND reason = 'daily'", (await ledgerAccount(sql, id))!.account))!.n;
+
+  it("N1: a game pays at most one daily reward: a ranked grant tried again after the XP day rolls over, and a Squads reward written again, pay it once; the next game that day pays the day's", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    const bo = await signedIn(sql, "bo@example.com");
+    const rollover = xpDayStart(T0) + 86_400_000;
+    // (Ranked: White's grant went in 5 s before the rollover; the room's retry (Black's failed), 15 s after it, grants White again.)
+    const ranked = (key: string, now: number) => grantXp(sql, ann.id, game(key, 15, { now }, { moves: 20 }));
+    const first = await ranked("duel:G1", rollover - 5_000);
+    expect(first!.parts.at(-1)).toEqual({ label: "Daily reward", xp: XP.dailyBonus });
+    const again = await ranked("duel:G1", rollover + 15_000);
+    // (The replay answers the reward the game paid, as a replay on the same day does.)
+    expect([again!.parts, again!.rewards, again!.before]).toEqual([first!.parts, first!.rewards, first!.before]);
+    expect([await dailies(sql, ann.id), await xpOf(sql, ann.id)]).toEqual([1, 150 + XP.dailyBonus]);
+    // (The new day's reward is still there: her next game pays it.)
+    expect((await ranked("duel:G2", rollover + MIN))!.parts.at(-1)).toEqual({ label: "Daily reward", xp: XP.dailyBonus });
+    expect(await dailies(sql, ann.id)).toBe(2);
+    // (Squads: a reward written before the rollover, written again after it, as when its row or crate op failed.)
+    await writeReward(sql, "SQUAD", T0, reward(bo.id, { moves: 20 }), rollover - 5_000, true);
+    await writeReward(sql, "SQUAD", T0, reward(bo.id, { moves: 20 }), rollover + 15_000, true);
+    expect([await dailies(sql, bo.id), await xpOf(sql, bo.id)]).toEqual([1, 190 + XP.dailyBonus]);
+    for (const u of [ann, bo]) expect(await ledgerMismatches(sql, u.id)).toEqual([]);
+  });
+
+  it("N2: a lasting grant fault in a Squads queue of 3: one failure starts every waiting reward's window, so all 3 go MATCH_SAVE.strictMinutes later, without XP or coins, each once", async () => {
+    const { sql } = await world();
+    const users = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com"), await signedIn(sql, "cy@example.com")];
+    const broken: Sql = { ...sql, batch: (st) => (grantBatch(st) ? lost() : sql.batch(st)) };
+    const rec = { code: "SQUAD", createdAt: T0, rewardQueue: users.map((u, i) => reward(u.id, { playerId: `p${i}`, squadId: i, placement: i + 1, crates: 1 })) };
+    const at = T0 + 20 * MIN;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(at);
+      expect((await writeRewardQueue(broken, rec, true, false)).written).toBe(0);
+      expect(rec.rewardQueue.map((r) => r.failedAt)).toEqual([at, at, at]);
+      // (The next wake past the window: every one written, not one a wake.)
+      vi.setSystemTime(at + (MATCH_SAVE.strictMinutes + 1) * MIN);
+      expect(await writeRewardQueue(broken, rec, true, false)).toEqual({ written: 3, refused: [], failure: null });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(rec.rewardQueue).toEqual([]);
+    for (const u of users) {
+      const rows = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM results WHERE user_id = ? AND lobby = 'SQUAD'", u.id))!.n;
+      const crates = (await sql.first<{ n: number }>("SELECT n FROM series_crates WHERE user_id = ? AND crate = ?", u.id, XP.rewardCrate))?.n ?? 0;
+      expect([rows, crates, await coinsOf(sql, u.id), await xpOf(sql, u.id)]).toEqual([1, 1, 0, 0]);
+      expect(await ledgerMismatches(sql, u.id)).toEqual([]);
+    }
+  });
+
+  it("N3: the ranked old-key guard searches the primary key (op id and leg), not the account's whole ledger", async () => {
+    const { db } = await world();
+    const g = oldCoins("duel:G1", "acct")!;
+    const plan = (db.prepare(`EXPLAIN QUERY PLAN SELECT ${g.sql}`).all(...(g.params as never[])) as { detail: string }[]).map((r) => r.detail).join(" | ");
+    expect(plan).toContain("(op_id=? AND leg=?)");
+    expect(plan).not.toMatch(/ledger_reason|ledger_account/);
   });
 });

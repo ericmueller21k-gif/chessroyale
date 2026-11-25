@@ -934,9 +934,9 @@ export class SquadsParty extends DurableObject<Env> {
 }
 
 /**
- * The lobby's rewards waiting (`rewardQueue`), written in order, each taken out once written. The first that fails is marked (its
- * `failedAt`, the first time) and it and those after it wait for the next try. Answers how many went, the players the daily cap
- * refused, and the failure (null: none left waiting).
+ * The lobby's rewards waiting (`rewardQueue`), written in order, each taken out once written. At the first that fails, it and those
+ * after it wait for the next try, every one of them marked (its `failedAt`, the first time: one window for the queue). Answers how
+ * many went, the players the daily cap refused, and the failure (null: none left waiting).
  */
 export async function writeRewardQueue(
   sql: Sql,
@@ -955,7 +955,9 @@ export async function writeRewardQueue(
       written++;
       if (out === "refused") refused.push(r.playerId);
     } catch (e) {
-      r.failedAt ??= now;
+      // (Every reward still waiting, not only this one: the queue shares one window, so a lasting fault ends within one
+      // MATCH_SAVE.strictMinutes, not one after another; the delta review's N2.)
+      for (const w of rec.rewardQueue) w.failedAt ??= now;
       return { written, refused, failure: e };
     }
   }

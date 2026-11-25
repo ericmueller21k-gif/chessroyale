@@ -412,14 +412,15 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
     : [];
   if (nonces.size || quests.length) await sql.batch([...[...nonces].flatMap(([op, nonce]) => opStatements(me, op, nonce)), ...quests]);
   // (What went in, and the wallet after, in one read. A replay: its first attempt's leg, so the same parts. The daily reward is this
-  // game's if its first leg names this game: another game today paid it otherwise.)
+  // game's if its XP leg names this game: another game today paid it otherwise. Read by the game, not today's op: a replay on the
+  // next XP day answers the one the game paid (its op's guard: one a game; the delta review's N1).)
   const after = await sql.first<{ time: number | null; win: string | null; daily: number | null; xp: number }>(
     `SELECT (SELECT delta FROM ledger WHERE op_id = ? AND leg = 0) AS time, (SELECT nonce FROM ledger WHERE op_id = ? AND leg = 0) AS win,
-       (SELECT delta FROM ledger WHERE op_id = ? AND asset_kind = 'xp' AND source_id = ?) AS daily,
+       (SELECT delta FROM ledger WHERE account = ? AND reason = 'daily' AND asset_kind = 'xp' AND source_id = ?) AS daily,
        COALESCE((SELECT xp FROM wallets WHERE user_id = ?), 0) AS xp`,
     time.id,
     win.id,
-    daily?.id ?? "",
+    me.account,
     game.key,
     userId,
   );
