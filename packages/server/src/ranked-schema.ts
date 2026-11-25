@@ -101,7 +101,8 @@ export const RANKED_COLUMNS: { table: string; column: string; type: string; then
  * (ladder.ts) and the top tiers' place (topPlace) both leave out exactly these, so a place on the ladder and the tier it gives always
  * agree. (Residents count: they're real-looking players by design.)
  */
-export const LEFT_OUT = `(SELECT user_id FROM fairplay_cases WHERE status IN ('banned', 'pool') UNION ALL SELECT id FROM users WHERE test = 1)`;
+// (Never a NULL in it: a TEXT primary key may hold one in SQLite, and one NULL would make every `NOT IN` unknown, the ladder empty.)
+export const LEFT_OUT = `(SELECT user_id FROM fairplay_cases WHERE status IN ('banned', 'pool') AND user_id IS NOT NULL UNION ALL SELECT id FROM users WHERE test = 1 AND id IS NOT NULL)`;
 
 /** SQL: how many shown ladders there are (no bound values): every ladder (placements done), less the few left out (LEFT_OUT's). */
 export const SHOWN_ALL_SQL = `SELECT (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder IS NOT NULL)

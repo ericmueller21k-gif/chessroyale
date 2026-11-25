@@ -121,6 +121,13 @@ describe("the ladder's top", () => {
     expect(await topPlace(sql, 2850, T0)).toBe(2);
   });
 
+  it("a stray case with no account id (a TEXT key may hold NULL) never empties the list", async () => {
+    const { sql } = await setup();
+    await players(sql, [2000, 1900]);
+    await sql.run("INSERT INTO fairplay_cases (user_id, status, opened_at, updated_at) VALUES (NULL, 'banned', 1, 1)");
+    expect((await ladderTop(sql)).rows).toHaveLength(2);
+  });
+
   it("names through the seat filter, as the stage shows them", async () => {
     const { sql } = await setup();
     const [id] = await players(sql, [2000]);
