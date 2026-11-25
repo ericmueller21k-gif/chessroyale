@@ -66,3 +66,5 @@ before shipping any change to an end screen.
   head with room kept for two lines; that room is empty only before he speaks.
 - Guard: `endPage` (resign.spec.ts: `endGaps`, buttons stacked, centered) on the 50 v 50 and Squads end pages, phone 390 x 844 and laptop
   1536 x 730; boss-result's resigned check at desktop 1920 x 960 too (the column centered with nothing to review; his words clear of your pawn).
+
+**Round 2d (Nov 25):** a boss's frame keeps 4 to 8 rows under his feet, which hang under his end-screen box. The row now keeps room under it for whatever the 12 px gap doesn't cover (`--rd-below`, ResultDuo). That's 1.5 to 6 px for 11 bosses, nothing for the rest. The call: room under the row, so his feet stay on the pawn's base line. Cropping his canvas could cut a defeat or a jump that draws there.
