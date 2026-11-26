@@ -10,7 +10,7 @@ import { alfilFen, alfilJolt, earlyLanding } from "../components/Alfil.tsx";
 import { hopperFen, yourPulls } from "../components/Hopper.tsx";
 import { rookTakenMoment, smudgyFen } from "../components/Smudgy.tsx";
 import { fullMoonMoment, noteMooMoments } from "../components/Moo.tsx";
-import { popOffMoments } from "../components/Dash.tsx";
+import { hangOnAt, hangOnFen, popOffMoments } from "../components/Dash.tsx";
 import { folioMoments, revisionFen } from "../components/Folio.tsx";
 import { gingerMoments } from "../components/Ginger.tsx";
 import { gardenerFen } from "../components/Gardener.tsx";
@@ -466,8 +466,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Birdie's train: the piece it smashes on its square until it rides, the line's pieces off the board while it rides (its layer draws
   // them stepping aside), your king off its square once his train has hit it; the board doesn't animate those.
   const birdie = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised || timber || zebra || swapped ? null : birdieFen(own("birdie"), moments, now, fenShown);
+  // (Dash's "Hang on" while he thinks: your move taken back on screen, then played again; the game's board never changes. When it
+  // started, for the dock's clock, which shows his gag's time; and the board takes no new pre-move meanwhile, only shows those waiting.)
+  const gagAt = thinking && !intro && !victim ? hangOnAt(moments, now) : undefined;
+  const hangOn = gagAt !== undefined ? hangOnFen(own("dash"), moments, now) : null;
   // (Dash's Scramble Rush: his sweep, your placements, then the position as it was: the game's never changed.)
-  const boardFen = dodge ? dodgeFen(boss, fenShown) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? swapped?.fen ?? birdie?.fen ?? fenShown);
+  const boardFen = dodge ? dodgeFen(boss, fenShown) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? swapped?.fen ?? birdie?.fen ?? hangOn?.fen ?? fenShown);
   const rushLines = rush ? rushDock(boss, rush, now) : dodge ? dodgeDock(boss, dodge, now) : null;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (own("bigboy").powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? swapped?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
@@ -505,6 +509,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         cues={kingCues}
         wide={!!lights && !lightsStart}
         panel={layout.strip ? <BossPanel match={match} hushLast={hush} /> : undefined}
+        gagAt={gagAt}
         status={
           lights && !lightsStart ? (
             // (Lights out: the round's prompt, whole, for the whole round, and the crowd's meter.)
@@ -595,7 +600,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         }
       />
     ),
-    [match, still, kingCues, lights, lights ? now : 0, rushLines?.line, rushLines?.sub, snacking, funPlayed, momentLine, burnLine, left, noMove, hush, layout.strip],
+    [match, still, kingCues, lights, lights ? now : 0, rushLines?.line, rushLines?.sub, snacking, funPlayed, momentLine, burnLine, left, noMove, hush, layout.strip, gagAt],
   );
   return (
     <div class={`screen game boss-screen${bossFramed(match) ? " bf-frame" : ""}${victim ? " striking" : ""}`}>
@@ -606,7 +611,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? (swapped ? swapped.lastMove : lastShown)} animate={!rush && !bounceShown && !splitStill(split, now) && !swapStill(moments, now) && !birdie?.still && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : onSide(boss, (b) => b.powers?.elephants)} gold={intro ? undefined : zebraGold(own("zebra"), moments, now)} decor={gardener?.decor ?? (intro ? undefined : battleDecor(boss, { moments, now, burnt, since: burnAt }))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? (swapped ? swapped.lastMove : hangOn ? hangOn.lastMove : lastShown)} animate={!rush && !bounceShown && !splitStill(split, now) && !swapStill(moments, now) && !birdie?.still && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : onSide(boss, (b) => b.powers?.elephants)} gold={intro ? undefined : zebraGold(own("zebra"), moments, now)} decor={gardener?.decor ?? (intro ? undefined : battleDecor(boss, { moments, now, burnt, since: burnAt }))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading || gagAt !== undefined }}>
             {/* (A floor of several: every boss's marks, each from his own part of the view with his own moments: audit 2, finding 1.) */}
             {!intro && partsOf(boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} moments={sideOf(boss) ? moments.filter((m) => !m.boss || m.boss === b.id) : moments} now={now} fen={boardFen} />)}
             {rush && <RushLayer boss={boss} view={rush} now={now} orientation={orientation} onPlace={(from, to) => match.rushPlace(from, to)} />}
