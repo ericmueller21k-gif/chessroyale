@@ -1,7 +1,7 @@
 # Eric's asks: every one until it's live (RULES.md, Nov 26). Newest last. States: queued / building / waiting on Eric / merged / live.
 
 - Nov 22 · Chub & Chirp Turf (his prints on his squares, your logo on yours, the count, holds Legs/Fuse/Hop, Chirp's hop-around) · WAITING ON ERIC: round-2 mockup re-sent Nov 26 · never built
-- Nov 26 · Chandy: Dodge also on checkmate · MERGED #973 · art #982 CI
+- Nov 26 · Chandy: Dodge also on checkmate + its art · MERGED #973 #982
 - Nov 26 · Birdie room: longer crossing arms; ~50 birds at the bar · MERGED #974
 - Nov 26 · Chub & Chirp + Puddles: ult waits at most 3 times after its warning · MERGED #972
 - Nov 26 · Puddles: watering regrows the piece he'd lose by passing · queued
