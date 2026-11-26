@@ -1848,7 +1848,8 @@ export const BOSS_POWERS = {
    * all: about 0.2 s on a phone). 2: the fusion itself gains him about a pawn (two pawns become a bishop) and a pass
    * costs a tempo, so a pawn left hanging nets out near zero and doesn't stop it, while a piece left hanging (a minor
    * nets about -2) or anything bigger does. In the sims before this guard, 25 of 153 fusions lost 2 pawns or more by
-   * this measure (most of them 4 to 8) and one lost between 1 and 2 (1.76).
+   * this measure (most of them 4 to 8) and one lost between 1 and 2 (1.76). Puddles' regrowth reads it too, as pawns of
+   * material by the exchange check (regrowKind: a piece of his the crowd nets at least this from once he passes).
    */
   passGuardPawns: 2,
   passGuardNodes: 30_000,

@@ -212,7 +212,8 @@ test("the hippo gardener: his seeds, then a watering of ten seeds within the ban
   const w = g.water;
   expect(w.seeds).toBe(10);
   expect(w.rolled).toHaveLength(10);
-  expect(w.growth).toHaveLength(10);
+  // (The seeds' ten; a regrowth, if a piece of his hung, is one more: its own check below.)
+  expect(w.growth.filter((o: { regrow?: boolean }) => !o.regrow)).toHaveLength(10);
   // His whole turn: no move of his after your last; your turn again.
   expect(s.history.length).toBe(before.history.length + 1);
   // Each outcome where its rules allow it.
@@ -233,6 +234,38 @@ test("the hippo gardener: his seeds, then a watering of ten seeds within the ban
   // The meter reset to none.
   expect(g.base).toBe(0);
   await expect.poll(() => page.evaluate(() => (window as any).__kinds as string[]), { timeout: 10_000 }).toContain("water");
+  expect(errors).toEqual([]);
+});
+
+test("a piece of his hanging when he waters: the same kind grows back for him, one more outcome than the seeds (Eric, Nov 26)", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto(`${BASE}&power=water&seeds=2`);
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  // His knights on a6 and h6, each hit by a pawn of yours (b5, g5); seven pawns of his, so a third knight can grow. His one move
+  // saves one of them; your two quiet knight moves leave the other hanging when he waters.
+  const fen = "4k3/p1ppppp1/n6n/1P4P1/8/8/P1PPPP1P/1N2K1N1 w - - 0 1";
+  await page.evaluate((f) => {
+    const r = (window as any).match.runner;
+    r.boards.set(0, { ...r.boards.get(0), fen: f, history: [], bases: [{ ply: 0, fen: f }] });
+  }, fen);
+  for (const move of ["b1c3", "g1f3"]) {
+    await yourMove(page);
+    await submitMove(page, move);
+    await expect.poll(() => page.evaluate(() => (window as any).match.phase.kind !== "play" || (window as any).match.boss?.powers?.garden?.waterings > 0), { timeout: 30_000 }).toBe(true);
+  }
+  await yourMove(page);
+  const s = await state(page);
+  const w = s.boss.powers.garden.water;
+  expect(s.boss.powers.garden.waterings).toBe(1);
+  expect(w.rolled).toHaveLength(2);
+  const back = w.growth.filter((g: { regrow?: boolean }) => g.regrow);
+  expect(back, "a knight grew back").toHaveLength(1);
+  expect(back[0].kind).toBe("n");
+  expect(w.growth).toHaveLength(3);
+  expect(new Chess(s.fen).get(back[0].square)).toMatchObject({ type: "n", color: "b" });
   expect(errors).toEqual([]);
 });
 
@@ -382,7 +415,7 @@ test("his watering on the board: the sweep, a sprout per seed, each outcome at i
   expect(garden.waterings).toBe(1);
   const growth = garden.water.growth as { kind: string; square: string; ate?: string }[];
   const plants = growth.filter((g) => g.kind === "plant");
-  expect(growth.length, "ten seeds came up").toBe(10);
+  expect(growth.filter((g) => !(g as { regrow?: boolean }).regrow).length, "ten seeds came up").toBe(10);
   const rec = await recorded(page);
   const sweepAt = rec.find((r) => r.sweep === "sweep")!;
   expect(sweepAt, "the sweep crossed the board").toBeTruthy();

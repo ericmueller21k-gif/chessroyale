@@ -359,26 +359,6 @@ export function exchangeNet(fen: string, move: string): number | null {
 }
 
 /**
- * The other side's piece (not the king) the side to move wins the most from, by one capture and the exchange on its
- * square (the cheapest attacker first, each side free to stop: exchangeNet's own check): its square, its kind and what
- * the side to move nets, ties to the bigger piece. Null when no capture wins anything. Simple on purpose, as
- * exchangeNet: a piece left hanging, not a fork or a pin. Pure: the same answer on every device and the server.
- */
-export function biggestHang(fen: string): { square: string; type: "p" | "n" | "b" | "r" | "q"; net: number } | null {
-  const b = xBoard(fen);
-  const white = fen.split(" ")[1] !== "b";
-  let best: { square: string; type: "p" | "n" | "b" | "r" | "q"; net: number } | null = null;
-  for (let s = 0; s < 64; s++) {
-    const p = b[s]!;
-    if (p === "" || isWhite(p) === white || kind(p) === "k") continue;
-    const net = exchangeOn(b, s, white);
-    const type = kind(p) as "p" | "n" | "b" | "r" | "q";
-    if (net > 0 && (!best || net > best.net || (net === best.net && EXCHANGE_VALUE[type]! > EXCHANGE_VALUE[best.type]!))) best = { square: "abcdefgh"[s % 8]! + String(Math.floor(s / 8) + 1), type, net };
-  }
-  return best;
-}
-
-/**
  * Picks that give up at least `threshold` pawns of material against the engine's best move by the exchange check
  * (exchangeNet), and how: "missed" when the best move is a capture that wins material and the pick loses none of its
  * own; else "gave". The opening allowance doesn't cover them (OPENING_ALLOWANCE.materialPawns). A move the check can't

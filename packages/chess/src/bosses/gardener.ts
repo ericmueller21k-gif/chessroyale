@@ -46,7 +46,7 @@
  *   it. Anything else waits a turn.
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type GardenPlant, type GardenState, type PowerEvent, type WaterGrowth, type WaterKind, type WaterResult } from "@chessroyale/core";
-import { biggestHang, kingAttacked, legalMoves, mateInOne, pieceAt, sideToMove, withPiece, withoutPiece } from "../rules.ts";
+import { exchangeNet, kingAttacked, legalMoves, mateInOne, pieceAt, sideToMove, withPiece, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { PASS_WAIT, eachOn, logit, meterFull, moveSquares, other, passLoses, powerRoll, testSwitch, ticksAt, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
@@ -169,15 +169,24 @@ export interface WaterAsk {
 }
 
 /**
- * The piece he stands to lose by passing (`fen`: him to move, before the watering), the kind the regrowth grows back: of
- * his pieces the crowd could take once he passes, the one it nets the most from by the exchange check (biggestHang; ties
- * to the bigger piece), if that's real material (at least passGuardPawns pawns: a knight a pawn attacks, a piece left
- * undefended). Null: nothing of his hangs (a pawn at most), or he can't pass. Pure, no engine: the server names it.
+ * The piece he stands to lose by passing (`fen`: him to move, before the watering; `plants`: the plain plants on the
+ * board), the kind the regrowth grows back: of his pieces the crowd could take once he passes (its legal captures no
+ * plant stops), the one it nets the most from by the exchange check (exchangeNet; ties to the bigger piece), if that's
+ * real material (at least passGuardPawns pawns: a knight a pawn attacks, a piece left undefended). Null: nothing of his
+ * hangs (a pawn at most), or he can't pass. Pure, no engine: the server names it.
  */
-export function regrowKind(fen: string, s: Pick<BossPowerSettings, "passGuardPawns"> = BOSS_POWERS): RegrowKind | null {
+export function regrowKind(fen: string, plants: readonly string[] = [], s: Pick<BossPowerSettings, "passGuardPawns"> = BOSS_POWERS): RegrowKind | null {
   const passed = passTurn(fen);
-  const hang = passed ? biggestHang(passed) : null;
-  return hang && hang.type !== "p" && hang.net >= s.passGuardPawns ? hang.type : null;
+  if (!passed) return null;
+  let best: { type: PlacedKind; net: number } | null = null;
+  for (const m of legalMoves(passed)) {
+    const victim = pieceAt(passed, m.slice(2, 4));
+    if (!victim || victim.type === "k" || plantStops(m, plants, passed)) continue;
+    const net = exchangeNet(passed, m);
+    if (net === null || net <= 0) continue;
+    if (!best || net > best.net || (net === best.net && NOMINAL[victim.type as PlacedKind] > NOMINAL[best.type])) best = { type: victim.type as PlacedKind, net };
+  }
+  return best && best.type !== "p" && best.net >= s.passGuardPawns ? (best.type as RegrowKind) : null;
 }
 
 /**
@@ -687,7 +696,7 @@ export const gardenerBattle = {
     const roll = gardenerBattle.roll(b);
     if (!roll) return null;
     const p = b.state.boss!.powers!;
-    const regrow = p.noAdd ? null : regrowKind(boardOf(b).fen);
+    const regrow = p.noAdd ? null : regrowKind(boardOf(b).fen, plantSquares(p));
     return { kinds: [...roll.kinds], plants: plantSquares(p), order: Math.floor(powerRoll(p.seed, "water-order", gardenOf(p).waterings) * 2 ** 32), ...(regrow ? { regrow } : {}) };
   },
 
