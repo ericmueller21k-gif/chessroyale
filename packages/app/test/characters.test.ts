@@ -102,4 +102,32 @@ describe("Chandy's checkmate figure", async () => {
     expect(nearestReach(85)).toBe(60);
     expect(nearestReach(-80)).toBe(-30);
   });
+
+  // (The director, Nov 26: "the collapse must clearly read as collapsed": the kneel sat only a little lower than his stand.)
+  it("collapses flat on the ground, his rifle off his back, and holds still a beat; the leap ends there", () => {
+    const box = (f: Parameters<typeof frameKeys>[1]) => {
+      const keys = frameKeys(ch, f);
+      const rows = keys.map((r, y) => (r.some(Boolean) ? y : -1)).filter((y) => y >= 0);
+      const cols = keys[0]!.map((_, x) => (keys.some((r) => r[x]) ? x : -1)).filter((x) => x >= 0);
+      return { top: rows[0]!, bottom: rows.at(-1)!, w: cols.at(-1)! - cols[0]! };
+    };
+    for (const st of STAGES) {
+      const stand = box(ch.anims[chandyAnim("idle", st)]!.frames[0]!);
+      const slumped = ch.anims[chandyAnim("slumped", st)]!;
+      const flat = slumped.frames[0]!;
+      const down = box(flat);
+      // Flat: no more than half his standing height (rifle and all), on the ground, and longer than tall.
+      expect(down.bottom - down.top, `stage ${st}`).toBeLessThanOrEqual((stand.bottom - stand.top) / 2);
+      expect(Math.abs(down.bottom - stand.bottom), `stage ${st}`).toBeLessThanOrEqual(2);
+      expect(down.w).toBeGreaterThan(down.bottom - down.top);
+      // His rifle lies on the ground (its part's bottom at his feet), not on his back.
+      const gun = flat.layers.find((l) => l.part.startsWith("rifle:"))!;
+      expect(gun.y + ch.parts[gun.part]!.grid.length, `stage ${st}`).toBeGreaterThanOrEqual(ch.foot[1] - 1);
+      // A beat of stillness first; the leap's last frame is the flat one, the reach starts from his knees.
+      expect(flat.ms).toBeGreaterThanOrEqual(1000);
+      const leap = ch.anims[chandyAnim("leap", st)]!;
+      expect(leap.frames.at(-1)!.layers).toEqual(flat.layers);
+      expect(box(ch.anims[chandyAnim("reach0", st)]!.frames[0]!).top).toBeGreaterThan(stand.top);
+    }
+  });
 });

@@ -25,15 +25,15 @@ import { CHANDY_FIRE_AT, CHANDY_FX, MATE_STEPS, dodgeTimeline, linesAfter, piece
 import { BOSS_POWERS, SPEECH, bossInText, type ChandyMove, type DodgeLine } from "@chessroyale/core";
 import type { BossView, DodgeRun } from "../game.ts";
 import { BoardEffects, onEachFrame, prewarm, prewarmAnims, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
-import { CHANDY, CHANDY_BAR, CHANDY_CLONE, CHANDY_RIFLE, chandyAnim, type RifleStage } from "../characters/chandy.ts";
+import { CHANDY, CHANDY_BAR, CHANDY_CLONE, CHANDY_RIFLE, type RifleStage } from "../characters/chandy.ts";
 import { CHANDY_MATE_LINES } from "../characters/chandy-lines.ts";
+import { CHANDY_MATE } from "../characters/chandy-mate.ts";
 import { useEffect, useLayoutEffect } from "preact/hooks";
 import { CRITICAL, Say, bossVoice } from "../speech.tsx";
 import { kingVoice } from "../godKing.ts";
 import { pacedLine } from "../paced-line.ts";
 import { FightBanner } from "./FightBanner.tsx";
 import { GodKingPortrait } from "./GodKing.tsx";
-import { playInPlace } from "./BossCharacter.tsx";
 
 import { spriteCanvas } from "../characters/sprite-kit.ts";
 import { EFFECTS, type EffectName } from "../characters/power-art.ts";
@@ -320,7 +320,7 @@ export function dodgeView(boss: BossView, run: DodgeRun, now: number, onPick?: (
   const side = boss.crowdSide === "w" ? "white" : "black";
   const tl = dodgeTimeline();
   const t = now - run.at;
-  const base = { side, king: d.king, center: d.center, hits: 0 } as const;
+  const base = { side, king: d.king, center: d.center, hits: 0, stage: Math.max(0, Math.min(5, chandyOf(boss)?.upgrades ?? 0)) as RifleStage } as const;
   // A mate's opening, before the Dodge's start (the board as it is): its step now. And after a survived one, the win beat.
   if (d.mate && t < 0) {
     const step: MateStep = MATE_STEPS.find((k) => t < tl.opening[k].end) ?? "line";
@@ -388,22 +388,14 @@ export function dodgeView(boss: BossView, run: DodgeRun, now: number, onPick?: (
   return { ...kept, phase: "result", since: killAt, lines, placed, round: roundNo, beams, result: result.hit ? "hit" : "dodged" };
 }
 
-/** His figure's poses for a mate's opening steps until their art lands (the characters' job): the collapse, the reach, the zap. */
-const MATE_POSES: Partial<Record<MateStep, string>> = { jump: "stow", reach: "point", zap: "fire" };
-
 /**
  * Dodge over the board while it runs (the board under it shows the position, its king taken off: dodgeFen). A mate's opening: his
- * figure's pose for each step, from the step's start (a redraw carries it on), and his line, said once as its step comes; the win beat:
+ * figure on the board (ChandyDodge's MateOver), and his line, said once as its step comes; the win beat:
  * "CHECKMATE!", the God King's hero banner, for the beat's length.
  */
 export function DodgeLayer({ boss, run, now, onPick }: { boss: BossView; run: DodgeRun; now: number; onPick: (square: string) => void }) {
   const view = dodgeView(boss, run, now, onPick);
   const step = view?.phase === "mate" ? view.step : undefined;
-  const pose = step ? MATE_POSES[step] : undefined;
-  const stage = Math.max(0, Math.min(5, chandyOf(boss)?.upgrades ?? 0)) as RifleStage;
-  useLayoutEffect(() => {
-    if (pose && view) playInPlace(`${run.key}:mate:${step}`, [chandyAnim(pose, stage)], view.since);
-  }, [run.key, step]);
   // (Your mate's opening: the God King quiet until the Dodge's own start. The line up as your mate lands is from your turn's start,
   // stale now: "Guard the queen!" over Qxf7#, the director's still, Nov 26. Taken off the screen early: he speaks again.)
   const opening = view?.phase === "mate";
@@ -483,8 +475,8 @@ function warmCanvases(ch: typeof CHANDY_CLONE, done?: () => void): void {
 /**
  * His art made ahead, in quiet slices from the battle's start (BossCharacter's warm-up; .claude/LESSONS.md, "A stall the first time an
  * effect shows"): Dodge's clones were made as its vote opened, a 3.9 s stall on a slowed phone that swallowed the whole vote (Nov 16).
- * Then the rifle's stages (the upgrade window), his figure at each stage (and his phone bar's own firing frames: CHANDY_BAR), and his
- * board art.
+ * Then the rifle's stages (the upgrade window), his figure at each stage (and his phone bar's own firing frames: CHANDY_BAR), his
+ * board art and his checkmate figure (CHANDY_MATE, on the board from your mate).
  */
 export function prewarmChandy(): void {
   if (warmed) return;
@@ -496,6 +488,9 @@ export function prewarmChandy(): void {
         const barOwn = Object.entries(CHANDY_BAR.anims).filter(([name, a]) => /_s\d$/.test(name) && a !== CHANDY.anims[name]);
         prewarmSprite(CHANDY, [...staged, ...barOwn].flatMap(([, a]) => a.frames));
         for (const fx of Object.keys(EFFECTS).filter((k) => k.startsWith("chandy")) as EffectName[]) prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
+        // (His checkmate figure, at every stage: made in its file's order, so the leap at stage 5 doesn't make all the others then.)
+        const mate = Object.values(CHANDY_MATE.anims);
+        prewarmAnims(mate, () => prewarmSprite(CHANDY_MATE, mate.flatMap((a) => a.frames)));
       }),
     ),
   );

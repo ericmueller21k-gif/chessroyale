@@ -44,7 +44,7 @@ async function playOne(page: Page, pick?: (legal: { uci: string; piece: string; 
 async function watch(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
-    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], steps: [] as string[], his: [] as string[], words: [] as string[], first: [] as { square: string; fen: string; thinking: boolean }[], king: [] as string[], clipped: [] as string[], mateKing: [] as string[] };
+    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], steps: [] as string[], his: [] as string[], words: [] as string[], first: [] as { square: string; fen: string; thinking: boolean }[], king: [] as string[], clipped: [] as string[], mateKing: [] as string[], figs: [] as string[] };
     const look = () => {
       const r = w.__ch;
       for (const e of w.match?.boss?.powers?.events ?? []) if (!r.kinds.includes(e.kind)) r.kinds.push(e.kind);
@@ -70,6 +70,11 @@ async function watch(page: Page) {
       // (A mate's opening steps, and his lines as his speech box shows them.)
       const st = root ? [...root.classList].find((c) => c.startsWith("cd-s-")) : null;
       if (st && r.steps.at(-1) !== st) r.steps.push(st);
+      // (His checkmate figure on the board: its pose at each step, and on the win beat.)
+      const fig = root?.querySelector(".cd-mate-fig");
+      const f = fig ? [...fig.classList].find((c) => c.startsWith("cd-f-")) : null;
+      const at = `${st ?? p}:${f ?? "none"}`;
+      if (root && !r.figs.includes(at)) r.figs.push(at);
       for (const b of document.querySelectorAll(".bc-bubble[aria-label]")) {
         const t = b.getAttribute("aria-label") ?? "";
         if (t && !r.his.includes(t)) r.his.push(t);
@@ -88,7 +93,7 @@ async function watch(page: Page) {
     requestAnimationFrame(look);
   });
 }
-const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; steps: string[]; his: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[]; king: string[]; clipped: string[]; mateKing: string[] });
+const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; steps: string[]; his: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[]; king: string[]; clipped: string[]; mateKing: string[]; figs: string[] });
 
 /**
  * Dodge's opening as a frame sampler can promise it (Nov 19: a long CI frame skipped the 600 ms slide): the phases sampled
@@ -388,6 +393,10 @@ test.describe("Chandy", () => {
     expect(s.dodge[0]).toBe("cd-p-mate");
     expect(s.dodge).toContain("cd-p-win");
     expect(s.steps).toEqual(["cd-s-pause", "cd-s-jump", "cd-s-reach", "cd-s-zap", "cd-s-line"]);
+    // (His figure on the board at each step (chandy-mate.ts): none in the pause; the leap and collapse, the reach, the zap, holding the
+    // reach for his line; the knockout on the win beat. His figure at his spot hides while it's there.)
+    for (const at of ["cd-s-pause:none", "cd-s-jump:cd-f-leap", "cd-s-reach:cd-f-reach", "cd-s-zap:cd-f-zap", "cd-s-line:cd-f-reaching", "cd-p-win:cd-f-out"]) expect(s.figs, at).toContain(at);
+    expect(s.figs.filter((f) => f.startsWith("cd-s-pause:") || f.startsWith("cd-p-win:")), "one pose a step").toEqual(["cd-s-pause:none", "cd-p-win:cd-f-out"]);
     // (His line whole, each sentence in his bar's two rows, nothing cut off (the director's still, Nov 26: "One shot left in the…").)
     for (const l of CHANDY_MATE_LINE) expect(s.his, l).toContain(l);
     expect(s.clipped, "his words cut off in his box").toEqual([]);
