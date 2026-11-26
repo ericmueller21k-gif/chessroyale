@@ -15,6 +15,7 @@ import { DASH_FIGURE as DASH, DASH_HANG, HANG_SECTION } from "../characters/dash
 import { bossKit } from "../characters/kits.ts";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
 import { SpriteAnim } from "./BossEffect.tsx";
+import { holdDashAway } from "./DashStall.tsx";
 import { DASH_HANG_ON } from "@chessroyale/core";
 
 /**
@@ -175,41 +176,48 @@ function hangOnMoment({ moment }: MomentProps) {
  * director's call: the whole routine there): from the gag's start (`at`) he jumps from his spot (the phone's bar, the computer's side)
  * onto the board's middle, DASH_HANG_ON.boardShare of the board's height and never past the screen's edge, does it all there (his
  * `hangOn` run: the slow smacks, cheetah speed with his head thrown back, the wind-up, "sorry"), and zips back to his spot as your
- * piece slides home, before his move. His spot's figure is away meanwhile (its place kept: `dash-away`, as his clock tap's), his
- * words stand over him. On the page's top layer, placed once as it shows, taking no taps (the board is only watched meanwhile).
+ * piece slides home, before his move. His spot's figure is away meanwhile (its place kept: `dash-away`, held beside his clock tap's:
+ * holdDashAway), his words stand over him. On the page's top layer, placed as it shows (and again on a resize), taking no taps (the
+ * board is only watched meanwhile).
  * The jump and the zip are the element's own animations from the gag's clock (a copy drawn late starts partway: negative delays).
  */
 export function DashHangOn({ at }: { at: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const sayRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => holdDashAway(), []);
   useLayoutEffect(() => {
-    document.body.classList.add("dash-away");
-    return () => document.body.classList.remove("dash-away");
-  }, []);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    const board = document.querySelector<HTMLElement>(".hb-board")?.getBoundingClientRect();
-    if (!el || !board?.width) return;
-    const tl = hangOnTimeline();
-    const fit = Math.min(1, (innerWidth - 8) / ((board.height * DASH_HANG_ON.boardShare * DASH.w) / DASH.h), (innerHeight - 8) / (board.height * DASH_HANG_ON.boardShare));
-    const h = board.height * DASH_HANG_ON.boardShare * fit;
-    const w = (h * DASH.w) / DASH.h;
-    // (His feet's middle over the board's center, his middle at its middle; whole on the screen.)
-    const fx = DASH.foot[0] / DASH.w;
-    const x = Math.max(4, Math.min(innerWidth - w - 4, board.left + board.width / 2 - fx * w));
-    const y = Math.max(4, Math.min(innerHeight - h - 4, board.top + board.height / 2 - h / 2));
-    Object.assign(el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
-    if (sayRef.current) Object.assign(sayRef.current.style, { left: `${x + fx * w - 300}px`, top: `${Math.max(48, y + 0.12 * h)}px` });
-    // (From his spot's figure, at its size; an arc up for the jump, straight back for the zip.)
-    const spot = [...document.querySelectorAll<HTMLElement>(".boss-char .boss-char-sprite")].map((e) => e.getBoundingClientRect()).find((r) => r.width > 0);
-    const [dx, dy, k] = spot ? [spot.left - x, spot.top - y, spot.height / h] : [0, -h, 0.5];
-    const from = `translate(${dx}px, ${dy}px) scale(${k})`;
-    const t = Date.now() - at;
-    const jump = el.animate([{ transform: from }, { transform: `translate(${dx * 0.45}px, ${dy * 0.45 - h * 0.35}px) scale(${(k + 1) / 2})`, offset: 0.5 }, { transform: "none" }], { duration: DASH_HANG_ON.jumpMs, delay: -t, fill: "backwards", easing: "ease-out" });
-    const zip = el.animate([{ transform: "none" }, { transform: from }], { duration: DASH_HANG_ON.returnMs, delay: tl.returnAt - t, fill: "forwards", easing: "ease-in" });
+    // (Placed as it shows, and again if the screen turns or resizes mid-gag: the jump and the zip redone from the gag's clock.)
+    let anims: Animation[] = [];
+    const place = () => {
+      for (const a of anims) a.cancel();
+      anims = [];
+      const el = ref.current;
+      const board = document.querySelector<HTMLElement>(".hb-board")?.getBoundingClientRect();
+      if (!el || !board?.width) return;
+      const tl = hangOnTimeline();
+      const fit = Math.min(1, (innerWidth - 8) / ((board.height * DASH_HANG_ON.boardShare * DASH.w) / DASH.h), (innerHeight - 8) / (board.height * DASH_HANG_ON.boardShare));
+      const h = board.height * DASH_HANG_ON.boardShare * fit;
+      const w = (h * DASH.w) / DASH.h;
+      // (His feet's middle over the board's center, his middle at its middle; whole on the screen.)
+      const fx = DASH.foot[0] / DASH.w;
+      const x = Math.max(4, Math.min(innerWidth - w - 4, board.left + board.width / 2 - fx * w));
+      const y = Math.max(4, Math.min(innerHeight - h - 4, board.top + board.height / 2 - h / 2));
+      Object.assign(el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+      if (sayRef.current) Object.assign(sayRef.current.style, { left: `${x + fx * w - 300}px`, top: `${Math.max(48, y + 0.12 * h)}px` });
+      // (From his spot's figure, at its size; an arc up for the jump, straight back for the zip.)
+      const spot = [...document.querySelectorAll<HTMLElement>(".boss-char .boss-char-sprite")].map((e) => e.getBoundingClientRect()).find((r) => r.width > 0);
+      const [dx, dy, k] = spot ? [spot.left - x, spot.top - y, spot.height / h] : [0, -h, 0.5];
+      const from = `translate(${dx}px, ${dy}px) scale(${k})`;
+      const t = Date.now() - at;
+      const jump = el.animate([{ transform: from }, { transform: `translate(${dx * 0.45}px, ${dy * 0.45 - h * 0.35}px) scale(${(k + 1) / 2})`, offset: 0.5 }, { transform: "none" }], { duration: DASH_HANG_ON.jumpMs, delay: -t, fill: "backwards", easing: "ease-out" });
+      const zip = el.animate([{ transform: "none" }, { transform: from }], { duration: DASH_HANG_ON.returnMs, delay: tl.returnAt - t, fill: "forwards", easing: "ease-in" });
+      anims = [jump, zip];
+    };
+    place();
+    addEventListener("resize", place);
     return () => {
-      jump.cancel();
-      zip.cancel();
+      removeEventListener("resize", place);
+      for (const a of anims) a.cancel();
     };
   }, [at]);
   if (typeof document === "undefined") return null;

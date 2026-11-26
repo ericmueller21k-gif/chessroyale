@@ -575,11 +575,9 @@ test.describe("Dash's clock", () => {
       expect(Math.abs(seen.lineAt[l]! - at0 - t), l).toBeLessThan(600);
     }
     // His smacks (round 2, Nov 26: on the board's middle, each landing on the button): slow, then cheetah speed (head thrown back),
-    // the fastest he has: a smack every DASH_HANG_ON.hitMs, quicker than every other smack setting of his (the pop-off's, the
-    // multi-hit's and the Rush's, the gag's slow ones).
+    // the fastest he has (dash-clock.test.ts compares the settings).
     expect(seen.cues["hangSlow:click"] ?? 0).toBeGreaterThanOrEqual(10);
     expect(seen.cues["hangFast:click"] ?? 0).toBeGreaterThanOrEqual(60);
-    expect(DASH_HANG_ON.hitMs).toBeLessThan(Math.min(BOSS_POWERS.dashPopOff.hitMs, BOSS_POWERS.dashClockFit.smackMs, DASH_HANG_ON.slowTo));
     // He jumps onto the board's middle for it (Eric: "he should jump onto the middle of the board"): from his landing to his zip back,
     // his figure stands over the board's center (within a square), big (DASH_HANG_ON.boardShare of the board's height), whole on the
     // screen, his spot's figure away meanwhile; after his move, gone, his spot's figure back.

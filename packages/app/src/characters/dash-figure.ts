@@ -184,7 +184,10 @@ const hangJump: Anim = lazyAnim(() => {
   return { loop: false, frames: [F(crouch, { sink: 2, eyes2: "sly", mouth: "grin", brow: 1, tail: 1 }), F(s.jumpMs - crouch, { lift: 3, tail: 4, ears: 2, hand: "up", eyes: "wide", mouth: "grin" }, { cue: "whoosh" })] };
 });
 
-/** The section of the routine each of `hangOn`'s frames comes from (hangJump, hangSlow, …), for a test's count of his smacks. */
+/**
+ * The section of the routine each of `hangOn`'s frames comes from (hangJump, hangSlow, …), for a test's count of his smacks. Its
+ * frames are the sections' own, tagged, never copies: frameImage caches a picture per Frame object, so each drawing renders once.
+ */
 export const HANG_SECTION = new WeakMap<Frame, string>();
 /**
  * His whole "Hang on" on the board's middle as one run (DashHangOn plays it from the gag's start): the jump, the slow smacks, cheetah
@@ -194,9 +197,8 @@ const hangOn: Anim = lazyAnim(() => {
   const frames: Frame[] = [];
   for (const [name, a] of [["hangJump", hangJump], ["hangSlow", hangSlow], ["hangFast", hangFast], ["hangWind", hangWind], ["hangSorry", hangSorry]] as const) {
     for (const f of a.frames) {
-      const own = { ...f };
-      HANG_SECTION.set(own, name);
-      frames.push(own);
+      HANG_SECTION.set(f, name);
+      frames.push(f);
     }
   }
   return { loop: false, frames };

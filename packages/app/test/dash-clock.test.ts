@@ -5,6 +5,7 @@ import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LINE_MAX, DASH_LOVE_LINES, DAS
 import { DASH_UI, hangOnAt, hangOnFen, popOffMoments } from "../src/components/Dash.tsx";
 import { DASH_FIGURE, DASH_HANG, HANG_SECTION } from "../src/characters/dash-figure.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
+import { holdDashAway } from "../src/components/DashStall.tsx";
 
 /** Dash's clock lines (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): the multi-hit's, the pop-off's two beats. */
 describe("Dash's clock lines (Eric, Nov 7)", () => {
@@ -136,11 +137,39 @@ describe("Dash's \"Hang on\" routine (round 2)", () => {
     expect(a.hangOn!.frames.at(-1)!.cue).toBe("zip");
   });
 
-  it("cheetah speed's smack is the quickest of every clock smack he has (the pop-off's fit10, the multi-hit, the Rush's, the stall slam, the Clock Slap)", () => {
+  it("cheetah speed's smack is the quickest of every clock smack he has (the pop-off's fit10, the multi-hits, the stall slam, the Clock Slap, his move's press)", () => {
     const fast = gap(DASH_HANG.anims.hangFast!);
     expect(fast).toBe(DASH_HANG_ON.hitMs);
     for (const name of ["fit3", "fit4", "fit5", "fit10", "slam", "clockSlap", "move"]) expect(fast, name).toBeLessThan(gap(DASH_FIGURE.anims[name]!));
     expect(fast).toBeLessThan(gap(DASH_HANG.anims.hangSlow!));
+  });
+
+  it("each drawing in the run is one Frame object, drawn once (frameImage caches by the object): no copies, cheetah speed's 3", () => {
+    const a = DASH_HANG.anims;
+    const sections = [a.hangJump!, a.hangSlow!, a.hangFast!, a.hangWind!, a.hangSorry!];
+    expect(new Set(a.hangOn!.frames).size).toBe(sections.reduce((n, s) => n + new Set(s.frames).size, 0));
+    for (const f of a.hangOn!.frames) expect(sections.some((s) => s.frames.includes(f))).toBe(true);
+    const fast = new Set(a.hangOn!.frames.filter((f) => HANG_SECTION.get(f) === "hangFast"));
+    expect(fast.size).toBe(new Set(a.hangFast!.frames).size);
+    expect(fast.size).toBe(3);
+  });
+
+  it("his spot's figure stays away while either his clock tap or his \"Hang on\" holds it: the tap ending mid-gag leaves the gag's hold", () => {
+    const had = (globalThis as { document?: unknown }).document;
+    const classes = new Set<string>();
+    (globalThis as { document?: unknown }).document = { body: { classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) } } };
+    try {
+      const tap = holdDashAway(); // (He lies down for your clock tap on the "Hang on" turn,)
+      const gag = holdDashAway(); // (then you move and the gag starts.)
+      tap(); // (The tap's figure gets up mid-gag.)
+      expect(classes.has("dash-away")).toBe(true);
+      tap(); // (A second release does nothing.)
+      expect(classes.has("dash-away")).toBe(true);
+      gag(); // (The gag ends: his spot's figure back.)
+      expect(classes.has("dash-away")).toBe(false);
+    } finally {
+      (globalThis as { document?: unknown }).document = had;
+    }
   });
 
   it("his routine's figure is his own, nothing cut off at its frame's edge (its runs never play where he stands: his bar's and side's fits unchanged)", () => {
