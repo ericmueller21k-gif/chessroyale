@@ -9,3 +9,4 @@
 - Nov 26 · Audit: every ask of the last ~2 weeks checked against what's live · queued (next free slot)
 - Nov 26 · Beta bots (HunBot, waits 15/30 s, no online count, ⚠ popover) · design, 5 decisions waiting on Eric
 - Nov 26 · Payments PR 7 (coin screen), 8 (Stripe), 9 (refunds), 10 (admin) · queued
+- Nov 26 · Dash's lying-down clock tap: 3x bigger over the board, taps pass through, redrawn pose (belly, feet up, hand on head) · queued (brief notes/briefs/dash-tap-bigger.md)
