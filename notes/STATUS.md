@@ -2164,3 +2164,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 02:05 UTC: #964 CI red: side-same-size:16 (pawn 201.6 vs 193.2 at 1280x800; hidden boss's fight not framed). Brief boss-frame-2.md QUEUED for the next free slot (2 xhigh running).
 - Nov 26: ERIC: bots join 15 s (50 v 50, Squads), 30 s (ranked 1 v 1); tag 'HunBot' (vs existing 'Bot'). Added to beta-bots-design.md.
 - Nov 26 02:15 UTC: crate-banner flake (Smiley Face variant name) fixed by director → PR #965 (8b49527e) CI. #964 waits on round 2 (queued).
+- Nov 26: main f01ba249 GREEN + LIVE (coin strip, no-gap quests).
