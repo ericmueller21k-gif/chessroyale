@@ -20,7 +20,8 @@ plus the phone at 390 × 844 (unchanged). In every computer still the left colum
 and the column start on the board's top line and end on its foot, 28 / 28 px either side of the board. The Moves panel ends 12 px over the
 God King's frame (the room his tallest pose needs: the eric.md guard keeps every figure off the list's text), so it is taller than main's
 (Boss alone 228 → 300 px at 1536 × 730, 343 → 480 at 1920 × 960; a raid 228 → 390, 343 → 620) but not the board's whole height.
-Boards: 602, 832, and 912 / 912 at 1858 × 1040. The figures stand where they did against the board.
+Boards: 602, 832, and 912 / 912 at 1858 × 1040. The figures stand where they did against the board. (Re-shot after the director's
+review: a raid's scoreboard ends over the boss, who covers nothing, and a raid's block is centered with room either side.)
 
 ## mock/ v2 (the director's review, Nov 26): the raid
 - `mock-boss-raid-1536x730-v2.png`, `-1920x960-v2.png` (the build): the boss never covers the scoreboard. The left column mirrors the right
