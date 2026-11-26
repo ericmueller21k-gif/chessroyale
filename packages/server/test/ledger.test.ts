@@ -6,7 +6,7 @@ import { OPS, SHOP_ITEMS, bossCrateOf, crateDef, itemDef, mulberry32, rollCrate,
 import { buyItem, createGuest, createSession, ensureSchema, grantReward, recordResult, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { buyBossCrate, countBossBattle, grantTestItems, openBossCrate } from "../src/boss-tokens.ts";
-import { applyOp, backfillLedger, clawOp, cond, leg, ledgerAccount, ledgerCheck, ledgerCheckDue, ledgerMismatches, opKeys, requestId } from "../src/ledger.ts";
+import { applyOp, backfillLedger, clawOp, cond, leg, ledgerAccount, ledgerCheck, ledgerCheckDue, ledgerMismatches, opKeys, requestId, spendLegs } from "../src/ledger.ts";
 import { deleteLockerItems, lockerState, openCrate } from "../src/locker.ts";
 import { pickBossCrate } from "../src/rewards.ts";
 import { grantXp, setTestXp } from "../src/xp.ts";
@@ -98,7 +98,7 @@ describe("an op", () => {
     const a = await signedIn(sql, "a@example.com", T0);
     const me = (await ledgerAccount(sql, a.id))!;
     await giveCoins(sql, a.id, 50, T0);
-    const spend = (id: string) => ({ id, reason: "test", now: T0, when: cond("EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND coins >= 80)", a.id), legs: [leg.coins(a.id, -80)] });
+    const spend = (id: string) => ({ id, reason: "test", now: T0, when: cond("EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND coins >= 80)", a.id), legs: spendLegs(a.id, { price: 80, draws: [] }) });
     expect(await applyOp(sql, me, spend("test:spend"))).toBe("refused");
     const failing: Sql = { ...sql, batch: (list) => sql.batch([...list, { sql: "INSERT INTO nowhere VALUES (1)", params: [] }]) };
     await expect(applyOp(failing, me, { id: "test:fails", reason: "test", now: T0, legs: [leg.coins(a.id, 10), leg.keys(a.id, 1)] })).rejects.toThrow();
@@ -610,11 +610,13 @@ describe("reconciliation: each balance is its ledger's sum", () => {
 });
 
 /** The balance tables: only ledger.ts writes them. */
-const BALANCE_TABLES = ["wallets", "inventory", "items", "boss_tokens", "boss_crates", "welcome_crates"];
+const BALANCE_TABLES = ["wallets", "inventory", "items", "boss_tokens", "boss_crates", "welcome_crates", "purchases"];
 const WRITE = new RegExp(`\\b(?:INSERT(?:\\s+OR\\s+\\w+)?\\s+INTO|UPDATE|DELETE\\s+FROM|REPLACE\\s+INTO)\\s+(${BALANCE_TABLES.join("|")})\\b`, "g");
 /** Writes to them elsewhere, each with why: none is a balance. (Part II moved the last paths, grantReward and openCrate.) */
 const NOT_YET: Record<string, Record<string, { n: number; why: string }>> = {
   "welcome.ts": { welcome_crates: { n: 1, why: "not a balance: the notice closed (seen_at)" } },
+  // (Nov 26: a purchase's balance is its `remaining`, which only ledger.ts moves: leg.purchase, the merge, the erase.)
+  "purchases.ts": { purchases: { n: 2, why: "not a balance: the checkout's pending row (remaining 0), and its status and payment details at the credit" } },
 };
 /** Files that once wrote balances themselves, and what they write through now. The guard fails if one does again. */
 const MOVED: Record<string, string> = {

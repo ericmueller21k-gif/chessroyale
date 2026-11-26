@@ -156,6 +156,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   meta: "key value",
   ops_errors: "fingerprint hour source kind message version count first_seen last_seen sample",
   ops_reports: "id at kind account version note diag",
+  purchases: "session_id user_id pack coins remaining cents tax_cents payment_intent card_country status refunded_cents created_at paid_at",
   quest_days: "user_id day week reroll_day nonce",
   quest_games: "user_id game attempt at",
   quest_progress: "quest_id user_id game at",
@@ -165,6 +166,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   ranked_1v1_games: "id white_id black_id control result reason moves times started_at ended_at checked nonce white_points black_points",
   ranked_conduct: "user_id match_id at mode kind games rp nonce",
   reports: "id reporter target reason at match line line_at",
+  refunds: "op_id session_id user_id kind cents coins stripe_ref status comment created_at",
   results:
     "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned play_ms moves xp_before xp_parts xp_none xp_rewards coins solo_game",
   series_crates: "user_id crate n",
@@ -173,7 +175,8 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   solo_games: "user_id id started_at test_minutes real_at mode players team boss_id boss_elo",
   tower_best: "user_id kind floor at",
   tower_runs: "id user_id kind seed floor met members fight last status started_at updated_at",
-  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online dnd pawn_color age_ok_at chat_on test resident",
+  users:
+    "id name icon email google_sub created_at last_seen rating allow_invites hide_online dnd pawn_color age_ok_at chat_on test resident buy_band buy_band_at refund_count hold_until chargebacks closed_at closed_reason held_taps",
   wallets: "user_id coins crates crate_keys xp boss_picks",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
 };
