@@ -1121,8 +1121,8 @@ export type ServerMessage = { now: number } & (
       /**
        * The hippo gardener's watering (his whole turn): what the seeds rolled, the plain plants on the board, the order the
        * squares are tried in. Answer the placement as `move` (waterAnswer: waterFrom's, as its letters and squares, "none"
-       * for nothing at all; PASS_WAIT when passing would lose real material, unless `waterAny`: the test switch or the
-       * admins' trigger; "" with no engine). The server checks it (waterCheck). An older app ignores it and plays a move,
+       * for nothing at all; PASS_WAIT when passing would lose real material, unless `waterAny`: the test switch, the
+       * admins' trigger, or the guard has held it ultWaitMax times; "" with no engine). The server checks it (waterCheck). An older app ignores it and plays a move,
        * which isn't a placement: the watering waits for his next turn.
        */
       water?: WaterAsk;

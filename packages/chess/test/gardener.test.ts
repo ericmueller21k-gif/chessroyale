@@ -409,18 +409,19 @@ describe("Watering: the engine's placement within the band", () => {
     // No engine: "".
     expect((await waterAnswer([], QUIET, ask(["plant"]))).answer).toBe("");
   });
-  it("the pass guard holds a warned watering at most ultWaitMax of his turns, then it comes whatever passing costs (Eric, Nov 26)", () => {
+  it("the pass guard holds a watering at most ultWaitMax times, then it comes whatever passing costs; his waits, not crowd moves (Eric, Nov 26; review of #972)", () => {
     expect(S.ultWaitMax).toBe(3);
     const r = battle(11);
-    const at = (crowdMoves: number, warnAt: number | undefined) => {
-      r.state.boss = { ...r.boss!, crowdMoves, powers: { ...r.boss!.powers!, warnAt, ultNext: false } };
+    const at = (waits: number | undefined, crowdMoves = 9) => {
+      const p = r.boss!.powers!;
+      r.state.boss = { ...r.boss!, crowdMoves, powers: { ...p, warnAt: 1, ultNext: false, garden: { ...p.garden!, waits } } };
       return r.waterAny();
     };
-    expect(at(5, 5)).toBe(false);
-    expect(at(7, 5)).toBe(false);
-    expect(at(8, 5)).toBe(true);
-    expect(at(9, 5)).toBe(true);
-    expect(at(9, undefined)).toBe(false);
+    expect(at(undefined)).toBe(false);
+    expect(at(2)).toBe(false);
+    // (Crowd moves since the warning don't count: a tower floor's other bosses' turns, his turns in check.)
+    expect(at(2, 40)).toBe(false);
+    expect(at(3)).toBe(true);
   });
 });
 

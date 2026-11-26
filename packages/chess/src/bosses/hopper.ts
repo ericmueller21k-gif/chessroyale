@@ -616,7 +616,7 @@ export const carrotBattle = {
    * (he answers the check with his move: passTurn), the warning staying; and so it does when passing would lose real
    * material (the pass guard, Oct 18: `passWait`, the host's PASS_WAIT): he plays his move, the warning and the
    * trigger staying, so "next turn" stays true, and it's checked again on his next turn; for at most ultWaitMax of his
-   * turns after the warning, then it comes (Eric, Nov 26).
+   * waits, then it comes (Eric, Nov 26).
    */
   due(b: Battle): boolean {
     const boss = b.state.boss;
@@ -649,11 +649,11 @@ export const carrotBattle = {
   apply(b: Battle, answer: string | null = null): CarrotPatch | null {
     if (!carrotBattle.due(b)) return null;
     const boss = b.state.boss!;
-    // (Waited ultWaitMax of his turns since the warning: it comes now, the guard or not. Eric, Nov 26: "just force it at some point".)
-    const warnedAt = boss.powers!.warnAt;
-    const forced = warnedAt !== undefined && boss.crowdMoves - warnedAt >= BOSS_POWERS.ultWaitMax;
+    // (The guard has held it ultWaitMax times: it comes now, the guard or not. His waits, not crowd moves, so a tower floor's other
+    // bosses' turns and his turns in check don't count. Eric, Nov 26: "just force it at some point"; review of #972, finding 1.)
+    const forced = (boss.powers!.passWaits ?? 0) >= BOSS_POWERS.ultWaitMax;
     if (answer === PASS_WAIT && !forced) {
-      setPowers(b, (p) => ({ ...p, passWait: boss.crowdMoves }));
+      setPowers(b, (p) => ({ ...p, passWait: boss.crowdMoves, passWaits: (p.passWaits ?? 0) + 1 }));
       return null;
     }
     const board = boardOf(b);

@@ -1840,7 +1840,7 @@ export const BOSS_POWERS = {
    * The pass guard (Eric, Oct 18: Alfil fused while his queen hung, and lost it for free;
    * docs/decisions/2026-10-18-turn-passing-guard.md): one rule for every power that spends a boss's whole turn (Alfil's
    * fusion, Chub & Chirp's Carrot Patch cast). When it's due and passing would lose real material, it waits a turn and
-   * he plays his move instead; it's checked again on his next turn (an ultimate's, the cast and the watering: at most ultWaitMax of his turns after its warning, then it comes). "Real material": the engine's
+   * he plays his move instead; it's checked again on his next turn (an ultimate's, the cast and the watering: at most ultWaitMax waits, then it comes). "Real material": the engine's
    * evaluation after the power (the crowd to move) at least passGuardPawns below his evaluation before it (him to move,
    * so his best move's), in pawns of log-odds (bouncePawnLogit), on the host's engine (the server never searches; no
    * engine anywhere: it comes as ever). The fusion reads the searches its square's pick already makes (tusksNodes); the
@@ -1855,8 +1855,9 @@ export const BOSS_POWERS = {
   /**
    * The pass guard on an ultimate that spends his whole turn, Chub & Chirp's Carrot Patch and Puddles' watering (Eric, Nov 26: warned,
    * then it "didn't ult for 20 turns and never ended up ulting ... just force it at some point", then "we could bump it up to like 3 or
-   * 4 turns"; every boss ults every game): once warned, the guard holds it back for at most this many of his turns; on the next it comes
-   * whatever passing costs (in check it still can't: a pass is no legal move there). Alfil's fusion (a passive) keeps its guard uncapped.
+   * 4 turns"; every boss ults every game): once warned, the guard holds it back at most this many times (his waits: a tower floor's other
+   * bosses' turns and his turns in check don't count); the next time it's due it comes whatever passing costs (in check it still
+   * can't: a pass is no legal move there). Alfil's fusion (a passive) keeps its guard uncapped.
    */
   ultWaitMax: 3,
   /**
