@@ -154,9 +154,10 @@ export function VoteScreen({
   below?: ComponentChildren;
   /**
    * The 50 v 50's opening vote (its match): its computer frame, the game's (board-size.css, "The 50 v 50's frame"), so nothing moves when
-   * the game begins. On a computer the column ends in the game's chat, the same component in the same place (UnderBoard).
+   * the game begins. On a computer the column ends in the game's chat, the same component in the same place (UnderBoard). `true`: the
+   * frame without a chat (Squads' votes, Nov 26: their column ends in `below`'s list of the votes).
    */
-  frame?: GameView;
+  frame?: GameView | true;
   /** The result's three tones and the timer's ticks (Crowd's); Squads has neither. */
   chime?: boolean;
   /** At the top line's end: the match's control (Sound, and Leave: MatchMenu); without one, the sound button. */
@@ -451,19 +452,16 @@ export function VoteScreen({
               aria-disabled={o.disabled ? true : undefined}
               onClick={() => cast(i, voteZoneCentre(zoneOf(i), side))}
             >
+              {/* Its share of the votes, rising from the card's foot (Eric, Nov 26): slid up from its foot, the card's box never changes. */}
+              {!o.disabled && <i class="vote-card-fill" aria-hidden="true" style={{ "--fill": String(counts[i]! / total) }} />}
               <strong>{o.label}</strong>
               <span class="vote-card-blurb">{o.blurb}</span>
-              {!o.disabled && (
-                <span class="vote-card-bar">
-                  <i style={{ width: `${(100 * counts[i]!) / total}%` }} />
-                </span>
-              )}
               {!o.disabled && <PopCount n={counts[i]!} class="vote-card-count" />}
             </button>
           );
         })}
       </div>
-      {computerFrame && <UnderBoard match={frame!} />}
+      {computerFrame && frame !== true && <UnderBoard match={frame!} />}
       {below}
     </div>
   );

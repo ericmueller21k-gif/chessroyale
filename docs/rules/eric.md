@@ -43,8 +43,9 @@ removed (old → new) and says whether any of them guards a rule here.
     the board"; "the padding on the left and right of the chessboard aren't equal".
   - Guard: `e2e/desktop-board.spec.ts`, "Eric's column rule (Nov 25): every column on the board's top and bottom lines, the gaps either
     side of the board equal: …", at 1536 × 730 (125%) and 1920 × 960: the 50 v 50 (its opening vote, your pick and watching; the vote's
-    board, scoreboard and chat where move 1's are) and the 1 v 1 now; Squads and Boss join it in their own PRs.
-  - Decision: [2026-11-26-crowd-frame.md](../decisions/2026-11-26-crowd-frame.md).
+    board, scoreboard and chat where move 1's are), the 1 v 1 and Squads (since Nov 26: its votes, a Pairs match and a Relay match; the
+    standings' box on the left, the tiny boards down to the panel's foot on the right); Boss joins it in its own PR.
+  - Decisions: [2026-11-26-crowd-frame.md](../decisions/2026-11-26-crowd-frame.md), [2026-11-26-squads-frame.md](../decisions/2026-11-26-squads-frame.md).
 - **No platform named means both.** When Eric doesn't say "phone" or "computer", a change is for both. When unsure, ask.
   (Eric, Oct 25.)
 - **Simple beats flashy** (Eric, Oct 14): the least code, the least lag on a phone, the fewest ways to break.

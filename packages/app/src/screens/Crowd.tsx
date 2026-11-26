@@ -28,6 +28,8 @@ import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { pawnLook } from "../looks.ts";
+// (The status box on your own pick: its own module since Nov 26, Squads' frame shows it too.)
+export { SlotIdle } from "../components/SlotIdle.tsx";
 import { seenKey, useBoardAnimations, useMotionTrail, useReplay, useStillKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
@@ -231,18 +233,6 @@ export function LockedPowerRow({ match }: { match: GameView }) {
   return <HistoryNav view={noHistory} total={0} extra={<PowerUps count={you?.out ? 0 : match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} />;
 }
 
-/**
- * The 50 v 50's status box on your own pick (Eric, Nov 26: "same treatment" as the vote box): always there, in the same place and
- * size as "White is voting…", gray like the skeleton rows, with a quiet "Waiting…", never a blank hole.
- */
-export function SlotIdle() {
-  return (
-    <div class="waiting-banner slot-idle" aria-hidden="true">
-      <i />
-      Waiting…
-    </div>
-  );
-}
 
 /**
  * A 50 v 50 between reveals (Eric, Nov 25: "do that also on mobile and desktop"): the vote box's skeleton rows wait in the slot, as
