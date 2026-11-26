@@ -2216,3 +2216,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - 08:25 Eric OK'd Chandy's storyboard ("looks good"): art phase 2 (collapse redo + wire to the timeline) after the rules PR merges.
 - Birdie's room: longer crossing arms + ~50 birds at the bar (loop, bartender scoops, scatter when you come near). session_01JuCWRvVDuUCicSsZbjjooA (high), brief notes/briefs/birdie-room-birds.md, mock waiter (.done-mock). Perf: bake at load, no uploads walking, ?report numbers.
 - 08:27 Eric: "the town is super smooth now, even when I had TFT running" after #969 (night glows baked at load). Town hitch case closed; keep the night upload guard.
+- 08:45 Eric: Chub & Chirp warned, then no ult for 20 turns (draw). Cause: the pass guard held the cast with no cap. #972 (claude/carrot-patch-wait-cap 9a9932c5): carrotWaitMax 2. CI waiter bkbfd663n. Boss-lane quick review pass queued for the next free slot.
