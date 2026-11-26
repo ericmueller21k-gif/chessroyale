@@ -964,4 +964,15 @@ describe("the carrots' test switch (?carrots=N: settings.bossCarrotTest)", () =>
     expect(eager.move).toBe("c6b4");
     expect(eager.searched).toBe(0);
   });
+
+  it("a slip's turn too: with the switch, a move that would slip goes through his race brain (Nov 26: the e2e's fifth carrot came by chance); without it, it slips", () => {
+    const fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/3P1N2/PPP2PPP/RNBQKB1R b KQkq - 0 3";
+    // (Every move of his slips: bossStumbleMax 1, far below bossStumbleBelow.)
+    const slips = { bossStumbleBelow: 99_999, bossStumbleMax: 1 };
+    const on = racing(fen, ["b4", "a5", "h5", "e6", "g4"], { patch: { ...slips, bossCarrotTest: 5 } });
+    expect(on.bossMoveKind()).toBe("elo");
+    expect(on.bossRace()?.eager).toBe(true);
+    const off = racing(fen, ["b4", "a5", "h5", "e6", "g4"], { patch: slips });
+    expect(off.bossMoveKind()).toBe("stumble");
+  });
 });
