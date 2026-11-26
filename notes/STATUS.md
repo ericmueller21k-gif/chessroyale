@@ -2257,3 +2257,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 15:05: main c39f7217 (Chandy art) RED: retry-pass dash.spec.ts:778 [desktop] joke line (move landed after the 540 ms lie-down: test round trips). Fix #984 claude/dash-joke-flake 523588f2 (in-page submit on the tap beat; 3/3 local). Watcher running. Live: c39f7217.
 - Nov 26 15:10: #983 MERGED 0e3b5804 (main watcher running; expect the dash joke flake until #984). #984 CI running.
 - Nov 26 15:35: #984 MERGED 5134b2e7. Main watchers: buhc8iffa (0e3b, #983) and new one for 5134.
+- Nov 26 15:53: main 0e3b red (dash joke retry-pass, pre-#984: covered). main 5134b2e7 GREEN full run, no flaky; live 5134b2e7. Next: birdie fall flake (birdie.spec.ts:426) cause-fix or CI town-layout (Eric OK pending); #978 waits Eric OK; Dash Hang-on nits; Puddles follow-ups.
