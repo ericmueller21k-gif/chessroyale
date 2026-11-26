@@ -16,3 +16,4 @@ jump onto the middle of the board when he does it ... the whole thing should hav
   (`dash-away` keeps his spot's place); the jump and the zip are the element's own animations. *(mine: the figure covers the middle
   squares meanwhile; nothing can be played then, and pre-moves are already held during the gag.)*
 - The routine is its own figure (`DASH_HANG`), so his bar's and the computer's fits (barScale, SIDE_REACH) stay his standing figure's.
+- **Director's still review:** only his head turned, so his snout pointed up and to the side. Now at cheetah speed his upper body (torso, arms, the clock in his paws) leans 25° back about his hips and his head turns 62° more on top of it, so his open mouth points up; legs, shorts and tail stay as drawn (`HANG_TILT`).
