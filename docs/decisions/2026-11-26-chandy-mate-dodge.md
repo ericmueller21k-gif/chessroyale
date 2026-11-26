@@ -34,9 +34,13 @@
   6. **Until the art lands** (no new art here): `jump` plays his `stow` pose, `reach` his `point` with his crosshair locking onto your
      king, `zap` his `fire` with rapid fire's hit on your king (`MATE_POSES`, `MateOver` in ChandyDodge.tsx); the dock says
      "Checkmate?" / "Chandy isn't done yet.", then "Checkmate!" / "You beat Chandy.". The win beat reuses the God King's hero banner
-     ("CHECKMATE!", "You beat Chandy") over your mate, the board's check ring on his king.
+     ("CHECKMATE!", "You beat Chandy") over your mate, its last-move squares lit. (The board's check glow is off game-wide,
+     `BOARD.checkHighlight`, and the game has no confetti effect: the banner is what shows it's yours.)
   7. **His line** (`CHANDY_MATE_LINES`, a placeholder for Eric): "Mate? Negative. One shot left in the chamber." Also offered: "Pinned
      isn't finished. Final protocol: engage." and "Down, not out. A sniper always saves one round."
+- **Watched** frame by frame with real taps (your Qxf7 tapped, each vote tapped), phone and computer: a frame on every change, the
+  steps at 0, 1.0, 2.2, 3.0 and 3.7 s, the scope-in at 6.1 s, the win beat at 34.2 s, the results at 36.4 s; your king never jumps or
+  flickers. Stills on branch `stills/chandy-mate-dodge`.
 - **Checks:** `chandy.test.ts` ("Dodge from your mate": the mate brings it, nothing else new does, two hits his, survived yours, once a
   battle, its beats; in danger nothing), `several-bosses.test.ts` (a floor of several: a mate is a mate), `chandy-lobby.test.ts` (online:
   its start after the opening, a vote in it refused, decided after the win beat), `chandy-wired.test.ts` (the screen's phases),
