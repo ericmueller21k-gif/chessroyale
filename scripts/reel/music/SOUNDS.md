@@ -779,7 +779,7 @@ solos, the tower, nineteen bosses, Birdie's ult, the Hidden Boss's three pieces)
 (a list to tap, with a player) and sent as a zip of numbered, tagged MP3s. It is a snapshot: when a theme is added or
 changed, run it again, republish the page and send the zip again.
 
-## The two-minute themes made longer: Hollow first (Nov 26), sent, no verdict yet
+## The two-minute themes made longer: Hollow first (Nov 26); second go sent
 
 Eric: "we've got a handful of songs that are like 2 minutes and 5 seconds ... then we started making them around like
 2 minutes and 30 seconds or 2 minutes and 40 seconds ... could you try to do one for ... hollows? ... I don't want the
@@ -828,4 +828,20 @@ there could be like a small part in the middle ... an extra like 25 to 30 second
   last third 1 dB over; -16.0 LUFS, peak -1.2 dBFS.
 - If he passes it: `RECLUSE_HYMN=1 python3 phases_v.py --stereo --kbps 192 <folder>` rebuilds his four pieces (only
   `recluse-phase3-loop` and its length change in substance), then the director gets the new loop's seconds.
+
+**Hollow's longer song, second go (Nov 26).** Eric on the first: "I'm not a fan of the hollow changes ... that first
+part of the transition, it just doesn't sound great ... whatever ... comes in at like 156 onward is good, but before
+that, I do like there's like a smashing sound that's good. That's like a transition, but other than that, it's just
+like too dull. It feels off ... it just feels like it was thrown in ... maybe reuse a bit more of the main score, the
+main ideas of the song. But then that stuff that hits like at 157 ... can be blended in a bit more ... Try one more
+time. Otherwise, we'll just leave everything as is."
+- Out: the bar of hush and the eight bars at half pace (the 808 and wobble drop, the low lead's slow tune). In its
+  place, at full pace over the band as it is under the tune: the smash (glass, a crash, one boom), the tune's own
+  first two bars, the limp's shapes answering them, the tune's two bars a half step down, the limp's shapes again.
+  The limp and the climb (1:57 on) are as he heard them. Still 2:36; the old bars still match the two-minute song.
+- **Lessons for the other two-minute songs:** new bars have to open on the song's own tune or texture and keep its
+  pace; a new idea comes in second, answering the old one, not first. A half-pace drop with a new instrument in a
+  song that never had one reads as another song "thrown in", though the same drop was liked where a song was built
+  round it (songs N and O). The level must not dip where the new bars begin (the first go's opening sat 2 dB under).
+- This is the last try he offered: if it misses, Hollow stays at two minutes and the others are left alone.
 

@@ -25,15 +25,20 @@ The longer song (Eric, Nov 26: the two-minute themes brought up to about 2:30 to
 song that's already there to be messed with ... adding one more verse ... I don't want a verse that doesn't hit right.
 I also don't want like repeated exact verse or sound that's already been used"). MORE bars of new music go in after
 bar 70; bars 1 to 70 are as they were, and the last ten (the tune whole, and the ending) are as they were, 36 s later.
-HOLLOW_MORE=24 in the environment renders it (0, the two-minute song, until he passes the longer one):
+HOLLOW_MORE=24 in the environment renders it (0, the two-minute song, until he passes the longer one).
+The second go. Of the first, whose new bars opened with a bar of hush and then eight at half pace (an 808, a wobbling
+bass, a low driven lead's slow tune): "that first part of the transition, it just doesn't sound great ... there's like
+a smashing sound that's good ... other than that, it's just like too dull. It feels off ... like it was thrown in ...
+maybe reuse a bit more of the main score, the main ideas of the song ... that stuff that hits like at 157 ... can be
+blended in a bit more"; the limp and the climb he passed ("156 onward is good"). So the half-pace bars are gone: the
+smash stays, and the new bars open at full pace on the song's own tune, with the limp's shapes answering it:
 
-  bars 71-78   the fall: a bar of hush (a heartbeat, one note of the music box, a riser), then a boom and the band at
-               half pace: an 808 under each bar, a wobbling bass, and a new voice, a low driven lead, with a slow tune
-               that sinks a half step at a time (G, F sharp, F); the music box answers in tritones; far-off voices
+  bars 71-78   the turn: a smash (glass, a crash, a boom), and the tune's own first two bars at once; the limp's
+               shapes answer them; the tune's two bars again a half step down (F sharp), and the limp's shapes on F
   bars 79-86   the limp: a motif five 8ths long on the lead, so it starts somewhere new in every bar, over the kit
-               at full pace; the floor goes on sinking (E, E flat, D, D flat); the low lead joins it halfway
-  bars 87-94   the climb: the fall's tune a minor third up (B flat) on both leads, then up a step (C) and another (D),
-               a riser and a roll, into the tune whole
+               at full pace; the floor goes on sinking (E, E flat, D, D flat); a low driven lead joins it halfway
+  bars 87-94   the climb: a slow tune on both leads, on B flat, then up a step (C) and another (D), a riser and a
+               roll, into the tune whole
   bars 95-104  the two-minute song's bars 71 to 80
 """
 import os
@@ -82,22 +87,25 @@ BOX2 = "D6:1.5 Ab5:1.5 G5:1 | Bb5:1.5 E6:1.5 Eb6:1"
 BOX3 = "Db6:1.5 G5:1.5 Ab5:1 | E6:1.5 Bb5:1.5 A5:1"
 END = "G6:.25 F#6:.25 F6:.25 E6:.25 Eb6:.25 D6:.25 Db6:.25 C6:.25 B5:.25 Bb5:.25 A5:.25 Ab5:.25 G5:1 | G4:.5 -:.5 Ab4:.5 -:.5 G4:.5 -:1.5"
 # ---- the longer song's new bars (71-94) ----
-# The fall (bars 72-78): the low driven lead's slow tune, its two-bar shape sinking a half step each time.
-FALL = (
-    "G3:1.5 Bb3:.5 Db4:2 | D4:1 Db4:1 Bb3:1.5 Ab3:.5 | G3:2.5 -:1.5 | F#3:1.5 A3:.5 C4:2 | Db4:1 C4:1 A3:1.5 G3:.5 | "
-    "F3:1 Ab3:1 B3:.5 C4:.5 B3:1 | Ab3:1.5 F3:.5 E3:2"
+# The turn (bars 71-78): the tune's first two bars; the limp's shapes (below) in answer; the tune's two bars a half
+# step down; the limp's shapes on F.
+TURN = (
+    "G5:1 -:.5 G5:.5 Ab5:.5 G5:.5 F5:.5 G5:.5 | Bb5:1.5 Ab5:.5 G5:1 -:.5 D5:.5 | "
+    "G5:.5 Ab5:.5 G5:.5 D5:1 Bb5:.5 Ab5:.5 G5:.5 | Db6:1 D6:.5 Db6:.5 Bb5:.5 G5:1 -:.5 | "
+    "F#5:1 -:.5 F#5:.5 G5:.5 F#5:.5 E5:.5 F#5:.5 | A5:1.5 G5:.5 F#5:1 -:.5 C#5:.5 | "
+    "F5:.5 Gb5:.5 F5:.5 C5:1 Ab5:.5 Gb5:.5 F5:.5 | B5:1 C6:.5 B5:.5 Ab5:.5 F5:1.5"
 )
 # The limp (bars 79-86): a motif five 8ths long (three 8ths and a quarter), three shapes of it in turn: half steps
 # over the bar's root.
 LIMP = ((0, 1, 0, -5), (3, 1, 0, 6), (7, 6, 3, 0))
-# The climb (bars 87-94): the fall's tune a minor third up, then its shape a step higher, and again on D.
+# The climb (bars 87-94): a slow tune that rises a tritone and falls back, on B flat; its shape a step higher, and again on D.
 CLIMB = (
     "Bb3:1.5 Db4:.5 E4:2 | F4:1 E4:1 Db4:1.5 B3:.5 | Bb3:1.5 Db4:.5 E4:1 F4:1 | Ab4:2 F4:1 E4:1 | "
     "C4:1.5 Eb4:.5 Gb4:2 | G4:1 Gb4:1 Eb4:1.5 Db4:.5 | D4:1.5 F#4:.5 A4:2 | C5:1 Bb4:1 A4:.5 F#4:.5 D4:1"
 )
 MORE_ROOTS = ["G2"] * 4 + ["F#2"] * 2 + ["F2"] * 2 + ["E3"] * 2 + ["Eb3"] * 2 + ["D3"] * 2 + ["Db3"] * 2 + ["Bb2"] * 4 + ["C3"] * 2 + ["D3"] * 2
 assert MORE in (0, len(MORE_ROOTS))
-for name, beats in [(BOX, 8), (TUNE, 32), (DARK, 32), (SECOND, 32), (CREEP, 24), (END, 8), (LASH, 32), (CREEP2, 32), (BOX2, 8), (BOX3, 8), (FALL, 28), (CLIMB, 32)]:
+for name, beats in [(BOX, 8), (TUNE, 32), (DARK, 32), (SECOND, 32), (CREEP, 24), (END, 8), (LASH, 32), (CREEP2, 32), (BOX2, 8), (BOX3, 8), (TURN, 32), (CLIMB, 32)]:
     assert abs(length(name) - beats) < 1e-9, (name, length(name))
 
 # The root, bar by bar, and whether its chord is major (only D's).
@@ -378,49 +386,26 @@ def main(out: str) -> None:
         env = np.exp(-t / (beats * x.beat_s * 0.6)) * np.minimum(1, (k - 1 - np.arange(k)) / (0.02 * x.sr))
         put("sub", b, (np.tanh(2.4 * np.sin(ph) * env) / np.tanh(2.4) + 0.3 * np.sin(2 * ph) * env + 0.15 * np.sin(3 * ph) * env) * vol)
 
-    def wobble(b, m, beats, rate, vol=0.2, top=18.0):
-        """The wobble bass: a sawtooth whose brightness sweeps open and shut `rate` times a beat, driven hard."""
-        k = x.k(beats)
-        t = np.arange(k) / x.sr
-        cut = 1.5 + (0.5 - 0.5 * np.cos(2 * np.pi * rate * t / x.beat_s)) * top
-        w = np.zeros(k)
-        for c in (-9, 9):
-            ph = 2 * np.pi * x.hz(m + c / 100) * t
-            for h in range(1, 22):
-                w += np.sin(h * ph) / h * np.clip(cut - h + 1, 0, 1)
-        put("wobble", b, np.tanh(1.8 * w) * np.minimum(1, t / 0.005) * np.minimum(1, (k - 1 - np.arange(k)) / (0.01 * x.sr)) * vol)
-
     def low(start, text, vol=1.0, pan=0.1):
         """The new voice: a low driven lead (three sawtooths a hair apart, driven hard, each note opening bright)."""
         for b, d, m in line(start, text):
             put("grit", b, x.gritty(m, d * 0.92, 0.21 * vol), pan)
 
-    def fall(first):
-        """Bars 71-78. A bar of hush: glass, wind, his heartbeat, one note of the music box, a riser. Then the boom, and
-        seven bars at half pace: a kick on 1 (and before 4), the snare on 3, an 808 under each bar, the wobbling bass
-        through each bar's second half, the fast pattern ticking far off; the low lead's tune sinking by half steps;
-        the music box answering in tritones; two far-off voices."""
+    def turn(first):
+        """Bars 71-78. A smash where the second tune ends: glass, a crash and one deep boom. Then the band as it is
+        under the tune (the kit, the bass, the fast pattern, the organ's stabs), and on the lead the tune's first two
+        bars, the limp's shapes answering, the tune's two bars a half step down, the limp's shapes on F; glass on
+        each new root; a roll and a screech into the limp."""
         b0 = first * 4
-        shatter(b0, 0.2)
-        put("wind", b0, x.rumble(6, 0.14, hold=40), 0.2)
-        heart(b0 + 1, 0.42), heart(b0 + 2.5, 0.42)
-        put("box", b0 + 0.5, x.bell(n("G6"), 3.0, 0.11, ratio=3.5, index=1.8, decay=0.6), 0.2)
-        riser(b0 + 2, 2, 0.13)
-        boom = b0 + 4
-        x.crash(boom, 0.26), shatter(boom, 0.2)
-        for bar in range(first + 1, first + 8):
-            b = bar * 4
-            root = n(ROOTS[bar])
-            x.kick(b, 0.55), x.kick(b + 2.5, 0.34), x.snare(b + 2, 0.26)
-            for i in range(8):
-                x.hat(b + i * 0.5, 0.05 if i % 2 == 0 else 0.03)
-            sub(b, root, 2.2, 0.5 if bar == first + 1 else 0.42)
-            wobble(b + 2, root + 12, 2.0, 3, 0.17)
-            under(bar, 0.04)
-        low(boom, FALL)
-        box(boom + 10.5, "Db7:.5 G6:.5 Db6:.5", 0.1), box(boom + 26, "B6:.5 F6:.5 B5:1", 0.1)
-        wail(boom + 5, 3, 86, 80, 0.045, -0.4), wail(boom + 21, 3, 84, 78, 0.045, 0.4)
-        screech(b0 + 31.6, 93, 0.35, 0.07)
+        shatter(b0, 0.2), x.crash(b0, 0.26)
+        sub(b0, n("G2"), 2.5, 0.5)
+        lead(b0, TURN)
+        for bar in range(first, first + 8):
+            under(bar), organ(bar), bass(bar), kit(bar)
+        shatter(b0 + 16, 0.14), shatter(b0 + 24, 0.14)
+        screech(b0 + 15, 93, 0.35, 0.07), screech(b0 + 23, 95, 0.3, 0.07, -0.3)
+        roll(b0 + 30, 8, 0.25, 0.06, 0.02)
+        screech(b0 + 31.4, 91, 0.4, 0.09)
 
     def limp(first):
         """Bars 79-86. The kit at full pace, the bass and the fast pattern; the lead's five-8th motif, twelve times,
@@ -449,9 +434,9 @@ def main(out: str) -> None:
         screech(b0 + 30.6, 91, 0.5, 0.1)
 
     def climb(first):
-        """Bars 87-94. Everything in, an 808 on each bar: the fall's tune a minor third up on the low lead with the
-        lead an octave over it; its shape again on C, and on D (the one bright chord); a riser, a roll and a screech
-        into the tune whole."""
+        """Bars 87-94. Everything in, an 808 on each bar: a slow tune on the low lead with the lead an octave over
+        it, on B flat; its shape again on C, and on D (the one bright chord); a riser, a roll and a screech into the
+        tune whole."""
         b0 = first * 4
         shatter(b0, 0.18), x.crash(b0, 0.26)
         for bar in range(first, first + 8):
@@ -465,14 +450,14 @@ def main(out: str) -> None:
 
     if MORE:
         dice = x.rng.bit_generator.state  # (the mix's own random numbers are put back after, so the hall is the same one)
-        fall(70), limp(78), climb(86)
+        turn(70), limp(78), climb(86)
         x.echo("grit", 0.75, 0.12, 0.05)
         x.rng.bit_generator.state = dice
 
     x.echo("box", 0.75, 0.3, 0.14)
     x.echo("fx", 0.75, 0.2, 0.08)
     x.echo("lead", 0.75, 0.12, 0.05)
-    write_wav(out, x.mixdown({"bass": 0.6, "fx": 2.0, "arp": 1.4, "organ": 1.3, "box": 1.5, "wind": 2.0, "sub": 0.5, "wobble": 0.8, "grit": 1.0}, lowpass=8500, room=0.2))
+    write_wav(out, x.mixdown({"bass": 0.6, "fx": 2.0, "arp": 1.4, "organ": 1.3, "box": 1.5, "wind": 2.0, "sub": 0.5, "grit": 1.0}, lowpass=8500, room=0.2))
 
 
 if __name__ == "__main__":
