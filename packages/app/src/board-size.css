@@ -601,11 +601,12 @@
  * the board with its strips (the boss's two-line bar over it, Eric, Nov 26: "I like the boss bar bigger"; the dock's row under it) and the
  * column beside it on one top and one bottom line, the frame's one gap (`--cf-gap`) either side of the board, the three centered as one
  * block, the board's box on its drawing step. The board keeps the size the bar allows (`--bd-room`, 123 px: game-frame.css). The column:
- * the gear (and the admins' ⚡ and 🐟) level with the bar; the Moves panel from the board's top down to the figures who stand on its foot
- * (the God King, and your pawn in Boss alone: they keep their places and sizes, placed from the board), 12 px over their heads; an online
+ * the gear (and the admins' ⚡ and 🐟) level with the bar; the Moves panel from the board's top down to 12 px over the God King's frame
+ * (his tallest pose's room), then the figures standing on the board's foot (the God King, and your pawn in Boss alone: they keep their
+ * places and sizes, placed from the board); an online
  * raid's chat under the moves as before, down to the God King's room (`--gk-zone`). The board's lines: its squares' top, their foot with
- * the clock's bar under it (the 50 v 50's). A phone, a tablet, a computer under 1100 px, a Battle Tower floor and the Hidden Boss's phase
- * change and phase 2 are unchanged. */
+ * the clock's bar under it (the 50 v 50's). A phone, a tablet, a computer under 1100 px, a Battle Tower floor and the Hidden Boss's fight
+ * (his phases keep phase 1's boxes) are unchanged (game.ts `bossFramed`). */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
   .screen.game.bf-frame {
     /* (The boss's room by the window's edge is the left column's now: the board gives none of its width for him.) */
@@ -626,13 +627,14 @@
   .screen.game.bf-frame > .gm-tools {
     left: 0;
   }
-  /* The Moves panel: the board's top line down to 12 px over the figures' heads (their box: 120 px times their size, `--king-k`), its
-     left edge one gap off the board. */
+  /* The Moves panel: the board's top line down to 12 px over the God King's frame, its left edge one gap off the board. His frame (his
+     canvas) reaches 200 px times his size (`--king-k`) over the board's foot, and his tallest pose fills it: never over the list's text
+     (boss-side.spec.ts, Nov 4). A party's team (2 x 84 px and their checks) is under it too. */
   .screen.game.bf-frame > .mv-side {
     translate: none;
     align-self: stretch;
     height: auto;
-    margin-bottom: calc(120px * var(--king-k, 1) + 12px);
+    margin-bottom: calc(200px * var(--king-k, 1) + 12px);
   }
   /* (An online raid's chat: under the moves (their old half height), 12 px between, down to the God King's room, as before.) */
   .screen.game.bf-frame:has(> .under-board.side) > .mv-side {
