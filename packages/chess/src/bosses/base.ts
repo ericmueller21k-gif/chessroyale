@@ -217,23 +217,11 @@ export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: Pick<R
 }
 
 /**
- * The boss is in danger (BOSS_POWERS.dangerAt; Eric, Nov 26): the crowd's expected score after its last move, as the judge has it
- * (`judged`), at or above dangerAt. Nothing judged yet: not in danger.
+ * The boss is in danger (BOSS_POWERS.dangerAt; Eric, Nov 26, about Birdie): the crowd's expected score after its last move, as the
+ * judge has it (`judged`), at or above dangerAt. Nothing judged yet: not in danger. Only Birdie's Fall reads it (and Chandy's Dodge
+ * until his checkmate rework): every other boss's meter fills as it always has (docs/decisions/2026-11-26-ult-danger-birdie-only.md).
  */
 export const inDanger = (judged: number | undefined, s: Pick<BossPowerSettings, "dangerAt"> = BOSS_POWERS): boolean => judged !== undefined && judged >= s.dangerAt;
-
-/**
- * The meter's charge with the boss in danger (inDanger) and the danger's ultimate still to come (`dangerSpent` unset): at least what
- * makes it full now (rageNow at rageFull, with his material lost and what the last ultimate spent), so its step warns (or brings the
- * ultimate) this turn. Otherwise `charge` as it is: one ultimate a danger, then the meter's usual pace (Nov 26: filled at once again
- * after every ultimate, the short ones came every other turn, Big Boy's Bounce 32 times in a battle).
- */
-export function dangerCharge(p: Pick<BossPowerState, "charge" | "lost" | "rageUsed" | "judged" | "dangerSpent">, speed: number, s: Pick<RageRates, "rageFull" | "ragePerMaterial"> & Pick<BossPowerSettings, "dangerAt"> = BOSS_POWERS): number {
-  const charge = p.charge ?? 0;
-  if (!inDanger(p.judged, s) || p.dangerSpent) return charge;
-  // (A hair over full, so the meter reads full whatever the rounding of the division.)
-  return Math.max(charge, s.rageFull / Math.max(1e-6, speed) + (p.rageUsed ?? 0) - p.lost * s.ragePerMaterial + 1e-6);
-}
 
 /** How fast a boss's meter fills (BOSS_POWERS.rageSpeed: every gain times this). */
 export const rageSpeedOf = (id: string | undefined, s: Pick<RageRates, "rageSpeed"> = BOSS_POWERS): number => (id && s.rageSpeed[id]) || 1;
@@ -621,16 +609,13 @@ export function ultCapped(p: Pick<BossPowerState, "ultMax" | "ults"> | null | un
 }
 
 /**
- * An ultimate has come (its `ultAt` just set): one more this battle, and the meter is spent (the danger's ultimate too, if the crowd
- * is at the danger line: `dangerSpent`). The dispatcher calls it
+ * An ultimate has come (its `ultAt` just set): one more this battle, and the meter is spent. The dispatcher calls it
  * as a turn begins; a boss's rules call it when theirs comes outside one (Lights out from the test trigger, the Big
  * Bounce).
  */
-export function unleashed(next: BossPowerState, s: Pick<RageRates, "ragePerMaterial"> & Partial<Pick<BossPowerSettings, "dangerAt">> = BOSS_POWERS): BossPowerState {
+export function unleashed(next: BossPowerState, s: Pick<RageRates, "ragePerMaterial"> = BOSS_POWERS): BossPowerState {
   next.ults = (next.ults ?? 0) + 1;
   next.rageUsed = ragePoints(next, s);
-  // (In danger as it comes: the danger's ultimate, spent until the danger ends: dangerCharge.)
-  if (inDanger(next.judged, { dangerAt: s.dangerAt ?? BOSS_POWERS.dangerAt })) next.dangerSpent = true;
   return next;
 }
 

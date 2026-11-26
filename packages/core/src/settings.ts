@@ -1456,17 +1456,11 @@ export const BOSS_POWERS = {
   ragePerMaterial: 100 / 18,
   rageStrike: 25,
   /**
-   * The boss in danger (Eric, Nov 26, after beating Birdie with no Fall: "It's not about like how many moves have been played. It
-   * should have detected like he was basically in danger, or like it was already heavily in my favor, and it should start
-   * triggering very quickly thereafter, like a turn or two at most"): the crowd's expected score after its move, as the judge has
-   * it (the boss's `judged`, the number "your chances" shows), at or above dangerAt. From one such move: the rage meter is full as
-   * the next crowd turn begins (its usual warning, then the ultimate) and Chandy's Dodge is warned as his rifle's meter would;
-   * Birdie's Fall, with no warning, comes at the start of his turn once two such moves come in a row (birdie.fallDangerMoves)
-   * (docs/decisions/2026-11-26-ult-danger.md). The ultimate comes within two of his turns, whatever his meter held, as soon as its
-   * own rules allow it. One a danger: once an ultimate has come with the crowd at the line (`dangerSpent`), the meter fills at its
-   * usual pace (the ahead gain at its fullest) until a crowd move below the line ends the danger (filled again at once after each,
-   * the audit's shortest ultimates came every other turn: Big Boy's Bounce 32 times in a battle). Below it, every meter fills as it
-   * always has.
+   * The danger line, for Birdie's Fall (Eric, Nov 26, after beating Birdie with no Fall: "It should have detected like he was basically
+   * in danger, or like it was already heavily in my favor, and it should start triggering very quickly thereafter, like a turn or two
+   * at most"): the crowd's expected score after its move, as the judge has it (the boss's `judged`, the number "your chances" shows),
+   * at or above dangerAt, for birdie.fallDangerMoves of its moves in a row. Birdie only (and Chandy's Dodge until his checkmate rework):
+   * every other boss's meter fills as it always has (docs/decisions/2026-11-26-ult-danger-birdie-only.md).
    */
   dangerAt: 0.7,
   /**
