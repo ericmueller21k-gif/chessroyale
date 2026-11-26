@@ -26,7 +26,7 @@ import { marksStop, type EdgeMark } from "../board-layer.ts";
 import { applyMove, baseAt, fenAtPly, legalMoves, matingMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { BALLOON_TEST_MOVES } from "./tiger.ts";
-import { dangerCharge, heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, ultCapped, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
+import { dangerCharge, heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, testSwitch, to, turnOf, ultCapped, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
 
 /**
  * How long each of its moments holds the screen (ms; POWER_FX in boss-timing.ts). `fold` and `revision` play at the start
@@ -482,16 +482,22 @@ export const folioBattle = {
     const boss = b.state.boss;
     const p = boss?.powers;
     // (Capped, ultMax: a tower floor of three's after his one Crease. None comes again, so no line is asked for.)
-    if (!boss || !p || boss.id !== "folio" || boss.result || p.ultAt !== undefined || ultCapped(p)) return false;
-    if (p.ultNext) return true;
-    if (p.warnAt !== undefined) return false;
+    if (!boss || !p || boss.id !== "folio" || boss.result || ultCapped(p)) return false;
     const turn = boss.crowdMoves + 1;
+    // (An ultimate of his that ends as this turn begins counts as over: prepareTurn clears it, its warning with it, and then a
+    // danger fills the meter at once. Review of #968, finding 1: asked for no line then, his Crease came a turn late.)
+    const ending = p.ultAt !== undefined;
+    if (ending && FOLIO.ultimateRunning!(p, turn, s)) return false;
+    if (p.ultNext) return true;
+    if (p.warnAt !== undefined && !ending) return false;
     if (b.settings.bossPowerTest === "crease" && turn >= 2 && !p.ults) return true;
     const moved = p.turn > 0 ? Math.max(0, turn - p.turn) : 0;
     const charge = (p.charge ?? 0) + moved * rageTick(p.judged, s);
     const lost = Math.max(p.lost, p.material - materialOf(boardOf(b).fen, other(boss.crowdSide)));
+    // (As prepareTurn: an ultimate ending spends what was gathered through it.)
+    const rageUsed = ending ? ragePoints({ charge, lost }, s) : p.rageUsed;
     // (In danger, prepareTurn fills the meter for its step: dangerCharge.)
-    return rageNow({ charge: dangerCharge({ charge, lost, rageUsed: p.rageUsed, judged: p.judged, ...(p.dangerSpent ? { dangerSpent: true as const } : {}) }, rageSpeedOf(boss.id, s), s), lost, rageUsed: p.rageUsed }, rageSpeedOf(boss.id, s), s) >= s.rageFull;
+    return rageNow({ charge: dangerCharge({ charge, lost, rageUsed, judged: p.judged, ...(p.dangerSpent ? { dangerSpent: true as const } : {}) }, rageSpeedOf(boss.id, s), s), lost, rageUsed }, rageSpeedOf(boss.id, s), s) >= s.rageFull;
   },
 
   /** What the host's engines need to pick the line after its move now (the boss request's `crease`), or null: none wanted. */

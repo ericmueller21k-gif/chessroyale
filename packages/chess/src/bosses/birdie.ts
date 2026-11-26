@@ -397,8 +397,8 @@ export const BIRDIE: BossRules = {
     rank: (boss, top, fen) => trainRanked(top, fen, trainSquare(boss), boss.crowdSide),
     evaluation: (boss, evaluation, fen) => trainJudged(evaluation, fen, trainSquare(boss), boss.crowdSide),
   },
-  afterCrowdMove(b, move) {
-    birdieBattle.afterCrowdMove(b, move);
+  afterCrowdMove(b, move, judged) {
+    birdieBattle.afterCrowdMove(b, move, BOSS_POWERS.birdie, judged === null);
   },
   // (Several bosses: another boss's power took the warned piece away outside a move: the warning goes with it.)
   followBoard(b) {
@@ -446,7 +446,7 @@ export const birdieBattle = {
    * the train's smash counted), the admins' trigger, the test switch). Nothing once the battle is decided, the game over on the
    * board, or at the move cap. Each a base on the board where it changes it; the events in that order.
    */
-  afterCrowdMove(b: Battle, move: string | null = null, s: BirdieSettings = BOSS_POWERS.birdie): void {
+  afterCrowdMove(b: Battle, move: string | null = null, s: BirdieSettings = BOSS_POWERS.birdie, unjudged = false): void {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || boss.id !== "birdie") return;
@@ -484,7 +484,8 @@ export const birdieBattle = {
     const test = b.settings.bossPowerTest === "fall" && boss.crowdMoves >= 2;
     // (In danger, Eric Nov 26: the crowd's expected score after its move, the judge's, at dangerAt or more for fallDangerMoves of its
     // moves in a row, this one the last: he falls now. The count goes on until his fall.)
-    const streak = bd.fell ? (bd.danger ?? 0) : inDanger(p.judged, b.rageRates?.() ?? BOSS_POWERS) ? (bd.danger ?? 0) + 1 : 0;
+    // (A move the judge didn't score, Boingo's funhouse playing the crowd's for it, leaves the count as it was: review of #968, finding 2.)
+    const streak = bd.fell || unjudged ? (bd.danger ?? 0) : inDanger(p.judged, b.rageRates?.() ?? BOSS_POWERS) ? (bd.danger ?? 0) + 1 : 0;
     const falls = !bd.fell && !over && !won && p.ultAt === undefined && !p.noUlt && !ultCapped(p) && (!!p.ultNext || lost >= s.fallLost || streak >= s.fallDangerMoves || test);
     if (falls) events.push({ kind: "birdieFall", turn: p.turn });
     if (!w && !falls && streak === (bd.danger ?? 0)) return;

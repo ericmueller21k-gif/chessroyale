@@ -51,3 +51,10 @@
   within two of his turns, or once its condition allows; one a danger; the level battles unchanged), Birdie's and Chandy's own cases
   (`birdie.test.ts`, `chandy.test.ts`), the boss kit, the boss smoke for Birdie and Chandy. The audit: `npx tsx
   packages/sim/scripts/ult-danger.ts` (`run`, `summary`, `jumps`, `compare`).
+
+## The review pass (Nov 26)
+- Folio's Crease line is now asked for when one of his ultimates ends as the crowd's turn begins (`creaseDue` counts it as over, as
+  `prepareTurn` does). Before this, a danger at that moment brought his warning a turn late.
+- Birdie's count of crowd moves in a row at the line skips a move the judge never scored (Boingo's funhouse on a tower floor plays
+  the crowd's move for it). Before this, one judged move plus the funhouse's could bring his Fall.
+- `unleashed` reads the danger line from the settings it is given.

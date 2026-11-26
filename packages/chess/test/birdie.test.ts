@@ -387,6 +387,12 @@ describe("the Fall", () => {
       expect(fell(), "at the line, too few in a row").toBe(false);
       await r.playBoss();
     }
+    // (A move the judge never scored, Boingo's funhouse playing the crowd's for it on a tower floor: the count stays as it was.
+    // Review of #968, finding 2.)
+    const counted = birdieOf(r)!.danger;
+    bossRules(r.boss!)!.afterCrowdMove!((r as unknown as { battle: Parameters<NonNullable<NonNullable<ReturnType<typeof bossRules>>["afterCrowdMove"]>>[0] }).battle, null, null);
+    expect(birdieOf(r)!.danger, "an unjudged move").toBe(counted);
+    expect(fell(), "an unjudged move").toBe(false);
     crowdScore = BOSS_POWERS.dangerAt - 0.01;
     await crowdMove(r, save);
     expect(birdieOf(r)!.danger).toBe(0);

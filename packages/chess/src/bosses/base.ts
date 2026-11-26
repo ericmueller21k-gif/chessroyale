@@ -626,11 +626,11 @@ export function ultCapped(p: Pick<BossPowerState, "ultMax" | "ults"> | null | un
  * as a turn begins; a boss's rules call it when theirs comes outside one (Lights out from the test trigger, the Big
  * Bounce).
  */
-export function unleashed(next: BossPowerState, s: Pick<RageRates, "ragePerMaterial"> = BOSS_POWERS): BossPowerState {
+export function unleashed(next: BossPowerState, s: Pick<RageRates, "ragePerMaterial"> & Partial<Pick<BossPowerSettings, "dangerAt">> = BOSS_POWERS): BossPowerState {
   next.ults = (next.ults ?? 0) + 1;
   next.rageUsed = ragePoints(next, s);
   // (In danger as it comes: the danger's ultimate, spent until the danger ends: dangerCharge.)
-  if (inDanger(next.judged)) next.dangerSpent = true;
+  if (inDanger(next.judged, { dangerAt: s.dangerAt ?? BOSS_POWERS.dangerAt })) next.dangerSpent = true;
   return next;
 }
 
