@@ -1,0 +1,27 @@
+15ms boss cd-p-mate.cd-s-pause pieces=31 bubble="" banner="" 000-boss-cd-p-mate.cd-s-pause.png
+1014ms boss cd-p-mate.cd-s-jump pieces=31 bubble="" banner="" 001-boss-cd-p-mate.cd-s-jump.png
+2240ms boss cd-p-mate.cd-s-reach pieces=31 bubble="" banner="" 002-boss-cd-p-mate.cd-s-reach.png
+3017ms boss cd-p-mate.cd-s-zap pieces=31 bubble="" banner="" 003-boss-cd-p-mate.cd-s-zap.png
+3723ms boss cd-p-mate.cd-s-line pieces=31 bubble="Mate? Negative. One shot left in the chamber." banner="" 004-boss-cd-p-mate.cd-s-line.png
+6120ms boss cd-p-scope pieces=31 bubble="Mate? Negative. One shot left in the chamber." banner="" 005-boss-cd-p-scope.png
+6362ms boss cd-p-scope pieces=30 bubble="Mate? Negative. One shot left in the chamber." banner="" 006-boss-cd-p-scope.png
+6706ms boss cd-p-slide pieces=30 bubble="Mate? Negative. One shot left in the chamber." banner="" 007-boss-cd-p-slide.png
+7313ms boss cd-p-volley pieces=30 bubble="Mate? Negative. One shot left in the chamber." banner="" 008-boss-cd-p-volley.png
+10514ms boss cd-p-volley pieces=30 bubble="" banner="" 009-boss-cd-p-volley.png
+10931ms boss cd-p-open pieces=30 bubble="" banner="" 010-boss-cd-p-open.png
+11308ms boss cd-p-vote pieces=30 bubble="" banner="" 011-boss-cd-p-vote.png
+14305ms boss cd-p-locked pieces=30 bubble="" banner="" 012-boss-cd-p-locked.png
+15215ms boss cd-p-blast pieces=30 bubble="" banner="" 013-boss-cd-p-blast.png
+16188ms boss cd-p-result pieces=30 bubble="" banner="" 014-boss-cd-p-result.png
+18676ms boss cd-p-open pieces=30 bubble="" banner="" 015-boss-cd-p-open.png
+19067ms boss cd-p-vote pieces=30 bubble="" banner="" 016-boss-cd-p-vote.png
+22054ms boss cd-p-locked pieces=30 bubble="" banner="" 017-boss-cd-p-locked.png
+22988ms boss cd-p-blast pieces=30 bubble="" banner="" 018-boss-cd-p-blast.png
+23932ms boss cd-p-result pieces=30 bubble="" banner="" 019-boss-cd-p-result.png
+26401ms boss cd-p-open pieces=30 bubble="" banner="" 020-boss-cd-p-open.png
+26821ms boss cd-p-vote pieces=30 bubble="" banner="" 021-boss-cd-p-vote.png
+29828ms boss cd-p-locked pieces=30 bubble="" banner="" 022-boss-cd-p-locked.png
+30702ms boss cd-p-blast pieces=30 bubble="" banner="" 023-boss-cd-p-blast.png
+31659ms boss cd-p-result pieces=30 bubble="" banner="" 024-boss-cd-p-result.png
+34156ms boss cd-p-win pieces=31 bubble="" banner="CHECKMATE!You beat Chandy" 025-boss-cd-p-win.png
+36371ms results  pieces=32 bubble="You moved too fast…" banner="" 026-results-none.png
