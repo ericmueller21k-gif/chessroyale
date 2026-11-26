@@ -13,7 +13,7 @@
  * - his Scramble Rush's running copy (DASH_RUN: his zip-in's pose, drawn leaning by the screen);
  * - his attack on a king (DASH_ATTACK: a dash in with his trail, ten claw swipes, a dash off).
  */
-import { BOSS_POWERS } from "@chessroyale/core";
+import { BOSS_POWERS, DASH_HANG_ON } from "@chessroyale/core";
 import { BOSS_BLITZ, PALETTE, layers, star, type Pose } from "./boss-blitz.ts";
 import { moved } from "./attack-frame.ts";
 import type { Anim, Character, Frame, Speck } from "./sprite.ts";
@@ -63,6 +63,55 @@ function fit(n: number, ms: number): Anim {
   };
 }
 
+// ---------------- His "Hang on" (Eric, Nov 26; DASH_HANG_ON) ----------------
+// Built from his move's slap (the fits' frames) and his rig's own poses, nothing new drawn: the head thrown back with the eyes shut
+// and the mouth wide is his jkLaugh's; the wind-up is his paw on the clock's front, circling; the sorry an open paw raised.
+
+/** Head thrown back, eyes shut, mouth wide open: "he's really enjoying himself" (his jkLaugh's laugh). */
+const HEAD_UP: Pose = { head: [3, -2], eyes2: "joy", mouth: "wide", brow: 2, ears: 1 };
+
+/** Its slow smacks speeding up: from slowFrom ms a smack down to slowTo (each a little quicker), filling slowMs; then the paw held. */
+const hangSlow: Anim = lazyAnim(() => {
+  const [up, down, high] = [A.move!.frames[3]!, A.move!.frames[4]!, A.move!.frames[5]!];
+  const s = DASH_HANG_ON;
+  const frames: Frame[] = [];
+  let t = 0;
+  for (let ms: number = s.slowFrom; t + ms <= s.slowMs; ms = Math.max(s.slowTo, Math.round(ms * 0.85))) {
+    // (A slow smack: the paw up, down with its click, and up again for the rest of its time; a quick one is up and down.)
+    const rise = Math.min(140, Math.round(ms * 0.4));
+    const hit = Math.min(160, ms - rise);
+    frames.push({ ...up, ms: rise }, { ...down, ms: hit }, ...(ms - rise - hit > 0 ? [{ ...high, ms: ms - rise - hit }] : []));
+    t += ms;
+  }
+  if (t < s.slowMs) frames.push({ ...high, ms: s.slowMs - t });
+  return { loop: false, frames };
+});
+
+/** Cheetah speed: smacks at hitMs, head back and mouth open, for fastMs (the same two drawings over and over: drawn once each). */
+const hangFast: Anim = lazyAnim(() => {
+  const s = DASH_HANG_ON;
+  const rise = Math.round(s.hitMs * 0.4);
+  const upF = F(rise, { hand: "up", lift: 1, ...HEAD_UP, tail: 3 });
+  const downF = F(s.hitMs - rise, { hand: "down", sink: 1, ...HEAD_UP, head: [3, -1], flag: 1, tail: 2 }, { cue: "click", specks: A.move!.frames[4]!.specks });
+  const n = Math.floor(s.fastMs / s.hitMs);
+  return { loop: false, frames: [...Array.from({ length: n }, () => [upF, downF]).flat(), ...(s.fastMs > n * s.hitMs ? [F(s.fastMs - n * s.hitMs, { hand: "high", ...HEAD_UP })] : [])] };
+});
+
+/** The wind-up: his paw on the clock's front, winding it round twice (its whirr), his eyes on it; windMs long. */
+const hangWind: Anim = lazyAnim(() => {
+  const s = DASH_HANG_ON;
+  const spots: [number, number][] = [[24, 57], [22, 58], [23, 60], [25, 59]];
+  const step = Math.floor(s.windMs / 8);
+  const turn = spots.map((at, i) => F(step, { at, gesture: "fist", eyes2: "down", mouth: "grin", brow: 1, tail: 1 }, i === 0 ? { cue: "whirr" } : {}));
+  return { loop: false, frames: [...turn, ...turn, F(s.windMs - 8 * step, { hand: "high", eyes2: "down", mouth: "grin" })] };
+});
+
+/** "Sorry about that, bro": an open paw raised to us, a sheepish grin; then his idle's first pose until his move. */
+const hangSorry: Anim = lazyAnim(() => {
+  const s = DASH_HANG_ON;
+  return { loop: false, frames: [F(s.sorryMs, { at: [36, 40], gesture: "open", eyes2: "us", mouth: "grin", brow: 1, tail: 1 }), F(s.returnMs, {})] };
+});
+
 /** His figure: the approved one in a frame with room on its right (105 x 104), his rest loops quiet, and his clock smacks. */
 export const DASH_FIGURE: Character = {
   ...BOSS_BLITZ,
@@ -77,6 +126,10 @@ export const DASH_FIGURE: Character = {
     fit4: lazyAnim(() => fit(4, BOSS_POWERS.dashClockFit.smackMs)),
     fit5: lazyAnim(() => fit(BOSS_POWERS.dashClockFit.smacks, BOSS_POWERS.dashClockFit.smackMs)),
     fit10: lazyAnim(() => fit(BOSS_POWERS.dashPopOff.hits, BOSS_POWERS.dashPopOff.hitMs)),
+    hangSlow,
+    hangFast,
+    hangWind,
+    hangSorry,
   },
 };
 
