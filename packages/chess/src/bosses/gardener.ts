@@ -32,7 +32,7 @@
  * - **Hard guards on every step:** never a king; never either side left in check; never a mate in one for either side;
  *   never the crowd without a move (the plants counted); never a position the engine refuses (stockfishRefuses).
  * - **The pass guard** (as every power that spends his whole turn): when the watering would lose him real material
- *   (passLoses), it waits for his next turn and he plays his move; the test switch's and the admins' trigger's come anyway.
+ *   (passLoses), it waits for his next turn and he plays his move, at most ultWaitMax times a watering (Eric, Nov 26); the test switch's and the admins' trigger's come anyway.
  * - Online the server rolls the seeds and the host's engines place them (the boss request's `water`); the server checks
  *   the answer (waterCheck: what was rolled, where the rules allow it) and plays it. Anything else waits a turn.
  */
@@ -621,10 +621,16 @@ export const gardenerBattle = {
     return { kinds: [...roll.kinds], plants: plantSquares(p), order: Math.floor(powerRoll(p.seed, "water-order", gardenOf(p).waterings) * 2 ** 32) };
   },
 
-  /** It comes even when it would lose him real material: the test switch's first watering, or the admins' trigger. */
+  /**
+   * It comes even when it would lose him real material: the test switch's first watering, the admins' trigger, or the pass guard
+   * having held it ultWaitMax times (Eric, Nov 26: "just force it at some point").
+   */
   any(b: Battle): boolean {
     const p = b.state.boss?.powers;
-    return !!p && (!!p.ultNext || (b.settings.bossPowerTest === "water" && !gardenOf(p).waterings));
+    if (!p) return false;
+    // (His waits, not crowd moves: a tower floor's other bosses' turns and his turns in check don't count. Review of #972, finding 1.)
+    const waited = (gardenOf(p).waits ?? 0) >= BOSS_POWERS.ultWaitMax;
+    return !!p.ultNext || waited || (b.settings.bossPowerTest === "water" && !gardenOf(p).waterings);
   },
 
   /** The watering from this device's engines (solo, the sims): waterAnswer, then apply. */
@@ -650,7 +656,7 @@ export const gardenerBattle = {
     const boss = b.state.boss!;
     const checked = answer && answer !== PASS_WAIT ? waterCheck(boardOf(b).fen, ask, answer) : null;
     if (!checked) {
-      setGarden(b, (g) => ({ ...g, roll: null, wait: boss.crowdMoves }));
+      setGarden(b, (g) => ({ ...g, roll: null, wait: boss.crowdMoves, ...(answer === PASS_WAIT ? { waits: (g.waits ?? 0) + 1 } : {}) }));
       return null;
     }
     const board = boardOf(b);
@@ -665,7 +671,7 @@ export const gardenerBattle = {
     const plants: GardenPlant[] = checked.plants.map((square) => ({ square, at: boss.crowdMoves, until: boss.crowdMoves + BOSS_POWERS.plantTurns }));
     const { ultNext: _trigger, ...p } = boss.powers!;
     const g = gardenOf(p);
-    const { roll: _roll, wait: _wait, ...rest } = g;
+    const { roll: _roll, wait: _wait, waits: _waits, ...rest } = g;
     b.state = { ...b.state, boss: { ...boss, powers: unleashed({ ...p, ultAt: boss.crowdMoves, garden: { ...rest, since: roll.clock, base: 0, plants: [...g.plants, ...plants], water: result, waterings: g.waterings + 1 } }) } };
     b.bossPassed();
     return result;

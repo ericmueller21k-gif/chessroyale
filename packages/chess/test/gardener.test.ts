@@ -409,6 +409,20 @@ describe("Watering: the engine's placement within the band", () => {
     // No engine: "".
     expect((await waterAnswer([], QUIET, ask(["plant"]))).answer).toBe("");
   });
+  it("the pass guard holds a watering at most ultWaitMax times, then it comes whatever passing costs; his waits, not crowd moves (Eric, Nov 26; review of #972)", () => {
+    expect(S.ultWaitMax).toBe(3);
+    const r = battle(11);
+    const at = (waits: number | undefined, crowdMoves = 9) => {
+      const p = r.boss!.powers!;
+      r.state.boss = { ...r.boss!, crowdMoves, powers: { ...p, warnAt: 1, ultNext: false, garden: { ...p.garden!, waits } } };
+      return r.waterAny();
+    };
+    expect(at(undefined)).toBe(false);
+    expect(at(2)).toBe(false);
+    // (Crowd moves since the warning don't count: a tower floor's other bosses' turns, his turns in check.)
+    expect(at(2, 40)).toBe(false);
+    expect(at(3)).toBe(true);
+  });
 });
 
 describe("Watering in a battle", () => {

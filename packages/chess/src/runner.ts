@@ -2044,7 +2044,7 @@ export class MatchRunner {
     return gardenerBattle.ask(this.battle);
   }
 
-  /** The watering comes even when it would lose him real material (the test switch's first, or the admins' trigger). */
+  /** The watering comes even when it would lose him real material (the test switch's first, the admins' trigger, or the guard has held it ultWaitMax times). */
   waterAny(): boolean {
     return gardenerBattle.any(this.battle);
   }

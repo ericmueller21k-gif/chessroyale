@@ -777,6 +777,8 @@ export interface BossPowerState {
    * of his next turn. Never sent to screens.
    */
   passWait?: number;
+  /** How many times the pass guard has held his warned Carrot Patch (BOSS_POWERS.ultWaitMax: at that many, it comes). */
+  passWaits?: number;
   /** The crowd's pieces in the air after the Mammoth Slam (each with the square it lands on), until they land. */
   airborne?: SlamPiece[] | null;
   /** Their last landing: where each came down (its own square, or the nearest empty one that's allowed). */
@@ -952,6 +954,8 @@ export interface GardenState {
   plants: GardenPlant[];
   roll?: { at: number; clock: number; seeds: number; kinds: WaterKind[] } | null;
   wait?: number;
+  /** How many times the pass guard has held this watering (BOSS_POWERS.ultWaitMax: at that many, it comes); none after it comes. */
+  waits?: number;
   water?: WaterResult | null;
   waterings: number;
 }
