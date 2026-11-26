@@ -368,6 +368,9 @@ export function TownScreen({
       ? part === "top"
         ? chunk(import("./shops/tower-floor-scene.ts")).then((m) => m.towerFloorFx(floorS.current!))
         : chunk(import("./shops/tower-scene.ts")).then((m) => m.towerLobbyFx(() => towerBest.current))
+      : id === "birdie"
+      ? // (Birdie's Station, Nov 26: the birds at the bar, who fly off when you come up to it: shops/birdie-birds.ts.)
+        chunk(import("./shops/birdie-birds.ts")).then((m) => m.birdieFx(() => shopCtl.current?.youAt?.() ?? null))
       : id !== "recluse"
       ? null
       : part === "top"

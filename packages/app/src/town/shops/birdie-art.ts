@@ -10,7 +10,8 @@
  * - Flat things (the floor with its side walls and safety line, the crossing's gravel and rails) are 37 x 37 floor tiles cut from the art's
  *   floor and tracks as drawn; the back wall stands up on row 0, the front wall's face (cut from the floor) on row 11 beside the doorway.
  * - Each other layer of the art is a piece on the row its foot is on (its picture's bottom), in the art's own order within a row. A layer
- *   that changes over the art's idle (the birds' bob) is a piece of 4 beats; the gates are a piece each (their post, motor, arm, lights and
+ *   that changes over the art's idle is a piece of its beats (the art's five birds are left out: the room's flock, shops/birdie-birds.ts,
+ *   is drawn in their place, Nov 26); the gates are a piece each (their post, motor, arm, lights and
  *   crossbuck), with their `lower` and `down` as pieces of their own (SHOP_BIRDIE_GATE_PLAYS), which ShopRoom plays for a challenge.
  * - The bar is one U-shaped picture in the art, its top raised 36 px over its squares: it's cut into its two arms (each one piece 1 x 3
  *   squares, rows 1 to 3: its raised top and its side face, from its north end to its south row's 36 px under the top) and the front run
@@ -194,7 +195,7 @@ L0.forEach((l, i) => {
   if (run && run[run.length - 1] === i - 1) run.push(i);
   else gateRuns.push([i]);
 });
-const NOT_WALKED = new Set(["bird", "feeder", "seed-pile"]);
+const NOT_WALKED = new Set(["feeder", "seed-pile"]);
 /** The bar's own picture as drawn (its outline round it), to cut into its arms' rows and its front run. */
 const barI = iOf("bar");
 const bar = L0[barI]!;
@@ -235,6 +236,9 @@ L0.forEach((l, i) => {
     return stand("feeder", [{ layers: [{ ...l, x: POUR_FEEDER.x, y: POUR_FEEDER.y }], ms: 1000 }], POUR_FEEDER.col, POUR_FEEDER.row, i, { solid: false });
   }
   if (part === "chess-table") return; // (the town's table in its place: below)
+  // (The art's five birds on the stools: the room's flock is drawn in their place, on its own loop, and flies off when you come up to the
+  // bar: shops/birdie-birds.ts, Nov 26. Left here, they'd sit on while every other bird flew off.)
+  if (part === "bird") return;
   // (A thing on the bar's raised top stands on the row of its foot's square under the top: 36 px further down.)
   const onBar = (part === "feeder" || part === "seed-pile") && l.x + w / 2 > bar.x && l.x + w / 2 < bar.x + BAR_W;
   const row = rowOf(l.y + (onBar ? BAR_UP : 0), h);
