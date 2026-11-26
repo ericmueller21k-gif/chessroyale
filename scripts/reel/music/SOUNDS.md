@@ -779,3 +779,27 @@ solos, the tower, nineteen bosses, Birdie's ult, the Hidden Boss's three pieces)
 (a list to tap, with a player) and sent as a zip of numbered, tagged MP3s. It is a snapshot: when a theme is added or
 changed, run it again, republish the page and send the zip again.
 
+## The two-minute themes made longer: Hollow first (Nov 26), sent, no verdict yet
+
+Eric: "we've got a handful of songs that are like 2 minutes and 5 seconds ... then we started making them around like
+2 minutes and 30 seconds or 2 minutes and 40 seconds ... could you try to do one for ... hollows? ... I don't want the
+song that's already there to be messed with ... keep the exact as they are ... if we need to slightly adjust like a
+few last seconds of it, but then maybe just adding one more verse ... I don't want a verse that doesn't hit right. I
+also don't want like repeated exact verse or sound that's already been used ... then we can go one by one".
+- **How it is done (the way to do the others):** new bars go in before the song's last statement of its tune and its
+  ending, not after them, so the ending and the loop point are the ones he knows and nothing needs adjusting. In the
+  code the new bars are made last and the mix's random numbers are put back after them, so every old note, noise and
+  the hall come out as they were. Checked on the masters: bars 2 to 69 and the last nine bars match the two-minute
+  song (correlation 1.0, 0.1 dB lower); with the switch off the render is bit for bit the old file.
+- **Hollow's new bars (71 to 94, 36 s; the song is 2:36):** nothing in them is a tune or a kind of part the song
+  already had. The fall: a bar of hush, a boom, the band at half pace with an 808 and a wobbling bass (the drop he
+  liked in songs N and O) and a new voice, the low driven lead (`Mix.gritty`, from his liked list), on a slow tune
+  sinking by half steps. The limp: a motif five 8ths long on the lead (the recipe's shifting motif) while the floor
+  goes on sinking. The climb: the fall's tune a minor third up on both leads, then up by steps to D, into the tune.
+- `HOLLOW_MORE=24 python3 song_l.py out.wav` renders it; without it the file still makes the two-minute song, which
+  is what the game has until he passes the longer one.
+- Measured: the fall 2 dB under the tunes (as a half-pace part should be), the limp level with them, the climb level
+  with the song's biggest parts; -16.0 LUFS, peak -1.4 dBFS.
+- The other two-minute themes, to do one by one if this passes: Boingo, Jefferson, Big Boy, Sawyer, Moo & Moon,
+  Folio, Timber, Don Dough (2:00 each); Ginger, Alfil and Chub & Chirp are 2:10.
+
