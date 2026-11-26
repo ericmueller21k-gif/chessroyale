@@ -14,3 +14,9 @@ Real battles, real taps (`?boss=chandy&win=1`: your Qxf7# mates him), captured a
 - phase2/4-computer-leap.png: mid-leap from his side spot onto the board.
 - phase2/phone-opening.gif: the whole opening on a phone, from your mate to his line (about 20 fps).
 - tools/mate-frames.spec.ts (put in e2e/, run with tools/pw-local.config.ts), mate-dump-phase2.ts, contact.py: how these were made.
+
+## phase3 (round 2, Nov 26): the bolt along his arm
+
+Staged: your king moved in the page to the square during his opening (the board and the Dodge's state alike), then the zap.
+- `1-phone-zap-king-near-center-d5.png`: king on d5, near the center: he lands 2 squares across, facing left, a level reach.
+- `2-phone-zap-king-far-rank-c8.png`: king on c8, the far rank: on the center, his arm up behind his head, the bolt up to the king.
