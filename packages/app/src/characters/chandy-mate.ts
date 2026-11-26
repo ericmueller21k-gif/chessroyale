@@ -225,7 +225,7 @@ const along = (deg: number, r: number, bend = 0): Pt => {
  *  goes up behind his head, longer, so his claws show over it (in front, it crossed his face: a hand on his snout, not a reach). */
 function reachPose(deg: number, full: boolean): MatePose {
   const up = deg <= -60;
-  const r = deg === -90 ? 42 : up ? 36 : 21;
+  const r = up ? 42 : 21;
   return {
     ...REST,
     ...KNEEL,

@@ -70,10 +70,11 @@ async function watch(page: Page) {
       // (A mate's opening steps, and his lines as his speech box shows them.)
       const st = root ? [...root.classList].find((c) => c.startsWith("cd-s-")) : null;
       if (st && r.steps.at(-1) !== st) r.steps.push(st);
-      // (His checkmate figure on the board: its pose at each step, and on the win beat.)
+      // (His checkmate figure on the board: its pose at each step, and on the win beat; and his spot's figure then, hidden or not.)
       const fig = root?.querySelector(".cd-mate-fig");
       const f = fig ? [...fig.classList].find((c) => c.startsWith("cd-f-")) : null;
-      const at = `${st ?? p}:${f ?? "none"}`;
+      const spot = [...document.querySelectorAll(".boss-char .boss-char-sprite")].find((e) => e.getBoundingClientRect().width > 0);
+      const at = `${st ?? p}:${f ?? "none"}:${spot ? getComputedStyle(spot).visibility : "nospot"}`;
       if (root && !r.figs.includes(at)) r.figs.push(at);
       for (const b of document.querySelectorAll(".bc-bubble[aria-label]")) {
         const t = b.getAttribute("aria-label") ?? "";
@@ -394,9 +395,11 @@ test.describe("Chandy", () => {
     expect(s.dodge).toContain("cd-p-win");
     expect(s.steps).toEqual(["cd-s-pause", "cd-s-jump", "cd-s-reach", "cd-s-zap", "cd-s-line"]);
     // (His figure on the board at each step (chandy-mate.ts): none in the pause; the leap and collapse, the reach, the zap, holding the
-    // reach for his line; the knockout on the win beat. His figure at his spot hides while it's there.)
-    for (const at of ["cd-s-pause:none", "cd-s-jump:cd-f-leap", "cd-s-reach:cd-f-reach", "cd-s-zap:cd-f-zap", "cd-s-line:cd-f-reaching", "cd-p-win:cd-f-out"]) expect(s.figs, at).toContain(at);
-    expect(s.figs.filter((f) => f.startsWith("cd-s-pause:") || f.startsWith("cd-p-win:")), "one pose a step").toEqual(["cd-s-pause:none", "cd-p-win:cd-f-out"]);
+    // reach for his line; the knockout on the win beat. One Chandy at a time: his spot's figure hidden while that one's up, shown in the
+    // pause and again from the scope-in.)
+    for (const at of ["cd-s-pause:none:visible", "cd-s-jump:cd-f-leap:hidden", "cd-s-reach:cd-f-reach:hidden", "cd-s-zap:cd-f-zap:hidden", "cd-s-line:cd-f-reaching:hidden", "cd-p-scope:none:visible", "cd-p-win:cd-f-out:hidden"]) expect(s.figs, at).toContain(at);
+    for (const at of s.figs) expect(at, "one Chandy at a time").toMatch(/:none:visible$|:cd-f-[a-z]+:hidden$/);
+    expect(s.figs.filter((f) => f.startsWith("cd-s-pause:") || f.startsWith("cd-p-win:")), "one pose a step").toEqual(["cd-s-pause:none:visible", "cd-p-win:cd-f-out:hidden"]);
     // (His line whole, each sentence in his bar's two rows, nothing cut off (the director's still, Nov 26: "One shot left in the…").)
     for (const l of CHANDY_MATE_LINE) expect(s.his, l).toContain(l);
     expect(s.clipped, "his words cut off in his box").toEqual([]);
