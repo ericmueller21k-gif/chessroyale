@@ -23,3 +23,4 @@
 - Nov 10 · Banana Suit as the secret crate's prize (nothing rolls it) · PARTLY · queued
 ## Waiting on Eric (re-ask in the next message)
 - Turf mockup (Nov 22) · beta bots 6 decisions (+ "expect more bots" note) · burst cheat detection build y/n (Nov 11) · Boss Battle select 2x vs bigger (Nov 12) · Boingo room revisions (Nov 12) · trailer v2 edits + Song C (Nov 11) · Settings cleanup look (Nov 25) · lossless music masters location (Nov 16) · Discord webhook (Nov 10) · payments: Access bypass, Stripe Tax, LLC details
+- Nov 26 · OK to merge #978 (ranked flake fix edits the vote-zone guard test; the guarded check unchanged)? · WAITING ON ERIC
