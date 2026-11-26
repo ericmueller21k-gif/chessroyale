@@ -2183,3 +2183,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 04:20 UTC: beta-bots DESIGN done (claude/beta-bots-design; stills/beta-bots). Sent Eric 3 stills + 6 decisions (band words, ~$7/mo Maia server, landing band, no opt-out, post-season HunBots, fair-play skip). 6-PR plan in the doc §11. Design PR to open (docs only) once Eric OKs.
 - Nov 26: main 270ea481 GREEN + LIVE (coin boost + crate bonus). Running: ult-danger, PR 6. Awaiting Eric: beta-bots 6 decisions.
 - Nov 26 04:40 UTC: ERIC: (1) beta band NO own space → overlay chip (noted in design brief; mockup later). (2) Town report: 1211 uploads walking, worst 117 ms → brief town-uploads-2.md, helper started (3rd Opus: Eric's top priority).
+- Nov 26: ERIC beta band spec: yellow ⚠ icon overlaid (moves nothing), tap → popover with the text, tap elsewhere closes. In design brief.

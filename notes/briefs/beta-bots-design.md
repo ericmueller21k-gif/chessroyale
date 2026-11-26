@@ -29,3 +29,7 @@ a ranked bot's name strip. Present to Eric before building.
 just get way out of place." Keep the design otherwise. Rework: an overlay on something that already exists, e.g. a small yellow "!" / BETA
 chip on the existing top bar (or the logo), tapping it opens the FAQ's "Bots and HunBots". Mockup before building. The online count's
 replacement line on computer is unaffected.
+- **Eric's spec (Nov 26):** a yellow warning icon (an exclamation in a small triangle ⚠) that sits ON TOP of something already on the
+  screen (overlay: moves nothing, takes no space). Tap it: the band's text pops up as a small popover near it. Tap anywhere else: it goes
+  away. (The popover may link on to the FAQ's "Bots and HunBots".) Where it sits: home, the queues, the 1 v 1 stage; phone and computer.
+  Mockup first.
