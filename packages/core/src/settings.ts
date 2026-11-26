@@ -4745,7 +4745,7 @@ export const END_SCREEN = {
   /** Each moved quest's slide, and the gap before the next. */
   questMs: 650,
   questGapMs: 250,
-  /** The most quest rows the box shows (its height is this many rows, always). */
+  /** The most quest rows the box shows (as many as the game moved, up to this; none kept empty: Eric, Nov 26). */
   questRows: 2,
   /** How long the end screen waits for the quests' answer before it goes on without them. */
   questWaitMs: 4000,
@@ -4754,6 +4754,12 @@ export const END_SCREEN = {
   backBoss: { w: 80, h: 66 },
   /** The largest a boss is drawn there (screen px a sprite px). */
   bossMaxScale: 2,
+  /**
+   * The coin strip under the XP box (Nov 25; the payments design's section 11; components/CoinStrip.tsx): after the XP fill, one coin
+   * for every `coinPer` coins (at least 1, at most `coinsMax`) drops into a pile, `coinGapMs` apart, each fall `fallMs`; the count rolls
+   * with them. `clinkGapMs`: the landing clinks (clawCoin) at most this often; the end's cascade (sell) once.
+   */
+  coins: { coinPer: 5, coinsMax: 10, coinGapMs: 110, fallMs: 420, clinkGapMs: 90 },
 } as const;
 
 /**

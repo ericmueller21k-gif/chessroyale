@@ -42,7 +42,8 @@ async function watchDuo(page: Page) {
           frame: attack?.getAttribute("data-frame") ?? null,
           figureHidden: !!fig && getComputedStyle(fig).visibility === "hidden",
           shift: jolt ? parseFloat(getComputedStyle(jolt).translate) || 0 : 0,
-          gap: right !== null && pawn ? pawn.left - right : null,
+          // (In the row's own px: a computer's short window zooms the result's column, Nov 25.)
+          gap: right !== null && pawn ? (pawn.left - right) / (parseFloat(getComputedStyle(document.querySelector(".results-top") ?? document.body).zoom) || 1) : null,
           past: right !== null && pawn ? right - pawn.right : null,
         });
       }

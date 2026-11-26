@@ -12832,9 +12832,9 @@ a.fd-row-link {
     min-width: 0;
   }
   /* The review's board: about double (the column's width, 680 px at most), and no taller than the window leaves room for the
-     stepper, the board and its text (no scroll). */
+     stepper, the board and its text (no scroll; 184: the page's own padding too, Nov 25: 180 left a 4 px scroll at 1280 x 600). */
   .breakdown.inline {
-    width: min(680px, 100%, calc(100vh - 180px));
+    width: min(680px, 100%, calc(100vh - 184px));
   }
 }
 .fd-bar {
@@ -21829,10 +21829,11 @@ button.sq-tiny {
     min-height: 0;
     contain: size;
   }
-  /* (The end page's sizes from its column's height, the board's: 1 from an 800 px window, as before; at 1280 × 600 a little under the
-     window's 0.75, so the chat keeps 40 px of messages in a column no taller than the board.) */
+  /* (The end page's sizes from its column's height, the board's: 1 from an 810 px window; at 1280 × 600 0.65 (its gap kept at 8 px), so
+     the chat keeps 40 px of messages in a column no taller than the board. Were 1 from 800 and 0.69 at 600: the coin strip, Nov 25,
+     took more room than the coins line it replaced.) */
   .screen.game.dv-ended .dv-box > .dv-end-col {
-    --es-u: clamp(0.68px, calc((var(--app-h) - 160px) / 640), 1px);
+    --es-u: clamp(0.64px, calc((var(--app-h) - 210px) / 600), 1px);
   }
   .dv-actions {
     flex: none;
