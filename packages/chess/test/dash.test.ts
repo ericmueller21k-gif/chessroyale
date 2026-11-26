@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, DASH_STALL, DASH_TAP, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
-import { DASH_ANIM, DASH_FX, MatchRunner, applyMove, inCheck, pieceAt, stallMove, stallPausedMs, stallPlan, stallTimeline, dashView, nextBeat, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
+import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, DASH_HANG_ON, DASH_STALL, DASH_TAP, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type BossPowerState, type PowerEvent, type Settings } from "@chessroyale/core";
+import { DASH_ANIM, DASH_FX, MatchRunner, applyMove, inCheck, pieceAt, stallMove, stallPausedMs, stallPlan, stallTimeline, dashView, nextBeat, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, scrambleSecondsOf, slappedClock, DASH, hangOnTimeline, popOffMs } from "../src/index.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -38,8 +38,9 @@ describe("Dash: his roster line and numbers", () => {
     expect(isPlayable(d)).toBe(false);
     expect(menuBosses({ admin: false, raid: true }).some((b) => b.id === "dash")).toBe(false);
     expect(menuBosses({ admin: true, raid: true }).some((b) => b.id === "dash")).toBe(true);
-    // (Eric's: 5 moves of 3 seconds. The sim's: 30 s a slap off the bank, the flag from the top 4, the usual meter.)
-    expect([S.scrambleMoves, S.scrambleSeconds, S.slapBankSeconds, S.slapMoveSeconds, S.slapMoveMin, S.flagTop, S.rageSpeed.dash]).toEqual([5, 3, 30, 6, 8, 4, 1]);
+    // (Eric, Nov 26: 3 moves of 5 seconds the first time, 3 moves of 3 seconds the second; was his 5 moves of 3 seconds. The sim's: 30 s
+    // a slap off the bank, the flag from the top 4, the usual meter.)
+    expect([S.scrambleMoves, S.scrambleSeconds, S.slapBankSeconds, S.slapMoveSeconds, S.slapMoveMin, S.flagTop, S.rageSpeed.dash]).toEqual([3, [5, 3], 30, 6, 8, 4, 1]);
     // His moments hold the screen as long as his animations: the slap, TIME SCRAMBLE!'s banner and his spin, his jab.
     expect(POWER_FX.slap).toBe(DASH_ANIM.clockSlap);
     expect(DASH_FX.scramble).toBe(1500 + DASH_ANIM.timeScramble);
@@ -55,13 +56,21 @@ describe("Dash: the clock", () => {
   type B = Parameters<typeof dashMoveClock>[0] & object;
   const boss = (p: object, crowdMoves = 4): B => ({ id: "dash", crowdMoves, result: undefined, powers: { seed: 1, turn: crowdMoves + 1, material: 39, lost: 0, nextPassive: 2, events: [], ...p } }) as unknown as B;
 
-  it("a scrambled move's clock is scrambleSeconds, for exactly scrambleMoves crowd turns from the one it came", () => {
-    for (const turn of [5, 6, 7, 8, 9]) expect(scrambleOn({ ultAt: 5 }, turn)).toBe(true);
-    for (const turn of [4, 10]) expect(scrambleOn({ ultAt: 5 }, turn)).toBe(false);
-    expect([5, 7, 9, 10].map((t) => scrambleLeft({ ultAt: 5 }, t))).toEqual([5, 3, 1, 0]);
-    expect(dashMoveClock(boss({ ultAt: 5 }, 4), 20)).toBe(S.scrambleSeconds);
-    expect(dashMoveClock(boss({ ultAt: 5 }, 4), 1200)).toBe(S.scrambleSeconds);
-    expect(dashMoveClock(boss({ ultAt: 5 }, 9), 20)).toBe(20);
+  it("a scrambled move's clock is its use's scrambleSeconds (5 the first, 3 the second), for exactly scrambleMoves crowd turns from the one it came", () => {
+    for (const turn of [5, 6, 7]) expect(scrambleOn({ ultAt: 5 }, turn)).toBe(true);
+    for (const turn of [4, 8]) expect(scrambleOn({ ultAt: 5 }, turn)).toBe(false);
+    expect([5, 6, 7, 8].map((t) => scrambleLeft({ ultAt: 5 }, t))).toEqual([3, 2, 1, 0]);
+    // (Its use: the battle's ultimates so far, this one counted.)
+    expect(dashMoveClock(boss({ ultAt: 5, ults: 1 }, 4), 20)).toBe(5);
+    expect(dashMoveClock(boss({ ultAt: 5, ults: 1 }, 4), 1200)).toBe(5);
+    expect(dashMoveClock(boss({ ultAt: 5, ults: 2 }, 6), 20)).toBe(3);
+    expect(dashMoveClock(boss({ ultAt: 5, ults: 2 }, 6), 1200)).toBe(3);
+    expect(dashMoveClock(boss({ ultAt: 5, ults: 1 }, 7), 20)).toBe(20);
+    // (A third, were there one: the last's.)
+    expect([0, 1, 2, 5].map((u) => scrambleSecondsOf(u))).toEqual([5, 3, 3, 3]);
+    // (His view's seconds, for the banner, the countdown and Tick's tally: the use's.)
+    const view = (ults: number) => dashView({ ...boss({ ultAt: 5, ults }, 4).powers!, dash: { slaps: 0, stolen: 0, flags: 0 } } as never)!.scramble;
+    expect([view(1), view(2)]).toEqual([{ at: 5, moves: 3, seconds: 5 }, { at: 5, moves: 3, seconds: 3 }]);
     // (Another boss, or his battle over: the clock as it was.)
     expect(dashMoveClock({ ...boss({ ultAt: 5 }, 4), id: "timber" }, 20)).toBe(20);
     expect(dashMoveClock({ ...boss({ ultAt: 5 }, 4), result: "boss" } as B, 20)).toBe(20);
@@ -127,14 +136,16 @@ describe("Dash: in a battle", () => {
     expect(r.allowedMsFor("h0")).toBe(BOSS_CLOCK.incrementSeconds * 1000);
   });
 
-  it("Time Scramble (the test switch): warned as turn 2 begins, then scrambleMoves turns of scrambleSeconds, the meter empty meanwhile; then the clock as before", async () => {
+  it("Time Scramble (the test switch): warned as turn 2 begins, then scrambleMoves turns of its first scrambleSeconds (5), the meter empty meanwhile; then the clock as before", async () => {
     const r = battle(7, { test: "scramble" });
     const clocks: number[] = [];
     const kinds: string[][] = [];
+    const said: (number | undefined)[] = [];
     for (let i = 0; i < 9; i++) {
       r.deal();
       clocks.push(r.moveClock());
       kinds.push(r.boss!.powers!.events.map((e) => e.kind));
+      said.push((r.boss!.powers!.events.find((e) => e.kind === "scramble") as { seconds?: number } | undefined)?.seconds);
       const fen = fenOf(r);
       const allowed = r.crowdAllowed() ?? legalMoves(fen);
       await r.score(new Map([["h0", { move: crowdPick(fen, allowed, mulberry32(i)), thinkMs: 500 }]]));
@@ -145,8 +156,51 @@ describe("Dash: in a battle", () => {
     expect(kinds[1]).toContain("warn");
     expect(kinds[2]).toContain("scramble");
     expect(clocks.slice(0, 2)).toEqual([base, base]);
-    expect(clocks.slice(2, 7)).toEqual(Array(S.scrambleMoves).fill(S.scrambleSeconds));
-    expect(clocks[7]).toBe(base);
+    // (The battle's first Time Scramble: 3 moves of 5 seconds, its moment saying so.)
+    expect(clocks.slice(2, 5)).toEqual([5, 5, 5]);
+    expect(said[2]).toBe(5);
+    expect(clocks.slice(5, 7)).toEqual([base, base]);
+  });
+
+  it("his \"Hang on\" (?power=hangon: his second turn) changes nothing in the game: your move stands, the same moves, clocks and bank as a battle without it; his thinking held for it only then (Nov 26)", async () => {
+    const run = async (test: string) => {
+      const r = battle(11, { test, bank: true });
+      const clocks: number[] = [];
+      const banks: number[] = [];
+      const held: number[] = [];
+      for (let i = 0; i < 4; i++) {
+        r.deal();
+        clocks.push(r.moveClock());
+        banks.push(r.allowedMsFor("h0"));
+        const fen = fenOf(r);
+        const allowed = r.crowdAllowed() ?? legalMoves(fen);
+        await r.score(new Map([["h0", { move: crowdPick(fen, allowed, mulberry32(i)), thinkMs: 1500 }]]));
+        if (r.isOver()) break;
+        // (His thinking after your move: how long it's held for his gags.)
+        held.push(popOffMs(r.boss));
+        await r.playBoss(fakeEngine());
+      }
+      return { history: [...r.boards.get(r.state.boards[0]!)!.history], clocks, banks, held, popOff: r.boss!.powers!.dash!.popOff ?? null };
+    };
+    const gag = await run("hangon");
+    const plain = await run("");
+    expect(gag.popOff).toEqual({ at: 2, hangOn: true });
+    expect(plain.popOff).toBeNull();
+    expect(gag.held).toEqual([0, hangOnTimeline().total + DASH_HANG_ON.tailMs, 0, 0]);
+    expect(plain.held).toEqual([0, 0, 0, 0]);
+    expect(gag.history).toEqual(plain.history);
+    expect(gag.clocks).toEqual(plain.clocks);
+    expect(gag.banks).toEqual(plain.banks);
+  });
+
+  it("each Time Scramble's moment says its own use's seconds and moves: 5 the first time, 3 the second (Eric, Nov 26)", () => {
+    for (const [ults, seconds] of [[0, 5], [1, 3]] as const) {
+      const next = { seed: 1, turn: 5, material: 39, lost: 0, nextPassive: 2, events: [], warnAt: 4, ults, dash: { slaps: 0, stolen: 0, flags: 0 } } as unknown as BossPowerState;
+      const events: PowerEvent[] = [];
+      const t = { turn: 5, fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", crowd: "w", seed: 1, passive: "clockslap", ultimate: "scramble", test: "", ultNext: false, lastMove: null, rageSpeed: 1, s: S, events } as never;
+      expect(DASH.ultimate(next, t)).toBe(true);
+      expect(events).toContainEqual(expect.objectContaining({ kind: "scramble", count: 3, seconds }));
+    }
   });
 });
 

@@ -26,7 +26,8 @@ export const DASH_LINES: Partial<Record<Beat, readonly string[]>> = {
   smug: ["Chopped, bro. Chopped.", "Main character? Kinda, yeah.", "Real quick: you wanna try these on?"],
   rattled: ["Not sweating. It's just humid.", "Deadass did not see that coming."],
   ultimateWarn: ["Speed run, broski! Let's gooo!", "Lace up, cuz. This is gonna be quick."],
-  ultimate: ["Three seconds a move, cuz. Skrrt!", "Tick tock, my guy. Tick tock."],
+  // (No seconds named: since Nov 26 the first Time Scramble is 5 s a move, the second 3 s; the banner says which.)
+  ultimate: ["Short clock, cuz. Skrrt!", "Tick tock, my guy. Tick tock."],
   flag: ["Too slow, cuz! I picked one for you.", "No cap, you need Cheetahs.", "Bro moved like he's in flip-flops."],
   victory: ["Too fast, bro! Built different!", "W! Big W! Hashtag no cap.", "W in the chat. Shoes are 20% off, broski."],
   defeat: ["GG, cuz. Lowkey you're goated.", "I'm cooked. Bro, I'm so cooked."],
@@ -90,6 +91,18 @@ export const DASH_STALL_LINES = {
   slam: ["Bro, I've aged three years. MOVE!", "Cuz, I could've played ten games by now!", "Fam, my fur's going gray over here. Hurry up!"],
   brag: ["Too slow, broski! I'm just gonna go again.", "You snooze, you lose, fam. My move. Again.", "Can't wait all day, cuz. I'll take your turn."],
   jk: ["Nahh, jk bro! Put it back, put it back.", "Nahh, I'm playin', fam! Your move.", "Jk, jk! Bro, your FACE though."],
+} as const;
+
+/**
+ * His "Hang on" (Eric, Nov 26, his words; the second pop-off's place): one line a beat, in order: as he starts (your piece goes
+ * back), as he goes super fast, near the end, and as he gives your time back (Eric's "Sorry about that, bro, I'll give you your
+ * time back", shortened to fit the two-row bubble: DASH_LINE_MAX).
+ */
+export const DASH_HANG_ON_LINES = {
+  start: "Hang on, one second.",
+  cheetah: "Time for cheetah speed!",
+  almost: "Almost done, bro.",
+  sorry: "Sorry about that, bro. Here's your time back.",
 } as const;
 
 /** His lying-down clock tap (Eric, Nov 17): a bored line as he lies down by your clock (placeholders for Eric). */

@@ -2158,10 +2158,13 @@ export const BOSS_POWERS = {
   /**
    * Dash's Time Scramble (his ultimate, the rage meter's: rageSpeed.dash; Eric's design): after the usual warning, your next
    * `scrambleMoves` moves get `scrambleSeconds` each (a raid's move timer and a bank alike; a bank still pays for them and still
-   * gets its increment). Eric's 5 and 3. At most maxUltimates.dash a battle.
+   * gets its increment), by its use this battle: the first's seconds, then the second's (a later one, were there more, the last's).
+   * Eric, Nov 26: "the first time he fires it off is 5 seconds for 3 moves, and then when he does it again, it's 3 seconds for 3
+   * moves" (was Eric's 5 moves of 3 s; docs/decisions/2026-11-26-dash-hang-on.md). The late-pick grace (lateGraceMs) as ever. At
+   * most maxUltimates.dash a battle.
    */
-  scrambleMoves: 5,
-  scrambleSeconds: 3,
+  scrambleMoves: 3,
+  scrambleSeconds: [5, 3] as readonly number[],
   /**
    * Out of time against Dash is never a loss (the brief): nobody picked in time, so a move is played for you at random from the
    * judge's top `flagTop` moves (0: from every legal move). The sim's call: any legal move at random hung a piece too often and
@@ -2186,6 +2189,7 @@ export const BOSS_POWERS = {
    * of his turns from `from` to `to` (drawn from the battle's seed), at least `gap` of his turns apart, before his move lands. Each
    * is `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks at `hitMs`
    * a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
+   * Since Nov 26 (Eric) only the first turn's is the pop-off: the second's is his "Hang on" (DASH_HANG_ON).
    */
   dashPopOff: { from: 8, to: 20, gap: 6, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
   // (His stall skit and his lying-down clock tap, Nov 17: DASH_STALL and DASH_TAP below BOSS_POWERS.)
@@ -2448,6 +2452,33 @@ export const DASH_STALL = {
   backMs: 450,
   marginMs: 2000,
   test: { slamAt: 1500, fakeAt: 3500 },
+} as const;
+
+/**
+ * Dash's "Hang on" (Eric, Nov 26: "instead of doing [the pop-off] again, he does this"; docs/decisions/2026-11-26-dash-hang-on.md),
+ * on dashPopOff's second turn in place of the second pop-off. Presentation only ("whatever's easiest, so it doesn't actually mess
+ * with the game"): your move is played and confirmed as ever, and while he thinks after it the screen shows (ms from its start):
+ * "Hang on, one second." and slow smacks of his clock speeding up (`slowFrom` ms a smack down to `slowTo`, `slowMs` in all), your
+ * piece slid back to its square at `backAt` and your clock ticking down (a display only: nobody's clock runs while he thinks);
+ * "Time for cheetah speed!" and super fast smacks (`hitMs` a smack), head up and mouth open, `fastMs` long, "Almost done, bro."
+ * `almostMs` into them; the wind-up on the clock's front (`windMs`); "Sorry about that, bro. Here's your time back." with your
+ * clock counting back up to its real value (`countUpMs`, in `sorryMs`); your piece sliding to its played square (`returnMs`); then
+ * his move. His thinking waits for all of it and `tailMs` more (a late frame or a slow connection never cuts its end), solo and
+ * online alike (popOffMs; hangOnTimeline in packages/chess/src/bosses/dash.ts). 12.6 s from your move to his, and the margin.
+ */
+export const DASH_HANG_ON = {
+  backAt: 450,
+  slowMs: 6200,
+  slowFrom: 900,
+  slowTo: 180,
+  fastMs: 3000,
+  almostMs: 1800,
+  hitMs: 80,
+  windMs: 900,
+  sorryMs: 2000,
+  countUpMs: 1200,
+  returnMs: 500,
+  tailMs: 300,
 } as const;
 
 /**

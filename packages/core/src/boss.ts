@@ -106,9 +106,10 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
 export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce", "train", "fall"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
- * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
+ * fake move a few seconds into the first move it can come on), his lying-down clock tap from the first move (`clocktap`) and his
+ * "Hang on" on his second turn (`hangon`: no pop-off before it; Nov 26).
  */
-export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower"];
+export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower", "hangon"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -1264,8 +1265,11 @@ export interface DashState {
   rush?: DashRush | null;
   /** The crowd turn his Scramble Rush was warned as it began (RAGE!, "Next turn: Scramble Rush"; Eric, Nov 6): it comes the next. */
   rushWarn?: number;
-  /** His pop-off (once a battle; Eric, Nov 7): his turn `at`, it plays before his move lands, while he thinks. */
-  popOff?: { at: number } | null;
+  /**
+   * His pop-off (twice a battle since Eric, Nov 8): his turn `at`, it plays before his move lands, while he thinks. The second one
+   * is his "Hang on" (`hangOn`; Eric, Nov 26: it replaces the second pop-off; DASH_HANG_ON): screen only, like the pop-off.
+   */
+  popOff?: { at: number; hangOn?: true } | null;
   /**
    * His stall skit's slam (once a battle; Eric, Nov 17: "each still occur once per game"; DASH_STALL): it came on the crowd move
    * after crowd move `at`. Spent as it starts: never a second slam.
@@ -1816,9 +1820,14 @@ export type PowerEventKind =
   // Dash's clock fit (at most twice a battle: `count` quick smacks), his Scramble Rush's warning a turn ahead (RAGE!, "Next
   // turn: Scramble Rush") and his extra move after a failed Scramble Rush.
   | "clockFit"
-  // (His pop-off, Eric, Nov 7: no event; it plays while he thinks, from DashState.popOff, as two beats.)
+  // (His pop-off, Eric, Nov 7: no event; it plays while he thinks, from DashState.popOff, as two beats. His "Hang on" in the second
+  // one's place, Eric, Nov 26: no event either, four beats: the slow smacks, cheetah speed, "almost done", the wind-up and sorry.)
   | "popOff"
   | "popOffFast"
+  | "hangOn"
+  | "hangOnFast"
+  | "hangOnAlmost"
+  | "hangOnSorry"
   | "rushWarn"
   | "rushExtra"
   // Don Dough: a lump of dough dropped (Rising Dough), risen into his piece, squashed by yours; Gold Plate's gilding; his comment
