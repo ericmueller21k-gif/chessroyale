@@ -782,8 +782,25 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     await openBossRaid(page);
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
     await yourMove(page);
-    await expect.poll(() => beatOf(page), { timeout: 15_000, intervals: [50] }).toBe("tap");
-    await playOne(page);
+    // (Your move the moment he starts, sent from the page as it first sees the tap beat: his lie-down lasts tapLengths().down, about
+    // half a second, and a poll then playOne's round trips missed it on a loaded runner (main, Nov 26), so no joke was due.)
+    const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+    const legal = new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")).sort();
+    await page.evaluate(
+      ([mv, f]) =>
+        new Promise<void>((done, fail) => {
+          const quit = Date.now() + 15_000;
+          const tick = () => {
+            const m = (window as any).match;
+            if (m.phase.kind === "play" && m.phase.board.fen === f && m.phase.stall?.beat === "tap") return m.submit(mv), done();
+            if (Date.now() > quit) return fail(new Error("no tap beat"));
+            setTimeout(tick, 5);
+          };
+          tick();
+        }),
+      [legal[0]!, fen] as const,
+    );
+    await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
     const lie = page.locator(".dash-lie");
     await expect(lie).toBeVisible();
     await expect.poll(() => said(page, DASH_TAP_JOKE_LINES), { timeout: 3_000 }).toBe(true);
