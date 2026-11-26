@@ -14,7 +14,7 @@ import { PlayerName } from "../components/PlayerName.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { ChatPanel, useMedia, type ChatPeople } from "../components/QuickChat.tsx";
 import { DuelOverlay, DuelVote } from "../components/DuelVote.tsx";
-import { DuelRankPill } from "../components/DuelRankPill.tsx";
+import { DuelRankButton } from "../components/DuelRankPill.tsx";
 import { DuelStage, type StageSide } from "../components/DuelStage.tsx";
 import { clockAt, type DuelQueue, type DuelSession, type DuelSide, type DuelSnapshot } from "../duel.ts";
 import { account } from "../account.ts";
@@ -235,7 +235,7 @@ function DuelStrip({ p, c, you, ms, running, clockShownNow, away, lead, tail }: 
       </span>
       <span class="dv-strip-who">
         <PlayerName name={p.name} uid={p.uid ?? undefined} you={you} bot={p.bot} class="dv-name" />
-        <DuelRankPill rank={you ? yourRankShown(p.rank) : p.rank} />
+        <DuelRankButton rank={you ? yourRankShown(p.rank) : p.rank} who={you ? "You" : p.name} />
         {away && <span class="dv-away">away</span>}
       </span>
       {lead}

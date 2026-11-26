@@ -176,6 +176,28 @@ export function rankView(row: { games: number; ladder: number | null; place?: nu
   return { placement: null, tier: tier.name, division, points, ladder, color: tier.color, emblem: emblemId(tier.name, division), label: `${divisionTitle({ tier: tier.name, division })} – ${points}` };
 }
 
+/** One rank in the Ranks pop-up's list: its title ("Gold III", "Transcendent"), emblem, color and the ladder RP it starts at. */
+export interface RankStep {
+  title: string;
+  emblem: string;
+  color: string;
+  /** The ladder points the rank starts at (Wood V 0, Wood IV 80, … the top tiers `topFloor`). */
+  from: number;
+  /** A top tier's place among the highest ladders (500, 100); null below. */
+  top: number | null;
+}
+
+/** Every rank, lowest first: each tier's divisions 5 → 1, then the top tiers (the widest `top` first). */
+export function rankSteps(s: Settings = RANKED_1V1): RankStep[] {
+  const out: RankStep[] = [];
+  s.tiers.forEach((t, i) => {
+    for (let d = s.divisions; d >= 1; d--)
+      out.push({ title: divisionTitle({ tier: t.name, division: d }), emblem: emblemId(t.name, d), color: t.color, from: (i * s.divisions + (s.divisions - d)) * s.pointsPerDivision, top: null });
+  });
+  for (const t of [...s.topTiers].sort((a, b) => b.top - a.top)) out.push({ title: t.name, emblem: emblemId(t.name, null), color: t.color, from: s.topFloor, top: t.top });
+  return out;
+}
+
 /**
  * The rank points a game gives (after placements): 2 × perGame × (score − the expected score), so ±perGame between
  * equals, more for beating a stronger player and less for beating a weaker one (Elo's rule, on the ladder); plus

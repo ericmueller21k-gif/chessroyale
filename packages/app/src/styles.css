@@ -21664,6 +21664,85 @@ button.sq-tiny {
   line-height: 16px;
   padding: 0 6px;
 }
+/* (The rank in a strip: the emblem and the pill, one button that opens the Ranks pop-up; the strip's height, a tap target the strip's.) */
+.dv-rank-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+/* (The emblem's 48 px art at 28 px, the pawn's size: its box always there, so nothing moves when it loads.) */
+.dv-strip-emblem {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+}
+.dv-strip-emblem .re-box {
+  transform: scale(calc(28 / 48));
+  transform-origin: 0 0;
+}
+/* The Ranks pop-up (components/DuelRankPill.tsx, RanksSheet): every rank, the highest first, the tapped player's marked. */
+.rk-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.rk-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 2px 10px 2px 4px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+}
+.rk-row.on {
+  border-color: var(--rank, var(--fd-sub));
+  background: color-mix(in srgb, var(--rank, var(--fd-sub)) 16%, var(--fd-panel));
+}
+.rk-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rk-who {
+  flex: none;
+  max-width: 40%;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--fd-panel-2);
+}
+.rk-from {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fd-sub);
+  font-variant-numeric: tabular-nums;
+}
 .dv-away {
   flex: none;
   font-size: 11px;

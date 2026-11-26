@@ -20,6 +20,7 @@ import {
   placeLadder,
   pointsFor,
   rankView,
+  rankSteps,
   rankedGame,
   rdAfterIdle,
   seedRating,
@@ -112,6 +113,13 @@ describe("the hidden rating (Glicko-1)", () => {
 });
 
 describe("the ladder", () => {
+  it("the Ranks pop-up's list: every rank lowest first, each starting where rankView places it, then the top tiers", () => {
+    const steps = rankSteps();
+    expect(steps.length).toBe(RANKED_1V1.tiers.length * RANKED_1V1.divisions + RANKED_1V1.topTiers.length);
+    expect(steps.slice(0, 2).map((r) => `${r.title} ${r.from}`)).toEqual(["Wood V 0", "Wood IV 80"]);
+    expect(steps.slice(-3).map((r) => `${r.title} ${r.from} ${r.top}`)).toEqual(["Radiant I 2720 null", "Pearlescent 2800 500", "Transcendent 2800 100"]);
+    for (const r of steps.filter((x) => x.top === null)) expect(rankView({ games: 9, ladder: r.from }).emblem).toBe(r.emblem);
+  });
   it("a division in Roman numerals, as the pill shows it (Eric, Nov 25): V to I; a top tier has none", () => {
     expect([1, 2, 3, 4, 5].map(romanDivision)).toEqual(["I", "II", "III", "IV", "V"]);
     expect(divisionTitle({ tier: "Gold", division: 3 })).toBe("Gold III");
