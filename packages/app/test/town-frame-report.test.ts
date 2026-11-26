@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { F, FpsCount, FrameRec, NP, P, PART_NAMES, PART_SHORT, RUN_MS, browserOf, newRun, quantile, refreshOf, setRec, summarize, timerStep, upName, whatOf, type RunData } from "../src/town/frame-report.ts";
+import { F, FpsCount, FrameRec, MAX_FRAMES, NP, P, PART_NAMES, PART_SHORT, RUN_MS, browserOf, newRun, reportMs, quantile, refreshOf, setRec, summarize, timerStep, upName, whatOf, type RunData } from "../src/town/frame-report.ts";
 import { panelHtml } from "../src/town/frame-report-panel.ts";
 
 /** A run of frames: each [ms, flags, parts as { part: ms }, turn deg/s, uploads, pictures painted]. */
@@ -251,6 +251,22 @@ describe("the recorder", () => {
     rec.finish();
     rec.finish();
     expect(done).toBe(2);
+  });
+
+  it("`?report=S` (Nov 26): a run S seconds long, 5 to 300 (else 30), its frames held at 120 Hz with room to spare", () => {
+    expect([reportMs(null), reportMs(""), reportMs("4"), reportMs("301"), reportMs("1.5"), reportMs("abc")]).toEqual(Array(6).fill(RUN_MS));
+    expect([reportMs("5"), reportMs("120"), reportMs("300")]).toEqual([5_000, 120_000, 300_000]);
+    expect(new FrameRec().run.total.length).toBe(MAX_FRAMES);
+    let t = 0;
+    const rec = new FrameRec(() => t, reportMs("120"));
+    expect(rec.run.total.length).toBeGreaterThanOrEqual(120 * 120);
+    for (; t <= 120_000 + 100; t += 8.4) {
+      rec.begin(t);
+      rec.end(true, 0, 2);
+      if (t < 119_000) expect(rec.state).not.toBe("done");
+    }
+    expect(rec.state).toBe("done");
+    expect(rec.run.n).toBeGreaterThan(14_000);
   });
 });
 
