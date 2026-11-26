@@ -546,7 +546,8 @@ describe("deleting the account, and Download my data", () => {
     expect(await rowOf(sql, "cs_test_B")).toMatchObject({ user_id: "deleted", ref: null, remaining: 0, status: "unclaimed", paid_at: T0 + 6 });
     // (Stripe's again for the one credited before: nothing, and the row still says paid.)
     expect(await creditPurchase(sql, await paid(sql, "cs_test_A"), T0 + 7)).toEqual({ ok: false, why: "gone" });
-    expect(await rowOf(sql, "cs_test_A")).toMatchObject({ status: "paid", paid_at: T0 });
+    // (Only the day of the sale is kept: its exact time would lead to the credit's ledger legs (delta review D1).)
+    expect(await rowOf(sql, "cs_test_A")).toMatchObject({ status: "paid", paid_at: T0 - (T0 % 86_400_000) });
   });
 
   it("a deleted buyer's kept purchase and refund rows lead to no ledger row, so not to the account's history (review M1)", async () => {
@@ -577,9 +578,22 @@ describe("deleting the account, and Download my data", () => {
         user,
       );
     expect((await history(ann.id)).length).toBeGreaterThan(3);
+    // And by time (delta review D1): a sale's paid_at is its credit legs' created_at, a refund row's created_at its op's.
+    const byTime = async () => [
+      ...(await sql.all(
+        `SELECT DISTINCT l2.reason FROM purchases p JOIN ledger l ON l.reason = 'purchase' AND l.created_at = p.paid_at AND l.delta = p.coins
+         JOIN ledger l2 ON l2.account = l.account WHERE p.payment_intent = 'pi_cs_test_A'`,
+      )),
+      ...(await sql.all(
+        `SELECT DISTINCT l2.reason FROM refunds r JOIN ledger l ON l.created_at = r.created_at AND l.delta = -r.coins
+         JOIN ledger l2 ON l2.account = l.account WHERE r.stripe_ref = 're_A1'`,
+      )),
+    ];
+    expect((await byTime()).length).toBeGreaterThan(2);
 
     await deleteAccount(sql, ann, T0 + 3);
     expect(await history("deleted")).toEqual([]);
+    expect(await byTime()).toEqual([]);
     // Nor by any id the kept rows hold: none is in any ledger row's op, asset or source.
     const kept = [
       ...(await sql.all<Record<string, unknown>>("SELECT session_id, ref, payment_intent FROM purchases WHERE user_id = 'deleted'")),

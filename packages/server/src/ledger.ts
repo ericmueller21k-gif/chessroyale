@@ -515,7 +515,9 @@ export function eraseMoves(userId: string, now: number, keptAs: string): Stmt[] 
         nonce,
       ),
     ),
-    stmt("UPDATE purchases SET remaining = 0, ref = NULL, user_id = ? WHERE user_id = ?", keptAs, userId),
+    // (Only the day of a kept sale: its exact time is its credit legs' `created_at`, which would lead back to the account's ledger rows
+    // (delta review D1). As deleting does to results.)
+    stmt("UPDATE purchases SET remaining = 0, ref = NULL, paid_at = paid_at - paid_at % 86400000, user_id = ? WHERE user_id = ?", keptAs, userId),
     ...["wallets", "inventory", "items", "boss_tokens", "boss_crates", "series_crates", "welcome_crates", "ledger_accounts"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId)),
   ];
 }

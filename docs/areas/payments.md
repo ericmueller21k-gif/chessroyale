@@ -43,9 +43,11 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
   read. For the profile's "Refundable N" (PR 7) and the Refund buttons (PR 9).
 - **Deleting an account:** purchase and refund rows stay as the shared `deleted` account's (sales records, for tax; a later dispute
   still finds its row by its session or payment intent): their unspent coins closed in the ledger with every balance (`remaining` 0),
-  then each purchase's `ref` set to NULL, and each refund given a new random op id (`deleted:<hex>`) and its comment erased. So no kept
-  row can be joined to the ledger, and from it to the rest of the account's history (tested: `purchases.test.ts`, "lead to no ledger
-  row"). The users columns go with the account. **TODO (PR 9):** the delete confirmation first offers the refundable amount back.
+  then each purchase's `ref` set to NULL and its `paid_at` cut to its day, and each refund given a new random op id (`deleted:<hex>`),
+  its comment erased and its `created_at` cut to its day (an exact time is its ledger op's: delta review D1; as deleting does to
+  results). So a kept row has no id and only the day: none can be joined to the ledger by id or time (tested: `purchases.test.ts`,
+  "lead to no ledger row"). What's left: the day and the pack can still single out a buyer on a day with one sale of that pack, as a
+  kept result's day can (the director and Eric may want more: see Open items). The users columns go with the account. **TODO (PR 9):** the delete confirmation first offers the refundable amount back.
 - **Download my data** has every purchase (pending too; with its `ref`, so it matches the download's ledger changes) and refund (store
   `purchases`), and the users columns in `account`.
 
@@ -103,7 +105,14 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
   matches on our row (session → account). If Stripe must carry something, the director's call is the purchase's `ref`; weigh first
   that Stripe's copy of the session would then hold the link our kept row no longer does (session → ref → the ledger's asset id), and
   that the ref would have to exist before Stripe makes the session (recordCheckout today makes it after).
+  `recordCheckout` is called ONLY in the request that creates the Stripe session, before its URL reaches the browser: the return trip
+  and the webhook call only `creditPurchase` (which answers `unknown` for a session never recorded). Our row is now the only thing that
+  binds a payment to an account (delta review D2).
 - **For PR 9 (refunds):** keep `refund_count`, `chargebacks` and `hold_until` against the hashed identity, as `fairplay_identities`
   does, so deleting the account (or a stale guest's merge) doesn't start them over (the review's m2; the design is silent on it: the
   director's call). A refund's op id names the purchase by its `ref`, never by a Stripe id; a refund made after the account is gone has
-  no ledger op, so its row needs an op id of its own (`deleted:<hex>`, as the erase gives).
+  no ledger op, so its row needs an op id of its own (`deleted:<hex>`, as the erase gives). Dedupe a refund webhook on `stripe_ref` (a UNIQUE index;
+  NULLs don't clash), since a kept row's random op id can't (delta review D4). Keep partly spent purchases few, or make
+  `PAYMENTS.maxDraws`' throw a polite refusal: partial refunds can leave many small remainders (delta review D3).
+- **Retention (the director's and Eric's call; touches the privacy page):** after Stripe can no longer open a dispute (up to 120 days),
+  give a kept purchase row a random `session_id` and clear `payment_intent`, so nothing on it names the buyer (delta review D1, step 4).

@@ -370,9 +370,13 @@ export const purchasesDownload = async (sql: Sql, userId: string) => ({
 /**
  * Deleting an account (account-data.ts): its refunds stay as `keptAs`'s (the shared "deleted" account), for tax, without the comment
  * (the player's own words), and each under a new random op id (`deleted:<hex>`): the old one is its ledger op's, which would lead back
- * to the account's ledger rows (review M1). Stripe's refund id (`stripe_ref`) and the session stay, to match its later events. Its
+ * to the account's ledger rows (review M1); only its day kept, as its exact time is its op's (delta D1). Stripe's refund id (`stripe_ref`) and the session stay, to match its later events. Its
  * purchases are kept by the ledger's part (ledger.ts eraseMoves: their unspent coins closed first, their `ref` dropped).
  */
 export const refundsErase = (userId: string, keptAs: string): Stmt[] => [
-  stmt("UPDATE refunds SET op_id = 'deleted:' || lower(hex(randomblob(12))), user_id = ?, comment = NULL WHERE user_id = ?", keptAs, userId),
+  stmt(
+    "UPDATE refunds SET op_id = 'deleted:' || lower(hex(randomblob(12))), user_id = ?, comment = NULL, created_at = created_at - created_at % 86400000 WHERE user_id = ?",
+    keptAs,
+    userId,
+  ),
 ];

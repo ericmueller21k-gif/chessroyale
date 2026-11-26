@@ -59,6 +59,9 @@ The review (`REVIEW.md` on branch `review/pay-storage`: no blocker, 1 major, 3 m
     (`pay:<ref>`) and its legs' source, and HOLDINGS reads `ref AS asset`; `session_id` stays the row's key for Stripe. Deleting sets
     the kept row's `ref` to NULL after the erase's legs, and gives a kept refund row a new random op id (`deleted:<hex>`): its op id was
     its ledger op's, a second join. Done now because the ledger is append-only: once PR 8 writes a real credit its keys are for good.
+    The delta review (D1) found a third join, by time: a kept row's `paid_at` (and a refund row's `created_at`) equal its ledger legs'
+    `created_at` to the millisecond. Deleting now keeps only the day of each (as it does for results). A kept row has no id and only
+    the day.
 14. **The ledger id never goes to Stripe (the design's §1, superseded; the director's call).** The design sent it as the Checkout
     Session's `client_reference_id`, so Stripe's copy of every session would have held it. PR 8 sends none: the credit matches on our
     own row (session → account), and `PaidSession` carries no account. If Stripe must carry something, the director's call is the
