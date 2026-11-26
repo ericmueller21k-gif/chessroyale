@@ -198,3 +198,9 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - Nov 26 (Eric): two xhigh money jobs may run at once (PR 4 + PR 5), still within the two-Opus cap; each keeps its full-lane review.
 - A message to a working helper is read only after its current run ends (Nov 26, three times): a .done right after a correction is usually the OLD round. Check its session before treating .done as final, and expect a second round.
 - Perf guards and measurements run the conditions players use (night sky in the evening, other players/bots, a long walk), not a convenient default (Nov 26: the town's guard used ?sky=day and missed 1,000+ night uploads for days).
+
+## Scope stays where Eric put it (Nov 26)
+A fix Eric asks for one boss/screen/feature stays on that one. Widening it ("every boss", "every screen") is a question to Eric first,
+asked plainly, and his silence is not a yes. Nov 26: Eric asked for Birdie's ult only; the director widened the danger line to every
+boss in #968 and merged it; Eric asked three times where he had said every boss (he hadn't). Reverted in #970. When Eric asks "did I
+say X?", answer yes or no in the first line, before anything else.

@@ -2202,3 +2202,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - 06:40 Eric corrected: Chandy's Dodge ALSO still from 5 upgrades (meter path kept); checkmate is a 2nd way in; remove only mateOpen + danger. Rules helper interrupted + messaged; brief updated.
 - Town #969 opened (head 3993f43a; png moved to stills/town-uploads-2), CI waiter bcw5i0n8t; town fixer archived. Merge on green, then wait-version and tell Eric to re-run ?report at night.
 - Chandy art phase 1: session_01JuCWRvijkgUxnS98dDvpLW (high), branch claude/chandy-mate-art, .done-storyboard waiter. Review storyboard myself, then send Eric.
+- 06:55 Eric: never asked for every boss (only Birdie). Revert PR #970 (claude/ult-danger-birdie-only, e11e4266): every boss but Birdie back as before #968; Chandy's danger stays until the Chandy job. CI waiter b17ajzs1i. Merge on green.
+- #967 PR 6 MERGED (1fe1328a). Payments next: PR 7 coin screen.
+- Town #969 CI running (bcw5i0n8t). Not live yet.
