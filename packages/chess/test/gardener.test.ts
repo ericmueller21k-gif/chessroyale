@@ -611,6 +611,7 @@ describe("Watering in a battle", () => {
   it("his reactions: a queen's big cheer, a piece's cheer, a shrug for nothing at all, none for plants and kills only", () => {
     expect(reactionOf([{ kind: "q", square: "e4" }, { kind: "p", square: "e5" }])).toBe("bigCheer");
     expect(reactionOf([{ kind: "p", square: "e5" }, { kind: "plant", square: "e4" }])).toBe("cheer");
+    expect(reactionOf([{ kind: "q", square: "d4", regrow: true }, { kind: "nothing", square: "a3" }])).toBe("cheer");
     expect(reactionOf([{ kind: "nothing", square: "e5" }, { kind: "nothing", square: "e4", dropped: "n" }])).toBe("shrug");
     expect(reactionOf([])).toBe("shrug");
     expect(reactionOf([{ kind: "killer", square: "e5", ate: "P" }, { kind: "plant", square: "e4" }])).toBeNull();

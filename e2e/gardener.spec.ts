@@ -244,7 +244,7 @@ test("a piece of his hanging when he waters: the same kind grows back for him, o
   await page.goto(`${BASE}&power=water&seeds=2`);
   await bossAloneFromHome(page);
   await yourMove(page);
-  // His knights on a6 and h6, each hit by a pawn of yours (b5, g5); seven pawns of his, so a third knight can grow. His one move
+  // His knights on a6 and h6, each hit by a pawn of yours (b5, g5); six pawns of his, so a third knight can grow. His one move
   // saves one of them; your two quiet knight moves leave the other hanging when he waters.
   const fen = "4k3/p1ppppp1/n6n/1P4P1/8/8/P1PPPP1P/1N2K1N1 w - - 0 1";
   await page.evaluate((f) => {

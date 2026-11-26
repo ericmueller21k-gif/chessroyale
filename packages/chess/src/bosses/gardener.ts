@@ -545,7 +545,7 @@ export const plantSquares = (p: Pick<BossPowerState, "garden"> | null | undefine
 /** His reaction after a watering: a queen grew (a seed's: a regrown one is a piece), another piece grew, or nothing came up at all (none: plants and kills only). */
 export function reactionOf(growth: readonly WaterGrowth[]): "bigCheer" | "cheer" | "shrug" | null {
   if (growth.some((g) => g.kind === "q" && !g.regrow)) return "bigCheer";
-  if (growth.some((g) => g.kind === "p" || g.kind === "n" || g.kind === "b" || g.kind === "r")) return "cheer";
+  if (growth.some((g) => g.kind === "p" || g.kind === "n" || g.kind === "b" || g.kind === "r" || g.kind === "q")) return "cheer";
   return growth.every((g) => g.kind === "nothing") ? "shrug" : null;
 }
 
