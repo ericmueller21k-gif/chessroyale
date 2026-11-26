@@ -5,7 +5,7 @@ import { Board } from "../components/Board.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
-import { allowanceNote, type BoardView, type GameView, type GroupReveal } from "../game.ts";
+import { allowanceNote, bossFramed, type BoardView, type GameView, type GroupReveal } from "../game.ts";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { play } from "../sound.ts";
 import { Hud } from "./Hud.tsx";
@@ -161,7 +161,7 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
   );
 
   return (
-    <div class="screen game" onClick={() => played && match.skipReveal()}>
+    <div class={`screen game${bossFramed(match) ? " bf-frame" : ""}`} onClick={() => played && match.skipReveal()}>
       {hud}
       <div class="board-area">
         <div class="opening-name">
