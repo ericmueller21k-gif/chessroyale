@@ -14,8 +14,8 @@ import { asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
  * speech box), then the Dodge; three dodged rounds, then the win beat (your mate back, "CHECKMATE!") and the result: yours.
  */
 const S = BOSS_POWERS.chandy;
-/** His line at his opening's `line` step (characters/chandy-lines.ts' CHANDY_MATE_LINES, the first). */
-const CHANDY_MATE_LINE = "Mate? Negative. One shot left in the chamber.";
+/** His line at his opening's `line` step (characters/chandy-lines.ts' CHANDY_MATE_LINES, the first): a phone's bar shows a sentence at a time. */
+const CHANDY_MATE_LINE = ["Mate? Negative.", "One shot left in the chamber."];
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase?.kind ?? "none").catch(() => "none");
 
 async function yourMove(page: Page) {
@@ -44,7 +44,7 @@ async function playOne(page: Page, pick?: (legal: { uci: string; piece: string; 
 async function watch(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
-    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], steps: [] as string[], his: [] as string[], words: [] as string[], first: [] as { square: string; fen: string; thinking: boolean }[], king: [] as string[] };
+    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], steps: [] as string[], his: [] as string[], words: [] as string[], first: [] as { square: string; fen: string; thinking: boolean }[], king: [] as string[], clipped: [] as string[], mateKing: [] as string[] };
     const look = () => {
       const r = w.__ch;
       for (const e of w.match?.boss?.powers?.events ?? []) if (!r.kinds.includes(e.kind)) r.kinds.push(e.kind);
@@ -73,7 +73,12 @@ async function watch(page: Page) {
       for (const b of document.querySelectorAll(".bc-bubble[aria-label]")) {
         const t = b.getAttribute("aria-label") ?? "";
         if (t && !r.his.includes(t)) r.his.push(t);
+        // (Cut off: its words run past the box's rows, the bar's two-row clamp: the line's untyped rest is laid out too, so any frame shows it.)
+        const clip = b.querySelector(".speech-clip");
+        if (t && clip && clip.scrollHeight > clip.clientHeight + 1 && !r.clipped.includes(t)) r.clipped.push(t);
       }
+      // (The God King's words while your mate's opening plays.)
+      if (st) for (const b of document.querySelectorAll(".gk-bubble[aria-label]")) r.mateKing.push(b.getAttribute("aria-label") ?? "");
       for (const el of document.querySelectorAll(".cd-result, .cd-tele")) {
         const t = (el.textContent ?? "").trim();
         if (t && !r.words.includes(t)) r.words.push(t);
@@ -83,7 +88,7 @@ async function watch(page: Page) {
     requestAnimationFrame(look);
   });
 }
-const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; steps: string[]; his: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[]; king: string[] });
+const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; steps: string[]; his: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[]; king: string[]; clipped: string[]; mateKing: string[] });
 
 /**
  * Dodge's opening as a frame sampler can promise it (Nov 19: a long CI frame skipped the 600 ms slide): the phases sampled
@@ -337,6 +342,7 @@ test.describe("Chandy", () => {
     await expect(page.locator(".cd-root.cd-p-kill")).toBeVisible();
     await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
     const s = await seen(page);
+    expect(s.dodge[0], "his meter's Dodge has no mate opening").not.toBe("cd-p-mate");
     dodgeOpening(s.dodge);
     expect(s.dodge).toContain("cd-p-kill");
     expect(s.kinds).toContain("dodgeWin");
@@ -382,7 +388,11 @@ test.describe("Chandy", () => {
     expect(s.dodge[0]).toBe("cd-p-mate");
     expect(s.dodge).toContain("cd-p-win");
     expect(s.steps).toEqual(["cd-s-pause", "cd-s-jump", "cd-s-reach", "cd-s-zap", "cd-s-line"]);
-    expect(s.his.some((t) => t.includes(CHANDY_MATE_LINE))).toBe(true);
+    // (His line whole, each sentence in his bar's two rows, nothing cut off (the director's still, Nov 26: "One shot left in the…").)
+    for (const l of CHANDY_MATE_LINE) expect(s.his, l).toContain(l);
+    expect(s.clipped, "his words cut off in his box").toEqual([]);
+    // (No stale warning over your mate: the God King quiet through the opening ("Guard the queen!" over Qxf7#, the same still).)
+    expect(s.mateKing, "the God King's words during the opening").toEqual([]);
     expect(s.kinds).not.toContain("warn");
     dodgeOpening(s.dodge);
     expect(await page.evaluate(() => (window as any).match.boss.result)).toBe("crowd");

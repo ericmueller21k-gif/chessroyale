@@ -36,7 +36,7 @@
      "Checkmate?" / "Chandy isn't done yet.", then "Checkmate!" / "You beat Chandy.". The win beat reuses the God King's hero banner
      ("CHECKMATE!", "You beat Chandy") over your mate, its last-move squares lit. (The board's check glow is off game-wide,
      `BOARD.checkHighlight`, and the game has no confetti effect: the banner is what shows it's yours.)
-  7. **His line** (`CHANDY_MATE_LINES`, a placeholder for Eric): "Mate? Negative. One shot left in the chamber." Also offered: "Pinned
+  7. **His line** (`CHANDY_MATE_LINES`; Eric picked the first): "Mate? Negative. One shot left in the chamber." Also offered: "Pinned
      isn't finished. Final protocol: engage." and "Down, not out. A sniper always saves one round."
 - **Watched** frame by frame with real taps (your Qxf7 tapped, each vote tapped), phone and computer: a frame on every change, the
   steps at 0, 1.0, 2.2, 3.0 and 3.7 s, the scope-in at 6.1 s, the win beat at 34.2 s, the results at 36.4 s; your king never jumps or
@@ -45,3 +45,13 @@
   battle, its beats; in danger nothing), `several-bosses.test.ts` (a floor of several: a mate is a mate), `chandy-lobby.test.ts` (online:
   its start after the opening, a vote in it refused, decided after the win beat), `chandy-wired.test.ts` (the screen's phases),
   `e2e/chandy.spec.ts` (the mate Dodge played through, solo).
+- **Round 2** (the review and the director's stills, Nov 26):
+  - **His line whole.** In one piece it takes three rows of a phone's bar at 320 px (20 characters a row) and the bar clamps to two:
+    "Mate? Negative. One shot left in the…". Eric's words stay; it's said as a paced line in two sentences ("Mate? Negative." / "One shot
+    left in the chamber.", `mateLinePauseMs` 900 between, SPEECH's typing pace), the Hidden Boss's chant's mechanism: a phone's bar
+    shows a sentence at a time, each within two rows; a computer's box shows the whole line (three rows, unclamped). Both are typed by
+    2.1 s, inside the 2.4 s `line` step. Nothing else moves: the bar's box keeps its place and rules.
+  - **No stale warning over your mate.** "Guard the queen!" was the God King's warning from your turn's start (Qh5 attacked by the
+    knight on f6), still up as Qxf7# landed. Call: the God King is quiet through the opening (`kingVoice.hush` until the Dodge's own
+    start, the Hidden Boss cutscene's hush; lifted if the screen goes early). Simplest: nothing new to write, and his lines resume with the
+    Dodge.

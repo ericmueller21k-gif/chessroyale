@@ -309,8 +309,8 @@ function bubbleFit(e: HTMLElement): { width: number; three: boolean } | null {
 }
 
 /** Says a line into a voice once, as it's first drawn (a moment's line from inside its screen); draws nothing. */
-export function Say({ voice, text, sayKey, priority = NORMAL }: { voice: Voice; text: string | null | undefined; sayKey: string; priority?: Priority }) {
-  useLayoutEffect(() => void voice.say(text, sayKey, priority), [sayKey]);
+export function Say({ voice, text, sayKey, priority = NORMAL, paced }: { voice: Voice; text: string | null | undefined; sayKey: string; priority?: Priority; /** Typed sentence by sentence (`sayPaced`): `text` is ignored. */ paced?: PacedLine }) {
+  useLayoutEffect(() => void (paced ? voice.sayPaced(paced, sayKey, priority) : voice.say(text, sayKey, priority)), [sayKey]);
   return null;
 }
 

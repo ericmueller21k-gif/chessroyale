@@ -2598,8 +2598,8 @@ export class MatchRunner {
    * (BossRules.outOfTurn: Wrangler's reply to the showdown's duel, Folio's move again after Revision), else the boss after the one
    * who moved last. The crowd to move: the boss after the one who moved (his turn change), or Hollow himself while his second
    * move is due (Lights out failed: his turn again before the next boss's), or the boss whose ultimate couldn't wait and came as
-   * this crowd turn began (BossRules.ultimateNow: Chandy's Dodge, read from him as at his own turn change). The order goes on
-   * from the boss after whoever moved.
+   * this crowd turn began (BossRules.ultimateNow, read from him as at his own turn change; no boss uses it since Nov 26). The
+   * order goes on from the boss after whoever moved.
    */
   private focusNow(): number {
     const n = this.state.bosses!.length;

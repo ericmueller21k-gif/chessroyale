@@ -2337,6 +2337,8 @@ export const BOSS_POWERS = {
     mateReachMs: 800,
     mateZapMs: 700,
     mateLineMs: 2400,
+    /** His line's two sentences (CHANDY_MATE_LINES): the second starts typing this long after the first is typed (SPEECH's pace). */
+    mateLinePauseMs: 900,
     mateWinMs: 2200,
   },
   /**

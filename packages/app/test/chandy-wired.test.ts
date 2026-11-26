@@ -8,7 +8,8 @@ import { CHANDY_FIRE_AT, CHANDY_FX, dodgeRounds, dodgeTimeline, safeSquares, lin
 import { BOSS_KITS, stagedKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength } from "../src/characters/power-art.ts";
 import { CHANDY } from "../src/characters/chandy.ts";
-import { CHANDY_MOVE_NAMES, CHANDY_WORDS, chandyFen, chandyItems, dodgeDock, dodgeFen, dodgeView, shotHitAt } from "../src/components/Chandy.tsx";
+import { CHANDY_MOVE_NAMES, CHANDY_WORDS, MATE_LINE, chandyFen, chandyItems, dodgeDock, dodgeFen, dodgeView, shotHitAt } from "../src/components/Chandy.tsx";
+import { barRows } from "../src/characters/zebra-lines.ts";
 import { CHANDY_MATE_LINES } from "../src/characters/chandy-lines.ts";
 import { POWER_WORDS } from "../src/power-words.ts";
 import { KING_LINES } from "../src/godKing.ts";
@@ -195,12 +196,16 @@ describe("Dodge on screen", () => {
     expect(at(lost, tl.win.at + 10).phase).toBe("kill");
     // (A Dodge from his meter: no opening, no win beat.)
     expect(at(bossWith({ ...EMPTY, dodge: d }), -10).phase).toBe("scope");
-    // (His line: not Eric's example, three to pick from, short enough for his box.)
+    // (His line: not Eric's example, three to pick from, Eric's pick said; each sentence whole in a phone's bar, two rows at 320 px
+    // (the line in one piece took three and was cut off: the director's still, Nov 26).)
     expect(CHANDY_MATE_LINES).toHaveLength(3);
+    expect(MATE_LINE.text).toBe("Mate? Negative. One shot left in the chamber.");
     for (const l of CHANDY_MATE_LINES) {
-      expect(l).not.toMatch(/trick up my sleeve/i);
-      expect(l.length).toBeLessThanOrEqual(60);
+      expect(l.join(" ")).not.toMatch(/trick up my sleeve/i);
+      for (const s of l) expect(barRows(s), s).toBeLessThanOrEqual(2);
     }
+    // (Both sentences typed by the end of its step, so the whole line is read before the scope-in.)
+    expect(MATE_LINE.typedMs).toBeLessThanOrEqual(BOSS_POWERS.chandy.mateLineMs);
   });
 });
 

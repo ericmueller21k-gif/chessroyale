@@ -22,13 +22,15 @@
  *   box (CHANDY_MATE_LINES). Then the Dodge; survived, the win beat: your mate back on the board, "CHECKMATE!" (the hero banner).
  */
 import { CHANDY_FIRE_AT, CHANDY_FX, MATE_STEPS, dodgeTimeline, linesAfter, pieceAt, withPiece, type ChandyView, type MateStep } from "@chessroyale/chess";
-import { BOSS_POWERS, bossInText, type ChandyMove, type DodgeLine } from "@chessroyale/core";
+import { BOSS_POWERS, SPEECH, bossInText, type ChandyMove, type DodgeLine } from "@chessroyale/core";
 import type { BossView, DodgeRun } from "../game.ts";
 import { BoardEffects, onEachFrame, prewarm, prewarmAnims, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { CHANDY, CHANDY_BAR, CHANDY_CLONE, CHANDY_RIFLE, chandyAnim, type RifleStage } from "../characters/chandy.ts";
 import { CHANDY_MATE_LINES } from "../characters/chandy-lines.ts";
-import { useLayoutEffect } from "preact/hooks";
+import { useEffect, useLayoutEffect } from "preact/hooks";
 import { CRITICAL, Say, bossVoice } from "../speech.tsx";
+import { kingVoice } from "../godKing.ts";
+import { pacedLine } from "../paced-line.ts";
 import { FightBanner } from "./FightBanner.tsx";
 import { GodKingPortrait } from "./GodKing.tsx";
 import { playInPlace } from "./BossCharacter.tsx";
@@ -56,6 +58,8 @@ const PIECES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r:
 
 /** When his shot fires in a move's moment (ms): his `fire` animation's cue (characters/chandy.ts: 520 ms in; the banners' window). */
 export const FIRE_AT = CHANDY_FIRE_AT;
+/** His line at the opening's `line` step: Eric's pick, its two sentences typed in turn at SPEECH's pace. */
+export const MATE_LINE = pacedLine(CHANDY_MATE_LINES[0], { ...SPEECH, sentencePauseMs: BOSS_POWERS.chandy.mateLinePauseMs });
 /** His point's lock cue (the crosshair snaps on). */
 const POINT_AT = 120;
 /** The rounds of rapid fire, this far apart (ms). */
@@ -400,12 +404,19 @@ export function DodgeLayer({ boss, run, now, onPick }: { boss: BossView; run: Do
   useLayoutEffect(() => {
     if (pose && view) playInPlace(`${run.key}:mate:${step}`, [chandyAnim(pose, stage)], view.since);
   }, [run.key, step]);
+  // (Your mate's opening: the God King quiet until the Dodge's own start. The line up as your mate lands is from your turn's start,
+  // stale now: "Guard the queen!" over Qxf7#, the director's still, Nov 26. Taken off the screen early: he speaks again.)
+  const opening = view?.phase === "mate";
+  useLayoutEffect(() => {
+    if (opening) kingVoice.hush(run.at);
+  }, [opening, run.at]);
+  useEffect(() => () => kingVoice.unhush(), []);
   if (!view) return null;
   const tl = dodgeTimeline();
   return (
     <>
       <ChandyDodge view={view} />
-      {step === "line" && <Say voice={bossVoice} text={CHANDY_MATE_LINES[0]} sayKey={`${run.key}:mate-line`} priority={CRITICAL} />}
+      {step === "line" && <Say voice={bossVoice} text={null} paced={MATE_LINE} sayKey={`${run.key}:mate-line`} priority={CRITICAL} />}
       {view.phase === "win" && now < view.since + (tl.win.end - tl.win.at) && <FightBanner key={`${run.key}:win`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="CHECKMATE!" sub={`You beat ${bossInText(boss.name)}`} ms={tl.win.end - tl.win.at} />}
     </>
   );
