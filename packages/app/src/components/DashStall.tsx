@@ -8,7 +8,7 @@ import { DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_L
 import { DASH_LIE, DASH_LIE_AT } from "../characters/dash-lie.ts";
 import { bossKit } from "../characters/kits.ts";
 import { CRITICAL, NORMAL, VoiceBubble, bossVoice } from "../speech.tsx";
-import { SpriteAnim } from "./BossEffect.tsx";
+import { SpriteAnim, prewarmAnims, prewarmSprite } from "./BossEffect.tsx";
 import type { BossView, StallState, StrikeState } from "../game.ts";
 import { playInPlace, stopInPlace } from "./BossCharacter.tsx";
 
@@ -201,9 +201,23 @@ function placeLie(el: HTMLElement, say: HTMLElement | null) {
  * him"), his figure and its usual box away. Drawn beside the match's screens, so a move going in (its screen changing) doesn't cut
  * him off. A reconnect mid-tap: he's lying.
  */
+let lieWarmed = false;
+/**
+ * His lying figure's frames made and drawn ahead, a slice at a time, as his battle shows (main, Nov 26: made the first time he lay
+ * down, they held the screen a quarter second on a fast computer and about a second on a slow runner, so a move made the moment he
+ * started went in after he was down and got no joke).
+ */
+function prewarmLie() {
+  if (lieWarmed || typeof window === "undefined") return;
+  lieWarmed = true;
+  const anims = Object.values(DASH_LIE.anims);
+  prewarmAnims(anims, () => prewarmSprite(DASH_LIE, anims.flatMap((a) => a.frames)));
+}
+
 export function DashTap({ match }: { match: { boss: BossView | null; phase: { kind: string; stall?: StallState | null; movedAt?: number }; myPick?: string | null; myPickAt?: number | null } }) {
   const boss = match.boss;
   const tap = useRef<TapSeen | null>(null);
+  useEffect(prewarmLie, []);
   const now = Date.now();
   const t = (tap.current = tapSeen(tap.current, match, now));
   const tl = t ? tapTimeline(t.at, t.moved) : null;
