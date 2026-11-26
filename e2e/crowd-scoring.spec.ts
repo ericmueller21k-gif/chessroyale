@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { CROWD_SCORING } from "@chessroyale/core";
 import { legalMoves } from "@chessroyale/chess";
-import { BOARD_SEL, named, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
+import { BOARD_SEL, named, settled, soloFromHome, submitMove, test, watchFor } from "./helpers.ts";
 
 /**
  * 50 v 50's scoring on screen (docs/decisions/2026-10-24-crowd-scoring.md): the scoreboard's fire from 3 strong moves
@@ -76,7 +76,9 @@ const streaks = (page: Page, on: boolean) =>
  * the rank and the name; the header's labels apart; and each name's cell as wide with the fires as without them.
  */
 async function checkTower(page: Page, scope: string, label: string) {
-  const { list, headGap } = await rows(page, scope);
+  // (Read once the rows hold still: after a resize the phone's scoreboard picks how many rows fit from a ResizeObserver, a
+  // frame or so later, so a read straight after it can catch the last width's rows (Nov 26: 3 with the fire, 2 without).)
+  const { list, headGap } = await settled(page, () => rows(page, scope));
   expect(new Set(list.map((r) => r.height)).size, label).toBe(1);
   expect(headGap, `${label}: "Player" runs into "Pts"`).toBeGreaterThanOrEqual(4);
   for (const r of list) {
@@ -86,7 +88,7 @@ async function checkTower(page: Page, scope: string, label: string) {
   expect(list.filter((r) => r.fire).length, label).toBeGreaterThan(0);
   await streaks(page, false);
   await expect(page.locator(`${scope} .streak-fire`)).toHaveCount(0);
-  const bare = (await rows(page, scope)).list;
+  const bare = (await settled(page, () => rows(page, scope))).list;
   expect(bare.map((r) => r.name), `${label}: a name's room with and without the fire`).toEqual(list.map((r) => r.name));
   await streaks(page, true);
   await expect(page.locator(`${scope} .streak-fire`).first()).toBeVisible();
