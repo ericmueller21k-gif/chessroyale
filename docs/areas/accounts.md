@@ -169,7 +169,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   - **Purchases** (store `purchases`: `purchases`, `refunds`; `purchases.ts`, Nov 26; [payments.md](payments.md)): the download has
     every purchase and refund (the refund's comment too), and the account's buying columns (`buy_band`, `refund_count`, `hold_until`,
     `chargebacks`, `closed_at`, `closed_reason`, `held_taps`) in `account`. Deleting keeps both tables' rows as the shared `deleted`
-    account's (sales records, for tax), their unspent coins closed in the ledger, a refund's comment erased. A guest can't buy; a
+    account's (sales records, for tax), their unspent coins closed in the ledger, a refund's comment erased, and with no key left that
+    joins them to the ledger (a purchase's `ref` set to NULL, a refund given a random op id). A guest can't buy; a
     guest's merge would move any rows with their ledger legs. (Nothing is sold yet; the privacy page's lines come with PR 8.)
   - **Every table is accounted for:** each is in a store in `ACCOUNT_STORES` (`account-data.ts`) or listed in
     `NO_ACCOUNT_DATA`. `account-data.test.ts` fails on a table in neither, from the schema or any `CREATE TABLE` in
