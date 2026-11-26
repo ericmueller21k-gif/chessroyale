@@ -148,16 +148,16 @@ describe("the pass guard on the real engine", () => {
     expect(blind.applyCarrots(null)).not.toBeNull();
   }, 60_000);
 
-  it("the Carrot Patch cast waits at most carrotWaitMax of his turns after the warning, then comes whatever passing costs (Eric, Nov 26)", async () => {
-    expect(BOSS_POWERS.carrotWaitMax).toBe(2);
+  it("the Carrot Patch cast waits at most ultWaitMax of his turns after the warning, then comes whatever passing costs (Eric, Nov 26)", async () => {
+    expect(BOSS_POWERS.ultWaitMax).toBe(3);
     const r = battle("hopper", HANGING, {}, { bossPowerTest: "carrotpatch" });
-    const boss = ["h7h6", "g7g6"];
-    const crowdMoves = ["b1c3", "h3h4", "h4h5"];
+    const boss = ["h7h6", "g7g6", "a7a6"];
+    const crowdMoves = ["b1c3", "h3h4", "h4h5", "a2a3"];
     for (let i = 0; i < crowdMoves.length; i++) {
       await crowd(r, crowdMoves[i]!);
       expect(r.carrotDue(), `try ${i + 1}`).toBe(true);
       const patch = r.applyCarrots(PASS_WAIT);
-      if (i < BOSS_POWERS.carrotWaitMax) {
+      if (i < BOSS_POWERS.ultWaitMax) {
         expect(patch, `try ${i + 1}: the guard holds it`).toBeNull();
         expect(r.boss!.powers!.warnAt).toBe(1);
         r.applyBossMove(boss[i]!);

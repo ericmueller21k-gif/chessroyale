@@ -409,6 +409,19 @@ describe("Watering: the engine's placement within the band", () => {
     // No engine: "".
     expect((await waterAnswer([], QUIET, ask(["plant"]))).answer).toBe("");
   });
+  it("the pass guard holds a warned watering at most ultWaitMax of his turns, then it comes whatever passing costs (Eric, Nov 26)", () => {
+    expect(S.ultWaitMax).toBe(3);
+    const r = battle(11);
+    const at = (crowdMoves: number, warnAt: number | undefined) => {
+      r.state.boss = { ...r.boss!, crowdMoves, powers: { ...r.boss!.powers!, warnAt, ultNext: false } };
+      return r.waterAny();
+    };
+    expect(at(5, 5)).toBe(false);
+    expect(at(7, 5)).toBe(false);
+    expect(at(8, 5)).toBe(true);
+    expect(at(9, 5)).toBe(true);
+    expect(at(9, undefined)).toBe(false);
+  });
 });
 
 describe("Watering in a battle", () => {

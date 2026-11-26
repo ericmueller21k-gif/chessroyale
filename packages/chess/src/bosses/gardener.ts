@@ -32,7 +32,8 @@
  * - **Hard guards on every step:** never a king; never either side left in check; never a mate in one for either side;
  *   never the crowd without a move (the plants counted); never a position the engine refuses (stockfishRefuses).
  * - **The pass guard** (as every power that spends his whole turn): when the watering would lose him real material
- *   (passLoses), it waits for his next turn and he plays his move; the test switch's and the admins' trigger's come anyway.
+ *   (passLoses), it waits for his next turn and he plays his move, at most ultWaitMax of his turns after the warning (Eric,
+ *   Nov 26); the test switch's and the admins' trigger's come anyway.
  * - Online the server rolls the seeds and the host's engines place them (the boss request's `water`); the server checks
  *   the answer (waterCheck: what was rolled, where the rules allow it) and plays it. Anything else waits a turn.
  */
@@ -621,10 +622,16 @@ export const gardenerBattle = {
     return { kinds: [...roll.kinds], plants: plantSquares(p), order: Math.floor(powerRoll(p.seed, "water-order", gardenOf(p).waterings) * 2 ** 32) };
   },
 
-  /** It comes even when it would lose him real material: the test switch's first watering, or the admins' trigger. */
+  /**
+   * It comes even when it would lose him real material: the test switch's first watering, the admins' trigger, or the pass guard
+   * having held it ultWaitMax of his turns since the warning (Eric, Nov 26: "just force it at some point").
+   */
   any(b: Battle): boolean {
-    const p = b.state.boss?.powers;
-    return !!p && (!!p.ultNext || (b.settings.bossPowerTest === "water" && !gardenOf(p).waterings));
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    if (!boss || !p) return false;
+    const waited = p.warnAt !== undefined && boss.crowdMoves - p.warnAt >= BOSS_POWERS.ultWaitMax;
+    return !!p.ultNext || waited || (b.settings.bossPowerTest === "water" && !gardenOf(p).waterings);
   },
 
   /** The watering from this device's engines (solo, the sims): waterAnswer, then apply. */
