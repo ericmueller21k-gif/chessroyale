@@ -858,8 +858,8 @@ below):
   phase 2, a phone on its side, a short window. Tests: `e2e/board-layout.spec.ts`, `e2e/boss-dock.spec.ts`,
   `e2e/hopper.spec.ts`, `e2e/boss-character.spec.ts`.
 - **The shared game frame on a computer (Nov 26; [decision](../decisions/2026-11-26-boss-frame.md)).** From 1100 px wide with a mouse, Boss
-  alone and a raid (solo or online; `bossFramed` in `game.ts` puts `bf-frame` on every screen of the battle: Play, Boss, Reveal; a Battle
-  Tower floor and the Hidden Boss's whole fight keep their own: his phases keep phase 1's boxes) take the 50 v 50's frame (`board-size.css`: the same `--cf-*`
+  alone and a raid (solo or online; `bossFramed` in `game.ts` puts `bf-frame` on every screen of the battle: Play, Boss, Reveal, and the
+  Hidden Boss's phase change and phase 2, which keep phase 1's boxes; a Battle Tower floor keeps its own) take the 50 v 50's frame (`board-size.css`: the same `--cf-*`
   sizes, gap and drawing step): the left column (a raid's scoreboard, its table from the board's top down to over the boss, who stands under
   it on the board's foot and never covers it, its rows scrolling (`board-foot.ts`); Boss alone's boss column,
   `.tower-space`, `--ts-w` plus half the room the block leaves, so Babur's pump keeps its room), the board with its strips (the two-line boss bar over it, kept: Eric, Nov 26, "I like the boss

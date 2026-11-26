@@ -23,6 +23,11 @@
     scrolling; the boss under it on the board's foot. The simplest that covers nothing and keeps every column on the board's lines.
   - **A raid's block is centered with room either side** (the same review): with the menu's labels it keeps at least 40 px each side, else
     icons (1536 × 730 and 1920 × 1080 icons now; 1920 × 960 labels). Boss alone keeps its own margins (its figures' sizes).
-  - **Not the Hidden Boss's fight, nor a Battle Tower floor** (`bossFramed`): his phase change and phase 2 keep phase 1's boxes (their own
-    layout, hidden-boss-room.spec.ts); a floor has its own bar and column.
+  - **Not a Battle Tower floor** (`bossFramed`): it has its own bar and column.
+  - **The Hidden Boss's whole fight takes the frame too** (round 2, Nov 26). Left out at first, his fight kept the old layout, where the
+    board stands 12 to 14 px further left at some sizes, so his figures were sized for other room than every other boss's (your pawn
+    1.2 against 1.15 at 1280 × 800: side-same-size.spec.ts). His phase change and phase 2 (Recluse2.tsx) are phase 1's skeleton (the four
+    boards inside phase 1's square, the same dock and Moves panel, no layout of their own on a computer), so they take the frame with
+    phase 1 and keep its boxes. Chosen over keeping the old scale inside the frame: that would size the figures from where the old layout
+    would have put the board, a second copy of its sums.
   - **Labels per #953's rule:** Boss alone has labels at 1536 × 730, 1920 × 960 and 1920 × 1080; icons at 1280 × 800, 1366 × 768 and 1440 × 900.

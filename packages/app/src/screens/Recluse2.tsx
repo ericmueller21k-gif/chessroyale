@@ -19,7 +19,7 @@ import { FightBanner } from "../components/FightBanner.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
 import { BossPanel, STRIP_LAYOUT, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
-import type { GameView, SimulBoardView, SimulView } from "../game.ts";
+import { bossFramed, type GameView, type SimulBoardView, type SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
 import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
 import { Hearts, TOO_SLOW_WORD, lostToHearts } from "../components/RecluseHearts.tsx";
@@ -226,7 +226,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   // its panel beside the God King keeping one size: there a fold remembered from another match changes nothing.)
   const folded = !strip && !underBoardView().open;
   return (
-    <div class={`screen game boss-screen rc-change${away ? " rc-away" : ""}${folded ? " rc-folded" : ""}`}>
+    <div class={`screen game boss-screen rc-change${bossFramed(match) ? " bf-frame" : ""}${away ? " rc-away" : ""}${folded ? " rc-folded" : ""}`}>
       {hud}
       {/* (No line above the board (Eric, Oct 24): the dock's second line says "Freestyle" once the boards split, the variant
           players see: FIDE's name for Chess960.) */}
@@ -430,7 +430,7 @@ export function SimulScreen({ match }: { match: GameView }) {
         ? "Your move"
         : "The boss is thinking…";
   return (
-    <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}`}>
+    <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}${bossFramed(match) ? " bf-frame" : ""}`}>
       {hud}
       <div class="board-area">
         <div class="board-row">

@@ -503,11 +503,12 @@ export const bossAlone = (m: Pick<GameView, "settings" | "totalPlayers">) => !!m
 
 /**
  * Boss alone and a raid (solo or online) take the shared game frame on a computer (`bf-frame`, board-size.css; Nov 26): every screen of the
- * battle, so nothing moves between them. A Battle Tower floor keeps its own layout, and so does the Hidden Boss's whole fight (his phase
- * change and phase 2 keep phase 1's boxes: Recluse2.tsx, hidden-boss-room.spec.ts).
+ * battle, so nothing moves between them. The Hidden Boss's whole fight too (round 2: his phase change and phase 2, Recluse2.tsx, keep phase
+ * 1's boxes, so they take it with phase 1; out of it, his figures were sized for other room than every other boss's). A Battle Tower floor
+ * keeps its own layout.
  */
 export const bossFramed = (m: Pick<GameView, "settings" | "boss" | "tower" | "towerParty">) =>
-  !!m.boss && !!m.settings.raid && !m.tower && !m.towerParty && m.boss.id !== "recluse";
+  !!m.boss && !!m.settings.raid && !m.tower && !m.towerParty;
 
 /** Crowd 50 v 50: your team (the side you play all match), if you have one. */
 export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {

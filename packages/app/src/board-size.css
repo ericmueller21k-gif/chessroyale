@@ -605,8 +605,9 @@
  * (his tallest pose's room), then the figures standing on the board's foot (the God King, and your pawn in Boss alone: they keep their
  * places and sizes, placed from the board); an online
  * raid's chat under the moves as before, down to the God King's room (`--gk-zone`). The board's lines: its squares' top, their foot with
- * the clock's bar under it (the 50 v 50's). A phone, a tablet, a computer under 1100 px, a Battle Tower floor and the Hidden Boss's fight
- * (his phases keep phase 1's boxes) are unchanged (game.ts `bossFramed`). */
+ * the clock's bar under it (the 50 v 50's). The Hidden Boss's whole fight too (round 2: his phase change and phase 2 on phase 1's boxes,
+ * so every boss's figures are sized for the same room). A phone, a tablet, a computer under 1100 px and a Battle Tower floor are unchanged
+ * (game.ts `bossFramed`). */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
   .screen.game.bf-frame {
     /* (The boss's room by the window's edge is the left column's now: the board gives none of its width for him.) */
