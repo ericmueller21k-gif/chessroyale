@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { RANKED_1V1, rankView } from "@chessroyale/core";
-import { BOARD_SEL, REAL_SCREENS, asSignedIn, endGaps, named, realLayout, realScreenContext, test, watchFor, watchSpans } from "./helpers.ts";
+import { BOARD_SEL, REAL_SCREENS, asSignedIn, endGaps, localSql, named, realLayout, realScreenContext, test, watchFor, watchSpans } from "./helpers.ts";
 
 /**
  * Ranked 1 v 1 through the real server (docs/areas/ranked.md), two players on emulated phones (and computers): both
@@ -537,6 +537,45 @@ test("the stage: your pawn on the left platform while searching; the opponent's 
   expect(held).toBeGreaterThan(RANKED_1V1.versusMs - 1000);
   expect(held).toBeLessThan(RANKED_1V1.versusMs + 500);
   expect(s.board!.first).toBeGreaterThan(s.versus!.last);
+});
+
+test("ranks in the game (Eric, Nov 25: \"the emblem next to everyone... click on someone's rank and then it shows the list of rankings\"): an emblem by both names, its box there in placements too; a tap opens Ranks with that rank marked; ✕ and Escape close it", async ({ browser }) => {
+  test.setTimeout(2 * 60_000);
+  const a = await player(browser, "Ann Ranks");
+  const b = await player(browser, "Bo Ranks");
+  // Bo placed in Gold III (ladder 1000: Gold's 800, two divisions up, 40 RP); Ann still in placements.
+  const bo = ((await (await b.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  await localSql(b, `INSERT OR REPLACE INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at, streak) VALUES ('${bo}', 1500, 80, 12, 7, 5, 0, 1000, 1, 0)`);
+  await meet(a, b, poolName());
+  const strip = (who: "you" | "them") => a.locator(`.dv-strip.dv-${who}`);
+  await expect(strip("them").locator(".dv-rank")).toHaveText("Gold III – 40");
+  await expect(strip("them").locator(".dv-strip-emblem .re-box")).toHaveAttribute("data-emblem", "gold-d3");
+  // (Placements: the emblem's box at its size, empty, as on the stage: nothing moves when a rank arrives.)
+  await expect(strip("you").locator(".dv-strip-emblem .re-box")).not.toHaveAttribute("data-emblem", /./);
+  for (const who of ["you", "them"] as const) {
+    const box = (await strip(who).locator(".dv-strip-emblem").boundingBox())!;
+    const s = (await strip(who).boundingBox())!;
+    expect([box.width, box.height, s.height]).toEqual([24, 24, 34]);
+  }
+  // Tap Bo's rank: every rank, the highest first, then Placement; Gold III marked with his name, in view.
+  await strip("them").getByRole("button", { name: /^Bo Ranks: Gold III – 40/ }).click();
+  const sheet = a.getByRole("dialog", { name: "Ranks" });
+  await expect(sheet.locator(".rk-row")).toHaveCount(RANKED_1V1.tiers.length * RANKED_1V1.divisions + RANKED_1V1.topTiers.length + 1);
+  await expect(sheet.locator(".rk-row").first()).toContainText("Transcendent");
+  await expect(sheet.locator(".rk-row").last()).toContainText("Placement");
+  const marked = sheet.locator('.rk-row[aria-current="true"]');
+  await expect(marked).toHaveCount(1);
+  await expect(marked).toContainText(/Gold III\s*Bo Ranks\s*960 RP/);
+  // (Only the list scrolls to it: the title and ✕ stay in view.)
+  await expect(marked).toBeInViewport({ ratio: 1 });
+  await expect(sheet.getByRole("heading", { name: "Ranks" })).toBeInViewport({ ratio: 1 });
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(sheet).toHaveCount(0);
+  // Your own: Placement marked. Escape closes it.
+  await strip("you").getByRole("button", { name: /^You: Placement 0\/5/ }).click();
+  await expect(sheet.locator('.rk-row[aria-current="true"]')).toContainText(/Placement\s*You/);
+  await a.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
 });
 
 test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longest names and ranks, no sideways scroll", async ({ browser }) => {

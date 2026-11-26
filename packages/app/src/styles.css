@@ -21669,7 +21669,7 @@ button.sq-tiny {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   height: 34px;
   padding: 0;
   border: 0;
@@ -21678,24 +21678,33 @@ button.sq-tiny {
   font: inherit;
   cursor: pointer;
 }
-/* (The emblem's 48 px art at 28 px, the pawn's size: its box always there, so nothing moves when it loads.) */
+/* (The emblem's 48 px art at 24 px, an exact half, so it stays crisp: its box always there, so nothing moves when it loads.) */
 .dv-strip-emblem {
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   overflow: hidden;
 }
 .dv-strip-emblem .re-box {
-  transform: scale(calc(28 / 48));
+  transform: scale(0.5);
   transform-origin: 0 0;
 }
-/* The Ranks pop-up (components/DuelRankPill.tsx, RanksSheet): every rank, the highest first, the tapped player's marked. */
+/* The Ranks pop-up (components/DuelRankPill.tsx, RanksSheet): every rank, the highest first, the tapped player's marked. Only the list
+   scrolls, so the title, its line and ✕ stay in view. */
+.fd-sheet.rk-sheet {
+  overflow: hidden;
+}
 .rk-line {
   margin: 0;
   font-size: 13px;
   color: var(--fd-sub);
 }
 .rk-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  position: relative;
   list-style: none;
   margin: 0;
   padding: 0;

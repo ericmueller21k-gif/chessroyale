@@ -38,7 +38,10 @@ export function DuelRankButton({ rank, who }: { rank: RankView; who: string }) {
 export function RanksSheet({ rank, who, onClose }: { rank: RankView; who: string; onClose: () => void }) {
   const list = useRef<HTMLOListElement>(null);
   useLayoutEffect(() => {
-    list.current?.querySelector<HTMLElement>("[aria-current]")?.scrollIntoView({ block: "center" });
+    // (The list alone scrolls, the marked row to its middle: scrollIntoView would scroll the sheet too, its title and ✕ out of view.)
+    const ol = list.current;
+    const row = ol?.querySelector<HTMLElement>("[aria-current]");
+    if (ol && row) ol.scrollTop = row.offsetTop - (ol.clientHeight - row.offsetHeight) / 2;
   }, []);
   const placing = rank.placement !== null;
   const tag = (on: boolean) => on && <span class="rk-who">{who}</span>;
