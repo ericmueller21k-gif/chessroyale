@@ -1840,7 +1840,7 @@ export const BOSS_POWERS = {
    * The pass guard (Eric, Oct 18: Alfil fused while his queen hung, and lost it for free;
    * docs/decisions/2026-10-18-turn-passing-guard.md): one rule for every power that spends a boss's whole turn (Alfil's
    * fusion, Chub & Chirp's Carrot Patch cast). When it's due and passing would lose real material, it waits a turn and
-   * he plays his move instead; it's checked again on his next turn, with no cap. "Real material": the engine's
+   * he plays his move instead; it's checked again on his next turn (the cast: at most carrotWaitMax of his turns, then it comes). "Real material": the engine's
    * evaluation after the power (the crowd to move) at least passGuardPawns below his evaluation before it (him to move,
    * so his best move's), in pawns of log-odds (bouncePawnLogit), on the host's engine (the server never searches; no
    * engine anywhere: it comes as ever). The fusion reads the searches its square's pick already makes (tusksNodes); the
@@ -1852,6 +1852,12 @@ export const BOSS_POWERS = {
    */
   passGuardPawns: 2,
   passGuardNodes: 30_000,
+  /**
+   * Chub & Chirp's Carrot Patch cast and the pass guard (Eric, Nov 26: warned, then it "didn't ult for 20 turns and never ended up
+   * ulting ... just force it at some point"; every boss ults every game): once warned, the guard holds the cast back for at most this
+   * many of his turns; on the next it comes whatever passing costs (in check it still can't: a pass is no legal move there).
+   */
+  carrotWaitMax: 2,
   /**
    * Chub & Chirp's Leapfrog (their passive; Eric, Oct 18): at the start of his turn, when one of his pawns stands nose
    * to nose with one of the crowd's (the crowd's pawn on the square in front of his) and the square beyond is empty, his

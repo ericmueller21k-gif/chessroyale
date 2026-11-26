@@ -615,7 +615,8 @@ export const carrotBattle = {
    * trigger; once a battle. In check, or with the crowd left no move once the turn passes, it waits for his next turn
    * (he answers the check with his move: passTurn), the warning staying; and so it does when passing would lose real
    * material (the pass guard, Oct 18: `passWait`, the host's PASS_WAIT): he plays his move, the warning and the
-   * trigger staying, so "next turn" stays true, and it's checked again on his next turn.
+   * trigger staying, so "next turn" stays true, and it's checked again on his next turn; for at most carrotWaitMax of his
+   * turns after the warning, then it comes (Eric, Nov 26).
    */
   due(b: Battle): boolean {
     const boss = b.state.boss;
@@ -648,7 +649,10 @@ export const carrotBattle = {
   apply(b: Battle, answer: string | null = null): CarrotPatch | null {
     if (!carrotBattle.due(b)) return null;
     const boss = b.state.boss!;
-    if (answer === PASS_WAIT) {
+    // (Waited carrotWaitMax of his turns since the warning: it comes now, the guard or not. Eric, Nov 26: "just force it at some point".)
+    const warnedAt = boss.powers!.warnAt;
+    const forced = warnedAt !== undefined && boss.crowdMoves - warnedAt >= BOSS_POWERS.carrotWaitMax;
+    if (answer === PASS_WAIT && !forced) {
       setPowers(b, (p) => ({ ...p, passWait: boss.crowdMoves }));
       return null;
     }
