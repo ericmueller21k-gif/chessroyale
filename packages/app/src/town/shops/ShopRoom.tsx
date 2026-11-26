@@ -4566,13 +4566,10 @@ function startRoom(
   let going: { to: DoorTo; act: () => void } | null = null;
   /** The room the open door card leads to (a door to another room's), or null. */
   let cardTo: RoomPart | null = null;
-  /** The square you stood on as the open card opened ("c,r"). */
-  let cardAt = "";
   const setCard = (c: ShopCard | null, a = -1) => {
     const h = you.here();
     const to = c !== "pass" ? null : a >= 0 ? (doorUps[a]!.to as RoomPart) : (passAt(room, h.c, h.r)?.to ?? null);
     if (c === card && a === aimI && to === cardTo) return;
-    cardAt = `${h.c},${h.r}`;
     card = c;
     aimI = a;
     cardTo = to;
@@ -4619,10 +4616,6 @@ function startRoom(
         return g.act();
       }
     }
-    // (A card that showed as you stopped somewhere else shuts: a short walk can begin and end between two frames on a slow device
-    // (a step is youStepMs, 90 ms), so the walk above never saw you moving (main, Nov 26: the Shopkeeper's card stayed open two
-    // squares from him).)
-    if (aimI < 0 && (card === "talk" || card === "door" || card === "pass") && cardAt !== key) setCard(null);
     if (card || shut === key) return;
     if (onDoor(room, h.c, h.r)) setCard("door");
     else if (onPass(room, h.c, h.r)) setCard("pass");
