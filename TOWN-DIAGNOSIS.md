@@ -24,4 +24,10 @@ Read-only investigation of `origin/main` at `270ea48`. Nothing in the product wa
   sun sets): in `warm`'s jobs, for every lot's front, every side's art with lights, every place with lights or pools, and the park
   lamp. And make the guard walk at night (`?sky=night`), past more than one block.
 
-(Stacks, counts per second, the other sources and the "outside our code" findings follow in the next version.)
+- **It is the whole of Eric's number (second version):** a 25 s tour of every street at `?sky=night` (headless, same window):
+  **1,020 uploads, 1,018 of them glow pieces** (997 `lightT ← drawWall`, 21 `light ← lightUp`), 2 speech bubbles; up to 192 a second
+  and 58 in one frame as a new block comes into view. The same walk at `?sky=day`: 4 uploads in 80 s (boss speech bubbles only).
+  The town holds about 1,050 glow pieces without turning; Eric's 1,211 in 16.7 s and Nov 25's 1,063 in 15.6 s are that number.
+  So #937 fixed the labels (real: 116 by day) but the bulk of the 1,063 was never the labels.
+
+(Per-source table, stacks, the smaller sources and the "outside our code" findings follow in the next version.)
