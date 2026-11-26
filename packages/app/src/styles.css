@@ -28384,6 +28384,88 @@ body.cs-on .mm-scrim {
   z-index: 25;
   pointer-events: none;
 }
+/* A mate's opening and the win beat (ChandyDodge.tsx MateOver): his checkmate figure on the board, its feet at --mf-x/--mf-y (the center,
+   or two squares off it for a king near it: chandy-mate.ts mateAim; the win beat: the center file, 90% down), a board 384 px
+   across drawing him a CSS px an art px; toward a king on his left, mirrored about his feet. His figure at his spot hides meanwhile. */
+.cd-mate-fig {
+  position: absolute;
+  left: calc(var(--mf-x, 50%) - var(--board-size) * var(--mf-fx) / 384);
+  top: calc(var(--mf-y, 50%) - var(--board-size) * var(--mf-fy) / 384);
+  width: calc(var(--board-size) * var(--mf-w) / 384);
+  height: calc(var(--board-size) * var(--mf-h) / 384);
+  transform-origin: calc(var(--mf-fx) / var(--mf-w) * 100%) calc(var(--mf-fy) / var(--mf-h) * 100%);
+  z-index: 2;
+}
+.cd-mate-fig canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.cd-mate-fig.cd-mirror canvas {
+  transform: scaleX(-1);
+  transform-origin: calc(var(--mf-fx) / var(--mf-w) * 100%) 0;
+}
+.screen:has(.cd-mate-fig) .boss-char-sprite {
+  visibility: hidden;
+}
+/* The win beat: his knockout on the center file below the hero banner ("CHECKMATE!" covers the board's middle, about 27% to 72% of
+   its height, lowest on the left where his head lies), his feet at 90%; under the banner's layer (.fight-banner's 9) where they meet. */
+.cd-root.cd-p-win {
+  z-index: 8;
+}
+.cd-p-win .cd-mate-fig {
+  --mf-y: 90%;
+}
+/* The leap (step `jump`): crouched at his spot (its feet, its size), then along an arc onto the center as he springs, landing as his
+   tuck ends (chandy-mate.ts JUMP_MS). */
+.cd-s-jump .cd-mate-fig {
+  animation: cd-leap var(--mf-leap) both;
+  animation-delay: var(--mf-delay);
+}
+@keyframes cd-leap {
+  0% {
+    translate: var(--mf-from-x, 0px) var(--mf-from-y, 0px);
+    scale: var(--mf-from-s, 1);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1);
+  }
+  40% {
+    translate: calc(var(--mf-from-x, 0px) * 0.6) calc(min(var(--mf-from-y, 0px), 0px) - var(--board-size) * 0.1);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.4);
+  }
+  100% {
+    translate: 0 0;
+    scale: 1;
+  }
+}
+/* The zap's bolt from his claws to your king: white-hot, a cyan glow (the Lock-on Shot round's colors), flicking out, then fading. */
+.cd-mate-bolt {
+  position: absolute;
+  height: 3px;
+  margin-top: -1.5px;
+  transform-origin: 0 50%;
+  background: #e4ffff;
+  border-radius: 2px;
+  box-shadow: 0 0 3px 1px #58e6ff, 0 0 9px 3px rgba(18, 156, 195, 0.75);
+  animation: cd-bolt 450ms linear both;
+  z-index: 1;
+}
+@keyframes cd-bolt {
+  0% {
+    scale: 0 1;
+    opacity: 1;
+  }
+  20% {
+    scale: 1 1;
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    scale: 1 1;
+    opacity: 0;
+  }
+}
 .cd-blank {
   position: absolute;
   inset: 0;
@@ -29073,8 +29155,9 @@ body.cs-on .mm-scrim {
   background: #111;
 }
 
-/* Dash's lying-down clock tap (Eric, Nov 17; DashStall.tsx, DashTap): beside your clock under the board, on the page's top layer,
-   placed once from the clock's time (left, top, size), mirrored when he lies on its left; taking no taps. His figure where he
+/* Dash's lying-down clock tap (Eric, Nov 17; DashStall.tsx, DashTap): beside your clock under the board, hanging a little over its
+   edge (Nov 26), on the page's top layer, placed once from the clock's time (left, top, size), mirrored when he lies on its left;
+   taking no taps (pointer-events: none, which his sprite inherits): a tap or drag on a piece under him reaches the board. His figure where he
    stands is away meanwhile (its place kept). */
 .dash-lie {
   position: fixed;

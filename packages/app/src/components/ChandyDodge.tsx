@@ -18,20 +18,23 @@
  * - `kill` (the hit that loses): the beams keep hitting your king; the cracks spread, he flickers and dissipates in particles, then
  *   shatters into shards (chandyDodgeKing); "HIT! YOU LOSE".
  * - From your mate (Eric, Nov 26; its beats: dodgeTimeline's `opening` and `win`): `mate`, before the scope-in, the board as it is
- *   under it, by `step`: `pause` and `jump` show nothing here (his figure: Chandy.tsx); `reach`, the crosshair locks onto your king;
- *   `zap`, rapid fire's hit on him; `line`, nothing (his speech box). `win`, after a survived Dodge: nothing over the board (your mate
- *   back on it), the hero banner "CHECKMATE!" (Chandy.tsx).
+ *   under it, by `step` (MateOver): `pause`, nothing yet; `jump`, his checkmate figure leaps from his spot onto the board's center and
+ *   collapses; `reach`, he reaches toward your king, the crosshair locking on; `zap`, a bolt to your king, rapid fire's hit on him; `line`,
+ *   he holds the reach (his speech box). `win`, after a survived Dodge: he's knocked out on the center (your mate back on the board),
+ *   under the hero banner "CHECKMATE!" (Chandy.tsx).
  *
  * The clones are drawn on one canvas of their own (90 px a square: half a CSS pixel an art pixel on a phone's 45 px square, crisp at
  * any size), one shared frame loop; the lines, beams and hits on the board's effects canvas, under your king (he stands in the beams;
  * his crack is drawn on him). Nothing here takes a tap but the vote's squares.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { CHANDY_CLONE, CHANDY_FOOT, cloneMuzzle } from "../characters/chandy.ts";
+import { CHANDY, CHANDY_CLONE, CHANDY_FOOT, CHANDY_SOUNDS, chandyAnim, cloneMuzzle, type RifleStage } from "../characters/chandy.ts";
+import { CHANDY_MATE, JUMP_MS, MATE_PX, ZAP_FIRE_MS, mateAim, reachSuffix, type ReachDir } from "../characters/chandy-mate.ts";
 import { shatterAnim } from "../characters/effects/chandy.ts";
 import { spriteCanvas } from "../characters/sprite-kit.ts";
-import { BoardEffects, onEachFrame, spriteFrameAt, type BoardItem } from "./BossEffect.tsx";
+import { BoardEffects, SpriteAnim, onEachFrame, spriteFrameAt, type BoardItem } from "./BossEffect.tsx";
+import { figurePoint } from "./BossCharacter.tsx";
 import type { MateStep } from "@chessroyale/chess";
 
 export type DodgePhase = "mate" | "scope" | "slide" | "volley" | "open" | "vote" | "locked" | "blast" | "result" | "kill" | "win";
@@ -41,6 +44,8 @@ export interface DodgeView {
   phase: DodgePhase;
   /** A mate's opening (phase `mate`): its step now (dodgeTimeline's `opening`). */
   step?: MateStep;
+  /** His rifle's stage (his checkmate figure's, on the board in a mate's opening and the win beat). */
+  stage?: RifleStage;
   /** When the phase began, in this device's time (online: `local(serverTime)`, as every moment), never a raw server time. */
   since: number;
   /** The crowd's side: its king's color, and the board's way up. */
@@ -164,14 +169,76 @@ function useTenths(on: boolean) {
   }, [on]);
 }
 
-/** A mate's opening and the win beat over the board (the board as it is under them): only the crosshair and the zap on your king. */
+/** The figure's run for a mate step or the win beat: its animation, then the loop it holds. */
+function mateAnims(v: DodgeView, dir: ReachDir): { anim: string; then?: string } | null {
+  const d = reachSuffix(dir);
+  if (v.phase === "win") return { anim: "out", then: "ko" };
+  if (v.step === "jump") return { anim: "leap", then: "slumped" };
+  if (v.step === "reach") return { anim: `reach${d}`, then: `reaching${d}` };
+  if (v.step === "zap") return { anim: `zap${d}`, then: `reaching${d}` };
+  if (v.step === "line") return { anim: `reaching${d}` };
+  return null;
+}
+/**
+ * A mate's opening and the win beat over the board (the board as it is under them): his checkmate figure on the board's center
+ * (characters/chandy-mate.ts), the crosshair and the zap on your king. `jump`: he leaves his spot (his figure there hides: styles.css)
+ * and leaps along an arc onto the center (the CSS leap, from where his spot's figure stands, at its size), collapses and lies still;
+ * `reach`: he pushes up onto his knees and reaches toward your king; `zap`: the bolt from his claws to your king (the Lock-on Shot
+ * round's colors); `line`: he holds the reach. `win`: on the center file below the hero banner (which covers the board's middle), his
+ * lens dies and he falls flat on his back (the KO).
+ */
 function MateOver({ view: v }: { view: DodgeView }) {
+  const fig = useRef<HTMLDivElement>(null);
+  const aim = mateAim(v.king, v.side);
+  const run = mateAnims(v, aim.dir);
+  // (How long ago the step began, measured once per step: a redraw mustn't move its animations' delay again.)
+  const ago = useMemo(() => Date.now() - v.since, [v.phase, v.step, v.since]);
+  // The leap's start: his spot's figure (the phone's bar or the computer's side), its feet and size, from the board's center.
+  useLayoutEffect(() => {
+    const el = fig.current;
+    if (!el || v.step !== "jump") return;
+    const root = el.parentElement!.getBoundingClientRect();
+    const spot = [...document.querySelectorAll<HTMLCanvasElement>(".boss-char .boss-char-sprite")].find((c) => c.getBoundingClientRect().width > 0);
+    const size = root.width;
+    let from = { x: 0, y: -size * 0.6, s: 1 };
+    if (spot) {
+      const p = figurePoint(spot, CHANDY, CHANDY_FOOT[0], CHANDY_FOOT[1]);
+      from = { x: p.x - (root.left + size * (0.5 + aim.feet[0])), y: p.y - (root.top + size * (0.5 + aim.feet[1])), s: spot.getBoundingClientRect().height / CHANDY.h / (size / MATE_PX) };
+    }
+    el.style.setProperty("--mf-from-x", `${Math.round(from.x)}px`);
+    el.style.setProperty("--mf-from-y", `${Math.round(from.y)}px`);
+    el.style.setProperty("--mf-from-s", from.s.toFixed(3));
+  }, [v.step]);
   const items: BoardItem[] = [];
   if (v.step === "reach") items.push({ square: v.king, name: "chandyCrosshair", anim: "lock", then: "held3", since: v.since });
-  if (v.step === "zap") items.push({ square: v.king, name: "chandyDizzy", anim: "hit", since: v.since });
+  // (The zap's hit on your king as the bolt reaches him: rapid fire's.)
+  if (v.step === "zap" && Date.now() >= v.since + ZAP_FIRE_MS) items.push({ square: v.king, name: "chandyDizzy", anim: "hit", since: v.since + ZAP_FIRE_MS });
+  const [fx, fy] = CHANDY_MATE.foot;
+  const len = Math.hypot(aim.to[0], aim.to[1]);
   return (
     <div class={`cd-root cd-p-${v.phase}${v.step ? ` cd-s-${v.step}` : ""}`}>
       <BoardEffects items={items} orientation={v.side} class="cd-lines" />
+      {v.step === "zap" && (
+        <i
+          class="cd-mate-bolt"
+          style={{
+            left: `${(0.5 + aim.hand[0]) * 100}%`,
+            top: `${(0.5 + aim.hand[1]) * 100}%`,
+            width: `calc(var(--board-size) * ${len.toFixed(4)})`,
+            rotate: `${Math.atan2(aim.to[1], aim.to[0]).toFixed(4)}rad`,
+            animationDelay: `${ZAP_FIRE_MS - ago}ms`,
+          }}
+        />
+      )}
+      {run && (
+        <div
+          ref={fig}
+          class={`cd-mate-fig cd-f-${run.anim.replace(/(U\d+|D\d+|0)$/, "")}${aim.mirror ? " cd-mirror" : ""}`}
+          style={{ ...(v.phase === "mate" && { "--mf-x": `${(0.5 + aim.feet[0]) * 100}%`, "--mf-y": `${(0.5 + aim.feet[1]) * 100}%` }), "--mf-w": CHANDY_MATE.w, "--mf-h": CHANDY_MATE.h, "--mf-fx": fx, "--mf-fy": fy, "--mf-delay": `${JUMP_MS.crouch - ago}ms`, "--mf-leap": `${JUMP_MS.spring + JUMP_MS.air}ms` }}
+        >
+          <SpriteAnim ch={CHANDY_MATE} anim={chandyAnim(run.anim, v.stage ?? 0)} then={run.then && chandyAnim(run.then, v.stage ?? 0)} since={v.since} sounds={CHANDY_SOUNDS} id={`mate:${v.phase}:${v.step ?? ""}`} />
+        </div>
+      )}
     </div>
   );
 }
