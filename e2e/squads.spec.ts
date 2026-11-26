@@ -78,7 +78,10 @@ test("a test lobby straight at the final (SQUADS_TEST): its people play; Next ro
   await tess.until(() => (tess.matches.get("r2m0")?.boards[0]?.ply ?? 0) >= 4, 120_000, "four moves in the final");
   // Every squad's team clock reaches everyone; the finalists' are the final's.
   expect(tess.clocks).toHaveLength(8);
-  expect(tess.clocks.filter((c) => c.key === "r2m0")).toHaveLength(2);
+  // (Once on main d68874aa, Nov 26, none of the 8 carried the final's key: not reproduced in 24 local runs, 12 under load. The message
+  // says what the lobby and the final were then, for the next time.)
+  const why = () => `clocks ${JSON.stringify(tess.clocks.map((c) => c.key))}; lobby ${tess.lobby?.phase}; final ${tess.matches.get("r2m0")?.state} at ply ${tess.matches.get("r2m0")?.boards[0]?.ply}, ${JSON.stringify(tess.matches.get("r2m0")?.result ?? null)}; closed ${tess.closed}`;
+  expect(tess.clocks.filter((c) => c.key === "r2m0"), why()).toHaveLength(2);
   tess.send({ t: "nextRound" });
   await tess.until(() => tess.lobby?.phase === "results", 15_000, "the results");
   expect(tess.results).not.toBeNull();

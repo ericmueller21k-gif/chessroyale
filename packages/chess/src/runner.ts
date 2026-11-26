@@ -1444,6 +1444,10 @@ export class MatchRunner {
     // (The stumble's draw comes first, as ever: a best reply moves nothing else the match's random source draws.)
     const stumbles = this.bossStumbles();
     if (this.bossBestReply() || this.towerStrength()?.full) return "best";
+    // (Test switch ?carrots=N only: in the race he takes a carrot whenever a move of his pulls one, a slip's turn too. A slip skips
+    // his race brain, and at the e2e's level a quarter of his moves slip, so his fifth came within the race's moves only by chance:
+    // main's run on d68874aa, Nov 26. The draw above stays, so the match's random source draws as ever.)
+    if (stumbles && this.settings.bossCarrotTest !== undefined && this.bossRace("elo")) return "elo";
     return stumbles ? "stumble" : "elo";
   }
 

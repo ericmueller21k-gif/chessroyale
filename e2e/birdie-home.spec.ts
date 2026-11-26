@@ -36,7 +36,9 @@ test("Birdie's Station: his card and hello out front; in to the lobby, the barte
   test.setTimeout(120_000);
   await asAdmin(page);
   await page.addInitScript(() => ((window as unknown as Hooks).__soundLog = []));
-  await page.goto("/town?sky=day&report");
+  // (`report=120`: a run long enough to hold the room's frames at a busy CI runner's 3-4 fps; the default 30 s ended itself with
+  // about 30 room frames, Nov 26, d68874aa. Done is pressed below once the room has its frames.)
+  await page.goto("/town?sky=day&report=120");
   await townReady(page);
   const card = await birdieCard(page);
   await expect(card.getByRole("button", { name: "Challenge alone" })).toBeEnabled();
@@ -71,11 +73,21 @@ test("Birdie's Station: his card and hello out front; in to the lobby, the barte
   // room's frames, from the walk in to the bar, uploaded and painted nothing (`?report`; the town's lesson #969: bake it all at load).
   expect(birds0!.shown).toBeGreaterThan(birds0!.n * 0.5);
   await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__birdieBirds?.() ?? null)).toMatchObject({ near: true, shown: 0, fled: 50 });
-  // (Recording since the walk to his door, 30 s at most: finished now if it's still going.)
-  if ((await page.evaluate(() => (window as unknown as Hooks).__townReport?.()?.state)) === "rec") await page.locator(".tfr-pill button").click();
+  // (Recording since the walk to his door, 120 s at most: once the room has over 30 frames in the run, still recording, Done.)
+  const ROOM = 256; // (frame-report.ts F.room)
+  const roomFrames = () =>
+    page.evaluate((room) => {
+      const r = (window as unknown as Hooks).__townReport?.(true);
+      return { state: r?.state ?? null, n: r?.raw?.flags.filter((f) => f & room).length ?? 0 };
+    }, ROOM);
+  await expect.poll(async () => {
+    const f = await roomFrames();
+    return f.n > 30 || f.state !== "rec";
+  }, { timeout: 60_000 }).toBe(true);
+  expect((await roomFrames()).state, "still recording with the room's frames in the run").toBe("rec");
+  await page.locator(".tfr-pill button").click();
   await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__townReport?.()?.state)).toBe("done");
   const rep = (await page.evaluate(() => (window as unknown as Hooks).__townReport!(true)))!.raw!;
-  const ROOM = 256; // (frame-report.ts F.room)
   const inRoom = rep.flags.map((f, i) => (f & ROOM ? i : -1)).filter((i) => i >= 0);
   expect(inRoom.length).toBeGreaterThan(30);
   expect(inRoom.reduce((a, i) => a + rep.ups[i]! + rep.bakes[i]!, 0), "pictures uploaded or painted in the room").toBe(0);
