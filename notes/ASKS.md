@@ -2,7 +2,7 @@
 
 - Nov 22 · Chub & Chirp Turf (his prints on his squares, your logo on yours, the count, holds Legs/Fuse/Hop, Chirp's hop-around) · WAITING ON ERIC: round-2 mockup re-sent Nov 26 · never built
 - Nov 26 · Chandy: Dodge also when you checkmate him (pause, jump, collapse, reach, zap, line, Dodge; win beat) · #973 CI · then art phase 2 (collapse redrawn)
-- Nov 26 · Birdie room: longer crossing arms; ~50 birds at the bar, bartender scoops seed, scatter when you come near · #974 CI
+- Nov 26 · Birdie room: longer crossing arms; ~50 birds at the bar · MERGED #974
 - Nov 26 · Chub & Chirp + Puddles: ult can't wait more than 3 turns after its warning · #972 CI
 - Nov 26 · Puddles: watering regrows the piece he'd lose by passing · queued
 - Nov 26 · Dash: Time Scramble 5 s x3 then 3 s x3; "Hang on" replaces his 2nd pop-off · MERGED #975 (deploying)
