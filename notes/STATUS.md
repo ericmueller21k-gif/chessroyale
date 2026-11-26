@@ -2192,3 +2192,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - #968 ult-danger opened (draft, head a21b0e49), subscribed; CI waiter bui3jzsus. Boss-lane review: session_01JuCWRtGBmY5m6rtSNk6mJw (xhigh, read-only) -> branch claude/ult-danger-review REVIEW.md + .done; waiter bsytymaay. Ult helper session archived.
 - Asked Eric: Chandy's Dodge (a) in danger regardless of upgrades (PR as is) or (b) keep his Nov 16 5-upgrade rule. Merge held for his answer.
 - Town fixer still running (claude/town-uploads-2), waiters bws22pd6c/bfw7wk5cj. Tell Eric the moment it lands.
+- 05:45 #968: CI red (chess 2: Wrangler's level test timed out, leaked dangerAt) fixed 89259c3a; review pass done (no blocker; F1 Folio creaseDue ending ult, F2 Birdie unjudged funhouse move, N3 unleashed s) fixed by me af27188d, checks fail without fix. CI waiter bkkteyzza. N4 (funhouse e2e phone-only branch) watch on main. Still held for Eric's Chandy (a)/(b).
+- #967 PR 6 CI green (full, no flakes). Independent review: session_01JuCWRtde7Gr6MZuCg473oB -> review/pay-who-buys REVIEW.md + .done; waiter b6tircdj6. Brief notes/briefs/payments-pr6-review.md.
