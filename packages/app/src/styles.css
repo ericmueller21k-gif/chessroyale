@@ -8149,6 +8149,49 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
 .boss-pick-row.none {
   opacity: 0.55;
 }
+/* The coin boost's placeholder art (Nov 26; components/BoostArt.tsx): an existing crate filling its box, the coin on its corner, a gold
+   tag ("x2.5", "x2") on its top-right. */
+.boost-art {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.boost-art > .item-art {
+  width: 100%;
+  height: 100%;
+}
+.boost-art-coin {
+  position: absolute;
+  right: -4%;
+  bottom: -4%;
+  width: 44%;
+  height: 44%;
+}
+.boost-art-coin .coin-icon {
+  width: 100%;
+  height: 100%;
+}
+.boost-art-tag {
+  position: absolute;
+  top: -2%;
+  right: -6%;
+  padding: 2px 4px;
+  border: 1px solid #0b0b1a;
+  border-radius: 4px;
+  background: #fde047;
+  color: #1a1300;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 9px;
+  line-height: 1;
+}
+/* The Crates tab's boost lines (Nov 26), beside Keys and Crates: always there, greyed while off (shown, not hidden). */
+.stock.boost-stock.off {
+  opacity: 0.55;
+}
+.boost-crate-row.none {
+  opacity: 0.55;
+}
 /* A series crate you can't open yet (Nov 9: none held, or no key): the Welcome Crate's padlock on its corner. */
 .crate-lock {
   z-index: 1;
@@ -12832,9 +12875,9 @@ a.fd-row-link {
     min-width: 0;
   }
   /* The review's board: about double (the column's width, 680 px at most), and no taller than the window leaves room for the
-     stepper, the board and its text (no scroll). */
+     stepper, the board and its text (no scroll; 184: the page's own padding too, Nov 25: 180 left a 4 px scroll at 1280 x 600). */
   .breakdown.inline {
-    width: min(680px, 100%, calc(100vh - 180px));
+    width: min(680px, 100%, calc(100vh - 184px));
   }
 }
 .fd-bar {
@@ -21829,10 +21872,11 @@ button.sq-tiny {
     min-height: 0;
     contain: size;
   }
-  /* (The end page's sizes from its column's height, the board's: 1 from an 800 px window, as before; at 1280 × 600 a little under the
-     window's 0.75, so the chat keeps 40 px of messages in a column no taller than the board.) */
+  /* (The end page's sizes from its column's height, the board's: 1 from an 810 px window; at 1280 × 600 0.65 (its gap kept at 8 px), so
+     the chat keeps 40 px of messages in a column no taller than the board. Were 1 from 800 and 0.69 at 600: the coin strip, Nov 25,
+     took more room than the coins line it replaced.) */
   .screen.game.dv-ended .dv-box > .dv-end-col {
-    --es-u: clamp(0.68px, calc((var(--app-h) - 160px) / 640), 1px);
+    --es-u: clamp(0.64px, calc((var(--app-h) - 210px) / 600), 1px);
   }
   .dv-actions {
     flex: none;

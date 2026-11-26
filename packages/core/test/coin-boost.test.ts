@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { COIN_BOOST, LEVEL_CRATE_BONUS, XP } from "../src/settings.ts";
 import { boostFor, boostLine, coinsPaid, crateBonusLine, questDrop } from "../src/coin-boost.ts";
-import { readPlayCoins, type PlayCoins } from "../src/play-coins.ts";
-import { readRewards, rewardDrops, rewardLines, type XpRewards } from "../src/xp.ts";
+import { coinStripView, readPlayCoins, type PlayCoins } from "../src/play-coins.ts";
+import { readRewards, rewardDrops, rewardLines, xpGrant, type XpRewards } from "../src/xp.ts";
 
 /**
  * The coin boost and the Crate Bonus (Nov 26; the payments design's section 7; COIN_BOOST, LEVEL_CRATE_BONUS; core's coin-boost.ts;
@@ -129,6 +129,26 @@ describe("what's shown", () => {
     expect(lines.quests).toEqual(["Quest done: Warm Up +300 XP", "Quest done: Winner +300 XP · +1 Winter Crate"]);
     expect(rewardDrops(q)).toEqual({ boost: 1, bonus: 5 });
     expect(rewardDrops(r)).toEqual({ boost: 0, bonus: 0 });
+  });
+
+  it("the coin strip: a boosted game's total has the extra, its last part \"Boost\", its badge x2.5 and the minutes left; unboosted, no badge", () => {
+    const c: PlayCoins = { play: 54, bonus: 15, parts: [{ label: "Win", coins: 15 }], step: 0, today: { play: 54, bonus: 15 }, boost: { coins: 104, minutes: 30, left: 90 } };
+    const v = coinStripView({ ...xpGrant(0, [{ label: "Win", xp: 50 }]), coins: c });
+    expect(v).toEqual({
+      total: 173,
+      parts: [
+        { label: "Play", coins: 54 },
+        { label: "Win", coins: 15 },
+        { label: "Boost", coins: 104 },
+      ],
+      today: "PLAY TODAY 54/300",
+      why: null,
+      boost: { times: "x2.5", left: 90 },
+    });
+    const { boost: _, ...plain } = c;
+    const p = coinStripView({ ...xpGrant(0, [{ label: "Win", xp: 50 }]), coins: plain });
+    expect(p.total).toBe(69);
+    expect(p).not.toHaveProperty("boost");
   });
 
   it("stored and read back: a reward's drops and doubled crates, a game's boost (absent when there was none)", () => {

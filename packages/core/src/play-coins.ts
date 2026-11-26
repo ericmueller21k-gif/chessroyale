@@ -1,6 +1,6 @@
-import { PLAY_COINS } from "./settings.ts";
-import { isXpNone, type GameXp, type XpNone } from "./xp.ts";
-import type { BoostPaid } from "./coin-boost.ts";
+import { PLAY_COINS, XP } from "./settings.ts";
+import { isXpNone, XP_NONE_LINES, type GameXp, type XpGrant, type XpNone } from "./xp.ts";
+import { boostTimes, type BoostPaid } from "./coin-boost.ts";
 
 /**
  * Play coins (Eric, Nov 18; the payments design's section 6, docs/decisions/2026-11-17-payments-design.md; PLAY_COINS in
@@ -200,4 +200,80 @@ export function readPlayCoins(x: unknown): PlayCoins | undefined {
   const b = (o.boost ?? null) as Record<string, unknown> | null;
   if (b && typeof b === "object" && whole(b.coins) > 0) out.boost = { coins: whole(b.coins), minutes: whole(b.minutes), left: whole(b.left) };
   return out;
+}
+
+// ---- The end screen's coin strip (Nov 25; docs/decisions/2026-11-17-payments-design.md section 11, 2026-11-25-coin-strip.md) ----
+
+/** Why a game paid no coins, in the strip's own words (short: the strip is the XP box's width, in the pixel type). */
+export const COIN_NONE_LINES: Readonly<Record<CoinNone, string>> = {
+  short: `No coins: under ${XP.minMoves} moves.`,
+  resigned: `No coins: resigned before move ${XP.minMoves}.`,
+  left: "No coins: you left the match.",
+  guest: "Sign in to earn coins.",
+  test: "No coins: test game.",
+  banned: "No coins: this account is banned.",
+  limit: "No coins: daily solo limit reached.",
+  paused: "Rewards are paused for a moment.",
+  held: "No coins while your account is in review.",
+};
+
+/** What the coin strip shows for a game's grant: the total and its parts (in the order they're counted), the day's play, or why none. */
+export interface CoinStripView {
+  total: number;
+  /** Play coins first ("Play"; never the minutes: XP's rule, Nov 9), then the bonus parts as paid (the steps' share of each). */
+  parts: { label: string; coins: number }[];
+  /** "PLAY TODAY 186/300" or "PLAY TODAY 300/300 · FULL". */
+  today: string;
+  /** Why none (the strip greyed): null when it pays. */
+  why: string | null;
+  /**
+   * The coin boost (Nov 26; COIN_BOOST): the badge's "x2.5" and the boost's minutes left after this game, when it boosted the game (its
+   * extra is the parts' last, "Boost"). Absent: not boosted.
+   */
+  boost?: { times: string; left: number };
+}
+
+/**
+ * The strip's view of a game's grant (the result row's first answer: the game's own, never a later replay's day). `none`: the screen's
+ * line for a game with no grant (an XP_NONE_LINES line maps to its coins' line). A bonus the day's steps cut is split over its parts
+ * by their shares, largest remainder first, so the parts always add up to what was paid.
+ */
+export function coinStripView(xp: XpGrant | null, none?: string, s = PLAY_COINS): CoinStripView {
+  const c = xp?.coins;
+  const off = (why: string): CoinStripView => ({ total: 0, parts: [], today: c ? todayLine(c.today.play, s) : "", why });
+  if (!xp) {
+    const k = (Object.keys(XP_NONE_LINES) as XpNone[]).find((k) => XP_NONE_LINES[k] === none);
+    return off(k ? COIN_NONE_LINES[k] : "No coins for this game.");
+  }
+  const reason = c?.none ?? xp.none;
+  if (reason) return off(COIN_NONE_LINES[reason]);
+  if (!c) return off("No coins for this game.");
+  // (A coin boost's extra, Nov 26: in the total, the parts' last, and the badge.)
+  const extra = c.boost?.coins ?? 0;
+  const total = c.play + c.bonus + extra;
+  if (total <= 0) return off(c.today.play >= s.perDay ? `No coins: today's ${s.perDay} play coins are earned.` : "No coins this game.");
+  return {
+    total,
+    parts: [...(c.play > 0 ? [{ label: "Play", coins: c.play }] : []), ...splitBonus(c.parts, c.bonus), ...(extra > 0 ? [{ label: "Boost", coins: extra }] : [])],
+    today: todayLine(c.today.play, s),
+    why: null,
+    ...(extra > 0 ? { boost: { times: boostTimes(), left: c.boost!.left } } : {}),
+  };
+}
+
+const todayLine = (play: number, s = PLAY_COINS) => `PLAY TODAY ${Math.min(play, s.perDay)}/${s.perDay}${play >= s.perDay ? " · FULL" : ""}`;
+
+/** The bonus paid, split over the parts as earned by their shares (largest remainder), summing to `paid`; parts at 0 left out. */
+export function splitBonus(parts: readonly CoinPart[], paid: number): { label: string; coins: number }[] {
+  const earned = parts.reduce((n, p) => n + p.coins, 0);
+  if (earned <= 0 || paid <= 0) return [];
+  const raw = parts.map((p) => (p.coins * paid) / earned);
+  const out = raw.map((r, i) => ({ label: parts[i]!.label, coins: Math.floor(r), rem: r - Math.floor(r), i }));
+  let left = paid - out.reduce((n, p) => n + p.coins, 0);
+  for (const p of [...out].sort((a, b) => b.rem - a.rem || a.i - b.i)) {
+    if (left <= 0) break;
+    p.coins++;
+    left--;
+  }
+  return out.filter((p) => p.coins > 0).map(({ label, coins }) => ({ label, coins }));
 }

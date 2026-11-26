@@ -10,10 +10,10 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   captures, Boingo's pie), the boss says a line to the God King and he answers, explaining it, in place of the boss's own line for that
   moment (`useMomentSpeech`); again in the 3rd and 8th battle with that power, then every 5th (`POWER_TIPS`), per account on this device.
   A new tip is one row in `TIPS` (`{ boss, power, trigger, lines }`); `?tip=all` plays every tip every battle.
-- **The result screen** (the end screen since Nov 20; [2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md); `components/EndScreen.tsx`): "Victory!" / "Defeat" / "A draw" in the
+- **The result screen** (the end screen since Nov 20; [2026-11-20-end-screen.md](../decisions/2026-11-20-end-screen.md); `components/EndScreen.tsx`): (since Nov 25 the coin strip sits under the XP bar, as on every end screen: [shop.md](shop.md), "The coin strip"; on a computer the result's column scales with the window's height below 870 px (0.84 at 1536 × 730, 0.69 at 1280 × 600) so Play again and Home are whole in it: [2026-11-25-coin-strip-fit.md](../decisions/2026-11-25-coin-strip-fit.md)) "Victory!" / "Defeat" / "A draw" in the
   God King's pixel type and the match's line under it ("Ginger defeated!", "Ginger wins"; a tower floor's: "Floor 3 cleared!", "Floor 4
-  lost · 1 life left"); then XP EARNED counting up and lobbing into the XP bar, the middle, the bar, the quests the game moved, and the
-  review with "Est. rating" under its move line. The middle: a Battle Tower floor's bosses 1-2-1 (`EndDuo`: the first in front, the
+  lost · 1 life left"); then XP EARNED counting up and lobbing into the XP bar, the middle, the bar, the quests the game moved (exactly
+  their rows, none kept empty: [2026-11-26-quests-no-empty-rows.md](../decisions/2026-11-26-quests-no-empty-rows.md)), and the review with "Est. rating" under its move line. The middle: a Battle Tower floor's bosses 1-2-1 (`EndDuo`: the first in front, the
   others behind; their defeat on a win, their victory, gloating, on a loss) and your pawn; any other boss battle's `ResultDuo` (Nov 9;
   [2026-11-09-boss-result-v2.md](../decisions/2026-11-09-boss-result-v2.md)): no God King, the boss on the left (his bow, his line),
   your pawn on the right facing him (your XP is in the bar under the row now). A loss: his `kingAttack` plays

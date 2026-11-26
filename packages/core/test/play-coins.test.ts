@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PLAY_COINS, XP } from "../src/settings.ts";
-import { bonusEarnedAt, bonusFor, bonusMax, bonusPaidAt, bonusStep, coinParts, gameCoins, playCoinsFor, readPlayCoins, type CoinDay } from "../src/play-coins.ts";
-import { gameXp, type XpFacts } from "../src/xp.ts";
+import { COIN_NONE_LINES, bonusEarnedAt, bonusFor, bonusMax, bonusPaidAt, bonusStep, coinParts, coinStripView, gameCoins, playCoinsFor, readPlayCoins, splitBonus, type CoinDay, type CoinPart, type PlayCoins } from "../src/play-coins.ts";
+import { XP_NONE_LINES, gameXp, type XpFacts, type XpGrant, type XpNone } from "../src/xp.ts";
 
 const min = 60_000;
 const fresh: CoinDay = { play: 0, bonus: 0 };
@@ -159,5 +159,43 @@ describe("play coins (PLAY_COINS, Nov 25; the payments design's section 6)", () 
     expect(readPlayCoins("{bad")).toBeUndefined();
     expect(readPlayCoins(null)).toBeUndefined();
     expect(readPlayCoins({ play: -3, bonus: 1.5, none: "nope" })).toEqual({ play: 0, bonus: 0, parts: [], step: null, today: { play: 0, bonus: 0 } });
+  });
+});
+
+describe("the end screen's coin strip (Nov 25): its view of a game's grant", () => {
+  const grant = (coins?: PlayCoins, none?: XpNone): XpGrant => ({ before: 0, after: 100, levelBefore: 1, levelAfter: 1, parts: [], ...(none ? { none } : {}), ...(coins ? { coins } : {}) });
+  const pc = (play: number, bonus: number, parts: CoinPart[], todayPlay: number, step: number | null = parts.length ? 0 : null): PlayCoins => ({ play, bonus, parts, step, today: { play: todayPlay, bonus } });
+
+  it("play coins first (never the minutes), then the bonus parts; the day's play; the total", () => {
+    const v = coinStripView(grant(pc(27, 25, [{ label: "Win", coins: 15 }, { label: "Top 3", coins: 10 }], 186)));
+    expect(v).toEqual({ total: 52, parts: [{ label: "Play", coins: 27 }, { label: "Win", coins: 15 }, { label: "Top 3", coins: 10 }], today: "PLAY TODAY 186/300", why: null });
+    expect(v.parts.some((p) => /min/.test(p.label))).toBe(false);
+  });
+
+  it("the day's play coins full: '300/300 · FULL', the bonus still paid", () => {
+    const v = coinStripView(grant(pc(0, 25, [{ label: "Win", coins: 15 }, { label: "Top 3", coins: 10 }], 300)));
+    expect(v.today).toBe("PLAY TODAY 300/300 · FULL");
+    expect(v.parts).toEqual([{ label: "Win", coins: 15 }, { label: "Top 3", coins: 10 }]);
+    expect(v.total).toBe(25);
+    // (Nothing at all: greyed, with why.)
+    expect(coinStripView(grant(pc(0, 0, [], 300))).why).toBe("No coins: today's 300 play coins are earned.");
+  });
+
+  it("a bonus the day's steps cut: split over its parts by their shares, adding up to what was paid", () => {
+    expect(splitBonus([{ label: "Win", coins: 15 }, { label: "Top 3", coins: 10 }], 13)).toEqual([{ label: "Win", coins: 8 }, { label: "Top 3", coins: 5 }]);
+    expect(splitBonus([{ label: "Win", coins: 15 }], 4)).toEqual([{ label: "Win", coins: 4 }]);
+    expect(splitBonus([{ label: "Win", coins: 15 }], 0)).toEqual([]);
+    for (let paid = 0; paid <= 25; paid++) expect(splitBonus([{ label: "Win", coins: 15 }, { label: "Top 3", coins: 10 }], paid).reduce((n, p) => n + p.coins, 0)).toBe(paid);
+  });
+
+  it("no coins: why, in the strip's words (the grant's reason, the coins' own, or the screen's XP line)", () => {
+    expect(coinStripView(grant(pc(0, 0, [], 40), "short")).why).toBe(`No coins: under ${XP.minMoves} moves.`);
+    expect(coinStripView(grant({ ...pc(0, 0, [], 40), none: "held" })).why).toBe(COIN_NONE_LINES.held);
+    expect(coinStripView(grant(undefined, "guest")).why).toBe("Sign in to earn coins.");
+    expect(coinStripView(null, XP_NONE_LINES.test).why).toBe("No coins: test game.");
+    expect(coinStripView(null, "No XP for this game.").why).toBe("No coins for this game.");
+    // (A grant from before coins.)
+    expect(coinStripView(grant()).why).toBe("No coins for this game.");
+    for (const line of Object.values(COIN_NONE_LINES)) expect(line.length, line).toBeLessThanOrEqual(44);
   });
 });

@@ -411,7 +411,8 @@ crate bonus that drop from daily quests; Stripe coin packs with no-questions ref
 
 - **The coin reward** (Eric, Nov 18: "send me a mock-up"): after a game that paid coins, a strip under the XP box (the FF window style,
   its space always there), coins dropping into a pile while the count clocks up like a gas pump, a coin clink. Mockup: branch
-  `stills/coin-reward-mockup`. PR 3 of the build, after play coins (PR 2).
+  `stills/coin-reward-mockup`. PR 3 of the build, after play coins (PR 2). **Built Nov 25** (no boost badge yet: PR 4):
+  [2026-11-25-coin-strip.md](docs/decisions/2026-11-25-coin-strip.md).
 
 ## Live ops: alerts, an on-call agent, a live-site bot (Eric, Nov 9, 2026: build before launch, not urgent)
 

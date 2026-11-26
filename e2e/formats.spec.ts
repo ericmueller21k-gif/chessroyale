@@ -283,7 +283,9 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
           const right = cv ? paintedRight(cv) : null;
           const pawn = document.querySelector(".results-duo .you-pawn-hop")?.getBoundingClientRect();
           const attacking = !!document.querySelector(".rd-attack canvas");
-          out.push({ t: performance.now() - t0, boss, attacking, gap: right !== null && pawn ? pawn.left - right : null, past: right !== null && pawn ? right - pawn.right : null, rects });
+          // (The gap in the row's own px: a computer's short window zooms the result's column, Nov 25.)
+          const z = parseFloat(getComputedStyle(document.querySelector(".results-top") ?? document.body).zoom) || 1;
+          out.push({ t: performance.now() - t0, boss, attacking, gap: right !== null && pawn ? (pawn.left - right) / z : null, past: right !== null && pawn ? right - pawn.right : null, rects });
           if (performance.now() - t0 < 6000) requestAnimationFrame(tick);
           else resolve(out);
         };

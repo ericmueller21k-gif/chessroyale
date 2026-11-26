@@ -119,7 +119,7 @@
     "packages/app/src/hints.ts",
     "packages/app/src/progress.ts",
     "packages/app/src/refused.ts",
-    "public/**", "packages/app/src/components/EndScreen.tsx", "packages/app/src/end-screen.css", "packages/app/src/town/shops/ShopRoom.tsx", "packages/app/src/town/shops/room.ts"],
+    "public/**", "packages/app/src/components/EndScreen.tsx", "packages/app/src/components/CoinStrip.tsx", "packages/app/src/end-screen.css", "packages/app/src/town/shops/ShopRoom.tsx", "packages/app/src/town/shops/room.ts"],
   "none": [
     "**/*.md",
     "docs/**",
@@ -165,7 +165,7 @@
   ],
   "areas": {
     "XP and levels (Nov 9): the XP box on every result screen, the level on home and the profiles; the server's grant": {
-      "paths": ["packages/server/src/xp.ts", "packages/server/src/play-coins.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/PageLayer.tsx"],
+      "paths": ["packages/server/src/xp.ts", "packages/server/src/play-coins.ts", "packages/server/src/coin-boost.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx", "packages/app/src/components/PageLayer.tsx"],
       "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/quests.spec.ts", "e2e/tower-party.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
     },
     "A solo boss battle kept on the device (Nov 22, step 2): the reload's card, Resume or Forfeit, and another start asking first": {
@@ -836,6 +836,8 @@
       "paths": [
         "packages/app/src/screens/Shop.tsx",
         "packages/app/src/screens/Crates.tsx",
+        "packages/app/src/components/BoostCrate.tsx",
+        "packages/app/src/components/BoostArt.tsx",
         "packages/app/src/welcome-rows.ts",
         "packages/app/src/boss-crate-rows.ts",
         "packages/app/src/components/blotches.ts",
