@@ -623,6 +623,11 @@ export interface BossPowerState {
    */
   charge?: number;
   judged?: number;
+  /**
+   * An ultimate has come while the crowd was at the danger line (BOSS_POWERS.dangerAt: `judged` at it as it came): the danger's
+   * ultimate is spent, so the meter fills at its usual pace again, until a crowd move below the line ends the danger.
+   */
+  dangerSpent?: true;
   /** The test trigger (an admin): the ultimate comes as the next crowd turn begins, without the warning. */
   ultNext?: boolean;
   /**
@@ -879,6 +884,8 @@ export interface BirdieState {
   warn: { turn: number; line: string; squares: string[]; square: string; piece: string } | null;
   ride?: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true; missed?: true } | null;
   fell?: { at: number } | null;
+  /** The crowd's moves in a row the judge put at the danger line (BOSS_POWERS.dangerAt), its last included: his Fall at birdie.fallDangerMoves. */
+  danger?: number;
 }
 
 export interface MooState {

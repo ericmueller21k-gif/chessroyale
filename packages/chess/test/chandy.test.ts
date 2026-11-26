@@ -53,6 +53,7 @@ import {
   triggerUltimate,
   unlockPick,
   type MoveScore,
+  type EngineLike,
 } from "../src/index.ts";
 import { KIT_OPENING, KIT_STRESS, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
@@ -1002,6 +1003,40 @@ describe("Dodge (D1-D12)", () => {
     }
     expect(cOf(r).upgrades).toBeLessThan(5);
     expect(r.boss!.powers!.warnAt).toBeUndefined();
+  });
+
+  it("in danger, his rifle not whole (Eric, Nov 26): the warning as his next turn ends, his meter full; Dodge as your turn after begins", async () => {
+    // (The judge's number for every crowd move: `crowdScore`, him to move the other way round.)
+    let crowdScore = 0.5;
+    const flat = (fen: string, move: string) => ({ move, expected: fen.split(" ")[1] === "w" ? crowdScore : 1 - crowdScore });
+    const engine: EngineLike = {
+      topMoves: async (fen, n) => legalMoves(fen).sort().slice(0, n).map((m) => flat(fen, m)),
+      scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((m) => flat(fen, m)),
+      topMovesAt: async (fen, n) => legalMoves(fen).sort().slice(0, n).map((m) => flat(fen, m)),
+      playAtElo: async (fen) => legalMoves(fen).sort()[0]!,
+    };
+    const r = new MatchRunner({ settings: kitSettings({ boss: "chandy", test: "", maxMoves: 60 }), rng: mulberry32(17), engines: [engine], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
+    const quiet = (_f: string, allowed: string[]) => [...allowed].sort()[0]!;
+    for (let i = 0; i < 6; i++) {
+      if (r.bossToMove()) await r.playBoss();
+      else await crowdMove(r, quiet);
+    }
+    if (r.bossToMove()) await r.playBoss();
+    expect(cOf(r).upgrades, "his rifle isn't whole").toBeLessThan(S.upgradesMax);
+    expect(r.boss!.powers!.warnAt).toBeUndefined();
+    // His next turn's end: warned (not the last chance: no mate in one for you), his meter full.
+    crowdScore = BOSS_POWERS.dangerAt;
+    await crowdMove(r, quiet);
+    await r.playBoss();
+    r.deal();
+    expect(matingMoves(fenOf(r))).toEqual([]);
+    expect(r.boss!.powers!.events.some((e) => e.kind === "warn")).toBe(true);
+    expect(rageOf(r.boss)).toBe(1);
+    expect(r.dodgeDue()).toBe(false);
+    // The turn after: Dodge as your turn begins.
+    await crowdMove(r, quiet);
+    await r.playBoss();
+    expect(r.dodgeDue()).toBe(true);
   });
 
   it("the fifth upgrade makes the rifle whole as your next turn begins; the fourth doesn't", async () => {

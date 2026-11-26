@@ -164,6 +164,8 @@ export interface KitBattle {
   bosses?: readonly string[];
   /** Any other settings (a tower floor: `towerFloor`). */
   patch?: Partial<Settings>;
+  /** The engine for the judge and the boss (the stand-in, fakeEngine, without one): ult-danger.test.ts's lost battles. */
+  engine?: () => EngineLike;
 }
 
 /**
@@ -612,7 +614,7 @@ export interface KitRun {
  */
 export async function runBattle(k: KitBattle, sf: StockfishMoves | null, watch?: (r: MatchRunner, fen: string, who: "crowd" | "boss") => void): Promise<KitRun> {
   const settings = kitSettings(k, k.patch);
-  const engines = [fakeEngine()];
+  const engines = [k.engine?.() ?? fakeEngine()];
   const r = new MatchRunner({ settings, rng: mulberry32(k.seed), engines, library: [k.opening], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: k.side });
   const where = `${k.bosses ? k.bosses.join(" + ") : k.boss} (seed ${k.seed}, crowd ${k.side === "w" ? "White" : "Black"}, ?power=${k.test || "none"}, from ${k.opening.id})`;
   const c = new Checker(where, sf, settings);

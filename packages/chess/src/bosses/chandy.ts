@@ -73,7 +73,7 @@ import type { BoardState } from "../boards.ts";
 import { applyMove, attackedSquares, exchangeNet, fenAtPly, kingAttacked, legalMoves, matingMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { PASS_WAIT, VALUE, from, logit, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
+import { PASS_WAIT, VALUE, from, inDanger, logit, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
 import { heldIn, marksStop, type LayerMarks, type PieceMark, type SquareMark } from "../board-layer.ts";
 import { lands } from "./boingo.ts";
 import { passTurn } from "./hollow.ts";
@@ -1023,7 +1023,8 @@ export const CHANDY: BossRules = {
     // (Warned as an earlier turn began: it comes now.)
     if (!t.ultNext && next.warnAt === undefined) {
       const last = mateOpen(next, t);
-      if (!last && dodgeMeter(next, t.turn, t.s) < 1 && !testSwitch(t, next)) return false;
+      // (In danger, Eric Nov 26: warned as if his meter were full, his rifle whole or not.)
+      if (!last && dodgeMeter(next, t.turn, t.s) < 1 && !inDanger(next.judged, t.s) && !testSwitch(t, next)) return false;
       next.warnAt = t.turn;
       t.events.push({ kind: "warn", turn: t.turn });
       if (!last) return false;

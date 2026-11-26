@@ -3,12 +3,22 @@
  * Maia loaded (else no brain to anyone, and nobody's "Maia played it" is heard). N2: when a checker's move plays on a turn with his
  * powers' extras, the host is asked for that move's extras; the checker's only if the host doesn't answer in its time.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Chess } from "chess.js";
-import { BOSS_CHECK, DEFAULT_SETTINGS, JUDGES, RAID_SETTINGS, mulberry32, type JudgeConfig, type Settings } from "@chessroyale/core";
+import { BOSS_CHECK, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, RAID_SETTINGS, mulberry32, type JudgeConfig, type Settings } from "@chessroyale/core";
 import { applyMove, legalMoves, lineups, type BoardScore, type MoveScore, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type ServerScoreRequest } from "../src/lobby.ts";
 import { library } from "./lobby-fixture.ts";
+
+// (The stand-in judge here scores every quiet move 1.0 for its mover, so the danger line (BOSS_POWERS.dangerAt, Nov 26) would read
+// every crowd move as a battle won and bring the boss's ultimate at once: these are the boss check's turns, without it.)
+const dangerAt = BOSS_POWERS.dangerAt;
+beforeAll(() => {
+  (BOSS_POWERS as { dangerAt: number }).dangerAt = 2;
+});
+afterAll(() => {
+  (BOSS_POWERS as { dangerAt: number }).dangerAt = dangerAt;
+});
 
 // (The engine server is a Container, which needs the Workers runtime: the match rooms import it.)
 vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, serverRecheck: async () => null, serverScoreAt: async () => null, warmEngine: async () => false }));
