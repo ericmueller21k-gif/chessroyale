@@ -1363,6 +1363,50 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   expect(errors).toEqual([]);
 });
 
+test("the coin boost in the Crates tab (Nov 26): the boost lines always there, greyed while off; a Crate Bonus says its level-ups left; a Coin Boost Crate under Ready to open, opened free from its dialog, its minutes on the line, which keeps its box", async ({ page }) => {
+  await asServerAdmin(page);
+  await page.goto("/shop?crates");
+  const crates = page.locator(".crates");
+  const boost = crates.getByTestId("boost-line");
+  const bonus = crates.getByTestId("crate-bonus-line");
+  await expect(boost).toHaveText("Coin boost: off");
+  await expect(boost).toHaveClass(/off/);
+  await expect(bonus).toHaveText("Crate bonus: none");
+  const row = crates.locator('.boost-crate-row[data-crate="coin-boost"]');
+  await expect(crates.getByRole("region", { name: "More crates" }).locator(".boost-crate-row")).toHaveClass(/none/);
+  const grants = page.getByRole("region", { name: "Admin test grants" });
+  await grants.getByRole("button", { name: "+1 Crate Bonus" }).click();
+  await expect(bonus).toHaveText("Crate bonus: 5 level-ups left");
+  await expect(bonus).not.toHaveClass(/off/);
+  await grants.getByRole("button", { name: "+1 Coin Boost Crate" }).click();
+  await expect(crates.getByRole("region", { name: "Ready to open" }).locator(".boost-crate-row")).toContainText("You have 1 · No key needed");
+  // (In the page's own coordinates: the taps below scroll it.)
+  const box = () => boost.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + scrollX, y: r.top + scrollY, w: r.width };
+  });
+  const before = await box();
+  await row.click();
+  const dialog = page.getByTestId("boost-dialog");
+  await expect(dialog).toContainText("2.5x coins for your next 120 minutes of play.");
+  await dialog.getByRole("button", { name: "▶ Open" }).click();
+  await expect(dialog).toContainText("Coin boost on!");
+  await dialog.getByRole("button", { name: "▶ OK" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(boost).toHaveText("Coin boost: x2.5 coins · 120 min of play left");
+  await expect(boost).not.toHaveClass(/off/);
+  // (Nothing shifts, Eric's rule: the line's box where it was.)
+  const after = await box();
+  expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(1);
+  // (Opened: none held, its row greyed under More crates again, its dialog's Open greyed.)
+  await expect(crates.getByRole("region", { name: "More crates" }).locator(".boost-crate-row")).toHaveClass(/none/);
+  await row.click();
+  await expect(dialog.getByRole("button", { name: "▶ Open" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
 test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's clock) drops one: the result screen's square box, OK, and it's in the inventory", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));

@@ -270,6 +270,13 @@ export function CoinStrip({ xp, none, api }: { xp: XpGrant | null | undefined; n
               ))}
             </span>
             <span class="es-cs-label">COINS</span>
+            {/* (The coin boost, Nov 26: its badge in the count's row (a fixed 24 px row: nothing moves), the minutes left under it.) */}
+            {view.boost && (
+              <span class="es-cs-boost" data-testid="es-cs-boost">
+                <b>{view.boost.times} BOOST</b>
+                <span>{view.boost.left > 0 ? `${view.boost.left} MIN LEFT` : "ALL USED"}</span>
+              </span>
+            )}
           </span>
           <span class="es-cs-today" data-testid="es-cs-today">
             {view.today}

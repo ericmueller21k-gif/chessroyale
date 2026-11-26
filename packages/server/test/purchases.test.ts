@@ -88,6 +88,8 @@ describe("the migration, on a copy of the schema as it was before (live data, ev
     db.prepare("INSERT INTO results (user_id, mode, online, placement, players, played_at) VALUES ('ann', 'crowd', 1, 1, 100, 6)").run();
     const rowsBefore = (t: string) => db.prepare(`SELECT * FROM ${t} ORDER BY 1`).all();
     const kept = Object.fromEntries(["wallets", "ledger", "ledger_accounts", "results"].map((t) => [t, rowsBefore(t)]));
+    // (The wallet's rows gain the coin boost's three counts, at 0: payments PR 4, Nov 26.)
+    kept.wallets = kept.wallets!.map((r) => ({ ...(r as object), boost_crates: 0, boost_minutes: 0, crate_bonus: 0 }));
 
     // (As a request runs it: the D1 binding, its batches.)
     const live = d1Sql(d1);

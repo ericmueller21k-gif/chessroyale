@@ -13,6 +13,7 @@ import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
 import { pickBossCrate } from "./rewards.ts";
+import { openBoostCrate } from "./coin-boost.ts";
 import { SOLO_TESTED, abandonSoloGame, endSoloGame, forfeitSoloGame, gameXpOf, grantXp, markSoloGame, setTestXp, soloGameKey, soloGameOpen, soloRealOf, soloStaleBefore, startSoloGame } from "./xp.ts";
 import { questsAnswer, rerollQuest, setTestQuests } from "./quests.ts";
 import { towerResponse, type LobbyGone } from "./tower.ts";
@@ -604,7 +605,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // The shop. GET /api/shop: your coins, items and what's equipped. POST /api/shop/buy {item}, /api/shop/equip {item}.
   if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id, admin));
   // (The shop resting, a kill switch: nothing new from it. Equipping what you have still works.)
-  if ((path === "/api/shop/buy" || path === "/api/locker/open" || path === "/api/shop/boss-crate" || path === "/api/shop/claw") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
+  if ((path === "/api/shop/buy" || path === "/api/locker/open" || path === "/api/locker/boost" || path === "/api/shop/boss-crate" || path === "/api/shop/claw") && request.method === "POST" && isPaused(env, "shop"))
+    return pausedResponse("shop");
   // POST /api/shop/claw {boss, request, seed?}: Boingo's claw machine (Nov 6; claw.ts, playClaw): one of the boss's tokens in, and a
   // chance (CLAW.winChance) at its Boss Crate, into your inventory unopened. The server rolls it now, in one transaction with the
   // token and the crate; `request` is the app's id for the play, so a retry answers the first play and spends nothing again.
@@ -671,6 +673,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
         : await openCrate(sql, current.id, b.crate, force, now, admin, once, { bonus });
     return r.ok ? json(r) : json({ message: r.message }, 400);
   }
+  // POST /api/locker/boost {request}: opens a Coin Boost Crate you hold (Nov 26; coin-boost.ts openBoostCrate): free, no key, one crate
+  // off and COIN_BOOST.minutes of boost on, once per request id. Answers {locker}. The shop's kill switch rests it, as every crate's open.
+  if (path === "/api/locker/boost" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { request?: unknown };
+    const r = await openBoostCrate(sql, current.id, requestId(b?.request), now);
+    return r.ok ? json({ locker: await lockerState(sql, current.id, admin) }) : json({ message: r.message }, 400);
+  }
   if (path === "/api/locker/pick" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; request?: unknown };
     const r = await pickBossCrate(sql, current.id, b?.crate, requestId(b?.request), now);
@@ -686,11 +695,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const r = await equipLocker(sql, current.id, b.slot, b.item ?? null, admin);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
-  // POST /api/locker/grant {keys?, boss?, tokens?, crate?, crates?, request}: an admin's test grant to their own account (crate keys, up to
-  // BOSS_TOKENS.keysGrantMax (100) at once; a boss's tokens; once per request id); for anyone else it isn't there. Answers the locker.
+  // POST /api/locker/grant {keys?, boss?, tokens?, crate?, crates?, boost?, crateBonus?, request}: an admin's test grant to their own account
+  // (crate keys, up to BOSS_TOKENS.keysGrantMax (100) at once; a boss's tokens; crates; since Nov 26 Coin Boost Crates and Crate Bonuses;
+  // once per request id); for anyone else it isn't there. Answers the locker.
   if (path === "/api/locker/grant" && request.method === "POST") {
     if (!admin) return json({ message: "Not found" }, 404);
-    const b = (await request.json().catch(() => ({}))) as { keys?: unknown; boss?: unknown; tokens?: unknown; crate?: unknown; crates?: unknown; request?: unknown };
+    const b = (await request.json().catch(() => ({}))) as { keys?: unknown; boss?: unknown; tokens?: unknown; crate?: unknown; crates?: unknown; boost?: unknown; crateBonus?: unknown; request?: unknown };
     const r = await grantTestItems(sql, current.id, b && typeof b === "object" ? b : {}, now);
     return r.ok ? json(await lockerState(sql, current.id, admin)) : json({ message: r.message }, 400);
   }

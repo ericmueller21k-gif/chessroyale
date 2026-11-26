@@ -1,6 +1,7 @@
 import type { PlayCoins } from "./play-coins.ts";
 import type { QuestPaid } from "./quests.ts";
-import { END_SCREEN, XP } from "./settings.ts";
+import { COIN_BOOST, END_SCREEN, XP } from "./settings.ts";
+import { BOOST_CRATE_NAME, CRATE_BONUS_NAME } from "./coin-boost.ts";
 
 /**
  * XP and levels: the rules (XP in settings.ts; docs/decisions/2026-11-09-xp-rules.md). Pure: the server decides a game's XP with
@@ -48,6 +49,11 @@ export interface XpRewards {
   keys: number;
   bossPicks: number;
   levels: number[];
+  /**
+   * How many of `crates` the Crate Bonus added (Nov 26; LEVEL_CRATE_BONUS: a paying level's crates twice). Absent: none. The card says
+   * "+2 Winter Crates (Crate bonus)".
+   */
+  doubled?: number;
   /** Quests this game completed (Nov 9, phase 3): each one's XP (also in the box's "Quest" part), crates and keys. Absent: none. */
   quests?: QuestPaid[];
 }
@@ -91,17 +97,35 @@ export function crateCount(n: number, name: string): string {
   return `${n} ${n === 1 ? one : `${one.replace(/Crate$/, "Crates")}`}`;
 }
 
-/** A reward's lines, in plain words: "+1 Winter Crate", "+2 Winter Crates", "+1 crate key", "Choose your boss crate". */
-export function rewardLines(r: XpRewards, crateName: string): { daily: string | null; level: string | null; pick: string | null; quests: string[] } {
-  const things = (crates: number, keys: number) => [crates ? `+${crateCount(crates, crateName)}` : "", keys ? `+${keys} crate ${keys === 1 ? "key" : "keys"}` : ""].filter(Boolean);
-  const level = things(r.crates, r.keys).join(" · ");
+/**
+ * A reward's lines, in plain words: "+1 Winter Crate", "+2 Winter Crates (Crate bonus)", "+1 crate key", "Choose your boss crate", and a
+ * daily's drop (Nov 26): "+1 Coin Boost Crate", "Crate Bonus: your next 5 level-ups that give crates give double crates" (only the
+ * levels that pay crates use one: the review of #966's m3).
+ */
+export function rewardLines(r: XpRewards, crateName: string): { daily: string | null; level: string | null; pick: string | null; quests: string[]; drops: string[] } {
+  const things = (crates: number, keys: number, doubled = 0) =>
+    [crates ? `+${crateCount(crates, crateName)}${doubled > 0 ? " (Crate bonus)" : ""}` : "", keys ? `+${keys} crate ${keys === 1 ? "key" : "keys"}` : ""].filter(Boolean);
+  const level = things(r.crates, r.keys, r.doubled).join(" · ");
+  const done = r.quests ?? [];
+  const boost = done.reduce((n, q) => n + (q.boost ?? 0), 0);
+  const bonus = done.reduce((n, q) => n + (q.crateBonus ?? 0), 0);
   return {
     daily: r.daily ? `+${crateCount(r.daily, crateName)}` : null,
     level: level || null,
     pick: r.bossPicks ? (r.bossPicks === 1 ? "Choose your boss crate" : `Choose your ${r.bossPicks} boss crates`) : null,
     // (Phase 3: "Quest done: Boss Hunter +300 XP · +1 Winter Crate"; "+300 XP" never split over two lines.)
-    quests: (r.quests ?? []).map((q) => [`Quest done: ${q.name} +${q.xp.toLocaleString("en-US")}\u00a0XP`, ...things(q.crates, q.keys)].join(" · ")),
+    quests: done.map((q) => [`Quest done: ${q.name} +${q.xp.toLocaleString("en-US")}\u00a0XP`, ...things(q.crates, q.keys)].join(" · ")),
+    drops: [
+      ...(boost ? [`+${boost} ${BOOST_CRATE_NAME}${boost === 1 ? "" : "s"}: open ${boost === 1 ? "it" : "one"} in Crates for ${COIN_BOOST.multiplier}x coins over ${COIN_BOOST.minutes} minutes of play`] : []),
+      ...(bonus ? [`${CRATE_BONUS_NAME}: your next ${bonus} level-ups that give crates give double crates`] : []),
+    ],
   };
+}
+
+/** A reward's drops from daily quests (Nov 26): Coin Boost Crates and the Crate Bonus's level-ups. */
+export function rewardDrops(r: XpRewards | null | undefined): { boost: number; bonus: number } {
+  const done = r?.quests ?? [];
+  return { boost: done.reduce((n, q) => n + (q.boost ?? 0), 0), bonus: done.reduce((n, q) => n + (q.crateBonus ?? 0), 0) };
 }
 
 /** A grant's rewards from what's stored (JSON), or none: anything unreadable reads as none. */
@@ -130,10 +154,14 @@ export function readRewards(x: unknown): XpRewards | undefined {
     ? o.quests.flatMap((q: unknown) => {
         if (!q || typeof q !== "object") return [];
         const v = q as Record<string, unknown>;
-        return typeof v.quest === "string" && typeof v.name === "string" ? [{ quest: v.quest, name: v.name, xp: whole(v.xp), crates: whole(v.crates), keys: whole(v.keys) }] : [];
+        if (typeof v.quest !== "string" || typeof v.name !== "string") return [];
+        // (A daily's drop, Nov 26: kept only when there was one.)
+        const drop = { ...(whole(v.boost) ? { boost: whole(v.boost) } : {}), ...(whole(v.crateBonus) ? { crateBonus: whole(v.crateBonus) } : {}) };
+        return [{ quest: v.quest, name: v.name, xp: whole(v.xp), crates: whole(v.crates), keys: whole(v.keys), ...drop }];
       })
     : [];
   if (quests.length) r.quests = quests;
+  if (n("doubled")) r.doubled = n("doubled");
   return hasRewards(r) ? r : undefined;
 }
 

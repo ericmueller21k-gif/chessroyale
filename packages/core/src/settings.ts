@@ -4722,6 +4722,41 @@ export const PLAY_COINS = {
 } as const;
 
 /**
+ * The coin boost (Eric, Nov 18: "2.5 times coin boost for your next certain hours of play", from a crate that "occasionally drops from
+ * a daily quest"; "Forget the experience. I want experience to be genuine"; the payments design, section 7 and call 3;
+ * docs/decisions/2026-11-26-coin-boost.md; core's coin-boost.ts, server coin-boost.ts). Never sold, for money or coins.
+ *   - **The drop:** each daily quest finished rolls once on the server, in its completion op: `dropChance` a Coin Boost Crate (and
+ *     LEVEL_CRATE_BONUS.dropChance a Crate Bonus), else nothing. The weekly doesn't roll.
+ *   - **The crate:** held until you open it (the Crates tab, free, no key: its contents are fixed, so it has no odds). Opening it adds
+ *     `minutes` of boost; a second crate adds `minutes` more, the multiplier never stacks. No expiry.
+ *   - **The boost:** a counted game's coins (play coins and bonus) times `multiplier`, the extra paid beside them (reason "coin-boost").
+ *     The day's PLAY_COINS.perDay and the bonus steps count the base coins only. It counts down by the minutes that earned the game's
+ *     play coins (its counted minutes, XP's; fewer for the game that reaches the day's perDay: its play coins over
+ *     PLAY_COINS.perMinute, rounded up; Nov 26, the review of #966's M1), and only in a game that paid play coins: past the day's
+ *     perDay it waits for the next day, so its minutes always buy boosted play coins (about 420 extra coins a crate). Each boosted game
+ *     uses at least `minGameMinutes` (the director's call on the review's m1: short games, a 40-second win say, can't multiply what a
+ *     crate is worth). A game partly in it (fewer minutes left than it uses) is boosted by that share. XP is never boosted.
+ */
+export const COIN_BOOST = {
+  multiplier: 2.5,
+  minutes: 120,
+  dropChance: 0.04,
+  minGameMinutes: 5,
+} as const;
+
+/**
+ * The Crate Bonus (Eric, Nov 18: "a 'crate bonus': your next 5 level-ups give double crates; drops occasionally from daily quests"; the
+ * payments design, section 7; docs/decisions/2026-11-26-coin-boost.md). Named apart from CRATE_BONUS (Nov 24's bonus crate an opening
+ * rolls), which is another thing. A daily quest finished drops one `dropChance` of the time (its roll beside COIN_BOOST's); it applies at
+ * once: your next `levels` paying level-ups (the levels whose reward has crates: every XP.levelRewardEvery-th) give their crates twice
+ * (keys stay as they are). Another adds `levels` more.
+ */
+export const LEVEL_CRATE_BONUS = {
+  levels: 5,
+  dropChance: 0.04,
+} as const;
+
+/**
  * The end screen (Eric, Nov 20; docs/decisions/2026-11-20-end-screen.md; the app's components/EndScreen.tsx): every match's result
  * shows "XP EARNED" (and on ranked 1 v 1, "RP EARNED" first) counting up from 0, the number lobbing into its bar, the bar filling from
  * where you were (a level or a division reached: the bar flashes full and goes on from 0), then the quests the match moved sliding to

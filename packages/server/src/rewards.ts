@@ -17,6 +17,8 @@ import { applyOp, cond, foldBonus, keyFor, leg, ledgerAccount, opKeys, opStateme
  *     before phase 2, through a guest's merge or a test switch, or while rewards were paused, is paid at the next counted game; never
  *     twice (one op per level), never a level a guest merged into the account was paid already (Nov 10), and never one the levels of
  *     1,000 XP paid already (Nov 20: `level:<old level>:<ledger id>` ops, mapped onto today's levels by paidLevels).
+ *   - **The Crate Bonus** (Nov 26; LEVEL_CRATE_BONUS, a daily quest's drop: coin-boost.ts): while it has level-ups left, a paying level's
+ *     crates come twice (op `lvlbonus:<level>:<ledger id>`, reason "crate-bonus", beside the level's own; keys stay as they are).
  *   - **The boss crate pick** (op `pick:<ledger id>:<request>`): one pick spent, the chosen live boss's crate into your boss crates
  *     (unopened, opened as any boss crate: no tokens, no key).
  *   - **Old crates** (the wallet's `crates`, Squads' placements' before Nov 9): turned into crates of XP.rewardCrate as the locker is
@@ -131,9 +133,43 @@ export async function owedLevels(sql: Sql, me: LedgerAccount, level: number): Pr
   return owed;
 }
 
-/** Pays every level owed at your XP now (one batch, each level once: a race or a retry pays nothing more). */
+/** The Crate Bonus's op for a level (Nov 26): one a level per account. */
+export const levelBonusOpId = (level: number, account: string) => `lvlbonus:${level}:${account}`;
+
+/**
+ * The Crate Bonus on a paying level (Nov 26; LEVEL_CRATE_BONUS; coin-boost.ts): its crates again (`crates`, the level's own; keys stay
+ * as they are) and one of the bonus's level-ups off. Its guard: a level-up left, and the level's own op there (it goes in the same batch,
+ * just before). Its legs name the game, so its result answers it ("+2 Winter Crates (Crate bonus)").
+ */
+export function levelBonusOp(me: LedgerAccount, level: number, crates: number, game: string, now: number): Op {
+  return {
+    id: levelBonusOpId(level, me.account),
+    reason: "crate-bonus",
+    now,
+    when: cond("EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND crate_bonus >= 1) AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)", me.user, levelOpId(level, me.account)),
+    legs: [leg.seriesCrates(me.user, XP.rewardCrate, crates, game), leg.crateBonus(me.user, -1, game)],
+  };
+}
+
+/**
+ * Pays every level owed at your XP now (one batch, each level once: a race or a retry pays nothing more). With the Crate Bonus (Nov 26),
+ * as many of the levels that pay crates as it has level-ups left, lowest first, get theirs twice (levelBonusOp, right after each
+ * level's op): its count is read only when a level here pays crates, so a game reaching none costs no read. A level-up the bonus's
+ * guard refuses (another game used it meanwhile) pays its own crates as usual.
+ */
 export async function payLevels(sql: Sql, me: LedgerAccount, xpNow: number, game: string, now: number): Promise<void> {
-  const ops = (await owedLevels(sql, me, levelOf(xpNow))).map((o) => levelOp(me, o.level, game, now, o)).filter((op): op is Op => !!op);
+  const owed = await owedLevels(sql, me, levelOf(xpNow));
+  let bonus = owed.some((o) => o.crates > 0) ? ((await sql.first<{ n: number | null }>("SELECT crate_bonus AS n FROM wallets WHERE user_id = ?", me.user))?.n ?? 0) : 0;
+  const ops: Op[] = [];
+  for (const o of owed) {
+    const op = levelOp(me, o.level, game, now, o);
+    if (!op) continue;
+    ops.push(op);
+    if (o.crates > 0 && bonus > 0) {
+      ops.push(levelBonusOp(me, o.level, o.crates, game, now));
+      bonus--;
+    }
+  }
   if (ops.length) await sql.batch(ops.flatMap((op) => opStatements(me, op, newId())));
 }
 
@@ -144,7 +180,7 @@ export async function payLevels(sql: Sql, me: LedgerAccount, xpNow: number, game
  */
 export async function gameRewards(sql: Sql, me: LedgerAccount, game: string, quests: readonly QuestPaid[] = []): Promise<XpRewards | undefined> {
   const rows = await sql.all<{ op_id: string; reason: string; asset_kind: string; n: number }>(
-    "SELECT op_id, reason, asset_kind, SUM(delta) AS n FROM ledger WHERE account = ? AND source_id = ? AND reason IN ('daily', 'level') GROUP BY op_id, reason, asset_kind",
+    "SELECT op_id, reason, asset_kind, SUM(delta) AS n FROM ledger WHERE account = ? AND source_id = ? AND reason IN ('daily', 'level', 'crate-bonus') GROUP BY op_id, reason, asset_kind",
     me.account,
     game,
   );
@@ -158,6 +194,14 @@ export async function gameRewards(sql: Sql, me: LedgerAccount, game: string, que
     }
     const level = Number(row.op_id.split(":")[1]);
     if (Number.isInteger(level)) levels.add(level);
+    // (The Crate Bonus's crates, Nov 26: among the level's, and counted apart for the card's "(Crate bonus)"; its level-up off isn't shown.)
+    if (row.reason === "crate-bonus") {
+      if (row.asset_kind === "series_crate") {
+        r.crates += row.n;
+        r.doubled = (r.doubled ?? 0) + row.n;
+      }
+      continue;
+    }
     if (row.asset_kind === "series_crate") r.crates += row.n;
     else if (row.asset_kind === "keys") r.keys += row.n;
     else if (row.asset_kind === "boss_pick") r.bossPicks += row.n;
@@ -166,15 +210,31 @@ export async function gameRewards(sql: Sql, me: LedgerAccount, game: string, que
   return r.daily || r.crates || r.keys || r.bossPicks || r.quests ? r : undefined;
 }
 
-/** Your series crates, by crate id (only those you hold some of), and your boss crates to pick. */
-export async function seriesHoldings(sql: Sql, userId: string): Promise<{ seriesCrates: Record<string, number>; seriesBonus: Record<string, number>; bossPicks: number }> {
+/**
+ * Your series crates, by crate id (only those you hold some of), your boss crates to pick, and (Nov 26, coin-boost.ts) your Coin Boost
+ * Crates, the boost's minutes left and the Crate Bonus's level-ups left: the wallet's, in the same read.
+ */
+export async function seriesHoldings(
+  sql: Sql,
+  userId: string,
+): Promise<{ seriesCrates: Record<string, number>; seriesBonus: Record<string, number>; bossPicks: number; boostCrates: number; boostMinutes: number; crateBonus: number }> {
   const [rows, wallet] = await Promise.all([
     sql.all<{ crate: string; n: number }>("SELECT crate, n FROM series_crates WHERE user_id = ? AND n > 0 ORDER BY crate", userId),
-    sql.first<{ boss_picks: number | null }>("SELECT boss_picks FROM wallets WHERE user_id = ?", userId),
+    sql.first<{ boss_picks: number | null; boost_crates: number | null; boost_minutes: number | null; crate_bonus: number | null }>(
+      "SELECT boss_picks, boost_crates, boost_minutes, crate_bonus FROM wallets WHERE user_id = ?",
+      userId,
+    ),
   ]);
   // (Bonus crates, Nov 24: counted with their crate's, and how many of them are bonus ones: ledger.ts foldBonus.)
   const { all, bonus } = foldBonus(Object.fromEntries(rows.map((r) => [r.crate, r.n])));
-  return { seriesCrates: all, seriesBonus: bonus, bossPicks: wallet?.boss_picks ?? 0 };
+  return {
+    seriesCrates: all,
+    seriesBonus: bonus,
+    bossPicks: wallet?.boss_picks ?? 0,
+    boostCrates: wallet?.boost_crates ?? 0,
+    boostMinutes: wallet?.boost_minutes ?? 0,
+    crateBonus: wallet?.crate_bonus ?? 0,
+  };
 }
 
 /**
