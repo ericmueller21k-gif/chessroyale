@@ -74,30 +74,55 @@ function fit(n: number, ms: number): Anim {
 const HEAD_BACK: Pose = { eyes2: "joy", mouth: "wide", brow: 2, lift: 1 };
 /** The parts that make his head (its face, ears and cap): headBack turns them together. */
 const HEAD_PARTS = /^(earF|earN|head|mouth:|eyes:|brow|cap)/;
+/** The parts that stay where they are when he leans back: his legs, shoes, shorts, tail and shadow (his feet stay planted). */
+const LOW_PARTS = /^(shadow|tail:|legF|legN|shoeF|shoeN|shorts)/;
 /**
- * A frame of his with the head thrown back (Eric, Nov 26: "he should have his head like up and then like lean back, so clearly his
- * like mouth is pointed up into the air"): his head drawn alone, turned `deg` back about his neck (`neck`, his pixels; nearest
- * pixel, no new drawing), moved `shift`, and laid over the rest of him as its own pixels. Made once a drawing (lazy anims).
+ * A frame of his thrown back (Eric, Nov 26: "he should have his head like up and then like lean back, so clearly his like mouth is
+ * pointed up into the air"): his upper body (torso, arms, the clock in his paws) leaned `HANG_TILT.body` back about his hips, and
+ * his head drawn alone, turned `HANG_TILT.deg` further back about his neck (moved `shift`) on top of it, so his open mouth points up.
+ * Nearest pixel, no new drawing; his legs, shorts and tail stay as drawn. The frame's own specks (sparks) lean with the clock.
+ * Made once a drawing (lazy anims).
  */
-function headBack(ms: number, pose: Pose, extra: Partial<Frame> = {}, deg = HANG_TILT.deg): Frame {
+function headBack(ms: number, pose: Pose, extra: Partial<Frame> = {}): Frame {
   const all = layers(pose);
-  const headOnly = frameKeys(DASH_FIGURE, { ms, layers: all.filter((l) => HEAD_PARTS.test(l.part)) });
+  const keysOf = (pick: (part: string) => boolean) => frameKeys(DASH_FIGURE, { ms, layers: all.filter((l) => pick(l.part)) });
+  const headOnly = keysOf((p) => HEAD_PARTS.test(p));
+  const upper = keysOf((p) => !HEAD_PARTS.test(p) && !LOW_PARTS.test(p));
   const [cx, cy] = HANG_TILT.neck;
   const [mx, my] = HANG_TILT.shift;
-  const a = (deg * Math.PI) / 180;
-  const [c, s] = [Math.cos(a), Math.sin(a)];
+  const [hx, hy] = HANG_TILT.hip;
+  const turn = (deg: number) => [Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) / 180)] as const;
+  const [bc, bs] = turn(HANG_TILT.body);
+  const [c, s] = turn(HANG_TILT.deg);
+  // (Each pixel where it lands: the one it comes from, turned back the other way, first about his hips, then (his head) his neck.)
+  const unBody = (x: number, y: number): [number, number] => [hx + (x - hx) * bc + (y - hy) * bs, hy - (x - hx) * bs + (y - hy) * bc];
+  const unHead = (x: number, y: number): [number, number] => {
+    const [u, v] = [x - mx - cx, y - my - cy];
+    return [cx + u * c + v * s, cy + -u * s + v * c];
+  };
+  const pick = (grid: ReturnType<typeof frameKeys>, [x, y]: [number, number]) => grid[Math.round(y)]?.[Math.round(x)];
+  const body: Speck[] = [];
   const head: Speck[] = [];
-  for (let y = 0; y < headOnly.length; y++)
-    for (let x = 0; x < headOnly[0]!.length; x++) {
-      // (Each pixel where it lands: the one it comes from, turned back the other way.)
-      const [u, v] = [x - mx - cx, y - my - cy];
-      const k = headOnly[Math.round(cy + -u * s + v * c)]?.[Math.round(cx + u * c + v * s)];
-      if (k) head.push([x, y, k]);
+  for (let y = 0; y < upper.length; y++)
+    for (let x = 0; x < upper[0]!.length; x++) {
+      const p = unBody(x, y);
+      const b = pick(upper, p);
+      if (b) body.push([x, y, b]);
+      const h = pick(headOnly, unHead(...p));
+      if (h) head.push([x, y, h]);
     }
-  return { ms, layers: all.filter((l) => !HEAD_PARTS.test(l.part)), ...extra, specks: [...head, ...(extra.specks ?? [])] };
+  // (The sparks: each moved forward, the way the clock went.)
+  const lean = (k: Speck): Speck => {
+    const [u, v] = [k[0] - hx, k[1] - hy];
+    return [Math.round(hx + u * bc - v * bs), Math.round(hy + u * bs + v * bc), k[2]];
+  };
+  return { ms, layers: all.filter((l) => LOW_PARTS.test(l.part)), ...extra, specks: [...body, ...head, ...(extra.specks ?? []).map(lean)] };
 }
-/** How far back his head goes at cheetah speed (degrees), the point it turns about (his neck) and where it's moved to (back and up). */
-const HANG_TILT = { deg: 50, neck: [37, 41] as [number, number], shift: [3, -1] as [number, number] };
+/**
+ * How far back he goes at cheetah speed (degrees): his upper body about his hips (`hip`, his pixels), and his head further about his
+ * neck (`neck`, moved `shift`), together turning his snout from forward to up.
+ */
+const HANG_TILT = { body: 25, hip: [41, 74] as [number, number], deg: 62, neck: [37, 41] as [number, number], shift: [0, 0] as [number, number] };
 /** A happy slam: on the button, the clock pressed, the flag jumping, sparks; `big` the slow smacks' bigger burst and shake. */
 const smackDown = (ms: number, pose: Pose, big: boolean): Frame =>
   F(ms, { at: [25.5, 54], gesture: "open", press: true, sink: big ? 2 : 1, flag: 1, flagY: big ? 3 : 2, tail: -2, ...pose }, { cue: "click", shake: big ? [0, 2] : [0, 1], specks: bigClick(big ? 2 : 1, 0) });
