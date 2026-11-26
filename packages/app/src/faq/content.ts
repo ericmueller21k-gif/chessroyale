@@ -1052,6 +1052,8 @@ In a level game (at ×1) it's full after about ${n(level, "crowd move")}; with t
 }
 When it's full: **"RAGE!"** and a warning as the next turn begins, then the ultimate the turn after. Hollow's, Big Boy's, Alfil's and Chub & Chirp's ultimates come at the start of their own turn instead (Lights Out's only warning is the full meter), Sawyer's needs more than a full meter, and Wrangler has a meter of his own with no warning (below).
 
+**Before his first ultimate, a boss losing badly:** ${p.dangerBosses.map((id) => BOSS_ROSTER.find((b) => b.id === id)?.name ?? id).join(", ").replace(/, ([^,]*)$/, " and $1")}: once your chances (the number the end screen shows) reach ${pct(p.dangerAt, 0)} after one of your moves and he hasn't used his ultimate yet this battle, his meter is full as your next turn begins, so it comes within two of his turns. After his first, his meter fills as usual.
+
 Then the meter empties and fills again for the next one. While an ultimate is still under way (the Blizzard's ${n(Math.max(2, Math.round(p.blizzardTurns)), "turn")}, the Roman Candle's fireballs still falling or burning, the board flipped or sawn in two, Lights Out and the extra move after it, Alfil's Slam while your pieces are up) the meter stays empty, dimmed, and nothing adds to it, so two ultimates never overlap. Chub & Chirp's Carrot Patch comes once a battle: after it, their meter is gone.
 ${Object.entries(BATTLE_TOWER.ultsOnFloorOf)
   .map(([size, most]) => `\nOn a Battle Tower floor of ${countWords(Number(size))} bosses, each boss has at most ${countWords(most)} ${most === 1 ? "ultimate" : "ultimates"} there, whatever he could have elsewhere: after ${most === 1 ? "it" : "his last"}, his meter stays on his bar for the rest of the floor, empty and dimmed.`)

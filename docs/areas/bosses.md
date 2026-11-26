@@ -296,7 +296,11 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   Hidden Boss, whose meters are their own: their rows below) fills over time
   (`ragePerMove` a crowd move, up to `rageAheadMax` more while the crowd is ahead on the judged eval), with the boss's
   own material lost (`ragePerMaterial`: a queen's worth is half the meter) and with each of the God King's strikes on
-  the boss (`rageStrike`: a quarter of it), every gain times the boss's `rageSpeed`. Full: a "RAGE!" warning, then the
+  the boss (`rageStrike`: a quarter of it), every gain times the boss's `rageSpeed`. **Before his first ultimate, in danger** (only the
+  bosses in `dangerBosses`: Timber, Chub & Chirp, Hollow, Alfil, Moo & Moon; Eric, Nov 26: "every boss has to ult in every game ... we
+  don't want bosses to ... ult twice"; [decision](../decisions/2026-11-26-ult-danger-birdie-only.md)): a crowd move judged at
+  `dangerAt` (0.70) or more fills the meter as the next crowd turn begins (`dangerCharge`, in `prepareTurn`), while he has used none
+  this battle (`ults` 0); after his first, never again. Full: a "RAGE!" warning, then the
   ultimate as the next crowd turn begins. Hollow's Lights out, Big Boy's Big Bounce and Alfil's Mammoth Slam come at the
   start of the boss's turn instead (Lights out's only warning is the full meter). A cap a battle: `ultimateMax` in a boss's rules
   (Smudgy's `repaintMax`: after his last the meter goes; Timber's `maxUltimates.timber`, 2, Eric, Nov 2: after his second Gnaw the
@@ -1270,7 +1274,7 @@ sheet's words in `PROMOTION_OPT_OUT` (`boss-kit-lib.ts`), with the decision file
 ## Settings
 
 `BOSS_POWERS` in `packages/core/src/settings.ts` (every power's numbers, Alfil's `tusks*` and `slam*`, Chub & Chirp's `hopMax`, `hopNodes`, `pawnBounceMax` and `carrot*`, Smudgy's `camo*` and `repaint*`, Moo & Moon's `moonbeam*` (`moonbeamTarget` among them), `fullMoonMoves` and `flurryBeams`, the circus tiger's `balloon*` (`balloonStages`, `balloonStageSec`, `balloonOdds`, `balloonPops`, `balloonLandsInRow`, `balloonColors`, `balloonBands`, `balloonLooks`, `balloonNodes`) and `hoops*` (`hoopsCount`, `hoopsCrowdMoves`, `hoopsBand`, `hoopsTarget`, `hoopsLooks`, `hoopsNodes`, `hoopsTimeMs`), the hippo gardener's `seed*`, `waterOdds`, `plantTurns`, `waterBand`, `waterTarget`, `jackpotMax`, `waterLooks`, `waterNodes`, `waterBudget` and `waterTimeMs` among them, Folio's `draft*`, `foldTurns`, `crease*` and `revision*`; the meter: `rageFull`, `ragePerMove`,
-`rageAheadMax`, `rageAheadFull`, `ragePerMaterial`, `rageStrike`, `rageSpeed` by boss, `dangerAt`: Birdie's danger line), `SAWYER_LOOKS` (how his split
+`rageAheadMax`, `rageAheadFull`, `ragePerMaterial`, `rageStrike`, `rageSpeed` by boss, `dangerAt`: the danger line, `dangerBosses`), `SAWYER_LOOKS` (how his split
 looks), the `boss*` keys of `Settings`,
 `BOSS_DIFFICULTY`, `HAPTICS` (the boss moments' buzzes: `patterns` and `cues`), `MUSIC` (the battle music's volume and fades), `BOSS_BRAIN` (every boss's brain, Maia's rating and the crowd's margin, the bridge band, its
 sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `boss.ts`.
@@ -1281,7 +1285,7 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   `boss-kit-lib.ts`; `KIT_SEEDS=<n>` for more seeds by hand), `packages/server/test/boss-kit-parity.test.ts` (solo and
   online agree), `e2e/boss-smoke.spec.ts` (every playable boss on a phone, the first on a computer). What each checks:
   "Adding a boss" above.
-- Unit, Birdie's danger line (`dangerAt`, Nov 26): his two in a row (`birdie.test.ts`); Chandy's (`chandy.test.ts`) until his checkmate rework.
+- Unit, the danger line (`dangerAt`, Nov 26): `dangerBosses` (`ult-danger.test.ts`: losing before his first ultimate, it comes within two of his turns, none close after; a level battle the same with the rule off); Birdie's two in a row (`birdie.test.ts`); Chandy's (`chandy.test.ts`) until his checkmate rework.
 - Unit, the brain: `packages/chess/test/boss-brain.test.ts` (the rule, the bridge, the guards, the fallbacks),
   `maia-bosses.test.ts` (every boss's Maia path: its powers' limits kept, its special moves untouched),
   `boss-power-legal.test.ts` (Eric's Oct 17 position; every power that stops the boss × every brain path; the last

@@ -21,6 +21,7 @@ import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
 import {
   bossPowers,
+  dangerCharge,
   heldBy,
   inDanger,
   materialOf,
@@ -51,7 +52,7 @@ import {
 import { bossRules } from "./bosses/index.ts";
 
 // Every boss's file, and the shared pieces of the base boss, for the whole package.
-export { bossPowers, heldBy, inDanger, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, ultCapped, unleashed };
+export { bossPowers, dangerCharge, heldBy, inDanger, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, ultCapped, unleashed };
 // (The pass guard: one rule for every power that spends his whole turn.)
 export { PASS_WAIT, passAnswer, passLoses, passScores, type PassScore } from "./bosses/base.ts";
 // The board layer (every boss's marks at once: board-layer.ts).
@@ -130,6 +131,9 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   }
   rules.wearOff?.(next, t);
   const before = next.ultAt;
+  // A boss in `dangerBosses` in danger before his first ultimate (Eric, Nov 26: every boss ults every game, never twice close
+  // together): his meter full now, for this turn's step (its warning, or the ultimate). Only while one can come.
+  if (before === undefined && !capped && !next.noUlt && !rules.meter && !(rules.ultimateMax !== undefined && (next.ults ?? 0) >= rules.ultimateMax)) next.charge = dangerCharge(boss.id ?? "", next, t.rageSpeed, s);
   // (`hold`: several bosses on one side, and this turn change isn't his (sideTurn): his ultimate's step waits, its warning and
   // the test trigger kept.)
   // (No ultimate this battle, noUlt: a Battle Tower floor's Wrangler; or none left, ultMax: a floor of three's after his one. The step

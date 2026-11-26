@@ -223,6 +223,18 @@ export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: Pick<R
  */
 export const inDanger = (judged: number | undefined, s: Pick<BossPowerSettings, "dangerAt"> = BOSS_POWERS): boolean => judged !== undefined && judged >= s.dangerAt;
 
+/**
+ * The meter's charge for a boss in `dangerBosses` in danger (inDanger) who hasn't used his ultimate yet this battle (`ults` 0): at
+ * least what makes it full now (rageNow at rageFull, with his material lost), so its step warns (or brings it) this turn. Otherwise
+ * `charge` as it is: once he has used one, the rule is done for the battle (Eric, Nov 26: never ulting twice close together).
+ */
+export function dangerCharge(id: string, p: Pick<BossPowerState, "charge" | "lost" | "rageUsed" | "judged" | "ults">, speed: number, s: Pick<RageRates, "rageFull" | "ragePerMaterial"> & Pick<BossPowerSettings, "dangerAt" | "dangerBosses"> = BOSS_POWERS): number {
+  const charge = p.charge ?? 0;
+  if (!s.dangerBosses.includes(id) || (p.ults ?? 0) > 0 || !inDanger(p.judged, s)) return charge;
+  // (A hair over full, so the meter reads full whatever the rounding of the division.)
+  return Math.max(charge, s.rageFull / Math.max(1e-6, speed) + (p.rageUsed ?? 0) - p.lost * s.ragePerMaterial + 1e-6);
+}
+
 /** How fast a boss's meter fills (BOSS_POWERS.rageSpeed: every gain times this). */
 export const rageSpeedOf = (id: string | undefined, s: Pick<RageRates, "rageSpeed"> = BOSS_POWERS): number => (id && s.rageSpeed[id]) || 1;
 
