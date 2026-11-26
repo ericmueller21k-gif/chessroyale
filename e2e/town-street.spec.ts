@@ -444,8 +444,10 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   });
   await asAdmin(page);
   // (At night, Nov 26: Eric's laptop's 1,211 uploads in 16.7 s of walking were the windows' lights, each baked and uploaded as it first
-  // shone; by day none shine. A crowd: more tags than the bots'.)
-  const at = "/town?sky=night&crowd=12&report";
+  // shone; by day none shine. A crowd: more tags than the bots'. A run of 120 s, not the report's 30 (Nov 26): the town's steps are
+  // capped at 0.1 s, so on a CI runner drawing two software-WebGL towns at once, at 4 fps, the roam took 40 s, the run ended itself
+  // and Done was greyed; every frame of the roam is recorded now, checked below as Done is pressed.)
+  const at = "/town?sky=night&crowd=12&report=120";
   await page.goto(at);
   await expect(bar).toBeVisible({ timeout: 30_000 });
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
@@ -490,6 +492,7 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
       await page.getByRole("button", { name: z, exact: true }).click();
       await page.waitForTimeout(900);
     }
+    expect((await page.evaluate(() => (window as unknown as R).__townReport()))!.state, `${visit}: still recording as the roam ends (all of it in the run)`).toBe("rec");
     await page.locator(".tfr-pill").getByRole("button", { name: "Done" }).click();
     const s = (await page.evaluate(() => (window as unknown as R).__townReport()))!.summary!;
     expect(s.frames, `${visit}: frames recorded`).toBeGreaterThan(10);

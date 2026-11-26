@@ -89,8 +89,18 @@ export const F = { walk: 1, turn: 2, zoom: 4, load: 8, upload: 16, gap: 32, rese
 
 /** Frames held: 30 s at up to 120 Hz, and room to spare. */
 export const MAX_FRAMES = 4096;
-/** How long a run records (ms). */
+/** How long a run records (ms), unless the page asks for another length (`?report=S`: reportMs). */
 export const RUN_MS = 30_000;
+/**
+ * A run's length from `?report=S` (seconds; Nov 26): 5 to 300, anything else (or `?report` alone) RUN_MS. The night town guard
+ * (e2e/town-street.spec.ts) roams across the town for about 25 s on a fast machine, but the town's frame steps are capped (0.1 s), so
+ * at the 4 fps of a CI runner drawing two software-WebGL towns at once the same roam takes 40 s: past 30 s the run ended itself and
+ * the rest went unrecorded. It asks for 120 s and checks the run still records when it presses Done.
+ */
+export const reportMs = (asked: string | null): number => {
+  const s = asked !== null && /^\d+$/.test(asked) ? Number(asked) : NaN;
+  return s >= 5 && s <= 300 ? s * 1000 : RUN_MS;
+};
 /** Faster than this the camera counts as turning (degrees a second). */
 export const TURN_DEG_S = 5;
 
@@ -120,7 +130,7 @@ export function newRun(max = MAX_FRAMES): RunData {
  * `take(part, ms)` for work timed where it happens inside another part (taken out of that part), then `end` with what was happening.
  */
 export class FrameRec {
-  readonly run: RunData = newRun();
+  readonly run: RunData;
   /** "wait": for the first move; "rec": recording; "done": the run is over (the panel shows). */
   state: "wait" | "rec" | "done" = "wait";
   startAt = 0;
@@ -134,14 +144,20 @@ export class FrameRec {
   private flags = 0;
   private heading = NaN;
   private zoom = NaN;
-  /** The run ended (30 s, or Done): the panel's to show. */
+  /** The run ended (30 s or `runMs`, or Done): the panel's to show. */
   onDone: (() => void) | null = null;
   /** A new second of the run (0 the first recorded frame's): the pill's count, from whichever loop records (the town's or a room's). */
   onSec: ((sec: number) => void) | null = null;
   private sec = -1;
   /** Going in or out of a building (F.goIn, F.goOut; 0: neither): Town.tsx sets it, every frame meanwhile carries it. */
   door = 0;
-  constructor(private readonly clock: () => number = () => performance.now()) {}
+  /** `runMs`: how long a run records (RUN_MS, or `?report=S`'s: reportMs); its frames held, at up to 120 Hz and room to spare. */
+  constructor(
+    private readonly clock: () => number = () => performance.now(),
+    readonly runMs = RUN_MS,
+  ) {
+    this.run = newRun(Math.max(MAX_FRAMES, Math.ceil((runMs / 1000) * 136)));
+  }
 
   begin(now: number): void {
     this.t0 = this.last = this.clock();
@@ -237,7 +253,7 @@ export class FrameRec {
       this.sec = sec;
       this.onSec?.(sec);
     }
-    if (now - this.startAt >= RUN_MS || r.n >= r.total.length) this.finish();
+    if (now - this.startAt >= this.runMs || r.n >= r.total.length) this.finish();
   }
   finish(): void {
     if (this.state === "done") return;
