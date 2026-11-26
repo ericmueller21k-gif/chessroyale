@@ -33,7 +33,7 @@
  * docs/areas/town-square.md.
  */
 import { roomLoadSlice } from "./shops/load-slice.ts";
-import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, setFps, setRec, summarize, timerStep, upName } from "./frame-report.ts";
+import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, reportMs, setFps, setRec, summarize, timerStep, upName } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
@@ -1781,8 +1781,9 @@ function startTown(
     setFps((fps = new FpsCount(fpsEl)));
   }
   // `/town?report`, anyone's, as `?fps` (Eric, Nov 11): the frame report (frame-report.ts). Every frame of a run recorded from your
-  // first move, for 30 s or until Done, then one panel to screenshot. Without `?report` there's no recorder: the marks are null checks.
-  const rec = TOWN_ASKED.report ? new FrameRec() : null;
+  // first move, for 30 s (`?report=S`: S s) or until Done, then one panel to screenshot. Without `?report` there's no recorder: the marks
+  // are null checks.
+  const rec = TOWN_ASKED.report ? new FrameRec(undefined, reportMs(TOWN_ASKED.reportS)) : null;
   setRec(rec);
   let recPill: ReturnType<typeof reportPill> | null = null;
   let recPanel: HTMLElement | null = null;
