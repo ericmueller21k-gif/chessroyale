@@ -861,7 +861,7 @@ below):
   alone and a raid (solo or online; `bossFramed` in `game.ts` puts `bf-frame` on every screen of the battle: Play, Boss, Reveal; a Battle
   Tower floor and the Hidden Boss's whole fight keep their own: his phases keep phase 1's boxes) take the 50 v 50's frame (`board-size.css`: the same `--cf-*`
   sizes, gap and drawing step): the left column (a raid's scoreboard, its table from the board's top to its foot; Boss alone's boss column,
-  `.tower-space`, `--ts-w`, where he stands), the board with its strips (the two-line boss bar over it, kept: Eric, Nov 26, "I like the boss
+  `.tower-space`, `--ts-w` plus half the room the block leaves, so Babur's pump keeps its room), the board with its strips (the two-line boss bar over it, kept: Eric, Nov 26, "I like the boss
   bar bigger"; the dock's row under it) and the column beside it (up to 300 px, Boss alone's up to 340 for your pawn and the God King),
   centered as one block, 28 px (`--cf-gap`) either side of the board. The gear (and the admins' ⚡ and 🐟) at the column's right end, level
   with the bar. The Moves panel runs from the board's top down to 12 px over the God King's frame (his canvas, `200px × --king-k` over the

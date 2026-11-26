@@ -7,7 +7,9 @@
 - Every column on the board's lines, 28 px either side of the board (were 38 and 16 in Boss alone at 1536 × 730). The Moves panel runs from
   the board's top down to 12 px over the God King's frame, then the figures to the board's foot. The gear in its place, level with the bar.
 - Calls:
-  - **Boss alone's left column is the boss's** (`.tower-space`, where he stands): its edge is the gap's. It has no box to see.
+  - **Boss alone's left column is the boss's** (`.tower-space`, where he stands): its edge is the gap's. It has no box to see. It takes half
+    the room the block leaves (the other half stays right of the column), so the board is where a centered block puts it and the boss's
+    room is at least the old layout's: centered, Babur's pump had no room at 1920 × 1080 and his board fell to the taller bar's 832.
   - **The figures keep their places from the board** and their sizes at 1536 × 730 and 1920 × 960. Elsewhere the room they grow into moved
     a little with the equal gaps (the board sits 12 to 14 px further right): your pawn and the God King 1.2 → 1.15 at 1280 × 800 and
     1.6 → 1.55 at 1920 × 1080; the boss 3.25 → 3.4 at 1440 × 900. A raid's are unchanged.
