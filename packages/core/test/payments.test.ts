@@ -8,7 +8,7 @@ import { PAYMENTS, boughtOf, inRefundWindow, packOf, refundableCoins, spendPlan,
  */
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 10, 26, 12, 0);
-const u = (session: string, remaining: number, paidAt: number): Unspent => ({ session, remaining, paidAt });
+const u = (ref: string, remaining: number, paidAt: number): Unspent => ({ ref, remaining, paidAt });
 
 describe("the coin packs", () => {
   it("are the five Eric approved (Nov 17): $1.99/200, $4.99/520, $9.99/1,100, $19.99/2,300, $49.99/6,000, in USD", () => {
@@ -41,25 +41,26 @@ describe("spending: earned coins first, then the oldest purchase's", () => {
   const twoBought = [u("cs_B", 520, T0 + 5 * DAY), u("cs_A", 200, T0)];
 
   it("earned covers it: no purchase is touched", () => {
-    expect(spendPlan(750, twoBought, 30)).toEqual({ price: 30, earned: 30, fromEarned: 30, draws: [] });
-    expect(spendPlan(750, twoBought, 0)).toEqual({ price: 0, earned: 30, fromEarned: 0, draws: [] });
+    expect(spendPlan(750, twoBought, 30)).toEqual({ price: 30, coins: 750, earned: 30, fromEarned: 30, draws: [] });
+    expect(spendPlan(750, twoBought, 0)).toEqual({ price: 0, coins: 750, earned: 30, fromEarned: 0, draws: [] });
   });
 
   it("past earned: the oldest purchase next (whatever order they come in), then the next", () => {
-    expect(spendPlan(750, twoBought, 100)).toEqual({ price: 100, earned: 30, fromEarned: 30, draws: [{ session: "cs_A", take: 70, was: 200 }] });
+    expect(spendPlan(750, twoBought, 100)).toEqual({ price: 100, coins: 750, earned: 30, fromEarned: 30, draws: [{ ref: "cs_A", take: 70, was: 200 }] });
     expect(spendPlan(750, twoBought, 300)).toEqual({
       price: 300,
+      coins: 750,
       earned: 30,
       fromEarned: 30,
       draws: [
-        { session: "cs_A", take: 200, was: 200 },
-        { session: "cs_B", take: 70, was: 520 },
+        { ref: "cs_A", take: 200, was: 200 },
+        { ref: "cs_B", take: 70, was: 520 },
       ],
     });
     // (Everything: earned, then all of both.)
     expect(spendPlan(750, twoBought, 750)!.draws).toEqual([
-      { session: "cs_A", take: 200, was: 200 },
-      { session: "cs_B", take: 520, was: 520 },
+      { ref: "cs_A", take: 200, was: 200 },
+      { ref: "cs_B", take: 520, was: 520 },
     ]);
   });
 
@@ -72,20 +73,31 @@ describe("spending: earned coins first, then the oldest purchase's", () => {
   it("purchases paid at the same moment go by their id; one with nothing left is passed over", () => {
     const same = [u("cs_Z", 100, T0), u("cs_M", 100, T0), u("cs_E", 0, T0 - DAY)];
     expect(spendPlan(200, same, 150)!.draws).toEqual([
-      { session: "cs_M", take: 100, was: 100 },
-      { session: "cs_Z", take: 50, was: 100 },
+      { ref: "cs_M", take: 100, was: 100 },
+      { ref: "cs_Z", take: 50, was: 100 },
     ]);
   });
 
   it("earned below zero (a purchase's coins taken back): nothing from earned, all from what's bought", () => {
     // 50 coins, 200 of them bought: earned -150.
-    expect(spendPlan(50, [u("cs_A", 200, T0)], 50)).toEqual({ price: 50, earned: -150, fromEarned: 0, draws: [{ session: "cs_A", take: 50, was: 200 }] });
+    expect(spendPlan(50, [u("cs_A", 200, T0)], 50)).toEqual({ price: 50, coins: 50, earned: -150, fromEarned: 0, draws: [{ ref: "cs_A", take: 50, was: 200 }] });
     expect(spendPlan(50, [u("cs_A", 200, T0)], 51)).toBeNull();
   });
 
   it("a price that isn't whole coins, or below 0, is a mistake", () => {
     expect(() => spendPlan(100, [], 1.5)).toThrow();
     expect(() => spendPlan(100, [], -1)).toThrow();
+  });
+
+  it("drawing on more than PAYMENTS.maxDraws (20) purchases is refused: D1's 100 values a statement (review n3)", () => {
+    expect(PAYMENTS.maxDraws).toBe(20);
+    const many = Array.from({ length: 21 }, (_, i) => u(`r${String(i).padStart(2, "0")}`, 10, T0 + i));
+    // 200 coins: all bought, 10 in each of 21 purchases. 20 of them: planned; all 21: refused.
+    expect(spendPlan(210, many, 200)!.draws.map((d) => d.ref)).toEqual(many.slice(0, 20).map((m) => m.ref));
+    expect(() => spendPlan(210, many, 201)).toThrow(/maxDraws/);
+    // (Earned pays first: with 50 earned, 250 draws on the same 20, and one coin more on the 21st.)
+    expect(spendPlan(260, many, 250)).toMatchObject({ fromEarned: 50, draws: many.slice(0, 20).map((m) => ({ ref: m.ref, take: 10, was: 10 })) });
+    expect(() => spendPlan(260, many, 251)).toThrow(/maxDraws/);
   });
 
   it("bought is what the purchases hold unspent", () => {

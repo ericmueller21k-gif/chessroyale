@@ -15,9 +15,12 @@ export type CoinPack = (typeof PAYMENTS.packs)[number];
 /** The pack with this id, if it's sold. */
 export const packOf = (id: unknown): CoinPack | undefined => PAYMENTS.packs.find((p) => p.id === id);
 
-/** A purchase's coins still unspent: its id (the Checkout Session's), how many, and when it was paid (the oldest are spent first). */
+/**
+ * A purchase's coins still unspent: its ledger reference (`purchases.ref`: its own random id, never the Checkout Session's, so a kept
+ * sales record can't lead back to the ledger), how many, and when it was paid (the oldest are spent first).
+ */
 export interface Unspent {
-  session: string;
+  ref: string;
   remaining: number;
   paidAt: number;
 }
@@ -28,20 +31,23 @@ export const boughtOf = (unspent: readonly Unspent[]): number => unspent.reduce(
 /** How a spend of `price` coins is paid: earned coins first, then each purchase drawn on, oldest first. */
 export interface SpendPlan {
   price: number;
+  /** The coins as read. A spend that draws on purchases is guarded on them too, so a give-back to an older purchase since is seen. */
+  coins: number;
   /** Earned coins as read (coins − bought). The spend is guarded on it, so a change since (a grant, another spend) is seen. */
   earned: number;
   /** Of the price, what earned coins pay. */
   fromEarned: number;
   /** Then each purchase drawn on, oldest first: what it pays (`take`) and its `remaining` as read (`was`: the spend's guard). */
-  draws: { session: string; take: number; was: number }[];
+  draws: { ref: string; take: number; was: number }[];
 }
 
 /** Oldest paid first; a tie by its id, so every read draws in the same order. */
-const oldestFirst = (a: Unspent, b: Unspent) => a.paidAt - b.paidAt || (a.session < b.session ? -1 : a.session > b.session ? 1 : 0);
+const oldestFirst = (a: Unspent, b: Unspent) => a.paidAt - b.paidAt || (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0);
 
 /**
  * A spend of `price` (whole coins, 0 or more) from `coins` with these purchases unspent: earned coins first (none while earned is
- * below zero), then the oldest purchase's remaining, then the next. Null: not enough coins.
+ * below zero), then the oldest purchase's remaining, then the next. Null: not enough coins. Drawing on more than PAYMENTS.maxDraws
+ * purchases is refused (it throws): the spend's guard binds 3 values a draw, and D1 allows 100 a statement.
  */
 export function spendPlan(coins: number, unspent: readonly Unspent[], price: number): SpendPlan | null {
   if (!Number.isInteger(price) || price < 0) throw new Error(`spendPlan: a price of whole coins, 0 or more (${price})`);
@@ -54,12 +60,13 @@ export function spendPlan(coins: number, unspent: readonly Unspent[], price: num
     if (!rest) break;
     if (u.remaining <= 0) continue;
     const take = Math.min(rest, u.remaining);
-    draws.push({ session: u.session, take, was: u.remaining });
+    draws.push({ ref: u.ref, take, was: u.remaining });
     rest -= take;
   }
+  if (draws.length > PAYMENTS.maxDraws) throw new Error(`spendPlan: ${draws.length} purchases drawn on, more than PAYMENTS.maxDraws (${PAYMENTS.maxDraws})`);
   // (Unreachable: coins ≥ price, and what earned doesn't pay, bought holds, as coins = earned + bought.)
   if (rest) throw new Error(`spendPlan: ${rest} coins unplaced (coins ${coins}, bought ${boughtOf(unspent)}, price ${price})`);
-  return { price, earned, fromEarned, draws };
+  return { price, coins, earned, fromEarned, draws };
 }
 
 const DAY_MS = 86_400_000;

@@ -3975,6 +3975,13 @@ export const PAYMENTS = {
   refundDays: 14,
   /** A refund's optional comment (the refund message's box): at most this many characters, stored in `refunds.comment`. */
   commentMax: 500,
+  /**
+   * A spend draws on at most this many purchases (core's spendPlan throws beyond it): its guard binds 3 values a draw and D1 allows
+   * 100 a statement (node:sqlite, in the tests, allows far more). Unreachable today: the dearest coin price is 400 and the smallest
+   * pack 200, so a spend draws on 3 at most. A price that could need more (above about 20 × 200 coins) needs the draws passed as one
+   * JSON value first (json_each, as locker.ts does).
+   */
+  maxDraws: 20,
 } as const;
 
 /**

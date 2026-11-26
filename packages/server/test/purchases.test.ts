@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { PAYMENTS, shopItem } from "@chessroyale/core";
+import { PAYMENTS, shopItem, type SpendPlan } from "@chessroyale/core";
 import { buyItem, createGuest, d1Sql, ensureSchema, grantReward, schemaParts, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
-import { applyOp, backfillLedger, leg, ledgerAccount, ledgerCheck, ledgerMismatches, spendLegs } from "../src/ledger.ts";
-import { coinSplit, creditOpId, creditPurchase, recordCheckout, refundable, type PaidSession } from "../src/purchases.ts";
+import { applyOp, backfillLedger, cond, leg, ledgerAccount, ledgerCheck, ledgerMismatches, opStatements, spendLegs } from "../src/ledger.ts";
+import { coinSplit, creditOpId, creditPurchase, recordCheckout, refundable, spendGuard, type PaidSession } from "../src/purchases.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
@@ -14,8 +14,10 @@ import { memoryDb } from "./memory-db.ts";
  * the migration on a copy of the schema as it was the day before (fixtures/schema-2026-11-26.json, made by ensureSchema on main at
  * 92320601), a checkout and its credit (once, however often or at once it's called; never a guest's), earned coins spent first and
  * then the oldest purchase's, the guarded races (a spend, a grant meanwhile; refused twice), the refundable amount, deleting and the
- * download, a guest's merge, and the reconciliation covering the new kind. Coins cost money only once Stripe is wired (PR 8): nothing
- * calls recordCheckout or creditPurchase yet but these tests.
+ * download, a guest's merge, and the reconciliation covering the new kind. The review's fixes (Nov 26, `review/pay-storage`'s REVIEW.md):
+ * each purchase's own ledger reference, so a deleted buyer's kept rows lead to no ledger row (M1); a payment with no account to credit
+ * kept as `unclaimed` (m1); the three untested branches (m3); oldest-first pinned by the coins (n1); the stored pack (n2); the draws'
+ * cap (n3). Coins cost money only once Stripe is wired (PR 8): nothing calls recordCheckout or creditPurchase yet but these tests.
  */
 
 // (Everything in the shop is free while SHOP_FREE is on: these spend coins, so it's off, as shop-buy.test.ts does.)
@@ -37,16 +39,20 @@ async function world() {
 const signedIn = async (sql: Sql, email: string, now = T0) => signInWithIdentity(sql, (await createGuest(sql, now, "Player")).user, "email", email, {}, now);
 const coinsOf = async (sql: Sql, id: string) => (await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", id))?.coins ?? 0;
 const remainingOf = async (sql: Sql, session: string) => (await sql.first<{ remaining: number }>("SELECT remaining FROM purchases WHERE session_id = ?", session))?.remaining;
+/** A purchase's ledger reference (its ledger asset id: never the session's). */
+const refOf = async (sql: Sql, session: string) => (await sql.first<{ ref: string }>("SELECT ref FROM purchases WHERE session_id = ?", session))!.ref;
+/** A purchase's row as a credit leaves it. */
+const rowOf = (sql: Sql, session: string) =>
+  sql.first("SELECT user_id, ref, remaining, status, paid_at, tax_cents, payment_intent, card_country FROM purchases WHERE session_id = ?", session);
 /** Earned coins, as a game or a reward pays them. */
 const earn = (sql: Sql, id: string, coins: number, now = T0) => grantReward(sql, id, coins, 0, undefined, now);
 const pack = (coins: number) => PAYMENTS.packs.find((p) => p.coins === coins)!;
 
-/** A paid Checkout Session for `session`, as PR 8 will read it from Stripe (the buyer's ledger id, the pack's price). */
-async function paid(sql: Sql, user: User, session: string, over: Partial<PaidSession> = {}): Promise<PaidSession> {
+/** A paid Checkout Session for `session`, as PR 8 will read it from Stripe (the pack's price; no account: the row says whose it is). */
+async function paid(sql: Sql, session: string, over: Partial<PaidSession> = {}): Promise<PaidSession> {
   const row = await sql.first<{ cents: number }>("SELECT cents FROM purchases WHERE session_id = ?", session);
   return {
     id: session,
-    account: (await ledgerAccount(sql, user.id))!.account,
     paid: true,
     subtotalCents: row?.cents ?? 0,
     taxCents: 12,
@@ -59,7 +65,7 @@ async function paid(sql: Sql, user: User, session: string, over: Partial<PaidSes
 /** A pack bought and paid at `now`: its checkout, then its credit. */
 async function buy(sql: Sql, user: User, coins: number, session: string, now = T0) {
   expect(await recordCheckout(sql, user, pack(coins).id, session, now - 60_000)).toMatchObject({ ok: true });
-  expect(await creditPurchase(sql, await paid(sql, user, session), now)).toMatchObject({ ok: true, credited: "now", coins });
+  expect(await creditPurchase(sql, await paid(sql, session), now)).toMatchObject({ ok: true, credited: "now", coins });
 }
 
 describe("the migration, on a copy of the schema as it was before (live data, every account before it)", () => {
@@ -124,9 +130,12 @@ describe("a checkout, and its credit: once, never a guest's", () => {
     const ann = await signedIn(sql, "ann@example.com");
     expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0)).toEqual({ ok: true, pack: pack(520) });
     expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 + 5)).toEqual({ ok: true, pack: pack(520) });
+    const ref = await refOf(sql, "cs_test_ann_1");
+    expect(ref).toMatch(/^[0-9a-f]{24}$/);
     expect(await sql.all("SELECT * FROM purchases")).toEqual([
       {
         session_id: "cs_test_ann_1",
+        ref,
         user_id: ann.id,
         pack: "coins-520",
         coins: 520,
@@ -147,6 +156,11 @@ describe("a checkout, and its credit: once, never a guest's", () => {
     expect(await recordCheckout(sql, bo, "coins-7", "cs_test_bo_1", T0)).toEqual({ ok: false, message: "That coin pack isn't sold." });
     await expect(recordCheckout(sql, bo, "coins-200", "cs'; DROP TABLE purchases; --", T0)).rejects.toThrow(/not a session id/);
     expect(await sql.first("SELECT COUNT(*) AS n FROM purchases")).toEqual({ n: 1 });
+    // Another pack for the same session is refused, and the answer is always the pack as stored (review n2): here a price from before.
+    expect(await recordCheckout(sql, ann, "coins-6000", "cs_test_ann_1", T0 + 6)).toEqual({ ok: false, message: "That checkout is for another coin pack." });
+    await sql.run("UPDATE purchases SET coins = 500, cents = 450 WHERE session_id = 'cs_test_ann_1'");
+    expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 + 7)).toEqual({ ok: true, pack: { id: "coins-520", coins: 500, cents: 450 } });
+    expect(await sql.first("SELECT ref, pack, coins, cents FROM purchases")).toEqual({ ref, pack: "coins-520", coins: 500, cents: 450 });
   });
 
   it("guests can't buy: no checkout, and no credit even for a row that got past (checked in the statement too)", async () => {
@@ -156,17 +170,28 @@ describe("a checkout, and its credit: once, never a guest's", () => {
     // (A stale signed-in view of a guest: the statement's own check refuses it.)
     expect(await recordCheckout(sql, { ...gus, email: "gus@example.com" }, "coins-200", "cs_test_gus_1", T0)).toEqual({ ok: false, message: "Sign in to buy coins." });
     expect(await sql.first("SELECT COUNT(*) AS n FROM purchases")).toEqual({ n: 0 });
-    await sql.run("INSERT INTO purchases (session_id, user_id, pack, coins, cents, created_at) VALUES ('cs_test_gus_2', ?, 'coins-200', 200, 199, ?)", gus.id, T0);
-    expect(await creditPurchase(sql, await paid(sql, gus, "cs_test_gus_2"), T0)).toEqual({ ok: false, why: "guest" });
+    await sql.run("INSERT INTO purchases (session_id, ref, user_id, pack, coins, cents, created_at) VALUES ('cs_test_gus_2', 'r-gus', ?, 'coins-200', 200, 199, ?)", gus.id, T0);
+    expect(await creditPurchase(sql, await paid(sql, "cs_test_gus_2"), T0)).toEqual({ ok: false, why: "guest" });
     expect(await coinsOf(sql, gus.id)).toBe(0);
     expect(await sql.first("SELECT COUNT(*) AS n FROM ledger")).toEqual({ n: 0 });
+    // (The payment kept all the same, unclaimed, for PR 8 to refund: review m1.)
+    expect(await rowOf(sql, "cs_test_gus_2")).toEqual({
+      user_id: gus.id,
+      ref: "r-gus",
+      remaining: 0,
+      status: "unclaimed",
+      paid_at: T0,
+      tax_cents: 12,
+      payment_intent: "pi_cs_test_gus_2",
+      card_country: "US",
+    });
   });
 
   it("credits once: its coins into the wallet and the purchase, one op `pay:<session>`; again, or three at once, pay nothing more", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 - 60_000);
-    const s = await paid(sql, ann, "cs_test_ann_1");
+    const s = await paid(sql, "cs_test_ann_1");
     expect(await creditPurchase(sql, s, T0)).toEqual({ ok: true, credited: "now", coins: 520, user: ann.id });
     expect(await creditPurchase(sql, s, T0 + 1)).toEqual({ ok: true, credited: "before", coins: 520, user: ann.id });
     expect(await sql.first("SELECT remaining, status, paid_at, tax_cents, payment_intent, card_country FROM purchases")).toEqual({
@@ -177,31 +202,32 @@ describe("a checkout, and its credit: once, never a guest's", () => {
       payment_intent: "pi_cs_test_ann_1",
       card_country: "US",
     });
+    // (By the purchase's own ledger reference, never Stripe's session id: review M1.)
     const acct = (await ledgerAccount(sql, ann.id))!.account;
+    const ref = await refOf(sql, "cs_test_ann_1");
     expect(await sql.all("SELECT op_id, leg, account, asset_kind, asset_id, delta, reason, source_id FROM ledger ORDER BY leg")).toEqual([
-      { op_id: creditOpId("cs_test_ann_1"), leg: 0, account: acct, asset_kind: "coins", asset_id: "", delta: 520, reason: "purchase", source_id: "cs_test_ann_1" },
-      { op_id: "pay:cs_test_ann_1", leg: 1, account: acct, asset_kind: "purchase", asset_id: "cs_test_ann_1", delta: 520, reason: "purchase", source_id: "cs_test_ann_1" },
+      { op_id: creditOpId(ref), leg: 0, account: acct, asset_kind: "coins", asset_id: "", delta: 520, reason: "purchase", source_id: ref },
+      { op_id: `pay:${ref}`, leg: 1, account: acct, asset_kind: "purchase", asset_id: ref, delta: 520, reason: "purchase", source_id: ref },
     ]);
     // Three at once of another session: one credits.
     await recordCheckout(sql, ann, "coins-200", "cs_test_ann_2", T0);
-    const s2 = await paid(sql, ann, "cs_test_ann_2");
+    const s2 = await paid(sql, "cs_test_ann_2");
     const race = await Promise.all([creditPurchase(sql, s2, T0 + 2), creditPurchase(sql, s2, T0 + 2), creditPurchase(sql, s2, T0 + 2)]);
     expect(race.map((r) => (r.ok ? r.credited : r.why)).sort()).toEqual(["before", "before", "now"]);
     expect(await coinSplit(sql, ann.id)).toEqual({ coins: 720, bought: 720, earned: 0 });
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
   });
 
-  it("pays nothing for a session we never made, one not paid, a price, currency or buyer not the row's, one not pending", async () => {
+  it("pays nothing for a session we never made, one not paid, a price or currency not the row's, one not pending", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     const bo = await signedIn(sql, "bo@example.com");
     await recordCheckout(sql, ann, "coins-1100", "cs_test_ann_1", T0);
-    const s = await paid(sql, ann, "cs_test_ann_1");
+    const s = await paid(sql, "cs_test_ann_1");
     expect(await creditPurchase(sql, { ...s, id: "cs_test_nobody" }, T0)).toEqual({ ok: false, why: "unknown" });
     expect(await creditPurchase(sql, { ...s, paid: false }, T0)).toEqual({ ok: false, why: "unpaid" });
     expect(await creditPurchase(sql, { ...s, subtotalCents: 199 }, T0)).toEqual({ ok: false, why: "mismatch" });
     expect(await creditPurchase(sql, { ...s, currency: "cad" }, T0)).toEqual({ ok: false, why: "mismatch" });
-    expect(await creditPurchase(sql, { ...s, account: (await ledgerAccount(sql, bo.id))!.account }, T0)).toEqual({ ok: false, why: "mismatch" });
     await sql.run("UPDATE purchases SET status = 'expired' WHERE session_id = 'cs_test_ann_1'");
     expect(await creditPurchase(sql, s, T0)).toEqual({ ok: false, why: "not-pending" });
     expect(await coinsOf(sql, ann.id)).toBe(0);
@@ -219,7 +245,7 @@ describe("spending: earned coins first, then the oldest purchase's", () => {
     // (Paid in this order: B's checkout began first, but A was paid first, so A is the older purchase.)
     await recordCheckout(sql, ann, "coins-520", "cs_test_B", T0);
     await buy(sql, ann, 200, "cs_test_A", T0 + 1000);
-    expect(await creditPurchase(sql, await paid(sql, ann, "cs_test_B"), T0 + 2000)).toMatchObject({ credited: "now" });
+    expect(await creditPurchase(sql, await paid(sql, "cs_test_B"), T0 + 2000)).toMatchObject({ credited: "now" });
     expect(await coinSplit(sql, ann.id)).toEqual({ coins: 750, bought: 720, earned: 30 });
 
     expect(await buyItem(sql, ann.id, STORM, T0 + 3000)).toMatchObject({ ok: true });
@@ -230,8 +256,8 @@ describe("spending: earned coins first, then the oldest purchase's", () => {
     expect(await sql.all("SELECT asset_kind, asset_id, delta FROM ledger WHERE op_id = ? ORDER BY leg", `shop:${acct}:${STORM}`)).toEqual([
       { asset_kind: "shop", asset_id: STORM, delta: 1 },
       { asset_kind: "coins", asset_id: "", delta: -price(STORM) },
-      { asset_kind: "purchase", asset_id: "cs_test_A", delta: -200 },
-      { asset_kind: "purchase", asset_id: "cs_test_B", delta: -70 },
+      { asset_kind: "purchase", asset_id: await refOf(sql, "cs_test_A"), delta: -200 },
+      { asset_kind: "purchase", asset_id: await refOf(sql, "cs_test_B"), delta: -70 },
     ]);
 
     // Earned again, then a spend bigger than it: earned first, the rest from B.
@@ -258,9 +284,9 @@ describe("spending: earned coins first, then the oldest purchase's", () => {
   it("a coin never leaves through leg.coins: only a spend's legs take coins (none for a price of 0)", () => {
     expect(() => leg.coins("ann", -1)).toThrow(/spendLegs/);
     expect(spendLegs("ann", { price: 0, draws: [] })).toEqual([]);
-    expect(spendLegs("ann", { price: 5, draws: [{ session: "cs_A", take: 5, was: 9 }] }).map((l) => [l.kind, l.asset, l.delta])).toEqual([
+    expect(spendLegs("ann", { price: 5, draws: [{ ref: "r_A", take: 5, was: 9 }] }).map((l) => [l.kind, l.asset, l.delta])).toEqual([
       ["coins", "", -5],
-      ["purchase", "cs_A", -5],
+      ["purchase", "r_A", -5],
     ]);
   });
 });
@@ -335,6 +361,85 @@ describe("the guarded race: a change between the read and the write changes noth
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
   });
 
+  it("refused with the coins as read (the item given meanwhile): not tried again, one batch, ok, nothing charged (review m3)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await buy(sql, ann, 520, "cs_test_A");
+    const me = (await ledgerAccount(sql, ann.id))!;
+    let batches = 0;
+    const counting: Sql = { ...sql, batch: (statements) => (batches++, sql.batch(statements)) };
+    const got = await buyItem(
+      racing(counting, 1, () => applyOp(sql, me, { id: "other:grant", reason: "test", now: T0, legs: [leg.shopItem(ann.id, STORM, T0)] })),
+      ann.id,
+      STORM,
+      T0 + 1,
+    );
+    expect(got).toMatchObject({ ok: true });
+    expect(batches).toBe(1);
+    expect(await coinSplit(sql, ann.id)).toEqual({ coins: 520, bought: 520, earned: 0 });
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
+
+  it("a credit with the account deleted, or the checkout expired, after its reads: its statement refuses it (review m3)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await recordCheckout(sql, ann, "coins-520", "cs_test_A", T0);
+    await recordCheckout(sql, ann, "coins-200", "cs_test_B", T0);
+    // Expired meanwhile: the account's there, the purchase isn't pending.
+    const expire = () => sql.run("UPDATE purchases SET status = 'expired' WHERE session_id = 'cs_test_B'");
+    expect(await creditPurchase(racing(sql, 1, expire), await paid(sql, "cs_test_B"), T0 + 1)).toEqual({ ok: false, why: "not-pending" });
+    expect(await rowOf(sql, "cs_test_B")).toMatchObject({ remaining: 0, status: "expired", paid_at: null });
+    // Deleted meanwhile: no coins, no credit in the ledger; the payment kept, unclaimed (m1).
+    expect(await creditPurchase(racing(sql, 1, () => deleteAccount(sql, ann, T0 + 2)), await paid(sql, "cs_test_A"), T0 + 3)).toEqual({ ok: false, why: "gone" });
+    expect(await rowOf(sql, "cs_test_A")).toEqual({
+      user_id: "deleted",
+      ref: null,
+      remaining: 0,
+      status: "unclaimed",
+      paid_at: T0 + 3,
+      tax_cents: 12,
+      payment_intent: "pi_cs_test_A",
+      card_country: "US",
+    });
+    expect(await sql.first("SELECT COUNT(*) AS n FROM ledger WHERE reason = 'purchase'")).toEqual({ n: 0 });
+    expect(await sql.first("SELECT COUNT(*) AS n FROM wallets")).toEqual({ n: 0 });
+  });
+
+  it("a give-back to an older purchase meanwhile: the spend is planned again and takes the oldest's coins first (review n1)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await buy(sql, ann, 200, "cs_test_OLD", T0);
+    await buy(sql, ann, 520, "cs_test_NEW", T0 + 1);
+    // OLD spent out, NEW holds 420.
+    expect(await buyItem(sql, ann.id, STORM, T0 + 2)).toMatchObject({ ok: true });
+    expect([await remainingOf(sql, "cs_test_OLD"), await remainingOf(sql, "cs_test_NEW")]).toEqual([0, 420]);
+    // OLD's 200 given back between the spend's read and its write (a withdrawn dispute, PR 9: here by hand). Earned is unchanged and
+    // NEW still holds what was read; only the coins (bought with them) show it.
+    const me = (await ledgerAccount(sql, ann.id))!;
+    const oldRef = await refOf(sql, "cs_test_OLD");
+    const giveBack = () => applyOp(sql, me, { id: "test:give-back", reason: "test", now: T0 + 3, legs: [leg.coins(ann.id, 200), leg.purchase(ann.id, oldRef, 200)] });
+    expect(await buyItem(racing(sql, 1, giveBack), ann.id, EMERALD, T0 + 4)).toMatchObject({ ok: true });
+    // 350: all 200 of OLD's, then 150 of NEW's (not OLD 200, NEW 70).
+    expect([await remainingOf(sql, "cs_test_OLD"), await remainingOf(sql, "cs_test_NEW")]).toEqual([0, 270]);
+    expect(await coinSplit(sql, ann.id)).toEqual({ coins: 270, bought: 270, earned: 0 });
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
+
+  it("a spend drawing on PAYMENTS.maxDraws purchases binds at most D1's 100 values in any statement (review n3)", () => {
+    const draws = Array.from({ length: PAYMENTS.maxDraws }, (_, i) => ({ ref: `r${i}`, take: 1, was: 1 }));
+    const plan: SpendPlan = { price: draws.length, coins: draws.length, earned: 0, fromEarned: 0, draws };
+    const spend = { when: spendGuard("ann", plan), legs: spendLegs("ann", plan) };
+    // (The coin shop's op, as buyItem builds it.)
+    const op = {
+      id: "shop:L:item",
+      reason: "shop",
+      now: T0,
+      when: cond(`NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?) AND (${spend.when.sql})`, "ann", STORM, ...spend.when.params),
+      legs: [leg.shopItem("ann", STORM, T0), ...spend.legs],
+    };
+    expect(Math.max(...opStatements({ user: "ann", account: "L" }, op, "n").map((st) => st.params.length))).toBeLessThanOrEqual(100);
+  });
+
   it("the purchase's own CHECK holds below the guard: a write that would take a purchase below zero is refused by the database", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
@@ -389,6 +494,7 @@ describe("deleting the account, and Download my data", () => {
       T0 + 3,
     );
     const acct = (await ledgerAccount(sql, ann.id))!.account;
+    const refA = await refOf(sql, "cs_test_A");
 
     const data = await accountDownload(sql, ann, T0 + 4);
     const iso = (t: number) => new Date(t).toISOString();
@@ -396,6 +502,7 @@ describe("deleting the account, and Download my data", () => {
       purchases: [
         {
           session_id: "cs_test_A",
+          ref: refA,
           pack: "coins-520",
           coins: 520,
           remaining: 270,
@@ -416,25 +523,97 @@ describe("deleting the account, and Download my data", () => {
     expect(JSON.stringify(data)).not.toContain("cs_test_bo");
 
     await deleteAccount(sql, ann, T0 + 5);
-    expect(await sql.all("SELECT session_id, user_id, coins, remaining, cents, tax_cents, payment_intent, status FROM purchases ORDER BY session_id")).toEqual([
-      { session_id: "cs_test_A", user_id: "deleted", coins: 520, remaining: 0, cents: 499, tax_cents: 12, payment_intent: "pi_cs_test_A", status: "paid" },
-      { session_id: "cs_test_B", user_id: "deleted", coins: 200, remaining: 0, cents: 199, tax_cents: 0, payment_intent: null, status: "pending" },
-      { session_id: "cs_test_bo", user_id: bo.id, coins: 200, remaining: 200, cents: 199, tax_cents: 12, payment_intent: "pi_cs_test_bo", status: "paid" },
+    // (Kept without their ledger reference: review M1.)
+    expect(await sql.all("SELECT session_id, ref IS NULL AS no_ref, user_id, coins, remaining, cents, tax_cents, payment_intent, status FROM purchases ORDER BY session_id")).toEqual([
+      { session_id: "cs_test_A", no_ref: 1, user_id: "deleted", coins: 520, remaining: 0, cents: 499, tax_cents: 12, payment_intent: "pi_cs_test_A", status: "paid" },
+      { session_id: "cs_test_B", no_ref: 1, user_id: "deleted", coins: 200, remaining: 0, cents: 199, tax_cents: 0, payment_intent: null, status: "pending" },
+      { session_id: "cs_test_bo", no_ref: 0, user_id: bo.id, coins: 200, remaining: 200, cents: 199, tax_cents: 12, payment_intent: "pi_cs_test_bo", status: "paid" },
     ]);
-    expect(await sql.all("SELECT op_id, user_id, comment, stripe_ref FROM refunds")).toEqual([{ op_id: "refund:x", user_id: "deleted", comment: null, stripe_ref: "re_1" }]);
+    expect(await sql.all("SELECT op_id, user_id, comment, stripe_ref FROM refunds")).toEqual([{ op_id: expect.stringMatching(/^deleted:[0-9a-f]{24}$/), user_id: "deleted", comment: null, stripe_ref: "re_1" }]);
     // The unspent coins closed in the ledger with the rest: every balance of that ledger id sums to 0, and nothing names Ann.
     expect(await sql.all("SELECT asset_kind, asset_id, delta FROM ledger WHERE account = ? AND reason = 'erase' ORDER BY asset_kind", acct)).toEqual([
       { asset_kind: "coins", asset_id: "", delta: -270 },
-      { asset_kind: "purchase", asset_id: "cs_test_A", delta: -270 },
+      { asset_kind: "purchase", asset_id: refA, delta: -270 },
       { asset_kind: "shop", asset_id: STORM, delta: -1 },
     ]);
     expect(await sql.all("SELECT asset_kind, asset_id, SUM(delta) AS n FROM ledger WHERE account = ? GROUP BY asset_kind, asset_id HAVING n <> 0", acct)).toEqual([]);
     expect(JSON.stringify(db.prepare("SELECT * FROM ledger").all())).not.toContain(ann.id);
     expect(JSON.stringify(db.prepare("SELECT * FROM purchases").all())).not.toContain(ann.id);
     expect(await ledgerCheck(sql, 10)).toEqual([]);
-    // A webhook after it (Stripe's for the pending checkout) credits nothing: the account is gone.
-    expect(await creditPurchase(sql, { ...(await paid(sql, bo, "cs_test_B")), account: acct }, T0 + 6)).toEqual({ ok: false, why: "gone" });
+    // A webhook after it (Stripe's for the pending checkout) credits nothing: the account is gone. The payment is kept, unclaimed (m1).
+    expect(await creditPurchase(sql, await paid(sql, "cs_test_B"), T0 + 6)).toEqual({ ok: false, why: "gone" });
     expect(await sql.first("SELECT COUNT(*) AS n FROM wallets WHERE user_id = 'deleted'")).toEqual({ n: 0 });
+    expect(await rowOf(sql, "cs_test_B")).toMatchObject({ user_id: "deleted", ref: null, remaining: 0, status: "unclaimed", paid_at: T0 + 6 });
+    // (Stripe's again for the one credited before: nothing, and the row still says paid.)
+    expect(await creditPurchase(sql, await paid(sql, "cs_test_A"), T0 + 7)).toEqual({ ok: false, why: "gone" });
+    expect(await rowOf(sql, "cs_test_A")).toMatchObject({ status: "paid", paid_at: T0 });
+  });
+
+  it("a deleted buyer's kept purchase and refund rows lead to no ledger row, so not to the account's history (review M1)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await earn(sql, ann.id, 50);
+    await buy(sql, ann, 520, "cs_test_A", T0);
+    await buyItem(sql, ann.id, STORM, T0 + 1);
+    // A refund of some unspent coins as PR 9 will make it (here by hand): its op takes them back; its row is keyed by the op.
+    const me = (await ledgerAccount(sql, ann.id))!;
+    const refA = await refOf(sql, "cs_test_A");
+    const refundOp = `refund:${refA}:1`;
+    await applyOp(sql, me, { id: refundOp, reason: "refund", now: T0 + 2, legs: spendLegs(ann.id, { price: 100, draws: [{ ref: refA, take: 100, was: 270 }] }) });
+    await sql.run(
+      "INSERT INTO refunds (op_id, session_id, user_id, kind, cents, coins, stripe_ref, status, comment, created_at) VALUES (?, 'cs_test_A', ?, 'coins', 96, 100, 're_A1', 'done', 'Too many.', ?)",
+      refundOp,
+      ann.id,
+      T0 + 2,
+    );
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+    // The review's join, from Stripe's payment id to every ledger row of the account (by the session id, as before, or by the ref).
+    const history = (user: string) =>
+      sql.all(
+        `SELECT DISTINCT l2.reason, l2.asset_kind FROM purchases p
+         JOIN ledger l ON l.asset_kind = 'purchase' AND (l.asset_id = p.session_id OR l.asset_id = p.ref)
+         JOIN ledger l2 ON l2.account = l.account
+         WHERE p.user_id = ? AND p.payment_intent = 'pi_cs_test_A' ORDER BY 1, 2`,
+        user,
+      );
+    expect((await history(ann.id)).length).toBeGreaterThan(3);
+
+    await deleteAccount(sql, ann, T0 + 3);
+    expect(await history("deleted")).toEqual([]);
+    // Nor by any id the kept rows hold: none is in any ledger row's op, asset or source.
+    const kept = [
+      ...(await sql.all<Record<string, unknown>>("SELECT session_id, ref, payment_intent FROM purchases WHERE user_id = 'deleted'")),
+      ...(await sql.all<Record<string, unknown>>("SELECT op_id, session_id, stripe_ref FROM refunds WHERE user_id = 'deleted'")),
+    ];
+    const ids = kept.flatMap((r) => Object.values(r)).filter((v): v is string => typeof v === "string");
+    expect(ids).toEqual(["cs_test_A", "pi_cs_test_A", expect.stringMatching(/^deleted:/), "cs_test_A", "re_A1"]);
+    expect(
+      await sql.all(
+        "SELECT op_id FROM ledger l WHERE EXISTS (SELECT 1 FROM json_each(?) j WHERE instr(l.op_id, j.value) OR instr(l.asset_id, j.value) OR instr(COALESCE(l.source_id, ''), j.value))",
+        JSON.stringify(ids),
+      ),
+    ).toEqual([]);
+    // (And the ledger's side still holds the ref, the refund's op and the ledger id, none of which a kept row has.)
+    expect(await sql.first("SELECT COUNT(*) AS n FROM ledger WHERE asset_id = ? OR op_id = ?", refA, refundOp)).not.toEqual({ n: 0 });
+    for (const id of [refA, refundOp, me.account]) expect(JSON.stringify(kept)).not.toContain(id);
+  });
+
+  it("paid after the account was deleted: no coins, and the payment kept on the sales record as unclaimed, once (review m1)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await recordCheckout(sql, ann, "coins-520", "cs_test_P", T0);
+    await deleteAccount(sql, ann, T0 + 1);
+    expect(await rowOf(sql, "cs_test_P")).toMatchObject({ user_id: "deleted", ref: null, status: "pending", payment_intent: null, paid_at: null });
+    // Then paid on Stripe's page (open up to 30 minutes).
+    const s = await paid(sql, "cs_test_P");
+    expect(await creditPurchase(sql, s, T0 + 2)).toEqual({ ok: false, why: "gone" });
+    const kept = { user_id: "deleted", ref: null, remaining: 0, status: "unclaimed", paid_at: T0 + 2, tax_cents: 12, payment_intent: "pi_cs_test_P", card_country: "US" };
+    expect(await rowOf(sql, "cs_test_P")).toEqual(kept);
+    // Again (Stripe retries a webhook): nothing changes. PR 8 finds it by its payment intent, to refund it.
+    expect(await creditPurchase(sql, { ...s, taxCents: 99 }, T0 + 3)).toEqual({ ok: false, why: "gone" });
+    expect(await rowOf(sql, "cs_test_P")).toEqual(kept);
+    expect(await sql.all("SELECT session_id FROM purchases WHERE payment_intent = 'pi_cs_test_P'")).toEqual([{ session_id: "cs_test_P" }]);
+    expect(await sql.first("SELECT (SELECT COUNT(*) FROM ledger) AS legs, (SELECT COUNT(*) FROM wallets) AS wallets")).toEqual({ legs: 0, wallets: 0 });
   });
 });
 
@@ -445,9 +624,9 @@ describe("a guest's merge, and the reconciliation", () => {
     await buy(sql, bo, 200, "cs_test_bo");
     const { user: gus } = await createGuest(sql, T0, "Gus");
     // (Made by hand, past the guards: a pending row, then its coins in through the ledger as a credit would.)
-    await sql.run("INSERT INTO purchases (session_id, user_id, pack, coins, cents, created_at) VALUES ('cs_test_gus', ?, 'coins-520', 520, 499, ?)", gus.id, T0);
+    await sql.run("INSERT INTO purchases (session_id, ref, user_id, pack, coins, cents, created_at) VALUES ('cs_test_gus', 'r-gus', ?, 'coins-520', 520, 499, ?)", gus.id, T0);
     const g = (await ledgerAccount(sql, gus.id))!;
-    await applyOp(sql, g, { id: "test:gus", reason: "test", now: T0, legs: [leg.coins(gus.id, 520), leg.purchase(gus.id, "cs_test_gus", 520)] });
+    await applyOp(sql, g, { id: "test:gus", reason: "test", now: T0, legs: [leg.coins(gus.id, 520), leg.purchase(gus.id, "r-gus", 520)] });
     await sql.run("UPDATE purchases SET status = 'paid', paid_at = ? WHERE session_id = 'cs_test_gus'", T0);
     await sql.run("INSERT INTO refunds (op_id, session_id, user_id, kind, status, created_at) VALUES ('refund:gus', 'cs_test_gus', ?, 'coins', 'done', ?)", gus.id, T0);
     expect(await ledgerMismatches(sql, gus.id)).toEqual([]);
@@ -468,10 +647,9 @@ describe("a guest's merge, and the reconciliation", () => {
     await buy(sql, ann, 520, "cs_test_A");
     expect(await ledgerCheck(sql, 10)).toEqual([]);
     await sql.run("UPDATE purchases SET remaining = remaining - 20 WHERE session_id = 'cs_test_A'");
-    expect(await ledgerMismatches(sql, ann.id)).toEqual([{ kind: "purchase", asset: "cs_test_A", diff: -20 }]);
-    expect(await ledgerCheck(sql, 10)).toEqual([
-      { user: ann.id, account: (await ledgerAccount(sql, ann.id))!.account, mismatches: [{ kind: "purchase", asset: "cs_test_A", diff: -20 }] },
-    ]);
+    const ref = await refOf(sql, "cs_test_A");
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([{ kind: "purchase", asset: ref, diff: -20 }]);
+    expect(await ledgerCheck(sql, 10)).toEqual([{ user: ann.id, account: (await ledgerAccount(sql, ann.id))!.account, mismatches: [{ kind: "purchase", asset: ref, diff: -20 }] }]);
     expect(await backfillLedger(sql, T0 + 1)).toBe(1);
     expect(await ledgerCheck(sql, 10)).toEqual([]);
   });

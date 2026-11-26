@@ -615,8 +615,9 @@ const WRITE = new RegExp(`\\b(?:INSERT(?:\\s+OR\\s+\\w+)?\\s+INTO|UPDATE|DELETE\
 /** Writes to them elsewhere, each with why: none is a balance. (Part II moved the last paths, grantReward and openCrate.) */
 const NOT_YET: Record<string, Record<string, { n: number; why: string }>> = {
   "welcome.ts": { welcome_crates: { n: 1, why: "not a balance: the notice closed (seen_at)" } },
-  // (Nov 26: a purchase's balance is its `remaining`, which only ledger.ts moves: leg.purchase, the merge, the erase.)
-  "purchases.ts": { purchases: { n: 2, why: "not a balance: the checkout's pending row (remaining 0), and its status and payment details at the credit" } },
+  // (Nov 26: a purchase's balance is its `remaining`, which by rule only ledger.ts moves: leg.purchase, the merge, the erase. This counts
+  // purchases.ts's writes to the table; it can't see which columns they set: review n5.)
+  "purchases.ts": { purchases: { n: 2, why: "not a balance: the checkout's pending row (remaining 0), and the payment and its status (paid, in the credit's op; or unclaimed)" } },
 };
 /** Files that once wrote balances themselves, and what they write through now. The guard fails if one does again. */
 const MOVED: Record<string, string> = {

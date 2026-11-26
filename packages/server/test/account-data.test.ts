@@ -156,7 +156,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   meta: "key value",
   ops_errors: "fingerprint hour source kind message version count first_seen last_seen sample",
   ops_reports: "id at kind account version note diag",
-  purchases: "session_id user_id pack coins remaining cents tax_cents payment_intent card_country status refunded_cents created_at paid_at",
+  purchases: "session_id ref user_id pack coins remaining cents tax_cents payment_intent card_country status refunded_cents created_at paid_at",
   quest_days: "user_id day week reroll_day nonce",
   quest_games: "user_id game attempt at",
   quest_progress: "quest_id user_id game at",

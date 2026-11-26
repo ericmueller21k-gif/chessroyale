@@ -16,7 +16,8 @@ import type { Sql, Stmt } from "./accounts.ts";
  * file's schema while it loads.)
  *
  * Bought coins (Nov 26, payments PR 5; purchases.ts, docs/areas/payments.md): each purchase's coins still unspent (`purchases.remaining`)
- * are a balance too (asset kind `purchase`, by its Checkout Session's id), beside the wallet's coins: a purchase credits both, and a
+ * are a balance too (asset kind `purchase`, by the purchase's own random ledger reference `purchases.ref`, never its Checkout Session's
+ * id: deleting the account drops the ref, so the kept sales record can't lead back here), beside the wallet's coins: a purchase credits both, and a
  * spend takes the wallet's coins and, for what earned coins don't pay, each purchase's share (spendLegs). Coins are never spent with
  * leg.coins: every spend goes through spendLegs, so none can skip earned-first.
  */
@@ -28,7 +29,7 @@ export const LEDGER_SCHEMA = [
   )`,
   // One row per leg: `asset_kind` coins | crates | keys | xp | token | shop | item | boss_crate | welcome | series_crate | boss_pick |
   // purchase, `asset_id` which one (a boss, a shop item, an item's id, a boss crate's kind, a Welcome Crate's milestone, a series crate's
-  // id ("winter-1"), a purchase's Checkout Session id; '' for coins, crates, keys, XP and boss picks), `source_id` where it
+  // id ("winter-1"), a purchase's ledger reference (purchases.ref); '' for coins, crates, keys, XP and boss picks), `source_id` where it
   // came from (a game, a battle, a crate). Never updated or deleted (the triggers below).
   `CREATE TABLE IF NOT EXISTS ledger (
     op_id TEXT NOT NULL,
@@ -72,7 +73,8 @@ export interface Cond {
 }
 export const cond = (sql: string, ...params: unknown[]): Cond => ({ sql, params });
 const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
-const newId = (bytes = 12) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+/** A random id, in hex (`bytes` random bytes): a ledger id, an attempt's nonce, a purchase's ledger reference (purchases.ts). */
+export const newId = (bytes = 12) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const COLS = "op_id, leg, account, asset_kind, asset_id, delta, reason, source_id, created_at, nonce";
 
 /** An account and its ledger id. */
@@ -233,16 +235,16 @@ export const leg = {
     ],
   }),
   /**
-   * A purchase's coins still unspent (Nov 26, payments PR 5; purchases.ts): its row's `remaining`, by its Checkout Session's id. Paid in
-   * by creditPurchase with the wallet's coins, taken down by a spend (spendLegs) and, later, a refund. Its row is already there (made at
-   * checkout): the op's guard checks it is, and is the account's.
+   * A purchase's coins still unspent (Nov 26, payments PR 5; purchases.ts): its row's `remaining`, by its ledger reference (`ref`, made
+   * at checkout; never the Checkout Session's id). Paid in by creditPurchase with the wallet's coins, taken down by a spend (spendLegs)
+   * and, later, a refund. Its row is already there (made at checkout): the op's guard checks it is, and is the account's.
    */
-  purchase: (user: string, session: string, delta: number, source: string | null = null): Leg => ({
+  purchase: (user: string, ref: string, delta: number, source: string | null = null): Leg => ({
     kind: "purchase",
-    asset: session,
+    asset: ref,
     delta,
     source,
-    writes: (o) => [stmt(`UPDATE purchases SET remaining = remaining + ? WHERE session_id = ? AND user_id = ? AND ${o.sql}`, delta, session, user, ...o.params)],
+    writes: (o) => [stmt(`UPDATE purchases SET remaining = remaining + ? WHERE ref = ? AND user_id = ? AND ${o.sql}`, delta, ref, user, ...o.params)],
   }),
   welcomeOut: (user: string, milestone: number, item: { id: string; def: string }, now: number): Leg => ({
     kind: "welcome",
@@ -269,7 +271,7 @@ export const leg = {
  */
 export function spendLegs(user: string, plan: Pick<SpendPlan, "price" | "draws">, source: string | null = null): Leg[] {
   if (!plan.price) return [];
-  return [walletLeg("coins", user, -plan.price, source), ...plan.draws.map((d) => leg.purchase(user, d.session, -d.take, source))];
+  return [walletLeg("coins", user, -plan.price, source), ...plan.draws.map((d) => leg.purchase(user, d.ref, -d.take, source))];
 }
 
 /**
@@ -412,8 +414,9 @@ const HOLDINGS: readonly { kind: AssetKind; rows: string }[] = [
   { kind: "welcome", rows: "SELECT user_id, CAST(milestone AS TEXT) AS asset, 1 AS n FROM welcome_crates WHERE opened_at IS NULL" },
   { kind: "series_crate", rows: "SELECT user_id, crate AS asset, n FROM series_crates" },
   { kind: "boss_pick", rows: "SELECT user_id, '' AS asset, boss_picks AS n FROM wallets" },
-  // (Each purchase's coins still unspent, Nov 26: a row for every purchase made, 0 until it's paid.)
-  { kind: "purchase", rows: "SELECT user_id, session_id AS asset, remaining AS n FROM purchases" },
+  // (Each purchase's coins still unspent, Nov 26: a row for every purchase made, 0 until it's paid, by its ledger reference. A kept
+  // sales record of a deleted account has none: it's no balance of anyone's.)
+  { kind: "purchase", rows: "SELECT user_id, ref AS asset, remaining AS n FROM purchases WHERE ref IS NOT NULL" },
 ];
 /** One account's balances (`?1`, its id), as rows (kind, asset, n), a table at a time. */
 const BALANCES = HOLDINGS.map((h) => `SELECT '${h.kind}' AS kind, asset, n FROM (${h.rows}) WHERE user_id = ?1`);
@@ -494,7 +497,9 @@ export function mergeMoves(from: string, to: string, now: number): Stmt[] {
 /**
  * Deleting an account (account-data.ts, its one batch): every balance it holds is closed in the ledger (op `erase:<ledger id>:<asset>`)
  * and its rows go; then its ledger id goes, so its ledger rows stay naming nobody. Its purchases stay (Nov 26: sales records, kept for
- * tax): their unspent coins closed with the rest, each row kept as `keptAs`'s (accounts.ts DELETED_ID, the shared "deleted" account).
+ * tax): their unspent coins closed with the rest, each row kept as `keptAs`'s (accounts.ts DELETED_ID, the shared "deleted" account),
+ * its ledger reference dropped after the erase's legs (review M1): the row keeps Stripe's ids, which name the buyer, so nothing on it
+ * may lead to the ledger rows, and from them to the rest of the account's history.
  */
 export function eraseMoves(userId: string, now: number, keptAs: string): Stmt[] {
   const nonce = newId(9);
@@ -510,7 +515,7 @@ export function eraseMoves(userId: string, now: number, keptAs: string): Stmt[] 
         nonce,
       ),
     ),
-    stmt("UPDATE purchases SET remaining = 0, user_id = ? WHERE user_id = ?", keptAs, userId),
+    stmt("UPDATE purchases SET remaining = 0, ref = NULL, user_id = ? WHERE user_id = ?", keptAs, userId),
     ...["wallets", "inventory", "items", "boss_tokens", "boss_crates", "series_crates", "welcome_crates", "ledger_accounts"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId)),
   ];
 }
