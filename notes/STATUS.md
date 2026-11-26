@@ -2197,3 +2197,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - 05:42 #967 review done (review/pay-who-buys): M1 birth month (safe -1), M2 refund tax clamp, m1-m4, n1-n7. Calls: M1 safe, m3 now, m4 no device flag (Eric "not fight"). Fixes: session_01JuCWRsyqWvJWB84aF1RmQ3 (xhigh), brief notes/briefs/payments-pr6-fixes.md, waiter on .done. Then delta review.
 - 06:05 #967 fixes landed (head 479ca281 after prep-pr; body $S/body-claude-pay-who-buys.md, update PR body at merge time). Delta review session_01JuCWRrMF5QgsMFRp3iFf4M -> review/pay-who-buys-delta, waiter bzgq9snnx; CI waiter b5ehoreoa.
 - #968 green (af27188d, no flakes); held only for Eric's Chandy (a)/(b).
+- 06:25 #967 delta review: no blocker/major/minor; 4 nits fixed by me (d710aa9c). PR body updated. CI waiter bdvrkwou9 (full suite). Merge on green + no flakes.
