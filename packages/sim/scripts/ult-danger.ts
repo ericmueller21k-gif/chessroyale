@@ -28,8 +28,8 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const NODES = 120_000;
 const MAX_MOVES = 60;
-/** The boss's Elo (bossFixedElo: a player rated just under the usual tier). */
-const BOSS_ELO = 1600;
+/** The boss's Elo (bossFixedElo: a player rated just under the usual tier; BOSS_ELO for another, a weaker boss the crowd gets ahead of). */
+const BOSS_ELO = Number(process.env.BOSS_ELO ?? 1600);
 /**
  * The even crowd: a strong player's skill (boss-sim's expert crowd spans 1 to 4) and a rare random move: against the boss's powers
  * that keeps most battles level for a long time (a club crowd, 8, was crushed within a few moves).

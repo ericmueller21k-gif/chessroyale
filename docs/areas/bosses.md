@@ -301,7 +301,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   [decision](../decisions/2026-11-26-ult-danger.md)): a crowd move the judge puts at `dangerAt` (0.70) or more for the crowd (its
   `judged`, the number "your chances" shows) fills the meter as the next crowd turn begins, whatever it held (`dangerCharge`, in
   `prepareTurn`, and Folio's `creaseDue` that predicts it), while one can come (none under way, one left: `ultCapped`,
-  `ultimateMax`, `noUlt`); his ultimate's own conditions still apply (Sawyer's half, Smudgy's pair, Don Dough's gild pick, the
+  `ultimateMax`, `noUlt`), once a danger (`unleashed` marks `dangerSpent` when one comes with the crowd at the line; a crowd move
+  below it clears it: filled again at once after each, the shortest ultimates came every other turn); his ultimate's own conditions still apply (Sawyer's half, Smudgy's pair, Don Dough's gild pick, the
   hoops' fit, Folio's guard). Birdie's Fall and Chandy's Dodge read the same line in their own rules; Wrangler's Showdown and the
   Hidden Boss's bullet clock don't (their rows). Full: a "RAGE!" warning, then the
   ultimate as the next crowd turn begins. Hollow's Lights out, Big Boy's Big Bounce and Alfil's Mammoth Slam come at the

@@ -1463,7 +1463,10 @@ export const BOSS_POWERS = {
    * the next crowd turn begins (its usual warning, then the ultimate) and Chandy's Dodge is warned as his rifle's meter would;
    * Birdie's Fall, with no warning, comes at the start of his turn once two such moves come in a row (birdie.fallDangerMoves)
    * (docs/decisions/2026-11-26-ult-danger.md). The ultimate comes within two of his turns, whatever his meter held, as soon as its
-   * own rules allow it. Below it, every meter fills as it always has.
+   * own rules allow it. One a danger: once an ultimate has come with the crowd at the line (`dangerSpent`), the meter fills at its
+   * usual pace (the ahead gain at its fullest) until a crowd move below the line ends the danger (filled again at once after each,
+   * the audit's shortest ultimates came every other turn: Big Boy's Bounce 32 times in a battle). Below it, every meter fills as it
+   * always has.
    */
   dangerAt: 0.7,
   /**
