@@ -1274,6 +1274,11 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   `boss-kit-lib.ts`; `KIT_SEEDS=<n>` for more seeds by hand), `packages/server/test/boss-kit-parity.test.ts` (solo and
   online agree), `e2e/boss-smoke.spec.ts` (every playable boss on a phone, the first on a computer). What each checks:
   "Adding a boss" above.
+- Unit, the danger line (`dangerAt`, Nov 26): `packages/chess/test/ult-danger.test.ts` (every boss but Wrangler and the Hidden Boss in a
+  battle the judge says he has lost: his meter full by his next turn, his ultimate within two of his turns or once its own condition
+  allows; one a danger, Big Boy's and Hollow's short ultimates never chained; a level battle the same with the rule off), Birdie's two
+  in a row (`birdie.test.ts`), Chandy's before his rifle is whole (`chandy.test.ts`). The audit with real engines:
+  `packages/sim/scripts/ult-danger.ts` (`reports/ult-danger.md`).
 - Unit, the brain: `packages/chess/test/boss-brain.test.ts` (the rule, the bridge, the guards, the fallbacks),
   `maia-bosses.test.ts` (every boss's Maia path: its powers' limits kept, its special moves untouched),
   `boss-power-legal.test.ts` (Eric's Oct 17 position; every power that stops the boss × every brain path; the last

@@ -603,10 +603,11 @@ describe("Sawyer's board saw", () => {
     expect(sawn.powers!.boardSaw).toEqual({ at: 11, until: 15 });
     expect(sawn.powers!.events).toContainEqual({ kind: "boardsaw", turn: 11 });
     expect(rageOf({ ...sawn, crowdMoves: 11 })).toBe(0);
-    // Through turn 15, then gone; the meter held empty all the while (nothing gathers), filling again from turn 16.
+    // Through turn 15, then gone; the meter held empty all the while (nothing gathers), filling again from turn 16. (The crowd ahead,
+    // just under the danger line: at it, the meter would be full as the saw ends, the danger's ultimate: ult-danger.test.ts.)
     let s = sawn;
     for (let t = 12; t <= 17; t++) {
-      s = prepareTurn({ ...s, crowdMoves: t - 1, powers: { ...s.powers!, judged: 0.9 } }, even);
+      s = prepareTurn({ ...s, crowdMoves: t - 1, powers: { ...s.powers!, judged: BOSS_POWERS.dangerAt - 0.01 } }, even);
       expect(!!s.powers!.boardSaw).toBe(t <= 15);
       expect(powerTurn(s)).toBe(t <= 15);
       expect(s.powers!.ultAt === undefined).toBe(t >= 16);
