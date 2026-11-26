@@ -879,6 +879,8 @@ export interface BirdieState {
   warn: { turn: number; line: string; squares: string[]; square: string; piece: string } | null;
   ride?: { at: number; line: string; squares: string[]; square: string; piece: string; spared?: true; king?: true; missed?: true } | null;
   fell?: { at: number } | null;
+  /** The crowd's moves in a row the judge put at the danger line (BOSS_POWERS.dangerAt), its last included: his Fall at birdie.fallDangerMoves. */
+  danger?: number;
 }
 
 export interface MooState {

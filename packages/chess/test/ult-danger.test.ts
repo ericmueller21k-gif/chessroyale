@@ -7,9 +7,11 @@ import { KIT_OPENING, fakeScore, hash, kitBosses, runBattle } from "./boss-kit-l
  * A boss's ultimate comes when he's losing (Eric, Nov 26: "It should have detected like he was basically in danger, or like it was
  * already heavily in my favor, and it should start triggering very quickly thereafter, like a turn or two at most";
  * docs/decisions/2026-11-26-ult-danger.md). Every boss in the roster but the Hidden Boss (his fight's design is Eric's: his bullet
- * clock comes on its own turn), each in a battle the judge says he has lost from the crowd's `LOST_FROM`th move: from the first
- * crowd move at or above BOSS_POWERS.dangerAt with none of his under way and one still to come, his ultimate comes within two of his
- * turns (in his very next turn, or the one after: a warning first).
+ * clock comes on its own turn) and Wrangler (NOT_HERE), each in a battle the judge says he has lost from one of the crowd's moves
+ * (LOST_FROM): from each crowd move at or above BOSS_POWERS.dangerAt (two in a row for Birdie's Fall: fallDangerMoves) with none of his
+ * under way and one still to come, his meter is full by his next turn (or his ultimate warned) and his ultimate comes within two of
+ * his turns (in his very next turn, or the one after: a warning first), or, for an ultimate that needs more of the board
+ * (CONDITIONS), once the board allows it.
  */
 
 /**
@@ -59,6 +61,12 @@ function lostEngine(crowd: "w" | "b", lost: () => boolean): EngineLike {
   };
 }
 
+/**
+ * The crowd's moves in a row at the danger line his ultimate's rule asks for: Birdie's Fall, with no warning before it, two
+ * (birdie.fallDangerMoves); every other boss one (his warning, or his meter full, as the next turn begins).
+ */
+const dangerMoves = (id: string): number => (id === "birdie" ? BOSS_POWERS.birdie.fallDangerMoves : 1);
+
 /** How many ultimates a battle allows him (once a battle, ultimateMax, maxUltimates), Infinity: no cap. */
 function capOf(id: string): number {
   const rules = bossRules({ id });
@@ -96,10 +104,12 @@ async function lostBattle(id: string, from: number): Promise<{ windows: Look[]; 
     if (who === "boss" && look) look.judged = p.judged;
   };
   const run = await runBattle({ boss: id, seed: 1 + Math.floor(hash(id) * 1000), side, test: "", triggerFrom: 999, strikes: [], maxMoves: 30, opening: KIT_OPENING, engine: () => lostEngine(side, () => lost) }, null, watch);
-  // (A danger window: a move of the crowd's at the danger line, none of his under way or warned as its turn began, one still to come;
-  // and a turn of his after it at least, to judge it.)
+  // (A danger window: a move of the crowd's at the danger line (and the moves after it, for a boss whose rule asks for several in a
+  // row: dangerMoves), none of his under way or warned as its turn began, one still to come; and a turn of his after it at least.)
   const last = looks.at(-1)?.turn ?? 0;
-  return { windows: looks.filter((l) => inDanger(l.judged) && !l.busy && l.ults < capOf(id) && last - l.turn >= 1), looks, came, failures: run.failures };
+  const n = dangerMoves(id);
+  const held = (l: Look) => looks.filter((x) => x.turn >= l.turn && x.turn < l.turn + n).every((x) => inDanger(x.judged));
+  return { windows: looks.filter((l) => inDanger(l.judged) && held(l) && !l.busy && l.ults < capOf(id) && last - l.turn >= n), looks, came, failures: run.failures };
 }
 
 describe("a boss in danger: his ultimate within two of his turns (Eric, Nov 26)", () => {
@@ -117,9 +127,10 @@ describe("a boss in danger: his ultimate within two of his turns (Eric, Nov 26)"
       for (const w of battle!.windows) {
         const next = battle!.came.find((j) => j >= w.turn);
         const where = `${def.id}, lost from the crowd's move ${from}: in danger after its move ${w.turn} (judged ${w.judged?.toFixed(2)}), ultimates in his turns ${battle!.came.join(", ") || "none"}`;
-        // (By his next turn's end, as the crowd's next turn begins: his meter full, or his ultimate warned, under way or come.)
+        // (One move at the line: by his next turn's end, as the crowd's next turn begins, his meter full, or his ultimate warned, under
+        // way or come.)
         const after = battle!.looks.find((l) => l.turn === w.turn + 1);
-        expect(!!after && (after.busy || (after.meter ?? 0) >= 1 || after.ults > w.ults), `${where}: his meter as the next turn began, ${after?.meter}`).toBe(true);
+        if (dangerMoves(def.id) === 1) expect(!!after && (after.busy || (after.meter ?? 0) >= 1 || after.ults > w.ults), `${where}: his meter as the next turn began, ${after?.meter}`).toBe(true);
         expect(next, where).toBeDefined();
         if (!CONDITIONS[def.id]) expect(next! - w.turn + 1, where).toBeLessThanOrEqual(2);
       }

@@ -1460,9 +1460,10 @@ export const BOSS_POWERS = {
    * should have detected like he was basically in danger, or like it was already heavily in my favor, and it should start
    * triggering very quickly thereafter, like a turn or two at most"): the crowd's expected score after its move, as the judge has
    * it (the boss's `judged`, the number "your chances" shows), at or above dangerAt. From one such move: the rage meter is full as
-   * the next crowd turn begins (its usual warning, then the ultimate), Birdie's Fall comes at the start of that very turn of his,
-   * and Chandy's Dodge is warned as his rifle's meter would (docs/decisions/2026-11-26-ult-danger.md). The ultimate comes within
-   * two of his turns, whatever his meter held. Below it, every meter fills as it always has.
+   * the next crowd turn begins (its usual warning, then the ultimate) and Chandy's Dodge is warned as his rifle's meter would;
+   * Birdie's Fall, with no warning, comes at the start of his turn once two such moves come in a row (birdie.fallDangerMoves)
+   * (docs/decisions/2026-11-26-ult-danger.md). The ultimate comes within two of his turns, whatever his meter held, as soon as its
+   * own rules allow it. Below it, every meter fills as it always has.
    */
   dangerAt: 0.7,
   /**
@@ -2334,7 +2335,8 @@ export const BOSS_POWERS = {
    *   (the fire's way, firePawnLogit), your king as the battle lost.
    * - The Fall, once a battle: at the start of his turn once he has lost `fallLost` points of material since the battle began
    *   (P1 N3 B3 R5 Q9: the most he has been down), or once he's in danger (Eric, Nov 26: the crowd's expected score after its move,
-   *   the judge's, at BOSS_POWERS.dangerAt or more; he can be lost on the board with far less than fallLost down), his fall and its cutscene (BIRDIE_CINEMATIC), then Armored Birdie for the rest of
+   *   the judge's, at BOSS_POWERS.dangerAt or more, for `fallDangerMoves` of its moves in a row; he can be lost on the board with far
+   *   less than fallLost down), his fall and its cutscene (BIRDIE_CINEMATIC), then Armored Birdie for the rest of
    *   the battle.
    * - Armored Birdie (Eric, Nov 23: "He still uses his same normal move after. He just does it every 3 to 4 turns ... we turn up the
    *   Maya to a much stronger level"): the train goes on, `armoredTrainEvery` crowd turns from one warning to the next; and his brain
@@ -2349,6 +2351,10 @@ export const BOSS_POWERS = {
     trainEvery: 5,
     trainPawnLogit: 1,
     fallLost: 9,
+    // (Two in a row, not one (Nov 26, docs/decisions/2026-11-26-ult-danger.md): in the audit's battles about half the crowd's moves
+    // that reached the line fell back below it the next move, his powers hitting back, and his Fall is once a battle and armors him for
+    // the rest of it. With no warning before it, the second move still brings it within two of his turns, as a warned ultimate's.)
+    fallDangerMoves: 2,
     armoredTrainEvery: 3,
     armoredMaiaBoost: 400,
     armoredStockfishAbove: 100,

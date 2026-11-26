@@ -354,7 +354,7 @@ describe("the Fall", () => {
     expect(warned.length, "the train warns again after his fall").toBeGreaterThan(0);
   });
 
-  it("comes at the start of his turn once he's in danger (Eric, Nov 26): the crowd's move judged at dangerAt or more, little material lost", async () => {
+  it("comes at the start of his turn once he's in danger (Eric, Nov 26): fallDangerMoves of the crowd's moves in a row judged at dangerAt or more, little material lost", async () => {
     // (The judge's number for every crowd move: `crowdScore`, him to move the other way round; set by the test as the battle goes.)
     let crowdScore = 0.5;
     const flat = (fen: string, move: string) => ({ move, expected: fen.split(" ")[1] === "w" ? crowdScore : 1 - crowdScore });
@@ -370,23 +370,40 @@ describe("the Fall", () => {
       const w = birdieOf(r)?.warn;
       return (w && allowed.filter((m) => m.startsWith(w.square)).sort()[0]) || [...allowed].sort()[0]!;
     };
+    const fell = () => r.boss!.powers!.events.some((e) => e.kind === "birdieFall");
+    const s = BOSS_POWERS.birdie;
     await untilTurn(r, 4, save);
-    // Just under the line: no fall.
+    // Just under the line, move after move: no fall.
+    crowdScore = BOSS_POWERS.dangerAt - 0.01;
+    for (let k = 0; k < s.fallDangerMoves + 1; k++) {
+      await crowdMove(r, save);
+      expect(fell(), "under the line").toBe(false);
+      await r.playBoss();
+    }
+    // At the line, then back under it: the count starts again (a lead his powers take back is no danger yet).
+    for (let k = 0; k < s.fallDangerMoves - 1; k++) {
+      crowdScore = BOSS_POWERS.dangerAt;
+      await crowdMove(r, save);
+      expect(fell(), "at the line, too few in a row").toBe(false);
+      await r.playBoss();
+    }
     crowdScore = BOSS_POWERS.dangerAt - 0.01;
     await crowdMove(r, save);
-    expect(birdieOf(r)!.fell, "under the line").toBeFalsy();
+    expect(birdieOf(r)!.danger).toBe(0);
     await r.playBoss();
-    // At the line: he falls as the crowd's move lands, at the start of his turn.
+    // fallDangerMoves in a row at the line: he falls as the last lands, at the start of his turn.
     crowdScore = BOSS_POWERS.dangerAt;
-    await crowdMove(r, save);
-    const p = r.boss!.powers!;
-    expect(p.lost, "he has lost less than fallLost").toBeLessThan(BOSS_POWERS.birdie.fallLost);
-    expect(p.events.some((e) => e.kind === "birdieFall")).toBe(true);
+    for (let k = 0; k < s.fallDangerMoves; k++) {
+      await crowdMove(r, save);
+      expect(fell(), `at the line ${k + 1} in a row`).toBe(k === s.fallDangerMoves - 1);
+      if (!fell()) await r.playBoss();
+    }
+    expect(r.boss!.powers!.lost, "he has lost less than fallLost").toBeLessThan(s.fallLost);
     expect(birdieOf(r)!.fell?.at).toBe(r.boss!.crowdMoves);
     // Once a battle: the danger after it brings nothing more.
     await r.playBoss();
     await crowdMove(r, save);
-    expect(r.boss!.powers!.events.some((e) => e.kind === "birdieFall")).toBe(false);
+    expect(fell()).toBe(false);
     expect(r.boss!.powers!.ults).toBe(1);
   });
 
