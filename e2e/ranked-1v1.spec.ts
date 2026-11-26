@@ -178,19 +178,32 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
   await expect.poll(() => inZone(b, ".vote-me", 0), { message: "Bo's pawn stands in the zone he tapped" }).toBe(true);
   // Ann sees Bo's pawn in Bullet (the zone on her left).
   await expect.poll(() => inZone(a, ".dv-pawn:not(.vote-me)", 0)).toBe(true);
+  // (Timed on Ann's page, from her pawn's release to the "Timer" line: the line shows for RANKED_1V1.overlayMs, 1.5 s, and a test
+  // process stalled that long on a busy runner once missed it while it waited for it (Nov 26).
+  // docs/decisions/2026-11-26-ranked-1v1-timer-line-flake.md.)
+  await a.evaluate(() => {
+    const w = window as unknown as { __closeAt?: { up?: number; timer?: number } };
+    const t = (w.__closeAt = {} as { up?: number; timer?: number });
+    window.addEventListener("pointerup", () => (t.up ??= Date.now()), { capture: true });
+    const check = () => {
+      if (t.timer === undefined && document.querySelector(".dv-overlay")?.textContent === "Timer: Blitz 3+2") t.timer = Date.now();
+    };
+    new MutationObserver(check).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
   const zone = (await a.locator(".vote-zone").nth(2).boundingBox())!;
   const mine = (await a.locator(".vote-me").boundingBox())!;
   await a.mouse.move(mine.x + mine.width / 2, mine.y + mine.height / 2);
   await a.mouse.down();
   await a.mouse.move(zone.x + zone.width / 2, zone.y + zone.height * 0.7, { steps: 8 });
   await a.mouse.up();
-  const both = Date.now();
-  await expect(a.locator(".dv-overlay")).toHaveText("Timer: Blitz 3+2", { timeout: 8_000 });
-  expect(Date.now() - both, "the vote closed a beat after both picks, well before its 10 s").toBeLessThan(RANKED_1V1.voteBothPickedMs + 4_000);
 
   // Rapid and Bullet meet on Blitz: "Timer: Blitz 3+2" over the board, then the game on the same board.
   await waitForPlay(a, b);
   expect((await overlay.seen()).timer).toBe(true);
+  const closed = await a.evaluate(() => (window as unknown as { __closeAt: { up?: number; timer?: number } }).__closeAt);
+  expect(closed.up, "Ann's release reached her page").toBeDefined();
+  expect(closed.timer, "\"Timer: Blitz 3+2\" showed over Ann's board").toBeDefined();
+  expect(closed.timer! - closed.up!, "the vote closed a beat after both picks, well before its 10 s").toBeLessThan(RANKED_1V1.voteBothPickedMs + 4_000);
   await expect(a.locator(".dv-control")).toHaveText("Blitz 3+2");
   await expect(a.locator(".dv-clock").first()).toHaveText("3:00");
   // The board never moved from the vote to the game.
