@@ -938,7 +938,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           ults.push({ kind: "dodge", turn: runner.boss!.crowdMoves });
           while (runner.dodgeDue()) runner.finishDodgeRound({});
           const d = runner.boss!.powers!.chandy!.dodge!;
-          // (`last`: the last chance, the crowd's mate in one, warned and come on one turn.)
+          // (`last`: warned and come on one turn: the last chance until Nov 26, none now. A Dodge from the crowd's mate comes after its move.)
           const hits = d.results.filter((r) => r.hit).length;
           chandy.dodges.push({ at: d0.at, rounds: d.results.length, hit: hits > 0, hits, won: hits >= BOSS_POWERS.chandy.dodgeHits, random: d.results.filter((r) => r.random).length, last: p0.warnAt === p0.ultAt, upgrades: p0.chandy!.upgrades });
           continue;

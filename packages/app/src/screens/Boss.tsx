@@ -467,7 +467,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // them stepping aside), your king off its square once his train has hit it; the board doesn't animate those.
   const birdie = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised || timber || zebra || swapped ? null : birdieFen(own("birdie"), moments, now, fenShown);
   // (Dash's Scramble Rush: his sweep, your placements, then the position as it was: the game's never changed.)
-  const boardFen = dodge ? dodgeFen(boss, fenShown) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? swapped?.fen ?? birdie?.fen ?? fenShown);
+  const boardFen = dodge ? dodgeFen(boss, fenShown, dodge, now) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? swapped?.fen ?? birdie?.fen ?? fenShown);
   const rushLines = rush ? rushDock(boss, rush, now) : dodge ? dodgeDock(boss, dodge, now) : null;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (own("bigboy").powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? swapped?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);

@@ -17,6 +17,10 @@
  * - `result`: "DODGED n/3", or the first hit: "HIT! KING CRACKED" (his crack stays for the rest of Dodge: `cracked`).
  * - `kill` (the hit that loses): the beams keep hitting your king; the cracks spread, he flickers and dissipates in particles, then
  *   shatters into shards (chandyDodgeKing); "HIT! YOU LOSE".
+ * - From your mate (Eric, Nov 26; its beats: dodgeTimeline's `opening` and `win`): `mate`, before the scope-in, the board as it is
+ *   under it, by `step`: `pause` and `jump` show nothing here (his figure: Chandy.tsx); `reach`, the crosshair locks onto your king;
+ *   `zap`, rapid fire's hit on him; `line`, nothing (his speech box). `win`, after a survived Dodge: nothing over the board (your mate
+ *   back on it), the hero banner "CHECKMATE!" (Chandy.tsx).
  *
  * The clones are drawn on one canvas of their own (90 px a square: half a CSS pixel an art pixel on a phone's 45 px square, crisp at
  * any size), one shared frame loop; the lines, beams and hits on the board's effects canvas, under your king (he stands in the beams;
@@ -28,12 +32,15 @@ import { CHANDY_CLONE, CHANDY_FOOT, cloneMuzzle } from "../characters/chandy.ts"
 import { shatterAnim } from "../characters/effects/chandy.ts";
 import { spriteCanvas } from "../characters/sprite-kit.ts";
 import { BoardEffects, onEachFrame, spriteFrameAt, type BoardItem } from "./BossEffect.tsx";
+import type { MateStep } from "@chessroyale/chess";
 
-export type DodgePhase = "scope" | "slide" | "volley" | "open" | "vote" | "locked" | "blast" | "result" | "kill";
+export type DodgePhase = "mate" | "scope" | "slide" | "volley" | "open" | "vote" | "locked" | "blast" | "result" | "kill" | "win";
 /** A clone's line, on the screen: a rank's clone on its `left` or `right` edge square, a file's on the top edge (his side). */
 export type DodgeLine = { rank: number; side: "left" | "right"; since?: number } | { file: string; since?: number };
 export interface DodgeView {
   phase: DodgePhase;
+  /** A mate's opening (phase `mate`): its step now (dodgeTimeline's `opening`). */
+  step?: MateStep;
   /** When the phase began, in this device's time (online: `local(serverTime)`, as every moment), never a raw server time. */
   since: number;
   /** The crowd's side: its king's color, and the board's way up. */
@@ -157,7 +164,23 @@ function useTenths(on: boolean) {
   }, [on]);
 }
 
+/** A mate's opening and the win beat over the board (the board as it is under them): only the crosshair and the zap on your king. */
+function MateOver({ view: v }: { view: DodgeView }) {
+  const items: BoardItem[] = [];
+  if (v.step === "reach") items.push({ square: v.king, name: "chandyCrosshair", anim: "lock", then: "held3", since: v.since });
+  if (v.step === "zap") items.push({ square: v.king, name: "chandyDizzy", anim: "hit", since: v.since });
+  return (
+    <div class={`cd-root cd-p-${v.phase}${v.step ? ` cd-s-${v.step}` : ""}`}>
+      <BoardEffects items={items} orientation={v.side} class="cd-lines" />
+    </div>
+  );
+}
+
 export function ChandyDodge({ view }: { view: DodgeView }) {
+  return view.phase === "mate" || view.phase === "win" ? <MateOver view={view} /> : <DodgeRun view={view} />;
+}
+
+function DodgeRun({ view }: { view: DodgeView }) {
   const v = view;
   useTenths(v.phase === "vote" && !!v.endsAt);
   const now = Date.now();

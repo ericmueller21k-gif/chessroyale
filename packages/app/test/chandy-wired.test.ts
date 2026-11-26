@@ -1,14 +1,15 @@
 // Chandy wired (his rules, Nov 16; docs/decisions/2026-11-16-chandy-rules.md): his moments' lengths against his art, his board layer
 // (the crosshairs and their pips, the beam's cover, the Lock-on Shot's line), the Dodge view through its timeline (the scope, the vote
-// with its teleports, the result), his kit at each rifle stage, the dock's words for a move his powers refuse, and the warning's
-// words when the last chance brings Dodge at once.
+// with its teleports, the result; a Dodge from your mate: its opening, step by step, and the win beat), his kit at each rifle stage,
+// the dock's words for a move his powers refuse, and the warning's words.
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { CHANDY_FIRE_AT, CHANDY_FX, dodgeRounds, dodgeTimeline, safeSquares, linesAfter } from "@chessroyale/chess";
 import { BOSS_KITS, stagedKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength } from "../src/characters/power-art.ts";
 import { CHANDY } from "../src/characters/chandy.ts";
-import { CHANDY_MOVE_NAMES, CHANDY_WORDS, chandyFen, chandyItems, dodgeFen, dodgeView, shotHitAt } from "../src/components/Chandy.tsx";
+import { CHANDY_MOVE_NAMES, CHANDY_WORDS, chandyFen, chandyItems, dodgeDock, dodgeFen, dodgeView, shotHitAt } from "../src/components/Chandy.tsx";
+import { CHANDY_MATE_LINES } from "../src/characters/chandy-lines.ts";
 import { POWER_WORDS } from "../src/power-words.ts";
 import { KING_LINES } from "../src/godKing.ts";
 import { WARN } from "../src/components/BossPowers.tsx";
@@ -163,6 +164,44 @@ describe("Dodge on screen", () => {
     // (The view's clones are the rules' lines after the teleports seen.)
     expect(linesAfter(d.rounds[2]!, 3).length).toBe(4);
   });
+
+  it("from your mate (Eric, Nov 26): his opening before the Dodge's start, step by step, the board as it is (your king on it); the Dodge as ever; survived, the win beat, your mate back", () => {
+    const fen = "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4";
+    const mate = { ...d, king: "e1", mate: true as const };
+    const boss = bossWith({ ...EMPTY, dodge: mate }, [], fen);
+    const at = (b: BossView, ms: number) => dodgeView(b, run, run.at + ms)!;
+    const steps: string[] = [];
+    for (let ms = -tl.openingMs; ms < 0; ms += 100) {
+      const v = at(boss, ms);
+      expect(v.phase).toBe("mate");
+      if (steps.at(-1) !== v.step) steps.push(v.step!);
+      expect(v.since).toBe(run.at + tl.opening[v.step!].at);
+      expect(dodgeFen(boss, fen, run, run.at + ms)).toBe(fen);
+    }
+    expect(steps).toEqual(["pause", "jump", "reach", "zap", "line"]);
+    expect(dodgeDock(boss, run, run.at - 10).line).toBe("Checkmate?");
+    // (Then the Dodge as ever: the scope-in, your king off the board under it.)
+    expect(at(boss, 10).phase).toBe("scope");
+    expect(dodgeFen(boss, fen, run, run.at + 10)).not.toBe(fen);
+    // (Survived: from its last round's end, the win beat, the board your mate's; lost, the kill as ever.)
+    const ok = (k: number) => ({ placed: mate.rounds[k]!.safe, hit: false, votes: {} });
+    const won = bossWith({ ...EMPTY, dodge: { ...mate, results: [ok(0), ok(1), ok(2)] } }, [], fen);
+    expect(at(won, tl.win.at - 10).phase).toBe("result");
+    expect(at(won, tl.win.at + 10)).toMatchObject({ phase: "win", since: run.at + tl.win.at });
+    expect(dodgeFen(won, fen, run, run.at + tl.win.at + 10)).toBe(fen);
+    expect(dodgeDock(won, run, run.at + tl.win.at + 10)).toEqual({ line: "Checkmate!", sub: "You beat Chandy." });
+    const hit = (k: number) => ({ placed: "a1", hit: true, votes: {} });
+    const lost = bossWith({ ...EMPTY, dodge: { ...mate, results: [hit(0), ok(1), hit(2)] } }, [], fen);
+    expect(at(lost, tl.win.at + 10).phase).toBe("kill");
+    // (A Dodge from his meter: no opening, no win beat.)
+    expect(at(bossWith({ ...EMPTY, dodge: d }), -10).phase).toBe("scope");
+    // (His line: not Eric's example, three to pick from, short enough for his box.)
+    expect(CHANDY_MATE_LINES).toHaveLength(3);
+    for (const l of CHANDY_MATE_LINES) {
+      expect(l).not.toMatch(/trick up my sleeve/i);
+      expect(l.length).toBeLessThanOrEqual(60);
+    }
+  });
 });
 
 describe("his kit and his words", () => {
@@ -187,7 +226,7 @@ describe("his kit and his words", () => {
 });
 
 describe("Dodge's warning", () => {
-  it("says when it comes: next turn as usual; now when it comes this very turn (the last chance, Eric, Nov 16)", () => {
+  it("says when it comes: next turn as usual; now when it comes this very turn (the words every boss's warning has)", () => {
     const said: string[] = [];
     const warn = (ultAt: number | null) => {
       const boss = { ...bossWith(EMPTY), powers: { turn: 5, events: [], ultAt, chandy: EMPTY } } as unknown as BossView;

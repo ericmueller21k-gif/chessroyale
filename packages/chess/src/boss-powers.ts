@@ -151,7 +151,7 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
 }
 
 /**
- * Several bosses: this boss's ultimate can't wait for his own turn change (BossRules.ultimateNow: Chandy's last chance), asked as the
+ * Several bosses: this boss's ultimate can't wait for his own turn change (BossRules.ultimateNow: no boss since Chandy's last chance went, Nov 26), asked as the
  * crowd's turn in `fen` is set up, before any boss's step (his powers as his last turn left them), with the side's allowed moves.
  * Never while an ultimate of his is under way.
  */

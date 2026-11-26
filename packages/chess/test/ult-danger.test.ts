@@ -23,9 +23,10 @@ const LOST_FROM = [12, 9, 15, 6];
 /**
  * Not here, each with why: the Hidden Boss (the brief: report only; his bullet clock is his fight's own design, Eric's); Wrangler (his
  * meter is full from his fifth move whatever the board says, and his showdown waits for a line-up the rules let him fire, which a lost
- * battle may never give: docs/decisions/2026-11-26-ult-danger.md, for the director and Eric).
+ * battle may never give: docs/decisions/2026-11-26-ult-danger.md, for the director and Eric); Chandy (Eric, Nov 26: his Dodge comes from
+ * his meter or your mate only, the danger line gone for him: docs/decisions/2026-11-26-chandy-mate-dodge.md; chandy.test.ts).
  */
-const NOT_HERE: Readonly<Record<string, string>> = { recluse: "report only", pig: "his showdown waits on a qualifying line-up" };
+const NOT_HERE: Readonly<Record<string, string>> = { recluse: "report only", pig: "his showdown waits on a qualifying line-up", chandy: "his meter or your mate only" };
 /**
  * Bosses whose ultimate needs something of the board besides a full meter (its own rule, kept): the meter is full in danger as for
  * every boss, and the ultimate comes once the board allows it, which can be a turn or more later. Each with its condition.

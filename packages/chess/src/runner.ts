@@ -2645,7 +2645,7 @@ export class MatchRunner {
    * the one after his own move for an ultimate his move prepares (`triggerAtHisTurn`: Wrangler's line-up, Folio's crease), the
    * one before it for every other (in focus); and one ultimate a turn change, that first one first (its line-up is ready), the
    * other waiting, its warning kept. The move just played is passed only to the boss who played it. An ultimate that can't wait
-   * (BossRules.ultimateNow: Chandy's last chance, asked with the side's allowed moves) runs its step first at any turn change, the
+   * (BossRules.ultimateNow, asked with the side's allowed moves; Chandy's last chance until Nov 26, no boss now) runs its step first at any turn change, the
    * others' waiting but a prepared one (its line-up is already on the board), and its boss holds the crowd's turn (focusNow).
    */
   private prepareSide() {
@@ -2668,7 +2668,7 @@ export class MatchRunner {
     const mine = (i: number) => (afterHis(i) ? i === moved : i === nextUp);
     const order = [moved, ...Array.from({ length: n }, (_, k) => (f + k) % n).filter((i) => i !== moved)];
     // (The crowd's allowed moves this turn on the side, as every boss's steps leave them, a can't-wait ultimate's own held: worked
-    // out on a copy, once, and only when asked (Chandy's last chance asks them when you have a mate in one).)
+    // out on a copy, once, and only when asked: by an ultimate that can't wait.)
     const start = this.state;
     let limits: readonly string[] | null = null;
     const crowdMoves = () => (limits ??= this.sideLimits(start, () => this.sideSteps(board, s, order, (i, came) => cantWait(i) || !mine(i) || came, undefined, false)));

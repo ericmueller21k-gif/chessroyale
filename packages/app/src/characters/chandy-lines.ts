@@ -26,3 +26,10 @@ export const CHANDY_LINES: Partial<Record<Beat, readonly string[]>> = {
   victory: ["Never miss. Never.", "Target eliminated."],
   defeat: ["You moved too fast…", "Out of ammo."],
 };
+
+/**
+ * His line as your mate is held for his Dodge (Eric, Nov 26: "he's says something like, I'm not I've got one last trick up my sleeve,
+ * but something that's not that line"), in his speech box at his opening's `line` step (components/Chandy.tsx). The first is said;
+ * the other two are Eric's to pick from (a placeholder, as his lines are).
+ */
+export const CHANDY_MATE_LINES = ["Mate? Negative. One shot left in the chamber.", "Pinned isn't finished. Final protocol: engage.", "Down, not out. A sniper always saves one round."] as const;
