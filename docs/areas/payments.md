@@ -35,14 +35,17 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
   6. under 16: "Buying coins is for players 16 and older.";
   7. 16-17, per pack: "Monthly limit for players under 18: $N left." on each pack whose price is more than what's left ($50, $45.01).
 - **The age band** (`users.buy_band`: `under-16`, `16-17`, `18+`; `buy_band_at`): the device asks a birth month and year at the first
-  Buy and posts only the band (core's `buyBandOf`, whole months as the age gate counts) to **`POST /api/buy/band`** {band} (this site's
-  page, JSON; answers the new BuyStatus, or 409 with why). Taken only when due (`askBand`): the first as given; asked again (under 18,
+  Buy and posts only the band (core's `buyBandOf`: the birth month counts as not yet complete, so 16 starts on the 1st of the month
+  after the 16th-birthday month, 18 likewise, and a truthful answer never lets a 15-year-old buy; the review's M1) to
+  **`POST /api/buy/band`** {band} (this site's page, JSON; answers the new BuyStatus, or 409 with why). Taken only when due (`askBand`): the first as given; asked again (under 18,
   6 calendar months on) at most one band up, a lower answer as given (`bandAfter`); each answer restarts the 6 months. Not asked of
   an account that couldn't buy anyway (a guest, closed, held, abroad). Two answers at once store one. Never a birth date.
-- **The buying month** (core's `buyMonthStart`): the 1st at `XP.dayStartUtcHour` UTC (08:00: midnight Pacific), turning with the XP day;
-  never the device's clock, and no time zone is stored. **What counts:** each checkout made in the month (by when it was made), at its
-  price before tax, paid or pending (one paid but not yet credited counts) less `refunded_cents`; never `expired`, `unclaimed`, or the
-  checkout still open (a new Buy replaces it).
+- **The buying month** (core's `buyMonthStart`): the 1st at `XP.dayStartUtcHour` UTC (08:00: midnight Pacific standard time; 1 am in
+  summer, 10 pm the evening before in Hawaii), turning with the XP day; never the device's clock, and no time zone is stored. **What
+  counts:** each checkout made in the month (by when it was made), at its price before tax, paid or pending (one paid but not yet
+  credited counts) less `refunded_cents` (before tax too: what refunds returned of the price), each checkout never below 0 (so no slip
+  in that convention frees more than a price; the review's M2); never `expired`, `unclaimed`, or the checkout still open (a new Buy
+  replaces it).
 - **One open checkout at a time** (every account): open = pending and made less than `checkoutMinutes` (30) ago. A new Buy replaces
   it: PR 8 expires each open one at Stripe (`openCheckouts`), then here (`expireCheckout`: pending → `expired`), then makes the new
   one. Two Buys at once: the second is refused ("Another checkout is open. Finish it, or try again in a moment.").
@@ -117,13 +120,14 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
 ## Tests
 
 - `packages/core/test/payments.test.ts`: the packs, earned first then the oldest (ties by id, earned below 0), the draws' cap, the
-  refundable window and cap; who may buy: the band's edges in whole months (15 years 11 months, 16, 17 years 11 months, 18, the year's
-  turn), asked again only under 18 after 6 months, up one band at most, the month's turn (08:00 UTC, the year's too), every line the
+  refundable window and cap; who may buy: the band's edges, the birth month not yet complete (15 years 11 months, 16 by month still
+  under 16, 16 years 1 month, 17 years 11 months, 18 by month still 16-17, 18 years 1 month, the year's turn), asked again only under 18 after 6 months, up one band at most, the month's turn (08:00 UTC, the year's too), every line the
   design's, the refusals' order (no band asked when something else refuses), the hold's end, the $50 cap to the cent per pack.
 - `packages/server/test/who-buys.test.ts`: the band asked once, stored, guarded (two at once), never asked of a guest, held, closed or
   abroad account; under 16 and the country (no checkout, nothing written); the $50 month's edge (exactly $50, a cent over, a refund
   freeing what it returned), the statement's own cap (a paid checkout landing between the read and the write), the month's turn, what
-  counts (pending, paid, refunded, part refunded, disputed; not expired, unclaimed, last month's or the one still open); the quiet
+  counts (pending, paid, refunded, part refunded, disputed, at the price before tax; a refund recorded with its tax frees no more
+  than its price; not expired, unclaimed, last month's or the one still open); the quiet
   flag's count (the 3rd starts 90 days, each after restarts, never shortened, three at once count three), held until its end, a hold
   landing between the read and the write; held taps (once a minute, never unheld); closed (no checkout; a payment begun before kept
   unclaimed, its op refusing too); one open checkout (30 minutes, expired, paid, two at once); the API (guest, no country, the band
@@ -168,7 +172,9 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
   row is `expired` gets no coins (`not-pending`): refund it.
 - **For PR 9:** the sign-in refusal for a closed account (a TODO in `api.ts`, where a ban refuses sign-in; `BUY_LINES.closed`); call
   `holdCount` in every refund's batch and a chargeback's (chargebacks + 1 beside it; the 2nd closes the account). Closing an account or
-  starting a hold should expire its open checkout (as deleting does, PR 8).
+  starting a hold should expire its open checkout (as deleting does, PR 8). **Record `refunded_cents` before tax** (as `cents`; the
+  review's M2): Stripe's `amount_refunded` and a Dashboard refund's amount include tax, so store their pre-tax part (the tax refunded
+  in proportion stays out). The 16-17 month's count clamps each row at 0 all the same.
 - **For PR 8 (Stripe):** refund an `unclaimed` purchase at once (found by its row's status, never by the credit's answer alone).
   Deleting an account expires its open Checkout Sessions (each is open up to 30 minutes). Send no `client_reference_id`: the credit
   matches on our row (session → account). If Stripe must carry something, the director's call is the purchase's `ref`; weigh first

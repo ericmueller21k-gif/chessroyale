@@ -93,9 +93,14 @@ export const BUY_BANDS = ["under-16", "16-17", "18+"] as const;
 export type BuyBand = (typeof BUY_BANDS)[number];
 export const isBuyBand = (v: unknown): v is BuyBand => (BUY_BANDS as readonly unknown[]).includes(v);
 
-/** The band of a birth month (1-12) and year on `today`, counted in whole months as the age gate counts (the device works it out). */
+/**
+ * The band of a birth month (1-12) and year on `today` (the device works it out). Only the month and year are asked, so the birth
+ * month itself counts as not yet complete (the review's M1): 16 starts on the 1st of the month after the 16th-birthday month, 18
+ * likewise. A truthful answer then never lets a 15-year-old buy (nor a 17-year-old skip the cap); someone born on the 1st waits one
+ * month more. (The age gate rounds the other way for 13, a few weeks early at most: core's ageInMonths, as it counts.)
+ */
 export function buyBandOf(month: number, year: number, today: Date): BuyBand {
-  const months = ageInMonths(month, year, today);
+  const months = ageInMonths(month, year, today) - 1;
   return months < PAYMENTS.buyers.minAge * 12 ? "under-16" : months < PAYMENTS.buyers.adultAge * 12 ? "16-17" : "18+";
 }
 
@@ -126,8 +131,9 @@ export function bandAfter(stored: BuyBand | null, answer: BuyBand): BuyBand {
 
 /**
  * The start of the buying month holding `t` (the 16-17 cap's month): the 1st at XP.dayStartUtcHour UTC, when the XP day turns too
- * (midnight Pacific, 3 am Eastern: overnight where packs are sold). UTC, never the device's clock: it can't be moved by changing the
- * phone's time zone, and nothing about where the player lives is stored.
+ * (midnight Pacific standard time, 3 am Eastern; in summer 1 am Pacific and 4 am Eastern, and in Hawaii 10 pm the evening before all
+ * year: any one turn is off for some zone). UTC, never the device's clock: it can't be moved by changing the phone's time zone, and
+ * nothing about where the player lives is stored.
  */
 export function buyMonthStart(t: number): number {
   const shift = XP.dayStartUtcHour * 3_600_000;
@@ -172,8 +178,8 @@ export interface BuyFacts {
   band: BuyBand | null;
   bandAt: number | null;
   /**
-   * This buying month's checkouts, in cents before tax: pending ones too, paid ones less what refunds returned; never expired or
-   * unclaimed ones, nor the one still open (a new Buy replaces it: PR 8 expires it first).
+   * This buying month's checkouts, in cents before tax: pending ones too, paid ones less what refunds returned of the price (before tax
+   * too; a checkout never below 0); never expired or unclaimed ones, nor the one still open (a new Buy replaces it: PR 8 expires it first).
    */
   spentCents: number;
 }

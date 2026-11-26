@@ -3985,12 +3985,14 @@ export const PAYMENTS = {
   /**
    * Who may buy (Nov 26, payments PR 6; the design's section 9; core's buyAnswer, the server's buyStatus and recordCheckout): signed in,
    * 16 or older by the age band answered at the first Buy, 16-17 at most `minorCapCents` a month, in `countries`, not held, not closed.
-   *   - `minAge`: under it, never (FTC v. HoYoverse, Jan 2025). `adultAge`: under it, the monthly cap. Both whole years, counted in whole
-   *     months from the birth month and year the device asks (the age gate's rule; only the band is posted, never the date).
+   *   - `minAge`: under it, never (FTC v. HoYoverse, Jan 2025). `adultAge`: under it, the monthly cap. Both whole years, counted from
+   *     the birth month and year the device asks, the birth month itself not yet complete (core's buyBandOf: 16 from the 1st of the
+   *     month after the 16th-birthday month; only the band is posted, never the date).
    *   - `minorCapCents`: the most an account in the 16-17 band spends a calendar month, on the packs' prices before tax (what the
    *     packs show), counted from its checkouts that month (pending ones too but the one still open, which a new Buy replaces; less what
-   *     refunds returned). The month turns when the XP
-   *     day does (XP.dayStartUtcHour UTC on the 1st: midnight Pacific, so overnight in the US and Canada), never the device's clock.
+   *     refunds returned of the price, before tax too, never below 0 a checkout). The month turns when the XP day does
+   *     (XP.dayStartUtcHour UTC on the 1st: midnight Pacific standard time; 1 am in summer, 10 pm the evening before in Hawaii), never
+   *     the device's clock.
    *   - `askAgainMonths`: an under-18 band is asked again this long after it was answered, and may then go up one band at most.
    *   - `countries`: where packs are sold, by the request's country (`request.cf.country`); PR 8 checks the card's too.
    *   - `checkoutMinutes`: a checkout stays open this long (Stripe's least session expiry, PR 8 sets it). One open at a time per

@@ -11,20 +11,25 @@ checkout calls `recordCheckout`. Calls made in building it (for the director's r
    `line`, `askBand`, `held`, `leftCents`, and each pack with its own line. PR 7 renders it as it is.
 2. **The order of refusals:** a guest, closed, held, the country, then under 16, then the 16-17 cap per pack. The band is asked only
    when nothing before it refuses, so no age is taken from someone who couldn't buy anyway (a guest, held, closed, abroad).
-3. **The band** (`users.buy_band`: `under-16`, `16-17`, `18+`; `buy_band_at`): worked out on the device from a birth month and year in
-   whole months, as the age gate counts (core's `buyBandOf`); only the band is posted (`POST /api/buy/band`). Asked once: an answer when
+3. **The band** (`users.buy_band`: `under-16`, `16-17`, `18+`; `buy_band_at`): worked out on the device from a birth month and year,
+   the birth month itself counted as not yet complete (core's `buyBandOf`; the review's M1, the director's call): 16 starts on the
+   1st of the month after the 16th-birthday month, 18 likewise, so a truthful answer never lets a 15-year-old buy or a 17-year-old skip
+   the cap. Someone born on the 1st waits a month more, and an honest player who answers in their birthday month waits out the 6
+   months before it's asked again; no day is asked. Only the band is posted (`POST /api/buy/band`). Asked once: an answer when
    it isn't due changes nothing. An under-18 band is asked again 6 calendar months after its answer, and may then go **up one band at
    most** (under-16 reaches 18+ in two askings, a year apart at least); **a lower answer is kept as given** (the design is silent: the
    safer reading of a young player's own word). Each answer restarts the 6 months. Two answers at once store one (guarded on the band
    as read). A due 16-17 band is asked before its next checkout too (every pack tappable then: an 18+ answer would lift the cap).
-4. **The $50 month is counted in UTC, turning with the XP day** (the 1st at `XP.dayStartUtcHour`, 08:00 UTC: midnight Pacific, 3 am
-   Eastern), not in the account's time zone: no time zone is stored for an account (storing one would be new personal data for the
-   privacy page), and the device's zone is the player's to change, which would move the month. Turning with the XP day keeps it
-   overnight where packs are sold, and matches the game's other days.
+4. **The $50 month is counted in UTC, turning with the XP day** (the 1st at `XP.dayStartUtcHour`, 08:00 UTC: midnight Pacific
+   standard time, 3 am Eastern; 1 am Pacific in summer, and 10 pm the evening before in Hawaii all year), not in the account's time
+   zone: no time zone is stored for an account (storing one would be new personal data for the privacy page), and the device's zone is
+   the player's to change, which would move the month. Any one turn is off for some zone; this one matches the game's other days.
 5. **What counts toward the $50:** every checkout made in the month, by when it was made (so one made on the 30th and paid on the 1st
    is the 30th's month), on its price before tax (the packs show prices before tax; $49.99 fits), **pending ones too** (one paid but
    not yet credited counts; PR 8 marks the unpaid ones expired), less what refunds returned (`refunded_cents`: a refund frees its
-   money, user friendly; the hold's count still limits refund cycles). Never an `expired` checkout or an `unclaimed` payment (refunded
+   money, user friendly; the hold's count still limits refund cycles). `refunded_cents` is before tax, as the price is (PR 9 stores the
+   pre-tax part of Stripe's amount), and each checkout counts at least 0, so a refund recorded with its tax can't free more than the
+   price (the review's M2). Never an `expired` checkout or an `unclaimed` payment (refunded
    at once). A dispute's money counts (a chargeback isn't a refund). **Not the checkout still open**: a new Buy replaces it (call 6),
    so a player who backs out of Stripe's page doesn't find every pack greyed by it for 30 minutes; once it's past 30 minutes and
    still pending (paid, maybe, its event late) it counts again, until PR 8 marks it expired or credits it.

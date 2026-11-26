@@ -229,13 +229,14 @@ describe("16-17: $50 a buying month", () => {
   it("counts every checkout made this month, pending or paid, less refunds; never one expired, unclaimed or still open", async () => {
     const { sql } = await world();
     const teen = await buyer(sql, "teen@example.com", "16-17");
-    const row = (session: string, cents: number, status: string, refunded = 0, at = T0) =>
+    const row = (session: string, cents: number, status: string, refunded = 0, at = T0, tax = 0) =>
       sql.run(
-        "INSERT INTO purchases (session_id, ref, user_id, pack, coins, cents, status, refunded_cents, created_at) VALUES (?, ?, ?, 'coins-200', 200, ?, ?, ?, ?)",
+        "INSERT INTO purchases (session_id, ref, user_id, pack, coins, cents, tax_cents, status, refunded_cents, created_at) VALUES (?, ?, ?, 'coins-200', 200, ?, ?, ?, ?, ?)",
         session,
         `ref_${session}`,
         teen.id,
         cents,
+        tax,
         status,
         refunded,
         at,
@@ -250,8 +251,12 @@ describe("16-17: $50 a buying month", () => {
     await row("cs_test_last_month", 4999, "paid", 0, buyMonthStart(T0) - 1);
     // (Open: made a minute ago. A new Buy replaces it, so it doesn't count.)
     await row("cs_test_open", 4999, "pending", 0, T0 - MIN);
-    // 999 + 499 + 0 + 999 + 199 = 2696.
-    expect(await buyStatus(sql, teen.id, "US", T0)).toMatchObject({ leftCents: 5000 - 2696 });
+    // With tax (13% HST): its price counts, never its tax; and a refund recorded with its tax (5649 of a $49.99 + $6.50: refunded_cents
+    // is before tax, review M2) frees its own price at most, never more (the row counts 0, not −650).
+    await row("cs_test_taxed", 499, "paid", 0, T0, 65);
+    await row("cs_test_refunded_taxed", 4999, "refunded", 5649, T0, 650);
+    // 999 + 499 + 0 + 999 + 199 + 499 + 0 = 3195.
+    expect(await buyStatus(sql, teen.id, "US", T0)).toMatchObject({ leftCents: 5000 - 3195 });
   });
 });
 

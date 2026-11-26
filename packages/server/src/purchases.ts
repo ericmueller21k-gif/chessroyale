@@ -52,9 +52,11 @@ export const PURCHASES_SCHEMA = [
   // NULL, so the kept row can't be joined to its ledger rows. `remaining`: its coins still unspent, moved only through the ledger
   // (ledger.ts leg.purchase, kind `purchase`): 0 until it's paid, then the pack's coins, down as they're spent or refunded. `status`:
   // pending | paid | unclaimed (paid with no account to credit: deleted, or a guest's; PR 8 refunds it) | expired | refunded |
-  // part_refunded | disputed (text, so a later status needs no rebuild). Money in cents, USD (PAYMENTS.currency); `tax_cents` Stripe
-  // Tax's, `refunded_cents` what refunds have returned. `payment_intent` matches Stripe's later events (a refund made in its Dashboard,
-  // a dispute) to the row; `card_country` the card's country, as Stripe reports it. Never a card number or an email.
+  // part_refunded | disputed (text, so a later status needs no rebuild). Money in cents, USD (PAYMENTS.currency): `cents` the pack's
+  // price before tax, `tax_cents` Stripe Tax's, `refunded_cents` what refunds have returned of `cents`, **before tax** as `cents` is
+  // (PR 9 records the pre-tax part of Stripe's refunded amount, which includes tax; the tax refunded with it stays out: the review's
+  // M2, so the 16-17 month's SPENT never frees more than a price). `payment_intent` matches Stripe's later events (a refund made in its
+  // Dashboard, a dispute) to the row; `card_country` the card's country, as Stripe reports it. Never a card number or an email.
   `CREATE TABLE IF NOT EXISTS purchases (
     session_id TEXT PRIMARY KEY,
     ref TEXT,
@@ -128,12 +130,13 @@ const openSince = (now: number) => now - PAYMENTS.buyers.checkoutMinutes * 60_00
 
 /**
  * This buying month's spend of account ?1 in cents before tax (?2: the month's start, core's buyMonthStart), by checkout: every
- * checkout made since, pending ones too (so one paid but not yet credited counts), less what refunds returned; never one that ended
- * unpaid (`expired`), was paid with no account to credit (`unclaimed`: refunded at once), or is still open (made after ?3, openSince):
- * a new Buy replaces an open checkout (PR 8 expires it first), so it doesn't stand in that Buy's way, and the checkout's statement
- * refuses while one is open anyway.
+ * checkout made since, pending ones too (so one paid but not yet credited counts), less what refunds returned of its price (both
+ * before tax; each checkout never below 0, so no slip in that convention frees more than its own price: the review's M2); never one
+ * that ended unpaid (`expired`), was paid with no account to credit (`unclaimed`: refunded at once), or is still open (made after ?3,
+ * openSince): a new Buy replaces an open checkout (PR 8 expires it first), so it doesn't stand in that Buy's way, and the checkout's
+ * statement refuses while one is open anyway.
  */
-const SPENT = `COALESCE((SELECT SUM(cents - refunded_cents) FROM purchases WHERE user_id = ?1 AND created_at >= ?2 AND status NOT IN ('expired', 'unclaimed')
+const SPENT = `COALESCE((SELECT SUM(MAX(cents - refunded_cents, 0)) FROM purchases WHERE user_id = ?1 AND created_at >= ?2 AND status NOT IN ('expired', 'unclaimed')
   AND NOT (status = 'pending' AND created_at > ?3)), 0)`;
 
 /** The account's buying columns as stored, with this month's spend: one read. Null: no such account. */
