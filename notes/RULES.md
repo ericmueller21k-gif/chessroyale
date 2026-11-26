@@ -221,3 +221,4 @@ re-raises anything waiting more than a day. A line leaves only when the thing is
 Stopping a watcher on main's run because a newer run started hid a red main (95a6fcb4, the night town guard's first failure) for
 3 hours. Every main run's result is read before its watcher is dropped, even when a newer run supersedes it (a run in progress is
 waited out, or its result fetched later), and any red one is fixed forward before the next merge.
+- **Every helper brief names `notes/briefs/rules-common.md` as required reading** (Nov 26 bloat sweep: PR bodies median 34 lines, 34 of 88 over 40, because the director's create_session briefs skipped the file that sets the 40-line cap). Briefs also say "PR body at most 40 lines".
