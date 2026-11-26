@@ -13,3 +13,11 @@ the `bf-frame` class added (`mock/mock-boss.spec.ts`; `CSS=… TAG=mock`; withou
   bar's height), the board, the Moves panel down to over the God King's head. Gaps 28 / 28.
 - `before-boss-*.png`: main today, for comparison (the Moves panel stops halfway; 38 / 16 px either side of the board in Boss alone).
 - His words open over the panel's foot for their few seconds (they're on top; nothing under them needs a tap).
+
+## The build (root)
+`stills-boss.spec.ts` takes them: Boss alone and a bot raid (Puddles, your first move) at 1536 × 730 (125%), 1920 × 960 and 1858 × 1040,
+plus the phone at 390 × 844 (unchanged). In every computer still the left column (the boss's column; a raid's scoreboard table), the board
+and the column start on the board's top line and end on its foot, 28 / 28 px either side of the board. The Moves panel ends 12 px over the
+God King's frame (the room his tallest pose needs: the eric.md guard keeps every figure off the list's text), so it is taller than main's
+(Boss alone 228 → 300 px at 1536 × 730, 343 → 480 at 1920 × 960; a raid 228 → 390, 343 → 620) but not the board's whole height.
+Boards: 602, 832, and 912 / 912 at 1858 × 1040. The figures stand where they did against the board.
