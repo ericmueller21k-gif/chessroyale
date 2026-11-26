@@ -152,6 +152,10 @@ export interface QuestPaid {
   xp: number;
   crates: number;
   keys: number;
+  /** A daily's drop (Nov 26; coin-boost.ts questDrop): Coin Boost Crates it gave. Absent: none. */
+  boost?: number;
+  /** A daily's drop: the Crate Bonus's level-ups it added (LEVEL_CRATE_BONUS.levels). Absent: none. */
+  crateBonus?: number;
 }
 
 /** The XP box's part for a game's quests ("Quest +300", "Quests +600"). */

@@ -1,5 +1,6 @@
 import { PLAY_COINS } from "./settings.ts";
 import { isXpNone, type GameXp, type XpNone } from "./xp.ts";
+import type { BoostPaid } from "./coin-boost.ts";
 
 /**
  * Play coins (Eric, Nov 18; the payments design's section 6, docs/decisions/2026-11-17-payments-design.md; PLAY_COINS in
@@ -66,6 +67,11 @@ export interface PlayCoins {
   /** The XP day's totals after this game (for "Play today 186/300"). */
   today: CoinDay;
   none?: CoinNone;
+  /**
+   * The coin boost's part of this game (Nov 26; COIN_BOOST, coin-boost.ts): the extra coins paid beside `play` and `bonus` (which stay
+   * the base: the day's caps count them), the boost minutes it used and those left after it. Absent: not boosted.
+   */
+  boost?: BoostPaid;
 }
 
 /** The bonus paid for `earned` bonus coins in a day (cumulative), by the steps: continuous, never past the last step's total. */
@@ -190,5 +196,8 @@ export function readPlayCoins(x: unknown): PlayCoins | undefined {
     today: { play: whole(t.play), bonus: whole(t.bonus) },
   };
   if (isXpNone(o.none) || o.none === "held") out.none = o.none;
+  // (The boost's part, Nov 26: kept only when it paid.)
+  const b = (o.boost ?? null) as Record<string, unknown> | null;
+  if (b && typeof b === "object" && whole(b.coins) > 0) out.boost = { coins: whole(b.coins), minutes: whole(b.minutes), left: whole(b.left) };
   return out;
 }
