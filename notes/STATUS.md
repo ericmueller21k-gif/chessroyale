@@ -2153,3 +2153,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: #960 (vote fill) MERGED 92320601. Main run watched (covers #961 too).
 - Nov 26: ERIC: 'yes run two money jobs at once' (today). Briefs payments-pr5-storage.md + payments-pr4-boost.md (xhigh, full lane each, independent review + delta after). Start both when coin-strip + boss-frame finish (keeps the 2-Opus cap).
 - Nov 26: main 92320601 GREEN + LIVE (vote fill, payment drafts).
+- Nov 26 01:10 UTC: boss-frame r1 done but raid unfixed (message landed after) → helper on r2 now. pay-storage (PR 5, xhigh) STARTED session_01JuCWRt7vwPGEjwESVxP8JH (3 Opus briefly: my miscount). PR 4 starts when two of coin-strip/boss-frame finish.
