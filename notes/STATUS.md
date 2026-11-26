@@ -2180,3 +2180,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 03:55 UTC: PR 4 delta: no findings (2 nits, no code). Merge #966 on green CI (b5qsiyout on 70ee387d).
 - Nov 26 03:56 UTC: beta-bots DESIGN started session_01JuCWRt6Ek5AmkKw4AF1iUY (xhigh, doc + mock stills). Running: ult-danger, beta-bots design. Next: PR 6 (who may buy) after one finishes; merge #966 on green.
 - Nov 26 04:05 UTC: #966 (PR 4 coin boost) MERGED 270ea481. Main run watched. Payments done: 1,2,3,4,5,11(drafts). Next: PR 6 (who may buy, xhigh) when a slot frees.
+- Nov 26 04:20 UTC: beta-bots DESIGN done (claude/beta-bots-design; stills/beta-bots). Sent Eric 3 stills + 6 decisions (band words, ~$7/mo Maia server, landing band, no opt-out, post-season HunBots, fair-play skip). 6-PR plan in the doc §11. Design PR to open (docs only) once Eric OKs.
