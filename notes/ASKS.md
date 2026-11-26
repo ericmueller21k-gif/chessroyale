@@ -5,7 +5,8 @@
 - Nov 26 · Birdie room: longer crossing arms; ~50 birds at the bar · MERGED #974
 - Nov 26 · Chub & Chirp + Puddles: ult waits at most 3 times after its warning · MERGED #972
 - Nov 26 · Puddles: watering regrows the piece he'd lose by passing · LIVE (#983 0e3b5804, main green at 5134b2e7)
-- Nov 26 · Dash: Time Scramble 5 s x3 then 3 s x3; "Hang on" replaces his 2nd pop-off · MERGED #975 (deploying)
+- Nov 26 · Dash: Time Scramble 5 s x3 then 3 s x3; "Hang on" replaces his 2nd pop-off · LIVE #975; round 2 below
+- Nov 27 · Dash Hang on round 2: he visibly presses; cheetah speed the fastest ever, a few seconds; head up, leaning back, mouth to the sky; jumps to the board center; a few seconds longer · building (brief dash-hang-on-2)
 - Nov 26 · Audit: every ask of the last ~2 weeks checked against what's live · queued (next free slot)
 - Nov 26 · Beta bots (HunBot, waits 15/30 s, no online count, ⚠ popover) · design, 5 decisions waiting on Eric
 - Nov 26 · Payments PR 7 (coin screen), 8 (Stripe), 9 (refunds), 10 (admin) · queued
