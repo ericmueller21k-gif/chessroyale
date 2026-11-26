@@ -209,15 +209,23 @@ interface Battle {
 
 /**
  * One battle's danger windows: from each crowd move at or above `danger` with no ultimate under way (none warned, one still to come
- * by the meter), his turns until the next ultimate came (1: in his very next turn), or the turns he had left with none (`never`).
+ * by the meter) and none come yet in this danger (since the crowd's moves last went under the line: the rule brings one a danger),
+ * his turns until the next ultimate came (1: in his very next turn), or the turns he had left with none (`never`).
  */
 export function windows(b: Battle, danger: number): { first: number | "never" | null; worst: number | "never" | null; onset: number | null } {
   const at = (k: number) => b.came.filter((j) => j >= k);
   let first: number | "never" | null = null;
   let worst: number | "never" | null = null;
   let onset: number | null = null;
-  for (const row of b.rows) {
+  // (The crowd move where this danger began: the first of the run of moves at the line that ends at row `i`.)
+  const since = (i: number) => {
+    while (i > 0 && (b.rows[i - 1]!.judged ?? 0) >= danger) i--;
+    return b.rows[i]!.turn;
+  };
+  for (const [i, row] of b.rows.entries()) {
     if (row.judged === null || row.judged < danger || row.busy || row.ults >= capOf(b.boss)) continue;
+    // (One ultimate a danger (dangerSpent): a move after one came in this danger is no window.)
+    if (b.came.some((j) => j >= since(i) && j < row.turn)) continue;
     const k = row.turn;
     const next = at(k)[0];
     // (His turns left from k to the end of the battle: the last crowd move's turn, k counted.)

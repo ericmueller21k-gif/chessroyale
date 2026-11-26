@@ -132,10 +132,12 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   rules.wearOff?.(next, t);
   const before = next.ultAt;
   // The boss in danger (BOSS_POWERS.dangerAt; Eric, Nov 26: "it should start triggering very quickly thereafter, like a turn or two
-  // at most"): the rage meter full now, for this turn's step (its warning, or the ultimate), whatever it held. Only while one can
-  // come: none under way, one left this battle (ultMax, ultimateMax), not off (noUlt). A boss with a meter of his own (Birdie's,
-  // Chandy's, Wrangler's) reads the danger in his own rules.
-  if (before === undefined && !capped && !next.noUlt && !rules.meter && !(rules.ultimateMax !== undefined && (next.ults ?? 0) >= rules.ultimateMax) && inDanger(next.judged, s)) next.charge = dangerCharge(next, t.rageSpeed, s);
+  // at most"): the rage meter full now, for this turn's step (its warning, or the ultimate), whatever it held, once a danger (an
+  // ultimate come in it spends it, `dangerSpent`; a crowd move below the line ends it). Only while one can come: none under way, one
+  // left this battle (ultMax, ultimateMax), not off (noUlt). A boss with a meter of his own (Birdie's, Chandy's, Wrangler's) reads
+  // the danger in his own rules.
+  if (!inDanger(next.judged, s)) delete next.dangerSpent;
+  if (before === undefined && !capped && !next.noUlt && !rules.meter && !(rules.ultimateMax !== undefined && (next.ults ?? 0) >= rules.ultimateMax) && inDanger(next.judged, s) && !next.dangerSpent) next.charge = dangerCharge(next, t.rageSpeed, s);
   // (`hold`: several bosses on one side, and this turn change isn't his (sideTurn): his ultimate's step waits, its warning and
   // the test trigger kept.)
   // (No ultimate this battle, noUlt: a Battle Tower floor's Wrangler; or none left, ultMax: a floor of three's after his one. The step

@@ -491,7 +491,7 @@ export const folioBattle = {
     const charge = (p.charge ?? 0) + moved * rageTick(p.judged, s);
     const lost = Math.max(p.lost, p.material - materialOf(boardOf(b).fen, other(boss.crowdSide)));
     // (In danger, prepareTurn fills the meter for its step: dangerCharge.)
-    return rageNow({ charge: dangerCharge({ charge, lost, rageUsed: p.rageUsed, judged: p.judged }, rageSpeedOf(boss.id, s), s), lost, rageUsed: p.rageUsed }, rageSpeedOf(boss.id, s), s) >= s.rageFull;
+    return rageNow({ charge: dangerCharge({ charge, lost, rageUsed: p.rageUsed, judged: p.judged, ...(p.dangerSpent ? { dangerSpent: true as const } : {}) }, rageSpeedOf(boss.id, s), s), lost, rageUsed: p.rageUsed }, rageSpeedOf(boss.id, s), s) >= s.rageFull;
   },
 
   /** What the host's engines need to pick the line after its move now (the boss request's `crease`), or null: none wanted. */
