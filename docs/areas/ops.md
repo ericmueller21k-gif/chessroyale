@@ -246,8 +246,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **XP's** (Nov 9; [2026-11-09-xp-storage.md](../decisions/2026-11-09-xp-storage.md)): `xp=<n>` (the app sets your XP to n once your
     account loads: `POST /api/xp/test`, a ledger op) and `xpgame=MINUTES` (a solo game's start, or a lobby's: it counts as a game that
     long with enough moves, test switches or not; only where TEST_SWITCHES is "1": an admin's on production makes a test game, no XP). Any other lobby test switch marks the lobby `tested`: no XP ("No XP: test game.").
-  - **Quests'** (Nov 9, phase 3): `quests=<kind>[:<progress>],…` (e.g. `?quests=warm-up:2,squad-up,regular:9`: your quests replaced by
-    these as home loads, `POST /api/quests/test`; only where TEST_SWITCHES is "1").
+  - **Quests'** (Nov 9, phase 3): `quests=<kind>[:<progress>[:<drop>]],…` (e.g. `?quests=warm-up:2,squad-up,regular:9`: your quests replaced by
+    these as home loads, `POST /api/quests/test`; only where TEST_SWITCHES is "1"). The drop (Nov 26: `none`, the default, | `boost` |
+    `bonus`, e.g. `warm-up:2:boost`) is what finishing that quest rolls: the server draws the quest's id until its completion op's key
+    gives it, so a test's drop is never chance (a daily quest's drop is otherwise 4% + 4%: the review of #966's B1).
   - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
 - **Kill switches** (Oct 15; docs/decisions/2026-10-15-kill-switches.md): Worker runtime variables that rest one part
   of the game, set in the dashboard (how: `DEPLOY.md`, "Kill switches and the maintenance banner"). `PAUSE_<NAME>` =
