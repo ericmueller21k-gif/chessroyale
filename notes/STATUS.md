@@ -2206,3 +2206,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - #967 PR 6 MERGED (1fe1328a). Payments next: PR 7 coin screen.
 - Town #969 CI running (bcw5i0n8t). Not live yet.
 - 07:10 Eric agreed: danger rule on Timber, Chub & Chirp, Hollow, Alfil, Moo & Moon, ONLY before the first ult (never a 2nd close after). Added to #970 (3869568b), CI waiter b4fxhzan3. Town #969 MERGED (95a6fcb4); main CI + deploy waiter bndva7fpn; then tell Eric to walk the town at night with ?report.
+- 07:15 Chandy art phase 1 done (claude/chandy-mate-art f9d61141, stills/chandy-mate-art). Sent Eric storyboard + pose sheet. My notes: the collapse is too subtle (redo: clearly collapsed, belly/knees, head down); the bar says Boingo (borrowed screen). Waiting on Eric before phase 2 (wiring to the rules job's timeline).
