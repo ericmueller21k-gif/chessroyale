@@ -803,3 +803,29 @@ also don't want like repeated exact verse or sound that's already been used ... 
 - The other two-minute themes, to do one by one if this passes: Boingo, Jefferson, Big Boy, Sawyer, Moo & Moon,
   Folio, Timber, Don Dough (2:00 each); Ginger, Alfil and Chub & Chirp are 2:10.
 
+## A hymn for the Hidden Boss's third form (Nov 26), sent, no verdict yet
+
+Eric, of the game's "he transforms" piece (song_v.py from the second chant on): "right now, like it dies out kind of
+during the middle, and then it does its final build up. But I feel like before that, we need like this one more verse
+... It keeps ... every kind of thing the same, but ... the main ... thing you hear is this ... angelic, like hymn
+chant kind of like men sound ... harmonized of like several different keys that just sounds like really nice, like
+pleasant to the ear. And it ... does like a ... one note, like ring out for a second and then like stops. And then ...
+the background beat ... everything kind of is picking up. And then it does like another ... a few times maybe. And
+there could be like a small part in the middle ... an extra like 25 to 30 seconds."
+- Where: after the second duel, before the choir alone (the dying out) and the build. 24 bars at 200, 28.9 s; the
+  piece from the drop is 1:58 (was 1:28).
+- What: the band of the chant runs all through. The men (the score's own choir, five parts, mouths open) sing one
+  full major chord for a bar and let it go into the stone room's echo; the band alone takes the next bar harder (a
+  kick on every 16th, the lead and fiddle's run or the snare's roll); then the next chord. G, E flat, B (the score's
+  three roots, a major third apart, all bright here) and D. The small part in the middle: eight bars of a hymn in four
+  parts, in G major, a chord every two beats. Then B, E flat, G bigger (boys over the men, two shouts after each)
+  and D held seven beats over a roll, into the book's slam.
+- `RECLUSE_HYMN=1` in the environment puts it in (`HYMN`, `hymned` in song_v.py); without it the score and every
+  game piece are as they were. It is made with its own run of the random numbers, so the rest of the score's notes
+  don't change; the tape is a little longer, so every tempo is 0.3% slower with it in.
+- Measured: the choir in the ring-outs and the hymn at the level it has in the chant (-15 dB RMS while it sings; the
+  first try had it 3 to 4 dB under, not the main thing); the section's loudness level with the chant and duel, its
+  last third 1 dB over; -16.0 LUFS, peak -1.2 dBFS.
+- If he passes it: `RECLUSE_HYMN=1 python3 phases_v.py --stereo --kbps 192 <folder>` rebuilds his four pieces (only
+  `recluse-phase3-loop` and its length change in substance), then the director gets the new loop's seconds.
+
