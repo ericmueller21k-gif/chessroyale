@@ -90,9 +90,7 @@ const kinds = (b: BossState) => b.powers!.events.map((e) => e.kind);
  * The meter's rates these tests were written for (5 a crowd move, up to 5 more ahead, a queen's worth a full meter,
  * every boss at speed 1), so a retune of the shipped numbers (settings.ts) doesn't move them.
  */
-// (The danger line out of reach, dangerAt: these are the meter's own gains, the crowd ahead or not; at the line it fills at once, which
-// ult-danger.test.ts checks.)
-const S: BossPowerSettings = { ...BOSS_POWERS, ragePerMove: 5, rageAheadMax: 5, ragePerMaterial: 100 / 9, rageStrike: 25, rageSpeed: {}, dangerAt: 2 };
+const S: BossPowerSettings = { ...BOSS_POWERS, ragePerMove: 5, rageAheadMax: 5, ragePerMaterial: 100 / 9, rageStrike: 25, rageSpeed: {} };
 
 describe("the ultimate's meter", () => {
   it("fills a little each crowd move, faster while the crowd is ahead on the judged eval; the switch turns that off", () => {

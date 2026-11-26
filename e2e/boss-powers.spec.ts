@@ -539,7 +539,6 @@ test("Boingo's funhouse at every angle (a computer: upside down): a move by tap 
   // the other, 15 on back.
   const angles: number[] = [];
   const turns: number[] = [];
-  const warned: boolean[] = [];
   const played: string[] = [];
   for (let i = 1; i <= last; i++) {
     await expect.poll(() => phase(page), { timeout: 90_000 }).toMatch(/play|results/);
@@ -548,7 +547,6 @@ test("Boingo's funhouse at every angle (a computer: upside down): a move by tap 
     const turn: number = p.turn;
     turns.push(turn);
     angles.push(p.angle);
-    warned.push(!!p.warned);
     const turned = p.angle === 90 || p.angle === 270 ? p.angle : 0;
     await expectCoordsInSquares(page, p.angle === 180 ? "black" : "white", 10_000, turned);
     const pies = await piesOffSquares(page);
@@ -560,18 +558,10 @@ test("Boingo's funhouse at every angle (a computer: upside down): a move by tap 
     else if (step === 1) played.push(`${p.angle}:drag:${await playByHand(page, "drag", phone, true)}`);
     else await playBest(page, true);
   }
-  // (The crowd far ahead as the board came back on turn 15, the engine's best moves against him: the danger line fills his meter at
-  // once (BOSS_POWERS.dangerAt, Nov 26: docs/decisions/2026-11-26-ult-danger.md), the next Funhouse is warned as that turn begins and
-  // plays your move on 16, so the look after turn 15 is turn 17, upside down again.)
-  const again = phone && warned[13] === true;
-  const wantTurns = [1, 2, ...Array.from({ length: 13 }, (_, i) => i + 4)].slice(0, last);
-  if (again) wantTurns[14] = 17;
-  expect(turns).toEqual(wantTurns);
+  expect(turns).toEqual([1, 2, ...Array.from({ length: 13 }, (_, i) => i + 4)].slice(0, last));
   const side = phone ? angles[5] : 90;
   if (phone) expect([90, 270]).toContain(side);
-  const wantAngles = [0, 0, 180, 180, 180, side, side, side, side, 360 - side!, 360 - side!, 360 - side!, 360 - side!, 0, 0].slice(0, last);
-  if (again) wantAngles[14] = 180;
-  expect(angles).toEqual(wantAngles);
+  expect(angles).toEqual([0, 0, 180, 180, 180, side, side, side, side, 360 - side!, 360 - side!, 360 - side!, 360 - side!, 0, 0].slice(0, last));
   console.log(info.project.name, JSON.stringify(played));
   for (const a of phone ? [0, 180, 90, 270] : [0, 180]) for (const how of ["tap", "drag"]) expect(played.some((x) => x.startsWith(`${a}:${how}:`)), `${a}° by ${how}`).toBe(true);
   expect(errors).toEqual([]);

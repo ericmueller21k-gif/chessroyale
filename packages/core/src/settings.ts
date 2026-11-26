@@ -1456,19 +1456,22 @@ export const BOSS_POWERS = {
   ragePerMaterial: 100 / 18,
   rageStrike: 25,
   /**
-   * The boss in danger (Eric, Nov 26, after beating Birdie with no Fall: "It's not about like how many moves have been played. It
-   * should have detected like he was basically in danger, or like it was already heavily in my favor, and it should start
-   * triggering very quickly thereafter, like a turn or two at most"): the crowd's expected score after its move, as the judge has
-   * it (the boss's `judged`, the number "your chances" shows), at or above dangerAt. From one such move: the rage meter is full as
-   * the next crowd turn begins (its usual warning, then the ultimate) and Chandy's Dodge is warned as his rifle's meter would;
-   * Birdie's Fall, with no warning, comes at the start of his turn once two such moves come in a row (birdie.fallDangerMoves)
-   * (docs/decisions/2026-11-26-ult-danger.md). The ultimate comes within two of his turns, whatever his meter held, as soon as its
-   * own rules allow it. One a danger: once an ultimate has come with the crowd at the line (`dangerSpent`), the meter fills at its
-   * usual pace (the ahead gain at its fullest) until a crowd move below the line ends the danger (filled again at once after each,
-   * the audit's shortest ultimates came every other turn: Big Boy's Bounce 32 times in a battle). Below it, every meter fills as it
-   * always has.
+   * The danger line, for Birdie's Fall (Eric, Nov 26, after beating Birdie with no Fall: "It should have detected like he was basically
+   * in danger, or like it was already heavily in my favor, and it should start triggering very quickly thereafter, like a turn or two
+   * at most"): the crowd's expected score after its move, as the judge has it (the boss's `judged`, the number "your chances" shows),
+   * at or above dangerAt, for birdie.fallDangerMoves of its moves in a row; and for the bosses in `dangerBosses` (below). Every other
+   * boss's meter fills as it always has (docs/decisions/2026-11-26-ult-danger-birdie-only.md).
    */
   dangerAt: 0.7,
+  /**
+   * The bosses whose rage meter fills at once in danger (Eric, Nov 26: "every boss has to ult in every game, no matter what. So if
+   * there was a games where they weren't ulting, then we have to. But ... we don't want bosses to ... ult twice"): a crowd move at
+   * dangerAt or more while the boss hasn't used his ultimate yet this battle, and his meter is full as the next crowd turn begins (the
+   * usual warning, then the ultimate within two of his turns, as its own rules allow). Once he has used it, never again this battle, so
+   * the rule never brings a second one close after the first. The ones that, against engine-best moves, waited 7 to 23 of their turns
+   * or never came (the Nov 26 audit). Add or remove an id here.
+   */
+  dangerBosses: ["timber", "hopper", "hollow", "alfil", "moo"] as readonly string[],
   /**
    * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
    * effect pauses the meter for its length (the blizzard 3 turns, the funhouse 12, the Roman candle about 13, Lights
@@ -4011,6 +4014,41 @@ export const PAYMENTS = {
    * JSON value first (json_each, as locker.ts does).
    */
   maxDraws: 20,
+  /**
+   * Who may buy (Nov 26, payments PR 6; the design's section 9; core's buyAnswer, the server's buyStatus and recordCheckout): signed in,
+   * 16 or older by the age band answered at the first Buy, 16-17 at most `minorCapCents` a month, in `countries`, not held, not closed.
+   *   - `minAge`: under it, never (FTC v. HoYoverse, Jan 2025). `adultAge`: under it, the monthly cap. Both whole years, counted from
+   *     the birth month and year the device asks, the birth month itself not yet complete (core's buyBandOf: 16 from the 1st of the
+   *     month after the 16th-birthday month; only the band is posted, never the date).
+   *   - `minorCapCents`: the most an account in the 16-17 band spends a calendar month, on the packs' prices before tax (what the
+   *     packs show), counted from its checkouts that month (pending ones too but the one still open, which a new Buy replaces; less what
+   *     refunds returned of the price, before tax too, never below 0 a checkout). The month turns when the XP day does
+   *     (XP.dayStartUtcHour UTC on the 1st: midnight Pacific standard time; 1 am in summer, 10 pm the evening before in Hawaii), never
+   *     the device's clock.
+   *   - `askAgainMonths`: an under-18 band is asked again this long after it was answered, and may then go up one band at most.
+   *   - `countries`: where packs are sold, by the request's country (`request.cf.country`); PR 8 checks the card's too.
+   *   - `checkoutMinutes`: a checkout stays open this long (Stripe's least session expiry, PR 8 sets it). One open at a time per
+   *     account: a new Buy closes the open one first (PR 8 expires it at Stripe, then expireCheckout).
+   */
+  buyers: {
+    minAge: 16,
+    adultAge: 18,
+    minorCapCents: 5000,
+    askAgainMonths: 6,
+    countries: ["US", "CA"] as readonly string[],
+    checkoutMinutes: 30,
+  },
+  /**
+   * The quiet flag (Eric, Nov 18: "three refunds ... a 90-day hold on trading and purchasing"; the design's section 3 and call 4):
+   * refunds and chargebacks count together, all time (`users.refund_count`); the `after`th starts a hold of `days` days on buying coins
+   * (and trading, when it exists), and each one after it starts the days again. Its line names no reason. A greyed Buy's taps while held
+   * are counted (`users.held_taps`, for the admins' Payments tab), at most one each `tapGapMs` an account.
+   */
+  hold: {
+    after: 3,
+    days: 90,
+    tapGapMs: 60_000,
+  },
 } as const;
 
 /**

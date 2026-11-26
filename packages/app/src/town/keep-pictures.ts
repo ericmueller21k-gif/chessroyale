@@ -38,6 +38,9 @@ export interface Manifest {
   /** Each roof painted, in the loading screen's order: its faces, each its whole then its triangles, seven numbers a piece
    * (picture, sx, sy, w, h, ox, oy). */
   roofs: number[][][];
+  /** (Nov 26) Each glow baked (render.ts bakeGlow: a lit window's, a lamp's), in the loading screen's order: none for no pieces, else
+   * seven numbers a piece (sx, sy, w, h on its sheet, the next picture; x, y in its picture's pixels; 1 if it flickers). */
+  glows: number[][];
 }
 export interface Entry {
   manifest: Manifest;
@@ -55,6 +58,7 @@ export interface Shelf {
 export interface Restored {
   readonly count: number;
   readonly roofs: readonly (readonly (readonly number[])[])[];
+  readonly glows: readonly (readonly number[])[];
   /** Picture `i`: the canvas standing in for it (empty until its pixels are asked for, `PageIO.standIn`). */
   pic(i: number): HTMLCanvasElement;
   /** The pages and the pictures on each, for the painter to upload whole (`Painter.adopt`). */
@@ -87,6 +91,9 @@ export class Pictures {
   /** (Painting) each roof painted: its faces' pieces, as `Manifest.roofs`. */
   readonly roofs: number[][][] = [];
   private roofAt = 0;
+  /** (Painting) each glow baked, as `Manifest.glows`. */
+  readonly glows: number[][] = [];
+  private glowAt = 0;
   constructor(
     readonly keep: (c: CanvasImageSource) => void,
     readonly from: Restored | null,
@@ -115,9 +122,19 @@ export class Pictures {
     if (this.from) return;
     this.roofs.push(a.faces.map((f) => [f.whole, ...f.tris].flatMap((p) => [this.at.get(p.cv) ?? -1, p.sx, p.sy, p.w, p.h, p.ox, p.oy])));
   }
-  /** (A later visit, once every job ran) whether every kept picture and roof was used: the layout was the last visit's. */
+  /** (A later visit) the next glow baked, as the last visit baked it (`Manifest.glows`: its sheet is the next picture). */
+  glow(): readonly number[] {
+    const g = this.from!.glows[this.glowAt++];
+    if (!g) throw new Error("kept pictures: a glow short");
+    return g;
+  }
+  /** A glow just baked (its sheet added, if it has pieces): kept for the next visit. */
+  glowDone(row: number[]): void {
+    if (!this.from) this.glows.push(row);
+  }
+  /** (A later visit, once every job ran) whether every kept picture, roof and glow was used: the layout was the last visit's. */
   matched(): boolean {
-    return !!this.from && this.list.length === this.from.count && this.roofAt === this.from.roofs.length;
+    return !!this.from && this.list.length === this.from.count && this.roofAt === this.from.roofs.length && this.glowAt === this.from.glows.length;
   }
 }
 
@@ -189,7 +206,7 @@ export function packPictures(sizes: readonly (readonly [number, number])[]): { a
 /** The manifest for these pictures, packed (`packPictures`). */
 export function manifestOf(key: string, pics: Pictures): Manifest {
   const { at, pages } = packPictures(pics.list.map((c) => [c.width, c.height] as const));
-  return { v: 2, key, pages: pages.flat(), pics: at.flatMap(([p, x, y], i) => [p, x, y, pics.list[i]!.width, pics.list[i]!.height]), roofs: pics.roofs };
+  return { v: 2, key, pages: pages.flat(), pics: at.flatMap(([p, x, y], i) => [p, x, y, pics.list[i]!.width, pics.list[i]!.height]), roofs: pics.roofs, glows: pics.glows };
 }
 
 const isInt = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0;
@@ -197,7 +214,7 @@ const isInt = (n: unknown): n is number => typeof n === "number" && Number.isInt
 export function entryFor(e: unknown, key: string): Entry | null {
   const x = e as Partial<Entry> | null;
   const m = x?.manifest;
-  if (!m || m.v !== 2 || m.key !== key || !Array.isArray(x!.blobs) || !Array.isArray(m.pages) || !Array.isArray(m.pics) || !Array.isArray(m.roofs)) return null;
+  if (!m || m.v !== 2 || m.key !== key || !Array.isArray(x!.blobs) || !Array.isArray(m.pages) || !Array.isArray(m.pics) || !Array.isArray(m.roofs) || !Array.isArray(m.glows)) return null;
   const nPages = m.pages.length / 2;
   if (!Number.isInteger(nPages) || nPages !== x!.blobs.length || !m.pages.every(isInt)) return null;
   if (!x!.blobs.every((b) => typeof Blob !== "undefined" && b instanceof Blob && b.size > 0)) return null;
@@ -216,6 +233,7 @@ export function entryFor(e: unknown, key: string): Entry | null {
     if (!Array.isArray(r)) return null;
     for (const f of r) if (!Array.isArray(f) || !f.length || f.length % 7 || !f.every((v, j) => (j % 7 ? typeof v === "number" && Number.isFinite(v) : isInt(v) && v < n))) return null;
   }
+  for (const g of m.glows) if (!Array.isArray(g) || g.length % 7 || !g.every((v, j) => typeof v === "number" && Number.isFinite(v) && (j % 7 >= 4 || isInt(v)))) return null;
   return x as Entry;
 }
 
@@ -287,6 +305,7 @@ export async function restore(shelf: Shelf | null, key: string, io: PageIO | nul
     return {
       count: n,
       roofs: m.roofs,
+      glows: m.glows,
       pic: (i: number) => {
         if (i >= n) throw new Error("kept pictures: past the end");
         return pics[i]!;
