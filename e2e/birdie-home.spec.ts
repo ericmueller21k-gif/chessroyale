@@ -19,6 +19,8 @@ type Hooks = {
   __birdieSteps?: string[];
   __birdieGates?: string[];
   __birdieLooks?: string[];
+  __birdieBirds?: () => { n: number; shown: number; flying: number; fled: number; near: boolean } | null;
+  __townReport?: (raw?: boolean) => { state: string; raw: { flags: number[]; ups: number[]; bakes: number[] } | null } | null;
 };
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 const sounds = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__soundLog ?? []);
@@ -30,11 +32,11 @@ async function birdieCard(page: Page) {
   return card;
 }
 
-test("Birdie's Station: his card and hello out front; in to the lobby, the bartender at the bar, the flip board writing the town", async ({ page }) => {
+test("Birdie's Station: his card and hello out front; in to the lobby, the bartender at the bar, the flip board writing the town; the birds at the bar fly off as you walk up to it, the room uploading and painting nothing new (Nov 26)", async ({ page }) => {
   test.setTimeout(120_000);
   await asAdmin(page);
   await page.addInitScript(() => ((window as unknown as Hooks).__soundLog = []));
-  await page.goto("/town?sky=day");
+  await page.goto("/town?sky=day&report");
   await townReady(page);
   const card = await birdieCard(page);
   await expect(card.getByRole("button", { name: "Challenge alone" })).toBeEnabled();
@@ -46,6 +48,8 @@ test("Birdie's Station: his card and hello out front; in to the lobby, the barte
   await home.getByRole("button", { name: "Go in" }).click();
   await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
   await expect(room(page)).toHaveAttribute("data-room", "birdie");
+  await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__birdieBirds?.()?.n ?? 0)).toBe(50);
+  const birds0 = await page.evaluate(() => (window as unknown as Hooks).__birdieBirds?.() ?? null);
   await expect(page.locator(".area-banner .area-banner-title")).toHaveText("BIRDIE'S STATION");
   // The board: a title, four rows of the same flaps, the town's buildings by their names; never the Hidden Boss's walk-up.
   const first = (await flaps(page))!;
@@ -63,6 +67,18 @@ test("Birdie's Station: his card and hello out front; in to the lobby, the barte
   await page.mouse.click(cv.x + xy.x, cv.y + xy.y);
   const keeper = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
   await expect(keeper).toBeVisible({ timeout: 15_000 });
+  // (Nov 26) The birds at the bar (shops/birdie-birds.ts): on show as you came in; walked up to the bar, every one has flown off. And the
+  // room's frames, from the walk in to the bar, uploaded and painted nothing (`?report`; the town's lesson #969: bake it all at load).
+  expect(birds0!.shown).toBeGreaterThan(birds0!.n * 0.5);
+  await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__birdieBirds?.() ?? null)).toMatchObject({ near: true, shown: 0, fled: 50 });
+  // (Recording since the walk to his door, 30 s at most: finished now if it's still going.)
+  if ((await page.evaluate(() => (window as unknown as Hooks).__townReport?.()?.state)) === "rec") await page.locator(".tfr-pill button").click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__townReport?.()?.state)).toBe("done");
+  const rep = (await page.evaluate(() => (window as unknown as Hooks).__townReport!(true)))!.raw!;
+  const ROOM = 256; // (frame-report.ts F.room)
+  const inRoom = rep.flags.map((f, i) => (f & ROOM ? i : -1)).filter((i) => i >= 0);
+  expect(inRoom.length).toBeGreaterThan(30);
+  expect(inRoom.reduce((a, i) => a + rep.ups[i]! + rep.bakes[i]!, 0), "pictures uploaded or painted in the room").toBe(0);
   // (Its flaps turn now and then: a row's status every few seconds.)
   await expect.poll(async () => JSON.stringify(await flaps(page)), { timeout: 20_000 }).not.toBe(JSON.stringify(first));
 });

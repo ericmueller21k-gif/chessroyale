@@ -738,6 +738,32 @@ export const SHOP_FEEL = {
    */
   flaps: { scale: 4, statusMs: 7000, pageMs: 30000, maxSteps: 5, stepMs: 60, staggerMs: 22 },
   /**
+   * Birdie's Station's birds at the bar (Nov 26, Eric: "like 50 birds at the bar ... nibbling on bird feed ... a cycle"; shops/birdie-birds.ts,
+   * docs/decisions/2026-11-26-birdie-room-birds.md). `count` birds (at most the room's 60 homes), each on its own fixed loop from `seed`: sitting
+   * (`sitMs`, a stool's `stoolSitMs`) and pecking in bouts (`peckMs` a peck, a bout and a rest `boutMs`), a small hop now and then (`hopMs`,
+   * `hopPx` high), off up into the ceiling (`flyMs`, a wingbeat `flapMs`) and away (`awayMs`) before flying back in. The bartender's scoop
+   * fills one of the run's seed piles a loop; a pile is eaten down in `pileEatMs`. You within `nearSquares` of the bar (checked every
+   * `checkMs`): every bird flies off and stays away `scatterAwayMs` after you leave, then they come back over `returnSpreadMs`.
+   */
+  birds: {
+    count: 50,
+    seed: 0xb1d5,
+    sitMs: [20000, 45000] as readonly [number, number],
+    stoolSitMs: [6000, 14000] as readonly [number, number],
+    awayMs: [2000, 6000] as readonly [number, number],
+    flyMs: 1600,
+    flapMs: 80,
+    hopMs: 380,
+    hopPx: 9,
+    peckMs: 150,
+    boutMs: [1800, 3400] as readonly [number, number],
+    pileEatMs: 16000,
+    nearSquares: 2.2,
+    checkMs: 100,
+    scatterAwayMs: 25000,
+    returnSpreadMs: 15000,
+  },
+  /**
    * The zoom you start at inside a home (0 Close, 1 the town's zoomed-in camera). Eric, Nov 3: "When you walk into the house, the
    * zoom should be the further out of the two by default" (it was Close); `docs/decisions/2026-11-03-home-zoom-out.md`.
    */
