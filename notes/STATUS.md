@@ -2187,3 +2187,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 04:36 UTC: ERIC (frustrated: '10th time'; 'if we need a fable on it then that's what must be done'; tell him the moment something's found). Started FABLE read-only diagnosis session_01JuCWRt6DkFmbqD23AHcf5c (review/town-uploads, TOWN-DIAGNOSIS.md, push first source asap) beside the Opus fixer session_01JuCWRuoQWomGvgjUubVTey. Watcher bz34z8uf3 fires on the first push of either. Bar: Eric's scenario, 0 uploads walking, before/after report to Eric.
 - Nov 26 04:45 UTC: PR 6 → #967 (1aef38e3, full-e2e) CI. Independent review WAITS for a free slot (running: ult-danger xhigh, town fixer high, town Fable diagnosis). Town first.
 - Nov 26 05:00 UTC: TOWN CAUSE FOUND (both investigators): night window glows (bakeGlow) made+uploaded on first view; ~1,650; old guard used ?sky=day. Fixer's 970a43f0 bakes glows at load. Sent the fixer the diagnosis's sources 2-8 + night guard. Told Eric.
+
+## Nov 26, 05:12 UTC
+- #968 ult-danger opened (draft, head a21b0e49), subscribed; CI waiter bui3jzsus. Boss-lane review: session_01JuCWRtGBmY5m6rtSNk6mJw (xhigh, read-only) -> branch claude/ult-danger-review REVIEW.md + .done; waiter bsytymaay. Ult helper session archived.
+- Asked Eric: Chandy's Dodge (a) in danger regardless of upgrades (PR as is) or (b) keep his Nov 16 5-upgrade rule. Merge held for his answer.
+- Town fixer still running (claude/town-uploads-2), waiters bws22pd6c/bfw7wk5cj. Tell Eric the moment it lands.
