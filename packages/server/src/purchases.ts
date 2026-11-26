@@ -188,7 +188,7 @@ export async function creditPurchase(sql: Sql, s: PaidSession, now: number): Pro
       stmt(
         `UPDATE purchases SET status = 'paid', paid_at = ?, tax_cents = ?, payment_intent = ?, card_country = ? WHERE session_id = ? AND ${ours.sql}`,
         now,
-        Math.max(0, Math.round(s.taxCents)),
+        Number.isFinite(s.taxCents) ? Math.max(0, Math.round(s.taxCents)) : 0,
         s.paymentIntent,
         s.cardCountry,
         s.id,
