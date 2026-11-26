@@ -138,6 +138,50 @@ describe("a boss in danger: his ultimate within two of his turns (Eric, Nov 26)"
   }
 });
 
+/** A level battle's stand-in: every move between 0.3 and 0.65 for whoever moves (never the danger line), a pure function of the position. */
+function levelEngine(): EngineLike {
+  const score = (fen: string, m: string) => 0.3 + 0.35 * hash(fen + m);
+  const ranked = (fen: string) =>
+    legalMoves(fen)
+      .map((move) => ({ move, expected: score(fen, move) }))
+      .sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1));
+  return {
+    topMoves: async (fen, n) => ranked(fen).slice(0, n),
+    scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((move) => ({ move, expected: score(fen, move) })),
+    topMovesAt: async (fen, n) => ranked(fen).slice(0, n),
+    playAtElo: async (fen) => ranked(fen)[0]?.move ?? "0000",
+  };
+}
+
+describe("below the line, nothing changes (the brief: the meters' normal pace in even games stays)", () => {
+  /** One level battle: as each crowd turn begins, his turn, meter, warning, ultimate and their count, and the board. */
+  async function level(id: string): Promise<string[]> {
+    const seen: string[] = [];
+    const watch = (r: MatchRunner, fen: string, who: "crowd" | "boss") => {
+      const p = r.boss!.powers!;
+      if (who === "crowd") seen.push(`${p.turn} ${rageOf(r.boss)} ${p.warnAt} ${p.ultAt} ${p.ults ?? 0} ${p.judged} ${fen}`);
+    };
+    await runBattle({ boss: id, seed: 3 + Math.floor(hash(id) * 1000), side: "b", test: "", triggerFrom: 999, strikes: [], maxMoves: 30, opening: KIT_OPENING, engine: levelEngine }, null, watch);
+    return seen;
+  }
+  for (const def of kitBosses()) {
+    it(`${def.id}: a level battle (the judge never at ${BOSS_POWERS.dangerAt}) plays the same with the danger rule switched off`, async () => {
+      const on = await level(def.id);
+      const powers = BOSS_POWERS as { dangerAt: number };
+      const was = powers.dangerAt;
+      powers.dangerAt = 2;
+      let off: string[];
+      try {
+        off = await level(def.id);
+      } finally {
+        powers.dangerAt = was;
+      }
+      expect(on.length).toBeGreaterThan(10);
+      expect(on).toEqual(off);
+    }, 60_000);
+  }
+});
+
 describe("the danger line", () => {
   it("in danger from dangerAt on (the judge's number after the crowd's move), never before anything is judged", () => {
     expect(inDanger(undefined)).toBe(false);

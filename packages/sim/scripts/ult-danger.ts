@@ -20,7 +20,7 @@
  * Rows go to reports/ult-danger/<tag>.jsonl; the summary prints a markdown table.
  */
 import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, botPick, mulberry32, type Settings } from "@chessroyale/core";
-import { MatchRunner, bossRules, legalMoves, pieceAt, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, bossRules, eloDraw, legalMoves, pieceAt, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -30,9 +30,34 @@ const NODES = 120_000;
 const MAX_MOVES = 60;
 /** The boss's Elo (bossFixedElo: a player rated just under the usual tier). */
 const BOSS_ELO = 1600;
-/** The even crowd: a club player's skill (boss-sim's club crowd spans 6 to 20) and a random move now and then. */
-const EVEN_SKILL = 8;
-const EVEN_RANDOM = 0.03;
+/**
+ * The even crowd: a strong player's skill (boss-sim's expert crowd spans 1 to 4) and a rare random move: against the boss's powers
+ * that keeps most battles level for a long time (a club crowd, 8, was crushed within a few moves).
+ */
+const EVEN_SKILL = 3;
+const EVEN_RANDOM = 0.01;
+
+/** A cheap position hash (FNV-1a), for the boss's seeded draw. */
+const hashOf = (s: string): number => {
+  let h = 2166136261;
+  for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return h >>> 0;
+};
+
+/**
+ * The engine with the boss's move drawn from its top moves by a seed of the battle's and the position's (eloDraw, as two devices
+ * agree on one online: BOSS_CHECK), not Stockfish's own draw at a strength, which its clock seeds: the same seed plays the same
+ * battle every run, so a before and an after differ only where the rule did.
+ */
+function seededEngine(engine: EngineLike, seed: number): EngineLike {
+  return {
+    topMoves: (fen, n) => engine.topMoves(fen, n),
+    scoreMoves: (fen, moves) => engine.scoreMoves(fen, moves),
+    ...(engine.scoreMovesAt ? { scoreMovesAt: (fen: string, moves: readonly string[], nodes: number) => engine.scoreMovesAt!(fen, moves, nodes) } : {}),
+    ...(engine.topMovesAt ? { topMovesAt: (fen: string, n: number, nodes: number, moves?: readonly string[]) => engine.topMovesAt!(fen, n, nodes, moves) } : {}),
+    playAtElo: async (fen, elo) => eloDraw(await engine.topMoves(fen, 8), elo, mulberry32(seed ^ hashOf(fen))),
+  };
+}
 /** The danger line: the crowd's expected score (the judge's) at or above it. */
 const DANGER = BOSS_POWERS.dangerAt;
 
@@ -165,7 +190,7 @@ async function run(ids: string[], seeds: number, crowd: "strong" | "even", tag: 
     for (let k = 0; k < seeds; k++) {
       const t0 = Date.now();
       const engine = await createNodeEngine({ nodes: NODES, hashMb: 16 });
-      const row = await battle(id, first + k, crowd, engine);
+      const row = await battle(id, first + k, crowd, seededEngine(engine, first + k));
       engine.close();
       appendFileSync(root + `reports/ult-danger/${tag}.jsonl`, JSON.stringify({ ...row, off }) + "\n");
       console.log(`${id} seed ${first + k}: ${row.result} after ${row.moves}, ults at ${JSON.stringify(row.came)} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
