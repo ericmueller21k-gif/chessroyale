@@ -2454,18 +2454,18 @@ export const DASH_STALL = {
  * `almostMs` into them; the wind-up on the clock's front (`windMs`); "Sorry about that, bro. Here's your time back." with your
  * clock counting back up to its real value (`countUpMs`, in `sorryMs`); your piece sliding to its played square (`returnMs`); then
  * his move. His thinking waits for all of it and `tailMs` more (a late frame or a slow connection never cuts its end), solo and
- * online alike (popOffMs; hangOnTimeline in packages/chess/src/bosses/dash.ts). About 12.6 s from your move to his.
+ * online alike (popOffMs; hangOnTimeline in packages/chess/src/bosses/dash.ts). 12.6 s from your move to his, and the margin.
  */
 export const DASH_HANG_ON = {
   backAt: 450,
-  slowMs: 6500,
+  slowMs: 6200,
   slowFrom: 900,
   slowTo: 180,
-  fastMs: 3200,
-  almostMs: 1900,
+  fastMs: 3000,
+  almostMs: 1800,
   hitMs: 80,
   windMs: 900,
-  sorryMs: 2200,
+  sorryMs: 2000,
   countUpMs: 1200,
   returnMs: 500,
   tailMs: 300,

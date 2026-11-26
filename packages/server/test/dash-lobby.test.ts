@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, DASH_STALL, DASH_TAP, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
-import { MatchRunner, legalMoves, rushTimeline, sanLineToUci, stallTimeline, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { BOSS_POWERS, DASH_HANG_ON, DASH_STALL, DASH_TAP, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { MatchRunner, hangOnTimeline, legalMoves, rushTimeline, sanLineToUci, stallTimeline, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 /**
@@ -105,21 +105,23 @@ describe("Dash online: the server's clocks", () => {
     expect(r.deadline - r.startsAt).toBeLessThanOrEqual((RAID_SETTINGS.moveClockSeconds! - BOSS_POWERS.slapMoveSeconds) * 1000);
   });
 
-  it("a scrambled move's deadline is 3 s from its start; a pick after it is refused; nobody in time: a move from the host's top moves is played, the battle goes on", () => {
+  it("a scrambled move's deadline is its seconds (the battle's first: 5 s) from its start; a pick after it is refused; nobody in time: a move from the host's top moves is played, the battle goes on", () => {
     const L = dashLobby("scramble");
     // (The test switch: its warning as the second turn begins, the scramble as the third does.)
     L.crowdPlays();
     L.crowdPlays();
     const r = L.toRound();
     expect(L.runner().boss!.powers!.events.some((e) => e.kind === "scramble")).toBe(true);
-    expect(r.moveClock).toBe(BOSS_POWERS.scrambleSeconds);
+    const first = BOSS_POWERS.scrambleSeconds[0]!;
+    expect(first).toBe(5);
+    expect(r.moveClock).toBe(first);
     for (const id of ["p1", "p2"]) {
       const mine = L.last(id, "round")!;
-      expect(mine.deadline - mine.startsAt).toBe(BOSS_POWERS.scrambleSeconds * 1000);
+      expect(mine.deadline - mine.startsAt).toBe(first * 1000);
     }
     // A pick after the deadline and its grace: refused (the server's word, not the device's).
     const fen = r.board!.fen;
-    L.advance(BOSS_POWERS.scrambleSeconds * 1000 + L.settings.lateGraceMs + 1);
+    L.advance(first * 1000 + L.settings.lateGraceMs + 1);
     L.core.message("p2", { t: "pick", key: r.key, move: legalMoves(fen)[0]! });
     expect(L.hostScores()).toBe(true);
     // Nobody picked in time: the flag's move, one of the host's top flagTop moves, played for the crowd; no loss on time.
@@ -131,8 +133,53 @@ describe("Dash online: the server's clocks", () => {
     expect(L.runner().boss!.result ?? null).toBeNull();
     // The next move is scrambled too, its jab first.
     const next = L.toRound();
-    expect(next.moveClock).toBe(BOSS_POWERS.scrambleSeconds);
+    expect(next.moveClock).toBe(first);
     expect(L.runner().boss!.powers!.events.some((e) => e.kind === "flag")).toBe(true);
+  });
+});
+
+/**
+ * Dash's "Hang on" online (Eric, Nov 26; docs/decisions/2026-11-26-dash-hang-on.md): screen only. The server holds his move for its
+ * whole timeline (his thinking's least, as for the pop-off: popOffMs) and sends it as ever; the crowd's next round is the same as
+ * without it, only later (nobody's clock ran while he thought).
+ */
+describe("Dash online: his \"Hang on\"", () => {
+  /** Two crowd moves (his second turn's thinking: the gag), the host answering his move at once; when his move landed after the request. */
+  function toGag(test: string) {
+    const L = dashLobby(test);
+    L.crowdPlays();
+    L.toRound();
+    L.crowdPlays();
+    for (let i = 0; i < 100 && !L.last("p1", "bossRequest"); i++) L.advance(100);
+    const asked = L.now();
+    const req = L.last("p1", "bossRequest")!;
+    const board = () => L.runner().boards.get(L.runner().state.boards[0]!)!;
+    const plies = board().history.length;
+    L.inbox.set("p1", (L.inbox.get("p1") ?? []).filter((m) => m.t !== "bossRequest"));
+    L.core.message("p1", { t: "bossMove", key: req.key, move: legalMoves(board().fen)[0]! });
+    let landed = board().history.length > plies ? L.now() : undefined;
+    for (let i = 0; i < 200 && landed === undefined; i++) {
+      L.advance(100);
+      if (board().history.length > plies) landed = L.now();
+    }
+    return { L, asked, landed: landed!, round: L.toRound() };
+  }
+
+  it("holds his move for the gag's whole timeline and its margin, his move then played as ever; the next round's clock as without it", () => {
+    const gag = toGag("hangon");
+    const plain = toGag("");
+    expect(gag.L.runner().boss!.powers!.dash!.popOff).toEqual({ at: 2, hangOn: true });
+    const hold = hangOnTimeline().total + DASH_HANG_ON.tailMs;
+    expect(gag.landed - gag.asked).toBeGreaterThanOrEqual(hold - 100);
+    expect(gag.landed - gag.asked).toBeLessThanOrEqual(hold + 200);
+    // (Without it his move comes at once, at his usual dashThinkMs.)
+    expect(plain.landed - plain.asked).toBeLessThan(1500);
+    // (The game the same: the moves, the next round's clock; the round only later.)
+    const hist = (x: typeof gag) => x.L.runner().boards.get(x.L.runner().state.boards[0]!)!.history;
+    expect(hist(gag)).toEqual(hist(plain));
+    expect(gag.round.moveClock).toBe(plain.round.moveClock);
+    expect(gag.round.deadline - gag.round.startsAt).toBe(plain.round.deadline - plain.round.startsAt);
+    expect(gag.round.startsAt).toBeGreaterThanOrEqual(gag.landed);
   });
 });
 
