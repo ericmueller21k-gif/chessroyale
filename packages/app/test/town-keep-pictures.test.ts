@@ -63,7 +63,11 @@ function firstVisit() {
   };
   for (const f of roof.faces) for (const p of [f.whole, ...f.tris]) P.add(p.cv as Pic);
   P.roofDone(roof);
-  for (const c of list.slice(202)) P.add(c);
+  // (Two glows, Nov 26: one with two pieces on its sheet, the next picture; one with none, no sheet.)
+  P.add(list[202]!);
+  P.glowDone([0, 0, 5, 6, 21.5, 5.049999999999999, 0, 7, 0, 4, 4, -3, 2, 1]);
+  P.glowDone([]);
+  for (const c of list.slice(203)) P.add(c);
   return { P, list, keptByPainter };
 }
 const KEY = pictureKey("abc123", "/assets/Town-x.js", "layout");
@@ -118,8 +122,17 @@ describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
     for (let i = 0; i < 200; i++) later.add(later.next());
     const roof = later.roof();
     for (const f of roof.faces) for (const p of [f.whole, ...f.tris]) later.add(p.cv);
+    const glow = later.glow();
+    expect(glow, "a glow's pieces as kept, fractions too").toEqual([0, 0, 5, 6, 21.5, 5.049999999999999, 0, 7, 0, 4, 4, -3, 2, 1]);
+    later.add(later.next());
+    expect(later.glow(), "a glow with no pieces").toEqual([]);
     while (later.list.length < 300) later.add(later.next());
     expect(later.matched()).toBe(true);
+    // (One that took every picture and roof but fewer glows than were kept doesn't match: Nov 26.)
+    const noGlows = new Pictures(() => undefined, from);
+    noGlows.roof();
+    while (noGlows.list.length < 300) noGlows.add(noGlows.next());
+    expect(noGlows.matched()).toBe(false);
     const cutOf = (i: number) => `${m.pics[i * 5]}:${m.pics[i * 5 + 1]},${m.pics[i * 5 + 2]} ${list[i]!.width}x${list[i]!.height}`;
     expect(later.list.map((c) => (c as Pic).tag)).toEqual(list.map((_, i) => cutOf(i)));
     expect(roof.faces.map((f) => [f.whole, ...f.tris].map((p) => [(p.cv as Pic).tag, p.sx, p.sy, p.w, p.h, p.ox, p.oy]))).toEqual([
@@ -169,6 +182,9 @@ describe("Chess Town's kept pictures (keep-pictures.ts)", () => {
       ["a picture off its page", { ...entry, manifest: { ...m, pics: m.pics.map((v, i) => (i === 3 ? 99999 : v)) } }, undefined],
       ["a picture count cut short", { ...entry, manifest: { ...m, pics: m.pics.slice(0, -2) } }, undefined],
       ["a roof's piece past the pictures", { ...entry, manifest: { ...m, roofs: [[[999, 0, 0, 1, 1, 0, 0]]] } }, undefined],
+      ["no glows (before Nov 26)", { ...entry, manifest: { ...m, glows: undefined } }, undefined],
+      ["a glow's piece cut short", { ...entry, manifest: { ...m, glows: [[0, 0, 5, 6, 1]] } }, undefined],
+      ["a glow's piece at a fraction on its sheet", { ...entry, manifest: { ...m, glows: [[0.5, 0, 5, 6, 1, 1, 0]] } }, undefined],
       ["a page that doesn't decode", entry, pageIO({ fail: true })],
       ["a page of the wrong size", entry, pageIO({ size: 7 })],
     ];

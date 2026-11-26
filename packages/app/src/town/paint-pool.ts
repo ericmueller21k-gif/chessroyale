@@ -103,13 +103,14 @@ export class PaintPool {
 
   /** Art's number (-1: it doesn't go into JSON, so its pictures are painted here). */
   private refOf(sp: PaintSpec): number {
-    const o = sp.kind === "frame" ? sp.ch : sp.b;
+    // (A glow's character is a frame's too: its JSON made once for both.)
+    const o = sp.kind === "roof" ? sp.b : sp.ch;
     let id = this.ids.get(o);
     if (id === undefined) {
       this.ids.set(o, (id = this.ids.size));
       let js: string | null = null;
       try {
-        js = JSON.stringify(sp.kind === "frame" ? paintCopy(sp.ch) : roofCopy(sp.b));
+        js = JSON.stringify(sp.kind === "roof" ? roofCopy(sp.b) : paintCopy(sp.ch));
       } catch {
         // (A loop, or a value JSON can't hold.)
       }
@@ -153,7 +154,7 @@ export class PaintPool {
           continue;
         }
         if (!s.has.has(ref) && !fresh.has(ref)) fresh.add(ref), defs.push([ref, this.json[ref]!]);
-        jobs.push(sp.kind === "frame" ? { i, kind: "frame", ref, k: sp.k, dark: sp.dark } : { i, kind: "roof", ref, q: sp.q });
+        jobs.push(sp.kind === "frame" ? { i, kind: "frame", ref, k: sp.k, dark: sp.dark } : sp.kind === "glow" ? { i, kind: "glow", ref, spots: sp.spots, pools: sp.pools } : { i, kind: "roof", ref, q: sp.q });
       }
       if (!jobs.length) return false;
       try {

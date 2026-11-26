@@ -30,7 +30,7 @@
  * Nothing is allocated per frame on the hot path: the streams, the path, the state stack and the scratch vertices are
  * typed arrays and objects that grow and are reused.
  */
-import { REC } from "./frame-report.ts";
+import { REC, upName } from "./frame-report.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
 import { ATLAS, art2d, artInMemory, type AtlasPage } from "./paint.ts";
@@ -805,8 +805,9 @@ class GLPainter implements Painter {
       e.tex = null;
       return;
     }
-    // (`?report`: the upload's time, its place in the atlas included, frame-report.ts.)
+    // (`?report`: the upload's time, its place in the atlas included, frame-report.ts; and why, for its count by source, Nov 26.)
     const t0 = REC ? performance.now() : 0;
+    const why = !REC ? "" : e.tex && e.gen !== this.gen ? "after a lost context" : e.tex ? "redrawn" : e.gen ? "its page started again" : "";
     // Pending draws that read its old pixels go first.
     if (e.tex && e.gen === this.gen) this.flushUsing(e.tex);
     if (!(e.tex && e.gen === this.gen && e.w === w && e.h === h)) this.place(e, w, h);
@@ -820,7 +821,7 @@ class GLPainter implements Painter {
       gl.bindTexture(gl.TEXTURE_2D, t.t);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, e.x, e.y, gl.RGBA, gl.UNSIGNED_BYTE, s);
     }
-    if (REC) REC.upload(performance.now() - t0);
+    if (REC) REC.upload(performance.now() - t0, s, why);
   }
 
   /** A place for a w x h picture: an atlas page's shelf, or its own texture. */
@@ -2274,7 +2275,7 @@ class GLCtx {
     const pad = stroke + 2;
     const left = Math.ceil((mt.actualBoundingBoxLeft + pad) * scale);
     const top = Math.ceil((mt.actualBoundingBoxAscent + pad) * scale);
-    const cv = document.createElement("canvas");
+    const cv = upName(document.createElement("canvas"), "text");
     cv.width = Math.max(1, left + Math.ceil((mt.actualBoundingBoxRight + pad) * scale));
     cv.height = Math.max(1, top + Math.ceil((mt.actualBoundingBoxDescent + pad) * scale));
     const c = art2d(cv);

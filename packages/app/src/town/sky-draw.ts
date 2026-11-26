@@ -12,6 +12,7 @@ import { TOWN_FEEL } from "./feel.ts";
 import { LOOKS, SKY_STOPS, look, mixRGB, type Look, type SkyWeights } from "./sky.ts";
 import type { Ctx } from "./paint.ts";
 import { art2d } from "./paint.ts";
+import { upName } from "./frame-report.ts";
 
 const lookOf = look;
 const css = (c: readonly number[], a = 1) => (a >= 1 ? `rgb(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0})` : `rgba(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0},${a.toFixed(3)})`);
@@ -127,8 +128,9 @@ export class SkyPainter {
   warm(keep: (c: HTMLCanvasElement) => void): void {
     if (!this.W || !this.H) return;
     const R = clamp(Math.min(this.W, this.H) * TOWN_FEEL.sunSize, 22, 80);
+    // (Every look's, not only the sky's now (Nov 26): the clock turns it as you play, and a look's sun and clouds made as it first
+    // shows were uploads while walking.)
     for (const l of LOOKS) {
-      if (this.weights[l] < 0.01) continue;
       keep(this.sunArt(l, R));
       for (const c of this.clouds) if (l !== "night" || c.night) keep(this.cloudArt(c, l));
     }
@@ -161,7 +163,7 @@ export class SkyPainter {
     if (a) return a;
     const { w, h, cells } = c.shape;
     const s = Math.max(1, Math.round(TOWN_FEEL.cloudPixel * this.DPR));
-    a = document.createElement("canvas");
+    a = upName(document.createElement("canvas"), "sky");
     a.width = w * s;
     a.height = h * s;
     const g = art2d(a);
@@ -184,7 +186,7 @@ export class SkyPainter {
     if (a) return a;
     const D = this.DPR;
     const size = Math.ceil(R * 4.4);
-    a = document.createElement("canvas");
+    a = upName(document.createElement("canvas"), "sky");
     a.width = a.height = Math.ceil(size * D);
     const g = art2d(a);
     g.scale(D, D);

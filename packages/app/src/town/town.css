@@ -993,7 +993,8 @@ button.town-pic.player {
   gap: 6px;
 }
 .tfr-dev,
-.tfr-most {
+.tfr-most,
+.tfr-ups {
   color: #c9c9d2;
 }
 .tfr-fps {
