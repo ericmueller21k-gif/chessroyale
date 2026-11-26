@@ -1,4 +1,5 @@
 {
+ "about": "The schema as ensureSchema made it on main at 92320601 (Nov 26, 2026), before payments PR 5: every table, index and trigger (sqlite_master), and its meta.schema version. purchases.test.ts runs the migration on a copy of it.",
  "version": "18510-ktc4er",
  "statements": [
   "CREATE TABLE blocks (\n    user_id TEXT NOT NULL,\n    blocked_id TEXT NOT NULL,\n    at INTEGER NOT NULL,\n    PRIMARY KEY (user_id, blocked_id)\n  )",
@@ -45,10 +46,9 @@
   "CREATE TABLE sessions (\n    token_hash TEXT PRIMARY KEY,\n    user_id TEXT NOT NULL,\n    created_at INTEGER NOT NULL,\n    expires_at INTEGER NOT NULL\n  )",
   "CREATE TABLE solo_battles (\n    user_id TEXT PRIMARY KEY,\n    id TEXT NOT NULL,\n    started_at INTEGER NOT NULL\n  )",
   "CREATE TABLE solo_games (\n    user_id TEXT PRIMARY KEY,\n    id TEXT NOT NULL,\n    started_at INTEGER NOT NULL,\n    test_minutes INTEGER\n  , real_at INTEGER, mode TEXT, players INTEGER, team TEXT, boss_id TEXT, boss_elo INTEGER)",
-  "CREATE TABLE sqlite_sequence(name,seq)",
   "CREATE TABLE tower_best (\n    user_id TEXT NOT NULL,\n    kind TEXT NOT NULL,\n    floor INTEGER NOT NULL,\n    at INTEGER NOT NULL,\n    PRIMARY KEY (user_id, kind)\n  )",
   "CREATE TABLE tower_runs (\n    id TEXT PRIMARY KEY,\n    user_id TEXT NOT NULL,\n    kind TEXT NOT NULL,\n    seed INTEGER NOT NULL,\n    floor INTEGER NOT NULL,\n    met TEXT NOT NULL,\n    members TEXT,\n    fight TEXT,\n    last TEXT,\n    status TEXT NOT NULL,\n    started_at INTEGER NOT NULL,\n    updated_at INTEGER NOT NULL\n  )",
-  "CREATE TABLE users (\n    id TEXT PRIMARY KEY,\n    name TEXT NOT NULL,\n    icon TEXT NOT NULL DEFAULT '♟',\n    email TEXT UNIQUE,\n    google_sub TEXT UNIQUE,\n    created_at INTEGER NOT NULL,\n    last_seen INTEGER NOT NULL\n  , rating INTEGER, allow_invites TEXT, hide_online INTEGER, dnd INTEGER, pawn_color TEXT, age_ok_at INTEGER, chat_on INTEGER, test INTEGER, resident INTEGER)",
+  "CREATE TABLE users (\n    id TEXT PRIMARY KEY,\n    name TEXT NOT NULL,\n    icon TEXT NOT NULL DEFAULT '\u265f',\n    email TEXT UNIQUE,\n    google_sub TEXT UNIQUE,\n    created_at INTEGER NOT NULL,\n    last_seen INTEGER NOT NULL\n  , rating INTEGER, allow_invites TEXT, hide_online INTEGER, dnd INTEGER, pawn_color TEXT, age_ok_at INTEGER, chat_on INTEGER, test INTEGER, resident INTEGER)",
   "CREATE TABLE wallets (\n    user_id TEXT PRIMARY KEY,\n    coins INTEGER NOT NULL DEFAULT 0\n  , crates INTEGER NOT NULL DEFAULT 0, crate_keys INTEGER NOT NULL DEFAULT 0, xp INTEGER NOT NULL DEFAULT 0, boss_picks INTEGER NOT NULL DEFAULT 0)",
   "CREATE TABLE welcome_crates (\n    user_id TEXT NOT NULL,\n    milestone INTEGER NOT NULL,\n    granted_at INTEGER NOT NULL,\n    games INTEGER NOT NULL,\n    seen_at INTEGER,\n    opened_at INTEGER,\n    item_id TEXT,\n    def TEXT,\n    PRIMARY KEY (user_id, milestone)\n  )",
   "CREATE INDEX blocks_blocked ON blocks (blocked_id)",

@@ -24,7 +24,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   (`npx tsx packages/sim/scripts/coin-report.ts`, from the settings). The FAQ's "Coins" (in "XP and levels") follows the settings.
 - **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
   coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
-  at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
+  at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`). **Earned coins go first** (Nov 26, payments PR 5; [payments.md](payments.md)): the spend goes through
+  `applySpend` (purchases.ts), which takes earned coins and then the oldest bought coins in the same batch, guarded on what it read and
+  planned again once if something changed meanwhile ("That didn't go through. Try again." if it changes twice). Coins bought with money
+  (none yet: Stripe is PR 8) are a balance of their own in the ledger, beside the wallet's coins.
 - **The inventory layer** (Nov 22; [2026-11-22-inventory-layer.md](../decisions/2026-11-22-inventory-layer.md); `InventoryLayer` in `components/PageLayer.tsx`, the page layer Chess Town's side menu pages use on a computer too, [town-square.md](town-square.md)):
   the same `ShopScreen` (opened on Crates) in the shop page's own frame (it looks the same as from the main menu; on a computer the
   same middle column, without the side menu and chat rail, whose links would leave), opaque, over whatever screen you're on, from the end screen's reward card ("Go to inventory"), so

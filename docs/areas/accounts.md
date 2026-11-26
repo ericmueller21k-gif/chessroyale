@@ -166,6 +166,11 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
     has none.
   - **The ledger** (store `ledger`: `ledger`, `ledger_accounts`; `ledger.ts`, Nov 6): the download has every change to the balances;
     deleting closes each balance in it and drops the account's random ledger id, so its rows stay naming nobody (append-only).
+  - **Purchases** (store `purchases`: `purchases`, `refunds`; `purchases.ts`, Nov 26; [payments.md](payments.md)): the download has
+    every purchase and refund (the refund's comment too), and the account's buying columns (`buy_band`, `refund_count`, `hold_until`,
+    `chargebacks`, `closed_at`, `closed_reason`, `held_taps`) in `account`. Deleting keeps both tables' rows as the shared `deleted`
+    account's (sales records, for tax), their unspent coins closed in the ledger, a refund's comment erased. A guest can't buy; a
+    guest's merge would move any rows with their ledger legs. (Nothing is sold yet; the privacy page's lines come with PR 8.)
   - **Every table is accounted for:** each is in a store in `ACCOUNT_STORES` (`account-data.ts`) or listed in
     `NO_ACCOUNT_DATA`. `account-data.test.ts` fails on a table in neither, from the schema or any `CREATE TABLE` in
     the server. It also pins every table's columns (`SCHEMA_COLUMNS`), so any schema change means checking the two
@@ -232,6 +237,7 @@ Who's online, who's in a match and what they're doing (`?doing=`) stay in the li
 | The age gate: its rule and lines (core), the answer's route and checks (`ageAnswer`, `ageRefusal`, POST `/api/auth/age`), the app's question and flag (`answerAge`, `tooYoung`) | `packages/core/src/age-gate.ts`, `packages/server/src/api.ts`, `packages/app/src/account.ts`, `components/SignIn.tsx` |
 | The privacy policy, terms and copyright page | `packages/app/src/screens/Legal.tsx` |
 | Download my data and deleting an account: every store's part (`ACCOUNT_STORES`), the routes `/api/me/data` and `/api/me/delete` | `packages/server/src/account-data.ts`, `api.ts`; the live hub's part `live-hub.ts` (`accountData`, `forgetAccount`) |
+| Purchases, refunds and the account's buying columns (D1): the checkout, the credit, earned-first spending, refundable | `packages/server/src/purchases.ts`, `ledger.ts`; [payments.md](payments.md) |
 | App side: Settings → ACCOUNT's download link and delete confirmation | `packages/app/src/components/AccountData.tsx`, `account.ts` (`deleteMyAccount`) |
 | Fair play's tables (made with the rest of the schema) | `packages/server/src/fairplay-schema.ts` |
 | The Battle Tower's climbs and bests (`tower_runs`, `tower_best`), `/api/tower*`, its part of the merge, the download and deleting | `packages/server/src/tower.ts`, routed from `api.ts`; [battle-tower.md](battle-tower.md) |
@@ -250,6 +256,8 @@ offered, how long each answer lasts).
 - Quests: `packages/core/test/quests.test.ts` (what counts, the pool, seeded picks, the cap, countdowns, the toast's lines),
   `packages/server/test/quests.test.ts` (dealing, resets, carry-over, the reroll, progress per mode, paid once under replays and races,
   the weekly, the pause, merge, download and delete, the API); `e2e/quests.spec.ts`.
+- Purchases (Nov 26): `packages/server/test/purchases.test.ts` (the migration on a copy of the schema from before, the credit once,
+  earned first, the races, refundable, the download and deleting, a guest's merge), `packages/core/test/payments.test.ts`; [payments.md](payments.md).
 - Play coins: `packages/core/test/play-coins.test.ts` (each rule, the steps, the day's 300, the 600 ceiling, solo, the reasons for none,
   the stored JSON), `packages/server/test/play-coins.test.ts` (once, replays and races, the day's caps with games at once, the XP day's
   boundary, held, the bonus's facts and the friends' lobby rule, the 50 v 50 scoreboard's top places), coins in `xp.test.ts`,
