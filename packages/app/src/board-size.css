@@ -631,6 +631,12 @@
   .arena:has(> .tower-space) > .screen.game.bf-frame {
     margin-right: round(down, max(0px, var(--cf-free) - var(--cf-bw) - var(--side-w)) / 2, 1px);
   }
+  /* (A raid: with the side menu's labels, the block keeps at least 40 px either side (the director, Nov 26: its column ran to the window's
+     edge at 1536 × 730); where that would cost the board, the menu shows icons (FrontMenu.tsx useMenuLabels), and the block is centered with
+     the room the 50 v 50 has there. Boss alone keeps its own: its boss column takes half the room either way, and his figures their sizes.) */
+  .gm-frame.gm-labels .arena:has(> .tower-side) > .screen.game.bf-frame {
+    --cf-edge: 40px;
+  }
   /* The gear row: level with the bar, at the column's right end (no shift: the column starts one gap off the board). */
   .screen.game.bf-frame > .gm-tools {
     left: 0;
@@ -656,7 +662,9 @@
     height: auto;
     margin-bottom: var(--gk-zone);
   }
-  /* (A raid's scoreboard: its table's top on the board's top, its foot the board's, as the 50 v 50's: board-foot.ts.) */
+  /* (A raid's scoreboard: its table's top on the board's top, as the 50 v 50's; its foot over the boss, who stands over its edge on the
+     board's foot (his frame and his words' room: the director, Nov 26, "the boss must never cover the scoreboard"), its rows scrolling in
+     it: board-foot.ts. The left column is the scoreboard and the boss under it, as the right one is the moves and the God King.) */
   .arena:has(> .screen.game.bf-frame) > .tower-side {
     max-height: var(--side-foot, var(--app-h));
     padding-top: var(--side-pad, 14px);

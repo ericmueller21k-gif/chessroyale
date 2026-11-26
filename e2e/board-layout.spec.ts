@@ -29,12 +29,13 @@ const MAIN_BOARD: Record<string, number> = { "390x844": 312, "360x640": 282.7, "
  * …the raid's scoreboard beside the board on a computer (x, y, width; its height the window's). Since Oct 29 the screen beside it
  * grows with the board (docs/decisions/2026-10-29-desktop-board-size.md). Nov 1 (round 2): the side menu sits left of the screens
  * (x 10 → 90 at 1280 and 1440 × 900, x 118 → 242 at 1920 × 1080), and the scoreboard is 340 px (was 360). Nov 26, the shared frame (the
- * scoreboard, the board and the column centered as one block): x 242 → 252 at 1920 × 1080; its foot the board's, not the window's.
+ * scoreboard, the board and the column centered as one block; with the menu's labels at least 40 px either side, else icons): x 242 → 176
+ * at 1920 × 1080 (icons now); its foot over the boss, not the window's.
  */
 const MAIN_TOWER: Record<string, { x: number; y: number; w: number }> = {
   "1280x800": { x: 90, y: 0, w: 340 },
   "1440x900": { x: 90, y: 0, w: 340 },
-  "1920x1080": { x: 252, y: 0, w: 340 },
+  "1920x1080": { x: 176, y: 0, w: 340 },
 };
 /** …and the "Your move" row's height (two lines' room). */
 const MAIN_ROW_H = 62;
@@ -283,9 +284,11 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
         const t = b.tower!;
         expect(t, `${at}: the scoreboard`).toBeTruthy();
         const m = MAIN_TOWER[size]!;
-        // (Nov 26, the shared frame: its foot the board's, the clock's bar under the squares included, as the 50 v 50's. Was the window's.)
-        const foot = b.board!.b + 6;
-        for (const [k, v] of [["x", t.x - m.x], ["y", t.y - m.y], ["width", t.r - t.x - m.w], ["foot", t.b - foot]] as const) expect(Math.abs(v), `${at}: the scoreboard's ${k} (${JSON.stringify(t)})`).toBeLessThanOrEqual(1);
+        // (Nov 26, the shared frame: its foot over the boss, who stands over its edge on the board's foot (his frame and his words' room;
+        // the director: "the boss must never cover the scoreboard"), its rows scrolling. Was the window's height, the boss over it.)
+        for (const [k, v] of [["x", t.x - m.x], ["y", t.y - m.y], ["width", t.r - t.x - m.w]] as const) expect(Math.abs(v), `${at}: the scoreboard's ${k} (${JSON.stringify(t)})`).toBeLessThanOrEqual(1);
+        const art = (await page.locator(".boss-char.place-side .boss-char-sprite").boundingBox())!;
+        expect(t.b, `${at}: the scoreboard ends over the boss`).toBeLessThanOrEqual(art.y);
       } else expect(b.mini, `${at}: the scoreboard under the moves`).toBeTruthy();
       expect(b.pawn, `${at}: no pawn in a raid`).toBeNull();
     } else {

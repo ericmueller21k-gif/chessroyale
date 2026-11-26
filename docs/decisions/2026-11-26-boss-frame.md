@@ -18,6 +18,11 @@
     before (Boss alone 228 → 300 px at 1536 × 730, 343 → 480 at 1920 × 960; a raid 228 → 390, 343 → 620), not the board's whole height:
     the room under it is the figures'. Drawing him over the list would need that guard changed (Eric's OK).
   - **The figures stand on the squares' foot, the clock's bar under them** (as the boss always has): the guard measures them there.
+  - **A raid's boss never covers the scoreboard** (the director's review of the mock, Nov 26). The left column mirrors the right one: the
+    scoreboard from the board's top down to over the boss's room (his frame, and five lines of his words: board-foot.ts), its rows
+    scrolling; the boss under it on the board's foot. The simplest that covers nothing and keeps every column on the board's lines.
+  - **A raid's block is centered with room either side** (the same review): with the menu's labels it keeps at least 40 px each side, else
+    icons (1536 × 730 and 1920 × 1080 icons now; 1920 × 960 labels). Boss alone keeps its own margins (its figures' sizes).
   - **Not the Hidden Boss's fight, nor a Battle Tower floor** (`bossFramed`): his phase change and phase 2 keep phase 1's boxes (their own
     layout, hidden-boss-room.spec.ts); a floor has its own bar and column.
-  - **Labels per #953's rule:** labels at 1536 × 730, 1920 × 960 and 1920 × 1080; icons at 1280 × 800, 1366 × 768 and 1440 × 900.
+  - **Labels per #953's rule:** Boss alone has labels at 1536 × 730, 1920 × 960 and 1920 × 1080; icons at 1280 × 800, 1366 × 768 and 1440 × 900.

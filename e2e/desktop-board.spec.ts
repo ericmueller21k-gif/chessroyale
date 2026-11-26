@@ -549,8 +549,9 @@ test("a computer's 50 v 50 (Eric, Nov 26): the labeled top row on the board, cle
  * 50 v 50's and Squads' bottom line is under the clock's bar (mirrored under the board), the 1 v 1's its squares' foot (its own strip under
  * it). Squads' columns: the standings' box on the left; the tiny boards (in the votes, the line that says what to do) down to the panel's foot
  * (the votes' list's) on the right. Boss alone's and a raid's (Nov 26): the left column a raid's scoreboard (its table from the board's top) or
- * Boss alone's boss column (`.tower-space`, where he stands: its edge is the gap's); the right column the Moves panel from the board's top,
- * then the God King (and your pawn) standing on the squares' foot, the clock's bar under them.
+ * Boss alone's boss column (`.tower-space`, where he stands: its edge is the gap's), or a raid's scoreboard with the boss under it (the
+ * scoreboard ends over him and his words); the right column the Moves panel from the board's top, then the God King (and your pawn)
+ * standing on the squares' foot, the clock's bar under them.
  * The 50 v 50's opening vote too (Nov 26, the director's round 2): its column (the line that says what to do, on one line, the cards, the
  * chat) on the same lines, and nothing moves as the game begins: the board, the scoreboard and the chat are where the game's are.
  */
@@ -575,8 +576,17 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
         const feet = pawn ? pawn.bottom : box(".boss-dock .gk-unit").bottom - 14;
         const left = box(screen === "alone" ? ".arena > .tower-space" : ".arena > .tower-side");
         const columns: Record<string, { top: number; foot: number }> = { "the column (the Moves panel, the figures under it)": { top: moves.top, foot: feet + bar } };
-        if (screen === "raid") columns.scoreboard = { top: box(".arena > .tower-side > .tower").top, foot: left.bottom };
-        return { board, columns, gaps: [sq.left - left.right, moves.left - sq.right] };
+        // (A raid's left column is the scoreboard and the boss under it, standing on the squares' foot: the scoreboard ends over him, his
+        // frame and his words' room, and never covers or is covered by him (the director, Nov 26).)
+        let cover: number | undefined;
+        if (screen === "raid") {
+          const boss = box(".screen.game .boss-char.place-side");
+          const art = box(".screen.game .boss-char.place-side .boss-char-sprite");
+          const words = document.querySelector(".screen.game .boss-char.place-side .bc-bubble")?.getBoundingClientRect();
+          columns["the left column (the scoreboard, the boss under it)"] = { top: box(".arena > .tower-side > .tower").top, foot: boss.bottom + bar };
+          cover = left.bottom - Math.min(art.top, boss.top, words && words.height > 0 ? words.top : Infinity);
+        }
+        return { board, columns, gaps: [sq.left - left.right, moves.left - sq.right], cover };
       }
       if (screen === "duel") {
         const panel = box(".dv-side > .dv-box");
@@ -615,6 +625,7 @@ test("Eric's column rule (Nov 25): every column on the board's top and bottom li
       expect(Math.abs(c.foot - g.board.foot), `${at}: the ${name}'s foot on the board's (${c.foot} v ${g.board.foot})`).toBeLessThanOrEqual(1);
     }
     expect(Math.abs(g.gaps[0]! - g.gaps[1]!), `${at}: the gaps either side of the board equal (${g.gaps.join(" v ")})`).toBeLessThanOrEqual(1);
+    if ("cover" in g && g.cover !== undefined) expect(g.cover, `${at}: the scoreboard ends over the boss and his words`).toBeLessThanOrEqual(0);
   };
   for (const s of [REAL_SCREENS[0], REAL_SCREENS[3]]) {
     for (const screen of ["vote", "crowd", "duel", "squads", "squads relay", "squads votes", "alone", "raid"] as const) {

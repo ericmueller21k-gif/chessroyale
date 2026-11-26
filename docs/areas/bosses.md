@@ -860,10 +860,12 @@ below):
 - **The shared game frame on a computer (Nov 26; [decision](../decisions/2026-11-26-boss-frame.md)).** From 1100 px wide with a mouse, Boss
   alone and a raid (solo or online; `bossFramed` in `game.ts` puts `bf-frame` on every screen of the battle: Play, Boss, Reveal; a Battle
   Tower floor and the Hidden Boss's whole fight keep their own: his phases keep phase 1's boxes) take the 50 v 50's frame (`board-size.css`: the same `--cf-*`
-  sizes, gap and drawing step): the left column (a raid's scoreboard, its table from the board's top to its foot; Boss alone's boss column,
+  sizes, gap and drawing step): the left column (a raid's scoreboard, its table from the board's top down to over the boss, who stands under
+  it on the board's foot and never covers it, its rows scrolling (`board-foot.ts`); Boss alone's boss column,
   `.tower-space`, `--ts-w` plus half the room the block leaves, so Babur's pump keeps its room), the board with its strips (the two-line boss bar over it, kept: Eric, Nov 26, "I like the boss
   bar bigger"; the dock's row under it) and the column beside it (up to 300 px, Boss alone's up to 340 for your pawn and the God King),
-  centered as one block, 28 px (`--cf-gap`) either side of the board. The gear (and the admins' ⚡ and 🐟) at the column's right end, level
+  centered as one block, 28 px (`--cf-gap`) either side of the board (a raid with the menu's labels keeps at least 40 px either side,
+  else icons). The gear (and the admins' ⚡ and 🐟) at the column's right end, level
   with the bar. The Moves panel runs from the board's top down to 12 px over the God King's frame (his canvas, `200px × --king-k` over the
   board's foot: his tallest pose stays clear of the list, boss-side.spec.ts); an online raid's chat sits under the moves (their half height)
   down to the God King's room (`--gk-zone`), as before. The figures stand on the squares' foot, placed from the board as before. The board is the size
