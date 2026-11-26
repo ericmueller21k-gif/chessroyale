@@ -87,6 +87,36 @@ function untilWater(L: ReturnType<typeof gardener>) {
   throw new Error("no watering asked");
 }
 
+/** Plays on until his watering is due at the start of his turn, before the server asks the host for it. */
+function untilDue(L: ReturnType<typeof gardener>) {
+  for (let i = 0; i < 6; i++) {
+    if (L.runner().bossToMove()) {
+      if (L.runner().waterDue()) return;
+      const req = L.asked()!;
+      L.answer((req.allowed ?? legalMoves(req.fen))[0]!);
+      continue;
+    }
+    L.crowdPlays();
+  }
+  throw new Error("no watering due");
+}
+
+/** A position of our own on the battle's board (him to move: `fen` as Black's, turned round if he's White), a base at its ply. */
+function stage(L: ReturnType<typeof gardener>, fen: string): { fen: string; sq: (s: string) => string } {
+  const r = L.runner();
+  const white = r.boss!.crowdSide === "b";
+  const flip = (f: string) => {
+    const [board, side, , , half, full] = f.split(" ");
+    const swap = (c: string) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase());
+    return [board!.split("/").reverse().map((row) => [...row].map(swap).join("")).join("/"), side === "w" ? "b" : "w", "-", "-", half, full].join(" ");
+  };
+  const at = white ? flip(fen) : fen;
+  const id = r.state.boards[0]!;
+  const b = r.boards.get(id)!;
+  r.boards.set(id, { ...b, fen: at, bases: [...(b.bases ?? []), { ply: b.history.length, fen: at }] });
+  return { fen: at, sq: (s) => (white ? s[0]! + String(9 - Number(s[1])) : s) };
+}
+
 describe("the hippo gardener online", () => {
   it("his meter on the server's clock: the opening toss for everyone, the request's seeds as many as the clock says", async () => {
     const L = gardener();
@@ -191,5 +221,29 @@ describe("the hippo gardener online", () => {
       (BOSS_POWERS as { waterOdds: unknown }).waterOdds = odds;
     }
   });
-});
 
+  it("a piece of his hangs once he passes: the request names it (`regrow`), the host's regrowth is played as his; one the server didn't name waits (Eric, Nov 26)", () => {
+    // (His knight on d4, hit by the e3 pawn; seven pawns of his, so a third knight can grow.)
+    const KNIGHT = "1n2k3/ppppppp1/8/8/3n4/4P3/PPPP1PPP/1N2K1N1 b - - 0 10";
+    const L = gardener({ bossSeedTest: 2 });
+    untilDue(L);
+    const at = stage(L, KNIGHT);
+    const req = L.asked()!;
+    expect(req.fen).toBe(at.fen);
+    expect(req.water!.regrow).toBe("n");
+    const answer = `gn${at.sq("h6")}`;
+    expect(waterCheck(req.fen, req.water!, answer)).not.toBeNull();
+    L.answer(answer);
+    const w = L.toRound().boss!.powers!.garden!.water!;
+    expect(w.growth.filter((g) => g.regrow)).toEqual([{ kind: "n", square: at.sq("h6"), regrow: true }]);
+    expect(w.rolled).toHaveLength(2);
+    expect(w.growth).toHaveLength(3);
+    // (Nothing of his hangs: none named, and a host's regrowth is no placement of this watering: it waits, and his move.)
+    const Q = gardener({ bossSeedTest: 2 });
+    const quiet = untilWater(Q);
+    expect(quiet.water!.regrow).toBeUndefined();
+    Q.answer(`gn${quiet.fen.split(" ")[1] === "b" ? "h6" : "h3"}`);
+    expect(Q.runner().boss!.powers!.garden!.waterings).toBe(0);
+    expect(Q.runner().boss!.powers!.garden!.wait).toBe(Q.runner().boss!.crowdMoves);
+  });
+});

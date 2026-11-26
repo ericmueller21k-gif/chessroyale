@@ -31,13 +31,22 @@
  *   up as nothing. Nothing at all placed: a shrug (his whole turn all the same).
  * - **Hard guards on every step:** never a king; never either side left in check; never a mate in one for either side;
  *   never the crowd without a move (the plants counted); never a position the engine refuses (stockfishRefuses).
- * - **The pass guard** (as every power that spends his whole turn): when the watering would lose him real material
- *   (passLoses), it waits for his next turn and he plays his move, at most ultWaitMax times a watering (Eric, Nov 26); the test switch's and the admins' trigger's come anyway.
+ * - **The regrowth** (Eric, Nov 26: "if he's going to lose like a big piece, then he should just basically regrow that
+ *   same piece"): when a piece of his hangs once he passes (regrowKind: the server's, by the exchange check, so the host
+ *   can't name another) and passing would lose it (the host's engine: its line after the pass takes a piece of that kind,
+ *   or the pass guard's own measure, passLoses; docs/decisions/2026-11-26-puddles-regrow.md), the watering grows
+ *   that same kind of piece back for him first, one more outcome than the seeds, on the square (of waterLooks its guards
+ *   allow) that leaves his gain nearest none: it makes up the loss, and the seeds are placed on top of it as ever, so his
+ *   total stays near waterTarget, not double. Under the hard guards like any grown piece (a full set: it can't grow).
+ * - **The pass guard** (as every power that spends his whole turn): when the watering would still lose him real material
+ *   (passLoses: no regrowth, or one that doesn't cover it), it waits for his next turn and he plays his move, at most
+ *   ultWaitMax times a watering (Eric, Nov 26); the test switch's and the admins' trigger's come anyway.
  * - Online the server rolls the seeds and the host's engines place them (the boss request's `water`); the server checks
- *   the answer (waterCheck: what was rolled, where the rules allow it) and plays it. Anything else waits a turn.
+ *   the answer (waterCheck: what was rolled, where the rules allow it, a regrowth only of the kind it named) and plays
+ *   it. Anything else waits a turn.
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type GardenPlant, type GardenState, type PowerEvent, type WaterGrowth, type WaterKind, type WaterResult } from "@chessroyale/core";
-import { kingAttacked, legalMoves, mateInOne, pieceAt, sideToMove, withPiece, withoutPiece } from "../rules.ts";
+import { exchangeNet, kingAttacked, legalMoves, mateInOne, pieceAt, sideToMove, withPiece, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { PASS_WAIT, eachOn, logit, meterFull, moveSquares, other, passLoses, powerRoll, testSwitch, ticksAt, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
@@ -136,21 +145,48 @@ export const grows = (k: WaterKind): boolean => k !== "nothing" && k !== "plant"
 /** What a placed outcome is: a plain plant, a killer plant, or a piece grown for him. */
 export type PlacedKind = Exclude<WaterKind, "nothing">;
 
-/** One outcome placed: its kind and square. */
+/** One outcome placed: its kind and square (`regrow`: the regrowth, not a seed's). */
 export interface Placed {
   kind: PlacedKind;
   square: string;
+  regrow?: true;
 }
+
+/** A piece the watering can grow back for him (the regrowth): never a pawn (a pawn's loss is under the pass guard's). */
+export type RegrowKind = "n" | "b" | "r" | "q";
 
 /**
  * What the host's engines (or solo's) need to place a watering: what the seeds rolled (in seed order), the plain plants
  * already on the board, and a number the order of the squares tried comes from (drawn from the battle's seed and the
- * watering: the battle's own seed never leaves the server).
+ * watering: the battle's own seed never leaves the server). `regrow`: the kind of piece of his that hangs once he
+ * passes (regrowKind), which the watering grows back if passing would lose him real material; none: no regrowth.
  */
 export interface WaterAsk {
   kinds: WaterKind[];
   plants: string[];
   order: number;
+  regrow?: RegrowKind;
+}
+
+/**
+ * The piece he stands to lose by passing (`fen`: him to move, before the watering; `plants`: the plain plants on the
+ * board), the kind the regrowth grows back: of his pieces the crowd could take once he passes (its legal captures no
+ * plant stops), the one it nets the most from by the exchange check (exchangeNet; ties to the bigger piece), if that's
+ * real material (at least passGuardPawns pawns: a knight a pawn attacks, a piece left undefended). Null: nothing of his
+ * hangs (a pawn at most), or he can't pass. Pure, no engine: the server names it.
+ */
+export function regrowKind(fen: string, plants: readonly string[] = [], s: Pick<BossPowerSettings, "passGuardPawns"> = BOSS_POWERS): RegrowKind | null {
+  const passed = passTurn(fen);
+  if (!passed) return null;
+  let best: { type: PlacedKind; net: number } | null = null;
+  for (const m of legalMoves(passed)) {
+    const victim = pieceAt(passed, m.slice(2, 4));
+    if (!victim || victim.type === "k" || plantStops(m, plants, passed)) continue;
+    const net = exchangeNet(passed, m);
+    if (net === null || net <= 0) continue;
+    if (!best || net > best.net || (net === best.net && NOMINAL[victim.type as PlacedKind] > NOMINAL[best.type])) best = { type: victim.type as PlacedKind, net };
+  }
+  return best && best.type !== "p" && best.net >= s.passGuardPawns ? (best.type as RegrowKind) : null;
 }
 
 /**
@@ -167,8 +203,8 @@ const PLAY_ORDER: readonly WaterKind[] = ["killer", "p", "n", "b", "r", "q", "pl
 const CODE: Record<PlacedKind, string> = { plant: "t", killer: "x", p: "p", n: "n", b: "b", r: "r", q: "q" };
 const KIND_OF: Record<string, PlacedKind> = { t: "plant", x: "killer", p: "p", n: "n", b: "b", r: "r", q: "q" };
 
-/** The host's answer for a placement: each outcome as its letter and square, in the order placed ("none": nothing at all). */
-export const waterCode = (placed: readonly Placed[]): string => (placed.length ? placed.map((p) => CODE[p.kind] + p.square).join(" ") : "none");
+/** The host's answer for a placement: each outcome as its letter and square, in the order placed ("none": nothing at all); the regrowth "g" and its piece's letter. */
+export const waterCode = (placed: readonly Placed[]): string => (placed.length ? placed.map((p) => (p.regrow ? "g" : "") + CODE[p.kind] + p.square).join(" ") : "none");
 
 const SQUARES: readonly string[] = [..."abcdefgh"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`));
 const isSquare = (sq: string) => SQUARES.includes(sq);
@@ -241,7 +277,7 @@ function pace(now: () => number, limitMs: number): Pace {
  * A step's options: up to `max` squares for this outcome, in a seeded order, each passing every guard. Stops early (with
  * what it has) once the search's time is up.
  */
-async function stepOptions(pos: string, plants: readonly string[], used: ReadonlySet<string>, kind: PlacedKind, boss: Side, order: number, step: number, tier: "crowd" | "his" | undefined, max: number, p: Pace) {
+async function stepOptions(pos: string, plants: readonly string[], used: ReadonlySet<string>, kind: PlacedKind, boss: Side, order: number, step: number | "regrow", tier: "crowd" | "his" | undefined, max: number, p: Pace) {
   // (A plain plant goes where the crowd could move now, when it can: a plant on a square nobody can use changes nothing.)
   let squares = SQUARES;
   if (kind === "plant") {
@@ -274,14 +310,19 @@ const blockedSquares = (move: string, fen: string): string[] => moveSquares(move
  * topMovesAt, a test's: its top move, or the best of the moves no plant stops.)
  */
 async function sideBest(engine: EngineLike, fen: string, plants: readonly string[], nodes: number): Promise<number | null> {
+  return (await sideLine(engine, fen, plants, nodes))?.expected ?? null;
+}
+
+/** sideBest's search with its move: the side to move's best move no plant stops, and its expected score. */
+async function sideLine(engine: EngineLike, fen: string, plants: readonly string[], nodes: number): Promise<{ move: string; expected: number } | null> {
   const all = legalMoves(fen);
   const ok = all.filter((m) => !plantStops(m, plants, fen));
   if (!ok.length) return null;
   const only = ok.length < all.length ? ok : undefined;
-  if (engine.topMovesAt) return (await engine.topMovesAt(fen, 1, nodes, only))[0]?.expected ?? null;
-  if (!only) return (await engine.topMoves(fen, 1))[0]?.expected ?? null;
+  if (engine.topMovesAt) return (await engine.topMovesAt(fen, 1, nodes, only))[0] ?? null;
+  if (!only) return (await engine.topMoves(fen, 1))[0] ?? null;
   const scored = await engine.scoreMoves(fen, only);
-  return scored.length ? Math.max(...scored.map((m) => m.expected)) : null;
+  return scored.reduce<{ move: string; expected: number } | null>((a, m) => (!a || m.expected > a.expected ? m : a), null);
 }
 
 /** The engines' placement of a watering (waterFrom), with what it gained him and what the search spent. */
@@ -307,6 +348,11 @@ export interface WaterPick {
  * top, and then only one that lands within the band. An
  * outcome with no option under the top is dropped (it comes up as nothing). The gain is his evaluation after (the crowd
  * to move) against his before (him to move), in pawns of log-odds (bouncePawnLogit), each over the moves no plant stops.
+ * **The regrowth first** (`ask.regrow`, Eric, Nov 26): the pass alone is searched, and when it loses him that piece (the
+ * engine's line takes one of that kind, or by the pass guard's measure, passLoses), that kind of piece grows back for him before any seed, on the option that leaves his gain nearest none
+ * (under the band's top): it makes up the loss; the seeds then go on top of it as ever, their targets reckoned on the
+ * whole board, so the total stays near waterTarget (the regrowth counted once). Without `ask.regrow`, or when the pass
+ * loses nothing real, the seeds alone, exactly as before.
  * Every step's position is a whole watering that passes the guards, so the last one placed is the answer. The search
  * stops at waterBudget positions or after waterTimeMs (its own clock, `now`; the outcomes left are dropped, `late`),
  * breathing between squares (Pace), so ten seeds never stall a phone nor run a host past the server's timeout. Null: no
@@ -330,19 +376,13 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
   let jackpot = false;
   let looks = 0;
   let ownKills = 0;
-  for (let i = 0; i < kinds.length && budget > 0 && !p.over(); i++) {
-    const kind = kinds[i]!;
-    await p.breathe();
-    const rest = kinds.slice(i + 1).reduce((t, k) => t + NOMINAL[k], 0);
-    // (The jackpot: the queen on the square nearest jackpotMax, however far over it (the engine's win chances saturate
-    // near 7 from an even position, so a queen that stays on the board often measures over 6: never one left hanging to
-    // fit); then the rest under jackpotMax, or under what the queen gained if more.)
-    const top = kind === "q" ? Infinity : jackpot ? Math.max(s.jackpotMax, gain ?? 0) : s.waterBand[1];
-    const target = kind === "q" ? s.jackpotMax : (jackpot ? s.jackpotMax : s.waterTarget) - rest;
-    let chosen: { square: string; fen: string; plants: string[]; gain: number } | null = null;
+  type Chosen = { square: string; fen: string; plants: string[]; gain: number };
+  /** One outcome's step: its options (a killer plant's in tiers), each searched; the one nearest `target` at most `top`, or null. */
+  const pick = async (kind: PlacedKind, step: number | "regrow", top: number, target: number): Promise<Chosen | null> => {
+    let chosen: Chosen | null = null;
     for (const tier of kind === "killer" ? (["crowd", "his"] as const) : ([undefined] as const)) {
       if (budget <= 0 || p.over()) break;
-      const options = await stepOptions(pos, plants, used, kind, boss, ask.order, i, tier, Math.min(s.waterLooks, budget), p);
+      const options = await stepOptions(pos, plants, used, kind, boss, ask.order, step, tier, Math.min(s.waterLooks, budget), p);
       if (!options.length) continue;
       budget -= options.length;
       looks += options.length;
@@ -360,22 +400,50 @@ export async function waterFrom(engines: readonly EngineLike[], fen: string, ask
         break;
       }
     }
-    if (!chosen) continue;
-    const c: { square: string; fen: string; plants: string[]; gain: number } = chosen;
+    return chosen;
+  };
+  const take = (kind: PlacedKind, c: Chosen, regrow = false) => {
     pos = c.fen;
     plants = c.plants;
     used.add(c.square);
-    placed.push({ kind, square: c.square });
+    placed.push({ kind, square: c.square, ...(regrow ? { regrow: true as const } : {}) });
     gain = c.gain;
+  };
+  // (The pass alone, searched only when a piece of his hangs once he passes: the regrowth's question, and the answer when
+  // nothing is placed. Passing loses it when the engine's line takes a piece of that kind, or by the pass guard's measure.)
+  let passCrowd: number | null | undefined;
+  if (ask.regrow) {
+    const line = await sideLine(engines[0]!, passed, ask.plants, s.waterNodes);
+    passCrowd = line?.expected ?? null;
+    budget--;
+    looks++;
+    const takes = !!line && pieceAt(passed, line.move.slice(2, 4))?.type === ask.regrow;
+    if (line && (takes || passLoses(gainOf(line.expected), s))) {
+      const c = await pick(ask.regrow, "regrow", s.waterBand[1], 0);
+      if (c) take(ask.regrow, c, true);
+    }
+  }
+  for (let i = 0; i < kinds.length && budget > 0 && !p.over(); i++) {
+    const kind = kinds[i]!;
+    await p.breathe();
+    const rest = kinds.slice(i + 1).reduce((t, k) => t + NOMINAL[k], 0);
+    // (The jackpot: the queen on the square nearest jackpotMax, however far over it (the engine's win chances saturate
+    // near 7 from an even position, so a queen that stays on the board often measures over 6: never one left hanging to
+    // fit); then the rest under jackpotMax, or under what the queen gained if more.)
+    const top = kind === "q" ? Infinity : jackpot ? Math.max(s.jackpotMax, gain ?? 0) : s.waterBand[1];
+    const target = kind === "q" ? s.jackpotMax : (jackpot ? s.jackpotMax : s.waterTarget) - rest;
+    const c = await pick(kind, i, top, target);
+    if (!c) continue;
+    take(kind, c);
     if (kind === "q") jackpot = true;
   }
   if (gain === null) {
     // (Nothing placed: the pass alone, if it's a position the watering may leave.)
     if (!waterGuard(passed, ask.plants)) return null;
-    const crowd = await sideBest(engines[0]!, passed, ask.plants, s.waterNodes);
+    const crowd = passCrowd !== undefined ? passCrowd : await sideBest(engines[0]!, passed, ask.plants, s.waterNodes);
     if (crowd === null) return null;
     gain = gainOf(crowd);
-    looks++;
+    if (passCrowd === undefined) looks++;
   }
   return { placed, fen: pos, gain: Math.round(gain * 100) / 100, looks, ownKills, ...(p.over() ? { late: true as const } : {}) };
 }
@@ -397,9 +465,12 @@ export async function waterAnswer(engines: readonly EngineLike[], fen: string, a
  * rolled (each at most as often), on a square its rules allow (a plain plant or a grown piece on an empty square no plant
  * holds, a pawn never on a first or last rank; a killer plant on a non-king piece), each square once, every step's
  * position passing the guards (waterGuard), placed in the answer's order. "none": nothing at all, if the pass alone
- * passes them. The position after (the crowd to move) and what was placed, or null: not a placement of this watering.
+ * passes them. The regrowth ("g" and a piece's letter): at most one, only of the kind the server named (`ask.regrow`,
+ * regrowKind: a host can't invent one), as a grown piece. (Whether passing really loses him material, as whether the
+ * band holds, needs an engine: the server never searches.) The position after (the crowd to move) and what was placed,
+ * or null: not a placement of this watering.
  */
-export function waterCheck(fen: string, ask: Pick<WaterAsk, "kinds" | "plants">, answer: string): { fen: string; placed: Placed[]; plants: string[] } | null {
+export function waterCheck(fen: string, ask: Pick<WaterAsk, "kinds" | "plants" | "regrow">, answer: string): { fen: string; placed: Placed[]; plants: string[] } | null {
   const passed = passTurn(fen);
   if (!passed) return null;
   const boss = sideToMove(fen);
@@ -411,19 +482,22 @@ export function waterCheck(fen: string, ask: Pick<WaterAsk, "kinds" | "plants">,
   let plants = [...ask.plants];
   const used = new Set<string>();
   const placed: Placed[] = [];
+  let regrown = false;
   for (const tok of text.split(/\s+/)) {
-    const kind = KIND_OF[tok[0] ?? ""];
-    const sq = tok.slice(1);
-    const at = kind ? left.indexOf(kind) : -1;
-    if (!kind || at < 0) return null;
+    const regrow = tok[0] === "g";
+    const kind = regrow ? (tok[1] === ask.regrow && !regrown ? ask.regrow : undefined) : KIND_OF[tok[0] ?? ""];
+    const sq = tok.slice(regrow ? 2 : 1);
+    const at = kind && !regrow ? left.indexOf(kind) : -1;
+    if (!kind || (!regrow && at < 0)) return null;
     const after = placeOne(pos, kind, sq, boss, plants, used);
     if (!after) return null;
-    left.splice(at, 1);
+    if (regrow) regrown = true;
+    else left.splice(at, 1);
     if (kind === "plant") plants = [...plants, sq];
     if (!waterGuard(after, plants)) return null;
     pos = after;
     used.add(sq);
-    placed.push({ kind, square: sq });
+    placed.push({ kind, square: sq, ...(regrow ? { regrow: true as const } : {}) });
   }
   return { fen: pos, placed, plants: plants.slice(ask.plants.length) };
 }
@@ -432,10 +506,10 @@ export function waterCheck(fen: string, ask: Pick<WaterAsk, "kinds" | "plants">,
  * What came up where, in the order the screens play it (killer plants, grown pieces, plain plants, nothing), from the
  * seeds' rolls (`kinds`) and the placement: each placed outcome on its square (a killer plant with the piece it ate, from
  * `passed`, the position before it); each roll that wasn't placed comes up as nothing (`dropped`), and every nothing on
- * an empty square of its own (seeded: where its sprout wilts).
+ * an empty square of its own (seeded: where its sprout wilts); the regrowth, if any, as a grown piece of its own (`regrow`).
  */
 export function waterGrowth(passed: string, after: string, kinds: readonly WaterKind[], placed: readonly Placed[], plants: readonly string[], boss: Side, order: number): WaterGrowth[] {
-  const left = [...placed];
+  const left = placed.filter((p) => !p.regrow);
   const out: WaterGrowth[] = [];
   const nothings: (WaterKind | null)[] = [];
   for (const k of kinds) {
@@ -450,6 +524,7 @@ export function waterGrowth(passed: string, after: string, kinds: readonly Water
       out.push({ kind: "killer", square: p.square, ate: piece.color === "w" ? piece.type.toUpperCase() : piece.type, ...(piece.color === boss ? { own: true as const } : {}) });
     } else out.push({ kind: p.kind, square: p.square });
   }
+  for (const p of placed) if (p.regrow) out.push({ kind: p.kind, square: p.square, regrow: true });
   const taken = new Set([...out.map((g) => g.square), ...plants]);
   const free = SQUARES.filter((sq) => !taken.has(sq) && !pieceAt(after, sq))
     .map((sq) => ({ sq, k: powerRoll(order, "water-wilt", sq) }))
@@ -467,10 +542,10 @@ export const gardenOf = (p: Pick<BossPowerState, "garden"> | null | undefined): 
 /** The plain plants on the board now (their squares). */
 export const plantSquares = (p: Pick<BossPowerState, "garden"> | null | undefined): string[] => (p?.garden?.plants ?? []).map((x) => x.square);
 
-/** His reaction after a watering: a queen grew, another piece grew, or nothing came up at all (none: plants and kills only). */
+/** His reaction after a watering: a queen grew (a seed's: a regrown one is a piece), another piece grew, or nothing came up at all (none: plants and kills only). */
 export function reactionOf(growth: readonly WaterGrowth[]): "bigCheer" | "cheer" | "shrug" | null {
-  if (growth.some((g) => g.kind === "q")) return "bigCheer";
-  if (growth.some((g) => g.kind === "p" || g.kind === "n" || g.kind === "b" || g.kind === "r")) return "cheer";
+  if (growth.some((g) => g.kind === "q" && !g.regrow)) return "bigCheer";
+  if (growth.some((g) => g.kind === "p" || g.kind === "n" || g.kind === "b" || g.kind === "r" || g.kind === "q")) return "cheer";
   return growth.every((g) => g.kind === "nothing") ? "shrug" : null;
 }
 
@@ -613,12 +688,16 @@ export const gardenerBattle = {
     return roll;
   },
 
-  /** What the host's engines need to place it (the boss request's `water`), or null when none is due. */
+  /**
+   * What the host's engines need to place it (the boss request's `water`), or null when none is due: with `regrow`, the
+   * kind of piece of his that hangs once he passes (regrowKind), unless his pieces are off this battle (noAdd).
+   */
   ask(b: Battle): WaterAsk | null {
     const roll = gardenerBattle.roll(b);
     if (!roll) return null;
     const p = b.state.boss!.powers!;
-    return { kinds: [...roll.kinds], plants: plantSquares(p), order: Math.floor(powerRoll(p.seed, "water-order", gardenOf(p).waterings) * 2 ** 32) };
+    const regrow = p.noAdd ? null : regrowKind(boardOf(b).fen, plantSquares(p));
+    return { kinds: [...roll.kinds], plants: plantSquares(p), order: Math.floor(powerRoll(p.seed, "water-order", gardenOf(p).waterings) * 2 ** 32), ...(regrow ? { regrow } : {}) };
   },
 
   /**
@@ -663,7 +742,7 @@ export const gardenerBattle = {
     const passed = passTurn(board.fen)!;
     const his = other(boss.crowdSide);
     const growth = waterGrowth(passed, checked.fen, roll.kinds, checked.placed, [...ask.plants, ...checked.plants], his, ask.order);
-    const result: WaterResult = { at: boss.crowdMoves, seeds: roll.seeds, rolled: [...roll.kinds], growth, gain, ...(checked.placed.some((x) => x.kind === "q") ? { jackpot: true as const } : {}) };
+    const result: WaterResult = { at: boss.crowdMoves, seeds: roll.seeds, rolled: [...roll.kinds], growth, gain, ...(checked.placed.some((x) => x.kind === "q" && !x.regrow) ? { jackpot: true as const } : {}) };
     const id = b.state.boards[0]!;
     const ply = board.history.length;
     b.boards.set(id, { ...board, fen: checked.fen, expected: 1 - board.expected, lastMove: null, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: checked.fen }] });

@@ -20,6 +20,7 @@ import {
   powerMomentMs,
   powerTurn,
   reactionOf,
+  regrowKind,
   rollSeed,
   seedFill,
   seedsAt,
@@ -425,6 +426,132 @@ describe("Watering: the engine's placement within the band", () => {
   });
 });
 
+describe("Watering: the regrowth (Eric, Nov 26: the piece he'd lose by passing grows back)", () => {
+  const engines = [materialEngine()];
+  /** His knight on d4, hit by the e3 pawn (passing loses it), seven pawns of his: a third knight can grow. */
+  const KNIGHT = "1n2k3/ppppppp1/8/8/3n4/4P3/PPPP1PPP/1N2K1N1 b - - 0 10";
+  /** The same with all eight of his pawns: a third knight is more than promotions could make (the full-set rule). */
+  const FULL = "1n2k3/pppppppp/8/8/3n4/4P3/PPPP1PPP/1N2K1N1 b - - 0 10";
+  /** His a5 pawn hit by the b3 knight: a pawn's loss, under the pass guard's threshold. */
+  const PAWN = "4k3/1ppppppp/8/p7/8/1N6/PPPPPPPP/4K3 b - - 0 10";
+  const ask = (kinds: WaterKind[], fen: string, order = 1) => ({ kinds, plants: [], order, ...(regrowKind(fen) ? { regrow: regrowKind(fen)! } : {}) });
+
+  it("what he'd lose by passing (regrowKind, by the exchange check, no engine): the piece the crowd nets the most from; never a pawn; none when nothing hangs", () => {
+    expect(regrowKind(KNIGHT)).toBe("n");
+    expect(regrowKind(FULL)).toBe("n");
+    expect(regrowKind(PAWN)).toBeNull();
+    expect(regrowKind(QUIET)).toBeNull();
+    // (Two hanging: the rook the b4 pawn hits nets more than the knight the d4 pawn hits.)
+    expect(regrowKind("6k1/8/8/2r1n3/1P1P4/8/8/6K1 b - - 0 30")).toBe("r");
+    // (A knight a pawn hits, defended: still a knight for a pawn, real material.)
+    expect(regrowKind("6k1/5p2/4n3/3P4/8/8/8/6K1 b - - 0 30")).toBe("n");
+    // (In check he can't pass: nothing to regrow.)
+    expect(regrowKind("4k3/8/8/1B1n4/4P3/8/8/4K3 b - - 0 30")).toBeNull();
+  });
+
+  it("a hanging knight: the watering regrows a knight (before the seeds, his gain nearest none after it) and comes now; the server's check accepts it", async () => {
+    const a = ask(["plant"], KNIGHT);
+    expect(a.regrow).toBe("n");
+    const { answer, pick } = await waterAnswer(engines, KNIGHT, a);
+    expect(answer).not.toBe(PASS_WAIT);
+    expect(answer.startsWith("gn")).toBe(true);
+    expect(pick!.placed[0]).toMatchObject({ kind: "n", regrow: true });
+    expect(pick!.gain).toBeGreaterThan(-S.passGuardPawns);
+    // (Counted once: his total stays in the band's reach, never the regrowth on top of it.)
+    expect(pick!.gain).toBeLessThanOrEqual(S.waterBand[1]);
+    const checked = waterCheck(KNIGHT, a, answer)!;
+    expect(checked.placed).toEqual(pick!.placed);
+    const sq = pick!.placed[0]!.square;
+    // (Placed legally: an empty square, his knight there, a position the watering may leave.)
+    expect(pieceAt(KNIGHT, sq)).toBeNull();
+    expect(pieceAt(checked.fen, sq)).toEqual({ color: "b", type: "n" });
+    expect(waterGuard(checked.fen, checked.plants)).toBe(true);
+    // (Without it, as before: passing loses the knight and the guard holds the watering.)
+    expect((await waterAnswer(engines, KNIGHT, { kinds: ["plant"], plants: [], order: 1 })).answer).toBe(PASS_WAIT);
+  });
+
+  it("in a battle: the ask names the knight, the watering comes now with it grown back (one more outcome than the seeds, a cheer); a pawn at risk asks for none, as before", async () => {
+    const due = async (seed: number) => {
+      const b = battle(seed, { test: "water", seeds: 2 });
+      for (let i = 0; i < 20 && !b.waterDue(); i++) await step(b);
+      return b;
+    };
+    const r = await due(21);
+    onPosition(r, KNIGHT, ["plant", "nothing"]);
+    expect(r.waterAsk()!.regrow).toBe("n");
+    const w = (await r.playWater(engines))!;
+    expect(w).not.toBeNull();
+    expect(r.boss!.powers!.garden!.waterings).toBe(1);
+    expect(w.rolled).toEqual(["plant", "nothing"]);
+    const back = w.growth.filter((g) => g.regrow);
+    expect(back).toHaveLength(1);
+    expect(back[0]!.kind).toBe("n");
+    expect(w.growth).toHaveLength(3);
+    expect(pieceAt(fenOf(r), back[0]!.square)).toEqual({ color: "b", type: "n" });
+    expect(reactionOf(w.growth)).toBe("cheer");
+    expect(w.jackpot).toBeUndefined();
+    // A pawn at risk: no regrowth asked; the watering as before.
+    const p = await due(22);
+    onPosition(p, PAWN, ["plant"]);
+    expect(p.waterAsk()!.regrow).toBeUndefined();
+    const pw = (await p.playWater(engines))!;
+    expect(pw.growth.some((g) => g.regrow)).toBe(false);
+    // (His pieces off this battle, noAdd: no regrowth, as no seed grows a piece.)
+    const off = await due(23);
+    onPosition(off, KNIGHT, ["plant"]);
+    off.state.boss = { ...off.boss!, powers: { ...off.boss!.powers!, noAdd: true } } as typeof off.state.boss;
+    expect(off.waterAsk()!.regrow).toBeUndefined();
+  });
+
+  it("a full set can't regrow (the hard guards stay): the guard still waits, and when it comes anyway, nothing grows back", async () => {
+    const a = ask(["plant"], FULL);
+    const { answer } = await waterAnswer(engines, FULL, a);
+    expect(answer).toBe(PASS_WAIT);
+    const forced = await waterAnswer(engines, FULL, a, true);
+    expect(forced.answer.split(" ").some((t) => t.startsWith("g"))).toBe(false);
+    expect(waterCheck(FULL, a, "gnh6")).toBeNull();
+  });
+
+  it("the server's check refuses a fake regrowth: none named, another kind, two, as a seed's, on a taken square, or one that gives check", () => {
+    const a = ask(["plant"], KNIGHT);
+    expect(waterCheck(KNIGHT, a, "gnh6 tc3")!.placed).toEqual([
+      { kind: "n", square: "h6", regrow: true },
+      { kind: "plant", square: "c3" },
+    ]);
+    expect(waterCheck(KNIGHT, { kinds: ["plant"], plants: [] }, "gnh6")).toBeNull();
+    expect(waterCheck(QUIET, ask(["plant"], QUIET), "gnh6")).toBeNull();
+    expect(waterCheck(KNIGHT, a, "gbh6")).toBeNull();
+    expect(waterCheck(KNIGHT, a, "gnh6 gna6")).toBeNull();
+    expect(waterCheck(KNIGHT, a, "nh6")).toBeNull();
+    expect(waterCheck(KNIGHT, a, "gnd4")).toBeNull();
+    expect(waterCheck(KNIGHT, a, "gnf3")).toBeNull();
+    expect(waterCheck(KNIGHT, a, "gn")).toBeNull();
+  });
+
+  it("nothing at risk: the same placements as before the regrowth (12 seeded positions, the answers the code gave on main)", async () => {
+    // (Positions from random games, him to move, nothing of his hanging; their rolls from rollSeed; each answer the one
+    // waterAnswer gave before this change, by the one-ply material engine.)
+    const BEFORE: [string, WaterKind[], number, string][] = [
+      ["rnbq1b2/2p1p2r/p4nkp/Pp1p1p2/1PNPP1p1/2P4N/R2QBP1P/4K2R b K - 2 16", ["n", "plant", "p", "plant", "p", "nothing", "plant"], 31676, "wait"],
+      ["rnbqkbnr/1p2ppp1/2pp4/p6p/P3P2P/3B1P2/1PPP2P1/RNBQK1NR b KQkq - 1 5", ["p", "p", "plant", "nothing"], 55433, "ta2"],
+      ["rnbq1b1r/2ppp1pp/p3k2n/1p3p2/4PP1P/2N2N2/PPPPQ1PR/R1B1KB2 b Q - 1 7", ["plant", "plant", "nothing", "plant", "nothing", "p"], 71271, "wait"],
+      ["rnbk1bnr/1p3p1p/3ppNpq/p1p4P/5P2/3PP1P1/PPP1B3/R1BQK1NR b KQ - 1 11", ["plant", "nothing", "nothing", "b", "nothing", "nothing", "nothing", "nothing"], 87109, "wait"],
+      ["r2qkbnr/pp1nppp1/4b2p/P1pp4/1P4P1/R3PN2/2PP1PBP/1NBQK2R b Kq - 0 8", ["nothing", "nothing", "plant"], 95028, "wait"],
+      ["rnq2bnr/3bpk1p/1p1p2p1/1pp1Pp2/PP4PP/N1P5/3P1P2/R1B1KBNR b KQ - 0 12", ["plant", "plant", "killer", "killer", "nothing", "p", "killer"], 174218, "xb4 xe5 xd2 th6 tb2"],
+      ["rn1qkbnr/pp2p3/3p2Pp/2pb1p2/2N3P1/5P2/PPPPPK1R/R1BQ1BN1 b kq - 0 11", ["plant", "nothing", "nothing", "killer", "nothing"], 205894, "wait"],
+      ["rnb1kb1r/1pqpp1p1/7n/PB5p/5pP1/4P2P/P1PPNP2/RNBQKR2 b Qkq - 3 10", ["plant", "plant", "p", "nothing", "plant", "nothing", "nothing"], 221732, "pg5 td3 ta6 td4"],
+      ["r1b1kbnr/pp3p1p/n1p2q2/3pp1p1/1P6/2PP1NN1/PQ1KP2P/1RB2B1R b kq - 1 15", ["nothing", "p", "nothing"], 237570, "wait"],
+      ["rnbqkbnr/2ppp1pp/8/pp3p2/5P2/7P/PPPPP1P1/RNBQKBNR b KQkq - 1 5", ["plant", "nothing", "killer", "nothing", "nothing", "nothing", "nothing", "nothing"], 277165, "xf4 tc3"],
+      ["r3k1nr/Nb1np2p/1p3p1b/p1pp4/P4P1N/3P3P/1PPKP3/R1B1QB1R b k - 0 16", ["plant", "p", "nothing"], 285084, "pc7 tg1"],
+      ["rnb3nr/1p1pkpq1/3b2p1/P1p1p2p/2PPPP2/P5PP/R3B2R/1NBQK1N1 b - - 0 15", ["nothing", "nothing", "nothing", "nothing", "killer", "p", "nothing", "plant"], 324679, "xa5 ph6 td5"],
+    ];
+    for (const [fen, kinds, order, answer] of BEFORE) {
+      expect(regrowKind(fen), fen).toBeNull();
+      expect((await waterAnswer(engines, fen, ask(kinds, fen, order))).answer, fen).toBe(answer);
+    }
+  });
+});
+
 describe("Watering in a battle", () => {
   it("his whole turn at the start of his turn after the warning: the turn passes, a base at its ply, his moments in order", async () => {
     const r = battle(11, { test: "water", seeds: 10 });
@@ -484,6 +611,7 @@ describe("Watering in a battle", () => {
   it("his reactions: a queen's big cheer, a piece's cheer, a shrug for nothing at all, none for plants and kills only", () => {
     expect(reactionOf([{ kind: "q", square: "e4" }, { kind: "p", square: "e5" }])).toBe("bigCheer");
     expect(reactionOf([{ kind: "p", square: "e5" }, { kind: "plant", square: "e4" }])).toBe("cheer");
+    expect(reactionOf([{ kind: "q", square: "d4", regrow: true }, { kind: "nothing", square: "a3" }])).toBe("cheer");
     expect(reactionOf([{ kind: "nothing", square: "e5" }, { kind: "nothing", square: "e4", dropped: "n" }])).toBe("shrug");
     expect(reactionOf([])).toBe("shrug");
     expect(reactionOf([{ kind: "killer", square: "e5", ate: "P" }, { kind: "plant", square: "e4" }])).toBeNull();
