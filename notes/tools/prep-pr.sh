@@ -4,7 +4,8 @@ S=/tmp/claude-0/-home-user-chessroyale/37426f64-a77b-5541-afaa-1847c6a1f530/scra
 b=$1; w=$S/wt-$b
 cd /home/user/chessroyale && git fetch -q origin "$b" main && rm -rf "$w" && git worktree prune && git worktree add -q "$w" "origin/$b" 2>/dev/null
 cd "$w" && git checkout -q -B "$b" && git show HEAD:.pr-body.md | sed 's#session_01EKH5j59nMnRVnekEcuZbim#session_01JuCWRuPpvjpkJLcU3sM3cR#' > "$S/body-$(echo $b | tr / -).md"
-for f in .pr-body.md .review-fixes.md .done .go .mockup; do git cat-file -e HEAD:$f 2>/dev/null && git rm -q $f; done
+# (Every handoff marker at the root, by pattern, not a list: .done-mock, .done-r2 and .mock-ready slipped past the old list, Nov 26.)
+for f in $(git ls-tree --name-only HEAD | grep -E '^\.(pr-body\.md|review-fixes\.md|done.*|go|mock.*|question.*|ready.*)$'); do git rm -q "$f"; done
 git commit -qm "Drop the PR body file
 
 Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR"
