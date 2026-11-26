@@ -40,13 +40,20 @@ const DANGER = BOSS_POWERS.dangerAt;
 const LIBRARY = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
 
 interface Row {
+  /** The crowd's move (its count). */
   turn: number;
+  /** The judge's expected score for the crowd after it. */
   judged: number | null;
+  /** As the crowd's turn began, before its move: his ultimates so far, one under way (its effect still running) or warned. */
   ults: number;
-  under: boolean;
-  /** The boss turn each ultimate came in (counted below), as known after this move. */
-  ultAt: number | null;
-  warned: boolean;
+  busy: boolean;
+}
+
+/** How many ultimates a battle allows him (once a battle, ultimateMax, maxUltimates); Infinity: no cap. */
+function capOf(id: string): number {
+  const rules = bossRules({ id });
+  if (rules?.ultimateOnce) return 1;
+  return Math.min(rules?.ultimateMax ?? Infinity, BOSS_POWERS.maxUltimates?.[id] ?? Infinity);
 }
 
 /** The boss turn an ultimate whose `ultAt` is `at` came in: his turn after crowd move `at` for one at the start of his turn, else his turn before crowd turn `at`. */
@@ -122,6 +129,9 @@ async function battle(id: string, seed: number, crowd: "strong" | "even", engine
     r.deal();
     const fen = r.boards.get(r.state.boards[0]!)!.fen;
     const allowed = r.crowdAllowed() ?? legalMoves(fen);
+    const before = r.boss?.powers;
+    const ults = before?.ults ?? 0;
+    const busy = before?.ultAt !== undefined || before?.warnAt !== undefined;
     let move: string;
     if (r.darkForcedDue()) move = await r.playDarkForced(engine);
     else {
@@ -139,7 +149,7 @@ async function battle(id: string, seed: number, crowd: "strong" | "even", engine
     await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
     look();
     const p = r.boss?.powers;
-    rows.push({ turn: r.boss!.crowdMoves, judged: p?.judged ?? null, ults: p?.ults ?? 0, under: p?.ultAt !== undefined, ultAt: p?.ultAt ?? null, warned: p?.warnAt !== undefined });
+    rows.push({ turn: r.boss!.crowdMoves, judged: p?.judged ?? null, ults, busy });
     if (process.env.TRACE) console.log(r.boss!.crowdMoves, fen, move, (p?.judged ?? -1).toFixed(2), JSON.stringify(p?.events.map((e) => e.kind)));
     if (r.bossKillDue()) r.bossKill();
   }
@@ -182,7 +192,7 @@ export function windows(b: Battle, danger: number): { first: number | "never" | 
   let worst: number | "never" | null = null;
   let onset: number | null = null;
   for (const row of b.rows) {
-    if (row.judged === null || row.judged < danger || row.under || row.warned) continue;
+    if (row.judged === null || row.judged < danger || row.busy || row.ults >= capOf(b.boss)) continue;
     const k = row.turn;
     const next = at(k)[0];
     // (His turns left from k to the end of the battle: the last crowd move's turn, k counted.)

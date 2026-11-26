@@ -354,6 +354,42 @@ describe("the Fall", () => {
     expect(warned.length, "the train warns again after his fall").toBeGreaterThan(0);
   });
 
+  it("comes at the start of his turn once he's in danger (Eric, Nov 26): the crowd's move judged at dangerAt or more, little material lost", async () => {
+    // (The judge's number for every crowd move: `crowdScore`, him to move the other way round; set by the test as the battle goes.)
+    let crowdScore = 0.5;
+    const flat = (fen: string, move: string) => ({ move, expected: fen.split(" ")[1] === "w" ? crowdScore : 1 - crowdScore });
+    const engine: EngineLike = {
+      topMoves: async (fen, n) => legalMoves(fen).sort().slice(0, n).map((m) => flat(fen, m)),
+      scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((m) => flat(fen, m)),
+      topMovesAt: async (fen, n) => legalMoves(fen).sort().slice(0, n).map((m) => flat(fen, m)),
+      playAtElo: async (fen) => legalMoves(fen).sort()[0]!,
+    };
+    const r = battle(13, "w", "", [engine]);
+    // (The crowd saves a warned piece, so his train takes nothing: the Fall can't come from material.)
+    const save = (_f: string, allowed: string[]) => {
+      const w = birdieOf(r)?.warn;
+      return (w && allowed.filter((m) => m.startsWith(w.square)).sort()[0]) || [...allowed].sort()[0]!;
+    };
+    await untilTurn(r, 4, save);
+    // Just under the line: no fall.
+    crowdScore = BOSS_POWERS.dangerAt - 0.01;
+    await crowdMove(r, save);
+    expect(birdieOf(r)!.fell, "under the line").toBeFalsy();
+    await r.playBoss();
+    // At the line: he falls as the crowd's move lands, at the start of his turn.
+    crowdScore = BOSS_POWERS.dangerAt;
+    await crowdMove(r, save);
+    const p = r.boss!.powers!;
+    expect(p.lost, "he has lost less than fallLost").toBeLessThan(BOSS_POWERS.birdie.fallLost);
+    expect(p.events.some((e) => e.kind === "birdieFall")).toBe(true);
+    expect(birdieOf(r)!.fell?.at).toBe(r.boss!.crowdMoves);
+    // Once a battle: the danger after it brings nothing more.
+    await r.playBoss();
+    await crowdMove(r, save);
+    expect(r.boss!.powers!.events.some((e) => e.kind === "birdieFall")).toBe(false);
+    expect(r.boss!.powers!.ults).toBe(1);
+  });
+
   it("the admins' trigger brings it at the start of his next turn, without the material", async () => {
     const r = battle(11);
     await untilTurn(r, 2);
