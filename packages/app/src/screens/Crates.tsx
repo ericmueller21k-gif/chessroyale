@@ -75,6 +75,7 @@ import { testParams } from "../test-switches.ts";
 import { haptic } from "../haptics.ts";
 import { welcomeResumeRow, welcomeRows, welcomeRowsShown, type WelcomeRowView } from "../welcome-rows.ts";
 import { bossCratesShown, NO_BOSS_CRATES_LINE, readShowUnowned, saveShowUnowned } from "../boss-crate-rows.ts";
+import { BoostCrateDialog, BoostCrateRow, BoostStock } from "../components/BoostCrate.tsx";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
 const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
@@ -192,6 +193,8 @@ export function CratesPanel() {
   const count = (n: number | null | undefined) => String(n ?? 0);
   const [picking, setPicking] = useState(false);
   const [showUnowned, setShowUnowned] = useState(readShowUnowned);
+  // (The coin boost, Nov 26: its crate's dialog over the page.)
+  const [boostOpen, setBoostOpen] = useState(false);
   if (picking) return <BossPickPage onBack={() => setPicking(false)} />;
   if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
   if (welcomeOpen !== null) {
@@ -212,7 +215,9 @@ export function CratesPanel() {
   const pickRow = <BossPickRow picks={picks} onOpen={() => setPicking(true)} />;
   const readyWelcome = welcomeShown.filter((r) => r.state === "ready");
   const heldSeries = CRATES.filter((c) => heldOf(locker, c) > 0);
-  const nothingReady = !readyWelcome.length && !heldSeries.length && !heldBoss.length && !picks;
+  const boostCrates = locker?.boostCrates ?? 0;
+  const boostRow = <BoostCrateRow held={boostCrates} onOpen={() => setBoostOpen(true)} />;
+  const nothingReady = !readyWelcome.length && !heldSeries.length && !heldBoss.length && !picks && !boostCrates;
   const welcomeRow = (row: WelcomeRowView) => <WelcomeRow key={`w${row.n}`} row={row} onOpen={() => setWelcomeOpen(row.n)} />;
   const seriesRow = (c: CrateDef) => <SeriesCrateRow key={c.id} crate={c} held={heldOf(locker, c)} keys={keysOf(locker)} onOpen={() => setOpen(c)} />;
   const bossRow = (c: BossCrateDef) => <BossCrateRow key={c.id} crate={c} held={heldOf(locker, c)} onOpen={() => setOpen(c)} />;
@@ -228,11 +233,13 @@ export function CratesPanel() {
         </span>
         <span class="stock">Crates × {count(locker?.crates)}</span>
       </div>
+      <BoostStock minutes={locker?.boostMinutes ?? 0} levels={locker?.crateBonus ?? 0} />
       <section class="crates-section crates-ready" aria-label="Ready to open">
         <h3 class="ff-title">Ready to open</h3>
         {readyWelcome.map(welcomeRow)}
         {picks > 0 && pickRow}
         {heldSeries.map(seriesRow)}
+        {boostCrates > 0 && boostRow}
         {heldBoss.map(bossRow)}
         {nothingReady && <p class="small muted crates-none">Nothing to open right now.</p>}
       </section>
@@ -259,12 +266,17 @@ export function CratesPanel() {
             every boss crate you don't hold. */}
         {welcomeShown.filter((r) => r.state !== "ready").map(welcomeRow)}
         {CRATES.filter((c) => heldOf(locker, c) === 0).map(seriesRow)}
+        {boostCrates === 0 && boostRow}
         {picks === 0 && pickRow}
         {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
         {moreBoss.map(bossRow)}
         {!showUnowned && <p class="small muted no-boss-crates">{heldBoss.length ? MORE_BOSS_CRATES_LINE : NO_BOSS_CRATES_LINE}</p>}
-        <p class="small muted crates-how">Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward, and an opening sometimes gives a bonus crate (with its key if it needs one).</p>
+        <p class="small muted crates-how">
+          Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward, and an opening sometimes gives a bonus crate (with its key if it needs one). A daily quest
+          sometimes gives a Coin Boost Crate (no key needed) or a Crate Bonus.
+        </p>
       </section>
+      {boostOpen && <BoostCrateDialog held={boostCrates} minutes={locker?.boostMinutes ?? 0} onClose={() => setBoostOpen(false)} />}
       {/* (Admins only, at the very bottom: the page above it is what every player sees. Eric, Nov 25.) */}
       {profile?.admin && <AdminGrants />}
     </div>
@@ -496,7 +508,7 @@ function AdminGrants() {
   const [crate, setCrate] = useState(CRATES[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const give = (body: { keys?: number; boss?: string; tokens?: number; crate?: string; crates?: number }) => {
+  const give = (body: { keys?: number; boss?: string; tokens?: number; crate?: string; crates?: number; boost?: number; crateBonus?: number }) => {
     setBusy(true);
     setError(null);
     void grantTestItems(body)
@@ -540,6 +552,15 @@ function AdminGrants() {
         </select>
         <button type="button" class="btn btn-secondary btn-small" disabled={busy || !crate} onClick={() => give({ crate, crates: 5 })}>
           +5 crates
+        </button>
+      </div>
+      {/* (The coin boost, Nov 26: what a daily quest drops, to test the Crates tab and a boosted game.) */}
+      <div class="admin-grants-row">
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ boost: 1 })}>
+          +1 Coin Boost Crate
+        </button>
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ crateBonus: 1 })}>
+          +1 Crate Bonus
         </button>
       </div>
       {error && <p class="shop-error">{error}</p>}

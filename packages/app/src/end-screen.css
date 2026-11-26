@@ -360,6 +360,27 @@
   letter-spacing: 0.04em;
   color: #c9d2ff;
 }
+/* (The coin boost's badge, Nov 26: a gold pill in the count's row, its two short lines inside the row's 24 px.) */
+.es-cs-boost {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  height: 24px;
+  box-sizing: border-box;
+  padding: 0 4px;
+  border: 1px solid #ffd54a;
+  border-radius: 3px;
+  background: #3a2a00;
+  font-size: 6px;
+  line-height: 7px;
+  white-space: nowrap;
+  color: #ffe9a3;
+}
+.es-cs-boost b {
+  font-weight: normal;
+  color: #ffd54a;
+}
 .es-cs-today {
   font-size: 7px;
   line-height: 9px;

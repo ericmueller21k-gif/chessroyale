@@ -581,6 +581,12 @@ export interface Locker {
   keys: number | null;
   /** Boss crates to pick (every XP.bossCrateEvery-th level's, Nov 9; missing from an older server). */
   bossPicks?: number;
+  /** Coin Boost Crates you hold, unopened (Nov 26: a daily quest's drop; missing from an older server). */
+  boostCrates?: number;
+  /** The coin boost's minutes of play left (an opened Coin Boost Crate's; missing from an older server). */
+  boostMinutes?: number;
+  /** The Crate Bonus's paying level-ups left (a daily quest's drop; missing from an older server). */
+  crateBonus?: number;
   /** Boss tokens you have, by boss id (only those you have some of; missing from an older server). */
   tokens?: Record<string, number>;
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger"; only those you have some of; missing from an older server). */
@@ -671,8 +677,11 @@ export async function playClawOnServer(boss: string, request: string, seed?: num
 /** How many of a boss crate ("boss-tiger") you hold, unopened, as your locker has it now. */
 export const bossCrateCount = (crate: string): number => state.profile?.locker?.bossCrates?.[crate] ?? 0;
 
-/** An admin's test grant to themselves: crate keys, a boss's tokens, crates (once: postOnce). Your locker comes back with it. */
-export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number; crate?: string; crates?: number }): Promise<void> {
+/**
+ * An admin's test grant to themselves: crate keys, a boss's tokens, crates, Coin Boost Crates and Crate Bonuses (Nov 26) (once: postOnce).
+ * Your locker comes back with it.
+ */
+export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number; crate?: string; crates?: number; boost?: number; crateBonus?: number }): Promise<void> {
   const locker = await postOnce<Locker>("/api/locker/grant", body);
   if (state.profile) set({ profile: { ...state.profile, locker } });
 }
@@ -734,6 +743,12 @@ export async function openCrate(crate: string, force: OpenForce = {}): Promise<O
   const r = await postOnce<Opened & { locker: Locker }>("/api/locker/open", { crate, ...force });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
   return { roll: r.roll, item: r.item, ...(r.bonus ? { bonus: r.bonus } : {}) };
+}
+
+/** Opens a Coin Boost Crate you hold (Nov 26; free, no key: COIN_BOOST.minutes of boost on), once (postOnce). Your locker comes back. */
+export async function openBoostCrate(): Promise<void> {
+  const r = await postOnce<{ locker: Locker }>("/api/locker/boost", {});
+  if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
 }
 
 /** Picks a level's boss crate (Nov 9): into your boss crates, unopened. Answers the crate's id. */
@@ -1067,8 +1082,8 @@ export async function rerollQuestNow(quest: string): Promise<QuestsAnswer> {
   return (await api<{ quests: QuestsAnswer }>("/api/quests/reroll", { method: "POST", body: JSON.stringify({ quest }) })).quests;
 }
 
-/** The test switch ?quests=<kind>[:<progress>],… (test servers only): your quests set to these. */
-export async function setTestQuests(quests: { kind: string; progress: number }[]): Promise<QuestsAnswer> {
+/** The test switch ?quests=<kind>[:<progress>[:<drop>]],… (test servers only): your quests set to these (the drop: none | boost | bonus). */
+export async function setTestQuests(quests: { kind: string; progress: number; drop?: string }[]): Promise<QuestsAnswer> {
   return api<QuestsAnswer>("/api/quests/test", { method: "POST", body: JSON.stringify({ quests }) });
 }
 

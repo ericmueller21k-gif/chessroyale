@@ -177,7 +177,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   tower_runs: "id user_id kind seed floor met members fight last status started_at updated_at",
   users:
     "id name icon email google_sub created_at last_seen rating allow_invites hide_online dnd pawn_color age_ok_at chat_on test resident buy_band buy_band_at refund_count hold_until chargebacks closed_at closed_reason held_taps",
-  wallets: "user_id coins crates crate_keys xp boss_picks",
+  wallets: "user_id coins crates crate_keys xp boss_picks boost_crates boost_minutes crate_bonus",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
 };
 
@@ -230,7 +230,7 @@ describe("download my data", () => {
     ]);
     expect(d.results[0]).not.toHaveProperty("held");
     // (Nov 9: crates are held by series; the placement's 2 are Winter Crates, in the XP store's seriesCrates.)
-    expect(d.shop.wallet).toEqual({ coins: 50, crates: 0, crate_keys: 1, xp: 0, boss_picks: 0 });
+    expect(d.shop.wallet).toEqual({ coins: 50, crates: 0, crate_keys: 1, xp: 0, boss_picks: 0, boost_crates: 0, boost_minutes: 0, crate_bonus: 0 });
     expect(d.xp.seriesCrates).toContainEqual({ crate: "winter-1", n: 2 });
     expect(d.bossTokens.tokens).toEqual([{ boss: "gingerbread", n: 1 }, { boss: "tiger", n: 2 }]);
     expect(d.bossTokens.drops).toEqual([{ boss: "gingerbread", at: new Date(T0 + 4).toISOString(), battle: "ABCDE" }]);

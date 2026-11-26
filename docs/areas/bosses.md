@@ -834,7 +834,7 @@ below):
   raid's picks, the time it took as this device saw it), from the match's own history. A phone upright: the panel left of
   the God King, "Players" / "Moves" (and "Chat" with chat on) with other players, the moves alone in Boss alone; a tap
   opens it full size over the board (✕, Escape, a tap outside close it). A computer (`.mv-side`, 900 px and up): right of
-  the board, its top level with the board's, **half the height it had** (`--mv-h`: half of the board's less 146 px, at
+  the board, its top level with the board's (since Nov 26 from 1100 px: the shared frame's, above; down to over the God King's frame, 28 px off the board), **half the height it had** (`--mv-h`: half of the board's less 146 px, at
   least 120 px; it grows with the board, 367 px tall by an 880 px board since Oct 29), the column's width, **13 to 15 px off the board** (it's shifted in with a `translate` from `--gk-column`
   and `--board-px`; the column's own 28 px gap and the board's slack go), Boss alone's pawn and the God King below it; a
   raid's scoreboard stays on the left, what the column held under the list (an online raid's chat, the scoreboard from
@@ -865,6 +865,21 @@ below):
   unchanged. The ⚡, 🐟 and carrot count stand just left of the column. Not drawn where the dock has no panel or computer corner: the Hidden Boss's phase change and
   phase 2, a phone on its side, a short window. Tests: `e2e/board-layout.spec.ts`, `e2e/boss-dock.spec.ts`,
   `e2e/hopper.spec.ts`, `e2e/boss-character.spec.ts`.
+- **The shared game frame on a computer (Nov 26; [decision](../decisions/2026-11-26-boss-frame.md)).** From 1100 px wide with a mouse, Boss
+  alone and a raid (solo or online; `bossFramed` in `game.ts` puts `bf-frame` on every screen of the battle: Play, Boss, Reveal, and the
+  Hidden Boss's phase change and phase 2, which keep phase 1's boxes; a Battle Tower floor keeps its own) take the 50 v 50's frame (`board-size.css`: the same `--cf-*`
+  sizes, gap and drawing step): the left column (a raid's scoreboard, its table from the board's top down to over the boss, who stands under
+  it on the board's foot and never covers it, its rows scrolling (`board-foot.ts`); Boss alone's boss column,
+  `.tower-space`, `--ts-w` plus half the room the block leaves, so Babur's pump keeps its room), the board with its strips (the two-line boss bar over it, kept: Eric, Nov 26, "I like the boss
+  bar bigger"; the dock's row under it) and the column beside it (up to 300 px, Boss alone's up to 340 for your pawn and the God King),
+  centered as one block, 28 px (`--cf-gap`) either side of the board (a raid with the menu's labels keeps at least 40 px either side,
+  else icons). The gear (and the admins' ⚡ and 🐟) at the column's right end, level
+  with the bar. The Moves panel runs from the board's top down to 12 px over the God King's frame (his canvas, `200px × --king-k` over the
+  board's foot: his tallest pose stays clear of the list, boss-side.spec.ts); an online raid's chat sits under the moves (their half height)
+  down to the God King's room (`--gk-zone`), as before. The figures stand on the squares' foot, placed from the board as before. The board is the size
+  the bar allows (602 at 1536 × 730, 832 at 1920 × 960: unchanged), its box on the drawing step at 125% and 150% too (the bar and the dock's
+  row are the drawn board's width there now: they were 5.4 px wider at 1536 × 730). Under 1100 px, a phone and a tablet: unchanged. Guard:
+  `e2e/desktop-board.spec.ts`, Eric's column rule (both turns); `e2e/board-layout.spec.ts` (the gap, the height, the board's box).
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
   bottom-right, mirroring him (feet level, as far from the board; in Boss alone, since Oct 28, your pawn stands there and
   he stands to its right); the status box under the board at its width; the column beside the board starts after the God King. (The eval bar is off for everyone since Nov 1: nothing is drawn beside the board, and every board is the no-bar size below.) A phone is unchanged.

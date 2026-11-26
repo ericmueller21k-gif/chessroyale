@@ -96,7 +96,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     name: "shop",
     tables: ["wallets", "inventory", "equipped", "chat_picks"],
     export: async (sql, u) => ({
-      wallet: await sql.first("SELECT coins, crates, crate_keys, xp, boss_picks FROM wallets WHERE user_id = ?", u.id),
+      wallet: await sql.first("SELECT coins, crates, crate_keys, xp, boss_picks, boost_crates, boost_minutes, crate_bonus FROM wallets WHERE user_id = ?", u.id),
       items: await all(sql, "SELECT item_id, acquired_at FROM inventory WHERE user_id = ?", u.id),
       equipped: await all(sql, "SELECT slot, item_id FROM equipped WHERE user_id = ?", u.id),
       chatPicks: await sql.first("SELECT lines, emoji FROM chat_picks WHERE user_id = ?", u.id),

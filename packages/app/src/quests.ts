@@ -121,17 +121,18 @@ function popsOff(): boolean {
 }
 
 /**
- * The test switch `?quests=<kind>[:<progress>],…` (test servers only, e.g. `?quests=warm-up:2,squad-up,regular:9`): your quests set
- * to these as home loads, once a page. Null: not asked.
+ * The test switch `?quests=<kind>[:<progress>[:<drop>]],…` (test servers only, e.g. `?quests=warm-up:2:boost,squad-up,regular:9`):
+ * your quests set to these as home loads, once a page. The drop (none | boost | bonus; none unless asked, Nov 26): what finishing
+ * that quest rolls, so a test's drop is never chance. Null: not asked.
  */
 let testAsked = false;
-function testQuests(): { kind: string; progress: number }[] | null {
+function testQuests(): { kind: string; progress: number; drop?: string }[] | null {
   const v = testParams().get("quests");
   if (!v || testAsked) return null;
   testAsked = true;
   return v.split(",").map((part) => {
-    const [kind, n] = part.split(":");
-    return { kind: kind ?? "", progress: Math.max(0, Math.floor(Number(n) || 0)) };
+    const [kind, n, drop] = part.split(":");
+    return { kind: kind ?? "", progress: Math.max(0, Math.floor(Number(n) || 0)), ...(drop ? { drop } : {}) };
   });
 }
 

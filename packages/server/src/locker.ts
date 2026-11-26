@@ -69,6 +69,12 @@ export interface LockerState {
   keys: number;
   /** Boss crates to pick (Nov 9: every XP.bossCrateEvery-th level's (20th since Nov 20)): rewards.ts pickBossCrate. */
   bossPicks: number;
+  /** Coin Boost Crates you hold, unopened (Nov 26: a daily quest's drop; opened free: coin-boost.ts openBoostCrate). */
+  boostCrates: number;
+  /** The coin boost's minutes of play left (an opened crate's COIN_BOOST.minutes; boosted games use them). */
+  boostMinutes: number;
+  /** The Crate Bonus's paying level-ups left (a daily's drop: LEVEL_CRATE_BONUS; each gives its crates twice: rewards.ts payLevels). */
+  crateBonus: number;
   /** Boss tokens you have, by boss (only those you have some of): boss-tokens.ts. */
   tokens: Record<string, number>;
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger": only those you have some of; Nov 2): boss-tokens.ts. */
@@ -107,7 +113,7 @@ export async function lockerState(sql: Sql, userId: string, admin = false, befor
     look[r.slot] = { def: it.def, color: it.color, blemish: it.blemish, seed: it.seed, ...(it.color2 ? { color2: it.color2 } : {}) };
   }
   for (const it of items) if (!it.color2) delete it.color2;
-  const [{ seriesCrates, seriesBonus, bossPicks }, { tokens, keys }, boss, welcome] = await Promise.all([
+  const [{ seriesCrates, seriesBonus, bossPicks, boostCrates, boostMinutes, crateBonus }, { tokens, keys }, boss, welcome] = await Promise.all([
     seriesHoldings(sql, userId),
     tokenHoldings(sql, userId),
     bossCrateStock(sql, userId),
@@ -115,7 +121,7 @@ export async function lockerState(sql: Sql, userId: string, admin = false, befor
   ]);
   const crates = Object.values(seriesCrates).reduce((s, n) => s + n, 0);
   const bonusCrates = { ...seriesBonus, ...boss.bonus };
-  return { items, equipped, look, crates, seriesCrates, keys, bossPicks, tokens, bossCrates: boss.all, bonusCrates, welcome };
+  return { items, equipped, look, crates, seriesCrates, keys, bossPicks, boostCrates, boostMinutes, crateBonus, tokens, bossCrates: boss.all, bonusCrates, welcome };
 }
 
 /**

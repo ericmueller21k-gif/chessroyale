@@ -27,6 +27,8 @@ import {
   BOSS_CRATE_PRICE,
   BOSS_TOKENS,
   CRATE_BONUS,
+  COIN_BOOST,
+  LEVEL_CRATE_BONUS,
   bonusOddsLine,
   XP,
   PLAY_COINS,
@@ -137,6 +139,9 @@ export interface FaqSources {
   xp: typeof XP;
   /** Play coins (Nov 25): what every counted game pays (PLAY_COINS). */
   playCoins: typeof PLAY_COINS;
+  /** The coin boost and the Crate Bonus (Nov 26): a daily quest's drops (COIN_BOOST, LEVEL_CRATE_BONUS). */
+  coinBoost: typeof COIN_BOOST;
+  levelCrateBonus: typeof LEVEL_CRATE_BONUS;
   /** Quests (Nov 9, phase 3): how many, the carry-over, the reroll, the pool. */
   quests: typeof QUESTS;
   bossCratePrice: typeof BOSS_CRATE_PRICE;
@@ -191,6 +196,8 @@ export const FAQ_DEFAULTS: FaqSources = {
   crateBonus: CRATE_BONUS,
   xp: XP,
   playCoins: PLAY_COINS,
+  coinBoost: COIN_BOOST,
+  levelCrateBonus: LEVEL_CRATE_BONUS,
   quests: QUESTS,
   bossCratePrice: BOSS_CRATE_PRICE,
   colors: ITEM_COLORS,
@@ -1226,6 +1233,12 @@ export function xpAndLevels(src: FaqSources): FaqSection {
   const dailyXp = [...new Set(Q.daily.map((q) => q.xp))];
   const dailyPays = `a daily quest gives ${dailyXp.length === 1 ? `**+${dailyXp[0]!.toLocaleString("en-US")} XP**` : "XP"}${Q.daily.some((q) => q.crates) ? " (some also a crate)" : ""}`;
   const weeklyPays = Q.weekly[0] ? `gives ${things(Q.weekly[0])}` : "pays too";
+  // (The coin boost, Nov 26: its time in hours, never minutes, as XP's rule asks of this section: Eric, Nov 9.)
+  const B = src.coinBoost;
+  const CB = src.levelCrateBonus;
+  const hours = Math.round((B.minutes / 60) * 100) / 100;
+  const boostTime = `${hours.toLocaleString("en-US")} hour${hours === 1 ? "" : "s"} of play`;
+  const share = (x: number) => `${Math.round(x * 1000) / 10}%`;
   return {
     id: "xp",
     title: "XP and levels",
@@ -1248,6 +1261,7 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 - **Rewards:** ${dailyPays}; the weekly quest ${weeklyPays}. They're paid the moment a game finishes the quest, and its XP joins that game's XP ("Quest +${Q.daily[0]?.xp ?? 0}"); the result says which quest ("Quest done: …").
 - **What counts:** only games that earn XP (the same rules as above), each game once per quest. Quests ask for modes you can always play: Squads, 50 v 50, Boss Battles (alone counts too), and any game. A win counts when it earns its win XP. Games on your device count toward "finish games" quests, and a Boss Battle on your device toward the Boss Battle quests too, but only once they've lasted a little while (our server times them).
 - **New dailies** come each day at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC; the weekly resets on Mondays at the same time. **Unfinished dailies stay**, up to ${Q.maxDailies} waiting, so missing a day doesn't waste them. A new weekly replaces the old one, finished or not.
+- **Drops:** each daily quest you finish has a ${share(B.dropChance)} chance of a **Coin Boost Crate** and a ${share(CB.dropChance)} chance of a **Crate Bonus**. A Crate Bonus works at once: your next ${CB.levels} level-ups that give crates give **double crates** (keys stay the same), and another adds ${CB.levels} more. The weekly quest doesn't drop them, and neither is ever sold.
 - **One free reroll a day for each daily:** the arrows on a daily you haven't finished swap it for another quest (only that one). The new quest's arrows come back the next day.
 
 **Coins:** every game that earns XP also earns coins, by the same rules (your own game as our server measured it, from your ${nth(X.minMoves)} move; nothing for leaving, a test game, a guest, or an account fair play is reviewing).
@@ -1255,6 +1269,7 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 - **A bonus for playing well,** even past the day's ${P.perDay}: **${P.bonus.win}** for a win (the same wins as XP's, the friends' lobby rule too), **${P.bonus.draw}** for a draw in ranked 1 v 1, **${P.bonus.crowdTop3}** for finishing in your team's top ${P.crowdTopPlaces} in a 50 v 50, and in Squads by your squad's place: ${squadsBonus}.
 - **The bonus slows through the day:** the first ${steps[0]?.upTo ?? 0} bonus coins of a day pay in full, ${steps.slice(1).map((st, i) => `the next ${st.upTo - steps[i]!.upTo} ${st.rate === 0.5 ? "at half" : st.rate === 0.25 ? "at a quarter" : `at ${Math.round(st.rate * 100)}%`}`).join(", ")}, then none: at most ${bonusTop} bonus coins and **${P.perDay + bonusTop} coins a day** in all.
 - **Games on your device** pay play coins for the time that earned XP under their daily limit, and no bonus.
+- **Coin boost:** open a Coin Boost Crate in the Crates tab (free, no key, whenever you like) for **${B.multiplier}x coins** over your next **${boostTime}**: play coins and bonus both, the extra paid on top. The day's ${P.perDay} and the bonus's slowing count only your usual coins. It runs only while a game earns play coins, so past the day's ${P.perDay} it waits for the next day, and it never runs out on its own. Another crate adds ${boostTime.replace(" of play", "")} more; it never goes above ${B.multiplier}x. XP is never boosted.
 
 After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level that pays, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, coins, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
 `,

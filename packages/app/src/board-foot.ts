@@ -11,6 +11,9 @@ import { useLayoutEffect, useRef } from "preact/hooks";
  * board-size.css uses them on a computer only; a phone never reads them. Neither box's height moves its own top, so there is no loop.
  * docs/decisions/2026-11-25-crowd-desktop-flush.md.
  */
+/** The room a boss's words take over him beside the board on a computer: five lines of his box (9 px type, 1.6 line height, its padding,
+ * border and shadow: styles.css `.bc-bubble`). */
+const BOSS_WORDS = 100;
 /** The board's squares in the arena's screen: their box is what OwnBoard sizes (a whole multiple of 8 device pixels). */
 const SQUARES = ":scope > .screen.game .board-area .board-row > .board-wrap > .board > .hb-container";
 
@@ -34,7 +37,21 @@ export function measureBoardFoot(arena: HTMLElement) {
     const pad = parseFloat(getComputedStyle(side).paddingTop) || 0;
     put("--side-pad", `${Math.max(0, Math.round(pad + b.top - table.getBoundingClientRect().top))}px`);
   }
-  put("--side-foot", to(side ?? null));
+  // (A boss raid in the shared frame (Nov 26, the director: "the boss must never cover the scoreboard"): the boss stands over the
+  // scoreboard's edge on the board's foot, so the scoreboard ends over his room: his frame, and room for his words (BOSS_WORDS) over his
+  // box, 12 px above it. Its rows scroll in what's left. Always that room, talking or not, so the box never changes size.)
+  const boss = side && arena.querySelector<HTMLElement>(":scope > .screen.game.bf-frame .boss-char.place-side");
+  const art = boss?.querySelector(".boss-char-sprite");
+  if (side && boss && art) {
+    const fig = boss.getBoundingClientRect();
+    const frame = art.getBoundingClientRect();
+    const sideBox = side.getBoundingClientRect();
+    if (frame.left < sideBox.right && fig.width > 0) {
+      const scale = parseFloat(getComputedStyle(boss).getPropertyValue("--bc-scale")) || 2;
+      const room = Math.min(frame.top, fig.top - 17 * scale - BOSS_WORDS) - 12;
+      put("--side-foot", `${Math.round(Math.min(foot, room) - sideBox.top)}px`);
+    } else put("--side-foot", to(side));
+  } else put("--side-foot", to(side ?? null));
   // (The column's last box: the 50 v 50's chat; Squads' panel, or its votes' list in the vote: Nov 26.)
   put("--chat-foot", to(arena.querySelector(":scope > .screen.game > :is(.under-board.side, .sq-panel, .sq-votes)")));
 }
@@ -44,12 +61,12 @@ export function measureBoardFoot(arena: HTMLElement) {
  * size (a resize of the window: the squares follow it a moment later, from OwnBoard's own observer, and this follows them).
  */
 export function BoardFoot() {
-  const seen = useRef<{ ro: ResizeObserver; board: Element | null } | null>(null);
+  const seen = useRef<{ ro: ResizeObserver; board: Element | null; boss: Element | null } | null>(null);
   useLayoutEffect(() => {
     const arena = document.querySelector<HTMLElement>(".arena");
     if (!arena) return;
     if (!seen.current) {
-      seen.current = { ro: new ResizeObserver(() => measureBoardFoot(arena)), board: null };
+      seen.current = { ro: new ResizeObserver(() => measureBoardFoot(arena)), board: null, boss: null };
       seen.current.ro.observe(arena);
     }
     const board = arena.querySelector(SQUARES);
@@ -57,6 +74,13 @@ export function BoardFoot() {
       if (seen.current.board) seen.current.ro.unobserve(seen.current.board);
       if (board) seen.current.ro.observe(board);
       seen.current.board = board;
+    }
+    // (A raid's boss: his box is sized as he's drawn, after the board; the scoreboard ends over him.)
+    const boss = arena.querySelector(":scope > .screen.game .boss-char.place-side");
+    if (boss !== seen.current.boss) {
+      if (seen.current.boss) seen.current.ro.unobserve(seen.current.boss);
+      if (boss) seen.current.ro.observe(boss);
+      seen.current.boss = boss;
     }
     measureBoardFoot(arena);
   });

@@ -1,9 +1,10 @@
 import type { JSX } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
-import { crateDef, hasRewards, rewardLines, type CrateLook, type XpGrant, type XpRewards } from "@chessroyale/core";
+import { BOOST_CRATE_NAME, CRATE_BONUS_NAME, LEVEL_CRATE_BONUS, crateDef, hasRewards, rewardDrops, rewardLines, type CrateLook, type XpGrant, type XpRewards } from "@chessroyale/core";
 import { refreshProfile } from "../account.ts";
 import { play } from "../sound.ts";
 import { BetaCrateArt, HunchessCrateArt, KeyArt, WinterCrateArt } from "./Items.tsx";
+import { CoinBoostCrateArt, CrateBonusArt } from "./BoostArt.tsx";
 import { InventoryLayer } from "./PageLayer.tsx";
 
 /**
@@ -15,6 +16,9 @@ import { InventoryLayer } from "./PageLayer.tsx";
  * counts, the lines, then **OK** (Escape or a tap outside too) and **Go to inventory**: your inventory's Crates tab as a layer over this
  * screen (`InventoryLayer`), so a Battle Tower run or a party stays as it was; its Back returns here. Never greyed. It doesn't come back
  * for that game; the prizes are in your inventory already. docs/decisions/2026-11-22-inventory-layer.md.
+ *
+ * A daily quest's drop (Nov 26; docs/decisions/2026-11-26-coin-boost.md) is the card's title ("Coin Boost Crate!", "Crate Bonus!"), its
+ * picture beside the crates and keys, and its line; a level's crates the Crate Bonus doubled say so ("+2 Winter Crates (Crate bonus)").
  */
 
 /** The grants whose toast has shown: the same game's next screen (Squads' card, then its results) doesn't show it again. */
@@ -27,7 +31,8 @@ const CRATE_ART: Record<CrateLook, () => JSX.Element> = { winter: WinterCrateArt
  * don't: the crates and keys (a level's, the daily reward's, a quest's) and a boss crate to choose. Nothing of those: no toast.
  */
 function forEndScreen(r: XpRewards): XpRewards | null {
-  const quests = (r.quests ?? []).filter((q) => q.crates > 0 || q.keys > 0);
+  // (A quest's drop too, Nov 26: the rows don't show it.)
+  const quests = (r.quests ?? []).filter((q) => q.crates > 0 || q.keys > 0 || !!q.boost || !!q.crateBonus);
   const out: XpRewards = { ...r, quests: quests.length ? quests : undefined };
   if (!out.quests) delete out.quests;
   return out.daily > 0 || out.crates > 0 || out.keys > 0 || out.bossPicks > 0 || !!out.quests ? out : null;
@@ -68,9 +73,22 @@ export function RewardBox({ xp, endScreen = false }: { xp: XpGrant; endScreen?: 
   const done = r.quests ?? [];
   const crates = r.daily + r.crates + done.reduce((n, q) => n + q.crates, 0);
   const keys = r.keys + done.reduce((n, q) => n + q.keys, 0);
+  // (A daily's drop, Nov 26: the rarest thing here, so the title.)
+  const drops = rewardDrops(r);
+  const bonuses = drops.bonus ? Math.max(1, Math.round(drops.bonus / LEVEL_CRATE_BONUS.levels)) : 0;
   // (The level reached, as the XP box pops it: since levels of 500 (Nov 20) only every other level pays, so the last paid may be one below.)
   const level = r.levels.length ? Math.max(xp.levelAfter, r.levels.at(-1)!) : undefined;
-  const title = level ? `Level ${level}!` : done.length && !r.daily ? (done.length === 1 ? "Quest done!" : "Quests done!") : "Daily reward";
+  const title = drops.boost
+    ? `${BOOST_CRATE_NAME}!`
+    : drops.bonus
+      ? `${CRATE_BONUS_NAME}!`
+      : level
+        ? `Level ${level}!`
+        : done.length && !r.daily
+          ? done.length === 1
+            ? "Quest done!"
+            : "Quests done!"
+          : "Daily reward";
   // (Over this screen, not to the shop's page: nothing under it unmounts.)
   const toInventory = () => {
     play("menuSelect");
@@ -98,6 +116,22 @@ export function RewardBox({ xp, endScreen = false }: { xp: XpGrant; endScreen?: 
               <span class="reward-count">×{keys}</span>
             </span>
           )}
+          {drops.boost > 0 && (
+            <span class="reward-thing" data-thing="boost">
+              <span class="reward-thing-art">
+                <CoinBoostCrateArt />
+              </span>
+              <span class="reward-count">×{drops.boost}</span>
+            </span>
+          )}
+          {bonuses > 0 && (
+            <span class="reward-thing" data-thing="crate-bonus">
+              <span class="reward-thing-art">
+                <CrateBonusArt />
+              </span>
+              <span class="reward-count">×{bonuses}</span>
+            </span>
+          )}
         </span>
         <span class="reward-text">
           {lines.level && <span class="reward-line">{lines.level}</span>}
@@ -105,6 +139,11 @@ export function RewardBox({ xp, endScreen = false }: { xp: XpGrant; endScreen?: 
           {lines.quests.map((q) => (
             <span key={q} class="reward-line reward-quest">
               {q}
+            </span>
+          ))}
+          {lines.drops.map((d) => (
+            <span key={d} class="reward-line reward-drop">
+              {d}
             </span>
           ))}
           {lines.pick && <span class="reward-line reward-pick">{lines.pick} in Crates.</span>}
