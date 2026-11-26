@@ -2253,3 +2253,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - 14:20 #982 Chandy art MERGED (c39f7217), main+deploy watcher. Open: #978 (Eric OK), Puddles regrow (b1uxnenaz). Queue: birdie fall flake, Dash Hang-on nits, 50v50/Squads ranks; CI layout fix pending Eric OK.
 
 - Nov 26 14:35 UTC: #983 Puddles regrow opened (head 0440ff0e); CI watcher bxiivub1z; review session_01JuCWRvxbCN2sRrJoKpxYrK (Opus high, claude/puddles-regrow-review). Builder archived. Main watcher bkoxlih6a (c39f) still running.
+- Nov 26 14:45: #983 first CI green (0440ff0e). Review (archived): fixed 1 regrown queen cheer, 5 protocol doc, 6 comment count -> 9295f30a, CI watcher b8297v97k. Left as follow-ups: 2 regrown queen plays the jackpot chime (app); 3 `takes` trigger can regrow on a near-even pass (bounded by band top); 7 a named regrowth spends one search of waterBudget; plus the seed step has no floor (gain far below band).
