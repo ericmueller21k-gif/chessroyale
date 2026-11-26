@@ -58,7 +58,7 @@ import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, upName, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { Pictures, type Restored } from "./keep-pictures.ts";
-import { framePixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
+import { framePixels, glowPixels, type GlowPixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
 import type { PaintPool } from "./paint-pool.ts";
 import type { Cut } from "./kit/bake.ts";
 import { stepChar } from "./kit/bake.ts";
@@ -580,157 +580,45 @@ interface GlowPiece {
   y: number;
   flicker: boolean;
 }
-/** Clear pixels between a glow's pieces on its sheet: the atlas's own padding round a picture (paint.ts ATLAS). */
-const GLOW_GAP = ATLAS.pad;
 interface Glow {
   pieces: GlowPiece[];
-  lit: Uint8Array;
+  /** Which of its picture's pixels are lit (the tests find a lit window by it): worked out when first asked for (`litOf`). */
+  lit: Uint8Array | null;
+  ch: Character;
+  spots: readonly LightSpot[];
 }
-const rgbOf = (hex: string) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)] as const;
-const bandAt = (bands: readonly (readonly [number, number])[], d: number) => {
-  for (const [to, a] of bands) if (d <= to) return a;
-  return 0;
-};
-type AddLight = (x: number, y: number, rgb: readonly number[], a: number) => void;
-function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly LightPool[]): Glow {
-  const f = TOWN_FEEL;
-  const spill = Math.ceil(f.lightSpill[f.lightSpill.length - 1]![0]);
+/** A glow's lit pixels (`Glow.lit`), worked out once. */
+function litOf(g: Glow): Uint8Array {
+  if (g.lit) return g.lit;
+  const { ch } = g;
   const keys = frameKeys(ch, ch.anims.idle!.frames[0]!);
-  const lit = new Uint8Array(ch.w * ch.h);
-  /** Each piece's light as worked out (r, g, b, premultiplied), before it goes on the glow's one sheet. */
-  const made: { x0: number; y0: number; w: number; h: number; flicker: boolean; A: Float32Array }[] = [];
-  /** A piece over (x0, y0, w, h), in the picture's pixels: `fill` adds its light, pixel by pixel (r, g, b, premultiplied). */
-  const piece = (x0: number, y0: number, w: number, h: number, flicker: boolean, fill: (add: AddLight) => void) => {
-    const A = new Float32Array(w * h * 3);
-    let any = false;
-    fill((x, y, rgb, a) => {
-      const X = x - x0;
-      const Y = y - y0;
-      if (a <= 0 || X < 0 || Y < 0 || X >= w || Y >= h) return;
-      const o = (Y * w + X) * 3;
-      A[o] = A[o]! + rgb[0]! * a;
-      A[o + 1] = A[o + 1]! + rgb[1]! * a;
-      A[o + 2] = A[o + 2]! + rgb[2]! * a;
-      any = true;
-    });
-    if (any) made.push({ x0, y0, w, h, flicker, A });
-  };
-  for (const s of spots) {
-    const rgb = rgbOf(s.color);
-    // Its pixels (its keys in its box).
-    const m = new Uint8Array(s.w * s.h);
+  const lit = (g.lit = new Uint8Array(ch.w * ch.h));
+  for (const s of g.spots)
     for (let y = 0; y < s.h; y++)
       for (let x = 0; x < s.w; x++) {
         const k = keys[s.y + y]?.[s.x + x];
-        if (!k || (s.keys !== undefined && !s.keys.includes(k))) continue;
-        m[y * s.w + x] = 1;
-        lit[(s.y + y) * ch.w + s.x + x] = 1;
+        if (k && (s.keys === undefined || s.keys.includes(k))) lit[(s.y + y) * ch.w + s.x + x] = 1;
       }
-    const isLit = (x: number, y: number) => x >= s.x && y >= s.y && x < s.x + s.w && y < s.y + s.h && m[(y - s.y) * s.w + x - s.x] === 1;
-    const halo = s.halo ?? 0;
-    const cx = s.x + s.w / 2;
-    const cy = s.y + s.h / 2;
-    const x0 = Math.min(s.x - spill, Math.floor(cx - halo));
-    const y0 = Math.min(s.y - spill, Math.floor(cy - halo));
-    const x1 = Math.max(s.x + s.w + spill, Math.ceil(cx + halo) + 1);
-    const y1 = Math.max(s.y + s.h + spill, Math.ceil(cy + halo) + 1);
-    // How far each pixel of the piece is from the nearest lit one within `spill` across and down (squared): stamped out from the lit
-    // pixels (Nov 26: the same numbers as looking round every pixel, which was 2.7 s of the loading screen for the town's 2,551 pieces).
-    const PW = x1 - x0;
-    const PH = y1 - y0;
-    const near = new Float32Array(PW * PH).fill(Infinity);
-    for (let v = s.y; v < s.y + s.h; v++)
-      for (let u = s.x; u < s.x + s.w; u++) {
-        if (m[(v - s.y) * s.w + u - s.x] !== 1) continue;
-        for (let dy = -spill; dy <= spill; dy++) {
-          const Y = v + dy - y0;
-          if (Y < 0 || Y >= PH) continue;
-          for (let dx = -spill; dx <= spill; dx++) {
-            const X = u + dx - x0;
-            if (X < 0 || X >= PW) continue;
-            const d = dx * dx + dy * dy;
-            if (d < near[Y * PW + X]!) near[Y * PW + X] = d;
-          }
-        }
-      }
-    piece(x0, y0, PW, PH, !!s.flicker, (add) => {
-      for (let y = y0; y < y1; y++)
-        for (let x = x0; x < x1; x++) {
-          // Its lit pixels warm and bright; round them, the glow spilling, by how far the nearest lit one is; and its
-          // halo in the air (a lantern's, a lamp's), round its box's middle.
-          if (isLit(x, y)) {
-            add(x, y, rgb, s.strength);
-            continue;
-          }
-          const d2 = near[(y - y0) * PW + x - x0]!;
-          if (d2 < Infinity) add(x, y, rgb, s.strength * bandAt(f.lightSpill, Math.sqrt(d2)));
-          if (halo) add(x, y, rgb, s.strength * bandAt(f.lightHalo, Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / halo));
-        }
-    });
-  }
-  for (const p of pools) {
-    const rgb = rgbOf(p.color);
-    const x0 = Math.floor(p.x - p.rx);
-    const y0 = Math.floor(p.y - p.ry);
-    const x1 = Math.ceil(p.x + p.rx) + 1;
-    const y1 = Math.ceil(p.y + p.ry) + 1;
-    piece(x0, y0, x1 - x0, y1 - y0, false, (add) => {
-      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) add(x, y, rgb, p.strength * bandAt(f.lightPool, Math.hypot((x + 0.5 - p.x) / p.rx, (y + 0.5 - p.y) / p.ry)));
-    });
-  }
-  // The pieces on one sheet (Nov 26: a canvas each was 2,551 canvases, most of the lights' cost on the loading screen), in rows, GLOW_GAP
-  // clear pixels apart (as the atlas pads each picture: a smoothed draw of one reads the same clear pixels round it).
-  const G = GLOW_GAP;
-  let area = 0;
-  let widest = 0;
-  for (const p of made) {
-    const w = Math.trunc(p.w);
-    area += (w + G) * (Math.trunc(p.h) + G);
-    widest = Math.max(widest, w);
-  }
-  const rowW = Math.max(widest, Math.ceil(Math.sqrt(area)));
-  const at: number[] = [];
-  let cx = 0;
-  let cy = 0;
-  let rowH = 0;
-  let sw = 0;
-  for (const p of made) {
-    const w = Math.trunc(p.w);
-    const h = Math.trunc(p.h);
-    if (cx > 0 && cx + w > rowW) ((cx = 0), (cy += rowH + G), (rowH = 0));
-    at.push(cx, cy);
-    sw = Math.max(sw, cx + w);
-    cx += w + G;
-    rowH = Math.max(rowH, h);
-  }
+  return lit;
+}
+/** A glow from its sheet (null: no pieces) and seven numbers a piece (paint-jobs.ts GlowPixels; as the last visit kept it: keep-pictures.ts `Manifest.glows`). */
+function keptGlow(cv: HTMLCanvasElement | null, row: readonly number[], ch: Character, spots: readonly LightSpot[]): Glow {
   const pieces: GlowPiece[] = [];
-  if (!made.length) return { pieces, lit };
-  const sh = cy + rowH;
-  const img = new ImageData(Math.max(1, sw), Math.max(1, sh));
-  const d = img.data;
+  for (let k = 0; cv && k < row.length; k += 7) pieces.push({ cv, sx: row[k]!, sy: row[k + 1]!, w: row[k + 2]!, h: row[k + 3]!, x: row[k + 4]!, y: row[k + 5]!, flicker: row[k + 6] === 1 });
+  return { pieces, lit: null, ch, spots };
+}
+/**
+ * A picture's lights baked (paint-jobs.ts `glowPixels`, or a paint worker's `px`), its sheet on a canvas: one picture a glow (Nov 26:
+ * a canvas a piece was 2,551 canvases).
+ */
+function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly LightPool[], px?: GlowPixels | null): Glow {
+  const { sheet, pieces: at } = px ?? glowPixels(ch, spots, pools);
+  if (!sheet) return { pieces: [], lit: null, ch, spots };
   const cv = upName(document.createElement("canvas"), "glow");
-  cv.width = img.width;
-  cv.height = img.height;
-  made.forEach((p, k) => {
-    const { w, h, A } = p;
-    const tw = Math.trunc(w);
-    const th = Math.trunc(h);
-    const sx = at[2 * k]!;
-    const sy = at[2 * k + 1]!;
-    // (As a canvas of its own had it: its pixels in order, tw across.)
-    for (let i = 0; i < w * h && i < tw * th; i++) {
-      const a = Math.min(255, Math.max(A[i * 3]!, A[i * 3 + 1]!, A[i * 3 + 2]!));
-      if (a <= 0) continue;
-      const o = ((sy + ((i / tw) | 0)) * cv.width + sx + (i % tw)) * 4;
-      d[o] = Math.min(255, (A[i * 3]! * 255) / a);
-      d[o + 1] = Math.min(255, (A[i * 3 + 1]! * 255) / a);
-      d[o + 2] = Math.min(255, (A[i * 3 + 2]! * 255) / a);
-      d[o + 3] = a;
-    }
-    pieces.push({ cv, sx, sy, w: tw, h: th, x: p.x0, y: p.y0, flicker: p.flicker });
-  });
-  art2d(cv).putImageData(img, 0, 0);
-  return { pieces, lit };
+  cv.width = sheet.w;
+  cv.height = sheet.h;
+  art2d(cv).putImageData(new ImageData(new Uint8ClampedArray(sheet.data.buffer as ArrayBuffer, sheet.data.byteOffset, sheet.data.length), sheet.w, sheet.h), 0, 0);
+  return keptGlow(cv, at, ch, spots);
 }
 
 /** A piece on a table's board: its square (f: rank from white's side, g: file), where it slid from, when, and when it's gone. */
@@ -2022,6 +1910,49 @@ export class Renderer {
         if (fresh) p.roofDone(a);
       });
     };
+    // The lights (Nov 26): every home's, front's, side's and lamp's glow, baked and kept whatever the sky now (the clock brings dusk as
+    // you play). Eric's laptop at night: 1,211 uploads in 16.7 s of walking, each window's light baked and uploaded as it first shone,
+    // 3 to 12 a frame, the worst frames 50 to 117 ms. First, so this thread bakes them while the paint workers start on the frames; a
+    // later visit takes each glow's sheet and pieces from the kept pages (`pics.glow`). One job a glow, each glow once.
+    const glowSeen = new Set<object>();
+    const glow = (id: string, key: object, ch: Character, spots: readonly LightSpot[], pools: readonly LightPool[], put: (g: Glow) => void) => {
+      if (glowSeen.has(key)) return;
+      glowSeen.add(key);
+      sig.push(`glow:${id}`);
+      const si = specs.push({ kind: "glow", ch, spots, pools }) - 1;
+      jobs.push(() => {
+        const p = P();
+        if (p.from) {
+          const row = p.glow();
+          const cv = row.length ? p.next() : null;
+          if (cv) p.add(cv);
+          put(keptGlow(cv, row, ch, spots));
+          return;
+        }
+        const px = !this.pool ? null : this.pool.take(si);
+        if (px === "wait") return "wait";
+        const g = bakeGlow(ch, spots, pools, px as GlowPixels | null);
+        put(g);
+        if (g.pieces.length) p.add(g.pieces[0]!.cv);
+        p.glowDone(g.pieces.flatMap((pc) => [pc.sx, pc.sy, pc.w, pc.h, pc.x, pc.y, pc.flicker ? 1 : 0]));
+      });
+    };
+    for (let i = 0; i < this.places.length; i++) {
+      const art = artOf(this.places[i]!);
+      if (art.lights.length || art.pools.length) glow(`home${i}`, art, art.ch, art.lights, art.pools, (g) => (this.placeGlow[i] = g));
+    }
+    for (let i = 0; i < PROPS.length; i++) {
+      const pr = PROPS[i]!;
+      const fc = this.propFrames[i]!;
+      if (pr.lot !== undefined) {
+        const box = lotArt(STREET_BUILDINGS[pr.lot]!);
+        if (box.lights.length) glow(`front${i}`, fc, box.front, box.lights, [], (g) => this.frontGlow.set(fc, g));
+      }
+      if (pr.kind === "lamp") glow("lamp", PARK_LAMP, PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, (g) => (this.lampGlow = g));
+    }
+    for (const b of this.boxes)
+      for (const side of [b.box.left, b.box.right, b.box.back ?? b.box.rear])
+        if (side?.lights.length) glow(`side:${side.ch.id}`, side.ch, side.ch, side.lights, [], (g) => this.wallGlow.set(side.ch, g));
     for (const b of this.boxes) {
       for (const list of [0, 1]) for (const w of this.warmList(b, list)) frame(w.fc, w.k, w.dark);
       for (let q = 0; q < 4; q++) roof(b, q);
@@ -2045,27 +1976,6 @@ export class Renderer {
         if (!sp.ready) return sp.failed ? undefined : false;
         for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) P().keep(c);
       });
-    // (The lights, Nov 26: every home's, front's, side's and lamp's glow baked and kept, whatever the sky now (the clock brings dusk as
-    // you play). Eric's laptop at night: 1,211 uploads in 16.7 s of walking, each window's light baked and uploaded as it first shone,
-    // 3 to 12 a frame, the worst frames 50 to 117 ms. Baked fresh each visit, as the labels are: not in the kept pages. One job a picture.)
-    const glow = (make: () => Glow | null) =>
-      jobs.push(() => {
-        const g = make();
-        if (g?.pieces.length) P().keep(g.pieces[0]!.cv);
-      });
-    for (let i = 0; i < this.places.length; i++) glow(() => this.glowOf(i));
-    for (let i = 0; i < PROPS.length; i++) {
-      const pr = PROPS[i]!;
-      if (pr.lot !== undefined) glow(() => this.frontGlowOf(this.propFrames[i]!, pr.lot!));
-      if (pr.kind === "lamp") glow(() => (this.lampGlow ??= bakeGlow(PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS)));
-    }
-    const sides = new Set<Character>();
-    for (const b of this.boxes)
-      for (const side of [b.box.left, b.box.right, b.box.back ?? b.box.rear])
-        if (side?.lights.length && !sides.has(side.ch)) {
-          sides.add(side.ch);
-          glow(() => this.wallGlowOf(side.ch, side.lights));
-        }
     // (The labels, Nov 25: once their fonts are in, up to `loadSheetWaitMs` all told; made fresh each visit, as they're quick.)
     jobs.push(() => this.fontsIn());
     jobs.push(() => this.makeLabels((c) => P().keep(c)));
@@ -3264,10 +3174,11 @@ export class Renderer {
     const g = this.glowOf(i);
     const s = artOf(this.places[i]!).lights[0];
     if (!it?.on || !g || !s) return false;
+    const lit = litOf(g);
     const cw = this.houseFrames[i]!.ch.w;
     const px = (it.x1 - it.x0) / cw;
     const amid = (x: number, y: number) => {
-      for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) if (!g.lit[(y + v) * cw + x + u]) return false;
+      for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) if (!lit[(y + v) * cw + x + u]) return false;
       return true;
     };
     const cands: [number, number][] = [];

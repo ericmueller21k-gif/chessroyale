@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { F, FpsCount, FrameRec, NP, P, PART_NAMES, PART_SHORT, RUN_MS, browserOf, newRun, quantile, refreshOf, summarize, timerStep, whatOf, type RunData } from "../src/town/frame-report.ts";
+import { F, FpsCount, FrameRec, NP, P, PART_NAMES, PART_SHORT, RUN_MS, browserOf, newRun, quantile, refreshOf, setRec, summarize, timerStep, upName, whatOf, type RunData } from "../src/town/frame-report.ts";
+import { panelHtml } from "../src/town/frame-report-panel.ts";
 
 /** A run of frames: each [ms, flags, parts as { part: ms }, turn deg/s, uploads, pictures painted]. */
 function runOf(frames: [number, number, Partial<Record<number, number>>?, number?, number?, number?][]): RunData {
@@ -192,6 +193,43 @@ describe("the recorder", () => {
     }
     expect(rec.run.n).toBe(3);
     expect(Array.from(rec.run.total.subarray(0, 3)).map((x) => +x.toFixed(1))).toEqual([16.7, 16.7, 16.7]);
+  });
+
+  it("counts the uploads by source (Nov 26: Eric's 1,211 couldn't be placed): named where each picture is made, why after it, only while recording; Again starts afresh", () => {
+    const { rec, at } = rig();
+    setRec(rec);
+    const glow = upName({ width: 20, height: 25 }, "glow");
+    const tag = upName({ width: 30, height: 9 }, "tag");
+    const bare = { width: 7, height: 3 };
+    // (Before the run: counted in the frame, not by source.)
+    at(0);
+    rec.begin(0);
+    rec.upload(1, glow);
+    rec.end(false, 0, 2);
+    at(16.7);
+    rec.begin(16.7);
+    rec.end(true, 0, 2);
+    for (let f = 2; f < 5; f++) {
+      at(16.7 * f);
+      rec.begin(16.7 * f);
+      rec.upload(0.5, glow);
+      rec.upload(0.5, glow);
+      if (f === 3) rec.upload(0.5, tag, "redrawn");
+      if (f === 4) rec.upload(0.5, bare);
+      rec.end(true, 0, 2);
+    }
+    const s = summarize(rec.run);
+    expect(s.uploads).toBe(8);
+    expect(s.uploadsBy).toEqual([
+      ["glow", 6],
+      ["other 7×3", 1],
+      ["tag (redrawn)", 1],
+    ]);
+    const html = panelHtml(s, { browser: "x", ratio: 1, drawn: 1, w: 1, h: 1, backend: "WebGL", timer: 0.1 });
+    expect(html).toContain("Uploads by source: glow 6 · other 7×3 1 · tag (redrawn) 1");
+    rec.again();
+    expect(summarize(rec.run).uploadsBy).toEqual([]);
+    setRec(null);
   });
 
   it("stops after 30 s (onDone once); Again starts an empty run that waits again", () => {
