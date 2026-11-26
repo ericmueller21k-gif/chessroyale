@@ -21,6 +21,7 @@ and `docs/history/`.
 | Accounts and sign-in | [accounts.md](accounts.md) | `hub` |
 | Chat: quick chat, lobby chat, global chat | [chat.md](chat.md) | `social` |
 | The shop, crates, the locker and the icon builder | [shop.md](shop.md) | `item-builder` |
+| Payments: buying coins (packs, purchases, earned-first spending, refunds; Stripe later) | [payments.md](payments.md) | the director |
 | The engine and the judge (scoring, many judges, the engine server) | [engine.md](engine.md) | `engine` |
 | Fair play | [fairplay.md](fairplay.md) | `fairplay` |
 | Ops: hosting, deploy, capacity, limits | [ops.md](ops.md) | `ops` |
