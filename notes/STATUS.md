@@ -2165,3 +2165,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: ERIC: bots join 15 s (50 v 50, Squads), 30 s (ranked 1 v 1); tag 'HunBot' (vs existing 'Bot'). Added to beta-bots-design.md.
 - Nov 26 02:15 UTC: crate-banner flake (Smiley Face variant name) fixed by director → PR #965 (8b49527e) CI. #964 waits on round 2 (queued).
 - Nov 26: main f01ba249 GREEN + LIVE (coin strip, no-gap quests).
+- Nov 26 02:13 UTC: PR 5 fixes done (3a4744f1) → branch prepped 45cbdb64, full CI running; delta review session_01JuCWRvQRvjKgJNLYrMwkEY. Fixes helper session_01JuCWRvnuXPv4LMkiPJjSdR to archive. Running Opus: PR 4 (xhigh), PR 5 delta (xhigh). Queue: boss-frame-2 (high), beta-bots design (xhigh).
