@@ -2176,3 +2176,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 03:20 UTC: #964 (boss frame) MERGED 80a8f901: every game screen now in the shared frame (1 v 1, 50 v 50, Squads, Boss). Main run watched. ult-danger branch must merge main (boss frame touched boss screens? no rules) when it finishes.
 - Nov 26: main 80a8f901 GREEN + LIVE (boss frame: every game screen in the shared frame).
 - Launch checklist: verify no non-admin path enables Practice mode or any test switch (Eric, Nov 26: keep admin-only).
+- Nov 26 03:35 UTC: PR 4 fixes done (4b67a5d0). Director's call: minGameMinutes stays 5 (10 would halve legit blitz). Delta review + CI next.
