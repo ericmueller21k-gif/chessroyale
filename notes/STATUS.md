@@ -2251,3 +2251,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - 14:00 Chandy art PR #982 (c0985359), CI waiter bvsaitwlw. Merge order once green: #981 (flakes; main green), #980 (Dash tap), #982 (Chandy art). Next helper (one at a time): Puddles regrow (xhigh), then Dash Hang-on nits, then 50v50/Squads ranks.
 - 14:10 #981 MERGED (cafab166), #980 Dash tap MERGED (879f9034); main+deploy watcher. New retry-pass on #981: birdie.spec.ts:426 [desktop] fall cutscene timing (toBeLessThan) -> queue after Puddles (one helper at a time) unless the CI layout fix (Eric OK pending) lands first. 8 timing flakes today, same cause pattern.
 - 14:20 #982 Chandy art MERGED (c39f7217), main+deploy watcher. Open: #978 (Eric OK), Puddles regrow (b1uxnenaz). Queue: birdie fall flake, Dash Hang-on nits, 50v50/Squads ranks; CI layout fix pending Eric OK.
+
+- Nov 26 14:35 UTC: #983 Puddles regrow opened (head 0440ff0e); CI watcher bxiivub1z; review session_01JuCWRvxbCN2sRrJoKpxYrK (Opus high, claude/puddles-regrow-review). Builder archived. Main watcher bkoxlih6a (c39f) still running.
