@@ -11,3 +11,15 @@
 - Nov 26 · Payments PR 7 (coin screen), 8 (Stripe), 9 (refunds), 10 (admin) · queued
 - Nov 26 · Dash's lying-down clock tap: 3x bigger over the board, taps pass through, redrawn pose (belly, feet up, hand on head) · queued (brief notes/briefs/dash-tap-bigger.md)
 - Nov 26 · Dash Hang on follow-up: the review's 3 display nits (premoves over the slid-back board; move list row; late join) · queued
+
+## From the Nov 26 audit (notes/asks-audit-2026-11-26.md): never built / partly done
+- Nov 9-25 · 50 v 50 and Squads get their own ranks (RP from placement + engine score vs the lobby; ladder for all rank modes; a ranked leaver's seat filled by a bot at their level) · NEVER BUILT · queued (ranked, xhigh)
+- Nov 9-10 · Riders in the regular crates (5 non-boss riders, crate exclusives; the shopping cart) · NEVER BUILT · queued (item-builder)
+- Nov 10 · Auto chess: play against people (unranked, in match history) + a landing page (queue with a bot or search) · NEVER BUILT · ask Eric if still wanted (was parked "only on Eric's word")
+- Nov 12 · Rare items: a gold/diamond tier frame + tap to preview on a pawn (with the rider) · NEVER BUILT · queued
+- Nov 13 · Hidden Boss in match history: his three forms, the beaten ones greyed · NEVER BUILT · queued
+- Nov 25 · 1 v 1: rank emblem by every name in game + tap a rank for the ranks pop-up · PARTLY (pill done #953) · queued
+- Nov 11 · Landing page: sound toggle (video muted today) · PARTLY · queued (after trailer v2)
+- Nov 10 · Banana Suit as the secret crate's prize (nothing rolls it) · PARTLY · queued
+## Waiting on Eric (re-ask in the next message)
+- Turf mockup (Nov 22) · beta bots 6 decisions (+ "expect more bots" note) · burst cheat detection build y/n (Nov 11) · Boss Battle select 2x vs bigger (Nov 12) · Boingo room revisions (Nov 12) · trailer v2 edits + Song C (Nov 11) · Settings cleanup look (Nov 25) · lossless music masters location (Nov 16) · Discord webhook (Nov 10) · payments: Access bypass, Stripe Tax, LLC details
