@@ -549,7 +549,9 @@ describe("Watering: the regrowth (Eric, Nov 26: the piece he'd lose by passing g
       expect(regrowKind(fen), fen).toBeNull();
       expect((await waterAnswer(engines, fen, ask(kinds, fen, order))).answer, fen).toBe(answer);
     }
-  });
+    // (Twelve waterings searched in one test: about 3 s here and 5 s on a busy CI runner, over vitest's 5 s default; #985's run,
+    // Nov 26. Its own budget, as the file's other many-search tests have.)
+  }, 30_000);
 });
 
 describe("Watering in a battle", () => {
