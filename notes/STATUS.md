@@ -2266,3 +2266,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 19:25: main 22350bcb (#985) GREEN full run, no flaky; live 22350bcb. (d445 flakes still to fix: helper running.) #986 fix round done c2152c44, CI bfkwkzr83.
 - Nov 26 19:40: #986 MERGED 6532b216 (its e2e had the known dash:778 retry-pass; cause-fix in flight). Main watcher running.
 - Nov 26 19:50: #987 flakes-main-d445 opened (8b238bd2): Dash lie frames prewarmed (first lie-down froze 250-1000 ms) + moved = move time; XP bar overshoot (negative progress); Hollow walkTo aim. CI running. Helper archived.
+- Nov 26 20:00: main 6532b216 (#986 Dash Hang on 2) GREEN, live.
