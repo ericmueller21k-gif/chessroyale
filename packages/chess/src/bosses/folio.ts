@@ -26,7 +26,7 @@ import { marksStop, type EdgeMark } from "../board-layer.ts";
 import { applyMove, baseAt, fenAtPly, legalMoves, matingMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { BALLOON_TEST_MOVES } from "./tiger.ts";
-import { heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, ultCapped, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
+import { dangerCharge, heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, ultCapped, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
 
 /**
  * How long each of its moments holds the screen (ms; POWER_FX in boss-timing.ts). `fold` and `revision` play at the start
@@ -475,7 +475,7 @@ export const folioBattle = {
   /**
    * The Crease's line is wanted with its move now: as the crowd's next turn begins the warning would come (the meter full
    * by then, worked out as prepareTurn will: this crowd move's rage and its material lost so far, at the floor's rates (several
-   * bosses: Battle.rageRates, as his step reads them; audit 1, finding 3); or the test switch), or the admins' trigger is
+   * bosses: Battle.rageRates, as his step reads them; audit 1, finding 3), full at once in danger (dangerCharge); or the test switch), or the admins' trigger is
    * pulled. Not while one is warned, holds or the meter is held.
    */
   creaseDue(b: Battle, s: BossPowerSettings = b.rageRates?.() ?? BOSS_POWERS): boolean {
@@ -490,7 +490,8 @@ export const folioBattle = {
     const moved = p.turn > 0 ? Math.max(0, turn - p.turn) : 0;
     const charge = (p.charge ?? 0) + moved * rageTick(p.judged, s);
     const lost = Math.max(p.lost, p.material - materialOf(boardOf(b).fen, other(boss.crowdSide)));
-    return rageNow({ charge, lost, rageUsed: p.rageUsed }, rageSpeedOf(boss.id, s), s) >= s.rageFull;
+    // (In danger, prepareTurn fills the meter for its step: dangerCharge.)
+    return rageNow({ charge: dangerCharge({ charge, lost, rageUsed: p.rageUsed, judged: p.judged }, rageSpeedOf(boss.id, s), s), lost, rageUsed: p.rageUsed }, rageSpeedOf(boss.id, s), s) >= s.rageFull;
   },
 
   /** What the host's engines need to pick the line after its move now (the boss request's `crease`), or null: none wanted. */

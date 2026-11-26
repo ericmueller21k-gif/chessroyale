@@ -216,6 +216,23 @@ export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: Pick<R
   return (p.charge ?? 0) + p.lost * s.ragePerMaterial;
 }
 
+/**
+ * The boss is in danger (BOSS_POWERS.dangerAt; Eric, Nov 26): the crowd's expected score after its last move, as the judge has it
+ * (`judged`), at or above dangerAt. Nothing judged yet: not in danger.
+ */
+export const inDanger = (judged: number | undefined, s: Pick<BossPowerSettings, "dangerAt"> = BOSS_POWERS): boolean => judged !== undefined && judged >= s.dangerAt;
+
+/**
+ * The meter's charge with the boss in danger (inDanger): at least what makes it full now (rageNow at rageFull, with his material
+ * lost and what the last ultimate spent), so its step warns (or brings the ultimate) this turn. Not in danger: `charge` as it is.
+ */
+export function dangerCharge(p: Pick<BossPowerState, "charge" | "lost" | "rageUsed" | "judged">, speed: number, s: Pick<RageRates, "rageFull" | "ragePerMaterial"> & Pick<BossPowerSettings, "dangerAt"> = BOSS_POWERS): number {
+  const charge = p.charge ?? 0;
+  if (!inDanger(p.judged, s)) return charge;
+  // (A hair over full, so the meter reads full whatever the rounding of the division.)
+  return Math.max(charge, s.rageFull / Math.max(1e-6, speed) + (p.rageUsed ?? 0) - p.lost * s.ragePerMaterial + 1e-6);
+}
+
 /** How fast a boss's meter fills (BOSS_POWERS.rageSpeed: every gain times this). */
 export const rageSpeedOf = (id: string | undefined, s: Pick<RageRates, "rageSpeed"> = BOSS_POWERS): number => (id && s.rageSpeed[id]) || 1;
 

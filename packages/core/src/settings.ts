@@ -1456,6 +1456,16 @@ export const BOSS_POWERS = {
   ragePerMaterial: 100 / 18,
   rageStrike: 25,
   /**
+   * The boss in danger (Eric, Nov 26, after beating Birdie with no Fall: "It's not about like how many moves have been played. It
+   * should have detected like he was basically in danger, or like it was already heavily in my favor, and it should start
+   * triggering very quickly thereafter, like a turn or two at most"): the crowd's expected score after its move, as the judge has
+   * it (the boss's `judged`, the number "your chances" shows), at or above dangerAt. From one such move: the rage meter is full as
+   * the next crowd turn begins (its usual warning, then the ultimate), Birdie's Fall comes at the start of that very turn of his,
+   * and Chandy's Dodge is warned as his rifle's meter would (docs/decisions/2026-11-26-ult-danger.md). The ultimate comes within
+   * two of his turns, whatever his meter held. Below it, every meter fills as it always has.
+   */
+  dangerAt: 0.7,
+  /**
    * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
    * effect pauses the meter for its length (the blizzard 3 turns, the funhouse 12, the Roman candle about 13, Lights
    * out 2, the Big Bounce 1, the board saw 5), so a longer one fills faster to fit two in a typical battle. Ginger a
@@ -2263,7 +2273,8 @@ export const BOSS_POWERS = {
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
    *   next turn begins. Eric, Nov 16: 1 (was 3): "It should come a turn later, he should say something about preparing yourself, and
-   *   then after you move it begins." **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
+   *   then after you move it begins." **In danger** (Eric, Nov 26; BOSS_POWERS.dangerAt): the usual warning as if his meter were full,
+   *   his rifle whole or not, then Dodge. **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
    *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. First the warning volley
    *   (Eric, Nov 16: "an additional shot first that you can't move"): the clones fire once on lines that miss your king, no vote, then
    *   "Dodge the next one!" (`dodgeVolleyMs` in all, the clones aiming `dodgeAimMs` first). Then `dodgeRounds` rounds, each a
@@ -2322,7 +2333,8 @@ export const BOSS_POWERS = {
    *   (your king: the battle is his). The judge counts a piece left there as gone: its value at `trainPawnLogit` log-odds a pawn
    *   (the fire's way, firePawnLogit), your king as the battle lost.
    * - The Fall, once a battle: at the start of his turn once he has lost `fallLost` points of material since the battle began
-   *   (P1 N3 B3 R5 Q9: the most he has been down), his fall and its cutscene (BIRDIE_CINEMATIC), then Armored Birdie for the rest of
+   *   (P1 N3 B3 R5 Q9: the most he has been down), or once he's in danger (Eric, Nov 26: the crowd's expected score after its move,
+   *   the judge's, at BOSS_POWERS.dangerAt or more; he can be lost on the board with far less than fallLost down), his fall and its cutscene (BIRDIE_CINEMATIC), then Armored Birdie for the rest of
    *   the battle.
    * - Armored Birdie (Eric, Nov 23: "He still uses his same normal move after. He just does it every 3 to 4 turns ... we turn up the
    *   Maya to a much stronger level"): the train goes on, `armoredTrainEvery` crowd turns from one warning to the next; and his brain
