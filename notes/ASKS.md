@@ -18,9 +18,9 @@
 - Nov 9-10 · Riders in the regular crates (5 non-boss riders, crate exclusives; the shopping cart) · NEVER BUILT · queued (item-builder)
 - Nov 10 · Auto chess: play against people (unranked, in match history) + a landing page (queue with a bot or search) · NEVER BUILT · ask Eric if still wanted (was parked "only on Eric's word")
 - Nov 12 · Rare items: a gold/diamond tier frame + tap to preview on a pawn (with the rider) · NEVER BUILT · queued
-- Nov 13 · Hidden Boss in match history: his three forms, the beaten ones greyed · NEVER BUILT · queued
+- Nov 13 · Hidden Boss in match history: his three forms, the beaten ones greyed · building (session_01JuCWRvi5KAswppgZ5rCniR, claude/hidden-boss-history)
 - Nov 25 · 1 v 1: rank emblem by every name in game + tap a rank for the ranks pop-up · PARTLY (pill done #953) · queued
-- Nov 11 · Landing page: sound toggle (video muted today) · PARTLY · queued (after trailer v2)
+- Nov 11 · Landing page: sound toggle (video muted today) · building (Haiku session_01JuCWRrPD9bEDFGSg9LQ36E, claude/landing-sound)
 - Nov 10 · Banana Suit as the secret crate's prize (nothing rolls it) · PARTLY · queued
 ## Waiting on Eric (re-ask in the next message)
 - Turf mockup (Nov 22) · beta bots 6 decisions (+ "expect more bots" note) · burst cheat detection build y/n (Nov 11) · Boss Battle select 2x vs bigger (Nov 12) · Boingo room revisions (Nov 12) · trailer v2 edits + Song C (Nov 11) · Settings cleanup look (Nov 25) · lossless music masters location (Nov 16) · Discord webhook (Nov 10) · payments: Access bypass, Stripe Tax, LLC details
