@@ -1,6 +1,6 @@
 import { mulberry32 } from "./rng.ts";
 import { questSeed } from "./quests.ts";
-import { COIN_BOOST, LEVEL_CRATE_BONUS } from "./settings.ts";
+import { COIN_BOOST, LEVEL_CRATE_BONUS, PLAY_COINS } from "./settings.ts";
 import type { PlayCoins } from "./play-coins.ts";
 
 /**
@@ -39,16 +39,28 @@ export interface BoostPaid {
 
 /**
  * What a boost adds to a game: `base` the game's coins as paid (play coins and bonus, both counted at base toward the day's caps),
- * `minutes` its counted minutes (XP's; at least 1 a game), `left` the boost minutes there are. Nothing without boost minutes, or for a
- * game that paid no play coins (past the day's PLAY_COINS.perDay: the boost waits for tomorrow). Else the game uses `min(left,
- * minutes)` of them, and its coins get (multiplier - 1) times that share of them, rounded (half up). Nothing used for no extra coin.
+ * `minutes` its counted minutes (XP's), `left` the boost minutes there are. Nothing without boost minutes, or for a game that paid no
+ * play coins (past the day's PLAY_COINS.perDay: the boost waits for tomorrow). Else the game costs the minutes that earned its play
+ * coins: its counted minutes (at least 1), but no more than its play coins over `perMinute`, rounded up (the game that reaches the
+ * day's 300 pays only part of its minutes; Nov 26, the review of #966's M1: "a 30-minute game paying the last 10 uses 6"), and at
+ * least `s.minGameMinutes` (m1: a 40-second win costs 5, so short games can't multiply a crate's worth). It uses `min(left, cost)` of
+ * them, and its coins get (multiplier - 1) times that share of them, rounded (half up). Nothing used for no extra coin.
  */
-export function boostFor(base: { play: number; bonus: number }, minutes: number, left: number, s = COIN_BOOST): { coins: number; minutes: number } {
+export function boostFor(
+  base: { play: number; bonus: number },
+  minutes: number,
+  left: number,
+  s: { multiplier: number; minGameMinutes: number } = COIN_BOOST,
+  perMinute: number = PLAY_COINS.perMinute,
+): { coins: number; minutes: number } {
   const have = Math.max(0, Math.floor(left));
   if (!have || !(base.play > 0)) return { coins: 0, minutes: 0 };
-  const m = Math.max(1, Math.floor(minutes));
-  const used = Math.min(have, m);
-  const coins = Math.round((base.play + Math.max(0, base.bonus)) * Math.max(0, s.multiplier - 1) * (used / m));
+  const counted = Math.max(1, Math.floor(minutes));
+  // (The minutes its play coins paid for; a hair under, so an exact multiple isn't rounded up by the float.)
+  const paid = perMinute > 0 ? Math.min(counted, Math.max(1, Math.ceil(base.play / perMinute - 1e-9))) : counted;
+  const cost = Math.max(paid, Math.floor(s.minGameMinutes));
+  const used = Math.min(have, cost);
+  const coins = Math.round((base.play + Math.max(0, base.bonus)) * Math.max(0, s.multiplier - 1) * (used / cost));
   return coins > 0 ? { coins, minutes: used } : { coins: 0, minutes: 0 };
 }
 

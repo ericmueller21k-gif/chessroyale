@@ -99,7 +99,8 @@ export function crateCount(n: number, name: string): string {
 
 /**
  * A reward's lines, in plain words: "+1 Winter Crate", "+2 Winter Crates (Crate bonus)", "+1 crate key", "Choose your boss crate", and a
- * daily's drop (Nov 26): "+1 Coin Boost Crate", "Crate Bonus: your next 5 level-ups give double crates".
+ * daily's drop (Nov 26): "+1 Coin Boost Crate", "Crate Bonus: your next 5 level-ups that give crates give double crates" (only the
+ * levels that pay crates use one: the review of #966's m3).
  */
 export function rewardLines(r: XpRewards, crateName: string): { daily: string | null; level: string | null; pick: string | null; quests: string[]; drops: string[] } {
   const things = (crates: number, keys: number, doubled = 0) =>
@@ -116,7 +117,7 @@ export function rewardLines(r: XpRewards, crateName: string): { daily: string | 
     quests: done.map((q) => [`Quest done: ${q.name} +${q.xp.toLocaleString("en-US")}\u00a0XP`, ...things(q.crates, q.keys)].join(" · ")),
     drops: [
       ...(boost ? [`+${boost} ${BOOST_CRATE_NAME}${boost === 1 ? "" : "s"}: open ${boost === 1 ? "it" : "one"} in Crates for ${COIN_BOOST.multiplier}x coins over ${COIN_BOOST.minutes} minutes of play`] : []),
-      ...(bonus ? [`${CRATE_BONUS_NAME}: your next ${bonus} level-ups give double crates`] : []),
+      ...(bonus ? [`${CRATE_BONUS_NAME}: your next ${bonus} level-ups that give crates give double crates`] : []),
     ],
   };
 }

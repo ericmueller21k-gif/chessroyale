@@ -4,7 +4,7 @@ import { createGuest, createSession, ensureSchema, signInWithIdentity, type Sql 
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { grantTestItems } from "../src/boss-tokens.ts";
-import { BOOST, NO_BOOST_CRATE, boostOpId, openBoostCrate } from "../src/coin-boost.ts";
+import { BOOST, NO_BOOST_CRATE, boostOpId, openBoostCrate, settleBoost } from "../src/coin-boost.ts";
 import { setCase } from "../src/fairplay.ts";
 import { ledgerAccount, ledgerMismatches } from "../src/ledger.ts";
 import { lockerState } from "../src/locker.ts";
@@ -53,19 +53,17 @@ async function boosted(sql: Sql, email: string, crates = 1) {
   for (let i = 0; i < crates; i++) expect(await openBoostCrate(sql, a.id, `open-${email}-${i}`, T0)).toEqual({ ok: true });
   return a;
 }
-const hex = (n: number) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, "0")).join("");
 /**
- * An account whose first quest (dealt by the test switch) rolls `want` when finished: its ledger id is picked here, before its first
- * ledger row, so the roll (core's questDrop, from the completion op's key, which holds the ledger id) is known. Answers the account,
- * its ledger id and the quest's op key.
+ * An account whose first quest (dealt by the test switch) rolls `want` when finished: the switch draws the quest's id until its
+ * completion op's key (which holds the account's ledger id) rolls that (core's questDrop). Answers the account, its ledger id and the
+ * quest's op key.
  */
 async function rolling(sql: Sql, email: string, kind: string, progress: number, want: QuestDrop, weekly = false) {
   const a = await signedIn(sql, email);
-  expect(await setTestQuests(sql, a.id, [{ kind, progress }], T0)).toBe(true);
+  expect(await setTestQuests(sql, a.id, [{ kind, progress, drop: want ?? "none" }], T0)).toBe(true);
   const q = (await sql.first<{ id: string }>("SELECT id FROM quests WHERE user_id = ? AND period = ?", a.id, weekly ? "weekly" : "daily"))!;
-  let account = hex(12);
-  while (questDrop(questOpId(kind, q.id, account)) !== want) account = hex(12);
-  await sql.run("INSERT INTO ledger_accounts (user_id, account) VALUES (?, ?)", a.id, account);
+  const { account } = (await ledgerAccount(sql, a.id))!;
+  expect(questDrop(questOpId(kind, q.id, account))).toBe(want);
   return { a, account, op: questOpId(kind, q.id, account) };
 }
 
@@ -142,6 +140,20 @@ describe("opening a Coin Boost Crate", () => {
     expect(r.status).toBe(200);
     expect([r.body.locker.boostCrates, r.body.locker.boostMinutes]).toEqual([0, COIN_BOOST.minutes]);
   });
+
+  it("three opens at once of one crate (two requests, one with none) open one: its minutes once (the review of #966's R4)", async () => {
+    const { sql } = await world();
+    const a = await signedIn(sql, "ann@example.com");
+    await grantTestItems(sql, a.id, { boost: 1 }, T0);
+    const answers = await Promise.all([openBoostCrate(sql, a.id, "race-open-1", T0), openBoostCrate(sql, a.id, "race-open-2", T0), openBoostCrate(sql, a.id, null, T0)]);
+    expect(answers.filter((r) => r.ok)).toHaveLength(1);
+    expect(answers.filter((r) => !r.ok)).toEqual([
+      { ok: false, message: NO_BOOST_CRATE },
+      { ok: false, message: NO_BOOST_CRATE },
+    ]);
+    expect(await wallet(sql, a.id)).toMatchObject({ boost_crates: 0, boost_minutes: COIN_BOOST.minutes });
+    expect(await ledgerMismatches(sql, a.id)).toEqual([]);
+  });
 });
 
 describe("a boosted game", () => {
@@ -210,6 +222,50 @@ describe("a boosted game", () => {
     expect((await wallet(sql, b.id))!.boost_minutes).toBe(120);
     const tomorrow = await grantXp(sql, b.id, game("lobby:NEXT1:1", 30, { now: T0 + DAY }));
     expect(tomorrow!.coins).toMatchObject({ play: 54, boost: { coins: 81, minutes: 30, left: 90 } });
+    expect(await ledgerMismatches(sql, b.id)).toEqual([]);
+  });
+
+  it("the game that reaches the day's 300 uses only the minutes its play coins paid for: from 290, a 30-minute game uses 6 and leaves 114 (the review of #966's M1)", async () => {
+    const { sql } = await world();
+    const b = await signedIn(sql, "bo@example.com");
+    // (Five 30-minute games and an 11-minute one, unboosted: 5 x 54 + 20 = 290.)
+    for (let i = 0; i < 5; i++) await grantXp(sql, b.id, game(`lobby:FILL${i}:1`, 30));
+    await grantXp(sql, b.id, game("lobby:FILL5:1", 11));
+    const acct = (await ledgerAccount(sql, b.id))!.account;
+    expect(await coinDayOf(sql, acct, xpDayStart(T0))).toEqual({ play: 290, bonus: 0 });
+    await grantTestItems(sql, b.id, { boost: 1 }, T0);
+    await openBoostCrate(sql, b.id, "bo-open-1", T0);
+    // (Its last 10 play coins took 10 / 1.8 = 5.6 minutes: 6 used, all of its 10 boosted: 15.)
+    const x = await grantXp(sql, b.id, game("lobby:CROSS:1", 30));
+    expect(x!.coins).toMatchObject({ play: 10, today: { play: 300 }, boost: { coins: 15, minutes: 6, left: 114 } });
+    expect((await wallet(sql, b.id))!.boost_minutes).toBe(114);
+    expect(await ledgerMismatches(sql, b.id)).toEqual([]);
+  });
+
+  it("a short game uses at least COIN_BOOST.minGameMinutes: a 40-second win (1 play coin, 15 bonus) uses 5 (the review of #966's m1)", async () => {
+    const { sql } = await world();
+    const a = await boosted(sql, "ann@example.com");
+    const x = await grantXp(sql, a.id, game("lobby:QUICK:1", 40 / 60, {}, { won: true }));
+    expect(x!.coins).toMatchObject({ play: 1, bonus: 15, boost: { coins: 24, minutes: COIN_BOOST.minGameMinutes, left: 115 } });
+    expect((await wallet(sql, a.id))!.boost_minutes).toBe(115);
+    expect(await ledgerMismatches(sql, a.id)).toEqual([]);
+  });
+
+  it("a boost worked out with no bonus while the ledger has the game's bonus is refused, so the bonus is never left unboosted (the review of #966's n1)", async () => {
+    const { sql } = await world();
+    const b = await signedIn(sql, "bo@example.com");
+    // (A won 30-minute game paid before the crate is opened: 54 play coins and 15 bonus, no boost.)
+    const paid = (await grantXp(sql, b.id, game("lobby:STALE:1", 30, {}, { won: true })))!.coins!;
+    expect(paid).toMatchObject({ play: 54, bonus: 15 });
+    await grantTestItems(sql, b.id, { boost: 1 }, T0);
+    await openBoostCrate(sql, b.id, "bo-open-1", T0);
+    const me = (await ledgerAccount(sql, b.id))!;
+    const plan = { key: "lobby:STALE:1", now: T0, minutes: 30 };
+    expect((await settleBoost(sql, me, plan, { ...paid, bonus: 0 })).boost).toBeUndefined();
+    expect(await sql.first("SELECT COUNT(*) AS n FROM ledger WHERE op_id = ?", boostOpId("lobby:STALE:1", me.account))).toEqual({ n: 0 });
+    expect((await wallet(sql, b.id))!.boost_minutes).toBe(120);
+    // (With the coins as the ledger has them: 69 x 1.5.)
+    expect((await settleBoost(sql, me, plan, paid)).boost).toEqual({ coins: 104, minutes: 30, left: 90 });
     expect(await ledgerMismatches(sql, b.id)).toEqual([]);
   });
 
@@ -299,6 +355,19 @@ describe("the Crate Bonus", () => {
     // (Another Crate Bonus adds 5 more.)
     await grantTestItems(sql, a.id, { crateBonus: 1 }, T0);
     expect((await wallet(sql, a.id))!.crate_bonus).toBe(5);
+    expect(await ledgerMismatches(sql, a.id)).toEqual([]);
+  });
+
+  it("two games at once reaching the same paying level pay one bonus: its crates twice, one level-up off (the review of #966's R3)", async () => {
+    const { sql } = await world();
+    const a = await signedIn(sql, "ann@example.com");
+    await grantTestItems(sql, a.id, { crateBonus: 1 }, T0);
+    await setTestXp(sql, a.id, 400, T0);
+    const xs = await Promise.all([grantXp(sql, a.id, game("lobby:TWIN1:1", 12)), grantXp(sql, a.id, game("lobby:TWIN2:1", 12))]);
+    expect(xs.map((x) => x!.rewards?.doubled ?? 0).sort()).toEqual([0, 1]);
+    expect(await winter(sql, a.id)).toBe(2);
+    expect(await wallet(sql, a.id)).toMatchObject({ crate_bonus: 4, crate_keys: 1 });
+    expect(await sql.first("SELECT COUNT(DISTINCT op_id) AS n FROM ledger WHERE reason = 'crate-bonus'")).toEqual({ n: 1 });
     expect(await ledgerMismatches(sql, a.id)).toEqual([]);
   });
 });

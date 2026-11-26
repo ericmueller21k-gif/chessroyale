@@ -16,7 +16,8 @@ import { coinOpIds } from "./play-coins.ts";
  *     of boost on, guarded by a crate being there. A retry opens it once.
  *   - **A boosted game** (`boost:<game>:<ledger id>`, reason "coin-boost", from xp.ts grantXp once the game's coins are settled): the
  *     extra coins (core's boostFor, from the coins as the ledger has them: the base, which alone the day's caps count) and the boost
- *     minutes it used, guarded by those minutes being there and the game's coin ops being there at the amounts it was worked out from.
+ *     minutes it used (the minutes that earned its play coins, at least COIN_BOOST.minGameMinutes), guarded by those minutes being there
+ *     and the game's coin ops being there at the amounts it was worked out from (a bonus of 0: no bonus op).
  *     One a game: a retry, a second tab or a room's restart finds it and pays nothing more. Refused (another game used the minutes
  *     meanwhile): worked out again from the wallet as it stands, up to TRIES times.
  *   - **The Crate Bonus** (rewards.ts payLevels): a paying level's `lvlbonus:<level>:<ledger id>`, its crates again and one level-up off.
@@ -77,13 +78,15 @@ export async function settleBoost(sql: Sql, me: LedgerAccount, p: BoostPlan, coi
       id,
       reason: BOOST,
       now: p.now,
+      // (The coins it was worked out from are the ledger's: the play op at its amount, and the bonus op at its amount, or none there
+      // for a bonus of 0: the review of #966's n1, so a bonus paid since by a retry is never left unboosted.)
       when: cond(
-        `EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND boost_minutes >= ?) AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0 AND delta = ?)${coins.bonus > 0 ? " AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0 AND delta = ?)" : ""}`,
+        `EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND boost_minutes >= ?) AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0 AND delta = ?) AND ${coins.bonus > 0 ? "EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0 AND delta = ?)" : "NOT EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)"}`,
         me.user,
         use.minutes,
         ops.play,
         coins.play,
-        ...(coins.bonus > 0 ? [ops.bonus, coins.bonus] : []),
+        ...(coins.bonus > 0 ? [ops.bonus, coins.bonus] : [ops.bonus]),
       ),
       legs: [leg.coins(me.user, use.coins, p.key), leg.boostMinutes(me.user, -use.minutes, p.key)],
     });

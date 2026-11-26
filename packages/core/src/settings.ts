@@ -4730,15 +4730,18 @@ export const PLAY_COINS = {
  *   - **The crate:** held until you open it (the Crates tab, free, no key: its contents are fixed, so it has no odds). Opening it adds
  *     `minutes` of boost; a second crate adds `minutes` more, the multiplier never stacks. No expiry.
  *   - **The boost:** a counted game's coins (play coins and bonus) times `multiplier`, the extra paid beside them (reason "coin-boost").
- *     The day's PLAY_COINS.perDay and the bonus steps count the base coins only. It counts down by the game's counted minutes (XP's,
- *     at least 1 a game), and only in a game that paid play coins: past the day's perDay it waits for the next day, so its minutes always
- *     buy boosted play coins (about 420 extra coins a crate). A game partly in it (fewer minutes left than the game's) is boosted by that
- *     share. XP is never boosted.
+ *     The day's PLAY_COINS.perDay and the bonus steps count the base coins only. It counts down by the minutes that earned the game's
+ *     play coins (its counted minutes, XP's; fewer for the game that reaches the day's perDay: its play coins over
+ *     PLAY_COINS.perMinute, rounded up; Nov 26, the review of #966's M1), and only in a game that paid play coins: past the day's
+ *     perDay it waits for the next day, so its minutes always buy boosted play coins (about 420 extra coins a crate). Each boosted game
+ *     uses at least `minGameMinutes` (the director's call on the review's m1: short games, a 40-second win say, can't multiply what a
+ *     crate is worth). A game partly in it (fewer minutes left than it uses) is boosted by that share. XP is never boosted.
  */
 export const COIN_BOOST = {
   multiplier: 2.5,
   minutes: 120,
   dropChance: 0.04,
+  minGameMinutes: 5,
 } as const;
 
 /**

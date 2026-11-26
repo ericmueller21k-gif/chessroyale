@@ -441,6 +441,9 @@ describe("the API", () => {
       ["Warm Up", 2],
       ["Regular", 0],
     ]);
+    // (A quest's drop, Nov 26: none | boost | bonus; anything else is refused.)
+    expect((await call(d1, cookie, "/api/quests/test", { quests: [{ kind: "warm-up", drop: "boost" }] }, { TEST_SWITCHES: "1" })).status).toBe(200);
+    expect((await call(d1, cookie, "/api/quests/test", { quests: [{ kind: "warm-up", drop: "gold" }] }, { TEST_SWITCHES: "1" })).status).toBe(400);
     expect((await call(d1, cookie, "/api/quests", undefined, { PAUSE_REWARDS: "1" })).body.paused).toBe(true);
     const guest = await createGuest(sql, T0, "Guest");
     const g = await call(d1, `hc_session=${guest.token}`, "/api/quests", undefined, { RESEND_API_KEY: "x" });

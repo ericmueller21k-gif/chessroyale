@@ -9,7 +9,9 @@ import {
   questSeed,
   questWeekStart,
   xpDayStart,
+  questDrop,
   type QuestDef,
+  type QuestDrop,
   type QuestGame,
   type QuestIcon,
   type QuestPaid,
@@ -17,7 +19,7 @@ import {
   type QuestsAnswer,
 } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
-import { cond, leg, type Cond, type LedgerAccount, type Op } from "./ledger.ts";
+import { cond, leg, ledgerAccount, type Cond, type LedgerAccount, type Op } from "./ledger.ts";
 import { questDropLegs } from "./coin-boost.ts";
 
 /**
@@ -358,19 +360,39 @@ export async function questsPaidBy(sql: Sql, me: LedgerAccount, game: string): P
   return [...paid.values()];
 }
 
+/** The test switch's drops (`?quests=warm-up:2:boost`): what a dealt quest's completion rolls. None unless asked. */
+const TEST_DROPS: Record<string, QuestDrop> = { none: null, boost: "boost", bonus: "bonus" };
+/** The most quest ids the test switch draws for one asked drop (4% a draw takes about 25; none in this many: the odds are off). */
+const TEST_DRAWS = 10_000;
+
 /**
- * The test switch `?quests=<kind>[:<progress>],…` (POST /api/quests/test; test servers only): your quests replaced by these (dailies
- * as listed, then a weekly), with that much progress, every reroll unused. Answers false for an unknown kind.
+ * The test switch `?quests=<kind>[:<progress>[:<drop>]],…` (POST /api/quests/test; test servers only): your quests replaced by these
+ * (dailies as listed, then a weekly), with that much progress, every reroll unused. `drop` (none | boost | bonus; none unless asked,
+ * Nov 26, the review of #966's B1): what finishing it rolls (core's questDrop, from its completion op's key, which holds the account's
+ * ledger id): the quest's id is drawn until its key gives that, so a test's drop is never chance. Only a daily rolls; a weekly's id is
+ * drawn the same (a key that would give it as a daily's). Answers false for an unknown kind or drop, or a drop the odds never give.
  */
 export async function setTestQuests(sql: Sql, userId: string, list: unknown, now: number): Promise<boolean> {
   if (!Array.isArray(list) || list.length > 6) return false;
   const want = list.map((x) => {
-    const o = (x ?? {}) as { kind?: unknown; progress?: unknown };
+    const o = (x ?? {}) as { kind?: unknown; progress?: unknown; drop?: unknown };
     const def = typeof o.kind === "string" ? questDef(o.kind) : null;
     const progress = typeof o.progress === "number" && Number.isInteger(o.progress) && o.progress >= 0 ? o.progress : 0;
-    return def ? { def, progress: Math.min(progress, def.target - 1) } : null;
+    const drop = o.drop === undefined ? "none" : typeof o.drop === "string" && Object.hasOwn(TEST_DROPS, o.drop) ? o.drop : null;
+    return def && drop ? { def, progress: Math.min(progress, def.target - 1), drop: TEST_DROPS[drop] ?? null } : null;
   });
   if (want.some((w) => !w)) return false;
+  const me = await ledgerAccount(sql, userId);
+  if (!me) return false;
+  const ids: string[] = [];
+  for (const w of want) {
+    let id = newId();
+    for (let n = 1; questDrop(questOpId(w!.def.id, id, me.account)) !== w!.drop; n++) {
+      if (n >= TEST_DRAWS) return false;
+      id = newId();
+    }
+    ids.push(id);
+  }
   const day = xpDayStart(now);
   const week = questWeekStart(now);
   const nonce = newId();
@@ -381,7 +403,7 @@ export async function setTestQuests(sql: Sql, userId: string, list: unknown, now
   ];
   want.forEach((w, i) => {
     const weekly = QUESTS.weekly.includes(w!.def);
-    const id = newId();
+    const id = ids[i]!;
     out.push(
       stmt(
         `INSERT INTO quests (id, user_id, period, kind, target, assigned_at, slot, done_at) SELECT ?, ?, ?, ?, ?, ?, ?, NULL WHERE ${ours.sql}`,

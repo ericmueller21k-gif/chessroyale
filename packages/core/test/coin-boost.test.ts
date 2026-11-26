@@ -19,8 +19,8 @@ const hex = (n: number, seed: number) => {
 };
 
 describe("the settings (the design's block)", () => {
-  it("2.5x for 120 minutes, 4% a daily; the Crate Bonus 5 level-ups, 4% a daily", () => {
-    expect(COIN_BOOST).toEqual({ multiplier: 2.5, minutes: 120, dropChance: 0.04 });
+  it("2.5x for 120 minutes, 4% a daily, at least 5 minutes a game; the Crate Bonus 5 level-ups, 4% a daily", () => {
+    expect(COIN_BOOST).toEqual({ multiplier: 2.5, minutes: 120, dropChance: 0.04, minGameMinutes: 5 });
     expect(LEVEL_CRATE_BONUS).toEqual({ levels: 5, dropChance: 0.04 });
   });
 });
@@ -76,8 +76,25 @@ describe("the boost's share of a game", () => {
     expect(boostFor({ play: 0, bonus: 0 }, 30, 120)).toEqual({ coins: 0, minutes: 0 });
   });
 
-  it("a counted game under a minute (XP's minutes 0, its 1 play coin) uses one minute", () => {
-    expect(boostFor({ play: 1, bonus: 15 }, 0, 120)).toEqual({ coins: 24, minutes: 1 });
+  it("a short game uses at least COIN_BOOST.minGameMinutes (5): a 40-second win (XP's minutes 0, its 1 play coin) uses 5, and with 3 left, 3/5 of it (the review of #966's m1)", () => {
+    expect(COIN_BOOST.minGameMinutes).toBe(5);
+    expect(boostFor({ play: 1, bonus: 15 }, 0, 120)).toEqual({ coins: 24, minutes: 5 });
+    // (16 x 1.5 x 3/5 = 14.4.)
+    expect(boostFor({ play: 1, bonus: 15 }, 0, 3)).toEqual({ coins: 14, minutes: 3 });
+    // (A 3-minute game: 5 play coins, 5 minutes; a 6-minute one its own 6.)
+    expect(boostFor({ play: 5, bonus: 0 }, 3, 120)).toEqual({ coins: 8, minutes: 5 });
+    expect(boostFor({ play: 11, bonus: 0 }, 6, 120)).toEqual({ coins: 17, minutes: 6 });
+  });
+
+  it("the game that reaches the day's 300 uses only the minutes its play coins paid for (the review of #966's M1)", () => {
+    // (A 30-minute game paying the day's last 10 play coins: 10 / 1.8 = 5.6, so 6 minutes, and the whole of its 10 boosted.)
+    expect(boostFor({ play: 10, bonus: 0 }, 30, 120)).toEqual({ coins: 15, minutes: 6 });
+    expect(boostFor({ play: 10, bonus: 15 }, 30, 120)).toEqual({ coins: 38, minutes: 6 });
+    // (Its play coins paid for 20 of its 30 minutes: 20; a whole 12-minute game's 22 coins (12.2) never cost more than its 12.)
+    expect(boostFor({ play: 36, bonus: 0 }, 30, 120)).toEqual({ coins: 54, minutes: 20 });
+    expect(boostFor({ play: 22, bonus: 0 }, 12, 120)).toEqual({ coins: 33, minutes: 12 });
+    // (Fewer left than it uses: that share. 4 of 6: 15 x 4/6 = 10.)
+    expect(boostFor({ play: 10, bonus: 0 }, 30, 4)).toEqual({ coins: 10, minutes: 4 });
   });
 
   it("the multiplier is one number: a boost of 240 minutes (two crates) pays the same per game as one of 120", () => {
@@ -125,7 +142,7 @@ describe("what's shown", () => {
       ],
     };
     const lines = rewardLines(q, "Winter Crate · Series 1");
-    expect(lines.drops).toEqual(["+1 Coin Boost Crate: open it in Crates for 2.5x coins over 120 minutes of play", "Crate Bonus: your next 5 level-ups give double crates"]);
+    expect(lines.drops).toEqual(["+1 Coin Boost Crate: open it in Crates for 2.5x coins over 120 minutes of play", "Crate Bonus: your next 5 level-ups that give crates give double crates"]);
     expect(lines.quests).toEqual(["Quest done: Warm Up +300 XP", "Quest done: Winner +300 XP · +1 Winter Crate"]);
     expect(rewardDrops(q)).toEqual({ boost: 1, bonus: 5 });
     expect(rewardDrops(r)).toEqual({ boost: 0, bonus: 0 });

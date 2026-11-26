@@ -1082,8 +1082,8 @@ export async function rerollQuestNow(quest: string): Promise<QuestsAnswer> {
   return (await api<{ quests: QuestsAnswer }>("/api/quests/reroll", { method: "POST", body: JSON.stringify({ quest }) })).quests;
 }
 
-/** The test switch ?quests=<kind>[:<progress>],… (test servers only): your quests set to these. */
-export async function setTestQuests(quests: { kind: string; progress: number }[]): Promise<QuestsAnswer> {
+/** The test switch ?quests=<kind>[:<progress>[:<drop>]],… (test servers only): your quests set to these (the drop: none | boost | bonus). */
+export async function setTestQuests(quests: { kind: string; progress: number; drop?: string }[]): Promise<QuestsAnswer> {
   return api<QuestsAnswer>("/api/quests/test", { method: "POST", body: JSON.stringify({ quests }) });
 }
 
