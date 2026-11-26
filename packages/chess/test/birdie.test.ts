@@ -354,6 +354,65 @@ describe("the Fall", () => {
     expect(warned.length, "the train warns again after his fall").toBeGreaterThan(0);
   });
 
+  it("comes at the start of his turn once he's in danger (Eric, Nov 26): fallDangerMoves of the crowd's moves in a row judged at dangerAt or more, little material lost", async () => {
+    // (The judge's number for every crowd move: `crowdScore`, him to move the other way round; set by the test as the battle goes.)
+    let crowdScore = 0.5;
+    const flat = (fen: string, move: string) => ({ move, expected: fen.split(" ")[1] === "w" ? crowdScore : 1 - crowdScore });
+    const engine: EngineLike = {
+      topMoves: async (fen, n) => legalMoves(fen).sort().slice(0, n).map((m) => flat(fen, m)),
+      scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((m) => flat(fen, m)),
+      topMovesAt: async (fen, n) => legalMoves(fen).sort().slice(0, n).map((m) => flat(fen, m)),
+      playAtElo: async (fen) => legalMoves(fen).sort()[0]!,
+    };
+    const r = battle(13, "w", "", [engine]);
+    // (The crowd saves a warned piece, so his train takes nothing: the Fall can't come from material.)
+    const save = (_f: string, allowed: string[]) => {
+      const w = birdieOf(r)?.warn;
+      return (w && allowed.filter((m) => m.startsWith(w.square)).sort()[0]) || [...allowed].sort()[0]!;
+    };
+    const fell = () => r.boss!.powers!.events.some((e) => e.kind === "birdieFall");
+    const s = BOSS_POWERS.birdie;
+    await untilTurn(r, 4, save);
+    // Just under the line, move after move: no fall.
+    crowdScore = BOSS_POWERS.dangerAt - 0.01;
+    for (let k = 0; k < s.fallDangerMoves + 1; k++) {
+      await crowdMove(r, save);
+      expect(fell(), "under the line").toBe(false);
+      await r.playBoss();
+    }
+    // At the line, then back under it: the count starts again (a lead his powers take back is no danger yet).
+    for (let k = 0; k < s.fallDangerMoves - 1; k++) {
+      crowdScore = BOSS_POWERS.dangerAt;
+      await crowdMove(r, save);
+      expect(fell(), "at the line, too few in a row").toBe(false);
+      await r.playBoss();
+    }
+    // (A move the judge never scored, Boingo's funhouse playing the crowd's for it on a tower floor: the count stays as it was.
+    // Review of #968, finding 2.)
+    const counted = birdieOf(r)!.danger;
+    bossRules(r.boss!)!.afterCrowdMove!((r as unknown as { battle: Parameters<NonNullable<NonNullable<ReturnType<typeof bossRules>>["afterCrowdMove"]>>[0] }).battle, null, null);
+    expect(birdieOf(r)!.danger, "an unjudged move").toBe(counted);
+    expect(fell(), "an unjudged move").toBe(false);
+    crowdScore = BOSS_POWERS.dangerAt - 0.01;
+    await crowdMove(r, save);
+    expect(birdieOf(r)!.danger).toBe(0);
+    await r.playBoss();
+    // fallDangerMoves in a row at the line: he falls as the last lands, at the start of his turn.
+    crowdScore = BOSS_POWERS.dangerAt;
+    for (let k = 0; k < s.fallDangerMoves; k++) {
+      await crowdMove(r, save);
+      expect(fell(), `at the line ${k + 1} in a row`).toBe(k === s.fallDangerMoves - 1);
+      if (!fell()) await r.playBoss();
+    }
+    expect(r.boss!.powers!.lost, "he has lost less than fallLost").toBeLessThan(s.fallLost);
+    expect(birdieOf(r)!.fell?.at).toBe(r.boss!.crowdMoves);
+    // Once a battle: the danger after it brings nothing more.
+    await r.playBoss();
+    await crowdMove(r, save);
+    expect(fell()).toBe(false);
+    expect(r.boss!.powers!.ults).toBe(1);
+  });
+
   it("the admins' trigger brings it at the start of his next turn, without the material", async () => {
     const r = battle(11);
     await untilTurn(r, 2);

@@ -25,8 +25,9 @@
  *
  * His ultimate, the Fall (once a battle; his meter is the material he has lost, BossRules.meter):
  * - At the start of his turn once he has lost fallLost points of material since the battle began (P1 N3 B3 R5 Q9; the most he has
- *   been down, as the rage meter counts it), or the admins' trigger, or the test switch (?power=fall: after the crowd's second
- *   move): his `fall`, then the cutscene (`birdieFall`, played while he thinks; his move waits for it), and he's Armored Birdie for
+ *   been down, as the rage meter counts it), or once he's in danger (Eric, Nov 26: the crowd's expected score after its move, the
+ *   judge's, at BOSS_POWERS.dangerAt or more, inDanger, for fallDangerMoves of its moves in a row), or the admins' trigger, or the test
+ *   switch (?power=fall: after the crowd's second move): his `fall`, then the cutscene (`birdieFall`, played while he thinks; his move waits for it), and he's Armored Birdie for
  *   the rest of the battle. After a train ridden on the same turn: the train first.
  * - Armored Birdie (Eric, Nov 23: "He still uses his same normal move after. He just does it every 3 to 4 turns"): the train goes on,
  *   the same rule, `armoredTrainEvery` crowd turns apart; and his brain plays much stronger (`brainNow`, armoredBrain): Maia
@@ -37,7 +38,7 @@ import { BIRDIE_CINEMATIC, BIRDIE_RIDE, BIRDIE_ULT, BOSS_POWERS, ENGINE_MAX_ELO,
 import { boardEnd, type BoardState } from "../boards.ts";
 import { applyMove, keptEnPassant, kingAttacked, legalMoves, pieceAt, positionOver, withoutPiece } from "../rules.ts";
 import { stockfishRefuses, type MoveScore } from "../uci.ts";
-import { VALUE, from, logit, materialOf, other, powerRoll, turnOf, ultCapped, unleashed, type Battle, type BossRules, type BrainNow, type JudgedEvaluation, type Side } from "./base.ts";
+import { VALUE, from, inDanger, logit, materialOf, other, powerRoll, turnOf, ultCapped, unleashed, type Battle, type BossRules, type BrainNow, type JudgedEvaluation, type Side } from "./base.ts";
 
 type BirdieSettings = BossPowerSettings["birdie"];
 
@@ -396,8 +397,8 @@ export const BIRDIE: BossRules = {
     rank: (boss, top, fen) => trainRanked(top, fen, trainSquare(boss), boss.crowdSide),
     evaluation: (boss, evaluation, fen) => trainJudged(evaluation, fen, trainSquare(boss), boss.crowdSide),
   },
-  afterCrowdMove(b, move) {
-    birdieBattle.afterCrowdMove(b, move);
+  afterCrowdMove(b, move, judged) {
+    birdieBattle.afterCrowdMove(b, move, BOSS_POWERS.birdie, judged === null);
   },
   // (Several bosses: another boss's power took the warned piece away outside a move: the warning goes with it.)
   followBoard(b) {
@@ -441,10 +442,11 @@ export const birdieBattle = {
   /**
    * After the crowd's move (`move`, UCI; null: none played) with him to move: his train on the warned line whenever the warning for
    * this move is due (a smash, a sparing, your king; the piece moved, saved: the same ride, missing, `missed`: Eric, Nov 24); then his
-   * fall when it's due (fallLost lost, the admins' trigger, the test switch). Nothing once the battle is decided, the game over on the
+   * fall when it's due (fallLost lost, in danger after this move and the one before (inDanger, fallDangerMoves: the judge's number,
+   * the train's smash counted), the admins' trigger, the test switch). Nothing once the battle is decided, the game over on the
    * board, or at the move cap. Each a base on the board where it changes it; the events in that order.
    */
-  afterCrowdMove(b: Battle, move: string | null = null, s: BirdieSettings = BOSS_POWERS.birdie): void {
+  afterCrowdMove(b: Battle, move: string | null = null, s: BirdieSettings = BOSS_POWERS.birdie, unjudged = false): void {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || boss.id !== "birdie") return;
@@ -480,12 +482,16 @@ export const birdieBattle = {
     const won = !!ride?.king && ride.at === boss.crowdMoves;
     const lost = Math.max(p.lost, p.material - materialOf(boardOf(b).fen, other(boss.crowdSide)));
     const test = b.settings.bossPowerTest === "fall" && boss.crowdMoves >= 2;
-    const falls = !bd.fell && !over && !won && p.ultAt === undefined && !p.noUlt && !ultCapped(p) && (!!p.ultNext || lost >= s.fallLost || test);
+    // (In danger, Eric Nov 26: the crowd's expected score after its move, the judge's, at dangerAt or more for fallDangerMoves of its
+    // moves in a row, this one the last: he falls now. The count goes on until his fall.)
+    // (A move the judge didn't score, Boingo's funhouse playing the crowd's for it, leaves the count as it was: review of #968, finding 2.)
+    const streak = bd.fell || unjudged ? (bd.danger ?? 0) : inDanger(p.judged, b.rageRates?.() ?? BOSS_POWERS) ? (bd.danger ?? 0) + 1 : 0;
+    const falls = !bd.fell && !over && !won && p.ultAt === undefined && !p.noUlt && !ultCapped(p) && (!!p.ultNext || lost >= s.fallLost || streak >= s.fallDangerMoves || test);
     if (falls) events.push({ kind: "birdieFall", turn: p.turn });
-    if (!w && !falls) return;
+    if (!w && !falls && streak === (bd.danger ?? 0)) return;
     const { ultNext: _trigger, ...rest } = p;
     const base: BossPowerState = falls ? unleashed({ ...rest, ultAt: boss.crowdMoves, events: p.events }) : p;
-    b.state = { ...b.state, boss: { ...boss, powers: { ...base, birdie: { ...bd, warn: null, ride, ...(falls ? { fell: { at: boss.crowdMoves } } : {}) }, events: [...p.events, ...events] } } };
+    b.state = { ...b.state, boss: { ...boss, powers: { ...base, birdie: { ...bd, warn: null, ride, ...(streak || bd.danger !== undefined ? { danger: streak } : {}), ...(falls ? { fell: { at: boss.crowdMoves } } : {}) }, events: [...p.events, ...events] } } };
   },
 };
 
