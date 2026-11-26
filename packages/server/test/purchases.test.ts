@@ -6,7 +6,7 @@ import { PAYMENTS, shopItem, type SpendPlan } from "@chessroyale/core";
 import { buyItem, createGuest, d1Sql, ensureSchema, grantReward, schemaParts, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { applyOp, backfillLedger, cond, leg, ledgerAccount, ledgerCheck, ledgerMismatches, opStatements, spendLegs } from "../src/ledger.ts";
-import { coinSplit, creditOpId, creditPurchase, recordCheckout, refundable, spendGuard, type PaidSession } from "../src/purchases.ts";
+import { answerBand, coinSplit, creditOpId, creditPurchase, recordCheckout, refundable, spendGuard, type PaidSession } from "../src/purchases.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
@@ -36,7 +36,12 @@ async function world() {
   await ensureSchema(sql);
   return { sql, db };
 }
-const signedIn = async (sql: Sql, email: string, now = T0) => signInWithIdentity(sql, (await createGuest(sql, now, "Player")).user, "email", email, {}, now);
+/** A signed-in account that may buy: its band answered 18+ (PR 6: no checkout before the band question; who-buys.test.ts has the rest). */
+async function signedIn(sql: Sql, email: string, now = T0) {
+  const user = await signInWithIdentity(sql, (await createGuest(sql, now, "Player")).user, "email", email, {}, now);
+  expect(await answerBand(sql, user.id, "18+", "US", now)).toMatchObject({ ok: true });
+  return user;
+}
 const coinsOf = async (sql: Sql, id: string) => (await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", id))?.coins ?? 0;
 const remainingOf = async (sql: Sql, session: string) => (await sql.first<{ remaining: number }>("SELECT remaining FROM purchases WHERE session_id = ?", session))?.remaining;
 /** A purchase's ledger reference (its ledger asset id: never the session's). */
@@ -64,7 +69,7 @@ async function paid(sql: Sql, session: string, over: Partial<PaidSession> = {}):
 }
 /** A pack bought and paid at `now`: its checkout, then its credit. */
 async function buy(sql: Sql, user: User, coins: number, session: string, now = T0) {
-  expect(await recordCheckout(sql, user, pack(coins).id, session, now - 60_000)).toMatchObject({ ok: true });
+  expect(await recordCheckout(sql, user, pack(coins).id, session, now - 60_000, "US")).toMatchObject({ ok: true });
   expect(await creditPurchase(sql, await paid(sql, session), now)).toMatchObject({ ok: true, credited: "now", coins });
 }
 
@@ -118,6 +123,8 @@ describe("the migration, on a copy of the schema as it was before (live data, ev
 
     // And it works: Ann (from before) buys a pack and spends earned coins first.
     const ann = { id: "ann", name: "Ann", icon: "♟", email: "ann@example.com", google_sub: null, created_at: 1 } satisfies User;
+    // (An account from before is asked the band at its first Buy, PR 6.)
+    expect(await answerBand(live, "ann", "18+", "US", T0)).toMatchObject({ ok: true });
     await buy(live, ann, 200, "cs_test_after_migration", T0);
     expect(await coinSplit(live, "ann")).toEqual({ coins: 620, bought: 200, earned: 420 });
     expect(await buyItem(live, "ann", HELLFIRE, T0 + 1)).toMatchObject({ ok: true });
@@ -130,8 +137,8 @@ describe("a checkout, and its credit: once, never a guest's", () => {
   it("a checkout is a pending row with its pack's coins and price as they are then; the same session again changes nothing", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
-    expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0)).toEqual({ ok: true, pack: pack(520) });
-    expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 + 5)).toEqual({ ok: true, pack: pack(520) });
+    expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0, "US")).toEqual({ ok: true, pack: pack(520) });
+    expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 + 5, "US")).toEqual({ ok: true, pack: pack(520) });
     const ref = await refOf(sql, "cs_test_ann_1");
     expect(ref).toMatch(/^[0-9a-f]{24}$/);
     expect(await sql.all("SELECT * FROM purchases")).toEqual([
@@ -154,23 +161,23 @@ describe("a checkout, and its credit: once, never a guest's", () => {
     ]);
     // Someone else's session, an unknown pack, a session id that isn't one.
     const bo = await signedIn(sql, "bo@example.com");
-    expect(await recordCheckout(sql, bo, "coins-200", "cs_test_ann_1", T0)).toEqual({ ok: false, message: "That checkout isn't yours." });
-    expect(await recordCheckout(sql, bo, "coins-7", "cs_test_bo_1", T0)).toEqual({ ok: false, message: "That coin pack isn't sold." });
-    await expect(recordCheckout(sql, bo, "coins-200", "cs'; DROP TABLE purchases; --", T0)).rejects.toThrow(/not a session id/);
+    expect(await recordCheckout(sql, bo, "coins-200", "cs_test_ann_1", T0, "US")).toEqual({ ok: false, message: "That checkout isn't yours." });
+    expect(await recordCheckout(sql, bo, "coins-7", "cs_test_bo_1", T0, "US")).toEqual({ ok: false, message: "That coin pack isn't sold." });
+    await expect(recordCheckout(sql, bo, "coins-200", "cs'; DROP TABLE purchases; --", T0, "US")).rejects.toThrow(/not a session id/);
     expect(await sql.first("SELECT COUNT(*) AS n FROM purchases")).toEqual({ n: 1 });
     // Another pack for the same session is refused, and the answer is always the pack as stored (review n2): here a price from before.
-    expect(await recordCheckout(sql, ann, "coins-6000", "cs_test_ann_1", T0 + 6)).toEqual({ ok: false, message: "That checkout is for another coin pack." });
+    expect(await recordCheckout(sql, ann, "coins-6000", "cs_test_ann_1", T0 + 6, "US")).toEqual({ ok: false, message: "That checkout is for another coin pack." });
     await sql.run("UPDATE purchases SET coins = 500, cents = 450 WHERE session_id = 'cs_test_ann_1'");
-    expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 + 7)).toEqual({ ok: true, pack: { id: "coins-520", coins: 500, cents: 450 } });
+    expect(await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 + 7, "US")).toEqual({ ok: true, pack: { id: "coins-520", coins: 500, cents: 450 } });
     expect(await sql.first("SELECT ref, pack, coins, cents FROM purchases")).toEqual({ ref, pack: "coins-520", coins: 500, cents: 450 });
   });
 
   it("guests can't buy: no checkout, and no credit even for a row that got past (checked in the statement too)", async () => {
     const { sql } = await world();
     const { user: gus } = await createGuest(sql, T0, "Gus");
-    expect(await recordCheckout(sql, gus, "coins-200", "cs_test_gus_1", T0)).toEqual({ ok: false, message: "Sign in to buy coins." });
+    expect(await recordCheckout(sql, gus, "coins-200", "cs_test_gus_1", T0, "US")).toEqual({ ok: false, message: "Sign in to buy coins." });
     // (A stale signed-in view of a guest: the statement's own check refuses it.)
-    expect(await recordCheckout(sql, { ...gus, email: "gus@example.com" }, "coins-200", "cs_test_gus_1", T0)).toEqual({ ok: false, message: "Sign in to buy coins." });
+    expect(await recordCheckout(sql, { ...gus, email: "gus@example.com" }, "coins-200", "cs_test_gus_1", T0, "US")).toEqual({ ok: false, message: "Sign in to buy coins." });
     expect(await sql.first("SELECT COUNT(*) AS n FROM purchases")).toEqual({ n: 0 });
     await sql.run("INSERT INTO purchases (session_id, ref, user_id, pack, coins, cents, created_at) VALUES ('cs_test_gus_2', 'r-gus', ?, 'coins-200', 200, 199, ?)", gus.id, T0);
     expect(await creditPurchase(sql, await paid(sql, "cs_test_gus_2"), T0)).toEqual({ ok: false, why: "guest" });
@@ -192,7 +199,7 @@ describe("a checkout, and its credit: once, never a guest's", () => {
   it("credits once: its coins into the wallet and the purchase, one op `pay:<session>`; again, or three at once, pay nothing more", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
-    await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 - 60_000);
+    await recordCheckout(sql, ann, "coins-520", "cs_test_ann_1", T0 - 60_000, "US");
     const s = await paid(sql, "cs_test_ann_1");
     expect(await creditPurchase(sql, s, T0)).toEqual({ ok: true, credited: "now", coins: 520, user: ann.id });
     expect(await creditPurchase(sql, s, T0 + 1)).toEqual({ ok: true, credited: "before", coins: 520, user: ann.id });
@@ -212,7 +219,7 @@ describe("a checkout, and its credit: once, never a guest's", () => {
       { op_id: `pay:${ref}`, leg: 1, account: acct, asset_kind: "purchase", asset_id: ref, delta: 520, reason: "purchase", source_id: ref },
     ]);
     // Three at once of another session: one credits.
-    await recordCheckout(sql, ann, "coins-200", "cs_test_ann_2", T0);
+    await recordCheckout(sql, ann, "coins-200", "cs_test_ann_2", T0, "US");
     const s2 = await paid(sql, "cs_test_ann_2");
     const race = await Promise.all([creditPurchase(sql, s2, T0 + 2), creditPurchase(sql, s2, T0 + 2), creditPurchase(sql, s2, T0 + 2)]);
     expect(race.map((r) => (r.ok ? r.credited : r.why)).sort()).toEqual(["before", "before", "now"]);
@@ -224,7 +231,7 @@ describe("a checkout, and its credit: once, never a guest's", () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     const bo = await signedIn(sql, "bo@example.com");
-    await recordCheckout(sql, ann, "coins-1100", "cs_test_ann_1", T0);
+    await recordCheckout(sql, ann, "coins-1100", "cs_test_ann_1", T0, "US");
     const s = await paid(sql, "cs_test_ann_1");
     expect(await creditPurchase(sql, { ...s, id: "cs_test_nobody" }, T0)).toEqual({ ok: false, why: "unknown" });
     expect(await creditPurchase(sql, { ...s, paid: false }, T0)).toEqual({ ok: false, why: "unpaid" });
@@ -244,8 +251,9 @@ describe("spending: earned coins first, then the oldest purchase's", () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     await earn(sql, ann.id, 30);
-    // (Paid in this order: B's checkout began first, but A was paid first, so A is the older purchase.)
-    await recordCheckout(sql, ann, "coins-520", "cs_test_B", T0);
+    // (Paid in this order: B's checkout began first, but A was paid first, so A is the older purchase. B began over 30 minutes before
+    // A did, so it wasn't open by then: one open checkout at a time, PR 6.)
+    await recordCheckout(sql, ann, "coins-520", "cs_test_B", T0 - 31 * 60_000, "US");
     await buy(sql, ann, 200, "cs_test_A", T0 + 1000);
     expect(await creditPurchase(sql, await paid(sql, "cs_test_B"), T0 + 2000)).toMatchObject({ credited: "now" });
     expect(await coinSplit(sql, ann.id)).toEqual({ coins: 750, bought: 720, earned: 30 });
@@ -385,8 +393,9 @@ describe("the guarded race: a change between the read and the write changes noth
   it("a credit with the account deleted, or the checkout expired, after its reads: its statement refuses it (review m3)", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
-    await recordCheckout(sql, ann, "coins-520", "cs_test_A", T0);
-    await recordCheckout(sql, ann, "coins-200", "cs_test_B", T0);
+    // (A began over 30 minutes before B, so it wasn't open by then: one open checkout at a time, PR 6.)
+    await recordCheckout(sql, ann, "coins-520", "cs_test_A", T0 - 31 * 60_000, "US");
+    await recordCheckout(sql, ann, "coins-200", "cs_test_B", T0, "US");
     // Expired meanwhile: the account's there, the purchase isn't pending.
     const expire = () => sql.run("UPDATE purchases SET status = 'expired' WHERE session_id = 'cs_test_B'");
     expect(await creditPurchase(racing(sql, 1, expire), await paid(sql, "cs_test_B"), T0 + 1)).toEqual({ ok: false, why: "not-pending" });
@@ -458,7 +467,7 @@ describe("refundable: unspent coins of purchases paid in the last 14 days, never
     const ann = await signedIn(sql, "ann@example.com");
     await buy(sql, ann, 200, "cs_test_A", T0);
     await buy(sql, ann, 520, "cs_test_B", T0 + 5 * DAY);
-    await recordCheckout(sql, ann, "coins-6000", "cs_test_C", T0 + 6 * DAY);
+    await recordCheckout(sql, ann, "coins-6000", "cs_test_C", T0 + 6 * DAY, "US");
     expect((await refundable(sql, ann.id, T0 + 10 * DAY)).coins).toBe(720);
     expect((await refundable(sql, ann.id, T0 + 14 * DAY - 1)).coins).toBe(720);
     expect(await refundable(sql, ann.id, T0 + 14 * DAY)).toEqual({
@@ -487,7 +496,7 @@ describe("deleting the account, and Download my data", () => {
     await earn(sql, ann.id, 50);
     await buy(sql, ann, 520, "cs_test_A", T0);
     await buyItem(sql, ann.id, STORM, T0 + 1);
-    await recordCheckout(sql, ann, "coins-200", "cs_test_B", T0 + 2);
+    await recordCheckout(sql, ann, "coins-200", "cs_test_B", T0 + 2, "US");
     await buy(sql, bo, 200, "cs_test_bo", T0);
     // (A refund row as PR 9 will write it, with its comment.)
     await sql.run(
@@ -521,7 +530,7 @@ describe("deleting the account, and Download my data", () => {
       ],
       refunds: [{ session_id: "cs_test_A", kind: "coins", cents: 0, coins: 0, stripe_ref: "re_1", status: "done", comment: "Not for me.", created_at: iso(T0 + 3) }],
     });
-    expect(data.account).toMatchObject({ buy_band: null, refund_count: 0, hold_until: null, chargebacks: 0, closed_at: null, closed_reason: null, held_taps: 0 });
+    expect(data.account).toMatchObject({ buy_band: "18+", buy_band_at: iso(T0), refund_count: 0, hold_until: null, chargebacks: 0, closed_at: null, closed_reason: null, held_taps: 0 });
     expect(JSON.stringify(data)).not.toContain("cs_test_bo");
 
     await deleteAccount(sql, ann, T0 + 5);
@@ -617,7 +626,7 @@ describe("deleting the account, and Download my data", () => {
   it("paid after the account was deleted: no coins, and the payment kept on the sales record as unclaimed, once (review m1)", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
-    await recordCheckout(sql, ann, "coins-520", "cs_test_P", T0);
+    await recordCheckout(sql, ann, "coins-520", "cs_test_P", T0, "US");
     await deleteAccount(sql, ann, T0 + 1);
     expect(await rowOf(sql, "cs_test_P")).toMatchObject({ user_id: "deleted", ref: null, status: "pending", payment_intent: null, paid_at: null });
     // Then paid on Stripe's page (open up to 30 minutes).

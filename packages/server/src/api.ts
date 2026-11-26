@@ -23,6 +23,7 @@ import { hiddenRoomResponse } from "./hidden-room-api.ts";
 import { enterOnly } from "./town-chat.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
+import { answerBand, buyStatus, heldTap } from "./purchases.ts";
 import { XP, AGE_GATE, HIDDEN_ROOM, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, soloQuestMode, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
@@ -178,6 +179,12 @@ export async function accountOf(request: Request, env: AccountEnv, waitUntil?: W
   return userFromToken(sql, readCookie(request, SESSION_COOKIE), Date.now(), presenceTouch(env, waitUntil));
 }
 
+/** The request's country as Cloudflare saw it (`request.cf.country`: two capital letters), or null where there's none (not on Cloudflare). */
+export const countryOf = (request: Request): string | null => {
+  const c = (request as { cf?: { country?: unknown } }).cf?.country;
+  return typeof c === "string" && /^[A-Z0-9]{2}$/.test(c) ? c : null;
+};
+
 /** A time as its day only (noon UTC that day), for a profile that hides when its player is online. */
 export const dayOf = (at: number) => Math.floor(at / 86_400_000) * 86_400_000 + 43_200_000;
 
@@ -198,6 +205,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/report" &&
     !path.startsWith("/api/profile/") &&
     !path.startsWith("/api/shop") &&
+    path !== "/api/buy" &&
+    !path.startsWith("/api/buy/") &&
     !path.startsWith("/api/locker") &&
     path !== "/api/chat" &&
     path !== "/api/chat/notice" &&
@@ -632,6 +641,22 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now, admin) : await equipItem(sql, current.id, item, admin);
     return r.ok ? json(r.shop) : json({ message: r.message }, 400);
   }
+  // ---- Who may buy coins (Nov 26, payments PR 6; purchases.ts; docs/areas/payments.md). Nothing is sold yet: PR 7's coin screen renders
+  // these, PR 8's checkout refuses by the same rule (recordCheckout). The request's country is Cloudflare's (`request.cf.country`). ----
+  // GET /api/buy: may this account buy, and if not, each Buy's greyed line (core's BuyStatus: `line`, `askBand`, `held`, `leftCents`, `packs`).
+  if (path === "/api/buy" && request.method === "GET") return json(await buyStatus(sql, current.id, countryOf(request), now));
+  // POST /api/buy/band {band}: the band question's answer ("under-16", "16-17" or "18+": the device works it out from a birth month and
+  // year, which never leave it), taken only when it's due. Answers the new BuyStatus. From this site's own page, as JSON.
+  if (path === "/api/buy/band" && request.method === "POST") {
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
+    const b = (await request.json().catch(() => ({}))) as { band?: unknown };
+    const r = await answerBand(sql, current.id, b?.band, countryOf(request), now);
+    return r.ok ? json(r.status) : json({ message: r.message }, 409);
+  }
+  // POST /api/buy/tap: a greyed Buy tapped while held (counted for the admins' Payments tab, at most once a minute). Answers {counted}.
+  if (path === "/api/buy/tap" && request.method === "POST") return json({ counted: await heldTap(sql, current.id, now) });
+
   // POST /api/shop/chat {lines?, emoji?}: the quick chat lines and emoji you see in your games (your profile's
   // "Quick chat and emoji"), in your order; null puts one back to the defaults. Answers with your shop.
   if (path === "/api/shop/chat" && request.method === "POST") {
