@@ -1160,11 +1160,14 @@ export interface DodgeResult {
  * Chandy's Dodge (his ultimate), once it has come: the crowd turn it came (`at`: crowdMoves as that turn began; the crowd's turn
  * waits for it), which of the battle's (1 or 2), the crowd's king's square and the center he slides to, the warning volley's lines
  * (they miss the king: no vote), its three rounds, and each round's result as it closes. Over after the third round, or at the
- * second hit (chandy.dodgeHits: the battle his); the first hit cracks the king and play goes on.
+ * second hit (chandy.dodgeHits: the battle his); the first hit cracks the king and play goes on. `mate`: it came from the crowd's
+ * mate (Eric, Nov 26; `at` then counts the mating move): its opening plays first, and survived, the mate stands (the win beat, then
+ * the battle the crowd's).
  */
 export interface ChandyDodge {
   at: number;
   n: number;
+  mate?: true;
   king: string;
   center: string;
   volley?: DodgeLine[];

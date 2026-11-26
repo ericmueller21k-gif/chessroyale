@@ -140,6 +140,7 @@ import {
   chandyBattle,
   CHANDY_FX,
   dodgeWon,
+  mateHeld,
   trainSquare,
   trainWon,
   type DarkTryResult,
@@ -1409,7 +1410,8 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b) || trainWon(b)) || ((this.bossForceWin || this.bossForceEnd !== null) && this.bossToMove());
+    // (Your mate held for Chandy's Dodge, from it: not decided until it's over, Eric, Nov 26: mateHeld.)
+    if (this.state.boss) return !this.sideBosses().some((b) => mateHeld(b)) && (this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b) || trainWon(b)) || ((this.bossForceWin || this.bossForceEnd !== null) && this.bossToMove()));
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1778,7 +1780,7 @@ export class MatchRunner {
     return dashBattle.finishRush(this.battle, places, only);
   }
 
-  /** Chandy's Dodge is due: it came as this crowd turn began, and the turn waits for it, round by round (chandyBattle.dodgeDue). */
+  /** Chandy's Dodge is due: it came as this crowd turn began (or from your mate, the battle waiting), and the turn waits for it, round by round (chandyBattle.dodgeDue). */
   dodgeDue(): boolean {
     return chandyBattle.dodgeDue(this.battle);
   }

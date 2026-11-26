@@ -4,10 +4,13 @@
  * later tap replaces it), and everyone sees the counts move ("dodgeVotes"). The teleports go out as they come (the view is
  * dodgeSeen: nothing shows before its time), and each round closes at its vote's end plus the lag grace (chandy.dodgeGraceMs): the
  * runner tallies it with the bots' votes (finishDodgeRound), everyone sees the result; the second hit ends the battle, his. After the
- * last round's held beams (or the losing hit's kill: dodgeEndAt), on with the match. The game's board never changes.
+ * last round's held beams (or the losing hit's kill: dodgeEndAt), on with the match. The game's board never changes. A Dodge from your
+ * mate (Eric, Nov 26) is timed the same, its start `dodgeLeadMs` after its message (his opening plays first: dodgeTimeline's `opening`)
+ * and its end after the win beat when it's survived (dodgeEndAt): then the battle is decided (the runner's stageComplete: the mate's, or
+ * his on the second hit).
  */
 import { BOSS_POWERS } from "@chessroyale/core";
-import { dodgeArena, dodgeEndAt, dodgeOver, dodgeTimeline, type NetDodge } from "@chessroyale/chess";
+import { dodgeArena, dodgeEndAt, dodgeLeadMs, dodgeOver, dodgeTimeline, type NetDodge } from "@chessroyale/chess";
 import type { BossLobby } from "./base.ts";
 
 const dodgeOf = (lobby: BossLobby) => lobby.runner?.boss?.powers?.chandy?.dodge ?? null;
@@ -32,9 +35,9 @@ function arm(lobby: BossLobby) {
   lobby.setTimer("dodge", l.at + next);
 }
 
-/** Dodge begins as the crowd's turn begins: the boss's screen with it to everyone, its steps timed here. */
+/** Dodge begins as the crowd's turn begins (or after your mate, its opening first): the boss's screen with it to everyone, its steps timed here. */
 function startDodge(lobby: BossLobby) {
-  const at = lobby.now();
+  const at = lobby.now() + dodgeLeadMs(dodgeOf(lobby));
   lobby.r.phase = "boss";
   lobby.r.dodge = { key: `d-${++lobby.r.counter}`, at, round: 0, votes: {} };
   lobby.broadcastBoss(0, { dodge: net(lobby) });
