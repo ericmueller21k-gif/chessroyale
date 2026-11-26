@@ -3,6 +3,7 @@ import { Chess } from "chess.js";
 import { BOSS_CLOCK, BOSS_POWERS, DASH_STALL, DASH_TAP } from "@chessroyale/core";
 import { hangOnTimeline, stallTimeline } from "@chessroyale/chess";
 import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES, DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } from "../packages/app/src/characters/dash-lines.ts";
+import { DASH_LIE, DASH_LIE_AT } from "../packages/app/src/characters/dash-lie.ts";
 import { BOARD_SEL, asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
@@ -660,15 +661,18 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
   const beatOf = (page: Page) => page.evaluate(() => (window as any).match.phase.stall?.beat ?? null);
   const said = (page: Page, lines: readonly string[]) => page.evaluate(() => document.body.textContent ?? "").then((t) => lines.some((l) => t.includes(l)));
 
-  test("the clock tap (&power=clocktap) only when you're slow: none on a quick move; at 10 s of the next he lies down beside your clock, his words over him, his spot empty; he stays until you move, no slam or fake move on his move, bored at 20 s; the next slow move has the slam", async ({ page }) => {
+  test("the clock tap (&power=clocktap) only when you're slow: none on a quick move; at 10 s of the next he lies down beside your clock, big and over the board's edge (never a whole square), his words over him, his spot empty; he stays until you move, no slam or fake move on his move, bored at 20 s; a piece under him taken and moved by real taps, he staying put through the pick; the next slow move has the slam", async ({ page }) => {
     test.setTimeout(200_000);
     await asAdmin(page);
     await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=clocktap&mode=raid");
     await openBossRaid(page);
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
     await watchLie(page);
-    // (Move 1, played at once: nothing.)
-    await playOne(page);
+    // (Move 1, played at once: nothing. The king's pawn a square up, so the pieces of your back rank under him have moves.)
+    await yourMove(page);
+    const fen1 = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+    await submitMove(page, new Chess(fen1).moves({ verbose: true }).some((m) => m.lan === "e2e3") ? "e2e3" : new Chess(fen1).moves({ verbose: true })[0]!.lan, fen1);
+    await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
     await yourMove(page);
     expect(await lies(page)).toEqual([]);
     // (Move 2, taking a while: at 10 s of it, not before.)
@@ -689,16 +693,18 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     const say = page.locator(".dash-say");
     await expect(say).toBeVisible();
     const [box, board, time, bubble] = await Promise.all([lie.boundingBox(), page.locator(BOARD_SEL.squares).boundingBox(), page.locator(".dk-clock .dk-time").boundingBox(), say.boundingBox()]);
-    // (Never over the board's squares nor the time's digits; whole on the screen.)
-    const frameTop = box!.y + (box!.height * 9) / 60;
-    expect(frameTop).toBeGreaterThanOrEqual(board!.y + board!.height - 1);
+    // (Big, hanging over the board's edge (Eric, Nov 26: "scale him up ... where he's actually hanging over the board a bit"), by at most
+    // DASH_TAP.overhang of a square, so never over the whole of one; never over the time's digits; whole on the screen.)
+    const frameTop = box!.y + (box!.height * DASH_LIE_AT.top) / DASH_LIE.h;
+    expect(frameTop).toBeLessThan(board!.y + board!.height);
+    expect(frameTop).toBeGreaterThanOrEqual(board!.y + board!.height - (DASH_TAP.overhang * board!.height) / 8 - 1);
     expect(box!.x + box!.width <= time!.x + 1 || box!.x >= time!.x + time!.width - 1).toBe(true);
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     // (His words over him (Eric: "it should show above him like over the board a bit"): above his cap and the time's digits, over his
     // figure's span, whole on the screen; the usual box away.)
     expect(bubble!.y + bubble!.height).toBeLessThanOrEqual(Math.min(frameTop, time!.y) + 1);
-    expect(bubble!.y + bubble!.height).toBeGreaterThan(board!.y + board!.height - 80);
+    expect(bubble!.y + bubble!.height).toBeGreaterThan(frameTop - 40);
     expect(bubble!.x < box!.x + box!.width && bubble!.x + bubble!.width > box!.x).toBe(true);
     expect(bubble!.x).toBeGreaterThanOrEqual(0);
     expect(bubble!.x + bubble!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
@@ -711,8 +717,51 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     await expect(lie).toBeVisible();
     await expect(lie).toHaveAttribute("data-quiet", "");
     expect(await beatOf(page)).toBe("tap");
-    // (Your move: he zips back to his spot.)
-    await playOne(page);
+    // (Your move, by real taps on a piece under him (Eric, Nov 26: "you can still click on your own tiles that he's blocking ... he
+    // shouldn't move"): the taps go through him to the board; picked, the piece shows its moves and he stays put, tapping; then the move
+    // is in and he zips back to his spot.)
+    const under = await page.evaluate(([b, l]) => {
+      const sq = b.height / 8;
+      const white = !!document.querySelector(".hb.orientation-white");
+      const at = (f: number, r: number) => ({ x: b.x + (white ? f : 7 - f) * sq, y: b.y + (white ? 8 - r : r - 1) * sq });
+      // (Your back rank's squares under his box, by how much of their bottom stretch he spans.)
+      const out: { sq: string; x: number; y: number }[] = [];
+      for (let f = 0; f < 8; f++) {
+        const r = white ? 1 : 8;
+        const p = at(f, r);
+        const x0 = Math.max(p.x, l.x);
+        const x1 = Math.min(p.x + sq, l.x + l.width);
+        if (x1 - x0 < sq / 3) continue;
+        const x = (x0 + x1) / 2;
+        const y = b.y + b.height - 3;
+        // (The tap lands on him, yet the board is what's there to take it.)
+        const hit = document.elementFromPoint(x, y);
+        if (hit?.closest(".dash-lie")) continue;
+        out.push({ sq: "abcdefgh"[f]! + r, x, y });
+      }
+      return out;
+    }, [board!, box!] as const);
+    const fen2 = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+    const legal2 = new Chess(fen2).moves({ verbose: true });
+    const pick = under.find((u) => legal2.some((m) => m.from === u.sq));
+    expect(pick, `a piece of yours with a move under him: ${JSON.stringify(under)}`).toBeTruthy();
+    const before2 = await lie.boundingBox();
+    await page.mouse.click(pick!.x, pick!.y);
+    await expect(page.locator(`${BOARD_SEL.square}.selected`)).toHaveCount(1);
+    await expect(page.locator(`${BOARD_SEL.square}.move-dest`).first()).toBeAttached();
+    await expect(lie).toBeVisible();
+    await expect(lie).toHaveAttribute("data-beat", "tap");
+    expect(await lie.boundingBox()).toEqual(before2);
+    const to = legal2.find((m) => m.from === pick!.sq)!.to;
+    const toBox = await page.evaluate(([b, sqName]) => {
+      const sq = b.height / 8;
+      const white = !!document.querySelector(".hb.orientation-white");
+      const f = sqName.charCodeAt(0) - 97;
+      const r = Number(sqName[1]);
+      return { x: b.x + ((white ? f : 7 - f) + 0.5) * sq, y: b.y + ((white ? 8 - r : r - 1) + 0.5) * sq };
+    }, [board!, to] as const);
+    await page.mouse.click(toBox.x, toBox.y);
+    await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
     await expect(lie).toHaveCount(0, { timeout: 3_000 });
     await expect(page.locator(".boss-char .boss-char-sprite").first()).toHaveCSS("visibility", "visible");
     // (Move 3, slow again: once a battle, so no tap; the skit's slam at 20 s.)

@@ -5,7 +5,7 @@ import { applyMove, passTurn, stallTimeline } from "@chessroyale/chess";
 import { hash } from "../characters/boss-beats.ts";
 import { DASH_FIGURE } from "../characters/dash-figure.ts";
 import { DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } from "../characters/dash-lines.ts";
-import { DASH_LIE } from "../characters/dash-lie.ts";
+import { DASH_LIE, DASH_LIE_AT } from "../characters/dash-lie.ts";
 import { bossKit } from "../characters/kits.ts";
 import { CRITICAL, NORMAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { SpriteAnim } from "./BossEffect.tsx";
@@ -143,29 +143,37 @@ export function tapSeen(prev: TapSeen | null, m: { boss: BossView | null; phase:
 }
 
 /**
- * Where his lying figure goes: beside your clock (the dock's time), its clock against the time, his feet on its line; and the point
- * his words stand on (`say`): over him, centered on him, never lower than the time's top (so never over him or the digits).
+ * Where his lying figure goes (Eric, Nov 26: "scale him up maybe like 3 times where he's actually hanging over the board a bit"):
+ * beside your clock (the dock's time), his chess clock against the time, his belly on the dock's box's bottom; DASH_TAP.lieScale times
+ * his old size (his standing figure's pixels), but no bigger than reaches DASH_TAP.overhang of a square over the board's edge (never the
+ * whole of a square), nor than fits beside the time on the screen. And the point his words stand on (`say`): over him, centered on
+ * him, never lower than the time's top (so never over him or the digits).
  */
 function placeLie(el: HTMLElement, say: HTMLElement | null) {
   const time = document.querySelector<HTMLElement>(".dk-clock .dk-time") ?? document.querySelector<HTMLElement>(".dk-clock");
   const t = time?.getBoundingClientRect();
   if (!t || !t.width) return false;
-  // (His own pixels at the size his figure stands at; never reaching up over the board's squares.)
+  const box = time?.closest(".boss-dock-status")?.getBoundingClientRect();
+  const floorY = box?.height ? box.bottom - 1 : t.bottom + 2;
   const fig = document.querySelector<HTMLElement>(".boss-char .boss-char-sprite")?.getBoundingClientRect();
   const board = document.querySelector<HTMLElement>(".hb-board")?.getBoundingClientRect();
-  let k = fig?.height ? fig.height / DASH_FIGURE.h : 0.7;
-  const floor = 57 / DASH_LIE.h;
-  // (His cap's top is about 9 of his pixels down the frame.)
-  if (board && t.bottom > board.bottom) k = Math.min(k, (t.bottom - board.bottom - 2) / (57 - 9));
-  k = Math.max(0.35, Math.min(1.2, k));
-  const w = DASH_LIE.w * k;
-  const h = DASH_LIE.h * k;
-  // (His clock is at his frame's left end: on the time's left he's mirrored, so it ends 4 px short of the digits; no room there,
-  // he lies on its right.)
-  const left = t.left - 4 - w;
-  const mirror = left >= 4;
-  const x = mirror ? left : Math.min(window.innerWidth - w - 4, t.right + 4);
-  const y = t.bottom + 2 - h * floor;
+  // (His standing figure's pixel on screen; his old lying figure was that size, a unit of his frame being R of its pixels.)
+  const k = Math.max(0.35, Math.min(1.2, fig?.height ? fig.height / DASH_FIGURE.h : 0.7));
+  const unitPx = DASH_LIE.w / 128;
+  let p = (DASH_TAP.lieScale * k) / unitPx;
+  // (His top over the board's edge: at most `overhang` of a square.)
+  const stands = DASH_LIE_AT.floor - DASH_LIE_AT.top;
+  if (board?.height && board.bottom <= floorY) p = Math.min(p, (floorY - board.bottom + (DASH_TAP.overhang * board.height) / 8) / stands);
+  // (Beside the time, never over its digits, whole on the screen: on its left (mirrored, his clock at the right end) if he fits
+  // there, else on the side with more room.)
+  const roomL = t.left - 8;
+  const roomR = window.innerWidth - t.right - 8;
+  const mirror = roomL >= DASH_LIE.w * p || roomL >= roomR;
+  p = Math.max(0.1, Math.min(p, (mirror ? roomL : roomR) / DASH_LIE.w));
+  const w = DASH_LIE.w * p;
+  const h = DASH_LIE.h * p;
+  const x = mirror ? t.left - 4 - w : t.right + 4;
+  const y = floorY - DASH_LIE_AT.floor * p;
   el.style.left = `${x}px`;
   el.style.top = `${y}px`;
   el.style.width = `${w}px`;
@@ -173,7 +181,7 @@ function placeLie(el: HTMLElement, say: HTMLElement | null) {
   el.classList.toggle("mirror", mirror);
   if (say) {
     say.style.left = `${x + w / 2 - 300}px`;
-    say.style.top = `${Math.min(y + 9 * k, t.top)}px`;
+    say.style.top = `${Math.min(y + DASH_LIE_AT.top * p, t.top)}px`;
   }
   return true;
 }
@@ -182,7 +190,8 @@ function placeLie(el: HTMLElement, say: HTMLElement | null) {
  * Dash's lying-down clock tap (Eric, Nov 17: "once per game he goes down laying down with his chess clock by your clock… and starts
  * tapping it"; only when you're slow: his rules' tap beat, at 10 s of your move or 30% of its clock, solo's or the server's, the
  * play phase's `stall` with beat `tap`). He zips down beside your clock under the board (DockClock's time, phone and computer alike),
- * never over the board's squares or the time's digits, on the page's top layer (a portal, placed once as it shows, then still), and
+ * big and hanging a little over the board's edge (Nov 26; placeLie), never over the time's digits, taps and drags going through him to
+ * the board, on the page's top layer (a portal, placed once as it shows, then still: never moving while you pick a piece), and
  * stays there tapping his clock until your move is in ("stay in the crawl position"); then he zips back. His crawl in always
  * finishes: your move in before he's down, "just a joke" first. His words stand over him meanwhile ("his chat box didn't follow
  * him"), his figure and its usual box away. Drawn beside the match's screens, so a move going in (its screen changing) doesn't cut
