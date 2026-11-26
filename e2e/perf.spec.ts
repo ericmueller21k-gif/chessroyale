@@ -521,12 +521,22 @@ test("the end screen on a slow phone: its frames through the count, the lob and 
   // (The end screen, Nov 20: from its first frame through XP EARNED's count, its lob and the bar's fill, to its end.)
   await page.getByTestId("es-rewards").waitFor({ timeout: 60_000 });
   await page.evaluate(() => ((window as any).__perf.frames = []));
-  await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
+  // (To the coin strip's start: the count, the lob and the fill.)
+  const strip = page.getByTestId("es-coin-strip");
+  await expect(strip).toHaveAttribute("data-cs", "run", { timeout: 30_000 });
   const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
   console.log(`the end screen's count, lob and fill (slowed phone): ${f(s)}`);
   expect(s.n, "frames while it filled").toBeGreaterThan(20);
   expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+  // The coin strip (Nov 25): its canvas's falling coins and the count's rolling digits, to its end; then no frames of its own.
+  await expect(strip).toHaveAttribute("data-cs", "done", { timeout: 30_000 });
+  const c = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`the coin strip's drop and count (slowed phone): ${f(c)}`);
+  expect(c.n, "frames while the coins dropped").toBeGreaterThan(15);
+  expect(c.p95, "the strip: 95th percentile frame (ms)").toBeLessThan(50);
+  expect(c.slow, "the strip: share of dropped frames").toBeLessThan(0.15);
+  await expect(page.getByTestId("es-rewards")).toHaveAttribute("data-es", "done", { timeout: 30_000 });
 });
 
 test("the boss's attack on your pawn on a slow phone: a loss's result screen while he attacks and your XP fills (Nov 9)", { tag: "@perf" }, async ({ page }) => {

@@ -536,7 +536,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
 /**
  * A ranked game's end page (Eric, Nov 20: "its own result page like the boss/tower end screen, with the move-by-move below", not a card
  * over the board): "Victory!" / "Defeat" / "A draw" and why, then RP EARNED (or RP LOST) counting up and lobbing into the division's bar,
- * then XP EARNED and its bar, the quests, your coins, Play again and Home; the game's moves under it (GameSteps).
+ * then XP EARNED and its bar, the coin strip, the quests, Play again and Home; the game's moves under it (GameSteps).
  */
 function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; people: ChatPeople; computer: boolean; wide: boolean; title: string | null; exit: MatchExit | null; onHome: () => void; onAgain: () => void }) {
   const end = snap.end!;
@@ -544,7 +544,6 @@ function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHom
   const them = other(you);
   const tone = resultTitle(end, you) === "You won" ? "win" : resultTitle(end, you) === "You lost" ? "loss" : "draw";
   const o = snap.outcome;
-  const coins = o?.coins ?? 0;
   // (The rank's change: coming until the outcome; none for an unranked game or one fair play holds: your rank as it stands.)
   const change = o ? (o.unranked ? null : o.change) : undefined;
   const now = o?.unranked ? null : ranked1v1Rank();
@@ -560,9 +559,6 @@ function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHom
   );
   const tail = (
     <>
-      <p class="es-coins muted" data-testid="es-coins">
-        {o?.unranked ? "Unranked game" : coins > 0 ? `+${coins} coins` : "No coins this game"}
-      </p>
       {/* (Stacked, the column's width: Eric, Nov 25.) */}
       <div class="dv-result-actions dv-stacked">
         <button type="button" class="btn btn-primary" onClick={onAgain}>
@@ -603,7 +599,7 @@ function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHom
     // A computer (Eric, Nov 25: "the chat box on the end game screen should not now suddenly be to the left of the board when it's to the
     // right during the game"): the game's own screen, its right column's content swapped. The board where the game's was, the same size,
     // stepping through the moves (its ◀ ▶ in your strip, in your clock's place); the right column, flush with the board's strips: the
-    // result, the rewards, the quests, your coins, Play again and Home stacked, then the chat to the foot with its post-game lines.
+    // result, the rewards (the coin strip under the XP bar), the quests, Play again and Home stacked, then the chat to the foot with its post-game lines.
     return (
       <div class="screen game duel-screen over dv-ended">
         <div class="hud-row">
@@ -623,7 +619,7 @@ function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHom
         {endCol}
       </div>
     );
-  // A phone: one column, tight (Nov 25): the result, the rewards, coins, Play again and Home stacked, the chat with its message area, then
+  // A phone: one column, tight (Nov 25): the result, the rewards, Play again and Home stacked, the chat with its message area, then
   // the move by move, clear of Safari's bar.
   return (
     <div class="screen results mm-screen boss-results es-screen dv-end">

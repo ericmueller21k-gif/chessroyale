@@ -10,6 +10,7 @@ import { markXpFilled, xpFilled } from "../xp.ts";
 import { SpriteAnim } from "./BossEffect.tsx";
 import { YourPawn } from "./BossDock.tsx";
 import { BossPortrait } from "./BossPortrait.tsx";
+import { CoinStrip, type CoinStripApi } from "./CoinStrip.tsx";
 import { QuestPicture } from "./QuestsOverlay.tsx";
 import { RankEmblem } from "./RankEmblem.tsx";
 import { RewardBox } from "./RewardBox.tsx";
@@ -26,10 +27,11 @@ import "../end-screen.css";
  *     the bar fills from where you were (the number under it counting with it), a rising ping with every step. A level (a division)
  *     reached: the bar flashes full, "Level 3!" pops, your pawn hops in a gold ring, and the bar goes on from 0.
  *   - Each screen's middle between the number and the bar: the floor's bosses 1-2-1 (EndDuo), the podium, the squads.
+ *   - The coin strip under the XP bar (CoinStrip, Nov 25): when the fill ends, coins drop into a pile and the count rolls up.
  *   - The quests this match moved, each sliding to its new count after the bars.
  *
- * Nothing shifts: every box (the number's slot, the bars, the quest box) has its size from the first frame, the game's XP still coming
- * included; the sequence only sets transforms, opacity and texts. Buttons work all the time; a tap anywhere else skips to the end (its
+ * Nothing shifts: every box (the number's slot, the bars) has its size from the first frame, the game's XP still coming included; the
+ * quests alone take their rows as they come (Eric's exception, Nov 26: no empty rows kept, the buttons under them may move once); the sequence only sets transforms, opacity and texts. Buttons work all the time; a tap anywhere else skips to the end (its
  * sounds stop). Reduced motion: the end at once, one ding. Timings: END_SCREEN in settings.ts.
  */
 
@@ -244,23 +246,22 @@ function Track({ plan, refs, emblem }: { plan: TrackPlan; refs: TrackRefs; emble
 // ---- The quests ----
 
 /**
- * The quests this match moved (every end screen): a fixed box of END_SCREEN.questRows rows (Eric: "show if your current match
- * impacted any of your current quests"). Each row: its picture, name and goal, a bar at the old count, the count, its reward. None
- * moved (or still asking): one centered line.
+ * The quests this match moved (every end screen; Eric: "show if your current match impacted any of your current quests"): exactly as
+ * many rows as it moved (at most END_SCREEN.questRows), no empty row kept (Eric, Nov 26: "if there's 3 quests that you checked off, then
+ * there's 3 quests, and then it starts after that"; the buttons under them may move once as they come). Each row: its picture, name and
+ * goal, a bar at the old count, the count, its reward. None moved (or still asking): one centered line.
  *
  * `day` (ranked 1 v 1's end page, Eric, Nov 25: never "No quests moved this game"): every quest you have, the dailies then the weekly
  * (a box of QUESTS.maxDailies + 1 rows, always), each at its count; the ones this game moved lit (`es-q-lit`) and sliding to theirs.
  */
-function QuestRows({ moves, box, line, day = false, reserve = 0 }: { moves: readonly (QuestMoved & { moved?: boolean })[] | null; box: RefObject<HTMLDivElement>; line: string; day?: boolean; reserve?: number }) {
-  // (`reserve`: rows kept from the first frame, a game that earned XP (it nearly always moves one), so the buttons under them never move as
-  // the answer comes. A game with no XP: one line from the first frame. Kept rows the game didn't move: the one line, in their place.)
-  const one = (!moves || moves.length === 0) && !reserve;
+function QuestRows({ moves, box, line, day = false }: { moves: readonly (QuestMoved & { moved?: boolean })[] | null; box: RefObject<HTMLDivElement>; line: string; day?: boolean }) {
+  const one = !moves || moves.length === 0;
   return (
-    <div class={`es-quests${one ? " es-quests-one" : ""}`} ref={box} data-testid="es-quests" style={reserve ? { gridTemplateRows: `16px repeat(${reserve}, 42px)` } : undefined}>
+    <div class={`es-quests${one ? " es-quests-one" : ""}`} ref={box} data-testid="es-quests">
       {/* (None, or still asking: one line, "QUESTS" and why beside it, Eric, Nov 25: "we don't need 800 feet of empty space". Rows: as many
           as there are, no empty ones kept.) */}
       {!moves || moves.length === 0 ? (
-        <p class="es-quests-none" style={reserve ? { gridRow: `1 / ${reserve + 2}`, alignSelf: "center" } : undefined}>
+        <p class="es-quests-none">
           <strong class="es-quests-head">{day ? "Your quests" : "Quests"}</strong> {line}
         </p>
       ) : (
@@ -340,7 +341,7 @@ interface Step {
  * fill; then the quests (`quests`: their rows drawn). Only transforms, opacity and texts change. A tap anywhere but a button or a field
  * skips to the end, the same as a remount after it ran (`already`). `onLevel`: a level reached (the pawn's hop).
  */
-function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly Step[]; quests: RefObject<HTMLDivElement>; questsIn: () => Promise<void>; root: RefObject<HTMLElement>; onLevel: () => void; onEmblem: (id: string | null) => void; onStart: () => void; onDone: () => void }) {
+function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly Step[]; coins: RefObject<CoinStripApi>; quests: RefObject<HTMLDivElement>; questsIn: () => Promise<void>; root: RefObject<HTMLElement>; onLevel: () => void; onEmblem: (id: string | null) => void; onStart: () => void; onDone: () => void }) {
   const opts = useRef(o);
   opts.current = o;
   // (The skip, from the first frame: a tap before the game's XP has come skips too.)
@@ -438,6 +439,8 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
       anim?.cancel();
       for (const st of steps) endState(st);
       if (ding) play("xpDing");
+      // (The coins at their end too; reduced motion: one clink.)
+      opts.current.coins.current?.end(ding);
       void questsIn().then(() => {
         questsEnd();
         set("done");
@@ -607,6 +610,9 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
         await fill(st);
       }
       if (stopped) return;
+      // (The coins when the XP fill ends: the eye goes XP, then coins.)
+      await opts.current.coins.current?.play();
+      if (stopped) return;
       await wait(FX.gapMs);
       await questRun();
       if (stopped) return;
@@ -618,6 +624,7 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
       timers.forEach(clearTimeout);
       frames.forEach(cancelAnimationFrame);
       anim?.cancel();
+      opts.current.coins.current?.end(false);
     };
   }, [o.ready]);
 }
@@ -633,7 +640,7 @@ export interface EndRp {
 
 /**
  * The rewards of every end screen, in order: (ranked: "RP EARNED" and its bar), "XP EARNED", the screen's own `middle` (given the
- * time a level was reached: the pawn's hop), the XP bar, the quests. `xp`: the game's grant (undefined: still coming; null: none came,
+ * time a level was reached: the pawn's hop), the XP bar, the coin strip (the game's coins, from the same grant), the quests. `xp`: the game's grant (undefined: still coming; null: none came,
  * for `none`'s reason). The toast for what the bars and rows don't show (crates, keys) once it has run.
  */
 export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day = false }: { xp: XpGrant | null | undefined; none?: string; rp?: EndRp; middle?: (hopAt: number) => ComponentChildren; day?: boolean }) {
@@ -642,6 +649,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day 
   const xpSlot = useRef<HTMLSpanElement>(null);
   const rpSlotRef = useRef<HTMLSpanElement>(null);
   const xpRefs = useTrackRefs();
+  const coins = useRef<CoinStripApi>(null);
   const rpRefs = useTrackRefs();
   const [hopAt, setHopAt] = useState(0);
   const [emblem, setEmblem] = useState<string | null | undefined>(undefined);
@@ -679,7 +687,9 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day 
   useLayoutEffect(() => {
     if (moves) drawn.current!.done();
   }, [moves]);
-  const ready = xp !== undefined && (!rp || rp.change !== undefined);
+  // (Ready once the quests' answer is in too (at most FX.questWaitMs): their rows are the one box that takes its size late (Eric, Nov 26:
+  // no empty rows kept), so the stack settles before anything counts, never while a bar fills.)
+  const ready = xp !== undefined && moves !== null && (!rp || rp.change !== undefined);
   const xpP = xpPlan(xp, waited);
   const rpP = rp ? rpPlan(rp.change ?? null, rp.now) : null;
   const steps: Step[] = [...(rpP ? [{ plan: rpP, slot: rpSlotRef, refs: rpRefs }] : []), { plan: xpP, slot: xpSlot, refs: xpRefs }];
@@ -688,6 +698,7 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day 
     ready,
     already: !!already.current,
     steps,
+    coins,
     quests: qBox,
     questsIn: () => drawn.current!.p,
     root,
@@ -703,9 +714,6 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day 
   const rpWhy = rp && rp.change === undefined ? null : rpP?.still ? (rp!.change?.placed ? "Placed!" : rpP.label(0)) : null;
   // (The RP slot only for a rank that counts RP: decided as the screen first draws, from the change if it's here, else your rank now. A
   // placement game or a top tier has only its card, which says where you are (Nov 25: no "Placement 1/5" line over the same card).)
-  // (The quests' rows kept (FX.questRows) while the game's XP is still coming and once it's counted: the buttons under them never move as
-  // the sequence runs. A game with no XP: one line, from the moment that's known, before anything counts.)
-  const questRows = (xp === undefined || counted) && !day ? FX.questRows : 0;
   const [rpSlot] = useState(() => !!rp && !(rp.change === undefined ? !rp.now || !!rp.now.placement || rp.now.division === null : rpPlan(rp.change, rp.now).still));
   const questLine = yours === false ? "Sign in to do quests." : xp === undefined || ((counted || day) && !moves) ? "Checking your quests…" : day ? "No quests right now." : "No quests this game.";
   return (
@@ -719,7 +727,8 @@ export function EndRewards({ xp, none = "No XP for this game.", rp, middle, day 
       <EarnedSlot kind="xp" slot={xpSlot} down={false} why={why} parts={parts} />
       {middle?.(hopAt)}
       <Track plan={xpP} refs={xpRefs} />
-      <QuestRows moves={moves} box={qBox} line={questLine} day={day} reserve={questRows} />
+      <CoinStrip xp={xp} none={none} api={coins} />
+      <QuestRows moves={moves} box={qBox} line={questLine} day={day} />
       {/* (What the bars and rows don't show, once the sequence has ended: a level's or the daily reward's crates and keys.) */}
       {ended && counted && xp!.rewards && <RewardBox xp={xp!} endScreen />}
     </div>
