@@ -842,6 +842,7 @@
         "packages/app/src/boss-crate-rows.ts",
         "packages/app/src/components/blotches.ts",
         "packages/app/src/components/GamblingWarning.tsx",
+        "packages/app/src/components/ItemPreview.tsx",
         "packages/app/src/components/Cosmetics.tsx",
         "packages/app/src/components/Items.tsx",
         "packages/app/src/components/item-paint.tsx",

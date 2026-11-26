@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
-import { bonusOddsLine, crateDef, itemDef } from "@chessroyale/core";
-import { giveCrates, named, test } from "./helpers.ts";
+import { bonusOddsLine, bossCrateOf, crateDef, itemDef } from "@chessroyale/core";
+import { giveCrates, giveItems, named, test } from "./helpers.ts";
 
 /**
  * Two crates (Beta Crate · Series 001 joined Winter, Oct 11, 2026): you choose one, its page shows its own boxes
@@ -462,4 +462,75 @@ test("crates: ?bonus=0 leaves the Bonus crate box unchecked and the opening give
   await expect(page.getByTestId("crate-bonus")).toHaveCount(0);
   await layer.getByRole("button", { name: "▶ Done" }).click();
   await expect(layer).toHaveCount(0);
+});
+
+/**
+ * Rare items' frames and the item preview (Eric, Nov 12: "a nice clean like gold border or like diamond border... if you click on them, it
+ * should load up like a little box... a preview of like a pawn... utilizing the rider"): a Legendary tile has the gold frame, a Mythic the
+ * diamond, a Common none, on a crate's page and in the locker; a tap on an item opens a box with a pawn wearing it (a hat) or riding it
+ * (a ride), its name and tier; Close puts it away and nothing on the page moved. RARE_SHOTS=<dir>: the stills for the PR.
+ */
+test("crates: rare tiles wear a gold or diamond frame; a tap on an item opens its preview, a pawn wearing or riding it; Close puts it away", async ({ page }) => {
+  const SHOTS = process.env.RARE_SHOTS;
+  const shot = async (name: string) => {
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}-${test.info().project.name}.png` });
+  };
+  await named(page, "Rare Frames");
+  await giveCrates(page, "beta-001", 1, 1);
+  await page.goto("/shop?crates");
+  await page.locator('.crate-row[data-crate="beta-001"]').click();
+  const row = (def: string) => page.locator(`.odds-row[data-item="${def}"]`);
+  await expect(row("tommy-gun")).toHaveClass(/tier-frame diamond/);
+  await expect(row("smiley-face")).toHaveClass(/tier-frame gold/);
+  await expect(row("party-hat")).not.toHaveClass(/tier-frame/);
+  await row("smiley-face").scrollIntoViewIfNeeded();
+  await shot("crate-frames");
+  // A hat: the pawn with it on, its name and tier.
+  const boxes = () => page.locator(".crate-page > *:not(.locker-dialog-back)").evaluateAll((els) => els.map((e) => JSON.stringify(e.getBoundingClientRect())));
+  await row("party-hat").scrollIntoViewIfNeeded();
+  const before = await boxes();
+  const preview = page.getByRole("dialog", { name: "Party Hat" });
+  await row("party-hat").click();
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("data-item", "party-hat");
+  await expect(preview.locator(".avatar piece.pawn.white")).toHaveCount(1);
+  await expect(preview.locator(".avatar-items")).toHaveCount(2);
+  await expect(preview).toContainText("Common");
+  const vp = page.viewportSize()!;
+  const b = (await preview.boundingBox())!;
+  expect(b.x >= 0 && b.y >= 0 && b.x + b.width <= vp.width && b.y + b.height <= vp.height, "the box inside the screen").toBe(true);
+  await shot("preview-hat");
+  expect(await boxes(), "nothing on the page moved").toEqual(before);
+  await preview.getByRole("button", { name: "Close" }).click();
+  await expect(preview).toHaveCount(0);
+  // A ride (a boss crate's): the pawn on it, in its idle, in the diamond-framed box.
+  await page.getByRole("button", { name: "‹ Crates" }).click();
+  await page.getByLabel("Show unowned").check();
+  const babur = bossCrateOf("tiger")!;
+  await page.locator(`.crate-row[data-crate="${babur.id}"]`).click();
+  await row("balloon-pup").click();
+  const ride = page.getByRole("dialog", { name: "Balloon Pup" });
+  await expect(ride).toHaveClass(/tier-frame diamond/);
+  await expect(ride.locator('.avatar.riding[data-ride="balloon-pup"]')).toHaveAttribute("data-drawn", "1");
+  await expect(ride).toContainText("Mythic");
+  await expect(ride).toContainText("Ride");
+  await shot("preview-ride");
+  await page.keyboard.press("Escape");
+  await expect(ride).toHaveCount(0);
+  // The locker's tiles wear the same frames (a tap there still wears the item).
+  await giveItems(page, [
+    { def: "party-hat", color: "red" },
+    { def: "smiley-face", color: "blue" },
+    { def: "tommy-gun", color: "yellow" },
+    { def: "balloon-pup", color: "emerald" },
+  ]);
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  const tile = (name: string) => page.locator(".locker-grid .locker-item", { hasText: name });
+  await expect(tile("Tommy Gun")).toHaveClass(/tier-frame diamond/);
+  await expect(tile("Balloon Pup")).toHaveClass(/tier-frame diamond/);
+  await expect(tile("Smiley Face")).toHaveClass(/tier-frame gold/);
+  await expect(tile("Party Hat")).not.toHaveClass(/tier-frame/);
+  await tile("Party Hat").scrollIntoViewIfNeeded();
+  await shot("locker-frames");
 });
