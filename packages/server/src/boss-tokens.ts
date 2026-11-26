@@ -1,6 +1,7 @@
 import {
   BOSS_CRATE_PRICE,
   BOSS_TOKENS,
+  LEVEL_CRATE_BONUS,
   TOKEN_WINDOW_MS,
   battleCounts,
   bossCrateDef,
@@ -360,15 +361,18 @@ const grantCount = (n: unknown, max: number = BOSS_TOKENS.grantMax) => (typeof n
 export async function grantTestItems(
   sql: Sql,
   userId: string,
-  body: { keys?: unknown; boss?: unknown; tokens?: unknown; crate?: unknown; crates?: unknown; request?: unknown },
+  body: { keys?: unknown; boss?: unknown; tokens?: unknown; crate?: unknown; crates?: unknown; boost?: unknown; crateBonus?: unknown; request?: unknown },
   now = Date.now(),
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const keys = grantCount(body.keys, BOSS_TOKENS.keysGrantMax);
+  // (The coin boost, Nov 26: Coin Boost Crates, and Crate Bonuses (each LEVEL_CRATE_BONUS.levels level-ups), as a daily quest drops them.)
+  const boost = grantCount(body.boost, BOSS_TOKENS.cratesGrantMax);
+  const crateBonus = grantCount(body.crateBonus, BOSS_TOKENS.cratesGrantMax) * LEVEL_CRATE_BONUS.levels;
   const tokens = isTokenBoss(body.boss) ? grantCount(body.tokens) : 0;
   const series = typeof body.crate === "string" ? crateDef(body.crate) : undefined;
   const boss = typeof body.crate === "string" ? bossCrateDef(body.crate) : undefined;
   const crates = series || boss ? grantCount(body.crates, BOSS_TOKENS.cratesGrantMax) : 0;
-  if (!keys && !tokens && !crates) return { ok: false, message: "Nothing to give." };
+  if (!keys && !tokens && !crates && !boost && !crateBonus) return { ok: false, message: "Nothing to give." };
   const me = await ledgerAccount(sql, userId);
   if (!me) return { ok: false, message: "Nothing to give." };
   const request = requestId(body.request);
@@ -383,6 +387,8 @@ export async function grantTestItems(
       ...(series && crates ? [leg.seriesCrates(userId, series.id, crates, id)] : []),
       // (A boss crate is a row each: its own id, as a bought one's.)
       ...(boss && crates ? Array.from({ length: crates }, () => leg.bossCrateIn(userId, randomHex(9), boss.id, now)) : []),
+      ...(boost ? [leg.boostCrates(userId, boost, id)] : []),
+      ...(crateBonus ? [leg.crateBonus(userId, crateBonus, id)] : []),
     ],
   });
   return { ok: true };

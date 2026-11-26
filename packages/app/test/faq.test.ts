@@ -516,6 +516,18 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).not.toMatch(/\bminutes?\b|per minute|a minute/i);
   });
 
+  it("the coin boost and the Crate Bonus (Nov 26), from the settings: the drops' chances, 2.5x over 2 hours of play, base coins count; no minutes", () => {
+    const t = section("xp");
+    expect(t).toContain("each daily quest you finish has a 4% chance of a Coin Boost Crate and a 4% chance of a Crate Bonus. A Crate Bonus works at once: your next 5 level-ups that give crates give double crates");
+    expect(t).toContain("for 2.5x coins over your next 2 hours of play: play coins and bonus both, the extra paid on top. The day's 300 and the bonus's slowing count only your usual coins.");
+    expect(t).toContain("Another crate adds 2 hours more; it never goes above 2.5x. XP is never boosted.");
+    const moved = section("xp", { ...FAQ_DEFAULTS, coinBoost: { multiplier: 3, minutes: 90, dropChance: 0.05 }, levelCrateBonus: { levels: 4, dropChance: 0.025 } });
+    expect(moved).toContain("a 5% chance of a Coin Boost Crate and a 2.5% chance of a Crate Bonus");
+    expect(moved).toContain("your next 4 level-ups that give crates");
+    expect(moved).toContain("for 3x coins over your next 1.5 hours of play");
+    expect(moved).not.toMatch(/\bminutes?\b|\bmin\b|per minute|a minute/i);
+  });
+
   it("level-up rewards (Nov 20: every other level, a boss crate every 20th), from the settings, in the XP and the crates sections", () => {
     expect(section("xp")).toContain("Level-up rewards: every other level you reach (2, 4, 6, …) gives you 1 crate and 1 crate key, and every 20th level (20, 40, 60, …) also a boss crate you choose");
     expect(section("crates")).toContain("(1 crate and 1 key every other level, and a crate for the day's first game)");

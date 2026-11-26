@@ -2,6 +2,7 @@ import { BOSS_TIERS, SOLO_ABANDON, XP, XP_DAILY, bossDef, gameCoins, gameXp, isX
 import type { Sql, Stmt } from "./accounts.ts";
 import { cond, ledgerAccount, leg, opStatements, type Cond, type Op } from "./ledger.ts";
 import { coinDayOf, coinOps, coinsFor, settleCoins, type CoinPlan } from "./play-coins.ts";
+import { settleBoost } from "./coin-boost.ts";
 import { questStatements, questsPaidBy } from "./quests.ts";
 import { dailyOp, gameRewards, payLevels } from "./rewards.ts";
 
@@ -19,6 +20,7 @@ import { dailyOp, gameRewards, payLevels } from "./rewards.ts";
  *   - A solo game's time leg has source `solo`: capped at XP.soloMinutesPerDay minutes an XP day, its guard in the same statement.
  *   - Play coins (Nov 25; play-coins.ts, PLAY_COINS): `coins:<game>:<ledger id>` and `coinsbonus:<game>:<ledger id>`, worked out by
  *     core's gameCoins from the same facts (XP's minutes, its win as paid) and the XP day's coins so far, in the same batch.
+ *   - The coin boost (Nov 26; coin-boost.ts, COIN_BOOST): `boost:<game>:<ledger id>`, once the coins are settled, from what they paid.
  * They all go in one batch, with phase 2's daily reward (rewards.ts: `daily:<XP day>:<ledger id>`, once a day, for a game of
  * XP.dailyMinMoves of your own moves); then the level rewards owed at the XP it reached (rewards.ts payLevels: `lvl:<n>:<ledger id>`,
  * once per level; every 2nd level pays since Nov 20). Nothing at all while rewards are paused (PAUSE_REWARDS: `paused`). What the screen shows is answered (`XpGrant`) and kept on the game's result row (results.xp_before,
@@ -281,19 +283,23 @@ const SOLO = "solo";
 
 /**
  * Who this is, for the rules: a guest (no sign-in identity), banned, held by fair play (in review or banned: no coins, as ranked's
- * coins before them), their XP now, their ledger id (null: none yet) and, for the solo cap, the solo time XP already paid this XP
- * day: one read. Null: no such account (deleted).
+ * coins before them), their XP now, their ledger id (null: none yet), for the solo cap, the solo time XP already paid this XP
+ * day, and (Nov 26) the coin boost's minutes left and whether this game's boost op is in already (`game`: its key): one read. Null: no
+ * such account (deleted).
  */
-async function standing(sql: Sql, userId: string, day: number) {
-  return sql.first<{ signed: number; banned: number; held: number; xp: number; account: string | null; solo: number }>(
+async function standing(sql: Sql, userId: string, day: number, game: string) {
+  return sql.first<{ signed: number; banned: number; held: number; xp: number; account: string | null; solo: number; boost: number; boosted: number }>(
     `SELECT (u.email IS NOT NULL OR u.google_sub IS NOT NULL) AS signed,
        EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id = u.id AND c.status = 'banned') AS banned,
        EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id = u.id AND c.status IN ('review', 'banned')) AS held,
        COALESCE((SELECT w.xp FROM wallets w WHERE w.user_id = u.id), 0) AS xp,
        a.account AS account,
-       COALESCE((SELECT SUM(l.delta) FROM ledger l WHERE l.account = a.account AND l.asset_kind = 'xp' AND l.reason = 'xp' AND l.source_id = '${SOLO}' AND l.created_at >= ?), 0) AS solo
+       COALESCE((SELECT SUM(l.delta) FROM ledger l WHERE l.account = a.account AND l.asset_kind = 'xp' AND l.reason = 'xp' AND l.source_id = '${SOLO}' AND l.created_at >= ?), 0) AS solo,
+       COALESCE((SELECT w.boost_minutes FROM wallets w WHERE w.user_id = u.id), 0) AS boost,
+       EXISTS (SELECT 1 FROM ledger l WHERE l.op_id = 'boost:' || ? || ':' || a.account AND l.leg = 0) AS boosted
      FROM users u LEFT JOIN ledger_accounts a ON a.user_id = u.id WHERE u.id = ?`,
     day,
+    game,
     userId,
   );
 }
@@ -362,7 +368,7 @@ async function winCap(sql: Sql, account: string, game: XpGame, day: number): Pro
  */
 export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<XpGrant | null> {
   const day = xpDayStart(game.now);
-  const who = await standing(sql, userId, day);
+  const who = await standing(sql, userId, day, game.key);
   if (!who) return null;
   const g = gameXp({ ...game.facts, guest: game.signedInOnly && !who.signed, banned: !!who.banned });
   if (game.paused) return xpGrant(who.xp, [], g.none ?? "paused");
@@ -439,7 +445,11 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   // (The coins as the ledger has them: a refused op worked out again. A D1 failure here throws, as the batch's would (the review's M1):
   // an op refused by a race must be tried again, and the callers try the whole grant again, which pays once: every op is keyed, and
   // the XP and coins already in answer as they are.)
-  const coins: PlayCoins = coins0.none ? coins0 : await settleCoins(sql, me, plan, coinsTried);
+  const settled: PlayCoins = coins0.none ? coins0 : await settleCoins(sql, me, plan, coinsTried);
+  // (The coin boost, Nov 26: on the coins as paid, by the game's counted minutes (solo: those XP paid). Only read when there's a boost
+  // running or this game's boost is in already (a replay: it answers it), both from the first read: no read for an unboosted game.)
+  const coins: PlayCoins =
+    settled.none || !(who.boost > 0 || who.boosted) ? settled : await settleBoost(sql, me, { key: game.key, now: game.now, minutes: solo ? Math.floor(timePaid / XP.perMinute) : g.minutes }, settled);
   // (The cap took all of it: say so as the reason, not a box of +0s; its coins too.)
   if (solo && g.time && !gained) return { ...xpGrant(after?.xp ?? who.xp, [], "limit"), coins: coins.play || coins.bonus ? coins : { ...coins, none: "limit" as const } };
   // (The levels owed at the XP it reached: paid once each, their legs naming this game, so its result answers them; then this
