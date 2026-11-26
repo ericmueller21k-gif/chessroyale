@@ -414,6 +414,13 @@ describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () =>
     // (Once up, the time he got up stays.)
     const up = tapSeen(seen, { boss: boss(4), phase: { kind: "scoring", stall: tap } }, 12_000);
     expect(tapSeen(up, { boss: boss(5), phase: { kind: "play", stall: null } }, 20_000)).toEqual(up);
+    // (When your move went in, not when this screen drew it (main, Nov 26): a slow screen first drawing your instant move after he's
+    // down still owes the joke.)
+    const { down } = tapLengths();
+    const late = tapSeen(seen, { boss: boss(4), phase: { kind: "scoring", stall: tap, movedAt: 5050 } }, 5000 + down + 200)!;
+    expect(late).toEqual({ at: 5000, turn: 4, moved: 5050 });
+    expect(tapTimeline(late.at, late.moved).joke).toBe(true);
+    expect(tapSeen(seen, { boss: boss(4), phase: { kind: "play", stall: tap }, myPick: "e2e4", myPickAt: 5060 }, 9000)).toEqual({ at: 5000, turn: 4, moved: 5060 });
   });
 
   it("the clock tap is no moment of his: his move keeps its own line", async () => {

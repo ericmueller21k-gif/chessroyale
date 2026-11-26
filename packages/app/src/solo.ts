@@ -2105,7 +2105,7 @@ export class SoloMatch implements GameView {
     // the judge's answer, so a reload while it's scored never takes it back; the rejoin scores it again (the review of #885, I2). In a Solo
     // raid with the bots' picks, there or as they land (D1).)
     this.scored = { move, thinkMs, ...(usedPowerUp ? { powerUp: true } : {}), ...(darkOut ? { darkOut: true } : {}), ...(move === null && this.runner.kingCallers.has(HUMAN) ? { king: true } : {}) };
-    this.set({ kind: "scoring", board, move });
+    this.set({ kind: "scoring", board, move, movedAt: now });
     const t = performance.now();
     // Score while the bots still thinking finish (they light up the leaderboard), then reveal.
     // Scores and the leaderboard only change once everyone has finished.

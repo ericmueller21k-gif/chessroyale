@@ -129,16 +129,20 @@ export type TapSeen = { at: number; turn: number; moved?: number };
  * His tap as this screen sees it now, from the one seen before (`prev`). Only a player still thinking sees it (review of #775): a
  * tap starts only when first seen in `play` with no pick of yours (a raid player who already moved is `scoring`; a party member who
  * picked has `myPick`), so a reconnect before your pick still sees him lying. Your pick, the move changing or the phase leaving
- * `play`: your move is in, he gets up.
+ * `play`: your move is in, he gets up. `moved` is when your move went in (the scoring phase's `movedAt`, a party's `myPickAt`), not
+ * when this screen noticed: a slow screen drawing it after he's down still owes the joke (main, Nov 26).
  */
-export function tapSeen(prev: TapSeen | null, m: { boss: BossView | null; phase: { kind: string; stall?: StallState | null }; myPick?: string | null }, now: number): TapSeen | null {
+export function tapSeen(prev: TapSeen | null, m: { boss: BossView | null; phase: { kind: string; stall?: StallState | null; movedAt?: number }; myPick?: string | null; myPickAt?: number | null }, now: number): TapSeen | null {
   const boss = m.boss;
   const ph = m.phase;
   const picked = !!m.myPick;
   const live = boss?.id === "dash" && ph.kind === "play" && !picked && ph.stall?.beat === "tap" ? ph.stall : null;
   let t = prev;
   if (live && boss && t?.at !== live.at) t = { at: live.at, turn: boss.crowdMoves };
-  if (t && t.moved === undefined && (picked || !(ph.kind === "play" && boss?.crowdMoves === t.turn))) t = { ...t, moved: now };
+  if (t && t.moved === undefined && (picked || !(ph.kind === "play" && boss?.crowdMoves === t.turn))) {
+    const went = picked ? m.myPickAt : ph.kind === "scoring" ? ph.movedAt : undefined;
+    t = { ...t, moved: went != null ? Math.max(t.at, Math.min(went, now)) : now };
+  }
   return t;
 }
 
@@ -197,7 +201,7 @@ function placeLie(el: HTMLElement, say: HTMLElement | null) {
  * him"), his figure and its usual box away. Drawn beside the match's screens, so a move going in (its screen changing) doesn't cut
  * him off. A reconnect mid-tap: he's lying.
  */
-export function DashTap({ match }: { match: { boss: BossView | null; phase: { kind: string; stall?: StallState | null }; myPick?: string | null } }) {
+export function DashTap({ match }: { match: { boss: BossView | null; phase: { kind: string; stall?: StallState | null; movedAt?: number }; myPick?: string | null; myPickAt?: number | null } }) {
   const boss = match.boss;
   const tap = useRef<TapSeen | null>(null);
   const now = Date.now();

@@ -314,6 +314,7 @@ export class NetMatch implements GameView {
   /** Fair play: look-aways during each move's clock, sent with the pick. */
   private lookAways = new LookAways();
   myPick: string | null = null;
+  myPickAt: number | null = null;
   private currentBoard: NetBoard | null = null;
   private standingsList: NetStanding[] = [];
   private slotList: BoardSlot[] = [];
@@ -765,6 +766,7 @@ export class NetMatch implements GameView {
         if (m.boss) this.scoutShowdown(m.boss);
         this.tally = null;
         this.myPick = null;
+        this.myPickAt = null;
         this.hint = null;
         this.progress.start(m.botsDoneIn ?? {}, this.local(m.startsAt ?? m.now) - Date.now());
         this.stage = m.stage;
@@ -924,7 +926,7 @@ export class NetMatch implements GameView {
           this.myPick = m.move;
           this.lookAways.stop();
           if (this.myId) this.progress.mark(this.myId);
-          return this.setPhase({ kind: "scoring", board: this.phase.board, move: m.move, strike: this.phase.strike });
+          return this.setPhase({ kind: "scoring", board: this.phase.board, move: m.move, strike: this.phase.strike, movedAt: Date.now() });
         }
         if (m.refused) {
           this.darkNote = null;
@@ -1546,6 +1548,7 @@ export class NetMatch implements GameView {
       if (move === this.myPick) return;
       const first = this.myPick === null;
       this.myPick = move;
+      if (first) this.myPickAt = Date.now();
       this.send({ t: "pick", key: this.key, move, ...(premove ? { premove: true as const } : {}) });
       crumb(`pick ${move}`);
       if (first && this.myId) this.progress.mark(this.myId);
@@ -1557,7 +1560,7 @@ export class NetMatch implements GameView {
     crumb(`move ${move}`);
     if (this.myId) this.progress.mark(this.myId);
     // (The crowd's turn goes on for the rest: a stall beat under way plays on for you too.)
-    this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike, ...(this.phase.stall ? { stall: this.phase.stall } : {}) });
+    this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike, ...(this.phase.stall ? { stall: this.phase.stall } : {}), movedAt: Date.now() });
   }
 
   /** A Boss Battle party: kick a member who hasn't picked a minute after the turn's first pick (the server checks). */
