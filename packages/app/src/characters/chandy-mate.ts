@@ -15,7 +15,8 @@
  * - `land`: the landing's squash, his knees giving way (the rifle slipping off his shoulder), then flat on his front, chin on the
  *   ground, his rifle on the ground behind him (`slumped` loops: still a long beat, then one breath). `leap` is `jump` then `land`.
  * - `reach<dir>`: he pushes himself up onto his knees, his head comes up and his near arm reaches out toward your king, at one of
- *   `REACH_DIRS` (degrees below level: -30 up and forward to 60 down), holding (`reaching<dir>` loops). His rifle stays on the ground.
+ *   `REACH_DIRS` (degrees below level: straight up to straight down), holding (`reaching<dir>` loops). His rifle stays on the ground.
+ *   Where he stands and which reach: `mateAim` (a square or two off the center for a king near it, so the bolt runs clear).
  * - `zap<dir>`: his hand charging cyan, the flash, a bolt off his claws along the same direction (the bolt across the board to your
  *   king is the board's: ChandyDodge's `.cd-mate-bolt`, from `mateHand`, at `ZAP_FIRE_MS`), then holding the reach.
  * - `out` (the win beat, after a survived Dodge): his lens sputters and dies, he slumps, and falls flat on his back; `ko` loops,
@@ -37,13 +38,18 @@ export const MATE_LEFT = 46;
 export const JUMP_MS = { crouch: 150, spring: 100, air: 330 } as const;
 
 type Extra = { specks?: (b: Built) => Speck[]; cue?: string; shake?: readonly [number, number]; pal?: Record<string, string> };
-/** A pose with his rifle off his back, on the ground (from the collapse on). */
-type MatePose = ChandyPose & { dropped?: boolean };
+/** A pose with his rifle off his back, on the ground (from the collapse on); his near arm behind his head (reaching up past it). */
+type MatePose = ChandyPose & { dropped?: boolean; armBehind?: boolean };
 const down = (s: readonly Speck[]): Speck[] => s.map(([x, y, k]) => [x, y + MATE_TOP, k]);
 function frame(stage: RifleStage, ms: number, p: MatePose, extra: Extra = {}): Frame {
   const b = build(stage, p.dropped ? { ...p, gun: { slung: true } } : p);
   let layers = b.layers;
   if (p.dropped) layers = [layers[0]!, groundRifle(stage), ...layers.slice(1).filter((l) => !l.part.startsWith("rifle:"))];
+  if (p.armBehind) {
+    // (The near arm is his rig's last layer: under his head instead.)
+    const head = layers.findIndex((l) => l.part.startsWith("head:"));
+    layers = [...layers.slice(0, head), layers.at(-1)!, ...layers.slice(head, -1)];
+  }
   return {
     ms,
     layers: layers.map((l) => ({ ...l, y: l.y + MATE_TOP })),
@@ -203,25 +209,29 @@ export const MATE_POSES = {
 } satisfies Record<string, MatePose>;
 const P = MATE_POSES;
 
-/** The directions he can reach in, degrees below level, facing our right (mirrored for a king on our left). */
-export const REACH_DIRS = [-30, 0, 30, 60] as const;
+/** The directions he can reach in, degrees below level, facing our right (mirrored for a king on our left): straight up to straight
+ *  down, 30° apart, and 45° down too (the crowd's king is most often down the board from him; between 30 and 60 down the bolt was 17°
+ *  off his arm, measured from each reach's own hand). */
+export const REACH_DIRS = [-90, -60, -30, 0, 30, 45, 60, 90] as const;
 export type ReachDir = (typeof REACH_DIRS)[number];
-/** An animation's direction suffix: `U30`, `0`, `D30`, `D60` (a king straight below: D60, the board's bolt bends the rest). */
+/** An animation's direction suffix: `U90`, `U60`, `U30`, `0`, `D30`, `D45`, `D60`, `D90`. */
 export const reachSuffix = (deg: ReachDir): string => (deg < 0 ? `U${-deg}` : deg === 0 ? "0" : `D${deg}`);
-/** The nearest of REACH_DIRS to a direction (degrees below level, facing his way): the component's pick for a king. */
-export const nearestReach = (deg: number): ReachDir => REACH_DIRS.reduce((a, b) => (Math.abs(b - deg) < Math.abs(a - deg) ? b : a));
 
 const along = (deg: number, r: number, bend = 0): Pt => {
   const a = (deg * Math.PI) / 180;
   return [Math.round(Math.cos(a) * r - Math.sin(a) * bend), Math.round(Math.sin(a) * r + Math.cos(a) * bend)];
 };
-/** Kneeling, head up toward the king, the near arm out at `deg` (`full` false: on its way). */
+/** Kneeling, head up toward the king, the near arm out at `deg` (`full` false: on its way). Reaching steeply up (60° or more), his arm
+ *  goes up behind his head, longer, so his claws show over it (in front, it crossed his face: a hand on his snout, not a reach). */
 function reachPose(deg: number, full: boolean): MatePose {
+  const up = deg <= -60;
+  const r = deg === -90 ? 42 : up ? 36 : 21;
   return {
     ...REST,
     ...KNEEL,
     bob: full ? 6 : 8,
-    armN: full ? [along(deg, 10, -1), along(deg, 21)] : [along(deg, 6, 2), along(deg, 12, 1)],
+    armN: full ? [along(deg, r / 2, -1), along(deg, r)] : [along(deg, 6, 2), along(deg, 12, 1)],
+    armBehind: up,
     armF: ARMS.hang,
     handN: "open",
     dropped: true,
@@ -462,6 +472,56 @@ export function mateHand(deg: ReachDir): Pt {
   const b = build(0, reachPose(deg, true));
   const [dx, dy] = along(deg, 5);
   return [b.hand[0] + dx + MATE_LEFT, b.hand[1] + dy + MATE_TOP];
+}
+
+/** His checkmate figure's art px a board: a board 384 px across draws him a CSS px an art px (ChandyDodge's `.cd-mate-fig`). */
+export const MATE_PX = 384;
+/** A king within this many squares of the board's center (across, and down the screen, from his square's middle) has him land off
+ *  the center; and up the screen, within MATE_NEAR_UP (his reaching hand is high: straight over his head it's 1.7 squares up). */
+export const MATE_NEAR = 1.5;
+export const MATE_NEAR_UP = 2.5;
+/** How far off the center he lands then, in squares, away from the king's side. */
+export const MATE_ASIDE = 2;
+const FILES = "abcdefgh";
+/** A square's middle on the screen, in board sizes from the board's center (x right, y down); the board flipped for the black crowd. */
+export function boardPoint(square: string, side: "white" | "black"): Pt {
+  const f = FILES.indexOf(square[0]!);
+  const r = Number(square[1]) - 1;
+  const [c, row] = side === "white" ? [f, 7 - r] : [7 - f, r];
+  return [(c + 0.5) / 8 - 0.5, (row + 0.5) / 8 - 0.5];
+}
+export interface MateAim {
+  /** Where his feet stand (board sizes from the center): the center, or MATE_ASIDE squares off it for a king near it. */
+  feet: Pt;
+  /** Facing our left (the king on his left): the sprite mirrored about his feet. */
+  mirror: boolean;
+  dir: ReachDir;
+  /** His reaching hand (the bolt's start), from the center; and from there to the king's middle. */
+  hand: Pt;
+  to: Pt;
+}
+/**
+ * Where he lands for your mate and which way he reaches (the director, Nov 26): on the board's center, or, for a king near it (MATE_NEAR,
+ * MATE_NEAR_UP), MATE_ASIDE squares across, away from the king's side, so he never stands over the king and the bolt runs clear; facing
+ * the king; at the reach whose own hand points nearest the king (the bolt's angle off his arm: 15° at most, every square).
+ */
+export function mateAim(king: string, side: "white" | "black"): MateAim {
+  const k = boardPoint(king, side);
+  const near = Math.abs(k[0]) <= MATE_NEAR / 8 && k[1] <= MATE_NEAR / 8 && k[1] >= -MATE_NEAR_UP / 8;
+  const feet: Pt = [near ? (k[0] < 0 ? MATE_ASIDE : -MATE_ASIDE) / 8 : 0, 0];
+  const mirror = k[0] < feet[0];
+  const m = mirror ? -1 : 1;
+  const [fx, fy] = CHANDY_MATE.foot;
+  let best: MateAim | null = null;
+  let off = Infinity;
+  for (const dir of REACH_DIRS) {
+    const [hx, hy] = mateHand(dir);
+    const hand: Pt = [feet[0] + (m * (hx - fx)) / MATE_PX, feet[1] + (hy - fy) / MATE_PX];
+    const to: Pt = [k[0] - hand[0], k[1] - hand[1]];
+    const d = Math.abs((Math.atan2(to[1], m * to[0]) * 180) / Math.PI - dir);
+    if (d < off) [best, off] = [{ feet, mirror, dir, hand, to }, d];
+  }
+  return best!;
 }
 
 const MAKERS: Record<string, (stage: RifleStage) => Anim> = {

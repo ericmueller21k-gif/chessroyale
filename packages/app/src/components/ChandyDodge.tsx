@@ -30,7 +30,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { CHANDY, CHANDY_CLONE, CHANDY_FOOT, CHANDY_SOUNDS, chandyAnim, cloneMuzzle, type RifleStage } from "../characters/chandy.ts";
-import { CHANDY_MATE, JUMP_MS, ZAP_FIRE_MS, mateHand, nearestReach, reachSuffix, type ReachDir } from "../characters/chandy-mate.ts";
+import { CHANDY_MATE, JUMP_MS, MATE_PX, ZAP_FIRE_MS, mateAim, reachSuffix, type ReachDir } from "../characters/chandy-mate.ts";
 import { shatterAnim } from "../characters/effects/chandy.ts";
 import { spriteCanvas } from "../characters/sprite-kit.ts";
 import { BoardEffects, SpriteAnim, onEachFrame, spriteFrameAt, type BoardItem } from "./BossEffect.tsx";
@@ -169,8 +169,6 @@ function useTenths(on: boolean) {
   }, [on]);
 }
 
-/** His checkmate figure's art px, in board sizes: a board 384 px across draws him a CSS px an art px. */
-const MATE_PX = 384;
 /** The figure's run for a mate step or the win beat: its animation, then the loop it holds. */
 function mateAnims(v: DodgeView, dir: ReachDir): { anim: string; then?: string } | null {
   const d = reachSuffix(dir);
@@ -182,25 +180,6 @@ function mateAnims(v: DodgeView, dir: ReachDir): { anim: string; then?: string }
   return null;
 }
 /**
- * Where he faces and reaches on the board, from its center (his feet) to your king: toward the king's side (mirrored for a king on his
- * left), at the nearest of his reach angles; and his hand then, and the vector to the king's middle (in board sizes from the center).
- */
-function mateAim(v: DodgeView): { mirror: boolean; dir: ReachDir; hand: [number, number]; to: [number, number] } {
-  const [c, r] = cell(v.king, v.side);
-  const k: [number, number] = [(c + 0.5) / 8 - 0.5, (r + 0.5) / 8 - 0.5];
-  const mirror = k[0] < 0;
-  const [fx, fy] = CHANDY_MATE.foot;
-  const at = (dir: ReachDir): [number, number] => {
-    const [hx, hy] = mateHand(dir);
-    return [((hx - fx) / MATE_PX) * (mirror ? -1 : 1), (hy - fy) / MATE_PX];
-  };
-  const h0 = at(30);
-  const dir = nearestReach((Math.atan2(k[1] - h0[1], Math.abs(k[0] - h0[0])) * 180) / Math.PI);
-  const hand = at(dir);
-  return { mirror, dir, hand, to: [k[0] - hand[0], k[1] - hand[1]] };
-}
-
-/**
  * A mate's opening and the win beat over the board (the board as it is under them): his checkmate figure on the board's center
  * (characters/chandy-mate.ts), the crosshair and the zap on your king. `jump`: he leaves his spot (his figure there hides: styles.css)
  * and leaps along an arc onto the center (the CSS leap, from where his spot's figure stands, at its size), collapses and lies still;
@@ -210,7 +189,7 @@ function mateAim(v: DodgeView): { mirror: boolean; dir: ReachDir; hand: [number,
  */
 function MateOver({ view: v }: { view: DodgeView }) {
   const fig = useRef<HTMLDivElement>(null);
-  const aim = mateAim(v);
+  const aim = mateAim(v.king, v.side);
   const run = mateAnims(v, aim.dir);
   // (How long ago the step began, measured once per step: a redraw mustn't move its animations' delay again.)
   const ago = useMemo(() => Date.now() - v.since, [v.phase, v.step, v.since]);
@@ -224,7 +203,7 @@ function MateOver({ view: v }: { view: DodgeView }) {
     let from = { x: 0, y: -size * 0.6, s: 1 };
     if (spot) {
       const p = figurePoint(spot, CHANDY, CHANDY_FOOT[0], CHANDY_FOOT[1]);
-      from = { x: p.x - (root.left + size / 2), y: p.y - (root.top + size / 2), s: spot.getBoundingClientRect().height / CHANDY.h / (size / MATE_PX) };
+      from = { x: p.x - (root.left + size * (0.5 + aim.feet[0])), y: p.y - (root.top + size * (0.5 + aim.feet[1])), s: spot.getBoundingClientRect().height / CHANDY.h / (size / MATE_PX) };
     }
     el.style.setProperty("--mf-from-x", `${Math.round(from.x)}px`);
     el.style.setProperty("--mf-from-y", `${Math.round(from.y)}px`);
@@ -254,8 +233,8 @@ function MateOver({ view: v }: { view: DodgeView }) {
       {run && (
         <div
           ref={fig}
-          class={`cd-mate-fig cd-f-${run.anim.replace(/(U30|D30|D60|0)$/, "")}${aim.mirror ? " cd-mirror" : ""}`}
-          style={{ "--mf-w": CHANDY_MATE.w, "--mf-h": CHANDY_MATE.h, "--mf-fx": fx, "--mf-fy": fy, "--mf-delay": `${JUMP_MS.crouch - ago}ms`, "--mf-leap": `${JUMP_MS.spring + JUMP_MS.air}ms` }}
+          class={`cd-mate-fig cd-f-${run.anim.replace(/(U\d+|D\d+|0)$/, "")}${aim.mirror ? " cd-mirror" : ""}`}
+          style={{ ...(v.phase === "mate" && { "--mf-x": `${(0.5 + aim.feet[0]) * 100}%`, "--mf-y": `${(0.5 + aim.feet[1]) * 100}%` }), "--mf-w": CHANDY_MATE.w, "--mf-h": CHANDY_MATE.h, "--mf-fx": fx, "--mf-fy": fy, "--mf-delay": `${JUMP_MS.crouch - ago}ms`, "--mf-leap": `${JUMP_MS.spring + JUMP_MS.air}ms` }}
         >
           <SpriteAnim ch={CHANDY_MATE} anim={chandyAnim(run.anim, v.stage ?? 0)} then={run.then && chandyAnim(run.then, v.stage ?? 0)} since={v.since} sounds={CHANDY_SOUNDS} id={`mate:${v.phase}:${v.step ?? ""}`} />
         </div>

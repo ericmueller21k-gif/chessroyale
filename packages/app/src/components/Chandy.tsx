@@ -486,11 +486,11 @@ export function prewarmChandy(): void {
       warmCanvases(CHANDY_RIFLE, () => {
         const staged = Object.entries(CHANDY.anims).filter(([name]) => /_s\d$/.test(name));
         const barOwn = Object.entries(CHANDY_BAR.anims).filter(([name, a]) => /_s\d$/.test(name) && a !== CHANDY.anims[name]);
-        prewarmSprite(CHANDY, [...staged, ...barOwn].flatMap(([, a]) => a.frames));
-        for (const fx of Object.keys(EFFECTS).filter((k) => k.startsWith("chandy")) as EffectName[]) prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
-        // (His checkmate figure, at every stage: made in its file's order, so the leap at stage 5 doesn't make all the others then.)
+        // (His checkmate figure, at every stage, once his own figure is drawn: one slice at work at a time. Made in its file's order, so
+        // the leap at stage 5 doesn't make all the others then.)
         const mate = Object.values(CHANDY_MATE.anims);
-        prewarmAnims(mate, () => prewarmSprite(CHANDY_MATE, mate.flatMap((a) => a.frames)));
+        prewarmSprite(CHANDY, [...staged, ...barOwn].flatMap(([, a]) => a.frames), undefined, () => prewarmAnims(mate, () => prewarmSprite(CHANDY_MATE, mate.flatMap((a) => a.frames))));
+        for (const fx of Object.keys(EFFECTS).filter((k) => k.startsWith("chandy")) as EffectName[]) prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
       }),
     ),
   );
