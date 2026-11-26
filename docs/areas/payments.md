@@ -158,7 +158,10 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
 - **For PR 7 (the coin screen):** render `GET /api/buy` as it is: each pack's `line` greyed (a tap shows it; while `held`, a tap also
   posts `/api/buy/tap`, at most once a minute), `askBand` asks the band question first (a birth month and year, worked out with core's
   `buyBandOf`, only the band posted to `/api/buy/band`; its heading `BUY_LINES.band` or the screen's own), `leftCents` for 16-17.
-- **For PR 8 (Stripe), who may buy:** before making a session, expire each of `openCheckouts` at Stripe (POST
+  The country is Cloudflare's (`request.cf.country`): check that `wrangler dev` (the e2e's server) gives one, else every pack says
+  "not sold in your country" there.
+- **For PR 8 (Stripe), who may buy:** set each session's `expires_at` to `PAYMENTS.buyers.checkoutMinutes` (30, Stripe's least): "open"
+  here assumes it. Before making a session, expire each of `openCheckouts` at Stripe (POST
   /v1/checkout/sessions/:id/expire) and `expireCheckout` it; one Stripe says is already complete is credited instead, at once. Pass
   `request.cf.country` to `recordCheckout`; a refusal: expire the session just made and answer the line. Mark a session `expired` on
   `checkout.session.expired` too (an unpaid pending one past 30 minutes counts toward a 16-17 month until then). A paid session whose
