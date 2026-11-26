@@ -33,14 +33,8 @@ kit are sound.
 
 ## Checked, no finding
 
-- Timing: `popOffMs` = `hangOnTimeline().total + tailMs` (15.9 s); the client's `hangOnAt` window and the `hangOn` run (unit-tested
-  to equal `total`) come from the same `DASH_HANG_ON`, solo and server alike. Online, the 300 ms margin is the same as round 1 (each
-  side starts on first sight); a reconnect mid-gag restarting the clock on screen is unchanged from round 1.
-- The portal: it unmounts when `thinking` ends, at `total`, or when leaving the screen or the match ends; the class is removed in
-  cleanup (finding 2 aside). On a late mount the jump/zip delays are negative, so the jump is done and the zip lands on time. Whole on
-  screen at 320 px (h = 0.5 × board, clamped). `pointer-events: none` on `.dash-hang` and `.dash-say-at`. Premoves are held
-  (`watch`) during the gag.
-- The rest of Dash: `DASH_FIGURE` only lost the hang runs (no other users); barScale and SIDE_REACH are unchanged; pop-off, stall,
-  tap and Scramble code are untouched. `bigClick`'s only change is `export`.
-- Frame work besides finding 1: one `putImageData` per changed frame; `onFrame` writes three data attributes; no per-frame layout
-  reads; the jump and zip are WAAPI transforms.
+- Timing: `popOffMs` (15.9 s), `hangOnAt`'s window and the `hangOn` run (unit-tested equal to `total`) all come from `DASH_HANG_ON`.
+  The online margin (300 ms) and a reconnect restarting the on-screen clock are unchanged from round 1.
+- The portal unmounts as thinking ends, at `total`, on leaving or at match end (class removed; finding 2 aside). Late mounts get negative
+  delays. Whole at 320 px. No taps taken (`pointer-events: none`); premoves are held. The rest of Dash is unchanged (`bigClick` only
+  exported). Per frame: one `putImageData`, three data attributes, no layout reads; jump and zip are WAAPI transforms.
