@@ -513,13 +513,20 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   };
   // (The counter is round the bend, out of sight: his tag goes behind the rock with him.)
   await still("mouth");
-  /** Walks to `sq`, tapping it once it's on screen; the room's floor only (the rock beside it is never walked on). */
+  /**
+   * Walks to `sq`, tapping it once it's on screen; the room's floor only (the rock beside it is never walked on). Aimed once the view
+   * rests on you, and done once you've stopped there (viewOnYou): a tap read while the camera glided landed on the dog's picture, the
+   * walk to his counter went through (7, 6) (data-you showed it mid-step) and stopped at his card (main, Nov 26).
+   */
   const walkTo = async (sq: readonly [number, number]) => {
     await expect(async () => {
+      await viewOnYou(page);
       const at = await shopAt(page, "square", sq);
       expect(at, `${sq} on screen`).not.toBeNull();
       await page.mouse.click(at!.x, at!.y);
       await expect(room(page)).toHaveAttribute("data-you", sq.join(","), { timeout: 6000 });
+      await viewOnYou(page);
+      await expect(room(page)).toHaveAttribute("data-you", sq.join(","));
     }).toPass({ timeout: 30_000 });
   };
   // Up the passage to the pond (the battle spot), then before the tree.

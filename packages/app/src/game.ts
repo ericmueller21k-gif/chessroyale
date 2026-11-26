@@ -242,8 +242,8 @@ export type Phase =
    * in seconds, the time control's cap (`allowedMs` is less when a time bank runs low).
    */
   | { kind: "play"; board: BoardView; startsAt: number; deadline: number; allowedMs: number; clock?: number; strike?: StrikeState; stall?: StallState }
-  /** `watched`: Crowd 50 v 50, the other team's vote is being counted. */
-  | { kind: "scoring"; board: BoardView; move: string | null; watched?: boolean; strike?: StrikeState; stall?: StallState }
+  /** `watched`: Crowd 50 v 50, the other team's vote is being counted. `movedAt`: when your move went in (local time). */
+  | { kind: "scoring"; board: BoardView; move: string | null; watched?: boolean; strike?: StrikeState; stall?: StallState; movedAt?: number }
   /** `until`: when the next board comes up (local time). */
   | { kind: "reveal"; mine: GroupReveal; board: BoardView; until: number }
   /** Crowd 50 v 50: the other team is choosing; you watch the vote come in. */
@@ -403,6 +403,8 @@ export interface GameView {
    */
   readonly party?: { seats: Record<string, number>; leader: string | null } | null;
   readonly myPick?: string | null;
+  /** When your first pick this turn went in (local time); null with no pick. */
+  readonly myPickAt?: number | null;
   readonly myId?: string | null;
   partyKick?(playerId: string): void;
   /** Crowd augments: your vote on the next round's move clock (at a cut). */
