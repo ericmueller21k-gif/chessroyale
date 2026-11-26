@@ -10,7 +10,7 @@ import { alfilFen, alfilJolt, earlyLanding } from "../components/Alfil.tsx";
 import { hopperFen, yourPulls } from "../components/Hopper.tsx";
 import { rookTakenMoment, smudgyFen } from "../components/Smudgy.tsx";
 import { fullMoonMoment, noteMooMoments } from "../components/Moo.tsx";
-import { hangOnAt, hangOnFen, popOffMoments } from "../components/Dash.tsx";
+import { DashHangOn, hangOnAt, hangOnFen, popOffMoments } from "../components/Dash.tsx";
 import { folioMoments, revisionFen } from "../components/Folio.tsx";
 import { gingerMoments } from "../components/Ginger.tsx";
 import { gardenerFen } from "../components/Gardener.tsx";
@@ -619,6 +619,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
+            {/* (Dash's "Hang on" on the board's middle, his whole routine there: a portal on the page's top layer.) */}
+            {gagAt !== undefined && <DashHangOn key={gagAt} at={gagAt} />}
             {mateKing && <KingAttack boss={mover} square={mateKing} orientation={orientation} startAt={attackAt} now={now} seed={`mate:${boss.board.fen}`} king={boss.crowdSide} />}
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
             {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}

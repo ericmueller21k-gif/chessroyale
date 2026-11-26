@@ -11,7 +11,12 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import type { BossView } from "../game.ts";
 import { InPlace, rageWarn, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { figurePoint } from "./BossCharacter.tsx";
-import { DASH_FIGURE as DASH } from "../characters/dash-figure.ts";
+import { DASH_FIGURE as DASH, DASH_HANG, HANG_SECTION } from "../characters/dash-figure.ts";
+import { bossKit } from "../characters/kits.ts";
+import { VoiceBubble, bossVoice } from "../speech.tsx";
+import { SpriteAnim } from "./BossEffect.tsx";
+import { holdDashAway } from "./DashStall.tsx";
+import { DASH_HANG_ON } from "@chessroyale/core";
 
 /**
  * Dash's powers on screen (his rules: packages/chess/src/bosses/dash.ts; docs/decisions/2026-11-03-dash.md). "Your time" is the
@@ -161,12 +166,79 @@ function popOffFastMoment({ moment }: MomentProps) {
   );
 }
 
-/** His "Hang on"'s beats, each a moment: its slow smacks (hangSlow), cheetah speed (hangFast: it runs on through "almost done"), the wind-up and sorry. */
-function hangOnMoment(anims: readonly string[] | null) {
-  return ({ moment }: MomentProps) => (
-    <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-kind={moment.kind}>
-      {anims && <InPlace runKey={moment.key} anims={anims} since={moment.at} />}
-    </div>
+/** His "Hang on"'s beats, each a moment (its line); his routine itself is DashHangOn's, on the board's middle. */
+function hangOnMoment({ moment }: MomentProps) {
+  return <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-kind={moment.kind} />;
+}
+
+/**
+ * His "Hang on" on the board's middle (round 2, Eric, Nov 26: "he should jump onto the middle of the board when he does it"; the
+ * director's call: the whole routine there): from the gag's start (`at`) he jumps from his spot (the phone's bar, the computer's side)
+ * onto the board's middle, DASH_HANG_ON.boardShare of the board's height and never past the screen's edge, does it all there (his
+ * `hangOn` run: the slow smacks, cheetah speed with his head thrown back, the wind-up, "sorry"), and zips back to his spot as your
+ * piece slides home, before his move. His spot's figure is away meanwhile (its place kept: `dash-away`, held beside his clock tap's:
+ * holdDashAway), his words stand over him. On the page's top layer, placed as it shows (and again on a resize), taking no taps (the
+ * board is only watched meanwhile).
+ * The jump and the zip are the element's own animations from the gag's clock (a copy drawn late starts partway: negative delays).
+ */
+export function DashHangOn({ at }: { at: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const sayRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => holdDashAway(), []);
+  useLayoutEffect(() => {
+    // (Placed as it shows, and again if the screen turns or resizes mid-gag: the jump and the zip redone from the gag's clock.)
+    let anims: Animation[] = [];
+    const place = () => {
+      for (const a of anims) a.cancel();
+      anims = [];
+      const el = ref.current;
+      const board = document.querySelector<HTMLElement>(".hb-board")?.getBoundingClientRect();
+      if (!el || !board?.width) return;
+      const tl = hangOnTimeline();
+      const fit = Math.min(1, (innerWidth - 8) / ((board.height * DASH_HANG_ON.boardShare * DASH.w) / DASH.h), (innerHeight - 8) / (board.height * DASH_HANG_ON.boardShare));
+      const h = board.height * DASH_HANG_ON.boardShare * fit;
+      const w = (h * DASH.w) / DASH.h;
+      // (His feet's middle over the board's center, his middle at its middle; whole on the screen.)
+      const fx = DASH.foot[0] / DASH.w;
+      const x = Math.max(4, Math.min(innerWidth - w - 4, board.left + board.width / 2 - fx * w));
+      const y = Math.max(4, Math.min(innerHeight - h - 4, board.top + board.height / 2 - h / 2));
+      Object.assign(el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+      if (sayRef.current) Object.assign(sayRef.current.style, { left: `${x + fx * w - 300}px`, top: `${Math.max(48, y + 0.12 * h)}px` });
+      // (From his spot's figure, at its size; an arc up for the jump, straight back for the zip.)
+      const spot = [...document.querySelectorAll<HTMLElement>(".boss-char .boss-char-sprite")].map((e) => e.getBoundingClientRect()).find((r) => r.width > 0);
+      const [dx, dy, k] = spot ? [spot.left - x, spot.top - y, spot.height / h] : [0, -h, 0.5];
+      const from = `translate(${dx}px, ${dy}px) scale(${k})`;
+      const t = Date.now() - at;
+      const jump = el.animate([{ transform: from }, { transform: `translate(${dx * 0.45}px, ${dy * 0.45 - h * 0.35}px) scale(${(k + 1) / 2})`, offset: 0.5 }, { transform: "none" }], { duration: DASH_HANG_ON.jumpMs, delay: -t, fill: "backwards", easing: "ease-out" });
+      const zip = el.animate([{ transform: "none" }, { transform: from }], { duration: DASH_HANG_ON.returnMs, delay: tl.returnAt - t, fill: "forwards", easing: "ease-in" });
+      anims = [jump, zip];
+    };
+    place();
+    addEventListener("resize", place);
+    return () => {
+      removeEventListener("resize", place);
+      for (const a of anims) a.cancel();
+    };
+  }, [at]);
+  if (typeof document === "undefined") return null;
+  // (Each frame's section and cue on the box, so a test counts his smacks by their clicks.)
+  const onFrame = (f: Parameters<NonNullable<Parameters<typeof SpriteAnim>[0]["onFrame"]>>[0]) => {
+    const el = ref.current;
+    if (!el) return;
+    el.dataset.anim = HANG_SECTION.get(f) ?? "";
+    el.dataset.frame = String(DASH_HANG.anims.hangOn!.frames.indexOf(f));
+    el.dataset.cue = f.cue ?? "";
+  };
+  return createPortal(
+    <>
+      <div ref={ref} class="dash-hang" aria-hidden="true">
+        <SpriteAnim ch={DASH_HANG} anim="hangOn" since={at} sounds={bossKit("Dash")?.sounds ?? {}} id={`hang:${at}`} class="dash-lie-sprite" onFrame={onFrame} />
+      </div>
+      <span ref={sayRef} class="dash-say-at">
+        <VoiceBubble voice={bossVoice} class="bc-bubble dash-say" />
+      </span>
+    </>,
+    document.body,
   );
 }
 
@@ -253,10 +325,10 @@ const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "po
   // (His "Hang on" in the second pop-off's place, while he thinks: a line a beat, in order, each cutting in at once on the one
   // before (INTERRUPT: one CRITICAL line waits for another to end, which put "Sorry…" after his move). No kit moment: his runs in
   // place are its own.)
-  hangOn: { order: 1, view: hangOnMoment(["hangSlow"]), line: () => DASH_HANG_ON_LINES.start, priority: () => INTERRUPT },
-  hangOnFast: { order: 2, view: hangOnMoment(["hangFast"]), line: () => DASH_HANG_ON_LINES.cheetah, priority: () => INTERRUPT },
-  hangOnAlmost: { order: 3, view: hangOnMoment(null), line: () => DASH_HANG_ON_LINES.almost, priority: () => INTERRUPT },
-  hangOnSorry: { order: 4, view: hangOnMoment(["hangWind", "hangSorry"]), lineAt: hangOnTimeline().sorryAt - hangOnTimeline().windAt, line: () => DASH_HANG_ON_LINES.sorry, priority: () => INTERRUPT },
+  hangOn: { order: 1, view: hangOnMoment, line: () => DASH_HANG_ON_LINES.start, priority: () => INTERRUPT },
+  hangOnFast: { order: 2, view: hangOnMoment, line: () => DASH_HANG_ON_LINES.cheetah, priority: () => INTERRUPT },
+  hangOnAlmost: { order: 3, view: hangOnMoment, line: () => DASH_HANG_ON_LINES.almost, priority: () => INTERRUPT },
+  hangOnSorry: { order: 4, view: hangOnMoment, lineAt: hangOnTimeline().sorryAt - hangOnTimeline().windAt, line: () => DASH_HANG_ON_LINES.sorry, priority: () => INTERRUPT },
   // (His Scramble Rush a turn ahead, as any ultimate's warning: RAGE!, "Next turn: Scramble Rush", his clock held up, his line.)
   rushWarn: { order: 1, kit: "ultimateWarn", view: (p) => rageWarn(p, "Scramble Rush", undefined, true), line: (_kit, m) => lineOf(DASH_RUSH_LINES.warn, m.key) },
   rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },

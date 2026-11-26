@@ -711,7 +711,7 @@ const streak = (x: number, y: number, len: number, dir: number): Speck[] =>
 /** Speed lines across him as he zips in, starting at x0 and running off to the right. */
 const zip = (x0: number, ys: readonly number[]): Speck[] => ys.flatMap((y, i) => streak(x0 + (i % 3) * 3, y, 20 + (i % 2) * 8, 1));
 /** The big slap's sparks off the button (clock at its place, the body down dy): `t` 0 the burst, 1 spread. */
-const bigClick = (dy: number, t: number, ox = 0): Speck[] => {
+export const bigClick = (dy: number, t: number, ox = 0): Speck[] => {
   const cx = 24 + ox;
   const cy = 53 + dy;
   const rays: Pt[] = [[-1, -1], [1, -1], [0, -1], [-1.6, -0.3], [1.6, -0.3]];

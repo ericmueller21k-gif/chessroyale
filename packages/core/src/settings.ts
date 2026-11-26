@@ -2468,27 +2468,33 @@ export const DASH_STALL = {
  * Dash's "Hang on" (Eric, Nov 26: "instead of doing [the pop-off] again, he does this"; docs/decisions/2026-11-26-dash-hang-on.md),
  * on dashPopOff's second turn in place of the second pop-off. Presentation only ("whatever's easiest, so it doesn't actually mess
  * with the game"): your move is played and confirmed as ever, and while he thinks after it the screen shows (ms from its start):
- * "Hang on, one second." and slow smacks of his clock speeding up (`slowFrom` ms a smack down to `slowTo`, `slowMs` in all), your
- * piece slid back to its square at `backAt` and your clock ticking down (a display only: nobody's clock runs while he thinks);
- * "Time for cheetah speed!" and super fast smacks (`hitMs` a smack), head up and mouth open, `fastMs` long, "Almost done, bro."
- * `almostMs` into them; the wind-up on the clock's front (`windMs`); "Sorry about that, bro. Here's your time back." with your
- * clock counting back up to its real value (`countUpMs`, in `sorryMs`); your piece sliding to its played square (`returnMs`); then
- * his move. His thinking waits for all of it and `tailMs` more (a late frame or a slow connection never cuts its end), solo and
- * online alike (popOffMs; hangOnTimeline in packages/chess/src/bosses/dash.ts). 12.6 s from your move to his, and the margin.
+ * "Hang on, one second." and his jump from his spot onto the board's middle, his clock with him (`jumpMs`; round 2, Eric: "he should
+ * jump onto the middle of the board when he does it"); slow smacks of his clock from over his head, speeding up (`slowFrom` ms a
+ * smack down to `slowTo`, to `slowMs` from the start), your piece slid back to its square at `backAt` and your clock ticking down (a
+ * display only: nobody's clock runs while he thinks); "Time for cheetah speed!" and his fastest smacks of all (`hitMs` a smack:
+ * under every other smack of his, Eric: "a ridiculous speed"), head thrown back with his mouth pointed up, `fastMs` long (round 2:
+ * 3000 → 6000, Eric: "it felt sort of like it went too quick"), "Almost done, bro." `almostMs` into them; the wind-up on the clock's
+ * front (`windMs`); "Sorry about that, bro. Here's your time back." with your clock counting back up to its real value (`countUpMs`,
+ * in `sorryMs`); his zip back to his spot as your piece slides to its played square (`returnMs`); then his move. His thinking waits
+ * for all of it and `tailMs` more (a late frame or a slow connection never cuts its end), solo and online alike (popOffMs;
+ * hangOnTimeline in packages/chess/src/bosses/dash.ts). 15.6 s from your move to his (round 1: 12.6), and the margin. His size on the
+ * board: `boardShare` of the board's height (never past the screen's edge).
  */
 export const DASH_HANG_ON = {
   backAt: 450,
+  jumpMs: 600,
   slowMs: 6200,
   slowFrom: 900,
   slowTo: 180,
-  fastMs: 3000,
-  almostMs: 1800,
-  hitMs: 80,
+  fastMs: 6000,
+  almostMs: 4200,
+  hitMs: 44,
   windMs: 900,
   sorryMs: 2000,
   countUpMs: 1200,
   returnMs: 500,
   tailMs: 300,
+  boardShare: 0.5,
 } as const;
 
 /**

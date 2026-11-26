@@ -282,13 +282,14 @@ export const popOffMs = (boss: PopOffBoss): number =>
 
 /**
  * His "Hang on" (Eric, Nov 26; DASH_HANG_ON), ms from its start (his thinking screen's, as the device first sees it):
- *   0          "Hang on, one second.", his slow smacks begin (`hangOn`)
+ *   0          "Hang on, one second.", his jump from his spot onto the board's middle (`hangOn`)
  *   backAt     your piece slides back to its square; your clock (shown) ticks down from here
+ *   landAt     he lands on the board's middle; his slow smacks begin
  *   cheetahAt  "Time for cheetah speed!": the super fast smacks, head up (`hangOnFast`)
  *   almostAt   "Almost done, bro." (`hangOnAlmost`), the smacks going on
  *   windAt     the wind-up on the clock's front (`hangOnSorry`)
  *   sorryAt    "Sorry about that, bro. Here's your time back.": your clock (shown) counts back up, done by upAt
- *   returnAt   your piece slides to its played square
+ *   returnAt   your piece slides to its played square, and he zips back to his spot
  *   total      his move (his thinking waits for it, and DASH_HANG_ON.tailMs more: popOffMs)
  * `beats`: each time the screen first shows something new by the clock alone (in order).
  */
@@ -299,7 +300,7 @@ export function hangOnTimeline(s: typeof DASH_HANG_ON = DASH_HANG_ON) {
   const sorryAt = windAt + s.windMs;
   const returnAt = sorryAt + s.sorryMs;
   const total = returnAt + s.returnMs;
-  return { backAt: s.backAt, cheetahAt, almostAt, windAt, sorryAt, upAt: sorryAt + s.countUpMs, returnAt, total, beats: [0, s.backAt, cheetahAt, almostAt, windAt, sorryAt, returnAt] };
+  return { backAt: s.backAt, landAt: s.jumpMs, cheetahAt, almostAt, windAt, sorryAt, upAt: sorryAt + s.countUpMs, returnAt, total, beats: [0, s.backAt, s.jumpMs, cheetahAt, almostAt, windAt, sorryAt, returnAt] };
 }
 
 /**

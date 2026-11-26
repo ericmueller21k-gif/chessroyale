@@ -57,7 +57,7 @@ describe("Dash's wiring", () => {
     expect(kit.ch).toBe(DASH_FIGURE);
     // (Every animation as drawn but his quiet rest loops and his capture (Dash v2, below), and his clock fits added.)
     for (const [name, a] of Object.entries(BOSS_BLITZ.anims)) if (!["idle", "thinking", "rattled", "capture"].includes(name)) expect(DASH_FIGURE.anims[name], name).toBe(a);
-    expect(Object.keys(DASH_FIGURE.anims).sort()).toEqual([...Object.keys(BOSS_BLITZ.anims), "fit3", "fit4", "fit5", "fit10", "hangSlow", "hangFast", "hangWind", "hangSorry"].sort());
+    expect(Object.keys(DASH_FIGURE.anims).sort()).toEqual([...Object.keys(BOSS_BLITZ.anims), "fit3", "fit4", "fit5", "fit10"].sort());
     expect(DASH_FIGURE.w).toBe(BOSS_BLITZ.w + DASH_ROOM);
     expect(DASH_FIGURE.foot).toEqual(BOSS_BLITZ.foot);
     expect([DASH_FIGURE.name, sidekickBlitz.name, TOKEN_ART.dash!.name]).toEqual(["Dash", "Tick", "Dash token"]);

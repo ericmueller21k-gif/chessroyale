@@ -103,6 +103,10 @@ describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before
     expect(BOSS_POWERS.dashPopOff.hitMs).toBeLessThan(BOSS_POWERS.dashClockFit.smackMs);
   });
 
+  it("cheetah speed is his fastest smack of all (Eric, Nov 26: \"a ridiculous speed\"): quicker than the pop-off's, the multi-hit's and the Rush's, and the gag's own slow ones", () => {
+    expect(DASH_HANG_ON.hitMs).toBeLessThan(Math.min(BOSS_POWERS.dashPopOff.hitMs, BOSS_POWERS.dashClockFit.smackMs, DASH_HANG_ON.slowTo));
+  });
+
   it("holds his thinking only while he thinks after your move of the turn it comes, both beats (popOffMs), and never for another boss", () => {
     const at = 9;
     // (While he thinks after your move: your move counted, crowdMoves the turn.)
@@ -131,14 +135,18 @@ describe("Dash's \"Hang on\" (Eric, Nov 26: in the second pop-off's place; scree
     expect(popOffMs({ ...hang, crowdMoves: at + 1, powers: { ...hang.powers, turn: at + 1 } })).toBe(0);
   });
 
-  it("its beats in Eric's order and about his times: 12 s or so in all, cheetah speed 6 to 8 s in, the piece back early and home last", () => {
+  it("its beats in Eric's order and about his times: a few seconds more than round 1's 12.6 s, mostly cheetah speed, 6 to 8 s in; the piece back early and home last", () => {
     const tl = hangOnTimeline();
-    expect(tl.beats).toEqual([0, tl.backAt, tl.cheetahAt, tl.almostAt, tl.windAt, tl.sorryAt, tl.returnAt]);
+    expect(tl.beats).toEqual([0, tl.backAt, tl.landAt, tl.cheetahAt, tl.almostAt, tl.windAt, tl.sorryAt, tl.returnAt]);
     for (let i = 1; i < tl.beats.length; i++) expect(tl.beats[i]!).toBeGreaterThan(tl.beats[i - 1]!);
     expect(tl.cheetahAt).toBeGreaterThanOrEqual(6000);
     expect(tl.cheetahAt).toBeLessThanOrEqual(8000);
-    expect(tl.total).toBeGreaterThanOrEqual(11_000);
-    expect(tl.total).toBeLessThanOrEqual(14_000);
+    // (Round 2, Eric: "the whole thing should have lasted like a few more seconds": 2 to 4 s more, most of it cheetah speed.)
+    expect(tl.total).toBeGreaterThanOrEqual(12_600 + 2000);
+    expect(tl.total).toBeLessThanOrEqual(12_600 + 4000);
+    expect(tl.windAt - tl.cheetahAt).toBeGreaterThanOrEqual(5000);
+    // (He lands on the board's middle within the first second, before his first smack.)
+    expect(tl.landAt).toBeLessThan(1000);
     expect(tl.backAt).toBeLessThan(1000);
     expect(tl.upAt).toBeLessThanOrEqual(tl.returnAt);
     expect(tl.total - tl.returnAt).toBe(DASH_HANG_ON.returnMs);
