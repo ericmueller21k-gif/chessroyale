@@ -2155,3 +2155,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: main 92320601 GREEN + LIVE (vote fill, payment drafts).
 - Nov 26 01:10 UTC: boss-frame r1 done but raid unfixed (message landed after) → helper on r2 now. pay-storage (PR 5, xhigh) STARTED session_01JuCWRt7vwPGEjwESVxP8JH (3 Opus briefly: my miscount). PR 4 starts when two of coin-strip/boss-frame finish.
 - Nov 26: pay-coin-strip (PR 3 + no-empty-quest-rows) → PR #962 (38c524c8) CI. Helper archived. Follow-up: boss result zoom 0.69 at 1280x600 (5 px words). Running Opus: boss-frame r2, pay-storage. PR 4 boost starts after boss-frame.
+- Nov 26 01:33 UTC: PR 5 storage → #963 (b9750f26, full-e2e label) CI; independent review session_01JuCWRvDQ9JJUe49pnPJJGk (xhigh, review/pay-storage). Builder archived. Running Opus: boss-frame r2 (high), PR 5 review (xhigh). PR 4 boost starts when boss-frame done.
