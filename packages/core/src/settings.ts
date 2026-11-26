@@ -3951,6 +3951,40 @@ export const SHOP = {
 };
 
 /**
+ * Buying coins (Eric, Nov 17-18: "Everything costs coins even the packs, so you can earn coins to buy them"; refunds "hassle free";
+ * the payments design, docs/decisions/2026-11-17-payments-design.md; its storage, PR 5: docs/decisions/2026-11-26-purchases-storage.md,
+ * core's payments.ts, server purchases.ts, docs/areas/payments.md). One coin on screen; only coin packs cost money (USD, 100 coins
+ * = $1). The server keeps bought coins apart (each purchase's unspent coins) and spends earned coins first. Nothing is sold yet:
+ * Stripe comes with the design's PR 8.
+ */
+export const PAYMENTS = {
+  /**
+   * The coin packs (Eric's OK, Nov 17): `cents` is the price before tax (Stripe Tax adds it where we're registered), `coins` what it
+   * credits. A purchase stores its pack's coins and cents as they were at checkout, so changing a pack here never changes one made.
+   */
+  packs: [
+    { id: "coins-200", coins: 200, cents: 199 },
+    { id: "coins-520", coins: 520, cents: 499 },
+    { id: "coins-1100", coins: 1100, cents: 999 },
+    { id: "coins-2300", coins: 2300, cents: 1999 },
+    { id: "coins-6000", coins: 6000, cents: 4999 },
+  ] as readonly { id: string; coins: number; cents: number }[],
+  /** The one currency (Stripe's code). A paid session in any other is never credited. */
+  currency: "usd",
+  /** A purchase's unspent coins can be refunded for this many days after it was paid (24-hour days from the payment). */
+  refundDays: 14,
+  /** A refund's optional comment (the refund message's box): at most this many characters, stored in `refunds.comment`. */
+  commentMax: 500,
+  /**
+   * A spend draws on at most this many purchases (core's spendPlan throws beyond it): its guard binds 3 values a draw and D1 allows
+   * 100 a statement (node:sqlite, in the tests, allows far more). Unreachable today: the dearest coin price is 400 and the smallest
+   * pack 200, so a spend draws on 3 at most. A price that could need more (above about 20 × 200 coins) needs the draws passed as one
+   * JSON value first (json_each, as locker.ts does).
+   */
+  maxDraws: 20,
+} as const;
+
+/**
  * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat
  * in matches" and "Lobby chat"). The server enforces the limits; the app mirrors them to gray out its buttons.
  */
