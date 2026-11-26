@@ -190,7 +190,9 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
   Access bypass missing, the endpoint down past Stripe's retries) greys a 16-17 buyer's month until it turns. At a Buy, and in the
   15-minute cron, ask Stripe about the account's (the cron: every) pending rows older than `checkoutMinutes`: expired →
   `expireCheckout`; complete and paid → `creditPurchase`. Counting them meanwhile is right (one may be paid with its event late).
-  **The pause:** check `isPaused(env, "payments")` before making a Stripe session at all, and pass it to `recordCheckout`. A
+  **The pause:** check `isPaused(env, "payments")` before making a Stripe session at all, and pass it to `recordCheckout` (make its
+  `paused` argument required then, so the typecheck forces it). The webhook and the return check never consult `PAUSE_PAYMENTS`: a
+  session already paid is credited while paused only because `creditPurchase` takes no pause. A
   `recordCheckout` refused as ended ("That checkout has ended."): make a new session, never send the old one.
 - **For PR 9:** the sign-in refusal for a closed account (a TODO in `api.ts`, where a ban refuses sign-in; `BUY_LINES.closed`); call
   `holdCount` in every refund's batch and a chargeback's (chargebacks + 1 beside it; the 2nd closes the account). Closing an account or

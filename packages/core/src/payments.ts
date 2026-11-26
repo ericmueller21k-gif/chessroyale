@@ -146,8 +146,9 @@ export function buyMonthStart(t: number): number {
 export const dollars = (cents: number): string => (cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
 /**
- * Every line a player can see about buying, in one place (the design's section 9 for the first four, section 1 for the pause's, section 3
- * for a hold's, section 4 for closed). A Buy that can't be bought shows greyed with its line, and a tap shows it (Eric, Nov 18: "just gray
+ * Every line a player sees about buying in normal play, in one place (the design's section 9 for the first four, section 1 for the
+ * pause's, section 3 for a hold's, section 4 for closed; two of recordCheckout's refusals, another account's checkout or another
+ * pack's, come only from a server bug and are written there). A Buy that can't be bought shows greyed with its line, and a tap shows it (Eric, Nov 18: "just gray
  * it out ... you can still click it").
  */
 export const BUY_LINES = {

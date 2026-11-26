@@ -157,14 +157,15 @@ describe("refundable: unspent coins of purchases paid in the last 14 days, never
  * (stored, guarded, the API): packages/server/test/who-buys.test.ts.
  */
 describe("who may buy: the age band", () => {
-  // (Noon UTC: the same day in every time zone the tests may run in; the device counts by its own.)
-  const nov26 = new Date(Date.UTC(2026, 10, 26, 12));
+  // (Local noon: the device counts by its own date, so each date is the intended day in whatever time zone the tests run in; noon UTC
+  // was the next day east of UTC+12. Delta review, n1.)
+  const nov26 = new Date(2026, 10, 26, 12);
   it("counts the birth month as not yet complete: 16 from the 1st of the month after the one you turn 16 in, 18 likewise", () => {
     expect([PAYMENTS.buyers.minAge, PAYMENTS.buyers.adultAge]).toEqual([16, 18]);
     expect(buyBandOf(12, 2010, nov26)).toBe("under-16"); // 15 years 11 months
     // (Born in November 2010: 16 sometime this month, maybe not yet (born the 30th, 15 until then). Not 16 until December 1.)
     expect(buyBandOf(11, 2010, nov26)).toBe("under-16"); // 16 exactly, by month
-    expect(buyBandOf(11, 2010, new Date(Date.UTC(2026, 11, 1, 12)))).toBe("16-17");
+    expect(buyBandOf(11, 2010, new Date(2026, 11, 1, 12))).toBe("16-17");
     expect(buyBandOf(10, 2010, nov26)).toBe("16-17"); // 16 years 1 month
     expect(buyBandOf(12, 2008, nov26)).toBe("16-17"); // 17 years 11 months
     expect(buyBandOf(11, 2008, nov26)).toBe("16-17"); // 18 exactly, by month
@@ -172,11 +173,11 @@ describe("who may buy: the age band", () => {
     expect(buyBandOf(1, 1970, nov26)).toBe("18+");
     expect(buyBandOf(5, 2020, nov26)).toBe("under-16");
     // (Across the turn of the year: born December 2010, 16 from January 1, 2027; born January 2011, from February 1.)
-    expect(buyBandOf(12, 2010, new Date(Date.UTC(2026, 11, 31, 12)))).toBe("under-16");
-    expect(buyBandOf(12, 2010, new Date(Date.UTC(2027, 0, 1, 12)))).toBe("16-17");
-    expect(buyBandOf(1, 2011, new Date(Date.UTC(2027, 0, 1, 12)))).toBe("under-16");
-    expect(buyBandOf(1, 2011, new Date(Date.UTC(2027, 0, 31, 12)))).toBe("under-16");
-    expect(buyBandOf(1, 2011, new Date(Date.UTC(2027, 1, 1, 12)))).toBe("16-17");
+    expect(buyBandOf(12, 2010, new Date(2026, 11, 31, 12))).toBe("under-16");
+    expect(buyBandOf(12, 2010, new Date(2027, 0, 1, 12))).toBe("16-17");
+    expect(buyBandOf(1, 2011, new Date(2027, 0, 1, 12))).toBe("under-16");
+    expect(buyBandOf(1, 2011, new Date(2027, 0, 31, 12))).toBe("under-16");
+    expect(buyBandOf(1, 2011, new Date(2027, 1, 1, 12))).toBe("16-17");
     expect(BUY_BANDS).toEqual(["under-16", "16-17", "18+"]);
     expect([isBuyBand("18+"), isBuyBand("18"), isBuyBand(null)]).toEqual([true, false, false]);
   });

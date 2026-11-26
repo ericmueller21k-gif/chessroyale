@@ -10,8 +10,8 @@ checkout calls `recordCheckout`. Calls made in building it (for the director's r
    The server reads the account as stored (never a session's view of it) and answers it (`buyStatus`, `GET /api/buy`): an account-wide
    `line`, `askBand`, `held`, `leftCents`, and each pack with its own line. PR 7 renders it as it is.
 2. **The order of refusals:** a guest, paused (call 12), closed, held, the country, then under 16, then the 16-17 cap per pack. The
-   band is asked only when nothing before it refuses, so no age is taken from someone who couldn't buy anyway (a guest, held, closed,
-   abroad).
+   band is asked only when nothing before it refuses, so no age is taken from someone who couldn't buy anyway (a guest, paused, held,
+   closed, abroad).
 3. **The band** (`users.buy_band`: `under-16`, `16-17`, `18+`; `buy_band_at`): worked out on the device from a birth month and year,
    the birth month itself counted as not yet complete (core's `buyBandOf`; the review's M1, the director's call): 16 starts on the
    1st of the month after the 16th-birthday month, 18 likewise, so a truthful answer never lets a 15-year-old buy or a 17-year-old skip
