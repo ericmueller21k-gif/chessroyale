@@ -1,0 +1,6 @@
+# The 50 v 50's vote cards fill upward (Nov 26, 2026)
+
+- Eric: "what if they stayed that long height but instead of a left to right meter they start from the bottom and 'fill' upward the container as votes come in".
+- Each vote card keeps its box; the bar is gone; a fill (the bar's color at 40%, 42% on the dark card; the director, Nov 26: 24% read as pale beige, and no top edge) rises from its foot to votes / all votes of its height (`.vote-card-fill`, a `translateY` transition, no layout per frame; none with reduced motion). Contrast over the fill: the count 10.9:1 light, 5.1:1 dark; the blurb a step darker (light: `--text` 40% into `--muted`, 5.4:1 over the fill) or `--text` on the dark card (5.1:1), at least muted-on-white's 5.0:1. Dark stops at 42%, not 45–50%: past that the blurb drops under 5:1. The phone's cards are the same component, so they fill too.
+- Call: votes / total, not / the leader's: it is each option's share, the old bar's rule; one early vote doesn't fill a card, and the leader isn't always full.
+- The first-time hint "Drag your pawn into a zone to vote" moved from above the zones (it covered the middle zone's name tag) to just under them, pointing up, everywhere.
