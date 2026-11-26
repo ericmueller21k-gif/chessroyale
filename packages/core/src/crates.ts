@@ -15,13 +15,16 @@ import { OUTFIT } from "./settings.ts";
 
 export type ItemTier = "common" | "uncommon" | "rare" | "epic" | "legendary" | "mythic";
 
-export const TIERS: readonly { id: ItemTier; name: string; color: string }[] = [
+/** The frame a rarer item's tile wears (Eric, Nov 12: "a nice clean like gold border or like diamond border"): Legendary gold, Mythic diamond. */
+export type TierFrame = "gold" | "diamond";
+
+export const TIERS: readonly { id: ItemTier; name: string; color: string; frame?: TierFrame }[] = [
   { id: "common", name: "Common", color: "#9ca3af" },
   { id: "uncommon", name: "Uncommon", color: "#4ade80" },
   { id: "rare", name: "Rare", color: "#60a5fa" },
   { id: "epic", name: "Epic", color: "#c084fc" },
-  { id: "legendary", name: "Legendary", color: "#fbbf24" },
-  { id: "mythic", name: "Mythic", color: "#f43f5e" },
+  { id: "legendary", name: "Legendary", color: "#fbbf24", frame: "gold" },
+  { id: "mythic", name: "Mythic", color: "#f43f5e", frame: "diamond" },
 ];
 
 export const tierInfo = (id: ItemTier) => TIERS.find((t) => t.id === id)!;

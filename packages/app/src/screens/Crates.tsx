@@ -65,6 +65,7 @@ import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestIt
 import { TokenArt } from "../components/TokenArt.tsx";
 import { Avatar, BetaCrateArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, TranscendentArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
+import { ItemPreview, frameClass } from "../components/ItemPreview.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { crateSoundsReady, play, unlockAudio, warmCrateSounds } from "../sound.ts";
@@ -568,6 +569,10 @@ function AdminGrants() {
   );
 }
 
+/** How a crate page draws its items (each its own look, the same every time): red, emerald second; a Welcome Crate's in HunChess colors. */
+const LIST_FINISH = { color: "red", color2: "emerald", blemish: 12, seed: 1 };
+const WELCOME_FINISH = { ...HUNCHESS_FINISH, seed: 1 };
+
 function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
   // A boss crate opens only one you hold (the server's, once each), never with a test switch; a series crate one you hold, with a key.
   const boss = isBossCrate(crate) ? crate : null;
@@ -605,8 +610,11 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   const look = CRATE_LOOKS[crate.look];
   // Commonest first; Legendary and Mythic (Fischer Random) last.
   const items = [...crate.items].sort((a, b) => tierIndex(a) - tierIndex(b));
+  // (A tap on an item opens its preview: a pawn wearing or riding it, Eric, Nov 12.)
+  const [preview, setPreview] = useState<string | null>(null);
   return (
     <div class="crate-page">
+      {preview && <ItemPreview def={preview} finish={LIST_FINISH} onClose={() => setPreview(null)} />}
       {/* (The opening on its own layer over this page, which stays as it is under it: Nov 24.) */}
       {opening && (
         <CrateOpening
@@ -688,9 +696,20 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           const t = tierInfo(d.tier);
           const special = d.tier === "legendary" || d.tier === "mythic";
           return (
-            <div key={def} class="odds-row" style={{ "--tier": t.color }}>
+            <button
+              type="button"
+              key={def}
+              class={`odds-row item-row${frameClass(def)}`}
+              data-item={def}
+              aria-haspopup="dialog"
+              style={{ "--tier": t.color }}
+              onClick={() => {
+                play("menuOpen");
+                setPreview(def);
+              }}
+            >
               <span class="odds-art">
-                <ItemArt def={def} finish={{ color: "red", color2: "emerald", blemish: 12, seed: 1 }} />
+                <ItemArt def={def} finish={LIST_FINISH} />
               </span>
               <span class="odds-text">
                 <strong>{d.name}</strong>
@@ -700,7 +719,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
                 </span>
               </span>
               <span class="odds-pct">{pct(itemChance(crate, def))}</span>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -762,9 +781,11 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
  */
 function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Unseen; onBack: () => void }) {
   const [opening, setOpening] = useState(!!resume);
+  const [preview, setPreview] = useState<string | null>(null);
   useEffect(() => warmCrateSounds(), []);
   return (
     <div class="crate-page welcome-page">
+      {preview && <ItemPreview def={preview} finish={WELCOME_FINISH} onClose={() => setPreview(null)} />}
       {opening && <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />}
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
@@ -797,16 +818,27 @@ function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Un
         {WELCOME_CRATE.items.map((def) => {
           const d = itemDef(def)!;
           return (
-            <div key={def} class="odds-row" style={{ "--tier": "#f2c14e" }}>
+            <button
+              type="button"
+              key={def}
+              class={`odds-row item-row${frameClass(def)}`}
+              data-item={def}
+              aria-haspopup="dialog"
+              style={{ "--tier": "#f2c14e" }}
+              onClick={() => {
+                play("menuOpen");
+                setPreview(def);
+              }}
+            >
               <span class="odds-art">
-                <ItemArt def={def} finish={{ ...HUNCHESS_FINISH, seed: 1 }} />
+                <ItemArt def={def} finish={WELCOME_FINISH} />
               </span>
               <span class="odds-text">
                 <strong>{d.name}</strong>
                 <span class="odds-tier">Ride · HunChess gold & black</span>
               </span>
               <span class="odds-pct">{pct(1 / WELCOME_CRATE.items.length)}</span>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -1343,7 +1375,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
             return (
               <HoldButton
                 key={s.key}
-                class={`locker-item${worn ? " worn" : ""}${covered ? " covered" : ""}${!hc && isShiny(it.blemish) ? " shiny" : ""}${hc ? " hunchess-item" : ""}`}
+                class={`locker-item${worn ? " worn" : ""}${covered ? " covered" : ""}${!hc && isShiny(it.blemish) ? " shiny" : ""}${hc ? " hunchess-item" : ""}${frameClass(it.def)}`}
                 style={{ "--tier": tierInfo(d.tier).color }}
                 label={`${itemName(it)}${covered ? ", hidden by your outfit" : ""}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
                 onTap={() => {

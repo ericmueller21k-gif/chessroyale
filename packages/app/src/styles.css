@@ -8928,6 +8928,92 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
 .ff-button.danger {
   background: linear-gradient(180deg, #d63939 0%, #9b1c1c 60%, #5f0f0f 100%);
 }
+/* Rarer items' tile frames (Eric, Nov 12: "a nice clean like gold border or like diamond border"; ItemPreview.tsx frameClass):
+   Legendary gold, Mythic diamond, Common to Epic none. A 3 px ring drawn just inside the tile's own border (::after, a masked
+   gradient, no animation), the border in the frame's edge color; the tile's tier stripe stays. Nothing moves: no size changes. */
+.tier-frame {
+  position: relative;
+  --frame-edge: #a8790a;
+  --frame: linear-gradient(135deg, #fff4b8 0%, #e0b33a 22%, #9a6d08 42%, #f7dc7a 60%, #b8860b 80%, #ffe89a 100%);
+}
+.tier-frame.diamond {
+  --frame-edge: #3d9fd6;
+  --frame: linear-gradient(135deg, #ffffff 0%, #8fdcff 18%, #2f8fd0 36%, #e6f9ff 52%, #5cc0f0 70%, #1f78b8 85%, #c9f0ff 100%);
+}
+.tier-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--frame);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.locker-item.tier-frame:not(.worn) {
+  border-color: var(--frame-edge);
+  border-bottom-color: var(--tier);
+}
+.odds-row.tier-frame {
+  border-color: var(--frame-edge);
+  border-left-color: var(--tier);
+}
+/* A crate page's item is a button (a tap opens its preview): the row's look, as before. */
+.odds-row.item-row {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.odds-row.item-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* The item preview (Eric, Nov 12): the locker dialog's box, a plain pawn wearing or riding the item, its name, tier and slot. */
+.item-preview {
+  gap: 8px;
+  width: min(300px, 100%);
+}
+.item-preview.tier-frame {
+  border-color: var(--frame-edge);
+}
+.item-preview.tier-frame::after {
+  border-radius: 5px;
+}
+.item-preview-pawn {
+  display: block;
+  width: 168px;
+  height: 168px;
+  border-radius: 12px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tier) 30%, transparent) 0%, transparent 70%);
+}
+.item-preview strong {
+  font-size: 18px;
+  line-height: 1.2;
+}
+.item-preview-tier {
+  font-size: 13px;
+  font-weight: 700;
+}
+.item-preview-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 6px;
+  color: #0b1020;
+  font-weight: 900;
+}
+.item-preview .ff-button {
+  justify-self: stretch;
+  margin-top: 4px;
+}
 /* A shiny item's shine rolls across it: slowly over, then a pause. */
 .item-shine {
   mix-blend-mode: screen;
