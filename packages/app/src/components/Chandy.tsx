@@ -16,12 +16,25 @@
  *   rage meter dimmed until the fifth ("Rage: unlocks at 5 upgrades").
  * - **Dodge** (as your turn begins): ChandyDodge over the board, built from the shared state and the battle's clock (dodgeView): the
  *   scope-in, the warning volley, three rounds of vote and beams; the first hit cracks your king, the second is the kill.
+ * - **Dodge from your mate** (Eric, Nov 26; the state's `dodge.mate`, the run's `at` its start; dodgeTimeline's `opening` and `win`):
+ *   first his opening over the board as it is, step by step: the pause on your move; his jump onto the board and collapse, his reach
+ *   for your king, the zap (his figure's poses for now: the characters' job draws them, fitting the timeline); his line in his speech
+ *   box (CHANDY_MATE_LINES). Then the Dodge; survived, the win beat: your mate back on the board, "CHECKMATE!" (the hero banner).
  */
-import { CHANDY_FIRE_AT, CHANDY_FX, dodgeTimeline, linesAfter, pieceAt, withPiece, type ChandyView } from "@chessroyale/chess";
-import { BOSS_POWERS, type ChandyMove, type DodgeLine } from "@chessroyale/core";
+import { CHANDY_FIRE_AT, CHANDY_FX, MATE_STEPS, dodgeTimeline, linesAfter, pieceAt, withPiece, type ChandyView, type MateStep } from "@chessroyale/chess";
+import { BOSS_POWERS, SPEECH, bossInText, type ChandyMove, type DodgeLine } from "@chessroyale/core";
 import type { BossView, DodgeRun } from "../game.ts";
 import { BoardEffects, onEachFrame, prewarm, prewarmAnims, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
-import { CHANDY, CHANDY_BAR, CHANDY_CLONE, CHANDY_RIFLE } from "../characters/chandy.ts";
+import { CHANDY, CHANDY_BAR, CHANDY_CLONE, CHANDY_RIFLE, chandyAnim, type RifleStage } from "../characters/chandy.ts";
+import { CHANDY_MATE_LINES } from "../characters/chandy-lines.ts";
+import { useEffect, useLayoutEffect } from "preact/hooks";
+import { CRITICAL, Say, bossVoice } from "../speech.tsx";
+import { kingVoice } from "../godKing.ts";
+import { pacedLine } from "../paced-line.ts";
+import { FightBanner } from "./FightBanner.tsx";
+import { GodKingPortrait } from "./GodKing.tsx";
+import { playInPlace } from "./BossCharacter.tsx";
+
 import { spriteCanvas } from "../characters/sprite-kit.ts";
 import { EFFECTS, type EffectName } from "../characters/power-art.ts";
 import { ChandyDodge, type DodgeView } from "./ChandyDodge.tsx";
@@ -45,6 +58,8 @@ const PIECES: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r:
 
 /** When his shot fires in a move's moment (ms): his `fire` animation's cue (characters/chandy.ts: 520 ms in; the banners' window). */
 export const FIRE_AT = CHANDY_FIRE_AT;
+/** His line at the opening's `line` step: Eric's pick, its two sentences typed in turn at SPEECH's pace. */
+export const MATE_LINE = pacedLine(CHANDY_MATE_LINES[0], { ...SPEECH, sentencePauseMs: BOSS_POWERS.chandy.mateLinePauseMs });
 /** His point's lock cue (the crosshair snaps on). */
 const POINT_AT = 120;
 /** The rounds of rapid fire, this far apart (ms). */
@@ -306,6 +321,12 @@ export function dodgeView(boss: BossView, run: DodgeRun, now: number, onPick?: (
   const tl = dodgeTimeline();
   const t = now - run.at;
   const base = { side, king: d.king, center: d.center, hits: 0 } as const;
+  // A mate's opening, before the Dodge's start (the board as it is): its step now. And after a survived one, the win beat.
+  if (d.mate && t < 0) {
+    const step: MateStep = MATE_STEPS.find((k) => t < tl.opening[k].end) ?? "line";
+    return { ...base, phase: "mate", step, since: run.at + tl.opening[step].at, lines: [], round: 1 };
+  }
+  if (d.mate && t >= tl.win.at && d.results.length >= d.rounds.length && d.results.filter((r) => r.hit).length < S.dodgeHits) return { ...base, phase: "win", since: run.at + tl.win.at, lines: [], round: 3 };
   if (t < tl.slideAt) return { ...base, phase: "scope", since: run.at, lines: [], round: 1 };
   if (t < tl.volley.at) return { ...base, phase: "slide", since: run.at + tl.slideAt, lines: [], round: 1 };
   // The warning volley: the clones on lines that miss your king fire once; no vote.
@@ -367,16 +388,48 @@ export function dodgeView(boss: BossView, run: DodgeRun, now: number, onPick?: (
   return { ...kept, phase: "result", since: killAt, lines, placed, round: roundNo, beams, result: result.hit ? "hit" : "dodged" };
 }
 
-/** Dodge over the board while it runs (the board under it shows the position, its king taken off: dodgeFen). */
+/** His figure's poses for a mate's opening steps until their art lands (the characters' job): the collapse, the reach, the zap. */
+const MATE_POSES: Partial<Record<MateStep, string>> = { jump: "stow", reach: "point", zap: "fire" };
+
+/**
+ * Dodge over the board while it runs (the board under it shows the position, its king taken off: dodgeFen). A mate's opening: his
+ * figure's pose for each step, from the step's start (a redraw carries it on), and his line, said once as its step comes; the win beat:
+ * "CHECKMATE!", the God King's hero banner, for the beat's length.
+ */
 export function DodgeLayer({ boss, run, now, onPick }: { boss: BossView; run: DodgeRun; now: number; onPick: (square: string) => void }) {
   const view = dodgeView(boss, run, now, onPick);
-  return view ? <ChandyDodge view={view} /> : null;
+  const step = view?.phase === "mate" ? view.step : undefined;
+  const pose = step ? MATE_POSES[step] : undefined;
+  const stage = Math.max(0, Math.min(5, chandyOf(boss)?.upgrades ?? 0)) as RifleStage;
+  useLayoutEffect(() => {
+    if (pose && view) playInPlace(`${run.key}:mate:${step}`, [chandyAnim(pose, stage)], view.since);
+  }, [run.key, step]);
+  // (Your mate's opening: the God King quiet until the Dodge's own start. The line up as your mate lands is from your turn's start,
+  // stale now: "Guard the queen!" over Qxf7#, the director's still, Nov 26. Taken off the screen early: he speaks again.)
+  const opening = view?.phase === "mate";
+  useLayoutEffect(() => {
+    if (opening) kingVoice.hush(run.at);
+  }, [opening, run.at]);
+  useEffect(() => () => kingVoice.unhush(), []);
+  if (!view) return null;
+  const tl = dodgeTimeline();
+  return (
+    <>
+      <ChandyDodge view={view} />
+      {step === "line" && <Say voice={bossVoice} text={null} paced={MATE_LINE} sayKey={`${run.key}:mate-line`} priority={CRITICAL} />}
+      {view.phase === "win" && now < view.since + (tl.win.end - tl.win.at) && <FightBanner key={`${run.key}:win`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="CHECKMATE!" sub={`You beat ${bossInText(boss.name)}`} ms={tl.win.end - tl.win.at} />}
+    </>
+  );
 }
 
-/** The board under Dodge: your king off it from the scope-in (Dodge draws its own); the blank board covers the rest from `open`. */
-export function dodgeFen(boss: BossView, fen: string): string {
+/**
+ * The board under Dodge: your king off it from the scope-in (Dodge draws its own); the blank board covers the rest from `open`. A mate's
+ * opening and its win beat (`run` at `now`): the board as it is, your king on it.
+ */
+export function dodgeFen(boss: BossView, fen: string, run?: DodgeRun, now = Date.now()): string {
   const d = chandyOf(boss)?.dodge;
   if (!d) return fen;
+  if (d.mate && run && (now < run.at || now >= run.at + dodgeTimeline().win.at)) return fen;
   const parts = fen.split(" ");
   const rows = parts[0]!.split("/").map((row) => row.replace(/\d/g, (n) => ".".repeat(Number(n))).split(""));
   const f = d.king.charCodeAt(0) - 97;
@@ -391,6 +444,9 @@ export function dodgeDock(boss: BossView, run: DodgeRun, now: number): { line: s
   const v = dodgeView(boss, run, now);
   if (!v) return { line: "", sub: "" };
   const S = BOSS_POWERS.chandy;
+  // (A mate's opening: the mate held; the win beat: it stands.)
+  if (v.phase === "mate") return { line: "Checkmate?", sub: `${bossInText(boss.name, true)} isn't done yet.` };
+  if (v.phase === "win") return { line: "Checkmate!", sub: `You beat ${bossInText(boss.name)}.` };
   const left = S.dodgeHits - v.hits;
   const stake = left <= 1 ? "One more hit and the battle is his." : `${left === 2 ? "Two" : left} hits and the battle is his.`;
   if (v.phase === "vote") return { line: "Vote where your king stands", sub: `One square is safe. ${stake}` };

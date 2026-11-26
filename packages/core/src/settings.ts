@@ -2292,9 +2292,11 @@ export const BOSS_POWERS = {
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
    *   next turn begins. Eric, Nov 16: 1 (was 3): "It should come a turn later, he should say something about preparing yourself, and
-   *   then after you move it begins." **In danger** (Eric, Nov 26; BOSS_POWERS.dangerAt): the usual warning as if his meter were full,
-   *   his rifle whole or not, then Dodge. **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
-   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. First the warning volley
+   *   then after you move it begins." **Checkmated** (Eric, Nov 26: "he'll only do it if you put him in checkmate. And then instead of
+   *   the game ending right away, it pauses"; "it also triggers still from his 5 upgrades"): your move mates him and he hasn't used it:
+   *   the mate waits, his opening plays (the pause on your move `matePauseMs`, his jump onto the board and collapse `mateJumpMs`, his
+   *   reach for your king `mateReachMs`, the zap `mateZapMs`, his line `mateLineMs`), then Dodge; survive it and the mate stands: the
+   *   win beat (`mateWinMs`), then the battle is yours. First the warning volley
    *   (Eric, Nov 16: "an additional shot first that you can't move"): the clones fire once on lines that miss your king, no vote, then
    *   "Dodge the next one!" (`dodgeVolleyMs` in all, the clones aiming `dodgeAimMs` first). Then `dodgeRounds` rounds, each a
    *   `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
@@ -2342,6 +2344,14 @@ export const BOSS_POWERS = {
     dodgeShatterMs: 1000,
     dodgeBotHit: 0.6,
     dodgeAfterMoves: 1,
+    matePauseMs: 1000,
+    mateJumpMs: 1200,
+    mateReachMs: 800,
+    mateZapMs: 700,
+    mateLineMs: 2400,
+    /** His line's two sentences (CHANDY_MATE_LINES): the second starts typing this long after the first is typed (SPEECH's pace). */
+    mateLinePauseMs: 900,
+    mateWinMs: 2200,
   },
   /**
    * Birdie (Eric, Nov 23; packages/chess/src/bosses/birdie.ts; docs/decisions/2026-11-23-birdie-rules.md):

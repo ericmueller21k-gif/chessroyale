@@ -19,12 +19,12 @@ const hash = (s: string) => {
 const line = sanLineToUci(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5", "Bb3", "d6", "c3", "O-O"]);
 const library: Opening[] = Array.from({ length: 30 }, (_, i) => ({ id: `o${i}`, eco: "C88", name: `O${i}`, family: `F${i}`, unusual: false, moves: line, namedPlies: line.length, expected: Object.fromEntries(line.map((_, n) => [n, 0.5])) }));
 
-function chandyLobby(test: string) {
+function chandyLobby(test: string, extra: Partial<Settings> = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   /** Every message each person got, with the server's time it went out. */
   const log: { id: string; at: number; msg: Msg }[] = [];
-  const settings = { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...RAID_SETTINGS, lastStandFrom: 999, bossId: "chandy", bossUnfinished: true, bossStumbleBelow: 0, bossPowerTest: test } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...RAID_SETTINGS, lastStandFrom: 999, bossId: "chandy", bossUnfinished: true, bossStumbleBelow: 0, bossPowerTest: test, ...extra } as Settings;
   const send = (id: string, msg: unknown) => {
     inbox.set(id, [...(inbox.get(id) ?? []), msg as Msg]);
     log.push({ id, at: now, msg: msg as Msg });
@@ -71,9 +71,15 @@ function chandyLobby(test: string) {
     for (const id of ["p1", "p2"]) core.message(id, { t: "pick", key: last(id, "round")!.key, move: m });
     expect(hostScores()).toBe(true);
   };
+  /** The crowd plays `m` (everyone picks it), the host scoring it. */
+  const crowdPlaysMove = (m: string) => {
+    for (let i = 0; i < 20 && core.save().phase !== "play"; i++) advance(2_000);
+    for (const id of ["p1", "p2"]) core.message(id, { t: "pick", key: last(id, "round")!.key, move: m });
+    expect(hostScores()).toBe(true);
+  };
   advance(1000);
   advance(60_000);
-  return { core, log, advance, runner, hisTurn, crowdPlays, last, drop, now: () => now };
+  return { core, log, advance, runner, hisTurn, crowdPlays, crowdPlaysMove, last, drop, now: () => now };
 }
 
 /** A message's Dodge (the boss's, a round's or a reveal's view of it), or null. */
@@ -266,5 +272,59 @@ describe("Chandy online: the Lock-on Shot (the queen lock until Nov 24) and a ta
     L.core.message("p1", { t: "bossMove", key: req.key, move: "f6g4" });
     for (let i = 0; i < 100 && r.boards.get(id)!.fen.includes("6N1"); i++) L.advance(200);
     expect([r.boss!.powers!.chandy!.marked, r.boss!.powers!.chandy!.taught, r.boss!.powers!.chandy!.upgrades]).toEqual([2, true, 3]);
+  });
+});
+
+describe("Chandy online: Dodge from your mate (Eric, Nov 26)", () => {
+  /** ?win=1's mate in one (Qxf7#), then Dodge timed by the server: each round's vote, `pick(k, safe)` from everyone once it's open. */
+  function mateDodge(pick: (k: number, safe: string) => string) {
+    const L = chandyLobby("", { bossWinTest: true });
+    L.crowdPlaysMove("h5f7");
+    const rec = () => (L.core as unknown as { record: { dodge?: { key: string; at: number; round: number } } }).record.dodge;
+    // (Your mate held: the battle not decided, his Dodge set up from it.)
+    for (let i = 0; i < 100 && !rec(); i++) L.advance(100);
+    const full = L.runner().boss!.powers!.chandy!.dodge!;
+    expect(full.mate).toBe(true);
+    expect(L.runner().boss!.result).toBeUndefined();
+    const tl = dodgeTimeline();
+    const sentAt = L.log.filter((x) => x.msg.t === "boss" && "dodge" in x.msg && x.msg.dodge).at(0)!.at;
+    // (Its start after his opening: the message carries it.)
+    expect(rec()!.at - sentAt).toBe(tl.openingMs);
+    // (A vote in the opening is no vote.)
+    L.core.message("p1", { t: "dodgeVote", key: rec()!.key, round: 0, square: full.rounds[0]!.safe });
+    expect(L.core.save().dodge?.votes ?? {}).toEqual({});
+    let end = 0;
+    let decided = 0;
+    for (let i = 0; i < 800; i++) {
+      const r = rec();
+      const d = L.runner().boss!.powers!.chandy!.dodge!;
+      if (L.runner().boss!.result && !decided) decided = L.now();
+      if (!r) break;
+      const k = d.results.length;
+      if (k < d.rounds.length && L.now() - r.at >= tl.rounds[k]!.voteAt && L.now() - r.at < tl.rounds[k]!.voteEnd) for (const id of ["p1", "p2"]) L.core.message(id, { t: "dodgeVote", key: r.key, round: r.round, square: pick(k, d.rounds[k]!.safe) });
+      end = r.at;
+      L.advance(100);
+    }
+    if (L.runner().boss!.result && !decided) decided = L.now();
+    return { L, end, decided, tl };
+  }
+
+  it("survived: the mate stands after the win beat, the battle the crowd's", () => {
+    const { L, end, decided, tl } = mateDodge((_k, safe) => safe);
+    const d = L.runner().boss!.powers!.chandy!.dodge!;
+    expect(d.results.length).toBe(3);
+    expect(d.results.every((r) => !r.hit)).toBe(true);
+    expect(L.runner().boss!.result).toBe("crowd");
+    // (Decided only after the win beat's end, not at the last round's.)
+    expect(decided - end).toBeGreaterThanOrEqual(tl.win.end);
+    expect(decided - end).toBeLessThan(tl.win.end + 1000);
+  });
+
+  it("the second hit: the battle is his", () => {
+    const wrong = (safe: string) => ["d3", "e3", "f3", "d4", "e4", "f4", "d5", "e5", "f5"].find((sq) => sq !== safe)!;
+    const { L } = mateDodge((k, safe) => (k < 2 ? wrong(safe) : safe));
+    const d = L.runner().boss!.powers!.chandy!.dodge!;
+    expect(d.results.filter((r) => r.hit).length).toBe(2);
+    expect(L.runner().boss!.result).toBe("boss");
   });
 });

@@ -26,3 +26,16 @@ export const CHANDY_LINES: Partial<Record<Beat, readonly string[]>> = {
   victory: ["Never miss. Never.", "Target eliminated."],
   defeat: ["You moved too fast…", "Out of ammo."],
 };
+
+/**
+ * His line as your mate is held for his Dodge (Eric, Nov 26: "he's says something like, I'm not I've got one last trick up my sleeve,
+ * but something that's not that line"), in his speech box at his opening's `line` step (components/Chandy.tsx). The first is said
+ * (Eric's pick, Nov 26); the other two were the options. Each in two sentences, typed in turn (a paced line, `mateLinePauseMs` between):
+ * a phone's boss bar shows one at a time, each whole in its two rows (the line in one piece takes three at 320 px and was cut off, the
+ * director's still, Nov 26); a computer's box shows the whole line.
+ */
+export const CHANDY_MATE_LINES = [
+  ["Mate? Negative.", "One shot left in the chamber."],
+  ["Pinned isn't finished.", "Final protocol: engage."],
+  ["Down, not out.", "A sniper always saves one round."],
+] as const satisfies readonly (readonly string[])[];

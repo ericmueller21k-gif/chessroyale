@@ -471,7 +471,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const gagAt = thinking && !intro && !victim ? hangOnAt(moments, now) : undefined;
   const hangOn = gagAt !== undefined ? hangOnFen(own("dash"), moments, now) : null;
   // (Dash's Scramble Rush: his sweep, your placements, then the position as it was: the game's never changed.)
-  const boardFen = dodge ? dodgeFen(boss, fenShown) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? swapped?.fen ?? birdie?.fen ?? hangOn?.fen ?? fenShown);
+  const boardFen = dodge ? dodgeFen(boss, fenShown, dodge, now) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? swapped?.fen ?? birdie?.fen ?? hangOn?.fen ?? fenShown);
   const rushLines = rush ? rushDock(boss, rush, now) : dodge ? dodgeDock(boss, dodge, now) : null;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (own("bigboy").powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? swapped?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
