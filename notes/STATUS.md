@@ -2152,3 +2152,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: #961 (payment page drafts) MERGED d3bcdbc4. #960 CI still running (bg1v4vv62).
 - Nov 26: #960 (vote fill) MERGED 92320601. Main run watched (covers #961 too).
 - Nov 26: ERIC: 'yes run two money jobs at once' (today). Briefs payments-pr5-storage.md + payments-pr4-boost.md (xhigh, full lane each, independent review + delta after). Start both when coin-strip + boss-frame finish (keeps the 2-Opus cap).
+- Nov 26: main 92320601 GREEN + LIVE (vote fill, payment drafts).
