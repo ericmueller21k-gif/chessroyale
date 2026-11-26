@@ -17,3 +17,9 @@ what a ranked game vs a bot does to RP and the hidden rating during beta, the re
 human-impersonating), the banner's place on phone and computer, the "games played" numbers, the home online count's removal, the
 engine budget (Maia on players' devices vs server, per CLAUDE.md's computing priorities), and the PR plan. Mockup stills of the banner and
 a ranked bot's name strip. Present to Eric before building.
+
+## Eric's numbers and name (Nov 26)
+- **The wait before bots join:** 15 s after a search starts for the 50 v 50 and Squads; 30 s for ranked 1 v 1. (Settings, so they're easy
+  to tune.)
+- **The tag:** "HunBot" for these beta bots (human-like Maia players), distinct from today's obvious "Bot" lobby bots. The design shows
+  both marks side by side and says where each appears.

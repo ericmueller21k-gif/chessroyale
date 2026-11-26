@@ -2162,3 +2162,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: #962 (coin strip + no-gap quests) MERGED f01ba249. Main run watched. Tell PR 4 helper: PR 3 merged (merge main).
 - Nov 26: ERIC beta-bots compromise: disclosed beta banner ('bots fill matches… human-like, NOT Stockfish'); ranked bots tagged; online count OFF during initial phase; games-played may include bot games; launch season reset wipes bots. Director declined fake counts/undisclosed bots earlier. Brief beta-bots-design.md (design first, xhigh) queued for the next free slot.
 - Nov 26 02:05 UTC: #964 CI red: side-same-size:16 (pawn 201.6 vs 193.2 at 1280x800; hidden boss's fight not framed). Brief boss-frame-2.md QUEUED for the next free slot (2 xhigh running).
+- Nov 26: ERIC: bots join 15 s (50 v 50, Squads), 30 s (ranked 1 v 1); tag 'HunBot' (vs existing 'Bot'). Added to beta-bots-design.md.
