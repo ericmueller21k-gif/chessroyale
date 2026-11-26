@@ -69,8 +69,8 @@ jobs:
 
   # (Two halves since Nov 19: the tower's kit and layer tests doubled this job, which then set check's time; the sweep's N2,
   # Eric's OK. Every test still runs on every PR, half on each runner.) Split by time since Nov 23 (Eric: "Yes, rebalance"):
-  # vitest's --shard split by file count, 1 : 2.8 by time. Half 1 is HALF1 (the slowest files by CI's own
-  # times, Nov 23); half 2 is the typecheck and every other file. One list, so every file runs exactly once; rebalance by moving names.
+  # vitest's --shard split by file count, 1 : 2.8 by time. Half 1 is the typecheck plus HALF1 (the slowest files by CI's own
+  # times, Nov 23); half 2 is every other file. One list, so every file runs exactly once; rebalance by moving names.
   chess:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -80,8 +80,9 @@ jobs:
         shard: [1, 2]
     env:
       HALF1: >-
-        packages/chess/test/boss-kit-side.test.ts packages/chess/test/boss-kit.test.ts
-        packages/chess/test/square-layer-twin.test.ts packages/chess/test/held-layer-twin.test.ts
+        packages/chess/test/boss-kit-side.test.ts packages/chess/test/several-bosses.test.ts
+        packages/chess/test/boss-kit.test.ts packages/chess/test/square-layer-twin.test.ts
+        packages/chess/test/edge-layer-twin.test.ts packages/chess/test/held-layer-twin.test.ts
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -89,11 +90,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # (The typecheck runs here, off the unit job's critical path (the Nov 9 audit, F7), on the second half since Nov 26: half 1's
-      # slow files had made it the long pole, 421 s against 304 s (the Nov 26 bloat sweep, Q1; Eric: "you can move the GitHub test
-      # server thing"). edge-layer-twin and several-bosses moved to half 2 with it: measured on #985, the typecheck alone
-      # left half 1 at 400 s of tests against half 2's 53 + 203 s.)
-      - if: ${{ matrix.shard == 2 }}
+      # (The typecheck runs here, on the first half only, so it's off the unit job's critical path: the Nov 9 audit, F7.)
+      - if: ${{ matrix.shard == 1 }}
         run: npm run typecheck
       - if: ${{ matrix.shard == 1 }}
         name: packages/chess's tests (half 1 of 2, the slowest files)
