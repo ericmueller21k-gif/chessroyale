@@ -19,8 +19,15 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   "Play coins"). 1.8 a counted minute (at most 54 a game) until 300 an XP day; a bonus past that for a win 15, a ranked draw 5, a
   50 v 50 team's top 3 +10, Squads 1st 40, 2nd 25, 3rd-4th 15, 5th-8th 5, paid by the day's steps (full, half, a quarter, none past
   550 earned): 600 a day at most. Solo: the minutes XP paid under its solo cap, no bonus. Ranked's and Squads' own coins are gone (Squads'
-  crates stay). Where a result already said its coins (the ranked end page's line, Squads' placement line) it says these; the coin
-  reward strip under the XP box is PR 3. The day's table by player and hours: `reports/coin-report.md`
+  crates stay). **The coin strip** (Nov 25, PR 3; [2026-11-25-coin-strip.md](../decisions/2026-11-25-coin-strip.md);
+  `components/CoinStrip.tsx`, timings `END_SCREEN.coins`, the view core's `coinStripView`): every end screen with an XP box shows the
+  game's coins in one place, right under the XP bar, its width and height from the first paint. After the XP fill, coins drop into a
+  pile (one a 5, at most 10), "+52" rolls like a gas pump, the parts show as the count reaches them ("Play +27 · Win +15"), "PLAY TODAY
+  186/300" (or "300/300 · FULL"); `clawCoin` per landing, `sell` at the end; a tap or reduced motion: the end at once. No coins: greyed,
+  with why (`COIN_NONE_LINES`). Ranked's and Squads' coin lines are gone. The 1 v 1's computer column has the compact strip (44 design
+  px, two rows, at the column's scale); a computer's boss result scales its whole column with a short window so Play again and Home stay
+  whole ([2026-11-25-coin-strip-fit.md](../decisions/2026-11-25-coin-strip-fit.md)). Tests: `e2e/xp.spec.ts` ("the coin strip under the XP box",
+  the test game's, 320 px), `e2e/perf.spec.ts` (the end screen on a slow phone), core `play-coins.test.ts`. The day's table by player and hours: `reports/coin-report.md`
   (`npx tsx packages/sim/scripts/coin-report.ts`, from the settings). The FAQ's "Coins" (in "XP and levels") follows the settings.
 - **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
   coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
