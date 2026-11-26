@@ -22,6 +22,9 @@ Read first: `/home/user/cr-notes/notes/audit-2026-11-06.md` (this morning's arch
    - fixed waits (waitForTimeout ≥ 1 s);
    - long timeouts hiding stalls;
    - retries masking flakiness;
+   - **for every intermittent failure, check whether it is still open**: find the last red main run that shows it and any later commit
+     that fixed its cause (or later main runs green on it), and list only the open ones; the fixed ones go in one "already fixed" line
+     (Nov 26: all seven geometry misses the sweep queued had been fixed after their red runs, costing a helper to find that out).
    - specs testing the same thing twice;
    - specs that could be unit tests;
    - the intermittent failures seen today (account.spec solo stall, colosseum.spec 3D draw calls, town-rows sky, formats lobby, autochess-sounds timing). A separate helper is fixing the first three; just note the pattern.
