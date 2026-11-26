@@ -218,8 +218,9 @@ export function ragePoints(p: Pick<BossPowerState, "charge" | "lost">, s: Pick<R
 
 /**
  * The boss is in danger (BOSS_POWERS.dangerAt; Eric, Nov 26, about Birdie): the crowd's expected score after its last move, as the
- * judge has it (`judged`), at or above dangerAt. Nothing judged yet: not in danger. Only Birdie's Fall reads it (and Chandy's Dodge
- * until his checkmate rework): every other boss's meter fills as it always has (docs/decisions/2026-11-26-ult-danger-birdie-only.md).
+ * judge has it (`judged`), at or above dangerAt. Nothing judged yet: not in danger. Only Birdie's Fall and the bosses in
+ * `dangerBosses` read it (not Chandy's Dodge: his meter or your mate only, since Nov 26): every other boss's meter fills as it
+ * always has (docs/decisions/2026-11-26-ult-danger-birdie-only.md).
  */
 export const inDanger = (judged: number | undefined, s: Pick<BossPowerSettings, "dangerAt"> = BOSS_POWERS): boolean => judged !== undefined && judged >= s.dangerAt;
 
@@ -292,7 +293,7 @@ export interface TurnContext {
   events: PowerEvent[];
   /**
    * Several bosses on one side: the crowd's allowed moves this turn on the whole side (every boss's limits, the lift; worked out
-   * only when asked). Left out (one boss): his own limits decide (Chandy's last chance reads them: mateOpen).
+   * only when asked). Left out (one boss): his own limits decide (Chandy's last chance read them until Nov 26).
    */
   crowdMoves?: () => readonly string[];
 }
@@ -313,8 +314,8 @@ export interface BossRules {
   /** The test trigger is worked out at his turn, after his move (Wrangler's line-up): kept until its ultimate comes. */
   triggerAtHisTurn?: boolean;
   /**
-   * Several bosses on one side: its ultimate can't wait for his own turn change (Chandy's last chance, Eric, Nov 16: "he still fires
-   * his ult anyway"), asked at every turn change (`p`: his powers as his last turn left them; `t.crowdMoves`: the side's allowed
+   * Several bosses on one side: its ultimate can't wait for his own turn change (Chandy's last chance used it, Nov 19 to Nov 26: no
+   * boss does now; docs/decisions/2026-11-26-chandy-mate-dodge.md), asked at every turn change (`p`: his powers as his last turn left them; `t.crowdMoves`: the side's allowed
    * moves). Yes: his ultimate's step runs at this turn change, first, the others' waiting, and he holds the crowd's turn (its show
    * read from him, as at his own turn change). The Battle Tower's audit 1, finding 2 (docs/decisions/2026-11-19-ultimate-now.md).
    */

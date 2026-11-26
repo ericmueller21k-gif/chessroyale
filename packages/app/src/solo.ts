@@ -1,6 +1,6 @@
 import { BIRDIE_ULT, DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, birdieTurnMs, birdieTurnBeats, birdieImpactMs, powerWinShowMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, fireShows, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, sawyerTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, birdieTurnMs, birdieTurnBeats, birdieImpactMs, powerWinShowMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeLeadMs, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, isHop, rushBeats, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -1185,13 +1185,14 @@ export class SoloMatch implements GameView {
    * `kept`: resumed mid-Dodge (KeptGame.moment): on from the time kept, the rounds closed by then kept too (dodgeStep), so the round on
    * goes on where it was (its teleports shown so far, its vote with only its own time left, your vote in it kept), never reopened with
    * its answers known (the review of #885, I3; the delta review, D2; every teleport kept as it shows: the third review, E1). Mid-Dodge with
-   * no time kept (it hadn't shown yet): the round due, as it opens.
+   * no time kept (it hadn't shown yet): the round due, as it opens. From your mate (Eric, Nov 26): its start after his opening
+   * (dodgeLeadMs); kept in the opening (its time kept as 0: momentNow), on from the Dodge's own start.
    */
   private dodgeTurn(kept?: KeptGame["moment"]) {
     if (this.timer) clearTimeout(this.timer);
     const full = this.runner.state.boss?.powers?.chandy?.dodge;
     const done = full?.results.length ?? 0;
-    const at = Date.now() - (kept ? kept.ms : done ? (dodgeTimeline().rounds[done]?.openAt ?? 0) : 0);
+    const at = Date.now() - (kept ? kept.ms : done ? (dodgeTimeline().rounds[done]?.openAt ?? 0) : -dodgeLeadMs(full));
     const mine = typeof kept?.mine === "string" && full && dodgeArena(full.center).includes(kept.mine) ? kept.mine : undefined;
     this.dodge = { key: `d-${at}`, at, round: done, ...(mine ? { mine } : {}) };
     this.showDodge();
