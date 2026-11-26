@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { bossRules, dangerCharge, inDanger, legalMoves, rageNow, rageOf, type EngineLike, type MatchRunner } from "../src/index.ts";
 import { KIT_OPENING, fakeScore, hash, kitBosses, runBattle } from "./boss-kit-lib.ts";
@@ -162,13 +162,26 @@ describe("one ultimate a danger, then the meter's usual pace (Nov 26: filled aga
   }
 });
 
-/** A level battle's stand-in: every move between 0.3 and 0.65 for whoever moves (never the danger line), a pure function of the position. */
+/**
+ * A level battle's stand-in: every move between 0.3 and 0.65 for whoever moves (never the danger line), a pure function of the position.
+ * (Each position's ranking kept, for every battle: Wrangler's lasso asks for the top move of every pull he could make, about 8,000
+ * positions a battle, and generating their moves twice ran his test past its minute on CI, Nov 26.)
+ */
+const levelRanked = new Map<string, { move: string; expected: number }[]>();
+const levelScore = (fen: string, m: string) => 0.3 + 0.35 * hash(fen + m);
 function levelEngine(): EngineLike {
-  const score = (fen: string, m: string) => 0.3 + 0.35 * hash(fen + m);
-  const ranked = (fen: string) =>
-    legalMoves(fen)
-      .map((move) => ({ move, expected: score(fen, move) }))
-      .sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1));
+  const score = levelScore;
+  const ranked = (fen: string) => {
+    let r = levelRanked.get(fen);
+    if (!r)
+      levelRanked.set(
+        fen,
+        (r = legalMoves(fen)
+          .map((move) => ({ move, expected: score(fen, move) }))
+          .sort((a, b) => b.expected - a.expected || (a.move < b.move ? -1 : 1))),
+      );
+    return r;
+  };
   return {
     topMoves: async (fen, n) => ranked(fen).slice(0, n),
     scoreMoves: async (fen, moves) => [...new Set(moves)].sort().map((move) => ({ move, expected: score(fen, move) })),
@@ -178,6 +191,11 @@ function levelEngine(): EngineLike {
 }
 
 describe("below the line, nothing changes (the brief: the meters' normal pace in even games stays)", () => {
+  // (The line back however a test ends, a timeout too: one left switched off failed the file's later tests, Nov 26.)
+  const dangerAt = BOSS_POWERS.dangerAt;
+  afterEach(() => {
+    (BOSS_POWERS as { dangerAt: number }).dangerAt = dangerAt;
+  });
   /** One level battle: as each crowd turn begins, his turn, meter, warning, ultimate and their count, and the board. */
   async function level(id: string): Promise<string[]> {
     const seen: string[] = [];
@@ -191,18 +209,11 @@ describe("below the line, nothing changes (the brief: the meters' normal pace in
   for (const def of kitBosses()) {
     it(`${def.id}: a level battle (the judge never at ${BOSS_POWERS.dangerAt}) plays the same with the danger rule switched off`, async () => {
       const on = await level(def.id);
-      const powers = BOSS_POWERS as { dangerAt: number };
-      const was = powers.dangerAt;
-      powers.dangerAt = 2;
-      let off: string[];
-      try {
-        off = await level(def.id);
-      } finally {
-        powers.dangerAt = was;
-      }
+      (BOSS_POWERS as { dangerAt: number }).dangerAt = 2;
+      const off = await level(def.id);
       expect(on.length).toBeGreaterThan(10);
       expect(on).toEqual(off);
-    }, 60_000);
+    }, 120_000);
   }
 });
 
