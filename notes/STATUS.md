@@ -2179,3 +2179,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 03:35 UTC: PR 4 fixes done (4b67a5d0). Director's call: minGameMinutes stays 5 (10 would halve legit blitz). Delta review + CI next.
 - Nov 26 03:55 UTC: PR 4 delta: no findings (2 nits, no code). Merge #966 on green CI (b5qsiyout on 70ee387d).
 - Nov 26 03:56 UTC: beta-bots DESIGN started session_01JuCWRt6Ek5AmkKw4AF1iUY (xhigh, doc + mock stills). Running: ult-danger, beta-bots design. Next: PR 6 (who may buy) after one finishes; merge #966 on green.
+- Nov 26 04:05 UTC: #966 (PR 4 coin boost) MERGED 270ea481. Main run watched. Payments done: 1,2,3,4,5,11(drafts). Next: PR 6 (who may buy, xhigh) when a slot frees.
