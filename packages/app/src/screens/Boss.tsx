@@ -31,7 +31,7 @@ import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
-import type { BossView, DodgeRun, GameView, LightsView, RushView } from "../game.ts";
+import { bossFramed, type BossView, type DodgeRun, type GameView, type LightsView, type RushView } from "../game.ts";
 import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
 import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
 import { DodgeLayer, FIRE_AT as CHANDY_FIRE_AT, chandyFen, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
@@ -598,7 +598,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
     [match, still, kingCues, lights, lights ? now : 0, rushLines?.line, rushLines?.sub, snacking, funPlayed, momentLine, burnLine, left, noMove, hush, layout.strip],
   );
   return (
-    <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
+    <div class={`screen game boss-screen${bossFramed(match) ? " bf-frame" : ""}${victim ? " striking" : ""}`}>
       {hud}
       {/* (No line above the board: the dock says what's happening, and "You beat him!", "The boss is thinking…", "Struck down"
           and "Boss plays" say what the old line did, Eric, Oct 24.) */}

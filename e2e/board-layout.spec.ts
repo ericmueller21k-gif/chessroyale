@@ -28,12 +28,14 @@ const MAIN_BOARD: Record<string, number> = { "390x844": 312, "360x640": 282.7, "
 /**
  * …the raid's scoreboard beside the board on a computer (x, y, width; its height the window's). Since Oct 29 the screen beside it
  * grows with the board (docs/decisions/2026-10-29-desktop-board-size.md). Nov 1 (round 2): the side menu sits left of the screens
- * (x 10 → 90 at 1280 and 1440 × 900, x 118 → 242 at 1920 × 1080), and the scoreboard is 340 px (was 360).
+ * (x 10 → 90 at 1280 and 1440 × 900, x 118 → 242 at 1920 × 1080), and the scoreboard is 340 px (was 360). Nov 26, the shared frame (the
+ * scoreboard, the board and the column centered as one block; with the menu's labels at least 40 px either side, else icons): x 242 → 176
+ * at 1920 × 1080 (icons now); its foot over the boss, not the window's.
  */
 const MAIN_TOWER: Record<string, { x: number; y: number; w: number }> = {
   "1280x800": { x: 90, y: 0, w: 340 },
   "1440x900": { x: 90, y: 0, w: 340 },
-  "1920x1080": { x: 242, y: 0, w: 340 },
+  "1920x1080": { x: 176, y: 0, w: 340 },
 };
 /** …and the "Your move" row's height (two lines' room). */
 const MAIN_ROW_H = 62;
@@ -47,20 +49,23 @@ const MAIN_ROW_H = 62;
  * 528 → 324, 760; 1536 × 864 496, 624 → 351.5, 736; 1920 × 1080 521.5, 952 → 511.5, 952; 1024 × 768 176, 384 → 176, 440 (main's
  * 464: 24 px less, the boss's reach there; see the decision note). Round 3: the board's box is its drawn size, so the board is
  * centered in its row (1536 × 864 x 351.5 → 354, 1920 × 1080 x 511.5 → 514), and from 900 to 1099 px the side menu is 60 px (1024 × 768 176, 440 → 156, 464:
- * main's size).
+ * main's size). Nov 26, the shared frame (docs/decisions/2026-11-26-boss-frame.md): the boss's column, the board and the column beside it
+ * centered as one block, 28 px either side of the board, the boss's column taking half the room the block leaves: x 346 → 358 at
+ * 1280 × 800 and 1440 × 900, 376 → 388.5 at 1536 × 864, 536 → 548.5 at 1920 × 1080; the sizes unchanged; 1024 × 768 (under 1100 px)
+ * unchanged.
  */
 const MAIN_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = {
-  "1280x800": { x: 346, y: 63.2, w: 600 },
-  "1440x900": { x: 346, y: 63.2, w: 760 },
-  "1536x864": { x: 376, y: 63.2, w: 736 },
-  "1920x1080": { x: 536, y: 63.2, w: 952 },
+  "1280x800": { x: 358, y: 63.2, w: 600 },
+  "1440x900": { x: 358, y: 63.2, w: 760 },
+  "1536x864": { x: 388.5, y: 63.2, w: 736 },
+  "1920x1080": { x: 548.5, y: 63.2, w: 952 },
   "1024x768": { x: 156, y: 63.2, w: 464 },
 };
 /**
  * A raid's board box at 1280 × 800 (its scoreboard beside it keeps the board width-bound there). Round 2: x 488 → 468, 376 → 456.
- * Nov 1 (the eval bar off for everyone): x 468 → 444, 456 → 504.
+ * Nov 1 (the eval bar off for everyone): x 468 → 444, 456 → 504. Nov 26, the shared frame: x 444 → 458 (28 px off the scoreboard).
  */
-const RAID_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = { "1280x800": { x: 444, y: 63.2, w: 504 } };
+const RAID_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = { "1280x800": { x: 458, y: 63.2, w: 504 } };
 /** …and the move list's height, twice: the board's half less 73 px, at least 120 px (styles.css, `--mv-h`; Nov 1: a smaller board). */
 const mainSideH = (board: number) => Math.max(240, board - 146);
 
@@ -259,7 +264,7 @@ test("a phone: the God King at the strip's right edge, the panel to his left, th
   }
 });
 
-test("a computer: Boss alone has no scoreboard and your pawn left of the God King by the board's corner; a raid's is where it was; the moves right of the board, from its top, half as tall, a small gap off it; the board's box main's", async ({ browser }) => {
+test("a computer: Boss alone has no scoreboard and your pawn left of the God King by the board's corner; a raid's beside the board; the moves right of the board, from its top (from 1100 px: the frame's gap off it, down to over the God King's frame; below: half as tall, a small gap off it); the board's box", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "it opens its own windows");
   test.setTimeout(15 * 60_000);
   const runs = [
@@ -279,7 +284,11 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
         const t = b.tower!;
         expect(t, `${at}: the scoreboard`).toBeTruthy();
         const m = MAIN_TOWER[size]!;
-        for (const [k, v] of [["x", t.x - m.x], ["y", t.y - m.y], ["width", t.r - t.x - m.w], ["height", t.b - t.y - h]] as const) expect(Math.abs(v), `${at}: the scoreboard's ${k}`).toBeLessThanOrEqual(1);
+        // (Nov 26, the shared frame: its foot over the boss, who stands over its edge on the board's foot (his frame and his words' room;
+        // the director: "the boss must never cover the scoreboard"), its rows scrolling. Was the window's height, the boss over it.)
+        for (const [k, v] of [["x", t.x - m.x], ["y", t.y - m.y], ["width", t.r - t.x - m.w]] as const) expect(Math.abs(v), `${at}: the scoreboard's ${k} (${JSON.stringify(t)})`).toBeLessThanOrEqual(1);
+        const art = (await page.locator(".boss-char.place-side .boss-char-sprite").boundingBox())!;
+        expect(t.b, `${at}: the scoreboard ends over the boss`).toBeLessThanOrEqual(art.y);
       } else expect(b.mini, `${at}: the scoreboard under the moves`).toBeTruthy();
       expect(b.pawn, `${at}: no pawn in a raid`).toBeNull();
     } else {
@@ -291,17 +300,25 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
     // (A raid at 1280 × 800: its own box, main's, unchanged since its scoreboard leaves the board width-bound. It was checked
     // against Boss alone's, the same box until Oct 29, when Boss alone's grew.)
     const main = raid ? RAID_BOARD_BOX[size]! : MAIN_BOARD_BOX[size]!;
-    if (!raid || size === "1280x800") for (const [k, v] of [["x", board.x - main.x], ["y", board.y - main.y], ["width", board.r - board.x - main.w], ["height", board.b - board.y - main.w]] as const) expect(Math.abs(v), `${at}: the board's ${k}`).toBeLessThanOrEqual(1);
+    if (!raid || size === "1280x800") for (const [k, v] of [["x", board.x - main.x], ["y", board.y - main.y], ["width", board.r - board.x - main.w], ["height", board.b - board.y - main.w]] as const) expect(Math.abs(v), `${at}: the board's ${k} (${JSON.stringify(board)})`).toBeLessThanOrEqual(1);
     // The moves: from the board's top, half as tall as they were, the column's width, a small gap off the board; over nothing.
     // (Eric, Nov 14: the list's top is the board's top; the column's ⚡, fish and gear moved up into the banner's row. Was, Nov 1:
     // the tools at the board's top, the list 36 px under them.)
     expect(Math.abs(side.y - board.y), `${at}: from the board's top, the tools above`).toBeLessThanOrEqual(1);
-    expect(side.x - board.r, `${at}: a small gap off the board`).toBeGreaterThanOrEqual(12);
-    expect(side.x - board.r, `${at}: a small gap off the board`).toBeLessThanOrEqual(16.5);
     // (The column: 340 px where the window's height limits the board, 280 px (its least) where its width does: Nov 1, round 2.)
     expect(side.r - side.x, `${at}: the column's width`).toBeGreaterThanOrEqual(279);
     expect(side.r - side.x, `${at}: the column's width`).toBeLessThanOrEqual(341);
-    expect(Math.abs(side.b - side.y - mainSideH(board.r - board.x) / 2), `${at}: half the height`).toBeLessThanOrEqual(2);
+    if (w >= 1100) {
+      // (Nov 26, the shared frame (docs/decisions/2026-11-26-boss-frame.md): the frame's one gap, 28 px, off the board, the left column's
+      // the same; down to 12 px over the God King's frame (his canvas: his tallest pose's room). Was: 12 to 16.5 px off it, half as tall.)
+      expect(Math.abs(side.x - board.r - 28), `${at}: the frame's gap off the board`).toBeLessThanOrEqual(1);
+      const frame = (await page.locator(".boss-dock .gk-canvas").boundingBox())!;
+      expect(Math.abs(frame.y - 12 - side.b), `${at}: down to 12 px over the God King's frame (${side.b} v ${frame.y})`).toBeLessThanOrEqual(1);
+    } else {
+      expect(side.x - board.r, `${at}: a small gap off the board`).toBeGreaterThanOrEqual(12);
+      expect(side.x - board.r, `${at}: a small gap off the board`).toBeLessThanOrEqual(16.5);
+      expect(Math.abs(side.b - side.y - mainSideH(board.r - board.x) / 2), `${at}: half the height`).toBeLessThanOrEqual(2);
+    }
     expect(side.b - side.y, `${at}: room for rows`).toBeGreaterThanOrEqual(120);
     expect(side.b, `${at}: above the God King`).toBeLessThanOrEqual(king.y);
     expect(overlap(side, board), at).toBe(false);
@@ -347,7 +364,7 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
   }
 });
 
-test("no eval bar (every player's board): your pawn and the boss by the board's bottom corners, each over its edge by at most SIDE_FEEL.over of its side, and the list is still a small gap off the board", async ({ browser }) => {
+test("no eval bar (every player's board): your pawn and the boss by the board's bottom corners, each over its edge by at most SIDE_FEEL.over of its side, and the list the frame's gap (28 px) off the board", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "it opens its own windows");
   test.setTimeout(6 * 60_000);
   for (const size of ["1280x800", "1920x1080"]) {
@@ -372,8 +389,8 @@ test("no eval bar (every player's board): your pawn and the boss by the board's 
     expect(g.pawn.x - g.board.r, `${at}: your pawn by the board`).toBeLessThanOrEqual(32);
     expect(g.boss.x + g.boss.w / 2, `${at}: the boss left of the board`).toBeLessThan(g.wrap.x);
     expect(g.king.x, `${at}: the God King to its right`).toBeGreaterThanOrEqual(g.pawn.r - 1);
-    expect(g.side.x - g.board.r, `${at}: the list a small gap off the board`).toBeGreaterThanOrEqual(12);
-    expect(g.side.x - g.board.r, `${at}: the list a small gap off the board`).toBeLessThanOrEqual(16.5);
+    // (Nov 26, the shared frame: the frame's one gap, 28 px. Was 12 to 16.5 px.)
+    expect(Math.abs(g.side.x - g.board.r - 28), `${at}: the list the frame's gap off the board`).toBeLessThanOrEqual(1);
     await ctx.close();
   }
 });

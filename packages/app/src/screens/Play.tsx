@@ -12,7 +12,7 @@ import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
 import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
-import { isCrowdFifty } from "../game.ts";
+import { bossFramed, isCrowdFifty } from "../game.ts";
 import type { BoardView, GameView, StallState, StrikeState } from "../game.ts";
 import { LOCKED_PHONE, UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import { CROWD_FRAME } from "../components/MatchMenu.tsx";
@@ -272,7 +272,7 @@ export function PlayScreen({
   }, [board.fen, strike?.at, waiting]);
 
   return (
-    <div class={fifty ? "screen game crowd-50" : "screen game"}>
+    <div class={fifty ? "screen game crowd-50" : bossFramed(match) ? "screen game bf-frame" : "screen game"}>
       <Hud match={match} />
       <div class="board-area">
         {/* (A boss battle has no line above its board: its dock says what's happening, and "N/M picked" is in it, Eric, Oct 24.) */}
