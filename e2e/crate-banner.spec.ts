@@ -46,7 +46,8 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
           tick();
         }),
     );
-    expect(crate.items.map((i) => itemDef(i)!.name)).toContain(early.name);
+    // (The card names a Smiley Face with its expression, "Smiley Face · Smile" (core `itemName`): its base name is the crate's item.)
+    expect(crate.items.map((i) => itemDef(i)!.name)).toContain(early.name?.replace(/ · .*$/, ""));
     expect(early.opacity, "Done tapped while the card was still forming").toBeLessThan(1);
     await expect(page.getByTestId("crate-opening")).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem("hunchess-crate-unseen")), "seen once Done is tapped").toBeNull();
