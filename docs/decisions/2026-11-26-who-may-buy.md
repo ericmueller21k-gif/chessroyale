@@ -9,8 +9,9 @@ checkout calls `recordCheckout`. Calls made in building it (for the director's r
 1. **One rule, pure, in core** (`buyAnswer`), with every line in `BUY_LINES` and the numbers in `PAYMENTS.buyers` and `PAYMENTS.hold`.
    The server reads the account as stored (never a session's view of it) and answers it (`buyStatus`, `GET /api/buy`): an account-wide
    `line`, `askBand`, `held`, `leftCents`, and each pack with its own line. PR 7 renders it as it is.
-2. **The order of refusals:** a guest, closed, held, the country, then under 16, then the 16-17 cap per pack. The band is asked only
-   when nothing before it refuses, so no age is taken from someone who couldn't buy anyway (a guest, held, closed, abroad).
+2. **The order of refusals:** a guest, paused (call 12), closed, held, the country, then under 16, then the 16-17 cap per pack. The
+   band is asked only when nothing before it refuses, so no age is taken from someone who couldn't buy anyway (a guest, held, closed,
+   abroad).
 3. **The band** (`users.buy_band`: `under-16`, `16-17`, `18+`; `buy_band_at`): worked out on the device from a birth month and year,
    the birth month itself counted as not yet complete (core's `buyBandOf`; the review's M1, the director's call): 16 starts on the
    1st of the month after the 16th-birthday month, 18 likewise, so a truthful answer never lets a 15-year-old buy or a 17-year-old skip
@@ -57,3 +58,16 @@ checkout calls `recordCheckout`. Calls made in building it (for the director's r
     field) for a count Eric wanted out of curiosity; a burst across instances may count a little more.
 11. **The download** already has the band and its time (the account's row). The privacy draft (`docs/drafts/payments/privacy-purchases.md`)
     already lists the band; the privacy page's lines still come with PR 8.
+
+**After the review** (Nov 26, `review/pay-who-buys`; the director's calls on it). Calls 3, 4 and 5 above now say the birth month and
+the tax as fixed; the rest:
+
+12. **Buying coins has its own kill switch, `PAUSE_PAYMENTS`** (the design's section 1: "Buying is paused for a moment."): in
+    `BuyFacts` (`paused`) and refused right after a guest, so no band is asked meanwhile; no new checkout or band answer, while a
+    session already paid is still credited and refunds keep working. **`PAUSE_SHOP` doesn't gate it:** that switch rests spending
+    coins (shop items, crates), a different part with its own failures. A Stripe or webhook problem shouldn't close the coin shop, and
+    a shop bug shouldn't stop coin sales (coins bought then keep). Each switch rests the narrowest part; the design names its own.
+13. **A second account on the same device answers the band afresh** (the review's m4): no device flag. Eric's answers make age
+    self-declared, and lies about it are "a good problem to have ... not fight"; the band stays one per account.
+14. **A replay of a checkout is answered only while it's pending** (the review's n4): one paid or expired since is refused ("That
+    checkout has ended. Try again."), so a retry never sends the player to a session Stripe has ended.

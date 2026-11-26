@@ -259,7 +259,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   level rewards and quests (no progress, no pay; the overlay says so); games play on, the XP box says "Rewards are paused for a moment.", levels reached are paid at the next game after it:
   [2026-11-09-xp-phase2-pause.md](../decisions/2026-11-09-xp-phase2-pause.md)), `PAUSE_LEAVE_PENALTIES` (Nov 9: ranked's leave
   rules, if they misfire: no dodge or leave is charged or marked, and no lockout or delayed queue applies; games play on;
-  [ranked.md](ranked.md), "Leaving early"),
+  [ranked.md](ranked.md), "Leaving early"), `PAUSE_PAYMENTS` (Nov 26: buying coins; every Buy greyed with "Buying is paused for a
+  moment.", no new checkout or band answer; a session already paid is still credited and refunds work; `PAUSE_SHOP` doesn't stop it:
+  [payments.md](payments.md)),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
   `PAUSE_RESIDENTS` (Nov 25; `residents.ts`): the server's own, never in `/api/status`: a resident's session gets 503 "Residents are paused." on
   every `/api/*` route, every room (Lobby, DuelGame, SquadsLobby, SquadsParty) refuses its hello and closes its socket on its next message.

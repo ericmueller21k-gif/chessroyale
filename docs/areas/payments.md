@@ -20,26 +20,32 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
   only ledger.ts's legs move `remaining`; the static guard (`ledger.test.ts`) counts each file's writes to `purchases`, not which
   columns they set, so a new write in purchases.ts needs that rule checked by hand.
 - **Who may buy** (PR 6; core's `buyAnswer` is the whole rule, pure; the numbers in `PAYMENTS.buyers` and `PAYMENTS.hold`, every line
-  in core's `BUY_LINES`): signed in; 16 or older by the age band; 16-17 at most $50 a buying month; in the US or Canada; not held; not
-  closed. **`GET /api/buy`** (`buyStatus`, the one answer PR 7 renders): `line` (every Buy's greyed line, or null), `askBand` (a Buy asks
-  the band question first; every pack tappable then), `held` (the line is a hold's: taps are counted), `leftCents` (16-17's money left
-  this month, else null) and each pack with its own `line` (the account's, or the cap's when its price no longer fits, or null). The
+  a player can see in core's `BUY_LINES`): signed in; buying not paused; 16 or older by the age band; 16-17 at most $50 a buying
+  month; in the US or Canada; not held; not closed. **`GET /api/buy`** (`buyStatus`, the one answer PR 7 renders): `line` (every
+  Buy's greyed line, or null), `askBand` (a Buy asks the band question first; every pack tappable then), `held` (the line is a hold's:
+  taps are counted), `leftCents` (16-17's money left this month, else null) and each pack with its own `line` (the account's, or the
+  cap's when its price no longer fits, or null). The
   refusals in order, each Buy greyed with its line (a tap shows it):
   1. a guest: "Sign in to buy coins.";
-  2. closed (`closed_at`): "This account is closed. Questions: support@hunchess.com" (the design's sign-in line; until PR 9 refuses
+  2. paused (**`PAUSE_PAYMENTS`**, its kill switch: [ops.md](ops.md) "Kill switches"; the design's section 1): "Buying is paused for a
+     moment." No checkout and no band answer meanwhile; a session already paid is still credited, and refunds work. `PAUSE_SHOP`
+     doesn't stop buying coins (it rests the coin shop and crates; a pause of either alone is the narrower switch);
+  3. closed (`closed_at`): "This account is closed. Questions: support@hunchess.com" (the design's sign-in line; until PR 9 refuses
      the sign-in itself, a closed account still sees a Buy);
-  3. held (now before `hold_until`): "Purchasing isn't available on this account." (no reason, no date);
-  4. outside the US and Canada (`request.cf.country`; unknown: not sold): "Coin packs aren't sold in your country yet. You can still
+  4. held (now before `hold_until`): "Purchasing isn't available on this account." (no reason, no date);
+  5. outside the US and Canada (`request.cf.country`; unknown: not sold): "Coin packs aren't sold in your country yet. You can still
      earn coins by playing.";
-  5. the band question due (never answered, or an under-18 band 6 months after its answer): no line, `askBand`;
-  6. under 16: "Buying coins is for players 16 and older.";
-  7. 16-17, per pack: "Monthly limit for players under 18: $N left." on each pack whose price is more than what's left ($50, $45.01).
+  6. the band question due (never answered, or an under-18 band 6 months after its answer): no line, `askBand`;
+  7. under 16: "Buying coins is for players 16 and older.";
+  8. 16-17, per pack: "Monthly limit for players under 18: $N left." on each pack whose price is more than what's left ($50, $45.01).
 - **The age band** (`users.buy_band`: `under-16`, `16-17`, `18+`; `buy_band_at`): the device asks a birth month and year at the first
   Buy and posts only the band (core's `buyBandOf`: the birth month counts as not yet complete, so 16 starts on the 1st of the month
   after the 16th-birthday month, 18 likewise, and a truthful answer never lets a 15-year-old buy; the review's M1) to
-  **`POST /api/buy/band`** {band} (this site's page, JSON; answers the new BuyStatus, or 409 with why). Taken only when due (`askBand`): the first as given; asked again (under 18,
-  6 calendar months on) at most one band up, a lower answer as given (`bandAfter`); each answer restarts the 6 months. Not asked of
-  an account that couldn't buy anyway (a guest, closed, held, abroad). Two answers at once store one. Never a birth date.
+  **`POST /api/buy/band`** {band} (this site's page, JSON; answers the new BuyStatus; not a band: 400 "Answer the question."; refused:
+  409 with why, "You've answered this already." when it isn't due). Taken only when due (`askBand`): the first as given; asked
+  again (under 18, 6 calendar months on) at most one band up, a lower answer as given (`bandAfter`); each answer restarts the 6
+  months. Not asked of an account that couldn't buy anyway (a guest, paused, closed, held, abroad). Two answers at once store one.
+  Never a birth date.
 - **The buying month** (core's `buyMonthStart`): the 1st at `XP.dayStartUtcHour` UTC (08:00: midnight Pacific standard time; 1 am in
   summer, 10 pm the evening before in Hawaii), turning with the XP day; never the device's clock, and no time zone is stored. **What
   counts:** each checkout made in the month (by when it was made), at its price before tax, paid or pending (one paid but not yet
@@ -55,7 +61,9 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
   checkout of the account's open. Its INSERT holds the rule's stored parts too (signed in, not closed, not held, a band that may buy,
   the 16-17 cap with this price, no checkout open), so a paid checkout or a hold landing between the read and the write can't slip past;
   a refusal answers its line (PR 8 then expires the session it made). The same session again changes nothing and answers the pack as
-  stored; another pack for it is refused ("That checkout is for another coin pack.").
+  stored while it's pending; one paid or expired since is refused ("That checkout has ended. Try again.": a retry never sends the
+  player to a session that has ended; the review's n4); another pack for it is refused ("That checkout is for another coin pack.").
+  `recordCheckout`'s last argument is the pause (PR 8 passes `isPaused(env, "payments")`; `buyStatus` and `answerBand` take it too).
 - **Credit once** (`creditPurchase`, PR 8's webhook and return check): a paid session credits its row's coins (never the session's word)
   to its row's account (our row maps the session to its buyer; the session carries no account) in one op `pay:<ref>`, reason
   `purchase`: coins +N and purchase +N, the row marked paid (when, the tax, the payment intent, the card's country) in the same batch.
@@ -69,8 +77,9 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
 - **A hold** (the quiet flag, the design's section 3): `holdCount` (a statement for PR 9's refund batch and a chargeback's; nothing
   calls it yet but tests) adds 1 to `refund_count`; the 3rd (`PAYMENTS.hold.after`) sets `hold_until` 90 days on (`days`), each after
   starts them again, never shortening a later end. Held until the moment before `hold_until`. While held only buying stops (refunds,
-  earning, spending all work). **`POST /api/buy/tap`** (`heldTap`): a greyed Buy tapped while held adds 1 to `held_taps`, at most one a
-  minute an account (`tapGapMs`, in each Worker instance's memory as the API's limits), never when not held; answers {counted}.
+  earning, spending all work). **`POST /api/buy/tap`** (`heldTap`; this site's page only): a greyed Buy tapped while held adds 1 to
+  `held_taps`, at most one a minute an account (`tapGapMs`, in each Worker instance's memory as the API's limits), never when not held
+  (nor closed, nor a guest's row: its statement checks all three); answers {counted}.
 - **Spending: earned coins first** (`applySpend`, every coin spend: the coin shop's `buyItem` today), then the oldest purchase's
   `remaining`, then the next (core's `spendPlan`), all in the spend's own op (`spendLegs`: coins −price, purchase −take per draw). Its
   guard: drawing on no purchase, the coins are there and earned covers the price; drawing on purchases, the coins and earned are both
@@ -106,7 +115,8 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
 | --- | --- |
 | The rules, pure: packs, `spendPlan`, `refundableCoins`, `inRefundWindow`, `boughtOf`; who may buy: `buyAnswer`, `checkoutLine`, `BUY_LINES`, `capLine`, the bands (`buyBandOf`, `bandDue`, `bandAfter`), `buyMonthStart` | `packages/core/src/payments.ts` |
 | The tables and columns (`PURCHASES_SCHEMA`, `PURCHASES_COLUMNS`), `buyRefusal`, who may buy (`buyStatus`, `answerBand`, `heldTap`, `holdCount`, `openCheckouts`, `expireCheckout`), `recordCheckout`, `creditPurchase`, `coinState`, `coinSplit`, `spendGuard`, `applySpend`, `refundable`, the download and the refunds' erase | `packages/server/src/purchases.ts` |
-| `GET /api/buy`, `POST /api/buy/band`, `POST /api/buy/tap` (and `countryOf`, the request's country) | `packages/server/src/api.ts` |
+| `GET /api/buy`, `POST /api/buy/band`, `POST /api/buy/tap` (and `countryOf`, the request's country; the pause, `isPaused(env, "payments")`) | `packages/server/src/api.ts` |
+| `PAUSE_PAYMENTS` (the part `payments`, its line) | `packages/core/src/pauses.ts`, read by `packages/server/src/kill-switches.ts` |
 | The `purchase` kind: `leg.purchase`, `spendLegs`, `HOLDINGS`, the merge and the erase | `packages/server/src/ledger.ts` |
 | The coin shop's spend | `packages/server/src/accounts.ts` (`buyItem`) |
 | The download's store and deleting | `packages/server/src/account-data.ts` (store `purchases`; the ledger's store keeps the purchase rows) |
@@ -121,17 +131,21 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
 
 - `packages/core/test/payments.test.ts`: the packs, earned first then the oldest (ties by id, earned below 0), the draws' cap, the
   refundable window and cap; who may buy: the band's edges, the birth month not yet complete (15 years 11 months, 16 by month still
-  under 16, 16 years 1 month, 17 years 11 months, 18 by month still 16-17, 18 years 1 month, the year's turn), asked again only under 18 after 6 months, up one band at most, the month's turn (08:00 UTC, the year's too), every line the
-  design's, the refusals' order (no band asked when something else refuses), the hold's end, the $50 cap to the cent per pack.
+  under 16, 16 years 1 month, 17 years 11 months, 18 by month still 16-17, 18 years 1 month, the year's turn), asked again only under
+  18 after 6 months, up one band at most, the month's turn (08:00 UTC, the year's too), every line the design's, the refusals' order
+  (paused right after a guest; no band asked when something else refuses), the hold's end, the $50 cap to the cent per pack.
 - `packages/server/test/who-buys.test.ts`: the band asked once, stored, guarded (two at once), never asked of a guest, held, closed or
   abroad account; under 16 and the country (no checkout, nothing written); the $50 month's edge (exactly $50, a cent over, a refund
   freeing what it returned), the statement's own cap (a paid checkout landing between the read and the write), the month's turn, what
   counts (pending, paid, refunded, part refunded, disputed, at the price before tax; a refund recorded with its tax frees no more
   than its price; not expired, unclaimed, last month's or the one still open); the quiet
   flag's count (the 3rd starts 90 days, each after restarts, never shortened, three at once count three), held until its end, a hold
-  landing between the read and the write; held taps (once a minute, never unheld); closed (no checkout; a payment begun before kept
-  unclaimed, its op refusing too); one open checkout (30 minutes, expired, paid, two at once); the API (guest, no country, the band
-  from this site as JSON only, 409 once answered, held taps).
+  landing between the read and the write; held taps (once a minute, never unheld; not counted closed, as a guest's row, or with the
+  hold lifted between the read and the statement); closed (no checkout; a payment begun before kept unclaimed, its op refusing too);
+  one open checkout (30 minutes, expired, paid, two at once, a replay of one ended refused); the checkout's statement against a
+  change between its reads and its INSERT (closed, deleted, signed out of its identity, the band lowered or gone; each guard's
+  removal fails its own test: checked by hand, Nov 26); paused (no checkout, no band, a paid session still credited); the API
+  (guest, no country, paused, the band from this site as JSON only, 400 for no band, 409 once answered, held taps from this site).
 - `packages/server/test/purchases.test.ts`: the migration on a copy of the schema from before (`test/fixtures/schema-2026-11-26.json`),
   the checkout (never a guest's; the stored pack), the credit (once, at once, every refusal; a guest's kept as unclaimed), earned first
   across several purchases, the guarded races (a spend meanwhile, coins earned meanwhile, a give-back to an older purchase meanwhile,
@@ -162,14 +176,22 @@ Lane: the director (money, stored data: the full lane). The approved design: [20
 - **For PR 7 (the coin screen):** render `GET /api/buy` as it is: each pack's `line` greyed (a tap shows it; while `held`, a tap also
   posts `/api/buy/tap`, at most once a minute), `askBand` asks the band question first (a birth month and year, worked out with core's
   `buyBandOf`, only the band posted to `/api/buy/band`; its heading `BUY_LINES.band` or the screen's own), `leftCents` for 16-17.
+  The pause comes in the answer (`line`: "Buying is paused for a moment."); `/api/status` lists `payments` among the parts resting too.
   The country is Cloudflare's (`request.cf.country`): check that `wrangler dev` (the e2e's server) gives one, else every pack says
   "not sold in your country" there.
 - **For PR 8 (Stripe), who may buy:** set each session's `expires_at` to `PAYMENTS.buyers.checkoutMinutes` (30, Stripe's least): "open"
-  here assumes it. Before making a session, expire each of `openCheckouts` at Stripe (POST
+  here assumes it. Stripe refuses an `expires_at` under 30 minutes by its own clock, so PR 8 may send a margin (31 minutes, say):
+  then raise `checkoutMinutes` to the value it sends. A session must never outlive what "open" assumes here. Before making a session, expire each of `openCheckouts` at Stripe (POST
   /v1/checkout/sessions/:id/expire) and `expireCheckout` it; one Stripe says is already complete is credited instead, at once. Pass
   `request.cf.country` to `recordCheckout`; a refusal: expire the session just made and answer the line. Mark a session `expired` on
   `checkout.session.expired` too (an unpaid pending one past 30 minutes counts toward a 16-17 month until then). A paid session whose
-  row is `expired` gets no coins (`not-pending`): refund it.
+  row is `expired` gets no coins (`not-pending`): refund it. **A sweeper for lost events** (the review's m2): a pending row past
+  `checkoutMinutes` is never looked at again, so one whose `checkout.session.expired` never arrives (the webhook misconfigured, the
+  Access bypass missing, the endpoint down past Stripe's retries) greys a 16-17 buyer's month until it turns. At a Buy, and in the
+  15-minute cron, ask Stripe about the account's (the cron: every) pending rows older than `checkoutMinutes`: expired →
+  `expireCheckout`; complete and paid → `creditPurchase`. Counting them meanwhile is right (one may be paid with its event late).
+  **The pause:** check `isPaused(env, "payments")` before making a Stripe session at all, and pass it to `recordCheckout`. A
+  `recordCheckout` refused as ended ("That checkout has ended."): make a new session, never send the old one.
 - **For PR 9:** the sign-in refusal for a closed account (a TODO in `api.ts`, where a ban refuses sign-in; `BUY_LINES.closed`); call
   `holdCount` in every refund's batch and a chargeback's (chargebacks + 1 beside it; the 2nd closes the account). Closing an account or
   starting a hold should expire its open checkout (as deleting does, PR 8). **Record `refunded_cents` before tax** (as `cents`; the
