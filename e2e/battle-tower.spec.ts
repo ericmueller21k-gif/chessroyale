@@ -99,7 +99,22 @@ async function floorThenMatch(page: Page, n: number, bosses: number) {
   // (Its number on its walls; its bosses walking out of the elevator: a still mid-walk.)
   await expect.poll(async () => (await floorNow(page))?.t ?? 0, { timeout: 10_000 }).toBeGreaterThan(1200);
   await still(page, `floor-${n}-walk-in`);
-  await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("play");
+  // (This floor's match in play: its bosses the floor's. `window.match` keeps the last match after you leave one (App.tsx sets it,
+  // never clears it), so a floor left mid-play read "play" before the next floor's match was even made; main's run on Nov 26
+  // (227ad6a, desktop) then measured the board during the intro and caught it swapped for the play screen's, null.)
+  const ids = [...f.bosses].sort();
+  await expect
+    .poll(
+      () =>
+        page.evaluate((ids) => {
+          const m = (window as any).match;
+          const b = m?.boss;
+          const now: string[] = (b?.side ? b.side.bosses.map((x: { id?: string }) => x.id) : [b?.id]).slice().sort();
+          return m?.phase?.kind === "play" && JSON.stringify(now) === JSON.stringify(ids);
+        }, ids),
+      { timeout: 90_000, message: `floor ${n}'s match (${ids.join(", ")}) in play` },
+    )
+    .toBe(true);
   await expect(page.locator(".tw-strip").first()).toContainText(`Floor ${n}`);
 }
 

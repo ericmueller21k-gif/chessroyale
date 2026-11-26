@@ -37,6 +37,12 @@ export function panelHtml(s: Summary, d: Device): string {
   const most = s.top >= 0 ? `${s.frames} frames in ${s.secs.toFixed(1)} s. Most time: ${part(s.top, all!)} of ${ms(all!.mean)} ms (ours: ${part(s.ours, all!)})` : "No frames recorded";
   const mostTurn = s.topTurn >= 0 ? `. Turning, to ${Math.round(s.maxTurn)}°/s: ${part(s.topTurn, turn!)} of ${ms(turn!.mean)} (ours: ${part(s.oursTurn, turn!)})` : ". No turning";
   lines.push(`<div class="tfr-most">${most}${mostTurn}. ${s.bakes} painted, ${s.uploads} uploads, ${s.resets} atlas resets.</div>`);
+  // (Nov 26) What was uploaded, by source, the most first (the rest summed): Eric's 1,211 couldn't be placed from the panel.
+  if (s.uploadsBy.length) {
+    const top = s.uploadsBy.slice(0, 6).map(([k, n]) => `${esc(k)} ${n}`);
+    const rest = s.uploadsBy.slice(6).reduce((a, [, n]) => a + n, 0);
+    lines.push(`<div class="tfr-ups">Uploads by source: ${top.join(" · ")}${rest ? ` · others ${rest}` : ""}</div>`);
+  }
   // The parts: the mean ms a frame overall and split, and the worst.
   let t = `<table class="tfr-parts"><thead><tr><th>ms a frame</th>`;
   for (const g of s.segs) t += `<th>${esc(g.name)}</th>`;

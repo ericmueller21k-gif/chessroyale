@@ -47,11 +47,13 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   or Hollow while his second move is due.
 - **Each crowd turn:** every boss's `prepareTurn` (passive, meter at `BATTLE_TOWER.rageScale`); each one's ultimate step only at his
   own turn change (after his move for a `triggerAtHisTurn` ultimate, before it for the rest), one ultimate a turn change. **An
-  ultimate that can't wait** (`BossRules.ultimateNow`, Nov 19: Chandy's last chance, a mate in one open as your turn begins) runs
+  ultimate that can't wait** (`BossRules.ultimateNow`, Nov 19; Chandy's last chance, a mate in one open as your turn began, until Nov 26:
+  no boss uses it now) runs
   its step first at any turn change, the others waiting but one the boss who just moved prepared (Wrangler's line-up is on the
   board already); its boss then holds the crowd's turn (`focusNow`), so his Dodge plays as at his own turn change. Its question
   reads the side's allowed moves (`TurnContext.crowdMoves`: every boss's steps on a copy, worked out only when a mate is on the
-  board): docs/decisions/2026-11-19-ultimate-now.md. A hook reading a meter outside a step reads the floor's rates
+  board): docs/decisions/2026-11-19-ultimate-now.md. **Your mate on a floor of several is a mate** (Nov 26): Chandy's Dodge from a
+  mate comes only when he fights alone (docs/decisions/2026-11-26-chandy-mate-dodge.md); his meter's Dodge still comes on a floor. A hook reading a meter outside a step reads the floor's rates
   (`Battle.rageRates`: Folio's `creaseDue`).
 - **The side's rules:** the dispatcher's `sideCrowdAllowed` (every boss's marks merged, every `crowdFilter`, one lift, the barred
   move), `sideBossAllowed` (every mark binding the bosses, his own `bossStops`, the others' `sideStops`), the judge, fair play, the
@@ -342,7 +344,7 @@ take from `startSide`) fixed in PR 8 (above).
 `packages/chess/test/board-layer.test.ts` (every mark, overlaps, the lift, castling, promotion, en passant); each family's twin
 (today's rule, frozen, against the layer over seeded battles: `held-layer-twin.test.ts` for the held pieces, `square-layer-twin.test.ts` for the square marks, `shield-layer-twin.test.ts` for the shields); the boss kit (`packages/chess/test/boss-kit.test.ts`) and `e2e/boss-smoke.spec.ts` guard every boss
 moved onto the layer; `boss-kit-side.test.ts` runs the kit over every pair and a sample of threes (and audit 1's seeds), `several-bosses.test.ts` the side's
-rules (Chandy's last chance in every order, Folio's crease line at the floor's rates), and `boss-kit-parity.test.ts` solo against online
+rules (Chandy in every order: a mate in one brings no Dodge, your mate is a mate on a floor of several; Folio's crease line at the floor's rates), and `boss-kit-parity.test.ts` solo against online
 for every boss in a pair and two threes (more by hand: `KIT_PARITY_SIDES`); core `tower.test.ts` (the design's table, the deal over 300 seeds and two pools, the run's steps and lives, finding 7's start) and the runner's
 side of finding 7 in `several-bosses.test.ts`; server `tower.test.ts` (the index, every route's happy path and refusals, a result once and
 only for the floor started, the same result sent again, a win too soon, a free leave against a counted one, a floor whose bosses rest

@@ -425,8 +425,8 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
   expect(errors).toEqual([]);
 });
 
-test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking, a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (its pictures kept)", { tag: "@phone-only" }, async ({ page }) => {
-  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { kept: boolean; saved: number | null | undefined } } };
+test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking across the town at night among the bots and a crowd's tags (Nov 26), a full turn and zooming in and out paint nothing new, upload nothing (Nov 25) and start no atlas page again, on a first visit and a second (its pictures kept)", { tag: "@phone-only" }, async ({ page }) => {
+  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number; uploads: number; uploadsBy: [string, number][] } | null } | null; __townYou: () => { moving: boolean } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townHush: (on: boolean) => void; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number }; pictures: { kept: boolean; saved: number | null | undefined } } };
   const errors = watchErrors(page);
   const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Loading Chess Town" });
   // The bar's share as it shows (sampled every frame until it goes): it only goes up. And the step named under it (Nov 14), each new one.
@@ -443,7 +443,12 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
     requestAnimationFrame(f);
   });
   await asAdmin(page);
-  await page.goto("/town?sky=day&report");
+  // (At night, Nov 26: Eric's laptop's 1,211 uploads in 16.7 s of walking were the windows' lights, each baked and uploaded as it first
+  // shone; by day none shine. A crowd: more tags than the bots'. A run of 120 s, not the report's 30 (Nov 26): the town's steps are
+  // capped at 0.1 s, so on a CI runner drawing two software-WebGL towns at once, at 4 fps, the roam took 40 s, the run ended itself
+  // and Done was greyed; every frame of the roam is recorded now, checked below as Done is pressed.)
+  const at = "/town?sky=night&crowd=12&report=120";
+  await page.goto(at);
   await expect(bar).toBeVisible({ timeout: 30_000 });
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(page.locator(".town-loading")).toHaveCount(0);
@@ -460,8 +465,12 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   // said is a new picture, its bubble, the one thing made as it comes.)
   const roam = async (visit: string) => {
     await page.evaluate(() => (window as unknown as R).__townHush(true));
-    await page.evaluate(() => (window as unknown as R).__townWalk([4, 25]));
-    await page.waitForTimeout(1500);
+    // Across the town (Nov 26): the square, the park, the east homes, north, round to the west (a new area's lights and tags on the way).
+    for (const sq of [[24, 30], [36, 30], [39, 12], [17, 9], [5, 27]] as const) {
+      await page.evaluate((s) => (window as unknown as R).__townWalk(s), sq);
+      await page.waitForTimeout(300);
+      await page.waitForFunction(() => !(window as unknown as R).__townYou()?.moving, null, { timeout: 8000 }).catch(() => undefined);
+    }
     await page.evaluate(() => {
       const w = window as unknown as R & { __spin?: boolean };
       let h = 0;
@@ -483,11 +492,12 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
       await page.getByRole("button", { name: z, exact: true }).click();
       await page.waitForTimeout(900);
     }
+    expect((await page.evaluate(() => (window as unknown as R).__townReport()))!.state, `${visit}: still recording as the roam ends (all of it in the run)`).toBe("rec");
     await page.locator(".tfr-pill").getByRole("button", { name: "Done" }).click();
     const s = (await page.evaluate(() => (window as unknown as R).__townReport()))!.summary!;
     expect(s.frames, `${visit}: frames recorded`).toBeGreaterThan(10);
     expect(s.bakes, `${visit}: pictures painted after the loading screen`).toBe(0);
-    expect(s.uploads, `${visit}: pictures uploaded after the loading screen`).toBe(0);
+    expect(s.uploads, `${visit}: pictures uploaded after the loading screen (${(s.uploadsBy ?? []).map(([k, n]) => `${k} ${n}`).join(", ")})`).toBe(0);
     expect(s.resets, `${visit}: atlas pages started again`).toBe(0);
     expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
   };
@@ -522,7 +532,7 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   await lossCheck("the first visit");
   // The second visit: its pictures' pages uploaded whole (keep-pictures.ts, paint-gl.ts `adopt`, Nov 25), and the labels made again; the same.
   await expect.poll(() => page.evaluate(() => (window as unknown as R).__townPaint().pictures.saved), { timeout: 60_000 }).not.toBeUndefined();
-  await page.goto("/town?sky=day&report");
+  await page.goto(at);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect((await page.evaluate(() => (window as unknown as R).__townPaint())).pictures.kept, "the second visit's pictures were kept").toBe(true);
   await roam("the second visit");

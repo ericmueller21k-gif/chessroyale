@@ -14,8 +14,9 @@
  * the time flying from your clock to him.
  *
  * His ultimate, **Time Scramble** (the rage meter, `rageSpeed.dash`): the usual warning, then from the next crowd turn your next
- * scrambleMoves moves get scrambleSeconds each (the move's clock; a bank still pays for them and still gets its increment). Its
- * moment (`scramble`) as the first begins; the countdown over the board on every one of them.
+ * scrambleMoves moves get scrambleSeconds each, by its use this battle (Eric, Nov 26: 5 s the first time, 3 s the second;
+ * scrambleSecondsOf), the move's clock; a bank still pays for them and still gets its increment. Its moment (`scramble`) as the
+ * first begins; the countdown over the board on every one of them.
  *
  * **Out of time is never a loss against him** (`noTimeLoss`; the brief): a move whose time runs out, a scrambled one's 3 s or an
  * empty bank's, gets a move played for you at random (`outOfTime`: seeded, from the judge's top flagTop moves allowed; the sim's
@@ -27,15 +28,20 @@
  *
  * Test switches (solo): `?power=clockslap`: his first move slaps as a capture would, whatever it is (then only his captures);
  * `?power=scramble` warns as the second turn begins; `?power=rush` warns of his Scramble Rush as the second turn begins (it comes
- * as the third does); `?power=clockfit` adds a multi-hit on his second turn; `?power=popoff` has his pop-off on his second turn.
+ * as the third does); `?power=clockfit` adds a multi-hit on his second turn; `?power=popoff` has his pop-off on his second turn
+ * (and his "Hang on" on his fourth); `?power=hangon` has his "Hang on" on his second turn (no pop-off before it).
  *
  * Dash v2 (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md): Time Scramble at most twice a battle (maxUltimates.dash); and once a
  * battle his **Scramble Rush** (below): a memory test over a frozen position, whose only outcome is his extra move or not.
  * Dash v3 (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): his clock multi-hit every 4 or 5 of his moves (`clockFit`: 5
  * quick smacks and always a line, clockHitTurns), and twice a battle his pop-off (popOff: state, not an event; popOffMs holds his
  * thinking for its two beats, 3 smacks and a pop-off line, then 10 fast smacks and a love line).
+ * Dash, Nov 26 (Eric; docs/decisions/2026-11-26-dash-hang-on.md): the second pop-off is his **"Hang on"** instead (popOff.hangOn):
+ * screen only, while he thinks after your move (your move played and confirmed as ever, nobody's clock running): your piece slid
+ * back, his clock routine, your time "given back", your piece slid home, then his move (hangOnTimeline; popOffMs holds his move
+ * for it). And Time Scramble's seconds go by its use: 5, then 3, for 3 moves.
  */
-import { BOSS_POWERS, DASH_STALL, DASH_TAP, type BossPowerSettings, type BossPowerState, type BossState, type DashRush, type DashState } from "@chessroyale/core";
+import { BOSS_POWERS, DASH_HANG_ON, DASH_STALL, DASH_TAP, type BossPowerSettings, type BossPowerState, type BossState, type DashRush, type DashState } from "@chessroyale/core";
 import { playOnBoard, type BoardState } from "../boards.ts";
 import { applyMove, inCheck, legalMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
@@ -66,12 +72,28 @@ export const DASH_FX = {
   // (His pop-off's two beats, while he thinks: dashPopOff's popMs and loveMs.)
   popOff: BOSS_POWERS.dashPopOff.popMs,
   popOffFast: BOSS_POWERS.dashPopOff.loveMs,
+  // (His "Hang on"'s four, while he thinks (Nov 26; hangOnTimeline): the slow smacks, cheetah speed, "almost done", the wind-up to
+  // your piece back home.)
+  hangOn: DASH_HANG_ON.slowMs,
+  hangOnFast: DASH_HANG_ON.almostMs,
+  hangOnAlmost: DASH_HANG_ON.fastMs - DASH_HANG_ON.almostMs,
+  hangOnSorry: DASH_HANG_ON.windMs + DASH_HANG_ON.sorryMs + DASH_HANG_ON.returnMs,
 } as const;
 
 type DashSettings = Pick<BossPowerSettings, "slapBankSeconds" | "slapMoveSeconds" | "slapMoveMin" | "scrambleMoves" | "scrambleSeconds">;
 
 /** His clock's state (a fresh one: nothing yet). */
 export const dashOf = (p: Pick<BossPowerState, "dash"> | null | undefined): DashState => p?.dash ?? { slaps: 0, stolen: 0, flags: 0 };
+
+/**
+ * A Time Scramble's seconds a move, by its use this battle (`use`: 0 the first, 1 the second): scrambleSeconds' entry, the last's
+ * past its end (Eric, Nov 26: 5 s the first time, 3 s the second).
+ */
+export const scrambleSecondsOf = (use: number, s: Pick<BossPowerSettings, "scrambleSeconds"> = BOSS_POWERS): number =>
+  s.scrambleSeconds[Math.max(0, Math.min(use, s.scrambleSeconds.length - 1))]!;
+
+/** The seconds a move of the Time Scramble under way (its use: the battle's ultimates so far, this one counted). */
+const scrambleNow = (p: Pick<BossPowerState, "ults">, s: Pick<BossPowerSettings, "scrambleSeconds"> = BOSS_POWERS): number => scrambleSecondsOf((p.ults ?? 1) - 1, s);
 
 /** Crowd turn `turn` is one of the Time Scramble's (it came at `ultAt`). */
 export function scrambleOn(p: Pick<BossPowerState, "ultAt"> | null | undefined, turn: number, s: Pick<BossPowerSettings, "scrambleMoves"> = BOSS_POWERS): boolean {
@@ -92,7 +114,7 @@ export function scrambleLeft(p: Pick<BossPowerState, "ultAt"> | null | undefined
 export function dashMoveClock(boss: Pick<BossState, "id" | "powers" | "crowdMoves" | "result"> | null | undefined, base: number, s: DashSettings = BOSS_POWERS): number {
   const p = boss?.powers;
   if (!boss || boss.id !== "dash" || !p || boss.result) return base;
-  if (scrambleOn(p, turnOf(boss), s)) return s.scrambleSeconds;
+  if (scrambleOn(p, turnOf(boss), s)) return scrambleNow(p, s);
   const slap = p.dash?.slap;
   if (slap && !slap.bank && slap.at === boss.crowdMoves) return slappedClock(base, s);
   return base;
@@ -136,16 +158,19 @@ export const DASH: BossRules = {
     // (Not while his Scramble Rush is warned and still to come: it waits until after it.)
     if (next.warnAt === undefined && !t.ultNext && rushWarned(next.dash)) return false;
     if (!warnThenUnleash(next, t)) return false;
-    t.events.push({ kind: "scramble", turn: t.turn, count: t.s.scrambleMoves, seconds: t.s.scrambleSeconds });
+    // (Its seconds by its use: this one isn't counted in `ults` until it has come, the dispatcher's unleashed.)
+    t.events.push({ kind: "scramble", turn: t.turn, count: t.s.scrambleMoves, seconds: scrambleSecondsOf(next.ults ?? 0, t.s) });
     return true;
   },
   // (Its moves: the meter stays empty and nothing else comes until the last is over.)
   ultimateRunning: (p, turn, s) => scrambleOn(p, turn, s),
   // As the crowd's turn after his turn's end begins: your flag's jab, then his slap.
   everyTurn(next, t) {
-    // His pop-off, twice a battle, on two of his turns (from the seed; the test switch: his second and eighth turns). It is state,
-    // not an event: it plays while he thinks, before his move lands (popOffMs), so it's set before the rest reads his state.
-    if (next.dash && popOffTurns(t.seed, t.s.dashPopOff, t.test).includes(t.turn)) next.dash = { ...next.dash, popOff: { at: t.turn } };
+    // His pop-off, twice a battle, on two of his turns (from the seed; the test switch: his second and fourth turns), the second his
+    // "Hang on" since Nov 26 (Eric). It is state, not an event: it plays while he thinks, before his move lands (popOffMs), so it's
+    // set before the rest reads his state.
+    const [pop, hang] = popOffTurns(t.seed, t.s.dashPopOff, t.test);
+    if (next.dash && (t.turn === pop || t.turn === hang)) next.dash = { ...next.dash, popOff: t.turn === hang ? { at: t.turn, hangOn: true } : { at: t.turn } };
     const d = next.dash;
     if (!d) return;
     if (d.flag && d.flag.at + 1 === t.turn) t.events.push({ kind: "flag", turn: t.turn, move: d.flag.move });
@@ -211,39 +236,84 @@ export function clockHitTurns(seed: number, upTo: number, s: BossPowerSettings["
 export const clockHitOn = (seed: number, turn: number, s: BossPowerSettings["dashClockFit"] = BOSS_POWERS.dashClockFit, test = ""): boolean =>
   (test === "clockfit" && turn === 2) || clockHitTurns(seed, turn, s).includes(turn);
 
+/** What his pop-off's helpers read of the battle (the state's and the screens' view alike). */
+type PopOffBoss = { id?: string; crowdMoves?: number; powers?: { turn?: number; dash?: { popOff?: { at: number; hangOn?: true } | null } | null } | null } | null | undefined;
+
 /**
- * His pop-off is playing as his thinking screen's beats, for the move he's about to play: the turn it came on is his turn to think
- * (powers.turn). Until his move lands, the move list keeps his move out (MovePanel's shownRows).
+ * His pop-off (or his "Hang on") is playing as his thinking screen's beats, for the move he's about to play after yours: the turn it
+ * came on is his turn to think (powers.turn), your move of that turn played (crowdMoves; never his extra move after a failed Scramble
+ * Rush, which comes before your move: Nov 26). Until his move lands, the move list keeps his move out (MovePanel's shownRows).
  */
-export const popOffPending = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): boolean =>
-  boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at === boss.powers.turn;
+export const popOffPending = (boss: PopOffBoss): boolean =>
+  boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at === boss.powers.turn && boss.crowdMoves === boss.powers.turn;
+
+/** His "Hang on" is playing as his thinking screen's beats (the second pop-off's place since Nov 26; popOffPending). */
+export const hangOnPending = (boss: PopOffBoss): boolean => popOffPending(boss) && !!boss!.powers!.dash!.popOff!.hangOn;
 
 /**
  * His move's row stays out of the move list while his pop-off's beats play: the pop-off came on this turn or the one before (the
  * runner's turn moves on as his move is played, before its beats end).
  */
-export const popOffHolding = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): boolean =>
+export const popOffHolding = (boss: PopOffBoss): boolean =>
   boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at >= (boss.powers.turn ?? 0) - 1;
 
 /**
  * His two pop-off turns: two of his turns from dashPopOff.from to dashPopOff.to, at least dashPopOff.gap apart, from the battle's
- * seed (the same on every device; in order). The test switch (?power=popoff): his second and fourth turns (close together, so
- * the e2e plays few moves: before his Scramble Rush can come, turn 7, and before Stockfish mates the test's shuffled knights).
+ * seed (the same on every device; in order). The second is his "Hang on" (Nov 26). The test switches: ?power=popoff, his second
+ * and fourth turns (close together, so the e2e plays few moves: before his Scramble Rush can come, turn 7, and before Stockfish mates
+ * the test's shuffled knights); ?power=hangon, the "Hang on" on his second turn and no pop-off (0: no turn is 0).
  */
 export function popOffTurns(seed: number, s: BossPowerSettings["dashPopOff"] = BOSS_POWERS.dashPopOff, test = ""): [number, number] {
   if (test === "popoff") return [2, 4];
+  if (test === "hangon") return [0, 2];
   const first = s.from + Math.floor(powerRoll(seed, "popoff", 1) * (s.to - s.from + 1 - s.gap));
   const second = first + s.gap + Math.floor(powerRoll(seed, "popoff", 2) * (s.to - first - s.gap + 1));
   return [first, second];
 }
 
 /**
- * How long his pop-off holds his thinking, ms (its two beats, DASH_FX.popOff + popOffFast), while he thinks for the turn it comes
- * (`powers.turn`: the turn his move after the crowd's is dispatched as). Else 0. That think waits for it (bossThinkMs, the solo and
- * the server alike), so his move lands after it and no crowd clock runs meanwhile.
+ * How long his pop-off holds his thinking, ms (its two beats, DASH_FX.popOff + popOffFast; his "Hang on", its whole timeline and
+ * DASH_HANG_ON.tailMs), while he thinks for the turn it comes (`powers.turn`: the turn his move after the crowd's is dispatched
+ * as). Else 0. That think waits for it (bossThinkMs, the solo and the server alike), so his move lands after it and no crowd clock
+ * runs meanwhile.
  */
-export const popOffMs = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): number =>
-  popOffPending(boss) ? DASH_FX.popOff + DASH_FX.popOffFast : 0;
+export const popOffMs = (boss: PopOffBoss): number =>
+  !popOffPending(boss) ? 0 : hangOnPending(boss) ? hangOnTimeline().total + DASH_HANG_ON.tailMs : DASH_FX.popOff + DASH_FX.popOffFast;
+
+/**
+ * His "Hang on" (Eric, Nov 26; DASH_HANG_ON), ms from its start (his thinking screen's, as the device first sees it):
+ *   0          "Hang on, one second.", his slow smacks begin (`hangOn`)
+ *   backAt     your piece slides back to its square; your clock (shown) ticks down from here
+ *   cheetahAt  "Time for cheetah speed!": the super fast smacks, head up (`hangOnFast`)
+ *   almostAt   "Almost done, bro." (`hangOnAlmost`), the smacks going on
+ *   windAt     the wind-up on the clock's front (`hangOnSorry`)
+ *   sorryAt    "Sorry about that, bro. Here's your time back.": your clock (shown) counts back up, done by upAt
+ *   returnAt   your piece slides to its played square
+ *   total      his move (his thinking waits for it, and DASH_HANG_ON.tailMs more: popOffMs)
+ * `beats`: each time the screen first shows something new by the clock alone (in order).
+ */
+export function hangOnTimeline(s: typeof DASH_HANG_ON = DASH_HANG_ON) {
+  const cheetahAt = s.slowMs;
+  const almostAt = cheetahAt + s.almostMs;
+  const windAt = cheetahAt + s.fastMs;
+  const sorryAt = windAt + s.windMs;
+  const returnAt = sorryAt + s.sorryMs;
+  const total = returnAt + s.returnMs;
+  return { backAt: s.backAt, cheetahAt, almostAt, windAt, sorryAt, upAt: sorryAt + s.countUpMs, returnAt, total, beats: [0, s.backAt, cheetahAt, almostAt, windAt, sorryAt, returnAt] };
+}
+
+/**
+ * Your clock as his "Hang on" shows it (a display only), `t` ms into it, from what your clock really holds (`real`, ms): ticking
+ * down from `backAt` (never under 0), then from `sorryAt` counting back up to `real` by `upAt`, and `real` from then on.
+ */
+export function hangOnClock(real: number, t: number, s: typeof DASH_HANG_ON = DASH_HANG_ON): number {
+  const tl = hangOnTimeline(s);
+  const down = (u: number) => Math.max(0, real - Math.max(0, u - tl.backAt));
+  if (t < tl.sorryAt) return down(t);
+  if (t >= tl.upAt) return real;
+  const low = down(tl.sorryAt);
+  return low + ((real - low) * (t - tl.sorryAt)) / (tl.upAt - tl.sorryAt);
+}
 
 // ---------------- His clock tap and his stall skit (Eric, Nov 17) ----------------
 
@@ -672,8 +742,8 @@ export interface DashView {
   scramble: { at: number; moves: number; seconds: number } | null;
   /** His Scramble Rush, once it has come (the swept pieces, and once it's over how many the crowd put back and his extra move). */
   rush?: DashRush | null;
-  /** His pop-off (Eric, Nov 7): his turn it comes on, so his screen plays it while he thinks. */
-  popOff?: { at: number } | null;
+  /** His pop-off (Eric, Nov 7): his turn it comes on, so his screen plays it while he thinks; `hangOn`: his "Hang on" in its place (Nov 26). */
+  popOff?: { at: number; hangOn?: true } | null;
   /** His stall skit's fake move, once it has come (Eric, Nov 17): the crowd move it came on and the move he took back. */
   stall?: { at: number; move: string } | null;
   /** His lying-down clock tap, once it has come (Eric, Nov 17): the crowd move it came on. */
@@ -689,7 +759,7 @@ export function dashView(p: BossPowerState, s: DashSettings = BOSS_POWERS): Dash
     stolen: d.stolen,
     flag: d.flag ?? null,
     flags: d.flags,
-    scramble: p.ultAt !== undefined && scrambleOn(p, p.turn, s) ? { at: p.ultAt, moves: s.scrambleMoves, seconds: s.scrambleSeconds } : null,
+    scramble: p.ultAt !== undefined && scrambleOn(p, p.turn, s) ? { at: p.ultAt, moves: s.scrambleMoves, seconds: scrambleNow(p, s) } : null,
     ...(d.rush ? { rush: { ...d.rush, moves: d.rush.moves.map((m) => ({ ...m })) } } : {}),
     ...(d.popOff ? { popOff: { ...d.popOff } } : {}),
     ...(d.stall ? { stall: { ...d.stall } } : {}),

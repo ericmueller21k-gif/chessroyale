@@ -91,6 +91,11 @@ async function trace(bossId: string, raids: number, seed: number) {
         await runner.playFunhouse(engines[0]);
         continue;
       }
+      if (runner.dodgeDue()) {
+        // Chandy's Dodge (his meter, or your mate holding the battle): every round dodged, as the other drivers play it.
+        while (runner.dodgeDue()) runner.finishDodgeRound({});
+        continue;
+      }
       runner.deal();
       const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
       const allowed = new Set(runner.crowdAllowed() ?? legalMoves(fen));

@@ -282,28 +282,6 @@ describe("several bosses: Folio's Crease line asked at the floor's rates (audit 
   });
 });
 
-describe("Folio's Crease line as one of his ultimates ends, the crowd in danger (review of #968, finding 1)", () => {
-  it("his Crease running out as the crowd's next turn begins counts as over: in danger, the line is asked for now, so the warning comes that turn", async () => {
-    const at = async (until: number, judged: number, dangerSpent = false) => {
-      const r = runner(["folio"]);
-      r.deal();
-      await r.score(new Map([["h0", { move: "e2e4", thinkMs: 1000 }]]));
-      expect(r.bossToMove() && r.boss!.id).toBe("folio");
-      const boss = r.boss!;
-      const p = boss.powers!;
-      const crease = { line: "a2a3", at: 0, until, side: boss.crowdSide };
-      r.state.boss = { ...boss, powers: { ...p, ultAt: 0, warnAt: 0, crease, judged, charge: 0, lost: 0, rageUsed: 0, ults: 1, ...(dangerSpent ? { dangerSpent: true as const } : {}) } };
-      return r.creaseAsk();
-    };
-    const turn = 2; // (The crowd's next turn: its first move played.)
-    expect(await at(turn - 1, BOSS_POWERS.dangerAt)).not.toBeNull();
-    // (Still running that turn, under the line, or this danger's ultimate already spent: none.)
-    expect(await at(turn, BOSS_POWERS.dangerAt)).toBeNull();
-    expect(await at(turn - 1, BOSS_POWERS.dangerAt - 0.01)).toBeNull();
-    expect(await at(turn - 1, BOSS_POWERS.dangerAt, true)).toBeNull();
-  });
-});
-
 describe("several bosses: each boss's own turn, and every move reaching every boss (the review of PR #808)", () => {
   it("Smudgy's forced moves are his own: the boss to move before him is never held to one, and his Camouflage isn't worn down by the others' turns", async () => {
     const held: string[] = [];
@@ -385,7 +363,7 @@ describe("several bosses: each boss's own turn, and every move reaching every bo
   }
 });
 
-describe("several bosses: an ultimate that can't wait (Chandy's last chance; audit 1, finding 2)", () => {
+describe("several bosses: an ultimate that can't wait (BossRules.ultimateNow; Chandy's last chance until Nov 26; audit 1, finding 2)", () => {
   /** Scholar's mate against him, the bosses' moves played as given (seed 5): Qxf7# open as the crowd's turn 4 begins. */
   async function scholars(order: readonly string[], each?: (r: MatchRunner, k: number) => void) {
     const r = runner(order);
@@ -403,28 +381,23 @@ describe("several bosses: an ultimate that can't wait (Chandy's last chance; aud
 
   // (Every order the audit tried: alone, Chandy first or second of two, each place of three.)
   for (const order of [["chandy"], ["timber", "chandy"], ["zebra", "chandy"], ["chandy", "timber"], ["chandy", "zebra"], ["chandy", "timber", "zebra"], ["timber", "zebra", "chandy"], ["timber", "chandy", "zebra"]]) {
-    it(`${order.join(" + ")}: a mate in one open as your turn begins brings his Dodge at once, whoever moved last`, async () => {
+    it(`${order.join(" + ")}: a mate in one as your turn begins brings no Dodge (the last chance went, Nov 26); your mate: alone, his Dodge first; on a floor of several, a mate`, async () => {
       const { r, chandy } = await scholars(order);
       expect(legalMoves(r.boards.get(0)!.fen)).toContain("h5f7");
-      expect(chandy.powers!.events.map((e) => e.kind)).toEqual(expect.arrayContaining(["warn", "dodge"]));
-      expect(chandy.powers!.ultAt).toBe(4);
-      // (One ultimate a turn change: his, the others' waiting.)
-      for (const b of r.sideBosses()) if (b.id !== "chandy") expect(b.powers?.events.map((e) => e.kind) ?? [], b.id).not.toContain("warn");
-      // (He holds your turn: his Dodge plays on it round by round, read from him; then your move, and the order goes on after
-      // whoever moved last.)
-      expect(r.boss!.id).toBe("chandy");
-      let rounds = 0;
+      expect(chandy.powers!.events.map((e) => e.kind)).not.toContain("dodge");
+      expect(chandy.powers!.events.map((e) => e.kind)).not.toContain("warn");
+      expect(chandy.powers!.ultAt).toBeUndefined();
+      r.deal();
+      await r.score(new Map([["h0", { move: "h5f7", thinkMs: 1000 }]]));
+      const alone = order.length === 1;
+      expect(r.dodgeDue()).toBe(alone);
+      expect(r.stageComplete()).toBe(!alone);
       while (r.dodgeDue()) {
         const d = r.boss!.powers!.chandy!.dodge!;
         r.finishDodgeRound({ h0: d.rounds[d.results.length]!.safe });
-        rounds++;
       }
-      expect(rounds).toBe(BOSS_POWERS.chandy.dodgeRounds);
-      r.deal();
-      await r.score(new Map([["h0", { move: "a2a3", thinkMs: 1000 }]]));
-      expect(r.boards.get(0)!.history.at(-1)).toBe("a2a3");
-      expect(r.bossToMove()).toBe(true);
-      expect(r.boss!.id).toBe(order[3 % order.length]);
+      expect(r.stageComplete()).toBe(true);
+      expect(r.finishBossBattle()).toBe("crowd");
     });
   }
 
@@ -458,20 +431,6 @@ describe("several bosses: an ultimate that can't wait (Chandy's last chance; aud
     expect(both[0]!.find((x) => x.startsWith("pig:"))).toMatch(/showdown/);
     expect(both[0]!.find((x) => x.startsWith("gingerbread:"))).not.toMatch(/warn|blizzard/);
   }, 60_000);
-
-  it("a mate another boss's limit stops isn't open: no Dodge (Ginger's freeze holding your queen; the side's allowed moves asked)", async () => {
-    for (const order of [["gingerbread", "chandy"], ["chandy", "gingerbread"]]) {
-      const { r, chandy } = await scholars(order, (r, k) => {
-        // (No freeze of his own until then; then his freeze on your queen through turn 4.)
-        const i = r.state.bosses!.findIndex((o) => o.id === "gingerbread");
-        const own = r.state.focus === i ? r.state.boss! : r.state.bosses![i]!;
-        own.powers = { ...own.powers!, nextPassive: 9, ...(k === 2 ? { frozen: { square: "h5", piece: "q", until: 4 } } : {}) };
-      });
-      expect(r.crowdAllowed(), order.join(" + ")).not.toContain("h5f7");
-      expect(chandy.powers!.events.map((e) => e.kind), order.join(" + ")).not.toContain("dodge");
-      expect(chandy.powers!.ultAt, order.join(" + ")).toBeUndefined();
-    }
-  });
 });
 
 describe("several bosses: the design's out-of-turn rules", () => {

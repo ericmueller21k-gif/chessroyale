@@ -123,7 +123,9 @@ message, without a code change: each is a Worker variable (docs/areas/ops.md, "K
    - `PAUSE_SQUADS`: Squads' PLAY and new parties.
    - `PAUSE_RANKED1V1`: ranked 1 v 1's queue (games already running finish; the bot game is reached only from the queue).
    - `PAUSE_SOLO`: Solo and Boss alone.
-   - `PAUSE_SHOP`: getting shop items and opening crates (the locker stays).
+   - `PAUSE_SHOP`: getting shop items and opening crates (the locker stays). Not buying coins: that's `PAUSE_PAYMENTS`.
+   - `PAUSE_PAYMENTS`: buying coins (every Buy says "Buying is paused for a moment."; no new checkout). A payment already made is
+     still credited, and refunds keep working.
    - `PAUSE_FRIENDS`: friends and invites.
    - `PAUSE_REWARDS`: XP, the daily reward and level rewards (games play on; the result's XP box says "Rewards are paused for
      a moment."; levels reached meanwhile are paid at the next game after it).

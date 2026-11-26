@@ -2130,7 +2130,7 @@ export class LobbyCore {
   /**
    * The boss's view as every message sends it (the boss's, a round's, a reveal's): Chandy's Dodge, until it's over, only as far as it
    * has been seen (dodgeSeen: no safe square before its vote closes, each teleport in its time). Dodge is set up as his move applies
-   * and plays from the next round on (startDodge): until then nothing of it has been seen. (Each message is stored as sent, so a
+   * (or as your mating move does) and plays from the next round on (startDodge): until then nothing of it has been seen. (Each message is stored as sent, so a
    * device back from a reload, `last`, gets no more than everyone had then.)
    */
   private bossViewSent(justKilled: string | null = null): NetBoss {

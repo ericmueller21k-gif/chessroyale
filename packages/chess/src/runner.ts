@@ -140,6 +140,7 @@ import {
   chandyBattle,
   CHANDY_FX,
   dodgeWon,
+  mateHeld,
   trainSquare,
   trainWon,
   type DarkTryResult,
@@ -1409,7 +1410,8 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b) || trainWon(b)) || ((this.bossForceWin || this.bossForceEnd !== null) && this.bossToMove());
+    // (Your mate held for Chandy's Dodge, from it: not decided until it's over, Eric, Nov 26: mateHeld.)
+    if (this.state.boss) return !this.sideBosses().some((b) => mateHeld(b)) && (this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b) || trainWon(b)) || ((this.bossForceWin || this.bossForceEnd !== null) && this.bossToMove()));
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1778,7 +1780,7 @@ export class MatchRunner {
     return dashBattle.finishRush(this.battle, places, only);
   }
 
-  /** Chandy's Dodge is due: it came as this crowd turn began, and the turn waits for it, round by round (chandyBattle.dodgeDue). */
+  /** Chandy's Dodge is due: it came as this crowd turn began (or from your mate, the battle waiting), and the turn waits for it, round by round (chandyBattle.dodgeDue). */
   dodgeDue(): boolean {
     return chandyBattle.dodgeDue(this.battle);
   }
@@ -2044,7 +2046,7 @@ export class MatchRunner {
     return gardenerBattle.ask(this.battle);
   }
 
-  /** The watering comes even when it would lose him real material (the test switch's first, or the admins' trigger). */
+  /** The watering comes even when it would lose him real material (the test switch's first, the admins' trigger, or the guard has held it ultWaitMax times). */
   waterAny(): boolean {
     return gardenerBattle.any(this.battle);
   }
@@ -2596,8 +2598,8 @@ export class MatchRunner {
    * (BossRules.outOfTurn: Wrangler's reply to the showdown's duel, Folio's move again after Revision), else the boss after the one
    * who moved last. The crowd to move: the boss after the one who moved (his turn change), or Hollow himself while his second
    * move is due (Lights out failed: his turn again before the next boss's), or the boss whose ultimate couldn't wait and came as
-   * this crowd turn began (BossRules.ultimateNow: Chandy's Dodge, read from him as at his own turn change). The order goes on
-   * from the boss after whoever moved.
+   * this crowd turn began (BossRules.ultimateNow, read from him as at his own turn change; no boss uses it since Nov 26). The
+   * order goes on from the boss after whoever moved.
    */
   private focusNow(): number {
     const n = this.state.bosses!.length;
@@ -2643,7 +2645,7 @@ export class MatchRunner {
    * the one after his own move for an ultimate his move prepares (`triggerAtHisTurn`: Wrangler's line-up, Folio's crease), the
    * one before it for every other (in focus); and one ultimate a turn change, that first one first (its line-up is ready), the
    * other waiting, its warning kept. The move just played is passed only to the boss who played it. An ultimate that can't wait
-   * (BossRules.ultimateNow: Chandy's last chance, asked with the side's allowed moves) runs its step first at any turn change, the
+   * (BossRules.ultimateNow, asked with the side's allowed moves; Chandy's last chance until Nov 26, no boss now) runs its step first at any turn change, the
    * others' waiting but a prepared one (its line-up is already on the board), and its boss holds the crowd's turn (focusNow).
    */
   private prepareSide() {
@@ -2666,7 +2668,7 @@ export class MatchRunner {
     const mine = (i: number) => (afterHis(i) ? i === moved : i === nextUp);
     const order = [moved, ...Array.from({ length: n }, (_, k) => (f + k) % n).filter((i) => i !== moved)];
     // (The crowd's allowed moves this turn on the side, as every boss's steps leave them, a can't-wait ultimate's own held: worked
-    // out on a copy, once, and only when asked (Chandy's last chance asks them when you have a mate in one).)
+    // out on a copy, once, and only when asked: by an ultimate that can't wait.)
     const start = this.state;
     let limits: readonly string[] | null = null;
     const crowdMoves = () => (limits ??= this.sideLimits(start, () => this.sideSteps(board, s, order, (i, came) => cantWait(i) || !mine(i) || came, undefined, false)));

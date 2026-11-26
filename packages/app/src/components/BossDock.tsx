@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal, memo } from "preact/compat";
 import { BOSS_PARTY, BOSS_POWERS, type ItemLook } from "@chessroyale/core";
 import { PARTY_COLORS } from "../board/logic.ts";
-import { bossRules } from "@chessroyale/chess";
+import { bossRules, hangOnClock, hangOnTimeline } from "@chessroyale/chess";
 import { account } from "../account.ts";
 import { bossAlone, type GameView, type StrikeState } from "../game.ts";
 import { pawnLook } from "../looks.ts";
@@ -65,6 +65,7 @@ export function BossDock({
   powerUp,
   king,
   clock,
+  gagAt,
   panel,
 }: {
   match: GameView;
@@ -105,6 +106,11 @@ export function BossDock({
    * stopped it (the boss's turn, the reveal, the waiting); null: none on this screen.
    */
   clock?: DockClockRun | null;
+  /**
+   * Dash's "Hang on" started at this time (Nov 26): the clock shows what his gag shows, ticking down and then given back
+   * (hangOnClock), a display only: what it holds is untouched.
+   */
+  gagAt?: number;
   /**
    * A phone: the panel under the row, left of the God King (MovePanel.tsx, BossPanel: the scoreboard and the moves), he at
    * the strip's far right (Eric, Oct 25). Left out (the Hidden Boss's phase change and phase 2), he stands under the row in
@@ -185,7 +191,7 @@ export function BossDock({
             )}
           </div>
           {/* (Lights out's prompt takes the whole box, as it takes the arrows' room.) */}
-          {!wide && clock !== null && <DockClock match={match} boss={boss} run={clock} />}
+          {!wide && clock !== null && <DockClock match={match} boss={boss} run={clock} gagAt={gagAt} />}
         </div>
         {!wide && (
           <button type="button" class="nav-btn" aria-label="Next move" disabled={!view?.browsing} onClick={() => view?.go(view.ply + 1)}>
@@ -460,15 +466,18 @@ export const DOCK_PLUS_MS = 1600;
  * he adds one), a move begins with it added, and a brief "+10" over the number says so (ClockPlus: on the page's top layer). It
  * re-renders itself, once each time the second shown changes; the screen around it doesn't.
  */
-export function DockClock({ match, boss, run }: { match: GameView; boss: GameView["boss"]; run?: DockClockRun }) {
+export function DockClock({ match, boss, run, gagAt }: { match: GameView; boss: GameView["boss"]; run?: DockClockRun; gagAt?: number }) {
   let h = held.get(match);
   if (!h) held.set(match, (h = { run: null, ms: null }));
   const now = Date.now();
   // (The first look after your move went in: what was left then is what it holds.)
   if (run) h.run = run;
-  const ms = h.run ? clockLeft(h.run, now) : h.ms;
+  const real = h.run ? clockLeft(h.run, now) : h.ms;
   if (!run && h.run) h.run = null;
-  h.ms = ms;
+  h.ms = real;
+  // (Dash's "Hang on" while he thinks: his gag's clock, shown only; it holds `real` all the while.)
+  const gag = !run && gagAt !== undefined && real !== null && now >= gagAt && now < gagAt + hangOnTimeline().total ? now - gagAt : null;
+  const ms = gag !== null ? hangOnClock(real!, gag) : real;
   const [, setShown] = useState(0);
   const timeRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -476,14 +485,23 @@ export function DockClock({ match, boss, run }: { match: GameView; boss: GameVie
     const t = setInterval(() => setShown(Math.ceil(clockLeft(run, Date.now()) / 1000)), 200);
     return () => clearInterval(t);
   }, [run?.startsAt, run?.deadline, run?.frozen?.until]);
+  useEffect(() => {
+    if (gagAt === undefined || run) return;
+    // (Drawn again through his gag, and once more as it ends: the clock back where it holds.)
+    const t = setInterval(() => setShown(Date.now()), 100);
+    const end = setTimeout(() => clearInterval(t), Math.max(0, gagAt + hangOnTimeline().total - Date.now()) + 150);
+    return () => (clearInterval(t), clearTimeout(end));
+  }, [gagAt, !run]);
   // (Before your first move of the battle there's nothing to hold yet: none, and the words have the whole box.)
   if (ms === null) return null;
   // (The increment: the bullet clock's once it's on, else Boss Battle's 10 + 10's.)
   const inc = !run ? 0 : bulletOn(boss) ? bulletIncrementOn(boss) : match.settings.bossClock ? match.settings.timeIncrementSeconds : 0;
   const plus = inc > 0 && now - run!.startsAt < DOCK_PLUS_MS;
   const low = !!run && Math.ceil(ms / 1000) <= TICK_FROM_SECONDS;
+  // (His gag's clock looks as if it runs, until it's given back.)
+  const ticking = !!run || (gag !== null && gag < hangOnTimeline().upAt);
   return (
-    <span class={`dk-clock${run ? " running" : " held"}${low ? " low" : ""}${plus ? " plus" : ""}`} role="timer" aria-label={`Your clock: ${clockShown(ms)}`}>
+    <span class={`dk-clock${ticking ? " running" : " held"}${low ? " low" : ""}${plus ? " plus" : ""}`} role="timer" aria-label={`Your clock: ${clockShown(ms)}`} data-gag={gag !== null ? "" : undefined}>
       <span ref={timeRef} class="dk-time" aria-hidden="true">
         {clockShown(ms)}
       </span>

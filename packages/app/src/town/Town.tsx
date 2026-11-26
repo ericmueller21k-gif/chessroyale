@@ -33,7 +33,7 @@
  * docs/areas/town-square.md.
  */
 import { roomLoadSlice } from "./shops/load-slice.ts";
-import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, setFps, setRec, summarize, timerStep } from "./frame-report.ts";
+import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, reportMs, setFps, setRec, summarize, timerStep, upName } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
@@ -368,6 +368,9 @@ export function TownScreen({
       ? part === "top"
         ? chunk(import("./shops/tower-floor-scene.ts")).then((m) => m.towerFloorFx(floorS.current!))
         : chunk(import("./shops/tower-scene.ts")).then((m) => m.towerLobbyFx(() => towerBest.current))
+      : id === "birdie"
+      ? // (Birdie's Station, Nov 26: the birds at the bar, who fly off when you come up to it: shops/birdie-birds.ts.)
+        chunk(import("./shops/birdie-birds.ts")).then((m) => m.birdieFx(() => shopCtl.current?.youAt?.() ?? null))
       : id !== "recluse"
       ? null
       : part === "top"
@@ -1709,15 +1712,22 @@ function startTown(
       r.youArt = null;
       mount(null, null);
     } else
-      void dressed(wear, pawnImage(side, null), !!on, sideOfPawn(color)).then(([art, back]) => {
-        if (youLook !== key || !alive) return;
-        r.youArt = art;
-        mount(art, back);
-      });
+      dressing.push(
+        dressed(wear, pawnImage(side, null), !!on, sideOfPawn(color)).then(([art, back]) => {
+          if (youLook !== key || !alive) return;
+          r.youArt = art;
+          mount(art, back);
+        }),
+      );
   };
   /** The rider your look asked for last (its frames may still be coming), and the one drawn now: each holds a share. */
   let youRide: Rider | null = null;
   let youShown: Rider | null = null;
+  /**
+   * (Nov 26) The pawns' crate items on their way (the bots', yours as the town opens): the loading screen waits for them, up to
+   * `loadSheetWaitMs`, and keeps their pictures. A bot's dressed pawn was made just after it and uploaded the first time it showed.
+   */
+  const dressing: Promise<unknown>[] = [];
   /** Someone else's pawn (a bot, the test player; real players later) as the square draws it, made once: its items, its ride. */
   const dressPerson = (p: Person) => {
     const lk = p.look;
@@ -1735,11 +1745,13 @@ function startTown(
     };
     if (!lookKey(wear)) mount(null, null);
     else
-      void dressed(wear, plain, !!on, lk.side === "dark" ? "b" : "w").then(([art, back]) => {
-        if (!alive) return;
-        if (art) r.botArt.set(p.id, art);
-        mount(art, back);
-      });
+      dressing.push(
+        dressed(wear, plain, !!on, lk.side === "dark" ? "b" : "w").then(([art, back]) => {
+          if (!alive) return;
+          if (art) r.botArt.set(p.id, art);
+          mount(art, back);
+        }),
+      );
   };
   const offAccount = onAccountChange(dress);
   dress();
@@ -1769,8 +1781,9 @@ function startTown(
     setFps((fps = new FpsCount(fpsEl)));
   }
   // `/town?report`, anyone's, as `?fps` (Eric, Nov 11): the frame report (frame-report.ts). Every frame of a run recorded from your
-  // first move, for 30 s or until Done, then one panel to screenshot. Without `?report` there's no recorder: the marks are null checks.
-  const rec = TOWN_ASKED.report ? new FrameRec() : null;
+  // first move, for 30 s (`?report=S`: S s) or until Done, then one panel to screenshot. Without `?report` there's no recorder: the marks
+  // are null checks.
+  const rec = TOWN_ASKED.report ? new FrameRec(undefined, reportMs(TOWN_ASKED.reportS)) : null;
   setRec(rec);
   let recPill: ReturnType<typeof reportPill> | null = null;
   let recPanel: HTMLElement | null = null;
@@ -2856,6 +2869,9 @@ function startTown(
         onLoading(share * f.loadPaintShare, "pictures");
         await tick();
       }
+      // (The pawns' crate items, Nov 26: waited for, up to loadSheetWaitMs from here, and kept with the rest.)
+      await Promise.race([Promise.allSettled(dressing), new Promise((go) => setTimeout(go, f.loadSheetWaitMs))]);
+      for (const a of [r.youArt, ...r.botArt.values()]) if (a) keep(upName(a.img, "dressed pawn"));
       if (pool) Object.assign(pictures, { byWorkers: pool.made.workers, whileWaiting: pool.made.here, workers: pool.workers });
       pool?.close();
       pool = null;

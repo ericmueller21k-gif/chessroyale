@@ -1,15 +1,15 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_CLOCK, BOSS_POWERS, DASH_STALL, DASH_TAP } from "@chessroyale/core";
-import { stallTimeline } from "@chessroyale/chess";
-import { DASH_FIT_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES, DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } from "../packages/app/src/characters/dash-lines.ts";
+import { hangOnTimeline, stallTimeline } from "@chessroyale/chess";
+import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES, DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } from "../packages/app/src/characters/dash-lines.ts";
 import { BOARD_SEL, asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
  * Dash, the cheetah (docs/decisions/2026-11-03-dash.md), in the game for admins first (BOSS_ADMIN_FIRST): his tile only on an
  * admin's Boss raid screen; Boss alone (Boss Battle's clock: the bank) with the test switches: his Clock Slap (`&power=clockslap`:
  * his first move slaps as a capture would) taking slapBankSeconds off your bank, the time flying from your clock to him, Tick's
- * tally; Time Scramble (the admins' trigger): its banner, then 3 seconds a move with the big 3-2-1 over the board; a scrambled move
+ * tally; Time Scramble (the admins' trigger): its banner, then 5 seconds a move (its first use's) with the big count over the board; a scrambled move
  * left to run out: a move played for you (never a loss), his jab; nothing on screen moving all along.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase?.kind ?? "none").catch(() => "none");
@@ -88,7 +88,7 @@ test.describe("Dash", () => {
     await expect(tiles.getByRole("radio", { name: "Dash", exact: true })).toBeVisible();
   });
 
-  test("Clock Slap takes time off your bank and flies it to him; Time Scramble: 3 s a move counted down over the board; out of time, a move is played for you, never a loss; nothing moves", { tag: "@phone-only" }, async ({ page }) => {
+  test("Clock Slap takes time off your bank and flies it to him; Time Scramble: 5 s a move (its first use) counted down over the board; out of time, a move is played for you, never a loss; nothing moves", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -116,16 +116,17 @@ test.describe("Dash", () => {
     await expect(page.locator(".tk-tally .tk-text")).toHaveText(`−0:${String(BOSS_POWERS.slapBankSeconds).padStart(2, "0")}`);
     const bank1 = await page.evaluate(() => (window as any).match.standings().find((s: any) => s.isYou)?.bankMs ?? null);
     if (bank0 !== null && bank1 !== null) expect(bank1).toBeLessThanOrEqual(bank0 + BOSS_CLOCK.incrementSeconds * 1000 - BOSS_POWERS.slapBankSeconds * 1000);
-    // Time Scramble by the admins' trigger: after his next move, TIME SCRAMBLE!, then your move has 3 seconds.
+    // Time Scramble by the admins' trigger: after his next move, TIME SCRAMBLE!, then your move has 5 seconds (the battle's first: Eric,
+    // Nov 26, 5 s for 3 moves the first time, 3 s the second).
     await page.locator(".ult-test").click();
     await playOne(page);
     await yourMove(page);
     const clock = await page.evaluate(() => ({ ms: (window as any).match.phase.deadline - (window as any).match.phase.startsAt }));
-    expect(clock.ms).toBe(BOSS_POWERS.scrambleSeconds * 1000);
+    expect(clock.ms).toBe(BOSS_POWERS.scrambleSeconds[0]! * 1000);
     s = await seen(page);
     expect(s.kinds).toContain("scramble");
-    expect(s.banners.some((b) => /TIME SCRAMBLE!/.test(b) && /next 5 moves: 3 seconds each/.test(b))).toBe(true);
-    // Left to run out: 3, 2, 1 over the board, then a move played for you (a move of yours on the board, no submit), and play goes on.
+    expect(s.banners.some((b) => /TIME SCRAMBLE!/.test(b) && /next 3 moves: 5 seconds each/.test(b))).toBe(true);
+    // Left to run out: 5 … 3, 2, 1 over the board, then a move played for you (a move of yours on the board, no submit), and play goes on.
     const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
     await expect(page.locator(".dash-count")).toBeVisible();
     await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
@@ -137,8 +138,8 @@ test.describe("Dash", () => {
     s = await seen(page);
     expect(s.secs).toEqual(expect.arrayContaining(["3", "2", "1"]));
     expect(s.kinds).toContain("flag");
-    // Still scrambled: this move too has 3 seconds and its countdown; a move in time is played as ever.
-    expect(await page.evaluate(() => (window as any).match.phase.deadline - (window as any).match.phase.startsAt)).toBe(BOSS_POWERS.scrambleSeconds * 1000);
+    // Still scrambled: this move too has 5 seconds and its countdown; a move in time is played as ever.
+    expect(await page.evaluate(() => (window as any).match.phase.deadline - (window as any).match.phase.startsAt)).toBe(BOSS_POWERS.scrambleSeconds[0]! * 1000);
     await expect(page.locator(".dash-count")).toHaveAttribute("data-left", String(BOSS_POWERS.scrambleMoves - 1));
     await playOne(page);
     // Nothing shifts: the board, your clock and Tick's tally kept their places and sizes all along.
@@ -387,7 +388,7 @@ type ClockSeen = {
   /** The figure's clicks: `anim:click` counted as the figure enters each click frame (a smack is one click frame). */
   cues: Record<string, number>;
 };
-const ALL_CLOCK_LINES = [...DASH_FIT_LINES, ...DASH_POPOFF_LINES, ...DASH_LOVE_LINES];
+const ALL_CLOCK_LINES = [...DASH_FIT_LINES, ...DASH_POPOFF_LINES, ...DASH_LOVE_LINES, ...Object.values(DASH_HANG_ON_LINES)];
 async function watchClock(page: Page) {
   await page.evaluate((lines: string[]) => {
     const w = window as any;
@@ -454,7 +455,7 @@ test.describe("Dash's clock", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the pop-off, twice: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks, twice; your clock starts after the first", { tag: "@phone-only" }, async ({ page }) => {
+  test("the pop-off: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks; your clock starts after it", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -464,19 +465,16 @@ test.describe("Dash's clock", () => {
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
     await yourMove(page);
     await watchClock(page);
-    // (The test switch: the pop-offs are his second and fourth turns' (Eric, Nov 8: two a battle). His pop-off comes as your move
-    // before his turn does, so four of your moves reach the fourth: before his Scramble Rush can come (from his turn 7, its
-    // countdown smacks fit3 too) and before Stockfish mates the shuffled knights.)
-    for (let i = 0; i < 4; i++) await playOne(page);
+    // (The test switch: the pop-off is his second turn's; his fourth's is his "Hang on" since Nov 26, its own test below. His pop-off
+    // comes as your move before his turn does, so two of your moves reach it.)
+    for (let i = 0; i < 2; i++) await playOne(page);
     await yourMove(page);
     const seen = await page.evaluate(() => (window as any).__clock as ClockSeen);
     const pops = Object.values(seen.moments).filter((m) => m.kind === "popOff").sort((x, y) => x.at - y.at);
     const fast = Object.values(seen.moments).filter((m) => m.kind === "popOffFast").sort((x, y) => x.at - y.at);
-    expect(pops).toHaveLength(2);
-    expect(fast).toHaveLength(2);
+    expect(pops).toHaveLength(1);
+    expect(fast).toHaveLength(1);
     for (const m of [...pops, ...fast]) expect(m.count).toBe(m.kind === "popOff" ? "3" : "10");
-    // (The second pop-off comes after the first one's beats are over.)
-    expect(pops[1]!.at).toBeGreaterThan(fast[0]!.at + BOSS_POWERS.dashPopOff.loveMs);
     expect(seen.lines.some((l) => DASH_POPOFF_LINES.includes(l))).toBe(true);
     expect(seen.lines.some((l) => DASH_LOVE_LINES.includes(l))).toBe(true);
     // (Its two beats play one after the other, 4.6 s; your clock starts only after them, so nobody's time goes while he thinks.)
@@ -504,8 +502,96 @@ test.describe("Dash's clock", () => {
     expect(landed!).toBeGreaterThanOrEqual(beatEnd - 300);
     // (The move list doesn't grow while the beats play: his move isn't in it until it lands.)
     for (const x of seen.samples) if (x.t >= beatStart && x.t < landed! - 50) expect(x.rows, `rows at ${x.t - beatStart} ms`).toBe(before);
-    expect(seen.cues["fit10:click"]).toBe(2 * BOSS_POWERS.dashPopOff.hits);
-    expect(seen.cues["fit3:click"]).toBe(2 * BOSS_POWERS.dashPopOff.smacks);
+    expect(seen.cues["fit10:click"]).toBe(BOSS_POWERS.dashPopOff.hits);
+    expect(seen.cues["fit3:click"]).toBe(BOSS_POWERS.dashPopOff.smacks);
+    expect(errors).toEqual([]);
+  });
+
+  test("his \"Hang on\" (Eric, Nov 26, the second pop-off's place): your piece back, his clock routine, your time given back, your piece home, then his move; the game unchanged", { tag: "@phone-only" }, async ({ page }) => {
+    test.setTimeout(240_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await asAdmin(page);
+    // (The test switch: his "Hang on" on his second turn, no pop-off before it.)
+    await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=hangon&mode=raid");
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    await watchClock(page);
+    await playOne(page);
+    await yourMove(page);
+    // Your second move: what it is, and from then each frame the board's two squares, your clock as shown, the bank and the moves.
+    const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+    const legal = new Chess(fen).moves({ verbose: true }).filter((m) => m.piece === "n" && !m.captured).map((m) => m.from + m.to).sort();
+    const mine = legal[0] ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to).sort()[0]!;
+    await page.evaluate((mv: string) => {
+      const w = window as any;
+      const from = mv.slice(0, 2);
+      const to = mv.slice(2, 4);
+      w.__hang = [] as { t: number; from: boolean; to: boolean; clock: string; gag: boolean; bank: number | null; rows: number; thinking: boolean }[];
+      const look = () => {
+        w.__hang.push({
+          t: Date.now(),
+          from: !!document.querySelector(`.hb-board piece[data-square="${from}"]:not(.fading)`),
+          to: !!document.querySelector(`.hb-board piece[data-square="${to}"]:not(.fading)`),
+          clock: document.querySelector(".dk-clock .dk-time")?.textContent ?? "",
+          gag: !!document.querySelector(".dk-clock[data-gag]"),
+          bank: w.match?.standings?.().find((s: any) => s.isYou)?.bankMs ?? null,
+          rows: document.querySelectorAll(".mv-row").length,
+          thinking: !!w.match?.phase?.thinking,
+        });
+        requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    }, mine);
+    await submitMove(page, mine, fen);
+    await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+    await yourMove(page);
+    const seen = await page.evaluate(() => (window as any).__clock as ClockSeen);
+    const hang = await page.evaluate(() => (window as any).__hang as { t: number; from: boolean; to: boolean; clock: string; gag: boolean; bank: number | null; rows: number; thinking: boolean }[]);
+    const tl = hangOnTimeline();
+    // Its four beats, in order, at the timeline's times (no pop-off before it).
+    const beat = (k: string) => Object.values(seen.moments).filter((m) => m.kind === k);
+    expect(beat("popOff")).toHaveLength(0);
+    for (const k of ["hangOn", "hangOnFast", "hangOnAlmost", "hangOnSorry"]) expect(beat(k), k).toHaveLength(1);
+    const at0 = beat("hangOn")[0]!.at;
+    for (const [k, t] of [["hangOnFast", tl.cheetahAt], ["hangOnAlmost", tl.almostAt], ["hangOnSorry", tl.windAt]] as const) {
+      expect(Math.abs(beat(k)[0]!.at - at0 - t), k).toBeLessThan(400);
+    }
+    // His four lines, in order (each shown in full: the text on the page).
+    const order = [DASH_HANG_ON_LINES.start, DASH_HANG_ON_LINES.cheetah, DASH_HANG_ON_LINES.almost, DASH_HANG_ON_LINES.sorry];
+    for (const l of order) expect(seen.lineAt[l], l).toBeDefined();
+    for (let i = 1; i < order.length; i++) expect(seen.lineAt[order[i]!]!).toBeGreaterThan(seen.lineAt[order[i - 1]!]!);
+    // (Each on its beat, the sorry before his move: never queued behind the one before.)
+    for (const [l, t] of [[DASH_HANG_ON_LINES.cheetah, tl.cheetahAt], [DASH_HANG_ON_LINES.almost, tl.almostAt], [DASH_HANG_ON_LINES.sorry, tl.sorryAt]] as const) {
+      expect(Math.abs(seen.lineAt[l]! - at0 - t), l).toBeLessThan(600);
+    }
+    // His smacks: slow, then the fast ones (head up), then the wind-up's whirr.
+    expect(seen.cues["hangSlow:click"] ?? 0).toBeGreaterThanOrEqual(10);
+    expect(seen.cues["hangFast:click"] ?? 0).toBeGreaterThanOrEqual(20);
+    // The board: your piece home as your move goes in, back on its square through the gag, home again before his move lands.
+    const during = hang.filter((x) => x.t >= at0 + tl.backAt + 400 && x.t < at0 + tl.returnAt - 300);
+    expect(during.length).toBeGreaterThan(30);
+    for (const x of during) expect([x.from, x.to], `${x.t - at0} ms in`).toEqual([true, false]);
+    // (His move lands as his thinking ends: solo's match already has it, the screen holding it back, as for the pop-off.)
+    const landed = hang.find((x) => x.t > at0 && !x.thinking)?.t;
+    expect(landed).toBeDefined();
+    const home = hang.filter((x) => x.t >= at0 + tl.returnAt + 400 && x.t < landed!);
+    expect(home.length).toBeGreaterThan(0);
+    for (const x of home) expect(x.to).toBe(true);
+    // His move lands only after it all (his thinking held for it): the move list as it was meanwhile (your move in it). Your move
+    // stands: the game's moves, yours then his.
+    expect(landed! - at0).toBeGreaterThanOrEqual(tl.total - 300);
+    const rows = hang.find((x) => x.t >= at0)!.rows;
+    for (const x of hang.filter((y) => y.t >= at0 && y.t < landed! - 50)) expect(x.rows, `rows at ${x.t - at0} ms`).toBe(rows);
+    expect(await page.evaluate(() => (window as any).match.boss.board.history.at(-2))).toBe(mine);
+    // Your clock as shown: it ticks down through the gag, then comes back to just what it held; the real bank never moved meanwhile.
+    const held = hang.find((x) => x.t >= at0)!.clock;
+    const shown = hang.filter((x) => x.t >= at0 && x.t < at0 + tl.total - 100);
+    expect(shown.some((x) => x.gag && x.clock !== held)).toBe(true);
+    expect(hang.filter((x) => x.t >= at0 + tl.upAt + 100 && x.t < landed!).every((x) => x.clock === held)).toBe(true);
+    expect(new Set(shown.map((x) => x.bank)).size).toBe(1);
+    expect(await page.evaluate(() => (window as any).match.boss.result ?? null)).toBeNull();
     expect(errors).toEqual([]);
   });
 });

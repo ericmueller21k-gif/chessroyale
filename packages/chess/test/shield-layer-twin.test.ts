@@ -12,8 +12,6 @@ import {
   layerStop,
   legalMoves,
   marksStop,
-  mateOpen,
-  matingMoves,
   mergeLayers,
   pieceAt,
   stopFieldsOf,
@@ -30,8 +28,8 @@ import { kitBattles, quickSearches, runBattle, type KitBattle } from "./boss-kit
  * and `stopReason` onto the board layer (`shieldFrom` piece marks: `goldMarks`, `chandyMarks`). Over seeded battles of both
  * bosses (the kit's, more seeds, and each power that shields switched on), on every crowd turn and before every move of his: the
  * crowd's allowed moves (the dispatcher's and the runner's), his, the Last Stand's test, the screens' words for every legal move
- * (the match's state and the screens' view), Don Dough's power turn (a pawn could take gold) and Chandy's last chance all agree
- * exactly with today's rules, frozen here as they stood on main. Solo and the server both ask the runner's `crowdAllowed` and
+ * (the match's state and the screens' view) and Don Dough's power turn (a pawn could take gold) all agree exactly with today's rules
+ * (Chandy's last chance was here too, until it went on Nov 26: docs/decisions/2026-11-26-chandy-mate-dodge.md), frozen here as they stood on main. Solo and the server both ask the runner's `crowdAllowed` and
  * `bossAllowed`, read here too (the server's own path: boss-kit-parity.test.ts).
  */
 
@@ -93,17 +91,6 @@ const OLD: Record<string, OldRules> = {
   },
 };
 
-/** chandy.ts `mateOpen`. */
-function oldMateOpen(c: ChandyState | null | undefined, fen: string, turn: number): boolean {
-  const mates = matingMoves(fen);
-  if (!mates.length) return false;
-  const f = stopFieldsOf({ chandy: c, turn });
-  const dizzy = c?.dizzy && c.dizzy.turn === turn ? c.dizzy.squares : [];
-  const marks = chandyMarks(f && { ...f, shields: [] }, dizzy);
-  const ok = (m: string) => !marksStop(marks, fen, m) && !(f?.shields.length && takesShield(fen, m, f.shields));
-  return mates.some(ok) || !legalMoves(fen).some(ok);
-}
-
 /** boss-powers.ts `limitCrowd`: the marks on the layer, then the boss's own limits. */
 function oldLimitCrowd(old: OldRules, rules: BossRules, boss: BossState, fen: string, legal: string[]): string[] {
   const marks = unshielded(rules.layer?.(boss, fen));
@@ -158,7 +145,7 @@ describe("the shields on the board layer: the twin of today's rules", () => {
     it(`${id}: both sides' allowed moves, the Last Stand's test, the screens' words and the powers' own looks are today's, every turn`, async () => {
       const undo = quickSearches();
       const old = OLD[id]!;
-      const t = { crowdTurns: 0, bossTurns: 0, shielded: 0, stopped: 0, lifted: 0, mates: 0 };
+      const t = { crowdTurns: 0, bossTurns: 0, shielded: 0, stopped: 0, lifted: 0 };
       const diffs: string[] = [];
       try {
         for (const k of battlesOf(id)) {
@@ -182,11 +169,6 @@ describe("the shields on the board layer: the twin of today's rules", () => {
               const shieldless = old.crowd(legal, boss, fen);
               if (shieldless.length < legal.length) t.stopped++;
               if (!shieldless.length && legal.length) t.lifted++;
-              if (id === "chandy") {
-                const p = boss.powers;
-                if (matingMoves(fen).length) t.mates++;
-                diff("mateOpen", oldMateOpen(p.chandy, fen, p.turn), mateOpen(p, { fen, turn: p.turn }));
-              }
             } else {
               t.bossTurns++;
               const was = oldBossAllowed(rules, boss, fen);

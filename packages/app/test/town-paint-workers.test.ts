@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 // The street town as an admin's (every home): its pictures are all made here.
 vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 
-const { framePixels, paintBatch, paintCopy, paintSpec, roofCopy } = await import("../src/town/paint-jobs.ts");
+const { framePixels, glowPixels, GLOW_GAP, paintBatch, paintCopy, paintSpec, roofCopy } = await import("../src/town/paint-jobs.ts");
+const { COLISEUM_ART, HOUSES } = await import("../src/town/houses/index.ts");
+const { PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS } = await import("../src/town/houses/park.ts");
 const { PaintPool, workerCount } = await import("../src/town/paint-pool.ts");
 const { roofCuts } = await import("../src/town/box-draw.ts");
 const { lotArt, streetBoxes } = await import("../src/town/boxes.ts");
@@ -41,6 +43,8 @@ function townCharacters(): Character[] {
   return [...out];
 }
 const same = (a: Painted, b: Painted): boolean => {
+  if ("pieces" in a || "pieces" in b)
+    return "pieces" in a && "pieces" in b && a.pieces.join() === b.pieces.join() && (a.sheet === null ? b.sheet === null : !!b.sheet && same(a.sheet, b.sheet));
   if ("data" in a || "data" in b) return "data" in a && "data" in b && a.w === b.w && a.h === b.h && Buffer.from(a.data).equals(Buffer.from(b.data));
   return a.length === b.length && a.every((f, i) => f.length === b[i]!.length && f.every((c, j) => { const e = b[i]![j]!; return c.w === e.w && c.h === e.h && c.ox === e.ox && c.oy === e.oy && Buffer.from(c.data).equals(Buffer.from(e.data)); }));
 };
@@ -49,9 +53,10 @@ function viaWorker(specs: PaintSpec[]): Painted[] {
   const defs: [number, string][] = [];
   const at = new Map<object, number>();
   const jobs = specs.map((sp, i) => {
-    const o = sp.kind === "frame" ? sp.ch : sp.b;
+    const o = sp.kind === "roof" ? sp.b : sp.ch;
     let ref = at.get(o);
-    if (ref === undefined) at.set(o, (ref = defs.push([at.size, JSON.stringify(sp.kind === "frame" ? paintCopy(sp.ch) : roofCopy(sp.b))]) - 1));
+    if (ref === undefined) at.set(o, (ref = defs.push([at.size, JSON.stringify(sp.kind === "roof" ? roofCopy(sp.b) : paintCopy(sp.ch))]) - 1));
+    if (sp.kind === "glow") return { i, kind: "glow" as const, ref, spots: structuredClone(sp.spots), pools: structuredClone(sp.pools) };
     return sp.kind === "frame" ? { i, kind: "frame" as const, ref, k: sp.k, dark: sp.dark } : { i, kind: "roof" as const, ref, q: sp.q };
   });
   const out: Painted[] = [];
@@ -86,6 +91,45 @@ describe("Chess Town's paint workers paint every picture as the main thread does
       if (sp.kind === "roof" && !same(got[i]!, roofCuts(sp.b, sp.b.box, sp.q))) differ++;
     });
     expect(differ, `roofs that differ of ${specs.length}`).toBe(0);
+  });
+
+  it("every glow the loading screen bakes (Nov 26: homes, the Colosseum, fronts, sides, the lamp), from the worker's copy: the same sheet and pieces, each piece on its sheet with clear pixels round it", { timeout: 120_000 }, () => {
+    const specs: PaintSpec[] = [];
+    for (const a of [...Object.values(HOUSES), COLISEUM_ART]) specs.push({ kind: "glow", ch: a.ch, spots: a.lights, pools: a.pools });
+    for (const l of STREET_LOTS) if (lotArt(l).lights.length) specs.push({ kind: "glow", ch: lotArt(l).front, spots: lotArt(l).lights, pools: [] });
+    const sides = new Set<Character>();
+    for (const b of BOXES)
+      for (const side of [b.box.left, b.box.right, b.box.back ?? b.box.rear])
+        if (side?.lights.length && !sides.has(side.ch)) (sides.add(side.ch), specs.push({ kind: "glow", ch: side.ch, spots: side.lights, pools: [] }));
+    specs.push({ kind: "glow", ch: PARK_LAMP, spots: PARK_LAMP_LIGHTS, pools: PARK_LAMP_POOLS });
+    expect(specs.length).toBeGreaterThan(100);
+    const got = viaWorker(specs);
+    let differ = 0;
+    let pieces = 0;
+    specs.forEach((sp, i) => {
+      if (sp.kind !== "glow") return;
+      const want = glowPixels(sp.ch, sp.spots, sp.pools);
+      if (!same(got[i]!, want)) differ++;
+      const { sheet, pieces: at } = want;
+      if (!sheet) return;
+      // Each piece on the sheet, none within GLOW_GAP of another (the atlas's padding), and nothing drawn outside the pieces.
+      const own = new Int32Array(sheet.w * sheet.h).fill(-1);
+      for (let k = 0; k < at.length; k += 7) {
+        pieces++;
+        const [sx, sy, w, h] = at.slice(k, k + 4) as [number, number, number, number];
+        expect(sx >= 0 && sy >= 0 && sx + w <= sheet.w && sy + h <= sheet.h, `${sp.ch.id}: a piece on its sheet`).toBe(true);
+        for (let y = sy - GLOW_GAP; y < sy + h + GLOW_GAP; y++)
+          for (let x = sx - GLOW_GAP; x < sx + w + GLOW_GAP; x++) {
+            if (x < 0 || y < 0 || x >= sheet.w || y >= sheet.h) continue;
+            const inside = x >= sx && y >= sy && x < sx + w && y < sy + h;
+            if (inside) own[y * sheet.w + x] = k;
+            else expect(own[y * sheet.w + x], `${sp.ch.id}: pieces apart`).toBe(-1);
+          }
+      }
+      for (let i = 0; i < own.length; i++) if (own[i]! < 0 && sheet.data[i * 4 + 3]) differ++;
+    });
+    expect(pieces, "the glows' pieces").toBeGreaterThan(2000);
+    expect(differ, `glows that differ of ${specs.length}`).toBe(0);
   });
 
   it("a worker's copy of a character holds only its idle frames and the parts they draw, as plain data", () => {

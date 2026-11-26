@@ -49,12 +49,18 @@
  *   hand him a promotion for his next move, fizzles.
  * A power never leaves you without a legal move: the dispatcher lifts the turn's limits if it would.
  *
- * **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16): his rage meter (his own: dodgeMeter) is dimmed until the
- * fifth upgrade, then fills over chandy.dodgeAfterMoves of your moves (nothing else fills or drains it); full, the usual warning, then
- * as your next turn begins Dodge (the crowd's turn waits for it: dodgeDue). **Last chance:** as your turn begins, if he hasn't used
- * it and you have a move that mates him (mateOpen), Dodge comes now, its warning with it, whatever his rifle or meter (on a shared
- * floor too, whichever boss moved last, the others' ultimates waiting: ultimateNow; the side's limits asked); the board
- * comes back after it and you may still play the mate. On a blank board, your king in the middle of the 3 x 3 round e4 (White) or e5
+ * **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16), two ways in:
+ * - **His meter:** his rage meter (his own: dodgeMeter) is dimmed until the fifth upgrade, then fills over chandy.dodgeAfterMoves of
+ *   your moves (nothing else fills or drains it); full, the usual warning, then as your next turn begins Dodge (the crowd's turn waits
+ *   for it: dodgeDue). Survived, the board comes back as it was and play goes on.
+ * - **Checkmated** (Eric, Nov 26: "he'll only do it if you put him in checkmate. And then instead of the game ending right away, it
+ *   pauses"; "it also triggers still from his 5 upgrades"): your move mates him and he hasn't used it (afterCrowdMove: `mate`): the
+ *   battle waits (stageComplete: mateHeld). His opening first (dodgeTimeline's `opening`, before the Dodge's own start: the pause on
+ *   your move, his jump onto the board and collapse, his reach for your king, the zap, his line), then Dodge; survived, the mate stands:
+ *   the win beat (`win`, after its last round), then the battle is yours by mate. Lost, his. Used already: your mate is a mate. On a
+ *   Battle Tower floor of several bosses a mate is a mate (the side's king isn't his alone); his meter brings it there as alone.
+ * (The last chance, a mate in one as your turn began, and #968's danger line went with this: Nov 26.)
+ * On a blank board, your king in the middle of the 3 x 3 round e4 (White) or e5
  * (Black): first the warning volley (Eric, Nov 16): the clones fire once on lines that miss your king (dodgeVolley), no vote, then
  * "Dodge the next one!". Then three rounds: four clones, two on rank lines and two on file lines, leave exactly one square safe
  * (dodgeRounds); they teleport chandy.dodgeTeleports' times into the vote, each one shifting the safe square a step. The crowd votes
@@ -69,11 +75,11 @@
  */
 import { BOSS_POWERS, CHANDY_MOVES, type BossPowerSettings, type BossPowerState, type BossState, type ChandyDodge, type ChandyLock, type ChandyMove, type ChandyState, type DodgeLine, type DodgeResult, type DodgeRound, type PowerEvent } from "@chessroyale/core";
 import { Chess, type Square } from "chess.js";
-import type { BoardState } from "../boards.ts";
-import { applyMove, attackedSquares, exchangeNet, fenAtPly, kingAttacked, legalMoves, matingMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
+import { boardEnd, type BoardState } from "../boards.ts";
+import { applyMove, attackedSquares, exchangeNet, fenAtPly, kingAttacked, legalMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { PASS_WAIT, VALUE, from, inDanger, logit, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
+import { PASS_WAIT, VALUE, from, logit, other, powerRoll, testSwitch, to, turnOf, ultCapped, unleashed, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
 import { heldIn, marksStop, type LayerMarks, type PieceMark, type SquareMark } from "../board-layer.ts";
 import { lands } from "./boingo.ts";
 import { passTurn } from "./hollow.ts";
@@ -807,6 +813,10 @@ export function dodgeVolley(center: string, seed: number, n: number): DodgeLine[
   ];
 }
 
+/** A mate's opening, step by step (Eric, Nov 26), in order: dodgeTimeline's `opening`. */
+export const MATE_STEPS = ["pause", "jump", "reach", "zap", "line"] as const;
+export type MateStep = (typeof MATE_STEPS)[number];
+
 /**
  * Dodge's beats (ms from its start; the server, solo and every screen alike; nobody's clock runs): the scope-in on your king, his
  * slide to the center (`slideAt`); the warning volley (`volley`: the clones appear at `at`, the beams fire at `fireAt` and have all
@@ -815,6 +825,13 @@ export function dodgeVolley(center: string, seed: number, n: number): DodgeLine[
  * lines flashing), the beams (`blastAt`: each from its clone's muzzle across the board, dodgeStaggerMs apart, dodgeTravelMs each),
  * the hit or DODGED as the last lands (`hitAt`), the beams held until `end` (dodgeHoldMs). A hit that loses: the kill from `hitAt`
  * for `killMs` (the beams on your king, then his shatter), then the result (dodgeEndAt).
+ *
+ * A Dodge from your mate (ChandyDodge.mate; Eric, Nov 26) has two more, the art's beats (the characters' job fits them):
+ * - `opening`, before its start (negative times, `openingMs` long): each step's `at` and `end` (MATE_STEPS): `pause` on your mating
+ *   move (the board as it landed), `jump` (he leaps onto the board's middle and collapses), `reach` (his arm out toward your king),
+ *   `zap` (at your king: it slides to the center as the scope-in follows), `line` (his line, in his speech box). Then the scope-in.
+ * - `win`, after a survived Dodge's last round (`at` = its `end`): the board back with your mate on it, shown as yours (CHECKMATE!),
+ *   until `end`; then the battle is the crowd's (dodgeEndAt).
  */
 export function dodgeTimeline(s: ChandySettings = BOSS_POWERS.chandy) {
   const travel = 3 * s.dodgeStaggerMs + s.dodgeTravelMs;
@@ -837,18 +854,29 @@ export function dodgeTimeline(s: ChandySettings = BOSS_POWERS.chandy) {
   // test: the volley's lines, then each round as it opens (the round before over), its lines and each teleport. (The scope-in and the
   // volley's beams show nothing a rejoin could use twice; a round's beams and its hit play out its result, kept by the update that
   // closes it.)
-  const beats = [volley.at, ...rounds.flatMap((r) => [r.openAt, r.voteAt, ...r.teleports])];
-  return { slideAt: s.dodgeScopeMs, volley, rounds, beats, killMs: s.dodgeKillMs + s.dodgeShatterMs, total: rounds.at(-1)?.end ?? 0 };
+  const total = rounds.at(-1)?.end ?? 0;
+  const stepMs: Record<MateStep, number> = { pause: s.matePauseMs, jump: s.mateJumpMs, reach: s.mateReachMs, zap: s.mateZapMs, line: s.mateLineMs };
+  const openingMs = MATE_STEPS.reduce((n, k) => n + stepMs[k], 0);
+  let o = -openingMs;
+  const opening = Object.fromEntries(MATE_STEPS.map((k) => [k, { at: o, end: (o += stepMs[k]) }])) as Record<MateStep, { at: number; end: number }>;
+  const win = { at: total, end: total + s.mateWinMs };
+  // (A mate's opening steps and its win beat show by the clock alone too: in the list, before its start and at its end.)
+  const beats = [...MATE_STEPS.map((k) => opening[k].at), volley.at, ...rounds.flatMap((r) => [r.openAt, r.voteAt, ...r.teleports]), win.at];
+  return { slideAt: s.dodgeScopeMs, volley, rounds, beats, killMs: s.dodgeKillMs + s.dodgeShatterMs, total, opening, openingMs, win };
 }
+
+/** How long before its start (`at`) a Dodge's run begins: a mate's opening (dodgeTimeline's `openingMs`); else none. */
+export const dodgeLeadMs = (d: Pick<ChandyDodge, "mate"> | null | undefined, s: ChandySettings = BOSS_POWERS.chandy): number => (d?.mate ? dodgeTimeline(s).openingMs : 0);
 
 /** A Dodge's hits so far. */
 export const dodgeHits = (d: Pick<ChandyDodge, "results">): number => d.results.filter((r) => r.hit).length;
 
-/** When a Dodge is done (ms from its start, `d` over): the kill's end after a losing hit, else the last round's end. */
-export function dodgeEndAt(d: Pick<ChandyDodge, "rounds" | "results">, s: ChandySettings = BOSS_POWERS.chandy): number {
+/** When a Dodge is done (ms from its start, `d` over): the kill's end after a losing hit, else the last round's end (a mate's: its win beat's). */
+export function dodgeEndAt(d: Pick<ChandyDodge, "rounds" | "results" | "mate">, s: ChandySettings = BOSS_POWERS.chandy): number {
   const tl = dodgeTimeline(s);
   const k = Math.max(0, d.results.length - 1);
-  return dodgeHits(d) >= s.dodgeHits ? tl.rounds[k]!.hitAt + tl.killMs : tl.rounds[k]!.end;
+  if (dodgeHits(d) >= s.dodgeHits) return tl.rounds[k]!.hitAt + tl.killMs;
+  return d.mate && d.results.length >= d.rounds.length ? tl.win.end : tl.rounds[k]!.end;
 }
 
 /**
@@ -881,6 +909,12 @@ export const dodgeOver = (d: Pick<ChandyDodge, "rounds" | "results"> | null | un
 export const dodgeWon = (boss: Pick<BossState, "powers"> | null | undefined, s: Pick<ChandySettings, "dodgeHits"> = BOSS_POWERS.chandy): boolean => {
   const d = boss?.powers?.chandy?.dodge;
   return !!d && dodgeHits(d) >= s.dodgeHits;
+};
+
+/** Your mate waits for his Dodge (it came from the mate and isn't over): the battle isn't decided yet (the runner's stageComplete). */
+export const mateHeld = (boss: Pick<BossState, "powers" | "result"> | null | undefined, s: Pick<ChandySettings, "dodgeHits"> = BOSS_POWERS.chandy): boolean => {
+  const d = boss?.powers?.chandy?.dodge;
+  return !!d?.mate && !dodgeOver(d, s) && !boss?.result;
 };
 
 /**
@@ -927,25 +961,10 @@ export function dodgeMeter(p: Pick<BossPowerState, "chandy" | "ultAt" | "warnAt"
   return n <= 0 ? 1 : Math.max(0, Math.min(1, (turn - whole) / n));
 }
 
-/**
- * The last chance (Eric, Nov 16: "if we can calculate that it's a guaranteed mate in one ... he still fires his ult anyway"): the
- * crowd, to move in `t.fen`, has a move that mates him, among its allowed moves as this turn's limits stand (his held pieces and
- * stops in `next` for crowd turn `t.turn`; limits that would leave no move lift, as the dispatcher's do). Every legal move tried
- * (chess.js: matingMoves). Several bosses: among the moves the side allows (`t.crowdMoves`: every boss's limits; a mate another
- * boss's freeze stops isn't open).
- */
-export function mateOpen(next: Pick<BossPowerState, "chandy">, t: Pick<TurnContext, "fen" | "turn" | "crowdMoves">): boolean {
-  const mates = matingMoves(t.fen);
-  if (!mates.length) return false;
-  if (t.crowdMoves) {
-    const allowed = t.crowdMoves();
-    return mates.some((m) => allowed.includes(m));
-  }
-  const c = next.chandy;
-  const f = stopFieldsOf({ chandy: c, turn: t.turn });
-  const marks = chandyMarks(f, on(c?.dizzy, t.turn)?.squares ?? []);
-  const ok = (m: string) => !marksStop(marks, t.fen, m);
-  return mates.some(ok) || !legalMoves(t.fen).some(ok);
+/** A Dodge as it comes (`n`: which of the battle's; `at`: the crowd's moves so far; `mate`: from your mate), from the position and the seed. */
+function newDodge(fen: string, crowd: Side, seed: number, n: number, at: number, s: ChandySettings, mate = false): ChandyDodge {
+  const center = dodgeCenter(crowd);
+  return { at, n, ...(mate ? { mate: true as const } : {}), king: kingOf(fen, crowd) ?? center, center, volley: dodgeVolley(center, seed, n), rounds: dodgeRounds(center, seed, n, s), results: [] };
 }
 
 /** His state after firing `m`: it counts (meterOrder), it's the one he fired last, and no longer new. */
@@ -1012,27 +1031,22 @@ export const CHANDY: BossRules = {
       locks: c.locks.filter((l) => !lockEnds(t.fen, t.crowd, c, l, t.s.chandy, false) && !(c.taught && !l.shot && lockEnds(t.fen, t.crowd, c, l, t.s.chandy, true) && another())),
     };
   },
-  // Several bosses: the last chance can't wait for his own turn change (a mate open as your turn begins: Dodge now, whoever moved).
-  ultimateNow: (p, t) => (p.ults ?? 0) < dodgeMax(t.s) && mateOpen(p, t),
-  // Dodge: his meter full (dodgeMeter) or the test switch, the warning as this turn begins, Dodge as the next does; the admins'
-  // trigger, straight to it; the last chance (mateOpen), now, its warning with it. Once a battle.
+  // Dodge from his meter: full (dodgeMeter) or the test switch, the warning as this turn begins, Dodge as the next does; the admins'
+  // trigger, straight to it. Once a battle. (From your mate: chandyBattle.afterCrowdMove. His meter alone: the last chance, a mate in
+  // one as your turn began, and the danger line went on Nov 26.)
   ultimate(next, t) {
     // (A fresh state where the battle set none up: the ?win=1 and ?mate=1 switches skip his set-up.)
     const c = chandyOf(next);
     if ((next.ults ?? 0) >= dodgeMax(t.s)) return false;
     // (Warned as an earlier turn began: it comes now.)
     if (!t.ultNext && next.warnAt === undefined) {
-      const last = mateOpen(next, t);
-      // (In danger, Eric Nov 26: warned as if his meter were full, his rifle whole or not.)
-      if (!last && dodgeMeter(next, t.turn, t.s) < 1 && !inDanger(next.judged, t.s) && !testSwitch(t, next)) return false;
+      if (dodgeMeter(next, t.turn, t.s) < 1 && !testSwitch(t, next)) return false;
       next.warnAt = t.turn;
       t.events.push({ kind: "warn", turn: t.turn });
-      if (!last) return false;
+      return false;
     }
     next.ultAt = t.turn;
-    const center = dodgeCenter(t.crowd);
-    const n = (next.ults ?? 0) + 1;
-    next.chandy = { ...c, dodge: { at: t.turn - 1, n, king: kingOf(t.fen, t.crowd) ?? center, center, volley: dodgeVolley(center, t.seed, n), rounds: dodgeRounds(center, t.seed, n, t.s.chandy), results: [] } };
+    next.chandy = { ...c, dodge: newDodge(t.fen, t.crowd, t.seed, (next.ults ?? 0) + 1, t.turn - 1, t.s.chandy) };
     t.events.push({ kind: "dodge", turn: t.turn });
     return true;
   },
@@ -1169,7 +1183,7 @@ export interface ChandyView {
   unlocked: ChandyMove[];
   /** The move meter, 0-1 (null: not started, before the first upgrade). */
   meter: number | null;
-  /** The rage meter is dimmed: the rifle isn't whole yet (D9) and Dodge hasn't come (the last chance can bring it before). */
+  /** The rage meter is dimmed: the rifle isn't whole yet (D9) and Dodge hasn't come (your mate can bring it before). */
   rageLocked: boolean;
   scatter: { spot: string; squares: string[] } | null;
   beam: { rank: number; file: string; squares: string[] } | null;
@@ -1247,11 +1261,16 @@ export const chandyBattle = {
   afterCrowdMove(b: Battle, move: string | null): void {
     const boss = b.state.boss;
     const p = boss?.powers;
-    if (!boss || !p?.chandy || boss.id !== "chandy" || boss.result) return;
+    if (!boss || !p || boss.id !== "chandy" || boss.result) return;
     const s = BOSS_POWERS.chandy;
     const crowd = boss.crowdSide;
     const before = move ? fenBeforeLast(boardOf(b)) : null;
-    let c: ChandyState = move && before ? followLocks(p.chandy, before, move) : { ...p.chandy };
+    // (A fresh state where the battle set none up: the ?win=1 switch skips his set-up, and its mate in one brings his Dodge.)
+    const was = chandyOf(p);
+    let c: ChandyState = move && before ? followLocks(was, before, move) : { ...was };
+    // Your move mates him: his Dodge now, if he hasn't used it, the battle waiting for it (mateDodge).
+    if (chandyBattle.mateDodge(b, c)) return;
+    if (!p.chandy) return;
     const fen = boardOf(b).fen;
     if (sideToMove(fen) === crowd || !legalMoves(fen).length) return setChandy(b, () => c);
     const events: PowerEvent[] = [];
@@ -1341,11 +1360,30 @@ export const chandyBattle = {
     setChandy(b, () => c);
   },
 
-  /** Dodge is due: it came as this crowd turn began, not over (the crowd's turn waits for it). */
+  /**
+   * Your move mated him (Eric, Nov 26: "instead of the game ending right away, it pauses"): his Dodge (`c`: his state after your
+   * move), if he hasn't used it (once a battle; none left or none this battle: ultCapped, noUlt) and he stands alone against you (a
+   * Battle Tower floor of several: a mate is a mate). Set up as an ultimate that comes (`ultAt`, one more this battle: unleashed),
+   * from your mate (`mate`; `at`, the crowd's moves with it): the battle waits for it (mateHeld, dodgeDue). Returns whether it came.
+   */
+  mateDodge(b: Battle, c: ChandyState): boolean {
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    const board = boardOf(b);
+    if (!boss || !p || boss.id !== "chandy" || boss.result || (b.state.bosses?.length ?? 0) > 1) return false;
+    if ((p.ults ?? 0) >= dodgeMax() || p.noUlt || ultCapped(p) || sideToMove(board.fen) === boss.crowdSide || boardEnd(board) !== "checkmate") return false;
+    const dodge = newDodge(board.fen, boss.crowdSide, p.seed, (p.ults ?? 0) + 1, boss.crowdMoves, BOSS_POWERS.chandy, true);
+    const next = unleashed({ ...p, ultAt: turnOf(boss), chandy: { ...c, dodge } });
+    b.state = { ...b.state, boss: { ...boss, powers: next } };
+    return true;
+  },
+
+  /** Dodge is due: it came as this crowd turn began (or from your mate: the board's game over, held for it), not over (the crowd's turn waits for it). */
   dodgeDue(b: Battle): boolean {
     const boss = b.state.boss;
     const d = boss?.powers?.chandy?.dodge;
-    return !!boss && !!d && d.at === boss.crowdMoves && !dodgeOver(d) && !boss.result && !b.finalGameOver() && !b.bossToMove();
+    if (!boss || !d || d.at !== boss.crowdMoves || dodgeOver(d) || boss.result) return false;
+    return !!d.mate || (!b.finalGameOver() && !b.bossToMove());
   },
 
   /**

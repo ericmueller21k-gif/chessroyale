@@ -198,11 +198,15 @@ async function sampleCoins(page: Page) {
       if (strip && track) {
         const r = strip.getBoundingClientRect();
         const t = track.getBoundingClientRect();
-        // (Each digit's column: 11 rows (0-9, 0); its translate over a row's height is the digit, rolling; both in layout px, as a zoomed column's transform is, which comes back a few hundredths of a px short: 0.01 of a row's slack.)
+        // (Each digit's column: 11 rows (0-9, 0); its translate over a row's height is the digit, rolling; both in layout px, as a zoomed column's transform is,
+        // which comes back a few hundredths of a px short. The last digit's is the count's own; a higher one is its digit plus how far the digits under it
+        // are past 9 (a gas pump: CoinStrip's setCount), so its digit is what's left, rounded. Nov 26: a floor with 0.01 of slack read 9.99 as 19.99, the
+        // tens' column 0.99 of the way round, and the next frame's 10.1 as "down" (a flake on #974).)
         const cols = [...strip.querySelectorAll<HTMLElement>(".es-cs-col")].reverse();
         const count = cols.reduce((n, c, d) => {
           const v = -new DOMMatrixReadOnly(getComputedStyle(c).transform === "none" ? undefined : getComputedStyle(c).transform).m42 / (c.offsetHeight / 11);
-          return n + (d === 0 ? v : Math.floor(v + 0.01)) * 10 ** d;
+          const unit = 10 ** d;
+          return n + (d === 0 ? v : Math.round(v - Math.max(0, n - (unit - 1)))) * unit;
         }, 0);
         const fill = document.querySelector(".es-track-xp .es-fill");
         w.__cs.push({

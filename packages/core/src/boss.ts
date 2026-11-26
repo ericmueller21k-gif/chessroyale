@@ -106,9 +106,10 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
 export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze", "sawswap", "pawnbounce", "train", "fall"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
- * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
+ * fake move a few seconds into the first move it can come on), his lying-down clock tap from the first move (`clocktap`) and his
+ * "Hang on" on his second turn (`hangon`: no pop-off before it; Nov 26).
  */
-export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower"];
+export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower", "hangon"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -623,11 +624,6 @@ export interface BossPowerState {
    */
   charge?: number;
   judged?: number;
-  /**
-   * An ultimate has come while the crowd was at the danger line (BOSS_POWERS.dangerAt: `judged` at it as it came): the danger's
-   * ultimate is spent, so the meter fills at its usual pace again, until a crowd move below the line ends the danger.
-   */
-  dangerSpent?: true;
   /** The test trigger (an admin): the ultimate comes as the next crowd turn begins, without the warning. */
   ultNext?: boolean;
   /**
@@ -781,6 +777,8 @@ export interface BossPowerState {
    * of his next turn. Never sent to screens.
    */
   passWait?: number;
+  /** How many times the pass guard has held his warned Carrot Patch (BOSS_POWERS.ultWaitMax: at that many, it comes). */
+  passWaits?: number;
   /** The crowd's pieces in the air after the Mammoth Slam (each with the square it lands on), until they land. */
   airborne?: SlamPiece[] | null;
   /** Their last landing: where each came down (its own square, or the nearest empty one that's allowed). */
@@ -956,6 +954,8 @@ export interface GardenState {
   plants: GardenPlant[];
   roll?: { at: number; clock: number; seeds: number; kinds: WaterKind[] } | null;
   wait?: number;
+  /** How many times the pass guard has held this watering (BOSS_POWERS.ultWaitMax: at that many, it comes); none after it comes. */
+  waits?: number;
   water?: WaterResult | null;
   waterings: number;
 }
@@ -1160,11 +1160,14 @@ export interface DodgeResult {
  * Chandy's Dodge (his ultimate), once it has come: the crowd turn it came (`at`: crowdMoves as that turn began; the crowd's turn
  * waits for it), which of the battle's (1 or 2), the crowd's king's square and the center he slides to, the warning volley's lines
  * (they miss the king: no vote), its three rounds, and each round's result as it closes. Over after the third round, or at the
- * second hit (chandy.dodgeHits: the battle his); the first hit cracks the king and play goes on.
+ * second hit (chandy.dodgeHits: the battle his); the first hit cracks the king and play goes on. `mate`: it came from the crowd's
+ * mate (Eric, Nov 26; `at` then counts the mating move): its opening plays first, and survived, the mate stands (the win beat, then
+ * the battle the crowd's).
  */
 export interface ChandyDodge {
   at: number;
   n: number;
+  mate?: true;
   king: string;
   center: string;
   volley?: DodgeLine[];
@@ -1266,8 +1269,11 @@ export interface DashState {
   rush?: DashRush | null;
   /** The crowd turn his Scramble Rush was warned as it began (RAGE!, "Next turn: Scramble Rush"; Eric, Nov 6): it comes the next. */
   rushWarn?: number;
-  /** His pop-off (once a battle; Eric, Nov 7): his turn `at`, it plays before his move lands, while he thinks. */
-  popOff?: { at: number } | null;
+  /**
+   * His pop-off (twice a battle since Eric, Nov 8): his turn `at`, it plays before his move lands, while he thinks. The second one
+   * is his "Hang on" (`hangOn`; Eric, Nov 26: it replaces the second pop-off; DASH_HANG_ON): screen only, like the pop-off.
+   */
+  popOff?: { at: number; hangOn?: true } | null;
   /**
    * His stall skit's slam (once a battle; Eric, Nov 17: "each still occur once per game"; DASH_STALL): it came on the crowd move
    * after crowd move `at`. Spent as it starts: never a second slam.
@@ -1818,9 +1824,14 @@ export type PowerEventKind =
   // Dash's clock fit (at most twice a battle: `count` quick smacks), his Scramble Rush's warning a turn ahead (RAGE!, "Next
   // turn: Scramble Rush") and his extra move after a failed Scramble Rush.
   | "clockFit"
-  // (His pop-off, Eric, Nov 7: no event; it plays while he thinks, from DashState.popOff, as two beats.)
+  // (His pop-off, Eric, Nov 7: no event; it plays while he thinks, from DashState.popOff, as two beats. His "Hang on" in the second
+  // one's place, Eric, Nov 26: no event either, four beats: the slow smacks, cheetah speed, "almost done", the wind-up and sorry.)
   | "popOff"
   | "popOffFast"
+  | "hangOn"
+  | "hangOnFast"
+  | "hangOnAlmost"
+  | "hangOnSorry"
   | "rushWarn"
   | "rushExtra"
   // Don Dough: a lump of dough dropped (Rising Dough), risen into his piece, squashed by yours; Gold Plate's gilding; his comment

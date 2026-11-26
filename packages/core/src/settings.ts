@@ -1456,19 +1456,22 @@ export const BOSS_POWERS = {
   ragePerMaterial: 100 / 18,
   rageStrike: 25,
   /**
-   * The boss in danger (Eric, Nov 26, after beating Birdie with no Fall: "It's not about like how many moves have been played. It
-   * should have detected like he was basically in danger, or like it was already heavily in my favor, and it should start
-   * triggering very quickly thereafter, like a turn or two at most"): the crowd's expected score after its move, as the judge has
-   * it (the boss's `judged`, the number "your chances" shows), at or above dangerAt. From one such move: the rage meter is full as
-   * the next crowd turn begins (its usual warning, then the ultimate) and Chandy's Dodge is warned as his rifle's meter would;
-   * Birdie's Fall, with no warning, comes at the start of his turn once two such moves come in a row (birdie.fallDangerMoves)
-   * (docs/decisions/2026-11-26-ult-danger.md). The ultimate comes within two of his turns, whatever his meter held, as soon as its
-   * own rules allow it. One a danger: once an ultimate has come with the crowd at the line (`dangerSpent`), the meter fills at its
-   * usual pace (the ahead gain at its fullest) until a crowd move below the line ends the danger (filled again at once after each,
-   * the audit's shortest ultimates came every other turn: Big Boy's Bounce 32 times in a battle). Below it, every meter fills as it
-   * always has.
+   * The danger line, for Birdie's Fall (Eric, Nov 26, after beating Birdie with no Fall: "It should have detected like he was basically
+   * in danger, or like it was already heavily in my favor, and it should start triggering very quickly thereafter, like a turn or two
+   * at most"): the crowd's expected score after its move, as the judge has it (the boss's `judged`, the number "your chances" shows),
+   * at or above dangerAt, for birdie.fallDangerMoves of its moves in a row; and for the bosses in `dangerBosses` (below). Every other
+   * boss's meter fills as it always has (docs/decisions/2026-11-26-ult-danger-birdie-only.md).
    */
   dangerAt: 0.7,
+  /**
+   * The bosses whose rage meter fills at once in danger (Eric, Nov 26: "every boss has to ult in every game, no matter what. So if
+   * there was a games where they weren't ulting, then we have to. But ... we don't want bosses to ... ult twice"): a crowd move at
+   * dangerAt or more while the boss hasn't used his ultimate yet this battle, and his meter is full as the next crowd turn begins (the
+   * usual warning, then the ultimate within two of his turns, as its own rules allow). Once he has used it, never again this battle, so
+   * the rule never brings a second one close after the first. The ones that, against engine-best moves, waited 7 to 23 of their turns
+   * or never came (the Nov 26 audit). Add or remove an id here.
+   */
+  dangerBosses: ["timber", "hopper", "hollow", "alfil", "moo"] as readonly string[],
   /**
    * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
    * effect pauses the meter for its length (the blizzard 3 turns, the funhouse 12, the Roman candle about 13, Lights
@@ -1837,7 +1840,7 @@ export const BOSS_POWERS = {
    * The pass guard (Eric, Oct 18: Alfil fused while his queen hung, and lost it for free;
    * docs/decisions/2026-10-18-turn-passing-guard.md): one rule for every power that spends a boss's whole turn (Alfil's
    * fusion, Chub & Chirp's Carrot Patch cast). When it's due and passing would lose real material, it waits a turn and
-   * he plays his move instead; it's checked again on his next turn, with no cap. "Real material": the engine's
+   * he plays his move instead; it's checked again on his next turn (an ultimate's, the cast and the watering: at most ultWaitMax waits, then it comes). "Real material": the engine's
    * evaluation after the power (the crowd to move) at least passGuardPawns below his evaluation before it (him to move,
    * so his best move's), in pawns of log-odds (bouncePawnLogit), on the host's engine (the server never searches; no
    * engine anywhere: it comes as ever). The fusion reads the searches its square's pick already makes (tusksNodes); the
@@ -1849,6 +1852,14 @@ export const BOSS_POWERS = {
    */
   passGuardPawns: 2,
   passGuardNodes: 30_000,
+  /**
+   * The pass guard on an ultimate that spends his whole turn, Chub & Chirp's Carrot Patch and Puddles' watering (Eric, Nov 26: warned,
+   * then it "didn't ult for 20 turns and never ended up ulting ... just force it at some point", then "we could bump it up to like 3 or
+   * 4 turns"; every boss ults every game): once warned, the guard holds it back at most this many times (his waits: a tower floor's other
+   * bosses' turns and his turns in check don't count); the next time it's due it comes whatever passing costs (in check it still
+   * can't: a pass is no legal move there). Alfil's fusion (a passive) keeps its guard uncapped.
+   */
+  ultWaitMax: 3,
   /**
    * Chub & Chirp's Leapfrog (their passive; Eric, Oct 18): at the start of his turn, when one of his pawns stands nose
    * to nose with one of the crowd's (the crowd's pawn on the square in front of his) and the square beyond is empty, his
@@ -2155,10 +2166,13 @@ export const BOSS_POWERS = {
   /**
    * Dash's Time Scramble (his ultimate, the rage meter's: rageSpeed.dash; Eric's design): after the usual warning, your next
    * `scrambleMoves` moves get `scrambleSeconds` each (a raid's move timer and a bank alike; a bank still pays for them and still
-   * gets its increment). Eric's 5 and 3. At most maxUltimates.dash a battle.
+   * gets its increment), by its use this battle: the first's seconds, then the second's (a later one, were there more, the last's).
+   * Eric, Nov 26: "the first time he fires it off is 5 seconds for 3 moves, and then when he does it again, it's 3 seconds for 3
+   * moves" (was Eric's 5 moves of 3 s; docs/decisions/2026-11-26-dash-hang-on.md). The late-pick grace (lateGraceMs) as ever. At
+   * most maxUltimates.dash a battle.
    */
-  scrambleMoves: 5,
-  scrambleSeconds: 3,
+  scrambleMoves: 3,
+  scrambleSeconds: [5, 3] as readonly number[],
   /**
    * Out of time against Dash is never a loss (the brief): nobody picked in time, so a move is played for you at random from the
    * judge's top `flagTop` moves (0: from every legal move). The sim's call: any legal move at random hung a piece too often and
@@ -2183,6 +2197,7 @@ export const BOSS_POWERS = {
    * of his turns from `from` to `to` (drawn from the battle's seed), at least `gap` of his turns apart, before his move lands. Each
    * is `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks at `hitMs`
    * a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
+   * Since Nov 26 (Eric) only the first turn's is the pop-off: the second's is his "Hang on" (DASH_HANG_ON).
    */
   dashPopOff: { from: 8, to: 20, gap: 6, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
   // (His stall skit and his lying-down clock tap, Nov 17: DASH_STALL and DASH_TAP below BOSS_POWERS.)
@@ -2277,9 +2292,11 @@ export const BOSS_POWERS = {
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
    *   next turn begins. Eric, Nov 16: 1 (was 3): "It should come a turn later, he should say something about preparing yourself, and
-   *   then after you move it begins." **In danger** (Eric, Nov 26; BOSS_POWERS.dangerAt): the usual warning as if his meter were full,
-   *   his rifle whole or not, then Dodge. **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
-   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. First the warning volley
+   *   then after you move it begins." **Checkmated** (Eric, Nov 26: "he'll only do it if you put him in checkmate. And then instead of
+   *   the game ending right away, it pauses"; "it also triggers still from his 5 upgrades"): your move mates him and he hasn't used it:
+   *   the mate waits, his opening plays (the pause on your move `matePauseMs`, his jump onto the board and collapse `mateJumpMs`, his
+   *   reach for your king `mateReachMs`, the zap `mateZapMs`, his line `mateLineMs`), then Dodge; survive it and the mate stands: the
+   *   win beat (`mateWinMs`), then the battle is yours. First the warning volley
    *   (Eric, Nov 16: "an additional shot first that you can't move"): the clones fire once on lines that miss your king, no vote, then
    *   "Dodge the next one!" (`dodgeVolleyMs` in all, the clones aiming `dodgeAimMs` first). Then `dodgeRounds` rounds, each a
    *   `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
@@ -2327,6 +2344,14 @@ export const BOSS_POWERS = {
     dodgeShatterMs: 1000,
     dodgeBotHit: 0.6,
     dodgeAfterMoves: 1,
+    matePauseMs: 1000,
+    mateJumpMs: 1200,
+    mateReachMs: 800,
+    mateZapMs: 700,
+    mateLineMs: 2400,
+    /** His line's two sentences (CHANDY_MATE_LINES): the second starts typing this long after the first is typed (SPEECH's pace). */
+    mateLinePauseMs: 900,
+    mateWinMs: 2200,
   },
   /**
    * Birdie (Eric, Nov 23; packages/chess/src/bosses/birdie.ts; docs/decisions/2026-11-23-birdie-rules.md):
@@ -2435,6 +2460,33 @@ export const DASH_STALL = {
   backMs: 450,
   marginMs: 2000,
   test: { slamAt: 1500, fakeAt: 3500 },
+} as const;
+
+/**
+ * Dash's "Hang on" (Eric, Nov 26: "instead of doing [the pop-off] again, he does this"; docs/decisions/2026-11-26-dash-hang-on.md),
+ * on dashPopOff's second turn in place of the second pop-off. Presentation only ("whatever's easiest, so it doesn't actually mess
+ * with the game"): your move is played and confirmed as ever, and while he thinks after it the screen shows (ms from its start):
+ * "Hang on, one second." and slow smacks of his clock speeding up (`slowFrom` ms a smack down to `slowTo`, `slowMs` in all), your
+ * piece slid back to its square at `backAt` and your clock ticking down (a display only: nobody's clock runs while he thinks);
+ * "Time for cheetah speed!" and super fast smacks (`hitMs` a smack), head up and mouth open, `fastMs` long, "Almost done, bro."
+ * `almostMs` into them; the wind-up on the clock's front (`windMs`); "Sorry about that, bro. Here's your time back." with your
+ * clock counting back up to its real value (`countUpMs`, in `sorryMs`); your piece sliding to its played square (`returnMs`); then
+ * his move. His thinking waits for all of it and `tailMs` more (a late frame or a slow connection never cuts its end), solo and
+ * online alike (popOffMs; hangOnTimeline in packages/chess/src/bosses/dash.ts). 12.6 s from your move to his, and the margin.
+ */
+export const DASH_HANG_ON = {
+  backAt: 450,
+  slowMs: 6200,
+  slowFrom: 900,
+  slowTo: 180,
+  fastMs: 3000,
+  almostMs: 1800,
+  hitMs: 80,
+  windMs: 900,
+  sorryMs: 2000,
+  countUpMs: 1200,
+  returnMs: 500,
+  tailMs: 300,
 } as const;
 
 /**
@@ -4003,6 +4055,41 @@ export const PAYMENTS = {
    * JSON value first (json_each, as locker.ts does).
    */
   maxDraws: 20,
+  /**
+   * Who may buy (Nov 26, payments PR 6; the design's section 9; core's buyAnswer, the server's buyStatus and recordCheckout): signed in,
+   * 16 or older by the age band answered at the first Buy, 16-17 at most `minorCapCents` a month, in `countries`, not held, not closed.
+   *   - `minAge`: under it, never (FTC v. HoYoverse, Jan 2025). `adultAge`: under it, the monthly cap. Both whole years, counted from
+   *     the birth month and year the device asks, the birth month itself not yet complete (core's buyBandOf: 16 from the 1st of the
+   *     month after the 16th-birthday month; only the band is posted, never the date).
+   *   - `minorCapCents`: the most an account in the 16-17 band spends a calendar month, on the packs' prices before tax (what the
+   *     packs show), counted from its checkouts that month (pending ones too but the one still open, which a new Buy replaces; less what
+   *     refunds returned of the price, before tax too, never below 0 a checkout). The month turns when the XP day does
+   *     (XP.dayStartUtcHour UTC on the 1st: midnight Pacific standard time; 1 am in summer, 10 pm the evening before in Hawaii), never
+   *     the device's clock.
+   *   - `askAgainMonths`: an under-18 band is asked again this long after it was answered, and may then go up one band at most.
+   *   - `countries`: where packs are sold, by the request's country (`request.cf.country`); PR 8 checks the card's too.
+   *   - `checkoutMinutes`: a checkout stays open this long (Stripe's least session expiry, PR 8 sets it). One open at a time per
+   *     account: a new Buy closes the open one first (PR 8 expires it at Stripe, then expireCheckout).
+   */
+  buyers: {
+    minAge: 16,
+    adultAge: 18,
+    minorCapCents: 5000,
+    askAgainMonths: 6,
+    countries: ["US", "CA"] as readonly string[],
+    checkoutMinutes: 30,
+  },
+  /**
+   * The quiet flag (Eric, Nov 18: "three refunds ... a 90-day hold on trading and purchasing"; the design's section 3 and call 4):
+   * refunds and chargebacks count together, all time (`users.refund_count`); the `after`th starts a hold of `days` days on buying coins
+   * (and trading, when it exists), and each one after it starts the days again. Its line names no reason. A greyed Buy's taps while held
+   * are counted (`users.held_taps`, for the admins' Payments tab), at most one each `tapGapMs` an account.
+   */
+  hold: {
+    after: 3,
+    days: 90,
+    tapGapMs: 60_000,
+  },
 } as const;
 
 /**
