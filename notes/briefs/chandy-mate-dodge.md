@@ -11,15 +11,16 @@ starts. ... if you fail that, you lose, and then if you succeed, then he's check
 succeed ... something a little extra too right before it ends, just clearly showing that you win."
 
 **The rule:**
-- Dodge's only trigger: the crowd's move checkmates Chandy (he hasn't used it; once a battle as now). The mate doesn't end the battle:
+- The new trigger: the crowd's move checkmates Chandy (he hasn't used it; once a battle as now). The mate doesn't end the battle:
   everything pauses, the new opening plays (below), then the Dodge as today (blank board, your king to e4/e5, the warning volley, the 3
   rounds, `dodgeHits` 2).
 - Fail (the second hit): the battle is his, as today (no Last Stand). Survive: the board comes back with your mate on it, the win beat
   (below), then the end screen as a crowd win by checkmate.
-- Remove every other way in: his `dodgeMeter` path (5 upgrades, `dodgeAfterMoves`), the last-chance `mateOpen` path, and #968's danger
-  path for Chandy (`dangerAt`). The upgrades and his other moves (scatter, beam, shields, rapid fire, the Lock-on Shot, the meter that
-  fires them) are unchanged. His bar's Dodge meter: nothing hidden, nothing shifts (eric.md): it keeps its place and says what it now
-  means (e.g. greyed, "Dodge: if checkmated"; your call, recorded).
+- **CORRECTED (Eric, Nov 26, a minute after: "it also triggers still from his 5 upgrades tho"):** two ways in, once a battle:
+  (1) his `dodgeMeter` path stays exactly as it is (5 upgrades, then full over `dodgeAfterMoves`, the warning, the Dodge); (2) the new
+  checkmate path above. Remove only the last-chance `mateOpen` path (a mate in one as your turn begins: the real mate replaces it) and
+  #968's danger path for Chandy (`dangerAt`). If he already used the Dodge from his meter, your mate ends the battle as any mate. His
+  bar's Dodge meter stays as it is (it still fills after 5 upgrades); add nothing hidden. The upgrades and his other moves are unchanged.
 - A Battle Tower floor with Chandy and others: your call (simplest that's fair), recorded.
 - The admins' trigger and `&power=dodge` test link: keep them working (they now start from a mate, or from the opening with the board
   as it is: your call).
