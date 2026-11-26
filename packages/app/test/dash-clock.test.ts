@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS } from "@chessroyale/core";
+import { BOSS_POWERS, DASH_HANG_ON } from "@chessroyale/core";
 import { DASH_FX, fenAtPly, hangOnTimeline } from "@chessroyale/chess";
 import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LINE_MAX, DASH_LOVE_LINES, DASH_POPOFF_LINES } from "../src/characters/dash-lines.ts";
 import { DASH_UI, hangOnAt, hangOnFen, popOffMoments } from "../src/components/Dash.tsx";
+import { DASH_FIGURE, HANG_SECTION } from "../src/characters/dash-figure.ts";
 
 /** Dash's clock lines (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): the multi-hit's, the pop-off's two beats. */
 describe("Dash's clock lines (Eric, Nov 7)", () => {
@@ -99,5 +100,44 @@ describe("Dash's \"Hang on\" on screen (Eric, Nov 26)", () => {
     expect(hangOnFen(his, popOffMoments({ ...boss, startMove: 3 } as never, 10_000), 10_000 + tl.cheetahAt)).toBeNull();
     // (No Hang on: nothing.)
     expect(hangOnAt(popOffMoments({ ...boss, powers: { ...boss.powers, dash: { popOff: { at: 14 } } } } as never, 10_000), 10_500)).toBeUndefined();
+  });
+});
+
+/** Round 2 (Eric, Nov 26: "he wasn't pressing it ... a ridiculous speed"): his routine on the board's middle, and his fastest smacks. */
+describe("Dash's \"Hang on\" routine (round 2)", () => {
+  /** The shortest time from one smack to the next in an animation (its click or slam cues), ms; Infinity with one or none. */
+  const gap = (a: { frames: readonly { ms: number; cue?: string }[] }) => {
+    let t = 0;
+    let last = -Infinity;
+    let min = Infinity;
+    for (const f of a.frames) {
+      if (f.cue === "click" || f.cue === "slam") {
+        min = Math.min(min, t - last);
+        last = t;
+      }
+      t += f.ms;
+    }
+    return min;
+  };
+  const length = (a: { frames: readonly { ms: number }[] }) => a.frames.reduce((s, f) => s + f.ms, 0);
+
+  it("one run as long as the gag, its sections in order: the jump, the slow smacks from his landing, cheetah speed, the wind-up, the sorry and the zip", () => {
+    const tl = hangOnTimeline();
+    const a = DASH_FIGURE.anims;
+    expect(length(a.hangOn!)).toBe(tl.total);
+    expect(length(a.hangJump!)).toBe(tl.landAt);
+    expect(length(a.hangJump!) + length(a.hangSlow!)).toBe(tl.cheetahAt);
+    expect(length(a.hangFast!)).toBe(tl.windAt - tl.cheetahAt);
+    const order = a.hangOn!.frames.map((f) => HANG_SECTION.get(f)).filter((s, i, all) => s !== all[i - 1]);
+    expect(order).toEqual(["hangJump", "hangSlow", "hangFast", "hangWind", "hangSorry"]);
+    // (Each slow smack lands on the button: a click; the zip back ends it.)
+    expect(a.hangSlow!.frames.filter((f) => f.cue === "click").length).toBeGreaterThanOrEqual(10);
+    expect(a.hangOn!.frames.at(-1)!.cue).toBe("zip");
+  });
+
+  it("cheetah speed's smack is the quickest of every clock smack he has (the pop-off's fit10, the multi-hit, the Rush's, the stall slam, the Clock Slap)", () => {
+    const fast = gap(DASH_FIGURE.anims.hangFast!);
+    expect(fast).toBe(DASH_HANG_ON.hitMs);
+    for (const name of ["fit3", "fit4", "fit5", "fit10", "slam", "clockSlap", "move", "hangSlow"]) expect(fast, name).toBeLessThan(gap(DASH_FIGURE.anims[name]!));
   });
 });

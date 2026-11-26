@@ -14,10 +14,10 @@
  * - his attack on a king (DASH_ATTACK: a dash in with his trail, ten claw swipes, a dash off).
  */
 import { BOSS_POWERS, DASH_HANG_ON } from "@chessroyale/core";
-import { BOSS_BLITZ, PALETTE, layers, star, type Pose } from "./boss-blitz.ts";
+import { BOSS_BLITZ, PALETTE, bigClick, layers, star, type Pose } from "./boss-blitz.ts";
 import { moved } from "./attack-frame.ts";
 import type { Anim, Character, Frame, Speck } from "./sprite.ts";
-import { lazyAnim } from "./sprite.ts";
+import { frameKeys, lazyAnim } from "./sprite.ts";
 
 /** The room added on his right, in his own pixels (his zip-in's blur reaches 32 past the art's frame). */
 export const DASH_ROOM = 33;
@@ -64,37 +64,75 @@ function fit(n: number, ms: number): Anim {
 }
 
 // ---------------- His "Hang on" (Eric, Nov 26; DASH_HANG_ON) ----------------
-// Built from his move's slap (the fits' frames) and his rig's own poses, nothing new drawn: the head thrown back with the eyes shut
-// and the mouth wide is his jkLaugh's; the wind-up is his paw on the clock's front, circling; the sorry an open paw raised.
+// Built from his rig's own poses and his stall skit's slam (the paw wound up high, hammered onto the button, the sparks, the flag
+// jumping), nothing new drawn. Round 2 (Eric, Nov 26: "he wasn't pressing it"): the round-1 smacks were his move's slap, the paw
+// going 10 of his 104 pixels between his chin and the button and held at his chin most of each smack, a few screen pixels in a
+// phone's bar; now each smack comes from over his head and lands on the button, and cheetah speed has his head thrown back
+// (Pose.back: his snout pointed up) with a second paw's blur, the fastest smacks he has (hitMs, under every other smack's).
 
-/** Head thrown back, eyes shut, mouth wide open: "he's really enjoying himself" (his jkLaugh's laugh). */
-const HEAD_UP: Pose = { head: [3, -2], eyes2: "joy", mouth: "wide", brow: 2, ears: 1 };
+/** Cheetah speed's face: eyes shut, mouth wide open (his head thrown back by headBack). */
+const HEAD_BACK: Pose = { eyes2: "joy", mouth: "wide", brow: 2, lift: 1 };
+/** The parts that make his head (its face, ears and cap): headBack turns them together. */
+const HEAD_PARTS = /^(earF|earN|head|mouth:|eyes:|brow|cap)/;
+/**
+ * A frame of his with the head thrown back (Eric, Nov 26: "he should have his head like up and then like lean back, so clearly his
+ * like mouth is pointed up into the air"): his head drawn alone, turned `deg` back about his neck (`neck`, his pixels; nearest
+ * pixel, no new drawing), moved `shift`, and laid over the rest of him as its own pixels. Made once a drawing (lazy anims).
+ */
+function headBack(ms: number, pose: Pose, extra: Partial<Frame> = {}, deg = HANG_TILT.deg): Frame {
+  const all = layers(pose);
+  const headOnly = frameKeys(DASH_FIGURE, { ms, layers: all.filter((l) => HEAD_PARTS.test(l.part)) });
+  const [cx, cy] = HANG_TILT.neck;
+  const [mx, my] = HANG_TILT.shift;
+  const a = (deg * Math.PI) / 180;
+  const [c, s] = [Math.cos(a), Math.sin(a)];
+  const head: Speck[] = [];
+  for (let y = 0; y < headOnly.length; y++)
+    for (let x = 0; x < headOnly[0]!.length; x++) {
+      // (Each pixel where it lands: the one it comes from, turned back the other way.)
+      const [u, v] = [x - mx - cx, y - my - cy];
+      const k = headOnly[Math.round(cy + -u * s + v * c)]?.[Math.round(cx + u * c + v * s)];
+      if (k) head.push([x, y, k]);
+    }
+  return { ms, layers: all.filter((l) => !HEAD_PARTS.test(l.part)), ...extra, specks: [...head, ...(extra.specks ?? [])] };
+}
+/** How far back his head goes at cheetah speed (degrees), the point it turns about (his neck) and where it's moved to (back and up). */
+const HANG_TILT = { deg: 50, neck: [37, 41] as [number, number], shift: [3, -1] as [number, number] };
+/** A happy slam: on the button, the clock pressed, the flag jumping, sparks; `big` the slow smacks' bigger burst and shake. */
+const smackDown = (ms: number, pose: Pose, big: boolean): Frame =>
+  F(ms, { at: [25.5, 54], gesture: "open", press: true, sink: big ? 2 : 1, flag: 1, flagY: big ? 3 : 2, tail: -2, ...pose }, { cue: "click", shake: big ? [0, 2] : [0, 1], specks: bigClick(big ? 2 : 1, 0) });
 
-/** Its slow smacks speeding up: from slowFrom ms a smack down to slowTo (each a little quicker), filling slowMs; then the paw held. */
+/** Its slow smacks speeding up: from slowFrom ms a smack down to slowTo (each a little quicker), filling slowMs from his landing; each wound up over his head, then slammed. */
 const hangSlow: Anim = lazyAnim(() => {
-  const [up, down, high] = [A.move!.frames[3]!, A.move!.frames[4]!, A.move!.frames[5]!];
   const s = DASH_HANG_ON;
   const frames: Frame[] = [];
+  const face: Pose = { eyes2: "sly", mouth: "grin", brow: 1 };
   let t = 0;
-  for (let ms: number = s.slowFrom; t + ms <= s.slowMs; ms = Math.max(s.slowTo, Math.round(ms * 0.85))) {
-    // (A slow smack: the paw up, down with its click, and up again for the rest of its time; a quick one is up and down.)
-    const rise = Math.min(140, Math.round(ms * 0.4));
-    const hit = Math.min(160, ms - rise);
-    frames.push({ ...up, ms: rise }, { ...down, ms: hit }, ...(ms - rise - hit > 0 ? [{ ...high, ms: ms - rise - hit }] : []));
+  const fill = s.slowMs - s.jumpMs;
+  for (let ms: number = s.slowFrom; t + ms <= fill; ms = Math.max(s.slowTo, Math.round(ms * 0.85))) {
+    // (Up high, the slam (at most 160 ms), and the rebound; a quick one is the wind-up and the slam.)
+    const hit = Math.min(160, Math.round(ms * 0.45));
+    const back = Math.min(120, ms - hit - 40);
+    const up = ms - hit - Math.max(0, back);
+    frames.push(F(up, { at: [57, 24], gesture: "open", lift: 2, head: [1, -1], tail: 3, ...face }), smackDown(hit, { mouth: "wide", brow: 1 }, true));
+    if (back > 0) frames.push(F(back, { at: [30, 44], gesture: "open", lift: 1, tail: 1, ...face }));
     t += ms;
   }
-  if (t < s.slowMs) frames.push({ ...high, ms: s.slowMs - t });
+  if (t < fill) frames.push(F(fill - t, { at: [57, 24], gesture: "open", lift: 2, head: [1, -1], tail: 3, ...face }));
   return { loop: false, frames };
 });
 
-/** Cheetah speed: smacks at hitMs, head back and mouth open, for fastMs (the same two drawings over and over: drawn once each). */
+/** Cheetah speed: a smack every hitMs, the paw high and down with a second paw's blur, his head thrown back, for fastMs (two drawings, drawn once each). */
 const hangFast: Anim = lazyAnim(() => {
   const s = DASH_HANG_ON;
-  const rise = Math.round(s.hitMs * 0.4);
-  const upF = F(rise, { hand: "up", lift: 1, ...HEAD_UP, tail: 3 });
-  const downF = F(s.hitMs - rise, { hand: "down", sink: 1, ...HEAD_UP, head: [3, -1], flag: 1, tail: 2 }, { cue: "click", specks: A.move!.frames[4]!.specks });
+  // (The paw up in front of his chest, not his face: his face is the joke.)
+  const UP: [number, number] = [38, 44];
+  const rise = Math.floor(s.hitMs / 2);
+  const upF = headBack(rise, { ...HEAD_BACK, at: UP, blur: [27, 50], gesture: "open", tail: 4 });
+  const down = smackDown(s.hitMs - rise, { ...HEAD_BACK, blur: UP, tail: 2 }, false);
+  const downF = headBack(down.ms, { ...HEAD_BACK, at: [25.5, 54], gesture: "open", press: true, sink: 1, flag: 1, flagY: 2, blur: UP, tail: 2 }, { cue: down.cue, shake: down.shake, specks: down.specks });
   const n = Math.floor(s.fastMs / s.hitMs);
-  return { loop: false, frames: [...Array.from({ length: n }, () => [upF, downF]).flat(), ...(s.fastMs > n * s.hitMs ? [F(s.fastMs - n * s.hitMs, { hand: "high", ...HEAD_UP })] : [])] };
+  return { loop: false, frames: [...Array.from({ length: n }, () => [upF, downF]).flat(), ...(s.fastMs > n * s.hitMs ? [headBack(s.fastMs - n * s.hitMs, { ...HEAD_BACK, at: UP, gesture: "open" })] : [])] };
 });
 
 /** The wind-up: his paw on the clock's front, winding it round twice (its whirr), his eyes on it; windMs long. */
@@ -110,7 +148,33 @@ const hangWind: Anim = lazyAnim(() => {
 const hangSorry: Anim = lazyAnim(() => {
   const s = DASH_HANG_ON;
   const press = { ...A.move!.frames[4]!, ms: 140 };
-  return { loop: false, frames: [press, F(s.sorryMs - press.ms, { at: [36, 40], gesture: "open", eyes2: "us", mouth: "grin", brow: 1, tail: 1 }), F(s.returnMs, {})] };
+  // (Then his zip back to his spot, returnMs: on his toes, ears back, tail out, its zip.)
+  return { loop: false, frames: [press, F(s.sorryMs - press.ms, { at: [36, 40], gesture: "open", eyes2: "us", mouth: "grin", brow: 1, tail: 1 }), { ...DASH_RUN, ms: s.returnMs, cue: "zip" }] };
+});
+
+/** His jump onto the board's middle, jumpMs (the screen moves him: DashHangOn): a crouch, then up on his toes, airborne, its whoosh; the clock with him. */
+const hangJump: Anim = lazyAnim(() => {
+  const s = DASH_HANG_ON;
+  const crouch = Math.round(s.jumpMs * 0.2);
+  return { loop: false, frames: [F(crouch, { sink: 2, eyes2: "sly", mouth: "grin", brow: 1, tail: 1 }), F(s.jumpMs - crouch, { lift: 3, tail: 4, ears: 2, hand: "up", eyes: "wide", mouth: "grin" }, { cue: "whoosh" })] };
+});
+
+/** The section of the routine each of `hangOn`'s frames comes from (hangJump, hangSlow, …), for a test's count of his smacks. */
+export const HANG_SECTION = new WeakMap<Frame, string>();
+/**
+ * His whole "Hang on" on the board's middle as one run (DashHangOn plays it from the gag's start): the jump, the slow smacks, cheetah
+ * speed, the wind-up, the press and "sorry", the zip back. Its length is hangOnTimeline().total (dash-clock.test.ts).
+ */
+const hangOn: Anim = lazyAnim(() => {
+  const frames: Frame[] = [];
+  for (const [name, a] of [["hangJump", hangJump], ["hangSlow", hangSlow], ["hangFast", hangFast], ["hangWind", hangWind], ["hangSorry", hangSorry]] as const) {
+    for (const f of a.frames) {
+      const own = { ...f };
+      HANG_SECTION.set(own, name);
+      frames.push(own);
+    }
+  }
+  return { loop: false, frames };
 });
 
 /** His figure: the approved one in a frame with room on its right (105 x 104), his rest loops quiet, and his clock smacks. */
@@ -127,6 +191,8 @@ export const DASH_FIGURE: Character = {
     fit4: lazyAnim(() => fit(4, BOSS_POWERS.dashClockFit.smackMs)),
     fit5: lazyAnim(() => fit(BOSS_POWERS.dashClockFit.smacks, BOSS_POWERS.dashClockFit.smackMs)),
     fit10: lazyAnim(() => fit(BOSS_POWERS.dashPopOff.hits, BOSS_POWERS.dashPopOff.hitMs)),
+    hangOn,
+    hangJump,
     hangSlow,
     hangFast,
     hangWind,
