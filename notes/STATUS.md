@@ -2167,3 +2167,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: main f01ba249 GREEN + LIVE (coin strip, no-gap quests).
 - Nov 26 02:13 UTC: PR 5 fixes done (3a4744f1) → branch prepped 45cbdb64, full CI running; delta review session_01JuCWRvQRvjKgJNLYrMwkEY. Fixes helper session_01JuCWRvnuXPv4LMkiPJjSdR to archive. Running Opus: PR 4 (xhigh), PR 5 delta (xhigh). Queue: boss-frame-2 (high), beta-bots design (xhigh).
 - Nov 26: #965 MERGED 85530107. Main run watched.
+- Nov 26 02:32 UTC: PR 5 delta: no blocker; D1 (time join) fixed by director (018c851d: paid_at/created_at cut to the day; test fails without), D2-D4 + retention → payments.md open items. #963 full CI on 018c851d (bu1ghk022). PR 4 → #966 (2dcde2b7, full-e2e) + review session_01JuCWRuxav3EYTkiAsX9e2U. boss-frame-2 session_01JuCWRtbPgLaMpXMvRasx6V. Queue: beta-bots design.
