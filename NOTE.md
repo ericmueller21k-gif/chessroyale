@@ -21,3 +21,10 @@ and the column start on the board's top line and end on its foot, 28 / 28 px eit
 God King's frame (the room his tallest pose needs: the eric.md guard keeps every figure off the list's text), so it is taller than main's
 (Boss alone 228 → 300 px at 1536 × 730, 343 → 480 at 1920 × 960; a raid 228 → 390, 343 → 620) but not the board's whole height.
 Boards: 602, 832, and 912 / 912 at 1858 × 1040. The figures stand where they did against the board.
+
+## mock/ v2 (the director's review, Nov 26): the raid
+- `mock-boss-raid-1536x730-v2.png`, `-1920x960-v2.png` (the build): the boss never covers the scoreboard. The left column mirrors the right
+  one: the scoreboard from the board's top down to over the boss's room (his frame, and room for five lines of his words), its rows
+  scrolling; the boss under it on the board's foot. Chosen as the simplest that covers nothing and keeps every column on the board's lines
+  (moving him beside the board as in Boss alone would need a third column). And the block is centered: with the side menu's labels a raid
+  keeps at least 40 px either side, else the menu shows icons (1536 × 730: icons, 79 px either side, as the 50 v 50 there).
