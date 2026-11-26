@@ -204,3 +204,8 @@ A fix Eric asks for one boss/screen/feature stays on that one. Widening it ("eve
 asked plainly, and his silence is not a yes. Nov 26: Eric asked for Birdie's ult only; the director widened the danger line to every
 boss in #968 and merged it; Eric asked three times where he had said every boss (he hadn't). Reverted in #970. When Eric asks "did I
 say X?", answer yes or no in the first line, before anything else.
+
+## Every boss ults every game (Eric, Nov 26, standing rule)
+"every boss has to ult in every game, no matter what. So if there was a games where they weren't ulting, then we have to. But ... we
+don't want bosses to ... ult twice." Tool: BOSS_POWERS.dangerBosses (in danger before his first ultimate, meter full; never after the
+first). A new boss: check it ults in lost and even battles; add it to dangerBosses only with Eric's OK.

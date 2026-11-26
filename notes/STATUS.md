@@ -2205,3 +2205,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - 06:55 Eric: never asked for every boss (only Birdie). Revert PR #970 (claude/ult-danger-birdie-only, e11e4266): every boss but Birdie back as before #968; Chandy's danger stays until the Chandy job. CI waiter b17ajzs1i. Merge on green.
 - #967 PR 6 MERGED (1fe1328a). Payments next: PR 7 coin screen.
 - Town #969 CI running (bcw5i0n8t). Not live yet.
+- 07:10 Eric agreed: danger rule on Timber, Chub & Chirp, Hollow, Alfil, Moo & Moon, ONLY before the first ult (never a 2nd close after). Added to #970 (3869568b), CI waiter b4fxhzan3. Town #969 MERGED (95a6fcb4); main CI + deploy waiter bndva7fpn; then tell Eric to walk the town at night with ?report.
