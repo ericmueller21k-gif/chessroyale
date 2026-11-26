@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_CLOCK, BOSS_POWERS, DASH_STALL, DASH_TAP } from "@chessroyale/core";
+import { BOSS_CLOCK, BOSS_POWERS, DASH_HANG_ON, DASH_STALL, DASH_TAP } from "@chessroyale/core";
 import { hangOnTimeline, stallTimeline } from "@chessroyale/chess";
 import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES, DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } from "../packages/app/src/characters/dash-lines.ts";
 import { DASH_LIE, DASH_LIE_AT } from "../packages/app/src/characters/dash-lie.ts";
@@ -508,7 +508,7 @@ test.describe("Dash's clock", () => {
     expect(errors).toEqual([]);
   });
 
-  test("his \"Hang on\" (Eric, Nov 26, the second pop-off's place): your piece back, his clock routine, your time given back, your piece home, then his move; the game unchanged", { tag: "@phone-only" }, async ({ page }) => {
+  test("his \"Hang on\" (Eric, Nov 26, the second pop-off's place): your piece back, his jump onto the board's middle and his clock routine there, your time given back, his zip back and your piece home, then his move; the game unchanged", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -529,9 +529,16 @@ test.describe("Dash's clock", () => {
       const w = window as any;
       const from = mv.slice(0, 2);
       const to = mv.slice(2, 4);
-      w.__hang = [] as { t: number; from: boolean; to: boolean; clock: string; gag: boolean; bank: number | null; rows: number; thinking: boolean }[];
+      w.__hang = [] as { t: number; from: boolean; to: boolean; clock: string; gag: boolean; bank: number | null; rows: number; thinking: boolean; fig: number[] | null; board: number[] | null; spot: string }[];
+      const box = (el: Element | null) => {
+        const r = el?.getBoundingClientRect();
+        return r && r.width ? [r.left, r.top, r.width, r.height] : null;
+      };
       const look = () => {
         w.__hang.push({
+          fig: box(document.querySelector(".dash-hang")),
+          board: box(document.querySelector(".hb-board")),
+          spot: [...document.querySelectorAll(".boss-char .boss-char-sprite")].map((e) => getComputedStyle(e).visibility).join(","),
           t: Date.now(),
           from: !!document.querySelector(`.hb-board piece[data-square="${from}"]:not(.fading)`),
           to: !!document.querySelector(`.hb-board piece[data-square="${to}"]:not(.fading)`),
@@ -549,7 +556,7 @@ test.describe("Dash's clock", () => {
     await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
     await yourMove(page);
     const seen = await page.evaluate(() => (window as any).__clock as ClockSeen);
-    const hang = await page.evaluate(() => (window as any).__hang as { t: number; from: boolean; to: boolean; clock: string; gag: boolean; bank: number | null; rows: number; thinking: boolean }[]);
+    const hang = await page.evaluate(() => (window as any).__hang as { t: number; from: boolean; to: boolean; clock: string; gag: boolean; bank: number | null; rows: number; thinking: boolean; fig: number[] | null; board: number[] | null; spot: string }[]);
     const tl = hangOnTimeline();
     // Its four beats, in order, at the timeline's times (no pop-off before it).
     const beat = (k: string) => Object.values(seen.moments).filter((m) => m.kind === k);
@@ -567,9 +574,27 @@ test.describe("Dash's clock", () => {
     for (const [l, t] of [[DASH_HANG_ON_LINES.cheetah, tl.cheetahAt], [DASH_HANG_ON_LINES.almost, tl.almostAt], [DASH_HANG_ON_LINES.sorry, tl.sorryAt]] as const) {
       expect(Math.abs(seen.lineAt[l]! - at0 - t), l).toBeLessThan(600);
     }
-    // His smacks: slow, then the fast ones (head up), then the wind-up's whirr.
+    // His smacks (round 2, Nov 26: on the board's middle, each landing on the button): slow, then cheetah speed (head thrown back),
+    // the fastest he has: a smack every DASH_HANG_ON.hitMs, quicker than every other smack setting of his (the pop-off's, the
+    // multi-hit's and the Rush's, the gag's slow ones).
     expect(seen.cues["hangSlow:click"] ?? 0).toBeGreaterThanOrEqual(10);
-    expect(seen.cues["hangFast:click"] ?? 0).toBeGreaterThanOrEqual(20);
+    expect(seen.cues["hangFast:click"] ?? 0).toBeGreaterThanOrEqual(60);
+    expect(DASH_HANG_ON.hitMs).toBeLessThan(Math.min(BOSS_POWERS.dashPopOff.hitMs, BOSS_POWERS.dashClockFit.smackMs, DASH_HANG_ON.slowTo));
+    // He jumps onto the board's middle for it (Eric: "he should jump onto the middle of the board"): from his landing to his zip back,
+    // his figure stands over the board's center (within a square), big (DASH_HANG_ON.boardShare of the board's height), whole on the
+    // screen, his spot's figure away meanwhile; after his move, gone, his spot's figure back.
+    const vp = page.viewportSize()!;
+    const onBoard = hang.filter((x) => x.t >= at0 + tl.landAt + 100 && x.t < at0 + tl.returnAt - 100);
+    expect(onBoard.length).toBeGreaterThan(30);
+    for (const x of onBoard) {
+      const [fx, fy, fw, fh] = x.fig! as [number, number, number, number];
+      const [bx, by, bw, bh] = x.board! as [number, number, number, number];
+      expect(Math.abs(fx + fw / 2 - (bx + bw / 2)), `${x.t - at0} ms in`).toBeLessThan(bw / 8);
+      expect(Math.abs(fy + fh / 2 - (by + bh / 2)), `${x.t - at0} ms in`).toBeLessThan(bh / 8);
+      expect(fh).toBeGreaterThanOrEqual(DASH_HANG_ON.boardShare * bh * 0.9);
+      expect(fx >= 0 && fy >= 0 && fx + fw <= vp.width && fy + fh <= vp.height).toBe(true);
+      expect(x.spot).not.toContain("visible");
+    }
     // The board: your piece home as your move goes in, back on its square through the gag, home again before his move lands.
     const during = hang.filter((x) => x.t >= at0 + tl.backAt + 400 && x.t < at0 + tl.returnAt - 300);
     expect(during.length).toBeGreaterThan(30);
@@ -593,6 +618,12 @@ test.describe("Dash's clock", () => {
     expect(hang.filter((x) => x.t >= at0 + tl.upAt + 100 && x.t < landed!).every((x) => x.clock === held)).toBe(true);
     expect(new Set(shown.map((x) => x.bank)).size).toBe(1);
     expect(await page.evaluate(() => (window as any).match.boss.result ?? null)).toBeNull();
+    const after = hang.filter((x) => x.t > landed! + 300);
+    expect(after.length).toBeGreaterThan(0);
+    for (const x of after) {
+      expect(x.fig).toBeNull();
+      expect(x.spot).toContain("visible");
+    }
     expect(errors).toEqual([]);
   });
 });

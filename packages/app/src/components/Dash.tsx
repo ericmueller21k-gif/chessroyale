@@ -11,7 +11,7 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import type { BossView } from "../game.ts";
 import { InPlace, rageWarn, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { figurePoint } from "./BossCharacter.tsx";
-import { DASH_FIGURE as DASH, HANG_SECTION } from "../characters/dash-figure.ts";
+import { DASH_FIGURE as DASH, DASH_HANG, HANG_SECTION } from "../characters/dash-figure.ts";
 import { bossKit } from "../characters/kits.ts";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
 import { SpriteAnim } from "./BossEffect.tsx";
@@ -218,13 +218,13 @@ export function DashHangOn({ at }: { at: number }) {
     const el = ref.current;
     if (!el) return;
     el.dataset.anim = HANG_SECTION.get(f) ?? "";
-    el.dataset.frame = String(DASH.anims.hangOn!.frames.indexOf(f));
+    el.dataset.frame = String(DASH_HANG.anims.hangOn!.frames.indexOf(f));
     el.dataset.cue = f.cue ?? "";
   };
   return createPortal(
     <>
       <div ref={ref} class="dash-hang" aria-hidden="true">
-        <SpriteAnim ch={DASH} anim="hangOn" since={at} sounds={bossKit("Dash")?.sounds ?? {}} id={`hang:${at}`} class="dash-lie-sprite" onFrame={onFrame} />
+        <SpriteAnim ch={DASH_HANG} anim="hangOn" since={at} sounds={bossKit("Dash")?.sounds ?? {}} id={`hang:${at}`} class="dash-lie-sprite" onFrame={onFrame} />
       </div>
       <span ref={sayRef} class="dash-say-at">
         <VoiceBubble voice={bossVoice} class="bc-bubble dash-say" />

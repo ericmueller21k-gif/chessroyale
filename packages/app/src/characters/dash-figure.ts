@@ -191,14 +191,15 @@ export const DASH_FIGURE: Character = {
     fit4: lazyAnim(() => fit(4, BOSS_POWERS.dashClockFit.smackMs)),
     fit5: lazyAnim(() => fit(BOSS_POWERS.dashClockFit.smacks, BOSS_POWERS.dashClockFit.smackMs)),
     fit10: lazyAnim(() => fit(BOSS_POWERS.dashPopOff.hits, BOSS_POWERS.dashPopOff.hitMs)),
-    hangOn,
-    hangJump,
-    hangSlow,
-    hangFast,
-    hangWind,
-    hangSorry,
   },
 };
+
+/**
+ * His "Hang on" on the board's middle (round 2, Nov 26; DashHangOn): his own figure, parts and frame, with only the routine's runs.
+ * Apart from DASH_FIGURE, as his attack's figure is: they're never played where he stands, so his bar's and the computer's fits
+ * (barScale, SIDE_REACH) are his standing figure's alone.
+ */
+export const DASH_HANG: Character = { ...DASH_FIGURE, id: "dash-hang", anims: { hangOn, hangJump, hangSlow, hangFast, hangWind, hangSorry } };
 
 /** The Scramble Rush's running copy: his zip-in's pose (on his toes, ears back, tail out), facing our left; the screen leans it. */
 export const DASH_RUN: Frame = F(100, { lift: 2, tail: 4, ears: 2, eyes: "wide", head: [1, 0], hand: "up", mouth: "grin" });

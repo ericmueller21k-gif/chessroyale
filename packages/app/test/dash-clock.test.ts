@@ -3,7 +3,8 @@ import { BOSS_POWERS, DASH_HANG_ON } from "@chessroyale/core";
 import { DASH_FX, fenAtPly, hangOnTimeline } from "@chessroyale/chess";
 import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LINE_MAX, DASH_LOVE_LINES, DASH_POPOFF_LINES } from "../src/characters/dash-lines.ts";
 import { DASH_UI, hangOnAt, hangOnFen, popOffMoments } from "../src/components/Dash.tsx";
-import { DASH_FIGURE, HANG_SECTION } from "../src/characters/dash-figure.ts";
+import { DASH_FIGURE, DASH_HANG, HANG_SECTION } from "../src/characters/dash-figure.ts";
+import { renderFrame } from "../src/characters/sprite.ts";
 
 /** Dash's clock lines (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): the multi-hit's, the pop-off's two beats. */
 describe("Dash's clock lines (Eric, Nov 7)", () => {
@@ -123,7 +124,7 @@ describe("Dash's \"Hang on\" routine (round 2)", () => {
 
   it("one run as long as the gag, its sections in order: the jump, the slow smacks from his landing, cheetah speed, the wind-up, the sorry and the zip", () => {
     const tl = hangOnTimeline();
-    const a = DASH_FIGURE.anims;
+    const a = DASH_HANG.anims;
     expect(length(a.hangOn!)).toBe(tl.total);
     expect(length(a.hangJump!)).toBe(tl.landAt);
     expect(length(a.hangJump!) + length(a.hangSlow!)).toBe(tl.cheetahAt);
@@ -136,8 +137,19 @@ describe("Dash's \"Hang on\" routine (round 2)", () => {
   });
 
   it("cheetah speed's smack is the quickest of every clock smack he has (the pop-off's fit10, the multi-hit, the Rush's, the stall slam, the Clock Slap)", () => {
-    const fast = gap(DASH_FIGURE.anims.hangFast!);
+    const fast = gap(DASH_HANG.anims.hangFast!);
     expect(fast).toBe(DASH_HANG_ON.hitMs);
-    for (const name of ["fit3", "fit4", "fit5", "fit10", "slam", "clockSlap", "move", "hangSlow"]) expect(fast, name).toBeLessThan(gap(DASH_FIGURE.anims[name]!));
+    for (const name of ["fit3", "fit4", "fit5", "fit10", "slam", "clockSlap", "move"]) expect(fast, name).toBeLessThan(gap(DASH_FIGURE.anims[name]!));
+    expect(fast).toBeLessThan(gap(DASH_HANG.anims.hangSlow!));
+  });
+
+  it("his routine's figure is his own, nothing cut off at its frame's edge (its runs never play where he stands: his bar's and side's fits unchanged)", () => {
+    for (const [name, a] of Object.entries(DASH_HANG.anims))
+      for (const [i, f] of a.frames.entries()) {
+        const img = renderFrame(DASH_HANG, f);
+        const at = (x: number, y: number) => img.data[(y * img.w + x) * 4 + 3]!;
+        for (let x = 0; x < img.w; x++) expect(at(x, 0) + at(x, img.h - 1), `${name} ${i}`).toBe(0);
+        for (let y = 0; y < img.h; y++) expect(at(0, y) + at(img.w - 1, y), `${name} ${i}`).toBe(0);
+      }
   });
 });
