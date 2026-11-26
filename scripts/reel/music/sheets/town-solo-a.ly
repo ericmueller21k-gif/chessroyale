@@ -6,7 +6,6 @@
 #(set-global-staff-size 21)
 \header {
   title = "The Town: Piano Solo A"
-  subtitle = "from the HunChess soundtrack"
   tagline = ##f
 }
 \paper {
