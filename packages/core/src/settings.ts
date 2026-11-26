@@ -1456,19 +1456,22 @@ export const BOSS_POWERS = {
   ragePerMaterial: 100 / 18,
   rageStrike: 25,
   /**
-   * The boss in danger (Eric, Nov 26, after beating Birdie with no Fall: "It's not about like how many moves have been played. It
-   * should have detected like he was basically in danger, or like it was already heavily in my favor, and it should start
-   * triggering very quickly thereafter, like a turn or two at most"): the crowd's expected score after its move, as the judge has
-   * it (the boss's `judged`, the number "your chances" shows), at or above dangerAt. From one such move: the rage meter is full as
-   * the next crowd turn begins (its usual warning, then the ultimate) and Chandy's Dodge is warned as his rifle's meter would;
-   * Birdie's Fall, with no warning, comes at the start of his turn once two such moves come in a row (birdie.fallDangerMoves)
-   * (docs/decisions/2026-11-26-ult-danger.md). The ultimate comes within two of his turns, whatever his meter held, as soon as its
-   * own rules allow it. One a danger: once an ultimate has come with the crowd at the line (`dangerSpent`), the meter fills at its
-   * usual pace (the ahead gain at its fullest) until a crowd move below the line ends the danger (filled again at once after each,
-   * the audit's shortest ultimates came every other turn: Big Boy's Bounce 32 times in a battle). Below it, every meter fills as it
-   * always has.
+   * The danger line, for Birdie's Fall (Eric, Nov 26, after beating Birdie with no Fall: "It should have detected like he was basically
+   * in danger, or like it was already heavily in my favor, and it should start triggering very quickly thereafter, like a turn or two
+   * at most"): the crowd's expected score after its move, as the judge has it (the boss's `judged`, the number "your chances" shows),
+   * at or above dangerAt, for birdie.fallDangerMoves of its moves in a row; and for the bosses in `dangerBosses` (below). Every other
+   * boss's meter fills as it always has (docs/decisions/2026-11-26-ult-danger-birdie-only.md).
    */
   dangerAt: 0.7,
+  /**
+   * The bosses whose rage meter fills at once in danger (Eric, Nov 26: "every boss has to ult in every game, no matter what. So if
+   * there was a games where they weren't ulting, then we have to. But ... we don't want bosses to ... ult twice"): a crowd move at
+   * dangerAt or more while the boss hasn't used his ultimate yet this battle, and his meter is full as the next crowd turn begins (the
+   * usual warning, then the ultimate within two of his turns, as its own rules allow). Once he has used it, never again this battle, so
+   * the rule never brings a second one close after the first. The ones that, against engine-best moves, waited 7 to 23 of their turns
+   * or never came (the Nov 26 audit). Add or remove an id here.
+   */
+  dangerBosses: ["timber", "hopper", "hollow", "alfil", "moo"] as readonly string[],
   /**
    * How fast each boss's meter fills (every gain times this), by BOSS_ROSTER id (1 when missing). Its ultimate's
    * effect pauses the meter for its length (the blizzard 3 turns, the funhouse 12, the Roman candle about 13, Lights

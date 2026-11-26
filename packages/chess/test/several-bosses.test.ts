@@ -282,28 +282,6 @@ describe("several bosses: Folio's Crease line asked at the floor's rates (audit 
   });
 });
 
-describe("Folio's Crease line as one of his ultimates ends, the crowd in danger (review of #968, finding 1)", () => {
-  it("his Crease running out as the crowd's next turn begins counts as over: in danger, the line is asked for now, so the warning comes that turn", async () => {
-    const at = async (until: number, judged: number, dangerSpent = false) => {
-      const r = runner(["folio"]);
-      r.deal();
-      await r.score(new Map([["h0", { move: "e2e4", thinkMs: 1000 }]]));
-      expect(r.bossToMove() && r.boss!.id).toBe("folio");
-      const boss = r.boss!;
-      const p = boss.powers!;
-      const crease = { line: "a2a3", at: 0, until, side: boss.crowdSide };
-      r.state.boss = { ...boss, powers: { ...p, ultAt: 0, warnAt: 0, crease, judged, charge: 0, lost: 0, rageUsed: 0, ults: 1, ...(dangerSpent ? { dangerSpent: true as const } : {}) } };
-      return r.creaseAsk();
-    };
-    const turn = 2; // (The crowd's next turn: its first move played.)
-    expect(await at(turn - 1, BOSS_POWERS.dangerAt)).not.toBeNull();
-    // (Still running that turn, under the line, or this danger's ultimate already spent: none.)
-    expect(await at(turn, BOSS_POWERS.dangerAt)).toBeNull();
-    expect(await at(turn - 1, BOSS_POWERS.dangerAt - 0.01)).toBeNull();
-    expect(await at(turn - 1, BOSS_POWERS.dangerAt, true)).toBeNull();
-  });
-});
-
 describe("several bosses: each boss's own turn, and every move reaching every boss (the review of PR #808)", () => {
   it("Smudgy's forced moves are his own: the boss to move before him is never held to one, and his Camouflage isn't worn down by the others' turns", async () => {
     const held: string[] = [];
