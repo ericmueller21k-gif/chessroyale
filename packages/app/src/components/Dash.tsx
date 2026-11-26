@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
-import { DASH_ANIM, POWER_FX, scrambleLeft, type DashView } from "@chessroyale/chess";
-import { CRITICAL } from "../speech.tsx";
+import { DASH_ANIM, POWER_FX, fenAtPly, hangOnTimeline, pieceAt, popOffPending, scrambleLeft, scrambleSecondsOf, type DashView } from "@chessroyale/chess";
+import { CRITICAL, INTERRUPT } from "../speech.tsx";
 import { hash, pickLine } from "../characters/boss-beats.ts";
-import { DASH_FIT_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES } from "../characters/dash-lines.ts";
+import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES } from "../characters/dash-lines.ts";
 import { renderFrame } from "../characters/sprite.ts";
 import { sidekickBlitz } from "../characters/sidekicks/blitz.ts";
 import { clockShown } from "../clock-text.ts";
@@ -22,15 +22,18 @@ import { DASH_FIGURE as DASH } from "../characters/dash-figure.ts";
  *   director's review, Nov 3: the corner cast hid a8, b8 and the 7th rank on a phone).
  * - **Clock Slap** (`slap`, as your turn after his capture begins): his clock slap where he stands, and the time he took flying
  *   from your clock to him ("−30s", or "−6s" off a raid's next move), placed once from the two on the page, then CSS.
- * - **Time Scramble** (`scramble`, after the RAGE warning a turn before): banner TIME SCRAMBLE! ("Your next 5 moves: 3 seconds
- *   each"), his clock tossed and spun. Then on each scrambled move a big 3-2-1 over the board (`ScrambleCount`, Play.tsx: drawn
+ * - **Time Scramble** (`scramble`, after the RAGE warning a turn before): banner TIME SCRAMBLE! ("Your next 3 moves: 5 seconds
+ *   each" the first time, 3 seconds the second: its seconds by use, from his view), his clock tossed and spun. Then on each scrambled move a big 3-2-1 over the board (`ScrambleCount`, Play.tsx: drawn
  *   again only as the second shown changes, never per frame, and never in the way of a tap), its moves left in Tick's tally.
  * - **Scramble Rush's warning** (`rushWarn`, a turn before it, as any ultimate's): RAGE!, "Next turn: Scramble Rush", his line.
  * - **His flag** (`flag`, as your turn after it begins): your time ran out, a random move was played for you: his finger gun and
  *   his jab, the dock says what happened.
  * - **Clock multi-hit** (`clockFit`, every 4 or 5 of his moves: five quick smacks where he stands, always a line about his clock)
  *   and **pop-off** (his thinking screen, `popOffMoments`: three smacks and "I gotta pop off", then ten fast smacks and a love
- *   line, before his move lands; the crowd's clock starts after his move, as ever).
+ *   line, before his move lands; the crowd's clock starts after his move, as ever); the second one is his **"Hang on"** (Nov 26,
+ *   `popOffMoments` too: four beats, hangOnTimeline): your piece slid back (`hangOnFen`), your clock ticking down and given back
+ *   (the dock's, a display only: DockClock's `gagAt`), his smacks from slow to cheetah speed, the wind-up and "sorry", your piece
+ *   home, then his move. Presentation only: the game's board, clock and result never change for it.
  * - **Tick**, his tortoise, in the boss bar's prop slot (fixed): asleep on his clock; he wakes with a bob at a slap and rattles
  *   through a scramble. Under him, the time Dash has stolen so far, or the scramble's moves left.
  */
@@ -110,10 +113,12 @@ function slapMoment({ boss, moment, now }: MomentProps) {
   );
 }
 
-function scrambleMoment({ moment, banner }: MomentProps & { moment: Moment }) {
+function scrambleMoment({ boss, moment, banner }: MomentProps & { moment: Moment }) {
+  // (Its seconds by its use this battle: his view's, as the first scrambled move begins.)
+  const sc = boss.powers?.dash?.scramble;
   return (
-    <div class="power-moment pm-scramble pm-stay" data-turn={moment.key}>
-      {banner("TIME SCRAMBLE!", DASH_WORDS.scramble(BOSS_POWERS.scrambleMoves, BOSS_POWERS.scrambleSeconds), "dash")}
+    <div class="power-moment pm-scramble pm-stay" data-turn={moment.key} data-seconds={sc?.seconds ?? scrambleSecondsOf(0)}>
+      {banner("TIME SCRAMBLE!", DASH_WORDS.scramble(sc?.moves ?? BOSS_POWERS.scrambleMoves, sc?.seconds ?? scrambleSecondsOf(0)), "dash")}
       <InPlace runKey={moment.key} anims={["timeScramble"]} since={moment.at + B.scramble.castAt} />
     </div>
   );
@@ -156,27 +161,74 @@ function popOffFastMoment({ moment }: MomentProps) {
   );
 }
 
+/** His "Hang on"'s beats, each a moment: its slow smacks (hangSlow), cheetah speed (hangFast: it runs on through "almost done"), the wind-up and sorry. */
+function hangOnMoment(anims: readonly string[] | null) {
+  return ({ moment }: MomentProps) => (
+    <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-kind={moment.kind}>
+      {anims && <InPlace runKey={moment.key} anims={anims} since={moment.at} />}
+    </div>
+  );
+}
+
 /** When this device first saw each pop-off (a screen drawn again carries on; it doesn't start over). */
 const popOffSeen = new Map<string, number>();
 
 /**
  * His pop-off, as his thinking screen's moments (Boss.tsx), from when this device first saw it: the pop-off's two beats, one after
- * the other. It plays while he thinks for the turn it comes (DashState.popOff.at = powers.turn); popOffMs holds his move for them.
+ * the other; or in the second's place his "Hang on" (Nov 26), its four (hangOnTimeline). It plays while he thinks after your move for
+ * the turn it comes (popOffPending); popOffMs holds his move for them.
  */
 export function popOffMoments(boss: BossView, now = Date.now()): Moment[] {
   const d = boss.id === "dash" ? boss.powers?.dash : null;
-  if (!d?.popOff || d.popOff.at !== boss.powers?.turn) return [];
-  const key = `${boss.id}:popOff:${d.popOff.at}`;
+  if (!d?.popOff || !popOffPending(boss)) return [];
+  const key = `${boss.id}:${d.popOff.hangOn ? "hangOn" : "popOff"}:${d.popOff.at}`;
   const seenKey = `${boss.startMove}:${key}`;
   let at = popOffSeen.get(seenKey);
   if (at === undefined) {
     popOffSeen.set(seenKey, (at = now));
     if (popOffSeen.size > 20) popOffSeen.delete(popOffSeen.keys().next().value!);
   }
+  if (d.popOff.hangOn) {
+    const tl = hangOnTimeline();
+    return [
+      { kind: "hangOn", key, at, ms: POWER_FX.hangOn },
+      { kind: "hangOnFast", key: `${key}:fast`, at: at + tl.cheetahAt, ms: POWER_FX.hangOnFast },
+      { kind: "hangOnAlmost", key: `${key}:almost`, at: at + tl.almostAt, ms: POWER_FX.hangOnAlmost },
+      { kind: "hangOnSorry", key: `${key}:sorry`, at: at + tl.windAt, ms: POWER_FX.hangOnSorry },
+    ];
+  }
   return [
     { kind: "popOff", key, at, ms: POWER_FX.popOff },
     { kind: "popOffFast", key: `${key}:fast`, at: at + POWER_FX.popOff, ms: POWER_FX.popOffFast },
   ];
+}
+
+/** When his "Hang on" started on this screen (its first moment's start), or undefined: none playing now. */
+export function hangOnAt(moments: readonly Moment[], now: number): number | undefined {
+  const m = moments.find((x) => x.kind === "hangOn");
+  return m && now >= m.at && now < m.at + hangOnTimeline().total ? m.at : undefined;
+}
+
+/** The position before your move, made once a move (a game's whole history replayed: not every frame). */
+let before: { key: string; fen: string } | null = null;
+
+/**
+ * The board as his "Hang on" shows it: from `backAt` until `returnAt`, your move taken back (the position before it, his move before
+ * yours its last), so the board slides your piece back, then home again as it ends; null otherwise (and if the board's last move
+ * isn't yours). The game's board is never touched.
+ */
+export function hangOnFen(boss: BossView, moments: readonly Moment[], now: number): { fen: string; lastMove: string | null } | null {
+  const at = hangOnAt(moments, now);
+  if (at === undefined) return null;
+  const tl = hangOnTimeline();
+  const t = now - at;
+  if (t < tl.backAt || t >= tl.returnAt) return null;
+  const { history, bases, fen } = boss.board;
+  const last = history.at(-1);
+  if (!last || pieceAt(fen, last.slice(2, 4))?.color !== boss.crowdSide) return null;
+  const key = `${boss.startMove}:${history.length}:${fen}`;
+  if (before?.key !== key) before = { key, fen: fenAtPly(history, history.length - 1, bases) };
+  return { fen: before.fen, lastMove: history.at(-2) ?? null };
 }
 
 /** His extra move after a failed Scramble Rush: its own moment as it lands (Hollow's "TWICE!" in his colors; his line came as time was up). */
@@ -187,7 +239,7 @@ function rushExtraMoment({ boss, banner }: MomentProps) {
 /** One of his lines for a moment, the same on every screen (by the moment's key). */
 const lineOf = (lines: readonly string[], key: string): string => lines[hash(key) % lines.length]!;
 
-const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "popOffFast" | "rushWarn" | "rushExtra", MomentUi> = {
+const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "popOffFast" | "hangOn" | "hangOnFast" | "hangOnAlmost" | "hangOnSorry" | "rushWarn" | "rushExtra", MomentUi> = {
   // (Your time ran out on your last move: first, his jab.)
   flag: { order: 1, kit: "cheer", view: flagMoment, dock: () => DASH_WORDS.flag, line: (kit, m) => (kit ? pickLine(kit, "flag", m.key) : null) },
   slap: { order: 2, kit: "power", lineAt: B.slap.slamAt, view: slapMoment, dock: () => DASH_WORDS.slap },
@@ -198,6 +250,13 @@ const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "po
   popOff: { order: 1, kit: "power", view: popOffMoment, line: (_kit, m) => lineOf(DASH_POPOFF_LINES, m.key) },
   // (Its love line cuts in on the pop-off line: a line said while one is up waits its turn, and this one must come before his move.)
   popOffFast: { order: 2, kit: "power", view: popOffFastMoment, line: (_kit, m) => lineOf(DASH_LOVE_LINES, m.key), priority: () => CRITICAL },
+  // (His "Hang on" in the second pop-off's place, while he thinks: a line a beat, in order, each cutting in at once on the one
+  // before (INTERRUPT: one CRITICAL line waits for another to end, which put "Sorry…" after his move). No kit moment: his runs in
+  // place are its own.)
+  hangOn: { order: 1, view: hangOnMoment(["hangSlow"]), line: () => DASH_HANG_ON_LINES.start, priority: () => INTERRUPT },
+  hangOnFast: { order: 2, view: hangOnMoment(["hangFast"]), line: () => DASH_HANG_ON_LINES.cheetah, priority: () => INTERRUPT },
+  hangOnAlmost: { order: 3, view: hangOnMoment(null), line: () => DASH_HANG_ON_LINES.almost, priority: () => INTERRUPT },
+  hangOnSorry: { order: 4, view: hangOnMoment(["hangWind", "hangSorry"]), lineAt: hangOnTimeline().sorryAt - hangOnTimeline().windAt, line: () => DASH_HANG_ON_LINES.sorry, priority: () => INTERRUPT },
   // (His Scramble Rush a turn ahead, as any ultimate's warning: RAGE!, "Next turn: Scramble Rush", his clock held up, his line.)
   rushWarn: { order: 1, kit: "ultimateWarn", view: (p) => rageWarn(p, "Scramble Rush", undefined, true), line: (_kit, m) => lineOf(DASH_RUSH_LINES.warn, m.key) },
   rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },

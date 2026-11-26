@@ -21,6 +21,7 @@ import { areaBannerOf } from "../src/town/AreaBanner.tsx";
 import { BOARD_NAMES, FLAP_COLS, boardStops, flapSteps, newBoard, pageEntries, pageRows, rng, stepBoard } from "../src/town/shops/flap-board.ts";
 import { SHOP_FEEL } from "../src/town/feel.ts";
 import { ALL_HOMES } from "../src/town/world.ts";
+import { BIRD_HOMES, Flock, PILES, POUR_AT, POUR_LOOP, makeFlock, newPose, pileSize, poseAt } from "../src/town/shops/birdie-birds.ts";
 
 const T = 37;
 const Y0 = 83;
@@ -78,13 +79,16 @@ describe("Birdie's Station: the lobby, the art's picture cut into the room's pie
     for (const s of [...room.talkAt, { c: 4, r: 7 }, { c: 8, r: 7 }, { c: 1, r: 9 }, { c: 10, r: 9 }]) expect(d[s.r * 12 + s.c], `${s.c},${s.r}`).toBeGreaterThanOrEqual(0);
   });
   it("draws back as the art drew it (round 4), pixel for pixel, but where the room moved things (the vat, the pour's feeder, the table)", () => {
-    const art = renderFrame(SHOP_BIRDIE_INTERIOR_4, SHOP_BIRDIE_INTERIOR_4.anims.idle!.frames[0]!).data;
+    // (The art without its five birds on the stools: the room's flock is drawn in their place, on its own loop: shops/birdie-birds.ts, Nov 26.)
+    const f0 = SHOP_BIRDIE_INTERIOR_4.anims.idle!.frames[0]!;
+    const art = renderFrame(SHOP_BIRDIE_INTERIOR_4, { ...f0, layers: f0.layers.filter((l) => l.part !== "bird") }).data;
     const ours = composed();
     const W = SHOP_BIRDIE_INTERIOR_4.w;
     // (The vat's old place and new; the east gate's old place and new (a square east, clear of your mark); the row-3 stools' rims tucked
     // against the bar, which the art drew over the run's far edge and the room draws under the run, nearer; the run's feeder's old place
-    // and new; the table, the town's at its row's middle: x0, y0, x1, y1 in the art's pixels.)
-    const moved = [[220, 110, 270, 215], [183, 195, 190, 206], [329, 195, 336, 206], [200, 200, 222, 222], [270, 180, 292, 203], [185, 320, 297, 382], [248, 335, 396, 416]];
+    // and new; the table, the town's at its row's middle: x0, y0, x1, y1 in the art's pixels. Since Nov 26 the arms are longer, so the east
+    // gate's raised arm, old place and new, reaches up to y 255: its two narrow columns.)
+    const moved = [[220, 110, 270, 215], [183, 195, 190, 206], [329, 195, 336, 206], [200, 200, 222, 222], [270, 180, 292, 203], [185, 320, 297, 382], [248, 335, 396, 416], [296, 254, 302, 335], [333, 254, 339, 335]];
     let diff = 0;
     for (let y = 0; y < SHOP_BIRDIE_INTERIOR_4.h; y++)
       for (let x = 0; x < W; x++) {
@@ -337,5 +341,49 @@ describe("Birdie's Boss Crate and his Train (Nov 23)", () => {
     // (His crate on his bar is his lobby's own drawing, so the card shows it, as every shop's (below). His lines are kept.)
     expect(A.SHOP_BIRDIE_ROOM_PIECES.crate).toBe(A.SHOP_BIRDIE_CRATE);
     expect(def.says).toHaveLength(3);
+  });
+});
+
+describe("Birdie's birds at the bar (Nov 26, shops/birdie-birds.ts)", () => {
+  const F = SHOP_FEEL.birds;
+  it("are `count` birds on fixed loops from the seed: the same pose at the same time, every one home on the bar, the floor or a stool", () => {
+    expect(F.count).toBe(50);
+    expect(BIRD_HOMES).toBeGreaterThanOrEqual(F.count);
+    const a = makeFlock();
+    const b = makeFlock();
+    expect(a).toHaveLength(F.count);
+    for (const t of [0, 12_345, 987_654]) for (let i = 0; i < a.length; i++) expect(poseAt(a[i]!, t, newPose())).toEqual(poseAt(b[i]!, t, newPose()));
+    // (Homes: the run's top clear of the crate (x 229 to 259) and the pour's feeder (274 to 292); the arms' tops; by the stools; a seat.)
+    const on = new Set(a.map((q) => q.home.on));
+    expect([...on].sort()).toEqual(["arm", "floor", "run", "stool"]);
+    for (const q of a) if (q.home.on === "run") expect(q.home.x <= 222 || (q.home.x >= 266 && q.home.x <= 268) || q.home.x >= 298).toBe(true);
+    // (At any moment most are on show, some flying or away: the loop has them come and go.)
+    const flock = new Flock();
+    flock.step(60_000, false);
+    const c = flock.counts(60_000);
+    expect(c.shown).toBeGreaterThan(F.count * 0.7);
+    expect(c.shown).toBeLessThan(F.count);
+  });
+  it("the bartender's pour fills the run's piles in turn, each eaten down before his next pour onto it", () => {
+    const t0 = 100 * POUR_LOOP + POUR_AT;
+    const k = 100 % PILES.length;
+    expect(pileSize(k, t0 - 1)).toBe(0);
+    expect(pileSize(k, t0 + 1)).toBe(3);
+    expect(pileSize(k, t0 + F.pileEatMs / 2)).toBe(2);
+    expect(pileSize(k, t0 + F.pileEatMs + 1)).toBe(0);
+  });
+  it("you near the bar: every bird flies up and away; none back until `scatterAwayMs` after you've gone, then all back over `returnSpreadMs`", () => {
+    expect(Flock.near(6.5, 6)).toBe(true); // (the talk squares)
+    expect(Flock.near(8, 7)).toBe(false); // (your mark in his challenge)
+    expect(Flock.near(4.5, 10)).toBe(false); // (the door)
+    const flock = new Flock();
+    let t = 50_000;
+    for (; t < 50_000 + F.flyMs + 100; t += 16) flock.step(t, true);
+    expect(flock.counts(t)).toMatchObject({ shown: 0, flying: 0, fled: F.count });
+    for (; t < 50_000 + F.scatterAwayMs - 100; t += 50) flock.step(t, false);
+    expect(flock.counts(t)).toMatchObject({ shown: 0, fled: F.count });
+    for (; t < 50_000 + F.scatterAwayMs + F.returnSpreadMs + 2 * F.flyMs; t += 50) flock.step(t, false);
+    expect(flock.counts(t).fled).toBe(0);
+    expect(flock.counts(t).shown).toBeGreaterThan(F.count * 0.6);
   });
 });

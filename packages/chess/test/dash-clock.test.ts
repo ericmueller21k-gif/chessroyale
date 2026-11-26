@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, type BossPowerState } from "@chessroyale/core";
-import { DASH, DASH_FX, clockHitOn, clockHitTurns, popOffMs, popOffTurns } from "../src/bosses/dash.ts";
+import { BOSS_POWERS, DASH_HANG_ON, type BossPowerState } from "@chessroyale/core";
+import { DASH, DASH_FX, clockHitOn, clockHitTurns, hangOnClock, hangOnPending, hangOnTimeline, popOffMs, popOffPending, popOffTurns } from "../src/bosses/dash.ts";
 import { POWER_FX } from "../src/index.ts";
 
-/** Dash's clock (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): the multi-hit every 4 or 5 of his moves, and the pop-off once. */
+/**
+ * Dash's clock (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): the multi-hit every 4 or 5 of his moves, and the pop-off, whose
+ * second turn is his "Hang on" since Nov 26 (docs/decisions/2026-11-26-dash-hang-on.md).
+ */
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 /** Plays Dash's turns 1..turns through his everyTurn hook (no battle: the schedule alone), returning what each turn set. */
@@ -11,17 +14,18 @@ function simulate(seed: number, test = "", turns = 60) {
   const next = { dash: { slaps: 0, stolen: 0, flags: 0 }, charge: 0, lost: 0, rageUsed: 0, events: [] } as unknown as BossPowerState;
   const hits: number[] = [];
   const popAt: number[] = [];
+  const hangAt: number[] = [];
   for (let turn = 1; turn <= turns; turn++) {
     const events: { kind: string; count?: number; turn: number }[] = [];
     const t = { turn, fen: START, crowd: "w", seed, passive: "clockslap", ultimate: "scramble", test, ultNext: false, lastMove: null, rageSpeed: 1, s: BOSS_POWERS, events } as never;
     DASH.everyTurn!(next, t);
-    if (next.dash?.popOff?.at === turn) popAt.push(turn);
+    if (next.dash?.popOff?.at === turn) (next.dash.popOff.hangOn ? hangAt : popAt).push(turn);
     for (const e of events) if (e.kind === "clockFit") {
       hits.push(turn);
       expect(e.count).toBe(BOSS_POWERS.dashClockFit.smacks);
     }
   }
-  return { hits, popAt, popOff: next.dash?.popOff ?? null };
+  return { hits, popAt, hangAt, popOff: next.dash?.popOff ?? null };
 }
 
 describe("Dash's clock multi-hit (Eric, Nov 7: every four or five turns, five quick smacks, always a line)", () => {
@@ -60,8 +64,8 @@ describe("Dash's clock multi-hit (Eric, Nov 7: every four or five turns, five qu
   });
 });
 
-describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before his move lands)", () => {
-  it("two pop-offs a battle, on two of his turns from 8 to 20, at least 6 apart, distinct, in order (from the seed)", () => {
+describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before his move lands; Eric, Nov 26: the second is his \"Hang on\")", () => {
+  it("two turns a battle from 8 to 20, at least 6 apart, in order (from the seed): the first his pop-off, the second his \"Hang on\" (never a second pop-off)", () => {
     const { from, to, gap } = BOSS_POWERS.dashPopOff;
     expect([from, to, gap]).toEqual([8, 20, 6]);
     for (let seed = 0; seed < 300; seed++) {
@@ -72,8 +76,9 @@ describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before
       }
       expect(b - a).toBeGreaterThanOrEqual(gap);
       const sim = simulate(seed, "", 60);
-      expect(sim.popAt).toEqual([a, b]);
-      expect(sim.popOff).toEqual({ at: b });
+      expect(sim.popAt).toEqual([a]);
+      expect(sim.hangAt).toEqual([b]);
+      expect(sim.popOff).toEqual({ at: b, hangOn: true });
     }
   });
 
@@ -83,8 +88,9 @@ describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before
     expect(pairs.size).toBeGreaterThan(10);
   });
 
-  it("the test switch (?power=popoff): on his second and fourth turns", () => {
-    expect(simulate(5, "popoff", 9).popAt).toEqual([2, 4]);
+  it("the test switches: ?power=popoff, the pop-off on his second turn and the \"Hang on\" on his fourth; ?power=hangon, the \"Hang on\" alone on his second", () => {
+    expect(simulate(5, "popoff", 9)).toMatchObject({ popAt: [2], hangAt: [4] });
+    expect(simulate(5, "hangon", 9)).toMatchObject({ popAt: [], hangAt: [2] });
   });
 
   it("two beats of 4 to 6 seconds in all (3 smacks and the pop-off line, then 10 fast smacks and the love line)", () => {
@@ -97,12 +103,63 @@ describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before
     expect(BOSS_POWERS.dashPopOff.hitMs).toBeLessThan(BOSS_POWERS.dashClockFit.smackMs);
   });
 
-  it("holds his thinking only while he thinks for the turn it comes, both beats (popOffMs), and never for another boss", () => {
+  it("holds his thinking only while he thinks after your move of the turn it comes, both beats (popOffMs), and never for another boss", () => {
     const at = 9;
-    const on = { id: "dash", powers: { turn: at, dash: { popOff: { at } } } };
+    // (While he thinks after your move: your move counted, crowdMoves the turn.)
+    const on = { id: "dash", crowdMoves: at, powers: { turn: at, dash: { popOff: { at } } } };
     expect(popOffMs(on)).toBe(DASH_FX.popOff + DASH_FX.popOffFast);
-    expect(popOffMs({ ...on, powers: { ...on.powers, turn: at + 1 } })).toBe(0);
+    expect(popOffMs({ ...on, crowdMoves: at + 1, powers: { ...on.powers, turn: at + 1 } })).toBe(0);
     expect(popOffMs({ ...on, id: "moo" })).toBe(0);
-    expect(popOffMs({ id: "dash", powers: { turn: at, dash: { popOff: null } } })).toBe(0);
+    expect(popOffMs({ id: "dash", crowdMoves: at, powers: { turn: at, dash: { popOff: null } } })).toBe(0);
+    // (His extra move after a failed Scramble Rush, before your move of that turn: neither plays, nor holds it.)
+    expect(popOffPending({ ...on, crowdMoves: at - 1 })).toBe(false);
+    expect(popOffMs({ ...on, crowdMoves: at - 1 })).toBe(0);
+  });
+});
+
+describe("Dash's \"Hang on\" (Eric, Nov 26: in the second pop-off's place; screen only)", () => {
+  const at = 14;
+  const hang = { id: "dash", crowdMoves: at, powers: { turn: at, dash: { popOff: { at, hangOn: true as const } } } };
+
+  it("holds his move for its whole timeline and a margin (the server's think and solo's alike: popOffMs), only while he thinks after your move", () => {
+    const tl = hangOnTimeline();
+    expect(hangOnPending(hang)).toBe(true);
+    expect(popOffMs(hang)).toBe(tl.total + DASH_HANG_ON.tailMs);
+    // (The first pop-off isn't it; nor his extra move's thinking before your move; nor the turn after.)
+    expect(hangOnPending({ ...hang, powers: { ...hang.powers, dash: { popOff: { at } } } })).toBe(false);
+    expect(popOffMs({ ...hang, crowdMoves: at - 1 })).toBe(0);
+    expect(popOffMs({ ...hang, crowdMoves: at + 1, powers: { ...hang.powers, turn: at + 1 } })).toBe(0);
+  });
+
+  it("its beats in Eric's order and about his times: 12 s or so in all, cheetah speed 6 to 8 s in, the piece back early and home last", () => {
+    const tl = hangOnTimeline();
+    expect(tl.beats).toEqual([0, tl.backAt, tl.cheetahAt, tl.almostAt, tl.windAt, tl.sorryAt, tl.returnAt]);
+    for (let i = 1; i < tl.beats.length; i++) expect(tl.beats[i]!).toBeGreaterThan(tl.beats[i - 1]!);
+    expect(tl.cheetahAt).toBeGreaterThanOrEqual(6000);
+    expect(tl.cheetahAt).toBeLessThanOrEqual(8000);
+    expect(tl.total).toBeGreaterThanOrEqual(11_000);
+    expect(tl.total).toBeLessThanOrEqual(14_000);
+    expect(tl.backAt).toBeLessThan(1000);
+    expect(tl.upAt).toBeLessThanOrEqual(tl.returnAt);
+    expect(tl.total - tl.returnAt).toBe(DASH_HANG_ON.returnMs);
+    // (Its moments' lengths, from the timeline: back to back, the four filling it.)
+    expect([POWER_FX.hangOn, POWER_FX.hangOnFast, POWER_FX.hangOnAlmost, POWER_FX.hangOnSorry]).toEqual([tl.cheetahAt, tl.almostAt - tl.cheetahAt, tl.windAt - tl.almostAt, tl.total - tl.windAt]);
+  });
+
+  it("your clock as it shows it: as it was until your piece goes back, then ticking down (never under 0), then given back to exactly what it was", () => {
+    const tl = hangOnTimeline();
+    const real = 61_000;
+    expect(hangOnClock(real, 0)).toBe(real);
+    expect(hangOnClock(real, tl.backAt + 5000)).toBe(real - 5000);
+    expect(hangOnClock(real, tl.sorryAt - 1)).toBe(real - (tl.sorryAt - 1 - tl.backAt));
+    // (Given back: rising from where it got to, all of it back by upAt, and held there.)
+    const low = real - (tl.sorryAt - tl.backAt);
+    const mid = hangOnClock(real, (tl.sorryAt + tl.upAt) / 2);
+    expect(mid).toBeGreaterThan(low);
+    expect(mid).toBeLessThan(real);
+    for (const t of [tl.upAt, tl.returnAt, tl.total]) expect(hangOnClock(real, t)).toBe(real);
+    // (Little left: it stops at 0, then comes back.)
+    expect(hangOnClock(2000, tl.windAt)).toBe(0);
+    expect(hangOnClock(2000, tl.upAt)).toBe(2000);
   });
 });
