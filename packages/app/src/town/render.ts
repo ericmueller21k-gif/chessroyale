@@ -42,7 +42,7 @@ import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
-import { art2d } from "./paint.ts";
+import { ATLAS, art2d } from "./paint.ts";
 import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
@@ -55,7 +55,7 @@ import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
 import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
-import { P, REC, type PartId } from "./frame-report.ts";
+import { P, REC, upName, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { Pictures, type Restored } from "./keep-pictures.ts";
 import { framePixels, type PaintSpec, type Pixels } from "./paint-jobs.ts";
@@ -288,7 +288,7 @@ export function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanv
   const key = side + (tint ?? "");
   let c = pawnCache.get(key);
   if (c) return c;
-  c = document.createElement("canvas");
+  c = upName(document.createElement("canvas"), "pawn");
   c.width = c.height = PAWN_PX;
   const g = art2d(c);
   g.scale(PAWN_PX / 45, PAWN_PX / 45);
@@ -338,7 +338,7 @@ class FrameCache {
     if (c) return c;
     const t0 = REC ? performance.now() : 0;
     const { w, h, data } = px ?? framePixels(this.ch, i);
-    c = document.createElement("canvas");
+    c = upName(document.createElement("canvas"), `frame ${this.ch.id}`);
     c.width = w;
     c.height = h;
     art2d(c).putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
@@ -415,7 +415,7 @@ class SpriteFrames {
     const sheet = this.sheet;
     SPRITE_ANIMS.forEach((a, row) => {
       this.frames[a] = sheet.ms[a].map((_, col) => {
-        const c = document.createElement("canvas");
+        const c = upName(document.createElement("canvas"), "sidekick");
         c.width = sheet.w;
         c.height = sheet.h;
         art2d(c).drawImage(img, col * sheet.w, row * sheet.h, sheet.w, sheet.h, 0, 0, sheet.w, sheet.h);
@@ -449,7 +449,7 @@ class SpriteFrames {
         if (d[(y * c.width + x) * 4 + 3]! > 0) ((x0 = Math.min(x0, x)), (y0 = Math.min(y0, y)), (x1 = Math.max(x1, x)), (y1 = Math.max(y1, y)));
     // Square, the figure standing on its bottom in the middle, so it sits in the strip's round spot like a pawn.
     const size = Math.max(x1 - x0, y1 - y0) + 1;
-    const out = document.createElement("canvas");
+    const out = upName(document.createElement("canvas"), "face");
     out.width = out.height = size;
     out.getContext("2d")!.drawImage(c, x0, y0, x1 - x0 + 1, y1 - y0 + 1, Math.floor((size - (x1 - x0 + 1)) / 2), size - (y1 - y0 + 1), x1 - x0 + 1, y1 - y0 + 1);
     return out.toDataURL();
@@ -502,7 +502,7 @@ export type Hit =
 /** A character's first idle frame on a canvas (and, `mask`, which of its pixels are drawn, for taps). */
 function canvasOf(ch: Character, mask?: Uint8Array[]): HTMLCanvasElement {
   const { w, h, data } = renderFrame(ch, ch.anims.idle!.frames[0]!);
-  const c = document.createElement("canvas");
+  const c = upName(document.createElement("canvas"), "figure");
   c.width = w;
   c.height = h;
   art2d(c).putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
@@ -544,7 +544,7 @@ function quoteArt(id: StatueId, lines: string[], s: number, e: number, lead: num
   const lh = lines.length * CAP + (lines.length - 1) * lead;
   const lw = Math.max(...lines.map(lineWidth));
   const ink = QUOTE_INK[id];
-  const cv = document.createElement("canvas");
+  const cv = upName(document.createElement("canvas"), "quote");
   cv.width = lw * s + e;
   cv.height = lh * s + e;
   const g = art2d(cv);
@@ -569,12 +569,19 @@ interface LightLayer {
   ny: number;
 }
 interface GlowPiece {
+  /** The sheet it's on (its glow's: Nov 26), and where on it (sx, sy; w x h). */
   cv: HTMLCanvasElement;
+  sx: number;
+  sy: number;
+  w: number;
+  h: number;
   /** Its top left, in the picture's pixels. */
   x: number;
   y: number;
   flicker: boolean;
 }
+/** Clear pixels between a glow's pieces on its sheet: the atlas's own padding round a picture (paint.ts ATLAS). */
+const GLOW_GAP = ATLAS.pad;
 interface Glow {
   pieces: GlowPiece[];
   lit: Uint8Array;
@@ -590,7 +597,8 @@ function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly Li
   const spill = Math.ceil(f.lightSpill[f.lightSpill.length - 1]![0]);
   const keys = frameKeys(ch, ch.anims.idle!.frames[0]!);
   const lit = new Uint8Array(ch.w * ch.h);
-  const pieces: GlowPiece[] = [];
+  /** Each piece's light as worked out (r, g, b, premultiplied), before it goes on the glow's one sheet. */
+  const made: { x0: number; y0: number; w: number; h: number; flicker: boolean; A: Float32Array }[] = [];
   /** A piece over (x0, y0, w, h), in the picture's pixels: `fill` adds its light, pixel by pixel (r, g, b, premultiplied). */
   const piece = (x0: number, y0: number, w: number, h: number, flicker: boolean, fill: (add: AddLight) => void) => {
     const A = new Float32Array(w * h * 3);
@@ -605,22 +613,7 @@ function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly Li
       A[o + 2] = A[o + 2]! + rgb[2]! * a;
       any = true;
     });
-    if (!any) return;
-    const img = new ImageData(w, h);
-    const d = img.data;
-    for (let i = 0; i < w * h; i++) {
-      const a = Math.min(255, Math.max(A[i * 3]!, A[i * 3 + 1]!, A[i * 3 + 2]!));
-      if (a <= 0) continue;
-      d[i * 4] = Math.min(255, (A[i * 3]! * 255) / a);
-      d[i * 4 + 1] = Math.min(255, (A[i * 3 + 1]! * 255) / a);
-      d[i * 4 + 2] = Math.min(255, (A[i * 3 + 2]! * 255) / a);
-      d[i * 4 + 3] = a;
-    }
-    const cv = document.createElement("canvas");
-    cv.width = w;
-    cv.height = h;
-    art2d(cv).putImageData(img, 0, 0);
-    pieces.push({ cv, x: x0, y: y0, flicker });
+    if (any) made.push({ x0, y0, w, h, flicker, A });
   };
   for (const s of spots) {
     const rgb = rgbOf(s.color);
@@ -641,7 +634,26 @@ function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly Li
     const y0 = Math.min(s.y - spill, Math.floor(cy - halo));
     const x1 = Math.max(s.x + s.w + spill, Math.ceil(cx + halo) + 1);
     const y1 = Math.max(s.y + s.h + spill, Math.ceil(cy + halo) + 1);
-    piece(x0, y0, x1 - x0, y1 - y0, !!s.flicker, (add) => {
+    // How far each pixel of the piece is from the nearest lit one within `spill` across and down (squared): stamped out from the lit
+    // pixels (Nov 26: the same numbers as looking round every pixel, which was 2.7 s of the loading screen for the town's 2,551 pieces).
+    const PW = x1 - x0;
+    const PH = y1 - y0;
+    const near = new Float32Array(PW * PH).fill(Infinity);
+    for (let v = s.y; v < s.y + s.h; v++)
+      for (let u = s.x; u < s.x + s.w; u++) {
+        if (m[(v - s.y) * s.w + u - s.x] !== 1) continue;
+        for (let dy = -spill; dy <= spill; dy++) {
+          const Y = v + dy - y0;
+          if (Y < 0 || Y >= PH) continue;
+          for (let dx = -spill; dx <= spill; dx++) {
+            const X = u + dx - x0;
+            if (X < 0 || X >= PW) continue;
+            const d = dx * dx + dy * dy;
+            if (d < near[Y * PW + X]!) near[Y * PW + X] = d;
+          }
+        }
+      }
+    piece(x0, y0, PW, PH, !!s.flicker, (add) => {
       for (let y = y0; y < y1; y++)
         for (let x = x0; x < x1; x++) {
           // Its lit pixels warm and bright; round them, the glow spilling, by how far the nearest lit one is; and its
@@ -650,8 +662,7 @@ function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly Li
             add(x, y, rgb, s.strength);
             continue;
           }
-          let d2 = Infinity;
-          for (let v = y - spill; v <= y + spill; v++) for (let u = x - spill; u <= x + spill; u++) if (isLit(u, v)) d2 = Math.min(d2, (u - x) ** 2 + (v - y) ** 2);
+          const d2 = near[(y - y0) * PW + x - x0]!;
           if (d2 < Infinity) add(x, y, rgb, s.strength * bandAt(f.lightSpill, Math.sqrt(d2)));
           if (halo) add(x, y, rgb, s.strength * bandAt(f.lightHalo, Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / halo));
         }
@@ -667,6 +678,58 @@ function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly Li
       for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) add(x, y, rgb, p.strength * bandAt(f.lightPool, Math.hypot((x + 0.5 - p.x) / p.rx, (y + 0.5 - p.y) / p.ry)));
     });
   }
+  // The pieces on one sheet (Nov 26: a canvas each was 2,551 canvases, most of the lights' cost on the loading screen), in rows, GLOW_GAP
+  // clear pixels apart (as the atlas pads each picture: a smoothed draw of one reads the same clear pixels round it).
+  const G = GLOW_GAP;
+  let area = 0;
+  let widest = 0;
+  for (const p of made) {
+    const w = Math.trunc(p.w);
+    area += (w + G) * (Math.trunc(p.h) + G);
+    widest = Math.max(widest, w);
+  }
+  const rowW = Math.max(widest, Math.ceil(Math.sqrt(area)));
+  const at: number[] = [];
+  let cx = 0;
+  let cy = 0;
+  let rowH = 0;
+  let sw = 0;
+  for (const p of made) {
+    const w = Math.trunc(p.w);
+    const h = Math.trunc(p.h);
+    if (cx > 0 && cx + w > rowW) ((cx = 0), (cy += rowH + G), (rowH = 0));
+    at.push(cx, cy);
+    sw = Math.max(sw, cx + w);
+    cx += w + G;
+    rowH = Math.max(rowH, h);
+  }
+  const pieces: GlowPiece[] = [];
+  if (!made.length) return { pieces, lit };
+  const sh = cy + rowH;
+  const img = new ImageData(Math.max(1, sw), Math.max(1, sh));
+  const d = img.data;
+  const cv = upName(document.createElement("canvas"), "glow");
+  cv.width = img.width;
+  cv.height = img.height;
+  made.forEach((p, k) => {
+    const { w, h, A } = p;
+    const tw = Math.trunc(w);
+    const th = Math.trunc(h);
+    const sx = at[2 * k]!;
+    const sy = at[2 * k + 1]!;
+    // (As a canvas of its own had it: its pixels in order, tw across.)
+    for (let i = 0; i < w * h && i < tw * th; i++) {
+      const a = Math.min(255, Math.max(A[i * 3]!, A[i * 3 + 1]!, A[i * 3 + 2]!));
+      if (a <= 0) continue;
+      const o = ((sy + ((i / tw) | 0)) * cv.width + sx + (i % tw)) * 4;
+      d[o] = Math.min(255, (A[i * 3]! * 255) / a);
+      d[o + 1] = Math.min(255, (A[i * 3 + 1]! * 255) / a);
+      d[o + 2] = Math.min(255, (A[i * 3 + 2]! * 255) / a);
+      d[o + 3] = a;
+    }
+    pieces.push({ cv, sx, sy, w: tw, h: th, x: p.x0, y: p.y0, flicker: p.flicker });
+  });
+  art2d(cv).putImageData(img, 0, 0);
   return { pieces, lit };
 }
 
@@ -1230,7 +1293,7 @@ export class Renderer {
       // One layer drawn (outlined and colored) at most a frame.
       const id = STATUES[job.i]!.id;
       if (!job.cv) {
-        job.cv = document.createElement("canvas");
+        job.cv = upName(document.createElement("canvas"), "statue");
         job.cv.width = STATUE_W * CLOSE;
         job.cv.height = statueH(id) * CLOSE;
       }
@@ -1982,6 +2045,27 @@ export class Renderer {
         if (!sp.ready) return sp.failed ? undefined : false;
         for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) P().keep(c);
       });
+    // (The lights, Nov 26: every home's, front's, side's and lamp's glow baked and kept, whatever the sky now (the clock brings dusk as
+    // you play). Eric's laptop at night: 1,211 uploads in 16.7 s of walking, each window's light baked and uploaded as it first shone,
+    // 3 to 12 a frame, the worst frames 50 to 117 ms. Baked fresh each visit, as the labels are: not in the kept pages. One job a picture.)
+    const glow = (make: () => Glow | null) =>
+      jobs.push(() => {
+        const g = make();
+        if (g?.pieces.length) P().keep(g.pieces[0]!.cv);
+      });
+    for (let i = 0; i < this.places.length; i++) glow(() => this.glowOf(i));
+    for (let i = 0; i < PROPS.length; i++) {
+      const pr = PROPS[i]!;
+      if (pr.lot !== undefined) glow(() => this.frontGlowOf(this.propFrames[i]!, pr.lot!));
+      if (pr.kind === "lamp") glow(() => (this.lampGlow ??= bakeGlow(PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS)));
+    }
+    const sides = new Set<Character>();
+    for (const b of this.boxes)
+      for (const side of [b.box.left, b.box.right, b.box.back ?? b.box.rear])
+        if (side?.lights.length && !sides.has(side.ch)) {
+          sides.add(side.ch);
+          glow(() => this.wallGlowOf(side.ch, side.lights));
+        }
     // (The labels, Nov 25: once their fonts are in, up to `loadSheetWaitMs` all told; made fresh each visit, as they're quick.)
     jobs.push(() => this.fontsIn());
     jobs.push(() => this.makeLabels((c) => P().keep(c)));
@@ -2291,8 +2375,8 @@ export class Renderer {
       const fl = this.flicker(now, phase);
       const crisp = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare >= 1.5;
       for (const pc of glow.pieces) {
-        this.wallAffine(w, ch, pc.x, pc.x + pc.cv.width, tall);
-        this.lightT(pc.cv, this.M, pc.x, pc.y, pc.cv.width, pc.cv.height, this.lightK * alpha * (pc.flicker ? fl : 1), crisp);
+        this.wallAffine(w, ch, pc.x, pc.x + pc.w, tall);
+        this.lightT(pc, this.M, this.lightK * alpha * (pc.flicker ? fl : 1), crisp);
       }
     }
   }
@@ -2395,9 +2479,10 @@ export class Renderer {
     g.drawImage(img, sx, sy, sw, sh, dx, dy, sw, sh);
     g.restore();
   }
-  /** Adds a light through the affine `m` (as `light`): `img` over (x, y, w, h) in the picture's pixels. */
-  private lightT(img: HTMLCanvasElement, m: Float64Array, x: number, y: number, w: number, h: number, a: number, crisp: boolean): void {
+  /** Adds a light through the affine `m` (as `light`): piece `pc` at its place in the picture's pixels. */
+  private lightT(pc: GlowPiece, m: Float64Array, a: number, crisp: boolean): void {
     if (a <= 0.004) return;
+    const { x, y, w, h } = pc;
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
@@ -2420,7 +2505,7 @@ export class Renderer {
     g.globalAlpha = Math.min(1, a);
     g.imageSmoothingEnabled = !crisp;
     g.setTransform(DPR * m[0]!, DPR * m[1]!, DPR * m[2]!, DPR * m[3]!, DPR * m[4]!, DPR * m[5]!);
-    g.drawImage(img, x, y, w, h);
+    g.drawImage(pc.cv, pc.sx, pc.sy, w, h, x, y, w, h);
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
     this.markLit(x0, y0, x1 - x0, y1 - y0);
   }
@@ -2700,7 +2785,7 @@ export class Renderer {
     if (!light && kind === "N") rows = rows.map((r) => [...r].reverse().join("")); // black's knight faces white
     const w = rows[0]!.length + 2;
     const h = rows.length + 2;
-    c = document.createElement("canvas");
+    c = upName(document.createElement("canvas"), "table piece");
     c.width = w;
     c.height = h;
     const g = art2d(c);
@@ -2728,7 +2813,7 @@ export class Renderer {
   private clockStrip(): HTMLCanvasElement {
     if (this.clockArt) return this.clockArt;
     const ink = TABLE_CLOCK_INK;
-    const c = document.createElement("canvas");
+    const c = upName(document.createElement("canvas"), "clock");
     let x = 0;
     for (const ch of CLOCK_CHARS) {
       this.clockAt[ch] = x;
@@ -2910,7 +2995,7 @@ export class Renderer {
     const w = Math.ceil((x1 + 2 - x0) * DPR);
     const hh = Math.ceil((y1 + 2 - y0) * DPR);
     if (w <= 0 || hh <= 0 || w * hh > 4_000_000) return void (cache.cv = null);
-    const cv = cache.cv ?? document.createElement("canvas");
+    const cv = cache.cv ?? upName(document.createElement("canvas"), "board");
     if (cv.width !== w || cv.height !== hh) {
       cv.width = w;
       cv.height = hh;
@@ -3077,19 +3162,19 @@ export class Renderer {
     const fl = this.flicker(now, phase);
     for (let i = 0; i < g.pieces.length; i++) {
       const p = g.pieces[i]!;
-      this.light(p.cv, x0 + p.x * px, y0 + p.y * px, p.cv.width * px, p.cv.height * px, p.flicker ? k * fl : k, crisp);
+      this.light(p, x0 + p.x * px, y0 + p.y * px, p.w * px, p.h * px, p.flicker ? k * fl : k, crisp);
     }
   }
 
-  /** Adds a light to the layer: `img` over (x, y, w, h) on the screen, `a` strong. */
-  private light(img: HTMLCanvasElement, x: number, y: number, w: number, h: number, a: number, crisp: boolean): void {
+  /** Adds a light to the layer: piece `p` over (x, y, w, h) on the screen, `a` strong. */
+  private light(p: GlowPiece, x: number, y: number, w: number, h: number, a: number, crisp: boolean): void {
     const L = this.layer!;
     const g = L.g;
     if (a <= 0.004 || x > this.W || y > this.H || x + w < 0 || y + h < 0) return;
     g.globalCompositeOperation = "lighter";
     g.globalAlpha = Math.min(1, a);
     g.imageSmoothingEnabled = !crisp;
-    g.drawImage(img, x, y, w, h);
+    g.drawImage(p.cv, p.sx, p.sy, p.w, p.h, x, y, w, h);
     this.markLit(x, y, w, h);
   }
 
@@ -3265,7 +3350,7 @@ export class Renderer {
     const { DPR } = this;
     const text = this.places[i]!.name;
     const font = NAME_FONT[size]!;
-    const cv = had?.cv ?? document.createElement("canvas");
+    const cv = had?.cv ?? upName(document.createElement("canvas"), "home name");
     const g = art2d(cv);
     g.font = font;
     g.textAlign = "center";
@@ -3644,7 +3729,7 @@ export class Renderer {
     // A new one: a canvas of its own, or the least lately used one's (never one drawn this frame or the last, which
     // this frame may still draw: a crowd of more names than TAG_ART_MAX on screen keeps them all).
     const old = this.tagArt.evict(this.frameNo);
-    const a: TagArt = { cv: old?.cv ?? document.createElement("canvas"), w: 0, h: 0, rh: 0, s, kind, used: this.frameNo, fonts: -1 };
+    const a: TagArt = { cv: old?.cv ?? upName(document.createElement("canvas"), "tag"), w: 0, h: 0, rh: 0, s, kind, used: this.frameNo, fonts: -1 };
     this.tagArt.add(text, a);
     return a;
   }
@@ -3729,7 +3814,7 @@ export class Renderer {
       this.bubbles.delete(oldest);
       cv = old.cv;
     }
-    cv ??= document.createElement("canvas");
+    cv ??= upName(document.createElement("canvas"), "bubble");
     const g = art2d(cv);
     g.font = BUBBLE_FONT;
     const words = text.split(" ");
@@ -3771,7 +3856,7 @@ export class Renderer {
   private tailArt(): HTMLCanvasElement {
     const { DPR } = this;
     if (this.tail && this.tailDpr === DPR) return this.tail;
-    const cv = (this.tail ??= document.createElement("canvas"));
+    const cv = (this.tail ??= upName(document.createElement("canvas"), "bubble tail"));
     this.tailDpr = DPR;
     cv.width = Math.ceil(12 * DPR) + 2 * BUBBLE_PAD;
     cv.height = Math.ceil(8 * DPR) + 2 * BUBBLE_PAD;

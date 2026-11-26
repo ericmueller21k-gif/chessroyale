@@ -107,10 +107,12 @@ export interface RunData {
   /** Pictures uploaded, pictures painted (counts). */
   ups: Uint16Array;
   bakes: Uint16Array;
+  /** (Nov 26) The run's uploads by what each picture is (`upName`: "glow", "tag", "bubble"…; a reason after it: "glow (redrawn)"). */
+  upsBy: Map<string, number>;
 }
 
 export function newRun(max = MAX_FRAMES): RunData {
-  return { n: 0, total: new Float32Array(max), part: new Float32Array(max * NP), flags: new Uint16Array(max), turn: new Float32Array(max), ups: new Uint16Array(max), bakes: new Uint16Array(max) };
+  return { n: 0, total: new Float32Array(max), part: new Float32Array(max * NP), flags: new Uint16Array(max), turn: new Float32Array(max), ups: new Uint16Array(max), bakes: new Uint16Array(max), upsBy: new Map() };
 }
 
 /**
@@ -160,10 +162,18 @@ export class FrameRec {
     this.cur[p] = this.cur[p]! + ms;
     this.stolen += ms;
   }
-  upload(ms: number): void {
+  /** A picture uploaded (`src`: which, named by `upName`; `why`: "redrawn", "after a lost context"…, or none for a first upload). */
+  upload(ms: number, src?: object, why = ""): void {
     this.take(P.uploads, ms);
     this.ups++;
     this.flags |= F.upload;
+    if (this.state !== "rec") return;
+    // (Uploads are rare once the town has loaded: a string and a map entry each is fine. The panel names the sources, Nov 26.)
+    const sz = src as { width?: number; height?: number } | undefined;
+    const name = (src && UP_NAMES.get(src)) ?? (sz?.width !== undefined ? `other ${sz.width}×${sz.height}` : "other");
+    const k = why ? `${name} (${why})` : name;
+    const by = this.run.upsBy;
+    by.set(k, (by.get(k) ?? 0) + 1);
   }
   /** A picture painted the first time it shows (a roof, a wall, a figure's frame). */
   paint(ms: number): void {
@@ -241,6 +251,7 @@ export class FrameRec {
   /** Again: an empty run, waiting for the first move. */
   again(): void {
     this.run.n = 0;
+    this.run.upsBy.clear();
     this.sec = -1;
     this.state = "wait";
     this.prevNow = -1;
@@ -250,8 +261,22 @@ export class FrameRec {
 
 /** The page's recorder (`?report`), or null: what render.ts, paint-gl.ts and Town.tsx's frame mark. */
 export let REC: FrameRec | null = null;
+
+/**
+ * (`?report`, Nov 26) What each picture is, for the panel's uploads by source: named where it's made ("glow", "tag", "bubble", "board"…),
+ * only with `?report` (a WeakMap entry each; without it, a check of a flag). Eric's laptop, Nov 26: 1,211 uploads in 16.7 s
+ * of walking that the report couldn't place (they were the windows' lights, baked as each first shone).
+ */
+const UP_NAMES = new WeakMap<object, string>();
+/** (Named from the first recorder on, between runs too: a picture made then may upload in the next run.) */
+let naming = false;
+export function upName<T extends object>(src: T, name: string): T {
+  if (naming) UP_NAMES.set(src, name);
+  return src;
+}
 export function setRec(r: FrameRec | null): void {
   REC = r;
+  if (r) naming = true;
 }
 
 /**
@@ -356,6 +381,8 @@ export interface Summary {
   /** The fastest turn (degrees a second). */
   maxTurn: number;
   uploads: number;
+  /** (Nov 26) The uploads by source, most first. */
+  uploadsBy: [string, number][];
   bakes: number;
   resets: number;
 }
@@ -458,6 +485,7 @@ export function summarize(r: RunData): Summary {
     oursTurn: segs[2]!.frames ? argmax(segs[2]!.avg, P.outside) : -1,
     maxTurn,
     uploads,
+    uploadsBy: [...r.upsBy].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)),
     bakes,
     resets,
   };
