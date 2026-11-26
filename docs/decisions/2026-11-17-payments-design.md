@@ -28,6 +28,10 @@ keyed `pay:<session>`; the return trip (`/?paid=<id>`) asks the server, which re
 Coins never come from the redirect's word. Keys in the Secrets Store (`withSecrets()`); test mode on the private site; `PAUSE_PAYMENTS`
 greys Buy ("Buying is paused for a moment.") while webhooks and refunds keep working. `/api/stripe/webhook` needs a Zero Trust bypass.
 
+> **Superseded in part (Nov 26, PR 5's review, the director's call):** `client_reference_id` is not the ledger id: the ledger id never
+> goes to Stripe, and the credit matches on our own row (session → account). The credit's op is `pay:<ref>`, the purchase's own random
+> ledger reference, not `pay:<session>`. See `2026-11-26-purchases-storage.md`, calls 13 and 14.
+
 **Fees** (stripe.com/pricing, read Nov 17): 2.9% + 30¢ a US card or wallet charge; +1.5% a Canadian card; no conversion fee (USD
 in, USD out); Stripe Tax 0.5% only where registered; **a dispute $15** (never countered, so never the extra $15); a refund costs
 nothing more but the first fee isn't returned. Our cost per pack: $1.99 → 36¢ (18%), $4.99 → 45¢, $9.99 → 59¢, $19.99 → 88¢,

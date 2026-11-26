@@ -1,4 +1,4 @@
-import { OPS, crateDef, type BonusRoll, type CrateRoll } from "@chessroyale/core";
+import { OPS, crateDef, type BonusRoll, type CrateRoll, type SpendPlan } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
@@ -14,6 +14,12 @@ import type { Sql, Stmt } from "./accounts.ts";
  * writes nothing. The ledger names no player: each account has a random ledger id (`ledger_accounts`), dropped when the account is
  * deleted or merged, so its rows stay but name nobody (as deleted results do). (Only types come from accounts.ts: it imports this
  * file's schema while it loads.)
+ *
+ * Bought coins (Nov 26, payments PR 5; purchases.ts, docs/areas/payments.md): each purchase's coins still unspent (`purchases.remaining`)
+ * are a balance too (asset kind `purchase`, by the purchase's own random ledger reference `purchases.ref`, never its Checkout Session's
+ * id: deleting the account drops the ref, so the kept sales record can't lead back here), beside the wallet's coins: a purchase credits both, and a
+ * spend takes the wallet's coins and, for what earned coins don't pay, each purchase's share (spendLegs). Coins are never spent with
+ * leg.coins: every spend goes through spendLegs, so none can skip earned-first.
  */
 export const LEDGER_SCHEMA = [
   // Each account's ledger id (random). Only the account's own row links the ledger to it.
@@ -21,9 +27,9 @@ export const LEDGER_SCHEMA = [
     user_id TEXT PRIMARY KEY,
     account TEXT NOT NULL UNIQUE
   )`,
-  // One row per leg: `asset_kind` coins | crates | keys | xp | token | shop | item | boss_crate | welcome | series_crate | boss_pick,
-  // `asset_id` which one (a boss, a shop item, an item's id, a boss crate's kind, a Welcome Crate's milestone, a series crate's id
-  // ("winter-1"); '' for coins, crates, keys, XP and boss picks), `source_id` where it
+  // One row per leg: `asset_kind` coins | crates | keys | xp | token | shop | item | boss_crate | welcome | series_crate | boss_pick |
+  // purchase, `asset_id` which one (a boss, a shop item, an item's id, a boss crate's kind, a Welcome Crate's milestone, a series crate's
+  // id ("winter-1"), a purchase's ledger reference (purchases.ref); '' for coins, crates, keys, XP and boss picks), `source_id` where it
   // came from (a game, a battle, a crate). Never updated or deleted (the triggers below). (Nov 26, the coin boost: boost_crate,
   // boost_min and crate_bonus, the wallet's boost_crates, boost_minutes and crate_bonus, asset_id ''.)
   `CREATE TABLE IF NOT EXISTS ledger (
@@ -71,6 +77,7 @@ export type AssetKind =
   | "welcome"
   | "series_crate"
   | "boss_pick"
+  | "purchase"
   // (The coin boost, Nov 26: coin-boost.ts. Coin Boost Crates held, boost minutes left, the Crate Bonus's level-ups left.)
   | "boost_crate"
   | "boost_min"
@@ -83,7 +90,8 @@ export interface Cond {
 }
 export const cond = (sql: string, ...params: unknown[]): Cond => ({ sql, params });
 const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
-const newId = (bytes = 12) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+/** A random id, in hex (`bytes` random bytes): a ledger id, an attempt's nonce, a purchase's ledger reference (purchases.ts). */
+export const newId = (bytes = 12) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const COLS = "op_id, leg, account, asset_kind, asset_id, delta, reason, source_id, created_at, nonce";
 
 /** An account and its ledger id. */
@@ -168,7 +176,11 @@ export type NewItem = Pick<CrateRoll, "def" | "color" | "color2" | "blemish" | "
 
 /** The legs there are. Each says what changes and writes that change. */
 export const leg = {
-  coins: (user: string, delta: number, source: string | null = null) => walletLeg("coins", user, delta, source),
+  /** Coins earned or credited (more than 0). A spend never comes through here: spendLegs, earned coins first (Nov 26). */
+  coins: (user: string, delta: number, source: string | null = null) => {
+    if (delta < 0) throw new Error("ledger: coins are spent through spendLegs (earned first: purchases.ts applySpend), never leg.coins");
+    return walletLeg("coins", user, delta, source);
+  },
   crates: (user: string, delta: number, source: string | null = null) => walletLeg("crates", user, delta, source),
   keys: (user: string, delta: number, source: string | null = null) => walletLeg("keys", user, delta, source),
   /** XP (Nov 9; xp.ts): a game's, or a test's. The wallet's `xp` column. */
@@ -257,6 +269,18 @@ export const leg = {
       stmt(`INSERT INTO welcome_crates (user_id, milestone, granted_at, games) SELECT ?, ?, ?, ${games.sql} WHERE ${o.sql}`, user, milestone, now, ...games.params, ...o.params),
     ],
   }),
+  /**
+   * A purchase's coins still unspent (Nov 26, payments PR 5; purchases.ts): its row's `remaining`, by its ledger reference (`ref`, made
+   * at checkout; never the Checkout Session's id). Paid in by creditPurchase with the wallet's coins, taken down by a spend (spendLegs)
+   * and, later, a refund. Its row is already there (made at checkout): the op's guard checks it is, and is the account's.
+   */
+  purchase: (user: string, ref: string, delta: number, source: string | null = null): Leg => ({
+    kind: "purchase",
+    asset: ref,
+    delta,
+    source,
+    writes: (o) => [stmt(`UPDATE purchases SET remaining = remaining + ? WHERE ref = ? AND user_id = ? AND ${o.sql}`, delta, ref, user, ...o.params)],
+  }),
   welcomeOut: (user: string, milestone: number, item: { id: string; def: string }, now: number): Leg => ({
     kind: "welcome",
     asset: String(milestone),
@@ -275,6 +299,15 @@ export const leg = {
     ],
   }),
 };
+
+/**
+ * A spend of coins (Nov 26, payments PR 5): the price off the wallet, and each purchase the plan draws on off its `remaining` (earned
+ * coins first: core's spendPlan, read and guarded by purchases.ts applySpend, which every spend goes through). None for a price of 0.
+ */
+export function spendLegs(user: string, plan: Pick<SpendPlan, "price" | "draws">, source: string | null = null): Leg[] {
+  if (!plan.price) return [];
+  return [walletLeg("coins", user, -plan.price, source), ...plan.draws.map((d) => leg.purchase(user, d.ref, -d.take, source))];
+}
 
 /**
  * Bonus crates (Nov 24; core bonus-crate.ts): held where their crate is (a series crate's count in `series_crates`, a boss crate's row in
@@ -416,6 +449,9 @@ const HOLDINGS: readonly { kind: AssetKind; rows: string }[] = [
   { kind: "welcome", rows: "SELECT user_id, CAST(milestone AS TEXT) AS asset, 1 AS n FROM welcome_crates WHERE opened_at IS NULL" },
   { kind: "series_crate", rows: "SELECT user_id, crate AS asset, n FROM series_crates" },
   { kind: "boss_pick", rows: "SELECT user_id, '' AS asset, boss_picks AS n FROM wallets" },
+  // (Each purchase's coins still unspent, Nov 26: a row for every purchase made, 0 until it's paid, by its ledger reference. A kept
+  // sales record of a deleted account has none: it's no balance of anyone's.)
+  { kind: "purchase", rows: "SELECT user_id, ref AS asset, remaining AS n FROM purchases WHERE ref IS NOT NULL" },
   // (The coin boost, Nov 26.)
   { kind: "boost_crate", rows: "SELECT user_id, '' AS asset, boost_crates AS n FROM wallets" },
   { kind: "boost_min", rows: "SELECT user_id, '' AS asset, boost_minutes AS n FROM wallets" },
@@ -448,6 +484,8 @@ const ensureAccount = (userId: string) =>
  * records each move (op `merge:<guest's ledger id>:<asset>`: a leg out of the guest, a leg into the account for what it really gains:
  * nothing for a shop item it has already, or for the guest's Welcome Crates, which are dropped: a guest never earns one). Coins,
  * crates, keys, XP, boss picks, the coin boost's counts (Nov 26), series crates and tokens are added up (XP: a guest earns none where sign-in is set up, so only XP from before then); items and boss crates move; then the guest's ledger id goes, so nothing names the guest.
+ * Purchases and their refunds move too (Nov 26): a guest can't buy (purchases.ts), so it has none, but if one ever did, its rows go with
+ * their ledger legs, and the two still agree.
  */
 /** The wallet's counts, every one (a guest's merge adds each up). */
 const WALLET_COLS = Object.values(WALLET_COLUMN);
@@ -488,6 +526,8 @@ export function mergeMoves(from: string, to: string, now: number): Stmt[] {
       from,
     ),
     stmt("UPDATE boss_crates SET user_id = ? WHERE user_id = ?", to, from),
+    stmt("UPDATE purchases SET user_id = ? WHERE user_id = ?", to, from),
+    stmt("UPDATE refunds SET user_id = ? WHERE user_id = ?", to, from),
     stmt(
       "INSERT INTO series_crates (user_id, crate, n) SELECT ?, crate, n FROM series_crates WHERE user_id = ? AND n > 0 ON CONFLICT (user_id, crate) DO UPDATE SET n = n + excluded.n",
       to,
@@ -499,9 +539,12 @@ export function mergeMoves(from: string, to: string, now: number): Stmt[] {
 
 /**
  * Deleting an account (account-data.ts, its one batch): every balance it holds is closed in the ledger (op `erase:<ledger id>:<asset>`)
- * and its rows go; then its ledger id goes, so its ledger rows stay naming nobody.
+ * and its rows go; then its ledger id goes, so its ledger rows stay naming nobody. Its purchases stay (Nov 26: sales records, kept for
+ * tax): their unspent coins closed with the rest, each row kept as `keptAs`'s (accounts.ts DELETED_ID, the shared "deleted" account),
+ * its ledger reference dropped after the erase's legs (review M1): the row keeps Stripe's ids, which name the buyer, so nothing on it
+ * may lead to the ledger rows, and from them to the rest of the account's history.
  */
-export function eraseMoves(userId: string, now: number): Stmt[] {
+export function eraseMoves(userId: string, now: number, keptAs: string): Stmt[] {
   const nonce = newId(9);
   return [
     ensureAccount(userId),
@@ -515,6 +558,9 @@ export function eraseMoves(userId: string, now: number): Stmt[] {
         nonce,
       ),
     ),
+    // (Only the day of a kept sale: its exact time is its credit legs' `created_at`, which would lead back to the account's ledger rows
+    // (delta review D1). As deleting does to results.)
+    stmt("UPDATE purchases SET remaining = 0, ref = NULL, paid_at = paid_at - paid_at % 86400000, user_id = ? WHERE user_id = ?", keptAs, userId),
     ...["wallets", "inventory", "items", "boss_tokens", "boss_crates", "series_crates", "welcome_crates", "ledger_accounts"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId)),
   ];
 }

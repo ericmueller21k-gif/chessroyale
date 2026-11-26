@@ -12,6 +12,7 @@ export * from "./boss-tokens.ts";
 export * from "./tower.ts";
 export { RATING_CURVE } from "./rating-curve.ts";
 export * from "./shop.ts";
+export * from "./payments.ts";
 export * from "./chat.ts";
 export * from "./crates.ts";
 export * from "./welcome.ts";

@@ -50,6 +50,7 @@ import { XP_COLUMNS, XP_SCHEMA, abandonStatements, xpColumns, xpOf } from "./xp.
 import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
 import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { TOWER_SCHEMA, holdsPartyCopy, towerMoves } from "./tower.ts";
+import { PURCHASES_COLUMNS, PURCHASES_SCHEMA, applySpend } from "./purchases.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { botPresence, isFriendBot } from "./friend-bot-schedule.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
@@ -218,6 +219,8 @@ const SCHEMA = [
   ...QUESTS_SCHEMA,
   // The engine server's per-account cap (Nov 10): each account's calls to its open routes today (engine-calls.ts).
   ...ENGINE_CALLS_SCHEMA,
+  // Purchases (Nov 26, payments PR 5): bought coins and their refunds (purchases.ts).
+  ...PURCHASES_SCHEMA,
   // The Battle Tower (Nov 19): each account's climbs and best floors (tower.ts).
   ...TOWER_SCHEMA,
 ];
@@ -329,6 +332,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // What detection would have done about a resident's match (residents.ts WouldHave: "watch", "review", "pool", "ban"), done for
   // nobody (fairplay.ts recordFairPlay). NULL for anyone else's match, and for a resident's that would have done nothing.
   { table: "fairplay_matches", column: "would", type: "TEXT" },
+  // Buying coins (Nov 26, payments PR 5; purchases.ts): the age band, refunds and chargebacks, the hold, closing. Defaults for every
+  // account from before: never asked, none, not held, open.
+  ...PURCHASES_COLUMNS,
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
@@ -1369,21 +1375,22 @@ export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: nu
   // One op in the ledger (`shop:<ledger id>:<item>`; ledger.ts), as one transaction (D1's batch: all of it or none), as another buy
   // may have run since the read above (docs/decisions/2026-10-16-atomic-shop-purchase.md): it applies only while the item isn't yours
   // and the coins are there, checked in that same transaction; then the item goes in and the coins come off. Two taps on one item pay
-  // once (the second is the same op); two items at once can't go below zero.
+  // once (the second is the same op); two items at once can't go below zero. The coins: earned first, then bought (Nov 26,
+  // purchases.ts applySpend: planned from a fresh read, guarded on it, planned again once if something changed meanwhile).
   const me = await ledgerAccount(sql, userId);
   const done = me
-    ? await applyOp(sql, me, {
+    ? await applySpend(sql, me, price, (spend) => ({
         id: `shop:${me.account}:${item.id}`,
         reason: "shop",
         now,
-        when: price
-          ? cond("NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?) AND EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND coins >= ?)", userId, item.id, userId, price)
-          : cond("NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?)", userId, item.id),
-        legs: [leg.shopItem(userId, item.id, now), ...(price ? [leg.coins(userId, -price)] : [])],
-      })
+        when: cond(`NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?) AND (${spend.when.sql})`, userId, item.id, ...spend.when.params),
+        legs: [leg.shopItem(userId, item.id, now), ...spend.legs],
+      }))
     : "refused";
-  // Owned: bought now, or by another buy since (this one refused, changing nothing): a no-op success, as above.
-  if (done !== "applied" && !(await sql.first("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", userId, item.id))) return { ok: false, message: "Not enough coins." };
+  // Owned: bought now, or by another buy since (this one refused, changing nothing): a no-op success, as above. Not owned: short of
+  // coins, or refused twice by changes meanwhile.
+  if (done !== "applied" && !(await sql.first("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", userId, item.id)))
+    return { ok: false, message: done === "refused" ? "That didn't go through. Try again." : "Not enough coins." };
   // A chat pack's lines go into any empty slots of the player's quick chat (the rest they pick in their profile).
   if (item.slot === "chat" && item.look.pack) {
     const { picks, added } = chatPicksAfterGetting(state.chat, item.look.pack);

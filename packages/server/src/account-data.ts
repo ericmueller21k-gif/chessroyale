@@ -15,6 +15,8 @@
  *     with only the day they were played, so the game's own numbers (how often each boss wins, typical placements)
  *     stay right while no row names anyone (its place among its match's rows still shows a gap: the decision file);
  *   - the ledger (ledger.ts): its rows stay, under the account's random ledger id, which goes, so they name nobody;
+ *   - purchases and refunds (purchases.ts, Nov 26): sales records, kept for tax as DELETED_ID's (their unspent coins closed in the
+ *     ledger with every balance), without a refund's comment;
  *   - fair play's file on an account that's banned, in review or in the engine pool: the case, its log, the hashed email and Google
  *     id (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
  *     around fair play (a new account with the same identity is banned again, or goes back to review or the pool). Everything
@@ -29,6 +31,7 @@ import { caseOf } from "./fairplay.ts";
 import { socialDeletes } from "./friends.ts";
 import { rankedDownload, rankedErase } from "./ranked.ts";
 import { eraseMoves, ledgerDownload } from "./ledger.ts";
+import { purchasesDownload, refundsErase } from "./purchases.ts";
 import { questDeletes, questsDownload } from "./quests.ts";
 import { towerDeletes, towerDownload } from "./tower.ts";
 
@@ -184,7 +187,19 @@ export const ACCOUNT_STORES: AccountStore[] = [
     name: "ledger",
     tables: ["ledger", "ledger_accounts"],
     export: (sql, u) => ledgerDownload(sql, u.id),
-    erase: (u, { now }) => eraseMoves(u.id, now),
+    // (Purchases, Nov 26: kept as DELETED_ID's, their unspent coins closed with the rest: eraseMoves.)
+    erase: (u, { now }) => eraseMoves(u.id, now, DELETED_ID),
+  },
+  {
+    // Purchases (purchases.ts, Nov 26, payments PR 5): each coin pack the player began to buy or bought (the pack, its coins and how
+    // many are unspent, the price and tax, Stripe's payment reference, the card's country, paid, refunded or disputed, when), and each
+    // refund (its kind, money and coins, Stripe's reference, its state, the comment they wrote, when). The account's own columns for
+    // buying (the age band, refunds and chargebacks counted, a hold's end, closed) are in `account`. Deleting: both are sales records,
+    // kept for tax as DELETED_ID's, naming nobody: the purchases by the ledger's part (above), the refunds here, without the comment.
+    name: "purchases",
+    tables: ["purchases", "refunds"],
+    export: (sql, u) => purchasesDownload(sql, u.id),
+    erase: (u) => refundsErase(u.id, DELETED_ID),
   },
   {
     // Boingo's claw machine (claw.ts, Nov 6): every play the player made (which boss's token, won or not, the crate it won, when).
@@ -334,6 +349,10 @@ export async function accountDownload(sql: Sql, user: User, now: number, extra: 
 /**
  * Deletes an account: every store's statements, then the account and its sessions (signed out on every device), in
  * one batch, so it's all or nothing. What stays and why: this file's header.
+ *
+ * TODO(payments PR 9, the refunds UI): before this, the app's delete confirmation offers the refundable amount back (purchases.ts
+ * refundable; the design's section 2, "Delete account first offers the refundable amount back"). Today nothing can be bought, so there
+ * is never any to offer.
  */
 export async function deleteAccount(sql: Sql, user: User, now: number, opts: { purgeFairPlay?: boolean } = {}): Promise<{ keptFairPlay: boolean }> {
   const status = (await caseOf(sql, user.id))?.status;
