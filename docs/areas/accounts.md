@@ -38,6 +38,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
     report with no note (`problems.ts` drops a guest's). Someone already signed in on that browser keeps all of these
     (`youngGuest` in the app).
   - "Delete account" keeps the flag.
+- **Buying coins has its own age question** (Nov 26, payments PR 6; [payments.md](payments.md), "Who may buy"): not the gate's. At the
+  first Buy the device asks a birth month and year and posts only the band (`users.buy_band`: under-16, 16-17, 18+; `buy_band_at`):
+  under 16 never buys, 16-17 at most $50 a month, an under-18 band asked again after 6 months. A closed account (`closed_at`) can't
+  buy; its sign-in refusal comes with PR 9 (a TODO in `api.ts`).
 - **Signing in keeps what you played as a guest.** A new identity attaches to your current account; one that already
   belongs to an account switches you to it, moves your guest results, items, coins, crates, crate keys, boss tokens and Battle Tower
   climbs and bests over (of two open climbs of a kind the higher floor stays, the account's on a tie; a party copy naming the guest names
@@ -168,7 +172,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   - **The ledger** (store `ledger`: `ledger`, `ledger_accounts`; `ledger.ts`, Nov 6): the download has every change to the balances;
     deleting closes each balance in it and drops the account's random ledger id, so its rows stay naming nobody (append-only).
   - **Purchases** (store `purchases`: `purchases`, `refunds`; `purchases.ts`, Nov 26; [payments.md](payments.md)): the download has
-    every purchase and refund (the refund's comment too), and the account's buying columns (`buy_band`, `refund_count`, `hold_until`,
+    every purchase and refund (the refund's comment too), and the account's buying columns (`buy_band`, `buy_band_at`, `refund_count`, `hold_until`,
     `chargebacks`, `closed_at`, `closed_reason`, `held_taps`) in `account`. Deleting keeps both tables' rows as the shared `deleted`
     account's (sales records, for tax), their unspent coins closed in the ledger, a refund's comment erased, and with no key left that
     joins them to the ledger (a purchase's `ref` set to NULL, a refund given a random op id). A guest can't buy; a
