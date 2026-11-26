@@ -903,6 +903,7 @@ export type WaterKind = "nothing" | "plant" | "killer" | "p" | "n" | "b" | "r" |
  * One seed's outcome at a watering, where it came up (`square`): a plain plant on an empty square; a killer plant on the
  * piece it ate (`ate`: its FEN letter, uppercase White's; `own`: one of his); a piece grown for him on an empty square;
  * nothing (the sprout wilts; `dropped`: it rolled that outcome, which couldn't be placed within the band and its guards).
+ * `regrow`: not a seed's: the piece he'd lose by passing, grown back (Eric, Nov 26), one more outcome than the seeds.
  */
 export interface WaterGrowth {
   kind: WaterKind;
@@ -910,6 +911,7 @@ export interface WaterGrowth {
   ate?: string;
   own?: true;
   dropped?: WaterKind;
+  regrow?: true;
 }
 
 /** A plain plant on the board: it blocks `square` from crowd turn `at` + 1 to crowd turn `until` (plantTurns of them). */
