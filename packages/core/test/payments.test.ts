@@ -18,6 +18,7 @@ import {
   inRefundWindow,
   isBuyBand,
   packOf,
+  pausedLine,
   refundableCoins,
   spendPlan,
   type BuyFacts,
@@ -219,9 +220,10 @@ describe("who may buy: the month, the lines, the rule", () => {
     expect(buyMonthStart(Date.UTC(2027, 0, 1, 8))).toBe(Date.UTC(2027, 0, 1, 8));
   });
 
-  it("every refusal's line is the design's (section 9; a hold's, section 3; closed, section 4); money as the packs show it", () => {
+  it("every refusal's line is the design's (section 9; the pause's, section 1; a hold's, section 3; closed, section 4); money as the packs show it", () => {
     expect(BUY_LINES).toMatchObject({
       guest: "Sign in to buy coins.",
+      paused: "Buying is paused for a moment.",
       young: "Buying coins is for players 16 and older.",
       country: "Coin packs aren't sold in your country yet. You can still earn coins by playing.",
       held: "Purchasing isn't available on this account.",
@@ -235,7 +237,7 @@ describe("who may buy: the month, the lines, the rule", () => {
   });
 
   const now = Date.UTC(2026, 10, 26, 12);
-  const adult: BuyFacts = { signedIn: true, closed: false, holdUntil: null, country: "US", band: "18+", bandAt: now - DAY, spentCents: 0 };
+  const adult: BuyFacts = { signedIn: true, paused: false, closed: false, holdUntil: null, country: "US", band: "18+", bandAt: now - DAY, spentCents: 0 };
   const lines = (s: BuyStatus) => s.packs.map((p) => p.line);
   const all = (line: string | null) => PAYMENTS.packs.map(() => line);
 
@@ -246,10 +248,12 @@ describe("who may buy: the month, the lines, the rule", () => {
     expect(PAYMENTS.buyers.countries).toEqual(["US", "CA"]);
   });
 
-  it("refuses in order: a guest, closed, held, the country, then under 16; the band is asked only when nothing before refuses", () => {
+  it("refuses in order: a guest, paused, closed, held, the country, then under 16; the band is asked only when nothing before refuses", () => {
     const none: BuyFacts = { ...adult, band: null, bandAt: null };
     const cases: [Partial<BuyFacts>, string][] = [
-      [{ signedIn: false, closed: true, holdUntil: now + DAY, country: "FR" }, BUY_LINES.guest],
+      [{ signedIn: false, paused: true, closed: true, holdUntil: now + DAY, country: "FR" }, BUY_LINES.guest],
+      [{ paused: true, closed: true, holdUntil: now + DAY, country: "FR" }, BUY_LINES.paused],
+      [{ paused: true }, BUY_LINES.paused],
       [{ closed: true, holdUntil: now + DAY, country: "FR" }, BUY_LINES.closed],
       [{ holdUntil: now + DAY, country: "FR" }, BUY_LINES.held],
       [{ country: "FR" }, BUY_LINES.country],
@@ -272,6 +276,10 @@ describe("who may buy: the month, the lines, the rule", () => {
     expect(checkoutLine(buyAnswer(young, now), "coins-200")).toBe(BUY_LINES.young);
     expect(buyAnswer(young, bandAskAgainAt("under-16", now)!)).toMatchObject({ line: null, askBand: true });
     expect(checkoutLine(buyAnswer(adult, now), "coins-7")).toBe("That coin pack isn't sold.");
+    // Paused: an under-16 band or a 16-17 band past its cap says the pause's line (it comes first), and a band answered 18+ too.
+    for (const f of [{ ...adult, paused: true }, { ...young, paused: true }, { ...adult, band: "16-17" as const, spentCents: 6000, paused: true }])
+      expect(lines(buyAnswer(f, now))).toEqual(all(BUY_LINES.paused));
+    expect(pausedLine("payments")).toBe(BUY_LINES.paused);
   });
 
   it("a hold ends at its hold_until: held until the moment before, buying from that moment", () => {

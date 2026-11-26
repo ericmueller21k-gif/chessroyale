@@ -24,7 +24,7 @@ import { enterOnly } from "./town-chat.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
 import { answerBand, buyStatus, heldTap } from "./purchases.ts";
-import { XP, AGE_GATE, HIDDEN_ROOM, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, soloQuestMode, tokenBossName } from "@chessroyale/core";
+import { XP, AGE_GATE, HIDDEN_ROOM, AGE_STEP_LINE, BUY_LINES, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isBuyBand, isWelcomeCrate, soloQuestMode, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -645,20 +645,27 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return r.ok ? json(r.shop) : json({ message: r.message }, 400);
   }
   // ---- Who may buy coins (Nov 26, payments PR 6; purchases.ts; docs/areas/payments.md). Nothing is sold yet: PR 7's coin screen renders
-  // these, PR 8's checkout refuses by the same rule (recordCheckout). The request's country is Cloudflare's (`request.cf.country`). ----
+  // these, PR 8's checkout refuses by the same rule (recordCheckout). The request's country is Cloudflare's (`request.cf.country`), and
+  // PAUSE_PAYMENTS greys every Buy (PAUSE_SHOP doesn't: it rests the coin shop and crates, not buying coins). ----
   // GET /api/buy: may this account buy, and if not, each Buy's greyed line (core's BuyStatus: `line`, `askBand`, `held`, `leftCents`, `packs`).
-  if (path === "/api/buy" && request.method === "GET") return json(await buyStatus(sql, current.id, countryOf(request), now));
+  if (path === "/api/buy" && request.method === "GET") return json(await buyStatus(sql, current.id, countryOf(request), now, isPaused(env, "payments", now)));
   // POST /api/buy/band {band}: the band question's answer ("under-16", "16-17" or "18+": the device works it out from a birth month and
-  // year, which never leave it), taken only when it's due. Answers the new BuyStatus. From this site's own page, as JSON.
+  // year, which never leave it), taken only when it's due. Answers the new BuyStatus. From this site's own page, as JSON. Not a band:
+  // 400; refused (not due, or the account can't buy): 409 with why.
   if (path === "/api/buy/band" && request.method === "POST") {
     if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
     if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
     const b = (await request.json().catch(() => ({}))) as { band?: unknown };
-    const r = await answerBand(sql, current.id, b?.band, countryOf(request), now);
+    if (!isBuyBand(b?.band)) return json({ message: BUY_LINES.answer }, 400);
+    const r = await answerBand(sql, current.id, b.band, countryOf(request), now, isPaused(env, "payments", now));
     return r.ok ? json(r.status) : json({ message: r.message }, 409);
   }
-  // POST /api/buy/tap: a greyed Buy tapped while held (counted for the admins' Payments tab, at most once a minute). Answers {counted}.
-  if (path === "/api/buy/tap" && request.method === "POST") return json({ counted: await heldTap(sql, current.id, now) });
+  // POST /api/buy/tap: a greyed Buy tapped while held (counted for the admins' Payments tab, at most once a minute), from this site's own
+  // page. Answers {counted}.
+  if (path === "/api/buy/tap" && request.method === "POST") {
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    return json({ counted: await heldTap(sql, current.id, now) });
+  }
 
   // POST /api/shop/chat {lines?, emoji?}: the quick chat lines and emoji you see in your games (your profile's
   // "Quick chat and emoji"), in your order; null puts one back to the defaults. Answers with your shop.

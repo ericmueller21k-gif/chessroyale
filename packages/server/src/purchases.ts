@@ -34,9 +34,9 @@ import { applyOp, cond, firstLeg, leg, ledgerAccount, newId, spendLegs, type Con
  *     guarded at its read value and earned at its own: a race changes nothing and is retried once.
  *   - **Refundable** (refundable): the `remaining` of purchases paid in the last PAYMENTS.refundDays days, never more than the coins.
  *   - **Guests can't buy** (buyRefusal): checked at checkout (recordCheckout) and again at the credit, in the statement itself.
- *   - **Who may buy** (Nov 26, PR 6; core's buyAnswer, the whole rule): signed in, 16 or older by the band answered at the first Buy,
- *     16-17 at most PAYMENTS.buyers.minorCapCents a buying month, in the US or Canada, not held, not closed; one open checkout at a
- *     time. buyStatus is the answer the coin screen renders; recordCheckout refuses by the same rule, and its statement holds it too.
+ *   - **Who may buy** (Nov 26, PR 6; core's buyAnswer, the whole rule): signed in, buying not paused (PAUSE_PAYMENTS), 16 or older by
+ *     the band answered at the first Buy, 16-17 at most PAYMENTS.buyers.minorCapCents a buying month, in the US or Canada, not held, not
+ *     closed; one open checkout at a time. buyStatus is the answer the coin screen renders; recordCheckout refuses by the same rule, and its statement holds it too.
  *   - **Deleting an account** keeps its purchase and refund rows as the shared "deleted" account's (sales records, for tax): ledger.ts
  *     eraseMoves closes their unspent coins with every balance and drops each purchase's `ref`; refundsErase drops the comments and
  *     each refund's op id (a new random one), so no kept row leads to the ledger. "Download my data" has them all.
@@ -152,9 +152,13 @@ interface BuyRow {
 const readBuyRow = (sql: Sql, userId: string, now: number) =>
   sql.first<BuyRow>(`SELECT email, google_sub, closed_at, hold_until, buy_band, buy_band_at, ${SPENT} AS spent FROM users WHERE id = ?1`, userId, buyMonthStart(now), openSince(now));
 
-/** The facts core's buyAnswer needs, from the account as stored now (never a session's view of it) and the request's country. */
-const factsOf = (row: BuyRow | null, country: string | null): BuyFacts => ({
+/**
+ * The facts core's buyAnswer needs, from the account as stored now (never a session's view of it), the request's country, and whether
+ * PAUSE_PAYMENTS is on (the caller's `isPaused(env, "payments")`: this file has no env).
+ */
+const factsOf = (row: BuyRow | null, country: string | null, paused: boolean): BuyFacts => ({
   signedIn: !!row && !buyRefusal(row),
+  paused,
   closed: row?.closed_at != null,
   holdUntil: row?.hold_until ?? null,
   country,
@@ -165,17 +169,19 @@ const factsOf = (row: BuyRow | null, country: string | null): BuyFacts => ({
 
 /**
  * May this account buy now, and if not, the exact greyed line (GET /api/buy; PR 7's coin screen renders it as it is: core's
- * BuyStatus). `country`: the request's (`request.cf.country`); unknown is not sold.
+ * BuyStatus). `country`: the request's (`request.cf.country`); unknown is not sold. `paused`: PAUSE_PAYMENTS is on (every route that
+ * answers about buying passes `isPaused(env, "payments")`).
  */
-export async function buyStatus(sql: Sql, userId: string, country: string | null, now: number): Promise<BuyStatus> {
-  return buyAnswer(factsOf(await readBuyRow(sql, userId, now), country), now);
+export async function buyStatus(sql: Sql, userId: string, country: string | null, now: number, paused = false): Promise<BuyStatus> {
+  return buyAnswer(factsOf(await readBuyRow(sql, userId, now), country, paused), now);
 }
 
 /**
  * The band question's answer (POST /api/buy/band): only the band, worked out on the device from a birth month and year (core's
  * buyBandOf). Taken only when the question is due (buyStatus's `askBand`: never answered, or an under-18 band asked again): the first
  * as given, asked again at most one band up (core's bandAfter), with the time (`buy_band_at`). Asked once: an answer when it isn't due
- * changes nothing. One statement, guarded on the band as read, so two answers at once (two tabs) store one.
+ * changes nothing. One statement, guarded on the band as read, so two answers at once (two tabs) store one. Not while paused (no age
+ * is asked while nothing can be bought).
  */
 export async function answerBand(
   sql: Sql,
@@ -183,12 +189,13 @@ export async function answerBand(
   answer: unknown,
   country: string | null,
   now: number,
+  paused = false,
 ): Promise<{ ok: true; status: BuyStatus } | { ok: false; message: string }> {
-  if (!isBuyBand(answer)) return { ok: false, message: "Answer the question." };
+  if (!isBuyBand(answer)) return { ok: false, message: BUY_LINES.answer };
   const row = await readBuyRow(sql, userId, now);
-  const facts = factsOf(row, country);
+  const facts = factsOf(row, country, paused);
   const status = buyAnswer(facts, now);
-  if (!status.askBand || !row) return { ok: false, message: status.line ?? "You've answered this already." };
+  if (!status.askBand || !row) return { ok: false, message: status.line ?? BUY_LINES.answered };
   const stored = await sql.first<{ ok: number }>(
     `UPDATE users SET buy_band = ?1, buy_band_at = ?2 WHERE id = ?3 AND (${SIGNED_IN}) AND buy_band IS ?4 AND buy_band_at IS ?5 RETURNING 1 AS ok`,
     bandAfter(facts.band, answer),
@@ -197,8 +204,8 @@ export async function answerBand(
     row.buy_band,
     row.buy_band_at,
   );
-  if (!stored) return { ok: false, message: "You've answered this already." };
-  return { ok: true, status: await buyStatus(sql, userId, country, now) };
+  if (!stored) return { ok: false, message: BUY_LINES.answered };
+  return { ok: true, status: await buyStatus(sql, userId, country, now, paused) };
 }
 
 /** Taps counted while held: at most one each PAYMENTS.hold.tapGapMs an account (in this Worker instance's memory, as the API's limits). */
@@ -261,30 +268,39 @@ const SESSION_ID = /^[A-Za-z0-9_]{8,255}$/;
 
 type CheckoutAnswer = { ok: true; pack: CoinPack } | { ok: false; message: string };
 
-/** The session's row if it was recorded: ours and this pack's, the pack as stored; else why not. Null: never recorded. */
+/**
+ * The session's row if it was recorded: ours, this pack's and still pending, the pack as stored; else why not. Null: never recorded.
+ * One no longer pending (paid, expired: the review's n4) is refused, so a retried checkout never sends the player to a session that
+ * has ended.
+ */
 async function recorded(sql: Sql, userId: string, pack: CoinPack, sessionId: string): Promise<CheckoutAnswer | null> {
-  const row = await sql.first<{ user_id: string; pack: string; coins: number; cents: number }>("SELECT user_id, pack, coins, cents FROM purchases WHERE session_id = ?", sessionId);
+  const row = await sql.first<{ user_id: string; pack: string; coins: number; cents: number; status: string }>(
+    "SELECT user_id, pack, coins, cents, status FROM purchases WHERE session_id = ?",
+    sessionId,
+  );
   if (!row) return null;
   if (row.user_id !== userId) return { ok: false, message: "That checkout isn't yours." };
   if (row.pack !== pack.id) return { ok: false, message: "That checkout is for another coin pack." };
+  if (row.status !== "pending") return { ok: false, message: BUY_LINES.ended };
   return { ok: true, pack: { id: row.pack, coins: row.coins, cents: row.cents } };
 }
 
 /** Why a checkout of `pack` is refused now (who may buy, then another checkout open), or null. */
-async function refusal(sql: Sql, userId: string, pack: CoinPack, country: string | null, now: number): Promise<string | null> {
-  const line = checkoutLine(await buyStatus(sql, userId, country, now), pack.id);
+async function refusal(sql: Sql, userId: string, pack: CoinPack, country: string | null, now: number, paused: boolean): Promise<string | null> {
+  const line = checkoutLine(await buyStatus(sql, userId, country, now, paused), pack.id);
   if (line) return line;
   return (await openCheckouts(sql, userId, now)).length ? BUY_LINES.open : null;
 }
 
 /**
- * A checkout begun (PR 8 calls it once Stripe has made the session, with the request's country; nothing calls it yet but tests): the
- * purchase's row, pending, with its pack's coins and price as they are now and its ledger reference (random). Only by the rule (core's
- * buyAnswer: never a guest's, a closed or held account's, outside the US and Canada, under 16, past the 16-17 month's cap, nor before
- * the band question is answered when it's due), and with no other checkout of the account's open. The statement holds the rule's
- * stored parts too (the account as it is then; the month's spend; no checkout open), so two Buys at once can't both pass the cap or
- * open two checkouts. Made once: the same session again changes nothing and answers the pack as stored; another pack for the same
- * session is refused (review n2). A refusal answers its line: PR 8 then expires the Stripe session it made.
+ * A checkout begun (PR 8 calls it once Stripe has made the session, with the request's country and `isPaused(env, "payments")`;
+ * nothing calls it yet but tests): the purchase's row, pending, with its pack's coins and price as they are now and its ledger
+ * reference (random). Only by the rule (core's buyAnswer: never a guest's, while paused, a closed or held account's, outside the US and
+ * Canada, under 16, past the 16-17 month's cap, nor before the band question is answered when it's due), and with no other checkout of
+ * the account's open. The statement holds the rule's stored parts too (the account as it is then; the month's spend; no checkout open),
+ * so two Buys at once can't both pass the cap or open two checkouts. Made once: the same session again changes nothing and answers the
+ * pack as stored while it's pending (paid or expired since: refused, the review's n4); another pack for the same session is refused
+ * (review n2). A refusal answers its line: PR 8 then expires the Stripe session it made.
  */
 export async function recordCheckout(
   sql: Sql,
@@ -294,18 +310,19 @@ export async function recordCheckout(
   sessionId: string,
   now: number,
   country: string | null,
+  paused = false,
 ): Promise<CheckoutAnswer> {
   const pack = packOf(packId);
-  if (!pack) return { ok: false, message: "That coin pack isn't sold." };
+  if (!pack) return { ok: false, message: BUY_LINES.noPack };
   if (!SESSION_ID.test(sessionId)) throw new Error(`recordCheckout: not a session id: ${sessionId.slice(0, 40)}`);
   const had = await recorded(sql, user.id, pack, sessionId);
   if (had) return had;
-  const no = await refusal(sql, user.id, pack, country, now);
+  const no = await refusal(sql, user.id, pack, country, now, paused);
   if (no) return { ok: false, message: no };
   // (The account as it is now: signed in, open, not held, a band that may buy and, for 16-17, the month's spend with this price under
   // the cap; and no checkout of its open. ?1 the account, ?2 the month's start, ?3 the open checkouts' start (both SPENT's too), ?4-?9
-  // the row, ?10 the cap. The band's time to ask again and the country were checked just before: time only moves on, and the request's
-  // country is the same.)
+  // the row, ?10 the cap. The band's time to ask again, the country and the pause were checked just before: time only moves on, and the
+  // request's country and the switches it read are the same.)
   await sql.run(
     `INSERT INTO purchases (session_id, ref, user_id, pack, coins, cents, created_at)
      SELECT ?4, ?5, ?1, ?6, ?7, ?8, ?9
@@ -326,7 +343,7 @@ export async function recordCheckout(
     now,
     PAYMENTS.buyers.minorCapCents,
   );
-  return (await recorded(sql, user.id, pack, sessionId)) ?? { ok: false, message: (await refusal(sql, user.id, pack, country, now)) ?? "That didn't go through. Try again." };
+  return (await recorded(sql, user.id, pack, sessionId)) ?? { ok: false, message: (await refusal(sql, user.id, pack, country, now, paused)) ?? BUY_LINES.retry };
 }
 
 /**

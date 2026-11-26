@@ -24,8 +24,9 @@ describe("reading the switches", () => {
     expect(pauseVariable("squads")).toBe("PAUSE_SQUADS");
     expect(pauseVariable("ranked1v1")).toBe("PAUSE_RANKED1V1");
     expect(pauseVariable("shop")).toBe("PAUSE_SHOP");
+    expect(pauseVariable("payments")).toBe("PAUSE_PAYMENTS");
     expect(pauseVariable("boss:pig")).toBe("PAUSE_BOSS_PIG");
-    expect(allPausable()).toEqual(expect.arrayContaining(["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends", ...BOSS_ROSTER.map((b) => `boss:${b.id}`)]));
+    expect(allPausable()).toEqual(expect.arrayContaining(["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends", "payments", ...BOSS_ROSTER.map((b) => `boss:${b.id}`)]));
   });
 
   it("on with 1, true, yes or on (or a JSON true or 1); anything else, or unset, leaves it running", () => {
@@ -58,6 +59,8 @@ describe("reading the switches", () => {
     expect(pausedLine("solo")).toBe("Solo and Boss alone are resting for a bit. Back soon.");
     expect(pausedLine("shop")).toBe("The shop is resting for a bit. Back soon.");
     expect(pausedLine("ranked1v1")).toBe("1 v 1 is resting for a bit. Back soon.");
+    // (Buying coins: the payments design's own line, section 1.)
+    expect(pausedLine("payments")).toBe("Buying is paused for a moment.");
     expect(pausedLine(`boss:${playable}`)).toBe(`${BOSS_ROSTER.find((b) => b.id === playable)!.name} is resting for a bit. Back soon.`);
     // (A name that's a title takes "the", as every sentence says him.)
     expect(pausedLine("boss:recluse")).toBe("The Hidden Boss is resting for a bit. Back soon.");

@@ -16,9 +16,11 @@ import { BOSS_ROSTER, bossDef, bossInText } from "./boss.ts";
  *     reward is granted while it's on (the result's XP box says so). Levels reached are paid at the next counted game after it.
  *   - "leave-penalties": ranked's leave rules (PAUSE_LEAVE_PENALTIES, Nov 9; LEAVES): no dodge or leave is charged or marked, and no
  *     lockout or delayed queue applies while it's on (if they misfire). Games play as usual.
+ *   - "payments": buying coins (PAUSE_PAYMENTS, Nov 26; the payments design's section 1): every Buy greyed with its line ("Buying is
+ *     paused for a moment."), no new checkout or band answer; a checkout already paid is still credited, refunds still work.
  *   - "boss:<id>": one boss (PAUSE_BOSS_<ID>): never met, at random or picked.
  */
-export const PAUSABLE = ["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends", "town-chat", "rewards", "leave-penalties"] as const;
+export const PAUSABLE = ["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends", "town-chat", "rewards", "leave-penalties", "payments"] as const;
 export type Pausable = (typeof PAUSABLE)[number] | `boss:${string}`;
 
 /** Every switch there is: the parts above, then one per boss in the roster. */
@@ -40,10 +42,17 @@ const NAMES: Record<(typeof PAUSABLE)[number], string> = {
   "town-chat": "Town chat is",
   rewards: "Rewards are",
   "leave-penalties": "Leave penalties are",
+  payments: "Buying coins is",
 };
 
 /** Parts whose line isn't "… resting for a bit": the town chat's field says this in its place (the director's line). */
-const LINES: Partial<Record<(typeof PAUSABLE)[number], string>> = { "town-chat": "Chat is paused.", rewards: "Rewards are paused for a moment.", "leave-penalties": "Leave penalties are paused." };
+const LINES: Partial<Record<(typeof PAUSABLE)[number], string>> = {
+  "town-chat": "Chat is paused.",
+  rewards: "Rewards are paused for a moment.",
+  "leave-penalties": "Leave penalties are paused.",
+  // (The payments design's line, section 1; core's BUY_LINES.paused.)
+  payments: "Buying is paused for a moment.",
+};
 
 /** The short friendly line for a part that's resting: on its way in (the app), and in the server's refusal. */
 export function pausedLine(what: Pausable): string {

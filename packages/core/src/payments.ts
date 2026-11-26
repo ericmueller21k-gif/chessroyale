@@ -1,5 +1,6 @@
 import { PAYMENTS, XP } from "./settings.ts";
 import { ageInMonths } from "./age-gate.ts";
+import { pausedLine } from "./pauses.ts";
 
 /**
  * Bought coins (the payments design, docs/decisions/2026-11-17-payments-design.md section 2; its storage, PR 5:
@@ -81,8 +82,8 @@ export function refundableCoins(coins: number, unspent: readonly Unspent[], now:
 }
 
 // ---------------- Who may buy (Nov 26, payments PR 6; the design's sections 3, 4 and 9; docs/decisions/2026-11-26-who-may-buy.md) ----------------
-// Signed in; 16 or older by the age band answered at the first Buy; 16-17 at most PAYMENTS.buyers.minorCapCents a month; in the US or
-// Canada; not held; not closed. buyAnswer is the whole rule, pure: the server reads the facts (purchases.ts buyStatus) and refuses a
+// Signed in; buying not paused (PAUSE_PAYMENTS); 16 or older by the age band answered at the first Buy; 16-17 at most
+// PAYMENTS.buyers.minorCapCents a month; in the US or Canada; not held; not closed. buyAnswer is the whole rule, pure: the server reads the facts (purchases.ts buyStatus) and refuses a
 // checkout by it (recordCheckout, in its statement too); the coin screen (PR 7) shows each Buy greyed with its line.
 
 /**
@@ -145,11 +146,14 @@ export function buyMonthStart(t: number): number {
 export const dollars = (cents: number): string => (cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
 /**
- * Every refusal's line, in one place (the design's section 9 for the first four, section 3 for a hold's, section 4 for closed). A Buy
- * that can't be bought shows greyed with its line, and a tap shows it (Eric, Nov 18: "just gray it out ... you can still click it").
+ * Every line a player can see about buying, in one place (the design's section 9 for the first four, section 1 for the pause's, section 3
+ * for a hold's, section 4 for closed). A Buy that can't be bought shows greyed with its line, and a tap shows it (Eric, Nov 18: "just gray
+ * it out ... you can still click it").
  */
 export const BUY_LINES = {
   guest: "Sign in to buy coins.",
+  /** While PAUSE_PAYMENTS is on (kill-switches.ts; the design's section 1): webhooks, credits and refunds keep working. */
+  paused: pausedLine("payments"),
   young: `Buying coins is for players ${PAYMENTS.buyers.minAge} and older.`,
   country: "Coin packs aren't sold in your country yet. You can still earn coins by playing.",
   /** A hold's: no reason, no date (the design's section 3). */
@@ -160,6 +164,15 @@ export const BUY_LINES = {
   band: "Before you buy coins: when were you born?",
   /** Not a greyed line: a new Buy closes the open checkout first (PR 8). Two Buys at once: the second is refused with it. */
   open: "Another checkout is open. Finish it, or try again in a moment.",
+  /** The band question's answers refused (POST /api/buy/band): not a band (400); one when it isn't due (409). */
+  answer: "Answer the question.",
+  answered: "You've answered this already.",
+  /** A checkout of a pack that isn't one of PAYMENTS.packs. */
+  noPack: "That coin pack isn't sold.",
+  /** A checkout recorded before that's no longer pending (paid or expired): PR 8 makes a new one, never sends the player to it. */
+  ended: "That checkout has ended. Try again.",
+  /** A checkout its statement refused with nothing else to say why (the account changed between the reads). */
+  retry: "That didn't go through. Try again.",
 } as const;
 /** The 16-17 cap's line, on each pack that no longer fits this month (the design's section 9). */
 export const capLine = (leftCents: number): string => `Monthly limit for players under ${PAYMENTS.buyers.adultAge}: ${dollars(Math.max(0, leftCents))} left.`;
@@ -168,6 +181,8 @@ export const capLine = (leftCents: number): string => `Monthly limit for players
 export interface BuyFacts {
   /** Signed in (a guest never buys). */
   signedIn: boolean;
+  /** PAUSE_PAYMENTS is on (the server's kill-switches.ts, `isPaused(env, "payments")`). */
+  paused: boolean;
   /** `users.closed_at` is set (two chargebacks, PR 9). */
   closed: boolean;
   /** `users.hold_until`: held while now is before it. */
@@ -194,7 +209,7 @@ export interface BuyPack {
 
 /**
  * May this account buy, and if not, why (GET /api/buy; PR 7's coin screen renders it): the one answer.
- *   - `line`: the greyed line for every Buy (signed out, closed, held, the country, under 16), or null.
+ *   - `line`: the greyed line for every Buy (signed out, paused, closed, held, the country, under 16), or null.
  *   - `askBand`: a Buy asks the band question first (never answered, or an under-18 band due again); every pack is tappable then.
  *   - `held`: the line is a hold's, so a greyed Buy's tap is counted (POST /api/buy/tap; the admins' "Buy taps while held").
  *   - `leftCents`: the 16-17 band's money left this month (null: no cap applies now).
@@ -212,19 +227,21 @@ export interface BuyStatus {
 export const heldAt = (holdUntil: number | null, now: number): boolean => holdUntil !== null && now < holdUntil;
 
 /**
- * The rule, pure. Its order: who the account is (a guest, closed, held), where the request is from, then the band (asked only when
- * nothing before refuses: no age is asked of someone who couldn't buy anyway), then the 16-17 cap per pack.
+ * The rule, pure. Its order: a guest, buying paused, who the account is (closed, held), where the request is from, then the band (asked
+ * only when nothing before refuses: no age is asked of someone who couldn't buy anyway), then the 16-17 cap per pack.
  */
 export function buyAnswer(f: BuyFacts, now: number): BuyStatus {
   const account = !f.signedIn
     ? BUY_LINES.guest
-    : f.closed
-      ? BUY_LINES.closed
-      : heldAt(f.holdUntil, now)
-        ? BUY_LINES.held
-        : !f.country || !PAYMENTS.buyers.countries.includes(f.country)
-          ? BUY_LINES.country
-          : null;
+    : f.paused
+      ? BUY_LINES.paused
+      : f.closed
+        ? BUY_LINES.closed
+        : heldAt(f.holdUntil, now)
+          ? BUY_LINES.held
+          : !f.country || !PAYMENTS.buyers.countries.includes(f.country)
+            ? BUY_LINES.country
+            : null;
   const askBand = !account && bandDue(f.band, f.bandAt, now);
   const line = account ?? (!askBand && f.band === "under-16" ? BUY_LINES.young : null);
   const leftCents = !line && !askBand && f.band === "16-17" ? Math.max(0, PAYMENTS.buyers.minorCapCents - f.spentCents) : null;
@@ -240,6 +257,6 @@ export function buyAnswer(f: BuyFacts, now: number): BuyStatus {
 /** Why a checkout of this pack is refused now (the line its Buy shows, or the band question's), or null: the rule lets it through. */
 export function checkoutLine(status: BuyStatus, packId: string): string | null {
   const pack = status.packs.find((p) => p.id === packId);
-  if (!pack) return "That coin pack isn't sold.";
+  if (!pack) return BUY_LINES.noPack;
   return pack.line ?? (status.askBand ? BUY_LINES.band : null);
 }

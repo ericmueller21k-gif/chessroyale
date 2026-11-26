@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BUY_LINES, PAYMENTS, buyMonthStart, capLine } from "@chessroyale/core";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
+import { deleteAccount } from "../src/account-data.ts";
 import { handleAccountApi } from "../src/api.ts";
 import {
   answerBand,
@@ -19,8 +20,9 @@ import { memoryDb } from "./memory-db.ts";
  * Who may buy (Nov 26, payments PR 6; server/purchases.ts, core's buyAnswer; docs/decisions/2026-11-26-who-may-buy.md; the design's
  * sections 3, 4 and 9): the band asked once, stored and guarded; the 16-17 band's $50 month at its edge and its turn, counted from the
  * checkouts; under 16; the country; a hold and its end, and the quiet flag's count that starts it; a closed account (no checkout, and
- * a payment begun before it closed kept unclaimed); one open checkout at a time, two at once; held taps; and the API. Every refusal's
- * line is core's BUY_LINES. Nothing is sold yet: PR 7 renders buyStatus, PR 8 calls recordCheckout.
+ * a payment begun before it closed kept unclaimed); one open checkout at a time, two at once, a replay of one ended; held taps; paused
+ * (PAUSE_PAYMENTS); every stored part of the checkout's statement against a change between its reads and its INSERT; and the API.
+ * Every refusal's line is core's BUY_LINES. Nothing is sold yet: PR 7 renders buyStatus, PR 8 calls recordCheckout.
  */
 
 const T0 = Date.UTC(2026, 10, 26, 12, 0);
@@ -58,6 +60,20 @@ async function buy(sql: Sql, user: User, cents: number, session: string, now = T
 }
 const lines = async (sql: Sql, id: string, now: number, country = "US") => (await buyStatus(sql, id, country, now)).packs.map((p) => p.line);
 const all = (line: string | null) => PAYMENTS.packs.map(() => line);
+/** `sql`, but `change` runs once just before the first statement `matches` (between a function's reads and its write). */
+const racing = (sql: Sql, matches: RegExp, change: () => Promise<unknown>): Sql & { raced: () => boolean } => {
+  let raced = false;
+  const once = async (q: string) => {
+    if (!raced && matches.test(q)) (raced = true), await change();
+  };
+  return {
+    ...sql,
+    raced: () => raced,
+    run: async (q, ...p) => (await once(q), sql.run(q, ...p)),
+    first: async (q, ...p) => (await once(q), sql.first(q, ...p)),
+  };
+};
+const BEFORE_INSERT = /^\s*INSERT INTO purchases/;
 
 describe("the band: asked once, stored, guarded", () => {
   it("never answered: the question comes first; the first answer is kept as given, with its time, and asked once", async () => {
@@ -327,6 +343,30 @@ describe("a hold, and the quiet flag's count that starts it", () => {
     expect(await heldTap(sql, ann.id, T0 + 10 * DAY)).toBe(false);
     expect(await taps()).toBe(2);
   });
+
+  it("a tap counts only if its statement finds the account still held, open and signed in (review m1)", async () => {
+    const { sql } = await world();
+    const tapsOf = async (id: string) => (await sql.first<{ held_taps: number }>("SELECT held_taps FROM users WHERE id = ?", id))!.held_taps;
+    const held = async (email: string) => {
+      const user = await buyer(sql, email, "18+");
+      await sql.run("UPDATE users SET hold_until = ? WHERE id = ?", T0 + 10 * DAY, user.id);
+      return user;
+    };
+    // Closed and held: not counted.
+    const ann = await held("ann@example.com");
+    await sql.run("UPDATE users SET closed_at = ? WHERE id = ?", T0, ann.id);
+    expect(await heldTap(sql, ann.id, T0 + 1)).toBe(false);
+    // A guest's row with a hold (by hand): not counted.
+    const bo = await held("bo@example.com");
+    await sql.run("UPDATE users SET email = NULL, google_sub = NULL WHERE id = ?", bo.id);
+    expect(await heldTap(sql, bo.id, T0 + 1)).toBe(false);
+    // The hold lifted between the tap's read and its statement: not counted.
+    const cy = await held("cy@example.com");
+    const lifted = racing(sql, /^\s*UPDATE users SET held_taps/, () => sql.run("UPDATE users SET hold_until = NULL WHERE id = ?", cy.id));
+    expect(await heldTap(lifted, cy.id, T0 + 1)).toBe(false);
+    expect(lifted.raced()).toBe(true);
+    expect([await tapsOf(ann.id), await tapsOf(bo.id), await tapsOf(cy.id)]).toEqual([0, 0, 0]);
+  });
 });
 
 describe("a closed account", () => {
@@ -375,10 +415,13 @@ describe("one open checkout at a time", () => {
     expect(await recordCheckout(sql, ann, "coins-1100", "cs_test_3", T0 + 31 * MIN, "US")).toEqual({ ok: false, message: BUY_LINES.open });
     expect(await expireCheckout(sql, "cs_test_2")).toBe(true);
     expect(await expireCheckout(sql, "cs_test_2")).toBe(false);
+    // A replay of a session that has ended is refused, never sent to the player again (review n4).
+    expect(await recordCheckout(sql, ann, "coins-520", "cs_test_2", T0 + 31 * MIN, "US")).toEqual({ ok: false, message: "That checkout has ended. Try again." });
     expect(await recordCheckout(sql, ann, "coins-1100", "cs_test_3", T0 + 31 * MIN, "US")).toMatchObject({ ok: true });
-    // Paid: not open (and an expired or paid one is never marked expired again).
+    // Paid: not open (and an expired or paid one is never marked expired again), and a replay of it refused too.
     expect(await creditPurchase(sql, await paid(sql, "cs_test_3"), T0 + 32 * MIN)).toMatchObject({ ok: true });
     expect(await expireCheckout(sql, "cs_test_3")).toBe(false);
+    expect(await recordCheckout(sql, ann, "coins-1100", "cs_test_3", T0 + 32 * MIN, "US")).toEqual({ ok: false, message: BUY_LINES.ended });
     expect(await openCheckouts(sql, ann.id, T0 + 33 * MIN)).toEqual([]);
     expect(await recordCheckout(sql, ann, "coins-200", "cs_test_4", T0 + 33 * MIN, "US")).toMatchObject({ ok: true });
     expect(await purchases(sql)).toEqual([
@@ -399,6 +442,65 @@ describe("one open checkout at a time", () => {
     expect(both.filter((r) => r.ok)).toHaveLength(1);
     expect(both.find((r) => !r.ok)).toEqual({ ok: false, message: BUY_LINES.open });
     expect(await purchases(sql)).toHaveLength(1);
+  });
+});
+
+describe("the checkout's statement holds the stored parts: a change between its reads and its INSERT (review m1)", () => {
+  // (Each one alone: the read let it through, the INSERT's own check refuses it, and the refusal answers the line as read again.)
+  it("closed meanwhile: refused with the closed line, nothing written", async () => {
+    const { sql } = await world();
+    const ann = await buyer(sql, "ann@example.com", "18+");
+    const r = racing(sql, BEFORE_INSERT, () => sql.run("UPDATE users SET closed_at = ?, closed_reason = 'chargebacks' WHERE id = ?", T0, ann.id));
+    expect(await recordCheckout(r, ann, "coins-200", "cs_test_ann", T0, "US")).toEqual({ ok: false, message: BUY_LINES.closed });
+    expect(r.raced()).toBe(true);
+    expect(await purchases(sql)).toEqual([]);
+  });
+
+  it("deleted meanwhile (no account), or signed out of its identity (a guest's row): refused with the sign-in line, nothing written", async () => {
+    const { sql } = await world();
+    const ann = await buyer(sql, "ann@example.com", "18+");
+    const gone = racing(sql, BEFORE_INSERT, () => deleteAccount(sql, ann, T0));
+    expect(await recordCheckout(gone, ann, "coins-200", "cs_test_ann", T0, "US")).toEqual({ ok: false, message: BUY_LINES.guest });
+    expect(gone.raced()).toBe(true);
+    // (The statement's signed-in check: as PR 5's stale signed-in view of a guest would need, now that the read is of the stored row.)
+    const bo = await buyer(sql, "bo@example.com", "18+");
+    const guest = racing(sql, BEFORE_INSERT, () => sql.run("UPDATE users SET email = NULL, google_sub = NULL WHERE id = ?", bo.id));
+    expect(await recordCheckout(guest, bo, "coins-200", "cs_test_bo", T0, "US")).toEqual({ ok: false, message: BUY_LINES.guest });
+    expect(guest.raced()).toBe(true);
+    expect(await purchases(sql)).toEqual([]);
+  });
+
+  it("the band changed meanwhile: to under 16 (refused with its line), or none (the band question first); nothing written", async () => {
+    const { sql } = await world();
+    for (const [i, [band, line]] of ([["under-16", BUY_LINES.young], [null, BUY_LINES.band]] as const).entries()) {
+      const ann = await buyer(sql, `ann${i}@example.com`, "18+");
+      const r = racing(sql, BEFORE_INSERT, () => sql.run("UPDATE users SET buy_band = ? WHERE id = ?", band, ann.id));
+      expect(await recordCheckout(r, ann, "coins-200", `cs_test_band_${i}`, T0, "US"), String(band)).toEqual({ ok: false, message: line });
+      expect(r.raced()).toBe(true);
+    }
+    expect(await purchases(sql)).toEqual([]);
+  });
+});
+
+describe("paused (PAUSE_PAYMENTS)", () => {
+  it("every Buy greyed with the pause's line, right after a guest's; no checkout, no band taken; a checkout paid before is still credited", async () => {
+    const { sql } = await world();
+    const ann = await buyer(sql, "ann@example.com", "18+");
+    expect(await recordCheckout(sql, ann, "coins-200", "cs_test_before", T0, "US")).toMatchObject({ ok: true });
+    expect(await buyStatus(sql, ann.id, "US", T0 + MIN, true)).toMatchObject({ line: "Buying is paused for a moment.", askBand: false, held: false, leftCents: null });
+    expect((await buyStatus(sql, ann.id, "US", T0 + MIN, true)).packs.map((p) => p.line)).toEqual(all(BUY_LINES.paused));
+    expect(await recordCheckout(sql, ann, "coins-200", "cs_test_paused", T0 + 40 * MIN, "US", true)).toEqual({ ok: false, message: BUY_LINES.paused });
+    expect(await purchases(sql)).toEqual([{ session_id: "cs_test_before", status: "pending" }]);
+    // (Webhooks keep working: a session paid before the pause is credited.)
+    expect(await creditPurchase(sql, await paid(sql, "cs_test_before"), T0 + 2 * MIN)).toMatchObject({ ok: true, credited: "now" });
+    // No age asked while nothing can be bought; held and closed say the pause's line too (it comes first).
+    const bo = await account(sql, "bo@example.com");
+    expect(await answerBand(sql, bo.id, "18+", "US", T0, true)).toEqual({ ok: false, message: BUY_LINES.paused });
+    expect(await bandOf(sql, bo.id)).toEqual({ buy_band: null, buy_band_at: null });
+    await sql.run("UPDATE users SET hold_until = ?, closed_at = ? WHERE id = ?", T0 + DAY, T0, bo.id);
+    expect(await buyStatus(sql, bo.id, "US", T0, true)).toMatchObject({ line: BUY_LINES.paused, held: false });
+    const { user: gus } = await createGuest(sql, T0, "Gus");
+    expect(await buyStatus(sql, gus.id, "US", T0, true)).toMatchObject({ line: BUY_LINES.guest });
   });
 });
 
@@ -429,6 +531,17 @@ describe("the API: GET /api/buy, POST /api/buy/band, POST /api/buy/tap", () => {
     const band = (body: unknown, headers: Record<string, string> = asJson, country = "US") => call(env, "/api/buy/band", { method: "POST", cookie, country, headers, body: JSON.stringify(body) });
     expect((await band({ band: "18+" }, { origin: "https://evil.example", "content-type": "application/json" })).status).toBe(403);
     expect((await band({ band: "18+" }, { origin })).status).toBe(415);
+    // Not a band: 400 (bad input), not 409 (review n3).
+    for (const bad of [{ band: "18" }, {}, "18+"]) {
+      const r = await band(bad);
+      expect([r.status, await r.json()]).toEqual([400, { message: "Answer the question." }]);
+    }
+    expect(await bandOf(sql, ann.id)).toEqual({ buy_band: null, buy_band_at: null });
+    // Paused (PAUSE_PAYMENTS): the pause's line, and no band taken.
+    const pausedEnv = { DB: d1, PAUSE_PAYMENTS: "1" };
+    expect(await (await call(pausedEnv, "/api/buy", { cookie, country: "US" })).json()).toMatchObject({ line: BUY_LINES.paused, askBand: false });
+    const pb = await call(pausedEnv, "/api/buy/band", { method: "POST", cookie, country: "US", headers: asJson, body: JSON.stringify({ band: "18+" }) });
+    expect([pb.status, await pb.json()]).toEqual([409, { message: BUY_LINES.paused }]);
     expect(await bandOf(sql, ann.id)).toEqual({ buy_band: null, buy_band_at: null });
     const answered = await band({ band: "16-17" });
     expect(answered.status).toBe(200);
@@ -441,7 +554,10 @@ describe("the API: GET /api/buy, POST /api/buy/band, POST /api/buy/tap", () => {
     // Held: the line, `held`, and a tap counted once.
     await sql.run("UPDATE users SET hold_until = ? WHERE id = ?", now + DAY, ann.id);
     expect(await get("US")).toMatchObject({ line: BUY_LINES.held, held: true });
-    const tap = async () => (await (await call(env, "/api/buy/tap", { method: "POST", cookie })).json()) as { counted: boolean };
+    const tap = async () => (await (await call(env, "/api/buy/tap", { method: "POST", cookie, headers: { origin } })).json()) as { counted: boolean };
+    // (From this site's own page only, as the band's answer: review n5.)
+    expect((await call(env, "/api/buy/tap", { method: "POST", cookie, headers: { origin: "https://evil.example" } })).status).toBe(403);
+    expect((await call(env, "/api/buy/tap", { method: "POST", cookie })).status).toBe(403);
     expect(await tap()).toEqual({ counted: true });
     expect(await tap()).toEqual({ counted: false });
     expect(await sql.first("SELECT held_taps FROM users WHERE id = ?", ann.id)).toEqual({ held_taps: 1 });

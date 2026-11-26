@@ -176,7 +176,8 @@ describe("a checkout, and its credit: once, never a guest's", () => {
     const { sql } = await world();
     const { user: gus } = await createGuest(sql, T0, "Gus");
     expect(await recordCheckout(sql, gus, "coins-200", "cs_test_gus_1", T0, "US")).toEqual({ ok: false, message: "Sign in to buy coins." });
-    // (A stale signed-in view of a guest: the statement's own check refuses it.)
+    // (A stale signed-in view of a guest: the account is read as stored, never this view, so the read refuses it, PR 6. The
+    // statement's own signed-in check, against a change after that read: who-buys.test.ts, "signed out of its identity".)
     expect(await recordCheckout(sql, { ...gus, email: "gus@example.com" }, "coins-200", "cs_test_gus_1", T0, "US")).toEqual({ ok: false, message: "Sign in to buy coins." });
     expect(await sql.first("SELECT COUNT(*) AS n FROM purchases")).toEqual({ n: 0 });
     await sql.run("INSERT INTO purchases (session_id, ref, user_id, pack, coins, cents, created_at) VALUES ('cs_test_gus_2', 'r-gus', ?, 'coins-200', 200, 199, ?)", gus.id, T0);
@@ -251,9 +252,9 @@ describe("spending: earned coins first, then the oldest purchase's", () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     await earn(sql, ann.id, 30);
-    // (Paid in this order: B's checkout began first, but A was paid first, so A is the older purchase. B began over 30 minutes before
-    // A did, so it wasn't open by then: one open checkout at a time, PR 6.)
-    await recordCheckout(sql, ann, "coins-520", "cs_test_B", T0 - 31 * 60_000, "US");
+    // (Paid in this order: B's checkout began first, but A was paid first, so A is the older purchase. B began 2 hours before A did,
+    // so it wasn't open by then: one open checkout at a time, PR 6.)
+    await recordCheckout(sql, ann, "coins-520", "cs_test_B", T0 - 2 * 3_600_000, "US");
     await buy(sql, ann, 200, "cs_test_A", T0 + 1000);
     expect(await creditPurchase(sql, await paid(sql, "cs_test_B"), T0 + 2000)).toMatchObject({ credited: "now" });
     expect(await coinSplit(sql, ann.id)).toEqual({ coins: 750, bought: 720, earned: 30 });
@@ -393,8 +394,8 @@ describe("the guarded race: a change between the read and the write changes noth
   it("a credit with the account deleted, or the checkout expired, after its reads: its statement refuses it (review m3)", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
-    // (A began over 30 minutes before B, so it wasn't open by then: one open checkout at a time, PR 6.)
-    await recordCheckout(sql, ann, "coins-520", "cs_test_A", T0 - 31 * 60_000, "US");
+    // (A began 2 hours before B, so it wasn't open by then: one open checkout at a time, PR 6.)
+    await recordCheckout(sql, ann, "coins-520", "cs_test_A", T0 - 2 * 3_600_000, "US");
     await recordCheckout(sql, ann, "coins-200", "cs_test_B", T0, "US");
     // Expired meanwhile: the account's there, the purchase isn't pending.
     const expire = () => sql.run("UPDATE purchases SET status = 'expired' WHERE session_id = 'cs_test_B'");
