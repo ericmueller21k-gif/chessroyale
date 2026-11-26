@@ -361,7 +361,7 @@ describe("Birdie's birds at the bar (Nov 26, shops/birdie-birds.ts)", () => {
     const flock = new Flock();
     flock.step(60_000, false);
     const c = flock.counts(60_000);
-    expect(c.shown).toBeGreaterThan(F.count * 0.6);
+    expect(c.shown).toBeGreaterThan(F.count * 0.7);
     expect(c.shown).toBeLessThan(F.count);
   });
   it("the bartender's pour fills the run's piles in turn, each eaten down before his next pour onto it", () => {

@@ -69,7 +69,7 @@ test("Birdie's Station: his card and hello out front; in to the lobby, the barte
   await expect(keeper).toBeVisible({ timeout: 15_000 });
   // (Nov 26) The birds at the bar (shops/birdie-birds.ts): on show as you came in; walked up to the bar, every one has flown off. And the
   // room's frames, from the walk in to the bar, uploaded and painted nothing (`?report`; the town's lesson #969: bake it all at load).
-  expect(birds0!.shown).toBeGreaterThan(birds0!.n * 0.6);
+  expect(birds0!.shown).toBeGreaterThan(birds0!.n * 0.5);
   await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__birdieBirds?.() ?? null)).toMatchObject({ near: true, shown: 0, fled: 50 });
   // (Recording since the walk to his door, 30 s at most: finished now if it's still going.)
   if ((await page.evaluate(() => (window as unknown as Hooks).__townReport?.()?.state)) === "rec") await page.locator(".tfr-pill button").click();

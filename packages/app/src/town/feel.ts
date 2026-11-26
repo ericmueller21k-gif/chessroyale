@@ -748,9 +748,9 @@ export const SHOP_FEEL = {
   birds: {
     count: 50,
     seed: 0xb1d5,
-    sitMs: [7000, 20000] as readonly [number, number],
-    stoolSitMs: [4000, 10000] as readonly [number, number],
-    awayMs: [3000, 12000] as readonly [number, number],
+    sitMs: [20000, 45000] as readonly [number, number],
+    stoolSitMs: [6000, 14000] as readonly [number, number],
+    awayMs: [2000, 6000] as readonly [number, number],
     flyMs: 1600,
     flapMs: 80,
     hopMs: 380,

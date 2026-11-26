@@ -719,8 +719,18 @@ function armPart(deg: number): Part {
     }
   ellipse(cv, PIV[0], PIV[1], 2.6, 2.6, "S");
   put(cv, Math.floor(PIV[0]), Math.floor(PIV[1]), "m");
-  return part(cv);
+  // (Cut to its drawn pixels, where it sits in the square kept in ARM_AT: at 130 px the square is mostly empty, and the room draws every
+  // piece's whole picture each frame, Nov 26.)
+  let [x0, y0, x1, y1] = [ARM_BOX, ARM_BOX, 0, 0];
+  cv.forEach((row, y) => row.forEach((k, x) => {
+    if (k === ".") return;
+    [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x + 1), Math.max(y1, y + 1)];
+  }));
+  ARM_AT[deg] = [x0, y0];
+  return part(cv.slice(y0, y1).map((row) => row.slice(x0, x1)));
 }
+/** Each arm angle's picture's top-left in its ARM_BOX square (armPart cuts it to its drawn pixels). */
+const ARM_AT: Record<number, [number, number]> = {};
 const ARM_UP = "arm-90";
 const ARM_LOWER = ["arm-62", "arm-34", "arm-10", "arm-0"];
 const ARM_DOWN = "arm-0";
@@ -775,7 +785,7 @@ function gateLayers(fx: number, fy: number, arm: string, dir: GateDir): Layer[] 
     ["gate-post", fx - 5, fy - 66],
     ["gate-motor", fx + 2, fy - 31],
     // the arm behind the lights and the crossbuck, so raised it never hides them
-    [arm, fx + 5 - Math.floor(PIV[0]), fy - 27 - Math.floor(PIV[1])],
+    [arm, fx + 5 - Math.floor(PIV[0]) + ARM_AT[Number(arm.slice(4))]![0], fy - 27 - Math.floor(PIV[1]) + ARM_AT[Number(arm.slice(4))]![1]],
     ["gate-lights", fx - 12, fy - 54],
     ["gate-crossbuck", fx - 12, fy - 72],
   ];
