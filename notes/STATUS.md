@@ -2215,3 +2215,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Flake fix: session_01JuCWRuV3xbY94gxr4YQ62N (medium), claude/flake-scoreboard-fire, waiter b73c6q0zs.
 - 08:25 Eric OK'd Chandy's storyboard ("looks good"): art phase 2 (collapse redo + wire to the timeline) after the rules PR merges.
 - Birdie's room: longer crossing arms + ~50 birds at the bar (loop, bartender scoops, scatter when you come near). session_01JuCWRvVDuUCicSsZbjjooA (high), brief notes/briefs/birdie-room-birds.md, mock waiter (.done-mock). Perf: bake at load, no uploads walking, ?report numbers.
+- 08:27 Eric: "the town is super smooth now, even when I had TFT running" after #969 (night glows baked at load). Town hitch case closed; keep the night upload guard.
