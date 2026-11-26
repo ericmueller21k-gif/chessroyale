@@ -88,7 +88,7 @@ test.describe("Dash", () => {
     await expect(tiles.getByRole("radio", { name: "Dash", exact: true })).toBeVisible();
   });
 
-  test("Clock Slap takes time off your bank and flies it to him; Time Scramble: 3 s a move counted down over the board; out of time, a move is played for you, never a loss; nothing moves", { tag: "@phone-only" }, async ({ page }) => {
+  test("Clock Slap takes time off your bank and flies it to him; Time Scramble: 5 s a move (its first use) counted down over the board; out of time, a move is played for you, never a loss; nothing moves", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));

@@ -106,10 +106,11 @@ const hangWind: Anim = lazyAnim(() => {
   return { loop: false, frames: [...turn, ...turn, F(s.windMs - 8 * step, { hand: "high", eyes2: "down", mouth: "grin" })] };
 });
 
-/** "Sorry about that, bro": an open paw raised to us, a sheepish grin; then his idle's first pose until his move. */
+/** The wind-up done, a press of the clock (Eric: "he like presses it"), its click; then "Sorry about that, bro": an open paw raised to us, a sheepish grin; then his idle's first pose until his move. */
 const hangSorry: Anim = lazyAnim(() => {
   const s = DASH_HANG_ON;
-  return { loop: false, frames: [F(s.sorryMs, { at: [36, 40], gesture: "open", eyes2: "us", mouth: "grin", brow: 1, tail: 1 }), F(s.returnMs, {})] };
+  const press = { ...A.move!.frames[4]!, ms: 140 };
+  return { loop: false, frames: [press, F(s.sorryMs - press.ms, { at: [36, 40], gesture: "open", eyes2: "us", mouth: "grin", brow: 1, tail: 1 }), F(s.returnMs, {})] };
 });
 
 /** His figure: the approved one in a frame with room on its right (105 x 104), his rest loops quiet, and his clock smacks. */
