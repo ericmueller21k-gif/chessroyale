@@ -2166,3 +2166,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 02:15 UTC: crate-banner flake (Smiley Face variant name) fixed by director → PR #965 (8b49527e) CI. #964 waits on round 2 (queued).
 - Nov 26: main f01ba249 GREEN + LIVE (coin strip, no-gap quests).
 - Nov 26 02:13 UTC: PR 5 fixes done (3a4744f1) → branch prepped 45cbdb64, full CI running; delta review session_01JuCWRvQRvjKgJNLYrMwkEY. Fixes helper session_01JuCWRvnuXPv4LMkiPJjSdR to archive. Running Opus: PR 4 (xhigh), PR 5 delta (xhigh). Queue: boss-frame-2 (high), beta-bots design (xhigh).
+- Nov 26: #965 MERGED 85530107. Main run watched.
