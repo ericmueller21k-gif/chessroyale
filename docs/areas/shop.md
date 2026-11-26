@@ -8,7 +8,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **Nothing here changes how a match is played or scored.** Everything is cosmetic.
 - **Its kill switch** (`PAUSE_SHOP`, [ops.md](ops.md) "Kill switches"): while it's set, the Shop and Crates tabs say
   "The shop is resting for a bit. Back soon." and the server refuses getting items and opening crates; the locker
-  (wearing what you have) stays.
+  (wearing what you have) stays. Buying coins has its own switch, `PAUSE_PAYMENTS` ([payments.md](payments.md)): `PAUSE_SHOP`
+  doesn't stop it.
 - **The shop** (`core/shop.ts`): God King effects (the color of his bolts, beam and halo; one is always on, Holy
   Light the free starter) and chat packs (not equipped: you use every pack you own). Prices in coins (God King effects `SHOP.godKing`, 300-400; chat packs `QUICK_CHAT.packPrices`, 100-150; both since Nov 18); `SHOP_FREE` is
   on (its items are free: "Get · Free"; the "free while we test" note is gone since Nov 9). The pawn hats it used to sell are Beta crate items now (Oct 11, 2026); the shop
@@ -45,7 +46,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   in the capture phase too. Its opener owns it: when that screen goes, so does the layer.
 - **The Shop tab's page** (Eric's mockup, Nov 9; [2026-11-09-shop-page.md](../decisions/2026-11-09-shop-page.md); `ShopPage` in
   `screens/Shop.tsx`). **Look only: no purchase is wired**; a price tapped shows the pop-up "Buying opens soon." (Stripe and coin
-  purchases come next). Under the tabs: "Everything in the shop is 50% off during beta." (from `SHOP.discount`). Then the **special
+  purchases come next; who may buy coins is decided on the server since Nov 26, `GET /api/buy`: [payments.md](payments.md)). Under the tabs: "Everything in the shop is 50% off during beta." (from `SHOP.discount`). Then the **special
   offer** banner (dark with gold, same in both themes): "SPECIAL OFFER", **Crate + Key Bundle**, "3 Keys + 3 Random Crates", "Includes a
   chance at a [Mythic Crate icon] Mythic Crate.", its price pill; its art `BundleArt` (three mystery crates and three keys on a gold glow).
   Then the **cards** (2 a row on a phone, the page scrolls; 4 on a computer): Boss Crate (`BossCrateArt`, "?" seal), HunChess Crate,

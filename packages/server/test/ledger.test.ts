@@ -617,7 +617,12 @@ const NOT_YET: Record<string, Record<string, { n: number; why: string }>> = {
   "welcome.ts": { welcome_crates: { n: 1, why: "not a balance: the notice closed (seen_at)" } },
   // (Nov 26: a purchase's balance is its `remaining`, which by rule only ledger.ts moves: leg.purchase, the merge, the erase. This counts
   // purchases.ts's writes to the table; it can't see which columns they set: review n5.)
-  "purchases.ts": { purchases: { n: 2, why: "not a balance: the checkout's pending row (remaining 0), and the payment and its status (paid, in the credit's op; or unclaimed)" } },
+  "purchases.ts": {
+    purchases: {
+      n: 3,
+      why: "not a balance: the checkout's pending row (remaining 0), the payment and its status (paid, in the credit's op; or unclaimed), and a pending checkout marked expired (PR 6: remaining stays 0)",
+    },
+  },
 };
 /** Files that once wrote balances themselves, and what they write through now. The guard fails if one does again. */
 const MOVED: Record<string, string> = {

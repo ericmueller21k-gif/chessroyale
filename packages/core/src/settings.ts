@@ -4003,6 +4003,41 @@ export const PAYMENTS = {
    * JSON value first (json_each, as locker.ts does).
    */
   maxDraws: 20,
+  /**
+   * Who may buy (Nov 26, payments PR 6; the design's section 9; core's buyAnswer, the server's buyStatus and recordCheckout): signed in,
+   * 16 or older by the age band answered at the first Buy, 16-17 at most `minorCapCents` a month, in `countries`, not held, not closed.
+   *   - `minAge`: under it, never (FTC v. HoYoverse, Jan 2025). `adultAge`: under it, the monthly cap. Both whole years, counted from
+   *     the birth month and year the device asks, the birth month itself not yet complete (core's buyBandOf: 16 from the 1st of the
+   *     month after the 16th-birthday month; only the band is posted, never the date).
+   *   - `minorCapCents`: the most an account in the 16-17 band spends a calendar month, on the packs' prices before tax (what the
+   *     packs show), counted from its checkouts that month (pending ones too but the one still open, which a new Buy replaces; less what
+   *     refunds returned of the price, before tax too, never below 0 a checkout). The month turns when the XP day does
+   *     (XP.dayStartUtcHour UTC on the 1st: midnight Pacific standard time; 1 am in summer, 10 pm the evening before in Hawaii), never
+   *     the device's clock.
+   *   - `askAgainMonths`: an under-18 band is asked again this long after it was answered, and may then go up one band at most.
+   *   - `countries`: where packs are sold, by the request's country (`request.cf.country`); PR 8 checks the card's too.
+   *   - `checkoutMinutes`: a checkout stays open this long (Stripe's least session expiry, PR 8 sets it). One open at a time per
+   *     account: a new Buy closes the open one first (PR 8 expires it at Stripe, then expireCheckout).
+   */
+  buyers: {
+    minAge: 16,
+    adultAge: 18,
+    minorCapCents: 5000,
+    askAgainMonths: 6,
+    countries: ["US", "CA"] as readonly string[],
+    checkoutMinutes: 30,
+  },
+  /**
+   * The quiet flag (Eric, Nov 18: "three refunds ... a 90-day hold on trading and purchasing"; the design's section 3 and call 4):
+   * refunds and chargebacks count together, all time (`users.refund_count`); the `after`th starts a hold of `days` days on buying coins
+   * (and trading, when it exists), and each one after it starts the days again. Its line names no reason. A greyed Buy's taps while held
+   * are counted (`users.held_taps`, for the admins' Payments tab), at most one each `tapGapMs` an account.
+   */
+  hold: {
+    after: 3,
+    days: 90,
+    tapGapMs: 60_000,
+  },
 } as const;
 
 /**
