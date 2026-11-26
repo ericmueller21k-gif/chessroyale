@@ -845,3 +845,16 @@ time. Otherwise, we'll just leave everything as is."
   round it (songs N and O). The level must not dip where the new bars begin (the first go's opening sat 2 dB under).
 - This is the last try he offered: if it misses, Hollow stays at two minutes and the others are left alone.
 
+## Sheet music: the town's first piano solo (Nov 26)
+
+Eric: "Can you turn the first piano solo into sheet music for me, and ... you know how it opens with a lower sounding,
+that's still piano and just the left hand right?" Yes: the solo's first four bars are his left-hand pattern alone on
+the same soft piano (with one bass note a bar under it, on the bass, as all through the solo).
+- `sheets/town-solo-a.ly` (LilyPond 2.24: `lilypond sheets/town-solo-a.ly` writes the PDF and a MIDI file): one page,
+  twenty bars at 129, two staves; the right hand with the notes under it, and in octaves the second time, as the song
+  doubles it; the left hand in the treble clef for the two bars it plays an octave up. Not on it, and said so on the
+  page: the bass's note a bar and the strings under the last four bars.
+- `sheets/check_sheet.py <the .midi> a` checks the sheet against the song's own notes (song_ad.py): 291 notes, each
+  at its beat and pitch, nothing extra. It takes `b` for the second solo when that has a sheet.
+- No composer's name is on the page: his to add.
+
