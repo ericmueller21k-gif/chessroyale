@@ -168,11 +168,19 @@ describe("16-17: $50 a buying month", () => {
     await sql.run("UPDATE purchases SET refunded_cents = 198 WHERE session_id = 'cs_test_a'");
     expect(await lines(sql, teen.id, T0 + MIN)).toEqual([null, ...all(capLine(199)).slice(1)]);
     expect(await recordCheckout(sql, teen, "coins-200", "cs_test_b", T0 + MIN, "US")).toMatchObject({ ok: true });
-    // The pending one counts: nothing left, even before it's paid.
+    // While it's open, a new Buy would replace it (PR 8 expires it first): it doesn't count, and a second checkout is refused meanwhile.
+    expect(await buyStatus(sql, teen.id, "US", T0 + 2 * MIN)).toMatchObject({ leftCents: 199 });
+    expect(await lines(sql, teen.id, T0 + 2 * MIN)).toEqual([null, ...all(capLine(199)).slice(1)]);
+    expect(await recordCheckout(sql, teen, "coins-200", "cs_test_c", T0 + 2 * MIN, "US")).toEqual({ ok: false, message: BUY_LINES.open });
+    // 30 minutes on and still pending (paid, maybe, its event late): it counts, nothing left.
+    const later = T0 + 31 * MIN;
+    expect(await buyStatus(sql, teen.id, "US", later)).toMatchObject({ leftCents: 0 });
+    expect(await recordCheckout(sql, teen, "coins-200", "cs_test_c", later, "US")).toEqual({ ok: false, message: capLine(0) });
+    // Marked expired (never paid): its $1.99 is back.
     expect(await expireCheckout(sql, "cs_test_b")).toBe(true);
-    expect(await buyStatus(sql, teen.id, "US", T0 + MIN)).toMatchObject({ leftCents: 199 });
-    expect(await recordCheckout(sql, teen, "coins-200", "cs_test_c", T0 + 2 * MIN, "US")).toMatchObject({ ok: true });
-    expect(await buyStatus(sql, teen.id, "US", T0 + 2 * MIN)).toMatchObject({ leftCents: 0 });
+    expect(await buyStatus(sql, teen.id, "US", later)).toMatchObject({ leftCents: 199 });
+    expect(await recordCheckout(sql, teen, "coins-200", "cs_test_c", later, "US")).toMatchObject({ ok: true });
+    expect(await buyStatus(sql, teen.id, "US", later + 30 * MIN)).toMatchObject({ leftCents: 0 });
     // An adult's spend has no cap.
     const adult = await buyer(sql, "adult@example.com", "18+");
     for (const [i, s] of ["cs_test_d1", "cs_test_d2", "cs_test_d3"].entries()) await buy(sql, adult, 4999, s, T0 + i * MIN);
@@ -214,10 +222,11 @@ describe("16-17: $50 a buying month", () => {
     expect(await buyStatus(sql, teen.id, "US", dec1)).toMatchObject({ leftCents: 5000 });
     expect(await lines(sql, teen.id, dec1)).toEqual(all(null));
     expect(await recordCheckout(sql, teen, "coins-6000", "cs_test_dec", dec1 + 20 * MIN, "US")).toMatchObject({ ok: true });
-    expect(await buyStatus(sql, teen.id, "US", dec1 + 21 * MIN)).toMatchObject({ leftCents: 1 });
+    expect(await creditPurchase(sql, await paid(sql, "cs_test_dec"), dec1 + 21 * MIN)).toMatchObject({ ok: true });
+    expect(await buyStatus(sql, teen.id, "US", dec1 + 22 * MIN)).toMatchObject({ leftCents: 1 });
   });
 
-  it("counts every checkout made this month, pending or paid, less refunds; never one expired or unclaimed", async () => {
+  it("counts every checkout made this month, pending or paid, less refunds; never one expired, unclaimed or still open", async () => {
     const { sql } = await world();
     const teen = await buyer(sql, "teen@example.com", "16-17");
     const row = (session: string, cents: number, status: string, refunded = 0, at = T0) =>
@@ -239,6 +248,8 @@ describe("16-17: $50 a buying month", () => {
     await row("cs_test_expired", 4999, "expired");
     await row("cs_test_unclaimed", 4999, "unclaimed");
     await row("cs_test_last_month", 4999, "paid", 0, buyMonthStart(T0) - 1);
+    // (Open: made a minute ago. A new Buy replaces it, so it doesn't count.)
+    await row("cs_test_open", 4999, "pending", 0, T0 - MIN);
     // 999 + 499 + 0 + 999 + 199 = 2696.
     expect(await buyStatus(sql, teen.id, "US", T0)).toMatchObject({ leftCents: 5000 - 2696 });
   });

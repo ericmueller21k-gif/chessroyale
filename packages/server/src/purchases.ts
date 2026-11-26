@@ -129,9 +129,12 @@ const openSince = (now: number) => now - PAYMENTS.buyers.checkoutMinutes * 60_00
 /**
  * This buying month's spend of account ?1 in cents before tax (?2: the month's start, core's buyMonthStart), by checkout: every
  * checkout made since, pending ones too (so one paid but not yet credited counts), less what refunds returned; never one that ended
- * unpaid (`expired`) or was paid with no account to credit (`unclaimed`: refunded at once).
+ * unpaid (`expired`), was paid with no account to credit (`unclaimed`: refunded at once), or is still open (made after ?3, openSince):
+ * a new Buy replaces an open checkout (PR 8 expires it first), so it doesn't stand in that Buy's way, and the checkout's statement
+ * refuses while one is open anyway.
  */
-const SPENT = `COALESCE((SELECT SUM(cents - refunded_cents) FROM purchases WHERE user_id = ?1 AND created_at >= ?2 AND status NOT IN ('expired', 'unclaimed')), 0)`;
+const SPENT = `COALESCE((SELECT SUM(cents - refunded_cents) FROM purchases WHERE user_id = ?1 AND created_at >= ?2 AND status NOT IN ('expired', 'unclaimed')
+  AND NOT (status = 'pending' AND created_at > ?3)), 0)`;
 
 /** The account's buying columns as stored, with this month's spend: one read. Null: no such account. */
 interface BuyRow {
@@ -144,7 +147,7 @@ interface BuyRow {
   spent: number;
 }
 const readBuyRow = (sql: Sql, userId: string, now: number) =>
-  sql.first<BuyRow>(`SELECT email, google_sub, closed_at, hold_until, buy_band, buy_band_at, ${SPENT} AS spent FROM users WHERE id = ?1`, userId, buyMonthStart(now));
+  sql.first<BuyRow>(`SELECT email, google_sub, closed_at, hold_until, buy_band, buy_band_at, ${SPENT} AS spent FROM users WHERE id = ?1`, userId, buyMonthStart(now), openSince(now));
 
 /** The facts core's buyAnswer needs, from the account as stored now (never a session's view of it) and the request's country. */
 const factsOf = (row: BuyRow | null, country: string | null): BuyFacts => ({
@@ -297,20 +300,21 @@ export async function recordCheckout(
   const no = await refusal(sql, user.id, pack, country, now);
   if (no) return { ok: false, message: no };
   // (The account as it is now: signed in, open, not held, a band that may buy and, for 16-17, the month's spend with this price under
-  // the cap; and no checkout of its open. ?1 the account, ?2 the month's start (SPENT's), ?3-?8 the row, ?9 the cap, ?10 the open
-  // checkouts' start. The band's time to ask again and the country were checked just before: time only moves on, and the request's
+  // the cap; and no checkout of its open. ?1 the account, ?2 the month's start, ?3 the open checkouts' start (both SPENT's too), ?4-?9
+  // the row, ?10 the cap. The band's time to ask again and the country were checked just before: time only moves on, and the request's
   // country is the same.)
   await sql.run(
     `INSERT INTO purchases (session_id, ref, user_id, pack, coins, cents, created_at)
-     SELECT ?3, ?4, ?1, ?5, ?6, ?7, ?8
+     SELECT ?4, ?5, ?1, ?6, ?7, ?8, ?9
      WHERE EXISTS (
-       SELECT 1 FROM users WHERE id = ?1 AND (${SIGNED_IN}) AND closed_at IS NULL AND (hold_until IS NULL OR hold_until <= ?8)
-         AND (buy_band = '18+' OR (buy_band = '16-17' AND ${SPENT} + ?7 <= ?9))
+       SELECT 1 FROM users WHERE id = ?1 AND (${SIGNED_IN}) AND closed_at IS NULL AND (hold_until IS NULL OR hold_until <= ?9)
+         AND (buy_band = '18+' OR (buy_band = '16-17' AND ${SPENT} + ?8 <= ?10))
      )
-     AND NOT EXISTS (SELECT 1 FROM purchases WHERE user_id = ?1 AND status = 'pending' AND created_at > ?10)
+     AND NOT EXISTS (SELECT 1 FROM purchases WHERE user_id = ?1 AND status = 'pending' AND created_at > ?3)
      ON CONFLICT (session_id) DO NOTHING`,
     user.id,
     buyMonthStart(now),
+    openSince(now),
     sessionId,
     newId(),
     pack.id,
@@ -318,7 +322,6 @@ export async function recordCheckout(
     pack.cents,
     now,
     PAYMENTS.buyers.minorCapCents,
-    openSince(now),
   );
   return (await recorded(sql, user.id, pack, sessionId)) ?? { ok: false, message: (await refusal(sql, user.id, pack, country, now)) ?? "That didn't go through. Try again." };
 }

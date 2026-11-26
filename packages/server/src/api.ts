@@ -416,6 +416,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // banned never reaches them (the whole device is banned: ban-gate.ts). ----
 
   // A sign-in refused for a ban (Eric, Nov 13: signInBan) ends whatever session this browser carried (the whole device is banned).
+  // TODO (payments PR 9; the design's section 4 and table 13's row 9): a closed account (`users.closed_at`, the 2nd chargeback) is
+  // refused sign-in here too, by email and Google, as a ban is (every session ended), with core's BUY_LINES.closed ("This account is
+  // closed. Questions: support@hunchess.com"). Until then a closed account still signs in; only its buying is refused (purchases.ts).
 
   // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
   // birth month and year and sends only this; the date never leaves the device). Old enough: this device may sign in

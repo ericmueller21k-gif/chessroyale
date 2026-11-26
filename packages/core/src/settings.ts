@@ -3988,7 +3988,8 @@ export const PAYMENTS = {
    *   - `minAge`: under it, never (FTC v. HoYoverse, Jan 2025). `adultAge`: under it, the monthly cap. Both whole years, counted in whole
    *     months from the birth month and year the device asks (the age gate's rule; only the band is posted, never the date).
    *   - `minorCapCents`: the most an account in the 16-17 band spends a calendar month, on the packs' prices before tax (what the
-   *     packs show), counted from its checkouts that month (pending ones too, less what refunds returned). The month turns when the XP
+   *     packs show), counted from its checkouts that month (pending ones too but the one still open, which a new Buy replaces; less what
+   *     refunds returned). The month turns when the XP
    *     day does (XP.dayStartUtcHour UTC on the 1st: midnight Pacific, so overnight in the US and Canada), never the device's clock.
    *   - `askAgainMonths`: an under-18 band is asked again this long after it was answered, and may then go up one band at most.
    *   - `countries`: where packs are sold, by the request's country (`request.cf.country`); PR 8 checks the card's too.

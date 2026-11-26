@@ -171,7 +171,10 @@ export interface BuyFacts {
   /** The band answered (`users.buy_band`; null: never, or not a band) and when (`buy_band_at`). */
   band: BuyBand | null;
   bandAt: number | null;
-  /** This buying month's checkouts, in cents before tax: pending ones too, paid ones less what refunds returned (never expired or unclaimed). */
+  /**
+   * This buying month's checkouts, in cents before tax: pending ones too, paid ones less what refunds returned; never expired or
+   * unclaimed ones, nor the one still open (a new Buy replaces it: PR 8 expires it first).
+   */
   spentCents: number;
 }
 
