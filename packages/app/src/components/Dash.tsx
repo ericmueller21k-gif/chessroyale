@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { DASH_ANIM, POWER_FX, fenAtPly, hangOnTimeline, pieceAt, popOffPending, scrambleLeft, scrambleSecondsOf, type DashView } from "@chessroyale/chess";
-import { CRITICAL } from "../speech.tsx";
+import { CRITICAL, INTERRUPT } from "../speech.tsx";
 import { hash, pickLine } from "../characters/boss-beats.ts";
 import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES } from "../characters/dash-lines.ts";
 import { renderFrame } from "../characters/sprite.ts";
@@ -250,12 +250,13 @@ const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "po
   popOff: { order: 1, kit: "power", view: popOffMoment, line: (_kit, m) => lineOf(DASH_POPOFF_LINES, m.key) },
   // (Its love line cuts in on the pop-off line: a line said while one is up waits its turn, and this one must come before his move.)
   popOffFast: { order: 2, kit: "power", view: popOffFastMoment, line: (_kit, m) => lineOf(DASH_LOVE_LINES, m.key), priority: () => CRITICAL },
-  // (His "Hang on" in the second pop-off's place, while he thinks: a line a beat, each cutting in on the one before, in order. No
-  // kit moment: his runs in place are its own.)
-  hangOn: { order: 1, view: hangOnMoment(["hangSlow"]), line: () => DASH_HANG_ON_LINES.start, priority: () => CRITICAL },
-  hangOnFast: { order: 2, view: hangOnMoment(["hangFast"]), line: () => DASH_HANG_ON_LINES.cheetah, priority: () => CRITICAL },
-  hangOnAlmost: { order: 3, view: hangOnMoment(null), line: () => DASH_HANG_ON_LINES.almost, priority: () => CRITICAL },
-  hangOnSorry: { order: 4, view: hangOnMoment(["hangWind", "hangSorry"]), lineAt: hangOnTimeline().sorryAt - hangOnTimeline().windAt, line: () => DASH_HANG_ON_LINES.sorry, priority: () => CRITICAL },
+  // (His "Hang on" in the second pop-off's place, while he thinks: a line a beat, in order, each cutting in at once on the one
+  // before (INTERRUPT: one CRITICAL line waits for another to end, which put "Sorry…" after his move). No kit moment: his runs in
+  // place are its own.)
+  hangOn: { order: 1, view: hangOnMoment(["hangSlow"]), line: () => DASH_HANG_ON_LINES.start, priority: () => INTERRUPT },
+  hangOnFast: { order: 2, view: hangOnMoment(["hangFast"]), line: () => DASH_HANG_ON_LINES.cheetah, priority: () => INTERRUPT },
+  hangOnAlmost: { order: 3, view: hangOnMoment(null), line: () => DASH_HANG_ON_LINES.almost, priority: () => INTERRUPT },
+  hangOnSorry: { order: 4, view: hangOnMoment(["hangWind", "hangSorry"]), lineAt: hangOnTimeline().sorryAt - hangOnTimeline().windAt, line: () => DASH_HANG_ON_LINES.sorry, priority: () => INTERRUPT },
   // (His Scramble Rush a turn ahead, as any ultimate's warning: RAGE!, "Next turn: Scramble Rush", his clock held up, his line.)
   rushWarn: { order: 1, kit: "ultimateWarn", view: (p) => rageWarn(p, "Scramble Rush", undefined, true), line: (_kit, m) => lineOf(DASH_RUSH_LINES.warn, m.key) },
   rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },
