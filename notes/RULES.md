@@ -216,3 +216,8 @@ and was never built; Eric found it missing four days later. STATUS lines scroll 
 `notes/ASKS.md` the moment Eric makes it (one line: date, his words short, state: queued / building / waiting on Eric / merged / live,
 the PR). An item "waiting on Eric" is re-asked in the next message to him, with its picture, and every session start reads ASKS.md and
 re-raises anything waiting more than a day. A line leaves only when the thing is live (or Eric drops it).
+
+## Read every main run's result (Nov 26)
+Stopping a watcher on main's run because a newer run started hid a red main (95a6fcb4, the night town guard's first failure) for
+3 hours. Every main run's result is read before its watcher is dropped, even when a newer run supersedes it (a run in progress is
+waited out, or its result fetched later), and any red one is fixed forward before the next merge.
