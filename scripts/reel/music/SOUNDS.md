@@ -779,7 +779,7 @@ solos, the tower, nineteen bosses, Birdie's ult, the Hidden Boss's three pieces)
 (a list to tap, with a player) and sent as a zip of numbered, tagged MP3s. It is a snapshot: when a theme is added or
 changed, run it again, republish the page and send the zip again.
 
-## The two-minute themes made longer: Hollow first (Nov 26); second go sent
+## The two-minute themes made longer: Hollow first (Nov 26); not liked, taken out
 
 Eric: "we've got a handful of songs that are like 2 minutes and 5 seconds ... then we started making them around like
 2 minutes and 30 seconds or 2 minutes and 40 seconds ... could you try to do one for ... hollows? ... I don't want the
@@ -844,6 +844,14 @@ time. Otherwise, we'll just leave everything as is."
   song that never had one reads as another song "thrown in", though the same drop was liked where a song was built
   round it (songs N and O). The level must not dip where the new bars begin (the first go's opening sat 2 dB under).
 - This is the last try he offered: if it misses, Hollow stays at two minutes and the others are left alone.
+
+**Hollow stays as it is (Nov 26).** Eric on the second go: "it just musically doesn't sound good. Whatever you put
+together on top of it. So not to worry. We'll leave the hollow as is."
+- The new bars are out of song_l.py: the file is the one from before both goes and renders bit for bit the two-minute
+  song the game has. No `HOLLOW_MORE` switch any more.
+- The other two-minute themes are left alone too, unless he asks for one by name.
+- **Lesson:** twice, bars written to sit inside a finished song he likes came out as "thrown in" or not musical. A
+  song he has passed is finished; a longer one is a new song to write whole, not an insert.
 
 ## Sheet music: the town's first piano solo (Nov 26)
 
