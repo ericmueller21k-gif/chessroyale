@@ -51,13 +51,14 @@ jobs:
             if [ "$w" -gt 200 ]; then echo "::warning file=$f::$f is $w words. Keep a decision note to about 150 words (Eric's words, what changed, the calls made); tables and test lists go in the PR body."; fi
           done
       # PR bodies stay short too (the Nov 16 bloat sweep, T4: 43% over 40 lines; Eric's OK, Nov 16). A warning, not a failure.
+      # At 40 lines since Nov 26 (was 60; the Nov 26 sweep, Q3, Eric's go-ahead): the cap the helpers' brief sets.
       - name: The PR body is short
         if: ${{ github.event_name == 'pull_request' }}
         env:
           BODY: ${{ github.event.pull_request.body }}
         run: |
           n=$(printf '%s\n' "$BODY" | wc -l)
-          if [ "$n" -gt 60 ]; then echo "::warning::The PR body is $n lines. Keep it to what changed, what players see and the changed checks (old -> new); detail goes on the area page."; fi
+          if [ "$n" -gt 40 ]; then echo "::warning::The PR body is $n lines. Keep it to what changed, what players see and the changed checks (old -> new); detail goes on the area page."; fi
       - uses: actions/setup-node@v7
         with:
           node-version: 22

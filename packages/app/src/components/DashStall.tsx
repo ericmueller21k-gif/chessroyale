@@ -28,6 +28,23 @@ const lineOf = (lines: readonly string[], key: string): string => lines[hash(key
 /** Each beat's lines' key: the battle, the move and the beat. */
 const keyOf = (boss: BossView, beat: string) => `dash-stall:${boss.startMove}:${boss.crowdMoves}:${beat}`;
 
+let awayHolds = 0;
+/**
+ * His spot's figure away (`dash-away` on the body) while anyone holds it: his clock tap's lie-down (DashTap) and his "Hang on"
+ * (DashHangOn) can overlap, so the class stays until the last holder lets go. Returns the release (a second call does nothing).
+ */
+export function holdDashAway(): () => void {
+  awayHolds++;
+  document.body.classList.add("dash-away");
+  let held = true;
+  return () => {
+    if (!held) return;
+    held = false;
+    awayHolds = Math.max(0, awayHolds - 1);
+    if (!awayHolds) document.body.classList.remove("dash-away");
+  };
+}
+
 /**
  * The window the move's clock stands still now, or last stood still (the King's strike or a stall beat): the dock's clock and the
  * timer bar hold through it (each beat's length is already in the deadline).
@@ -241,11 +258,7 @@ export function DashTap({ match }: { match: { boss: BossView | null; phase: { ki
   useEffect(() => {
     if (bored) bossVoice.say(DASH_TAP_BORED_LINES[hash(key) % DASH_TAP_BORED_LINES.length]!, `${key}:bored`, CRITICAL);
   }, [bored && key]);
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.body.classList.toggle("dash-away", shown);
-    return () => document.body.classList.remove("dash-away");
-  }, [shown]);
+  useEffect(() => (shown && typeof document !== "undefined" ? holdDashAway() : undefined), [shown]);
   const ref = useRef<HTMLDivElement>(null);
   const sayRef = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {

@@ -29164,6 +29164,14 @@ body.cs-on .mm-scrim {
   z-index: 55;
   pointer-events: none;
 }
+/* His "Hang on" on the board's middle (round 2, Nov 26; Dash.tsx, DashHangOn): placed once from the board, jumping in from his spot
+   and zipping back by its own animations (transform from its top-left corner). */
+.dash-hang {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
 .dash-lie.mirror {
   transform: scaleX(-1);
 }

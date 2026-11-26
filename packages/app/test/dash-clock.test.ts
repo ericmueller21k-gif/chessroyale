@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS } from "@chessroyale/core";
+import { BOSS_POWERS, DASH_HANG_ON } from "@chessroyale/core";
 import { DASH_FX, fenAtPly, hangOnTimeline } from "@chessroyale/chess";
 import { DASH_FIT_LINES, DASH_HANG_ON_LINES, DASH_LINE_MAX, DASH_LOVE_LINES, DASH_POPOFF_LINES } from "../src/characters/dash-lines.ts";
 import { DASH_UI, hangOnAt, hangOnFen, popOffMoments } from "../src/components/Dash.tsx";
+import { DASH_FIGURE, DASH_HANG, HANG_SECTION } from "../src/characters/dash-figure.ts";
+import { renderFrame } from "../src/characters/sprite.ts";
+import { holdDashAway } from "../src/components/DashStall.tsx";
 
 /** Dash's clock lines (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): the multi-hit's, the pop-off's two beats. */
 describe("Dash's clock lines (Eric, Nov 7)", () => {
@@ -99,5 +102,83 @@ describe("Dash's \"Hang on\" on screen (Eric, Nov 26)", () => {
     expect(hangOnFen(his, popOffMoments({ ...boss, startMove: 3 } as never, 10_000), 10_000 + tl.cheetahAt)).toBeNull();
     // (No Hang on: nothing.)
     expect(hangOnAt(popOffMoments({ ...boss, powers: { ...boss.powers, dash: { popOff: { at: 14 } } } } as never, 10_000), 10_500)).toBeUndefined();
+  });
+});
+
+/** Round 2 (Eric, Nov 26: "he wasn't pressing it ... a ridiculous speed"): his routine on the board's middle, and his fastest smacks. */
+describe("Dash's \"Hang on\" routine (round 2)", () => {
+  /** The shortest time from one smack to the next in an animation (its click or slam cues), ms; Infinity with one or none. */
+  const gap = (a: { frames: readonly { ms: number; cue?: string }[] }) => {
+    let t = 0;
+    let last = -Infinity;
+    let min = Infinity;
+    for (const f of a.frames) {
+      if (f.cue === "click" || f.cue === "slam") {
+        min = Math.min(min, t - last);
+        last = t;
+      }
+      t += f.ms;
+    }
+    return min;
+  };
+  const length = (a: { frames: readonly { ms: number }[] }) => a.frames.reduce((s, f) => s + f.ms, 0);
+
+  it("one run as long as the gag, its sections in order: the jump, the slow smacks from his landing, cheetah speed, the wind-up, the sorry and the zip", () => {
+    const tl = hangOnTimeline();
+    const a = DASH_HANG.anims;
+    expect(length(a.hangOn!)).toBe(tl.total);
+    expect(length(a.hangJump!)).toBe(tl.landAt);
+    expect(length(a.hangJump!) + length(a.hangSlow!)).toBe(tl.cheetahAt);
+    expect(length(a.hangFast!)).toBe(tl.windAt - tl.cheetahAt);
+    const order = a.hangOn!.frames.map((f) => HANG_SECTION.get(f)).filter((s, i, all) => s !== all[i - 1]);
+    expect(order).toEqual(["hangJump", "hangSlow", "hangFast", "hangWind", "hangSorry"]);
+    // (Each slow smack lands on the button: a click; the zip back ends it.)
+    expect(a.hangSlow!.frames.filter((f) => f.cue === "click").length).toBeGreaterThanOrEqual(10);
+    expect(a.hangOn!.frames.at(-1)!.cue).toBe("zip");
+  });
+
+  it("cheetah speed's smack is the quickest of every clock smack he has (the pop-off's fit10, the multi-hits, the stall slam, the Clock Slap, his move's press)", () => {
+    const fast = gap(DASH_HANG.anims.hangFast!);
+    expect(fast).toBe(DASH_HANG_ON.hitMs);
+    for (const name of ["fit3", "fit4", "fit5", "fit10", "slam", "clockSlap", "move"]) expect(fast, name).toBeLessThan(gap(DASH_FIGURE.anims[name]!));
+    expect(fast).toBeLessThan(gap(DASH_HANG.anims.hangSlow!));
+  });
+
+  it("each drawing in the run is one Frame object, drawn once (frameImage caches by the object): no copies, cheetah speed's 3", () => {
+    const a = DASH_HANG.anims;
+    const sections = [a.hangJump!, a.hangSlow!, a.hangFast!, a.hangWind!, a.hangSorry!];
+    expect(new Set(a.hangOn!.frames).size).toBe(sections.reduce((n, s) => n + new Set(s.frames).size, 0));
+    for (const f of a.hangOn!.frames) expect(sections.some((s) => s.frames.includes(f))).toBe(true);
+    const fast = new Set(a.hangOn!.frames.filter((f) => HANG_SECTION.get(f) === "hangFast"));
+    expect(fast.size).toBe(new Set(a.hangFast!.frames).size);
+    expect(fast.size).toBe(3);
+  });
+
+  it("his spot's figure stays away while either his clock tap or his \"Hang on\" holds it: the tap ending mid-gag leaves the gag's hold", () => {
+    const had = (globalThis as { document?: unknown }).document;
+    const classes = new Set<string>();
+    (globalThis as { document?: unknown }).document = { body: { classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) } } };
+    try {
+      const tap = holdDashAway(); // (He lies down for your clock tap on the "Hang on" turn,)
+      const gag = holdDashAway(); // (then you move and the gag starts.)
+      tap(); // (The tap's figure gets up mid-gag.)
+      expect(classes.has("dash-away")).toBe(true);
+      tap(); // (A second release does nothing.)
+      expect(classes.has("dash-away")).toBe(true);
+      gag(); // (The gag ends: his spot's figure back.)
+      expect(classes.has("dash-away")).toBe(false);
+    } finally {
+      (globalThis as { document?: unknown }).document = had;
+    }
+  });
+
+  it("his routine's figure is his own, nothing cut off at its frame's edge (its runs never play where he stands: his bar's and side's fits unchanged)", () => {
+    for (const [name, a] of Object.entries(DASH_HANG.anims))
+      for (const [i, f] of a.frames.entries()) {
+        const img = renderFrame(DASH_HANG, f);
+        const at = (x: number, y: number) => img.data[(y * img.w + x) * 4 + 3]!;
+        for (let x = 0; x < img.w; x++) expect(at(x, 0) + at(x, img.h - 1), `${name} ${i}`).toBe(0);
+        for (let y = 0; y < img.h; y++) expect(at(0, y) + at(img.w - 1, y), `${name} ${i}`).toBe(0);
+      }
   });
 });
