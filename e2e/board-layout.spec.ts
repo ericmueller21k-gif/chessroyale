@@ -49,14 +49,15 @@ const MAIN_ROW_H = 62;
  * 464: 24 px less, the boss's reach there; see the decision note). Round 3: the board's box is its drawn size, so the board is
  * centered in its row (1536 × 864 x 351.5 → 354, 1920 × 1080 x 511.5 → 514), and from 900 to 1099 px the side menu is 60 px (1024 × 768 176, 440 → 156, 464:
  * main's size). Nov 26, the shared frame (docs/decisions/2026-11-26-boss-frame.md): the boss's column, the board and the column beside it
- * centered as one block, 28 px either side of the board (the side menu's place moves with the block): x 346 → 358 at 1280 × 800 and
- * 1440 × 900, 376 → 390 at 1536 × 864, 536 → 550 at 1920 × 1080; the sizes unchanged; 1024 × 768 (under 1100 px) unchanged.
+ * centered as one block, 28 px either side of the board, the boss's column taking half the room the block leaves: x 346 → 358 at
+ * 1280 × 800 and 1440 × 900, 376 → 388.5 at 1536 × 864, 536 → 548.5 at 1920 × 1080; the sizes unchanged; 1024 × 768 (under 1100 px)
+ * unchanged.
  */
 const MAIN_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = {
   "1280x800": { x: 358, y: 63.2, w: 600 },
   "1440x900": { x: 358, y: 63.2, w: 760 },
-  "1536x864": { x: 390, y: 63.2, w: 736 },
-  "1920x1080": { x: 550, y: 63.2, w: 952 },
+  "1536x864": { x: 388.5, y: 63.2, w: 736 },
+  "1920x1080": { x: 548.5, y: 63.2, w: 952 },
   "1024x768": { x: 156, y: 63.2, w: 464 },
 };
 /**

@@ -620,8 +620,16 @@
     --cf-left: var(--ts-w, 196px);
     --cf-side-most: 340px;
   }
+  /* (The room the block leaves (`--cf-free` less the board and the column at their most): half of it goes to the boss's column, half stays
+     right of the column, so the board is where the centered block puts it and the boss's room (Babur's pump in front of him) is at least
+     the old layout's: at 1920 × 1080 the centered block left the pump no room and his board took the taller bar's 832. The column's half
+     is worked out from the window as the screen's sums are (its board unrounded, so never more than the screen's half).) */
   .arena:has(> .screen.game.bf-frame) > .tower-space {
-    flex: 0 0 var(--ts-w, 196px);
+    --bf-free: calc(var(--win-w) - 20px - var(--ts-w, 196px) - 56px);
+    flex: 0 0 calc(var(--ts-w, 196px) + round(down, max(0px, var(--bf-free) - min(var(--app-h) - 123px, var(--bf-free) - 280px) - 340px) / 2, 1px));
+  }
+  .arena:has(> .tower-space) > .screen.game.bf-frame {
+    margin-right: round(down, max(0px, var(--cf-free) - var(--cf-bw) - var(--side-w)) / 2, 1px);
   }
   /* The gear row: level with the bar, at the column's right end (no shift: the column starts one gap off the board). */
   .screen.game.bf-frame > .gm-tools {
