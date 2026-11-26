@@ -2175,3 +2175,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26 03:10 UTC: PR 4 review: B1 (drop makes 3 tests 8% flaky), M1 (crossing-the-300 game burns all minutes), m1-m3, n1-n2. Director's call m1: minGameMinutes 5. Fixes helper session_01JuCWRrWbPnTipK4W9MQPJJ (xhigh; merges main incl. PR 5 first). Then a delta review. Running Opus: ult-danger, PR 4 fixes.
 - Nov 26 03:20 UTC: #964 (boss frame) MERGED 80a8f901: every game screen now in the shared frame (1 v 1, 50 v 50, Squads, Boss). Main run watched. ult-danger branch must merge main (boss frame touched boss screens? no rules) when it finishes.
 - Nov 26: main 80a8f901 GREEN + LIVE (boss frame: every game screen in the shared frame).
+- Launch checklist: verify no non-admin path enables Practice mode or any test switch (Eric, Nov 26: keep admin-only).
