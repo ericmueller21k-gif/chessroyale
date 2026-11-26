@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CHAT_MOD } from "@chessroyale/core";
+import { CHAT_MOD, coinsPaid } from "@chessroyale/core";
 import { DUEL_PROTOCOL, DUEL_UPDATE, type Color, type DuelClientMessage, type DuelOutcome, type DuelPlayerView } from "@chessroyale/chess/duel";
 import { DuelCore, RECORD_RETRY_MS, newDuelRecord, type DuelRecord } from "./duel-room.ts";
 import { accountOf, ageAnswer, isSignedIn, signInRequired, withSecrets } from "./api.ts";
@@ -384,8 +384,9 @@ async function withXp(sql: ReturnType<typeof d1Sql>, f: FinishedDuel, outcomes: 
         if (i >= XP_TRIES) throw e;
       }
     }
-    // (The game's coins are its play coins and bonus, paid with its XP (PLAY_COINS since Nov 25; ranked's own coins are gone).)
-    if (xp) out[c] = { ...out[c], xp, coins: xp.coins ? xp.coins.play + xp.coins.bonus : 0 };
+    // (The game's coins are its play coins and bonus, paid with its XP (PLAY_COINS since Nov 25; ranked's own coins are gone), and a
+    // coin boost's extra (Nov 26).)
+    if (xp) out[c] = { ...out[c], xp, coins: coinsPaid(xp.coins) };
   }
   return out;
 }

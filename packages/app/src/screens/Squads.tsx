@@ -22,7 +22,7 @@ import { BoardFoot } from "../board-foot.ts";
 import { ReplayButton } from "../components/MoveReplay.tsx";
 import { useGameXp } from "../components/XpResult.tsx";
 import { EndHeadline, EndRewards } from "../components/EndScreen.tsx";
-import { XP_NONE_LINES, type XpGrant } from "@chessroyale/core";
+import { XP_NONE_LINES, coinsPaid, type XpGrant } from "@chessroyale/core";
 
 /**
  * Squads' screens (docs/areas/squads.md, "The screens"), by the lobby's phase: the waiting room (the queue's seats, 32 of
@@ -243,7 +243,8 @@ export const NO_REWARD: Record<"daily", string> = {
  */
 export function squadsRewardLine(p: { crates: number; recorded: boolean; why?: "daily" }, xp: XpGrant | null | undefined, test: boolean, sep: string): string {
   if (test) return "Test lobby: no rewards.";
-  const coins = xp?.coins ? xp.coins.play + xp.coins.bonus : 0;
+  // (A coin boost's extra too, Nov 26.)
+  const coins = coinsPaid(xp?.coins);
   const words = [xp === undefined && p.recorded ? "+… coins" : coins > 0 ? `+${coins} coins` : "", p.crates ? `${p.crates} crate` : ""].filter(Boolean).join(sep);
   const why = p.why ? NO_REWARD[p.why] : "";
   return words && why ? `${words}. ${why}` : words || why;

@@ -24,7 +24,8 @@ export const LEDGER_SCHEMA = [
   // One row per leg: `asset_kind` coins | crates | keys | xp | token | shop | item | boss_crate | welcome | series_crate | boss_pick,
   // `asset_id` which one (a boss, a shop item, an item's id, a boss crate's kind, a Welcome Crate's milestone, a series crate's id
   // ("winter-1"); '' for coins, crates, keys, XP and boss picks), `source_id` where it
-  // came from (a game, a battle, a crate). Never updated or deleted (the triggers below).
+  // came from (a game, a battle, a crate). Never updated or deleted (the triggers below). (Nov 26, the coin boost: boost_crate,
+  // boost_min and crate_bonus, the wallet's boost_crates, boost_minutes and crate_bonus, asset_id ''.)
   `CREATE TABLE IF NOT EXISTS ledger (
     op_id TEXT NOT NULL,
     leg INTEGER NOT NULL,
@@ -58,7 +59,22 @@ export const LEDGER_TRIGGERS = [
   `CREATE TRIGGER IF NOT EXISTS ledger_no_delete BEFORE DELETE ON ledger BEGIN SELECT RAISE(ABORT, 'the ledger is append-only'); END`,
 ];
 
-export type AssetKind = "coins" | "crates" | "keys" | "xp" | "token" | "shop" | "item" | "boss_crate" | "welcome" | "series_crate" | "boss_pick";
+export type AssetKind =
+  | "coins"
+  | "crates"
+  | "keys"
+  | "xp"
+  | "token"
+  | "shop"
+  | "item"
+  | "boss_crate"
+  | "welcome"
+  | "series_crate"
+  | "boss_pick"
+  // (The coin boost, Nov 26: coin-boost.ts. Coin Boost Crates held, boost minutes left, the Crate Bonus's level-ups left.)
+  | "boost_crate"
+  | "boost_min"
+  | "crate_bonus";
 
 /** A condition in SQL with its parameters. */
 export interface Cond {
@@ -107,7 +123,7 @@ export const opKeys = {
   onlineDrop: (code: string, startedAt: number): OpKey => (a) => `drop:${code}:${startedAt}:${a}`,
   /** A Squads placement reward: its lobby's code and when that lobby was made. */
   squadsReward: (code: string, createdAt: number): OpKey => (a) => `squads:${code}:${createdAt}:${a}`,
-  /** An action the app sent with its request id: `boss-crate`, `open`, `grant`, `claw`, `pick`. */
+  /** An action the app sent with its request id: `boss-crate`, `open`, `grant`, `claw`, `pick`, `boost-open` (Nov 26). */
   request: (kind: string, request: string): OpKey => (a) => `${kind}:${a}:${request}`,
 };
 
@@ -124,8 +140,19 @@ export interface Leg {
 function countLeg(kind: AssetKind, asset: string, delta: number, source: string | null, add: (o: Cond) => Stmt, spend: (o: Cond) => Stmt): Leg {
   return { kind, asset, delta, source, writes: (o) => [delta > 0 ? add(o) : spend(o)] };
 }
-function walletLeg(kind: "coins" | "crates" | "keys" | "xp" | "boss_pick", user: string, delta: number, source: string | null): Leg {
-  const col = kind === "keys" ? "crate_keys" : kind === "boss_pick" ? "boss_picks" : kind;
+/** The wallet's column of each count it holds. */
+const WALLET_COLUMN = {
+  coins: "coins",
+  crates: "crates",
+  keys: "crate_keys",
+  xp: "xp",
+  boss_pick: "boss_picks",
+  boost_crate: "boost_crates",
+  boost_min: "boost_minutes",
+  crate_bonus: "crate_bonus",
+} as const;
+function walletLeg(kind: keyof typeof WALLET_COLUMN, user: string, delta: number, source: string | null): Leg {
+  const col = WALLET_COLUMN[kind];
   return countLeg(
     kind,
     "",
@@ -148,6 +175,13 @@ export const leg = {
   xp: (user: string, delta: number, source: string | null = null) => walletLeg("xp", user, delta, source),
   /** Boss crates to pick (Nov 9: every XP.bossCrateEvery-th level's (20th since Nov 20); the wallet's `boss_picks`): one is spent as it's picked (rewards.ts). */
   bossPicks: (user: string, delta: number, source: string | null = null) => walletLeg("boss_pick", user, delta, source),
+  /**
+   * The coin boost (Nov 26; coin-boost.ts): Coin Boost Crates held, unopened (a daily quest's drop; opened free), the boost's minutes
+   * left (an opened crate's, used by boosted games) and the Crate Bonus's paying level-ups left (a daily's drop; used by rewards.ts).
+   */
+  boostCrates: (user: string, delta: number, source: string | null = null) => walletLeg("boost_crate", user, delta, source),
+  boostMinutes: (user: string, delta: number, source: string | null = null) => walletLeg("boost_min", user, delta, source),
+  crateBonus: (user: string, delta: number, source: string | null = null) => walletLeg("crate_bonus", user, delta, source),
   /** Series crates you hold, unopened (Nov 9; `series_crates`): earned by the daily reward and levels, spent by an open. */
   seriesCrates: (user: string, crate: string, delta: number, source: string | null = null) =>
     countLeg(
@@ -382,6 +416,10 @@ const HOLDINGS: readonly { kind: AssetKind; rows: string }[] = [
   { kind: "welcome", rows: "SELECT user_id, CAST(milestone AS TEXT) AS asset, 1 AS n FROM welcome_crates WHERE opened_at IS NULL" },
   { kind: "series_crate", rows: "SELECT user_id, crate AS asset, n FROM series_crates" },
   { kind: "boss_pick", rows: "SELECT user_id, '' AS asset, boss_picks AS n FROM wallets" },
+  // (The coin boost, Nov 26.)
+  { kind: "boost_crate", rows: "SELECT user_id, '' AS asset, boost_crates AS n FROM wallets" },
+  { kind: "boost_min", rows: "SELECT user_id, '' AS asset, boost_minutes AS n FROM wallets" },
+  { kind: "crate_bonus", rows: "SELECT user_id, '' AS asset, crate_bonus AS n FROM wallets" },
 ];
 /** One account's balances (`?1`, its id), as rows (kind, asset, n), a table at a time. */
 const BALANCES = HOLDINGS.map((h) => `SELECT '${h.kind}' AS kind, asset, n FROM (${h.rows}) WHERE user_id = ?1`);
@@ -409,8 +447,10 @@ const ensureAccount = (userId: string) =>
  * A guest signing in to an account (accounts.ts, the sign-in's one batch): the guest's balances join the account, and the ledger
  * records each move (op `merge:<guest's ledger id>:<asset>`: a leg out of the guest, a leg into the account for what it really gains:
  * nothing for a shop item it has already, or for the guest's Welcome Crates, which are dropped: a guest never earns one). Coins,
- * crates, keys, XP, boss picks, series crates and tokens are added up (XP: a guest earns none where sign-in is set up, so only XP from before then); items and boss crates move; then the guest's ledger id goes, so nothing names the guest.
+ * crates, keys, XP, boss picks, the coin boost's counts (Nov 26), series crates and tokens are added up (XP: a guest earns none where sign-in is set up, so only XP from before then); items and boss crates move; then the guest's ledger id goes, so nothing names the guest.
  */
+/** The wallet's counts, every one (a guest's merge adds each up). */
+const WALLET_COLS = Object.values(WALLET_COLUMN);
 export function mergeMoves(from: string, to: string, now: number): Stmt[] {
   const nonce = newId(9);
   return [
@@ -434,8 +474,10 @@ export function mergeMoves(from: string, to: string, now: number): Stmt[] {
       ),
     ),
     stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
+    // (Every count of the wallet, the coin boost's three since Nov 26: WALLET_COLUMN.)
     stmt(
-      "INSERT INTO wallets (user_id, coins, crates, crate_keys, xp, boss_picks) SELECT ?, coins, crates, crate_keys, xp, boss_picks FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0 OR crate_keys > 0 OR xp > 0 OR boss_picks > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates, crate_keys = crate_keys + excluded.crate_keys, xp = xp + excluded.xp, boss_picks = boss_picks + excluded.boss_picks",
+      `INSERT INTO wallets (user_id, ${WALLET_COLS.join(", ")}) SELECT ?, ${WALLET_COLS.join(", ")} FROM wallets WHERE user_id = ? AND (${WALLET_COLS.map((c) => `${c} > 0`).join(" OR ")})
+       ON CONFLICT (user_id) DO UPDATE SET ${WALLET_COLS.map((c) => `${c} = ${c} + excluded.${c}`).join(", ")}`,
       to,
       from,
     ),

@@ -278,6 +278,12 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // Boss crates to pick (Nov 9, 2026, XP phase 2: every XP.bossCrateEvery-th level's (20th since Nov 20); rewards.ts): moved only through the ledger (asset kind
   // "boss_pick"). Every row from before has none.
   { table: "wallets", column: "boss_picks", type: "INTEGER NOT NULL DEFAULT 0" },
+  // The coin boost (Nov 26, 2026; coin-boost.ts): Coin Boost Crates held (a daily quest's drop, opened free), the boost's minutes left
+  // and the Crate Bonus's paying level-ups left (rewards.ts). Moved only through the ledger (asset kinds "boost_crate", "boost_min",
+  // "crate_bonus"). Every row from before has none.
+  { table: "wallets", column: "boost_crates", type: "INTEGER NOT NULL DEFAULT 0" },
+  { table: "wallets", column: "boost_minutes", type: "INTEGER NOT NULL DEFAULT 0" },
+  { table: "wallets", column: "crate_bonus", type: "INTEGER NOT NULL DEFAULT 0" },
   // A game's XP (Nov 9, 2026; xp.ts): the player's time in it and their own moves (online: as the match room counted them; solo: the
   // server's clock between the game's start and its result, and the device's count of moves), and what the result screen showed: their XP before, the parts (JSON [{label, xp}]) or why none
   // ("short", "resigned", "left", "guest", "test", "banned"). NULL on every result from before (and a solo result from an app before XP).

@@ -18,6 +18,7 @@ import {
 } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 import { cond, leg, type Cond, type LedgerAccount, type Op } from "./ledger.ts";
+import { questDropLegs } from "./coin-boost.ts";
 
 /**
  * Quests (Eric, Nov 9; XP phase 3; QUESTS in settings.ts, core's quests.ts; docs/decisions/2026-11-09-quests-*.md). Decided by the
@@ -36,7 +37,8 @@ import { cond, leg, type Cond, type LedgerAccount, type Op } from "./ledger.ts";
  *     a new day's deal moves nothing, the new quests included (review of #575, m1).
  *   - **Completion** (op `quest:<kind>:<quest id>:<ledger id>`, reason "quest", in that same batch): its guard counts the progress in
  *     the same transaction, so the game that brings it to its target pays it, once; two games at once, two tabs or a replay can't pay
- *     it twice. Its legs (XP, crates of XP.rewardCrate, keys) name the game as their source, so that game's result answers it.
+ *     it twice. Its legs (XP, crates of XP.rewardCrate, keys) name the game as their source, so that game's result answers it. A daily's
+ *     also carry its drop (Nov 26; coin-boost.ts questDropLegs: a Coin Boost Crate or a Crate Bonus, rolled from the op's key, 4% each).
  *   - **The reroll** (POST /api/quests/reroll; Eric, Nov 10: one per daily, not one per day): each unfinished daily has its own free
  *     reroll a day, swapped for a quest of the pool you don't hold, its progress gone. The replacement keeps the slot and is marked
  *     with the day (`quests.rerolled_day`), so it can't be rerolled again that day; tomorrow it can. The swap goes in only while the
@@ -315,8 +317,9 @@ export async function questStatements(
         ...(game.timeOp ? [game.timeOp, game.winOp] : []),
       ),
     );
+    const id = questOpId(def.id, q.id, me.account);
     ops.push({
-      id: questOpId(def.id, q.id, me.account),
+      id,
       reason: "quest",
       now: game.now,
       when: cond("EXISTS (SELECT 1 FROM quests WHERE id = ? AND done_at IS NULL) AND (SELECT COUNT(*) FROM quest_progress WHERE quest_id = ?) >= ?", q.id, q.id, q.target),
@@ -324,6 +327,8 @@ export async function questStatements(
         leg.xp(me.user, def.xp, game.key),
         ...(def.crates ? [leg.seriesCrates(me.user, XP.rewardCrate, def.crates, game.key)] : []),
         ...(def.keys ? [leg.keys(me.user, def.keys, game.key)] : []),
+        // (A daily's drop, Nov 26: rolled from this op's key, so every attempt at the game builds the same op; the weekly rolls none.)
+        ...(q.period === "daily" ? questDropLegs(me.user, id, game.key) : []),
       ],
       also: (o) => [stmt(`UPDATE quests SET done_at = ? WHERE id = ? AND ${o.sql}`, game.now, q.id, ...o.params)],
     });
@@ -345,6 +350,9 @@ export async function questsPaidBy(sql: Sql, me: LedgerAccount, game: string): P
     if (r.asset_kind === "xp") p.xp += r.n;
     else if (r.asset_kind === "series_crate") p.crates += r.n;
     else if (r.asset_kind === "keys") p.keys += r.n;
+    // (A daily's drop, Nov 26.)
+    else if (r.asset_kind === "boost_crate") p.boost = (p.boost ?? 0) + r.n;
+    else if (r.asset_kind === "crate_bonus") p.crateBonus = (p.crateBonus ?? 0) + r.n;
     paid.set(r.op_id, p);
   }
   return [...paid.values()];
