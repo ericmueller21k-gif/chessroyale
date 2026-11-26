@@ -70,3 +70,36 @@ describe("the Hidden Boss's ages (mockup)", async () => {
     });
   }
 });
+
+// Chandy's checkmate way into Dodge (Nov 26): the poses, drawn ahead of their wiring (chandy-mate.ts), in no character list yet.
+describe("Chandy's checkmate figure", async () => {
+  const { CHANDY_MATE, MATE_ANIMS, REACH_DIRS, nearestReach } = await import("../src/characters/chandy-mate.ts");
+  const { chandyAnim, STAGES } = await import("../src/characters/chandy.ts");
+  const ch = CHANDY_MATE;
+
+  it("has every animation at every rifle stage, drawn in his palette, cues on its one-shots, nothing cut off", () => {
+    for (const st of STAGES)
+      for (const name of MATE_ANIMS) {
+        const anim = ch.anims[chandyAnim(name, st)]!;
+        expect(anim, `${name} ${st}`).toBeTruthy();
+        if (!anim.loop) expect(anim.frames.some((f) => f.cue), name).toBe(true);
+        anim.frames.forEach((f, i) => {
+          expect(renderFrame(ch, f).data.length).toBe(ch.w * ch.h * 4);
+          const keys = frameKeys(ch, f);
+          const edge = [...keys[0]!, ...keys[ch.h - 1]!, ...keys.map((r) => r[0]), ...keys.map((r) => r[ch.w - 1])];
+          expect(edge.filter(Boolean), `${name}_s${st} frame ${i + 1}`).toEqual([]);
+        });
+      }
+    for (const [name, part] of Object.entries(ch.parts))
+      for (const row of part.grid) for (const k of row) if (k !== "." && k !== " ") expect(ch.palette, `${name}: "${k}"`).toHaveProperty(k);
+  });
+
+  it("stands on its foot point and picks the nearest reach", () => {
+    const keys = frameKeys(ch, ch.anims.idle!.frames[0]!);
+    const [fx, fy] = ch.foot;
+    expect(keys[fy - 1]!.slice(fx - 6, fx + 6).some(Boolean)).toBe(true);
+    expect(REACH_DIRS.map((d) => nearestReach(d))).toEqual([...REACH_DIRS]);
+    expect(nearestReach(85)).toBe(60);
+    expect(nearestReach(-80)).toBe(-30);
+  });
+});
