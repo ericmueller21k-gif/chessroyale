@@ -2240,3 +2240,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - 11:45 #977 MERGED (1421cf71, main watcher bf1t703ln). #975 Dash MERGED (37311eb8), main+deploy watcher. #978 green, waiting Eric OK. Remaining: #973, #974, #972 CI (waiters bqy81tkkt, bi6zmz69z, b6jw2zeqd); tower flake helper (bj0af9cyn).
 - 11:55 #974 Birdie MERGED (dc542608), main watcher. #973 merged main (Dash conflict in Boss.tsx boardFen resolved: both), d14c7756, CI waiter bi1rrbfn8. #972 CI b6jw2zeqd.
 - 12:00 Dash LIVE (37311eb8; main run cancelled, superseded). #979 tower flake fix (28244ba3, stale window.match in floorThenMatch), CI waiter bmk77dcpw; not an eric.md guard -> merge on green. Watching: main 1421 (bf1t703ln), main dc54 (bi2b03sbo), #973 (bi1rrbfn8), #972 (b6jw2zeqd).
+- 12:05 #972 MERGED (63b5f061), main+deploy watcher. Left: #973 Chandy (bi1rrbfn8), #979 tower flake (bmk77dcpw), #978 waits Eric. Main runs to read: 1421 (bf1t703ln), dc54 (bi2b03sbo), 63b5.
