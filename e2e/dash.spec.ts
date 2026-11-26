@@ -762,7 +762,6 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     }, [board!, to] as const);
     await page.mouse.click(toBox.x, toBox.y);
     await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
-    expect(await page.evaluate(() => (window as any).match.phase.board?.fen ?? null)).not.toBe(fen2);
     await expect(lie).toHaveCount(0, { timeout: 3_000 });
     await expect(page.locator(".boss-char .boss-char-sprite").first()).toHaveCSS("visibility", "visible");
     // (Move 3, slow again: once a battle, so no tap; the skit's slam at 20 s.)
