@@ -380,7 +380,10 @@ function useEndSequence(o: { ready: boolean; already: boolean; steps: readonly S
         const s = performance.now();
         const f = (now: number) => {
           if (stopped) return;
-          const k = Math.min(1, (now - s) / ms);
+          // (Never below 0: a frame's time is its vsync, which on a busy main thread comes before a run begun just ahead of that
+          // frame, and smooth() of a negative k runs past 1 (smooth(-1) is 5): the bar shot full for a frame, then fell back
+          // (main, Nov 26).)
+          const k = Math.min(1, Math.max(0, (now - s) / ms));
           draw(k);
           if (k < 1) frames.push(requestAnimationFrame(f));
           else r();
