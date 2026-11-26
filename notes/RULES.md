@@ -209,3 +209,10 @@ say X?", answer yes or no in the first line, before anything else.
 "every boss has to ult in every game, no matter what. So if there was a games where they weren't ulting, then we have to. But ... we
 don't want bosses to ... ult twice." Tool: BOSS_POWERS.dangerBosses (in danger before his first ultimate, meter full; never after the
 first). A new boss: check it ults in lost and even battles; add it to dangerBosses only with Eric's OK.
+
+## Every ask Eric makes lives in notes/ASKS.md until it is live (Nov 26)
+Chub & Chirp's Turf (Nov 22) stalled at "waiting on Eric's OK of round-2 stills" in a STATUS line, fell off the queue across restarts,
+and was never built; Eric found it missing four days later. STATUS lines scroll away; that's the cause. Now: every ask goes into
+`notes/ASKS.md` the moment Eric makes it (one line: date, his words short, state: queued / building / waiting on Eric / merged / live,
+the PR). An item "waiting on Eric" is re-asked in the next message to him, with its picture, and every session start reads ASKS.md and
+re-raises anything waiting more than a day. A line leaves only when the thing is live (or Eric drops it).
