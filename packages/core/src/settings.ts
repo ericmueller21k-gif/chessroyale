@@ -2489,8 +2489,11 @@ export const DASH_HANG_ON = {
  * finishes, his "just a joke" line, `jokeMs`, then up. Your clock keeps running as ever. His taps tick aloud for the first `tapMs`
  * after he's down, then go silent (he keeps tapping). Never with less than DASH_STALL.marginMs of the move's clock left after it.
  * Only the players still thinking see it: a player who already moved never does (their pick gets him up).
+ * His size (Eric, Nov 26: "could we scale him up maybe like 3 times where he's actually hanging over the board a bit"): `lieScale`
+ * times his old lying size (his standing figure's pixels), at most as big as reaches `overhang` of a square's height over the board's
+ * edge (so never the whole of a square: "he'll never be covering an entire square"), and whole on the screen. Taps go through him.
  */
-export const DASH_TAP = { fromMove: 3, afterMs: 10_000, afterShare: 0.3, boredMs: 20_000, jokeMs: 1800, tapMs: 3000 } as const;
+export const DASH_TAP = { fromMove: 3, afterMs: 10_000, afterShare: 0.3, boredMs: 20_000, jokeMs: 1800, tapMs: 3000, lieScale: 3, overhang: 0.8 } as const;
 
 /**
  * The Hidden Boss's phase 2 (Eric, Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960 at once,

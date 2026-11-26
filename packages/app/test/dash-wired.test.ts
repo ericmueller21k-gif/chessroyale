@@ -13,7 +13,7 @@ import { TOKEN_ART } from "../src/components/tokens/index.ts";
 import { DASH_UI, DASH_WORDS, slapText } from "../src/components/Dash.tsx";
 import { WARN } from "../src/components/BossPowers.tsx";
 import type { MomentProps } from "../src/components/PowerParts.tsx";
-import { renderFrame } from "../src/characters/sprite.ts";
+import { frameKeys, renderFrame } from "../src/characters/sprite.ts";
 import { POWER_WORDS } from "../src/power-words.ts";
 import { BLITZ_INTRO_DROP_AT, BOSS_BLITZ_INTRO, INTRO_BLITZ_DUST, INTRO_BLITZ_FRONT, INTRO_BLITZ_POP, INTRO_BLITZ_STOOL, INTRO_BLITZ_STORM, INTRO_BLITZ_TABLE } from "../src/town/shops/blitz-intro-art.ts";
 import { SHOP_BLITZ_LAYOUT, SHOP_BLITZ_MARKS } from "../src/town/shops/blitz-art.ts";
@@ -284,7 +284,8 @@ describe("Dash's intro", () => {
 describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () => {
   const { DASH_STALL, DASH_TAP } = await import("@chessroyale/core");
   const { stallTimeline, passTurn, applyMove } = await import("@chessroyale/chess");
-  const { DASH_LIE } = await import("../src/characters/dash-lie.ts");
+  const DASH_LIE_MOD = await import("../src/characters/dash-lie.ts");
+  const { DASH_LIE } = DASH_LIE_MOD;
   const { DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } = await import("../src/characters/dash-lines.ts");
   const { frozenWindow, stallBoard, stallHolding, stallOn, tapLengths, tapSeen, tapTimeline } = await import("../src/components/DashStall.tsx");
   const len = (a: { frames: readonly { ms: number }[] }) => a.frames.reduce((t, f) => t + f.ms, 0);
@@ -309,9 +310,9 @@ describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () =>
     for (const c of ["tap", "zip"]) expect(kit.sounds[c], c).toBeTruthy();
   });
 
-  it("the lying figure is his: every color of it his own palette's, but its speed lines, tap lines, dust and shadow; nothing cut off at its frame's edge", () => {
+  it("the lying figure is his: every color of it his own palette's, but its dust and shadow; nothing cut off at its frame's edge", () => {
     const his = new Set(Object.values(BOSS_BLITZ.palette).map((c) => c.toLowerCase()));
-    const fx = new Set(["L", "l", "u", "v", "Z"]);
+    const fx = new Set(["u", "v", "Z"]);
     for (const [k, c] of Object.entries(DASH_LIE.palette)) if (!fx.has(k)) expect(his.has(c.toLowerCase()), `${k} ${c}`).toBe(true);
     for (const [name, an] of Object.entries(DASH_LIE.anims))
       for (const [i, f] of an.frames.entries()) {
@@ -320,6 +321,30 @@ describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () =>
           for (const y of [0, r.h - 1]) expect(r.data[(y * r.w + x) * 4 + 3], `${name} ${i} edge`).toBe(0);
         for (let y = 0; y < r.h; y++) for (const x of [0, r.w - 1]) expect(r.data[(y * r.w + x) * 4 + 3], `${name} ${i} edge`).toBe(0);
       }
+  });
+
+  it("the lying figure redrawn (Eric, Nov 26): on his belly, his feet up in the air, tapping; his top and floor where placeLie reads them", () => {
+    const { DASH_LIE_AT } = DASH_LIE_MOD;
+    const alpha = (r: { w: number; data: Uint8ClampedArray }, x: number, y: number) => r.data[(y * r.w + x) * 4 + 3]!;
+    const tops: number[] = [];
+    for (const f of DASH_LIE.anims.idle!.frames) {
+      const r = renderFrame(DASH_LIE, f);
+      let top = -1;
+      for (let y = 0; y < r.h && top < 0; y++) for (let x = 0; x < r.w; x++) if (alpha(r, x, y) > 40) top = y;
+      tops.push(top);
+      // (His belly and clock on the floor: his lowest pixels on the floor's row, a good stretch of them.)
+      const solid = (y: number) => Array.from({ length: r.w }, (_, x) => alpha(r, x, y) === 255).filter(Boolean).length;
+      expect(solid(DASH_LIE_AT.floor)).toBeGreaterThan(r.w / 5);
+      for (let y = DASH_LIE_AT.floor + 1; y < r.h; y++) expect(solid(y), `under the floor, row ${y}`).toBeLessThanOrEqual(4);
+      // (His feet up in the air: his sneakers' white and orange soles well above the floor, at the frame's right, behind him.)
+      const cells = frameKeys(DASH_LIE, f);
+      let shoes = 0;
+      for (let y = 0; y < DASH_LIE_AT.floor - 30; y++) for (let x = Math.floor(r.w * 0.75); x < r.w; x++) if (cells[y]?.[x] === "F" || cells[y]?.[x] === "O") shoes++;
+      expect(shoes).toBeGreaterThan(20);
+    }
+    expect(Math.min(...tops)).toBe(DASH_LIE_AT.top);
+    // (His tap: the paw on the button, its sound, on two frames a loop.)
+    expect(DASH_LIE.anims.idle!.frames.filter((f) => f.cue === "tap").length).toBe(2);
   });
 
   it("his lines: three of each, placeholders for Eric, none naming him", () => {

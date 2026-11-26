@@ -29073,8 +29073,9 @@ body.cs-on .mm-scrim {
   background: #111;
 }
 
-/* Dash's lying-down clock tap (Eric, Nov 17; DashStall.tsx, DashTap): beside your clock under the board, on the page's top layer,
-   placed once from the clock's time (left, top, size), mirrored when he lies on its left; taking no taps. His figure where he
+/* Dash's lying-down clock tap (Eric, Nov 17; DashStall.tsx, DashTap): beside your clock under the board, hanging a little over its
+   edge (Nov 26), on the page's top layer, placed once from the clock's time (left, top, size), mirrored when he lies on its left;
+   taking no taps (pointer-events: none, which his sprite inherits): a tap or drag on a piece under him reaches the board. His figure where he
    stands is away meanwhile (its place kept). */
 .dash-lie {
   position: fixed;
