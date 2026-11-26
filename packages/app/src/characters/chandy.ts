@@ -511,6 +511,14 @@ export interface ChandyPose {
   jaw?: number;
   /** The head's offset from his neck (a tilt forward to aim). */
   head?: Pt;
+  /** The far and near legs' knee and ankle (frame px, before the figure's offset). Default: standing, bent by `crouch`. */
+  legF?: readonly [Pt, Pt];
+  legN?: readonly [Pt, Pt];
+  /** The far hand (default a fist). */
+  handF?: "fist" | "point" | "open";
+  /** The whole figure up by pixels (a jump), its ground shadow left on the ground; `shadow: false` leaves the shadow out. */
+  lift?: number;
+  shadow?: boolean;
 }
 
 // The rest skeleton (frame px).
@@ -612,9 +620,9 @@ function tailPart(sway: number, crouch: number): { name: string; at: Pt } | null
 function legPart(hip: Pt, knee: Pt, ankle: Pt, near: boolean): { name: string; at: Pt } | null {
   return part(`leg:${near ? "n" : "f"}:${[hip, knee, ankle].map(r2).join(";")}`, (c) => {
     limb(c, [hip, knee, ankle], 5.2, 3.2, near ? "bcde" : "abcd");
-    // The foot: a flat wedge forward, three pale claws.
+    // The foot: a flat wedge forward, three pale claws (its sole 5 px under the ankle: on the ground at rest, off it in a jump).
     const fx = ankle[0];
-    const fy = GROUND;
+    const fy = ankle[1] + GROUND - 101;
     polyFill(
       c,
       [
@@ -872,6 +880,36 @@ function riflePart(stage: RifleStage, butt: Pt, deg: number): { name: string; at
 }
 const MUZZLES = new Map<string, Pt>();
 
+/**
+ * His tail lying along the ground in a figure drawn some other way (the checkmate's KO, chandy-mate.ts): from `hip` along the ground
+ * `dir` (1 our right), its tip curling up; the points in a 200 x 170 canvas, the part's `at` in it.
+ */
+export function groundTailPart(hip: Pt, ground: number, dir: 1 | -1): { name: string; at: Pt } | null {
+  return part(
+    `gtail:${r2(hip)}:${ground}:${dir}`,
+    (c) => {
+      const [hx, hy] = hip;
+      const pts: Pt[] = [
+        [hx, hy],
+        [hx + dir * 10, ground - 6],
+        [hx + dir * 22, ground - 4],
+        [hx + dir * 32, ground - 4.5],
+        [hx + dir * 37, ground - 8],
+      ];
+      limb(c, pts, 6.5, 1.4, "bcde");
+      for (let i = 0; i < 34; i += 3) {
+        const x = hx + dir * (6 + i);
+        let top = -1;
+        for (let y = 0; y < c.length; y++) if (get(c, x, y) !== ".") ((top = y), (y = c.length));
+        if (top > 0) (put(c, x, top - 1, "c"), put(c, x, top, "b"));
+      }
+    },
+    true,
+    200,
+    170,
+  );
+}
+
 // ---- A whole figure.
 
 export interface Built {
@@ -889,10 +927,12 @@ export function build(stage: RifleStage, p: ChandyPose): Built {
   const crouch = p.crouch ?? 0;
   const layers: Layer[] = [];
   const push = (b: { name: string; at: Pt } | null) => b && layers.push({ part: b.name, x: b.at[0], y: b.at[1] });
-  push(shadowPart());
+  if (p.shadow !== false) push(shadowPart());
+  const lifted = layers.length;
   push(tailPart(p.sway ?? 0, crouch));
   // The far leg, then the rifle on his back and the far arm, then the body, the near leg, the head and the near arm.
-  push(legPart([40, 89 + crouch], [37 - crouch * 0.5, 97 + crouch * 0.5], [39, 101], false));
+  const legF = p.legF ?? [[37 - crouch * 0.5, 97 + crouch * 0.5], [39, 101]];
+  push(legPart([40, 89 + crouch], legF[0], legF[1], false));
   const gun = p.gun ?? { slung: true };
   const sDx = "slung" in gun ? (gun.dx ?? 0) : 0;
   const sDy = "slung" in gun ? (gun.dy ?? 0) : 0;
@@ -914,9 +954,10 @@ export function build(stage: RifleStage, p: ChandyPose): Built {
     }
   }
   const aF = p.armF ?? ARMS.hang;
-  push(armPart(shF, [shF[0] + aF[0][0], shF[1] + aF[0][1]], [shF[0] + aF[1][0], shF[1] + aF[1][1]], false, "fist"));
+  push(armPart(shF, [shF[0] + aF[0][0], shF[1] + aF[0][1]], [shF[0] + aF[1][0], shF[1] + aF[1][1]], false, p.handF ?? "fist"));
   push(bodyPart(bob, crouch));
-  push(legPart([51, 89 + crouch], [56 + crouch * 0.5, 97 + crouch * 0.5], [53, 101], true));
+  const legN = p.legN ?? [[56 + crouch * 0.5, 97 + crouch * 0.5], [53, 101]];
+  push(legPart([51, 89 + crouch], legN[0], legN[1], true));
   const hd = p.head ?? [0, 0];
   const headAt: Pt = [hd[0], bob + hd[1]];
   push(headPart(headAt, p.eye ?? "open", p.jaw ?? 0, p.lens ?? 1));
@@ -924,12 +965,13 @@ export function build(stage: RifleStage, p: ChandyPose): Built {
   const aN = p.armN ?? ARMS.sling;
   const hand: Pt = [shN[0] + aN[1][0], shN[1] + aN[1][1]];
   push(armPart(shN, [shN[0] + aN[0][0], shN[1] + aN[0][1]], hand, true, p.handN ?? "fist"));
-  for (const l of layers) ((l.x += OX), (l.y += OY));
+  const up = p.lift ?? 0;
+  layers.forEach((l, i) => ((l.x += OX), (l.y += OY - (i >= lifted ? up : 0))));
   return {
     layers,
-    muzzle: [muzzle[0] + OX, muzzle[1] + OY],
-    lens: [56.5 + headAt[0] + OX, 37.6 + headAt[1] + OY],
-    hand: [hand[0] + OX, hand[1] + OY],
+    muzzle: [muzzle[0] + OX, muzzle[1] + OY - up],
+    lens: [56.5 + headAt[0] + OX, 37.6 + headAt[1] + OY - up],
+    hand: [hand[0] + OX, hand[1] + OY - up],
   };
 }
 
