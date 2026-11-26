@@ -2177,3 +2177,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 26: main 80a8f901 GREEN + LIVE (boss frame: every game screen in the shared frame).
 - Launch checklist: verify no non-admin path enables Practice mode or any test switch (Eric, Nov 26: keep admin-only).
 - Nov 26 03:35 UTC: PR 4 fixes done (4b67a5d0). Director's call: minGameMinutes stays 5 (10 would halve legit blitz). Delta review + CI next.
+- Nov 26 03:55 UTC: PR 4 delta: no findings (2 nits, no code). Merge #966 on green CI (b5qsiyout on 70ee387d).
