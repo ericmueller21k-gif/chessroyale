@@ -23,3 +23,9 @@ a ranked bot's name strip. Present to Eric before building.
   to tune.)
 - **The tag:** "HunBot" for these beta bots (human-like Maia players), distinct from today's obvious "Bot" lobby bots. The design shows
   both marks side by side and says where each appears.
+
+## Eric on the band (Nov 26): NO band with its own space
+"We don't want that banner... I don't like how it's messing with the UI... we're not giving it its own space. That makes everything else
+just get way out of place." Keep the design otherwise. Rework: an overlay on something that already exists, e.g. a small yellow "!" / BETA
+chip on the existing top bar (or the logo), tapping it opens the FAQ's "Bots and HunBots". Mockup before building. The online count's
+replacement line on computer is unaffected.
