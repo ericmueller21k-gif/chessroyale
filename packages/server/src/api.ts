@@ -4,7 +4,7 @@ import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
 import { REPORT_THANKS, evasionAccount, reportPlayer, signInBan } from "./fairplay.ts";
 import { banAnswer, banRedirect } from "./ban-gate.ts";
-import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
+import { NAME_NOT_ALLOWED, NAME_RESERVED, isBlockedText, isReservedName } from "./text-filter.ts";
 import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedBosses, pausedResponse } from "./kill-switches.ts";
@@ -571,6 +571,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown; pawn?: unknown; chatOn?: unknown };
     // (A name with a slur or a hate term in it: text-filter.ts.)
     if (typeof body.name === "string" && isBlockedText(String(body.name).slice(0, 64))) return json({ message: NAME_NOT_ALLOWED }, 400);
+    // ("HunChess" in a name: staff only, Eric Nov 27.)
+    if (typeof body.name === "string" && isReservedName(String(body.name).slice(0, 64)) && !admins(current)) return json({ message: NAME_RESERVED }, 400);
     if (body.pawn !== undefined && cleanPawnColor(body.pawn) === null) return json({ message: "Pick white or black." }, 400);
     if (typeof body.chatOn === "boolean" && isSignedIn(current)) await setChatOn(sql, current.id, body.chatOn);
     const updated = await updateProfile(sql, current.id, body);

@@ -1246,7 +1246,8 @@ export class LobbyCore {
     const seat = admit?.seat ?? -1;
     if (pl && (!admit || Object.values(pl.seats).includes(seat) || (admit.userId !== undefined && admit.userId !== userId))) return { ok: false as const, message: PARTY_ONLY };
     // (A name the filter refuses becomes "Player N", like an empty one: text-filter.ts.)
-    const clean = seatName(name, `Player ${this.r.humans.length + 1}`);
+    // ("HunChess" in a name is staff's only, Nov 27: a non-admin's seat gets "Player N" for it.)
+    const clean = seatName(name, `Player ${this.r.humans.length + 1}`, admin);
     const id = `p${++this.r.counter}`;
     const newToken = reseat ? token! : Array.from({ length: 24 }, () => Math.floor(this.rng() * 16).toString(16)).join("");
     this.r.humans.push({
