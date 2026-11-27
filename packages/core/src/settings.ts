@@ -1353,6 +1353,14 @@ export const BATTLE_TOWER = {
   soloWinMinSeconds: 10,
   rageScale: [1, 0.75, 0.6] as readonly number[],
   /**
+   * Floors that are one boss's alone (Eric, Nov 27, the Stranger: "he shows up after 10 rounds of the battle tower ... He'll show up a
+   * few times in the battle tower at different strengths"): on each, that boss alone, at a lone boss's strength for the floor
+   * (floorStrength with one boss), whatever the pattern says; the deal skips the floor (the decks go on to the next). He's never in a
+   * deck. Winning his first floor here unlocks him in the Boss Battle picker (core tower.ts, unlockedBosses). His floors deal as any
+   * other while he isn't ready to meet (unlockReady: no art yet) or is resting.
+   */
+  bossFloors: { 10: "stranger", 30: "stranger", 50: "stranger" } as Readonly<Record<number, string>>,
+  /**
    * Bosses whose ultimate never comes on a tower floor of several (2 or 3 bosses; solo and party alike; the runner sets it up as the
    * floor starts, so solo and online agree). Eric, Nov 20: "Disable wrangler ult plz in battle tower", then "if wrangler is solo in battle
    * tower he fires his ult off still ... just make sure in all modes for him he can only ult once a game then it turns gray": alone on a
@@ -2388,6 +2396,27 @@ export const BOSS_POWERS = {
     armoredTrainEvery: 3,
     armoredMaiaBoost: 400,
     armoredStockfishAbove: 100,
+  },
+  /**
+   * The Stranger (Eric, Nov 27; packages/chess/src/bosses/stranger.ts; docs/decisions/2026-11-27-stranger-rules.md): his Frostfire
+   * strike, "a dual fire and ice move, like where it hits a square, freezes your piece, and then that ... tile also becomes like in 2
+   * turns, it burns whatever's on it" (timing: "Freeze 1 turn, then flee").
+   * - As crowd turn `strikeFrom` begins (after his reply to your 2nd move), then `strikeEvery` crowd turns from one strike to the
+   *   next (the director's call: near Birdie's 5 and Ginger's freeze), it comes with his move: your most valuable piece but the king
+   *   (ties: the most central, then the seed's pick), only one whose freeze leaves you a move and whose burning would be legal now.
+   * - Frozen `freezeTurns` crowd turns (that turn: it can't move); then `fleeTurns` turns thawed, your chance to move it off; then, as
+   *   the last of those moves lands (the start of his turn), the tile burns whatever is on it, his own pieces too, never a king (and
+   *   never a loss no game can have: spared). No piece fits: it waits a turn.
+   * - The judge counts a piece left on the tile on the flee turn as gone (its value at `burnPawnLogit` log-odds a pawn, the fire's
+   *   way), and always scores the moves that save it.
+   * His ultimate: Eric's, still to come (the `strangerult` placeholder never fires; his meter fills as every boss's).
+   */
+  stranger: {
+    strikeFrom: 3,
+    strikeEvery: 4,
+    freezeTurns: 1,
+    fleeTurns: 1,
+    burnPawnLogit: 1,
   },
 } as const;
 
