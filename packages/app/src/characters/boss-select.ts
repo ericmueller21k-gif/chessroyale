@@ -272,6 +272,8 @@ export const GOODBYE_LINES: Readonly<Record<string, string>> = {
   chandy: "Good game. I'll keep you in my sights.",
   birdie: "Good game! Next train leaves soon.",
   recluse: "Good game. Come back and bring a better opening.",
+  // (The Stranger, Nov 27: no building of his own; said wherever a town goodbye plays.)
+  stranger: "Good game. I'll keep looking for the strongest.",
 };
 
 /**
