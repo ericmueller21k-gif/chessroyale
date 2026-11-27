@@ -15,13 +15,13 @@
 
 ## From the Nov 26 audit (notes/asks-audit-2026-11-26.md): never built / partly done
 - Nov 9-25 · 50 v 50 and Squads get their own ranks (RP from placement + engine score vs the lobby; ladder for all rank modes; a ranked leaver's seat filled by a bot at their level) · PR 1 of 5 #993 (design docs/ideas/mode-ranks.md + pure math); PRs 2-5 next (sim; 50v50 recorded, full lane; Squads recorded, full lane; screens)
-- Nov 9-10 · Riders in the regular crates (5 non-boss riders, crate exclusives; the shopping cart) · NEVER BUILT · queued (item-builder)
+- Nov 9-10 · Riders in the regular crates (5 non-boss riders, crate exclusives; the shopping cart) · PR #997 (5 Mythic rides in the Beta Crate, tier totals unchanged; full lane review running)
 - Nov 10 · Auto chess: play against people (unranked, in match history) + a landing page (queue with a bot or search) · NEVER BUILT · ask Eric if still wanted (was parked "only on Eric's word")
 - Nov 12 · Rare items: a gold/diamond tier frame + tap to preview on a pawn (with the rider) · PR #995 (stills reviewed; CI)
 - Nov 13 · Hidden Boss in match history: his three forms, the beaten ones greyed · LIVE #990 b6206491 (main green)
 - Nov 25 · 1 v 1: rank emblem by every name in game + tap a rank for the ranks pop-up · LIVE #988 d699d71c (main green)
 - Nov 11 · Landing page: sound toggle · WAITING ON ERIC: the reel files have no audio; pick chiptune or orchestra (both sent Nov 26 23:40, from stills/reel-music; audio on design/trailer-music reel-music/), then mux + toggle
-- Nov 10 · Banana Suit as the secret crate's prize (nothing rolls it) · PARTLY · queued
+- Nov 10 · Banana Suit as the secret crate's prize (nothing rolls it) · PR #998 (Mythic Crate rolls it at 2%; full lane review running)
 ## Waiting on Eric (re-ask in the next message)
 - Turf mockup (Nov 22) · beta bots 6 decisions (+ "expect more bots" note) · burst cheat detection build y/n (Nov 11) · Boss Battle select 2x vs bigger (Nov 12) · Boingo room revisions (Nov 12) · trailer v2 edits + Song C (Nov 11) · Settings cleanup look (Nov 25) · lossless music masters location (Nov 16) · Discord webhook (Nov 10) · payments: Access bypass, Stripe Tax, LLC details
 - Nov 26 · OK to merge #978 (ranked flake fix edits the vote-zone guard test; the guarded check unchanged)? · WAITING ON ERIC
