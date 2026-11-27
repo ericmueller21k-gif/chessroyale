@@ -1,5 +1,0 @@
-Cause (app, not test): as his turn begins the game screen is swapped for the boss screen, so the oven timer remounts; the new one had seen 7 already and drew the still, cutting pRoll08.
-When judging (scoring) ended within a frame, no frame of pRoll08 was ever drawn: zebra.spec.ts:162 false on phone. Seen frame by frame: DEL/ADD of the screen at scoring -> boss, shown never bounced.
-Fix (Zebra.tsx timerRun/TimerCanvas): a timer drawn afresh at a minute already seen resumes the roll it started, from where it is, its sound not replayed.
-Checks: zebra.test.ts timerRun's lines (old: same minute -> null; new: same minute -> the same roll, again: true). e2e unchanged.
-Local: vitest zebra.test.ts + typecheck pass; instrumented phone runs 7/7 pass (CPU 1x and 4x). Lane: targeted. Commit b2928000.
