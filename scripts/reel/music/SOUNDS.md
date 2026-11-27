@@ -877,7 +877,7 @@ together on top of it. So not to worry. We'll leave the hollow as is."
 - **Lesson:** twice, bars written to sit inside a finished song he likes came out as "thrown in" or not musical. A
   song he has passed is finished; a longer one is a new song to write whole, not an insert.
 
-## The gothic hybrid (Nov 27, song_ap.py): chips and sampled voices; second go sent, no verdict yet
+## The gothic hybrid (Nov 27, song_ap.py): chips and sampled voices; third go sent (after 1:14 passed)
 
 Eric, with a write-up made with another assistant ("Full Song Deconstruction & IP-Free Master Blueprint": a timeline
 of a reference track, then a plan for one like it): "trying to work with Gemini to help me come up with a song, but
@@ -951,6 +951,38 @@ know before you start building."
 - **Lessons:** between a real recorded choir and one soft looped voice sample he chose the sample: "real" was not
   the point, the sound was. A chip pattern he likes must not sit 11 dB under a voice: 4 to 5 dB is the most. Send
   the alternatives with the first go: he picked from them in one answer.
+
+**Third go (Nov 27): the second missed twice, and he was angry.** Eric: "2 issues right away. And this is why I
+said, don't ... do it unless you're clear, because listening again at 106, I hear the main thing is so much louder
+than the stuff playing in the back, like the back tone, the back beat. You can't hear it at all. And I have
+headphones on ... And also when you got rid of the voice. Like from 23 to 24 seconds in, it just died. We got rid of
+that extra in there. So we need to re-add that as like the normal, the one that's already in there right before it.
+So like keep the same, like add to the beat more so there isn't these random gaps. And it does it like 3 times ...
+Like I said, ask me if you didn't know. And you said you knew." Then: "The rest of the song is clean ... everything
+after 1 minute 14 sounds really good ... when I say balancing, it's really that part before that."
+- What went wrong. (1) The men's three bars: there were two readings (leave the beat alone there, or give the lines
+  to her voice); the helper saw both, picked one and built, though he had said to ask. (2) The balance: his "45 to 46
+  seconds" was "an exact example", and the fix was made there and hardly anywhere else; in the swell the drum loop
+  stopped by design, so with the voice 3 dB up and chords and strings over the pattern, the beat he liked was
+  7.5 dB under the held voices at 1:06.
+- The third go changes nothing after 1:14 (the raw mix matches the second go's to -74 dB or better; the master is
+  0.3 dB lower there, the first part being fuller). Before it: the answers back in their three bars, the men's lines
+  an octave up on her voice; the breakbeat on through the swell, the band's kick and hats under it from the first
+  round; the pattern 2 dB up; her line 2 dB down in the swell, the chords and strings 4 dB.
+- Measured, the loop and pattern together against the held voices: her bars +2.3 dB, the answers +4.4 to +5.3,
+  0:45 +3.0, the swell +2.9, 1:06 +2.6 (was -7.5). Sent with one clip of 0:51 to 1:14 pushed further (+6.5) for his
+  ear to choose.
+- **Rules from this:**
+  - **When he says to ask if anything is unclear, and there is a fork the helper can name, ask it before building:
+    one question, the readings as options.** A named fork is "unclear". Stating the guess afterwards is not asking.
+  - **A balance note with one timestamp is about the whole passage.** Find every stretch with the same parts and
+    measure them all: the rhythm (loop, pattern, snare, hats) against the held voices (lead, chords, strings), a
+    few seconds at a time. 7 dB under was "can't hear it at all", through headphones; 2 to 5 dB over is this go's
+    guess, his ear to confirm.
+  - **A beat he likes doesn't stop** for a section unless the plan's own quiet part asks for it; a part taken out
+    leaves a hole he hears as "it just died": fill it with what was playing just before.
+  - **When he passes part of a song, leave that part sample for sample** (new drum hits take their noise from a
+    generator of their own, so the old ones keep theirs) and say that it is unchanged.
 
 ## Sheet music: the town's first piano solo (Nov 26)
 

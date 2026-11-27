@@ -35,10 +35,22 @@ pattern alone in the three bars they chanted, the pattern a step forward there);
 of the breakbeat, 4 dB up; the breakbeat 1 dB up. The strings, flute, oboe, violin and bell are still the bank's.
 `choir` as the second argument plays the first go's voices (to go back).
 
+The third go, from his answer to that: "at 106 ... the main thing is so much louder than the stuff playing in the
+back, like the back tone, the back beat. You can't hear it at all ... when you got rid of the voice ... from 23 to 24
+seconds in, it just died ... we need to re-add that as like the normal, the one that's already in there right before
+it ... add to the beat more so there isn't these random gaps. And it does it like 3 times"; then: "everything after 1
+minute 14 sounds really good ... when I say balancing, it's really that part before that". So, before 1:14 only (the
+rest is the second go's, sample for sample): the answers are back in their three bars, the men's lines an octave up
+on her voice; the breakbeat goes on through the swell (it had stopped there: only drum hits and the pattern, which
+the voice, chords and strings covered), with the band's kick and hats under it from the first round; the pattern
+2 dB up again; her line 2 dB down in the swell, the chords and strings 4. The loop and pattern together now sit 2 to
+5 dB over the held voices all the way from 0:17 to 1:14 (at 1:06 they were 7.5 under).
+
   0:00  a low held tone (E and B), one bell; from 0:03 the voice alone
   0:17  the breakbeat, filtered and crushed, a throbbing low bass, a fast chip pattern; the voice sings five bars of
-        the tune, the beat and the pattern answer for three; three times, the pattern louder each time
-  0:51  the swell: the voice's chords and strings a chord a bar, her line climbing to a high C held two bars, drum hits
+        the tune and answers itself, lower, for three; three times, the pattern louder each time
+  0:51  the breakbeat goes on: the voice's chords and strings a chord a bar under it, her line climbing to a high C
+        held two bars, drum hits, a roll
   1:14  the guitars: muted 16ths on low E, a kick on every 16th
   1:26  the lead guitar with the tune; the second time, two guitars in harmony
   1:49  the voice and its chords over the band; two guitars run in thirds under her long notes
