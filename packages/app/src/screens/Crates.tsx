@@ -640,7 +640,9 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         ) : (
           <span class="small crate-held" data-held={held} data-keys={keys}>
             {!held
-              ? "You have none. Leveling up and the daily reward give you crates."
+              ? crate.id === MYTHIC_CRATE.id
+                ? "You have none. The shop's Crate + Key Bundle has a chance at one."
+                : "You have none. Leveling up and the daily reward give you crates."
               : !keys
                 ? `You have ${heldWords}. You need a crate key to open one: ${everyLevel(XP.levelRewardEvery)} gives you one.`
                 : `You have ${heldWords}, and ${keys} ${keys === 1 ? "key" : "keys"}.`}
