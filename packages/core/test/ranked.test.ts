@@ -20,6 +20,7 @@ import {
   placeLadder,
   pointsFor,
   rankView,
+  rankSteps,
   rankedGame,
   rdAfterIdle,
   seedRating,
@@ -112,6 +113,20 @@ describe("the hidden rating (Glicko-1)", () => {
 });
 
 describe("the ladder", () => {
+  it("the Ranks pop-up's list: every rank lowest first, each starting where rankView places it, then the top tiers", () => {
+    const steps = rankSteps();
+    expect(steps.length).toBe(RANKED_1V1.tiers.length * RANKED_1V1.divisions + RANKED_1V1.topTiers.length);
+    expect(steps.slice(0, 2).map((r) => `${r.title} ${r.from}`)).toEqual(["Wood V 0", "Wood IV 80"]);
+    expect(steps.slice(-3).map((r) => `${r.title} ${r.from} ${r.top}`)).toEqual(["Radiant I 2720 null", "Pearlescent 2800 500", "Transcendent 2800 100"]);
+    for (const r of steps.filter((x) => x.top === null)) expect(rankView({ games: 9, ladder: r.from }).emblem).toBe(r.emblem);
+    // (Eric, Nov 27: a rough Elo by each rank: the ladder's rating at its start and the next one's, to the nearest 10; the ranges meet.)
+    expect(steps[0]!.elo).toEqual({ from: 800, to: 850 });
+    expect(steps.find((r) => r.title === "Gold III")!.elo).toEqual({ from: 1350, to: 1390 });
+    expect(steps.find((r) => r.title === "Radiant I")!.elo.to).toBe(2400);
+    expect(steps.filter((r) => r.top !== null).map((r) => r.elo)).toEqual([{ from: 2400, to: null }, { from: 2400, to: null }]);
+    const divs = steps.filter((r) => r.top === null);
+    for (let i = 1; i < divs.length; i++) expect(divs[i]!.elo.from).toBe(divs[i - 1]!.elo.to);
+  });
   it("a division in Roman numerals, as the pill shows it (Eric, Nov 25): V to I; a top tier has none", () => {
     expect([1, 2, 3, 4, 5].map(romanDivision)).toEqual(["I", "II", "III", "IV", "V"]);
     expect(divisionTitle({ tier: "Gold", division: 3 })).toBe("Gold III");
