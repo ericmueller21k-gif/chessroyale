@@ -239,7 +239,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     account's first visit** (Nov 27, `firstOnVisit`, `welcomeGamesNeeded`; [2026-11-27-welcome-crate-first-visit.md](../decisions/2026-11-27-welcome-crate-first-visit.md)),
     the second at 25 finished games; **both open only from level 5** (`openLevel`; the server refuses below, `WELCOME_TEXT.tooLow`; held,
     the row sits under Ready to open greyed with a padlock, "Reach level 5 to open", its meter your level, its page greyed the same and
-    showing every ride; "Nothing to open right now" counts only what opens; it covers crates already held too). The 25 counts in any mode or against any boss (an online `results` row not marked `abandoned`,
+    showing every ride; "Nothing to open right now" counts only what opens (a series crate with no key doesn't); it covers crates already held too). The 25 counts in any mode or against any boss (an online `results` row not marked `abandoned`,
     a solo one only with `XP.minMoves` (10) moves and `WELCOME_GIFT.soloMinSeconds` (60) of the server's own time (`play_ms`; Nov 10:
     empty posts had earned crates; idle open timers still count, accepted while items aren't traded), or a ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
     milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. Checked on every `/api/me` (the backfill) and after every

@@ -5,7 +5,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { bannerPlusMs, type ItemTier } from "@chessroyale/core";
+import { CRATE_OPEN, bannerPlusMs, type ItemTier } from "@chessroyale/core";
 import { crateSound, renderCues } from "../packages/app/src/crate-open/sounds.ts";
 import { STRIPS, clickTimes, cues, timeline, type CrateCue } from "../packages/app/src/crate-open/timeline.ts";
 
@@ -41,7 +41,7 @@ function wav(name: string, x: Float32Array) {
 const end = (list: readonly CrateCue[]) => Math.max(...list.map((c) => c.at + (crateSound(c.sound, RATE).length / RATE) * 1000)) + 300;
 
 const T = timeline();
-const clicks = clickTimes(T.spinMs, WIDTH, STRIPS.crate.land);
+const clicks = clickTimes(T.spinMs, WIDTH, STRIPS.crate.land, CRATE_OPEN.pullPx);
 for (const tier of ["common", "rare", "epic", "legendary", "mythic"] as ItemTier[]) {
   const list = cues(T, clicks, tier);
   wav(`opening-${tier}`, renderCues(RATE, list, end(list)));
