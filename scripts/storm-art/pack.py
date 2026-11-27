@@ -3,7 +3,9 @@
 Packs the storm's rendered frames (render.py) into what the game ships: one sheet (every frame's fire cell and ice cell side by side,
 COLS frames a row) and the still frost, both WebP with transparency.
 
-  python3 scripts/storm-art/pack.py <cells-dir> <out-dir> [quality=72] [unpack-dir]
+  python3 scripts/storm-art/pack.py <cells-dir> <out-dir> [quality=72|lossless] [unpack-dir]
+
+lossless: for the GBA pass (few colors, hard edges: exact and still small).
 
 unpack-dir: the shipped files cut back into frames (as the game will show them, after compression), for preview.py.
 """
@@ -18,7 +20,8 @@ COLS = 6
 
 def main():
     cells, out = sys.argv[1], sys.argv[2]
-    quality = int(sys.argv[3]) if len(sys.argv) > 3 else 72
+    exact = len(sys.argv) > 3 and sys.argv[3] == "lossless"
+    quality = 72 if exact or len(sys.argv) <= 3 else int(sys.argv[3])
     fire = [Image.open(p).convert("RGBA") for p in sorted(glob.glob(os.path.join(cells, "fire-*.png")))]
     ice = [Image.open(p).convert("RGBA") for p in sorted(glob.glob(os.path.join(cells, "ice-*.png")))]
     assert len(fire) == len(ice) and fire, "render the frames first"
@@ -30,8 +33,9 @@ def main():
         sheet.paste(f, (x, y))
         sheet.paste(c, (x + w, y))
     os.makedirs(out, exist_ok=True)
-    sheet.save(os.path.join(out, "storm.webp"), "WEBP", quality=quality, alpha_quality=60, method=6)
-    Image.open(os.path.join(cells, "frost.png")).save(os.path.join(out, "frost.webp"), "WEBP", quality=82, alpha_quality=80, method=6)
+    how = dict(lossless=True, quality=100, method=6) if exact else dict(quality=quality, alpha_quality=60, method=6)
+    sheet.save(os.path.join(out, "storm.webp"), "WEBP", **how)
+    Image.open(os.path.join(cells, "frost.png")).save(os.path.join(out, "frost.webp"), "WEBP", **(how if exact else dict(quality=82, alpha_quality=80, method=6)))
     for name in ("storm.webp", "frost.webp"):
         print(name, Image.open(os.path.join(out, name)).size, os.path.getsize(os.path.join(out, name)) // 1024, "KB")
     print(f"frames {len(fire)}, cell {w} x {h}, {COLS} a row")

@@ -1,33 +1,36 @@
-The Stranger's storm, redrawn: mockup (waiting for .go before wiring)
+The Stranger's storm, redrawn: mockup round 2 (waiting for .go before wiring)
 
-Branch stills/stranger-storm-art, folder stranger-storm-art/ (images only):
-  storm-phone-fire-turn.gif / .mp4 / .png     phone, light, a fire turn (fire leads)
-  storm-phone-ice-turn.gif / .mp4 / .png      phone, light, an ice turn (ice leads)
-  storm-computer-fire-turn.gif / .mp4 / .png  computer, dark, a fire turn
-  storm-computer-ice-turn.gif / .mp4 / .png   computer, dark, an ice turn
-  before-phone-todays-ring.png                today's pixel ring, the same moment, for comparison
-The GIFs are 256 colors at 15 frames a second; the MP4s show the true colors (same frames). The PNGs are full screens.
+Branch stills/stranger-storm-art, folder stranger-storm-art/round2/ (round 1 stays in stranger-storm-art/). Two versions, Eric picks:
 
-What it is
-- Real screenshots of a Stranger battle (?power=storm), today's ring hidden, the new storm composited the way the game will do it:
-  the loop's frames on one small canvas (400 px, scaled up), neighbors cross-faded, the still frost under it.
-- Fire up the left and across the top-left (yellow-white cores, orange, deep red edges, embers); frost wind, crystal shards, snow and
-  icicles down the right and along the bottom-right; both turn the same way round and meet at the top's and the bottom's middle.
-- A 3 s seamless loop, 30 frames. On a fire turn the fire is full and doubled (a second copy half a loop on), the ice at 80%; on an
-  ice turn the other way round.
-- Over the board the storm is see-through and reaches about a third of an edge square; its bright part sits on the frame and margin.
-  Along the bottom it barely reaches past the board, so the line under it (what to do, the clock) stays readable.
+A, painterly (round 1's art, unchanged: "keep the ice as is")
+  A-painterly-phone-fire-turn.gif / .mp4       phone, light, the storm's 2nd turn (fire leads)
+  A-painterly-computer-ice-turn.gif / .mp4     computer, LIGHT this time, the storm's 1st turn (ice leads)
+  A-painterly-phone-three-turns.png            the storm's three turns side by side: the crack whole, 2/3, 1/3
+  A-painterly-computer-fire-turn.png           computer, light, a fire turn, full screen
+B, the GBA pass (the same storm and motion, redone as pixels)
+  B-gba-phone-fire-turn.gif / .mp4, B-gba-computer-ice-turn.gif / .mp4, B-gba-phone-three-turns.png, B-gba-computer-fire-turn.png
+The MP4s and PNGs show the true pixels and colors; the GIFs are 256 colors and scaled down (B's pixels look softer in them).
 
-What ships (measured from these frames, after compression; the mockup is cut back out of these files)
-- storm.webp: 3264 x 2000, 1029 KB (30 frames, a fire cell and an ice cell each, 272 x 400). frost.webp: 544 x 800, 34 KB (still).
-  About 1.06 MB in all, loaded when a Stranger battle starts. About 26 MB once decoded (the price of 30 frames at this size).
-- At play time: 2 to 6 image draws a frame on one 400 px canvas (no particles), plus one still image under it.
-- Drawn offline by scripts/storm-art/render.py (numpy + Pillow, about 40 s), packed by pack.py; preview.py made these mockups.
+What changed for Eric's notes
+- The crack stays (17:25): the opening's own cracks (fire-side lava-orange, ice-side blue, a dark fissure with a hot core), on the
+  board under the pieces through the storm's three turns, each branch shorter from its tip every turn: whole, 2/3, about 1/3, then
+  gone with the storm. (Mocked by putting the scene's real cracks back in the live page; A soft-edged, B hard-edged.)
+- See-through, not dark (17:30): the storm itself at 88% over everything it overlaps (Moves, his figure, the strip all still show
+  through); a soft dim round the board, 22% just off it and a little more toward the far edges and corners; none on the squares.
+  The computer shots are light mode now (round 1's computer video was the game's dark mode, which is likely what read as "too dark").
+- The overlap stays (17:25): nothing held back at the top or sides. Only the bottom stays low, so the line under the board and the
+  clock read.
+- B, the GBA pass (17:40): 250 px frames scaled up as hard pixels (about 1.7 px a pixel on a phone, 3.8 on a computer: his figure's
+  own pixel size), 10 colors each for fire and ice (15-bit), ordered dithering between them, three hard see-through levels for the
+  glow, whole frames at 12 a second (no cross-fade). The detail is kept: the same tongues, embers, ribbons, shards and icicles.
+
+What would ship
+- A: storm.webp 1029 KB + frost.webp 34 KB (30 frames, 400 px; about 26 MB decoded), neighbors cross-faded on a 400 px canvas.
+- B: storm.webp 376 KB + frost.webp 1 KB (36 frames, 250 px, lossless; about 12 MB decoded), whole frames on a 250 px canvas
+  shown as pixels (like today's ring). B is the lighter one to load and to run.
+- Either way: 2 to 6 image draws a frame, no particles. The dim is one still CSS layer; the crack one still SVG a turn.
 
 Calls for the director / Eric
-1. On a computer the top of the storm crosses the thin boss strip above the board (his name, the move count). Today's ring does
-   too. Say if the top should be held back like the bottom.
-2. On a phone the board nearly fills the width (14 px each side), so the side flames show mostly over the a- and h-file's outer third.
-3. The crack of the opening scene (lava-orange / ice-blue) is not in this mockup: I'd recolor the existing SVG cracks by side when
-   wiring (cheap), not draw new art. Say if you want more.
-4. Decoded size: 24 frames instead of 30 (a 2.4 s loop) or 360 px frames would cut it by about a fifth each, if 26 MB is too much.
+1. A or B (or B's pixels a notch finer or coarser: it's one number).
+2. The dim's strength (22%) and the storm's see-through (88%): both are single numbers, easy to move after a playtest.
+3. The crack keeps the opening's shape (two bursts where the swords went in). One long crack across the board would be new art.

@@ -5,6 +5,8 @@ stills and a looping GIF, for a look before anything is wired.
 
   python3 scripts/storm-art/preview.py still <cells-dir> <screenshot.png> <x,y,size,dpr> <out.png> [frame=0] [lead=none|fire|ice] [crop=x0,y0,x1,y1]
   python3 scripts/storm-art/preview.py gif   <cells-dir> <screenshot.png> <x,y,size,dpr> <out.gif> [lead] [crop] [width=390] [fps=15] [seconds=3]
+  Both: [style=gba] (whole frames, scaled up as pixels) [opacity=1] (the storm's own) [dim=0] (the soft dim round the board)
+  [area=x0,y0,x1,y1] (the part of the page the dim covers, CSS px)
 """
 import glob
 import os
@@ -36,16 +38,23 @@ def over(dst, src, alpha=1.0):
     return s + dst * (1 - s[..., 3:4])
 
 
+PIX = False  # the GBA pass: whole frames (no cross-fade), scaled up as pixels
+
+
 def blend(frames, pos):
-    """The loop at `pos` (in frames): two neighbors cross-faded, as the game plays it."""
+    """The loop at `pos` (in frames): two neighbors cross-faded, as the game plays it (the GBA pass: the frame itself)."""
     n = len(frames)
     i = int(np.floor(pos)) % n
+    if PIX:
+        return pm(frames[i])
     f = pos - np.floor(pos)
     return pm(frames[i]) * (1 - f) + pm(frames[(i + 1) % n]) * f
 
 
 def scaled(layer, k):
     """A premultiplied layer scaled about its middle by k (the frame's own size kept)."""
+    if PIX:
+        return layer
     h, w = layer.shape[:2]
     img = Image.fromarray(np.clip(layer * 255 + 0.5, 0, 255).astype(np.uint8), "RGBa")
     big = img.resize((int(round(w * k)), int(round(h * k))), Image.BILINEAR)
@@ -79,23 +88,41 @@ def canvas(fire, ice, pos, lead):
     return c
 
 
-def compose(shot, box, c, frost, lead):
+def veil(shape, box, area, dim):
+    """The soft dim round the board (Eric: everything behind stays visible, "just dimmed a bit"): none on the board, `dim` just off
+    it, a little more toward the screen's far edges and corners; only inside `area` (the game's part of the page)."""
+    x, y, size, dpr = box
+    H, W = shape
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    xx, yy = xx / dpr, yy / dpr
+    off = np.hypot(np.maximum(np.maximum(x - xx, xx - (x + size)), 0), np.maximum(np.maximum(y - yy, yy - (y + size)), 0))
+    far = np.hypot(xx - (x + size / 2), yy - (y + size / 2)) / np.hypot(W / dpr, H / dpr)
+    a = dim * np.clip(off / 14, 0, 1) * (1 + 1.1 * np.clip(far * 1.6, 0, 1) ** 2)
+    if area:
+        a = a * ((xx >= area[0]) & (xx < area[2]) & (yy >= area[1]) & (yy < area[3]))
+    return np.clip(a, 0, 0.6)
+
+
+def compose(shot, box, c, frost, lead, opacity=1.0, dim=0.0, area=None):
     x, y, size, dpr = box
     frame = int(round(size * (1 + 2 * MARGIN) * dpr))
     left = int(round((x - size * MARGIN) * dpr))
     top = int(round((y - size * MARGIN) * dpr))
     layer = Image.new("RGBa", (frame, frame), (0, 0, 0, 0))
     fw = int(round(frame * CELL))
-    fr = frost.resize((fw, frame), Image.LANCZOS).convert("RGBa")
+    fr = frost.resize((fw, frame), Image.NEAREST if PIX else Image.LANCZOS).convert("RGBa")
     # (The still frost under the moving frames, a little fainter on a fire turn.)
     a = np.asarray(fr, np.float32) / 255 * (0.75 if lead == "fire" else 1.0)
     layer.paste(Image.fromarray(np.clip(a * 255 + 0.5, 0, 255).astype(np.uint8), "RGBa"), (frame - fw, 0))
-    up = Image.fromarray(np.clip(c * 255 + 0.5, 0, 255).astype(np.uint8), "RGBa").resize((frame, frame), Image.BILINEAR)
+    up = Image.fromarray(np.clip(c * 255 + 0.5, 0, 255).astype(np.uint8), "RGBa").resize((frame, frame), Image.NEAREST if PIX else Image.BILINEAR)
     base = np.asarray(layer, np.float32) / 255
     top_l = np.asarray(up, np.float32) / 255
-    both = top_l + base * (1 - top_l[..., 3:4])
+    both = (top_l + base * (1 - top_l[..., 3:4])) * opacity
     out = np.asarray(shot.convert("RGB"), np.float32) / 255
     H, W = out.shape[:2]
+    if dim > 0:
+        v = veil((H, W), box, area, dim)[..., None]
+        out = out * (1 - v) + np.array([10, 8, 22], np.float32) / 255 * v
     x0, y0, x1, y1 = max(left, 0), max(top, 0), min(left + frame, W), min(top + frame, H)
     part = both[y0 - top : y1 - top, x0 - left : x1 - left]
     out[y0:y1, x0:x1] = part[..., :3] + out[y0:y1, x0:x1] * (1 - part[..., 3:4])
@@ -103,6 +130,7 @@ def compose(shot, box, c, frost, lead):
 
 
 def main():
+    global PIX
     mode, cells, shot_path, box_s, out = sys.argv[1:6]
     rest = sys.argv[6:]
     opt = dict(a.split("=", 1) for a in rest if "=" in a)
@@ -110,9 +138,11 @@ def main():
     fire, ice, frost = load(cells)
     shot = Image.open(shot_path)
     lead = opt.get("lead", "none")
+    PIX = opt.get("style") == "gba"
+    look = dict(opacity=float(opt.get("opacity", 1)), dim=float(opt.get("dim", 0)), area=[float(v) for v in opt["area"].split(",")] if "area" in opt else None)
     crop = [int(float(v) * box[3]) for v in opt["crop"].split(",")] if "crop" in opt else None
     if mode == "still":
-        img = compose(shot, box, canvas(fire, ice, float(opt.get("frame", 0)), lead), frost, lead)
+        img = compose(shot, box, canvas(fire, ice, float(opt.get("frame", 0)), lead), frost, lead, **look)
         (img.crop(crop) if crop else img).save(out)
         return
     fps = int(opt.get("fps", 15))
@@ -122,7 +152,7 @@ def main():
     total = int(round(fps * seconds))
     with tempfile.TemporaryDirectory() as tmp:
         for k in range(total):
-            img = compose(shot, box, canvas(fire, ice, k * n / total, lead), frost, lead)
+            img = compose(shot, box, canvas(fire, ice, k * n / total, lead), frost, lead, **look)
             if crop:
                 img = img.crop(crop)
             img.resize((width, int(round(img.height * width / img.width))), Image.LANCZOS).save(os.path.join(tmp, f"{k:04d}.png"))

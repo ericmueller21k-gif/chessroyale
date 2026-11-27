@@ -5,7 +5,7 @@ loop ... like a GIF basically"). Renders the ring's loop offline: fire up the le
 crystal shards down the right and along the bottom, both swirling the same way round, meeting top and bottom. The game only plays the
 frames back (components/Stranger.tsx `StormRing`): nothing is drawn per particle at play time.
 
-  python3 scripts/storm-art/render.py <out-dir> [frames=30] [res=400]
+  python3 scripts/storm-art/render.py <out-dir> [frames=30] [res=400] [all|fire|ice|frost] [soft|gba]
   python3 scripts/storm-art/pack.py <out-dir> packages/app/src/assets/stranger-storm   # the shipped sheet and its frost
 
 It writes, in <out-dir>: fire-NN.png and ice-NN.png (one cell each a frame, straight alpha) and frost.png (the still frost and icicles).
@@ -30,6 +30,30 @@ ARC = math.pi * RAD / 2
 PERIM = 8 * B + 4 * ARC
 CELL = 0.68  # each element's cell: its own side of the frame and the part of the other where they meet
 SS = 2  # drawn at twice the size, then scaled down
+# The Game Boy Advance pass (Eric, Nov 27: "a bit more Game Boy Advance style, but still keep the details"): the same storm at a low
+# size, each element in a small palette (15-bit colors), ordered dithering between its colors, its glow in hard see-through bands.
+PIX = False
+BAYER = (np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]], np.float32) + 0.5) / 16
+FIRE_PAL = [(96, 8, 0), (144, 16, 0), (192, 40, 8), (232, 72, 8), (248, 112, 16), (248, 152, 24), (255, 192, 56), (255, 224, 112), (255, 248, 176), (255, 255, 232)]
+ICE_PAL = [(16, 48, 112), (24, 80, 168), (40, 112, 216), (64, 144, 240), (96, 184, 248), (136, 208, 255), (176, 228, 255), (208, 240, 255), (232, 248, 255), (255, 255, 255)]
+
+
+def pixel(img, palette, x0):
+    """The pass itself, on a finished frame: its colors to the palette (dithered), its transparency to three hard levels."""
+    a = np.asarray(img, np.float32)
+    rgb, al = a[..., :3], a[..., 3] / 255
+    h, w = al.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    b = BAYER[yy % 4, (xx + x0) % 4]
+    levels = 3
+    aq = np.clip(np.floor(al * levels + 0.5 + (b - 0.5) * 0.4), 0, levels) / levels
+    aq = np.where(al < 0.07, 0, aq)
+    c = rgb + (b[..., None] - 0.5) * 32
+    pal = np.array(palette, np.float32)
+    idx = np.argmin(((c[:, :, None, :] - pal[None, None, :, :]) ** 2).sum(-1), axis=2)
+    out = np.dstack([pal[idx], aq * 255])
+    out[aq == 0] = 0
+    return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), "RGBA")
 
 
 def smooth(a, b, x):
@@ -293,7 +317,7 @@ class Fire:
             hot = 1 - life
             rgb = (255, 150 + 100 * hot, 30 + 170 * hot * hot)
             splat(layer, px, py, 2.4 * e["size"] * big, (255, 110, 20), 0.3 * fade)
-            splat(layer, px, py, 0.95 * e["size"] * big, rgb, 0.95 * fade)
+            splat(layer, px, py, (1.7 if PIX else 0.95) * e["size"] * big, rgb, 0.95 * fade)
         layer *= self.edge[..., None]
         return layer
 
@@ -402,7 +426,7 @@ class Ice:
                     continue
                 x, y, _, _ = ring_point(es, ed)
                 px, py = to_px(x, y, res, self.x_from)
-                splat(layer, px, py, 0.8 * e["size"] * big, (240, 250, 255), 0.9 * f)
+                splat(layer, px, py, (1.4 if PIX else 0.8) * e["size"] * big, (240, 250, 255), 0.9 * f)
         # Crystal shards, whipping round: drawn as two faces, a lit one and a shaded one, with a bright ridge.
         img = Image.new("RGBA", (layer.shape[1], layer.shape[0]), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img, "RGBA")
@@ -423,10 +447,10 @@ class Ice:
             tip, tail = pts[0], pts[3]
             lit = (int(214 + 30 * e["tone"]), int(240 + 10 * e["tone"]), 255, int(225 * f))
             shade = (int(70 + 40 * e["tone"]), int(150 + 30 * e["tone"]), int(236), int(215 * f))
-            draw.polygon(pts, fill=None, outline=(38, 104, 200, int(150 * f)), width=max(1, int(round(1.2 * big))))
+            draw.polygon(pts, fill=None, outline=(38, 104, 200, int(150 * f)), width=SS if PIX else max(1, int(round(1.2 * big))))
             draw.polygon([tip, pts[1], pts[2], tail], fill=lit)
             draw.polygon([tip, tail, pts[4]], fill=shade)
-            draw.line([tip, tail], fill=(255, 255, 255, int(235 * f)), width=max(1, int(round(0.9 * big))))
+            draw.line([tip, tail], fill=(255, 255, 255, int(235 * f)), width=SS if PIX else max(1, int(round(0.9 * big))))
             gx, gy = cx + (0.35 * ca) * half, cy + (0.35 * sa) * half
             gr = max(1.0, 0.12 * half)
             draw.ellipse([gx - gr, gy - gr, gx + gr, gy + gr], fill=(255, 255, 255, int(240 * f)))
@@ -492,23 +516,30 @@ def frost(res, seed=41):
 
 
 def main():
+    global PIX
     out = sys.argv[1]
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 30
     res = int(sys.argv[3]) if len(sys.argv) > 3 else 400
     only = sys.argv[4] if len(sys.argv) > 4 else "all"
+    PIX = len(sys.argv) > 5 and sys.argv[5] == "gba"
     os.makedirs(out, exist_ok=True)
     big = res * SS
     if only in ("all", "fire"):
         fire = Fire(big)
         for i in range(n):
-            finish(fire.frame(i / n), res).save(os.path.join(out, f"fire-{i:02d}.png"))
+            img = finish(fire.frame(i / n), res)
+            (pixel(img, FIRE_PAL, 0) if PIX else img).save(os.path.join(out, f"fire-{i:02d}.png"))
     if only in ("all", "ice"):
         ice = Ice(big)
         for i in range(n):
-            finish(ice.frame(i / n), res).save(os.path.join(out, f"ice-{i:02d}.png"))
+            img = finish(ice.frame(i / n), res)
+            (pixel(img, ICE_PAL, res - img.width) if PIX else img).save(os.path.join(out, f"ice-{i:02d}.png"))
     if only in ("all", "frost"):
-        layer, _ = frost(res * 2 * SS)
-        finish(layer, res * 2).save(os.path.join(out, "frost.png"))
+        # (The still frost: twice the frames' size when soft, so its icicles stay sharp; the frames' own pixels in the GBA pass.)
+        k = 1 if PIX else 2
+        layer, _ = frost(res * k * SS)
+        img = finish(layer, res * k)
+        (pixel(img, ICE_PAL, res - img.width) if PIX else img).save(os.path.join(out, "frost.png"))
     print(f"{out}: {n} frames at {res} px (cells {int(round(CELL * res))} x {res})")
 
 
