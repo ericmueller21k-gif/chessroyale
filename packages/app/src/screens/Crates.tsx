@@ -1375,10 +1375,6 @@ function lockerStacks(items: readonly ItemInstance[], tab: LockerTab): ItemStack
     .sort((a, b) => tierIndex(topOf(b).def) - tierIndex(topOf(a).def) || colorIndex(topOf(b).color) - colorIndex(topOf(a).color) || topOf(a).blemish - topOf(b).blemish);
 }
 
-/** About how many locker cells a first screen shows (LOCKER_ART): those are drawn on the first paint, the rest just after. */
-const firstCells = () =>
-  Math.max(LOCKER_ART.firstMin, Math.min(LOCKER_ART.firstMax, Math.ceil(innerWidth / LOCKER_ART.cellW) * Math.ceil(innerHeight / LOCKER_ART.cellH)));
-
 /**
  * Home's warm-up (Eric, Nov 27: "how about it silently loads when you boot into the website on the main menu?"): the drawings of what
  * you own, in the locker's order, made ahead in home's idle time a few at a time, so the Locker opens with them ready. Only while home
@@ -1412,8 +1408,6 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const locker = profile?.locker;
   const shop = profile?.shop;
   const pawn = myPawnColor();
-  // (The cells a first screen shows are drawn at once, the rest in idle time just after, each in its place from the start: Nov 27.)
-  const [first] = useState(firstCells);
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
   const top = topOf;
   // (The Outfit slot is secret, Eric, Nov 10: its tab shows only once you own an outfit; his exception to "nothing hidden".)
@@ -1457,7 +1451,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
       {!stacks.length && <p class="muted">No crate items here yet. Open a crate!</p>}
       {stacks.length > 0 && (
         <div class="locker-grid">
-          {stacks.map((s, i) => {
+          {stacks.map((s) => {
             const it = top(s);
             const d = itemDef(it.def)!;
             const worn = wornIn(s);
@@ -1486,7 +1480,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                         }
                   }
                 >
-                  <ItemArt def={it.def} finish={it} kept later={i >= first} />
+                  <ItemArt def={it.def} finish={it} kept later />
                   <strong>{itemName(it)}</strong>
                   {hc ? (
                     <>

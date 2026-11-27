@@ -4,7 +4,7 @@ import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, sho
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import { HIDE_ALL, type RiderDraft } from "./rides/kit.ts";
-import { rideCells, useRide } from "./rides/load.ts";
+import { loadRide, rideCells, rideDrawing, useRide } from "./rides/load.ts";
 import type { RideCells } from "../town/ride-cells.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "./rides/scale.ts";
 import { TokenArt } from "./TokenArt.tsx";
@@ -1422,59 +1422,85 @@ export function ItemArt({
   live?: boolean;
   /** Its drawing kept for the session (item-art-cache.ts): set from the kept markup when there is one, kept once drawn otherwise. */
   kept?: boolean;
-  /** Drawn in the page's idle time after the first paint, in the order asked (the locker's cells past its first screen). Its box is there from the start. */
+  /** Drawn before the first paint only if it's in view then, otherwise a slice a frame after it, in order (the locker's cells). Its box is there from the start. */
   later?: boolean;
 }) {
   const ride = rideCells(def);
   const d = useRide(ride && def);
   const [ready, setReady] = useState(!later);
-  useEffect(() => (ready ? undefined : drawLater(() => setReady(true))), []);
-  // (A ride's drawing loads on its own, so it's never kept.)
-  const key = kept && !ride && ITEM_ART[def] ? artKey(def, finish, side) : "";
+  const box = useRef<HTMLSpanElement>(null);
+  // (In view as it shows: drawn before the first paint. Otherwise a slice a frame after it, in order.)
+  useLayoutEffect(() => {
+    if (ready) return;
+    const r = box.current!.getBoundingClientRect();
+    if (r.top < innerHeight && r.bottom > 0) setReady(true);
+    else return drawLater(() => setReady(true));
+  }, []);
+  const key = kept && (ride || ITEM_ART[def]) ? artKey(def, finish, side) : "";
   const markup = useMemo(() => (key && ready ? keptArt(key) : undefined), [key, ready]);
   const svg = useRef<SVGSVGElement>(null);
+  // (Kept once drawn: a ride once its drawing has loaded, not while it's the pawn alone.)
   useLayoutEffect(() => {
-    if (key && ready && !markup && svg.current && !artKept(key)) keepArt(key, svg.current.innerHTML);
+    if (key && ready && !markup && (!ride || d) && svg.current && !artKept(key)) keepArt(key, svg.current.innerHTML);
   });
   const [x, y, w, h] = FRAMES[def] ?? ride?.frame ?? [0, 0, 100, 100];
   const s = Math.max(w, h) * 1.12;
   const vb = `${x + w / 2 - s / 2} ${y + h / 2 - s / 2} ${s} ${s}`;
   return (
-    <span class={`item-art${isShiny(finish.blemish) && showsPurity(def) ? " shiny" : ""}${live ? " ia-live" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+(!!d && ready)) : undefined}>
+    <span
+      ref={box}
+      class={`item-art${isShiny(finish.blemish) && showsPurity(def) ? " shiny" : ""}${live ? " ia-live" : ""}${cls ? ` ${cls}` : ""}`}
+      style={{ "--sw": String(Math.max(0.4, s / 100)) }}
+      data-drawn={ride ? String(+(!!markup || (!!d && ready))) : undefined}
+    >
       {markup ? (
         <svg key="kept" viewBox={vb} aria-hidden="true" dangerouslySetInnerHTML={{ __html: markup }} />
       ) : (
         <svg key="drawn" ref={svg} viewBox={vb} aria-hidden="true">
-          {!ready ? null : ride ? (
-            <RideLayers id={def} c={ride} d={d} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
-              <PawnShape side={side} />
-            </RideLayers>
-          ) : (
-            <ItemLayer def={def} finish={finish} side={side} />
-          )}
+          {ready && <ArtInside def={def} finish={finish} side={side} d={d} />}
         </svg>
       )}
     </span>
   );
 }
 
+/** What's inside an item's framed svg: a ride with a pawn on it (its drawing `d` once loaded), or the item. */
+function ArtInside({ def, finish, side, d }: { def: string; finish: Finish; side: "w" | "b"; d: RiderDraft | undefined }) {
+  const ride = rideCells(def);
+  return ride ? (
+    <RideLayers id={def} c={ride} d={d} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
+      <PawnShape side={side} />
+    </RideLayers>
+  ) : (
+    <ItemLayer def={def} finish={finish} side={side} />
+  );
+}
+
 /**
  * Draws these items' drawings ahead into the session's keep (item-art-cache.ts), as the locker's cells draw them (white's side), in the
- * page's idle time a few at a time while `go()` answers true (home's warm-up: Crates.tsx, warmLocker). Answers a stop.
+ * page's idle time a few at a time while `go()` answers true (home's warm-up: Crates.tsx, warmLocker). A ride whose drawing hasn't
+ * loaded is asked for and tried again at the end (once). Answers a stop.
  */
 export function warmItemArt(items: readonly (Finish & { def: string })[], go: () => boolean): () => void {
-  const todo = items.filter((it) => !rideCells(it.def) && ITEM_ART[it.def]);
-  let i = 0;
+  const todo = items.filter((it) => rideCells(it.def) || ITEM_ART[it.def]).map((it) => ({ it, tries: 0 }));
   return inIdle(() => {
-    const it = todo[i++];
-    if (!it) return false;
+    const next = todo.shift();
+    if (!next) return false;
+    const { it } = next;
     const key = artKey(it.def, it, "w");
-    if (!artKept(key)) {
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      render(<ItemLayer def={it.def} finish={it} side="w" />, svg);
-      keepArt(key, svg.innerHTML);
+    const d = rideDrawing(it.def);
+    if (artKept(key)) return todo.length > 0;
+    if (rideCells(it.def) && !d) {
+      if (next.tries++ < 1) {
+        void loadRide(it.def);
+        todo.push(next);
+      }
+      return todo.length > 0;
     }
-    return i < todo.length;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    render(<ArtInside def={it.def} finish={it} side="w" d={d} />, svg);
+    keepArt(key, svg.innerHTML);
+    return todo.length > 0;
   }, go);
 }
 
