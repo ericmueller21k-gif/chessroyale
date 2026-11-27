@@ -309,6 +309,7 @@
 import type { SoundName } from "../sound.ts";
 import { CHANDY_DODGE_SOUNDS, CHANDY_SOUNDS } from "./chandy.ts";
 import { EFFECT_SPRITES } from "./effects.ts";
+import { STRANGER_FX_SOUNDS } from "./effects/stranger.ts";
 import { animLength, cueAt, type Anim, type Character } from "./sprite.ts";
 
 /** The power moments' animation names, every boss's. */
@@ -668,6 +669,17 @@ export const EFFECTS: Record<EffectName, Effect> = {
   // the smash on the piece his train reaches.
   birdieCrossing: { ch: EFFECT_SPRITES.birdieCrossing, covers: "square", start: "on", loop: "crossing", end: "off", sounds: { ding: "birdieBell" } },
   birdieSmash: { ch: EFFECT_SPRITES.birdieSmash, covers: "square", start: "smash", sounds: { smash: "birdieSmash" } },
+  // The Stranger's square (effects/stranger.ts; art first, his rules decide when it plays): struck and frozen, then cracking into a
+  // burning tile, burning out.
+  strangerSquare: {
+    ch: EFFECT_SPRITES.strangerSquare,
+    covers: "square",
+    start: "strike",
+    loop: "frozen",
+    stages: [{ loop: "frozen" }, { loop: "burn", into: "ignite" }],
+    end: "burnOut",
+    sounds: STRANGER_FX_SOUNDS,
+  },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
