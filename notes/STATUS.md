@@ -2283,3 +2283,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 27 01:05: #991 CI green; review: BLOCKER online never got draw (lobby.ts bossRequest drops it), should-fix throw strike for honest/older devices on loose floors (call: no strike, better plays, when draw is loose), nits (mate-sac gift, type, note). Finding 4 (review/ deletion) intended. Fix round session_01JuCWRsFdGUYZL6fqt3Uynb (xhigh). #990 fix round still running.
 - Nov 27 01:06: #990 fix round done (e4a4ab07): fall counts the fallen form; View all one height; soloFormsBeaten test. Delta re-review session_01JuCWRrqatokCtGYA6vsqtd + full CI. #991 fix round running. Opus: 2.
 - Nov 27 01:16: main d699d71c (#988) GREEN, live.
+- Nov 27 01:25: #990 delta review clean (5/5 fixed); accounts page nit fixed by director 838eeb0d; final CI bbsgrtlhx then merge. Rare items restarted (Opus high). Tower fix round finishing.
