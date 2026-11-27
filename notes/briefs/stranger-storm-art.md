@@ -55,3 +55,5 @@ nearest-neighbor, a small palette per element, ordered dithering, hard glow band
 it as offline-rendered art like his reference (a deep jagged rift, depth, lifted broken edges, floating board chips, lava glow on the fire
 side, ice crystals on the other), three heal stages, painterly and GBA versions; mockup again. A or B: not picked yet.
 **Eric, ~18:40:** picked **B (the GBA pass)**. The crack in the GBA style only.
+**Eric, ~18:45:** follow his reference's crack closely: one central impact (board chunks flying from it), a wide lava fissure to the
+lower left (flames out of it) and a wide ice fissure to the upper right (ice crystals erupting), thinner branches, real depth; GBA style.
