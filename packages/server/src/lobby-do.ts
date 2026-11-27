@@ -841,7 +841,7 @@ export interface SaveContext {
   /** The kill switches PAUSE_REWARDS and the bosses resting. */
   paused: boolean;
   off: ReturnType<typeof pausedBosses>;
-  /** TEST_SWITCHES is "1" here: the tower's pool meets a boss of his own floors before his art (core towerPool's `unfinished`). */
+  /** TEST_SWITCHES is "1" here: the tower's pool meets a boss of his own floors as an admin would (core towerPool's `unfinished`). */
   testSwitches?: boolean;
 }
 
@@ -877,7 +877,7 @@ export async function writeTowerEnds(
         countCall("lobby.towerCrateFailed");
       });
     try {
-      await partyFloorWrite(c.sql, now, t.fight, t.end, { pool: towerPool(c.off, undefined, !!c.testSwitches), ...(c.paused ? {} : { crate: pay }) });
+      await partyFloorWrite(c.sql, now, t.fight, t.end, { pool: towerPool(c.off, undefined, { unfinished: !!c.testSwitches }), ...(c.paused ? {} : { crate: pay }) });
       rec.towerQueue!.splice(rec.towerQueue!.indexOf(t), 1);
       written++;
     } catch (e) {

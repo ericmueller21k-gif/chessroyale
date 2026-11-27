@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, type BossDef } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, adminFirst, adminFirstBosses, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, menuBosses, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, unlockReady, type BossDef } from "@chessroyale/core";
 import { MatchRunner, POWER_FX, bossRules, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
@@ -179,18 +179,18 @@ describe("his ultimate: a placeholder that never fires (Eric's comes next)", () 
 });
 
 describe("his Battle Tower floors and unlock", () => {
-  const ready: BossDef[] = BOSS_ROSTER.map((b) => (b.id === "stranger" ? { ...b, kit: "The Stranger" } : b));
-
-  it("never at random, never in a deck; on floors 10, 30 and 50 alone once ready, else those floors deal as ever", () => {
+  it("never at random, never in a deck; on floors 10, 30 and 50 alone for an admin's climb (admins first), else those floors deal as ever", () => {
     const def = bossDef("stranger")!;
+    expect(def.kit).toBe("Stranger");
     expect(isPlayable(def)).toBe(false);
     for (let i = 0; i < 40; i++) expect(chooseBoss(i / 40).id).not.toBe("stranger");
-    // (No art yet: not in the pool, his floors deal as any other.)
+    // (Admins first, Nov 27: a player's climb never meets him, his floors deal as any other.)
+    expect(adminFirst(def)).toBe(true);
     expect(towerPool()).not.toContain("stranger");
     expect(floorBoss(10, towerPool())).toBeNull();
-    // Ready (his art in): in the pool for his floors only.
-    const pool = towerPool(undefined, ready);
-    expect(pool).toContain("stranger");
+    // An admin's climb: in the pool for his floors only.
+    const pool = towerPool(undefined, undefined, { admin: true });
+    expect(pool).toEqual([...towerPool(), "stranger"]);
     let run = newRun(77, pool);
     for (let f = 1; f < 52; f++) {
       const ids = run.floors[f - 1]!;
@@ -201,17 +201,24 @@ describe("his Battle Tower floors and unlock", () => {
       run = finishFloor(start.run, "won", pool);
     }
     // Resting (a kill switch): his floor deals two bosses from the deck, as the pattern says.
-    const off = towerPool(["stranger"], ready);
+    const off = towerPool(["stranger"], undefined, { admin: true });
     let r2 = newRun(77, off);
     for (let f = 1; f < 10; f++) r2 = finishFloor(startFloor(r2, off)!.run, "won", off);
     expect(r2.floors[9]).toHaveLength(2);
     expect(r2.floors[9]).not.toContain("stranger");
   });
 
-  it("a test's server (unfinished) meets him before his art", () => {
-    expect(towerPool(undefined, BOSS_ROSTER, true)).toContain("stranger");
-    expect(unlockBosses(BOSS_ROSTER, true).map((b) => b.id)).toEqual(["stranger"]);
+  it("admins first: his picker card and Boss alone for an admin only, never one of an admin's plain tiles; a test's server (unfinished) meets him as an admin does", () => {
     expect(unlockBosses()).toEqual([]);
+    expect(unlockBosses(BOSS_ROSTER, false, true).map((b) => b.id)).toEqual(["stranger"]);
+    expect(unlockBosses(BOSS_ROSTER, true).map((b) => b.id)).toEqual(["stranger"]);
+    expect(towerPool(undefined, BOSS_ROSTER, { unfinished: true })).toContain("stranger");
+    // (An admin's tiles are the bosses in the game for admins first but him: he's his card, locked until won.)
+    expect(adminFirstBosses().map((b) => b.id)).not.toContain("stranger");
+    expect(menuBosses({ admin: true, raid: false }).map((b) => b.id)).not.toContain("stranger");
+    // (A floor the tower dealt him, or a pick the unlock allowed: the runner meets him, never a stand-in.)
+    expect(chooseBoss(0.5, "stranger").id).toBe("stranger");
+    expect([unlockReady(bossDef("stranger")), unlockReady(bossDef("stranger"), false, true)]).toEqual([false, true]);
   });
 
   it("unlocked only by a floor of his own won with him on it (Eric: \"you have to beat him to unlock him\"); picked only then", () => {
@@ -224,9 +231,13 @@ describe("his Battle Tower floors and unlock", () => {
     expect(floorUnlocks(9, ["clown"])).toEqual([]);
     // His floor dealt to others (no art yet, or resting): beating them isn't beating him.
     expect(floorUnlocks(10, ["clown", "gingerbread"])).toEqual([]);
-    const def = ready.find((b) => b.id === "stranger")!;
-    expect(canPick(def, [])).toBe(false);
-    expect(canPick(def, floorUnlocks(10, ["stranger"]))).toBe(true);
+    const def = bossDef("stranger")!;
+    // An admin (admins first): his once won, never before.
+    expect(canPick(def, [], false, true)).toBe(false);
+    expect(canPick(def, floorUnlocks(10, ["stranger"]), false, true)).toBe(true);
+    // Anyone else (and the server's online picks, which pass no admin): not while he's admins first; a test's server, once won.
+    expect(canPick(def, ["stranger"])).toBe(false);
+    expect(canPick(def, ["stranger"], true)).toBe(true);
     expect(canPick(bossDef("gingerbread"), [])).toBe(true);
   });
 });

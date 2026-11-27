@@ -98,12 +98,13 @@ export type TowerDrawRows = readonly (readonly [number, number, number])[];
  * The bosses the tower deals from, in roster order: every playable boss (a complete character with powers, live for everyone:
  * never the hidden one, never one in the game for admins first) but those resting (`off`: the kill switches, rosterWithout).
  */
-export const towerPool = (off?: readonly string[], roster: readonly BossDef[] = BOSS_ROSTER, unfinished = false, s: Pick<TowerRules, "bossFloors"> = BATTLE_TOWER): string[] => {
+export const towerPool = (off?: readonly string[], roster: readonly BossDef[] = BOSS_ROSTER, opts: { unfinished?: boolean; admin?: boolean } = {}, s: Pick<TowerRules, "bossFloors"> = BATTLE_TOWER): string[] => {
   const left = rosterWithout(off, roster);
-  // (And the bosses whose own floors these are, once ready to meet and not resting (unlockReady; `unfinished`, a test's: his powers
-  // alone): never in a deck (deal), only on their floors. A test switch's server passes `unfinished`, so a test meets him before his art.)
+  // (And the bosses whose own floors these are, once ready to meet and not resting (unlockReady): never in a deck (deal), only on their
+  // floors. While one is in the game for admins first, only an admin's climb (`admin`, the server's read of the session) meets him; a
+  // test switch's server passes `unfinished`, so a test meets him as an admin does (and before his art).)
   const own = new Set(Object.values(s.bossFloors ?? {}));
-  const floors = left.filter((b) => own.has(b.id) && !off?.includes(b.id) && unlockReady(b, unfinished));
+  const floors = left.filter((b) => own.has(b.id) && !off?.includes(b.id) && unlockReady(b, !!opts.unfinished, !!opts.admin));
   return [...playableBosses(left).map((b) => b.id), ...floors.map((b) => b.id)];
 };
 

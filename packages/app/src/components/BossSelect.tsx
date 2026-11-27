@@ -49,7 +49,7 @@ const lastLine = new Map<string, string>();
 export function selectBosses(admin = isAdmin()): { bosses: BossDef[]; hidden: BossDef[]; unlock: BossDef[] } {
   const on = (b: BossDef) => !isPaused(`boss:${b.id}`);
   // (And the bosses unlocked by a win, the Stranger (Eric, Nov 27): a card each after the others, darkened and locked until won.)
-  return { bosses: menuBosses({ admin, raid: true }).filter(on), hidden: hiddenBosses().filter(on), unlock: unlockBosses(undefined, unlockTest()).filter(on) };
+  return { bosses: menuBosses({ admin, raid: true }).filter(on), hidden: hiddenBosses().filter(on), unlock: unlockBosses(undefined, unlockTest(), admin).filter(on) };
 }
 
 /** The "?" tile's value, and the stage's when a random boss is picked. */

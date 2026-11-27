@@ -758,11 +758,12 @@ export class SquadsParty extends DurableObject<Env> {
   }
 
   /**
-   * The tower's pool now: the kill switches applied; where TEST_SWITCHES is on, a boss of his own floors (the Stranger) met before his
-   * art, as the solo routes and the floor room's writes deal (core towerPool's `unfinished`: the review of #1000).
+   * The tower's pool now: the kill switches applied; where TEST_SWITCHES is on, a boss of his own floors (the Stranger) met as the solo
+   * routes and the floor room's writes deal him (core towerPool's `unfinished`: the review of #1000). Never an admin's pool: a party has
+   * players who aren't, so while he's admins first a party's floors deal as if he weren't there.
    */
   private towerPoolNow(): string[] {
-    return towerPool(pausedBosses(this.env), undefined, this.env.TEST_SWITCHES === "1");
+    return towerPool(pausedBosses(this.env), undefined, { unfinished: this.env.TEST_SWITCHES === "1" });
   }
 
   /** A member's name here, by account (a plan's words). */

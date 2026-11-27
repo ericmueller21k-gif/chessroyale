@@ -295,9 +295,9 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // Frostfire strike every few of his turns (the crowd's most valuable piece but the king frozen for your next turn, thawed the turn
   // after, your one chance to move it off; then the tile burns whatever is on it, never a king); his ultimate is Eric's, still to come
   // (`strangerult`: a placeholder that never fires). Unlocked by beating him on a Battle Tower floor (`unlock`: BATTLE_TOWER.bossFloors,
-  // 10, 30 and 50, his alone); no building in town. `kit` null until his art lands (claude/stranger-art sets it): until then he's met
-  // only on a test link (?boss=stranger&wip=1) and his floors deal as any other.
-  { id: "stranger", name: "The Stranger", icon: "⚔️", kit: null, offset: -250, powers: { passive: "frostfire", ultimate: "strangerult" }, unlock: "tower" },
+  // 10, 30 and 50, his alone); no building in town. Admins first (BOSS_ADMIN_FIRST) until Eric's ult lands: for anyone else his floors
+  // deal as any other and his card isn't shown (unlockReady); a test server (TEST_SWITCHES, `?wip=1`) meets him as an admin does.
+  { id: "stranger", name: "The Stranger", icon: "⚔️", kit: "Stranger", offset: -250, powers: { passive: "frostfire", ultimate: "strangerult" }, unlock: "tower" },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -314,24 +314,32 @@ export const BOSS_ROSTER: readonly BossDef[] = [
 export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null && !b.adminOnly && !adminFirst(b) && !b.unlock;
 /**
  * A boss unlocked by a win (`unlock`: the Stranger) that's ready to meet: his powers and his character (`unfinished`: a test's, his
- * powers alone, with placeholders), never hidden. Never at random; on the picker locked until the account's unlocks name him.
+ * powers alone, with placeholders), never hidden. Never at random; on the picker locked until the account's unlocks name him. While
+ * he's in the game for admins first (BOSS_ADMIN_FIRST, Nov 27: until his ult lands), ready only for an admin (`admin`) or a test's
+ * (`unfinished`): for anyone else his tower floors deal as any other and his card isn't on the picker, as before his art.
  */
-export const unlockReady = (b: BossDef | null | undefined, unfinished = false): b is BossDef => !!b && !!b.unlock && b.powers !== null && !b.adminOnly && (b.kit !== null || unfinished);
+export const unlockReady = (b: BossDef | null | undefined, unfinished = false, admin = false): b is BossDef =>
+  !!b && !!b.unlock && b.powers !== null && !b.adminOnly && (b.kit !== null || unfinished) && (!adminFirst(b) || admin || unfinished);
 /** The bosses unlocked by a win that are ready to meet (unlockReady), in roster order: the picker's cards, locked or not. */
-export const unlockBosses = (roster: readonly BossDef[] = BOSS_ROSTER, unfinished = false): BossDef[] => roster.filter((b) => unlockReady(b, unfinished));
+export const unlockBosses = (roster: readonly BossDef[] = BOSS_ROSTER, unfinished = false, admin = false): BossDef[] => roster.filter((b) => unlockReady(b, unfinished, admin));
 /**
- * A boss a player may pick for a battle (Boss alone, a raid, a party): a playable one, or one unlocked by a win that's ready and that
- * `unlocked` names (the account's unlocks, from the server: a floor of his own won with him on it, floorUnlocks).
+ * A boss a player may pick for a battle (Boss alone, a raid, a party): a playable one, or one unlocked by a win that's ready (for an
+ * admin, `admin`, while admins first) and that `unlocked` names (the account's unlocks, from the server: floorUnlocks). The server's
+ * raid and party picks pass no `admin`: a boss in the game for admins first is never picked online but on a test's server.
  */
-export const canPick = (b: BossDef | null | undefined, unlocked: readonly string[] = [], unfinished = false): boolean => !!b && (isPlayable(b) || (unlockReady(b, unfinished) && unlocked.includes((b as BossDef).id)));
+export const canPick = (b: BossDef | null | undefined, unlocked: readonly string[] = [], unfinished = false, admin = false): boolean =>
+  !!b && (isPlayable(b) || (unlockReady(b, unfinished, admin) && unlocked.includes((b as BossDef).id)));
 /**
  * A new boss in the game for admins first (BOSS_ADMIN_FIRST in settings.ts; Timber, Nov 1): complete, but met only by an
  * admin until Eric says go. He shows on an admin's boss select and boss menu (Boss alone and a Solo raid), never at random,
  * never in a player's. Taking his id out of BOSS_ADMIN_FIRST puts him live for everyone.
  */
 export const adminFirst = (b: Pick<BossDef, "id"> | null | undefined): boolean => !!b && BOSS_ADMIN_FIRST.includes(b.id);
-/** The bosses in the game for admins first (adminFirst), in roster order. */
-export const adminFirstBosses = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => roster.filter((b) => adminFirst(b) && !b.adminOnly && b.kit !== null && b.powers !== null);
+/**
+ * The bosses in the game for admins first (adminFirst), in roster order: an admin's tiles like any other's. Never one unlocked by a win
+ * (the Stranger): for an admin too, he's his card, locked until won (unlockBosses).
+ */
+export const adminFirstBosses = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => roster.filter((b) => adminFirst(b) && !b.adminOnly && !b.unlock && b.kit !== null && b.powers !== null);
 /** An admin may meet it in Boss alone: a playable boss, or one hidden from players with its character and powers. */
 export const adminPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null;
 /** The bosses only admins meet (in Boss alone), in roster order. */
@@ -390,8 +398,9 @@ export function chooseBoss(roll: number, wanted?: string | null, avoid?: string 
   // (Testing, solo only: a boss whose powers are built but whose art isn't yet, with placeholders. Never a hidden one
   // but for an admin's Boss alone.)
   if (unfinished && pick?.powers && (!pick.adminOnly || hidden)) return pick;
-  // (A boss unlocked by a win: whoever set `wanted` checked the unlock (the server's lobby and party, the tower's deal; solo, the device).)
-  if (isPlayable(pick) || unlockReady(pick) || (hidden && adminPlayable(pick))) return pick;
+  // (A boss unlocked by a win: whoever set `wanted` checked the unlock and, while he's admins first, the admin (the server's lobby and
+  // party, the tower's deal; solo, the device): `admin` true here.)
+  if (isPlayable(pick) || unlockReady(pick, false, true) || (hidden && adminPlayable(pick))) return pick;
   const all = playableBosses(roster);
   if (!all.length) throw new Error("No playable boss");
   const pool = all.length > 1 ? all.filter((b) => b.id !== avoid) : all;

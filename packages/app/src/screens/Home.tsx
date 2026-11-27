@@ -104,7 +104,7 @@ export function prefetchBossAlone(pick: string, rating: number | null, difficult
  */
 export function aloneBosses() {
   const list = menuBosses({ admin: isAdmin(), raid: false });
-  const won = unlockBosses(undefined, unlockTest()).filter((b) => unlockedNow().includes(b.id) && !list.some((m) => m.id === b.id));
+  const won = unlockBosses(undefined, unlockTest(), isAdmin()).filter((b) => unlockedNow().includes(b.id) && !list.some((m) => m.id === b.id));
   return [...list, ...won];
 }
 
@@ -139,7 +139,7 @@ export function chosenBoss(hidden = false): string {
     }
   }
   // (A boss unlocked by a win, the Stranger: once the server's best has unlocked him; the server checks it again online.)
-  return v && (canPick(bossDef(v), unlockedNow(), unlockTest()) || (hidden && adminPlayable(bossDef(v)))) ? v : "";
+  return v && (canPick(bossDef(v), unlockedNow(), unlockTest(), isAdmin()) || (hidden && adminPlayable(bossDef(v)))) ? v : "";
 }
 
 /** A test link's fixed strength (?boss=1600: one of the tiers, a test switch), else 0: the boss plays a step above you. */

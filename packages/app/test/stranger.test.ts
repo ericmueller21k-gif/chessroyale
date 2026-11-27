@@ -1,5 +1,5 @@
 // The Stranger's art (Nov 27; docs/decisions/2026-11-27-stranger-art.md), drawn ahead of his rules: his figure (and its locked look), his
-// kit (ART_KITS until his rules put him in the roster), his square's fire and ice, and his sounds. The same checks characters.test.ts and
+// kit (in BOSS_KITS with his rules since Nov 27, the roster's `stranger`), his square's fire and ice, and his sounds. The same checks characters.test.ts and
 // boss-character.test.ts make of every boss, plus his own: swords on his back at rest, drawn before every move, the tips meeting.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -62,9 +62,9 @@ describe("the Stranger's art", () => {
     for (const k of ["r", "i", "X", "K", "6", "9"]) expect(locked[k], k).toBeUndefined();
   });
 
-  it("is a kit drawn ahead of his boss: every moment animated, a sound for every cue, its portrait inside the frame", () => {
-    const kit = ART_KITS.Stranger!;
-    expect(BOSS_KITS.Stranger).toBeUndefined();
+  it("is the roster's kit (moved from ART_KITS with his rules): every moment animated, a sound for every cue, its portrait inside the frame", () => {
+    const kit = BOSS_KITS.Stranger!;
+    expect(ART_KITS.Stranger).toBeUndefined();
     expect(kit.ch).toBe(STRANGER);
     const beats: Beat[] = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit"];
     for (const b of beats) expect(kit.ch.anims[kit.anims[b] ?? b], b).toBeTruthy();

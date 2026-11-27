@@ -1380,7 +1380,7 @@ export const BATTLE_TOWER = {
    * few times in the battle tower at different strengths"): on each, that boss alone, at a lone boss's strength for the floor
    * (floorStrength with one boss), whatever the pattern says; the deal skips the floor (the decks go on to the next). He's never in a
    * deck. Beating him on one of them unlocks him in the Boss Battle picker (core tower.ts, floorUnlocks). His floors deal as any
-   * other while he isn't ready to meet (unlockReady: no art yet) or is resting.
+   * other while he isn't ready to meet (unlockReady: no art yet, or in the game for admins first and the climb not an admin's) or rests.
    */
   bossFloors: { 10: "stranger", 30: "stranger", 50: "stranger" } as Readonly<Record<number, string>>,
   /**
@@ -2461,7 +2461,10 @@ export const BOSS_POWERS = {
 // (docs/decisions/2026-11-16-chandy-rules.md): in the roster now, an admin's in every mode until Eric says go.)
 // (Nov 23: "birdie": his rules, art and the fall's cutscene wiring, his armored power and the cutscene's art still to come: an admin's
 // in every mode until Eric says go, as Chandy.)
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy", "birdie"];
+// (Nov 27: "stranger": his rules and art in, his ultimate Eric's still to come ("every boss ults every game"): an admin's until it lands.
+// He's unlocked by a win, so for an admin his tower floors deal him and his Boss Battle card follows his unlock; anyone else meets
+// neither: core boss.ts unlockReady.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy", "birdie", "stranger"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the

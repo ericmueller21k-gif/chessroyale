@@ -233,7 +233,7 @@ describe("one run, a copy each", () => {
 describe("the Stranger's unlock in a party (Eric, Nov 27: \"you have to beat him to unlock him\")", () => {
   it("his floor 10 won by the party unlocks each member in it at the end; one who left it after the party's 2nd move (a life) doesn't; a copy played on alone that wins it does", async () => {
     // (A test server's pool: him before his art, on his floors.)
-    const HIM = towerPool(undefined, undefined, true);
+    const HIM = towerPool(undefined, undefined, { unfinished: true });
     const sql = await world();
     const [ann, bo, cy] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com"), await signedIn(sql, "cy@example.com")];
     const all = [ann.id, bo.id, cy.id];

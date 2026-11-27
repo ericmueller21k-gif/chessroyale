@@ -381,7 +381,7 @@ describe("a floor's result: only for the floor started, once", () => {
 
 describe("the Stranger's unlock (Eric, Nov 27: \"you have to beat him to unlock him\")", () => {
   /** A test server's pool: him before his art (core towerPool's `unfinished`), on his floors 10, 30 and 50. */
-  const HIM = towerPool(undefined, undefined, true);
+  const HIM = towerPool(undefined, undefined, { unfinished: true });
   /** The open run's floor started and ended `outcome` (from `pool`): its floor and bosses, and the time after. */
   async function play(sql: Sql, uid: string, outcome: "won" | "lost", t: number, pool = HIM) {
     const start = body<{ fight: { id: string }; floor: number; bosses: string[] }>(await startTowerFloor(sql, uid, ++t, { pool }));
@@ -417,7 +417,7 @@ describe("the Stranger's unlock (Eric, Nov 27: \"you have to beat him to unlock 
     expect(await towerUnlocks(sql, ann.id)).toEqual(["stranger"]);
   });
 
-  it("beaten on a later floor of his (30) after a life spent on 10: unlocked; his floor dealt to others (no art: not in the pool) and won: nothing", async () => {
+  it("beaten on a later floor of his (30) after a life spent on 10: unlocked; his floor dealt to others (a player's climb while he's admins first) and won: nothing", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     const bo = await signedIn(sql, "bo@example.com");
@@ -428,7 +428,7 @@ describe("the Stranger's unlock (Eric, Nov 27: \"you have to beat him to unlock 
     const thirty = await play(sql, ann.id, "won", T0);
     expect([thirty.floor, thirty.bosses]).toEqual([30, ["stranger"]]);
     expect(await towerUnlocks(sql, ann.id)).toEqual(["stranger"]);
-    // Bo climbs where he isn't ready (the live pool: no art yet): his floor 10 deals others, and winning it unlocks nothing.
+    // Bo climbs where he isn't there (a player's pool while he's admins first): his floor 10 deals others, and winning it unlocks nothing.
     const ten = await play(sql, bo.id, "won", await toTen(sql, bo.id, T0, POOL), POOL);
     expect(ten.floor).toBe(10);
     expect(ten.bosses).not.toContain("stranger");
@@ -693,6 +693,37 @@ describe("the API", () => {
     };
     expect(await quick("eric@example.com")).toMatchObject({ status: 200, body: { status: "open", best: 1, run: { floor: 2 } } });
     expect(await quick("ann@example.com")).toMatchObject({ status: 409, body: { message: "That floor only just began." } });
+  });
+
+  it("the Stranger while he's admins first (Nov 27): an admin's climb meets him on floor 10 and a win there unlocks him; a player's climb on the same server deals floor 10 as any other, and its win unlocks nothing", async () => {
+    const { sql, d1 } = await world();
+    const env = { ADMIN_EMAILS: "eric@example.com" };
+    /** The floor under way won through the routes (its start set back past BATTLE_TOWER.soloWinMinSeconds: no wait). */
+    const win = async (cookie: string, uid: string) => {
+      const start = (await call(d1, cookie, "/api/tower/floor/start", {}, env)).body as { fight: { id: string }; floor: number; bosses: string[] };
+      await sql.run("UPDATE tower_runs SET fight = json_set(fight, '$.startedAt', 0) WHERE user_id = ? AND status = 'open'", uid);
+      const end = await call(d1, cookie, "/api/tower/floor/finish", { fight: start.fight.id, outcome: "won" }, env);
+      expect(end.status).toBe(200);
+      return { floor: start.floor, bosses: start.bosses };
+    };
+    /** A climb on floor 9 (8 won: set in the database, as e2e/stranger.spec.ts does), floor 9 won: floor 10 dealt by the routes' pool. */
+    const toTen = async (email: string) => {
+      const who = await signedIn(sql, email, Date.now());
+      const cookie = await cookieOf(sql, who.id);
+      await call(d1, cookie, "/api/tower/run", {}, env);
+      await sql.run("UPDATE tower_runs SET floor = 9, met = ? WHERE user_id = ?", JSON.stringify({ floors: [...Array.from({ length: 8 }, (_, i) => (i % 2 ? ["clown"] : ["gingerbread"])), ["moo"]], deck: [], decks: 1 }), who.id);
+      expect((await win(cookie, who.id)).floor).toBe(9);
+      return { uid: who.id, cookie, ten: ((await call(d1, cookie, "/api/tower", undefined, env)).body as { runs: { solo: { floor: number; bosses: string[] } } }).runs.solo };
+    };
+    const eric = await toTen("eric@example.com");
+    expect(eric.ten).toMatchObject({ floor: 10, bosses: ["stranger"] });
+    expect(await win(eric.cookie, eric.uid)).toEqual({ floor: 10, bosses: ["stranger"] });
+    expect((await call(d1, eric.cookie, "/api/tower", undefined, env)).body.unlocked).toEqual(["stranger"]);
+    const ann = await toTen("ann@example.com");
+    expect(ann.ten.floor).toBe(10);
+    expect(ann.ten.bosses).not.toContain("stranger");
+    expect((await win(ann.cookie, ann.uid)).bosses).not.toContain("stranger");
+    expect((await call(d1, ann.cookie, "/api/tower", undefined, env)).body.unlocked).toEqual([]);
   });
 
   it("a boss resting (its kill switch) is never dealt", async () => {

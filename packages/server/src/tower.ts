@@ -613,8 +613,9 @@ const POSTS = new Set(["/api/tower/run", "/api/tower/floor/start", "/api/tower/f
 export async function towerResponse(request: Request, sql: Sql, userId: string, env: TowerEnv, now: number): Promise<Response | null> {
   const path = new URL(request.url).pathname;
   if (path !== "/api/tower" && !POSTS.has(path)) return null;
-  // (Where TEST_SWITCHES is on, a boss of his own floors (the Stranger) is met before his art: core towerPool's `unfinished`.)
-  const pool = towerPool(env.off, undefined, env.testSwitches);
+  // (A boss of his own floors (the Stranger) while he's admins first: an admin's climb meets him (`admin`); where TEST_SWITCHES is on,
+  // anyone's (core towerPool's `unfinished`).)
+  const pool = towerPool(env.off, undefined, { unfinished: env.testSwitches, admin: !!env.admin });
   const answer = (a: TowerAnswer) => json(a.body, a.status);
   if (path === "/api/tower") return request.method === "GET" ? json(await towerState(sql, userId, pool)) : null;
   if (request.method !== "POST") return null;
