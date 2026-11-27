@@ -22,6 +22,9 @@ const HOY = 12;
 const SIGN = { x: 24, y: 30, w: 96, h: 17 };
 /** Where the game writes the bakery's name: the sign board's face (as kit.ts signFace). */
 export const HOUSE_ZEBRA_SIGN = { x: SIGN.x + 2, y: HOY + SIGN.y + 3, w: SIGN.w - 5, h: SIGN.h - 6 } as const;
+/** Its chip and large-map face (x, y, side in the picture): Don Dough is in his back room, so the door, round its blinds' middle (the door, `DR`
+ * in makeHouse: x 79 to 103, its blinds y 4 to 28 down it from 69; the picture is the drawing `HOY` down). */
+export const HOUSE_ZEBRA_CHIP = [91 - 22, HOY + 69 + 16 - 22, 44] as const;
 function makeHouse(): Character {
   const frames: Bit[][] = [];
   for (let f = 0; f < 8; f++) {

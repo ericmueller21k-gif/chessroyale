@@ -29,7 +29,10 @@ import { FOLIO } from "../characters/folio.ts";
 import { BOSS_BEAVER } from "../characters/timber.ts";
 import { BOSS_BLITZ } from "../characters/boss-blitz.ts";
 import { CHANDY_TOWN } from "../characters/chandy-figure.ts";
-import { BIRDIE_TOWN } from "../characters/birdie-figure.ts";
+import { BIRDIE_TOWN, YOUNG_DX, YOUNG_DY } from "../characters/birdie-figure.ts";
+import { TIMBER_ROOM } from "../characters/timber-figure.ts";
+import { portraitOf } from "../characters/portraits.ts";
+import { BOSS_ROSTER } from "@chessroyale/core";
 import { NPC_ZEBRA_GUARD_A } from "./shops/zebra-crew.ts";
 import { N, colI, rowI, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rel, rimYAt, setHeading, setView, stepCams, tableLift, toCam, wrapF, wrapFX, wrapFY, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
@@ -37,6 +40,9 @@ import { MAP_BOX } from "./minimap.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { PIECE_ART, statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
+import { HOUSE_ZEBRA_CHIP } from "./houses/zebra.ts";
+import { HOUSE_RECLUSE_CHIP } from "./houses/recluse.ts";
+import { HOUSE_TOWER_CHIP } from "./houses/tower.ts";
 import { CLOSE, QUOTE_INK, STATUE_W, quoteFace, statueArt, statueFrame, statueH, statueSteps } from "./houses/statues.ts";
 import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
@@ -62,7 +68,7 @@ import { framePixels, glowPixels, type GlowPixels, type PaintSpec, type Pixels }
 import type { PaintPool } from "./paint-pool.ts";
 import type { Cut } from "./kit/bake.ts";
 import { stepChar } from "./kit/bake.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type NoFigureId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { ALL_HOMES, ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type NoFigureId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
 import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
@@ -97,40 +103,28 @@ const STAND_IN_ART: Record<Exclude<IndoorId, NoFigureId>, Character> = { zebra: 
 /** The town figure's sprite for a home: its boss's, or its stand-in's (a home with nobody out front, world.ts hasFigure, has none). */
 const figureArt = (id: HomeId): Character => (id === "zebra" ? STAND_IN_ART[id] : BOSS_ART[id as TownBossId]);
 /**
- * Each boss's head in its first idle frame (x, y and a side, in its pixels): what its edge chip shows. (Slice 1 cropped
- * the top of the frame, which showed Babur's balloons, not Babur.)
+ * Each town figure's face box (x, y and a side, in its own pixels): what its edge chip and its large-map portrait show. Taken from its
+ * boss's portrait window (portraits.gen.ts, made from the drawing and kept in step with it by portraits.test.ts), so a redrawn boss
+ * moves its box with it (Nov 27: Chandy's, Folio's and Birdie's hand-set boxes had drifted off their heads). A square round the window's
+ * middle, its longer side, inside the figure's frame. `PORTRAIT_AT`: where the town figure sits in the portrait's frame, where the board
+ * figure keeps room round it (on the right only: none).
  */
+const PORTRAIT_AT: Partial<Record<TownBossId, readonly [dx: number, dy: number]>> = { timber: [TIMBER_ROOM.left, TIMBER_ROOM.top], birdie: [YOUNG_DX, YOUNG_DY] };
+function portraitFace(h: Home & { id: TownBossId }): readonly [x: number, y: number, size: number] {
+  const p = portraitOf(BOSS_ROSTER.find((b) => b.id === h.id)!.kit)!;
+  const ch = BOSS_ART[h.id];
+  const [dx, dy] = PORTRAIT_AT[h.id] ?? [0, 0];
+  const [fx, fy, fw, fh] = p.face;
+  const size = Math.min(ch.w, ch.h, Math.max(fw, fh));
+  const at = (mid: number, len: number) => Math.max(0, Math.min(len - size, Math.round(mid - size / 2)));
+  return [at(fx + fw / 2 - dx, ch.w), at(fy + fh / 2 - dy, ch.h), size];
+}
 export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: number]> = {
-  tiger: [7, 52, 36],
-  gingerbread: [29, 27, 32],
-  grex: [22, 29, 40],
-  hollow: [28, 18, 44],
-  moo: [9, 26, 50],
-  clown: [14, 24, 40],
-  bigboy: [24, 16, 42],
-  sawyer: [18, 0, 40],
-  pig: [26, 4, 46],
-  smudgy: [28, 8, 44],
-  hopper: [22, 4, 36],
-  gardener: [24, 22, 46],
-  alfil: [10, 16, 38],
-  // (Its head and beak, at its rest.)
-  folio: [3, 12, 28],
-  // (His hard hat and face.)
-  timber: [14, 5, 40],
-  // (His backwards cap and face.)
-  dash: [21, 9, 38],
-  // (Rolling Dough has no boss in the town, Don Dough being in his back room: its chip shows the bakery's door, the eyes peeking
-  // through its blinds, in the home's own picture: chipFace.)
-  zebra: [72, 82, 44],
-  // (The Walk-up has nobody out front, the Hidden Boss upstairs: its chip shows the top floor's lit window, the child's, under its hood.)
-  recluse: [32, 34, 44],
-  // (His snout and eye strap.)
-  chandy: [36, 26, 44],
-  // (His head, cap and beak.)
-  birdie: [30, 6, 34],
-  // (The Battle Tower has nobody out front: its chip shows its glass door under the sunburst, in its own picture.)
-  tower: [46, 500, 52],
+  ...(Object.fromEntries(ALL_HOMES.filter(hasTownBoss).map((h) => [h.id, portraitFace(h)])) as Record<TownBossId, readonly [number, number, number]>),
+  // The homes with nobody out front: a box in the home's own picture (chipFace), kept with its drawing.
+  zebra: HOUSE_ZEBRA_CHIP,
+  recluse: HOUSE_RECLUSE_CHIP,
+  tower: HOUSE_TOWER_CHIP,
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).
