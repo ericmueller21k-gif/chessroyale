@@ -27,6 +27,7 @@ import {
   dodgeSeen,
   dodgeOver,
   popOffMs,
+  popOffPending,
   folioTurnMs,
   sawyerTurnMs,
   birdieTurnMs,
@@ -468,6 +469,8 @@ export interface LobbyRecord {
   bossMinAt?: number;
   /** When Birdie's moments at the start of his turn began (his thinking's start, server time), for that crowd turn (BirdieView.turnAt). */
   birdieAt?: { turn: number; at: number };
+  /** When Dash's pop-off or "Hang on" hold began (his thinking's start, server time), for that battle and crowd turn (DashView popOff.since). */
+  popOffAt?: { key: string; at: number };
   bossIntroDone?: boolean;
   /**
    * The boss's brain for this battle, decided as it begins (bossBrainFor; BOSS_BRAIN): Maia (with its rating, and the
@@ -2137,7 +2140,7 @@ export class LobbyCore {
    * device back from a reload, `last`, gets no more than everyone had then.)
    */
   private bossViewSent(justKilled: string | null = null): NetBoss {
-    const view = this.withBirdieAt(this.runner!.bossView(justKilled)!);
+    const view = this.withPopOffAt(this.withBirdieAt(this.runner!.bossView(justKilled)!));
     const d = view.powers?.chandy?.dodge;
     if (!d || dodgeOver(d)) return view;
     const l = this.r.dodge;
@@ -2151,6 +2154,14 @@ export class LobbyCore {
     if (!at || !bd || view.powers!.turn !== at.turn) return view;
     const impact = birdieImpactMs(view);
     return { ...view, powers: { ...view.powers!, birdie: { ...bd, turnAt: { ...at, ...(impact !== null ? { dropAt: at.at + impact } : {}) } } } };
+  }
+
+  /** Dash's view with when his pop-off's (or "Hang on"'s) hold began (popOff.since), while it plays. */
+  private withPopOffAt(view: NetBoss): NetBoss {
+    const at = this.r.popOffAt;
+    const d = view.powers?.dash;
+    if (!at || !d?.popOff || !popOffPending(view) || at.key !== `${view.startMove}:${view.powers!.turn}`) return view;
+    return { ...view, powers: { ...view.powers!, dash: { ...d, popOff: { ...d.popOff, since: at.at } } } };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -2463,6 +2474,8 @@ export class LobbyCore {
     // thinking of the same turn, if any, keeps the first's.)
     const turn = view.powers?.turn ?? -1;
     if (birdieTurnMs(view) && this.r.birdieAt?.turn !== turn) this.r.birdieAt = { turn, at: this.io.now() };
+    // (Dash's pop-off and "Hang on" too: a device that first sees them late plays them from here, with this hold. Nov 27.)
+    if (popOffMs(b) && this.r.popOffAt?.key !== `${view.startMove}:${turn}`) this.r.popOffAt = { key: `${view.startMove}:${turn}`, at: this.io.now() };
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 

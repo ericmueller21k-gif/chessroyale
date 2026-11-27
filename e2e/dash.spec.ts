@@ -624,6 +624,84 @@ test.describe("Dash's clock", () => {
     }
     expect(errors).toEqual([]);
   });
+
+  test("his \"Hang on\" with a computer's two premoves queued (the review's nit 1, Nov 27): the one still waiting keeps its piece on its real square through the gag (its squares still colored), so only your move slides back and home; it plays after his move", async ({ page }) => {
+    test.skip(test.info().project.name === "phone", "a phone holds one premove, played as your move: none waits through the gag");
+    test.setTimeout(180_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await asAdmin(page);
+    await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=hangon&mode=raid");
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    // Your first move a pawn's; then, while he answers, two clicked premoves with one knight: a to b (your second move, the gag's),
+    // then b to c (waiting through his "Hang on").
+    const fen0 = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+    const g0 = new Chess(fen0);
+    const me = g0.turn();
+    const pawn = g0.moves({ verbose: true }).filter((m) => m.piece === "p" && !m.captured && Math.abs(Number(m.to[1]) - Number(m.from[1])) === 1).map((m) => m.from + m.to).sort()[0]!;
+    g0.move({ from: pawn.slice(0, 2), to: pawn.slice(2, 4) });
+    const mine = (f: string) => new Chess(f.replace(/ [wb] /, ` ${me} `).replace(/ [a-h][36] /, " - "));
+    const hops = (f: string, from: string) => mine(f).moves({ square: from as any, verbose: true }).filter((m) => !m.captured).map((m) => m.to);
+    let plan: [string, string, string] | null = null;
+    for (const m of mine(g0.fen()).moves({ verbose: true }).filter((x) => x.piece === "n" && !x.captured)) {
+      const g = mine(g0.fen());
+      g.move({ from: m.from, to: m.to });
+      const c = hops(g.fen(), m.to).filter((sq) => (me === "w" ? Number(sq[1]) <= 4 : Number(sq[1]) >= 5) && sq !== m.from).sort()[0];
+      if (c) {
+        plan = [m.from, m.to, c];
+        break;
+      }
+    }
+    expect(plan).not.toBeNull();
+    const [a, b, c] = plan!;
+    const center = async (sq: string) => {
+      const box = (await page.locator(BOARD_SEL.squares).boundingBox())!;
+      const white = (await page.locator(BOARD_SEL.wrap).first().getAttribute("class"))!.includes("orientation-white");
+      const col = white ? sq.charCodeAt(0) - 97 : 104 - sq.charCodeAt(0);
+      const row = white ? 8 - Number(sq[1]) : Number(sq[1]) - 1;
+      return { x: box.x + ((col + 0.5) * box.width) / 8, y: box.y + ((row + 0.5) * box.height) / 8 };
+    };
+    const pts = [await center(a), await center(b), await center(b), await center(c)];
+    await page.evaluate(([sqs, color]) => {
+      const w = window as any;
+      w.__pre = [] as { t: number; on: string; gag: boolean; marks: number; thinking: boolean }[];
+      const look = () => {
+        const kn = [...document.querySelectorAll(".hb-board piece.knight")].filter((e) => e.classList.contains(color) && !e.classList.contains("fading"));
+        const on = (sqs as readonly string[]).filter((sq) => kn.some((e) => e.getAttribute("data-square") === sq)).join(",");
+        w.__pre.push({ t: Date.now(), on, gag: !!document.querySelector(".dk-clock[data-gag]"), marks: document.querySelectorAll(".hb-board square.premove").length, thinking: !!w.match?.phase?.thinking });
+        requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    }, [[a, b, c], me === "w" ? "white" : "black"] as const);
+    const n0 = await page.evaluate(() => (window as any).match.boss.board.history.length as number);
+    await submitMove(page, pawn, fen0);
+    await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+    for (const p of pts) await page.mouse.click(p.x, p.y);
+    // (Your second move is the first premove; the second waits through his "Hang on".)
+    const ply = (i: number) => page.evaluate((k: number) => ((window as any).match.boss.board.history as string[])[k] ?? null, n0 + i);
+    await expect.poll(() => ply(2), { timeout: 30_000 }).not.toBeNull();
+    expect(await ply(2)).toBe(a + b);
+    await expect.poll(() => page.evaluate(() => (window as any).__pre.some((x: { gag: boolean }) => x.gag)), { timeout: 10_000 }).toBe(true);
+    await expect.poll(() => page.evaluate(() => (window as any).__pre.some((x: { gag: boolean; thinking: boolean }, i: number, all: { gag: boolean }[]) => !x.thinking && all.slice(0, i).some((y) => y.gag))), { timeout: 30_000 }).toBe(true);
+    const seen = await page.evaluate(() => (window as any).__pre as { t: number; on: string; gag: boolean; marks: number; thinking: boolean }[]);
+    const gag = seen.filter((x) => x.gag);
+    expect(gag.length).toBeGreaterThan(60);
+    const g0t = gag[0]!.t;
+    const tl = hangOnTimeline();
+    // Through the gag: the knight never on the premove's square c; taken back to a while your move is (backAt to returnAt), home on b
+    // otherwise; the premove's squares still colored all along.
+    for (const x of gag) {
+      expect(x.on, `${x.t - g0t} ms in`).not.toContain(c);
+      expect(x.marks, `${x.t - g0t} ms in`).toBeGreaterThan(0);
+    }
+    for (const x of gag.filter((y) => y.t >= g0t + tl.backAt + 400 && y.t < g0t + tl.returnAt - 300)) expect(x.on, `${x.t - g0t} ms in`).toBe(a);
+    // His move lands, then the premove plays as your third move.
+    await expect.poll(() => ply(4), { timeout: 30_000 }).not.toBeNull();
+    expect(await ply(4)).toBe(b + c);
+    expect(errors).toEqual([]);
+  });
 });
 
 test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {

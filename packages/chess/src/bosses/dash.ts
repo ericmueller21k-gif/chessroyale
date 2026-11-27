@@ -237,7 +237,7 @@ export const clockHitOn = (seed: number, turn: number, s: BossPowerSettings["das
   (test === "clockfit" && turn === 2) || clockHitTurns(seed, turn, s).includes(turn);
 
 /** What his pop-off's helpers read of the battle (the state's and the screens' view alike). */
-type PopOffBoss = { id?: string; crowdMoves?: number; powers?: { turn?: number; dash?: { popOff?: { at: number; hangOn?: true } | null } | null } | null } | null | undefined;
+type PopOffBoss = { id?: string; crowdMoves?: number; powers?: { turn?: number; dash?: { popOff?: { at: number; hangOn?: true; since?: number } | null } | null } | null } | null | undefined;
 
 /**
  * His pop-off (or his "Hang on") is playing as his thinking screen's beats, for the move he's about to play after yours: the turn it
@@ -251,11 +251,15 @@ export const popOffPending = (boss: PopOffBoss): boolean =>
 export const hangOnPending = (boss: PopOffBoss): boolean => popOffPending(boss) && !!boss!.powers!.dash!.popOff!.hangOn;
 
 /**
- * His move's row stays out of the move list while his pop-off's beats play: the pop-off came on this turn or the one before (the
- * runner's turn moves on as his move is played, before its beats end).
+ * His move's row stays out of the move list while his pop-off's beats play: the pop-off came on this turn, your move of it counted
+ * (as popOffPending: never his extra move's thinking after a failed Scramble Rush, which comes before your move and would hide his
+ * last move instead, Nov 27), or on the one before (the runner's turn moves on as his move is played, before its beats end).
  */
-export const popOffHolding = (boss: PopOffBoss): boolean =>
-  boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at >= (boss.powers.turn ?? 0) - 1;
+export const popOffHolding = (boss: PopOffBoss): boolean => {
+  const at = boss?.id === "dash" ? boss.powers?.dash?.popOff?.at : undefined;
+  const turn = boss?.powers?.turn ?? 0;
+  return at !== undefined && (at === turn ? boss!.crowdMoves === turn : at === turn - 1);
+};
 
 /**
  * His two pop-off turns: two of his turns from dashPopOff.from to dashPopOff.to, at least dashPopOff.gap apart, from the battle's
@@ -743,8 +747,12 @@ export interface DashView {
   scramble: { at: number; moves: number; seconds: number } | null;
   /** His Scramble Rush, once it has come (the swept pieces, and once it's over how many the crowd put back and his extra move). */
   rush?: DashRush | null;
-  /** His pop-off (Eric, Nov 7): his turn it comes on, so his screen plays it while he thinks; `hangOn`: his "Hang on" in its place (Nov 26). */
-  popOff?: { at: number; hangOn?: true } | null;
+  /**
+   * His pop-off (Eric, Nov 7): his turn it comes on, so his screen plays it while he thinks; `hangOn`: his "Hang on" in its place (Nov 26).
+   * `since`, online only: when the server's hold for it began (his thinking's start; the lobby's clock, net.ts puts it on the device's),
+   * so a device that first sees it late (a reload, a rejoin) plays it from there, with the server's hold (Nov 27).
+   */
+  popOff?: { at: number; hangOn?: true; since?: number } | null;
   /** His stall skit's fake move, once it has come (Eric, Nov 17): the crowd move it came on and the move he took back. */
   stall?: { at: number; move: string } | null;
   /** His lying-down clock tap, once it has come (Eric, Nov 17): the crowd move it came on. */
