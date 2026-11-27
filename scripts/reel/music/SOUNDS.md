@@ -994,6 +994,9 @@ send it to the director to be wired into the stranger as his boss music."
   master (correlation 1.00000), and the loop point is clean on the MP3 and the OGG.
 - Told the director: the files and their entry, and that the game's credits need a line for the sound bank
   (FluidR3_GM, Frank Wen, MIT license), the first sampled sound in the game's music.
+- The director's answer (Nov 27): wired in PR #1019, "re-encoded to 128 kbps like the others"; the bank's credit is
+  in the FAQ, LICENSES.md and /licenses/third-party.txt. So the game's music files are 128 kbps now: the director
+  re-encodes what handoff.py builds at 192; ask before the next handover whether to build at 128 here instead.
 - What passed, for the next songs: the balance of the third go (the drum loop and fast pattern 2 to 5 dB over the
   held voices); one soft sampled voice over a chip band; a chip pattern racing under a slow tune; guitars through
   the amp stage; real flute, oboe, strings and violin for a quiet bridge (he called everything after 1:14 "really
