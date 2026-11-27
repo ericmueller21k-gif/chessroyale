@@ -148,7 +148,8 @@ describe("Recent Matches", () => {
     const his = (patch: Partial<PublicProfile["recent"][number]>) => other({ mode: "boss", bossId: "recluse", won: false, ...patch });
     const rows = recentRows([], [his({ formsBeaten: 1, playedAt: before(1) }), his({ won: true, formsBeaten: 3, playedAt: before(2) }), his({ formsBeaten: 0, playedAt: before(3) })], NOW);
     expect(rows.map((r) => r.forms)).toEqual([1, 3, 0]);
-    expect(rows[0]).toMatchObject({ pill: { text: "LOSS" }, face: { kind: "boss", id: "recluse" } });
+    // (His name alone: "vs." left out so his forms fit beside it at every width.)
+    expect(rows[0]).toMatchObject({ pill: { text: "LOSS" }, title: "Hidden Boss", face: { kind: "boss", id: "recluse" } });
     expect(rows[1]!.pill.text).toBe("WIN");
     // (A row of his from before the count was kept: a win beat all three; else none known, none grayed. Every other row: none.)
     expect([his({ won: true }), his({ won: false }), his({ won: null, formsBeaten: null })].map(recluseFormsShown)).toEqual([3, 0, 0]);

@@ -441,6 +441,69 @@ test("every mode's row in Recent Matches: a raid, 50 v 50, Squads", { tag: "@pho
   expect((await box(page, ".pp-rows")).height).toBeGreaterThanOrEqual(5 * (isComputer() ? 50.6 : 41.3) - 1);
 });
 
+test("the Hidden Boss's rows: his three forms' faces, the ones beaten grayed, the same room whatever the count; the full list too (Eric, Nov 13)", async ({ page }) => {
+  const at = (h: number) => Date.now() - h * 3_600_000;
+  const his = { mode: "boss", online: true, placement: 1, players: 4, team: "w", survived: true, bestMove: null, bossElo: null, bossId: "recluse", ranked: false };
+  // Won (3), lost to the man (1), and two rows from before the count was kept: a win (all three) and a loss (none known).
+  const recent = [
+    { ...his, won: true, formsBeaten: 3, playedAt: at(1) },
+    { ...his, won: false, formsBeaten: 1, playedAt: at(2) },
+    { ...his, won: true, playedAt: at(3) },
+    { ...his, won: false, playedAt: at(4) },
+    { ...demoProfile().recent[0]!, playedAt: at(5) },
+  ];
+  await openDemo(page, demoProfile({ recent, ranked1v1: { ...demoProfile().ranked1v1, recent: [] } }));
+  await loaded(page);
+  const rows = page.locator(".pp-row");
+  await expect(rows.locator(".pp-row-text strong")).toHaveText(["Hidden Boss", "Hidden Boss", "Hidden Boss", "Hidden Boss", "vs. Ginger"]);
+  await expect(rows.locator(".pp-pill")).toHaveText(["WIN", "LOSS", "WIN", "LOSS", "WIN"]);
+  // (A phone at 360 too, and a laptop's 1366: the title stays whole beside the strip; the card is narrowest at 1280.)
+  for (const vp of isComputer() ? [...sizes(), { width: 1366, height: 768 }] : [...sizes(), { width: 360, height: 780 }]) {
+    await page.setViewportSize(vp);
+    await page.evaluate(() => document.fonts.ready);
+    const m = await page.evaluate(() =>
+      [...document.querySelectorAll(".pp-row")].map((row) => {
+        const strip = row.querySelector(".rf-forms");
+        const faces = [...row.querySelectorAll(".rf-face")];
+        const end = (strip ?? row.querySelector(".pp-rpchange"))!.getBoundingClientRect().right;
+        const title = row.querySelector(".pp-row-text strong") as HTMLElement;
+        return {
+          faces: faces.map((f) => (f.classList.contains("beaten") ? "gray" : "color")),
+          filters: faces.map((f) => getComputedStyle(f.querySelector("canvas")!).filter),
+          drawn: faces.map((f) => {
+            const c = f.querySelector("canvas")!;
+            const px = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+            return px.some((v, i) => i % 4 === 3 && v > 0);
+          }),
+          strip: strip ? strip.getBoundingClientRect().width : null,
+          end,
+          rowH: row.getBoundingClientRect().height,
+          titleWhole: title.scrollWidth <= title.clientWidth,
+        };
+      }),
+    );
+    const where = `${vp.width} × ${vp.height}`;
+    expect(m.map((r) => r.faces), where).toEqual([["gray", "gray", "gray"], ["gray", "color", "color"], ["gray", "gray", "gray"], ["color", "color", "color"], []]);
+    for (const r of m.slice(0, 4)) {
+      expect(r.drawn, where).toEqual([true, true, true]);
+      r.faces.forEach((f, i) => expect(r.filters[i], where).toBe(f === "gray" ? "grayscale(1)" : "none"));
+      // (The same room whatever the count, ending where the RP change ends; the title whole beside it.)
+      expect(Math.abs(r.strip! - m[0]!.strip!), where).toBeLessThan(0.5);
+      expect(Math.abs(r.end - m[4]!.end), where).toBeLessThan(1);
+      expect(r.titleWhole, where).toBe(true);
+    }
+    // Nothing shifts: every row the card's one height.
+    for (const r of m) expect(Math.abs(r.rowH - m[4]!.rowH), where).toBeLessThan(0.5);
+  }
+  // The full list (View all): the same strip in each of his rows.
+  await page.locator(".pp-recent").getByRole("button", { name: /^View all/ }).click();
+  const list = page.getByRole("dialog", { name: "Recent matches" }).locator(".fd-match");
+  await expect(list).toHaveCount(5);
+  const gray = await list.evaluateAll((els) => els.map((e) => [e.querySelectorAll(".rf-face").length, e.querySelectorAll(".rf-face.beaten").length]));
+  expect(gray).toEqual([[3, 3], [3, 1], [3, 3], [3, 0], [0, 0]]);
+  await expect(list.nth(1).locator(".rf-forms")).toHaveAttribute("aria-label", "1 of 3 forms beaten");
+});
+
 test("View all: the full list of matches and each worn item's details open in sheets; with nothing, they're greyed", { tag: "@phone-only" }, async ({ page }) => {
   await openDemo(page);
   await loaded(page);

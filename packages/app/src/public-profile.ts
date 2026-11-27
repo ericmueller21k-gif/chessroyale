@@ -163,7 +163,8 @@ function resultRow(r: PublicProfile["recent"][number], i: number, now: number): 
       ...(forms !== null ? { forms } : {}),
       face: { kind: "boss", id: def?.id ?? null, name: info?.name ?? "Boss", icon: info?.icon ?? "👑" },
       pill: r.won === true ? RESULT_PILL.win : RESULT_PILL.loss,
-      title: info ? `vs. ${info.name}` : "Boss Battle",
+      // (His row: his name alone, so his three forms fit whole beside it at every width, a 1280 laptop's narrow card too.)
+      title: info ? (forms !== null ? info.name : `vs. ${info.name}`) : "Boss Battle",
     };
   }
   if (r.mode === "crowd") {
