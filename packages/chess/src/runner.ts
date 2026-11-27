@@ -627,9 +627,9 @@ export class MatchRunner {
     return fuseClock(this.state.boss, dashMoveClock(this.several() ? this.sideBosses().find((b) => b.id === "dash") : this.state.boss, moveClockAt(this.settings, this.clockMove(boardId))));
   }
 
-  /** The time this round's move adds to a bank (seconds): the time control's, less Short fuse's cut (Turf); the bullet clock's own. */
+  /** The time control's increment for this round's clock on screen (seconds), less Chub & Chirp's Short fuse cut (Turf). */
   incrementNow(): number {
-    return this.roundSettings().timeIncrementSeconds;
+    return fuseIncrement(this.state.boss, this.settings.timeIncrementSeconds);
   }
 
   /**
