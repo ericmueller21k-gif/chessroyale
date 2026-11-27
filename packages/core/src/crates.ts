@@ -537,14 +537,17 @@ export const isShiny = (blemish: number) => purity(blemish) >= 90;
  * The purity roll: the chance of each band of purity (`low` to `high`, as shown, to one decimal place), even within
  * a band. Most items land between 30% and 70%; shiny (90%+) is 1 in 250, and 99%+ 1 in 25,000; under 5% (blotched
  * nearly all over) is 1 in 100. The bands run from 100% down to 0% with no gaps, and the weights add up to 100.
- * Exactly 0% (blotched all over: one color, a shade darker) has a band of its own, exactly as rare as exactly 100% (Eric, Nov 27: "treat
- * this as a very desirable thing, it should be as rare as getting 100%... but gettable"): about 1 in 275,000; it was 1 in 5,000.
+ * Exactly 100% and exactly 0% (blotched all over: one color, a shade darker) each have a band of their own, both 1 in 5,000 (Eric, Nov 27:
+ * "keep 0% at what it is now... make 100% closer to 1 in every 5000 too"; exactly 100% was about 1 in 275,000). Shiny stays 1 in 250
+ * in all: exactly 100% comes out of the 90% to 98.9% band.
  */
-/** The chance (percent) of exactly 100.0% purity, one tenth of the top band's 11 (99.0 to 100.0), and so of exactly 0%. */
-export const PURITY_EXACT = 0.004 / 11;
+/** The chance (percent) of exactly 100% purity, and of exactly 0%: 1 in 5,000 each (Eric, Nov 27). */
+export const PURITY_EXACT = 0.02;
 export const PURITY_BANDS: readonly { low: number; high: number; weight: number }[] = [
-  { low: 99, high: 100, weight: 0.004 },
-  { low: 90, high: 98.9, weight: 0.396 },
+  { low: 100, high: 100, weight: PURITY_EXACT },
+  // (99% to 99.9%: the ten tenths' share they had in the old 99-100 band, 0.004 of eleven.)
+  { low: 99, high: 99.9, weight: (0.004 * 10) / 11 },
+  { low: 90, high: 98.9, weight: 0.4 - PURITY_EXACT - (0.004 * 10) / 11 },
   { low: 70, high: 89.9, weight: 9.6 },
   { low: 30, high: 69.9, weight: 80 },
   { low: 5, high: 29.9, weight: 9 },
