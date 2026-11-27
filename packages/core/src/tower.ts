@@ -91,6 +91,12 @@ const ownFloors = (id: string, s: Pick<TowerRules, "bossFloors">) => Object.valu
  * (floorsWonBest), so a best of 10 is his floor beaten; one higher may have been climbed past him with a life spent on his floor (the
  * director's call, Nov 27: the best is what the server stores; docs/decisions/2026-11-27-stranger-rules.md).
  */
+/** The floor whose win unlocks `id` (his first own floor, BATTLE_TOWER.bossFloors: the Stranger's 10), or null: not a boss of his own floors. */
+export function unlockFloor(id: string, s: Pick<TowerRules, "bossFloors"> = BATTLE_TOWER): number | null {
+  const floors = Object.entries(s.bossFloors ?? {}).filter(([, b]) => b === id).map(([f]) => Number(f));
+  return floors.length ? Math.min(...floors) : null;
+}
+
 export function unlockedBosses(best: number, s: Pick<TowerRules, "bossFloors"> = BATTLE_TOWER): string[] {
   const first = new Map<string, number>();
   for (const [f, id] of Object.entries(s.bossFloors ?? {})) first.set(id, Math.min(first.get(id) ?? Infinity, Number(f)));

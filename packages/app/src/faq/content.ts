@@ -80,6 +80,7 @@ import {
   crowdFinalBoss,
   fixedLevel,
   isPlayable,
+  unlockBosses,
   adminFirst,
   maiaTopRating,
   rankedMinHumans,
@@ -981,6 +982,18 @@ Plays from the game so far. A young mourning dove in a conductor's cap, riding h
 - **The Fall** (ultimate, once a battle): his meter is the material he has lost (pawn 1, knight 3, bishop 3, rook 5, queen 9). Once he's down ${n(s.fallLost, "point")} from the start, or he's in danger (your chances at ${pct(p.dangerAt, 0)} or more after ${s.fallDangerMoves <= 1 ? "your move" : `${countWords(s.fallDangerMoves)} of your moves in a row`}), he falls off his train at the start of his turn, it runs into him, and he's **Armored Birdie** for the rest of the battle. If his train rides that same turn, the train comes first.
 - **Armored Birdie** keeps the train (the same rule, every ${n(s.armoredTrainEvery, "of your turns", "of your turns")}) and plays much stronger: ${n(s.armoredMaiaBoost, "rating point")} higher, up to the strongest human-style play we have; if he was already there (Very hard), he plays the engine's own moves, a little stronger still.`;
   },
+  stranger: (p, b) => {
+    const s = p.stranger;
+    const floors = Object.entries(BATTLE_TOWER.bossFloors)
+      .filter(([, id]) => id === b.id)
+      .map(([f]) => f);
+    const where = floors.length > 1 ? `${floors.slice(0, -1).join(", ")} and ${floors.at(-1)}` : (floors[0] ?? "");
+    return `
+Plays from the game so far. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."} **Locked at first:** he's the Battle Tower's boss on floors ${where}, alone. Beat him on floor ${floors[0] ?? ""} (or win any floor past it) and he's yours to pick in Boss Battle from then on.
+
+- **Frostfire** (passive): with his reply to your ${s.strikeFrom <= 2 ? "first move" : `move ${s.strikeFrom - 1}`}, and then every ${n(s.strikeEvery, "of your turns", "of your turns")}, he strikes your most valuable piece (never your king): it's frozen for your next ${n(s.freezeTurns, "turn")} and can't move. Then it thaws: you get ${n(s.fleeTurns, "turn")} to move it off. After that move, its square burns whatever is on it, his own pieces too. A king on it is never burnt, and if burning would leave a position no game can have, the piece is spared. He only strikes a piece whose freeze leaves you a move and whose burning would be legal. Leaving the piece there counts as losing it when your move is scored, so saving it is never a mistake.
+- **His ultimate:** still to come.`;
+  },
 };
 
 /**
@@ -1004,7 +1017,8 @@ Met in Chess Town: up the stairs of his walk-up to the top floor, where up to ${
 
 function bossPowers(src: FaqSources): FaqSection {
   const p = src.powers;
-  const playable = src.roster.filter(isPlayable);
+  // (And the bosses unlocked by a win, the Stranger, once ready to meet.)
+  const playable = [...src.roster.filter(isPlayable), ...unlockBosses(src.roster)];
   // (Still to come: those without their art and powers. The Hidden Boss has his own block, after the rest.)
   const later = src.roster.filter((b) => b.kit === null || b.powers === null).map((b) => b.name);
   const finalBoss = crowdFinalBoss(src.roster);

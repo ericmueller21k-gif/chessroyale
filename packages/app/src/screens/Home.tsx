@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
-import { CROWD_PARTY_MAX, BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
+import { CROWD_PARTY_MAX, BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, canPick, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -12,6 +12,7 @@ import { BackButton, ChatIcon, DressedPawn, FdButton, FriendsIcon, GearIcon, Lev
 import { ChatSheet } from "../components/ChatSheet.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
+import { unlockLine, unlockTest, unlockedNow, useUnlocks } from "../unlocks.ts";
 import { BossInviteSheet } from "../components/BossParty.tsx";
 import type { PartyClient } from "../squads.ts";
 import { openProfile } from "../profile-nav.ts";
@@ -127,7 +128,8 @@ export function chosenBoss(hidden = false): string {
       v = null;
     }
   }
-  return v && (isPlayable(bossDef(v)) || (hidden && adminPlayable(bossDef(v)))) ? v : "";
+  // (A boss unlocked by a win, the Stranger: once the server's best has unlocked him; the server checks it again online.)
+  return v && (canPick(bossDef(v), unlockedNow(), unlockTest()) || (hidden && adminPlayable(bossDef(v)))) ? v : "";
 }
 
 /** A test link's fixed strength (?boss=1600: one of the tiers, a test switch), else 0: the boss plays a step above you. */
@@ -705,9 +707,14 @@ export function HomeScreen({
   const [pick, setPick] = useState(() => {
     // (An admin's pick may be a boss in the game for admins first: Timber.)
     const id = chosenBoss(isAdmin());
-    return selectBosses().bosses.some((b) => b.id === id) ? id : RANDOM;
+    const { bosses, unlock } = selectBosses();
+    return [...bosses, ...unlock].some((b) => b.id === id) ? id : RANDOM;
   });
   const hiddenPicked = selectBosses().hidden.some((b) => b.id === pick);
+  // A boss unlocked by a win, not yet won (the Stranger, Eric Nov 27): his card shows him, every way to play greyed, the line says how.
+  const unlocks = useUnlocks();
+  const lockedPick = (id: string) => selectBosses().unlock.some((b) => b.id === id) && !unlocks.includes(id);
+  const unlockPicked = lockedPick(pick);
   // Boss Battle's party: in one with someone else, the stage shows them and START becomes the party's.
   const bp = bossParty?.client && !bossParty.client.done ? bossParty.client : null;
   const [, partyDrawn] = useState(0);
@@ -728,8 +735,9 @@ export function HomeScreen({
   const partyNotice: HomeNotice | null = partyErr && !partyErrGone ? { text: partyErr, onDismiss: () => setPartyErrGone(true) } : null;
   const pickTile = (id: string) => {
     setPick(id);
-    if (!selectBosses().hidden.some((b) => b.id === id)) rememberBossPick(id);
-    if (leading && !selectBosses().hidden.some((b) => b.id === id)) bp!.choose(id, difficulty);
+    const off = selectBosses().hidden.some((b) => b.id === id) || lockedPick(id);
+    if (!off) rememberBossPick(id);
+    if (leading && !off) bp!.choose(id, difficulty);
   };
   // Boss alone's menu ("solo": the difficulty for the tiles' pick) or the full picker (/bosses: "pick").
   const [bossMenu, setBossMenu] = useState<null | "solo" | "pick">(null);
@@ -1031,7 +1039,7 @@ export function HomeScreen({
     const raidResting = full ? rest("raid") : null;
     const online = (sub: string) => (onlineLocked ? "Online: sign in to play" : sub);
     // (The Hidden Boss picked: every way to play locked.)
-    const locked = hiddenPicked;
+    const locked = hiddenPicked || unlockPicked;
     return (
       <div class="fd-page rd-page">
         <header class="fd-page-head">
@@ -1082,7 +1090,7 @@ export function HomeScreen({
                 </button>
               )}
               <p class="bs-line" role="status">
-                {partyLine}
+                {unlockPicked ? unlockLine(pick) : partyLine}
               </p>
             </>
           )}
