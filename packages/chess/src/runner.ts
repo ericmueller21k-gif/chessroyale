@@ -160,6 +160,8 @@ import {
   alfilBattle,
   hopperBattle,
   type HopperStep,
+  fuseClock,
+  fuseIncrement,
   carrotBattle,
   smudgyBattle,
   mooBattle,
@@ -621,7 +623,13 @@ export class MatchRunner {
   /** This round's move clock in seconds (see moveClockAt): the same everywhere a clock is set. */
   moveClock(boardId?: number): number {
     // (Dash's clock: a scrambled move's seconds, a slapped move's shorter clock on a raid's timer: dashMoveClock.)
-    return dashMoveClock(this.several() ? this.sideBosses().find((b) => b.id === "dash") : this.state.boss, moveClockAt(this.settings, this.clockMove(boardId)));
+    // (Chub & Chirp's Short fuse, Turf's second hold: a third off. Never on a tower floor: no Turf there.)
+    return fuseClock(this.state.boss, dashMoveClock(this.several() ? this.sideBosses().find((b) => b.id === "dash") : this.state.boss, moveClockAt(this.settings, this.clockMove(boardId))));
+  }
+
+  /** The time this round's move adds to a bank (seconds): the time control's, less Short fuse's cut (Turf); the bullet clock's own. */
+  incrementNow(): number {
+    return this.roundSettings().timeIncrementSeconds;
   }
 
   /**
@@ -639,7 +647,7 @@ export class MatchRunner {
    * and a cap no bank can reach (the bullet bank plus the increment on every move a battle can have), so the bank decides.
    */
   private roundSettings(boardId?: number): Settings {
-    if (!bulletClock(this.state.boss)) return { ...this.settings, moveClockSeconds: this.moveClock(boardId), moveClockSteps: [] };
+    if (!bulletClock(this.state.boss)) return { ...this.settings, moveClockSeconds: this.moveClock(boardId), moveClockSteps: [], timeIncrementSeconds: fuseIncrement(this.state.boss, this.settings.timeIncrementSeconds) };
     return {
       ...this.settings,
       moveClockSeconds: BOSS_POWERS.bulletBankSeconds + BOSS_POWERS.bulletIncrementSeconds * this.settings.bossMaxMoves,
@@ -1549,7 +1557,7 @@ export class MatchRunner {
    * null: the server sends it to the host with the request for the move; solo works it out in playBoss.
    */
   bossAsks(): BossAsks | null {
-    return pigBattle.asks(this.battle);
+    return pigBattle.asks(this.battle) ?? hopperBattle.asks(this.battle);
   }
 
   /** Wrangler's showdown scout on this device (solo's), searching line-ups while the crowd thinks; null: none. */
@@ -1727,19 +1735,25 @@ export class MatchRunner {
 
   /** Hollow's extra move is due (the crowd failed Lights out, and he has played his own move), or Dash's (a failed Scramble Rush). */
   extraMoveDue(): boolean {
-    return hollowBattle.extraMoveDue(this.battle) || dashBattle.extraMoveDue(this.battle);
+    return hollowBattle.extraMoveDue(this.battle) || dashBattle.extraMoveDue(this.battle) || hopperBattle.doubleDue(this.battle);
   }
 
-  /** His extra move: a quiet one that gains him only a little (extraMoveFrom), from this device's engine. */
+  /** The moment his extra move plays as: Dash's "rushExtra", Chub & Chirp's Double hop "doubleHop", Hollow's "extra". */
+  extraMoveKind(): "extra" | "rushExtra" | "doubleHop" {
+    const id = this.state.boss?.id;
+    return id === "dash" ? "rushExtra" : id === "hopper" ? "doubleHop" : "extra";
+  }
+
+  /** His extra move: a quiet one that gains him only a little (extraMoveFrom), from this device's engine; Double hop's, his best quiet one. */
   async playExtraMove(engine: EngineLike = this.opts.engines[0]!): Promise<string | null> {
-    const played = await (dashBattle.extraMoveDue(this.battle) ? dashBattle.playExtraMove(this.battle, engine) : hollowBattle.playExtraMove(this.battle, engine));
+    const played = await (hopperBattle.doubleDue(this.battle) ? hopperBattle.playDouble(this.battle, engine) : dashBattle.extraMoveDue(this.battle) ? dashBattle.playExtraMove(this.battle, engine) : hollowBattle.playExtraMove(this.battle, engine));
     this.extraMoveOver(played);
     return played;
   }
 
-  /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove, dashBattle's). Returns it, or null. */
+  /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove, dashBattle's, hopperBattle.applyDouble). Returns it, or null. */
   applyExtraMove(move: string | null): string | null {
-    const played = dashBattle.extraMoveDue(this.battle) ? dashBattle.applyExtraMove(this.battle, move) : hollowBattle.applyExtraMove(this.battle, move);
+    const played = hopperBattle.doubleDue(this.battle) ? hopperBattle.applyDouble(this.battle, move) : dashBattle.extraMoveDue(this.battle) ? dashBattle.applyExtraMove(this.battle, move) : hollowBattle.applyExtraMove(this.battle, move);
     this.extraMoveOver(played);
     return played;
   }
@@ -1972,7 +1986,8 @@ export class MatchRunner {
    * reaches every other boss's trackers as a move (Chandy's lock on the bounced pawn follows it).
    */
   private hopped(hop: HopperStep | null, fenBefore: string): HopperStep | null {
-    if (hop) this.followOthers(`${hop.from}${hop.to}`, fenBefore);
+    // (The hop-around moves nothing on the board.)
+    if (hop && "from" in hop) this.followOthers(`${hop.from}${hop.to}`, fenBefore);
     return hop;
   }
 

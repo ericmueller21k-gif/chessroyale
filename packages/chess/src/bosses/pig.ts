@@ -30,6 +30,7 @@ import { applyMove, gameEnd, legalMoves, pieceAt } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
 import { logit, other, powerRoll, turnOf, type Battle, type BossAsks, type BossMoveExtras, type BossRules, type Side } from "./base.ts";
+import { legsFrom } from "./turf.ts";
 import { gridAttackers, gridHanging, gridKingAttacked, gridOf, isLight, placementOf, type Grid } from "./grid.ts";
 
 // ---------------- His moments' beats (ms; the app draws them, the server times by POWER_FX) ----------------
@@ -978,6 +979,11 @@ export interface PigAnswer {
  * when none comes the drag (dragFrom), if one is due or (the test trigger) to stand in for it.
  */
 export async function pigTurn(engines: readonly EngineLike[], fen: string, ask: PigAsk, move: () => Promise<string>, scout: ShowdownScout | null = null): Promise<PigAnswer> {
+  // (Chub & Chirp's Long legs, Turf: a long step when it's sound (legsFrom), else his move as ever. Nothing after it.)
+  if (ask.legs?.length) {
+    const legs = await legsFrom(engines, fen, ask.legs).catch(() => null);
+    return { move: legs ?? (await move()) };
+  }
   if (ask.pull?.length && engines[0]) {
     const pull = await pullFrom(engines[0], fen, ask.pull).catch(() => null);
     if (pull) return { move: pull };

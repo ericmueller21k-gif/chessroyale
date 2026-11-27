@@ -837,6 +837,8 @@ export interface BossPowerState {
   pawnBounce?: PawnBounce | null;
   /** How many Pawn Bounces the hopper has made this battle (at most BOSS_POWERS.pawnBounceMax). */
   pawnBounces?: number;
+  /** The hopper's Turf: the squares each side holds, his holds, his hop-arounds (none on a Battle Tower floor). */
+  turf?: TurfState | null;
   /** The hopper's Carrot Patch, from its cast on (his ultimate, once a battle): the carrots, the race, his spin. */
   carrots?: CarrotPatch | null;
   /** Smudgy's Camouflage (his passive): his two forced moves, the swap, the rook hiding as a pawn, its reveal. */
@@ -1593,6 +1595,34 @@ export interface PawnBounce {
   to: string;
 }
 
+/**
+ * Chub & Chirp's hop-around (Turf): after the crowd's move `at`, at the start of his turn, Chirp hopped on `hops` (squares of his)
+ * and landed on `to`, claiming it.
+ */
+export interface TurfHop {
+  at: number;
+  hops: string[];
+  to: string;
+}
+
+/**
+ * Chub & Chirp's Turf (Nov 27): who holds each square, his holds and his hop-arounds. Off on a Battle Tower floor (none).
+ * `owner`: 64 letters, a1 to h1, then a2 ... h8 (`b` his, `c` the crowd's, `.` open). `seen`: the board's pieces (a FEN's first
+ * field) when the squares were last claimed, so every piece that has come to a square since claims it.
+ */
+export interface TurfState {
+  owner: string;
+  seen: string;
+  /** His holds as his last turn began (0 none, 1 Long legs, 2 and Short fuse, 3 and Double hop), and the crowd move it came after. */
+  holds: number;
+  holdsAt: number;
+  /** The crowd move his last hop-around came after (0: none yet). */
+  hopAt: number;
+  hop?: TurfHop | null;
+  /** Double hop's second move after his move that came after crowd move `at`: still to come, played, or not this turn. */
+  double?: { at: number; state: "due" | "played" | "skipped" } | null;
+}
+
 /** Who pulled a carrot: the crowd, or the boss (Chub & Chirp). */
 export type CarrotSide = "crowd" | "boss";
 
@@ -1863,6 +1893,11 @@ export type PowerEventKind =
   // Chub & Chirp's Pawn Bounce (Nov 22): at the start of his turn, before his move (as the hop), the crowd's pawn its double push
   // brought to `squares[0]` knocked back to `squares[1]` (`square`).
   | "pawnBounce"
+  // Chub & Chirp's hop-around (Turf, Nov 27): at the start of his turn, before his move, Chirp hops on `squares` (his, then the square
+  // he lands on, `square`, claimed).
+  | "turfHop"
+  // Chub & Chirp's Double hop (Turf's third hold): his quiet second move after his move, landing on `square`.
+  | "doubleHop"
   | "carrots"
   | "carrot"
   | "carrotSpin"

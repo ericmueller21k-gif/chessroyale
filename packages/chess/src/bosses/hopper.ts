@@ -29,16 +29,17 @@
  * changes outside a move: every replay plays from it, and a repetition counts from it); so do the cast (passTurn) and
  * the prize (placePrize: never giving check, never more than the engines take).
  */
-import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type CarrotPatch, type CarrotPull, type CarrotSide, type CarrotSpin, type LeapfrogHop, type PawnBounce, type PowerEvent } from "@chessroyale/core";
-import { BOSS_OPENING, newBoard } from "../boards.ts";
-import { gameEnd, legalMoves, mateInOne, sideToMove } from "../rules.ts";
+import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type CarrotPatch, type CarrotPull, type CarrotSide, type CarrotSpin, type LeapfrogHop, type PawnBounce, type PowerEvent, type TurfHop, type TurfState } from "@chessroyale/core";
+import { BOSS_OPENING, newBoard, playOnBoard, type BoardState } from "../boards.ts";
+import { gameEnd, legalMoves, mateInOne, sideToMove, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { editedFen } from "./alfil.ts";
-import { PASS_WAIT, meterFull, other, passAnswer, passScores, topEach, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { PASS_WAIT, meterFull, other, passAnswer, passScores, powerRoll, topEach, unleashed, type Battle, type BossAsks, type BossMoveExtras, type BossRules, type Side } from "./base.ts";
 import { carrotsOf, carrotsOpen, plantCarrots, prizeFits, pullsOf, raceJudged, raceLeft, raceOn, racePulls, raceRanked, raceWeight, spinRoll, standingOn, type CarrotRace } from "./carrots.ts";
 import { gridKingAttacked, gridOf, type Grid } from "./grid.ts";
-import { passTurn } from "./hollow.ts";
+import { extraMoveCandidates, extraMoveFrom, passTurn } from "./hollow.ts";
+import { claimTurf, holdOn, holdsFor, legsOptions, legsPlay, newTurf, turfCount, turfIndex, turfOf, turfHopPick } from "./turf.ts";
 
 /**
  * His moments, beat by beat (ms into each; nobody's clock runs), on his animations' cues (the app's characters/hopper.ts:
@@ -63,9 +64,18 @@ import { passTurn } from "./hollow.ts";
  *   carrotWin   his last carrot pulled: the battle is his (`cheerAt`), then the result.
  */
 const HOP_BEATS = { liftAt: 720, overAt: 885, landAt: 1050, total: 1600 } as const;
+/**
+ * The hop-around (Turf): its banner until `dropAt`, then Chirp's legs, each `legMs` long (from the board's corner to each of his
+ * squares, to the square he claims, and back to the corner: at most turfHops + 2), each his `leapfrog` from `animLead` before the
+ * leg (its `takeoff` at `takeoffAt` into the leg, its `land` at `landAt`, as the hop's 330 ms in the air); the screen holds to
+ * `total`. Double hop: his banner as his second move lands (as Hollow's and Dash's extra moves).
+ */
+const TURF_HOP = { dropAt: 720, legMs: 600, animLead: 20, takeoffAt: 190, landAt: 520, total: 4000 } as const;
 export const HOPPER_BEATS = {
   hop: HOP_BEATS,
   pawnBounce: HOP_BEATS,
+  turfHop: TURF_HOP,
+  doubleHop: { total: 2200 },
   carrots: { castAt: 900, tosses: [1100, 1310, 1520, 1730, 1940], flightMs: 300, ladderAt: 2400, total: 4900 },
   carrot: { popAt: 0, tokenAt: 60, total: 600 },
   carrotSpin: { reelAt: 1000, stopAt: 4000, prizeAt: 4200, total: 5000 },
@@ -76,6 +86,8 @@ export const HOPPER_BEATS = {
 export const HOPPER_FX = {
   hop: HOPPER_BEATS.hop.total,
   pawnBounce: HOPPER_BEATS.pawnBounce.total,
+  turfHop: HOPPER_BEATS.turfHop.total,
+  doubleHop: HOPPER_BEATS.doubleHop.total,
   carrots: HOPPER_BEATS.carrots.total,
   carrot: HOPPER_BEATS.carrot.total,
   carrotSpin: HOPPER_BEATS.carrotSpin.total,
@@ -405,9 +417,10 @@ export const HOPPER: BossRules = {
   // The crowd's turn right after a hop or a Pawn Bounce, and the one right after his spin (its prize put on the board): its picks don't
   // count for fair play, as for every power that changes the board. A race turn counts only where the engine's best is
   // the race's best too (the runner's resolveBoard, which then records the engine's own numbers).
+  // (And the one after his Double hop: his two moves in a row.)
   powerTurn: (boss) => {
     const p = boss.powers!;
-    return (!!p.hop && p.hop.at === boss.crowdMoves) || (!!p.pawnBounce && p.pawnBounce.at === boss.crowdMoves) || p.carrots?.spin?.at === boss.crowdMoves;
+    return (!!p.hop && p.hop.at === boss.crowdMoves) || (!!p.pawnBounce && p.pawnBounce.at === boss.crowdMoves) || p.carrots?.spin?.at === boss.crowdMoves || (p.turf?.double?.state === "played" && p.turf.double.at === boss.crowdMoves);
   },
   // The carrots on the board while the race is on (the God King's Last Stand sits out).
   altersBoard: (boss) => raceOn(boss.powers!.carrots),
@@ -422,21 +435,52 @@ export const HOPPER: BossRules = {
   },
   afterCrowdMove(b, move) {
     if (move) carrotBattle.afterCrowdMove(b);
+    turfBattle.turnBegins(b, !!move);
   },
-  afterBossMove(b) {
+  // After his move: Long legs' pawn on to its square, his carrots, then the squares claimed and Double hop's second move due.
+  afterBossMove(b, move, extras) {
+    turfBattle.legsOn(b, move, extras);
     carrotBattle.afterHisMove(b);
+    turfBattle.afterHisMove(b);
+  },
+  // Long legs: his pawn's long step is written from to ("c3c5"), played as its first step (the pawn goes on after it: afterBossMove).
+  specialMove(boss, fen, move) {
+    if (!holdOn(boss, 1) || !legsOptions(fen, other(boss.crowdSide)).includes(move)) return null;
+    return { play: legsPlay(move), san: move.slice(2, 4) };
+  },
+  // Long legs: his long steps to weigh against his move (the host's engine online: the boss request's `legs`; solo's), never staggered.
+  asks(boss, fen) {
+    if (!holdOn(boss, 1) || boss.staggerNext || sideToMove(fen) === boss.crowdSide) return null;
+    const legs = legsOptions(fen, other(boss.crowdSide));
+    return legs.length ? { legs, seed: Math.floor(powerRoll(boss.powers!.seed, "legs", boss.crowdMoves) * 2 ** 32) >>> 0 } : null;
   },
   opening: {
+    // (Turf everywhere but the Battle Tower: each side's first two ranks, from the board the battle starts from.)
     setUp(b, at) {
       const test = b.settings.bossPowerTest;
       const moves = test === "leapfrog" ? LEAPFROG_TEST_MOVES[at.crowdSide] : test === "carrotpatch" ? CARROT_TEST_MOVES[at.crowdSide] : null;
-      if (!moves) return {};
-      b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...moves] }, moves.length, at.generation));
-      return {};
+      if (moves) b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...moves] }, moves.length, at.generation));
+      return b.settings.towerFloor != null ? {} : { turf: newTurf(b.boards.get(at.boardId)!.fen, at.crowdSide) };
     },
   },
-  view: (p) => ({ hop: p.hop ?? null, pawnBounce: p.pawnBounce ?? null, carrots: carrotView(p.carrots) }),
+  view: (p) => ({ hop: p.hop ?? null, pawnBounce: p.pawnBounce ?? null, carrots: carrotView(p.carrots), turf: turfView(p.turf) }),
 };
+
+/** His Turf as the screens get it (NetBossPowers.turf): who holds each square, his holds and the turn they're for, his last hop-around. */
+export interface TurfView {
+  owner: string;
+  holds: number;
+  holdsAt: number;
+  hop: TurfHop | null;
+  /** Double hop's second move this turn (played: its moment). */
+  double: "due" | "played" | "skipped" | null;
+  doubleAt: number | null;
+}
+
+export function turfView(t: TurfState | null | undefined): TurfView | null {
+  if (!t) return null;
+  return { owner: t.owner, holds: t.holds, holdsAt: t.holdsAt, hop: t.hop ? { ...t.hop, hops: [...t.hop.hops] } : null, double: t.double?.state ?? null, doubleAt: t.double?.at ?? null };
+}
 
 // ---------------- Their part in the match runner ----------------
 
@@ -463,7 +507,7 @@ function hopList(b: Battle): ReturnType<typeof hopOptions> {
 export function bounceNow(b: Battle, s: Pick<BossPowerSettings, "pawnBounceMax"> = BOSS_POWERS): ReturnType<typeof bounceOption> {
   const boss = b.state.boss!;
   const p = boss.powers!;
-  if ((p.pawnBounces ?? 0) >= s.pawnBounceMax || p.pawnBounce?.at === boss.crowdMoves || p.hop?.at === boss.crowdMoves) return null;
+  if ((p.pawnBounces ?? 0) >= s.pawnBounceMax || p.pawnBounce?.at === boss.crowdMoves || p.hop?.at === boss.crowdMoves || p.turf?.hop?.at === boss.crowdMoves) return null;
   const board = boardOf(b);
   // (A ply of the opening the battle started from isn't the crowd's push.)
   if (board.history.length <= board.openingPlies) return null;
@@ -479,16 +523,39 @@ export function bounceNow(b: Battle, s: Pick<BossPowerSettings, "pawnBounceMax">
 }
 
 /** The bounce he makes now, if one is due (bounceNow, not refused). */
-const bounceDue = (b: Battle): BounceOption | null => {
-  const out = bounceNow(b);
+const bounceDue = (b: Battle, s: Pick<BossPowerSettings, "pawnBounceMax"> = BOSS_POWERS): BounceOption | null => {
+  const out = bounceNow(b, s);
   return out && "fen" in out ? out : null;
 };
 
-/** What his step at the start of his turn did: a hop (Leapfrog) or a Pawn Bounce. */
-export type HopperStep = LeapfrogHop | PawnBounce;
+/** What his step at the start of his turn did: a hop (Leapfrog), a Pawn Bounce or a hop-around (Turf). */
+export type HopperStep = LeapfrogHop | PawnBounce | TurfHop;
 
-/** The step was a hop, not a Pawn Bounce (a hop has the pawn it hopped over). */
+/** The step was a hop, not a Pawn Bounce or a hop-around (a hop has the pawn it hopped over). */
 export const isHop = (step: HopperStep): step is LeapfrogHop => "over" in step;
+
+/** The moment a step plays as (its event's kind: POWER_FX). */
+export const hopperStepKind = (step: HopperStep): "hop" | "pawnBounce" | "turfHop" => ("over" in step ? "hop" : "hops" in step ? "turfHop" : "pawnBounce");
+
+type StepSettings = Pick<BossPowerSettings, "hopMax" | "pawnBounceMax" | "turfHopEvery" | "turfHops">;
+
+/** The hop-around he'd make now: his Turf on, turfHopEvery crowd moves since his last, and a square to land on (turfHopPick). */
+function turfHopNow(b: Battle, s: Pick<BossPowerSettings, "turfHopEvery" | "turfHops"> = BOSS_POWERS): TurfHop | null {
+  const boss = b.state.boss!;
+  const t = turfOf(boss);
+  if (!t || boss.crowdMoves - t.hopAt < s.turfHopEvery) return null;
+  return turfHopPick(t, boardOf(b).fen, boss.powers!.seed, boss.crowdMoves, s);
+}
+
+/** Which step comes at the start of his turn now (one a turn): the bounce, else a hop, else the hop-around; null: none. */
+function stepNow(b: Battle, s: StepSettings = BOSS_POWERS): "bounce" | "hop" | "turf" | null {
+  const boss = b.state.boss!;
+  const p = boss.powers!;
+  if (bounceDue(b, s)) return "bounce";
+  if (p.hop?.at === boss.crowdMoves || p.pawnBounce?.at === boss.crowdMoves || p.turf?.hop?.at === boss.crowdMoves) return null;
+  if ((p.hops ?? 0) < s.hopMax && hopList(b).options.length > 0) return "hop";
+  return turfHopNow(b, s) ? "turf" : null;
+}
 
 /** His powers' state, changed (the match's state replaced, as everywhere). */
 const setPowers = (b: Battle, change: (p: BossPowerState) => BossPowerState): void => {
@@ -542,26 +609,24 @@ export function carrotsWithinReach(fen: string, crowd: Side, his: number, count:
 export const hopperBattle = {
   /**
    * His step at the start of his turn is due: his turn (the crowd has moved), the battle on, no Carrot Patch cast due (that's
-   * his whole turn), and either a Pawn Bounce (bounceNow: the crowd's double push just played, fewer than pawnBounceMax so
-   * far) or a hop: fewer than hopMax hops so far, none (and no bounce) yet this turn, and a pawn of his that can hop
-   * (hopOptions: in check, none). One a turn, the bounce first.
+   * his whole turn), and one of (one a turn, in this order): a Pawn Bounce (bounceNow: the crowd's double push just played, fewer
+   * than pawnBounceMax so far); a hop (fewer than hopMax so far, a pawn of his that can: hopOptions, none in check); the hop-around
+   * (Turf: turfHopEvery crowd moves since his last, a square to land on).
    */
-  due(b: Battle, s: Pick<BossPowerSettings, "hopMax"> = BOSS_POWERS): boolean {
+  due(b: Battle, s: StepSettings = BOSS_POWERS): boolean {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || boss.id !== "hopper" || boss.result || !b.bossToMove() || b.finalGameOver()) return false;
     if (carrotBattle.due(b)) return false;
-    if (bounceDue(b)) return true;
-    if ((p.hops ?? 0) >= s.hopMax || p.hop?.at === boss.crowdMoves || p.pawnBounce?.at === boss.crowdMoves) return false;
-    return hopList(b).options.length > 0;
+    return stepNow(b, s) !== null;
   },
 
   /**
    * The positions the engine's pick weighs (one per hop he could make), when a hop is due: the same on the server, the host and
-   * in solo. None for a Pawn Bounce: no choice to make.
+   * in solo. None for a Pawn Bounce or a hop-around: no choice to make.
    */
   candidates(b: Battle): string[] {
-    return hopperBattle.due(b) && !bounceDue(b) ? hopList(b).options.map((o) => o.fen) : [];
+    return hopperBattle.due(b) && stepNow(b) === "hop" ? hopList(b).options.map((o) => o.fen) : [];
   },
 
   /** The hop needs an engine's pick: more than one pawn can hop (one alone hops at once). */
@@ -584,16 +649,30 @@ export const hopperBattle = {
    * King's strike waits for that move, as ever. In the Carrot Patch's race a carrot it lands on is his (its `carrot`
    * event just before the hop's, so the hop's screen stays its own); it counts toward hopMax as any hop. Returns the hop;
    * null when none was due. A Pawn Bounce due comes instead (no pick: one way to go), the same way: the crowd's pawn back one
-   * square, a base at its ply, its moment a screen of its own (its event with this turn's), then his move; returns the bounce.
+   * square, a base at its ply, the last move shown as the bounce (the pawn is no longer where the push put it), its moment a
+   * screen of its own, then his move; returns the bounce. Neither: the hop-around (Turf; no pick, nothing on the board moves):
+   * the square he lands on is his, then his move; returns it. Each claims the squares its pieces land on (Turf).
    */
   apply(b: Battle, pick: string | null): HopperStep | null {
     if (!hopperBattle.due(b)) return null;
-    const bounce = bounceDue(b);
-    if (bounce) {
-      const step: PawnBounce = { at: b.state.boss!.crowdMoves, from: bounce.from, to: bounce.to };
+    const step = stepNow(b);
+    if (step === "bounce") {
+      const bounce = bounceDue(b)!;
+      const done: PawnBounce = { at: b.state.boss!.crowdMoves, from: bounce.from, to: bounce.to };
       setBase(b, bounce.fen);
-      setPowers(b, (p) => ({ ...p, pawnBounce: step, pawnBounces: (p.pawnBounces ?? 0) + 1, events: [...p.events, { kind: "pawnBounce", turn: p.turn, square: step.to, squares: [step.from, step.to] }] }));
-      return step;
+      b.boards.set(b.state.boards[0]!, { ...boardOf(b), lastMove: `${done.from}${done.to}` });
+      setPowers(b, (p) => ({ ...p, pawnBounce: done, pawnBounces: (p.pawnBounces ?? 0) + 1, events: [...p.events, { kind: "pawnBounce", turn: p.turn, square: done.to, squares: [done.from, done.to] }] }));
+      turfBattle.claim(b);
+      return done;
+    }
+    if (step === "turf") {
+      const hop = turfHopNow(b)!;
+      setPowers(b, (p) => {
+        const owner = [...p.turf!.owner];
+        owner[turfIndex(hop.to)] = "b";
+        return { ...p, turf: { ...p.turf!, owner: owner.join(""), hop, hopAt: hop.at }, events: [...p.events, { kind: "turfHop", turn: p.turn, square: hop.to, squares: [...hop.hops, hop.to] }] };
+      });
+      return hop;
     }
     const options = hopList(b).options;
     const chosen = options.find((o) => o.fen === pick) ?? options[0]!;
@@ -601,7 +680,116 @@ export const hopperBattle = {
     setBase(b, chosen.fen);
     const pulled = carrotBattle.pull(b, "boss", true);
     setPowers(b, (p) => ({ ...p, hop, hops: (p.hops ?? 0) + 1, events: [...p.events, ...pulled, { kind: "hop", turn: p.turn, square: hop.to, squares: [hop.from, hop.over, hop.to] }] }));
+    turfBattle.claim(b);
     return hop;
+  },
+
+  /** What his turn must work out besides his move (Long legs' long steps: HOPPER.asks), or null. */
+  asks(b: Battle): BossAsks | null {
+    const boss = b.state.boss;
+    if (!boss?.powers || boss.id !== "hopper") return null;
+    return HOPPER.asks!(boss, boardOf(b).fen);
+  },
+
+  /**
+   * Double hop's second move is due: his third hold on as his turn began, his move played (the crowd's turn begun, not yet
+   * played) and the turn could pass back to him (turfBattle.afterHisMove). Like Hollow's extra move, it comes before the crowd picks.
+   */
+  doubleDue(b: Battle): boolean {
+    const boss = b.state.boss;
+    const d = turfOf(boss)?.double;
+    return d?.state === "due" && d.at === boss!.crowdMoves && !b.finalGameOver() && !b.bossToMove();
+  },
+
+  /** His second move from this device's engine (doubleHopFrom); none, the seeded stand-in (applyDouble). */
+  async playDouble(b: Battle, engine: EngineLike): Promise<string | null> {
+    const pick = await doubleHopFrom(engine, boardOf(b).fen).catch(() => null);
+    return hopperBattle.applyDouble(b, pick);
+  },
+
+  /**
+   * Plays his second move (from the host's engine online), as Hollow's extra move: the crowd's turn passes back (a base at its
+   * ply), then his quiet move (extraMoveCandidates: no capture, check or promotion, the crowd left a move). One that isn't a
+   * candidate, or none (no engine answer), and a quiet candidate from the battle's seed (as Dash's: it never just doesn't come
+   * once due). Unscored, never fair play's; the squares it lands on his; a carrot it ends on his. Returns it, or null.
+   */
+  applyDouble(b: Battle, move: string | null): string | null {
+    if (!hopperBattle.doubleDue(b)) return null;
+    const boss = b.state.boss!;
+    const d = boss.powers!.turf!.double!;
+    const id = b.state.boards[0]!;
+    const board = b.boards.get(id)!;
+    const passed = passTurn(board.fen);
+    const candidates = passed ? extraMoveCandidates(passed) : [];
+    if (move === null || !candidates.includes(move)) move = candidates.length ? [...candidates].sort()[Math.floor(powerRoll(boss.powers!.seed, "double", d.at) * candidates.length)]! : null;
+    const done = (state: "played" | "skipped", events: readonly PowerEvent[] = []) => setPowers(b, (p) => ({ ...p, turf: { ...p.turf!, double: { at: d.at, state } }, events: [...p.events, ...events] }));
+    if (!passed || !move) {
+      done("skipped");
+      return null;
+    }
+    const ply = board.history.length;
+    const base: BoardState = { ...board, fen: passed, expected: 1 - board.expected, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: passed }] };
+    b.boards.set(id, playOnBoard(base, move, base.expected));
+    b.bossLast = { move, san: toSan(passed, move) };
+    const pulled = carrotBattle.pull(b, "boss", true);
+    done("played", [...pulled, { kind: "doubleHop", turn: boss.powers!.turn, square: move.slice(2, 4), squares: [move.slice(0, 2), move.slice(2, 4)] }]);
+    turfBattle.claim(b);
+    return move;
+  },
+};
+
+/** Double hop's second move from this device's engine: his best quiet move within turfDoubleGain points (extraMoveFrom). */
+export const doubleHopFrom = (engine: EngineLike, fen: string, s: Pick<BossPowerSettings, "turfDoubleGain"> = BOSS_POWERS): Promise<string | null> => extraMoveFrom(engine, fen, s.turfDoubleGain);
+
+/** His Turf in a battle: the squares claimed after every move and step, his holds as his turn begins, Long legs' long step. */
+export const turfBattle = {
+  /** Every piece that has come to a square since the last claim claims it (claimTurf). */
+  claim(b: Battle): void {
+    const boss = b.state.boss;
+    const t = turfOf(boss);
+    if (!t) return;
+    const next = claimTurf(t, boardOf(b).fen, boss!.crowdSide);
+    if (next !== t) setPowers(b, (p) => ({ ...p, turf: next }));
+  },
+
+  /** As his turn begins (the crowd has moved: `moved`): the squares claimed, then his holds from his count (holdsFor). */
+  turnBegins(b: Battle, moved: boolean): void {
+    turfBattle.claim(b);
+    const boss = b.state.boss!;
+    const t = turfOf(boss);
+    if (!t || !moved) return;
+    setPowers(b, (p) => ({ ...p, turf: { ...t, holds: holdsFor(turfCount(t.owner, "b")), holdsAt: boss.crowdMoves } }));
+  },
+
+  /**
+   * Long legs: his move was a long step's first step (`extras.special`, his rules' specialMove: legsPlay of it is `move`), so the
+   * pawn goes on to its square (a base at its ply; the last move shown from to; no en passant from it).
+   */
+  legsOn(b: Battle, move: string, extras?: BossMoveExtras): void {
+    const legs = extras?.special;
+    if (!legs || legsPlay(legs) !== move || !holdOn(b.state.boss, 1)) return;
+    const id = b.state.boards[0]!;
+    const board = b.boards.get(id)!;
+    const g = gridOf(board.fen);
+    const pawn = g.get(move.slice(2, 4));
+    if (!pawn || g.has(legs.slice(2, 4))) return;
+    g.delete(move.slice(2, 4));
+    g.set(legs.slice(2, 4), pawn);
+    const parts = editedFen(board.fen, g).split(" ");
+    parts[3] = "-";
+    const fen = parts.join(" ");
+    const ply = board.history.length;
+    b.boards.set(id, { ...board, fen, lastMove: legs, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }] });
+  },
+
+  /** After his move (and its carrots and spin): the squares claimed; Double hop's second move due when his third hold is on. */
+  afterHisMove(b: Battle): void {
+    turfBattle.claim(b);
+    const boss = b.state.boss!;
+    if (!holdOn(boss, 3) || boss.result || carrotBattle.won(boss) || b.finalGameOver()) return;
+    const passed = passTurn(boardOf(b).fen);
+    const state = passed && extraMoveCandidates(passed).length ? ("due" as const) : ("skipped" as const);
+    setPowers(b, (p) => ({ ...p, turf: { ...p.turf!, double: { at: boss.crowdMoves, state } } }));
   },
 };
 

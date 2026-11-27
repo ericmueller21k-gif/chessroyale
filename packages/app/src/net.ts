@@ -28,6 +28,7 @@ import {
   funhouseMoveFrom,
   dashExtraMoveFrom,
   extraMoveFrom,
+  doubleHopFrom,
   bounceFrom,
   fuseFrom,
   landingAhead,
@@ -979,7 +980,7 @@ export class NetMatch implements GameView {
         if (m.water) return void this.hostPick(m.key, async (engines) => (await waterAnswer(engines, m.fen, m.water!, !!m.waterAny)).answer);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null, !!m.check, !!m.share, m.lock ?? null, m.storm ?? null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.legs ? { legs: m.legs } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null, !!m.check, !!m.share, m.lock ?? null, m.storm ?? null);
       case "recluseCutscene":
         return this.phase2.onCutscene(m.at, m.until);
       case "phase2":
@@ -1241,7 +1242,8 @@ export class NetMatch implements GameView {
   private async hostExtra(key: string, fen: string) {
     try {
       const [engine] = await this.engines();
-      const pick = this.boss?.id === "dash" ? dashExtraMoveFrom : extraMoveFrom;
+      // (Chub & Chirp's Double hop, Turf's third hold: his best quiet move, doubleHopFrom.)
+      const pick = this.boss?.id === "dash" ? dashExtraMoveFrom : this.boss?.id === "hopper" ? doubleHopFrom : extraMoveFrom;
       this.send({ t: "bossMove", key, move: (await pick(engine!, fen)) ?? "" });
     } catch {
       // No engine here: the server asks someone else, or he skips it.
