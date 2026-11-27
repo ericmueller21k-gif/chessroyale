@@ -1480,7 +1480,9 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                         }
                   }
                 >
-                  <ItemArt def={it.def} finish={it} kept later />
+                  <span class="locker-art">
+                    <ItemArt def={it.def} finish={it} kept later />
+                  </span>
                   <strong>{itemName(it)}</strong>
                   {hc ? (
                     <>

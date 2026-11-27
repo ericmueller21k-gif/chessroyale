@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { RECLUSE_PHASE2 } from "@chessroyale/core";
+import { ITEM_DEFS, RECLUSE_PHASE2, adminCopy } from "@chessroyale/core";
 import { SAW_SWAP_TEST_CHECK } from "@chessroyale/chess";
 import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
@@ -777,4 +777,50 @@ test("Ginger's Super Freeze on a slow phone: his charge-up and blast, the ice bl
   console.log(`Ginger's Super Freeze (slowed phone): ${f(s)}`);
   expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+});
+
+test("an admin's locker on a slow phone: one of every item, shiny, opens and fills within budget (Nov 27)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(2 * 60_000);
+  await page.addInitScript(instrument);
+  // (An admin's locker, as the server makes it: one of every item, each shiny; core/admin-copies.ts. Before Nov 27, on this phone: 450 to
+  // 830 ms to the first paint, a 250 to 450 ms task, and 67 ms frames while it was open, every shine repainting.)
+  await page.route("**/api/me*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const res = await route.fetch();
+    const body = await res.json().catch(() => null);
+    if (body?.locker) body.locker.items = ITEM_DEFS.map(adminCopy);
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.goto("/shop?nolanding");
+  await page.getByRole("tab", { name: "Crates" }).waitFor();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.waitForTimeout(1000);
+  const open = await page.evaluate(
+    () =>
+      new Promise<{ paint: number; filled: number; longest: number }>((done) => {
+        const P = (window as any).__perf;
+        const t0 = performance.now();
+        [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find((b) => b.textContent?.trim() === "Locker")!.click();
+        let paint = 0;
+        const wait = () => {
+          const arts = [...document.querySelectorAll(".locker-grid .item-art svg")];
+          if (!paint && arts.length) requestAnimationFrame(() => setTimeout(() => (paint = performance.now() - t0)));
+          if (paint && arts.length && arts.every((e) => e.childElementCount)) {
+            const longs: [number, number][] = P.longs.filter((l: [number, number]) => l[0] >= t0 - 5);
+            done({ paint: Math.round(paint), filled: Math.round(performance.now() - t0), longest: Math.round(Math.max(0, ...longs.map((l) => l[1]))) });
+          } else requestAnimationFrame(wait);
+        };
+        requestAnimationFrame(wait);
+      }),
+  );
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await page.waitForTimeout(2000);
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`admin's locker (${ITEM_DEFS.length} items, slowed phone): first paint ${open.paint} ms, all drawn ${open.filled} ms, longest task ${open.longest} ms; open: ${f(s)}`);
+  expect(open.paint, "the first paint (ms)").toBeLessThan(450);
+  expect(open.longest, "the longest task (ms)").toBeLessThan(250);
+  expect(open.filled, "every cell drawn (ms)").toBeLessThan(5000);
+  expect(s.p50, "median frame while open (ms)").toBeLessThan(50);
 });
