@@ -974,10 +974,11 @@ button.town-pic.player {
   border: 1.5px solid #d9bb8c;
   background: #20212a;
   color: #f2f2f2;
-  font: 400 10.5px/1.25 system-ui, sans-serif;
+  font: 400 10px/1.2 system-ui, sans-serif;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  /* (2 px, Nov 27: the report's stalls row and its long-frames line still fit a phone's box.) */
+  gap: 2px;
 }
 .tfr-panel b {
   color: #fff;
@@ -994,6 +995,7 @@ button.town-pic.player {
 }
 .tfr-dev,
 .tfr-most,
+.tfr-out,
 .tfr-ups {
   color: #c9c9d2;
 }
@@ -1006,7 +1008,7 @@ button.town-pic.player {
 }
 .tfr-parts {
   border-collapse: collapse;
-  font: 400 10px/1.15 ui-monospace, monospace;
+  font: 400 10px/1.1 ui-monospace, monospace;
   width: 100%;
 }
 .tfr-parts th,
@@ -1072,6 +1074,11 @@ button.town-pic.player {
 .town-loading {
   z-index: 30;
   background: #1b1830;
+}
+/* (Nov 27) Squeezed too narrow on a computer: the same card and one line, the town paused under it; centered, the line wrapping in the box. */
+.town-narrow .boss-loading-title {
+  max-width: calc(100% - 32px);
+  text-align: center;
 }
 /* The street town couldn't load (Nov 13; gl-fail.ts): the same card, its line and a Reload button. */
 .town-broken .town-btn {

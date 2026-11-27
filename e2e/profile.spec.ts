@@ -103,6 +103,21 @@ test("an admin's locker has one of every item, each tagged Admin, worn like any 
   await page.getByRole("tab", { name: "Locker" }).click();
   await expect(crate.locator(".locker-item")).toHaveCount(ITEM_DEFS.length);
   await expect(crate.locator(".locker-admin")).toHaveCount(ITEM_DEFS.length);
+  // Every drawing fills in (those in view before the first paint, the rest a slice a frame after; Nov 27), each cell where it stood
+  // from the start; opened again, from the session's kept drawings, no two cells share an id.
+  const cells = () => crate.locator(".locker-item").evaluateAll((els) => els.map((e) => [Math.round(e.getBoundingClientRect().x), Math.round(e.getBoundingClientRect().y + scrollY)].join(",")));
+  const drawn = () => crate.locator(".item-art svg").evaluateAll((els) => els.filter((e) => e.childElementCount).length);
+  const before = await cells();
+  await expect.poll(drawn, { message: "every cell's drawing" }).toBe(ITEM_DEFS.length);
+  expect(await cells()).toEqual(before);
+  await page.getByRole("tab", { name: "Crates" }).click();
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect.poll(drawn, { message: "every cell's drawing, again" }).toBe(ITEM_DEFS.length);
+  const shared = await crate.locator(".item-art").evaluateAll((arts) => {
+    const ids = arts.flatMap((a) => [...new Set([...a.querySelectorAll("[id]")].map((e) => e.id))]);
+    return ids.length - new Set(ids).size;
+  });
+  expect(shared).toBe(0);
   // (The "From the shop" God King effects are hidden, GOD_KING_SHOP: the admin's are not shown, and their data stays.)
   await expect(page.getByText("From the shop")).toHaveCount(0);
   // Worn like any item, and others see it.

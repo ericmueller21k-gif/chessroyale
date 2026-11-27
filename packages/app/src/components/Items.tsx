@@ -1,13 +1,14 @@
-import type { ComponentChildren } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { render, type ComponentChildren } from "preact";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, shownLook, smileyExpression, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import { HIDE_ALL, type RiderDraft } from "./rides/kit.ts";
-import { rideCells, useRide } from "./rides/load.ts";
+import { loadRide, rideCells, rideDrawing, useRide } from "./rides/load.ts";
 import type { RideCells } from "../town/ride-cells.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "./rides/scale.ts";
 import { TokenArt } from "./TokenArt.tsx";
+import { artKept, artKey, drawLater, inIdle, keepArt, keptArt } from "./item-art-cache.ts";
 
 export { type Finish } from "./item-paint.tsx";
 export { blotchPath } from "./blotches.ts";
@@ -1405,25 +1406,104 @@ export function ItemLayer({ def, finish, side = "w" }: { def: string; finish: Fi
  * box measured ahead, so the pawn sits in place while the ride's drawing loads, and the ride appears under it: `data-drawn` once it has).
  * `live` (Nov 25): its animation plays (the crate's reveal, a profile's cosmetics); in the grids and lists it rests still.
  */
-export function ItemArt({ def, finish, side = "w", class: cls, live = false }: { def: string; finish: Finish; side?: "w" | "b"; class?: string; live?: boolean }) {
+export function ItemArt({
+  def,
+  finish,
+  side = "w",
+  class: cls,
+  live = false,
+  kept = false,
+  later = false,
+}: {
+  def: string;
+  finish: Finish;
+  side?: "w" | "b";
+  class?: string;
+  live?: boolean;
+  /** Its drawing kept for the session (item-art-cache.ts): set from the kept markup when there is one, kept once drawn otherwise. */
+  kept?: boolean;
+  /** Drawn before the first paint only if it's in view then, otherwise a slice a frame after it, in order (the locker's cells). Its box is there from the start. */
+  later?: boolean;
+}) {
   const ride = rideCells(def);
   const d = useRide(ride && def);
+  const [ready, setReady] = useState(!later);
+  const box = useRef<HTMLSpanElement>(null);
+  // (In view as it shows: drawn before the first paint. Otherwise a slice a frame after it, in order. Where its frame is, not where it is:
+  // inside a frame with content-visibility, as the locker's, asking where it is lays the frame out to answer, 79 times a slowed phone's
+  // 3 ms on opening an admin's locker.)
+  useLayoutEffect(() => {
+    if (ready) return;
+    const r = (box.current!.parentElement ?? box.current!).getBoundingClientRect();
+    if (r.top < innerHeight && r.bottom > 0) setReady(true);
+    else return drawLater(() => setReady(true));
+  }, []);
+  const key = kept && (ride || ITEM_ART[def]) ? artKey(def, finish, side) : "";
+  const markup = useMemo(() => (key && ready ? keptArt(key) : undefined), [key, ready]);
+  const svg = useRef<SVGSVGElement>(null);
+  // (Kept once drawn: a ride once its drawing has loaded, not while it's the pawn alone.)
+  useLayoutEffect(() => {
+    if (key && ready && !markup && (!ride || d) && svg.current && !artKept(key)) keepArt(key, svg.current.innerHTML);
+  });
   const [x, y, w, h] = FRAMES[def] ?? ride?.frame ?? [0, 0, 100, 100];
   const s = Math.max(w, h) * 1.12;
   const vb = `${x + w / 2 - s / 2} ${y + h / 2 - s / 2} ${s} ${s}`;
   return (
-    <span class={`item-art${isShiny(finish.blemish) && showsPurity(def) ? " shiny" : ""}${live ? " ia-live" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+!!d) : undefined}>
-      <svg viewBox={vb} aria-hidden="true">
-        {ride ? (
-          <RideLayers id={def} c={ride} d={d} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
-            <PawnShape side={side} />
-          </RideLayers>
-        ) : (
-          <ItemLayer def={def} finish={finish} side={side} />
-        )}
-      </svg>
+    <span
+      ref={box}
+      class={`item-art${isShiny(finish.blemish) && showsPurity(def) ? " shiny" : ""}${live ? " ia-live" : ""}${cls ? ` ${cls}` : ""}`}
+      style={{ "--sw": String(Math.max(0.4, s / 100)) }}
+      data-drawn={ride ? String(+(!!markup || (!!d && ready))) : undefined}
+    >
+      {markup ? (
+        <svg key="kept" viewBox={vb} aria-hidden="true" dangerouslySetInnerHTML={{ __html: markup }} />
+      ) : (
+        <svg key="drawn" ref={svg} viewBox={vb} aria-hidden="true">
+          {ready && <ArtInside def={def} finish={finish} side={side} d={d} />}
+        </svg>
+      )}
     </span>
   );
+}
+
+/** What's inside an item's framed svg: a ride with a pawn on it (its drawing `d` once loaded), or the item. */
+function ArtInside({ def, finish, side, d }: { def: string; finish: Finish; side: "w" | "b"; d: RiderDraft | undefined }) {
+  const ride = rideCells(def);
+  return ride ? (
+    <RideLayers id={def} c={ride} d={d} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
+      <PawnShape side={side} />
+    </RideLayers>
+  ) : (
+    <ItemLayer def={def} finish={finish} side={side} />
+  );
+}
+
+/**
+ * Draws these items' drawings ahead into the session's keep (item-art-cache.ts), as the locker's cells draw them (white's side), in the
+ * page's idle time a few at a time while `go()` answers true (home's warm-up: Crates.tsx, warmLocker). A ride whose drawing hasn't
+ * loaded is asked for and tried again at the end (once). Answers a stop.
+ */
+export function warmItemArt(items: readonly (Finish & { def: string })[], go: () => boolean): () => void {
+  const todo = items.filter((it) => rideCells(it.def) || ITEM_ART[it.def]).map((it) => ({ it, tries: 0 }));
+  return inIdle(() => {
+    const next = todo.shift();
+    if (!next) return false;
+    const { it } = next;
+    const key = artKey(it.def, it, "w");
+    const d = rideDrawing(it.def);
+    if (artKept(key)) return todo.length > 0;
+    if (rideCells(it.def) && !d) {
+      if (next.tries++ < 1) {
+        void loadRide(it.def);
+        todo.push(next);
+      }
+      return todo.length > 0;
+    }
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    render(<ArtInside def={it.def} finish={it} side="w" d={d} />, svg);
+    keepArt(key, svg.innerHTML);
+    return todo.length > 0;
+  }, go);
 }
 
 // ---------------- Rides (Oct 31) ----------------

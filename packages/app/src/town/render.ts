@@ -59,7 +59,7 @@ import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
 import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
-import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
+import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, solidTop, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, upName, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
@@ -190,6 +190,21 @@ function groundColors(skyh: readonly number[]): GroundColors {
       }
   const haze = Array.from({ length: HAZE_LINES }, (_, i) => `rgba(${skyh[0]! | 0},${skyh[1]! | 0},${skyh[2]! | 0},${(0.75 * Math.pow(1 - i / HAZE_LINES, 1.7)).toFixed(3)})`);
   return { fill, seam, haze, skirt: rgb(mix(SQ_LIGHT, skyh, 0.85)), horizon: rgb(skyh) };
+}
+/** (Nov 27) A board's squares in `quads`' order: the 32 light ones (file + rank even) first, then the 32 dark, each in the path's order. */
+const BOARD_ORDER = (() => {
+  const o = new Int32Array(64);
+  let n = 0;
+  for (const dark of [false, true]) for (let f = 0; f < 8; f++) for (let r = 0; r < 8; r++) if (((f + r) % 2 === 1) === dark) o[r * 8 + f] = n++;
+  return o;
+})();
+const BOARD_IDS = Int32Array.from({ length: 64 }, (_, i) => i);
+/** A set of pieces far ones first (at rest: kept a set, as a set's pieces don't move then). */
+const farSorted = new WeakMap<readonly TablePiece[], TablePiece[]>();
+function farFirst(pcs: readonly TablePiece[]): readonly TablePiece[] {
+  let s = farSorted.get(pcs);
+  if (!s || s.length !== pcs.length) farSorted.set(pcs, (s = [...pcs].sort((p1, p2) => p2.g - p1.g)));
+  return s;
 }
 /** Fonts by whole pixel size (tags, signs). */
 const TAG_FONT = Array.from({ length: 16 }, (_, s) => `600 ${s}px ${FONT}`);
@@ -968,7 +983,7 @@ export class Renderer {
         // The face: its corners pulled toward its middle by half a seam.
         const dx = cx - q[i]!;
         const dy = cy - q[i + 1]!;
-        const t = Math.min(0.45, s / (Math.hypot(dx, dy) || 1));
+        const t = Math.min(0.45, s / (Math.sqrt(dx * dx + dy * dy) || 1));
         this.sqFace[o + i] = q[i]! + dx * t;
         this.sqFace[o + i + 1] = q[i + 1]! + dy * t;
       }
@@ -1010,6 +1025,11 @@ export class Renderer {
     const { ctx, W, H, DPR } = this;
     this.paint.frame();
     this.frameNo++;
+    // (Once the loading screen is done: none of its time taken.)
+    if (this.topsAt < 0 && this.boxes.length && this.warmJobs && this.warmAt0 >= this.warmJobs.jobs.length) {
+      this.topsAt = 0;
+      this.nextTops();
+    }
     this.nSoft = 0;
     this.camX = camX;
     this.camY = camY;
@@ -1467,10 +1487,18 @@ export class Renderer {
   /** One fill per color: every square of that color's quad (from `pts`) in one path (`seams`: only squares with one). */
   private fillRuns(pts: Float64Array, colors: readonly string[], seams: boolean): void {
     const { ctx, sqOrder: order, keyStart: start, sqSeam: seam } = this;
+    const quads = this.paint.quads;
     let i = 0;
     for (let k = 0; k < SQ_KEYS; k++) {
       const end = start[k]!;
       if (i === end) continue;
+      // (WebGL, Nov 27: straight into its stream, no path.)
+      if (quads) {
+        ctx.fillStyle = colors[k]!;
+        quads(pts, order, i, end, seams ? seam : null);
+        i = end;
+        continue;
+      }
       ctx.beginPath();
       for (; i < end; i++) {
         if (seams && !seam[order[i]!]) continue;
@@ -2332,7 +2360,7 @@ export class Renderer {
     const { ctx, DPR } = this;
     ctx.setTransform(DPR * m[0]!, DPR * m[1]!, DPR * m[2]!, DPR * m[3]!, DPR * m[4]!, DPR * m[5]!);
     ctx.globalAlpha = a;
-    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, seam ? dw + 0.6 / Math.max(0.01, Math.hypot(m[0]!, m[1]!)) : dw, dh);
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, seam ? dw + 0.6 / Math.max(0.01, Math.sqrt(m[0]! * m[0]! + m[1]! * m[1]!)) : dw, dh);
     // (The transform is left as it is: the caller puts the town's back once its pieces are drawn, `untransform`.)
   }
   /** The town's own transform and full strength back, after pieces drawn through `drawT`. */
@@ -2851,10 +2879,12 @@ export class Renderer {
     // Nov 25: a picture made on the CPU is uploaded, a hitch each time the camera comes to rest; drawn as it is while you walk instead.)
     const c0 = this.grid[0]!;
     const c8 = this.grid[80]!;
-    const key = `${Math.round((c0.x * m + tx) * 8)},${Math.round((c0.y * m + ty) * 8)},${Math.round((c8.x * m + tx) * 8)},${Math.round((c8.y * m + ty) * 8)},${Math.round(shift * m * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${DPR}`;
+    const gl = this.paint.kind === "webgl";
+    // (No key with WebGL, Nov 27: it draws the board as it is every frame; the string was built for nothing, ten tables a frame.)
+    const key = gl ? "" : `${Math.round((c0.x * m + tx) * 8)},${Math.round((c0.y * m + ty) * 8)},${Math.round((c8.x * m + tx) * 8)},${Math.round((c8.y * m + ty) * 8)},${Math.round(shift * m * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${DPR}`;
     const cache = (this.boardCache[ti] ??= { key: "", seen: "", cv: null, x: 0, y: 0, w: 0, h: 0 });
     ctx.globalAlpha = alpha;
-    if (moving || key !== cache.seen || this.paint.kind === "webgl") {
+    if (moving || key !== cache.seen || gl) {
       cache.seen = moving ? "" : key;
       cache.key = "";
       paint(ctx);
@@ -2873,6 +2903,8 @@ export class Renderer {
   }
 
   private readonly lift: TableLift = { dz: 0, top: 0, thick: 0, grow: 1 };
+  /** (WebGL) A board's 64 squares' corners this frame, light squares first (BOARD_ORDER), for `quads`. */
+  private readonly boardPts = new Float64Array(64 * 8);
   private stillSet: TablePiece[] | null = null;
   private boardCache: { key: string; seen: string; cv: HTMLCanvasElement | null; x: number; y: number; w: number; h: number }[] = [];
 
@@ -2937,7 +2969,32 @@ export class Renderer {
     quad([[-h, -h, top], [h, -h, top], [h, -h, top - thick], [-h, -h, top - thick]], pal["4"]!);
     quad([[-h, -h, top], [h, -h, top], [h, h, top], [-h, h, top]], pal["2"]!);
     quad([[-h, h, top], [h, h, top], [h, h - 0.03, top], [-h, h - 0.03, top]], pal["1"]!);
-    // The board: the light squares in one fill and the dark in another, over the grid's points.
+    // The board: the light squares in one fill and the dark in another, over the grid's points. (WebGL, Nov 27: its 64 quads straight
+    // into the stream, `quads`, the same triangles as the path's fill.)
+    const quads = g === this.ctx ? this.paint.quads : undefined;
+    if (quads) {
+      const bp = this.boardPts;
+      for (let r = 0; r < 8; r++)
+        for (let f = 0; f < 8; f++) {
+          const o = (BOARD_ORDER[r * 8 + f]!) * 8;
+          const p0 = this.grid[r * 9 + f]!;
+          const p1 = this.grid[r * 9 + f + 1]!;
+          const p2 = this.grid[(r + 1) * 9 + f + 1]!;
+          const p3 = this.grid[(r + 1) * 9 + f]!;
+          bp[o] = p0.x - shift;
+          bp[o + 1] = p0.y;
+          bp[o + 2] = p1.x - shift;
+          bp[o + 3] = p1.y;
+          bp[o + 4] = p2.x - shift;
+          bp[o + 5] = p2.y;
+          bp[o + 6] = p3.x - shift;
+          bp[o + 7] = p3.y;
+        }
+      g.fillStyle = pal.L!;
+      quads(bp, BOARD_IDS, 0, 32, null);
+      g.fillStyle = pal.D!;
+      quads(bp, BOARD_IDS, 32, 64, null);
+    } else
     for (const dark of [false, true]) {
       g.beginPath();
       for (let f = 0; f < 8; f++)
@@ -2960,7 +3017,8 @@ export class Renderer {
     const f = TOWN_FEEL;
     const hb = B.board;
     const sq = (2 * hb) / 8;
-    const live = (now < 0 ? [...pcs] : pcs.filter((q) => !q.gone || now < q.gone)).sort((p1, p2) => p2.g - p1.g);
+    // (At rest, the pieces' far-first order is worked out once a set, Nov 27: not copied and sorted every frame.)
+    const live = now < 0 ? farFirst(pcs) : pcs.filter((q) => !q.gone || now < q.gone).sort((p1, p2) => p2.g - p1.g);
     g.imageSmoothingEnabled = false;
     for (const q of live) {
       const t = now < 0 ? 1 : clamp((now - q.t0) / f.tableSlideMs, 0, 1);
@@ -3601,10 +3659,79 @@ export class Renderer {
     ctx.drawImage(art, Math.round((fx + (fw - w) / 2) * DPR) / DPR, Math.round((fy + (fh - h) / 2) * DPR) / DPR, w, h);
   }
 
+  /**
+   * (Nov 27) Newcomers' name tags (another player arriving: here-net.ts's answer, Town.tsx `others`) painted ahead, every size, a slice
+   * at a time between frames (an idle callback), not in the frame they first show: 55 arriving at once cost the
+   * busy town's frames 3 ms of painting and 2 of uploads each (the busy town's perf check), and a crowd of more tags than the cache held
+   * painted them again and again. The cache is sized to everyone's tags at every size, twice over.
+   */
+  queueTags(people: readonly Person[]): void {
+    for (const p of people) {
+      if (!p.name || p.home) continue;
+      this.tagQ.push({ name: p.name, kind: p.you ? "you" : isSprite(p.look) ? "sidekick" : "bot" });
+    }
+    this.tagArt.max = Math.max(this.tagArt.max, 2 * this.town.people.length * (TAG_SIZES[1] - TAG_SIZES[0] + 1));
+    if (this.tagQ.length && !this.tagSlicing) this.nextTagSlice();
+  }
+  /** (Tests) Newcomers' tags still to make between frames. */
+  get tagsQueued(): number {
+    return this.tagQ.length;
+  }
+  private readonly tagQ: { name: string; kind: TagKind }[] = [];
+  /** The frame a new tag was last painted in (drawTag: one a frame). */
+  private newTagAt = -1;
+  private tagSlicing = false;
+  /**
+   * (Nov 27) Each box's solid top (boxes.ts solidTop: its front's first frame worked out, a few ms) worked out between frames from the first
+   * frame on, a box a slice, not the first time the box shows while walking (nor on the loading screen: it added 0.6 s there at 4x).
+   */
+  private topsAt = -1;
+  private nextTops(): void {
+    const go = (budgetMs: number) => {
+      const t0 = performance.now();
+      while (this.topsAt < this.boxes.length && performance.now() - t0 < budgetMs) solidTop(this.boxes[this.topsAt++]!.box);
+      if (this.topsAt < this.boxes.length) this.nextTops();
+    };
+    const ric = (globalThis as { requestIdleCallback?: (f: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    if (ric) ric((d) => go(d.didTimeout ? 4 : Math.min(4, d.timeRemaining())), { timeout: 1000 });
+    else setTimeout(() => go(3), 32);
+  }
+  private nextTagSlice(): void {
+    this.tagSlicing = true;
+    const ric = (globalThis as { requestIdleCallback?: (f: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    // (No idle time for half a second, a busy device: a 4 ms slice anyway.)
+    if (ric) ric((d) => this.tagSlice(d.didTimeout ? 4 : Math.min(4, d.timeRemaining())), { timeout: 500 });
+    else setTimeout(() => this.tagSlice(3), 16);
+  }
+  private tagSlice(budgetMs: number): void {
+    const t0 = performance.now();
+    do {
+      const q = this.tagQ.shift();
+      if (!q) break;
+      // (Painted only: each size goes on the GPU as it's first drawn. Every size of 55 newcomers' tags uploaded at once overfilled the
+      // atlas's spare pages, which started again, and everything on them was uploaded again.)
+      for (let s = TAG_SIZES[0]; s <= TAG_SIZES[1]; s++) this.tagReady(q.name, s, q.kind);
+    } while (performance.now() - t0 < budgetMs);
+    if (this.tagQ.length) this.nextTagSlice();
+    else this.tagSlicing = false;
+  }
+
   /** A name tag over a figure: white for the pawns, gold for you, blue for a boss's sidekick; it shrinks with distance. Stamped from its drawing (`tagArtOf`). */
   private drawTag(text: string, ax: number, ay: number, kind: TagKind, size: number, alpha: number): void {
     const { ctx, DPR } = this;
-    const a = this.tagReady(text, Math.round(size), kind);
+    const s = Math.round(size);
+    // (Nov 27) A tag not made yet (someone just come, or a size not drawn yet): at most one painted a frame; the rest are made between
+    // frames (queueTags) and show from the frame after. 55 players arriving at once painted 275 tags in the frames they first showed.
+    const had = this.tagDpr === DPR ? this.tagArt.find(text, s, kind) : undefined;
+    if (!had || (had.fonts !== -2 && had.fonts !== fontsLoaded)) {
+      if (this.newTagAt === this.frameNo) {
+        if (!this.tagQ.some((q) => q.name === text && q.kind === kind)) this.tagQ.push({ name: text, kind });
+        if (!this.tagSlicing) this.nextTagSlice();
+        return;
+      }
+      this.newTagAt = this.frameNo;
+    }
+    const a = this.tagReady(text, s, kind);
     a.used = this.frameNo;
     this.keepFree(ax - a.w / 2, ay - a.h, a.w, a.h);
     // (On the device's pixel grid, so the drawing lands pixel for pixel.)

@@ -290,7 +290,8 @@ export function pastCurve(v: View, dx: number, dz: number): boolean {
 }
 
 /** Distance from the focus point in rim units (the rim's sideways stretch taken out). */
-export const radial = (v: View, dx: number, dz: number): number => Math.hypot(dx / v.rimX, dz);
+// (Math.sqrt, not Math.hypot: called for every thing every frame, and hypot's result is boxed, Nov 27.)
+export const radial = (v: View, dx: number, dz: number): number => Math.sqrt((dx / v.rimX) ** 2 + dz * dz);
 /** How far toward the horizon a point is: 0 at the focus, 1 at the rim. */
 export const farOf = (v: View, dz: number): number => clamp(dz / Math.max(1, v.rim), 0, 1);
 /** Things fade in over their first squares inside the rim, so nothing pops. */

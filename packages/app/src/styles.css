@@ -8812,6 +8812,17 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   width: 64px;
   height: 64px;
 }
+/* Off screen, a cell's drawing isn't styled, laid out or painted, and a shiny one's shine doesn't roll there (Nov 27: an admin's
+   locker of 80 shiny items cost a slowed phone 50 ms a frame). On a frame of its own with 16 px of room round the 64 px drawing (what
+   content-visibility paints is cut at its box, and a hat's pom-pom reaches past the drawing's), its padding taken back by its margin:
+   the same 64 px in the cell, in view or not, so nothing shifts. */
+.locker-art {
+  display: block;
+  padding: 16px;
+  margin: -16px;
+  content-visibility: auto;
+  contain-intrinsic-size: 96px 96px;
+}
 .locker-item strong {
   font-size: 12px;
   line-height: 1.15;

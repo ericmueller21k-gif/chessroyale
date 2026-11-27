@@ -116,6 +116,11 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Smile, Wink, Tongue, Cool, Surprised, Laughing) comes from its seed (`smileyExpression`, its own stream; never stored); `itemName(it)`
   names it ("Smiley Face · Wink") on the reveal card, the locker tile and its label, the delete dialog and the profile; `stackKey` keeps
   each expression its own stack.
+- **The locker's speed** (Nov 27; [2026-11-27-locker-speed.md](../decisions/2026-11-27-locker-speed.md); `LOCKER_ART`): each item's drawing is
+  kept for the session as its markup (`components/item-art-cache.ts`; ids renamed per copy) once drawn; the locker's cells (`ItemArt kept later`)
+  in view draw before the first paint, the rest a slice a frame; off-screen ones skip rendering (`.locker-art`: `content-visibility` with 16 px of
+  room, so a pom-pom isn't cut). Home warms what you own in its idle time (`warmLocker`: only while home shows, no Chess Town over it; not with
+  little memory or Save-Data). Guards: `item-art-cache.test.ts`, profile.spec's admin locker (fills, no shift, own ids), perf.spec's `@perf` locker.
 - **Outfits** (Nov 10; [2026-11-10-outfit-slot.md](../decisions/2026-11-10-outfit-slot.md)): the `outfit` slot. One on, every other worn item is
   hidden (core's `shownLook`: only the outfit, and eyewear, `eyewear: true` (goggles, shades) while `OUTFIT.eyewear`), everywhere a look is
   drawn (`Avatar`, the town, the profiles' rows); the rest stay equipped underneath. **Secret** (Eric's exception to "nothing hidden"): the

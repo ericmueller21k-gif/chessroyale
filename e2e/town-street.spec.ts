@@ -408,7 +408,8 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
   // The panel: the device line, the frame rates, a row a part with numbers, the worst frames; all inside the world's box, nothing cut.
   await expect(panel.locator(".tfr-dev")).toContainText(/ratio \d(\.\d+)? \(drawn \d(\.\d+)?\) · \d+×\d+ px · WebGL · /);
   await expect(panel.locator(".tfr-fps b").first()).toHaveText(/^\d+$/);
-  await expect(panel.locator(".tfr-parts tbody tr")).toHaveCount(20);
+  // (21 since Nov 27: "Outside our code" split into "Waiting for the screen" and "Stalls outside our code", town-hitches-2.)
+  await expect(panel.locator(".tfr-parts tbody tr")).toHaveCount(21);
   await expect(panel.locator(".tfr-parts tbody tr").filter({ hasText: "New pictures" }).locator("td").nth(1)).toHaveText(/^\d+(\.\d)?$/);
   await expect(panel.locator(".tfr-worst li")).toHaveCount(s.worst.length);
   if (STILLS) {

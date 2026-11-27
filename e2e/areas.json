@@ -865,6 +865,7 @@
         "packages/app/src/components/Cosmetics.tsx",
         "packages/app/src/components/Items.tsx",
         "packages/app/src/components/item-paint.tsx",
+        "packages/app/src/components/item-art-cache.ts",
         "packages/app/src/components/rides/**",
         "packages/app/src/components/PixelIcon.tsx",
         "packages/app/src/icon-pixels.ts",

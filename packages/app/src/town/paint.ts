@@ -132,6 +132,12 @@ export interface Painter {
    * a scratch canvas). `k`: the shrunk copy's pixels a CSS pixel; `haze`: how far toward `horizon` (a CSS color).
    */
   readonly soft?: (img: CanvasImageSource, x: number, y: number, w: number, h: number, f: number, haze: number, horizon: string) => void;
+  /**
+   * (Nov 27) Quads filled in the fill style, as one path of them filled: quad `order[i]` (8 floats from `pts[order[i] * 8]`) for i from
+   * `from` to `to - 1`, those with `only[order[i]]` set (null: all). WebGL writes them straight in (the ground's squares); undefined:
+   * render.ts builds the path.
+   */
+  readonly quads?: (pts: Float64Array, order: Int32Array, from: number, to: number, only: Uint8Array | null) => void;
   /** Draw calls in the last frame (WebGL: the GPU's; Canvas 2D: not counted, 0). */
   readonly drawCalls: number;
   /** Lost (WebGL's context): nothing is drawn until it's back. */

@@ -249,7 +249,18 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   // brief +2"; on the page's top layer since Nov 16): from what it held through his moment to that plus 10 s.
   const tick = await watchFor(page, { plus: { selector: "body > .dk-plus", text: /^\+10$/ } });
   await play(page, await quietMove(page));
-  const heldText = await page.locator(".dk-clock.held .dk-time").textContent();
+  // (Read once its number has settled: the dock redraws the clock every 200 ms, so a read just as it's held could still show
+  // the second before, off by one on a slow runner; main 18ef4a1, Nov 27.)
+  const held = page.locator(".dk-clock.held .dk-time");
+  let heldText: string | null = null;
+  await expect
+    .poll(async () => {
+      const a = await held.textContent();
+      await page.waitForTimeout(250);
+      heldText = await held.textContent();
+      return a === heldText;
+    })
+    .toBe(true);
   await yourMove(page);
   expect(await plus.seen()).toEqual({ text: true, line: true, dock: false, consult: true });
   await expect.poll(() => tick.seen()).toEqual({ plus: true });
