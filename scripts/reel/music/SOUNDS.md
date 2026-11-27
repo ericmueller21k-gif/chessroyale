@@ -1002,6 +1002,24 @@ send it to the director to be wired into the stranger as his boss music."
   the amp stage; real flute, oboe, strings and violin for a quiet bridge (he called everything after 1:14 "really
   good").
 
+**A try on top of the approved theme (Nov 27): the choir's women alongside her voice.** Eric: "take the version ...
+1 had like the woman and the man's voice. We don't want to do anything with the man's voice ... let's bring back the
+woman's voice, the choir, and ... double so it runs alongside the version 3 in the same spots that we replaced it
+with that other instrument, but it plays a little bit quieter ... the same for the whole song, like wherever the other
+one plays, that now this plays as well. It can run about 50% the volume ... that part where the man's voice ... Let's
+re-add not the man's, but the woman's voice for those same notes ... If you're not sure, let me know, because
+sometimes it'll bite us if you're not 100% sure."
+- Asked before building, two questions with the readings as options (the rule from the third go); his answers: in
+  the three answering spots the choir sings the same notes the voice sings now (not the men's old octave: there the
+  choir's sample is the men); and the held chords are doubled too.
+- `python3 song_ap.py out.wav both`: the third go untouched (the mix under the new layers matches it to -78 dB),
+  plus the bank's "Ahh Choir" on every note the one-voice sample has (her line, the answers, the chords' three
+  notes), tuned, with the first go's light vibrato and swells. Measured against the voice it doubles, section by
+  section: 5.7 to 7.1 dB under her line, 5.8 to 6.4 under the chords ("50%" is -6 dB).
+- The held voices are 0.7 dB up with it, so the beat over them is +1.6 to +4.0 where the third go had +2.3 to +5.0
+  (1:06: +1.9, was +2.6). Told him; if the beat feels covered again, both voices come down by that much.
+- The game's file is still the third go. This one replaces it only if he says so.
+
 ## Sheet music: the town's first piano solo (Nov 26)
 
 Eric: "Can you turn the first piano solo into sheet music for me, and ... you know how it opens with a lower sounding,

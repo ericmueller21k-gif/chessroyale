@@ -59,7 +59,7 @@ the voice, chords and strings covered), with the band's kick and hats under it f
   2:11  everything stops: a flute and an oboe over soft strings, G major turning to G minor
   2:23  a violin climbs in 16ths; a drum fill
   2:29  the last part, a minor third up: the guitars' tune, the voice over it; the last chord rings into the loop
-  python3 song_ap.py <out.wav> [choir]
+  python3 song_ap.py <out.wav> [both|choir]
 """
 import itertools
 import sys
@@ -175,10 +175,11 @@ def voicings(chords, shift=0, top=(64, 67, 71), mid=59, floor=99):
 
 
 def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
-    """The song (stereo, at the mix's own level). `voice`: "vox", the second go (her line and the chords on the bank's
-    one-voice sample, no men), or "choir", the first go's recorded choir, men and all. `parts`: a dict to fill with
-    each recorded part as mixed, by name (for measuring)."""
-    men = voice == "choir"
+    """The song (stereo, at the mix's own level). `voice`: "vox", the Stranger's theme as the game has it (her line
+    and the chords on the bank's one-voice sample, no men); "both", that with the choir's women alongside it, note
+    for note, at half its level; or "choir", the first go's recorded choir, men and all. `parts`: a dict to fill
+    with each recorded part as mixed, by name (for measuring)."""
+    men, both = voice == "choir", voice == "both"
     x = Mix(SECS, BEATS, os=2, seed=1127)
     put, sr = x.put, x.sr
     rng = np.random.default_rng(1127)
@@ -514,7 +515,7 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
         real("chant", chant, sampled.CHOIR_AAH, 0.75, tune=True, seed=5)
     # The chords over the swell (growing), the climax and the last part: the choir's five voices, or (no men) the
     # upper three on the one-voice sample; and the strings under them.
-    choir, bows, grow = [], [], []
+    choir, women, bows, grow = [], [], [], []
     for start, chords, shift, loud, low_from in ((SWELL, SWELL_CH, 0, 112, 43), (CLIMAX, LAMENT * 2, 0, 118, 99), (SURGE, LAMENT, 3, 124, 99)):
         for bar, (low, mid, top) in enumerate(voicings(chords, shift, floor=low_from)):
             b, d = start + 4 * bar, (3.5 if start == SURGE and bar == 7 else 4)
@@ -522,6 +523,7 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
             if not hold:
                 d = 8 if start == SWELL and bar == 12 else d
                 choir += part([(b, d - 0.1, m) for m in ((low, mid, *top) if men else top)], loud, joined=False, ahead=VOX if men else ONE)
+                women += part([(b, d - 0.1, m) for m in top], loud, joined=False)
                 bows += part([(b, d - 0.05, m) for m in (low, low + 7 if (low + 7) % 12 in {v % 12 for v in top} else mid, *top, top[-1] + 12)], loud, joined=False, ahead=BOW)
             t = b * S
             peak = 127 if start != SWELL else (98 + 29 * bar / 15 if men else 76 + 30 * bar / 15)
@@ -530,6 +532,8 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
         real("choir", choir, sampled.CHOIR_AAH, 0.3, tune=True, swell=sorted(grow), seed=6)
     else:
         real("pads", choir, sampled.SOLO_VOX, 0.18, swell=sorted(grow), wet=0.5, seed=6)
+        if both:  # the choir's women on the same three notes, 6 dB under them
+            real("women-pads", women, sampled.CHOIR_AAH, 0.13, tune=True, swell=sorted(grow), seed=15)
     # Her line: the choir's women, or the one-voice sample (quieter under the breakbeat, fuller over the band).
     line = sorted((b, d, m + up) for start, text, up, _ in her for b, d, m in notes(start, text))
     if men:
@@ -539,6 +543,11 @@ def render(voice: str = "vox", parts: dict | None = None) -> np.ndarray:
         for start, text, up, loud in her:
             made += part([(b, d, m + up) for b, d, m in notes(start, text)], loud, ahead=ONE)
         real("soprano", made, sampled.SOLO_VOX, 0.45, swell=breath(line, ahead=ONE), wet=0.5, seed=7)
+        if both:  # and on her line, the answers too, 6 dB under her
+            made = []
+            for start, text, up, loud in her:
+                made += part([(b, d, m + up) for b, d, m in notes(start, text)], loud)
+            real("women", made, sampled.CHOIR_AAH, 0.27, tune=True, swell=breath(line), bend=waver(line), wet=0.45, seed=14)
     # The strings: under the choir's chords, and the bridge's twelve bars (soft, then growing under the violin).
     real("strings", bows, sampled.STRINGS, 0.22, tune=True, swell=sorted(grow), wet=0.35, seed=8)
     bows, quiet = [], []
@@ -566,5 +575,5 @@ def main(out: str, voice: str = "vox") -> None:
     write_wav(out, render(voice))
 
 
-if __name__ == "__main__":  # song_ap.py <out.wav> [choir]
-    main(sys.argv[1], "choir" if "choir" in sys.argv[2:] else "vox")
+if __name__ == "__main__":  # song_ap.py <out.wav> [both|choir]
+    main(sys.argv[1], next((v for v in ("both", "choir") if v in sys.argv[2:]), "vox"))
