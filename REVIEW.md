@@ -1,7 +1,5 @@
 # Review: claude/stranger-rules (eabda7fb), boss lane quick pass (Nov 27)
-
 Read: the whole diff, its decision note, CLAUDE.md, docs/rules/eric.md. Not run: unit tests, e2e, sims (read-only pass).
-
 ## Should-fix
 1. **Boss alone with an unlocked Stranger opens an empty menu.** `packages/app/src/screens/Home.tsx:180` (BossMenu's list is `menuBosses()`,
    which has no unlock bosses) with `:777` (`bossAlone` opens it with `only = pick`, which also hides the Random row). Case: win floor 10,
@@ -11,7 +9,6 @@ Read: the whole diff, its decision note, CLAUDE.md, docs/rules/eric.md. Not run:
    kit is set, production's floor 10 still deals two normal bosses (towerPool skips him), so every floor-10 win from this merge until the art
    PR unlocks him, as does every best of 10 or more already stored. Eric's rule is "Beat him in the tower". The decision note only
    covers the case where a life is spent. This is the director's call: record it, or key the unlock to a win against him.
-
 ## Nits
 3. Test servers only: `server/src/tower.ts:586` passes `testSwitches` (unfinished) to towerPool, but `squads-do.ts:771,810` and
    `lobby-do.ts:878` don't. On a TEST_SWITCHES server a solo run's floor 10 is his and a party run's isn't. The gap closes when his art lands.
@@ -19,7 +16,6 @@ Read: the whole diff, its decision note, CLAUDE.md, docs/rules/eric.md. Not run:
    (`if (!off.length) return`). `:118` skips the tile-empty check when the burn spared the piece. Assert that the seeds really reach the cases.
 5. `stranger.test.ts:141`: the name says "the frozen turn and the flee turn", but only the frozen turn is checked. `:147`: "again once the last has burnt"
    only checks `next === 4`, and no second strike is checked. `:156`: "no ultimate comes" is checked right after the trigger, not on later turns.
-
 ## Checked, none found
 - (1) Frostfire timing: the strike comes in `passive` as crowd turn 3 begins, then every 4 turns. Frozen until `turn`, the burn at `turn + 1` (afterCrowdMove,
   `crowdMoves === burnAt`). Both paths use the same runner and the seeded roll. The king is spared. A gap left open next to either king, a promotion handed to him, or no move left for him: spared. Castling rights and en passant
