@@ -3,15 +3,15 @@
  * of fire and ice: steel ringing as both swords leave his back, a slide and a clack as they go home, two whooshes for his double slash
  * (one with a crackle of fire, one with a glassy tinkle of ice), a bright ping as his blades' tips touch, and his cast: a low roar of
  * fire under a rising shimmer of ice. Hurt, a low thump; beaten, a sword's clatter and his knee on the ground. His voice for his lines
- * is a low, calm "hm" (`voice`), his entrance a longer hum (`hum`). The board art's: a crackle of ice forming (`freeze`) and a burst
- * of flame (`burn`).
+ * is a low, calm "hm" (`voice`), his entrance a longer hum (`hum`), his block a clang of steel (`clang`). The board art's: a crackle of
+ * ice forming (`freeze`), a burst of flame (`burn`) and the ice finisher's block shattering (`shatter`).
  *
  * Each is a pure function of the sample rate (its noise is seeded), so a test can measure it: every one stays quieter than a piece's
  * move (peak and loudness). Which cue plays which: STRANGER_SOUNDS (stranger-lines.ts's kit wiring, kits.ts ART_KITS).
  */
 import { bandpass, lowpass, noise, osc, render, rng, sine, soft, soundCache } from "./synth.ts";
 
-export type StrangerSound = "draw" | "sheathe" | "slash" | "tips" | "cast" | "hit" | "fall" | "kneel" | "hum" | "voice" | "freeze" | "burn";
+export type StrangerSound = "draw" | "sheathe" | "slash" | "tips" | "cast" | "hit" | "fall" | "kneel" | "hum" | "voice" | "freeze" | "burn" | "clang" | "shatter";
 
 const clamp01 = (u: number) => Math.max(0, Math.min(1, u));
 const lerp = (a: number, b: number, u: number) => a + (b - a) * clamp01(u);
@@ -108,6 +108,10 @@ const SOUNDS: Record<StrangerSound, (rate: number) => Float32Array> = {
   // The board's: ice forming (a crackle, high), and flame bursting up.
   freeze: (rate) => unit(mix(rate, 0.5, [[0, tinkle(rate, 0.35, 7, 22, false), 0.8], [0, whoosh(rate, 6000, 3000, 0.3, 23), 0.5]])),
   burn: (rate) => unit(mix(rate, 0.6, [[0, whoosh(rate, 300, 1400, 0.3, 24)], [0.05, crackle(rate, 0.5, 18, 25, 0.8), 0.8]])),
+  // His block: steel on steel, a hard clang (two blades' rings, struck together) over a thump.
+  clang: (rate) => unit(mix(rate, 0.6, [[0, ring(rate, 1320, 0.5)], [0, ring(rate, 1710, 0.45), 0.8], [0, thump(rate, 180, 0.12), 0.9], [0.01, whoosh(rate, 5200, 2600, 0.06, 26), 0.6]])),
+  // The ice finisher's block shattering: a crack, then a burst of glassy shards scattering.
+  shatter: (rate) => unit(mix(rate, 0.6, [[0, thump(rate, 260, 0.06), 0.7], [0, whoosh(rate, 7000, 3000, 0.12, 27), 0.6], [0.02, tinkle(rate, 0.45, 9, 28, false), 0.9]])),
 };
 
 /** Each sound's level: every one under a move's loudness; a soft ceiling keeps the peaks well under. */
@@ -124,6 +128,8 @@ const LEVEL: Record<StrangerSound, number> = {
   voice: 0.045,
   freeze: 0.04,
   burn: 0.045,
+  clang: 0.045,
+  shatter: 0.04,
 };
 
 const cache = soundCache("stranger");

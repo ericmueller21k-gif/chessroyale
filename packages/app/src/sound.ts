@@ -1102,6 +1102,8 @@ export type SoundName =
   | "strangerVoice"
   | "strangerFreeze"
   | "strangerBurn"
+  | "strangerClang"
+  | "strangerShatter"
   // Birdie, Eric's young mourning dove on his toy diesel (a raid boss): synthesized, see characters/birdie-sounds.ts.
   | "birdieHello"
   | "birdieTsip"
@@ -1575,6 +1577,8 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   strangerVoice: strangerBoss("voice"),
   strangerFreeze: strangerBoss("freeze"),
   strangerBurn: strangerBoss("burn"),
+  strangerClang: strangerBoss("clang"),
+  strangerShatter: strangerBoss("shatter"),
   birdieHello: birdieBoss("hello"),
   birdieTsip: birdieBoss("tsip"),
   birdieTeeoo: birdieBoss("teeoo"),
@@ -1964,6 +1968,8 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   strangerVoice: [["stranger", "voice"]],
   strangerFreeze: [["stranger", "freeze"]],
   strangerBurn: [["stranger", "burn"]],
+  strangerClang: [["stranger", "clang"]],
+  strangerShatter: [["stranger", "shatter"]],
   birdieHello: [["birdie", "hello"]],
   birdieTsip: [["birdie", "tsip"]],
   birdieTeeoo: [["birdie", "teeoo"]],

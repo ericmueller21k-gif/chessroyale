@@ -22,11 +22,12 @@
  * and the admins' trigger waits). Eric's ult lands in the next PR.
  */
 import { BOSS_POWERS, type BalloonShape, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type StrangerState } from "@chessroyale/core";
-import { boardEnd, type BoardState } from "../boards.ts";
+import { BOSS_OPENING, boardEnd, newBoard, type BoardState } from "../boards.ts";
 import { heldIn } from "../board-layer.ts";
-import { applyMove, keptEnPassant, kingAttacked, legalMoves, pieceAt, positionOver, sideToMove, withoutPiece } from "../rules.ts";
+import { applyMove, fenAtPly, keptEnPassant, kingAttacked, legalMoves, pieceAt, positionOver, sideToMove, withoutPiece, type Base } from "../rules.ts";
 import { stockfishRefuses, type MoveScore } from "../uci.ts";
-import { VALUE, from, heldBy, logit, other, powerRoll, turnOf, type Battle, type BossRules, type JudgedEvaluation, type Side } from "./base.ts";
+import { VALUE, from, heldBy, logit, materialOf, other, powerRoll, turnOf, type Battle, type BossRules, type JudgedEvaluation, type Side } from "./base.ts";
+import { capturedSquare } from "./chandy.ts";
 
 type StrangerSettings = BossPowerSettings["stranger"];
 
@@ -35,7 +36,42 @@ type StrangerSettings = BossPowerSettings["stranger"];
  * the bolt onto the piece and its ice) as the crowd's turn after his move begins; the burn at the start of his turn. His art plays
  * within them (the characters lane's).
  */
-export const STRANGER_FX = { frostfire: 2300, frostfireBurn: 1500 } as const;
+export const STRANGER_FX = { frostfire: 2300, frostfireBurn: 1500, finisher: 4600 } as const;
+
+/**
+ * His finishers (Eric, Nov 27: "a flame strike ... or a literal strike with a sword ... one of them could be he cuts the piece in half
+ * ... some ice or some fire, or cuts the piece, or ... a combination"): which one an event's `pick` plays (`pick` modulo their count).
+ */
+export const FINISHERS = ["flame", "ice", "cut", "frostfire"] as const;
+export type Finisher = (typeof FINISHERS)[number];
+/**
+ * The test switch `?power=finisher` (and `finisher-<kind>`, that finisher every time; test links only): the battle starts where your
+ * bishop can take his knight at once (by your side: your move first), and every move of his takes a piece of yours that isn't a pawn
+ * when one can (the most valuable), so the e2e sees his block and then his finisher. Not a position the game reaches; nothing else changes.
+ */
+export const FINISHER_TEST = {
+  w: "rnbqkb1r/pppp1ppp/5n2/4p1B1/3PP3/8/PPP2PPP/RN1QKBNR w KQkq - 0 4",
+  b: "rn1qkbnr/ppp2ppp/8/3pp3/4P1b1/5N2/PPPP1PPP/RNBQKB1R b KQkq - 0 4",
+} as const;
+/**
+ * His block before his finisher (ms): when the crowd's move that began his turn took a piece of his that isn't a pawn, his block plays where
+ * he stands (the app's hurt beat: draw, the blow, sheathe) before he hops onto the board, so the finisher comes this much later and his
+ * move is held this much longer (finisherLeadMs). At least the block's animation (a unit test in the app).
+ */
+export const FINISHER_BLOCK_MS = 1800;
+
+/** The material he lost (pawn 1 ... queen 9) since before the crowd's last move: a piece of his taken by it, or burnt as his turn began. */
+export function hisLoss(board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null }, crowd: Side): number {
+  if (!board.history.length) return 0;
+  const his = other(crowd);
+  return materialOf(fenAtPly(board.history, board.history.length - 1, board.bases), his) - materialOf(board.fen, his);
+}
+
+/** How long his finisher waits for his block (ms): FINISHER_BLOCK_MS after a piece of his that isn't a pawn was lost (hisLoss 3 or more), else 0. */
+export const finisherLeadMs = (board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null }, crowd: Side): number => (hisLoss(board, crowd) >= 3 ? FINISHER_BLOCK_MS : 0);
+
+const finisherTest = (test: string): { on: boolean; kind: number } => ({ on: test === "finisher" || test.startsWith("finisher-"), kind: test.startsWith("finisher-") ? FINISHERS.indexOf(test.slice(9) as Finisher) : -1 });
+export const finisherOf = (pick: number | undefined): Finisher => FINISHERS[(((pick ?? 0) % FINISHERS.length) + FINISHERS.length) % FINISHERS.length]!;
 
 const FILES = "abcdefgh";
 /** How far a square is from the board's middle (0.5 on the four center squares, 3.5 in a corner): the strike's tie-break. */
@@ -283,6 +319,16 @@ export const STRANGER: BossRules = {
   afterCrowdMove(b) {
     strangerBattle.afterCrowdMove(b);
   },
+  // (The test switch ?power=finisher: the battle starts on FINISHER_TEST, your move first.)
+  opening: {
+    setUp(b, at) {
+      if (!finisherTest(b.settings.bossPowerTest).on) return {};
+      const fen = FINISHER_TEST[at.crowdSide];
+      const board = newBoard(at.boardId, BOSS_OPENING, 0, at.generation);
+      b.boards.set(at.boardId, { ...board, fen, bases: [{ ply: 0, fen }] });
+      return {};
+    },
+  },
   view: (p) => {
     const st = strangerOf(p);
     return { stranger: { strike: st.strike ? { ...st.strike } : null, burn: st.burn ? { ...st.burn } : null } };
@@ -292,6 +338,45 @@ export const STRANGER: BossRules = {
 // ---------------- His part in the match runner ----------------
 
 export const strangerBattle = {
+  /** The test switch's move (`?power=finisher`, solo): a capture of your most valuable piece that isn't a pawn (nor the king); else null. */
+  testMove(b: Battle, allowed: readonly string[] | null): string | null {
+    const boss = b.state.boss;
+    if (!boss || boss.id !== "stranger" || !finisherTest(b.settings.bossPowerTest).on || !b.bossToMove()) return null;
+    const fen = boardOf(b).fen;
+    const takes = (allowed ?? legalMoves(fen))
+      .map((m) => ({ m, sq: capturedSquare(fen, m) }))
+      .map(({ m, sq }) => ({ m, v: sq ? pieceAt(fen, sq) : null }))
+      .filter((x) => x.v && x.v.color === boss.crowdSide && x.v.type !== "p" && x.v.type !== "k")
+      .sort((a, c) => (VALUE[c.v!.type] ?? 0) - (VALUE[a.v!.type] ?? 0) || (a.m < c.m ? -1 : 1));
+    return takes[0]?.m ?? null;
+  },
+
+  /**
+   * His finisher, as his move is about to show (`move`: the move he plays; him to move): a move that takes a piece of yours that isn't a
+   * pawn (nor the king) is shown as his leap onto the board and a finisher on that piece (`finisher`: `square`, `shape`, `pick` from the
+   * seed, the same on every device), then the move. The server holds the move for it, solo waits (STRANGER_FX.finisher; the runner's
+   * bossMoveMoment). The move itself is an ordinary capture. Marked once a turn (the server asks again as it plays the held move); never
+   * once the battle is over. Returns how long it holds his move (ms: the finisher, after his block when a piece of his was just lost,
+   * finisherLeadMs); 0: none.
+   */
+  finisher(b: Battle, move: string): number {
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    if (!boss || !p || boss.id !== "stranger" || boss.result || !b.bossToMove() || b.finalGameOver()) return 0;
+    if (p.events.some((e) => e.kind === "finisher" && e.turn === p.turn)) return 0;
+    const board = boardOf(b);
+    const fen = board.fen;
+    if (!legalMoves(fen).includes(move)) return 0;
+    const sq = capturedSquare(fen, move);
+    const piece = sq ? pieceAt(fen, sq) : null;
+    if (!sq || !piece || piece.color !== boss.crowdSide || piece.type === "p" || piece.type === "k") return 0;
+    const forced = finisherTest(b.settings.bossPowerTest).kind;
+    const pick = forced >= 0 ? forced : Math.floor(powerRoll(p.seed, "finisher", p.turn, sq) * 4096);
+    const event: PowerEvent = { kind: "finisher", turn: p.turn, square: sq, shape: piece.type as BalloonShape, pick };
+    b.state = { ...b.state, boss: { ...boss, powers: { ...p, events: [...p.events, event] } } };
+    return STRANGER_FX.finisher + finisherLeadMs(board, boss.crowdSide);
+  },
+
   /**
    * After the crowd's move with him to move: the strike's tile burns as crowd move `burnAt` lands (frostfireOutcome: whatever stands there,
    * a king or a loss no game can have spared; nothing there, the tile burns empty). A base on the board where it changes it. Nothing
@@ -327,4 +412,4 @@ export const strangerBattle = {
 };
 
 /** His events for a turn (the sims and tests read them). */
-export const strangerEvents = (events: readonly PowerEvent[]) => events.filter((e) => e.kind === "frostfire" || e.kind === "frostfireBurn");
+export const strangerEvents = (events: readonly PowerEvent[]) => events.filter((e) => e.kind === "frostfire" || e.kind === "frostfireBurn" || e.kind === "finisher");

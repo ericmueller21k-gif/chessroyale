@@ -4,7 +4,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ART_KITS, BOSS_KITS } from "../src/characters/kits.ts";
+import { ART_KITS, BOSS_KITS, STRANGER_FLOURISH_EVERY, STRANGER_SLASHES, strangerAnim } from "../src/characters/kits.ts";
+import { FINISHERS, FINISHER_BLOCK_MS } from "@chessroyale/chess";
+import { animLength } from "../src/characters/power-art.ts";
+import { finishTimeline, finisherStand } from "../src/components/Stranger.tsx";
 import { EFFECTS } from "../src/characters/power-art.ts";
 import { POSES, STRANGER, STRANGER_FOOT, STRANGER_PORTRAIT, STRANGER_SOUNDS, TIPS_AT } from "../src/characters/stranger.ts";
 import { STRANGER_SQUARE } from "../src/characters/effects/stranger.ts";
@@ -100,7 +103,8 @@ describe("the Stranger's art", () => {
     const own = (n: string) => `stranger${n[0]!.toUpperCase()}${n.slice(1)}`;
     const used = new Set([...Object.values(STRANGER_SOUNDS), "strangerVoice"]);
     for (const n of STRANGER_SOUND_NAMES) expect(used.has(own(n) as never), n).toBe(true);
-    for (const s of used) expect(s.startsWith("stranger"), s).toBe(true);
+    // (His own, but his shout: the God King's recorded four, one at random, given to him too by Eric, Nov 27.)
+    for (const s of used) expect(s.startsWith("stranger") || s === "gkHyuah", s).toBe(true);
     for (const name of STRANGER_SOUND_NAMES)
       for (const rate of [44100, 48000]) {
         const s = strangerSound(name, rate);
@@ -118,5 +122,71 @@ describe("the Stranger's art", () => {
         expect(s.length / rate, name).toBeLessThan(1.3);
       }
     expect(strangerSound("slash", 44100)).toEqual(strangerSound("slash", 44100));
+  });
+});
+
+describe("his swords (Eric, Nov 27: his slashes, his block, his flourish, his finisher)", () => {
+  const W = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  const state = (o: Partial<Parameters<typeof strangerAnim>[1]>) => ({ fen: W, history: [] as string[], crowdSide: "w" as const, lastMove: null, ...o });
+
+  it("which capture plays which: your pawn one of three slashes (by the move, the same everywhere); any other piece he rests (his finisher played it)", () => {
+    const slashes = new Set<string>();
+    for (let ply = 1; ply < 60; ply += 2) {
+      const a = strangerAnim({ anim: "capture", key: `capture:${ply}` }, state({ lastMove: { captured: "p" } }))!;
+      expect(STRANGER_SLASHES).toContain(a);
+      expect(strangerAnim({ anim: "capture", key: `capture:${ply}` }, state({ lastMove: { captured: "p" } }))).toBe(a);
+      slashes.add(a);
+    }
+    expect([...slashes].sort()).toEqual([...STRANGER_SLASHES].sort());
+    for (const k of ["n", "b", "r", "q"]) expect(strangerAnim({ anim: "capture", key: "capture:3" }, state({ lastMove: { captured: k } })), k).toBe("idle");
+    // A check: the double slash (his kit's), a pawn taken with it one of the three.
+    expect(strangerAnim({ anim: "check", key: "check:3" }, state({}))).toBeUndefined();
+    expect(STRANGER_SLASHES).toContain(strangerAnim({ anim: "check", key: "check:3" }, state({ lastMove: { captured: "p" } })));
+    for (const a of [...STRANGER_SLASHES, "block", "flourishAll", "hop", ...FINISHERS.map((f) => `fin_${f}`)]) expect(STRANGER.anims[a], a).toBeTruthy();
+  });
+
+  it("a piece of his taken that isn't a pawn: his block; a pawn: his flinch; every third quiet move of his, his flourish", () => {
+    // You (White) took his knight on f6 with your bishop; then his pawn on e5 with your d-pawn.
+    const before = "rnbqkb1r/pppp1ppp/5n2/4p1B1/3PP3/8/PPP2PPP/RN1QKBNR w KQkq - 0 4";
+    const knight = "rnbqkb1r/pppp1ppp/5B2/4p3/3PP3/8/PPP2PPP/RN1QKBNR b KQkq - 0 4";
+    const pawn = "rnbqkb1r/pppp1ppp/5n2/4P1B1/4P3/8/PPP2PPP/RN1QKBNR b KQkq - 0 4";
+    const bases = [{ ply: 0, fen: before }];
+    expect(strangerAnim({ anim: "hurt", key: "hurt:1" }, state({ fen: knight, history: ["g5f6"], bases }))).toBe("block");
+    expect(strangerAnim({ anim: "hurt", key: "hurt:1" }, state({ fen: pawn, history: ["d4e5"], bases }))).toBeUndefined();
+    const moves = [1, 2, 3, 4, 5, 6].map((n) => strangerAnim({ anim: "move", key: `move:${2 * n}` }, state({ history: Array(2 * n).fill("e2e4") })));
+    expect(moves).toEqual([undefined, undefined, "flourishAll", undefined, undefined, "flourishAll"]);
+    expect(STRANGER_FLOURISH_EVERY).toBe(3);
+  });
+
+  it("each finisher's beats in order, his hop back home before the moment ends, the piece gone after its board art lands", () => {
+    for (const kind of FINISHERS) {
+      const tl = finishTimeline(kind);
+      expect(tl.landAt, kind).toBeLessThan(tl.finAt);
+      expect(tl.finAt, kind).toBeLessThan(tl.hitAt);
+      expect(tl.hitAt, kind).toBeLessThan(tl.goneAt);
+      expect(tl.goneAt, kind).toBeLessThan(tl.backAt);
+      expect(tl.homeAt + 100, kind).toBeLessThanOrEqual(tl.ms);
+      if (kind === "ice") expect(tl.shatterAt).toBeGreaterThan(tl.hitAt + 400);
+      if (kind === "frostfire") expect(tl.igniteAt).toBeGreaterThan(tl.hitAt);
+    }
+    // His shout (the God King's, Eric's) as every strike winds up; his clang as he blocks.
+    for (const a of [...STRANGER_SLASHES, ...FINISHERS.map((f) => `fin_${f}`)]) expect(STRANGER.anims[a]!.frames.some((f) => f.cue === "shout"), a).toBe(true);
+    expect(STRANGER.anims.block!.frames.some((f) => f.cue === "clang")).toBe(true);
+    // (His finisher waits for his block: the block's whole animation within the wait.)
+    expect(animLength(STRANGER.anims.block!)).toBeLessThanOrEqual(FINISHER_BLOCK_MS);
+    expect(STRANGER_SOUNDS.shout).toBe("gkHyuah");
+  });
+
+  it("where he stands to strike: beside the piece, toward the board's middle, his head no more than a little over the board's top", () => {
+    for (const computer of [false, true])
+      for (const o of ["white", "black"] as const)
+        for (const f of "abcdefgh")
+          for (let r = 1; r <= 8; r++) {
+            const at = finisherStand(`${f}${r}`, o, computer);
+            expect(at.x, `${f}${r}`).toBeGreaterThan(15);
+            expect(at.x, `${f}${r}`).toBeLessThan(85);
+            expect(at.y, `${f}${r}`).toBeLessThanOrEqual(100);
+            expect(at.y - (110 * 38) / 128, `${f}${r}`).toBeGreaterThanOrEqual(computer ? -0.01 : -8.01);
+          }
   });
 });

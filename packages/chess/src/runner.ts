@@ -139,6 +139,7 @@ import {
   blackedOut,
   chandyBattle,
   CHANDY_FX,
+  strangerBattle,
   dodgeWon,
   mateHeld,
   trainSquare,
@@ -1484,7 +1485,8 @@ export class MatchRunner {
     // (Test switch ?paint=1: Smudgy's hidden rook steps like a pawn, whose name the e2e reads.)
     const paint = this.settings.bossPaintTest ? smudgyBattle.paintStep(this.battle, this.bossAllowed() ?? legalMoves(fen)) : undefined;
     // (Test switch ?power=lockon: Chandy takes a piece as soon as he can, so his first lock comes early.)
-    const grab = chandyBattle.testMove(this.battle, this.bossAllowed()) ?? undefined;
+    // (Test switch ?power=finisher: the Stranger takes a piece of yours that isn't a pawn whenever he can.)
+    const grab = chandyBattle.testMove(this.battle, this.bossAllowed()) ?? strangerBattle.testMove(this.battle, this.bossAllowed()) ?? undefined;
     // (His brain for this move (brainNow): the Hidden Boss's child's rating now, Armored Birdie's stronger one, or Stockfish.)
     const now = this.brainNow(this.humanBrain?.rating ?? null);
     const brain = this.humanBrain && now.rating !== null ? { ...this.humanBrain, rating: now.rating } : null;
@@ -1824,13 +1826,16 @@ export class MatchRunner {
 
   /**
    * A moment of the boss's that plays with his move known, before it shows (Chandy's first captures, chandy.teachCaptures: the
-   * crosshair locks onto the piece he's about to take, chandyBattle.firstLock): marks it and returns how long it holds the screen (ms) before the move may show; 0:
+   * crosshair locks onto the piece he's about to take, chandyBattle.firstLock; the Stranger's capture of a piece of yours that isn't a pawn: his
+   * finisher, strangerBattle.finisher): marks it and returns how long it holds the screen (ms) before the move may show; 0:
    * none. The server holds the host's move that long; solo's playBoss waits (its `beforeShow`).
    */
   bossMoveMoment(move: string): number {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     if (!(this.bossAllowed() ?? legalMoves(fen)).includes(move)) return 0;
-    return chandyBattle.firstLock(this.battle, move) ? CHANDY_FX.lockOn : 0;
+    if (chandyBattle.firstLock(this.battle, move)) return CHANDY_FX.lockOn;
+    // (The Stranger's finisher on a piece of yours that isn't a pawn: his leap, the strike, then the move.)
+    return strangerBattle.finisher(this.battle, move);
   }
 
   /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */

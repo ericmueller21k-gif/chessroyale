@@ -120,16 +120,16 @@ export const SIDE_SWING: Readonly<Record<string, readonly [left: number, right: 
   recluse: [31, 30],
   chandy: [57, 98],
   birdie: [37, 36],
-  // (The Stranger: his slash and cast reach past his rest.)
-  stranger: [61, 61],
+  // (The Stranger: his slash and cast reach past his rest; 63 and 62 (was 61 and 61, Nov 27) with his twirl and sweep.)
+  stranger: [63, 62],
 };
 
 /**
  * Animations whose drawing lies over the board on a computer, left out of a boss's SIDE_REACH (his room is his rest's): Chandy's level
- * rifle, aiming and firing (Nov 16), at every stage. Over the board is fine (Eric's rule, Nov 4); the e2e guard still checks every frame
+ * rifle, aiming and firing (Nov 16), at every stage; the Stranger's hop and finishers, played on the board itself (Nov 27). Over the board is fine (Eric's rule, Nov 4); the e2e guard still checks every frame
  * whole in the window.
  */
-export const OVER_BOARD: Readonly<Record<string, RegExp>> = { chandy: /^(aim|fire)(_s\d)?$/ };
+export const OVER_BOARD: Readonly<Record<string, RegExp>> = { chandy: /^(aim|fire)(_s\d)?$/, stranger: /^(hop|fin_\w+)$/ };
 /** The God King's the same (characters/god-king.ts: his frame 108 × 104, his feet at 64, 99), measured by the same test. */
 export const KING_REACH = [38, 98, 34, 3] as const;
 

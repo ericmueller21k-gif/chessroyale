@@ -9,6 +9,8 @@
  * - `ignite`: the block cracks and bursts into flame (a cue `burn`); it ends on `burn`'s first frame.
  * - `burn` (loop): the tile burning, flames licking up its edges and corners (the middle left clear so the piece reads), embers.
  * - `burnOut`: the flames sink to embers and go; it ends empty.
+ * - His finishers' (Nov 27): `shatter` (the block bursts into shards, a cue `shatter`; it ends empty), `blaze` (his flame strike bursting
+ *   up, a cue `burn`; it ends on `burn`'s first frame) and `cutLine` (a clean cut's white stroke; it ends empty).
  * His colors: the fire sword's reds to white-hot, the ice sword's blues to white (stranger.ts STRANGER_PALETTE's p P q Q y, s S v V W).
  */
 import type { Anim, Character, Frame, Speck } from "../sprite.ts";
@@ -154,6 +156,34 @@ function flash(r: number): Speck[] {
   return out;
 }
 
+/** The ice block bursting (`t` 0..1): its shards flung out from its middle, spinning pale to deep, falling as they go. */
+function shardSpecks(t: number): Speck[] {
+  const out: Speck[] = [];
+  for (let n = 0; n < 14; n++) {
+    const a = (n / 14) * Math.PI * 2 + (n % 3) * 0.3;
+    const r = 3 + t * (9 + (n % 4) * 3);
+    const x = Math.round(16 + Math.cos(a) * r);
+    const y = Math.round(18 + Math.sin(a) * r * 0.8 + t * t * 6);
+    const k = t < 0.35 ? (n % 2 ? "W" : "V") : t < 0.7 ? (n % 2 ? "V" : "v") : n % 2 ? "v" : "S";
+    out.push([x, y, k]);
+    if (n % 3 === 0 && t < 0.7) out.push([x + 1, y, k], [x, y + 1, "e"]);
+  }
+  return out.filter(([x, y]) => x >= 0 && y >= 0 && x < S && y < S);
+}
+
+/** A clean cut's stroke across the square, from its top right to its bottom left, `t` (0..1) of it drawn, fading by `fade` (0..2). */
+function cutSpecks(t: number, fade: number): Speck[] {
+  const out: Speck[] = [];
+  const n = Math.round(30 * t);
+  for (let i = 0; i < n; i++) {
+    const x = 30 - i;
+    const y = 1 + i;
+    out.push([x, y, fade === 0 ? "W" : fade === 1 ? "V" : "v"]);
+    if (fade < 2) out.push([x - 1, y, fade === 0 ? "V" : "v"], [x, y + 1, "v"]);
+  }
+  return out.filter(([x, y]) => x >= 0 && y >= 0 && x < S && y < S);
+}
+
 const F = (ms: number, layers: Frame["layers"], o: Partial<Frame> = {}): Frame => ({ ms, layers, ...o });
 const glints = [-1, 0, 1, 2, 3, 4, -1, -1];
 
@@ -183,6 +213,39 @@ const anims: Record<string, Anim> = {
     ],
   })),
   burn: lazyAnim(() => ({ loop: true, frames: [0, 1, 2, 3].map((i) => F(110, [layer(`fire:${i}:1`, () => fire(i, 1))])) })),
+  // His finishers on a piece (components/Stranger.tsx, FINISH): the ice's block shattering, the piece gone with it (a cue `shatter`); his
+  // flame strike bursting up on the square (a cue `burn`), ending on `burn`'s first frame; his clean cut's stroke, a white line (silent:
+  // his own slash is its sound).
+  shatter: lazyAnim(() => ({
+    loop: false,
+    frames: [
+      F(60, [layer("blk:c4", () => block(1, -1, 4))], { shake: [1, 0], cue: "shatter" }),
+      F(70, [], { specks: [...flash(6), ...shardSpecks(0.15)] }),
+      F(80, [], { specks: shardSpecks(0.4) }),
+      F(90, [], { specks: shardSpecks(0.65) }),
+      F(90, [], { specks: shardSpecks(0.9) }),
+      F(60, []),
+    ],
+  })),
+  blaze: lazyAnim(() => ({
+    loop: false,
+    frames: [
+      F(60, [], { specks: flash(9), cue: "burn" }),
+      F(70, [layer("fire:0:0.5", () => fire(0, 0.5))], { specks: flash(6) }),
+      F(80, [layer("fire:1:0.8", () => fire(1, 0.8))]),
+      F(80, [layer("fire:0:1", () => fire(0, 1))]),
+    ],
+  })),
+  cutLine: lazyAnim(() => ({
+    loop: false,
+    frames: [
+      F(40, [], { specks: cutSpecks(0.5, 0) }),
+      F(60, [], { specks: [...cutSpecks(1, 0), ...flash(3)] }),
+      F(90, [], { specks: cutSpecks(1, 1) }),
+      F(90, [], { specks: cutSpecks(1, 2) }),
+      F(60, []),
+    ],
+  })),
   burnOut: lazyAnim(() => ({
     loop: false,
     frames: [
@@ -207,4 +270,4 @@ export const STRANGER_SQUARE: Character = {
 };
 
 /** The board art's cues and their sounds (sound.ts names). */
-export const STRANGER_FX_SOUNDS = { freeze: "strangerFreeze", burn: "strangerBurn" } as const;
+export const STRANGER_FX_SOUNDS = { freeze: "strangerFreeze", burn: "strangerBurn", shatter: "strangerShatter" } as const;
