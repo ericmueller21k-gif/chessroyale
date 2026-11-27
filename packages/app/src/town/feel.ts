@@ -56,6 +56,13 @@ export const TOWN_FEEL = {
    * for a few seconds"; Town.tsx readyYou): past it the town shows with you on foot and the ride appears the moment it's ready.
    */
   youWaitMs: 1000,
+  /**
+   * (Eric, Nov 27: "shut the town off in browser if u squeeze it too much and it just says a popup like please expand the game to
+   * continue") On a computer (a mouse: hover and a fine pointer), a town box narrower than this (its width over its height) pauses
+   * the town under "Make the window wider to keep playing", back the moment it's wider. Under the narrowest phone's box (a 390 x 844
+   * phone's is 0.49; touch screens never pause); a 1024 px window on a tall screen gives 0.39 to 0.445.
+   */
+  narrowAspect: 0.45,
   // ---- The walk (Eric: "perfect"; square to square "makes it feel like chess").
   /** Your step: one square in this many ms. (Prototype: 90.) */
   youStepMs: 90,

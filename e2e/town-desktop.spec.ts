@@ -234,6 +234,35 @@ test("a mouse window narrower than the frame (900 × 700) has the whole screen a
   expect(Math.abs(900 - 18 - (t.gear[0] + t.gear[2])), "the gear is at the right end (home's 18 px margin since Nov 22)").toBeLessThanOrEqual(1);
 });
 
+test("squeezed too narrow on a computer (Eric, Nov 27): the town pauses under \"Make the window wider to keep playing\" and comes back as it widens; a 390 × 844 window's shape never pauses it", async ({ page }) => {
+  onlyComputer();
+  await page.setViewportSize({ width: 1360, height: 948 });
+  await page.goto("/town?sky=day");
+  await ready(page);
+  const note = page.getByRole("alert").filter({ hasText: "Make the window wider to keep playing" });
+  const you = () => page.evaluate(() => {
+    const y = (window as unknown as { __townYou: () => { c: number; r: number } }).__townYou();
+    return `${y.c},${y.r}`;
+  });
+  await expect(note).toHaveCount(0);
+  // (A 1024 px window on a tall screen: the frame's middle box 512 px wide, 0.39 of its height.)
+  await page.setViewportSize({ width: 1024, height: 1300 });
+  await expect(note).toBeVisible();
+  // (Paused: a walk asked for goes nowhere until it's wider.)
+  const at = await you();
+  expect(await page.evaluate(() => (window as unknown as { __townWalk: (s: [number, number]) => boolean }).__townWalk([28, 25])), "a way there").toBe(true);
+  await page.waitForTimeout(800);
+  expect(await you(), "no step taken while paused").toBe(at);
+  await page.setViewportSize({ width: 1360, height: 948 });
+  await expect(note).toHaveCount(0);
+  await expect.poll(you, { message: "the walk goes on once it's wider" }).not.toBe(at);
+  // (A phone's shape, 390 × 844, in a mouse window: the whole screen, never paused.)
+  await page.setViewportSize({ width: 390, height: 844 });
+  await ready(page);
+  await page.waitForTimeout(300);
+  await expect(note).toHaveCount(0);
+});
+
 test("a phone's bar (Nov 22): back and home's six buttons fit a 320 px phone at 40 px, in order, none touching; Shop & crates and Play with friends open over the town and close back to the same town", async ({ browser }) => {
   onlyComputer();
   const ctx = await browser.newContext({ ...devices["iPhone 13"], viewport: { width: 320, height: 568 } });

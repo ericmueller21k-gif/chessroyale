@@ -1074,6 +1074,11 @@ button.town-pic.player {
   z-index: 30;
   background: #1b1830;
 }
+/* (Nov 27) Squeezed too narrow on a computer: the same card and one line, the town paused under it; centered, the line wrapping in the box. */
+.town-narrow .boss-loading-title {
+  max-width: calc(100% - 32px);
+  text-align: center;
+}
 /* The street town couldn't load (Nov 13; gl-fail.ts): the same card, its line and a Reload button. */
 .town-broken .town-btn {
   width: auto;
