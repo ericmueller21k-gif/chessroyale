@@ -877,6 +877,50 @@ together on top of it. So not to worry. We'll leave the hollow as is."
 - **Lesson:** twice, bars written to sit inside a finished song he likes came out as "thrown in" or not musical. A
   song he has passed is finished; a longer one is a new song to write whole, not an insert.
 
+## The gothic hybrid (Nov 27, song_ap.py): chips and recorded voices; first go sent, no verdict yet
+
+Eric, with a write-up made with another assistant ("Full Song Deconstruction & IP-Free Master Blueprint": a timeline
+of a reference track, then a plan for one like it): "trying to work with Gemini to help me come up with a song, but
+have you produce it ... our normal time length ... when we did ... the game trailer, we had done a chiptune style, and
+then we did a real instrument ... Let's try to like do a hybrid approach here where we use chiptune, but we can add in
+like for the hymning ... the actual human from whatever other tool that does that ... Unless it sounds bad, because
+then ... take that real human humming and then ... add some layer on top of it to ... make it a bit more chiptune like".
+- **Which kind of brief:** a write-up of someone else's track with a plan drawn from it: the plan has the reference's
+  own tempo, key and chord loops, and note-by-note soprano lines that may be the reference's. So the style only (the
+  rule above): its means are used (168 felt at half pace, the men's drone and a woman's voice, a filtered breakbeat
+  with the two trading, a swell, muted 16th guitars over a kick on every 16th, a lead guitar's tune, the voices over
+  the band with guitar runs in thirds, a flute-and-oboe bridge, a violin's climb, a long stone echo); its key, both
+  chord loops, the eight-chord climax and its named notes are not. Mine: E minor, a lament bass, a turn round the
+  fifths ending on F, a bridge from G major to G minor, the last part a minor third up. Said to him and in the
+  docstring. (He asked for nothing as written this time; if he wants the plan's own notes, that is his to say.)
+- **What "the real instrument" was:** the trailer's second track was computed too (track_b.py); there was never
+  another tool. Now there is: `sampled.py` writes a part's notes to a MIDI file and plays it through FluidSynth with
+  the FluidR3_GM sound bank (recorded voices and instruments; MIT license; `apt-get install fluidsynth
+  fluid-soundfont-gm`; the bank is not in the repo). **If a song made with it goes into the game, CREDITS.md needs a
+  line for the bank (Frank Wen, MIT): tell the director at the handover.**
+- **What the bank is like, measured:** its "Ahh Choir" is a real choir sampled every three half steps from E2 to
+  F#5 (one sample stretched over everything above), with a singer's ring round 3 kHz; its men's notes are 10 to 35
+  cents flat, so `stem(..., tune=True)` nudges each note by what `off_pitch` measures (within 5 cents after). It
+  speaks late (half level 110 to 230 ms after the note starts), so the choir's parts start 90 ms ahead of the beat,
+  the strings 50, the oboe 80. There is no solo opera singer in it: the woman's line is the choir's women in unison,
+  with a light vibrato (9 cents) and a swell on each long note. "Solo Vox" is one soft voice, one sample an octave,
+  its wobble speeding up with the pitch: the `solo` version. "Ohh Voices" is in tune and dark low down (the drone)
+  and hollow up high (not used there). The solo violin is slow to speak in its middle (16ths reach 7 dB under a held
+  note) and fine high up.
+- **The chips:** the guitars are `Mix.gritty` chords through an amp stage on the bus (lows thinned, clipped together,
+  a speaker's curve): without it 500 Hz to 2 kHz sat 15 dB under the lows, 8 to 13 dB short of the Hidden Boss
+  score's balance. The lead is `Mix.drive` (his liked one). The breakbeat is its own bus, band-passed and crushed
+  (12 kHz, 6 bits).
+- Measured on the master (-16.0 LUFS, peak -1.1): intro -21.9, break -20.3 to -19.3, swell -20.4 to -18.6, riff
+  -19.2, lead -18.2 and -17.7, climax -16.5, bridge -22.5, the violin -20.3, the last part -15.6. Her voice 1 to 2 dB
+  over the men where they trade; in the climax the voices together 2 dB over the guitars. Her held notes within 4
+  cents.
+- Sent: the song, and the opening (0:30) two more ways: the one-voice sample; and his chiptune layer (`chip`: every
+  voice at 12 kHz and 7 bits, her line doubled by a soft square wave).
+- To watch in his answer: whether the bank's choir sounds real enough to him at all; the riff sits 0.6 dB under the
+  swell's end (it should feel like a step up); the men's chant has no consonants, so its repeated notes may blur.
+- If he likes the recorded choir: the Hidden Boss's hymn (above) could be sung by it in place of the computed men.
+
 ## Sheet music: the town's first piano solo (Nov 26)
 
 Eric: "Can you turn the first piano solo into sheet music for me, and ... you know how it opens with a lower sounding,
