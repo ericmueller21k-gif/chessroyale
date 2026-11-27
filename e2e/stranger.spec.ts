@@ -127,3 +127,69 @@ test("his locked card: a tap shows him and how to unlock him, every way to play 
   await expect(page.locator(".boss-menu-list .boss-row:not(.match)")).toHaveCount(1);
   await expect(page.locator(".boss-menu-list .boss-row:not(.match)")).toHaveAttribute("aria-label", /^The Stranger, /);
 });
+
+/** Every frame from now (an init-free recorder: started before your move goes in), for his finisher's test: what the page draws. */
+type Frame = { t: number; dock: string | null; stage: string | null; kind: string | null; pieces: string[]; thinking: boolean; phase: string; fig: number[] | null; vw: number; vh: number };
+const record = (page: Page, square: string) =>
+  page.evaluate((sq) => {
+    const log: unknown[] = [];
+    (window as any).__fin = log;
+    const end = performance.now() + 60_000;
+    const frame = () => {
+      const m = document.querySelector(".pm-finisher");
+      const r = document.querySelector(".sg-fig")?.getBoundingClientRect();
+      const ph = (window as any).match?.phase;
+      log.push({
+        t: performance.now(),
+        dock: document.querySelector(".boss-char")?.getAttribute("data-anim") ?? null,
+        stage: m?.getAttribute("data-stage") ?? null,
+        kind: m?.getAttribute("data-finisher") ?? null,
+        pieces: [...document.querySelectorAll(`.hb-board piece[data-square="${sq}"]:not(.fading)`)].map((e) => e.className),
+        thinking: !!ph?.thinking,
+        phase: ph?.kind ?? "",
+        fig: r ? [r.left, r.top, r.right, r.bottom] : null,
+        vw: innerWidth,
+        vh: innerHeight,
+      });
+      if (performance.now() < end) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }, square);
+
+test("his finisher: your bishop takes his knight (he blocks), he takes your bishop back: his hop and his cut on it, the bishop gone, then his move", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (The test switch: the battle starts where your bishop can take his knight, and he takes a piece of yours back; the clean cut.)
+  await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=stranger&wip=1&power=finisher-cut`);
+  await openBossRaid(page);
+  await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+  await expect.poll(() => phase(page), { timeout: 45_000 }).toBe("play");
+  const t = await yourTurn(page);
+  const crowd: "w" | "b" = await page.evaluate(() => (window as any).match.boss.crowdSide);
+  const [take, square] = crowd === "w" ? ["g5f6", "f6"] : ["g4f3", "f3"];
+  const mine = crowd === "w" ? "white" : "black";
+  await record(page, square);
+  await submitMove(page, take, t.fen);
+  await yourTurn(page);
+  const log: Frame[] = await page.evaluate(() => (window as any).__fin);
+  // He blocks as your bishop takes his knight (his thinking: a piece of his taken that isn't a pawn).
+  expect(log.some((f) => f.thinking && f.dock === "block")).toBe(true);
+  // His finisher while he still thinks: the hop, the strike, the piece gone, the hop back, in that order; the cut, as switched.
+  const fin = log.filter((f) => f.stage);
+  expect([...new Set(fin.map((f) => f.stage))]).toEqual(["hop", "strike", "gone", "back"]);
+  expect([...new Set(fin.map((f) => f.kind))]).toEqual(["cut"]);
+  expect(fin.every((f) => f.thinking)).toBe(true);
+  // Your bishop on its square until his cut takes it; from then no piece of yours there; his move then shows, his piece on it.
+  const gone = log.findIndex((f) => f.stage === "gone");
+  const moved = log.findIndex((f, i) => i > gone && !f.thinking && f.phase === "boss");
+  expect(gone).toBeGreaterThan(0);
+  expect(moved).toBeGreaterThan(gone);
+  expect(log.slice(log.findIndex((f) => f.stage === "strike"), gone - 2).every((f) => f.pieces.some((c) => c.includes(`${mine} bishop`)))).toBe(true);
+  expect(log.slice(gone, moved).filter((f) => f.pieces.some((c) => c.includes(mine)))).toEqual([]);
+  await expect.poll(() => page.evaluate((sq) => [...document.querySelectorAll(`.hb-board piece[data-square="${sq}"]`)].map((e) => e.className).join(" "), square)).toContain(crowd === "w" ? "black" : "white");
+  // His figure on the board whole on the screen, every frame (Eric's rule).
+  const off = fin.filter((f) => f.fig && (f.fig[0]! < 0 || f.fig[1]! < 0 || f.fig[2]! > f.vw || f.fig[3]! > f.vh));
+  expect(off.map((f) => f.fig)).toEqual([]);
+  expect(errors).toEqual([]);
+});

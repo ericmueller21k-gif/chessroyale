@@ -6,7 +6,7 @@ import { BoardEffects, BossMoment, SpriteAnim, prewarm, type BoardItem } from ".
 import { FREEZE } from "./Ginger.tsx";
 import { BURN, FireBurn } from "./Grex.tsx";
 import { squareXY } from "./GodKing.tsx";
-import { Flight, PIECE_WORD, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { Flight, PIECE_WORD, onComputer, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 
 /**
  * The Stranger's powers on screen (his rules: packages/chess/src/bosses/stranger.ts). Reused, not new (Eric, Oct 14: simple beats
@@ -56,19 +56,24 @@ const arc = (a: Pt, b: Pt, h: number, u: number): Pt => ({ x: a.x + (b.x - a.x) 
 /** His box on the board (% of its width): 128 frame px, his body about 2.4 squares tall. */
 const FIG_W = 38;
 const PX = FIG_W / STRANGER.w;
-/** His corner of the board (its top left, by his place in a phone's bar): where he hops from and back to (his feet). */
-const CORNER: Pt = { x: 9, y: 6 };
-/** His drawing's reach above his feet (sprite px, his crown and aura), so his head never rises more than HEAD_ROOM % above the board. */
+/**
+ * His corner of the board, where he hops from and back to (his feet), his box inside the board's left edge: on a phone its top left (his
+ * place in the bar above it), on a computer its bottom left (his place beside it; the board's top is near the window's there).
+ */
+const cornerOf = (computer: boolean): Pt => ({ x: FIG_W / 2 + 1, y: computer ? 97 : 6 });
+/**
+ * His drawing's reach above his feet (sprite px, his crown and aura), so his head never rises more than `headRoom` % above the board: a
+ * little on a phone (the bar is above it), none on a computer.
+ */
 const UP = 110;
-const HEAD_ROOM = 8;
 
 /**
  * Where he stands to strike a piece: beside it, a square and a bit toward the board's middle, his feet on its square's bottom edge (lower
  * where the piece is near the top of the board, so his head stays on the screen).
  */
-export function finisherStand(square: string, o: Orientation): Pt {
+export function finisherStand(square: string, o: Orientation, computer = false): Pt {
   const c = centreOf(square, o);
-  return { x: c.x + (c.x < 50 ? 1 : -1) * 14, y: Math.max(c.y + 6.25, UP * PX - HEAD_ROOM) };
+  return { x: c.x + (c.x < 50 ? 1 : -1) * 14, y: Math.max(c.y + 6.25, UP * PX - (computer ? 0 : 8)) };
 }
 
 /**
@@ -147,7 +152,9 @@ function finisherMoment({ boss, moment, now, t, orientation }: MomentProps) {
   if (!square) return null;
   const kind = finisherOf(moment.pick);
   const tl = finishTimeline(kind);
-  const stand = finisherStand(square, orientation);
+  const computer = onComputer();
+  const CORNER = cornerOf(computer);
+  const stand = finisherStand(square, orientation, computer);
   const flight = STRANGER_HOP.landAt - STRANGER_HOP.upAt;
   const hop = (a: Pt, b: Pt, from: number): Pt => (t < from + STRANGER_HOP.upAt ? a : arc(a, b, 14, clamp01((t - from - STRANGER_HOP.upAt) / flight)));
   const going = t >= tl.backAt;

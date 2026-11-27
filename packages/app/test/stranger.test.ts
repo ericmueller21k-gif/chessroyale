@@ -175,14 +175,15 @@ describe("his swords (Eric, Nov 27: his slashes, his block, his flourish, his fi
   });
 
   it("where he stands to strike: beside the piece, toward the board's middle, his head no more than a little over the board's top", () => {
-    for (const o of ["white", "black"] as const)
-      for (const f of "abcdefgh")
-        for (let r = 1; r <= 8; r++) {
-          const at = finisherStand(`${f}${r}`, o);
-          expect(at.x, `${f}${r}`).toBeGreaterThan(15);
-          expect(at.x, `${f}${r}`).toBeLessThan(85);
-          expect(at.y, `${f}${r}`).toBeLessThanOrEqual(100);
-          expect(at.y - (110 * 38) / 128, `${f}${r}`).toBeGreaterThanOrEqual(-8.01);
-        }
+    for (const computer of [false, true])
+      for (const o of ["white", "black"] as const)
+        for (const f of "abcdefgh")
+          for (let r = 1; r <= 8; r++) {
+            const at = finisherStand(`${f}${r}`, o, computer);
+            expect(at.x, `${f}${r}`).toBeGreaterThan(15);
+            expect(at.x, `${f}${r}`).toBeLessThan(85);
+            expect(at.y, `${f}${r}`).toBeLessThanOrEqual(100);
+            expect(at.y - (110 * 38) / 128, `${f}${r}`).toBeGreaterThanOrEqual(computer ? -0.01 : -8.01);
+          }
   });
 });
