@@ -1031,7 +1031,8 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   sheathe; locked look `looks.locked`), `stranger-sounds.ts`, `stranger-lines.ts` (placeholders), his square's fire and ice in
   `effects/stranger.ts` (`EFFECTS.strangerSquare`: strike, frozen, ignite, burn, burnOut). His kit waits in `ART_KITS.Stranger` until his
   rules put him in the roster; `test/stranger.test.ts`. His hair is drawn strand by strand (`paintBackHair`, the front locks in
-  `paintHead`: single-pixel strands, light and shadow by turns), long and wide behind him, under the hilts on his back. His aura grows
+  `paintHead`: single-pixel strands, light and shadow by turns), straight down both sides of his face to his collar, nothing behind his shoulders (Eric's crop); the
+  hilts on his back peek over his shoulders beside it. His aura grows
   from the figure's own part (two levels), so it never paints him twice. His lines are his alone: his voice's sound is keyed by a
   line's words.
 

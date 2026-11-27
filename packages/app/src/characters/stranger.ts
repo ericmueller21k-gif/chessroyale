@@ -4,8 +4,8 @@
  * place come in their own job (docs/decisions/2026-11-27-stranger-art.md).
  *
  * An original JRPG swordsman, drawn facing front, light from the top left, in a 128 x 128 frame, his feet at [64, 122], about 100 px
- * from his boots to his crown's tips: long white hair parted over his brow, its front locks framing his face, the whole of it falling
- * long and wide behind him past both shoulders to his knees, drawn strand by single-pixel strand (Eric, Nov 27); pale skin, a
+ * from his boots to his crown's tips: long white hair parted over his brow, its locks falling straight down both sides of his face to his
+ * collar and the top of his chest, nothing behind his shoulders, drawn strand by single-pixel strand (Eric, Nov 27); pale skin, a
  * narrow face, one ember eye and one ice eye; a long midnight-indigo trench coat of his own cut (a standing collar, gold trim, open
  * from the belt down over dark trousers, its crimson lining showing as its tails swing: the trench-coat idea of the Hidden Boss's final
  * form, cut and colored anew, no pauldrons); dark gloves and boots; and his crown, a grander Fire & Ice crown than the player's item:
@@ -271,9 +271,12 @@ function paintSword(c: Cv, kind: "fire" | "ice", at: Pt, deg: number, phase = 0)
   }
 }
 
-/** Where a sword on his back sits: its grip just over that shoulder, the blade down across his back (an X with the other). */
-const BACK_F = { at: [44, 39] as Pt, deg: 140 };
-const BACK_I = { at: [84, 39] as Pt, deg: -140 };
+/**
+ * Where a sword on his back sits: its guard tucked at the top of that shoulder behind his hair, its grip and pommel rising just over it
+ * (steep, so it reads as a hilt, not a twig of hair: Eric, Nov 27), the blade down across his back (an X with the other).
+ */
+const BACK_F = { at: [46, 47] as Pt, deg: 152 };
+const BACK_I = { at: [82, 47] as Pt, deg: -152 };
 
 // His hair is drawn strand by strand: single-pixel strands side by side, light and shadow alternating (Eric, Nov 27: "the strands really
 // need to be like thinly drawn pixel next to each other more, not these like chunks"), a few white highlight pixels in its sheen.
@@ -295,45 +298,25 @@ const along = (pts: readonly Pt[], y: number) => {
   return pts.at(-1)![1];
 };
 
-/** The fall's half width by height (frame px, standing): narrow at his crown, past his shoulders by his chest, widest at its ends. */
-const FALL_HW: readonly Pt[] = [
-  [20, 9],
-  [30, 15],
-  [44, 19],
-  [54, 25],
-  [70, 32],
-  [90, 37],
-  [106, 38],
-];
-/** The strands across the fall: about one a pixel where it's widest. */
-const FALL_STRANDS = 68;
-
 /**
- * The long fall behind him: from the crown of his head down behind his shoulders and his back, fanning out past both shoulders to his
- * knees (seen to his left and right behind the coat), strand by strand, its tips in pointed locks, swaying at their ends.
+ * The hair behind his head: from his crown down behind his neck to his collar, no wider than his front locks (Eric, Nov 27: "get rid of
+ * all the hair behind him ... this is basically the length that it should be"), so nothing spreads past them behind his shoulders.
+ * Strand by strand, their tips uneven, hidden under his collar.
  */
 function paintBackHair(c: Cv, oy: number, sway: number): void {
-  const tipOf = (n: number) => {
-    // (Pointed locks of 7 strands, the middle one longest; shorter toward the fall's outer edges.)
-    // (Each lock its own length, for a wild, uneven end.)
-    const s = (n + 0.5) / FALL_STRANDS - 0.5;
-    const g = n % 7;
-    const lockLen = [0, 5, 2, 7, 1, 4, 6, 3, 5, 0][Math.floor(n / 7) % 10]!;
-    return 108 - 22 * s * s - Math.abs(g - 3) * 1.8 - ((n * 5) % 3) - lockLen;
-  };
-  for (let y = 20; y < 108; y++) {
-    const hw = along(FALL_HW, y);
-    const drift = sway * 1.5 * Math.max(0, (y - 50) / 50);
-    for (let x = Math.floor(MID - hw - 3); x <= Math.ceil(MID + hw + 3); x++) {
-      // (Each strand a gentle wave down its length.)
-      const wave = 0.5 * Math.sin(y * 0.16 + (x - MID) * 0.05);
-      const s = (x + 0.5 - MID - drift - wave) / hw;
+  const N = 26;
+  for (let y = 20; y <= 60; y++) {
+    // (Half width: round his crown, then straight down inside the front locks' outer edges.)
+    const hw = y < 30 ? 9 + (y - 20) * 0.35 : 12.5;
+    const drift = sway * Math.max(0, (y - 44) / 20);
+    for (let x = Math.floor(MID - hw - 2); x <= Math.ceil(MID + hw + 2); x++) {
+      const s = (x + 0.5 - MID - drift) / hw;
       if (Math.abs(s) > 1) continue;
-      const n = Math.floor(((s + 1) / 2) * FALL_STRANDS);
-      if (y > tipOf(n)) continue;
-      // (Lit from the top left; darker toward its ends, behind him.)
-      const l = 0.46 - s * 0.18 - Math.max(0, y - 64) * 0.004 + strandTone(n);
-      put(c, x, y + oy, (y === 66 || y === 67) && sheen(n) && s < 0 ? "J" : ramp(HAIR, l));
+      const n = Math.floor(((s + 1) / 2) * N);
+      if (y > 56 + ((n * 5) % 4)) continue;
+      // (Lit from the top left; in shadow behind his head.)
+      const l = 0.36 - s * 0.14 + strandTone(n);
+      put(c, x, y + oy, ramp(HAIR, l));
     }
   }
 }
@@ -606,29 +589,28 @@ function paintHead(c: Cv, pose: StrangerPose, ox: number, oy: number, sway: numb
     },
   );
   lay(c, hd);
-  // The front locks: from his temples down past his cheeks over his collar, the front of the same fall (no line between them), each a
-  // band of strands, their tips in points at his collarbone. Inside the swords' hilts on his back.
+  // The front locks: from his temples straight down past his cheeks to his collar and the top of his chest (Eric's crop, Nov 27), each a
+  // band of single-pixel strands, light and shadow by turns, their tips uneven. The hilts on his back peek out beside them.
   const lock = (side: -1 | 1) => {
     const lk = cvs();
-    // (Inner edge by the face, outer edge out toward his shoulder: our left lock's, mirrored for the other.)
+    // (Inner edge by the face, outer edge toward his shoulder: our left lock's, mirrored for the other. Straight: nothing pokes out.)
     const inner: readonly Pt[] = [
       [27, 57],
       [34, 56],
       [40, 55.5],
       [47, 57],
       [54, 56.5],
-      [62, 55],
+      [64, 56],
     ];
     const outer: readonly Pt[] = [
       [27, 52],
-      [40, 51],
+      [36, 51],
       [46, 50.5],
-      [54, 47],
-      [62, 45],
+      [64, 50.5],
     ];
-    const N = 7;
-    const tips = [61, 64, 62, 66, 63, 60, 62];
-    for (let y = 27; y <= 66; y++) {
+    const N = 6;
+    const tips = [60, 63, 61, 64, 62, 60];
+    for (let y = 27; y <= 64; y++) {
       const a = along(outer, y);
       const b = along(inner, y);
       const d = sway * 1.2 * Math.max(0, (y - 44) / 20);
