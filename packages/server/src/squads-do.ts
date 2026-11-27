@@ -21,10 +21,10 @@ import { countCall } from "./ops.ts";
 import { LiveReporter } from "./live.ts";
 import { liveHub } from "./live-hub.ts";
 import { isPaused, pausedBosses, RESIDENTS_PAUSED, residentsPaused } from "./kill-switches.ts";
-import { TOWER_LINES, commitPartyFloor, preparePartyFloor, type LobbyGone, type PartyFloorPrep, type PartyRefusal } from "./tower.ts";
+import { TOWER_LINES, commitPartyFloor, preparePartyFloor, towerUnlocks, type LobbyGone, type PartyFloorPrep, type PartyRefusal } from "./tower.ts";
 import { partyOpenText } from "./town-chat.ts";
 import { chatRoomOf, townPartyPoster } from "./town-chat-api.ts";
-import { livesLeft, towerPool } from "@chessroyale/core";
+import { bossDef, livesLeft, towerPool } from "@chessroyale/core";
 import type { Env } from "./index.ts";
 
 const library = openings as unknown as Opening[];
@@ -646,7 +646,11 @@ export class SquadsParty extends DurableObject<Env> {
     try {
       if (this.record.kind === "tower") return await this.makeTowerFloor(want);
       const code = this.record.code;
-      const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, bossPartyOverrides(want), undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
+      // (A boss unlocked by a win, the Stranger: the leader's unlocks, read from the server's tower best.)
+      const leader = want.members.find((m) => m.seat === want.leaderSeat)?.userId;
+      const unlocked = bossDef(want.boss)?.unlock && leader && this.env.DB ? await towerUnlocks(d1Sql(this.env.DB), leader).catch(() => []) : [];
+      const overrides = bossPartyOverrides(want, unlocked, (this.env as { TEST_SWITCHES?: string }).TEST_SWITCHES === "1");
+      const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, overrides, undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
       if (!this.record) return;
       const core = this.core();
       core.placedIn(lobby ?? null, want.id);

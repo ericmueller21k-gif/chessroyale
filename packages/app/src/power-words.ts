@@ -60,6 +60,9 @@ export const POWER_WORDS: Record<PowerId, string> = {
   queenlock: "Lock-on Shot",
   train: "smashes a piece left on his line, The Train",
   fall: "The Fall",
+  frostfire: "freezes a piece, then burns its square",
+  // (A placeholder: Eric's ultimate for him comes next.)
+  strangerult: "an ultimate to come",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

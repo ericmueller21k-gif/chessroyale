@@ -1,4 +1,4 @@
-import { BATTLE_TOWER, TOWER_PARTY, finishFloor, floorSettings, floorsWonBest, leaveFloor, livesLeft, newRun, pausedLine, sideRefusal, startFloor, towerPartySettings, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
+import { BATTLE_TOWER, TOWER_PARTY, unlockedBosses, finishFloor, floorSettings, floorsWonBest, leaveFloor, livesLeft, newRun, pausedLine, sideRefusal, startFloor, towerPartySettings, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 import type { PartyFloorEnd } from "./lobby.ts";
 
@@ -144,6 +144,15 @@ export interface TowerRunView {
   /** A party copy's: the others who climbed it (their names now; an account deleted since is gone from it), and whether it's played on alone. */
   mates?: { uid: string; name: string }[];
   alone?: boolean;
+}
+
+/**
+ * The bosses this account has unlocked (the Stranger: Eric, Nov 27, "Beat him in the tower"), from what's stored: its tower best, solo
+ * or party (tower_best: floors won only), through core's unlockedBosses. No row of its own: the best is the record.
+ */
+export async function towerUnlocks(sql: Sql, userId: string): Promise<string[]> {
+  const row = await sql.first<{ best: number | null }>("SELECT MAX(floor) AS best FROM tower_best WHERE user_id = ?", userId);
+  return unlockedBosses(row?.best ?? 0);
 }
 
 /** GET /api/tower: your open runs and your best floors (0: none won yet). */
@@ -573,7 +582,8 @@ const POSTS = new Set(["/api/tower/run", "/api/tower/floor/start", "/api/tower/f
 export async function towerResponse(request: Request, sql: Sql, userId: string, env: TowerEnv, now: number): Promise<Response | null> {
   const path = new URL(request.url).pathname;
   if (path !== "/api/tower" && !POSTS.has(path)) return null;
-  const pool = towerPool(env.off);
+  // (Where TEST_SWITCHES is on, a boss of his own floors (the Stranger) is met before his art: core towerPool's `unfinished`.)
+  const pool = towerPool(env.off, undefined, env.testSwitches);
   const answer = (a: TowerAnswer) => json(a.body, a.status);
   if (path === "/api/tower") return request.method === "GET" ? json(await towerState(sql, userId, pool)) : null;
   if (request.method !== "POST") return null;
