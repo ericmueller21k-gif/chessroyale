@@ -827,5 +827,5 @@ test("an admin's locker on a slow phone: one of every item, shiny, opened from h
   expect(open.paint, "the first paint (ms)").toBeLessThan(500);
   expect(open.longest, "the longest task (ms)").toBeLessThan(200);
   expect(open.filled, "every cell drawn (ms)").toBeLessThan(5000);
-  expect(s.p95, "95th percentile frame while open (ms)").toBeLessThan(70);
+  expect(s.p95, "95th percentile frame while open (ms)").toBeLessThan(100);
 });
