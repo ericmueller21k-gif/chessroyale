@@ -68,7 +68,7 @@ import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
 import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sound.ts";
-import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_PICTURES, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, ROOM_BOSS_MUSIC, TOWN_ITEM_FRAMES, TOWN_PICTURES, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { art2d, painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { APP_VERSION, reportTownFallback } from "../problems.ts";
@@ -94,7 +94,7 @@ import type { FloorScript } from "./shops/tower-floor-scene.ts";
 import { FLOOR_YOU, TOWER_FLOOR_FEEL, floorTimes, upWords } from "./shops/tower-floor.ts";
 import type { LivePawn, RecluseScene } from "./shops/recluse-scene.ts";
 import { tooYoung } from "../account.ts";
-import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
+import { dressedPawn, lookKey, loopOf, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
@@ -1477,8 +1477,9 @@ function yourLook() {
  * A pawn's dressed picture, and (`riding`: its ride has a back view) the same seen from behind, its face items left off (Nov 1,
  * rides v2, the director's call: from behind a face item doesn't show, a hat does).
  */
-const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean, side: "w" | "b" = "w"): Promise<[YouArt | null, YouArt | null]> => {
-  const front = dressedPawn(wear, plain, PAWN_PX, side);
+const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean, side: "w" | "b" = "w", play = !riding): Promise<[YouArt | null, YouArt | null]> => {
+  // (`play`, Nov 27: an item that plays in the town painted as its loop's frames too. Not on a ride: the rider's frames carry the still.)
+  const front = dressedPawn(wear, plain, PAWN_PX, side, play && !riding);
   if (!riding || !wear?.face) return front.then((a) => [a, a]);
   return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX, side)]);
 };
@@ -1759,6 +1760,23 @@ function startTown(
    * `loadSheetWaitMs`, and keeps their pictures. A bot's dressed pawn was made just after it and uploaded the first time it showed.
    */
   const dressing: Promise<unknown>[] = [];
+  /**
+   * (Nov 27) Everyone else's dressed pictures, shared by those who look the same (their pawn, its tint, their items and colors, a ride or
+   * not): one set of pictures (and an item's loop frames) for all of them. The looks whose item plays, `othersLooks` at most (the atlas's
+   * spare pages hold their frames): one more stands still.
+   */
+  const looks = new Map<string, Promise<[YouArt | null, YouArt | null]>>();
+  let playing = 0;
+  const dressedShared = (wear: ItemLook | null, lk: { side: string; tint: string | null }, plain: HTMLCanvasElement, riding: boolean, side: "w" | "b") => {
+    const key = `${lk.side}|${lk.tint ?? ""}|${riding ? 1 : 0}|${lookKey(wear)}`;
+    let got = looks.get(key);
+    if (!got) {
+      const play = !riding && !!loopOf(wear) && playing < TOWN_ITEM_FRAMES.othersLooks;
+      if (play) playing++;
+      looks.set(key, (got = dressed(wear, plain, riding, side, play)));
+    }
+    return got;
+  };
   /** Someone else's pawn (a bot, the test player; real players later) as the square draws it, made once: its items, its ride. */
   const dressPerson = (p: Person) => {
     const lk = p.look;
@@ -1777,8 +1795,8 @@ function startTown(
     if (!lookKey(wear)) mount(null, null);
     else
       dressing.push(
-        dressed(wear, plain, !!on, lk.side === "dark" ? "b" : "w").then(([art, back]) => {
-          if (!alive) return;
+        dressedShared(wear, lk, plain, !!on, lk.side === "dark" ? "b" : "w").then(([art, back]) => {
+          if (!alive || p.look !== lk) return;
           if (art) r.botArt.set(p.id, art);
           mount(art, back);
         }),
@@ -2736,7 +2754,14 @@ function startTown(
         tag: tagged.has(i),
       }));
   };
-  const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving(), way: [town.you.walker.wdc, town.you.walker.wdr] } : null);
+  // (Nov 27, `item`: your item's loop as the last frame drew it: how many frames it has, the one drawn (-1: the still alone), each patch's
+  // size (px), null: none.)
+  const hookYou = () => {
+    if (!testSwitchesAllowed()) return null;
+    const lp = r.youArt?.loop;
+    const item = lp ? { frames: lp.frames.length, drawn: lp.frames.indexOf(r.youDrawn!), w: lp.frames[0]?.width ?? 0, h: lp.frames[0]?.height ?? 0 } : null;
+    return { ...standOf(town.you.walker), moving: town.you.walker.moving(), way: [town.you.walker.wdc, town.you.walker.wdr], item };
+  };
   // ... `__townWalk([c, r])`: you walk to that square (or the free one nearest it) as a tap on it would, the camera following (to measure
   // the frame rate walking a set route, Nov 5). True if there's a way.
   const hookWalk = (sq: readonly [number, number]) => {
@@ -2913,7 +2938,12 @@ function startTown(
       }
       // (The pawns' crate items, Nov 26: waited for, up to loadSheetWaitMs from here, and kept with the rest.)
       await Promise.race([Promise.allSettled(dressing), new Promise((go) => setTimeout(go, f.loadSheetWaitMs))]);
-      for (const a of [r.youArt, ...r.botArt.values()]) if (a) keep(upName(a.img, "dressed pawn"));
+      for (const a of new Set([r.youArt, ...r.botArt.values()]))
+        if (a) {
+          keep(upName(a.img, "dressed pawn"));
+          // (An item's loop frames, Nov 27: kept with it, so walking uploads none.)
+          for (const fr of a.loop?.frames ?? []) keep(upName(fr, "dressed pawn frame"));
+        }
       if (pool) Object.assign(pictures, { byWorkers: pool.made.workers, whileWaiting: pool.made.here, workers: pool.workers });
       pool?.close();
       pool = null;

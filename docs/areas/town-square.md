@@ -445,6 +445,11 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   on its square's middle, with a contact shadow under it that shrinks and fades as the hop lifts it. You have no ring
   under you (Oct 26, Eric: the ring and the shadow together "looks sloppy"); your gold name tag marks you, and your
   shadows are a bot's, sized from the pawn rather than the margin your items are drawn in.
+  **Items that play (Nov 27; [decision](../decisions/2026-11-27-town-item-frames.md)):** a worn item in `TOWN_ITEM_FRAMES` (the tube's twist,
+  the cane's strand) is painted as its loop's frames once as the figure is dressed (`dressedPawn`'s `play`: its CSS animations stopped at each
+  moment), each kept as a patch over the still (`patches`); render.ts `loopAt` picks one by the shared clock, drawn after the still in
+  `drawSprite`. Identical looks share them (`looks` in Town.tsx); others' looks play `othersLooks` at most; riders, the far band and reduced
+  motion show the still. Kept on the loading screen. Tests: `e2e/town.spec.ts` "an item that plays", `@perf` "Chess Town busy … wearing".
 
 - **Rides** (Oct 31, Eric: "a GIF of it running around town with a piece mounted to it… and then… an idle animation, the usual";
   docs/decisions/2026-10-31-rides.md; Nov 1, every boss's, with views and trails: docs/decisions/2026-11-01-rides-v2.md). A pawn

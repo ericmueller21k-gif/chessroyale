@@ -201,7 +201,7 @@ test("Chub & Chirp's Carrot Patch (the test switches): the cast and its ladder, 
     banner: { selector: ".fight-banner", text: /CARROT PATCH!/ },
     fly: { selector: ".pm-carrots .hp-fly" },
     ladder: { selector: ".hp-ladder", text: /What their carrots win/ },
-    top: { selector: ".hp-ladder li.win", text: /they win/ },
+    top: { selector: ".hp-ladder li.win", text: /Chub & Chirp wins/ },
     canvas: { selector: ".board-wrap > .hp-carrots" },
     dock: { selector: ".dock-line", text: /Chub & Chirp spent their turn planting carrots\./ },
   });

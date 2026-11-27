@@ -108,11 +108,12 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
 - **Item animations and the Smiley's expressions** (Nov 25; [2026-11-25-item-polish.md](../decisions/2026-11-25-item-polish.md)): the Fire & Ice
   Crown's flames, the Candy Cane's strand, the Gift-Wrap Tube's confetti (and its barber-pole twist, Nov 27: its stripes scroll up it,
-  one turn every 1.5 s, everywhere but Chess Town, where your figure is a still picture, and the crate strip (`.cox-track`, too fast to
+  one turn every 1.5 s, everywhere but the crate strip (`.cox-track`, too fast to
   see; the reveal card twists), `ia-twist`, `TUBE_CELL`; [2026-11-27-crate-polish.md](../decisions/2026-11-27-crate-polish.md)), the Parrot's flap and the Tommy Gun's key and puff play (CSS `ia-`
   classes in styles.css, SVG transforms and opacity, no frame loop) only under `.ia-live`: `live` on `ItemArt` / `Avatar`, set where the
   item is the focus (your pawn on screen, the locker's preview, a crate's reveal, a profile's Wearing rows and tiles), and only inside
-  `prefers-reduced-motion: no-preference`. Grids, lists and the power banner stay still. A Smiley Face's expression (`SMILEY_EXPRESSIONS`:
+  `prefers-reduced-motion: no-preference`. Grids, lists and the power banner stay still. **In Chess Town** (Nov 27) the tube's twist and the
+  cane's strand play from frames painted once ([town-square.md](town-square.md), "You"); the other items there next, a `TOWN_ITEM_FRAMES` line each. A Smiley Face's expression (`SMILEY_EXPRESSIONS`:
   Smile, Wink, Tongue, Cool, Surprised, Laughing) comes from its seed (`smileyExpression`, its own stream; never stored); `itemName(it)`
   names it ("Smiley Face · Wink") on the reveal card, the locker tile and its label, the delete dialog and the profile; `stackKey` keeps
   each expression its own stack.

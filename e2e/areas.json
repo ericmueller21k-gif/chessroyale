@@ -474,6 +474,7 @@
         "packages/chess/src/bosses/stranger.ts",
         "packages/app/src/components/Stranger.tsx",
         "packages/app/src/characters/stranger*.ts",
+        "packages/app/src/characters/stranger-*.webp",
         "packages/app/src/characters/effects/stranger.ts",
         "packages/app/src/unlocks.ts",
         "e2e/stranger.spec.ts"

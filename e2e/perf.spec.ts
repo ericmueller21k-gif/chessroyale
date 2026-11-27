@@ -718,6 +718,24 @@ test("Chess Town on a slow phone: a second visit loads the first visit's kept pi
 test("Chess Town busy on a slow phone: 55 other players walking and a chat line every 250 ms cost our frame little more than an empty town's, and the page little outside it (Nov 27)", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(5 * 60_000);
+  await busyTown(page, false);
+});
+
+/**
+ * The same, half of them wearing an item that plays in the town (Eric, Nov 27: "it needs to be playing in the town"): the Gift-Wrap Tube or
+ * the Candy Cane, in four colors each (eight looks: TOWN_ITEM_FRAMES.othersLooks of them play, the rest stand still). The same budget, and
+ * a second walk uploads none of their frames again (each uploaded once, as it first showed; again only if its spare page starts again).
+ */
+test("Chess Town busy on a slow phone, half of them wearing the tube or the cane, playing: the same frame budget, and their frames uploaded once (Nov 27)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(6 * 60_000);
+  await busyTown(page, true);
+});
+
+/** (The busy town's walks: `wearing`, half the others in the tube or the cane.) */
+async function busyTown(page: Page, wearing: boolean) {
+  const colors = ["red", "cobalt", "gold", "green"];
+  const wear = (i: number) => (wearing && i % 2 ? { weapon: { def: i % 4 === 1 ? "gift-tube" : "candy-cane", color: colors[Math.floor(i / 4) % 4]!, blemish: 30, seed: 4 } } : undefined);
   // (The server's answers: everyone else in the town. 55 players on walkable squares near the start, each a few squares on at every answer.)
   const spots: [number, number][] = [];
   for (let d = 1; spots.length < 400 && d < 20; d++)
@@ -728,13 +746,13 @@ test("Chess Town busy on a slow phone: 55 other players walking and a chat line 
   await page.route("**/api/town/here", async (route) => {
     if (route.request().method() !== "POST") return route.continue();
     beat++;
-    const others = busy ? Array.from({ length: 55 }, (_, i) => { const [c, r] = spots[(i * 7 + beat * 3) % spots.length]!; return { id: `busy-${i}`, name: `Walker ${i + 1}`, c, r, zzz: false, pawn: i % 2 ? "black" : "white" }; }) : [];
+    const others = busy ? Array.from({ length: 55 }, (_, i) => { const [c, r] = spots[(i * 7 + beat * 3) % spots.length]!; return { id: `busy-${i}`, name: `Walker ${i + 1}`, c, r, zzz: false, pawn: i % 2 ? "black" : "white", look: wear(i) }; }) : [];
     await route.fulfill({ json: { others } });
   });
   await page.goto(`/town?sky=day&report=120&townroom=busy${Date.now().toString(36)}`);
   const canvas = page.locator("canvas.town-canvas");
   await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
-  type W = { __townHush: (on: boolean) => void; __townWalk: (s: readonly [number, number]) => boolean; __townYou: () => { moving: boolean } | null; __townHere: () => { you: boolean; here: boolean }[]; __townSay: (n: string, l: string, k?: string) => void; __townReport: () => { state: string; summary: { frames: number; uploads: number; uploadsBy: [string, number][]; segs: { avg: number[]; mean: number }[]; long: { n: number; ms: number; scripts: number; layout: number; by: [string, number][] } | null } | null } | null; __chat?: number };
+  type W = { __townHush: (on: boolean) => void; __townWalk: (s: readonly [number, number]) => boolean; __townYou: () => { moving: boolean } | null; __townHere: () => { you: boolean; here: boolean }[]; __townSay: (n: string, l: string, k?: string) => void; __townReport: () => { state: string; summary: { frames: number; uploads: number; resets: number; uploadsBy: [string, number][]; segs: { avg: number[]; mean: number }[]; long: { n: number; ms: number; scripts: number; layout: number; by: [string, number][] } | null } | null } | null; __chat?: number };
   await page.evaluate(() => (window as unknown as W).__townHush(true));
   // (A first visit's pictures saved, so their packing isn't in either walk.)
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townPaint: () => { pictures: { saved?: number } } }).__townPaint().pictures.saved), { timeout: 90_000 }).not.toBeUndefined();
@@ -752,7 +770,7 @@ test("Chess Town busy on a slow phone: 55 other players walking and a chat line 
     // (Ours: every part of a frame but the time outside our code.)
     const ours = s.segs[0]!.avg.slice(0, P.outside).reduce((a, b) => a + b, 0);
     await page.locator(".tfr-panel").getByRole("button", { name: "Again" }).click();
-    return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}` };
+    return { ours, frames: s.frames, mean: s.segs[0]!.mean, long: s.long, parts: s.segs[0]!.avg.slice(0, P.outside).map((x) => +x.toFixed(2)).join(" "), uploads: `${s.uploads} uploads: ${s.uploadsBy.map(([k, n]) => `${k} ${n}`).join(", ")}; ${s.resets} pages started again`, frameUps: s.uploadsBy.find(([k]) => k === "dressed pawn frame")?.[1] ?? 0 };
   };
   const empty = await walk();
   busy = true;
@@ -764,11 +782,21 @@ test("Chess Town busy on a slow phone: 55 other players walking and a chat line 
   });
   // (Their name tags made between frames as they came, Nov 27: render.ts queueTags. Once made, the busy town's walk is measured.)
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townPaint: () => { tagsQueued: number } }).__townPaint().tagsQueued), { timeout: 60_000, message: "newcomers' tags still to make" }).toBe(0);
+  // (Wearing: the eight looks dressed, their frames painted off the frame loop, before the walk is measured.)
+  if (wearing) await expect.poll(() => page.evaluate(() => (window as unknown as { __townHere: () => { you: boolean; look: unknown; dressed: boolean }[] }).__townHere().filter((h) => !h.you && h.look && !h.dressed).length), { timeout: 60_000, message: "wearers still being dressed" }).toBe(0);
   const beats = beat;
   const full = await walk();
+  // (Wearing: the same walk again, every frame they play uploaded by now: none again, no page started again.)
+  const again = wearing ? await walk() : null;
   await page.evaluate(() => clearInterval((window as unknown as W).__chat));
   const fmt = (x: typeof empty) => `our parts ${x.ours.toFixed(1)} ms a frame of ${x.mean.toFixed(0)} (${x.frames} frames; ${x.parts}; ${x.uploads})${x.long ? `, the browser's long frames' other scripts ${Math.round(x.long.scripts)} ms (${x.long.by.map(([k, n]) => `${k} ${Math.round(n)}`).join(", ")})` : ""}`;
-  console.log(`Chess Town busy (slowed phone): empty ${fmt(empty)}; with 55 others and a chat line every 250 ms ${fmt(full)}; ${beat - beats} server answers`);
+  console.log(`Chess Town busy (slowed phone${wearing ? ", half wearing the tube or the cane" : ""}): empty ${fmt(empty)}; with 55 others and a chat line every 250 ms ${fmt(full)}${again ? `; again ${fmt(again)}` : ""}; ${beat - beats} server answers`);
+  if (again) {
+    // (Uploaded again for their own sake: none. After a spare page starts again they are, as everything on it is: the 55 players' tags at
+    // five sizes nearly fill the 2 spare pages, and any wearers' pictures tip them over, on main too; logged above, not checked here.)
+    expect(again.frameUps, "their frames uploaded on the second walk (not counting a page started again)").toBe(0);
+    expect(again.ours, "our parts a frame, busy and playing, the second walk, against the empty town's").toBeLessThan(empty.ours * 1.25);
+  }
   expect(beat - beats, "the server's answers while the busy town walked (each moving everyone)").toBeGreaterThan(0);
   expect(empty.frames, "frames recorded walking the empty town").toBeGreaterThan(20);
   expect(full.frames, "frames recorded walking the busy town").toBeGreaterThan(20);
@@ -777,7 +805,7 @@ test("Chess Town busy on a slow phone: 55 other players walking and a chat line 
   expect(full.ours, "our parts a frame, busy, against the empty town's").toBeLessThan(empty.ours * 1.25);
   // (Outside our frame: the server's answers put in the town and the chat's lines, under 2 ms a frame of the walk.)
   if (full.long) expect(full.long.scripts / full.frames, "the page's other scripts a frame (ms), busy").toBeLessThan(2);
-});
+}
 
 test("Moo & Moon's Full Moon cinematic on a slow phone: the hop, the field, the close-up, the transformation and the hop back stay within budget, the first time they show (Nov 17)", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
