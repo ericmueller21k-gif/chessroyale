@@ -8,17 +8,17 @@ import { Region, LINE, lw } from "../item-paint.tsx";
 const TAU = Math.PI * 2;
 const IDLE_N = 8;
 const MOVE_N = 8;
-const PAWN_Y = -6;
+const PAWN_Y = -9;
 const CUT = 88;
 
 /** The float: up and down, slow standing, quicker flying. */
 function bob(anim: "idle" | "move", f: number): number {
   const n = anim === "idle" ? IDLE_N : MOVE_N;
-  return -3 - 1.6 * Math.cos((TAU * f) / n);
+  return -1.6 + 1.6 * Math.cos((TAU * f) / n);
 }
 
 /** The rug's middle line at x, rippling (the ripple runs back along it, frame by frame). */
-const wave = (x: number, ph: number, amp: number) => 85 + amp * Math.sin(x / 14 - ph);
+const wave = (x: number, ph: number, amp: number) => 82 + amp * Math.sin(x / 14 - ph);
 
 /** The rug from x0 to x1, its top edge a ripple, 7 thick. */
 function rug(x0: number, x1: number, ph: number, amp: number): string {
@@ -37,13 +37,13 @@ const phase = (anim: "idle" | "move", f: number) => (TAU * f) / (anim === "idle"
 function pose(anim: "idle" | "move", f: number): RiderPose {
   const ph = phase(anim, f);
   // (The pawn rides the ripple under it.)
-  const under = wave(50, ph, anim === "move" ? 2.2 : 1.4) - 85;
+  const under = wave(50, ph, anim === "move" ? 2.2 : 1.4) - 82;
   return { dx: anim === "move" ? (100 * f) / MOVE_N : 0, dy: bob(anim, f), pawnX: 0, pawnY: PAWN_Y + under, cut: CUT };
 }
 
 function Shadow({ anim, f, rx }: { anim: "idle" | "move"; f: number; rx: number }) {
   const lift = -bob(anim, f);
-  const s = 1 - (lift - 3) * 0.04;
+  const s = 1 - lift * 0.04;
   return <ellipse cx={50} cy={97 + lift} rx={rx * s} ry={2.6 * s} fill="#1d1d1f" opacity={0.25} />;
 }
 
@@ -83,7 +83,7 @@ function endPose(anim: "idle" | "move", f: number): RiderPose {
   return { dx: 0, dy: bob(anim, f), pawnX: 0, pawnY: PAWN_Y, pawnTilt: anim === "move" ? Math.sin(phase(anim, f)) : 0, cut: CUT };
 }
 
-const END = "M 14 84 Q 50 81 86 84 L 86 91 Q 50 88 14 91 Z";
+const END = "M 14 81 Q 50 78 86 81 L 86 88 Q 50 85 14 88 Z";
 
 function EndBack({ anim, f }: RiderProps) {
   return <Shadow anim={anim} f={f} rx={30} />;
@@ -91,11 +91,11 @@ function EndBack({ anim, f }: RiderProps) {
 
 function EndFront({ p, p2, anim, f }: RiderProps) {
   const sway = anim === "move" ? Math.sin(phase(anim, f)) : 0;
-  const tassels = [20, 30, 40, 50, 60, 70, 80].map((x) => `M ${x} ${89.6 - Math.abs(x - 50) * 0.04} l ${sway} 4`).join(" ");
+  const tassels = [20, 30, 40, 50, 60, 70, 80].map((x) => `M ${x} ${86.6 - Math.abs(x - 50) * 0.04} l ${sway} 4`).join(" ");
   return (
     <g>
       <Region p={p} name="rug" d={[END]} />
-      <path d="M 16 87.5 Q 50 84.5 84 87.5" fill="none" stroke={p2.hex} stroke-dasharray="3 3" stroke-linecap="round" {...lw(1.8)} />
+      <path d="M 16 84.5 Q 50 81.5 84 84.5" fill="none" stroke={p2.hex} stroke-dasharray="3 3" stroke-linecap="round" {...lw(1.8)} />
       <path d={END} fill="none" {...LINE} {...lw(2.4)} />
       <path d={tassels} fill="none" stroke={p2.hex} stroke-linecap="round" {...lw(1.8)} />
     </g>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VNode } from "preact";
-import { HUNCHESS_RIDES, RIDES as RIDE_SETTINGS, hunchessBase, itemDef } from "@chessroyale/core";
+import { CRATE_RIDES, HUNCHESS_RIDES, RIDES as RIDE_SETTINGS, hunchessBase, itemDef } from "@chessroyale/core";
 import { HUNCHESS_LEVELS, HUNCHESS_PALETTE, hunchessFilterId } from "../src/components/rides/hunchess.tsx";
 import { FACINGS, viewOf, type RiderProps } from "../src/components/rides/kit.ts";
 import { RIDE_IDS, loadRide, rideBase, rideCells } from "../src/components/rides/load.ts";
@@ -20,9 +20,9 @@ const props: RiderProps = { p: paint as never, p2: paint as never, side: "w", f:
 const filterOf = (node: unknown) => ((node as VNode<{ filter?: string }>)?.props?.filter ?? null) as string | null;
 
 describe("the HunChess colorway (Nov 6)", () => {
-  it("every ride has one, and only rides do", () => {
-    // (Rides only: an outfit, drawn with the rides' kit since Nov 10, has no colorway.)
-    expect(HUNCHESS_RIDES.map((d) => hunchessBase(d.id)).sort()).toEqual(RIDE_IDS.filter((id) => itemDef(id)?.slot === "ride").sort());
+  it("every ride has one but the crate riders, and only rides do", () => {
+    // (Rides only: an outfit, drawn with the rides' kit since Nov 10, has no colorway; nor a crate rider, Nov 27: the Beta Crate's own.)
+    expect(HUNCHESS_RIDES.map((d) => hunchessBase(d.id)).sort()).toEqual(RIDE_IDS.filter((id) => itemDef(id)?.slot === "ride" && !CRATE_RIDES.includes(id)).sort());
     for (const d of HUNCHESS_RIDES) expect(RIDE_IDS).not.toContain(d.id);
   });
 

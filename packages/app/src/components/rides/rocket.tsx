@@ -17,7 +17,7 @@ const FLAME_CORE = "#ffe27a";
 
 function bob(anim: "idle" | "move", f: number): number {
   const n = anim === "idle" ? IDLE_N : MOVE_N;
-  return -1.2 - 1.2 * Math.cos((TAU * f) / n);
+  return -1.2 + 1.2 * Math.cos((TAU * f) / n);
 }
 
 function pose(anim: "idle" | "move", f: number): RiderPose {

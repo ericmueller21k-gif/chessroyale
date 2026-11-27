@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HUNCHESS_RIDES, ITEM_DEFS, NOT_TRADEABLE, WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, WELCOME_TEXT, XP, hunchessBase, isHunchess, itemDef, showsPurity, tradeable } from "@chessroyale/core";
+import { CRATE_RIDES, HUNCHESS_RIDES, ITEM_DEFS, NOT_TRADEABLE, WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, WELCOME_TEXT, XP, hunchessBase, isHunchess, itemDef, showsPurity, tradeable } from "@chessroyale/core";
 import { createGuest, createSession, ensureSchema, profile, recordResult, signInWithIdentity, type MatchResult, type Sql } from "../src/accounts.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { lockerMoves, lockerState } from "../src/locker.ts";
@@ -257,8 +257,9 @@ describe("opening it", () => {
 });
 
 describe("the prize: a HunChess colorway of every ride, never tradeable, no purity", () => {
-  it("every ride has its colorway, its own id (never a ride's), drawn from that ride", () => {
-    const rides = ITEM_DEFS.filter((d) => d.slot === "ride" && !d.hunchess);
+  it("every ride has its colorway (but the crate riders), its own id (never a ride's), drawn from that ride", () => {
+    // (Nov 27: the crate riders are the Beta Crate's own, no colorway: docs/decisions/2026-11-27-crate-riders.md.)
+    const rides = ITEM_DEFS.filter((d) => d.slot === "ride" && !d.hunchess && !CRATE_RIDES.includes(d.id));
     expect(rides.length).toBeGreaterThanOrEqual(17);
     expect(HUNCHESS_RIDES.map((d) => d.id)).toEqual(rides.map((d) => `${d.id}-hunchess`));
     for (const r of rides) {
