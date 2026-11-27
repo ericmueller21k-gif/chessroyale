@@ -1025,6 +1025,11 @@ export class Renderer {
     const { ctx, W, H, DPR } = this;
     this.paint.frame();
     this.frameNo++;
+    // (Once the loading screen is done: none of its time taken.)
+    if (this.topsAt < 0 && this.boxes.length && this.warmJobs && this.warmAt0 >= this.warmJobs.jobs.length) {
+      this.topsAt = 0;
+      this.nextTops();
+    }
     this.nSoft = 0;
     this.camX = camX;
     this.camY = camY;
@@ -1992,11 +1997,6 @@ export class Renderer {
         sp.cut();
         if (!sp.ready) return sp.failed ? undefined : false;
         for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) P().keep(c);
-      });
-    // (Each box's solid top, Nov 27: worked out from its front's first frame the first time it showed, a few ms each while walking.)
-    for (let i = 0; i < this.boxes.length; i += 8)
-      jobs.push(() => {
-        for (let j = i; j < Math.min(i + 8, this.boxes.length); j++) solidTop(this.boxes[j]!.box);
       });
     // (The labels, Nov 25: once their fonts are in, up to `loadSheetWaitMs` all told; made fresh each visit, as they're quick.)
     jobs.push(() => this.fontsIn());
@@ -3681,6 +3681,21 @@ export class Renderer {
   /** The frame a new tag was last painted in (drawTag: one a frame). */
   private newTagAt = -1;
   private tagSlicing = false;
+  /**
+   * (Nov 27) Each box's solid top (boxes.ts solidTop: its front's first frame worked out, a few ms) worked out between frames from the first
+   * frame on, a box a slice, not the first time the box shows while walking (nor on the loading screen: it added 0.6 s there at 4x).
+   */
+  private topsAt = -1;
+  private nextTops(): void {
+    const go = (budgetMs: number) => {
+      const t0 = performance.now();
+      while (this.topsAt < this.boxes.length && performance.now() - t0 < budgetMs) solidTop(this.boxes[this.topsAt++]!.box);
+      if (this.topsAt < this.boxes.length) this.nextTops();
+    };
+    const ric = (globalThis as { requestIdleCallback?: (f: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    if (ric) ric((d) => go(d.didTimeout ? 4 : Math.min(4, d.timeRemaining())), { timeout: 1000 });
+    else setTimeout(() => go(3), 32);
+  }
   private nextTagSlice(): void {
     this.tagSlicing = true;
     const ric = (globalThis as { requestIdleCallback?: (f: (d: { timeRemaining(): number; didTimeout: boolean }) => void, o?: { timeout: number }) => number }).requestIdleCallback;

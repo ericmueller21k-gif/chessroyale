@@ -772,7 +772,8 @@ test("Chess Town busy on a slow phone: 55 other players walking and a chat line 
   expect(beat - beats, "the server's answers while the busy town walked (each moving everyone)").toBeGreaterThan(0);
   expect(empty.frames, "frames recorded walking the empty town").toBeGreaterThan(20);
   expect(full.frames, "frames recorded walking the busy town").toBeGreaterThan(20);
-  // (The busy town's frame: 55 more pawns and their tags drawn. Measured Nov 27 (this PR): ... Its budget, a quarter over the empty town's.)
+  // (The busy town's frame: 55 more pawns and their tags drawn. Measured Nov 27, 4x: empty 10.7 to 12.3 ms, busy 12.0 to 13.0 (before that
+  // day's fixes 16 to 19: tags painted in the frames, chat lines drawn again). Its budget, a quarter over the empty town's.)
   expect(full.ours, "our parts a frame, busy, against the empty town's").toBeLessThan(empty.ours * 1.25);
   // (Outside our frame: the server's answers put in the town and the chat's lines, under 2 ms a frame of the walk.)
   if (full.long) expect(full.long.scripts / full.frames, "the page's other scripts a frame (ms), busy").toBeLessThan(2);
