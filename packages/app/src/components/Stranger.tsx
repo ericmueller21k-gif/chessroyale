@@ -327,8 +327,8 @@ export const STORM_ART = { px: 250, cell: 170, frames: 36, cols: 6, fps: 12, mar
  */
 export const RIFT_ART = { px: 202, cols: 8, stages: 3, loop: 4, loopFps: 6, openA: 9, openB: 10, openFps: 12 } as const;
 
-/** A sheet, fetched and decoded ahead as his battle shows (prewarmStranger): `src` once it can be drawn. */
-type Sheet = { src: CanvasImageSource | null };
+/** A sheet, fetched and decoded ahead as his battle shows (prewarmStranger): `src` once it can be drawn; `dead` once released. */
+type Sheet = { src: CanvasImageSource | null; dead?: boolean };
 const sheets: { storm?: Sheet; rift?: Sheet } = {};
 function sheetOf(which: "storm" | "rift"): Sheet {
   const had = sheets[which];
@@ -338,13 +338,33 @@ function sheetOf(which: "storm" | "rift"): Sheet {
   if (typeof Image === "undefined") return sheet;
   const img = new Image();
   const ready = () => {
+    if (sheet.dead) return;
     sheet.src = img;
     // (Kept decoded, so no frame's draw waits on a decode.)
-    if (typeof createImageBitmap === "function") createImageBitmap(img).then((b) => (sheet.src = b), () => undefined);
+    if (typeof createImageBitmap === "function")
+      createImageBitmap(img).then(
+        (b) => (sheet.dead ? b.close() : (sheet.src = b)),
+        () => undefined,
+      );
   };
   img.onload = ready;
   img.src = which === "storm" ? stormUrl : riftUrl;
   return sheet;
+}
+
+/**
+ * The sheets let go when his battle's screen closes (BossCharacter): about 19.5 MB decoded, so they don't stay for the rest of the
+ * session (review of #1023). A later battle of his fetches them again.
+ */
+export function releaseStranger(): void {
+  for (const k of ["storm", "rift"] as const) {
+    const s = sheets[k];
+    if (!s) continue;
+    s.dead = true;
+    if (typeof ImageBitmap !== "undefined" && s.src instanceof ImageBitmap) s.src.close();
+    s.src = null;
+    delete sheets[k];
+  }
 }
 
 /**
@@ -407,13 +427,22 @@ function StormRing({ scene, lead }: { scene: number | null; lead: "fire" | "ice"
     const g = cv.current?.getContext("2d");
     if (!g) return;
     g.imageSmoothingEnabled = false;
-    const sheet = sheetOf("storm");
+    // (The sheet read each draw, not kept: released, it's fetched again rather than left blank.)
+    // (Through the storm's turns the picture changes only with its frame (12 a second) or the turn's element: drawn then alone, not every
+    // frame. In the opening scene its strength changes every frame, so it's drawn every frame there. Review of #1023.)
+    let last = "";
     const draw = () => {
+      const sheet = sheetOf("storm");
       if (!sheet.src) return;
       const now = Date.now();
-      const level = stormLevel(at.current.scene, now);
-      paintRing(g, sheet.src, now, level, at.current.lead);
-      drawn.ring = level.fire > 0 ? ringFrame(now, level.chaos) : -1;
+      const { scene, lead } = at.current;
+      const level = stormLevel(scene, now);
+      const f = ringFrame(now, level.chaos);
+      const key = scene === null ? `${f}:${lead}` : "";
+      if (key && key === last) return;
+      last = key;
+      paintRing(g, sheet.src, now, level, lead);
+      drawn.ring = level.fire > 0 ? f : -1;
     };
     draw();
     const stop = onEachFrame(draw);
@@ -459,9 +488,9 @@ function StormRift({ scene, stage }: { scene: number | null; stage: number }) {
     if (!g) return;
     g.imageSmoothingEnabled = false;
     const R = RIFT_ART;
-    const sheet = sheetOf("rift");
     let shown = -2;
     const draw = () => {
+      const sheet = sheetOf("rift");
       if (!sheet.src) return;
       const f = riftFrame(at.current.scene, at.current.stage, Date.now());
       if (f === shown) return;

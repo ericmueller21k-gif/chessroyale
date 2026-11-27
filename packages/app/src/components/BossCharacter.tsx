@@ -19,7 +19,7 @@ import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmGinger } from "./Ginger.tsx";
 import { prewarmBoingo } from "./Boingo.tsx";
 import { prewarmGrex } from "./Grex.tsx";
-import { prewarmStranger } from "./Stranger.tsx";
+import { prewarmStranger, releaseStranger } from "./Stranger.tsx";
 import { prewarmSawyer } from "./Sawyer.tsx";
 import { prewarmPig } from "./Pig.tsx";
 import { prewarmAlfil } from "./Alfil.tsx";
@@ -294,6 +294,8 @@ function Character({ boss, stage, place, muteFall, yourTurn = false, children }:
   // (When this beat's one-shot ends, for figureBusy.)
   const shot = kit && beat ? kit.ch.anims[beatShot(kit, beat)] : undefined;
   beatEnds.at = shot && !shot.loop ? since + length(shot) : 0;
+  // (The Stranger's storm sheets let go when his battle's screen closes.)
+  useEffect(() => (kit?.ch.id === "stranger" ? releaseStranger : undefined), [kit?.ch.id]);
   // His sounds and his powers' made ahead, in idle moments, so a first play never stalls a slow phone.
   useEffect(() => {
     if (!kit) return;
