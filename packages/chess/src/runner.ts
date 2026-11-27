@@ -83,7 +83,7 @@ import { freestyleStart } from "./chess960.ts";
 import { pickOpenings, startsInCheck, type Opening } from "./openings.ts";
 import { START_FEN, applyMove, baseAt, fenAtPly, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan, type GameEnd } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
-import { BATTLE_TOWER, BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, floorStrength, levelForMaia, sideRefusal, type BossBrain, type BossBrainPlan, type BossForm, type FloorStrength } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, floorDraw, floorStrength, levelForMaia, sideRefusal, type BossBrain, type BossBrainPlan, type BossForm, type FloorStrength, type MaiaDraw } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
@@ -1550,7 +1550,7 @@ export class MatchRunner {
    * The boss's brain when it isn't plain Stockfish (solo's Boss alone sets it as the battle begins: Maia-3 at a
    * rating, with its engine; see BOSS_BRAIN). Null: Stockfish, as everywhere else.
    */
-  humanBrain: { brain: BossBrain; rating: number; stockfishShare?: number; engine: HumanEngineLike } | null = null;
+  humanBrain: { brain: BossBrain; rating: number; stockfishShare?: number; draw?: MaiaDraw; engine: HumanEngineLike } | null = null;
   /** What the brain did with the boss's last move (the admins' debug line). */
   brainNote: BrainNote | null = null;
   /** What the landing guard did with the boss's last move (null: it didn't look); the sims count it. */
@@ -1572,13 +1572,18 @@ export class MatchRunner {
    * How the boss plays this battle (bossBrainFor): an admin's pick (`picked`, "" for the boss's own), and whether Maia
    * may play here at all; a crowd's margin when more than one picks the crowd's moves (not Boss alone). A tower floor: the
    * floor's (floorStrength), alone or a party alike: Maia at its rating, as Boss alone's; Stockfish (at the floor's UCI_Elo, the
-   * boss's elo) from BATTLE_TOWER.stockfishFrom.
+   * boss's elo) from BATTLE_TOWER.stockfishFrom. On Maia the floor's own draw (floorDraw: looser on the first floors, never a gift),
+   * carried with the plan to the device that plays it, solo or online.
    */
   bossBrainPlan(picked: BossBrain | "", maia: boolean): BossBrainPlan | null {
     const b = this.state.boss;
     if (!b) return null;
     const floor = this.towerStrength();
-    if (floor) return floor.brain === "maia" ? bossBrainFor(b.id ?? "", b.elo, picked, maia, { alone: floor.rating }) : { brain: "stockfish", rating: null, stockfishShare: 0 };
+    if (floor) {
+      if (floor.brain !== "maia") return { brain: "stockfish", rating: null, stockfishShare: 0 };
+      const plan = bossBrainFor(b.id ?? "", b.elo, picked, maia, { alone: floor.rating });
+      return plan.brain === "stockfish" ? plan : { ...plan, draw: floorDraw(this.settings.towerFloor!) };
+    }
     return bossBrainFor(b.id ?? "", b.elo, picked, maia, { crowd: this.alive().length > 1, alone: this.settings.bossAloneMaia || undefined });
   }
 

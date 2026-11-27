@@ -490,12 +490,24 @@ export const childRating = (plies: number, s: ChildRamp = RECLUSE_CHILD, top = m
 /** Which of his drawings shows at a Maia `rating` in the child form (RECLUSE_CHILD.ages): 0 about 9, 1 about 13, 2 about 20, 3 his adult look. */
 export const childAge = (rating: number, ages: readonly number[] = RECLUSE_CHILD.ages): number => Math.max(0, ages.filter((a) => rating >= a).length - 1);
 
+/**
+ * How Maia's move is drawn when not as BOSS_BRAIN draws it (a Battle Tower floor's: core floorDraw): the box's temperature and topP, and
+ * `noGift`: a drawn move that puts the moved queen or rook where it's simply lost is drawn again (boss-brain.ts, humanBrainMove).
+ */
+export interface MaiaDraw {
+  temperature: number;
+  topP: number;
+  noGift?: true;
+}
+
 /** How a boss plays a battle: its brain, the rating Maia plays at (null: Stockfish), and the bridge's share of Stockfish's moves. */
 export interface BossBrainPlan {
   brain: BossBrain;
   rating: number | null;
   /** The share of its moves that are today's Stockfish move instead (the bridge band; 0 elsewhere). */
   stockfishShare: number;
+  /** Maia's draw, when not BOSS_BRAIN's own (a Battle Tower floor: floorDraw). */
+  draw?: MaiaDraw;
 }
 
 /**

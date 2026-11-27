@@ -1,6 +1,6 @@
-import { BOSS_ROSTER, ENGINE_MAX_ELO, maiaTopRating, playableBosses, rosterWithout, unlockReady, type BossDef } from "./boss.ts";
+import { BOSS_ROSTER, ENGINE_MAX_ELO, maiaTopRating, playableBosses, rosterWithout, unlockReady, type BossDef, type MaiaDraw } from "./boss.ts";
 import { mulberry32, shuffle } from "./rng.ts";
-import { BATTLE_TOWER, type Settings } from "./settings.ts";
+import { BATTLE_TOWER, BOSS_BRAIN, type BossBrainSettings, type Settings } from "./settings.ts";
 
 /**
  * The Battle Tower's climb (docs/decisions/2026-11-18-battle-tower-design.md, section 3; docs/areas/battle-tower.md): how many
@@ -62,6 +62,37 @@ export function floorStrength(floor: number, bosses: number, s: TowerRules = BAT
   const full = floor > s.stockfishFrom && at(floor - 1) >= ENGINE_MAX_ELO;
   return { brain: "stockfish", rating: full ? ENGINE_MAX_ELO : Math.min(ENGINE_MAX_ELO, at(floor) + bonus), full };
 }
+
+/**
+ * How Maia's move is drawn on floor `floor` (a Maia floor): BATTLE_TOWER.carelessDraw's temperature and topP (straight between its rows,
+ * held at the first row before it), from its last row's floor on BOSS_BRAIN's own; never a gift (noGift) on every floor.
+ */
+export function floorDraw(floor: number, rows: TowerDrawRows = BATTLE_TOWER.carelessDraw, own: Pick<BossBrainSettings, "temperature" | "topP"> = BOSS_BRAIN): MaiaDraw {
+  const last = rows[rows.length - 1];
+  if (!last || floor >= last[0]) return { temperature: own.temperature, topP: own.topP, noGift: true };
+  let [f0, t0, p0] = rows[0]!;
+  if (floor <= f0) return { temperature: t0, topP: p0, noGift: true };
+  for (const [f1, t1, p1] of rows.slice(1)) {
+    if (floor <= f1) {
+      const k = (floor - f0) / (f1 - f0);
+      const round = (x: number) => Math.round(x * 1000) / 1000;
+      return { temperature: round(t0 + k * (t1 - t0)), topP: round(p0 + k * (p1 - p0)), noGift: true };
+    }
+    [f0, t0, p0] = [f1, t1, p1];
+  }
+  return { temperature: own.temperature, topP: own.topP, noGift: true };
+}
+
+/**
+ * A draw looser than BOSS_BRAIN's own (a tower floor's first floors: floorDraw), a hotter temperature or a wider topP: the lobby gives no
+ * throw strike on such a battle (BOSS_CHECK.throwLoss was set at BOSS_BRAIN's draw, and an older app draws that way). Never a gift alone
+ * isn't looser: it only takes gifts away.
+ */
+export const drawLooser = (draw: MaiaDraw | undefined, own: Pick<BossBrainSettings, "temperature" | "topP"> = BOSS_BRAIN): boolean =>
+  !!draw && (draw.temperature > own.temperature || draw.topP > own.topP);
+
+/** BATTLE_TOWER.carelessDraw's shape: [floor, temperature, topP] rows in floor order. */
+export type TowerDrawRows = readonly (readonly [number, number, number])[];
 
 /**
  * The bosses the tower deals from, in roster order: every playable boss (a complete character with powers, live for everyone:

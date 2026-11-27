@@ -102,6 +102,29 @@ describe("accounts", () => {
     expect(rows.map((r) => r.eval_bar)).toEqual([1, 0, null]);
   });
 
+  it("the Hidden Boss's forms beaten (results.forms_beaten, Nov 26): his fights' rows only; won, all three; else held to 0-2; none known: NULL", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000);
+    const his = { mode: "boss" as const, online: true, placement: 1, players: 4, bossId: "recluse" };
+    await recordResult(sql, user.id, { ...his, teamWon: false, formsBeaten: 1 }, 2000);
+    // (A device's word can't say more than the row can be: a fight not won beat at most two; won beat all three, whatever was sent.)
+    await recordResult(sql, user.id, { ...his, online: false, teamWon: false, formsBeaten: 3 }, 3000);
+    await recordResult(sql, user.id, { ...his, online: false, teamWon: true, formsBeaten: 0 }, 4000);
+    await recordResult(sql, user.id, { ...his, teamWon: null, formsBeaten: -4 }, 5000);
+    // (None sent: NULL, as on his rows from before; won without a number: all three.)
+    await recordResult(sql, user.id, { ...his, teamWon: false }, 6000);
+    await recordResult(sql, user.id, { ...his, teamWon: true }, 7000);
+    // (Anyone else's fight, and a Crowd's boss final against him (a 50 v 50 row), keep none.)
+    await recordResult(sql, user.id, { ...his, bossId: "gingerbread", teamWon: true, formsBeaten: 2 }, 8000);
+    await recordResult(sql, user.id, { ...his, mode: "crowd", teamWon: false, formsBeaten: 2 }, 9000);
+    const rows = await sql.all<{ forms_beaten: number | null }>("SELECT forms_beaten FROM results WHERE user_id = ? ORDER BY played_at", user.id);
+    expect(rows.map((r) => r.forms_beaten)).toEqual([1, 2, 3, 0, null, 3, null, null]);
+    // The profile's recent matches carry it, newest first.
+    const p = (await publicProfile(sql, user.id, 10_000))!;
+    expect(p.recent.map((r) => r.formsBeaten)).toEqual([null, null, 3, null, 0, 3, 2, 1]);
+  });
+
   it("a solo result from before the ranked rule (ranked NULL, the browser's rating) never counts, and the next schema run fixes a rating it set", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
@@ -331,6 +354,16 @@ describe("account API", () => {
     // (So a raid, which reads the stored rating as you join, never meets a boss matched to it.)
     expect(after.body.rating).toBeNull();
     expect((await call(env, `/api/profile/${me.body.user.id}`, { cookie: me.cookie })).body.rating).toBeNull();
+  });
+
+  it("POST /api/results: a solo fight against the Hidden Boss keeps its forms beaten, held to what the row can be, on the public profile", async () => {
+    const env = { DB: memoryD1() };
+    const me = await call(env, "/api/me?name=Solo");
+    const post = (body: object) => call(env, "/api/results", { method: "POST", body: JSON.stringify({ mode: "boss", placement: 1, players: 1, bossId: "recluse", ...body }), cookie: me.cookie });
+    await post({ teamWon: false, formsBeaten: 1 });
+    await post({ teamWon: false, formsBeaten: 9 });
+    const recent = (await call(env, `/api/profile/${me.body.user.id}`, { cookie: me.cookie })).body.recent as { formsBeaten: number | null }[];
+    expect(recent.map((r) => r.formsBeaten)).toEqual([2, 1]);
   });
 
   it("POST /api/shop/chat: your quick chat picks, saved to your account and on your profile", async () => {

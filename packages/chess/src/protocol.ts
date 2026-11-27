@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, CharMark, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, PawnBounce, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TowerScatter, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, MaiaDraw, BurnEvent, CharMark, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, PawnBounce, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TowerScatter, TusksCast } from "@chessroyale/core";
 import type { Base, Capture } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -805,6 +805,8 @@ export interface NetBossBrain {
   rating: number;
   /** The bridge band's share of moves that are today's Stockfish move. */
   stockfishShare?: number;
+  /** Maia's draw when not BOSS_BRAIN's (a Battle Tower floor's: floorDraw); an older app draws as BOSS_BRAIN does. */
+  draw?: MaiaDraw;
 }
 
 /**

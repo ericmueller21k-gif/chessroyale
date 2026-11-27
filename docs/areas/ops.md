@@ -13,7 +13,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
   branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`: since Nov 6 `unit` and `chess`, packages/chess's tests,
   run side by side and `check` is green when both are) and the e2e run decide whether a PR
-  is green. The typecheck covers the e2e specs too (`e2e/tsconfig.json`, Nov 15): a spec's missing name or wrong field fails `check`
+  is green. On a PR `chess` plays 1 in 4 of `boss-kit-side.test.ts`'s pairs (rotated by the PR number; main plays every
+  pair: [decision](../decisions/2026-11-27-kit-side-sample.md)). The typecheck covers the e2e specs too (`e2e/tsconfig.json`, Nov 15): a spec's missing name or wrong field fails `check`
   in minutes, not the e2e run half an hour later. Merge with a merge commit, then confirm the deploy live.
 - **The installed app's first window** (Nov 20, [decision](../decisions/2026-11-20-app-window-size.md)): on a computer, the installed
   app opens itself once at `APP_WINDOW` (1600 x 900, smaller on a smaller screen, centered; settings.ts), not the narrow window

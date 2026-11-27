@@ -877,7 +877,7 @@ export class SoloMatch implements GameView {
     const plan = this.runner.bossBrainPlan(picked, maia)!;
     this.brainShown = isAdmin();
     if (plan.brain === "stockfish" || plan.rating === null || typeof Worker === "undefined") return next();
-    const brain = { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}) };
+    const brain = { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}), ...(plan.draw ? { draw: plan.draw } : {}) };
     this.brainPlan = brain;
     // (Its files: already here, or under way since the boss menu; else from now, so the bar can show them coming.)
     prefetchMaia();
