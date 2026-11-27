@@ -125,5 +125,5 @@ test("his locked card: a tap shows him and how to unlock him, every way to play 
   // (Boss alone's menu lists him: the review of #1000 found it empty for a boss unlocked by a win.)
   await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
   await expect(page.locator(".boss-menu-list .boss-row:not(.match)")).toHaveCount(1);
-  await expect(page.locator(".boss-menu-list .boss-row:not(.match)")).toContainText("The Stranger");
+  await expect(page.locator(".boss-menu-list .boss-row:not(.match)")).toHaveAttribute("aria-label", /^The Stranger, /);
 });
