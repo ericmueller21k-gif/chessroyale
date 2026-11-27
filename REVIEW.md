@@ -6,9 +6,11 @@ new unit tests at the head (all pass); ran 20 quick mutations (one line opened o
 restored) to see which new checks bite.
 
 **Verdict: no defect in the stored data or the unlock itself.** The `boss_unlocks` table, its writes, the sign-in merge, the download
-and the delete are correct, and nothing the client sends can unlock him or deal his floor to a non-admin. The one blocker (CI red at
-`04c8fec2`) has a fix in `b0444d72` that passes locally; it stays a blocker until CI is green on it. The gaps are in what the tests pin,
-not in the code.
+and the delete are correct, and nothing the client sends can unlock him or deal his floor to a non-admin. The gaps are in what the tests
+pin, not in the code.
+
+**Update after the review (CI on `b0444d72` and `b28e3980`):** B1 (unit) is fixed: `check` is green on both. **B2 is new and blocks:**
+the e2e is red on `b28e3980`, including Eric's Nov 4 guard, because the boss-wide specs can't open his battle (his card is locked).
 
 ## Blockers
 
@@ -30,11 +32,43 @@ computer side figure is sized with no reach of its own and whose facing is unkno
 reach. Fix: the characters lane's data for him (facing, goodbye, shorter bar lines, the two reach rows), or keep the kit out of
 `BOSS_KITS` until it's complete.
 
-**Status: fixed in `b0444d72`, pending CI.** It adds `artFacing` "front", `GOODBYE_LINES.stranger`, `SIDE_REACH`/`SIDE_SWING` rows, and
-six shorter lines; it changes no test. The four files pass locally at `b0444d72` (77/77). Before merging, `check` must be green on
-`b0444d72` and the e2e result read, including `boss-side.spec.ts`'s Stranger case (the run on `04c8fec2` was cancelled; the one on
-`b0444d72` was running when this was written). The PR body should list `b0444d72`'s new text: the goodbye "Good game. I'll keep looking
-for the strongest." and the six reworded lines.
+**Status: fixed in `b0444d72`.** It adds:
+- `artFacing` "front";
+- `GOODBYE_LINES.stranger`;
+- `SIDE_REACH`/`SIDE_SWING` rows;
+- him to `SIDE_FEEL.overMenu`;
+- six shorter lines.
+
+It changes no test. The four files pass locally (77/77), and `check` and `unit` are green on `b0444d72` and `b28e3980`. The PR body
+should list `b0444d72`'s new text: the goodbye "Good game. I'll keep looking for the strongest." and the six reworded lines.
+
+**B2. The e2e is red on `b28e3980`: the boss-wide specs open his battle as an admin with no unlock, so his card is locked.** CI run
+45941946034 has three failures:
+- **`e2e/boss-side.spec.ts:98`, Eric's Nov 4 guard** ("stranger and the God King whole on screen …"), phone and desktop. START stays
+  disabled and the test times out at 180 s, so the guard never measured him.
+- **`e2e/boss-smoke.spec.ts:99`.** It looks for the open tile "The Stranger", but an admin without the unlock sees "Locked boss: The
+  Stranger. Beat him on Battle Tower floor 10". Past that, its `ultimate: true` (the same test) can't pass while `strangerult` never
+  fires.
+
+Failing scenario: merged as is, `main`'s full run is red, and Eric's guard reports nothing about him. Fix direction (the director's
+call):
+- Give these specs a way to meet him unlocked without touching the guard's checks: e.g. the shared e2e helper seeding his
+  `boss_unlocks` row for the test account, or a test server's `?boss=stranger` link counting as unlocked. Editing
+  `boss-side.spec.ts` itself needs Eric's OK (eric.md).
+- For the smoke's ultimate: either a named, recorded exception for a placeholder ultimate or waiting for Eric's. Never a silent skip.
+
+**The `overMenu` call** (`b0444d72`, `packages/app/src/characters/side-size.ts:44`; the author asked for this check) follows Chandy's
+precedent and the rule's own words ("over the board or a menu is fine"). No other boss shrinks, because `SIDE_WIDEST` still leaves
+both out. Facing "front", he isn't mirrored, so his swing toward the board counts as 0, as Chandy's does. At rest and at every beat's
+end he reaches 50 left and 51 right, against Chandy's 57 and 43. Where his room is short, his drawing (101 wide against Chandy's 100) sits
+with its right edge at the same place as Chandy's, so his far edge comes 1 sprite px (at most 3.4 screen px at `max`) further out,
+inside the 8 px `margin` only if Chandy's case has that slack. His 61 left swing is mid-beat only, which the rule allows. So it's
+consistent, but **unproven until B2 lets the guard measure him** at its five sizes, including whether a front-facing figure passes
+its "facing the board" step.
+
+**`b28e3980` changed `e2e/boss-select.spec.ts:315`** (an admin's tile count now adds `unlockBosses(…, admin)`): this follows the spec's
+own design (counted from the roster), its fit checks are unchanged, and they passed on `b28e3980` with his 22nd tile. It isn't an
+eric.md guard. The PR body must list it, old → new.
 
 ## Should-fix
 
@@ -142,8 +176,9 @@ cap → no strike, no event.
 
 ## Not reached
 
-- The PR's e2e run (`full-e2e`): cancelled on `04c8fec2` and still running on `b0444d72` at the time of review, above all
-  `e2e/boss-side.spec.ts`'s new Stranger case (B1) and `e2e/stranger.spec.ts`. Whether "front" is the right facing for his art beside
-  the board is the characters lane's call; the unit check only asks that there is one.
+- The e2e runs: on `04c8fec2` it was cancelled; on `b0444d72`, shard 9 failed (the tile count `b28e3980` fixed) and the rest were
+  cancelled. On `b28e3980` every shard but 11 and 12 passed, `e2e/stranger.spec.ts` included. What the guard would measure for him
+  once B2 is fixed is not known. Whether "front" is the right facing for his art beside the board is the characters lane's call; the
+  unit check only asks that there is one.
 - The rest of the unit suite beyond the files named here; the sim report; his screen effects (`Stranger.tsx`); the judge's numbers on a
   device against the server's; Squads.
