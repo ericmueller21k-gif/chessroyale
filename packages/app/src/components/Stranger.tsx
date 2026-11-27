@@ -8,6 +8,7 @@ import { FREEZE } from "./Ginger.tsx";
 import { BURN, FireBurn } from "./Grex.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { Flight, PIECE_WORD, onComputer, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { STORM_SHORT } from "../refused.ts";
 
 /**
  * The Stranger's powers on screen (his rules: packages/chess/src/bosses/stranger.ts). Reused, not new (Eric, Oct 14: simple beats
@@ -623,9 +624,10 @@ export const STRANGER_UI = {
     // His storm: its opening scene (his banner, his leap, the swords in the board), then each of its turns as it begins, and a fire
     // turn's burn as your move lands.
     storm: { order: 1, kit: "ultimate", lineAt: STORM_SCENE.fireAt, view: stormView },
-    stormIce: { order: 2, appearAt: iceFrom, dock: (m) => (m.squares?.length ? "Ice: only your king and two pieces can move this turn." : "The storm swirls. Nothing froze."), view: stormIceMoment },
-    stormFire: { order: 2, appearAt: fireFrom, dock: (m) => (m.squares?.length ? "Fire: whatever stands on a burning square after your move burns." : "The storm swirls. Nothing caught fire."), view: stormFireMoment },
-    stormBurn: { order: 0, dock: (m) => (m.fizzled?.length ? "The fire spared a piece." : "The marked squares burnt."), view: stormBurnMoment },
+    // (The dock's words after his name, short enough to be whole on a 360 px phone: refused.ts STORM_SHORT; through your turn, STORM_LINES.)
+    stormIce: { order: 2, appearAt: iceFrom, dock: (m) => (m.squares?.length ? STORM_SHORT.ice : "The storm swirls."), view: stormIceMoment },
+    stormFire: { order: 2, appearAt: fireFrom, dock: (m) => (m.squares?.length ? STORM_SHORT.fire : "The storm swirls."), view: stormFireMoment },
+    stormBurn: { order: 0, dock: (m) => (m.fizzled?.length ? "A piece was spared." : "The marks burnt."), view: stormBurnMoment },
   },
   // The frozen piece's ice (the characters' iceOverlay, as Ginger's freeze), and on the flee turn its tile ablaze, its countdown 1.
   board: ({ boss, p, board, orientation, now, appearAt, moments }) => {

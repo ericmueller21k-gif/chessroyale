@@ -1516,9 +1516,11 @@ export const BOSS_POWERS = {
    * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md). Folio 1.3 (the director's call,
    * Oct 27, after the first sim put it among the easiest; was the brief's start, 1): 2.8 Creases a battle of 50 moves in
    * the raid sim (reports/folio-sim.md). Dash 1 (Nov 3): about 1.9 Time Scrambles a battle of 46 moves in the
-   * raid sim with the player's clock, the crowd 0.15 (reports/dash-sim.md).
+   * raid sim with the player's clock, the crowd 0.15 (reports/dash-sim.md). The Stranger 2.5 (Nov 27, Eric: two storms "about 70% of
+   * the time"): the raid sim at 2.3 saw both in 25 of 40 battles (reports/boss-sim/raid-stranger-storm.jsonl; his Frostfire's strike holds
+   * the warning, first storm at turn 12, the second at 23, battles of 29 moves), so 2.5 by estimate for about 70%.
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1, chandy: 1, stranger: 2.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1, chandy: 1, stranger: 2.5 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1

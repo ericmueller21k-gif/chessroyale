@@ -95,12 +95,17 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
       if (document.querySelector(".sg-storm")) w.__storm.ring++;
       // (The fire turn's burn, drawn as his thinking begins.)
       if (document.querySelector(".pm-storm-burn .pw-burns")) w.__storm.burn++;
-      const dock = document.querySelector(".bd-line, .dock-line")?.textContent ?? "";
-      if (dock && w.__storm.docks.at(-1) !== dock) w.__storm.docks.push(dock);
+      // (The storm's words in the dock: each one whole, never cut short.)
+      for (const el of document.querySelectorAll<HTMLElement>(".boss-dock .dock-line, .boss-dock .through-note")) {
+        const dock = `${el.textContent?.trim() ?? ""}${el.scrollWidth > el.clientWidth + 1 ? ` [cut] ${el.scrollWidth}/${el.clientWidth}` : ""}`;
+        if (/Ice:|Fire:|marks burnt|storm swirls|spared/.test(dock) && !w.__storm.docks.includes(dock)) w.__storm.docks.push(dock);
+      }
       requestAnimationFrame(look);
     };
     requestAnimationFrame(look);
   });
+  // (A narrow phone, 360 px: the dock's words measured at their tightest.)
+  await page.setViewportSize({ width: 360, height: 780 });
   await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=stranger&wip=1&power=storm`);
   await openBossRaid(page);
   await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
@@ -150,6 +155,9 @@ test("his Storm of Two Worlds on a phone: the opening scene (10 to 12 s, his fig
   expect(burnt, "a marked piece of yours burnt").toBe(true);
   const rec = await page.evaluate(() => (window as any).__storm as { scene: number[]; outside: string[]; ring: number; burn: number; docks: string[] });
   expect(rec.burn, "the burn drawn as his thinking began").toBeGreaterThan(5);
+  // (Both kinds' words seen, after his name as each turn began and through your turn.)
+  expect(rec.docks.length).toBeGreaterThanOrEqual(4);
+  expect(rec.docks.filter((d) => d.includes("[cut]"))).toEqual([]);
   // The scene: 10 to 12 s from his leap (its banner's second before it), every frame of him whole on screen.
   const ms = rec.scene.at(-1)! - rec.scene[0]!;
   expect(ms).toBeGreaterThan(10_500);
