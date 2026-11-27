@@ -6,7 +6,7 @@ import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { CROWD_PARTY, FAIRPLAY, PLAY_COINS, packParties, type FairMove } from "@chessroyale/core";
-import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseFormsAt, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, drawLooser, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseFormsAt, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   BOT_NAMES,
@@ -2418,7 +2418,7 @@ export class LobbyCore {
    * the crowd: the lower of the crowd's). The better for him plays, but for Maia's move against a fallback to Stockfish (a Maia
    * move, one device's Maia late, not ready or failed: honest devices differ so): it plays, the battle's own brain, if it's within
    * BOSS_CHECK.maiaGap of the other (as four honest Maia moves in five; D1). A move BOSS_CHECK.throwLoss or more worse than the other
-   * is a throw: its device gets a strike. No answer: bossDefault's, unvouched.
+   * is a throw: its device gets a strike (not on a battle drawn looser: drawLooser). No answer: bossDefault's, unvouched.
    */
   private bossServerScored(moves: MoveScore[] | null) {
     const c = this.r.bossCheck!;
@@ -2435,7 +2435,11 @@ export class LobbyCore {
     const better = sign * sa >= sign * sb ? ia : ib;
     const worse = better === ia ? ib : ia;
     const gap = Math.abs(sa - sb);
-    const thrown = gap >= BOSS_CHECK.throwLoss ? worse : null;
+    // (Not on a battle drawn looser than BOSS_BRAIN (a tower floor's first floors, drawLooser) when a Maia answer is one of the two:
+    // throwLoss was set above an honest Maia's worst at BOSS_BRAIN's draw, and an older app draws that way, not the floor's. The better
+    // still plays; only the strike goes. Two fallbacks (no Maia) are struck as ever. Today an online floor is a party room, which has
+    // no checker (its host's move alone, unvouched), so this guards a checked floor for later: the second review of #991.)
+    const thrown = gap >= BOSS_CHECK.throwLoss && !(drawLooser(this.r.bossBrain?.draw) && (a.by || b.by)) ? worse : null;
     const maiaOf = !!a.by !== !!b.by ? (a.by ? ia : ib) : null;
     const pick = maiaOf && (maiaOf === better || gap <= BOSS_CHECK.maiaGap) ? maiaOf : better;
     console.log(`boss move in ${this.r.code}: the engine server's scores ${ia} ${sa.toFixed(3)}, ${ib} ${sb.toFixed(3)}: ${pick}'s plays${maiaOf ? " (Maia's against a fallback)" : ""}`);
@@ -2520,7 +2524,8 @@ export class LobbyCore {
     // (His brain for this move, the same as solo's (runner.brainNow): the Hidden Boss's child's rating now and the strength it stands
     // for; Armored Birdie's much stronger one, Stockfish at Maia's top.)
     const now = runner.brainNow(this.r.bossBrain?.rating ?? null);
-    const brain = b && now.rating !== null ? { brain: b.brain, rating: now.rating } : null;
+    // (A Battle Tower floor's own draw goes with it (NetBossBrain.draw): the host and the checker draw alike.)
+    const brain = b && now.rating !== null ? { brain: b.brain, rating: now.rating, ...(b.draw ? { draw: b.draw } : {}) } : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -2568,7 +2573,7 @@ export class LobbyCore {
     const maia = BOSS_BRAIN.forPlayers || (people.length > 0 && people.every((h) => h.admin));
     const plan = this.runner?.bossBrainPlan("", maia);
     if (!plan || plan.rating === null || plan.brain === "stockfish") return null;
-    return { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}) };
+    return { brain: plan.brain, rating: plan.rating, ...(plan.stockfishShare ? { stockfishShare: plan.stockfishShare } : {}), ...(plan.draw ? { draw: plan.draw } : {}) };
   }
 
   /**
