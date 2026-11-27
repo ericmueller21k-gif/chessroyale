@@ -362,6 +362,7 @@ test("his locked card: a tap shows him and how to unlock him, every way to play 
   await expect(notice).toBeVisible({ timeout: 30_000 });
   await expect(notice).toHaveClass(/ff-window/);
   await expect(notice.getByRole("button")).toHaveText(["▶ OK"]);
+  if (process.env.STILLS) await page.screenshot({ path: `${process.env.STILLS}/notice-${test.info().project.name}.png` });
   await notice.getByRole("button", { name: "OK" }).click();
   await expect(notice).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("brc.unlock.told"))).toBe('["stranger"]');
