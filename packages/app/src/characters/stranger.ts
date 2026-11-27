@@ -20,6 +20,7 @@
  * his face (eyes, mouth), his head's tilt, and a drop to one knee (`kneel`). Every part is painted the first time a frame shows it.
  */
 import { lazyAnimsTogether, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import type { SoundName } from "../sound.ts";
 
 const lazyAnim = lazyAnimsTogether();
 
@@ -791,10 +792,10 @@ export const POSES = {
   },
   flourish: {
     ...REST,
-    armF: [[38, 60], [30, 62]],
-    armI: [[90, 60], [98, 62]],
-    swordF: held([30, 62], -78),
-    swordI: held([98, 62], 78),
+    armF: [[38, 62], [32, 68]],
+    armI: [[90, 62], [96, 68]],
+    swordF: held([32, 68], -142),
+    swordI: held([96, 68], 142),
     eyes: "narrow",
     mouth: "smirk",
   },
@@ -1032,4 +1033,23 @@ export const STRANGER: Character = {
 };
 
 /** The part of his idle's first frame his portrait shows: his head, crown and collar. */
-export const STRANGER_PORTRAIT = { x: 44, y: 10, w: 40, h: 44 };
+export const STRANGER_PORTRAIT = { x: 43, y: 12, w: 42, h: 40 };
+
+/**
+ * His cues and their sounds (stranger-sounds.ts, sound.ts names): `draw` both swords out, `sheathe` home, `slash` the double slash,
+ * `tips` the tips touching, `cast` the cast's release, `hit`, `fall` (a sword's clatter), `kneel`, `hum` (his entrance's nod).
+ */
+export const STRANGER_SOUNDS: Record<string, SoundName> = {
+  draw: "strangerDraw",
+  sheathe: "strangerSheathe",
+  slash: "strangerSlash",
+  tips: "strangerTips",
+  cast: "strangerCast",
+  hit: "strangerHit",
+  fall: "strangerFall",
+  kneel: "strangerKneel",
+  hum: "strangerHum",
+  // (The board art's: effects/stranger.ts.)
+  freeze: "strangerFreeze",
+  burn: "strangerBurn",
+};

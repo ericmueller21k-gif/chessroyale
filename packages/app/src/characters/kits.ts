@@ -39,6 +39,8 @@ import { BOSS_ZEBRA as ZEBRA, BOSS_ZEBRA_PORTRAIT } from "./zebra.ts";
 import { ZEBRA_ATTACK } from "./zebra-figure.ts";
 import { CHANDY, CHANDY_BAR, CHANDY_PORTRAIT, CHANDY_SOUNDS, CHANDY_SPRITE } from "./chandy.ts";
 import { CHANDY_LINES } from "./chandy-lines.ts";
+import { STRANGER, STRANGER_PORTRAIT, STRANGER_SOUNDS } from "./stranger.ts";
+import { STRANGER_LINES } from "./stranger-lines.ts";
 import { BIRDIE_FIGURE } from "./birdie-figure.ts";
 import { BIRDIE_LINES } from "./birdie-lines.ts";
 import { birdieArmoredNow } from "./birdie-state.ts";
@@ -1255,9 +1257,39 @@ export const BOSS_KITS: Record<string, BossKit> = {
 /**
  * Kits drawn ahead of their boss (Nov 16): a boss's art, complete as a kit, before his rules put him in the roster. Not in BOSS_KITS
  * (that's the roster's: its tests walk every playable boss), so nothing in the game plays one; the art's previews do. The rules job
- * moves a kit into BOSS_KITS (Chandy's moved there with his rules, Nov 16). None now.
+ * moves a kit into BOSS_KITS (Chandy's moved there with his rules, Nov 16).
  */
-export const ART_KITS: Readonly<Record<string, BossKit>> = {};
+export const ART_KITS: Readonly<Record<string, BossKit>> = {
+  // The Stranger (docs/decisions/2026-11-27-stranger-art.md): the fire-and-ice swordsman, his swords on his back at rest, drawn for a
+  // capture, a check or his strike (draw, the double slash, sheathe) and for his power (draw, the twin-tip cast, sheathe). His sounds are
+  // his own (stranger-sounds.ts); his lines are placeholders for Eric. His bar's fit (barScale...) is measured when he joins the roster.
+  Stranger: {
+    ch: STRANGER,
+    anims: {
+      entrance: "nod",
+      thinking: "think",
+      move: "nod",
+      capture: "strike",
+      hurt: "hit",
+      check: "strike",
+      smug: "smug",
+      rattled: "rattled",
+      defeat: "defeat",
+      victory: "victory",
+      strike: "strike",
+      power: "castFull",
+      powerHit: "nod",
+      ultimateWarn: "draw",
+      ultimate: "strike",
+      ultimateHit: "nod",
+    },
+    loops: { thinking: "think", defeat: "defeatLoop" },
+    sounds: STRANGER_SOUNDS,
+    lines: STRANGER_LINES,
+    chance: { entrance: 1, capture: 0.3, rattled: 0.3, victory: 1, defeat: 1, ultimateWarn: 1 },
+    portrait: { ...STRANGER_PORTRAIT, anim: "idle", frame: 0 },
+  },
+};
 
 /**
  * The Hidden Boss in his child form (BossView.form "child", RECLUSE_CHILD; Nov 13): his growing figure (the child, 13, 20, then his
@@ -1302,6 +1334,8 @@ export const bossKitOf = (boss: { name: string; form?: string } | null | undefin
 
 // Folio's voice (Eric, Oct 27): each of its lines heard as it starts, its chirp (speech.tsx, `lineSounds`).
 for (const lines of Object.values(FOLIO_LINES)) for (const line of lines ?? []) lineSounds.set(line, "folioVoice");
+// The Stranger's voice (Nov 27): a low, calm "hm" as each of his lines starts.
+for (const lines of Object.values(STRANGER_LINES)) for (const line of lines ?? []) lineSounds.set(line, "strangerVoice");
 
 /** Every moment a kit may name an animation for (and so every `anims` key a powered twin may replace). */
 const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "place", "wince", "fold", "revision", "gnawNone", "kingAttack"] as const satisfies readonly Beat[];

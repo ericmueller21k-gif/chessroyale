@@ -30,6 +30,7 @@ import { ZEBRA_DOUGH } from "./zebra-dough.ts";
 import { GOLD_FX } from "./zebra-gold.ts";
 import { CHANDY_FX } from "./effects/chandy.ts";
 import { BIRDIE_CROSSING, BIRDIE_SMASH } from "./effects/birdie.ts";
+import { STRANGER_SQUARE } from "./effects/stranger.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -128,4 +129,6 @@ export const EFFECT_SPRITES = {
   // Birdie's (effects/birdie.ts): the crossing on his warned line, and his train's smash.
   birdieCrossing: BIRDIE_CROSSING,
   birdieSmash: BIRDIE_SMASH,
+  // The Stranger's (effects/stranger.ts; his rules wire it in their own job): a square struck by fire and ice.
+  strangerSquare: STRANGER_SQUARE,
 } as const satisfies Record<string, Character>;
