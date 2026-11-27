@@ -164,7 +164,7 @@ test("every slide in order lights its elements (a computer lights two where two 
   // Both Welcome Crates, each with its picture, its goal and its progress.
   const crates = dialogOf(page).locator(".wt-crate");
   await expect(crates).toHaveCount(2);
-  await expect(crates.nth(0)).toContainText("5 games");
+  await expect(crates.nth(0)).toContainText("Level 5");
   await expect(crates.nth(1)).toContainText("25 games");
 });
 

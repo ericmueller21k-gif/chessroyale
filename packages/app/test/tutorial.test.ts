@@ -3,6 +3,7 @@ import {
   TUTORIAL_CRATE_GOALS,
   TUTORIAL_SPOTS,
   crateBars,
+  tutorialCrateRows,
   TUTORIAL_ANYWHERE_SLIDE,
   shouldSaveSeen,
   shouldShowTutorial,
@@ -99,5 +100,18 @@ describe("the crates slide and finishing", () => {
   it("labels each crate by its goal", () => {
     expect(TUTORIAL_CRATE_LABEL(5)).toBe("5 games");
     expect(TUTORIAL_CRATE_LABEL(25)).toBe("25 games");
+  });
+});
+
+describe("the last slide's Welcome Crates (Nov 27)", () => {
+  it("the first is yours and opens at level 5 (its bar your level); the second, 25 games (its bar your games)", () => {
+    expect(tutorialCrateRows(2, 7).map((b) => [b.label, b.done, b.goal, b.reached])).toEqual([
+      ["Level 5", 2, 5, false],
+      ["25 games", 7, 25, false],
+    ]);
+    expect(tutorialCrateRows(9, 30).map((b) => [b.done, b.reached])).toEqual([
+      [5, true],
+      [25, true],
+    ]);
   });
 });

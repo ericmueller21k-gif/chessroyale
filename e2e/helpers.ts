@@ -635,8 +635,8 @@ export async function asServerAdmin(page: Page, who: "ops" | "chat" = "ops") {
  * no sign-in is set up in tests), e.g. for the town square's chat, which is for signed-in accounts only. A fresh email each
  * time. Reload the page after it for the app to see it. Answers the account's id.
  */
-export async function asSignedIn(page: Page, label = "player") {
-  return withEmail(page, `${label}-${test.info().project.name}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@e2e.test`);
+export async function asSignedIn(page: Page, label = "player", opts: { welcomeNotice?: boolean } = {}) {
+  return withEmail(page, `${label}-${test.info().project.name}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@e2e.test`, opts);
 }
 
 /**
@@ -653,10 +653,18 @@ async function pageAccountId(page: Page): Promise<string> {
   return ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
 }
 
-/** Puts `email` on this page's account in the local database (taking it off any other account first). Answers the id. */
-async function withEmail(page: Page, email: string) {
+/**
+ * Puts `email` on this page's account in the local database (taking it off any other account first). Answers the id. A signed-in
+ * account's first visit is given its first Welcome Crate, with a one-time notice over home (Nov 27, welcome-crate.spec.ts): given and
+ * closed here (its /api/me, then "seen"), so it never covers what a test taps; `welcomeNotice` leaves it to show.
+ */
+async function withEmail(page: Page, email: string, opts: { welcomeNotice?: boolean } = {}) {
   const id = await pageAccountId(page);
   await localSql(page, `UPDATE users SET email = NULL WHERE email = '${email}'; UPDATE users SET email = '${email}' WHERE id = '${id}'`);
+  if (!opts.welcomeNotice) {
+    await page.request.get("/api/me");
+    await page.request.post("/api/locker/welcome/seen", { data: {} });
+  }
   return id;
 }
 

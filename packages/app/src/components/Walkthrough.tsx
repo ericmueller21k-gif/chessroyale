@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { HunchessCrateArt } from "./Items.tsx";
+import { levelOf } from "@chessroyale/core";
 import {
   TUTORIAL_ANYWHERE_SLIDE,
-  TUTORIAL_CRATE_LABEL,
+  tutorialCrateRows,
   TUTORIAL_HANDBOOK_SLIDE,
   TUTORIAL_SEEN_KEY,
-  crateBars,
   shouldSaveSeen,
   shouldShowTutorial,
   slideSpotId,
@@ -267,7 +267,7 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
     : slide.kind === "anywhere" ? TUTORIAL_ANYWHERE_SLIDE.body
     : null;
   const isCrates = slide.kind === "crates";
-  const bars = isCrates ? crateBars(account().profile?.locker?.welcome?.games ?? 0) : null;
+  const bars = isCrates ? tutorialCrateRows(levelOf(account().profile?.xp ?? 0), account().profile?.locker?.welcome?.games ?? 0) : null;
   const holes = spots.map(holeOf);
   const spotClass = (s: SpotBox) => ["wt-spot", s.scale !== 1 ? "wt-spot-lit" : "", gliding ? "wt-glide" : ""].join(" ").trim();
 
@@ -336,7 +336,7 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
                   <li key={b.goal} class="wt-crate">
                     <span class="wt-art"><HunchessCrateArt /></span>
                     <span class="wt-crate-text">
-                      <strong>{TUTORIAL_CRATE_LABEL(b.goal)}</strong>
+                      <strong>{b.label}</strong>
                       <span class="wt-bar"><span style={{ width: `${b.fraction * 100}%` }} /></span>
                       <span class="wt-progress">{b.done} of {b.goal}</span>
                     </span>

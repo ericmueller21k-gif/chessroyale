@@ -371,8 +371,11 @@ const welcomeOf = (profile: ReturnType<typeof useAccount>["profile"]) =>
 /** Both Welcome Crate rows (Eric, Nov 6), from the account's locker: the rides in it are the HunChess ones (welcome-rows.ts). */
 const welcomeRowsNow = (profile: ReturnType<typeof useAccount>["profile"]): WelcomeRowView[] => {
   const rides = (profile?.locker?.items ?? []).filter((i) => isHunchess(i.def)).map((i) => ({ id: i.id, def: i.def }));
-  return welcomeRows(welcomeOf(profile), !!profile?.user.signedIn, rides);
+  return welcomeRows(welcomeOf(profile), !!profile?.user.signedIn, rides, levelOf(profile?.xp ?? 0));
 };
+
+/** A Welcome Crate you hold but can't open yet (below level 5, Nov 27): greyed, with the padlock, under Ready to open. */
+const welcomeHeld = (row: WelcomeRowView) => row.state === "ready" && !row.canOpen;
 
 /** A Welcome Crate's meter: its bar filling, and "3/5" beside it (full at ready and opened). */
 function WelcomeMeter({ row }: { row: WelcomeRowView }) {
@@ -403,10 +406,10 @@ function Padlock() {
  */
 function WelcomeRow({ row, onOpen }: { row: WelcomeRowView; onOpen: () => void }) {
   return (
-    <button type="button" class={`ff-window crate-row welcome-crate-row ${row.state}`} data-crate={WELCOME_CRATE.id} data-welcome={row.state} data-welcome-n={row.n} onClick={onOpen}>
+    <button type="button" class={`ff-window crate-row welcome-crate-row ${row.state}${welcomeHeld(row) ? " locked level-locked" : ""}`} data-crate={WELCOME_CRATE.id} data-welcome={row.state} data-welcome-n={row.n} onClick={onOpen}>
       <span class="crate-row-art">
         <HunchessCrateArt />
-        {row.state === "locked" && (
+        {(row.state === "locked" || welcomeHeld(row)) && (
           <span class="welcome-lock">
             <Padlock />
           </span>
@@ -849,10 +852,10 @@ function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Un
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
       </button>
-      <div class={`ff-window crate-hero welcome-crate-hero ${row.state}`}>
+      <div class={`ff-window crate-hero welcome-crate-hero ${row.state}${welcomeHeld(row) ? " locked level-locked" : ""}`}>
         <span class="crate-hero-art">
           <HunchessCrateArt />
-          {row.state === "locked" && (
+          {(row.state === "locked" || welcomeHeld(row)) && (
             <span class="welcome-lock">
               <Padlock />
             </span>
@@ -870,7 +873,7 @@ function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Un
       <button
         type="button"
         class="ff-button crate-open-btn"
-        disabled={row.state !== "ready"}
+        disabled={!row.canOpen}
         onClick={() => {
           unlockAudio();
           play("menuSelect");
@@ -880,9 +883,9 @@ function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Un
         ▶ Open
       </button>
       <p class="small muted">
-        Two per account: Welcome Crate 1 for finishing {WELCOME_GIFT.milestones[0]} games in any mode or against any boss, Welcome Crate 2 at{" "}
-        {WELCOME_GIFT.milestones[1]}. Each holds one ride, any of the game's rides, each as likely (the second never the first's), in HunChess
-        gold and black. They and their rides can't be traded.
+        Two per account: Welcome Crate 1 is yours on your first visit, Welcome Crate 2 for finishing {WELCOME_GIFT.milestones[1]} games in any
+        mode or against any boss. Both open from level {WELCOME_GIFT.openLevel}. Each holds one ride, any of the game's rides, each as likely
+        (the second never the first's), in HunChess gold and black. They and their rides can't be traded.
       </p>
       <h3 class="ff-title">Possible rides</h3>
       <div class="odds-list">
