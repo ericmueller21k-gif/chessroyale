@@ -40,3 +40,21 @@ Stills on `stills/stranger-ult`. `.pr-body.md` at most 40 lines, then `.done`.
   is `spared: true`.
 - N-a/N-b: remove boss-smoke.spec's `powersOf` helper and his skip (he gets the smoke); update `chess/test/stranger.test.ts`'s
   "a placeholder that never fires". N-c: trim `docs/decisions/2026-11-27-stranger-unlock-win.md` to about 120 words.
+
+**The ult's opening scene (Eric, Nov 27 ~05:55 UTC; animation only, the rules above are unchanged):** "he jumps onto the center of the
+board, takes both of his swords out, and slams them both into the chessboard, giving almost like a cracking animation... when he jumps
+in the middle of the board, any pieces that are there get, like, pushed a little bit out of the way, and then when he takes both of his
+swords out, and then one at a time just... crushes them down into the board... digs them into the board, and then they start pulsating
+out, like, their respective color in like a ripple effect. And as that's happening, like, a swirl is beginning around the board and
+starts to gather, and then he grabs both of the swords and... grips them, and then... he has like a red and blue aura around him now,
+and then it starts charging... more crazy, the animation, everything, and then until the full swirl starts, and it's, like, chaotic
+basically, and then he pulls them out, and then the board's still cracked at this point, and then when he jumps back, we can, like,
+restore the board and kind of return to the actual way the game looked, and the pieces move back to where they were."
+- The director's reading: (1) leap to the board's middle, pieces there nudged aside (drawn only; the position never changes);
+  (2) fire sword then ice sword driven in one at a time, the board cracking round each; (3) each pulses its color outward in ripples
+  while the storm begins to gather round the board; (4) he grips both hilts, a red-and-blue aura, the charge builds faster and wilder
+  until the full, chaotic swirl; (5) he pulls them out (board still cracked), leaps back to his place; the cracks heal, the nudged
+  pieces slide back to their squares, the board looks as it did; the storm ring keeps circling for its 3 turns, then clears.
+- About 6-8 s, the same timing solo and online (a moment the runner holds, as other bosses' ults), phone frame rate checked with
+  real taps, every frame whole on screen. Reuse: his `draw`/`strike`/`castFull` poses and aura, the board-crack/ripple as one
+  overlay effect; simple beats flashy.
