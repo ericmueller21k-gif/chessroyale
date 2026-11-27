@@ -1026,6 +1026,12 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   nor its thaw), Boingo's pie splat (`boingoPie`, 40 ms); and QUEEN SLAIN! as its banner comes (`queenSlain`, 40/60/40,
   Boss.tsx, once per banner). Settings → Sound, "Vibration" turns them off. A new moment is a line in `HAPTICS.cues`.
 
+- **The Stranger** (`stranger`, a working name; Nov 27, art only: docs/decisions/2026-11-27-stranger-art.md): `characters/stranger.ts`
+  (one figure painted per pose, swords on his back at rest; `strike` = draw, double slash, sheathe; `castFull` = draw, twin-tip cast,
+  sheathe; locked look `looks.locked`), `stranger-sounds.ts`, `stranger-lines.ts` (placeholders), his square's fire and ice in
+  `effects/stranger.ts` (`EFFECTS.strangerSquare`: strike, frozen, ignite, burn, burnOut). His kit waits in `ART_KITS.Stranger` until his
+  rules put him in the roster; `test/stranger.test.ts`.
+
 - **Chandy** (Nov 16; art docs/decisions/2026-11-16-chandy-art.md, rules 2026-11-16-chandy-rules.md): rules `bosses/chandy.ts`
   (and `chandyBattle`: the meter, the queen lock's shot, Dodge's rounds), server `server/src/bosses/chandy.ts` (Dodge's timer and
   votes: `dodgeVote`, `dodgeVotes`), screens `components/Chandy.tsx` (board layer, bar's pips and meter, the upgrade window,

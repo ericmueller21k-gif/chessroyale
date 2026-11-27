@@ -1028,7 +1028,7 @@ export const STRANGER_ANIMS: Record<string, Anim> = {
 /** His locked look (the picker shows him before he's unlocked): all in shadow but his eyes, the jewel and the aura's rim. */
 export const STRANGER_LOCKED: Record<string, string> = Object.fromEntries(
   Object.keys(STRANGER_PALETTE)
-    .filter((k) => !"riXK6789zk".includes(k))
+    .filter((k) => !"rRiIXK6789zk".includes(k))
     .map((k) => [k, "#0b0912"]),
 );
 
@@ -1046,7 +1046,7 @@ export const STRANGER: Character = {
 };
 
 /** The part of his idle's first frame his portrait shows: his head, crown and collar. */
-export const STRANGER_PORTRAIT = { x: 43, y: 12, w: 42, h: 40 };
+export const STRANGER_PORTRAIT = { x: 43, y: 9, w: 42, h: 42 };
 
 /**
  * His cues and their sounds (stranger-sounds.ts, sound.ts names): `draw` both swords out, `sheathe` home, `slash` the double slash,

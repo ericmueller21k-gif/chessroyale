@@ -450,6 +450,13 @@
       ],
       "specs": ["e2e/chandy.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/boss-side.spec.ts"]
     },
+    "The Stranger (stranger)": {
+      "paths": [
+        "packages/app/src/characters/stranger*.ts",
+        "packages/app/src/characters/effects/stranger.ts"
+      ],
+      "specs": ["e2e/boss-character.spec.ts", "e2e/boss-smoke.spec.ts"]
+    },
     "Birdie (birdie)": {
       "paths": [
         "packages/chess/src/bosses/birdie.ts",
