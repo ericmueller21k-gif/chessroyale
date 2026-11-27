@@ -1,36 +1,34 @@
-The Stranger's storm, redrawn: mockup round 3 (waiting for .go before wiring)
+The Stranger's storm, redrawn: mockup round 4 (waiting for .go before wiring)
 
-Branch stills/stranger-storm-art, folder stranger-storm-art/round3/ (rounds 1 and 2 stay beside it). Two versions, Eric picks:
+Branch stills/stranger-storm-art, folder stranger-storm-art/round4/ (earlier rounds stay beside it). GBA style only (Eric's pick, B):
+  storm-phone-ice-turn.gif / .mp4        phone, light, the storm's 1st turn (ice leads), the rift whole
+  storm-phone-fire-turn.gif / .mp4       phone, light, the 2nd turn (fire leads), the rift closing
+  storm-computer-ice-turn.gif / .mp4     computer, light, the 1st turn
+  storm-phone-three-turns.png            the three turns side by side: the rift whole, closing, nearly healed
+  storm-computer-ice-turn.png            computer, full screen
+The MP4s and PNGs show the true pixels; the GIFs are scaled down (their pixels look softer).
 
-A, painterly
-  A-painterly-phone-fire-turn.gif / .mp4       phone, light, the storm's 1st turn (fire leads), the rift whole
-  A-painterly-computer-ice-turn.gif / .mp4     computer, light, the storm's 1st turn (ice leads), the rift whole
-  A-painterly-phone-three-turns.png            the storm's three turns side by side: the rift whole, closing, nearly healed
-  A-painterly-computer-fire-turn.png           computer, light, the 2nd turn (fire), full screen
-B, the GBA pass
-  B-gba-phone-fire-turn.gif / .mp4, B-gba-computer-ice-turn.gif / .mp4, B-gba-phone-three-turns.png, B-gba-computer-fire-turn.png
-The MP4s and PNGs show the true pixels and colors; the GIFs are 256 colors and scaled down.
+The rift, redrawn to Eric's 18:45 note (scripts/storm-art/rift.py)
+- One central impact between his swords: a dark pit with a white-hot seam where the two sides meet, board chunks flying out from it
+  (the board's two colors, each with its thickness, a rim lit by its side's glow and a shadow that is farther off the higher it flew).
+- A wide lava fissure to the lower left: running lava on its floor, basalt walls with veins, scorch and molten rock over its lips,
+  flames rising out of it. A wide ice fissure to the upper right: a deep blue floor with pale facets, ice walls, rime on its lips,
+  clusters of crystals erupting from both lips. Thinner branches off each, and hairline cracks past those.
+- Real depth, the way a top-down pixel game draws a pit: under every upper lip you see the board's own thickness, then the wall going
+  down into the dark, then the floor far below with the wall's shadow across it. The lips are lifted slabs (lit at the edge, shaded
+  toward a break line). Each side's glow spills softly onto the squares.
+- GBA style: the ring's own pixel size, one 15-color palette, ordered dithering, hard see-through levels.
+- It lives: a 4-frame loop at 6 a second (the flames lick, the lava and crystals glint, the chunks bob a pixel).
+- Three heal stages, one each turn: whole; 72% as long and 74% as wide with fewer chunks and crystals and lower flames; 44% and half
+  as wide; then gone with the storm. Under the pieces; the last-move highlight and a fire turn's marked tiles stay over it.
+- Known, to fix when wiring: at stages 2 and 3 the ice fissure's thin far end reads pale; it should be a dark hairline.
 
-What changed since round 2 (Eric, 18:35: the crack "looks like a joke ... squiggly lines ... like somebody ripped open the board")
-- The crack is now drawn art, rendered offline like the ring (scripts/storm-art/rift.py): a deep jagged rift down the board's middle,
-  between his two swords, about a square across at its widest. Looking down into it: terraced walls stepping down into the dark,
-  basalt with veins of lava on the fire side, blue ice on the other, a white-hot seam in the deep where the two meet. Its lips are
-  lifted, broken slabs (lit at the edge, shaded toward a break line, a thin shadow past it), thin cracks run off into the board,
-  molten rock and scorch spill over the fire side's lip with an orange glow on the squares, ice crystals and rime grow from the
-  other with a cold glow, and chips of board (in the board's two colors, with thickness and a shadow) float over it.
-- Three heal stages, one each turn of the storm: 88% of the board's height and whole; 64% and two-thirds as wide with fewer chips and
-  crystals; 40% and under half as wide; then gone with the storm.
-- It sits under the pieces. The last-move highlight and a fire turn's marked tiles stay over it (they must stay readable).
-- Both styles: A at 640 px, B at the ring's own pixel size (15 colors, dithered).
-- The ring, the dim (22%) and the see-through (88%) are as in round 2.
+The rest is round 2's B: the ring (36 frames, 250 px, 12 a second), the soft dim (22%), the storm see-through (88%).
 
-What would ship
-- A: storm.webp 1029 KB + frost.webp 34 KB + three rift stills about 92 KB (about 26 MB decoded for the loop).
-- B: storm.webp 376 KB + frost.webp 1 KB + three rift stills about 6 KB (about 12 MB decoded). B is the lighter one.
-- At play time: 2 to 6 image draws a frame for the ring, no particles; the rift is one still image a turn; the dim one CSS layer.
+What would ship: storm.webp 376 KB + frost.webp 1 KB + three rift strips 17 KB in all (about 12 MB decoded for the ring's loop).
+At play time: 2 to 6 image draws a frame for the ring, no particles; the rift one small image stepped by CSS; the dim one CSS layer.
 
 Calls for the director / Eric
-1. A or B.
-2. The rift runs top to bottom between the swords (the fire world left of it, the ice world right). If his reference runs the other
-   way (side to side), it's one setting in rift.py: say so.
-3. In the opening scene the rift would open as the swords go in (in place of today's line cracks) and stay; the ripples stay.
+1. The rift's look and size (its fissures are about a square wide near the impact).
+2. In the opening scene the rift would open as the swords go in (in place of today's line cracks) and stay; the ripples stay.
+3. The painterly files (round 3's A) stay in the scripts (`soft`), unused, unless you want them dropped.

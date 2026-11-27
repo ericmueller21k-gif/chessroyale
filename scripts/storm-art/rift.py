@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
-The rift the Stranger's storm tears in the board (Eric, Nov 27: "like somebody ripped open the board ... more graphical"): a deep
-jagged rift down the board's middle, between his two swords. Depth (terraced walls down to a glow), lifted broken edges, floating chips
-of board, lava and its glow on the fire side (left), ice crystals and frost on the other. Drawn once, offline, as stills: one per heal
-stage (the rift closes from its ends and narrows each turn of the storm). The game only shows the picture, under the pieces.
+The rift the Stranger's storm tears in the board (Eric, Nov 27: "like somebody ripped open the board"; his reference: one central
+impact, board chunks flying from it, a wide lava fissure to the lower left with flames out of it, a wide ice fissure to the upper
+right with ice crystals erupting, thinner branches, real depth). GBA style: drawn smooth at four times the size, then scaled down to
+the storm ring's own pixel size and put in one 15-color palette with ordered dithering.
 
-  python3 scripts/storm-art/rift.py <out-dir> [soft|gba] [res]     # rift-1.png (whole), rift-2.png, rift-3.png
+Depth is drawn the way a top-down pixel game draws a pit: under each upper lip you see the board's thickness and the wall going down,
+then the floor far below (lava on the fire side, ice on the other) with the wall's shadow on it.
+
+Drawn once, offline: one short loop (FRAMES frames: the flames lick, the lava and crystals glint, the chunks bob) for each heal stage
+(the rift closes from its ends and narrows each turn of the storm). The game only shows the pictures, under the pieces.
+
+  python3 scripts/storm-art/rift.py <out-dir> [res=202]    # rift-<stage>-<frame>.png, and rift-<stage>.png (the frames side by side)
 
 Units: the board is 0..1 both ways, y down. Needs numpy and Pillow.
 """
@@ -17,257 +23,328 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from render import BAYER, ICE, FIRE, over, ramp, smooth, unit, volume, samp  # noqa: E402
+from render import BAYER, FIRE, ICE, over, ramp, samp, smooth, unit, volume  # noqa: E402
 
-SS = 2
-# How much of the rift is left at each stage: its length (a share of the board's height) and its width (a share of its widest).
-STAGES = [dict(length=0.88, width=1.0, bits=1.0), dict(length=0.64, width=0.68, bits=0.6), dict(length=0.4, width=0.4, bits=0.3)]
-MID = 0.545  # where it is widest: between his swords
-WIDE = 0.058  # half its widest opening (about a square across at its widest)
-BOARD_LIGHT = (240, 217, 181)
-BOARD_DARK = (190, 172, 142)
-# The GBA pass's palette: the dark of the deep, the rock, the board's two colors (chips), lava and ice.
-RIFT_PAL = [(8, 4, 16), (40, 20, 24), (80, 48, 40), (128, 88, 64), (184, 152, 120), (240, 216, 176), (136, 16, 0), (216, 56, 8), (248, 136, 24), (255, 216, 80), (255, 248, 200), (24, 72, 160), (56, 136, 232), (136, 208, 255), (224, 244, 255)]
+SS = 4
+FRAMES = 4
+CENTER = (0.5, 0.545)  # the impact: between his two swords
+# What is left at each stage: the fissures' length and width, the crater's size, how many chunks and crystals, the flames' height.
+STAGES = [dict(length=1.0, width=1.0, crater=1.0, bits=1.0, flames=1.0), dict(length=0.72, width=0.74, crater=0.78, bits=0.6, flames=0.7), dict(length=0.44, width=0.5, crater=0.55, bits=0.3, flames=0.42)]
+LAVA, ICY = 0, 1
+BOARD_LIGHT = (240, 216, 176)
+BOARD_DARK = (184, 152, 120)
+# One palette (15-bit colors): the deep, rock, the board's two colors (its thickness, the chunks), lava, ice.
+PAL = [(8, 4, 16), (40, 20, 24), (80, 48, 40), (128, 88, 64), BOARD_DARK, BOARD_LIGHT, (136, 16, 0), (216, 56, 8), (248, 136, 24), (255, 216, 80), (255, 248, 200), (24, 72, 160), (56, 136, 232), (136, 208, 255), (224, 244, 255)]
 
 
-def jag(rng, lo, hi, step_lo, step_hi, value):
-    """A jagged line's knots: positions from lo to hi, a value at each from `value(rng, position)`."""
-    ks = [lo]
-    while ks[-1] < hi:
-        ks.append(ks[-1] + rng.uniform(step_lo, step_hi))
-    ks = np.array(ks)
-    return ks, np.array([value(rng, k) for k in ks])
+def walk(rng, start, ang, total, n, wobble):
+    """A jagged line from `start`: n stretches, each off the heading by up to `wobble`."""
+    pts = [start]
+    for _ in range(n):
+        a = ang + rng.uniform(-wobble, wobble)
+        seg = total / n * rng.uniform(0.75, 1.25)
+        pts.append((pts[-1][0] + math.cos(a) * seg, pts[-1][1] + math.sin(a) * seg))
+    return pts
+
+
+class Fissure:
+    def __init__(self, rng, pts, wide, kind, fork=0.0):
+        self.pts, self.wide, self.kind, self.fork = pts, wide, kind, fork
+        segs = [math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:])]
+        self.total = sum(segs)
+        self.cum = np.concatenate([[0], np.cumsum(segs)])
+        k = np.linspace(0, 1, 14)
+        self.jit = [(k, rng.uniform(0.55, 1.0, len(k))), (k, rng.uniform(0.55, 1.0, len(k)))]
+
+    def at(self, t):
+        """The point at `t` along it (0..1) and its heading there."""
+        s = min(max(t, 0.0), 0.9999) * self.total
+        i = int(np.searchsorted(self.cum, s, side="right") - 1)
+        a, b = self.pts[i], self.pts[i + 1]
+        f = (s - self.cum[i]) / (self.cum[i + 1] - self.cum[i])
+        return a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, math.atan2(b[1] - a[1], b[0] - a[0])
+
+    def width(self, t, side, st):
+        """Its half-width at `t` on a side (0 left of its heading, 1 right): widest at the impact, a point at its end."""
+        left = np.clip(1 - t / st["length"], 0, 1)
+        return self.wide * st["width"] * left**0.8 * np.interp(t, *self.jit[side])
+
+    def field(self, u, v, st):
+        """For every pixel: how deep into it (1 on its middle line, 0 at its lip, below 0 outside), and how far outside its lip."""
+        best = np.full(u.shape, 1e9, np.float32)
+        tt = np.zeros_like(u)
+        sd = np.zeros(u.shape, np.int32)
+        for i, (a, b) in enumerate(zip(self.pts, self.pts[1:])):
+            abx, aby = b[0] - a[0], b[1] - a[1]
+            l2 = abx * abx + aby * aby
+            h = np.clip(((u - a[0]) * abx + (v - a[1]) * aby) / l2, 0, 1)
+            d = np.hypot(u - (a[0] + h * abx), v - (a[1] + h * aby))
+            near = d < best
+            best = np.where(near, d, best)
+            tt = np.where(near, (self.cum[i] + h * math.sqrt(l2)) / self.total, tt)
+            sd = np.where(near, (abx * (v - a[1]) - aby * (u - a[0]) > 0).astype(np.int32), sd)
+        w = np.where(sd == 0, self.width(tt, 0, st), self.width(tt, 1, st))
+        q = np.where(w > 1e-5, 1 - best / np.maximum(w, 1e-5), -1.0)
+        return q, best - w, w
 
 
 class Rift:
-    def __init__(self, seed=5):
+    def __init__(self, seed=3):
         rng = np.random.default_rng(seed)
-        # Its middle line: a jagged walk down the board, back through the middle where the swords are.
-        kv, steps = jag(rng, 0.0, 1.0, 0.035, 0.085, lambda r, k: r.uniform(-0.034, 0.034))
-        kx = np.cumsum(steps)
-        kx = kx - np.linspace(kx[0], kx[-1], len(kx))  # no drift: it ends under where it starts
-        kx = np.clip(kx, -0.07, 0.07)
-        kx = kx - np.interp(MID, kv, kx) + 0.5
-        self.mid = (kv, kx)
-        # Each lip's own jaggedness (a share of the opening), and each lip's lifted slab (how far the broken edge reaches).
-        self.lip_l = jag(rng, 0.0, 1.0, 0.014, 0.04, lambda r, k: r.uniform(0.35, 1.0))
-        self.lip_r = jag(rng, 0.0, 1.0, 0.014, 0.04, lambda r, k: r.uniform(0.35, 1.0))
-        self.slab_l = jag(rng, 0.0, 1.0, 0.03, 0.08, lambda r, k: r.uniform(0.012, 0.04))
-        self.slab_r = jag(rng, 0.0, 1.0, 0.03, 0.08, lambda r, k: r.uniform(0.012, 0.04))
-        self.terrace = jag(rng, 0.0, 1.0, 0.012, 0.03, lambda r, k: r.uniform(-0.14, 0.14))
-        self.rng_seed = seed
+        self.seed = seed
+        lava = Fissure(rng, walk(rng, CENTER, math.radians(133), 0.56, 9, 0.5), 0.05, LAVA)
+        ice = Fissure(rng, walk(rng, CENTER, math.radians(-44), 0.54, 9, 0.5), 0.05, ICY)
+        self.mains = [lava, ice]
+        self.all = [lava, ice]
+        # Thinner branches off each: alternately to either side.
+        for main, base in ((lava, math.radians(133)), (ice, math.radians(-44))):
+            for j, i in enumerate((2, 4, 6)):
+                t = main.cum[i] / main.total
+                turn = (1 if j % 2 == 0 else -1) * rng.uniform(0.65, 1.1)
+                length = rng.uniform(0.11, 0.2) * (1 - 0.4 * t)
+                self.all.append(Fissure(rng, walk(rng, main.pts[i], base + turn, length, 4, 0.45), 0.4 * 0.05 * (1 - t) ** 0.8 + 0.006, main.kind, fork=t))
+        k = np.linspace(0, 2 * math.pi, 19)
+        r = rng.uniform(0.72, 1.12, len(k))
+        r[-1] = r[0]
+        self.crater = (k, r)
         self.grain = volume((1, 256, 256), 6, 60, seed + 1, slope=0.9)
         self.low = volume((1, 128, 128), 2, 10, seed + 2, slope=1.1)
+        self.lick = volume((FRAMES, 128, 128), 2, 16, seed + 3, slope=1.1, taniso=5)
 
-    def shape(self, v, stage):
-        """At height v: the rift's middle, its left and right lips (x), for a stage. No opening where the lips meet."""
-        half = STAGES[stage]["length"] / 2
-        taper = np.clip(1 - (np.abs(v - MID) / half) ** 1.5, 0, 1) ** 1.1
-        w = WIDE * STAGES[stage]["width"] * taper
-        xc = np.interp(v, *self.mid)
-        return xc, xc - w * np.interp(v, *self.lip_l), xc + w * np.interp(v, *self.lip_r), taper
-
-    def draw(self, res, stage):
+    def draw(self, res, stage, frame):
         st = STAGES[stage]
         R = res * SS
+        tau = frame / FRAMES
         c = (np.arange(R, dtype=np.float32) + 0.5) / R
         u, v = np.meshgrid(c, c)
-        xc, xl, xr, taper = self.shape(v, stage)
-        wide = xr - xl
-        inside = (u > xl) & (u < xr) & (wide > 0.5 / R)
-        dl = xl - u  # how far left of the left lip
-        dr = u - xr
-        near = np.where(u < xc, dl, dr)
-        left = u < xc
         grain = unit(samp(self.grain, u * 2.3, v * 2.3, 0), 1.2)
         low = unit(samp(self.low, u * 1.7, v * 1.7, 0), 1.1)
+
+        # Every opening as one: how deep into the nearest (q), how far outside it (near), whose it is (kind), how wide it is there.
+        q = np.full(u.shape, -1.0, np.float32)
+        near = np.full(u.shape, 1e9, np.float32)
+        kind = np.zeros(u.shape, np.int32)
+        wide = np.zeros_like(u)
+        for f in self.all:
+            if f.fork > st["length"] * 0.8:
+                continue
+            fq, fn, fw = f.field(u, v, st)
+            closer = fn < near
+            kind = np.where(closer, f.kind, kind)
+            wide = np.where(closer, fw, wide)
+            near = np.minimum(near, fn)
+            q = np.maximum(q, fq)
+        # The impact's crater: jagged, lava on the fire fissure's side of it, ice on the other.
+        rx, ry = u - CENTER[0], v - CENTER[1]
+        rho = np.hypot(rx, ry)
+        rc = 0.072 * st["crater"] * np.interp(np.mod(np.arctan2(ry, rx), 2 * math.pi), *self.crater)
+        cq = 1 - rho / rc
+        axis = (-rx + ry) * 0.7071 + 0.02 * (low - 0.5)
+        in_crater = cq > q
+        kind = np.where((rho - rc < near) | in_crater, (axis < 0).astype(np.int32), kind)
+        wide = np.where(rho - rc < near, rc * 0.7, wide)
+        near = np.minimum(near, rho - rc)
+        q = np.maximum(q, cq)
+        inside = q > 0
+        lava_side = kind == LAVA
         layer = np.zeros((R, R, 4), np.float32)
-        on = smooth(0.0, 0.3, taper)  # the rift is here at all (fades toward its ends)
+        out = np.maximum(near, 0)
 
-        # 1. The glow that spills onto the board either side: lava's on the left, the cold's on the right. Soft, see-through.
-        spill = np.exp(-np.maximum(near, 0) / 0.055) * on * taper**0.5 * (0.75 + 0.25 * low) * (0.5 + 0.5 * st["width"])
-        over(layer, np.where(left[..., None], np.array([255, 96, 16], np.float32), np.array([64, 160, 255], np.float32)), 0.32 * spill * (near > 0))
-        # 2. The lifted, broken edges: each lip's slab tilts up toward the rift (catching light at the lip, in shade toward its
-        #    break), ends at a dark break line, and throws a thin shadow on the board past it.
-        for side, slab in ((True, self.slab_l), (False, self.slab_r)):
-            reach = np.interp(v, *slab) * (0.45 + 0.55 * st["width"]) * (0.35 + 0.65 * taper)
-            d = np.where(side, dl, dr)
-            mine = (left == side) & (d > 0) & (taper > 0)
-            t = np.clip(d / np.maximum(reach, 1e-5), 0, 1.6)
-            over(layer, np.array([255, 246, 226], np.float32), 0.26 * np.clip(1 - t / 0.45, 0, 1) * mine * on)
-            over(layer, np.array([44, 26, 18], np.float32), 0.36 * smooth(0.4, 1.0, t) * (t <= 1) * mine * on)
-            over(layer, np.array([20, 10, 10], np.float32), 0.3 * np.clip(1 - (t - 1) / 0.35, 0, 1) * (t > 1) * mine * on)
-            line = np.exp(-(((d - reach) / 0.0024) ** 2)) * mine * on
-            over(layer, np.array([24, 12, 10], np.float32), 0.9 * line)
-        # 3. Scorch and molten rock on the fire side's edge; rime on the ice side's.
-        edge = np.exp(-np.maximum(near, 0) / 0.014) * on * (near > 0)
-        over(layer, np.array([30, 12, 8], np.float32), 0.55 * edge * left * (0.35 + 0.65 * grain))
-        melt = np.clip(np.exp(-np.maximum(dl, 0) / 0.02) * 1.5 - 1.25 * (1 - unit(samp(self.low, u * 6.1, v * 6.1, 0), 1.6)), 0, 1) * on * left * (near > 0)
+        # 1. The glow that spills onto the board: lava's, and the cold's. Soft, see-through.
+        spill = np.exp(-out / 0.045) * (near > 0) * (0.7 + 0.3 * low) * np.clip(wide / 0.03, 0.25, 1)
+        over(layer, np.where(lava_side[..., None], np.array([255, 96, 16], np.float32), np.array([64, 160, 255], np.float32)), 0.34 * spill)
+        # 2. The lifted, broken edges: a slab along each lip, tilted up toward the rift (lit at the lip, shaded toward its break), a
+        #    dark break line, and its thin shadow on the board past it.
+        reach = (0.012 + 0.03 * unit(samp(self.low, u * 3.3 + 0.2, v * 3.3, 0), 1.6)) * np.clip(wide / 0.03, 0.3, 1)
+        t = np.clip(out / reach, 0, 1.6)
+        slab = (near > 0).astype(np.float32)
+        over(layer, np.array([255, 246, 226], np.float32), 0.16 * np.clip(1 - t / 0.45, 0, 1) * slab)
+        over(layer, np.array([44, 26, 18], np.float32), 0.42 * smooth(0.4, 1.0, t) * (t <= 1) * slab)
+        over(layer, np.array([20, 10, 10], np.float32), 0.34 * np.clip(1 - (t - 1) / 0.35, 0, 1) * (t > 1) * slab)
+        over(layer, np.array([24, 12, 10], np.float32), 0.9 * np.exp(-(((out - reach) / 0.0028) ** 2)) * slab)
+        # 3. Scorch and molten rock over the fire side's lips; rime over the ice side's.
+        edge = np.exp(-out / 0.014) * (near > 0)
+        over(layer, np.array([30, 12, 8], np.float32), 0.55 * edge * lava_side * (0.35 + 0.65 * grain))
+        melt = np.clip(np.exp(-out / 0.014) * 1.5 - 1.38 * (1 - unit(samp(self.low, u * 6.1, v * 6.1, 0), 1.6)), 0, 1) * lava_side * (near > 0)
         over(layer, ramp(np.clip(0.3 + 0.75 * melt, 0, 1), FIRE), smooth(0.0, 0.18, melt))
-        over(layer, ramp(np.clip(0.55 + 0.45 * grain, 0, 1), ICE), 0.8 * np.clip(edge * 1.6 - 0.6 * (1 - grain), 0, 1) * ~left)
+        over(layer, ramp(np.clip(0.55 + 0.45 * grain, 0, 1), ICE), 0.6 * np.clip(edge * 1.3 - 0.7 * (1 - grain), 0, 1) * ~lava_side)
 
+        # 4. Hairline cracks running on from the branches' ends and off the lips.
         img = Image.new("RGBA", (R, R), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img, "RGBA")
-        rng = np.random.default_rng(self.rng_seed + 10)
-        half = st["length"] / 2
+        rng = np.random.default_rng(self.seed + 10)
         px = lambda x, y: (x * R, y * R)
+        for f in self.all:
+            for k in range(5 if f in self.mains else 2):
+                t0 = rng.uniform(0.25, 0.95) if f in self.mains else rng.uniform(0.6, 1.0)
+                turn = rng.choice([-1, 1]) * rng.uniform(0.5, 1.3)
+                length = rng.uniform(0.04, 0.1)
+                turns = [(rng.uniform(-0.7, 0.7), rng.uniform(0.4, 1.0)) for _ in range(4)]
+                if t0 > st["length"] or f.fork > st["length"] * 0.8:
+                    continue
+                x, y, ang = f.at(min(t0, st["length"] * 0.98))
+                ang += turn
+                pts = [(x, y)]
+                for da, dn in turns:
+                    ang += da
+                    pts.append((pts[-1][0] + math.cos(ang) * length * dn / 2, pts[-1][1] + math.sin(ang) * length * dn / 2))
+                for i in range(len(pts) - 1):
+                    draw.line([px(*pts[i]), px(*pts[i + 1])], fill=(22, 10, 10, 235), width=max(1, int(0.0062 * R * (1 - i / len(pts)))))
+        cr = np.asarray(img, np.float32)
+        over(layer, cr[..., :3], cr[..., 3] / 255 * (near > 0))
 
-        def lips_at(y):
-            a = self.shape(np.float32(y), stage)
-            return float(a[0]), float(a[1]), float(a[2]), float(a[3])
-
-        # 4. Cracks running off the lips into the board: thin, jagged, a faint glow at their roots.
-        for k in range(14):
-            y = MID + rng.uniform(-0.43, 0.43)
-            go_left = k % 2 == 0
-            ang = (math.pi if go_left else 0.0) + rng.uniform(-0.9, 0.9)
-            length = rng.uniform(0.035, 0.11)
-            turns = [(rng.uniform(-0.7, 0.7), rng.uniform(0.3, 1.0)) for _ in range(5)]
-            if abs(y - MID) > half * 0.92:
-                continue
-            _, l, r, tp = lips_at(y)
-            at = [l if go_left else r, y]
-            pts = [tuple(at)]
-            for da, dn in turns[: 2 + int(3 * tp)]:
-                ang += da
-                seg = length * dn * (0.4 + 0.6 * tp) * (0.5 + 0.5 * st["width"]) / 2.2
-                at = [at[0] + math.cos(ang) * seg, at[1] + math.sin(ang) * seg * 0.9]
-                pts.append(tuple(at))
-            glow = (255, 120, 24, 70) if go_left else (96, 184, 255, 80)
-            draw.line([px(*q) for q in pts[:3]], fill=glow, width=max(2, int(0.01 * R)), joint="curve")
-            # (Thicker at its root, a hairline at its tip.)
-            for i in range(len(pts) - 1):
-                draw.line([px(*pts[i]), px(*pts[i + 1])], fill=(22, 10, 10, 230), width=max(1, int(0.0058 * R * (1 - i / len(pts)))))
-        cr = np.asarray(img.filter(ImageFilter.GaussianBlur(0.35 * SS)), np.float32)
-        over(layer, cr[..., :3], cr[..., 3] / 255)
-
-        # 5. The rift itself, looking down into it: terraced walls stepping down, darker with depth, to a glow in the deep: lava on the
-        #    fire side, cold light on the other, a white-hot seam where they meet.
-        a = np.clip((u - xl) / np.maximum(wide, 1e-6), 0, 1)
-        fire_side = a < 0.5 + 0.08 * (low - 0.5)
-        q = np.minimum(a, 1 - a) * 2 + np.interp(v, *self.terrace) * 0.75 + 0.08 * (grain - 0.5)
-        # (Where it is narrow there is no room for walls: all deep.)
-        room = smooth(0.006, 0.05, wide)
-        q = q * room + (1 - room) * 0.7
-        steps = [0.17, 0.34, 0.52]
-        fire_rock = [(124, 84, 58), (78, 44, 34), (40, 20, 22), (10, 4, 12)]
-        ice_rock = [(120, 160, 204), (58, 104, 172), (26, 56, 120), (6, 10, 28)]
-        level = (q >= steps[0]).astype(np.int32) + (q >= steps[1]) + (q >= steps[2])
-        rock = np.where(fire_side[..., None], np.array(fire_rock, np.float32)[level], np.array(ice_rock, np.float32)[level])
-        rock = rock * (0.8 + 0.4 * grain[..., None])
-        # (Each ledge's edge catches a little light; under it, its own shadow.)
-        for sidx, sv in enumerate(steps):
-            ledge = np.exp(-(((q - sv) / 0.022) ** 2)) * (q >= sv)
-            rock = rock * (1 - 0.45 * ledge[..., None])
-            lip = np.exp(-(((q - sv + 0.012) / 0.012) ** 2)) * (q < sv)
-            rock = rock + lip[..., None] * np.where(fire_side[..., None], np.array([90, 50, 24], np.float32), np.array([70, 90, 110], np.float32)) * (1 - 0.25 * sidx)
-        # (The fire side's walls: veins of lava. The ice side's: glints.)
-        veins = np.clip(1 - np.abs(samp(self.grain, u * 1.1, v * 1.1, 0)) * 3.2, 0, 1) ** 3 * (level >= 1)
-        rock = np.where(fire_side[..., None], rock * (1 - veins[..., None]) + ramp(np.clip(0.45 + 0.4 * veins, 0, 1), FIRE) * veins[..., None], rock + (grain[..., None] > 0.86) * 70)
-        rock = np.clip(rock, 0, 255)
-        deep = np.clip((q - steps[2]) / 0.4, 0, 1)
-        flick = 0.7 + 0.6 * unit(samp(self.low, u * 9, v * 5, 0))
-        lava = ramp(np.clip(0.38 + 0.66 * deep * flick, 0, 1), FIRE)
+        # 5. Into the rift. Under each upper lip: the board's own thickness, then the wall going down into the dark. Below: the floor,
+        #    far down (running lava on the fire side, blue ice on the other), the wall's shadow across it.
+        run = np.zeros(u.shape, np.float32)  # how far below the opening's upper lip (pixels)
+        for y in range(1, R):
+            run[y] = np.where(inside[y], run[y - 1] + 1, 0)
+        below = np.zeros(u.shape, np.float32)  # how far above its lower lip
+        for y in range(R - 2, -1, -1):
+            below[y] = np.where(inside[y], below[y + 1] + 1, 0)
+        tall = (run + below) / R
+        wall = np.clip(0.46 * tall, 0.0, 0.062)
+        d = run / R
+        slabh = np.minimum(0.011, wall * 0.3)
+        on_slab = inside & (d < slabh)
+        on_wall = inside & ~on_slab & (d < wall)
+        floor = inside & ~on_slab & ~on_wall
+        wd = np.clip((d - slabh) / np.maximum(wall - slabh, 1e-5), 0, 1)
+        strata = 0.82 + 0.3 * unit(samp(self.grain, u * 0.9, v * 4.0, 0), 1.4)
+        fire_wall = (np.array([120, 78, 54], np.float32) * (1 - wd[..., None]) ** 1.6 + np.array([14, 6, 12], np.float32) * (1 - (1 - wd[..., None]) ** 1.6)) * strata[..., None]
+        ice_wall = (np.array([136, 196, 244], np.float32) * (1 - wd[..., None]) ** 1.6 + np.array([10, 28, 84], np.float32) * (1 - (1 - wd[..., None]) ** 1.6)) * strata[..., None]
+        veins = np.clip(1 - np.abs(samp(self.grain, u * 1.1, v * 1.1, 0)) * 3.4, 0, 1) ** 3 * wd
+        fire_wall = fire_wall * (1 - veins[..., None]) + ramp(np.clip(0.4 + 0.45 * veins, 0, 1), FIRE) * veins[..., None]
+        over(layer, np.where(lava_side[..., None], fire_wall, ice_wall), on_wall.astype(np.float32))
+        board = np.where((np.floor(u * 8) + np.floor(v * 8)) % 2 == 0, 1.0, 0.0)[..., None]
+        edge_col = (np.array(BOARD_LIGHT, np.float32) * board + np.array(BOARD_DARK, np.float32) * (1 - board)) * 0.78
+        over(layer, edge_col, on_slab.astype(np.float32))
+        flick = unit(samp(self.lick, u * 5, v * 5 + tau, tau), 1.3)
+        crust = unit(samp(self.grain, u * 1.6 + 0.3, v * 1.6, 0), 1.6)
+        hot = np.clip(0.34 + 0.62 * q + 0.16 * (flick - 0.5) - 0.34 * (crust > 0.72) * (q < 0.55), 0, 1)
         facets = np.clip(1 - np.abs(samp(self.grain, u * 0.8 + 0.4, v * 0.8, 0)) * 2.4, 0, 1) ** 2
-        cold = ramp(np.clip(0.28 + 0.6 * deep * flick + 0.3 * facets * deep, 0, 1), ICE)
-        glow = np.where(fire_side[..., None], lava, cold)
-        seam = np.exp(-(((a - 0.5 - 0.08 * (low - 0.5)) / 0.06) ** 2)) * deep
-        glow = np.clip(glow + seam[..., None] * np.array([120, 100, 130], np.float32), 0, 255)
-        into = smooth(0.0, 0.45, deep)[..., None]
-        col = rock * (1 - into) + glow * into
-        over(layer, col, inside.astype(np.float32))
-        # (A hairline where it has all but closed: dark, with a thread of glow.)
-        thin = np.exp(-(((u - xc) / 0.0028) ** 2)) * on * (wide < 0.006) * (taper > 0)
-        over(layer, np.array([24, 10, 14], np.float32), 0.85 * thin)
+        cold = np.clip(0.02 + 0.3 * q + 0.5 * facets * (0.6 + 0.8 * (flick - 0.5)), 0, 1)
+        fl = np.where(lava_side[..., None], ramp(hot, FIRE), ramp(cold, ICE))
+        # (Where the two meet in the crater: a white-hot seam.)
+        seam = np.exp(-((axis / 0.012) ** 2)) * (cq > 0.1)
+        pit = smooth(0.12, 0.55, cq)[..., None] * in_crater[..., None]
+        fl = fl * (1 - 0.82 * pit) + np.array([10, 4, 18], np.float32) * 0.82 * pit
+        fl = np.clip(fl + seam[..., None] * np.array([230, 200, 230], np.float32), 0, 255)
+        shade = 1 - 0.62 * np.exp(-np.maximum(d - wall, 0) / 0.014)
+        over(layer, fl * shade[..., None], floor.astype(np.float32))
+        # (The near lip's edge, and the far one's: a bright line where the broken board catches the light from below.)
+        rim = np.exp(-((np.abs(near) / 0.0034) ** 2)) * smooth(0.008, 0.022, wide)
+        over(layer, np.where(lava_side[..., None], np.array([255, 196, 96], np.float32), np.array([208, 240, 255], np.float32)), 0.9 * rim * (near > 0))
 
-        # 6. The lips' own edges: a bright rim where the broken board catches the light from below.
-        rim = np.exp(-((np.abs(near) / 0.0028) ** 2)) * on * (wide > 0.004)
-        over(layer, np.where(left[..., None], np.array([255, 196, 96], np.float32), np.array([208, 240, 255], np.float32)), 0.85 * rim * (near > -0.001))
+        # 6. Flames out of the lava: they rise from its floor past its lips, licking (each frame its own).
+        src = (floor & lava_side & (q > 0.45) & ~((cq > 0.1) & in_crater)).astype(np.float32) * np.clip(wide / 0.04, 0.3, 1)
+        col_tall = unit(samp(self.lick, u * 11, np.zeros_like(u) + 0.3, tau), 2.2)
+        src = src * (col_tall > 0.42)
+        height = 0.12 * st["flames"] * np.clip((col_tall - 0.42) / 0.5, 0.05, 1)
+        decay = 1.0 / np.maximum(height * R, 1.0)
+        fire = np.zeros_like(u)
+        fire[R - 1] = src[R - 1]
+        for y in range(R - 2, -1, -1):
+            sway = int(round(1.5 * SS * math.sin(y / (5.0 * SS) + 2 * math.pi * tau)))
+            fire[y] = np.maximum(src[y], np.roll(fire[y + 1], sway) - decay[y])
+        turb = unit(samp(self.lick, u * 13 + 0.6, v * 9 + 1 * tau, tau), 1.4)
+        heat = np.clip(fire * (0.7 + 0.5 * turb) - 0.12, 0, 1)
+        over(layer, ramp(np.clip(0.25 + heat * 0.95, 0, 1), FIRE), smooth(0.12, 0.3, heat) * (1 - src) * 0.96)
 
-        # 7. On the fire side: molten drops on the lip. On the ice side: crystals grown from the lip. Then the chips of board, afloat.
+        # 7. Ice crystals erupting from the ice fissure and its branches: clusters of spikes off both lips.
         img = Image.new("RGBA", (R, R), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img, "RGBA")
-        rng = np.random.default_rng(self.rng_seed + 20)
-        for k in range(30):
-            y = MID + rng.uniform(-0.4, 0.4)
-            length = rng.uniform(0.024, 0.062) * rng.choice([1, 1, 1.5])
-            ang = rng.uniform(-1.15, 1.15) - 0.25
-            wid = rng.uniform(0.2, 0.34)
-            tone = rng.random()
-            keep = rng.random() < st["bits"] + 0.2
-            if abs(y - MID) > half * 0.88 or not keep:
-                continue
-            _, _, r, tp = lips_at(y)
-            length *= 0.55 + 0.45 * tp
-            bx, by = r - 0.002, y
-            ca, sa = math.cos(ang), math.sin(ang)
-            tip = (bx + ca * length, by + sa * length)
-            nx, ny = -sa * length * wid, ca * length * wid
-            mid = (bx + ca * length * 0.3, by + sa * length * 0.3)
-            p1, p2 = (mid[0] + nx, mid[1] + ny), (mid[0] - nx, mid[1] - ny)
-            base = (bx - ca * length * 0.05, by - sa * length * 0.05)
-            draw.polygon([px(*base), px(*p1), px(*tip), px(*p2)], outline=(30, 92, 190, 230), width=max(1, int(0.003 * R)))
-            draw.polygon([px(*base), px(*p1), px(*tip)], fill=(int(214 + 30 * tone), int(240 + 10 * tone), 255, 240))
-            draw.polygon([px(*base), px(*tip), px(*p2)], fill=(int(74 + 40 * tone), int(150 + 30 * tone), 236, 232))
-            draw.line([px(*base), px(*tip)], fill=(255, 255, 255, 240), width=max(1, int(0.002 * R)))
-        bits = np.asarray(img.filter(ImageFilter.GaussianBlur(0.3 * SS)), np.float32)
+        rng = np.random.default_rng(self.seed + 20)
+        for f in [x for x in self.all if x.kind == ICY]:
+            main = f in self.mains
+            for k in range(15 if main else 4):
+                t0 = rng.uniform(0.04, 0.92)
+                side = int(rng.integers(0, 2))
+                spikes = [(rng.uniform(-0.85, 0.85), rng.uniform(0.45, 1.0), rng.uniform(0.16, 0.26), rng.random(), int(rng.integers(0, FRAMES))) for _ in range(int(rng.integers(2, 4)))]
+                size = rng.uniform(0.055, 0.125) * (1 if main else 0.6)
+                keep = rng.random() < st["bits"] + 0.15
+                if t0 > st["length"] * 0.92 or f.fork > st["length"] * 0.8 or not keep:
+                    continue
+                x, y, ang = f.at(t0)
+                w = float(f.width(np.float32(t0), side, st))
+                out_ang = ang + (math.pi / 2 if side else -math.pi / 2)
+                bx, by = x + math.cos(out_ang) * w * 0.8, y + math.sin(out_ang) * w * 0.8
+                grow = size * (0.45 + 0.55 * (1 - t0 / st["length"])) * (0.6 + 0.4 * st["width"])
+                for da, dl, wid, tone, glint in spikes:
+                    a = out_ang + da
+                    a = math.atan2(math.sin(a) - 0.35, math.cos(a))  # they lean upward: erupting
+                    length = grow * dl
+                    ca, sa = math.cos(a), math.sin(a)
+                    tip = (bx + ca * length, by + sa * length)
+                    nx, ny = -sa * length * wid, ca * length * wid
+                    mid = (bx + ca * length * 0.28, by + sa * length * 0.28)
+                    p1, p2 = (mid[0] + nx, mid[1] + ny), (mid[0] - nx, mid[1] - ny)
+                    base = (bx - ca * length * 0.06, by - sa * length * 0.06)
+                    draw.polygon([px(*base), px(*p1), px(*tip), px(*p2)], outline=(16, 48, 128, 255), width=SS + 2)
+                    draw.polygon([px(*base), px(*p1), px(*tip)], fill=(int(214 + 30 * tone), int(240 + 10 * tone), 255, 255))
+                    draw.polygon([px(*base), px(*tip), px(*p2)], fill=(int(48 + 30 * tone), int(124 + 30 * tone), 228, 255))
+                    draw.line([px(*base), px(*p1), px(*tip), px(*p2), px(*base)], fill=(16, 48, 128, 255), width=SS)
+                    draw.line([px(*base), px(*tip)], fill=(255, 255, 255, 255), width=max(1, int(0.003 * R)))
+                    if glint == frame:
+                        gx, gy = bx + ca * length * 0.55, by + sa * length * 0.55
+                        g = 0.011
+                        draw.line([px(gx - g, gy), px(gx + g, gy)], fill=(255, 255, 255, 255), width=max(1, int(0.005 * R)))
+                        draw.line([px(gx, gy - g), px(gx, gy + g)], fill=(255, 255, 255, 255), width=max(1, int(0.005 * R)))
+        bits = np.asarray(img, np.float32)
         over(layer, bits[..., :3], bits[..., 3] / 255)
 
+        # 8. Chunks of board flying from the impact: each with its thickness, a rim lit by its side's glow, and its shadow on the
+        #    board (the farther it has flown, the higher it is and the farther its shadow). They bob a pixel as the loop turns.
         shadow = Image.new("L", (R, R), 0)
         sdraw = ImageDraw.Draw(shadow)
         img = Image.new("RGBA", (R, R), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img, "RGBA")
-        rng = np.random.default_rng(self.rng_seed + 30)
-        for k in range(13):
-            y = MID + rng.uniform(-0.36, 0.36)
-            size = rng.uniform(0.016, 0.036)
-            spot = rng.uniform(-1.1, 1.1)
-            n = int(rng.integers(4, 6))
+        rng = np.random.default_rng(self.seed + 30)
+        for k in range(15):
+            ang = k / 15 * 2 * math.pi + rng.uniform(-0.2, 0.2)
+            far = rng.uniform(0.075, 0.25)
+            n = int(rng.integers(4, 7))
             angs = np.sort(rng.uniform(0, 2 * math.pi, n))
-            rad = rng.uniform(0.55, 1.0, n)
+            rad = rng.uniform(0.6, 1.0, n)
             lightc = rng.random() < 0.5
-            turn = rng.uniform(0, math.pi)
-            lift = rng.uniform(0.006, 0.014)
+            size = rng.uniform(0.02, 0.042) * (1.2 - 2.0 * far)
+            phase = int(rng.integers(0, FRAMES))
             keep = rng.random() < st["bits"]
-            if abs(y - MID) > half * 0.8 or not keep:
+            if not keep:
                 continue
-            xcn, l, r, tp = lips_at(y)
-            x = xcn + spot * max(r - l, 0.02) * 0.75
-            pts = [(x + math.cos(t + turn) * size * rr, y + math.sin(t + turn) * size * rr * 0.8) for t, rr in zip(angs, rad)]
-            # Its shadow on the board (down and to the right: it floats), its thickness, its top, and a rim lit by its side's glow.
-            sdraw.polygon([px(qx + lift * 1.1, qy + lift * 1.6) for qx, qy in pts], fill=150)
-            thick = size * 0.28
-            draw.polygon([px(qx, qy + thick) for qx, qy in pts], fill=(70, 46, 34, 255))
-            top = BOARD_LIGHT if lightc else BOARD_DARK
-            draw.polygon([px(*q) for q in pts], fill=top + (255,))
-            rimc = (255, 170, 60, 255) if x < xcn else (170, 224, 255, 255)
-            order = sorted(range(n), key=lambda i: pts[i][0], reverse=x < xcn)
-            a0, a1 = order[0], order[1]
-            draw.line([px(*pts[a0]), px(*pts[a1])], fill=rimc, width=max(1, int(0.0035 * R)))
-            draw.line([px(*p) for p in pts] + [px(*pts[0])], fill=(60, 38, 28, 200), width=max(1, int(0.0018 * R)))
-        sh = np.asarray(shadow.filter(ImageFilter.GaussianBlur(0.006 * R)), np.float32) / 255
+            far *= 0.55 + 0.45 * st["crater"]
+            bob = [0, -1, 0, 1][(frame + phase) % FRAMES] / res
+            x, y = CENTER[0] + math.cos(ang) * far, CENTER[1] + math.sin(ang) * far * 0.9 + bob
+            pts = [(x + math.cos(t) * size * rr, y + math.sin(t) * size * rr * 0.8) for t, rr in zip(angs, rad)]
+            lift = 0.012 + 0.11 * far
+            sdraw.polygon([px(qx + lift * 0.45, qy + lift - bob) for qx, qy in pts], fill=170)
+            thick = size * 0.34
+            draw.polygon([px(qx, qy + thick) for qx, qy in pts], fill=(80, 48, 40, 255))
+            draw.polygon([px(*p) for p in pts], fill=(BOARD_LIGHT if lightc else BOARD_DARK) + (255,))
+            on_lava = (-(x - CENTER[0]) + (y - CENTER[1])) > 0
+            order = sorted(range(n), key=lambda i: (pts[i][0] - CENTER[0]) ** 2 + (pts[i][1] - CENTER[1]) ** 2)
+            draw.line([px(*pts[order[0]]), px(*pts[order[1]])], fill=(255, 170, 60, 255) if on_lava else (170, 224, 255, 255), width=max(1, int(0.006 * R)))
+            draw.line([px(*p) for p in pts] + [px(*pts[0])], fill=(40, 20, 24, 255), width=max(1, int(0.004 * R)))
+        sh = np.asarray(shadow.filter(ImageFilter.GaussianBlur(0.004 * R)), np.float32) / 255
         over(layer, np.array([10, 6, 14], np.float32), 0.5 * sh)
-        chips = np.asarray(img.filter(ImageFilter.GaussianBlur(0.25 * SS)), np.float32)
+        chips = np.asarray(img, np.float32)
         over(layer, chips[..., :3], chips[..., 3] / 255)
         return layer
 
 
-def finish(layer, res, pix):
+def finish(layer, res):
+    """Scaled down to the game's pixels, then the GBA pass: the palette, dithered; transparency in three hard levels."""
     a = np.clip(layer[..., 3], 0, 1)
     pm = np.dstack([layer[..., :3], a * 255]).astype(np.float32)
     h, w = a.shape
     small = pm.reshape(h // SS, SS, w // SS, SS, 4).mean(axis=(1, 3))
     sa = small[..., 3] / 255
     rgb = np.where(sa[..., None] > 1e-4, small[..., :3] / np.maximum(sa[..., None], 1e-4), 0)
-    if not pix:
-        return Image.fromarray(np.clip(np.dstack([rgb, small[..., 3]]) + 0.5, 0, 255).astype(np.uint8), "RGBA")
-    # The GBA pass: its palette, dithered; its transparency in three hard levels.
     yy, xx = np.mgrid[0:res, 0:res]
     b = BAYER[yy % 4, xx % 4]
     aq = np.clip(np.floor(sa * 3 + 0.5 + (b - 0.5) * 0.4), 0, 3) / 3
-    aq = np.where(sa < 0.09, 0, aq)
-    c = rgb + (b[..., None] - 0.5) * 30
-    pal = np.array(RIFT_PAL, np.float32)
+    aq = np.where(sa < 0.1, 0, aq)
+    c = rgb + (b[..., None] - 0.5) * 18
+    pal = np.array(PAL, np.float32)
     idx = np.argmin(((c[:, :, None, :] - pal[None, None, :, :]) ** 2).sum(-1), axis=2)
     out = np.dstack([pal[idx], aq * 255])
     out[aq == 0] = 0
@@ -276,13 +353,17 @@ def finish(layer, res, pix):
 
 def main():
     out = sys.argv[1]
-    pix = len(sys.argv) > 2 and sys.argv[2] == "gba"
-    res = int(sys.argv[3]) if len(sys.argv) > 3 else (202 if pix else 640)
+    res = int(sys.argv[2]) if len(sys.argv) > 2 else 202
     os.makedirs(out, exist_ok=True)
     rift = Rift()
-    for stage in range(3):
-        finish(rift.draw(res, stage), res, pix).save(os.path.join(out, f"rift-{stage + 1}.png"))
-    print(f"{out}: 3 stages at {res} px{' (GBA pass)' if pix else ''}")
+    for stage in range(len(STAGES)):
+        strip = Image.new("RGBA", (res * FRAMES, res), (0, 0, 0, 0))
+        for frame in range(FRAMES):
+            img = finish(rift.draw(res, stage, frame), res)
+            img.save(os.path.join(out, f"rift-{stage + 1}-{frame}.png"))
+            strip.paste(img, (frame * res, 0))
+        strip.save(os.path.join(out, f"rift-{stage + 1}.png"))
+    print(f"{out}: {len(STAGES)} stages, {FRAMES} frames each, {res} px")
 
 
 if __name__ == "__main__":

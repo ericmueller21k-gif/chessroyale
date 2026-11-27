@@ -7,6 +7,8 @@ stills and a looping GIF, for a look before anything is wired.
   python3 scripts/storm-art/preview.py gif   <cells-dir> <screenshot.png> <x,y,size,dpr> <out.gif> [lead] [crop] [width=390] [fps=15] [seconds=3]
   Both: [style=gba] (whole frames, scaled up as pixels) [opacity=1] (the storm's own) [dim=0] (the soft dim round the board)
   [area=x0,y0,x1,y1] (the part of the page the dim covers, CSS px)
+  gif: <screenshot.png> may be several, comma-separated: the same moment with each frame of the rift's loop under the pieces,
+  stepped at [riftfps=6]
 """
 import glob
 import os
@@ -136,7 +138,9 @@ def main():
     opt = dict(a.split("=", 1) for a in rest if "=" in a)
     box = [float(v) for v in box_s.split(",")]
     fire, ice, frost = load(cells)
-    shot = Image.open(shot_path)
+    shots = [Image.open(q) for q in shot_path.split(",")]
+    shot = shots[0]
+    riftfps = float(opt.get("riftfps", 6))
     lead = opt.get("lead", "none")
     PIX = opt.get("style") == "gba"
     look = dict(opacity=float(opt.get("opacity", 1)), dim=float(opt.get("dim", 0)), area=[float(v) for v in opt["area"].split(",")] if "area" in opt else None)
@@ -152,7 +156,7 @@ def main():
     total = int(round(fps * seconds))
     with tempfile.TemporaryDirectory() as tmp:
         for k in range(total):
-            img = compose(shot, box, canvas(fire, ice, k * n / total, lead), frost, lead, **look)
+            img = compose(shots[int(k / fps * riftfps) % len(shots)], box, canvas(fire, ice, k * n / total, lead), frost, lead, **look)
             if crop:
                 img = img.crop(crop)
             img.resize((width, int(round(img.height * width / img.width))), Image.LANCZOS).save(os.path.join(tmp, f"{k:04d}.png"))
