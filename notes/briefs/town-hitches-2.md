@@ -45,3 +45,18 @@ expand the game to continue". Find the town box's aspect/width where the drawing
 and below it pause the town's frame loop and show a pop-up in the game's style ("Make the window wider to keep playing"), back the moment
 it's wide enough again. Phones in portrait must never hit it (their town works today): set the threshold by the box's aspect where it
 breaks, checked at 390x844 and a narrow desktop window. One focused e2e check (resize narrow → the message; wide → the town back).
+
+**The director's read of Eric's second trace (Nov 27 ~08:35; Edge, walking, 9.5 s; the file is local to the director only, the
+scripts that read it are `notes/tools/trace/a2.py`-`a4.py`, `python3 -I a4.py <trace.json>`):**
+- Main thread sampled 9.6 s, **busy 7.3 s (77%)**; ~504 animation frames (~53 fps); FireAnimationFrame max 24 ms; GC small in this one
+  (main MinorGC 10 × max 4.4 ms; the keep-pictures worker's 1.5 s and its MajorGCs are off the main thread).
+- Per second while walking: our render code ~170-250 ms ("you-look" chunk = the town renderer), Town chunk ~150-240 ms, "(program)"
+  (native canvas/GL) ~250-380 ms, GPU calls ~10-100 ms. So each frame costs ~13 ms of main-thread CPU on his laptop: almost no headroom,
+  and anything extra (a GC, an input event, chat, an upload) tips a frame over.
+- Where ours goes (all under the frame loop `zs` → `ss` → render `draw`): `drawGround` → `fillSquares` → `fillRuns` and `HP.drawSquare`
+  (canvas 2D, every frame); `drawThings` → `planBoxes` → `PR`, `partPos`; `drawProp` → `drawBoard` → `paintBoard` (**the park tables'
+  chessboards painted every frame**); in the Town chunk `emitPoly` (~480 ms/9.5 s), `v`, `P`, `strokeStrip`, `fill`, `add`, `pack`,
+  `clipPoly`, `bufferSubData`. The frame report's parts (Ground 2.4 ms…) undercount this: make them agree with a profile.
+- So the target, besides any GC: cut the per-frame CPU on a mid laptop to well under half a frame: cache what doesn't change (the
+  tables' boards, the ground's squares as a picture or a GPU texture/tiles), stop re-emitting static polygons every frame, keep
+  `(program)` low (fewer canvas 2D calls per frame). Measure with a CPU-throttled profile (4x) in Chromium, before/after.
