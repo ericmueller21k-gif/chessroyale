@@ -68,7 +68,7 @@ function youOnStage(): StageSide {
  * returning the stage, not a component of its own: the search and the versus moment must be the same `DuelStage`, so
  * Preact keeps it, and your pawn on it, from one to the other.)
  */
-function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => void, onCancel: () => void, onBot: () => void, onAway: () => void) {
+function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => void, onCancel: () => void, onBot: () => void, onAway: (() => void) | null) {
   const s = queue.state;
   const waited = s.kind === "searching" ? Math.max(0, now - s.since) : 0;
   const delayLeft = s.kind === "searching" && s.delayUntil ? Math.max(0, s.delayUntil - now) : 0;
@@ -79,10 +79,13 @@ function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => 
       them={null}
       head={
         <>
-          {/* Home, still searching (Eric, Oct 16: "a back button or they can view inventory"): the bar comes with you. */}
-          <button type="button" class="dv-st-home" onClick={onAway} aria-label="Home: keep searching while you look around">
-            <span aria-hidden="true">‹</span> Home
-          </button>
+          {/* Home, still searching (Eric, Oct 16: "a back button or they can view inventory"): the bar comes with you. (Not over the town,
+              from a table: Cancel is the way back, still seated. Nov 27.) */}
+          {onAway && (
+            <button type="button" class="dv-st-home" onClick={onAway} aria-label="Home: keep searching while you look around">
+              <span aria-hidden="true">‹</span> Home
+            </button>
+          )}
           {stageHead}
         </>
       }
@@ -266,6 +269,7 @@ export function DuelFront({
   onAway,
   onHome,
   onAgain,
+  town = false,
 }: {
   queue: DuelQueue | null;
   session: DuelSession | null;
@@ -278,6 +282,11 @@ export function DuelFront({
   onAway: () => void;
   onHome: () => void;
   onAgain: () => void;
+  /**
+   * Begun at a town's park table (Nov 27): the search is over the town (no Home on its stage: Cancel is the way back, still seated), and
+   * once played, Home reads "Back to town" (you're back on your stool).
+   */
+  town?: boolean;
 }) {
   const src = (session ?? queue)!;
   const first = session?.snapshot();
@@ -303,7 +312,7 @@ export function DuelFront({
       q.keepWaiting = true;
       redraw((n) => n + 1);
     };
-    return frame(searchStage(q, now, few, keep, onCancel, onBot, onAway));
+    return frame(searchStage(q, now, few, keep, onCancel, onBot, town ? null : onAway));
   }
   const snap = session.snapshot();
   if (snap.gone && !snap.end)
@@ -317,7 +326,7 @@ export function DuelFront({
       </div>
     );
   if (snap.phase === "waiting" || snap.phase === "versus") return frame(versusStage(snap));
-  const board = <DuelBoard session={session} snap={snap} now={now} onHome={onHome} onAgain={onAgain} />;
+  const board = <DuelBoard session={session} snap={snap} now={now} onHome={onHome} onAgain={onAgain} home={town ? "Back to town" : "Home"} />;
   return gameFrame ? gameFrame(board) : board;
 }
 
@@ -356,7 +365,7 @@ const modeLine = (line: string | null) => (
   </span>
 );
 
-function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; now: number; onHome: () => void; onAgain: () => void }) {
+function DuelBoard({ session, snap, now, onHome, onAgain, home }: { session: DuelSession; snap: DuelSnapshot; now: number; onHome: () => void; onAgain: () => void; home: string }) {
   const computer = useMedia(COMPUTER_LAYOUT);
   const wide = useMedia(MOUSE_LAYOUT);
   const you = snap.you;
@@ -434,7 +443,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
   );
   // (A ranked game that was played (not aborted): its own end page, as the boss battles' (Eric, Nov 20), its move-by-move below.)
   if (over && snap.end && !snap.town && !snap.bot && snap.end.result !== "aborted")
-    return <DuelEndPage session={session} snap={snap} people={people} computer={computer} wide={wide} title={clockLine} exit={exit} onHome={onHome} onAgain={onAgain} />;
+    return <DuelEndPage session={session} snap={snap} people={people} computer={computer} wide={wide} title={clockLine} exit={exit} onHome={onHome} onAgain={onAgain} home={home} />;
   const chat = session.chat && session.chat.enabled && (
     <div class="lchat dv-chat">
       <ChatPanel people={people} chat={session.chat} variant={computer ? "side" : "full"} />
@@ -450,7 +459,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
     // One row under the chat: Offer a draw and Resign (greyed until they apply); a draw offer's Accept and Decline take the row. Once it's
     // over (an aborted game, a bot's or the town's), the result in its place.
     const row = over ? (
-      snap.end && <DuelResult snap={snap} onHome={onHome} onAgain={onAgain} />
+      snap.end && <DuelResult snap={snap} onHome={onHome} onAgain={onAgain} home={home} />
     ) : snap.drawOffer === them ? (
       <div class="dv-actions dv-draw" role="alert">
         <span class="dv-draw-words">{theirName} offers a draw</span>
@@ -528,7 +537,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
             Offer a draw
           </button>
         )}
-        {over && snap.end && <DuelResult snap={snap} onHome={onHome} onAgain={onAgain} />}
+        {over && snap.end && <DuelResult snap={snap} onHome={onHome} onAgain={onAgain} home={home} />}
       </div>
       {chat}
     </div>
@@ -540,7 +549,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
  * over the board): "Victory!" / "Defeat" / "A draw" and why, then RP EARNED (or RP LOST) counting up and lobbing into the division's bar,
  * then XP EARNED and its bar, the coin strip, the quests, Play again and Home; the game's moves under it (GameSteps).
  */
-function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; people: ChatPeople; computer: boolean; wide: boolean; title: string | null; exit: MatchExit | null; onHome: () => void; onAgain: () => void }) {
+function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHome, onAgain, home }: { session: DuelSession; snap: DuelSnapshot; people: ChatPeople; computer: boolean; wide: boolean; title: string | null; exit: MatchExit | null; onHome: () => void; onAgain: () => void; home: string }) {
   const end = snap.end!;
   const you = snap.you;
   const them = other(you);
@@ -567,7 +576,7 @@ function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHom
           Play again
         </button>
         <button type="button" class="btn btn-secondary" onClick={onHome}>
-          Home
+          {home}
         </button>
       </div>
     </>
@@ -642,7 +651,7 @@ function DuelEndPage({ session, snap, people, computer, wide, title, exit, onHom
 }
 
 /** The result card (an aborted game, a bot's or the town's): who won and why, your rank's change, your coins, and what's next. */
-function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () => void; onAgain: () => void }) {
+function DuelResult({ snap, onHome, onAgain, home }: { snap: DuelSnapshot; onHome: () => void; onAgain: () => void; home: string }) {
   const end = snap.end!;
   const you = snap.you;
   const line = rankLine(snap);
@@ -679,10 +688,95 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
               {snap.bot ? "Find a person" : "Play again"}
             </button>
             <button type="button" class="btn btn-secondary" onClick={onHome}>
-              Home
+              {home}
             </button>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Watching a game from the town (Nov 27) ----------------
+
+/** How a watched game ended, said of the players by name ("Ann won" and why, on two lines). */
+export function watchedEnd(end: DuelEnd, players: Record<Color, { name: string }>): { title: string; why: string } {
+  const by = end.by ? players[end.by].name : "";
+  const title = end.result === "aborted" ? "Game called off" : end.result === "1/2-1/2" ? "A draw" : `${players[end.result === "1-0" ? "w" : "b"].name} won`;
+  const why: Record<DuelEnd["reason"], string> = {
+    checkmate: "Checkmate.",
+    resign: `${by} resigned.`,
+    timeout: `${by} ran out of time.`,
+    timeout_vs_insufficient: `${by} ran out of time, but there was no checkmate left.`,
+    stalemate: "Stalemate.",
+    repetition: "The same position three times.",
+    fifty_moves: "50 moves each without a capture or a pawn move.",
+    insufficient_material: "Not enough material to checkmate.",
+    agreement: "Draw agreed.",
+    abort: "Called off before the first moves.",
+    no_first_move: "Called off before the first moves.",
+    no_show: "Called off: a player didn't arrive.",
+  };
+  return { title, why: why[end.reason] };
+}
+
+/**
+ * Watching a ranked 1 v 1 from the town (Eric, Nov 27: "they could actually click and spectate those games"): its board as it's played,
+ * White at the foot, both players' strips and clocks (an eval bar as the game screens have it: off for everyone since Nov 1), a line
+ * for where the game is, and Back to town, to where you stood. Nothing here is sent to the game (NetDuel's `watch`).
+ */
+export function DuelWatch({ session, onBack }: { session: DuelSession; onBack: () => void }) {
+  const first = session.snapshot();
+  const now = useSession(session, !first.end && !first.gone, 100);
+  const snap = session.snapshot();
+  const toMove: Color = snap.moves.length % 2 === 0 ? "w" : "b";
+  const over = !!snap.end || snap.phase === "over";
+  const control = snap.control ? duelControl(snap.control) : null;
+  const clockLine = control && snap.clock ? controlLabel({ ...control, ...snap.clock }) : null;
+  const set = snap.clock !== null;
+  const end = snap.end ? watchedEnd(snap.end, snap.players) : null;
+  const line = snap.gone
+    ? snap.gone
+    : end
+      ? null
+      : snap.phase === "waiting"
+        ? "The players are sitting down…"
+        : snap.phase === "versus" || snap.phase === "vote"
+          ? "They're choosing the time control"
+          : snap.phase === "overlay"
+            ? `Timer: ${clockLine ?? "Blitz"}`
+            : `${snap.players[toMove].name} to move`;
+  const strip = (c: Color) => <DuelStrip ranked p={snap.players[c]} c={c} you={false} ms={clockAt(snap, c, now)} running={snap.running && toMove === c && !over} clockShownNow={set} away={!over && snap.phase !== "waiting" && !snap.connected[c]} />;
+  return (
+    <div class="screen game duel-screen dv-watch">
+      <div class="hud-row">
+        <div class="hud dv-title">
+          <h1>Spectating</h1>
+          <span class="dv-control">{clockLine ? `1 v 1 · ${clockLine}` : "1 v 1 · Classic chess"}</span>
+        </div>
+      </div>
+      <div class="board-area">
+        {strip("b")}
+        <div class="board-row">
+          <Board fen={snap.fen} orientation="white" lastMove={snap.lastMove} interactive={false} />
+        </div>
+        {strip("w")}
+      </div>
+      <div class="play-footer dv-panel">
+        {line && (
+          <p class="dv-status" role="status">
+            {line}
+          </p>
+        )}
+        {end && (
+          <div class="dv-result" role="status">
+            <strong class="dv-result-title">{end.title}</strong>
+            <p class="dv-result-why">{end.why}</p>
+          </div>
+        )}
+        <button type="button" class="btn btn-primary dv-watch-back" onClick={onBack}>
+          Back to town
+        </button>
       </div>
     </div>
   );
