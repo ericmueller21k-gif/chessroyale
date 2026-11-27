@@ -1,0 +1,33 @@
+The Stranger's storm, redrawn: mockup (waiting for .go before wiring)
+
+Branch stills/stranger-storm-art, folder stranger-storm-art/ (images only):
+  storm-phone-fire-turn.gif / .mp4 / .png     phone, light, a fire turn (fire leads)
+  storm-phone-ice-turn.gif / .mp4 / .png      phone, light, an ice turn (ice leads)
+  storm-computer-fire-turn.gif / .mp4 / .png  computer, dark, a fire turn
+  storm-computer-ice-turn.gif / .mp4 / .png   computer, dark, an ice turn
+  before-phone-todays-ring.png                today's pixel ring, the same moment, for comparison
+The GIFs are 256 colors at 15 frames a second; the MP4s show the true colors (same frames). The PNGs are full screens.
+
+What it is
+- Real screenshots of a Stranger battle (?power=storm), today's ring hidden, the new storm composited the way the game will do it:
+  the loop's frames on one small canvas (400 px, scaled up), neighbors cross-faded, the still frost under it.
+- Fire up the left and across the top-left (yellow-white cores, orange, deep red edges, embers); frost wind, crystal shards, snow and
+  icicles down the right and along the bottom-right; both turn the same way round and meet at the top's and the bottom's middle.
+- A 3 s seamless loop, 30 frames. On a fire turn the fire is full and doubled (a second copy half a loop on), the ice at 80%; on an
+  ice turn the other way round.
+- Over the board the storm is see-through and reaches about a third of an edge square; its bright part sits on the frame and margin.
+  Along the bottom it barely reaches past the board, so the line under it (what to do, the clock) stays readable.
+
+What ships (measured from these frames, after compression; the mockup is cut back out of these files)
+- storm.webp: 3264 x 2000, 1029 KB (30 frames, a fire cell and an ice cell each, 272 x 400). frost.webp: 544 x 800, 34 KB (still).
+  About 1.06 MB in all, loaded when a Stranger battle starts. About 26 MB once decoded (the price of 30 frames at this size).
+- At play time: 2 to 6 image draws a frame on one 400 px canvas (no particles), plus one still image under it.
+- Drawn offline by scripts/storm-art/render.py (numpy + Pillow, about 40 s), packed by pack.py; preview.py made these mockups.
+
+Calls for the director / Eric
+1. On a computer the top of the storm crosses the thin boss strip above the board (his name, the move count). Today's ring does
+   too. Say if the top should be held back like the bottom.
+2. On a phone the board nearly fills the width (14 px each side), so the side flames show mostly over the a- and h-file's outer third.
+3. The crack of the opening scene (lava-orange / ice-blue) is not in this mockup: I'd recolor the existing SVG cracks by side when
+   wiring (cheap), not draw new art. Say if you want more.
+4. Decoded size: 24 frames instead of 30 (a 2.4 s loop) or 360 px frames would cut it by about a fifth each, if 26 MB is too much.
