@@ -103,7 +103,11 @@ export function homeOf(computer: boolean, key = ""): Stand {
   if (!board?.width || !sprite) return fallback;
   const b = figureRestBox(sprite, STRANGER, false);
   const k = b.width / STRANGER.w;
-  const home: Stand = { x: r2(((b.left + STRANGER.foot[0] * k - board.left) / board.width) * 100), y: r2(((b.top + STRANGER.foot[1] * k - board.top) / board.width) * 100), w: r2((b.width / board.width) * 100) };
+  // (His frame's box whole on the screen: his own figure's may hang half a pixel off a phone's edge, its clear margin; the moment's
+  // box never does, moved in by that much. Eric, Nov 4: sprites always on screen.)
+  const left = Math.max(0.1, b.left);
+  const top = Math.max(0.1, b.top);
+  const home: Stand = { x: r2(((left + STRANGER.foot[0] * k - board.left) / board.width) * 100), y: r2(((top + STRANGER.foot[1] * k - board.top) / board.width) * 100), w: r2((b.width / board.width) * 100) };
   homes.set(id, home);
   if (homes.size > 8) homes.delete(homes.keys().next().value!);
   return home;
