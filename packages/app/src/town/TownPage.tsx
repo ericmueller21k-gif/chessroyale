@@ -6,6 +6,7 @@ import { FrontFrame, type FrontNav, type FrontPage } from "../components/FrontMe
 import { useMedia } from "../components/QuickChat.tsx";
 import type { Stand } from "./world.ts";
 import { chunk } from "../stale.ts";
+import { pauseEngines } from "../engine.ts";
 
 export type { Stand };
 
@@ -114,6 +115,14 @@ export function TownPage({ nav, layer, ...props }: Props & { nav: FrontNav; laye
       live = false;
       release();
     };
+  }, []);
+  // (Stockfish's workers end while the town is open and start again as it closes (engine.ts pauseEngines; Nov 27): nothing in the town
+  // asks them anything, and back from a battle they were up to four of about 56 MB each beside the town's pictures on a phone, which
+  // iOS reloads when a page runs out of memory.)
+  useEffect(() => {
+    let open = () => {};
+    void pauseEngines(new Promise<void>((go) => (open = go)));
+    return () => open();
   }, []);
   const screen = Town ? <Town {...props} framed={framed} /> : <div class="screen" />;
   return framed ? (

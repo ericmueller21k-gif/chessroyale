@@ -4,6 +4,7 @@ import { legalMoves } from "@chessroyale/chess";
 import { BATTLE_TOWER } from "@chessroyale/core";
 import { test, asAdmin, asSignedIn, submitMove, tapInTown, localSql } from "./helpers.ts";
 import { frameStats, instrument } from "./perf-probe.js";
+import { memProbe } from "./mem-probe.js";
 
 /**
  * The Battle Tower (PR 10's battle; PR 11b's flow, Eric, Nov 19: "you walk into the battle tower, you talk to the clerk, you start a
@@ -304,6 +305,8 @@ test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, th
   await asAdmin(page);
   // (Signed in, so the town's beats carry your pawn: the check after the floor.)
   await asSignedIn(page, "tower");
+  let loads = 0;
+  page.on("load", () => loads++);
   await intoTower(page);
   const clerk = await tapRoom(page, "keeper", "Clerk");
   await clerk.getByRole("button", { name: /^(Start|Continue)/ }).first().click();
@@ -331,8 +334,18 @@ test("an admin's 🏆 \"Win this match\" (Eric, Nov 20): greyed once pressed, th
   await expect.poll(() => beats.filter((b) => !b.leave).length, { timeout: 20_000 }).toBeGreaterThan(1);
   expect(beats.filter((b) => !b.leave)[0]?.floor, "the first beat back says it's from a floor").toBe(true);
   expect(beats.filter((b) => !b.leave).at(-1)?.floor, "and once answered, no more").toBeUndefined();
-  const lift = await tapRoom(page, "pass", "Elevator", "top");
-  await lift.getByRole("button", { name: "Up to floor 2" }).click();
+  // Back to the tower is its own load (Eric, Nov 27: "it loaded the town twice"): straight into the floor room, the street not loaded
+  // again (only the first visit's load), and the page never reloaded.
+  expect(await page.evaluate(() => (window as any).__townLoads), "the street loaded once").toBe(1);
+  expect(loads, "no page reload").toBe(1);
+  // A reload (the app closed and opened again): back in the tower, in front of the clerk, his card open (the street still not loaded).
+  await page.reload();
+  await expect(room(page)).toHaveAttribute("data-room", "tower", { timeout: 40_000 });
+  await expect(room(page)).not.toHaveAttribute("data-part", "top");
+  const clerk2 = page.getByRole("dialog", { name: "Clerk", exact: true });
+  await expect(clerk2).toBeVisible({ timeout: 20_000 });
+  expect(await page.evaluate(() => (window as any).__townLoads ?? 0), "the street not loaded in the tower").toBe(0);
+  await clerk2.getByRole("button", { name: "Continue: floor 2" }).click();
   await floorThenMatch(page, 2, 2);
   // (A new floor: the 🏆 ready again.)
   await expect(page.getByRole("button", { name: "Win this match (testing)" })).toBeEnabled();
@@ -406,9 +419,11 @@ test("no Last Stand on a floor; a free leave before your 2nd move goes down to t
   await page.getByRole("alertdialog").getByRole("button", { name: "Leave" }).click();
   await expect(room(page)).toHaveAttribute("data-room", "tower", { timeout: 60_000 });
   await expect(room(page)).not.toHaveAttribute("data-part", "top");
-  // A reload: the clerk says Continue: floor 1, "Start over" under it asks first.
+  // A reload: straight back in the tower in front of the clerk (Eric, Nov 27: the last town spot, town/spot.ts; the street not loaded),
+  // his card open saying Continue: floor 1, "Start over" under it asks first.
   await page.reload();
-  await intoTower(page);
+  await expect(room(page)).toHaveAttribute("data-room", "tower", { timeout: 40_000 });
+  await expect(page.locator("canvas.town-canvas")).not.toHaveAttribute("data-ready", "1");
   const desk = await tapRoom(page, "keeper", "Clerk");
   await expect(desk.getByRole("button", { name: "Continue: floor 1" })).toBeEnabled({ timeout: 20_000 });
   await desk.getByRole("button", { name: "Start over" }).click();
@@ -1020,4 +1035,60 @@ test("Moo & Moon's Full Moon on a shared floor (Eric, Nov 22: \"the cow didn't g
     await page.waitForTimeout(400);
     await still(page, "moo-full-moon-open");
   }
+});
+
+test("memory across two floors on a slowed phone (Eric, Nov 27: the game reloaded itself after a floor, twice): the battle holds none of the town, and back in the tower the street isn't loaded again", { tag: ["@perf", "@phone-only"] }, async ({ page }) => {
+  test.setTimeout(10 * 60_000);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await cdp.send("HeapProfiler.enable");
+  let loads = 0;
+  page.on("load", () => loads++);
+  await page.addInitScript(memProbe);
+  type Row = { at: string; heapMB: number; canvasMB: number; bitmapMB: number; imageMB: number; textureMB: number; engines: number; townLoads: number };
+  const rows: Row[] = [];
+  /** What's alive after a forced collection: the JS heap, live canvases, ImageBitmaps, decoded images, WebGL textures, Stockfish workers. */
+  const measure = async (at: string) => {
+    for (let i = 0; i < 2; i++) (await cdp.send("HeapProfiler.collectGarbage"), await page.waitForTimeout(300));
+    const heap = (await cdp.send("Runtime.getHeapUsage")) as { usedSize: number };
+    const m = await page.evaluate(() => (window as any).__mem());
+    const engines = page.workers().filter((w) => w.url().includes("stockfish")).length;
+    rows.push({ at, heapMB: Math.round(heap.usedSize / 1e5) / 10, canvasMB: m.canvasMB, bitmapMB: m.bitmapMB, imageMB: m.imageMB, textureMB: m.textureMB, engines, townLoads: await page.evaluate(() => (window as any).__townLoads ?? 0) });
+    return rows.at(-1)!;
+  };
+  await asAdmin(page);
+  await asSignedIn(page, "tower");
+  await intoTower(page);
+  const town = await measure("tower lobby (street loaded)");
+  const run = await page.evaluate(async () => {
+    await fetch("/api/tower/run", { method: "POST", body: "{}", credentials: "same-origin", headers: { "content-type": "application/json" } });
+    return ((await (await fetch("/api/me", { credentials: "same-origin" })).json()) as { user: { id: string } }).user.id;
+  });
+  // (The Stranger first, his storm's big sheets, then Big Boy: Eric's two floors.)
+  await localSql(page, "UPDATE tower_runs SET floor = 1, met = ? WHERE user_id = ? AND status = 'open'", JSON.stringify({ floors: [["stranger"]], deck: [], decks: 1 }), run);
+  const clerk = await tapRoom(page, "keeper", "Clerk");
+  await clerk.getByRole("button", { name: /^(Start|Continue)/ }).first().click();
+  for (const n of [1, 2]) {
+    await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
+    const fight = await measure(`floor ${n}'s battle`);
+    // (None of the town is kept through the battle: its pictures were some 230 MB of canvases before Nov 27.)
+    expect(fight.canvasMB, `floor ${n}: no town in the battle`).toBeLessThan(40);
+    await page.getByRole("button", { name: "Win this match (testing)" }).click();
+    await playAMove(page);
+    const won = page.locator('[data-tower-result="won"]');
+    await won.getByRole("button", { name: "Back to the Battle Tower" }).click({ timeout: 120_000 });
+    await expect.poll(async () => (await floorNow(page))?.mode ?? null, { timeout: 90_000 }).toBe("won");
+    for (const k of ["ArrowLeft", "ArrowUp", "ArrowRight"]) (await page.keyboard.down(k), await page.waitForTimeout(1200), await page.keyboard.up(k));
+    const back = await measure(`floor ${n}'s room, walked`);
+    // (Back in the tower: the room alone, never the street's pictures (290 MB of textures, 170 MB of kept pages before), nor Stockfish.)
+    expect(back.canvasMB + back.bitmapMB + back.textureMB, `floor ${n}: the room alone`).toBeLessThan(80);
+    expect(back.engines, "no Stockfish in the town").toBe(0);
+    expect(back.townLoads, "the street loaded once").toBe(1);
+    if (n === 2) break;
+    await localSql(page, "UPDATE tower_runs SET met = json_set(met, '$.floors[1]', json(?)) WHERE user_id = ? AND status = 'open'", JSON.stringify(["bigboy"]), run);
+    const lift = await tapRoom(page, "pass", "Elevator", "top");
+    await lift.getByRole("button", { name: "Up to floor 2" }).click();
+  }
+  expect(loads, "no page reload").toBe(1);
+  console.log(`town ${JSON.stringify(town)}\n${rows.map((r) => JSON.stringify(r)).join("\n")}`);
 });

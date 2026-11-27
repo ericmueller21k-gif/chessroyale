@@ -43,6 +43,7 @@ import { openProfile } from "../profile-nav.ts";
 import { account, askForfeitFirst, myPawnColor, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, TOWN_PAINT_ASKED, testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { setHooks } from "../window-hooks.ts";
+import { keepSpot, readSpot, spotKey } from "./spot.ts";
 import { play, warmSounds } from "../sound.ts";
 import { preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic, townMusic } from "../music.ts";
 import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
@@ -695,16 +696,40 @@ export function TownScreen({
     const room = chunk(import("./shops/ShopRoom.tsx")).then(async (m) => ({ room: await (lobby ? m.loadRoom("tower") : m.loadTowerFloor(floor)), View: m.ShopRoom }));
     const got = await room.catch(() => null);
     const fx = await (roomFxOf("tower", lobby ? "front" : "top") ?? Promise.resolve(null)).catch(() => null);
-    if (!got || !box.current) {
-      fadeTo(0, SHOP_FEEL.fadeMs);
-      doorBusy.current = false;
-      return;
-    }
+    if (!got || !box.current) return void streetInstead();
     if (back.error) setNote(back.error);
     ctl.current?.pause();
     setShopOut(SHOP_FEEL.startZoom === 1);
     setInside({ ...got, intro: null, fx, n: 1, ...(lobby ? { arrived: "top" as const } : { at: FLOOR_YOU.sq }) });
     roomMusic(roomMusicFor(got.room.def));
+  };
+  /**
+   * The last town spot (spot.ts) on a new town load: straight into that building (its front room; the Battle Tower in front of its
+   * clerk, his card open: Eric, Nov 27), the street not loaded until you go out.
+   */
+  const enterStraight = async (id: HomeId) => {
+    doorBusy.current = true;
+    opening.current = { home: id, challenge: false };
+    if (ROOM_BOSS_MUSIC) roomMusicLoad(homeTheme(id));
+    const got = await chunk(import("./shops/ShopRoom.tsx"))
+      .then(async (m) => (m ? { room: await m.loadRoom(id), View: m.ShopRoom } : null))
+      .catch(() => null);
+    const scene = roomFxOf(id, "front");
+    const fx = scene ? await scene.catch(() => null) : null;
+    if (!got || !box.current || (scene && !fx)) return void streetInstead();
+    ctl.current?.pause();
+    setShopOut(SHOP_FEEL.startZoom === 1);
+    setInside({ ...got, intro: null, fx, n: 1, ...(id === "tower" ? { atKeeper: true } : {}) });
+    roomMusic(roomMusicFor(got.room.def));
+  };
+  /** A building the town opened straight into didn't load: the street after all (loaded now, its card up meanwhile), you at its door. */
+  const streetInstead = async () => {
+    if (ctl.current?.asleep()) setLoading(true);
+    await ctl.current?.wake();
+    if (gone.current) return;
+    ctl.current?.resume();
+    fadeTo(0, SHOP_FEEL.fadeMs);
+    doorBusy.current = false;
   };
   /**
    * A solo floor's (or a party copy's played alone) result sent: into the floor room, the elevator open while the climb goes on (a win, or
@@ -796,6 +821,8 @@ export function TownScreen({
   /** The room drew its first frame: the black lifts. */
   const shopReady = () => {
     const at = insideNow.current;
+    // (Inside: this building is where the next town load starts you, spot.ts; not the Hidden Boss's room, which needs its way in.)
+    if (at && canStartIn(at.room.def.home)) keepSpot(spotKeyNow(), at.room.def.home);
     if (at?.room.def.home === "tower" && at.room.def.part === "top") floorShown();
     if (byDoor.current && at) {
       byDoor.current = false;
@@ -840,6 +867,13 @@ export function TownScreen({
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
     setInside(null);
+    // (Out on the street: no building kept, spot.ts. Came straight in (`direct`): the street loads now, its card up, under the black.)
+    keepSpot(spotKeyNow(), null);
+    if (ctl.current?.asleep()) {
+      setLoading(true);
+      await ctl.current.wake();
+      if (gone.current) return;
+    }
     ctl.current?.resume();
     const cv = townCanvas();
     if (cv) {
@@ -992,20 +1026,29 @@ export function TownScreen({
         setGated(true);
       });
     };
-    if (tower) fadeTo(1, 0);
+    // Straight into a building, the street not loaded until you go out to it (Nov 27, Eric: "it needs its own unique load"; startTown's
+    // `defer`): back from a tower floor (its floor room, or the lobby), or the last town spot (spot.ts) when nothing else says where the
+    // town opens you (a table's seat, where you stood for a challenge, a deploy's reload). You stand at its door for when you go out.
+    const spotIn = tower || seat || stand || back ? null : readSpot(spotKeyNow(), canStartIn);
+    const direct = !!tower || !!spotIn;
+    const door = direct ? HOMES.find((h) => h.id === (spotIn ?? "tower"))?.door : undefined;
+    if (direct) fadeTo(1, 0);
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    }, (id, x, y, challenge, clerk) => void goIn(id, x, y, challenge, clerk), stand ?? back?.stand ?? null, () => step("cancel"), (share, step) => {
+    }, (id, x, y, challenge, clerk) => void goIn(id, x, y, challenge, clerk), stand ?? back?.stand ?? (door ? { c: door.c, r: door.r, facing: 1, view: 0 } : null), () => step("cancel"), (share, step) => {
       if (share === null) {
+        setLoading(false);
+        // (Woken as you go out of the building you came straight into: goOut goes on from here.)
+        if (direct) return;
         loaded = true;
         startGuest();
+        // (On the street: no building kept.)
+        keepSpot(spotKeyNow(), null);
         // (Back after that reload: the room or challenge your tap was opening opens, as the tap would, once the town is drawn.)
-        const i = back?.open && !tower ? HOMES.findIndex((h) => h.id === back.open!.home) : -1;
+        const i = back?.open ? HOMES.findIndex((h) => h.id === back.open!.home) : -1;
         if (i >= 0) requestAnimationFrame(() => (back!.open!.challenge ? fight(i) : ctl.current?.goIn(i)));
-        // (Back from a tower floor's match: straight into the tower, the street never showing.)
-        if (tower) requestAnimationFrame(() => void towerBack(tower));
-        return setLoading(false);
+        return;
       }
       if (step) setLoadStep(step);
       const bar = loadBar.current;
@@ -1017,8 +1060,14 @@ export function TownScreen({
       broken = true;
       setLoading(false);
       setBroken(why);
-    });
+    }, direct);
     ctl.current = t;
+    if (direct) {
+      loaded = true;
+      startGuest();
+      setLoading(false);
+      requestAnimationFrame(() => void (tower ? towerBack(tower) : enterStraight(spotIn as HomeId)));
+    }
     // (Opened already squeezed: no frames until it's wider.)
     t.squeeze(narrowNow.current);
     // Should the page have to load again (stale.ts): where you stand (for a challenge, where you stood as you called it, so it's called
@@ -1564,6 +1613,11 @@ function startTown(
   onLoading: (share: number | null, step?: LoadStep) => void = () => {},
   /** The street town can't run here (no WebGL 2), or didn't load again after its reload (gl-fail.ts): the town's box says so. */
   onFail: (why: TownBroken) => void = () => {},
+  /**
+   * Straight into a building (Nov 27, Eric: "it needs its own unique load"): back from a tower floor, or the last town spot (spot.ts).
+   * The street isn't loaded (none of its pictures painted, kept or uploaded) until `wake()`, as you go out to it.
+   */
+  defer = false,
 ) {
   const f = TOWN_FEEL;
   /** The world's canvas (a new one if the street town's WebGL fails as it starts: a canvas keeps the first kind of context it gave). */
@@ -3000,9 +3054,17 @@ function startTown(
   };
   // (The street town failed as it started (its painter is Canvas 2D then): the loading card stays up until the page reloads, or the
   // message has replaced it. No frames ever run on a 2D painter.)
-  if (loading) void loadTown();
+  /** The street's load (`loadTown`): under way or done; null while it waits for `wake` (`defer`). */
+  let woken: Promise<void> | null = loading && !defer ? loadTown() : null;
 
   return {
+    /**
+     * The street loaded, if it waited (`defer`): its loading card up until it's done (the screen's `onLoading`). Resolves at once when
+     * it's loaded already, or is loading.
+     */
+    wake: (): Promise<void> => (woken ??= loading ? loadTown() : Promise.resolve()),
+    /** The street waits for `wake` (`defer`): nothing of it is loaded yet. */
+    asleep: (): boolean => woken === null && loading,
     /** The open card put over what it's on now (the screen's layout effect as a card opens: drawn there on its first frame). */
     placeCard,
     /**
@@ -3202,6 +3264,11 @@ function startTown(
     },
   };
 }
+
+/** A building the town can open you straight into (spot.ts): one of this town's homes with a room; never the Hidden Boss's (his stairs' way up asks the server). */
+const canStartIn = (home: string): boolean => home !== "recluse" && HOMES.some((h) => h.id === home) && !!shopOf(home as HomeId);
+/** Where this account's last town spot is kept on this device (a guest's own id too). */
+const spotKeyNow = () => spotKey(account().profile?.user.id);
 
 const POSE = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
 /** Why the street town shows a message instead of itself (gl-fail.ts): no WebGL 2 here, or it didn't load after its one reload. */
