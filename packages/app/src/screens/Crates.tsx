@@ -798,7 +798,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         >
           Colors and purity
         </summary>
-        <p class="small">Every item also rolls a color and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250).</p>
+        <p class="small">Every item also rolls a color and a purity, 0-100%. The lower its purity, the more it's blotched (at 0%, all over: one color, a shade darker). At 90% or more it's shiny ✨ (about 1 in 250). Exactly 0% is as rare as exactly 100%.</p>
         <div class="color-odds">
           {ITEM_COLORS.map((c) => (
             <span key={c.id} class="color-chip">
@@ -810,7 +810,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         <div class="color-odds">
           {PURITY_BANDS.map((b) => (
             <span key={b.low} class="color-chip">
-              Purity {b.low}-{b.high}%{b.low >= 90 ? " ✨" : ""}: {b.weight}%
+              {b.low === b.high ? `Purity ${b.low}%: about 1 in ${Math.round(100 / b.weight).toLocaleString("en-US")}` : `Purity ${b.low}-${b.high}%${b.low >= 90 ? " ✨" : ""}: ${b.weight}%`}
             </span>
           ))}
         </div>

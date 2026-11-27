@@ -299,6 +299,14 @@ describe("crates", () => {
     const chance = (pred: (low: number) => boolean) => PURITY_BANDS.filter((b) => pred(b.low)).reduce((s, b) => s + b.weight, 0);
     expect(chance((low) => low >= 90)).toBeCloseTo(0.4); // shiny: 1 in 250
     expect(chance((low) => low < 5)).toBeCloseTo(1); // under 5%: 1 in 100
+    // Exactly 0% as rare as exactly 100% (Eric, Nov 27): a band of its own, one tenth of the top band's eleven.
+    const zero = PURITY_BANDS.find((b) => b.low === 0 && b.high === 0)!;
+    expect(zero.weight).toBeCloseTo(PURITY_BANDS[0]!.weight / 11, 12);
+    expect(Math.round(100 / zero.weight)).toBe(275_000);
+    // The roll's last draw lands on it: a blemish of 100 (purity 0%), and just above it, 4.9%.
+    const total = PURITY_BANDS.reduce((s, b) => s + b.weight, 0);
+    expect(rollBlemish(() => (total - zero.weight / 2) / total)).toBe(100);
+    expect(rollBlemish(() => (total - zero.weight * 1.5) / total)).toBe(99.9);
     expect(chance((low) => low >= 30 && low < 70)).toBe(80);
     // The lowest draw is perfect, the highest 0%, and every value is in tenths within 0-100.
     expect(rollBlemish(() => 0)).toBe(0);

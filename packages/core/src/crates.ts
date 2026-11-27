@@ -537,14 +537,19 @@ export const isShiny = (blemish: number) => purity(blemish) >= 90;
  * The purity roll: the chance of each band of purity (`low` to `high`, as shown, to one decimal place), even within
  * a band. Most items land between 30% and 70%; shiny (90%+) is 1 in 250, and 99%+ 1 in 25,000; under 5% (blotched
  * nearly all over) is 1 in 100. The bands run from 100% down to 0% with no gaps, and the weights add up to 100.
+ * Exactly 0% (blotched all over: one color, a shade darker) has a band of its own, exactly as rare as exactly 100% (Eric, Nov 27: "treat
+ * this as a very desirable thing, it should be as rare as getting 100%... but gettable"): about 1 in 275,000; it was 1 in 5,000.
  */
+/** The chance (percent) of exactly 100.0% purity, one tenth of the top band's 11 (99.0 to 100.0), and so of exactly 0%. */
+export const PURITY_EXACT = 0.004 / 11;
 export const PURITY_BANDS: readonly { low: number; high: number; weight: number }[] = [
   { low: 99, high: 100, weight: 0.004 },
   { low: 90, high: 98.9, weight: 0.396 },
   { low: 70, high: 89.9, weight: 9.6 },
   { low: 30, high: 69.9, weight: 80 },
   { low: 5, high: 29.9, weight: 9 },
-  { low: 0, high: 4.9, weight: 1 },
+  { low: 0.1, high: 4.9, weight: 1 - PURITY_EXACT },
+  { low: 0, high: 0, weight: PURITY_EXACT },
 ];
 
 /** A blemish (0-100, to one decimal place) by the purity bands. One draw of `rng`. */

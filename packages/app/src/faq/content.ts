@@ -1181,7 +1181,8 @@ function crates(src: FaqSources): FaqSection {
   const cTotal = sum(src.colors.map((c) => c.weight)) || 1;
   const colors = src.colors.map((c) => `| ${c.name} | ${pct(c.weight / cTotal)} |`).join("\n");
   const pTotal = sum(src.purity.map((b) => b.weight)) || 1;
-  const purity = src.purity.map((b) => `| ${num(b.low, 1)}% to ${num(b.high, 1)}% | ${pct(b.weight / pTotal, 3)} |`).join("\n");
+  // (Exactly 0%, a band of one value, Nov 27: as rare as exactly 100%, too rare for a percent, so "1 in".)
+  const purity = src.purity.map((b) => (b.low === b.high ? `| exactly ${num(b.low, 1)}% | 1 in ${Math.round(pTotal / b.weight).toLocaleString("en-US")} |` : `| ${num(b.low, 1)}% to ${num(b.high, 1)}% | ${pct(b.weight / pTotal, 3)} |`)).join("\n");
   const shiny = sum(src.purity.filter((b) => b.low >= 90).map((b) => b.weight)) / pTotal;
   // Boss tokens and boss crates (Nov 2): each boss crate's ride, the only item behind its Fischer Random.
   const bt = src.bossTokens;
@@ -1215,7 +1216,7 @@ Every item from a crate rolls three things, each on its own:
 
 1. **Its tier, which decides the item.** The strip lands on a tier's box, which opens to one of that tier's items, each as likely as the others. Or it lands on **Transcendent**, a second spin for the rarest items: ${fischerWords}.
 2. **Its color.**
-3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**.
+3. **Its purity:** 100% less a blemish (blotches over that share of its color). From 90% it's **shiny**. At exactly 0% it's blotched all over, one color a shade darker, and that's as rare as exactly 100%.
 
 | Box | ${src.crates.map((c) => c.name).join(" | ")} |
 |${src.crates.map(() => "---|").join("")}---|
