@@ -154,8 +154,8 @@ test.describe("Don Dough", () => {
     // Shown a minute off on every turn (Eric, Nov 27: "8 and then to 7 to 6"): yours as your move goes in (while it's judged, before
     // the rules count it as his turn begins), his as he moves.
     expect(s.shown0.map(([n]) => n)).toEqual([P, P - 1, P - 2]);
-    // ([shown, the phase, the rules' count]: P - 1 first shown while your move is judged, the rules still at P.)
-    expect(s.shown0[1]!.slice(1), `your move's minute shown while it's judged: ${JSON.stringify(s.shown0)}`).toEqual(["scoring", P]);
+    // (When yours shows, while your move is judged, is the unit test's (zebra.test.ts, shownLeft): with ?pace=quick the judging can be
+    // over before a frame is drawn on CI, so a frame inside it isn't always there to see (#1026's run, phone, twice).)
     expect((await zebraOf(page)).lumps.find((l) => l.n === 0)?.left).toBe(P - 2);
     await expect(page.locator('.dd-slot[data-slot="0"] .dd-timer')).toHaveAttribute("data-left", String(P - 2));
     // (The roll from its start and from a minute under played: their frames drawn.)
