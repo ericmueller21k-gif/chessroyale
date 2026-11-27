@@ -6709,6 +6709,7 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-size: 20px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -8415,6 +8416,32 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
 .crate-hero .crate-held {
   font-weight: 700;
   opacity: 1;
+}
+/* The crate's Open button under its hero (Eric, Nov 27): the width of the hero and the rows, its height and text as before. */
+.crate-open-btn {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  text-align: center;
+}
+/* A crate you can open: its art is a button (a tap asks first, see the pop-up below). Looks the same, but for the pointer. */
+.crate-art-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+/* "Open this crate?": the game's confirm card (MatchMenu's Confirm) centered over the dimmed page. A tap outside closes it. */
+.crate-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
 }
 .odds-list {
   display: grid;

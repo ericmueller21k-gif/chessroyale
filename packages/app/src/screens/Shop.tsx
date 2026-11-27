@@ -63,7 +63,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
       <div class="shop-head">
         <BackButton onClick={onBack} />
         <span class="shop-coins" aria-label={`${shop?.coins ?? 0} coins`}>
-          <Coin /> {shop?.coins ?? 0}
+          <Coin size={30} /> {shop?.coins ?? 0}
         </span>
       </div>
       <div class="area-tabs" role="tablist">
