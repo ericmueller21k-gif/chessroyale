@@ -587,14 +587,15 @@ describe("the sign-in merge", () => {
   });
 
   it("a guest's unlocks (the Stranger beaten) are the account's: the earlier kept where both have one; the guest keeps none", async () => {
-    for (const both of [false, true]) {
+    // (The guest's alone; the guest's the later; the guest's the earlier: the review of #1000, N1.)
+    for (const [guestAt, accountAt, kept] of [[T0 + 9, null, T0 + 9], [T0 + 9, T0 + 5, T0 + 5], [T0 + 5, T0 + 9, T0 + 5]] as const) {
       const { sql } = await world();
       const account = await signedIn(sql, "ann@example.com");
       const visitor = await guest(sql);
-      await sql.run("INSERT INTO boss_unlocks (user_id, boss, at) VALUES (?, 'stranger', ?)", visitor.id, T0 + 5);
-      if (both) await sql.run("INSERT INTO boss_unlocks (user_id, boss, at) VALUES (?, 'stranger', ?)", account.id, T0 + 9);
+      await sql.run("INSERT INTO boss_unlocks (user_id, boss, at) VALUES (?, 'stranger', ?)", visitor.id, guestAt);
+      if (accountAt !== null) await sql.run("INSERT INTO boss_unlocks (user_id, boss, at) VALUES (?, 'stranger', ?)", account.id, accountAt);
       await signInWithIdentity(sql, visitor, "email", "ann@example.com", {}, T0 + 3_600_000);
-      expect(await sql.all("SELECT user_id, boss, at FROM boss_unlocks")).toEqual([{ user_id: account.id, boss: "stranger", at: T0 + 5 }]);
+      expect(await sql.all("SELECT user_id, boss, at FROM boss_unlocks")).toEqual([{ user_id: account.id, boss: "stranger", at: kept }]);
       expect(await towerUnlocks(sql, account.id)).toEqual(["stranger"]);
     }
   });
