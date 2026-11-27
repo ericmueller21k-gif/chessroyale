@@ -55,20 +55,29 @@ export const FINISHER_TEST = {
 } as const;
 /**
  * His block before his finisher (ms): when the crowd's move that began his turn took a piece of his that isn't a pawn, his block plays where
- * he stands (the app's hurt beat: draw, the blow, sheathe) before he hops onto the board, so the finisher comes this much later and his
- * move is held this much longer (finisherLeadMs). At least the block's animation (a unit test in the app).
+ * he stands (the app's hurt beat: draw, the blow, sheathe) as his thinking begins, and he thinks at least this long (strangerTurnMs, in the
+ * thinking minimum as Grex's burn is), so his finisher starts as his block ends, never after a wait. At least the block's animation (a unit
+ * test in the app).
  */
 export const FINISHER_BLOCK_MS = 1800;
 
-/** The material he lost (pawn 1 ... queen 9) since before the crowd's last move: a piece of his taken by it, or burnt as his turn began. */
+/**
+ * The material he lost (pawn 1 ... queen 9) since before the crowd's last move: a piece of his taken by it, or burnt as his turn began. 0
+ * when the board has just gone back past it (Folio's Revision: a base that goes back, `from`), as bossBeat reads it.
+ */
 export function hisLoss(board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null }, crowd: Side): number {
-  if (!board.history.length) return 0;
+  const ply = board.history.length;
+  if (!ply || board.bases?.some((x) => x.ply === ply && x.from !== undefined)) return 0;
   const his = other(crowd);
-  return materialOf(fenAtPly(board.history, board.history.length - 1, board.bases), his) - materialOf(board.fen, his);
+  return materialOf(fenAtPly(board.history, ply - 1, board.bases), his) - materialOf(board.fen, his);
 }
 
-/** How long his finisher waits for his block (ms): FINISHER_BLOCK_MS after a piece of his that isn't a pawn was lost (hisLoss 3 or more), else 0. */
-export const finisherLeadMs = (board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null }, crowd: Side): number => (hisLoss(board, crowd) >= 3 ? FINISHER_BLOCK_MS : 0);
+/**
+ * How long his thinking lasts at least for his block (ms; the server's thinkMinAt and solo's bossTurn add it, as each boss's turn moments):
+ * FINISHER_BLOCK_MS when a piece of his that isn't a pawn was just lost (hisLoss 3 or more), else 0.
+ */
+export const strangerTurnMs = (boss: { id?: string; crowdSide: Side; board: { fen: string; history: readonly string[]; bases?: readonly Base[] | null } } | null | undefined): number =>
+  boss?.id === "stranger" && hisLoss(boss.board, boss.crowdSide) >= 3 ? FINISHER_BLOCK_MS : 0;
 
 const finisherTest = (test: string): { on: boolean; kind: number } => ({ on: test === "finisher" || test.startsWith("finisher-"), kind: test.startsWith("finisher-") ? FINISHERS.indexOf(test.slice(9) as Finisher) : -1 });
 export const finisherOf = (pick: number | undefined): Finisher => FINISHERS[(((pick ?? 0) % FINISHERS.length) + FINISHERS.length) % FINISHERS.length]!;
@@ -356,8 +365,9 @@ export const strangerBattle = {
    * pawn (nor the king) is shown as his leap onto the board and a finisher on that piece (`finisher`: `square`, `shape`, `pick` from the
    * seed, the same on every device), then the move. The server holds the move for it, solo waits (STRANGER_FX.finisher; the runner's
    * bossMoveMoment). The move itself is an ordinary capture. Marked once a turn (the server asks again as it plays the held move); never
-   * once the battle is over. Returns how long it holds his move (ms: the finisher, after his block when a piece of his was just lost,
-   * finisherLeadMs); 0: none.
+   * once the battle is over. The event carries the move (`move`): the board shows it from the finisher's `gone` beat, so when the held
+   * move plays the board already matches it. Returns how long it holds his move (ms: STRANGER_FX.finisher; his block, if any, played in
+   * his thinking: strangerTurnMs); 0: none.
    */
   finisher(b: Battle, move: string): number {
     const boss = b.state.boss;
@@ -372,9 +382,9 @@ export const strangerBattle = {
     if (!sq || !piece || piece.color !== boss.crowdSide || piece.type === "p" || piece.type === "k") return 0;
     const forced = finisherTest(b.settings.bossPowerTest).kind;
     const pick = forced >= 0 ? forced : Math.floor(powerRoll(p.seed, "finisher", p.turn, sq) * 4096);
-    const event: PowerEvent = { kind: "finisher", turn: p.turn, square: sq, shape: piece.type as BalloonShape, pick };
+    const event: PowerEvent = { kind: "finisher", turn: p.turn, square: sq, shape: piece.type as BalloonShape, pick, move };
     b.state = { ...b.state, boss: { ...boss, powers: { ...p, events: [...p.events, event] } } };
-    return STRANGER_FX.finisher + finisherLeadMs(board, boss.crowdSide);
+    return STRANGER_FX.finisher;
   },
 
   /**

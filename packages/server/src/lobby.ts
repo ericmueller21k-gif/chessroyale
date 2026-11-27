@@ -24,6 +24,7 @@ import {
   zebraTurnMs,
   bigboyTurnMs,
   chandyTurnMs,
+  strangerTurnMs,
   dodgeSeen,
   dodgeOver,
   popOffMs,
@@ -2468,8 +2469,8 @@ export class LobbyCore {
     const b = this.runner!.state.boss;
     const burnt = fireShows(b);
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
-    // transformation at the start of his turn, Ginger's Super Freeze and Sawyer's Saw Swap.)
-    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view) + birdieTurnMs(view);
+    // transformation at the start of his turn, Ginger's Super Freeze and Sawyer's Saw Swap; the Stranger's block, a piece of his just taken.)
+    const own = landedEarlyMs(b) + fullMoonMs(view) + gingerTurnMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b) + bigboyTurnMs(b) + sawyerTurnMs(view) + birdieTurnMs(view) + strangerTurnMs(view);
     // (Birdie's moments begin with this thinking: when, kept for every message of it, so a device rejoining carries them on. A second
     // thinking of the same turn, if any, keeps the first's.)
     const turn = view.powers?.turn ?? -1;

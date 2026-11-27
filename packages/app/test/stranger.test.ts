@@ -7,9 +7,10 @@ import { describe, expect, it } from "vitest";
 import { ART_KITS, BOSS_KITS, STRANGER_FLOURISH_EVERY, STRANGER_SLASHES, strangerAnim } from "../src/characters/kits.ts";
 import { FINISHERS, FINISHER_BLOCK_MS } from "@chessroyale/chess";
 import { animLength } from "../src/characters/power-art.ts";
-import { finishTimeline, finisherStand } from "../src/components/Stranger.tsx";
+import { FINISHER_MARGIN_MS, UP, arc, cornerOf, finishTimeline, finisherStand, hopHeight } from "../src/components/Stranger.tsx";
+import { fireBurnItems } from "../src/components/Grex.tsx";
 import { EFFECTS } from "../src/characters/power-art.ts";
-import { POSES, STRANGER, STRANGER_FOOT, STRANGER_PORTRAIT, STRANGER_SOUNDS, TIPS_AT } from "../src/characters/stranger.ts";
+import { POSES, STRANGER, STRANGER_FOOT, STRANGER_HOP, STRANGER_PORTRAIT, STRANGER_SOUNDS, TIPS_AT } from "../src/characters/stranger.ts";
 import { STRANGER_SQUARE } from "../src/characters/effects/stranger.ts";
 import { STRANGER_LINES } from "../src/characters/stranger-lines.ts";
 import { STRANGER_SOUND_NAMES, strangerSound } from "../src/characters/stranger-sounds.ts";
@@ -165,14 +166,15 @@ describe("his swords (Eric, Nov 27: his slashes, his block, his flourish, his fi
       expect(tl.finAt, kind).toBeLessThan(tl.hitAt);
       expect(tl.hitAt, kind).toBeLessThan(tl.goneAt);
       expect(tl.goneAt, kind).toBeLessThan(tl.backAt);
-      expect(tl.homeAt + 100, kind).toBeLessThanOrEqual(tl.ms);
+      // (Home at least FINISHER_MARGIN_MS before his move shows: a device that saw the event late still sees him land. Review of #1002.)
+      expect(tl.backAt + STRANGER_HOP.ms + FINISHER_MARGIN_MS, kind).toBeLessThanOrEqual(tl.ms);
       if (kind === "ice") expect(tl.shatterAt).toBeGreaterThan(tl.hitAt + 400);
       if (kind === "frostfire") expect(tl.igniteAt).toBeGreaterThan(tl.hitAt);
     }
     // His shout (the God King's, Eric's) as every strike winds up; his clang as he blocks.
     for (const a of [...STRANGER_SLASHES, ...FINISHERS.map((f) => `fin_${f}`)]) expect(STRANGER.anims[a]!.frames.some((f) => f.cue === "shout"), a).toBe(true);
     expect(STRANGER.anims.block!.frames.some((f) => f.cue === "clang")).toBe(true);
-    // (His finisher waits for his block: the block's whole animation within the wait.)
+    // (His thinking lasts at least his block, so his finisher comes as it ends: the block's whole animation within it.)
     expect(animLength(STRANGER.anims.block!)).toBeLessThanOrEqual(FINISHER_BLOCK_MS);
     expect(STRANGER_SOUNDS.shout).toBe("gkHyuah");
   });
@@ -188,5 +190,28 @@ describe("his swords (Eric, Nov 27: his slashes, his block, his flourish, his fi
             expect(at.y, `${f}${r}`).toBeLessThanOrEqual(100);
             expect(at.y - (110 * 38) / 128, `${f}${r}`).toBeGreaterThanOrEqual(computer ? -0.01 : -8.01);
           }
+  });
+
+  it("his hop never rises above his corner on a phone (the highest the e2e proves on screen), nor his head over the board's top on a computer", () => {
+    for (const computer of [false, true])
+      for (const o of ["white", "black"] as const)
+        for (const f of "abcdefgh")
+          for (let r = 1; r <= 8; r++) {
+            const corner = cornerOf(computer);
+            const stand = finisherStand(`${f}${r}`, o, computer);
+            const h = hopHeight(corner, stand, computer);
+            // (The whole arc, both ways: its highest point is at u = 0.5 only when its ends are level.)
+            let top = Infinity;
+            for (let i = 0; i <= 100; i++) top = Math.min(top, arc(corner, stand, h, i / 100).y, arc(stand, corner, h, i / 100).y);
+            expect(top, `${f}${r} ${o}${computer ? " computer" : ""}`).toBeGreaterThanOrEqual(computer ? (UP * 38) / 128 - 0.01 : corner.y - 0.01);
+            // (A real hop: the full height wherever it fits, and some rise always.)
+            expect(h, `${f}${r}`).toBeGreaterThan(4);
+          }
+  });
+
+  it("his Frostfire's burn is quiet (Grex's tile and burn art: their poof and fizz are Grex's)", () => {
+    for (const burnt of [[{ square: "e4", piece: "n" }], [{ square: "e4" }], [{ square: "e4", fizzled: true }]]) expect(fireBurnItems(burnt, 0, true).every((i) => i.quiet), JSON.stringify(burnt)).toBe(true);
+    // (Grex's own keeps his poof.)
+    expect(fireBurnItems([{ square: "e4", piece: "n" }], 0).some((i) => !i.quiet)).toBe(true);
   });
 });

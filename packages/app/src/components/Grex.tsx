@@ -120,13 +120,9 @@ export function shadowItems(boss: Pick<BossView, "powers">, moments: readonly Mo
  * candle's under a piece it only chars (the piece's charred look comes with its flames: grexDecor). One canvas over the
  * board, for BURN.ms from `since`.
  */
-export function FireBurn({ burnt, since, now, orientation }: { burnt: readonly Burnt[]; since: number; now: number; orientation: "white" | "black" }) {
+export function FireBurn({ burnt, since, now, orientation, quiet = false }: { burnt: readonly Burnt[]; since: number; now: number; orientation: "white" | "black"; quiet?: boolean }) {
   if (!burnt.length || now < since || now >= since + BURN.ms) return null;
-  const items: BoardItem[] = burnt.flatMap((b): BoardItem[] =>
-    b.fizzled
-      ? [{ square: b.square, name: "fireTile", anim: "fizzle", since }]
-      : [{ square: b.square, name: "fireTile", anim: "burnOut", since, quiet: !!b.piece }, ...(b.piece ? [{ square: b.square, name: "pieceBurn" as const, anim: b.piece, since }] : [])],
-  );
+  const items = fireBurnItems(burnt, since, quiet);
   return (
     <div class="power-board pw-burns" aria-hidden="true">
       <BoardEffects items={items} orientation={orientation} class="pw-fire-board" />
@@ -141,6 +137,18 @@ export function FireBurn({ burnt, since, now, orientation }: { burnt: readonly B
 }
 
 type Burnt = { square: string; piece?: string; fizzled?: boolean; charred?: string; hits?: number };
+
+/**
+ * FireBurn's board art: the tile burning out (quiet under a piece: its poof is the sound), or fizzling, and the piece burning up. `quiet`:
+ * none of it sounds (another boss reusing the art, with his own sound: the Stranger's burn; .claude/LESSONS.md, "A boss's sounds are its own").
+ */
+export function fireBurnItems(burnt: readonly Burnt[], since: number, quiet = false): BoardItem[] {
+  return burnt.flatMap((b): BoardItem[] =>
+    b.fizzled
+      ? [{ square: b.square, name: "fireTile", anim: "fizzle", since, ...(quiet ? { quiet } : {}) }]
+      : [{ square: b.square, name: "fireTile", anim: "burnOut", since, quiet: quiet || !!b.piece }, ...(b.piece ? [{ square: b.square, name: "pieceBurn" as const, anim: b.piece, since, ...(quiet ? { quiet } : {}) }] : [])],
+  );
+}
 
 /**
  * The dock's line for what the fire did after the crowd's move (one line on a phone: one or two pieces by name, more by how
