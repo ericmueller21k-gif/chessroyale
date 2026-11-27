@@ -142,6 +142,11 @@ export interface Settings {
    */
   bossMateTest?: boolean;
   /**
+   * Test switch, solo (?ult=0): the boss has no ultimate this battle (his powers' noUlt, as a Battle Tower floor's Wrangler: the meter
+   * empty and dimmed), for a test of his passive alone that the danger line (dangerBosses) would otherwise cut into.
+   */
+  bossNoUltTest?: boolean;
+  /**
    * Test switch, solo (?paint=1 or 2, with ?boss=smudgy): the battle starts with Smudgy's rook already hidden on d7 and the
    * crowd's king able to step into its line (bosses/smudgy.ts, PAINT_TEST): the e2e's way to a move refused for the painted
    * piece. His moves are scripted: 1, the rook steps like a pawn, then strikes; 2, it steps twice like a pawn (to be taken).
