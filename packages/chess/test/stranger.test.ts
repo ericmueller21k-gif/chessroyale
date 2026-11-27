@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, bossDef, canPick, chooseBoss, finishFloor, floorBoss, isPlayable, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockedBosses, type BossDef } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_POWERS, BOSS_ROSTER, bossDef, canPick, chooseBoss, finishFloor, floorBoss, floorUnlocks, isPlayable, mulberry32, newRun, startFloor, towerPool, unlockBosses, unlockFloor, type BossDef } from "@chessroyale/core";
 import { MatchRunner, POWER_FX, bossRules, icedSquares, burnJudged, burnLoss, chooseStrike, crowdAllowed, frostfireOutcome, legalMoves, pieceAt, prepareTurn, triggerUltimate, type EngineLike } from "../src/index.ts";
 import { KIT_OPENING, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
@@ -24,6 +24,10 @@ async function crowdMove(r: MatchRunner, pick?: (fen: string, allowed: string[])
   const move = pick ? pick(fen, allowed) : [...allowed].sort()[0]!;
   return r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
 }
+
+/** A crowd that opens its queen's diagonal first (e2, then d2), so the piece he strikes (the queen) has a move off its tile. */
+const OPENERS = ["e2e4", "e2e3", "d2d4", "d2d3"];
+const opener = (_fen: string, allowed: string[]) => OPENERS.find((m) => allowed.includes(m)) ?? [...allowed].sort()[0]!;
 
 /** Plays until the crowd's turn `turn` has been dealt, the crowd picking `pick` (the first allowed move without one). */
 async function untilTurn(r: MatchRunner, turn: number, pick?: (fen: string, allowed: string[]) => string) {
@@ -93,7 +97,7 @@ describe("the strike in a battle: frozen a turn, thawed a turn, then the tile bu
   it("comes with his move as crowd turn strikeFrom begins; the piece can't move that turn, can the next; then the burn", async () => {
     const r = battle(11, "w");
     const s = BOSS_POWERS.stranger;
-    await untilTurn(r, s.strikeFrom);
+    await untilTurn(r, s.strikeFrom, opener);
     const st = strangerOf(r)!.strike!;
     expect(st).toMatchObject({ turn: s.strikeFrom, frozenUntil: s.strikeFrom, burnAt: s.strikeFrom + 1 });
     expect(r.boss!.powers!.events.some((e) => e.kind === "frostfire" && e.square === st.square)).toBe(true);
@@ -101,54 +105,64 @@ describe("the strike in a battle: frozen a turn, thawed a turn, then the tile bu
     const allowed = r.crowdAllowed() ?? legalMoves(fenOf(r));
     expect(allowed.some((m) => m.startsWith(st.square))).toBe(false);
     expect(icedSquares(r.boss, fenOf(r))).toContain(st.square);
-    await crowdMove(r);
+    await crowdMove(r, opener);
     await r.playBoss();
     // The flee turn: thawed (it may move), no ice; the judge weighs the tile.
     r.deal();
-    if (pieceAt(fenOf(r), st.square)?.color === "w") {
-      const now = r.crowdAllowed() ?? legalMoves(fenOf(r));
-      expect(now.some((m) => m.startsWith(st.square)) || !legalMoves(fenOf(r)).some((m) => m.startsWith(st.square))).toBe(true);
-    }
+    const before = pieceAt(fenOf(r), st.square);
+    expect(before?.color, "the struck piece still there, yours").toBe("w");
+    expect((r.crowdAllowed() ?? legalMoves(fenOf(r))).some((m) => m.startsWith(st.square))).toBe(true);
     expect(icedSquares(r.boss, fenOf(r))).not.toContain(st.square);
     // Leave it there (a move of another piece): the burn takes it as the move lands.
-    const before = pieceAt(fenOf(r), st.square);
-    await crowdMove(r, (_fen, ms) => ms.filter((m) => !m.startsWith(st.square)).sort()[0] ?? ms[0]!);
+    await crowdMove(r, (_fen, ms) => ms.filter((m) => !m.startsWith(st.square)).sort()[0]!);
     const burn = strangerOf(r)!.burn!;
-    expect(burn.at).toBe(st.burnAt);
+    expect(burn).toMatchObject({ at: st.burnAt, square: st.square, piece: before!.type, side: "w" });
+    expect(burn.spared).toBeUndefined();
     expect(strangerOf(r)!.strike).toBeNull();
-    if (before && before.type !== "k" && !burn.spared) expect(pieceAt(fenOf(r), st.square)).toBeNull();
+    expect(pieceAt(fenOf(r), st.square)).toBeNull();
     expect(r.boss!.powers!.events.some((e) => e.kind === "frostfireBurn" && e.square === st.square)).toBe(true);
   });
 
   it("a piece moved off on the flee turn is saved: the tile burns empty", async () => {
     const r = battle(5, "w", "frostfire");
-    await untilTurn(r, 2);
+    await untilTurn(r, 2, opener);
     const st = strangerOf(r)!.strike!;
     expect(st.turn).toBe(2);
-    await crowdMove(r);
+    await crowdMove(r, opener);
     await r.playBoss();
     r.deal();
     const fen = fenOf(r);
-    const off = (r.crowdAllowed() ?? legalMoves(fen)).filter((m) => m.startsWith(st.square) && pieceAt(fen, st.square)?.color === "w");
-    if (!off.length) return;
+    expect(pieceAt(fen, st.square)?.color, "the struck piece still there, yours").toBe("w");
+    const off = (r.crowdAllowed() ?? legalMoves(fen)).filter((m) => m.startsWith(st.square)).sort();
+    expect(off.length, "a move off its tile").toBeGreaterThan(0);
     const kind = pieceAt(fen, st.square)!.type;
-    await crowdMove(r, () => off.sort()[0]!);
+    await crowdMove(r, () => off[0]!);
     const burn = strangerOf(r)!.burn!;
+    expect(burn).toMatchObject({ at: st.burnAt, square: st.square });
     expect(burn.piece).toBeUndefined();
-    expect(pieceAt(fenOf(r), off.sort()[0]!.slice(2, 4))?.type).toBe(kind);
+    expect(pieceAt(fenOf(r), off[0]!.slice(2, 4))?.type).toBe(kind);
   });
 
-  it("the frozen turn and the flee turn are power turns (no fair-play signal, no Last Stand)", async () => {
+  it("the frozen turn and the flee turn are power turns (no fair-play signal, no Last Stand); the turn after isn't", async () => {
     const r = battle(11, "w");
-    await untilTurn(r, BOSS_POWERS.stranger.strikeFrom);
-    expect(bossRules(r.boss)!.powerTurn!(r.boss!)).toBe(true);
+    const s = BOSS_POWERS.stranger;
+    await untilTurn(r, s.strikeFrom);
+    expect(bossRules(r.boss)!.powerTurn!(r.boss!), "the frozen turn").toBe(true);
+    await untilTurn(r, s.strikeFrom + 1);
+    expect(bossRules(r.boss)!.powerTurn!(r.boss!), "the flee turn").toBe(true);
+    await untilTurn(r, s.strikeFrom + 2);
+    expect(strangerOf(r)!.strike).toBeNull();
+    expect(bossRules(r.boss)!.powerTurn!(r.boss!), "the turn after the burn").toBe(false);
   });
 
-  it("the test switch strikes from his first move, again once the last has burnt", async () => {
+  it("the test switch strikes from his first move, then again on the turn after the burn", async () => {
     const r = battle(3, "w", "frostfire");
     await untilTurn(r, 2);
     expect(strangerOf(r)!.strike?.turn).toBe(2);
     expect(strangerOf(r)!.next).toBe(4);
+    await untilTurn(r, 4);
+    expect(strangerOf(r)!.burn?.at).toBe(3);
+    expect(strangerOf(r)!.strike?.turn).toBe(4);
   });
 });
 
@@ -200,13 +214,19 @@ describe("his Battle Tower floors and unlock", () => {
     expect(unlockBosses()).toEqual([]);
   });
 
-  it("unlocked by a best of floor 10 or more, solo or party; picked only then", () => {
-    expect(unlockedBosses(9)).toEqual([]);
-    expect(unlockedBosses(10)).toEqual(["stranger"]);
-    expect(unlockedBosses(31)).toEqual(["stranger"]);
+  it("unlocked only by a floor of his own won with him on it (Eric: \"you have to beat him to unlock him\"); picked only then", () => {
+    expect(unlockFloor("stranger")).toBe(10);
+    expect(unlockFloor("gingerbread")).toBeNull();
+    // His floors, him on them: each unlocks him (10 the first; 30 and 50 too, beaten there after a life spent on 10).
+    for (const f of [10, 30, 50]) expect(floorUnlocks(f, ["stranger"]), `floor ${f}`).toEqual(["stranger"]);
+    // Any other floor won: nothing (floor 11 climbed past his 10 with a life spent on it; floor 9).
+    expect(floorUnlocks(11, ["clown", "gingerbread"])).toEqual([]);
+    expect(floorUnlocks(9, ["clown"])).toEqual([]);
+    // His floor dealt to others (no art yet, or resting): beating them isn't beating him.
+    expect(floorUnlocks(10, ["clown", "gingerbread"])).toEqual([]);
     const def = ready.find((b) => b.id === "stranger")!;
     expect(canPick(def, [])).toBe(false);
-    expect(canPick(def, unlockedBosses(10))).toBe(true);
+    expect(canPick(def, floorUnlocks(10, ["stranger"]))).toBe(true);
     expect(canPick(bossDef("gingerbread"), [])).toBe(true);
   });
 });

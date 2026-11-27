@@ -1,4 +1,4 @@
-import { BATTLE_TOWER, TOWER_PARTY, unlockedBosses, finishFloor, floorSettings, floorsWonBest, leaveFloor, livesLeft, newRun, pausedLine, sideRefusal, startFloor, towerPartySettings, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
+import { BATTLE_TOWER, TOWER_PARTY, finishFloor, floorUnlocks, floorSettings, floorsWonBest, leaveFloor, livesLeft, newRun, pausedLine, sideRefusal, startFloor, towerPartySettings, towerPool, type Settings, type TowerRun } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 import type { PartyFloorEnd } from "./lobby.ts";
 
@@ -33,6 +33,9 @@ import type { PartyFloorEnd } from "./lobby.ts";
  *     replaces too (so each account keeps at most a few rows).
  *   - `tower_best`: the best floor won, an account and kind (1-99; 99 is the top, BATTLE_TOWER.floors its cap); it only rises. A floor
  *     lost with a life spent counts for the run's floor, never for a best (Nov 20: core floorsWonBest).
+ *   - `boss_unlocks` (Nov 27): the bosses an account has unlocked by beating them on a floor of their own (core floorUnlocks: the
+ *     Stranger), and when; one row a boss, never removed but with the account. Written as a won floor's result is taken (solo, or alone on
+ *     a party copy: the device's word, as the best; a party's floor: its match room's, for each member), never from a device's say-so.
  * (Only types come from accounts.ts: it imports this file's schema while it loads.)
  */
 export const TOWER_SCHEMA = [
@@ -59,6 +62,12 @@ export const TOWER_SCHEMA = [
     floor INTEGER NOT NULL,
     at INTEGER NOT NULL,
     PRIMARY KEY (user_id, kind)
+  )`,
+  `CREATE TABLE IF NOT EXISTS boss_unlocks (
+    user_id TEXT NOT NULL,
+    boss TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, boss)
   )`,
 ];
 
@@ -147,18 +156,25 @@ export interface TowerRunView {
 }
 
 /**
- * The bosses this account has unlocked (the Stranger: Eric, Nov 27, "Beat him in the tower"), from what's stored: its tower best, solo
- * or party (tower_best: floors won only), through core's unlockedBosses. No row of its own: the best is the record.
+ * The bosses this account has unlocked (the Stranger: Eric, Nov 27, "you have to beat him to unlock him"), as stored (`boss_unlocks`:
+ * a floor of his own won with him on it, solo or party). What a raid's and a party's pick are checked against, and GET /api/tower's.
  */
 export async function towerUnlocks(sql: Sql, userId: string): Promise<string[]> {
-  const row = await sql.first<{ best: number | null }>("SELECT MAX(floor) AS best FROM tower_best WHERE user_id = ?", userId);
-  return unlockedBosses(row?.best ?? 0);
+  return (await sql.all<{ boss: string }>("SELECT boss FROM boss_unlocks WHERE user_id = ? ORDER BY boss", userId)).map((r) => r.boss);
 }
 
-/** GET /api/tower: your open runs and your best floors (0: none won yet). */
+/**
+ * A won floor's unlocks (core floorUnlocks: the floor `floor`, its bosses as dealt `bosses`), for this account: written once, kept (a
+ * retry or a second win of his floor changes nothing).
+ */
+const unlockStmts = (userId: string, floor: number, bosses: readonly string[], now: number): Stmt[] =>
+  floorUnlocks(floor, bosses).map((boss) => stmt("INSERT INTO boss_unlocks (user_id, boss, at) VALUES (?, ?, ?) ON CONFLICT (user_id, boss) DO NOTHING", userId, boss, now));
+
+/** GET /api/tower: your open runs, your best floors (0: none won yet) and the bosses you've unlocked (towerUnlocks). */
 export interface TowerState {
   runs: Record<TowerKind, TowerRunView | null>;
   best: Record<TowerKind, number>;
+  unlocked: string[];
 }
 
 /** An answer: its HTTP status and body. */
@@ -314,9 +330,10 @@ const floorResting = (run: TowerRun, pool: readonly string[]) => sideRefusal(run
 
 /** GET /api/tower: your open runs (between floors, the next floor's bosses as dealt now) and your bests. */
 export async function towerState(sql: Sql, userId: string, pool: readonly string[]): Promise<TowerState> {
-  const [rows, bests] = await Promise.all([
+  const [rows, bests, unlocked] = await Promise.all([
     sql.all<RunRow>(`SELECT ${RUN_COLUMNS} FROM tower_runs WHERE user_id = ? AND status = 'open'`, userId),
     sql.all<{ kind: string; floor: number }>("SELECT kind, floor FROM tower_best WHERE user_id = ?", userId),
+    towerUnlocks(sql, userId),
   ]);
   const names = await namesOf(sql, rows.flatMap((r) => (r.kind === "party" ? (membersOf(r.members)?.uids ?? []) : [])));
   const run = (kind: TowerKind) => {
@@ -324,7 +341,7 @@ export async function towerState(sql: Sql, userId: string, pool: readonly string
     return row ? viewOf(row, pool, names) : null;
   };
   const best = (kind: TowerKind) => bests.find((b) => b.kind === kind)?.floor ?? 0;
-  return { runs: { solo: run("solo"), party: run("party") }, best: { solo: best("solo"), party: best("party") } };
+  return { runs: { solo: run("solo"), party: run("party") }, best: { solo: best("solo"), party: best("party") }, unlocked };
 }
 
 /**
@@ -481,9 +498,18 @@ export async function finishTowerFloor(sql: Sql, userId: string, now: number, bo
     row.fight,
   );
   if (!applied) return resultAgain(sql, userId, body.fight, outcome, opts.pool, kind);
-  if (kind === "solo") await runStmt(sql, soloBest(userId));
-  else if (outcome === "won") await runStmt(sql, aloneBest(userId, floor, now));
+  await bestAfter(sql, userId, kind, outcome, floor, before.floors[floor - 1] ?? [], now);
   return { status: 200, body: { outcome, floor, status: after.status, ...livesNow(after.status, after.lost), ...(await soloNow(sql, userId, opts.pool, kind)) } };
+}
+
+/**
+ * After a result taken alone (and again for its retry): the solo best worked out again (a solo run), or a party copy's floor won alone
+ * as the solo best (aloneBest); and a won floor's unlocks (unlockStmts: `bosses`, that floor's as dealt). One batch.
+ */
+async function bestAfter(sql: Sql, userId: string, kind: TowerKind, outcome: FloorOutcome, floor: number, bosses: readonly string[], now: number): Promise<void> {
+  const won = outcome === "won";
+  const writes = [...(kind === "solo" ? [soloBest(userId)] : won ? [aloneBest(userId, floor, now)] : []), ...(won ? unlockStmts(userId, floor, bosses, now) : [])];
+  if (writes.length) await sql.batch(writes);
 }
 
 /** The lives left after a result and the run's floors lost (Nov 20), for its answer: none left for a run that's out. */
@@ -495,12 +521,17 @@ const livesNow = (status: unknown, lost: readonly number[]) => ({ lives: status 
  * own write was missed; any other is refused (409). Both with the run and best as they are now: a 409 means "read the run again".
  */
 async function resultAgain(sql: Sql, userId: string, id: string, outcome: FloorOutcome, pool: readonly string[], kind: TowerKind = "solo"): Promise<TowerAnswer> {
-  const lasts = await sql.all<{ last: string }>("SELECT last FROM tower_runs WHERE user_id = ? AND kind = ? AND last IS NOT NULL", userId, kind);
+  const lasts = await sql.all<{ last: string; seed: number; met: string; status: RunStatus }>("SELECT last, seed, met, status FROM tower_runs WHERE user_id = ? AND kind = ? AND last IS NOT NULL", userId, kind);
   // (A party's floor's result, which its room wrote, is never a device's to send again: `party` marks it.)
-  const taken = lasts.map((r) => parsed(r.last)).find((l) => l?.id === id && l.outcome === outcome && !l.party);
-  if (!taken) return { status: 409, body: { message: TOWER_LINES.notUnderWay, ...(await soloNow(sql, userId, pool, kind)) } };
-  if (kind === "solo") await runStmt(sql, soloBest(userId));
-  else if (outcome === "won" && typeof taken.floor === "number") await runStmt(sql, aloneBest(userId, taken.floor, Date.now()));
+  const row = lasts.find((r) => {
+    const l = parsed(r.last);
+    return l?.id === id && l.outcome === outcome && !l.party;
+  });
+  const taken = row ? parsed(row.last)! : null;
+  if (!row || !taken) return { status: 409, body: { message: TOWER_LINES.notUnderWay, ...(await soloNow(sql, userId, pool, kind)) } };
+  // (Its best and unlocks written again, in case their own write was missed: the floor's bosses from the run's deal, still on its row.)
+  if (typeof taken.floor === "number") await bestAfter(sql, userId, kind, outcome, taken.floor, runOf(row).floors[taken.floor - 1] ?? [], Date.now());
+  else if (kind === "solo") await runStmt(sql, soloBest(userId));
   return { status: 200, body: { outcome, floor: taken.floor, status: taken.status, ...livesNow(taken.status, floorsOf(taken.lost)), ...(await soloNow(sql, userId, pool, kind)) } };
 }
 
@@ -599,8 +630,8 @@ export async function towerResponse(request: Request, sql: Sql, userId: string, 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 /**
- * A guest's climbs and bests join the account it signs in to, for the sign-in's one batch (accounts.ts). Bests: the higher of each
- * kind's. Two open runs of one kind: the higher floor stays open (the account's on a tie), the other is abandoned; then every run of
+ * A guest's climbs, bests and unlocks join the account it signs in to, for the sign-in's one batch (accounts.ts). Bests: the higher of each
+ * kind's; unlocks: each one either holds. Two open runs of one kind: the higher floor stays open (the account's on a tie), the other is abandoned; then every run of
  * the guest's is the account's (one open each: the unique index holds). A party copy's `members` naming the guest (a party played
  * where signing in isn't asked for: local and tests) name the account instead: the same person, so the run's members can still climb
  * it together (Nov 20; deleting an account takes its id out of them: towerDeletes); a copy naming both names the account once. That
@@ -615,6 +646,9 @@ export const towerMoves = (from: string, to: string, now: number, opts: { party?
     from,
   ),
   stmt("DELETE FROM tower_best WHERE user_id = ?", from),
+  // (The bosses the guest unlocked are the account's too: the earlier unlock kept where both have one.)
+  stmt("INSERT INTO boss_unlocks (user_id, boss, at) SELECT ?, boss, at FROM boss_unlocks WHERE user_id = ? ON CONFLICT (user_id, boss) DO UPDATE SET at = MIN(at, excluded.at)", to, from),
+  stmt("DELETE FROM boss_unlocks WHERE user_id = ?", from),
   stmt(
     `UPDATE tower_runs SET status = 'abandoned', fight = NULL, updated_at = ? WHERE user_id = ? AND status = 'open'
      AND EXISTS (SELECT 1 FROM tower_runs o WHERE o.user_id = ? AND o.kind = tower_runs.kind AND o.status = 'open' AND o.floor >= tower_runs.floor)`,
@@ -656,8 +690,8 @@ function lastResult(text: string | null) {
   return l ? { outcome: l.outcome, floor: l.floor } : null;
 }
 
-/** The account's part of "Download my data": its climbs (each one's floors met, never the seed or the deck still to deal) and bests. */
-export async function towerDownload(sql: Sql, userId: string): Promise<{ runs: unknown[]; best: unknown[] }> {
+/** The account's part of "Download my data": its climbs (each one's floors met, never the seed or the deck still to deal), bests and unlocks. */
+export async function towerDownload(sql: Sql, userId: string): Promise<{ runs: unknown[]; best: unknown[]; unlocked: unknown[] }> {
   const rows = await sql.all<RunRow>(`SELECT ${RUN_COLUMNS} FROM tower_runs WHERE user_id = ? ORDER BY started_at, id`, userId);
   return {
     runs: rows.map((r) => ({
@@ -675,15 +709,16 @@ export async function towerDownload(sql: Sql, userId: string): Promise<{ runs: u
       updated_at: r.updated_at,
     })),
     best: await sql.all("SELECT kind, floor, at FROM tower_best WHERE user_id = ? ORDER BY kind", userId),
+    unlocked: await sql.all("SELECT boss, at FROM boss_unlocks WHERE user_id = ? ORDER BY boss", userId),
   };
 }
 
 /**
- * Deleting the account: its climbs and bests go, and its id goes from the others' party copies (`members`: a run it climbed with them
+ * Deleting the account: its climbs, bests and unlocks go, and its id goes from the others' party copies (`members`: a run it climbed with them
  * no longer names it; Nov 20).
  */
 export const towerDeletes = (userId: string): Stmt[] => [
-  ...["tower_runs", "tower_best"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId)),
+  ...["tower_runs", "tower_best", "boss_unlocks"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId)),
   stmt(
     `UPDATE tower_runs SET members = json_set(members, '$.uids', json((SELECT json_group_array(value) FROM json_each(tower_runs.members, '$.uids') WHERE value <> ?)))
      WHERE kind = 'party' AND instr(members, ?) > 0 AND json_valid(members)`,
@@ -879,7 +914,8 @@ const bestStmt = (userId: string, kind: TowerKind, floor: number, now: number): 
 /**
  * A party floor's result, written to one member's copy by its match room (lobby-do.ts; never a device): only while that copy's floor
  * under way is this one (`fight`, its id), so writing it again (the room's retry) changes nothing. The party's win, loss or draw
- * (finishFloor: a win deals the next floor, the party best rising; a loss or draw spends a life and deals it too, or with none left
+ * (finishFloor: a win deals the next floor, the party best rising and a floor of a boss's own unlocking him (unlockStmts); a loss or
+ * draw spends a life and deals it too, or with none left
  * ends the run: Nov 20), or their leave mid-floor (leaveFloor: free before the party's 2nd move, else a loss: Boss Battle's party
  * rule, and solo's). A win on a crate floor (TOWER_PARTY.crateFloors) pays its crate first
  * (`crate`: once an account, the ledger's key), so a retry after a failure pays it at most once and never loses it.
@@ -911,7 +947,8 @@ export async function partyFloorWrite(sql: Sql, now: number, fightId: string, en
       row.id,
       row.fight,
     ),
-    ...(won ? [bestStmt(end.uid, "party", floor, now)] : []),
+    // (And a won floor's unlocks, for this member: the floor's bosses as the party met them. Nov 27.)
+    ...(won ? [bestStmt(end.uid, "party", floor, now), ...unlockStmts(end.uid, floor, before.floors[floor - 1] ?? [], now)] : []),
   ]);
 }
 

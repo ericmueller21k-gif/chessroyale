@@ -1379,7 +1379,7 @@ export const BATTLE_TOWER = {
    * Floors that are one boss's alone (Eric, Nov 27, the Stranger: "he shows up after 10 rounds of the battle tower ... He'll show up a
    * few times in the battle tower at different strengths"): on each, that boss alone, at a lone boss's strength for the floor
    * (floorStrength with one boss), whatever the pattern says; the deal skips the floor (the decks go on to the next). He's never in a
-   * deck. Winning his first floor here unlocks him in the Boss Battle picker (core tower.ts, unlockedBosses). His floors deal as any
+   * deck. Beating him on one of them unlocks him in the Boss Battle picker (core tower.ts, floorUnlocks). His floors deal as any
    * other while he isn't ready to meet (unlockReady: no art yet) or is resting.
    */
   bossFloors: { 10: "stranger", 30: "stranger", 50: "stranger" } as Readonly<Record<number, string>>,

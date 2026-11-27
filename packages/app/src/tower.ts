@@ -56,10 +56,11 @@ export interface TowerStripInfo {
 /** Which of your runs: your solo run, or your party copy played on alone (Nov 20: solo from then on). */
 export type RunKind = "solo" | "party";
 
-/** GET /api/tower: your open runs and best floors (0: none won yet). */
+/** GET /api/tower: your open runs, best floors (0: none won yet) and the bosses you've unlocked by beating them there (Nov 27). */
 export interface TowerState {
   runs: { solo: TowerRun | null; party: TowerRun | null };
   best: { solo: number; party: number };
+  unlocked?: string[];
 }
 
 /** POST /api/tower/floor/start: the floor begun, or (`under`) the one already under way; `resting`: its bosses rest now (leaving is free). */

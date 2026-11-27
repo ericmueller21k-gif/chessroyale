@@ -148,7 +148,7 @@ export interface BossDef {
   /**
    * Unlocked by winning one of his own Battle Tower floors (BATTLE_TOWER.bossFloors; the Stranger, Eric Nov 27: "Beat him in the
    * tower"): never met at random, never in the tower's deal (his floors are his alone), never in a raid's random pick; on the Boss
-   * Battle picker a locked card until you've won his first floor (`unlockedBosses`), then picked like any other (`canPick`).
+   * Battle picker a locked card until you've beaten him on one (the server's `boss_unlocks`: core floorUnlocks), then picked like any other (`canPick`).
    */
   unlock?: "tower";
 }
@@ -314,14 +314,14 @@ export const BOSS_ROSTER: readonly BossDef[] = [
 export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null && !b.adminOnly && !adminFirst(b) && !b.unlock;
 /**
  * A boss unlocked by a win (`unlock`: the Stranger) that's ready to meet: his powers and his character (`unfinished`: a test's, his
- * powers alone, with placeholders), never hidden. Never at random; on the picker locked until `unlockedBosses` names him.
+ * powers alone, with placeholders), never hidden. Never at random; on the picker locked until the account's unlocks name him.
  */
 export const unlockReady = (b: BossDef | null | undefined, unfinished = false): b is BossDef => !!b && !!b.unlock && b.powers !== null && !b.adminOnly && (b.kit !== null || unfinished);
 /** The bosses unlocked by a win that are ready to meet (unlockReady), in roster order: the picker's cards, locked or not. */
 export const unlockBosses = (roster: readonly BossDef[] = BOSS_ROSTER, unfinished = false): BossDef[] => roster.filter((b) => unlockReady(b, unfinished));
 /**
  * A boss a player may pick for a battle (Boss alone, a raid, a party): a playable one, or one unlocked by a win that's ready and that
- * `unlocked` names (unlockedBosses: the account's Battle Tower best, from the server).
+ * `unlocked` names (the account's unlocks, from the server: a floor of his own won with him on it, floorUnlocks).
  */
 export const canPick = (b: BossDef | null | undefined, unlocked: readonly string[] = [], unfinished = false): boolean => !!b && (isPlayable(b) || (unlockReady(b, unfinished) && unlocked.includes((b as BossDef).id)));
 /**

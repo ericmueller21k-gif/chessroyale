@@ -649,7 +649,7 @@ export class SquadsParty extends DurableObject<Env> {
       // (A boss unlocked by a win, the Stranger: the leader's unlocks, read from the server's tower best.)
       const leader = want.members.find((m) => m.seat === want.leaderSeat)?.userId;
       const unlocked = bossDef(want.boss)?.unlock && leader && this.env.DB ? await towerUnlocks(d1Sql(this.env.DB), leader).catch(() => []) : [];
-      const overrides = bossPartyOverrides(want, unlocked, (this.env as { TEST_SWITCHES?: string }).TEST_SWITCHES === "1");
+      const overrides = bossPartyOverrides(want, unlocked, this.env.TEST_SWITCHES === "1");
       const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, overrides, undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
       if (!this.record) return;
       const core = this.core();
@@ -757,6 +757,14 @@ export class SquadsParty extends DurableObject<Env> {
     return "n" in put ? put : { message: TOWER_PARTY_LINES.openWait(put.retryMs) };
   }
 
+  /**
+   * The tower's pool now: the kill switches applied; where TEST_SWITCHES is on, a boss of his own floors (the Stranger) met before his
+   * art, as the solo routes and the floor room's writes deal (core towerPool's `unfinished`: the review of #1000).
+   */
+  private towerPoolNow(): string[] {
+    return towerPool(pausedBosses(this.env), undefined, this.env.TEST_SWITCHES === "1");
+  }
+
   /** A member's name here, by account (a plan's words). */
   private nameOf(uid: string): string {
     return this.record?.members.find((m) => m.userId === uid)?.name ?? "A member";
@@ -768,7 +776,7 @@ export class SquadsParty extends DurableObject<Env> {
     const sql = d1Sql(this.env.DB);
     const read = await (async () => {
       await ensureSchema(sql, this.env.DB);
-      return preparePartyFloor(sql, people, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
+      return preparePartyFloor(sql, people, Date.now(), { pool: this.towerPoolNow(), lobbyGone: this.lobbyGone });
     })().catch(() => null);
     if (!read) return { kind: "wait", message: TOWER_PARTY_LINES.reading, recheck: true };
     if (read.ok) return planOf(read.prep);
@@ -807,7 +815,7 @@ export class SquadsParty extends DurableObject<Env> {
     const uids = [...want.members].sort((a, b) => a.seat - b.seat).flatMap((m) => (m.userId ? [m.userId] : []));
     const read = await (async () => {
       await ensureSchema(sql, this.env.DB);
-      return preparePartyFloor(sql, uids, Date.now(), { pool: towerPool(pausedBosses(this.env)), lobbyGone: this.lobbyGone });
+      return preparePartyFloor(sql, uids, Date.now(), { pool: this.towerPoolNow(), lobbyGone: this.lobbyGone });
     })().catch(() => null);
     if (!this.record) return;
     if (!read) return fail("Couldn't reach the tower. Try again.");

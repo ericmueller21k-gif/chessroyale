@@ -1,11 +1,12 @@
 import { useEffect, useState } from "preact/hooks";
-import { unlockFloor, unlockedBosses } from "@chessroyale/core";
+import { unlockFloor } from "@chessroyale/core";
 import { towerApi } from "./tower.ts";
 import { testParams } from "./test-switches.ts";
 
 /**
- * The bosses this account has unlocked (the Stranger, Eric Nov 27: "Beat him in the tower"), from the server's Battle Tower best (GET
- * /api/tower, solo or party: floors won only), never stored on this device: the server checks it again for a raid's or a party's pick.
+ * The bosses this account has unlocked (the Stranger, Eric Nov 27: "you have to beat him to unlock him"), as the server keeps them (GET
+ * /api/tower's `unlocked`: a floor of his own won with him on it, solo or party), never stored on this device: the server checks it
+ * again for a raid's or a party's pick.
  * Empty until the server answers (his card shows locked meanwhile: nothing shifts, it only unlocks).
  */
 let known: readonly string[] = [];
@@ -21,7 +22,7 @@ export const unlockTest = (): boolean => testParams().get("wip") === "1";
 export function refreshUnlocks(): void {
   void towerApi.state().then((a) => {
     if (!a.ok) return;
-    const next = unlockedBosses(Math.max(a.body.best.solo ?? 0, a.body.best.party ?? 0));
+    const next = [...(a.body.unlocked ?? [])].sort();
     if (next.join() === known.join()) return;
     known = next;
     subs.forEach((f) => f());
@@ -40,7 +41,7 @@ export function useUnlocks(): readonly string[] {
   return known;
 }
 
-/** A locked card's line: how to unlock him (his first own floor). */
+/** A locked card's line: how to unlock him (his first own floor; beating him on a later one of his unlocks him too). */
 export const unlockLine = (id: string): string => {
   const floor = unlockFloor(id);
   return floor ? `Beat him on Battle Tower floor ${floor}` : "";
