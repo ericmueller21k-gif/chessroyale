@@ -39,3 +39,7 @@ little over the outer squares, see-through there).
 Boss lane: the boss kit, one quick review by a fresh helper after (the director starts it). `.pr-body.md` (at most 40 lines, changed
 checks old → new), a short decision note, `docs/areas/bosses.md`'s storm lines, `.done`. Commits end only with your Claude-Session
 line; no model names. Stills only on the orphan stills branch; never images under docs/.
+
+**Eric, ~17:00:** the crack in his reference is not part of the storm: he merged two screenshots (the opening and the storm); during the
+storm the board has no crack. And "see how it... darkens the side... That's what we are also trying to aim for": the storm dims the
+page and margins around the board (deepest at the edges and corners) so the fire and frost glow against them; the squares stay readable.
