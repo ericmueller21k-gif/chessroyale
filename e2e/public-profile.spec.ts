@@ -903,3 +903,23 @@ test("each rarity's pill is the shop's: dark ink on the tier's color, Common gra
     expect(await pills.evaluateAll((ps) => ps.map((p) => getComputedStyle(p).color))).toEqual(names.map(() => "rgb(20, 22, 27)"));
   }
 });
+
+test("the Gift-Wrap Tube twists like a barber's pole wherever it's drawn: its stripes scroll, one turn a loop, even outside a focus spot (Eric, Nov 27)", { tag: "@phone-only" }, async ({ page }) => {
+  // (The demo wears one: the pawn and its tile. A copy of the pawn's drawing put outside any `.ia-live` spot stands for the places that
+  // don't play the other items' animations, such as the duel's strips.)
+  await openDemo(page);
+  const twists = page.locator(".ia-twist");
+  expect(await twists.count(), "the pawn's tube and its tile's").toBeGreaterThanOrEqual(2);
+  const state = await page.evaluate(() => {
+    const bare = document.createElement("div");
+    bare.append(document.querySelector(".ia-twist")!.closest("svg")!.cloneNode(true));
+    document.body.append(bare);
+    return [...document.querySelectorAll(".ia-twist")].map((g) => {
+      const a = g.getAnimations()[0] as CSSAnimation | undefined;
+      const end = (a?.effect as KeyframeEffect | undefined)?.getKeyframes().at(-1)?.transform;
+      return { live: !!g.closest(".ia-live"), name: a?.animationName, state: a?.playState, end, ms: a?.effect?.getTiming().duration };
+    });
+  });
+  expect(state.some((s) => !s.live), "one outside a focus spot").toBe(true);
+  for (const s of state) expect(s).toMatchObject({ name: "ia-twist", state: "running", end: "translateY(-13.8px)", ms: 1500 });
+});
