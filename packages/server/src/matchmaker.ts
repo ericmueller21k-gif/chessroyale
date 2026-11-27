@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, CROWD_PARTY_MAX, DEFAULT_SETTINGS, MATCHMAKING, firstGetsWhite, type SeatColor } from "@chessroyale/core";
+import { CAPACITY, CROWD_PARTY_MAX, DEFAULT_SETTINGS, MATCHMAKING, firstGetsWhite, pawnColorOf, type SeatColor } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
@@ -7,6 +7,7 @@ import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
 import { FILL_IN_ORDER, PAIR_BY_RATING, QueueCore, duelTicketComplete, type MatchRules, type Ticket } from "./queue.ts";
 import type { DuelPlayerView } from "@chessroyale/chess/duel";
+import type { TableSeat } from "./town-tables.ts";
 
 export { queueName } from "./queue.ts";
 import { liveHub } from "./live-hub.ts";
@@ -390,13 +391,22 @@ export class Matchmaker extends DurableObject<Env> {
     const coin = () => (crypto.getRandomValues(new Uint8Array(1))[0]! & 1) === 1;
     const [w, b] = firstGetsWhite(colorsOf(tickets[0]!), colorsOf(tickets[1]!), coin) ? [tickets[0]!, tickets[1]!] : [tickets[1]!, tickets[0]!];
     const testSeconds = [w, b].map((t) => Number(t.info?.testSeconds)).find((x) => Number.isFinite(x) && x > 0) ?? null;
+    // (A search begun at a town's table, either of them: the game tells the town when it's over, Nov 27.)
+    const town = tickets.some((t) => t.info?.town === true);
     countCall("mm.duel");
-    const code = await openLobbyCode(async (c) => this.env.DUELS.get(this.env.DUELS.idFromName(c)).create(c, { w: view(w), b: view(b) }, { testSeconds }));
+    const code = await openLobbyCode(async (c) => this.env.DUELS.get(this.env.DUELS.idFromName(c)).create(c, { w: view(w), b: view(b) }, { testSeconds, ...(town ? { town } : {}) }));
     if (!code) {
       countCall("mm.createFailed");
       return false;
     }
     this.placeAll(tickets, code);
+    // Ranked at the park's tables (Eric, Nov 27): the town seats the pair at a table, the first's (the one who searched longer) if they
+    // still sit there (live-hub.ts townMatch, town-tables.ts found). Not waited for: the game is theirs already.
+    if (town && this.env.LIVE) {
+      const seat = (t: Ticket): TableSeat => ({ uid: view(t).uid, name: view(t).name, look: view(t).look ?? null, pawn: pawnColorOf(t.info?.pawn as string | undefined) });
+      const [first, second] = [...tickets].sort((x, y) => x.at - y.at);
+      this.ctx.waitUntil(liveHub(this.env).townMatch(code, [seat(first!), seat(second!)]).catch(() => false));
+    }
     return true;
   }
 

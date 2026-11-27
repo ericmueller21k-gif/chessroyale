@@ -4470,6 +4470,19 @@ export const TOWN_AFK = {
 } as const;
 
 /**
+ * Ranked at the park's tables (Eric, Nov 27; docs/areas/town-square.md, "Ranked at the tables"): a 1 v 1 found from a table is shown
+ * at that table while it lasts, its two players seated there, and anyone in the town can watch it (server town-tables.ts).
+ */
+export const TOWN_TABLES = {
+  /** A table's match is let go after this long whatever its game says (a lost "it's over"): longer than any game's clocks. */
+  matchMaxMinutes: 180,
+  /** The most watchers one 1 v 1 takes at once (its spectator view). */
+  watchersMax: 50,
+  /** The highest table number a beat may name (a guard: the park has 20). */
+  tableMax: 63,
+} as const;
+
+/**
  * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): a moderator's chat bans and how
  * long their decisions are kept. Chat is preset lines only; the free text players see is display names, which the
  * server's filter checks (server/src/text-filter.ts).

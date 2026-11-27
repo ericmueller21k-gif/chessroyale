@@ -6,7 +6,9 @@ import { countCall } from "./ops.ts";
 import { GlobalChat, TEST_GLOBAL_CHAT, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
 import { TOWN_CHAT_ROOM, TownChat, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
 import { pruneFriends, recentNews } from "./friends.ts";
-import { TownHere, type HereBeat, type HereLimits, type HereOther } from "./town-here.ts";
+import { TownHere, type HereBeat, type HereLimits } from "./town-here.ts";
+import type { HereView } from "./town-here-api.ts";
+import { TownTables, type TableClaim, type TableSeat } from "./town-tables.ts";
 import { HiddenRooms, fightingText, type RoomBeat, type RoomLimits, type RoomStart, type RoomView } from "./hidden-room.ts";
 import type { RoomAction } from "./hidden-room-api.ts";
 import type { LobbyRecord, PartyLobby } from "./lobby.ts";
@@ -45,6 +47,11 @@ export class LiveHub extends DurableObject<Env> {
   private towns = new Map<string, TownChat>();
   /** Who's in the town square now (town-here.ts): in memory only, from each device's beat; a restart forgets it. */
   private here = new TownHere();
+  /**
+   * The ranked games at the town's park tables (town-tables.ts), kept in this object's storage too ("town-match:CODE"): a game lasts
+   * minutes and nothing beats it back after a restart, as the devices do their pawns.
+   */
+  private tables = new TownTables();
   /** The Hidden Boss's room in each town (hidden-room.ts): its people and its request; in memory only, a restart forgets it. */
   private hidden = new HiddenRooms();
   /** Each room's fight being made now (`hiddenFight` awaits the lobby's Durable Object): the room's next answers wait for it. */
@@ -61,6 +68,7 @@ export class LiveHub extends DurableObject<Env> {
       for (const [, s] of await ctx.storage.list<LobbySummary & { updatedAt: number }>({ prefix: "lobby:" })) {
         this.board.report(s, s.updatedAt);
       }
+      for (const [, c] of await ctx.storage.list<TableClaim>({ prefix: "town-match:" })) this.tables.restore(c);
       if (env.DB) {
         try {
           const sql = d1Sql(env.DB);
@@ -295,18 +303,47 @@ export class LiveHub extends DurableObject<Env> {
    * A device in the town square says where its player is (`beat`), or that it left (null). Answers everyone else in its room's
    * town square (not in a shop), each with their "zzz", after dropping every pawn past its limit (town-here.ts).
    */
-  async townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits, look?: ItemLook | null, pawn?: PawnColor): Promise<HereOther[]> {
+  async townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits, look?: ItemLook | null, pawn?: PawnColor): Promise<HereView> {
     countCall("hub.townHere");
     const now = Date.now();
     if (!beat) {
       this.here.leave(id);
-      return [];
+      return { others: [], tables: [] };
     }
     const fresh = this.here.beat(id, name, room, beat, now, limits, look ?? null, pawn);
     // "Ann has entered the town." (Eric, Nov 12) in the chat room of the same name as this town (the town's own, or a test's).
     const chat = this.townIn(room);
     if (chat.arrive({ id, name }, now, fresh) || chat.holdsEntering) await this.townAlarm();
-    return this.here.view(room, now, id);
+    return this.townView(room, now, id, true);
+  }
+
+  /**
+   * A town's square as a device there sees it: everyone else walking (not those playing at its tables), and the games at its tables
+   * (not one the device plays in). Matches past TOWN_TABLES.matchMaxMinutes are let go first.
+   */
+  private async townView(room: string, now: number, except: string | null, names: boolean): Promise<HereView> {
+    const old = this.tables.sweep(now);
+    if (old.length) await this.ctx.storage.delete(old.map((c) => `town-match:${c}`));
+    const away = this.tables.size ? (uid: string) => this.tables.playing(uid, room) : undefined;
+    return { others: this.here.view(room, now, except, undefined, names, away), tables: this.tables.view(room, except, names) };
+  }
+
+  /**
+   * A pair the ranked queue found, at least one of them searching from a town's table (matchmaker.ts `seatDuel`; `order`: the one who
+   * searched longer first): seated at a table (town-tables.ts `found`) where the town has one of them sitting. Whether it was.
+   */
+  async townMatch(code: string, order: [TableSeat, TableSeat]): Promise<boolean> {
+    countCall("hub.townMatch");
+    const now = Date.now();
+    const c = this.tables.found(code, order, (uid) => this.here.seatOf(uid, now), now);
+    if (c) await this.ctx.storage.put(`town-match:${code}`, c);
+    return !!c;
+  }
+
+  /** A game found from a town's table is over (duel-do.ts `tellTown`): its table is free. */
+  async townMatchOver(code: string): Promise<void> {
+    countCall("hub.townMatchOver");
+    if (this.tables.over(code)) await this.ctx.storage.delete(`town-match:${code}`);
   }
 
   /**
@@ -396,9 +433,9 @@ export class LiveHub extends DurableObject<Env> {
   }
 
   /** A guest watching the town square (no pawn of their own): everyone there, their looks and "zzz"s, no names. */
-  async townWatch(room: string): Promise<HereOther[]> {
+  async townWatch(room: string): Promise<HereView> {
     countCall("hub.townWatch");
-    return this.here.view(room, Date.now(), null, undefined, false);
+    return this.townView(room, Date.now(), null, false);
   }
 
   /** One line still in the town's room (a report reads what was said from here). */

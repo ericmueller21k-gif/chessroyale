@@ -725,11 +725,15 @@
     },
     "the town square (/town)": {
       "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts", "packages/app/src/characters/sidekicks/**", "packages/app/src/characters/ginger-intro.ts", "packages/app/src/characters/dash-intro.ts"],
-      "specs": ["e2e/town.spec.ts", "e2e/town-street.spec.ts", "e2e/town-rows.spec.ts", "e2e/town-fixed.spec.ts", "e2e/town-controls.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/colosseum.spec.ts", "e2e/shop.spec.ts", "e2e/boss-challenge.spec.ts", "e2e/town-afk.spec.ts", "e2e/town-leave.spec.ts"]
+      "specs": ["e2e/town.spec.ts", "e2e/town-street.spec.ts", "e2e/town-rows.spec.ts", "e2e/town-fixed.spec.ts", "e2e/town-controls.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/colosseum.spec.ts", "e2e/shop.spec.ts", "e2e/boss-challenge.spec.ts", "e2e/town-afk.spec.ts", "e2e/town-leave.spec.ts", "e2e/town-ranked.spec.ts"]
     },
     "away in the town (the zzz, out to home after 10 minutes, the server's town presence)": {
       "paths": ["e2e/town-afk.spec.ts", "packages/server/src/town-here.ts", "packages/server/src/town-here-api.ts", "packages/app/src/components/AwayNote.tsx"],
-      "specs": ["e2e/town-afk.spec.ts"]
+      "specs": ["e2e/town-afk.spec.ts", "e2e/town-ranked.spec.ts"]
+    },
+    "ranked at the town's tables (Nov 27: a search from a table, the pair seated there, watching it from the town)": {
+      "paths": ["e2e/town-ranked.spec.ts", "packages/server/src/town-tables.ts"],
+      "specs": ["e2e/town-ranked.spec.ts", "e2e/town-afk.spec.ts", "e2e/ranked-1v1.spec.ts"]
     },
     "Rolling Dough, Don Dough's bakery (Nov 11: the front room, the back room and the door between them, the guards, the chatter, the talk beat)": {
       "paths": ["e2e/zebra-home.spec.ts", "packages/app/src/town/shops/zebra-*.ts", "packages/app/src/town/shops/bakery-kit.ts", "packages/app/src/town/shops/intros/zebra.ts", "packages/app/src/town/houses/zebra.ts", "packages/app/src/characters/zebra-sounds.ts", "packages/app/src/characters/sidekicks/zebrakeeper.ts"],
@@ -951,7 +955,7 @@
         "packages/server/src/duel-do.ts",
         "packages/server/src/duel-room.ts"
       ],
-      "specs": ["e2e/board-tools.spec.ts", "e2e/home-ranked.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/ranked-1v1-browse.spec.ts", "e2e/ranked-tiers.spec.ts", "e2e/town.spec.ts", "e2e/vote-hint.spec.ts", "e2e/search-home.spec.ts"]
+      "specs": ["e2e/board-tools.spec.ts", "e2e/home-ranked.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/ranked-1v1-browse.spec.ts", "e2e/ranked-tiers.spec.ts", "e2e/town.spec.ts", "e2e/vote-hint.spec.ts", "e2e/search-home.spec.ts", "e2e/town-ranked.spec.ts"]
     },
     "errors, reports, kill switches and capacity": {
       "paths": [

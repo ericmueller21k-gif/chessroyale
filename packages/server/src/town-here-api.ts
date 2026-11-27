@@ -1,13 +1,15 @@
-import { pawnColorOf, type ItemLook, type PawnColor } from "@chessroyale/core";
+import { TOWN_TABLES, pawnColorOf, type ItemLook, type PawnColor } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { looksOf } from "./locker.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { signedInReader } from "./town-chat-api.ts";
 import { HERE_LIMITS, type HereBeat, type HereLimits, type HereOther } from "./town-here.ts";
+import type { HereSeat, TableMatch } from "./town-tables.ts";
 
 /**
- * POST /api/town/here {c, r, idleMs, hidden, shop?, leave?} (town-here.ts): a device in the town square says where its player is,
- * or that it left; the answer is everyone else in the town (`others`), each with what they wear. Signed-in players on a device the
+ * POST /api/town/here {c, r, idleMs, hidden, shop?, seat?, leave?} (town-here.ts): a device in the town square says where its player
+ * is (`seat`: sitting at a park table, [table, stool]), or that it left; the answer is everyone else in the town (`others`), each with
+ * what they wear, and the ranked games being played at its tables (`tables`: town-tables.ts). Signed-in players on a device the
  * age gate didn't mark too young only have a pawn there; the name and the look come from the account (read at most once a
  * minute). A guest (Eric, on #542) watches: they see everyone, dressed, with no names, and are in nobody's town themselves; a
  * device marked too young sees nobody.
@@ -16,9 +18,12 @@ import { HERE_LIMITS, type HereBeat, type HereLimits, type HereOther } from "./t
  * one of its own (nobody else's tests walk in it), and `limits` (seconds) shortens the numbers for a test; never for players.
  */
 
+/** What a device in the town is told: everyone else there, and the games at its tables. */
+export type HereView = { others: HereOther[]; tables: TableMatch[] };
+
 type HereHub = {
-  townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits, look?: ItemLook | null, pawn?: PawnColor): Promise<HereOther[]>;
-  townWatch(room: string): Promise<HereOther[]>;
+  townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits, look?: ItemLook | null, pawn?: PawnColor): Promise<HereView>;
+  townWatch(room: string): Promise<HereView>;
 };
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -57,7 +62,15 @@ export function readBeat(b: Record<string, unknown>): HereBeat | null {
   if (c === null || r === null) return null;
   const idle = typeof b.idleMs === "number" && Number.isFinite(b.idleMs) ? Math.min(Math.max(0, b.idleMs), 86_400_000) : 0;
   const shop = typeof b.shop === "string" && /^[a-z0-9-]{1,24}$/.test(b.shop) ? b.shop : null;
-  return { c, r, idleMs: idle, hidden: b.hidden === true, shop, ...(b.floor === true ? { floor: true } : {}) };
+  const seat = readSeat(b.seat);
+  return { c, r, idleMs: idle, hidden: b.hidden === true, shop, ...(b.floor === true ? { floor: true } : {}), ...(seat && !shop ? { seat } : {}) };
+}
+
+/** A beat's seat at a park table ([table, stool]), checked (null: none). */
+export function readSeat(v: unknown): HereSeat | null {
+  if (!Array.isArray(v) || v.length !== 2) return null;
+  const table = int(v[0], 0, TOWN_TABLES.tableMax);
+  return table !== null && (v[1] === 0 || v[1] === 1) ? { table, stool: v[1] } : null;
 }
 
 /** A test's shortened numbers (seconds, each 1 to 3600), where the test switches are on; else the real ones. */
@@ -78,7 +91,7 @@ export async function townHereResponse(
   if (Number(request.headers.get("content-length")) > BODY_MAX) return json({ message: "Too big." }, 413);
   const raw = await request.text().catch(() => "");
   if (raw.length > BODY_MAX) return json({ message: "Too big." }, 413);
-  if (a.tooYoung) return json({ others: [] });
+  if (a.tooYoung) return json({ others: [], tables: [] });
   const id = await signedInReader(sql, a.token, now);
   const body = ((): Record<string, unknown> => {
     try {
@@ -90,14 +103,13 @@ export async function townHereResponse(
   })();
   const room = !a.testSwitches ? "town" : typeof body.room === "string" && /^[\w-]{1,40}$/.test(body.room) ? `test:${body.room}` : `alone:${id ?? "guest"}`;
   // A guest watches (no pawn, no names).
-  if (!id) return json({ others: body.leave === true ? [] : await hub.townWatch(room) });
+  if (!id) return json(body.leave === true ? { others: [], tables: [] } : await hub.townWatch(room));
   if (body.leave === true) {
     await hub.townHere(id, "", room, null);
-    return json({ others: [] });
+    return json({ others: [], tables: [] });
   }
   const beat = readBeat(body);
   if (!beat) return json({ message: "Not a beat." }, 400);
   const me = await profileOf(sql, id, now, a.admin);
-  const others = await hub.townHere(id, me.name, room, beat, a.testSwitches ? readLimits(body.limits) : undefined, me.look, me.pawn);
-  return json({ others });
+  return json(await hub.townHere(id, me.name, room, beat, a.testSwitches ? readLimits(body.limits) : undefined, me.look, me.pawn));
 }

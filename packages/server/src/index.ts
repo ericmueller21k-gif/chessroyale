@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { OPS, RAID_SETTINGS, bossDef, bossIdFromLink, lockedLine, modeSettings, type RankedLeaves } from "@chessroyale/core";
+import { OPS, RAID_SETTINGS, bossDef, bossIdFromLink, lockedLine, modeSettings, pawnColorOf, type RankedLeaves } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -499,7 +499,7 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
 
 /**
  * Ranked 1 v 1 (docs/areas/ranked.md):
- *   POST /api/1v1/play[?ticket=&pool=&clock=] → { code } | { searching, ticket, waitedMs } | { expired } | busy: the
+ *   POST /api/1v1/play[?ticket=&pool=&clock=&town=1] → { code } | { searching, ticket, waitedMs } | { expired } | busy: the
  *     queue. The first ask reads the player from their account (name, look, rank, hidden rating: ranked.ts) and makes
  *     a ticket; the app asks again with it at once (each ask waits up to CAPACITY.queue.holdMs) until it's paired. A
  *     ticket the queue doesn't know (gone while the app slept) is `expired`: the app asks afresh. Signed in where
@@ -513,7 +513,9 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
  *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired already: that game ends for its player as their own Abort
  *     or Resign (ranked's leave rules decide what it costs), unless they never connected to it (pressed the moment it was
  *     found: called off, no dodge). The other player hears it at once.
- *   GET /api/1v1/game/CODE → { open, phase } | 404; /api/1v1/game/CODE/ws: its WebSocket (the two players only).
+ *     `town=1`: a search begun at a town's park table (Nov 27): the pair is seated at a table there once found (live-hub.ts townMatch).
+ *   GET /api/1v1/game/CODE → { open, phase } | 404; /api/1v1/game/CODE/ws: its WebSocket (the two players; `?watch=1`: anyone's,
+ *     watching only, the town's spectator view).
  */
 async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
   if (!url.pathname.startsWith("/api/1v1/")) return null;
@@ -559,7 +561,10 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       // (The device's marker, hashed: two accounts on one device never meet. Fair play's device cookie.)
       const deviceCookie = readCookie(request, DEVICE_COOKIE);
       const device = deviceCookie ? (await sha256(`1v1:${deviceCookie}`)).slice(0, 24) : null;
-      const first = await (await queue(may.pooled)).duelNext(null, { uid: me.id, rating, rd, player, device, colors, ...delay, ...(testSeconds ? { testSeconds } : {}) });
+      // (A search begun at a town's park table, `town=1`: once paired the town seats the pair there, live-hub.ts townMatch. The pawn color
+      // is for the town to draw them by.)
+      const town = url.searchParams.get("town") === "1" ? { town: true } : {};
+      const first = await (await queue(may.pooled)).duelNext(null, { uid: me.id, rating, rd, player, device, colors, pawn: pawnColorOf(me.pawn_color), ...town, ...delay, ...(testSeconds ? { testSeconds } : {}) });
       return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);

@@ -1,4 +1,5 @@
 import { TOWN_AFK, pawnColorOf, type ItemLook, type PawnColor } from "@chessroyale/core";
+import type { HereSeat } from "./town-tables.ts";
 
 /**
  * Who's in the town square now, as pure logic (the live hub keeps one, in memory only: a restart forgets it, and each device's
@@ -28,6 +29,11 @@ export interface HereBeat {
    * until a beat is answered: it can only keep its own "entered" line out of the chat.
    */
   floor?: boolean;
+  /**
+   * Sitting at a park table (Nov 27): which, and on which stool. Others see the pawn seated there; a ranked search begun at that table
+   * is seated at it once found (town-tables.ts `found`). The device's word: it can only place its own pawn.
+   */
+  seat?: HereSeat;
 }
 
 /** The numbers a pawn is dropped by (a test's own, shortened, where the test switches are on). */
@@ -57,6 +63,8 @@ export interface HereOther {
   look?: ItemLook;
   /** Their default pawn color (white unless they chose black; pawn-color.ts). */
   pawn: PawnColor;
+  /** Seated at a park table (on the stool their square is). */
+  sit?: true;
 }
 
 interface Entry {
@@ -72,6 +80,7 @@ interface Entry {
   limits: HereLimits;
   look: ItemLook | null;
   pawn: PawnColor;
+  seat: HereSeat | null;
 }
 
 /** The most rooms' worth of players held (a guard: a test makes a room per run). */
@@ -95,7 +104,7 @@ export class TownHere {
     const hiddenSince = b.hidden ? (was?.hiddenSince ?? now) : null;
     if (!was && this.here.size >= HOLD_MAX) this.sweep(now);
     if (!was && this.here.size >= HOLD_MAX) return false;
-    this.here.set(id, { id, name, room, c: b.c, r: b.r, shop: b.shop, idleSince: now - Math.max(0, b.idleMs), hiddenSince, beatAt: now, limits, look, pawn: pawnColorOf(pawn) });
+    this.here.set(id, { id, name, room, c: b.c, r: b.r, shop: b.shop, idleSince: now - Math.max(0, b.idleMs), hiddenSince, beatAt: now, limits, look, pawn: pawnColorOf(pawn), seat: b.seat ?? null });
     return fresh;
   }
 
@@ -128,16 +137,23 @@ export class TownHere {
     return this.here.has(id);
   }
 
+  /** Where this account sits in the town now (a park table and its stool, and which town), or null: not there, past its limit, or standing. */
+  seatOf(id: string, now: number): (HereSeat & { room: string }) | null {
+    const e = this.here.get(id);
+    return e && e.seat && !e.shop && !TownHere.past(e, now) ? { ...e.seat, room: e.room } : null;
+  }
+
   /**
    * Everyone else in the town square of `room` (not in a shop), after the sweep: at most TOWN_AFK.maxShown. `names` false (a guest
-   * watching: Eric, on #542, "maybe nothing" over their heads): no names, their looks still.
+   * watching: Eric, on #542, "maybe nothing" over their heads): no names, their looks still. `away`: those not shown walking (playing
+   * at a table: town-tables.ts, where they're shown seated instead).
    */
-  view(room: string, now: number, except: string | null, max: number = TOWN_AFK.maxShown, names = true): HereOther[] {
+  view(room: string, now: number, except: string | null, max: number = TOWN_AFK.maxShown, names = true, away?: (id: string) => boolean): HereOther[] {
     this.sweep(now);
     const out: HereOther[] = [];
     for (const e of this.here.values()) {
-      if (e.room !== room || e.id === except || e.shop) continue;
-      out.push({ id: e.id, name: names ? e.name : "", c: e.c, r: e.r, zzz: now - e.idleSince >= e.limits.zzzMs, pawn: e.pawn, ...(e.look ? { look: e.look } : {}) });
+      if (e.room !== room || e.id === except || e.shop || away?.(e.id)) continue;
+      out.push({ id: e.id, name: names ? e.name : "", c: e.c, r: e.r, zzz: now - e.idleSince >= e.limits.zzzMs, pawn: e.pawn, ...(e.look ? { look: e.look } : {}), ...(e.seat ? { sit: true as const } : {}) });
       if (out.length >= max) break;
     }
     return out;
