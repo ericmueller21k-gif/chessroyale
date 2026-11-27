@@ -7,4 +7,5 @@
   temperature 1.6 and top-p 1 on floor 1, easing to BOSS_BRAIN's 0.8 and 0.9 by floor 10). On every Maia floor, a drawn queen or
   rook move that's simply lost (3+ pawns, a chess.js static exchange, no engine) is drawn again (`giftPieces`, `giftLoss`). Rooks
   too: a rook for nothing reads as a gift. The plan carries the draw, so solo and online agree. The climb from 10 is unchanged: the
-  sim doesn't show floors 10 to 30 too easy (reports/tower-sim.md).
+  sim doesn't show floors 10 to 30 too easy (reports/tower-sim.md). The gift check is `maia-raw`'s only (an admin's guarded brain
+  is already guarded). Online, a looser draw gets no throw strike (`drawLooser`, the director's call); the better move still plays.

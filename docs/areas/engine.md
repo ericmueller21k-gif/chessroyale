@@ -151,7 +151,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     rng, Maia's Seed, and `eloDraw` for Stockfish at a strength, its T scaled by `eloDrawScale` to match UCI_LimitStrength,
     `reports/elo-draw.md`); the checker's request skips his powers' extras on turns that have none. Same move: it plays; two differ:
     the better, but Maia's against a fallback within `maiaGap` (0.25; `bossMove.by` heard on Maia moves only, the server draws the
-    bridge share: `bossRequest.share`); a throw (`throwLoss` 0.8) or a junk move: a strike; a missed window: replaced, `missStrikes`
+    bridge share: `bossRequest.share`); a throw (`throwLoss` 0.8; none on a battle drawn looser, `drawLooser`: a tower floor's first) or a junk move: a strike; a missed window: replaced, `missStrikes`
     a strike, one more asked once; a new host: its whole window; none: unvouched; no verdict: the host's, unvouched. His powers' extras
     are always the host's: when another device's move plays, the host is asked for that move's (`allowed: [move]`), and the other's
     only if it can't answer in time. `boss-check.test.ts`, `delta2-review-fable-b3.test.ts`.
