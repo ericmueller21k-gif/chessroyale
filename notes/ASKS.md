@@ -33,3 +33,5 @@
 - Nov 27 03:30 Stranger: lines theme (stranger far from home, hunting the strongest, senses the hidden one; chess the same everywhere) [#992]; unlock = beat him [#1000 fix]; banners guard OK [#1000]; swords: draw every few moves, slash variants on capture, block/hit when a non-pawn is taken; his strikes play Eric's recorded shouts at random [swords round]; ult: capture shown as a leap-down strike (flame/ice/cut/combo, ~5 s) [ult PR].
 
 - Nov 27 05:50 Stranger ult: Storm of Two Worlds (fire/ice ring; up to 2/game, ~70% see 2; 3 turns, random first; ice: all but 2 frozen, best move free; fire: 3-4 marks, <=1 on a non-pawn; engine fairness: best play loses nothing, decent loses <= ~1 pawn) [ult PR]
+
+- Nov 27 09:10 crates: staff barber-pole twist; Welcome Crate on first visit, open at level 5 (view before); opening: still strip -> rubber-band pull-back -> spin [crates-nov27]
