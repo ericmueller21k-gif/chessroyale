@@ -4769,6 +4769,29 @@ export const RIDES = {
 };
 
 /**
+ * Animated items playing in Chess Town (Eric, Nov 27: "it needs to be playing in the town. That's how people like to show off ... just
+ * drawn at the start as a few frames ... that loop"; docs/decisions/2026-11-27-town-item-frames.md). A figure wearing an item listed here
+ * has its picture painted `n` times once, as it's dressed (town/you-look.ts), the item's own CSS animations (styles.css, the `ia-` classes
+ * in `play`) stopped at `n` evenly spaced moments of the stretch `fromMs` to `toMs` of its `loopMs` loop; the town picks the frame by one
+ * shared clock each draw (nothing painted or uploaded per frame). Outside the stretch, its still picture (the item at rest). The rest of
+ * its animations rest. One item a figure plays: the first worn in this table's order. Not with reduced motion.
+ * - Gift-Wrap Tube: the twist (one turn, 13.8 units of its stripes, every 1.5 s; its confetti rests).
+ * - Candy Cane: the strand's climb, its motes and the sparkle at the tip (all over by 2.6 s of its 6.5 s; then it rests).
+ * Next, a line each: the crown's flames, the parrot's flap, the tommy gun's notch and puff, the tube's confetti.
+ *
+ * `othersLooks`: how many different looks (the same items and colors share one set of frames) of the players and bots in the town play at
+ * once; one more than that stands still, so the atlas's spare pages hold them (a look's frames: n + 1 pictures of 208 x 208 px, about 81 an
+ * atlas page). Yours always plays.
+ */
+export const TOWN_ITEM_FRAMES = {
+  items: {
+    "gift-tube": { play: ["ia-twist"], loopMs: 1500, fromMs: 0, toMs: 1500, n: 8 },
+    "candy-cane": { play: ["ia-strand", "ia-mote", "ia-pop"], loopMs: 6500, fromMs: 0, toMs: 2600, n: 12 },
+  } as Readonly<Record<string, { readonly play: readonly string[]; readonly loopMs: number; readonly fromMs: number; readonly toMs: number; readonly n: number }>>,
+  othersLooks: 6,
+};
+
+/**
  * A ride's moving sound (Eric, Nov 14: "when you move around ... it sounds like ... a little bulldozer moving ... one continuous sound";
  * "when you stop moving, it doesn't just like instantly stop ... it kind of fades over like a second or whatever ... I guess we'll have
  * to test it"; docs/decisions/2026-11-14-ride-sounds.md). Your own pawn's ride only, only while it moves, and only a ride listed in

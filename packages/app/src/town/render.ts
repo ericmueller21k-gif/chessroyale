@@ -291,6 +291,19 @@ export interface YouArt {
   pad: number;
   /** The top of what's drawn (a hat over the head), down its box: your name tag sits on it. */
   top: number;
+  /**
+   * (Nov 27) An item that plays in the town: its loop's frames, painted once as it was dressed (you-look.ts), each the size of `img`; they
+   * cover `fromMs` to `toMs` of every `loopMs`, the still `img` the rest (TOWN_ITEM_FRAMES).
+   */
+  loop?: { frames: HTMLCanvasElement[]; loopMs: number; fromMs: number; toMs: number };
+}
+/** The picture of a dressed pawn to draw at `now` (one clock for everyone): its loop's frame then, or its still. Nothing made. */
+export function artAt(a: YouArt, now: number): HTMLCanvasElement {
+  const l = a.loop;
+  if (!l) return a.img;
+  const u = ((now % l.loopMs) + l.loopMs) % l.loopMs;
+  if (u < l.fromMs || u >= l.toMs) return a.img;
+  return l.frames[Math.min(l.frames.length - 1, Math.floor(((u - l.fromMs) / (l.toMs - l.fromMs)) * l.frames.length))]!;
 }
 const pawnCache = new Map<string, HTMLCanvasElement>();
 export function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanvasElement {
@@ -785,6 +798,8 @@ export class Renderer {
   private readonly q4 = new Float64Array(8);
   /** Your dressed pawn (null: the plain pawn): set by Town.tsx when your look changes. */
   youArt: YouArt | null = null;
+  /** (Tests) Your pawn's picture as the last frame drew it (your item's loop frame, or its still). */
+  youDrawn: HTMLCanvasElement | null = null;
   /** Each bot's dressed pawn (its crate items, drawn once when the page opens: Town.tsx), by person id; none: plain. */
   readonly botArt = new Map<string, YouArt>();
   /**
@@ -1678,7 +1693,7 @@ export class Renderer {
           this.youRide.anim = "";
           if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, wview, f.youSquares, now, this.youRide);
           else {
-            this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
+            this.drawSprite(it, (this.youDrawn = art ? artAt(art, now) : null) ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
             this.soonBox(it, this.soonOf(person), wview, f.youSquares);
           }
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, TAG_SIZES[0], TAG_SIZES[1]), this.fade, it.i);
@@ -1704,7 +1719,7 @@ export class Renderer {
             const rider = this.riders.get(person.id);
             if (rider && !table) this.drawRider(it, rider, pose, facing, wview, f.botSquares, now + it.i * 577);
             else {
-              this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
+              this.drawSprite(it, art ? artAt(art, now) : pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
               this.soonBox(it, this.soonOf(person), wview, f.botSquares);
             }
           }
